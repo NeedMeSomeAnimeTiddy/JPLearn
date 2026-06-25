@@ -12,6 +12,8 @@ applyTo: "domain/**/*.py"
 - Must be deterministic
 - No hidden state or randomness
 
+---
+
 # SRS Contract
 
 Deterministic function:
@@ -20,6 +22,8 @@ Deterministic function:
 → (next_interval, new_ease_factor)
 
 - No time dependency (inject if needed)
+
+---
 
 # Learning Model (conceptual only)
 
