@@ -1,11 +1,11 @@
 ---
-description: Domain layer rules (pure learning logic)
+description: Domain layer rules
 applyTo: "domain/**/*.py"
 ---
 
 # Domain Rules
 
-- Pure business logic only (SRS, active recall, parsing)
+- Pure logic only (SRS, active recall, parsing)
 - No database access
 - No UI code
 - No file I/O
@@ -16,21 +16,18 @@ applyTo: "domain/**/*.py"
 
 # SRS Contract
 
-Deterministic function:
-
 (last_interval, ease_factor, performance)
 → (next_interval, new_ease_factor)
 
-- No time dependency (inject if needed)
+- No time dependency (inject externally if needed)
 
 ---
 
-# Learning Model (conceptual only)
+# Intent Anchor
 
-Stages:
-- SRS scheduling
-- Active recall
-- Presentation formatting
-- Ingestion (mining)
+This layer is ONLY for:
+- deterministic learning logic
+- SRS calculations
+- domain models
 
-These are conceptual boundaries only and must not become a pipeline implementation.
+Not for storage or UI behavior.
