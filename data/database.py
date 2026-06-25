@@ -17,6 +17,7 @@ def _connect() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    """Create required tables when they do not already exist."""
     with _connect() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS review_states (
@@ -29,9 +30,22 @@ def init_db() -> None:
                 PRIMARY KEY (deck, card_id)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS review_events (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                deck        TEXT    NOT NULL,
+                card_id     INTEGER NOT NULL,
+                quality     INTEGER NOT NULL,
+                reviewed_on TEXT    NOT NULL
+            )
+        """)
 
 
 def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
+    """Load persisted states for a deck; missing cards get default ReviewState."""
+    if not card_ids:
+        return {}
+
     with _connect() as conn:
         placeholders = ",".join("?" * len(card_ids))
         rows = conn.execute(
@@ -57,6 +71,7 @@ def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
 
 
 def save_state(deck_name: str, state: ReviewState) -> None:
+    """Insert or update one review state row."""
     with _connect() as conn:
         conn.execute(
             """
@@ -77,3 +92,42 @@ def save_state(deck_name: str, state: ReviewState) -> None:
                 state.next_review.isoformat(),
             ),
         )
+
+
+def log_review(deck_name: str, card_id: int, quality: int, reviewed_on: date | None = None) -> None:
+    """Record one review outcome for daily progress reporting."""
+    review_day = reviewed_on or date.today()
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO review_events (deck, card_id, quality, reviewed_on)
+            VALUES (?, ?, ?, ?)
+            """,
+            (deck_name, card_id, quality, review_day.isoformat()),
+        )
+
+
+def load_today_progress(
+    deck_name: str, card_ids: list[int], on_date: date | None = None
+) -> tuple[int, int]:
+    """Return (due_today, completed_today) for the selected deck cards."""
+    if not card_ids:
+        return (0, 0)
+
+    target_day = on_date or date.today()
+    states = load_states(deck_name, card_ids)
+    due_remaining = sum(1 for state in states.values() if state.next_review <= target_day)
+
+    placeholders = ",".join("?" * len(card_ids))
+    with _connect() as conn:
+        completed_today = conn.execute(
+            f"""
+            SELECT COUNT(DISTINCT card_id)
+            FROM review_events
+            WHERE deck=? AND reviewed_on=? AND card_id IN ({placeholders})
+            """,
+            [deck_name, target_day.isoformat(), *card_ids],
+        ).fetchone()[0]
+
+    due_today = due_remaining + completed_today
+    return due_today, completed_today

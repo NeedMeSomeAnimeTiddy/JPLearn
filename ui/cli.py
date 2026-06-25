@@ -64,6 +64,7 @@ def run_flashcard_session(deck: Deck) -> None:
             correct += 1
         updated_state = update(states[card.id], quality)
         database.save_state(deck.name, updated_state)
+        database.log_review(deck.name, card.id, quality)
 
     accuracy = round(correct / len(due_cards) * 100)
     console.rule()

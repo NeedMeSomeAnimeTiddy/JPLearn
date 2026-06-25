@@ -14,11 +14,12 @@ def show_deck_progress(deck: Deck) -> None:
     database.init_db()
     card_ids = [c.id for c in deck.cards]
     states = database.load_states(deck.name, card_ids)
+    due_today, completed_today = database.load_today_progress(deck.name, card_ids)
 
     mastered = sum(1 for s in states.values() if s.repetitions >= 3 and s.interval >= 21)
     learning = sum(1 for s in states.values() if 0 < s.repetitions < 3)
     new = sum(1 for s in states.values() if s.repetitions == 0)
-    due_today = sum(1 for s in states.values() if s.is_due())
+    due_now = sum(1 for s in states.values() if s.is_due())
 
     table = Table(title=f"{deck.name} Progress", show_header=True, header_style="bold cyan")
     table.add_column("Stat", style="bold")
@@ -28,6 +29,9 @@ def show_deck_progress(deck: Deck) -> None:
     table.add_row("[green]Mastered[/green]", str(mastered))
     table.add_row("[yellow]Learning[/yellow]", str(learning))
     table.add_row("[dim]New[/dim]", str(new))
+    table.add_row("[red]Due now[/red]", str(due_now))
     table.add_row("[red]Due today[/red]", str(due_today))
+    table.add_row("[green]Completed today[/green]", str(completed_today))
+    table.add_row("[cyan]Today progress[/cyan]", f"{completed_today}/{due_today}")
 
     console.print(table)

@@ -211,6 +211,7 @@ class FlashcardFrame(AppFrame):
             self._correct += 1
         state = update(self._states[self._current.id], quality)
         database.save_state(deck.name, state)
+        database.log_review(deck.name, self._current.id, quality)
         self._next_card()
 
     def show(self):
@@ -289,6 +290,7 @@ class StatsFrame(AppFrame):
             deck = loader()
             card_ids = [c.id for c in deck.cards]
             states = database.load_states(deck.name, card_ids)
+            due_today, completed_today = database.load_today_progress(deck.name, card_ids)
 
             mastered = sum(1 for s in states.values() if s.repetitions >= 3 and s.interval >= 21)
             learning = sum(1 for s in states.values() if 0 < s.repetitions < 3)
@@ -316,7 +318,10 @@ class StatsFrame(AppFrame):
                 ("Mastered", str(mastered), BTN_GOOD),
                 ("Learning", str(learning), BTN_HARD),
                 ("New",      str(new),      FG_DIM),
-                ("Due today",str(due),      BTN_AGAIN),
+                ("Due now", str(due), BTN_AGAIN),
+                ("Due today", str(due_today), BTN_AGAIN),
+                ("Completed today", str(completed_today), BTN_GOOD),
+                ("Today progress", f"{completed_today}/{due_today}", FG),
             ]
             for r, (label, val, colour_fg) in enumerate(rows, start=2):
                 tk.Label(panel, text=label, font=_jp_font(11),

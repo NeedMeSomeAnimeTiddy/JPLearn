@@ -3,47 +3,71 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 
 ---
 
+## Contributing / Dev Workflow
+
+1. Install dependencies:
+   `python -m pip install -r requirements.txt`
+2. Run the CLI app:
+   `python main.py`
+3. Run the GUI app:
+   `python gui.py`
+4. Run the full development checks:
+   `python scripts\dev.py`
+5. Run targeted tests while working:
+   `python -m pytest tests\path\to\test_file.py -q`
+
+`scripts\dev.py` is the main gate and runs type checks, architecture checks, DB checks, SRS checks, then tests.
+
+---
+
 ## Project TODO
 
-### Project Structure
-- [x] Set up Python project with `src/` layout and `requirements.txt`
-- [x] Create `data/` directory for card/deck JSON or SQLite database
-- [x] Create `main.py` entry point with a simple CLI menu
-- [x] Organise modules: `cards.py`, `decks.py`, `scheduler.py`, `quiz.py`, `stats.py`
+### Architecture & Code Health
+- [x] Keep strict layer boundaries: `domain/`, `data/`, `ui/`
+- [ ] Remove or migrate remaining legacy code in `src/`
+- [ ] Improve type coverage for public APIs (`mypy --explicit-package-bases`)
+- [ ] Add/update docstrings in domain and data public interfaces
+- [x] Add a lightweight "contributing/dev workflow" section to this README
 
-### Core Data & Content
-- [x] Build Hiragana deck (46 base characters + dakuten/combos)
-- [x] Build Katakana deck (46 base characters + dakuten/combos)
-- [ ] Build Kanji deck (JLPT N5–N1 levels, with readings and meanings)
-- [x] Store cards with fields: `character`, `romaji`, `meaning`, `example_word`, `audio` (optional)
-- [x] Support card tags (e.g. `hiragana`, `katakana`, `kanji`, `jlpt-n5`)
+### Learning Content
+- [x] Ship Hiragana deck
+- [x] Ship Katakana deck
+- [ ] Add first Kanji deck (start with JLPT N5)
+- [ ] Add vocabulary decks grouped by topic and JLPT level
+- [ ] Add basic grammar pattern cards (particles, verb forms, sentence templates)
 
-### Spaced Repetition (Anki-inspired)
-- [x] Implement SM-2 algorithm for spaced repetition scheduling
-- [x] Track per-card stats: `ease_factor`, `interval`, `repetitions`, `next_review`
-- [x] Persist review state to SQLite database
-- [x] Support "Again", "Hard", "Good", "Easy" answer buttons (like Anki)
+### SRS & Study Logic
+- [x] Persist and apply SRS scheduling in SQLite-backed flow
+- [ ] Add configurable target retention / review load settings
+- [ ] Add "leech" handling for repeatedly failed items
+- [ ] Add smarter distractor generation for future multiple-choice sessions
+- [ ] Add per-item study history view (last reviews + outcome trend)
 
-### Quiz & Learning Modes
-- [x] Flashcard mode: show character, reveal answer on keypress
-- [ ] Multiple-choice mode: pick the correct romaji/meaning from 4 options
-- [ ] Writing prompt mode: user types the romaji/reading of a shown character
-- [ ] Stroke order display (show PNG/SVG stroke diagrams where available)
-- [x] Daily review queue: show only cards due today
+### User Experience (CLI + GUI)
+- [x] Maintain working CLI flow (`main.py`)
+- [x] Maintain working Tkinter app flow (`gui.py`)
+- [ ] Add multiple-choice mode
+- [ ] Add typed-answer mode with tolerant input checking
+- [ ] Improve session summary screen (time spent, accuracy, weakest items)
+- [ ] Add optional stroke-order display where assets are available
 
-### Progress & Stats
-- [ ] Track total cards learned, review accuracy, and daily streaks
-- [x] Show per-deck progress (e.g. "32/46 Hiragana mastered")
-- [ ] Heatmap or summary of review history
+### Progress & Insights
+- [x] Show per-deck mastery progress
+- [ ] Add daily streak tracking
+- [ ] Add weekly/monthly activity summary
+- [x] Add "due today vs completed today" progress indicator
+- [ ] Add mistake breakdown by script/tag (hiragana/katakana/kanji/vocab)
 
-### UI
-- [x] Start with a terminal (CLI) interface using `rich` for formatting
-- [x] Add a simple GUI later using `tkinter` or `PyQt6`
-- [ ] Optional: web frontend using Flask/FastAPI + basic HTML
+### Data & Reliability
+- [x] Keep `data/app.db` and `data/jplearn.db` responsibilities separate
+- [ ] Add backup/restore command for local DB files
+- [ ] Add migration/version marker for DB schema changes
+- [ ] Add import/export for decks and user progress
+- [ ] Strengthen normalization checks for Japanese text at data boundaries
 
 ### Stretch Goals
-- [ ] Vocabulary decks with example sentences
-- [ ] Grammar tip cards
-- [ ] Audio pronunciation using `gTTS` or pre-recorded clips
-- [ ] Export/import decks in Anki `.apkg` format
-- [ ] Leaderboard or gamification (XP, levels)
+- [ ] Audio pronunciation playback (pre-recorded or TTS)
+- [ ] Sentence mining/import workflow
+- [ ] Theme/customization options in GUI
+- [ ] Optional cloud sync
+- [ ] Optional web frontend
