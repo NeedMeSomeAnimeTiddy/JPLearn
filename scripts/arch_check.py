@@ -11,11 +11,10 @@ RULES = {
 
 
 def get_layer(path: Path) -> str | None:
-    parts = path.parts
-    for layer in RULES:
-        if layer in parts:
-            return layer
-    return None
+    try:
+        return path.relative_to(Path(".")).parts[0]
+    except Exception:
+        return None
 
 
 def extract_imports(file_path: Path) -> set[str]:
