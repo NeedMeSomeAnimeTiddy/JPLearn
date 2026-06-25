@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
     node: process.versions.node,
   },
   getStudySummary: () => ipcRenderer.invoke('study:get-summary'),
+  getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),
 })

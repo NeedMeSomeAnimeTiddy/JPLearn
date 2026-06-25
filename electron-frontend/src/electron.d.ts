@@ -17,9 +17,23 @@ interface StudySummary {
   decks: DeckSummary[]
 }
 
+interface GameCard {
+  id: number
+  character: string
+  romaji: string
+  meaning: string
+}
+
+interface ScriptDeckPayload {
+  slug: 'hiragana' | 'katakana' | 'kanji_n5'
+  name: string
+  cards: GameCard[]
+}
+
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
+  getDeckCards: (slug: 'hiragana' | 'katakana' | 'kanji_n5') => Promise<ScriptDeckPayload>
 }
 
 declare global {

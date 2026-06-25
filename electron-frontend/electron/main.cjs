@@ -54,12 +54,72 @@ function runPythonBridge(command) {
   })
 }
 
+function runPythonBridgeWithArgs(args) {
+  const pythonCmd = process.env.JPLEARN_PYTHON || 'python'
+  const bridgeScript = path.join(repoRoot, 'scripts', 'desktop_bridge.py')
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonCmd, [bridgeScript, ...args], {
+      cwd: repoRoot,
+      windowsHide: true,
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+
+    child.on('error', (error) => {
+      reject(error)
+    })
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(
+          new Error(
+            [
+              `Bridge exited with code ${code}`,
+              `Python command: ${pythonCmd}`,
+              `Bridge script: ${bridgeScript}`,
+              `Bridge args: ${args.join(' ')}`,
+              `stderr: ${stderr.trim() || '(empty)'}`,
+              `stdout: ${stdout.trim() || '(empty)'}`,
+            ].join('\n'),
+          ),
+        )
+        return
+      }
+
+      try {
+        resolve(JSON.parse(stdout))
+      } catch (error) {
+        reject(new Error(`Invalid bridge JSON: ${String(error)}`))
+      }
+    })
+  })
+}
+
 ipcMain.handle('study:get-summary', async () => {
   try {
     return await runPythonBridge('summary')
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(`Failed to fetch study summary: ${detail}`)
+  }
+})
+
+ipcMain.handle('study:get-deck-cards', async (_event, slug) => {
+  try {
+    return await runPythonBridgeWithArgs(['deck-cards', slug])
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to fetch deck cards: ${detail}`)
   }
 })
 
@@ -70,7 +130,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 640,
     autoHideMenuBar: true,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#1e1f22',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

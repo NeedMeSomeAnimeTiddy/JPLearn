@@ -1,86 +1,45 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg-main: #f4f3ee;
-  --bg-subtle: #eceae3;
-  --text-main: #172026;
-  --text-soft: #4e5d65;
-  --accent: #0f8c85;
+  --bg-main: #191b1f;
+  --bg-subtle: #13151a;
+  --text-main: #f1f2f5;
+  --text-soft: #b5bcc8;
+  --accent: #8ea1ff;
 
-  --blob-left: rgba(15, 140, 133, 0.42);
-  --blob-right: rgba(230, 137, 91, 0.34);
+  --blob-left: rgba(95, 112, 246, 0.28);
+  --blob-right: rgba(55, 173, 152, 0.18);
 
-  --panel-bg: rgba(255, 255, 255, 0.8);
-  --panel-bg-alt: rgba(249, 248, 244, 0.7);
-  --panel-border: rgba(34, 46, 56, 0.12);
-  --panel-shadow: 0 26px 40px -30px rgba(23, 32, 38, 0.55);
+  --panel-bg: rgba(35, 38, 45, 0.88);
+  --panel-bg-alt: rgba(28, 31, 38, 0.84);
+  --panel-border: rgba(143, 154, 186, 0.21);
+  --panel-shadow: 0 30px 44px -30px rgba(0, 0, 0, 0.95);
 
-  --tile-bg: rgba(255, 255, 255, 0.75);
-  --tile-border: rgba(34, 46, 56, 0.12);
-  --tile-shadow: 0 14px 25px -22px rgba(22, 30, 37, 0.7);
+  --tile-bg: rgba(45, 49, 58, 0.84);
+  --tile-border: rgba(131, 141, 168, 0.2);
+  --tile-shadow: 0 18px 28px -22px rgba(0, 0, 0, 0.95);
 
-  --chip-bg: rgba(255, 255, 255, 0.55);
-  --chip-border: rgba(34, 46, 56, 0.12);
+  --chip-bg: rgba(58, 62, 73, 0.73);
+  --chip-border: rgba(131, 141, 168, 0.25);
 
-  --button-border: rgba(34, 46, 56, 0.2);
-  --button-bg-top: rgba(255, 255, 255, 0.94);
-  --button-bg-bottom: rgba(238, 238, 232, 0.9);
+  --button-border: rgba(131, 141, 168, 0.32);
+  --button-bg-top: rgba(79, 86, 102, 0.9);
+  --button-bg-bottom: rgba(56, 61, 74, 0.9);
 
-  --card-border: rgba(31, 43, 52, 0.11);
-  --card-bg-top: rgba(255, 255, 255, 0.83);
-  --card-bg-bottom: rgba(244, 242, 235, 0.78);
+  --card-border: rgba(131, 141, 168, 0.2);
+  --card-bg-top: rgba(49, 53, 63, 0.87);
+  --card-bg-bottom: rgba(37, 41, 50, 0.84);
 
-  --track-bg: rgba(22, 32, 39, 0.14);
-  --status-error: #a23434;
+  --track-bg: rgba(201, 209, 224, 0.16);
+  --status-error: #ff8f95;
 
-  --tone-teal: #1b9f97;
-  --tone-ocean: #2878b9;
-  --tone-amber: #de9a2f;
-  --tone-rose: #da6d55;
+  --tone-teal: #2dcab4;
+  --tone-ocean: #7aa8ff;
+  --tone-amber: #f0b357;
+  --tone-rose: #ef7f70;
 
   --sans: 'Space Grotesk', 'Trebuchet MS', 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-main: #11161a;
-    --bg-subtle: #151c20;
-    --text-main: #eef2ef;
-    --text-soft: #b6c3c5;
-    --accent: #5de4d9;
-
-    --blob-left: rgba(52, 155, 146, 0.32);
-    --blob-right: rgba(194, 115, 71, 0.3);
-
-    --panel-bg: rgba(18, 26, 31, 0.77);
-    --panel-bg-alt: rgba(14, 22, 27, 0.72);
-    --panel-border: rgba(177, 197, 206, 0.18);
-    --panel-shadow: 0 26px 42px -30px rgba(0, 0, 0, 0.82);
-
-    --tile-bg: rgba(19, 28, 33, 0.76);
-    --tile-border: rgba(177, 197, 206, 0.2);
-    --tile-shadow: 0 18px 28px -25px rgba(0, 0, 0, 0.9);
-
-    --chip-bg: rgba(25, 36, 42, 0.65);
-    --chip-border: rgba(177, 197, 206, 0.2);
-
-    --button-border: rgba(177, 197, 206, 0.24);
-    --button-bg-top: rgba(33, 44, 51, 0.9);
-    --button-bg-bottom: rgba(23, 32, 39, 0.9);
-
-    --card-border: rgba(177, 197, 206, 0.18);
-    --card-bg-top: rgba(20, 30, 36, 0.86);
-    --card-bg-bottom: rgba(15, 24, 29, 0.83);
-
-    --track-bg: rgba(214, 227, 231, 0.14);
-    --status-error: #f18181;
-
-    --tone-teal: #3bd4c8;
-    --tone-ocean: #52a7f0;
-    --tone-amber: #f0be58;
-    --tone-rose: #ff8f73;
-  }
 }
 
 * {
@@ -98,8 +57,8 @@ body {
   font-family: var(--sans);
   color: var(--text-main);
   background:
-    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.4) 0%, transparent 42%),
-    radial-gradient(circle at 78% 38%, rgba(255, 255, 255, 0.26) 0%, transparent 40%),
+    radial-gradient(circle at 14% 14%, rgba(142, 161, 255, 0.16) 0%, transparent 46%),
+    radial-gradient(circle at 78% 40%, rgba(45, 202, 180, 0.1) 0%, transparent 44%),
     linear-gradient(180deg, var(--bg-main), var(--bg-subtle));
   font-size: 16px;
   line-height: 1.45;

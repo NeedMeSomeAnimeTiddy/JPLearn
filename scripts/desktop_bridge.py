@@ -11,6 +11,11 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -27,6 +32,14 @@ class DeckSummary:
     mastered: int
     due_today: int
     completed_today: int
+
+
+@dataclass(frozen=True)
+class GameCard:
+    id: int
+    character: str
+    romaji: str
+    meaning: str
 
 
 def _mastered_count(states: dict[int, object]) -> int:
@@ -63,6 +76,29 @@ def build_summary() -> dict[str, object]:
     }
 
 
+def build_deck_cards(slug: str) -> dict[str, object]:
+    init_study_db()
+    factory = ALL_DECKS.get(slug)
+    if factory is None:
+        raise ValueError(f"Unknown deck slug: {slug}")
+
+    deck = factory()
+    cards = [
+        GameCard(
+            id=card.id,
+            character=card.character,
+            romaji=card.romaji,
+            meaning=card.meaning,
+        )
+        for card in deck.cards
+    ]
+    return {
+        "slug": slug,
+        "name": deck.name,
+        "cards": [asdict(card) for card in cards],
+    }
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Missing command"}))
@@ -72,6 +108,19 @@ def main() -> int:
 
     if command == "summary":
         print(json.dumps(build_summary(), ensure_ascii=False))
+        return 0
+
+    if command == "deck-cards":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "Missing deck slug"}))
+            return 2
+        slug = sys.argv[2]
+        try:
+            payload = build_deck_cards(slug)
+        except ValueError as exc:
+            print(json.dumps({"error": str(exc)}))
+            return 2
+        print(json.dumps(payload, ensure_ascii=False))
         return 0
 
     print(json.dumps({"error": f"Unknown command: {command}"}))
