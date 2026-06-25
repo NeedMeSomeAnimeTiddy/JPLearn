@@ -15,6 +15,49 @@ interface DeckSummary {
 
 interface StudySummary {
   decks: DeckSummary[]
+  streak: {
+    current_days: number
+    best_days: number
+  }
+  activity: {
+    week: {
+      days: number
+      reviewed: number
+      correct: number
+      incorrect: number
+      accuracy: number
+      points_earned: number
+      active_days: number
+    }
+    month: {
+      days: number
+      reviewed: number
+      correct: number
+      incorrect: number
+      accuracy: number
+      points_earned: number
+      active_days: number
+    }
+  }
+  mistakes: Array<{
+    key: string
+    attempts: number
+    mistakes: number
+    error_rate: number
+  }>
+  item_history: Array<{
+    key: string
+    script_tag: string
+    deck: string
+    card_id: number
+    prompt: string
+    trend: 'improving' | 'stable' | 'declining'
+    events: Array<{
+      reviewed_at_utc: string
+      outcome: 'correct' | 'incorrect'
+      points_delta: number
+    }>
+  }>
 }
 
 interface GameCard {
@@ -22,6 +65,10 @@ interface GameCard {
   character: string
   romaji: string
   meaning: string
+  tags: string[]
+  is_leech: boolean
+  meaning_distractor_ids: number[]
+  character_distractor_ids: number[]
 }
 
 interface ScriptDeckPayload {

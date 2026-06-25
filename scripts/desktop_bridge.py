@@ -20,7 +20,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from data.study_pipeline import init_study_db, load_review_states, load_today_progress, reset_study_db
+from data.study_pipeline import (
+    init_study_db,
+    load_activity_summary,
+    load_active_leech_card_ids,
+    load_item_history,
+    load_mistake_breakdown,
+    load_review_states,
+    load_streak_state,
+    load_today_progress,
+    reset_study_db,
+)
+from domain.distractors import rank_distractor_ids
 from domain.decks import ALL_DECKS
 
 
@@ -35,11 +46,21 @@ class DeckSummary:
 
 
 @dataclass(frozen=True)
+class StudyStreak:
+    current_days: int
+    best_days: int
+
+
+@dataclass(frozen=True)
 class GameCard:
     id: int
     character: str
     romaji: str
     meaning: str
+    tags: list[str]
+    is_leech: bool
+    meaning_distractor_ids: list[int]
+    character_distractor_ids: list[int]
 
 
 def _mastered_count(states: dict[int, object]) -> int:
@@ -54,12 +75,20 @@ def _mastered_count(states: dict[int, object]) -> int:
 def build_summary() -> dict[str, object]:
     init_study_db()
     decks: list[DeckSummary] = []
+    prompt_lookup: dict[tuple[str, int], str] = {}
+    streak = load_streak_state()
+    activity_week = load_activity_summary(7)
+    activity_month = load_activity_summary(30)
+    mistakes = load_mistake_breakdown(limit=6)
+    item_history = load_item_history(limit_items=8, events_per_item=8)
 
     for slug, factory in ALL_DECKS.items():
         deck = factory()
         card_ids = [card.id for card in deck.cards]
         states = load_review_states(deck.name, card_ids)
         due_today, completed_today = load_today_progress(deck.name, card_ids)
+        for card in deck.cards:
+            prompt_lookup[(deck.name, card.id)] = card.character
         decks.append(
             DeckSummary(
                 slug=slug,
@@ -73,6 +102,24 @@ def build_summary() -> dict[str, object]:
 
     return {
         "decks": [asdict(deck) for deck in decks],
+        "streak": asdict(
+            StudyStreak(
+                current_days=streak.current_streak_days,
+                best_days=streak.best_streak_days,
+            )
+        ),
+        "activity": {
+            "week": asdict(activity_week),
+            "month": asdict(activity_month),
+        },
+        "mistakes": [asdict(item) for item in mistakes],
+        "item_history": [
+            {
+                **asdict(item),
+                "prompt": prompt_lookup.get((item.deck, item.card_id), item.prompt or f"Card {item.card_id}"),
+            }
+            for item in item_history
+        ],
     }
 
 
@@ -83,12 +130,17 @@ def build_deck_cards(slug: str) -> dict[str, object]:
         raise ValueError(f"Unknown deck slug: {slug}")
 
     deck = factory()
+    active_leech_ids = load_active_leech_card_ids(deck.name)
     cards = [
         GameCard(
             id=card.id,
             character=card.character,
             romaji=card.romaji,
             meaning=card.meaning,
+            tags=card.tags,
+            is_leech=card.id in active_leech_ids,
+            meaning_distractor_ids=rank_distractor_ids(deck.cards, card, mode="meaning")[:8],
+            character_distractor_ids=rank_distractor_ids(deck.cards, card, mode="character")[:8],
         )
         for card in deck.cards
     ]

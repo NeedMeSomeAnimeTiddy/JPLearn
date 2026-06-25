@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { ArrowLeft, BarChart3, Copy, Heart, Keyboard, Languages, ListChecks, Minus, Settings, Square, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, BarChart3, CalendarDays, Copy, Flame, Heart, History, Keyboard, Languages, ListChecks, Minus, Settings, Square, Target, Trophy, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -309,6 +309,7 @@ function App() {
   const [sessionPoints, setSessionPoints] = useState<number>(0)
   const [livesEnabled, setLivesEnabled] = useState<boolean>(false)
   const [livesRemaining, setLivesRemaining] = useState<number>(DEFAULT_LIVES)
+  const [leechFocusEnabled, setLeechFocusEnabled] = useState<boolean>(false)
 
   const [scriptStats, setScriptStats] = useState<StatsByScript>(() => loadSavedStats())
   const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
@@ -316,6 +317,7 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [resettingDb, setResettingDb] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
   const [isWindowMaximized, setIsWindowMaximized] = useState(false)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const roundCycleRef = useRef<number[]>([])
@@ -409,6 +411,7 @@ function App() {
     setSessionRounds(0)
     setSessionPoints(0)
     setLivesRemaining(DEFAULT_LIVES)
+    setLeechFocusEnabled(false)
     resetRoundCycle()
 
     try {
@@ -443,14 +446,39 @@ function App() {
 
       if (cards.length < 4) return null
 
-      const distractorIndices = chooseUniqueIndices(cards.length, 3, cardIndex)
+      const cardsById = new Map(cards.map((entry) => [entry.id, entry]))
+
+      function pickDistractorsFromPool(poolIds: number[], desiredCount: number): ScriptDeck['cards'] {
+        const selected: ScriptDeck['cards'] = []
+        const seen = new Set<number>()
+        for (const candidateId of poolIds) {
+          if (candidateId === card.id || seen.has(candidateId)) continue
+          const candidate = cardsById.get(candidateId)
+          if (!candidate) continue
+          selected.push(candidate)
+          seen.add(candidateId)
+          if (selected.length >= desiredCount) return selected
+        }
+
+        // Fallback when ranked pool is insufficient.
+        for (const fallbackIndex of chooseUniqueIndices(cards.length, desiredCount * 2, cardIndex)) {
+          const fallbackCard = cards[fallbackIndex]
+          if (fallbackCard.id === card.id || seen.has(fallbackCard.id)) continue
+          selected.push(fallbackCard)
+          seen.add(fallbackCard.id)
+          if (selected.length >= desiredCount) break
+        }
+
+        return selected
+      }
 
       if (minigame === 'meaning_match') {
+        const rankedMeaningDistractors = pickDistractorsFromPool(card.meaning_distractor_ids, 3)
         const options = shuffleArray([
           { id: `${card.id}-correct`, label: card.meaning },
-          ...distractorIndices.map((idx) => ({
-            id: `${cards[idx].id}-meaning`,
-            label: cards[idx].meaning,
+          ...rankedMeaningDistractors.map((candidate) => ({
+            id: `${candidate.id}-meaning`,
+            label: candidate.meaning,
           })),
         ])
 
@@ -462,11 +490,12 @@ function App() {
         }
       }
 
+      const rankedCharacterDistractors = pickDistractorsFromPool(card.character_distractor_ids, 3)
       const options = shuffleArray([
         { id: `${card.id}-correct`, label: card.character },
-        ...distractorIndices.map((idx) => ({
-          id: `${cards[idx].id}-character`,
-          label: cards[idx].character,
+        ...rankedCharacterDistractors.map((candidate) => ({
+          id: `${candidate.id}-character`,
+          label: candidate.character,
         })),
       ])
 
@@ -482,12 +511,18 @@ function App() {
 
   const startSession = useCallback(() => {
     resetRoundCycle()
-    const index = nextCardIndex(deckCards.length)
-    const nextRound = index === null ? null : buildRound(deckCards, activeGame, index)
+    const leechPool = deckCards.filter((card) => card.is_leech)
+    const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : deckCards
+    const index = nextCardIndex(sourceCards.length)
+    const nextRound = index === null ? null : buildRound(sourceCards, activeGame, index)
     if (!nextRound) {
       setSessionActive(false)
       setRoundState(null)
-      setGameError('Not enough cards in this deck for the selected minigame yet.')
+      if (leechFocusEnabled && leechPool.length === 0) {
+        setGameError('No active leech cards in this deck yet. Disable focused review mode to continue.')
+      } else {
+        setGameError('Not enough cards in this deck for the selected minigame yet.')
+      }
       return
     }
 
@@ -506,11 +541,13 @@ function App() {
       setSessionScore(0)
       setSessionPoints(0)
     }
-  }, [activeGame, buildRound, deckCards, nextCardIndex, resetRoundCycle, sessionRounds])
+  }, [activeGame, buildRound, deckCards, leechFocusEnabled, nextCardIndex, resetRoundCycle, sessionRounds])
 
   const nextRound = useCallback(() => {
-    const index = nextCardIndex(deckCards.length)
-    const candidate = index === null ? null : buildRound(deckCards, activeGame, index)
+    const leechPool = deckCards.filter((card) => card.is_leech)
+    const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : deckCards
+    const index = nextCardIndex(sourceCards.length)
+    const candidate = index === null ? null : buildRound(sourceCards, activeGame, index)
     if (!candidate) {
       setRoundState(null)
       setSessionActive(false)
@@ -523,7 +560,7 @@ function App() {
     setRoundFeedbackTone(null)
     setRoundFeedbackPoints(null)
     setRoundFeedbackAnswer(null)
-  }, [activeGame, buildRound, deckCards, nextCardIndex])
+  }, [activeGame, buildRound, deckCards, leechFocusEnabled, nextCardIndex])
 
   const submitAnswer = useCallback(
     (answer: string) => {
@@ -670,6 +707,20 @@ function App() {
   }, [showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
+  const streak = useMemo(
+    () => summary?.streak ?? { current_days: 0, best_days: 0 },
+    [summary],
+  )
+  const activity = useMemo(
+    () =>
+      summary?.activity ?? {
+        week: { days: 7, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
+        month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
+      },
+    [summary],
+  )
+  const mistakes = useMemo(() => summary?.mistakes ?? [], [summary])
+  const itemHistory = useMemo(() => summary?.item_history ?? [], [summary])
 
   const totals = useMemo(() => {
     const totalCards = decks.reduce((acc, deck) => acc + deck.total, 0)
@@ -688,15 +739,33 @@ function App() {
   }, [decks])
 
   const summaryTiles = [
-    { label: 'Decks', value: decks.length.toString(), tone: 'teal' },
-    { label: 'Total Cards', value: totals.totalCards.toString(), tone: 'ocean' },
-    { label: 'Mastered', value: `${totals.masteryRate}%`, tone: 'amber' },
-    { label: 'Due Today', value: totals.dueToday.toString(), tone: 'rose' },
+    { label: 'Decks', value: decks.length.toString(), tone: 'teal', icon: BarChart3, accent: 'insight' },
+    { label: 'Current Streak', value: `${streak.current_days} days`, tone: 'ocean', icon: Flame, accent: 'streak' },
+    { label: 'Mastered', value: `${totals.masteryRate}%`, tone: 'amber', icon: Trophy, accent: 'mastery' },
+    { label: 'Due Today', value: totals.dueToday.toString(), tone: 'rose', icon: CalendarDays, accent: 'warning' },
   ] as const
 
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
   const selectedGameIntro = MINIGAME_INTROS[activeGame]
   const activeScriptStats = scriptStats[activeScript]
+  const leechCards = useMemo(
+    () => deckCards.filter((card) => card.is_leech),
+    [deckCards],
+  )
+  const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : deckCards
+  const hasAnyActivity = activity.week.reviewed > 0 || activity.month.reviewed > 0
+  const hasMistakeData = mistakes.length > 0
+  const historyPageSize = 4
+  const historyPageCount = Math.max(1, Math.ceil(itemHistory.length / historyPageSize))
+  const clampedHistoryPage = Math.min(historyPage, historyPageCount)
+  const pagedHistory = itemHistory.slice(
+    (clampedHistoryPage - 1) * historyPageSize,
+    clampedHistoryPage * historyPageSize,
+  )
+
+  useEffect(() => {
+    setHistoryPage(1)
+  }, [summary])
 
   const goHome = useCallback(() => {
     setNavDirection('back')
@@ -857,7 +926,8 @@ function App() {
             </div>
             <div className="topbar-end">
               <div className="focus-chip">
-                <span>{activeScriptStats.bestStreak} Best Streak</span>
+                <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`best-${activeScriptStats.bestStreak}`} className="live-value">{activeScriptStats.bestStreak}</strong> Best Streak</span>
+                <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`leech-${leechCards.length}`} className="live-value">{leechCards.length}</strong> Leeches</span>
               </div>
               <button
                 type="button"
@@ -991,8 +1061,8 @@ function App() {
             </div>
             <div className="topbar-end">
               <div className="focus-chip">
-                <span>{sessionScore}/{sessionRounds} Correct</span>
-                <span>{sessionPoints} Points</span>
+                <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`correct-${sessionScore}-${sessionRounds}`} className="live-value">{sessionScore}/{sessionRounds}</strong> Correct</span>
+                <span className="metric-accent-streak"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`points-${sessionPoints}`} className="live-value">{sessionPoints}</strong> Points</span>
               </div>
               <button
                 type="button"
@@ -1028,20 +1098,28 @@ function App() {
                   />
                   Enable lives mode ({DEFAULT_LIVES} lives per run)
                 </label>
+                <label className="lives-toggle leech-focus-toggle">
+                  <input
+                    type="checkbox"
+                    checked={leechFocusEnabled}
+                    onChange={(event) => setLeechFocusEnabled(event.target.checked)}
+                  />
+                  Focused review mode (leech cards first)
+                </label>
 
                 <div className="game-actions intro-actions">
-                  <button type="button" onClick={startSession} disabled={gameLoading || deckCards.length === 0}>
+                  <button type="button" onClick={startSession} disabled={gameLoading || activeRunCards.length === 0}>
                     Play
                   </button>
-                  {gameLoading ? <span>Loading deck...</span> : <span>{deckCards.length} cards available</span>}
+                  {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
                 </div>
               </article>
             ) : (
               <div className="game-actions">
-                <button type="button" onClick={startSession} disabled={gameLoading || deckCards.length === 0}>
+                <button type="button" onClick={startSession} disabled={gameLoading || activeRunCards.length === 0}>
                   Restart Challenge
                 </button>
-                {gameLoading ? <span>Loading deck...</span> : <span>{deckCards.length} cards available</span>}
+                {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
                 <div className="lives-inline" aria-live="polite">
                   {livesEnabled ? (
                     [...Array(DEFAULT_LIVES).keys()].map((life) => (
@@ -1232,14 +1310,133 @@ function App() {
           <section className="tile-grid overview-tile-grid">
             {summaryTiles.map((tile, index) => (
               <article
-                key={tile.label}
+                key={`${tile.label}-${tile.value}`}
                 className={`metric-tile tone-${tile.tone}`}
                 style={{ animationDelay: `${120 + index * 80}ms` }}
               >
-                <p>{tile.label}</p>
-                <strong>{tile.value}</strong>
+                <p><tile.icon aria-hidden="true" className={`metric-icon icon-${tile.accent}`} strokeWidth={2.2} />{tile.label}</p>
+                <strong className="live-value">{tile.value}</strong>
               </article>
             ))}
+          </section>
+
+          <section className="panel-glass activity-summary-panel">
+            <div className="panel-head">
+              <h2 className="panel-title-with-icon"><CalendarDays aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Study Activity</h2>
+              <div className="panel-actions">
+                <span>Rolling windows for consistency and momentum</span>
+              </div>
+            </div>
+
+            {!hasAnyActivity ? (
+              <p className="status-line">No recent activity yet. Complete a round to populate weekly and monthly summaries.</p>
+            ) : (
+              <div className="activity-window-grid">
+                {[activity.week, activity.month].map((windowData, index) => (
+                  <article
+                    key={windowData.days}
+                    className="activity-window-card"
+                    style={{ animationDelay: `${140 + index * 80}ms` }}
+                  >
+                    <h3>Last {windowData.days} Days</h3>
+                    <div className="activity-window-metrics">
+                      <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`reviewed-${windowData.days}-${windowData.reviewed}`} className="live-value">{windowData.reviewed}</strong> reviewed</span>
+                      <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`correct-${windowData.days}-${windowData.correct}`} className="live-value">{windowData.correct}</strong> correct</span>
+                      <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`incorrect-${windowData.days}-${windowData.incorrect}`} className="live-value">{windowData.incorrect}</strong> incorrect</span>
+                      <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`accuracy-${windowData.days}-${windowData.accuracy}`} className="live-value">{windowData.accuracy}%</strong> accuracy</span>
+                      <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`earned-${windowData.days}-${windowData.points_earned}`} className="live-value">{windowData.points_earned}</strong> points</span>
+                      <span className="metric-accent-warning"><CalendarDays aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`days-${windowData.days}-${windowData.active_days}`} className="live-value">{windowData.active_days}</strong> active days</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="panel-glass mistakes-summary-panel">
+            <div className="panel-head">
+              <h2 className="panel-title-with-icon"><AlertTriangle aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Mistake Breakdown</h2>
+              <div className="panel-actions">
+                <span>Top weak areas by error rate</span>
+              </div>
+            </div>
+
+            {!hasMistakeData ? (
+              <p className="status-line">No mistake data yet. Incorrect answers will populate script/tag breakdowns here.</p>
+            ) : (
+              <div className="mistake-grid">
+                {mistakes.map((row, index) => (
+                  <article
+                    key={row.key}
+                    className="mistake-card"
+                    style={{ animationDelay: `${140 + index * 60}ms` }}
+                  >
+                    <h3>{row.key}</h3>
+                    <div className="mistake-card-metrics">
+                      <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`rate-${row.key}-${row.error_rate}`} className="live-value">{row.error_rate}%</strong> error rate</span>
+                      <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`mistakes-${row.key}-${row.mistakes}`} className="live-value">{row.mistakes}</strong> mistakes</span>
+                      <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`attempts-${row.key}-${row.attempts}`} className="live-value">{row.attempts}</strong> attempts</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="panel-glass timeline-summary-panel">
+            <div className="panel-head">
+              <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Item Timeline</h2>
+              <div className="panel-actions">
+                <span>Recent review events and trend per item</span>
+              </div>
+            </div>
+
+            {itemHistory.length === 0 ? (
+              <p className="status-line">No item history yet. Complete review rounds to build timelines.</p>
+            ) : (
+              <>
+                <div className="timeline-grid">
+                  {pagedHistory.map((item, index) => (
+                    <article
+                      key={item.key}
+                      className="timeline-card"
+                      style={{ animationDelay: `${140 + index * 60}ms` }}
+                    >
+                      <div className="timeline-card-head">
+                        <h3>{item.prompt}</h3>
+                        <span className={`timeline-trend timeline-trend-${item.trend}`}>{item.trend}</span>
+                      </div>
+                      <p className="timeline-card-subhead">{item.script_tag} • {item.deck}</p>
+                      <div className="timeline-events">
+                        {item.events.map((event, eventIndex) => (
+                          <span key={`${item.key}-${eventIndex}`} className={`timeline-event timeline-event-${event.outcome}`}>
+                            <strong>{event.outcome === 'correct' ? '✓' : '✕'}</strong>
+                            {event.points_delta} pts
+                          </span>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="timeline-pagination">
+                  <button
+                    type="button"
+                    disabled={clampedHistoryPage <= 1}
+                    onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    Previous
+                  </button>
+                  <span>Page {clampedHistoryPage} / {historyPageCount}</span>
+                  <button
+                    type="button"
+                    disabled={clampedHistoryPage >= historyPageCount}
+                    onClick={() => setHistoryPage((prev) => Math.min(historyPageCount, prev + 1))}
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="panel-glass deck-panel overview-deck-panel">
@@ -1302,8 +1499,8 @@ function App() {
             ) : null}
 
             <footer className="panel-foot">
-              <span>{totals.completedToday} cards completed today</span>
-              <span>{totals.masteredCards} cards mastered overall</span>
+              <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`completed-${totals.completedToday}`} className="live-value">{totals.completedToday}</strong> cards completed today</span>
+              <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`best-day-${streak.best_days}`} className="live-value">{streak.best_days}</strong> day best streak</span>
             </footer>
           </section>
         </div>
