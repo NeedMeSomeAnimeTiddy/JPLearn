@@ -31,6 +31,19 @@ An Electron-based Japanese learning app with a Python backend for domain logic a
 
 `scripts\dev.py` is the main gate and runs type checks, architecture checks, DB checks, SRS checks, then tests.
 
+### Compact Debug Tools
+
+Use the compact debug CLI when you want high-signal diagnostics with less output noise:
+
+- Quick workspace snapshot:
+   `python scripts\debug_tools.py snapshot`
+- JSON snapshot (easy to parse):
+   `python scripts\debug_tools.py snapshot --json`
+- Condensed architecture/DB/SRS checks:
+   `python scripts\debug_tools.py checks`
+- Include tests in condensed mode:
+   `python scripts\debug_tools.py checks --with-tests`
+
 ---
 
 ## Project TODO
