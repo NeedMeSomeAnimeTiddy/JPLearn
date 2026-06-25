@@ -11,6 +11,8 @@ applyTo: "ui/**/*.py"
 - Calls Domain and Data only through interfaces
 - Keep UI thin and minimal
 
+---
+
 # Constraints
 
 - UI must not calculate SRS values
