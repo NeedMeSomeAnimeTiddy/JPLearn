@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, BarChart3, CalendarDays, Copy, Flame, Heart, History, Keyboard, Languages, ListChecks, Minus, Settings, Square, Target, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, CalendarDays, Copy, Flame, Heart, History, Keyboard, Languages, ListChecks, Lock, Minus, Settings, Square, Target, Trophy, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
   ReturnType<typeof window.jplearnDesktop.getStudySummary>
 >
 type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
+type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match'
 type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
@@ -41,6 +42,7 @@ interface RoundOption {
 }
 
 interface RoundState {
+  cardId: number
   promptLabel: string
   focusText: string
   answer: string
@@ -175,6 +177,8 @@ function MinigameIcon({ game }: { game: MinigameKey }) {
 
 const STATS_STORAGE_KEY = 'jplearn-desktop-script-stats-v1'
 const SETTINGS_STORAGE_KEY = 'jplearn-desktop-settings-v1'
+const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
+const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
 const EMPTY_SCRIPT_STATS: ScriptStats = {
   attempted: 0,
@@ -256,6 +260,23 @@ function loadSettings(): AppSettings {
   }
 }
 
+type CardScores = Record<ScriptKey, Record<number, number>>
+
+function loadCardScores(): CardScores {
+  try {
+    const raw = window.localStorage.getItem(CARD_SCORES_STORAGE_KEY)
+    if (!raw) return { hiragana: {}, katakana: {}, kanji_n5: {} }
+    const parsed = JSON.parse(raw) as Partial<CardScores>
+    return {
+      hiragana: parsed.hiragana ?? {},
+      katakana: parsed.katakana ?? {},
+      kanji_n5: parsed.kanji_n5 ?? {},
+    }
+  } catch {
+    return { hiragana: {}, katakana: {}, kanji_n5: {} }
+  }
+}
+
 function normalizeText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -287,12 +308,17 @@ function App() {
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
   const [summary, setSummary] = useState<StudySummaryPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const viewHistoryRef = useRef<AppView[]>(['home'])
+  const viewHistoryIndexRef = useRef(0)
+  const isHistoryNavigationRef = useRef(false)
   const [loading, setLoading] = useState<boolean>(true)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
   const [activeScript, setActiveScript] = useState<ScriptKey>('hiragana')
   const [activeGame, setActiveGame] = useState<MinigameKey>('romaji_sprint')
   const [deckCards, setDeckCards] = useState<ScriptDeck['cards']>([])
+  const [blockProgress, setBlockProgress] = useState<BlockInfo[]>([])
+  const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0)
   const [gameLoading, setGameLoading] = useState<boolean>(false)
   const [gameError, setGameError] = useState<string | null>(null)
 
@@ -313,9 +339,22 @@ function App() {
 
   const [scriptStats, setScriptStats] = useState<StatsByScript>(() => loadSavedStats())
   const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
+  const [cardScores, setCardScores] = useState<CardScores>(() => loadCardScores())
+  const [overviewBlocks, setOverviewBlocks] = useState<Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>>({})
+  const [overviewBlocksLoading, setOverviewBlocksLoading] = useState(false)
+  const [charMasteryExpanded, setCharMasteryExpanded] = useState(true)
+  const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
+
+  interface SelectedChar {
+    character: string
+    romaji: string
+    meaning: string
+    score: number
+  }
+  const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
-  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0)
   const [resettingDb, setResettingDb] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
   const [isWindowMaximized, setIsWindowMaximized] = useState(false)
@@ -344,6 +383,10 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(scriptStats))
   }, [scriptStats])
+
+  useEffect(() => {
+    window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(cardScores))
+  }, [cardScores])
 
   useEffect(() => {
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
@@ -415,10 +458,27 @@ function App() {
     resetRoundCycle()
 
     try {
-      const payload = await window.jplearnDesktop.getDeckCards(script)
-      setDeckCards(payload.cards)
+      const [deckPayload, blockPayload] = await Promise.all([
+        window.jplearnDesktop.getDeckCards(script),
+        window.jplearnDesktop.getBlockProgress(script),
+      ])
+      setDeckCards(deckPayload.cards)
+      const blocks = blockPayload.blocks
+      setBlockProgress(blocks)
+      // Auto-select the last unlocked block so the user lands on the current frontier.
+      if (blocks.length > 0) {
+        const lastUnlocked = blocks.reduce(
+          (best, b) => (b.unlocked ? b.index : best),
+          0,
+        )
+        setActiveBlockIndex(lastUnlocked)
+      } else {
+        setActiveBlockIndex(0)
+      }
     } catch (err) {
       setDeckCards([])
+      setBlockProgress([])
+      setActiveBlockIndex(0)
       setGameError(err instanceof Error ? err.message : 'Unknown game bridge error')
     } finally {
       setGameLoading(false)
@@ -437,6 +497,7 @@ function App() {
 
       if (minigame === 'romaji_sprint') {
         return {
+          cardId: card.id,
           promptLabel: 'Type the romaji for this character',
           focusText: card.character,
           answer: card.romaji,
@@ -483,6 +544,7 @@ function App() {
         ])
 
         return {
+          cardId: card.id,
           promptLabel: 'Select the meaning for this character',
           focusText: card.character,
           answer: card.meaning,
@@ -500,6 +562,7 @@ function App() {
       ])
 
       return {
+        cardId: card.id,
         promptLabel: 'Select the character for this meaning',
         focusText: card.meaning,
         answer: card.character,
@@ -509,19 +572,33 @@ function App() {
     [],
   )
 
+  const leechCards = useMemo(
+    () => deckCards.filter((card) => card.is_leech),
+    [deckCards],
+  )
+
+  // Cards restricted to the active block when block progression is available.
+  const activeBlockCards = useMemo(() => {
+    if (blockProgress.length === 0) return deckCards
+    const block = blockProgress[activeBlockIndex]
+    if (!block) return deckCards
+    const idSet = new Set(block.card_ids)
+    return deckCards.filter((c) => idSet.has(c.id))
+  }, [deckCards, blockProgress, activeBlockIndex])
+
   const startSession = useCallback(() => {
     resetRoundCycle()
-    const leechPool = deckCards.filter((card) => card.is_leech)
-    const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : deckCards
+    const leechPool = activeBlockCards.filter((card) => card.is_leech)
+    const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
     const index = nextCardIndex(sourceCards.length)
     const nextRound = index === null ? null : buildRound(sourceCards, activeGame, index)
     if (!nextRound) {
       setSessionActive(false)
       setRoundState(null)
       if (leechFocusEnabled && leechPool.length === 0) {
-        setGameError('No active leech cards in this deck yet. Disable focused review mode to continue.')
+        setGameError('No active leech cards in this block yet. Disable focused review mode to continue.')
       } else {
-        setGameError('Not enough cards in this deck for the selected minigame yet.')
+        setGameError('Not enough cards in this block for the selected minigame yet.')
       }
       return
     }
@@ -541,11 +618,11 @@ function App() {
       setSessionScore(0)
       setSessionPoints(0)
     }
-  }, [activeGame, buildRound, deckCards, leechFocusEnabled, nextCardIndex, resetRoundCycle, sessionRounds])
+  }, [activeGame, activeBlockCards, buildRound, leechFocusEnabled, nextCardIndex, resetRoundCycle, sessionRounds])
 
   const nextRound = useCallback(() => {
-    const leechPool = deckCards.filter((card) => card.is_leech)
-    const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : deckCards
+    const leechPool = activeBlockCards.filter((card) => card.is_leech)
+    const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
     const index = nextCardIndex(sourceCards.length)
     const candidate = index === null ? null : buildRound(sourceCards, activeGame, index)
     if (!candidate) {
@@ -560,7 +637,7 @@ function App() {
     setRoundFeedbackTone(null)
     setRoundFeedbackPoints(null)
     setRoundFeedbackAnswer(null)
-  }, [activeGame, buildRound, deckCards, leechFocusEnabled, nextCardIndex])
+  }, [activeGame, activeBlockCards, buildRound, leechFocusEnabled, nextCardIndex])
 
   const submitAnswer = useCallback(
     (answer: string) => {
@@ -612,6 +689,19 @@ function App() {
         setRoundFeedbackTone('success')
         setRoundFeedbackPoints(awardedPoints)
         setRoundFeedbackAnswer(null)
+
+        // Update per-card score: correct → +1 (capped at CARD_MASTERY_MAX).
+        const answeredCardId = roundState.cardId
+        setCardScores((prev) => {
+          const current = prev[activeScript][answeredCardId] ?? 0
+          return {
+            ...prev,
+            [activeScript]: {
+              ...prev[activeScript],
+              [answeredCardId]: Math.min(current + 1, CARD_MASTERY_MAX),
+            },
+          }
+        })
       } else {
         if (livesEnabled) {
           nextLives = Math.max(0, livesRemaining - 1)
@@ -621,6 +711,19 @@ function App() {
         setRoundFeedbackTone('error')
         setRoundFeedbackPoints(0)
         setRoundFeedbackAnswer(roundState.answer)
+
+        // Wrong answer deducts 1 from the card score (floored at 0).
+        const answeredCardId = roundState.cardId
+        setCardScores((prev) => {
+          const current = prev[activeScript][answeredCardId] ?? 0
+          return {
+            ...prev,
+            [activeScript]: {
+              ...prev[activeScript],
+              [answeredCardId]: Math.max(current - 1, 0),
+            },
+          }
+        })
       }
 
       window.setTimeout(() => {
@@ -659,6 +762,11 @@ function App() {
       }
 
       if (event.key === 'Escape') {
+        if (selectedChar) {
+          setSelectedChar(null)
+          return
+        }
+
         if (showSettings) {
           setShowSettings(false)
           return
@@ -704,7 +812,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showSettings, view])
+  }, [selectedChar, showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -748,11 +856,34 @@ function App() {
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
   const selectedGameIntro = MINIGAME_INTROS[activeGame]
   const activeScriptStats = scriptStats[activeScript]
-  const leechCards = useMemo(
-    () => deckCards.filter((card) => card.is_leech),
-    [deckCards],
-  )
-  const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : deckCards
+  const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : activeBlockCards
+
+  // Block progress enhanced with locally-tracked card scores (updates live while playing).
+  const blockProgressWithMastery = useMemo(() => {
+    const scores = cardScores[activeScript]
+    return blockProgress.map((block) => {
+      const total = block.card_ids.reduce((sum, id) => sum + (scores[id] ?? 0), 0)
+      const mastery = block.card_ids.length > 0 ? total / (CARD_MASTERY_MAX * block.card_ids.length) : 0
+      const unlocked = block.index === 0 || (() => {
+        for (let i = 0; i < block.index; i++) {
+          const prev = blockProgress[i]
+          const prevTotal = prev.card_ids.reduce((sum, id) => sum + (scores[id] ?? 0), 0)
+          const prevMastery = prev.card_ids.length > 0 ? prevTotal / (CARD_MASTERY_MAX * prev.card_ids.length) : 0
+          if (prevMastery < 0.8) return false
+        }
+        return true
+      })()
+      return { ...block, mastery, unlocked }
+    })
+  }, [blockProgress, cardScores, activeScript])
+
+  // Block session is complete when every card in the active block has reached max score.
+  // sessionRounds > 0 ensures we don't trigger on a pre-mastered block before answering.
+  const blockSessionComplete = useMemo(() => {
+    if (!sessionActive || sessionRounds === 0 || activeBlockCards.length === 0) return false
+    const scores = cardScores[activeScript]
+    return activeBlockCards.every((c) => (scores[c.id] ?? 0) >= CARD_MASTERY_MAX)
+  }, [sessionActive, sessionRounds, activeBlockCards, cardScores, activeScript])
   const hasAnyActivity = activity.week.reviewed > 0 || activity.month.reviewed > 0
   const hasMistakeData = mistakes.length > 0
   const historyPageSize = 4
@@ -766,6 +897,37 @@ function App() {
   useEffect(() => {
     setHistoryPage(1)
   }, [summary])
+
+  // Lazy-load block data for hiragana + katakana when the overview opens.
+  useEffect(() => {
+    if (view !== 'overview') return
+    setOverviewBlocksLoading(true)
+    void Promise.all([
+      window.jplearnDesktop.getBlockProgress('hiragana'),
+      window.jplearnDesktop.getBlockProgress('katakana'),
+    ])
+      .then(([hira, kata]) => {
+        setOverviewBlocks({ hiragana: hira.blocks, katakana: kata.blocks })
+      })
+      .catch(() => undefined)
+      .finally(() => setOverviewBlocksLoading(false))
+  }, [view])
+
+  useEffect(() => {
+    if (isHistoryNavigationRef.current) {
+      isHistoryNavigationRef.current = false
+      return
+    }
+
+    const currentHistory = viewHistoryRef.current
+    const currentIndex = viewHistoryIndexRef.current
+    if (currentHistory[currentIndex] === view) return
+
+    const nextHistory = currentHistory.slice(0, currentIndex + 1)
+    nextHistory.push(view)
+    viewHistoryRef.current = nextHistory
+    viewHistoryIndexRef.current = nextHistory.length - 1
+  }, [view])
 
   const goHome = useCallback(() => {
     setNavDirection('back')
@@ -786,7 +948,19 @@ function App() {
     setError(null)
     try {
       await window.jplearnDesktop.resetStudyDb()
-      setShowResetConfirm(false)
+      // Also wipe all locally-tracked scores and stats so the UI is fully clean.
+      const emptyScores: CardScores = { hiragana: {}, katakana: {}, kanji_n5: {} }
+      const emptyStats: StatsByScript = {
+        hiragana: { ...EMPTY_SCRIPT_STATS },
+        katakana: { ...EMPTY_SCRIPT_STATS },
+        kanji_n5: { ...EMPTY_SCRIPT_STATS },
+      }
+      window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(emptyScores))
+      window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(emptyStats))
+      setCardScores(emptyScores)
+      setScriptStats(emptyStats)
+      setMinigameStats(defaultMinigameStatsByScript())
+      setResetConfirmStep(0)
       await loadSummary()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown reset error')
@@ -809,11 +983,57 @@ function App() {
     void window.jplearnDesktop.closeWindow()
   }, [])
 
+  const titlebarHistoryBack = useCallback(() => {
+    const currentIndex = viewHistoryIndexRef.current
+    if (currentIndex <= 0) return
+
+    const nextIndex = currentIndex - 1
+    viewHistoryIndexRef.current = nextIndex
+    isHistoryNavigationRef.current = true
+    setNavDirection('back')
+    setView(viewHistoryRef.current[nextIndex])
+  }, [])
+
+  const titlebarHistoryForward = useCallback(() => {
+    const currentIndex = viewHistoryIndexRef.current
+    const nextIndex = currentIndex + 1
+    if (nextIndex >= viewHistoryRef.current.length) return
+
+    viewHistoryIndexRef.current = nextIndex
+    isHistoryNavigationRef.current = true
+    setNavDirection('forward')
+    setView(viewHistoryRef.current[nextIndex])
+  }, [])
+
+  const canTitlebarBack = viewHistoryIndexRef.current > 0
+  const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
+
   return (
     <main className="app-shell">
       <header className="window-titlebar" aria-label="Window controls">
-        <div className="window-titlebar-drag" aria-hidden="true">
-          <span className="window-titlebar-title">JPLearn</span>
+        <div className="window-titlebar-drag">
+          <div className="window-titlebar-nav" role="group" aria-label="App navigation">
+            <button
+              type="button"
+              className="window-nav-button"
+              onClick={titlebarHistoryBack}
+              aria-label="Back"
+              title="Back"
+              disabled={!canTitlebarBack}
+            >
+              <ArrowLeft className="window-nav-icon" strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              className="window-nav-button"
+              onClick={titlebarHistoryForward}
+              aria-label="Forward"
+              title="Forward"
+              disabled={!canTitlebarForward}
+            >
+              <ArrowRight className="window-nav-icon" strokeWidth={2.2} />
+            </button>
+          </div>
         </div>
         <div className="window-controls" role="group" aria-label="Window actions">
           <button type="button" className="window-control-button" onClick={minimizeWindow} aria-label="Minimize window">
@@ -943,97 +1163,165 @@ function App() {
 
           <section className="panel-glass game-panel">
             <div className="panel-head">
-              <h2>Choose a Minigame</h2>
-              <span className="game-stats">Pick one to enter play mode</span>
+              <h2>Learning Path</h2>
+              <span className="game-stats">
+                {blockProgressWithMastery.length > 0
+                  ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length} / ${blockProgressWithMastery.length} blocks mastered`
+                  : 'Choose a minigame to start'}
+              </span>
             </div>
 
-            <div className="minigame-grid">
-              {MINIGAMES.map((game, index) => (
-                (() => {
-                  const gameStats = minigameStats[activeScript][game.key]
-                  const accuracy =
-                    gameStats.attempted > 0
-                      ? Math.round((gameStats.correct / gameStats.attempted) * 100)
-                      : 0
-
+            {blockProgressWithMastery.length > 0 ? (
+              <div className="block-path">
+                {blockProgressWithMastery.map((block, index) => {
+                  const isActive = activeBlockIndex === block.index
+                  const masteryPct = Math.round(block.mastery * 100)
                   return (
-                <article
-                  key={game.key}
-                  role="button"
-                  tabIndex={0}
-                  className={`game-tile ${activeGame === game.key ? 'is-active' : ''}`}
-                  onClick={() => {
-                    setActiveGame(game.key)
-                    setSessionActive(false)
-                    setRoundState(null)
-                    setRoundFeedback(null)
-                    setRoundFeedbackTone(null)
-                    setRoundFeedbackPoints(null)
-                    setRoundFeedbackAnswer(null)
-                    setIsRoundResolving(false)
-                    setLivesRemaining(DEFAULT_LIVES)
-                    resetRoundCycle()
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setActiveGame(game.key)
-                      setSessionActive(false)
-                      setRoundState(null)
-                      setRoundFeedback(null)
-                      setRoundFeedbackTone(null)
-                      setRoundFeedbackPoints(null)
-                      setRoundFeedbackAnswer(null)
-                      setIsRoundResolving(false)
-                      setLivesRemaining(DEFAULT_LIVES)
-                      resetRoundCycle()
-                    }
-                  }}
-                  style={{ animationDelay: `${120 + index * 70}ms` }}
-                >
-                  <span className="game-icon" aria-hidden="true"><MinigameIcon game={game.key} /></span>
-                  <strong>{game.title}</strong>
-                  <p>{game.description}</p>
-                  <div className="game-tile-stats" aria-label="Minigame stats">
-                    <span className="game-tile-stat">
-                      <small>Accuracy</small>
-                      <strong>{accuracy}%</strong>
-                    </span>
-                    <span className="game-tile-stat">
-                      <small>Best Streak</small>
-                      <strong>{gameStats.bestStreak}</strong>
-                    </span>
-                    <span className="game-tile-stat">
-                      <small>Points</small>
-                      <strong>{gameStats.points}</strong>
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="play-cta-button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setActiveGame(game.key)
-                      setNavDirection('forward')
-                      setView('minigame')
-                      setSessionActive(false)
-                      setRoundState(null)
-                      setRoundFeedback(null)
-                      setRoundFeedbackTone(null)
-                      setRoundFeedbackPoints(null)
-                      setRoundFeedbackAnswer(null)
-                      setIsRoundResolving(false)
-                      setLivesRemaining(DEFAULT_LIVES)
-                      resetRoundCycle()
-                    }}
-                  >
-                    Play
-                  </button>
-                </article>
+                    <article
+                      key={block.index}
+                      className={`block-node ${isActive ? 'is-active' : ''} ${!block.unlocked ? 'is-locked' : ''}`}
+                      style={{ animationDelay: `${80 + index * 50}ms` }}
+                    >
+                      <button
+                        type="button"
+                        className="block-node-button"
+                        disabled={!block.unlocked}
+                        onClick={() => {
+                          if (!block.unlocked) return
+                          setActiveBlockIndex(block.index)
+                          setSessionActive(false)
+                          setRoundState(null)
+                          setRoundFeedback(null)
+                          setRoundFeedbackTone(null)
+                          setRoundFeedbackPoints(null)
+                          setRoundFeedbackAnswer(null)
+                          setIsRoundResolving(false)
+                          setLivesRemaining(DEFAULT_LIVES)
+                          resetRoundCycle()
+                        }}
+                        aria-pressed={isActive}
+                        aria-label={`${block.name}, ${block.unlocked ? `${masteryPct}% mastered` : 'locked'}`}
+                      >
+                        <div className="block-node-header">
+                          <div className="block-node-chars" lang="ja" aria-hidden="true">
+                            {block.sample_chars.join(' ')}
+                          </div>
+                          {!block.unlocked ? (
+                            <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
+                          ) : null}
+                        </div>
+                        <strong className="block-node-name">{block.name}</strong>
+                        <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
+                          <div
+                            className="block-node-bar"
+                            style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties}
+                          />
+                        </div>
+                        <span className="block-node-pct">{masteryPct}%</span>
+                      </button>
+                    </article>
                   )
-                })()
-              ))}
-            </div>
+                })}
+              </div>
+            ) : null}
+
+            {/* Minigame selector – shown below block path once a block is active */}
+            {(blockProgressWithMastery.length === 0 || blockProgressWithMastery[activeBlockIndex]?.unlocked) ? (
+              <>
+                <div className="panel-head block-minigame-head">
+                  <h3>
+                    {blockProgressWithMastery.length > 0
+                      ? `Choose a minigame — ${blockProgressWithMastery[activeBlockIndex]?.name ?? ''} (${activeBlockCards.length} cards)`
+                      : 'Choose a minigame'}
+                  </h3>
+                </div>
+                <div className="minigame-grid">
+                  {MINIGAMES.map((game, index) => {
+                    const gameStats = minigameStats[activeScript][game.key]
+                    const accuracy =
+                      gameStats.attempted > 0
+                        ? Math.round((gameStats.correct / gameStats.attempted) * 100)
+                        : 0
+
+                    return (
+                      <article
+                        key={game.key}
+                        role="button"
+                        tabIndex={0}
+                        className={`game-tile ${activeGame === game.key ? 'is-active' : ''}`}
+                        onClick={() => {
+                          setActiveGame(game.key)
+                          setSessionActive(false)
+                          setRoundState(null)
+                          setRoundFeedback(null)
+                          setRoundFeedbackTone(null)
+                          setRoundFeedbackPoints(null)
+                          setRoundFeedbackAnswer(null)
+                          setIsRoundResolving(false)
+                          setLivesRemaining(DEFAULT_LIVES)
+                          resetRoundCycle()
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            setActiveGame(game.key)
+                            setSessionActive(false)
+                            setRoundState(null)
+                            setRoundFeedback(null)
+                            setRoundFeedbackTone(null)
+                            setRoundFeedbackPoints(null)
+                            setRoundFeedbackAnswer(null)
+                            setIsRoundResolving(false)
+                            setLivesRemaining(DEFAULT_LIVES)
+                            resetRoundCycle()
+                          }
+                        }}
+                        style={{ animationDelay: `${120 + index * 70}ms` }}
+                      >
+                        <span className="game-icon" aria-hidden="true"><MinigameIcon game={game.key} /></span>
+                        <strong>{game.title}</strong>
+                        <p>{game.description}</p>
+                        <div className="game-tile-stats" aria-label="Minigame stats">
+                          <span className="game-tile-stat">
+                            <small>Accuracy</small>
+                            <strong>{accuracy}%</strong>
+                          </span>
+                          <span className="game-tile-stat">
+                            <small>Best Streak</small>
+                            <strong>{gameStats.bestStreak}</strong>
+                          </span>
+                          <span className="game-tile-stat">
+                            <small>Points</small>
+                            <strong>{gameStats.points}</strong>
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="play-cta-button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setActiveGame(game.key)
+                            setNavDirection('forward')
+                            setView('minigame')
+                            setSessionActive(false)
+                            setRoundState(null)
+                            setRoundFeedback(null)
+                            setRoundFeedbackTone(null)
+                            setRoundFeedbackPoints(null)
+                            setRoundFeedbackAnswer(null)
+                            setIsRoundResolving(false)
+                            setLivesRemaining(DEFAULT_LIVES)
+                            resetRoundCycle()
+                          }}
+                        >
+                          Play
+                        </button>
+                      </article>
+                    )
+                  })}
+                </div>
+              </>
+            ) : null}
 
             {gameLoading ? <p className="status-line">Loading deck cards...</p> : null}
             {gameError ? <p className="status-line status-error">{gameError}</p> : null}
@@ -1056,7 +1344,12 @@ function App() {
               Back to Map
             </button>
             <div className="brand-block">
-              <span className="brand-kicker">{SCRIPT_LABELS[activeScript]} Run</span>
+              <span className="brand-kicker">
+                {SCRIPT_LABELS[activeScript]}
+                {blockProgressWithMastery.length > 0 && blockProgressWithMastery[activeBlockIndex]
+                  ? ` · ${blockProgressWithMastery[activeBlockIndex].name}`
+                  : ' Run'}
+              </span>
               <h1>{selectedGameMeta?.title ?? 'Minigame'}</h1>
             </div>
             <div className="topbar-end">
@@ -1077,7 +1370,36 @@ function App() {
           </header>
 
           <section className="panel-glass game-panel">
-            {!sessionActive ? (
+            {blockSessionComplete && sessionActive ? (
+              <article className="block-complete-banner panel-glass" role="status">
+                <span className="block-complete-icon" aria-hidden="true">🎉</span>
+                <h2 className="block-complete-title">Block complete!</h2>
+                <p className="block-complete-copy">
+                  You answered every card in{' '}
+                  <strong>{blockProgressWithMastery[activeBlockIndex]?.name ?? 'this block'}</strong>{' '}
+                  correctly. Head back to the map to continue your path.
+                </p>
+                <div className="game-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNavDirection('back')
+                      setView('script_hub')
+                    }}
+                  >
+                    Back to Map
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      startSession()
+                    }}
+                  >
+                    Play Again
+                  </button>
+                </div>
+              </article>
+            ) : !sessionActive ? (
               <article className="minigame-intro panel-glass">
                 <span className="intro-icon" aria-hidden="true">
                   <MinigameIcon game={activeGame} />
@@ -1224,19 +1546,6 @@ function App() {
         </div>
       ) : null}
 
-      {roundFeedback ? (
-        <div
-          className={`round-feedback-toast ${
-            roundFeedbackTone === 'success' ? 'round-feedback-toast-success' : 'round-feedback-toast-error'
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          <strong>{roundFeedback}</strong>
-          {roundFeedbackTone === 'error' && roundFeedbackAnswer ? <span>Correct: {roundFeedbackAnswer}</span> : null}
-        </div>
-      ) : null}
-
       {view === 'overview' ? (
         <div className={`view-shell view-${navDirection}`}>
           <header className="topbar panel-glass">
@@ -1277,7 +1586,7 @@ function App() {
               <button
                 type="button"
                 className="danger-button"
-                onClick={() => setShowResetConfirm(true)}
+                onClick={() => setResetConfirmStep(1)}
                 disabled={resettingDb}
               >
                 {resettingDb ? 'Resetting...' : 'Reset DB'}
@@ -1286,24 +1595,51 @@ function App() {
             </div>
           </section>
 
-          {showResetConfirm ? (
+          {resetConfirmStep > 0 ? (
             <section className="panel-glass reset-confirm-panel" role="alertdialog" aria-modal="true">
-              <h3>Reset study database?</h3>
-              <p>
-                This will permanently clear all review progress and event history for the study overview.
-              </p>
-              <div className="reset-confirm-actions">
-                <button type="button" className="danger-button" onClick={() => void resetStudyDb()} disabled={resettingDb}>
-                  {resettingDb ? 'Resetting...' : 'Yes, reset DB'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowResetConfirm(false)}
-                  disabled={resettingDb}
-                >
-                  Cancel
-                </button>
-              </div>
+              {resetConfirmStep === 1 ? (
+                <>
+                  <h3>Reset all progress?</h3>
+                  <p>
+                    This will permanently delete all review history, streaks, leech data,
+                    and locally-tracked character scores. There is no undo.
+                  </p>
+                  <div className="reset-confirm-actions">
+                    <button
+                      type="button"
+                      className="danger-button"
+                      onClick={() => setResetConfirmStep(2)}
+                      disabled={resettingDb}
+                    >
+                      I understand — continue
+                    </button>
+                    <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3>Final confirmation</h3>
+                  <p>
+                    <strong>All your progress will be erased.</strong>{' '}
+                    Click the button below to permanently delete everything.
+                  </p>
+                  <div className="reset-confirm-actions">
+                    <button
+                      type="button"
+                      className="danger-button danger-button-final"
+                      onClick={() => void resetStudyDb()}
+                      disabled={resettingDb}
+                    >
+                      {resettingDb ? 'Resetting…' : '⚠ Yes, delete everything'}
+                    </button>
+                    <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
             </section>
           ) : null}
 
@@ -1318,6 +1654,109 @@ function App() {
                 <strong className="live-value">{tile.value}</strong>
               </article>
             ))}
+          </section>
+
+          {/* ── Character mastery grid ────────────────────────────────── */}
+          <section className="panel-glass char-mastery-panel">
+            <button
+              type="button"
+              className="char-mastery-toggle"
+              onClick={() => setCharMasteryExpanded((v) => !v)}
+              aria-expanded={charMasteryExpanded}
+            >
+              <div className="panel-head char-mastery-panel-head">
+                <h2>Character Mastery</h2>
+                <div className="panel-actions">
+                  <span>{overviewBlocksLoading ? 'Loading…' : 'Color-coded progress for every symbol'}</span>
+                </div>
+                <span className={`char-mastery-chevron ${charMasteryExpanded ? 'is-open' : ''}`} aria-hidden="true">▾</span>
+              </div>
+            </button>
+
+            {/* max-height wrapper — inner div carries padding so wrapper can collapse to 0 cleanly */}
+            <div className={`char-mastery-body ${charMasteryExpanded ? 'is-open' : ''}`}>
+              <div className="char-mastery-body-inner">
+                {(['hiragana', 'katakana'] as const).map((script) => {
+                  const blocks = overviewBlocks[script]
+                  if (!blocks || blocks.length === 0) return null
+                  const scores = cardScores[script]
+
+                  return (
+                    <div key={script} className="char-mastery-script">
+                      <h3 className="char-mastery-script-name">
+                        {script === 'hiragana' ? 'Hiragana' : 'Katakana'}
+                      </h3>
+
+                      {/*
+                        CSS-Grid inline-expand pattern (css-tricks.com/expandable-sections-within-a-css-grid):
+                        Tiles sit in an auto-fill grid. The active block's detail panel is injected
+                        directly after its tile with grid-column: 1 / -1 so it spans the full row.
+                        grid-auto-flow: dense fills any gaps in the tile row before the detail panel,
+                        keeping the visual tile order stable.
+                      */}
+                      <div className="char-mastery-tiles-grid">
+                        {blocks.map((block) => {
+                          const blockKey = `${script}-${block.index}`
+                          const isActive = expandedBlocks === blockKey
+                          const blockTotal = block.card_ids.reduce((sum, id) => sum + (scores[id] ?? 0), 0)
+                          const pct = block.card_ids.length > 0
+                            ? Math.round(blockTotal / (CARD_MASTERY_MAX * block.card_ids.length) * 100)
+                            : 0
+                          return (
+                            <Fragment key={block.index}>
+                              <button
+                                type="button"
+                                className={`cmb-tile ${isActive ? 'is-active' : ''}`}
+                                onClick={() => setExpandedBlocks(isActive ? null : blockKey)}
+                                aria-expanded={isActive}
+                                aria-label={`${block.name}: ${pct}% mastered`}
+                              >
+                                <div className="cmb-tile-chars" lang="ja" aria-hidden="true">
+                                  {block.sample_chars.join(' ')}
+                                </div>
+                                <strong className="cmb-tile-name">{block.name}</strong>
+                                <div className="cmb-bar-wrap">
+                                  <div className="cmb-bar" style={{ '--cmb-pct': `${pct}%` } as React.CSSProperties} />
+                                </div>
+                                <div className="cmb-tile-pct">{pct}%</div>
+                              </button>
+
+                              {/* Detail panel: grid-column 1/-1 makes it span the full row right below this tile */}
+                              {isActive ? (
+                                <div className="char-mastery-detail-inline">
+                                  <div className="char-mastery-chips">
+                                    {block.card_ids.map((id, charIdx) => {
+                                      const score = scores[id] ?? 0
+                                      const level = Math.min(score, CARD_MASTERY_MAX)
+                                      const char = block.characters?.[charIdx] ?? ''
+                                      const meaning = block.meanings?.[charIdx] ?? ''
+                                      const romaji = block.romajis?.[charIdx] ?? ''
+                                      return (
+                                        <button
+                                          key={id}
+                                          type="button"
+                                          className="char-mastery-chip"
+                                          data-level={level}
+                                          aria-label={`${char} (${romaji}): ${level}/${CARD_MASTERY_MAX}`}
+                                          lang="ja"
+                                          onClick={() => setSelectedChar({ character: char, romaji, meaning, score: level })}
+                                        >
+                                          {char}
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </Fragment>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </section>
 
           <section className="panel-glass activity-summary-panel">
@@ -1586,6 +2025,46 @@ function App() {
                 <code className="command-hint">1 / 2 / 3</code><span>Script villages (home)</span>
                 <code className="command-hint">4</code><span>Study overview (home)</span>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedChar ? (
+        <div
+          className="char-detail-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Character detail: ${selectedChar.character}`}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedChar(null) }}
+        >
+          <div className="char-detail-card">
+            <button
+              type="button"
+              className="char-detail-close"
+              onClick={() => setSelectedChar(null)}
+              aria-label="Close"
+            >✕</button>
+            <div className="char-detail-char" lang="ja">{selectedChar.character}</div>
+            <div className="char-detail-romaji">{selectedChar.romaji}</div>
+            {selectedChar.meaning !== selectedChar.romaji ? (
+              <div className="char-detail-meaning">{selectedChar.meaning}</div>
+            ) : null}
+            <div className="char-detail-score-bar-wrap">
+              {Array.from({ length: CARD_MASTERY_MAX }, (_, i) => (
+                <span
+                  key={i}
+                  className={`char-detail-pip ${i < selectedChar.score ? 'is-filled' : ''}`}
+                  aria-hidden="true"
+                />
+              ))}
+            </div>
+            <div className="char-detail-score-label">
+              {selectedChar.score === 0 && 'Not studied yet'}
+              {selectedChar.score === 1 && 'Just started'}
+              {selectedChar.score === 2 && 'Getting there'}
+              {selectedChar.score === 3 && 'Almost mastered'}
+              {selectedChar.score === CARD_MASTERY_MAX && 'Mastered ✓'}
             </div>
           </div>
         </div>

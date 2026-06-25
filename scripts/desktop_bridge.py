@@ -31,6 +31,11 @@ from data.study_pipeline import (
     load_today_progress,
     reset_study_db,
 )
+from domain.blocks import (
+    blocks_for_slug,
+    compute_block_mastery,
+    compute_unlocked_count,
+)
 from domain.distractors import rank_distractor_ids
 from domain.decks import ALL_DECKS
 
@@ -151,6 +156,49 @@ def build_deck_cards(slug: str) -> dict[str, object]:
     }
 
 
+def build_block_progress(slug: str) -> dict[str, object]:
+    """Return block definitions with unlock status and per-block mastery."""
+    init_study_db()
+    blocks = blocks_for_slug(slug)
+    if not blocks:
+        return {"slug": slug, "blocks": []}
+
+    factory = ALL_DECKS.get(slug)
+    if factory is None:
+        raise ValueError(f"Unknown deck slug: {slug}")
+
+    deck = factory()
+    card_ids = [card.id for card in deck.cards]
+    states = load_review_states(deck.name, card_ids)
+    repetitions_map: dict[int, int] = {
+        cid: getattr(states.get(cid), "repetitions", 0) for cid in card_ids
+    }
+
+    unlocked_count = compute_unlocked_count(blocks, repetitions_map)
+    char_map: dict[int, str] = {card.id: card.character for card in deck.cards}
+    meaning_map: dict[int, str] = {card.id: card.meaning for card in deck.cards}
+    romaji_map: dict[int, str] = {card.id: card.romaji for card in deck.cards}
+
+    result = []
+    for block in blocks:
+        mastery = compute_block_mastery(block, repetitions_map)
+        result.append(
+            {
+                "index": block.index,
+                "name": block.name,
+                "card_ids": block.card_ids,
+                "sample_chars": block.sample_chars,
+                "characters": [char_map[cid] for cid in block.card_ids if cid in char_map],
+                "meanings": [meaning_map[cid] for cid in block.card_ids if cid in meaning_map],
+                "romajis": [romaji_map[cid] for cid in block.card_ids if cid in romaji_map],
+                "mastery": round(mastery, 3),
+                "unlocked": block.index < unlocked_count,
+            }
+        )
+
+    return {"slug": slug, "blocks": result}
+
+
 def reset_progress() -> dict[str, object]:
     reset_study_db()
     return {"ok": True}
@@ -174,6 +222,19 @@ def main() -> int:
         slug = sys.argv[2]
         try:
             payload = build_deck_cards(slug)
+        except ValueError as exc:
+            print(json.dumps({"error": str(exc)}))
+            return 2
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    if command == "block-progress":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "Missing deck slug"}))
+            return 2
+        slug = sys.argv[2]
+        try:
+            payload = build_block_progress(slug)
         except ValueError as exc:
             print(json.dumps({"error": str(exc)}))
             return 2

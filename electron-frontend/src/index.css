@@ -48,6 +48,8 @@
   --sans: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
   --button-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+
+  font-family: var(--sans);
 }
 
 html[data-theme='harbor_mist'] {

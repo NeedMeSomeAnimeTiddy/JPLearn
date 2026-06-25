@@ -39,13 +39,47 @@
   app-region: drag;
 }
 
-.window-titlebar-title {
-  font-family: var(--button-font);
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--text-main) 80%, var(--text-soft));
-  opacity: 0.86;
+.window-titlebar-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.window-nav-button {
+  border: none;
+  background: transparent;
+  color: color-mix(in oklab, var(--text-main) 90%, var(--text-soft));
+  width: calc(46px * var(--ui-scale));
+  height: calc(40px * var(--ui-scale));
+  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+  padding: 0;
+}
+
+.window-nav-button:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--tone-ocean) 15%, transparent);
+  color: var(--text-main);
+}
+
+.window-nav-button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.window-nav-button:focus-visible {
+  outline: 1px solid color-mix(in oklab, var(--tone-ocean) 72%, white);
+  outline-offset: -2px;
+}
+
+.window-nav-icon {
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
 }
 
 .window-controls {
@@ -283,7 +317,7 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: linear-gradient(155deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
   color: color-mix(in oklab, var(--accent) 66%, var(--text-main));
-  font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+  font-family: var(--sans);
   font-size: clamp(2rem, 5vw, 2.8rem);
   font-weight: 700;
   line-height: 1;
@@ -316,7 +350,7 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+  font-family: var(--sans);
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1;
@@ -618,6 +652,21 @@ button {
   border-color: color-mix(in oklab, var(--tone-rose) 72%, var(--button-border));
 }
 
+.danger-button-final {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--tone-rose) 32%, var(--button-bg-top)),
+    color-mix(in oklab, var(--tone-rose) 22%, var(--button-bg-bottom))
+  );
+  border-color: color-mix(in oklab, var(--tone-rose) 72%, var(--button-border));
+  animation: dangerPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dangerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--tone-rose) 0%, transparent); }
+  50%       { box-shadow: 0 0 0 4px color-mix(in oklab, var(--tone-rose) 30%, transparent); }
+}
+
 .overview-hero-actions span {
   color: var(--text-soft);
   font-size: 0.84rem;
@@ -898,6 +947,466 @@ button {
   color: var(--text-soft);
   font-size: 0.9rem;
 }
+
+/* ── Block progression path ─────────────────────────────────────── */
+
+.block-path {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.block-node {
+  animation: enterUp 480ms ease both;
+}
+
+.block-node-button {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background: linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
+  padding: 12px 14px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: border-color 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.block-node-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--tone-ocean) 50%, var(--card-border));
+}
+
+.block-node.is-active .block-node-button {
+  border-color: color-mix(in oklab, var(--tone-ocean) 70%, var(--card-border));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tone-ocean) 36%, transparent);
+}
+
+.block-node.is-locked .block-node-button {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.block-node-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.block-node-chars {
+  font-family: var(--display-font);
+  font-size: 1.4rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: var(--text-main);
+}
+
+.block-lock-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.block-node-name {
+  font-size: 0.82rem;
+  display: block;
+  color: var(--text-soft);
+}
+
+.block-node-bar-wrap {
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.block-node-bar {
+  height: 100%;
+  width: var(--block-mastery, 0%);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--tone-ocean) 80%, var(--tone-amber));
+  transition: width 400ms ease;
+}
+
+.block-node-pct {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.block-minigame-head {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--card-border);
+}
+
+.block-minigame-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.block-complete-banner {
+  padding: 28px 24px;
+  text-align: center;
+  animation: enterUp 420ms ease both;
+}
+
+.block-complete-icon {
+  font-size: 2.4rem;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.block-complete-title {
+  font-family: var(--display-font);
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  margin: 0 0 10px;
+}
+
+.block-complete-copy {
+  color: var(--text-soft);
+  font-size: 0.92rem;
+  margin: 0 0 20px;
+  max-width: 400px;
+  margin-inline: auto;
+}
+
+.block-complete-banner .game-actions {
+  justify-content: center;
+}
+
+/* ── Character mastery grid (Overview) ─────────────────────────── */
+
+.char-mastery-panel {
+  padding: 0;
+  animation: enterUp 460ms ease both;
+}
+
+/* Toggle button that covers the panel head */
+.char-mastery-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 20px 22px 16px;
+  color: inherit;
+  text-align: left;
+  font-family: var(--sans);
+  letter-spacing: normal;
+}
+
+.char-mastery-toggle:hover .char-mastery-panel-head h2 {
+  color: color-mix(in oklab, var(--text-main) 85%, var(--tone-ocean));
+}
+
+.char-mastery-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  width: 100%;
+}
+
+.char-mastery-chevron {
+  margin-left: auto;
+  font-size: 1rem;
+  color: var(--text-muted);
+  display: inline-block;
+  transition: transform 260ms ease;
+  flex-shrink: 0;
+}
+
+.char-mastery-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/*
+ * max-height collapse: the outer wrapper clips to zero height.
+ * Padding lives on the inner div so the wrapper collapses cleanly to 0.
+ */
+.char-mastery-body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 340ms ease;
+}
+
+.char-mastery-body.is-open {
+  max-height: 6000px;
+  transition: max-height 500ms ease;
+}
+
+.char-mastery-body-inner {
+  padding: 0 22px 20px;
+}
+
+.char-mastery-script {
+  margin-bottom: 16px;
+}
+
+.char-mastery-script:last-child {
+  margin-bottom: 0;
+}
+
+.char-mastery-script-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+/* Compact tile grid with CSS-Grid inline expand (css-tricks.com/expandable-sections-within-a-css-grid) */
+.char-mastery-tiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  gap: 7px;
+  grid-auto-flow: dense; /* fills row gaps left by the injected detail panel */
+}
+
+.char-mastery-block-group { /* kept for any stray references */ }
+
+/* Individual compact tile */
+.cmb-tile {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
+  padding: 10px 11px 8px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.cmb-tile:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--tone-ocean) 42%, var(--card-border));
+}
+
+.cmb-tile.is-active {
+  border-color: color-mix(in oklab, var(--tone-ocean) 68%, var(--card-border));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tone-ocean) 28%, transparent);
+}
+
+.cmb-tile-chars {
+  font-family: var(--display-font);
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  color: var(--text-main);
+}
+
+.cmb-tile-name {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmb-bar-wrap {
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.cmb-bar {
+  height: 100%;
+  width: var(--cmb-pct, 0%);
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--tone-ocean) 78%, var(--tone-amber));
+  transition: width 400ms ease;
+}
+
+.cmb-tile-pct {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* Inline detail panel — spans full grid row immediately below the active tile */
+.char-mastery-detail-inline {
+  grid-column: 1 / -1;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 55%, var(--card-border));
+  border-radius: 12px;
+  background: linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
+  animation: enterUp 200ms ease both;
+}
+
+.char-mastery-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 12px 14px 14px;
+}
+
+/* Chip is now a button */
+.char-mastery-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-family: var(--display-font);
+  font-size: 1.05rem;
+  border: 1px solid transparent;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+}
+
+.char-mastery-chip:hover {
+  transform: scale(1.18);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* Score 0 – unknown: red */
+.char-mastery-chip[data-level="0"] {
+  background: rgba(200, 60, 60, 0.22);
+  border-color: rgba(200, 60, 60, 0.42);
+  color: #f08080;
+}
+
+/* Score 1 – early: orange */
+.char-mastery-chip[data-level="1"] {
+  background: rgba(210, 110, 30, 0.22);
+  border-color: rgba(210, 110, 30, 0.42);
+  color: #f0a060;
+}
+
+/* Score 2 – halfway: amber */
+.char-mastery-chip[data-level="2"] {
+  background: rgba(200, 165, 20, 0.22);
+  border-color: rgba(200, 165, 20, 0.42);
+  color: #e0c050;
+}
+
+/* Score 3 – nearly there: yellow-green */
+.char-mastery-chip[data-level="3"] {
+  background: rgba(120, 180, 40, 0.22);
+  border-color: rgba(120, 180, 40, 0.42);
+  color: #a8d060;
+}
+
+/* Score 4 – mastered: green */
+.char-mastery-chip[data-level="4"] {
+  background: rgba(50, 165, 90, 0.28);
+  border-color: rgba(50, 165, 90, 0.52);
+  color: #70e090;
+}
+
+/* ── Character detail modal ─────────────────────────────────────── */
+
+.char-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: fadeIn 200ms ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0 }
+  to   { opacity: 1 }
+}
+
+.char-detail-card {
+  position: relative;
+  padding: 40px 48px 36px;
+  border-radius: 22px;
+  border: 1px solid var(--card-border);
+  background: linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
+  backdrop-filter: blur(16px);
+  text-align: center;
+  min-width: 260px;
+  max-width: 380px;
+  animation: enterUp 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.char-detail-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.char-detail-close:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.char-detail-char {
+  font-family: var(--display-font);
+  font-size: clamp(5rem, 14vw, 8rem);
+  line-height: 1;
+  margin-bottom: 12px;
+  color: var(--text-main);
+}
+
+.char-detail-romaji {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+
+.char-detail-meaning {
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.char-detail-score-bar-wrap {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.char-detail-pip {
+  width: 36px;
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 300ms ease;
+}
+
+.char-detail-pip.is-filled {
+  background: color-mix(in oklab, var(--tone-ocean) 72%, var(--tone-amber));
+}
+
+.char-detail-score-label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* ── Minigame grid ──────────────────────────────────────────────── */
 
 .minigame-grid {
   display: grid;
@@ -1302,7 +1811,7 @@ button {
 }
 
 .game-prompt-main.is-japanese {
-  font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+  font-family: var(--sans);
   font-size: clamp(2.2rem, 9vw, 4.2rem);
   line-height: 1;
 }
@@ -1349,7 +1858,7 @@ button {
 }
 
 .option-button-character {
-  font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+  font-family: var(--sans);
   font-size: clamp(1.45rem, 4vw, 2rem);
   line-height: 1.1;
   text-align: center;

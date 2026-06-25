@@ -114,6 +114,15 @@ ipcMain.handle('study:get-summary', async () => {
   }
 })
 
+ipcMain.handle('study:get-block-progress', async (_event, slug) => {
+  try {
+    return await runPythonBridgeWithArgs(['block-progress', slug])
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to fetch block progress: ${detail}`)
+  }
+})
+
 ipcMain.handle('study:get-deck-cards', async (_event, slug) => {
   try {
     return await runPythonBridgeWithArgs(['deck-cards', slug])

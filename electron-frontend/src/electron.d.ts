@@ -77,9 +77,27 @@ interface ScriptDeckPayload {
   cards: GameCard[]
 }
 
+interface BlockInfo {
+  index: number
+  name: string
+  card_ids: number[]
+  sample_chars: string[]
+  characters: string[]
+  meanings: string[]
+  romajis: string[]
+  mastery: number
+  unlocked: boolean
+}
+
+interface BlockProgressPayload {
+  slug: string
+  blocks: BlockInfo[]
+}
+
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
+  getBlockProgress: (slug: 'hiragana' | 'katakana' | 'kanji_n5') => Promise<BlockProgressPayload>
   getDeckCards: (slug: 'hiragana' | 'katakana' | 'kanji_n5') => Promise<ScriptDeckPayload>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>

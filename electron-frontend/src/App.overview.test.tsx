@@ -18,6 +18,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 const baseDesktopApi = {
   versions: { chrome: '0', electron: '0', node: '0' },
+  getBlockProgress: async (slug: string) => ({ slug, blocks: [] }),
   getDeckCards: async () => ({ slug: 'hiragana' as const, name: 'Hiragana', cards: [] }),
   resetStudyDb: async () => ({ ok: true }),
   minimizeWindow: async () => ({ ok: true }),
