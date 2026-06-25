@@ -32,9 +32,9 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 ### Learning Content
 - [x] Ship Hiragana deck
 - [x] Ship Katakana deck
-- [ ] Add first Kanji deck (start with JLPT N5)
-- [ ] Add vocabulary decks grouped by topic and JLPT level
-- [ ] Add basic grammar pattern cards (particles, verb forms, sentence templates)
+- [x] Add first Kanji deck (start with JLPT N5)
+- [x] Add vocabulary decks grouped by topic and JLPT level
+- [x] Add basic grammar pattern cards (particles, verb forms, sentence templates)
 
 ### SRS & Study Logic
 - [x] Persist and apply SRS scheduling in SQLite-backed flow
