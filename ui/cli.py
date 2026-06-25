@@ -6,9 +6,9 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich import print as rprint
 
-from src.cards import Card, Deck
-from src.scheduler import ReviewState, update, AGAIN, HARD, GOOD, EASY
-from src import database
+from data import database
+from domain.cards import Deck
+from domain.scheduler import ReviewState, update, AGAIN, HARD, GOOD, EASY
 
 console = Console()
 

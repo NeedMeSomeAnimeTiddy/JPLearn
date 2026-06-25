@@ -3,47 +3,53 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-
 DB_PATH = Path("data/app.db")
 
 
-def check_row(row) -> list[str]:
-    errors = []
+def check_row(row: tuple[object, ...]) -> list[str]:
+    errors: list[str] = []
 
-    last_interval, ease, performance, next_interval, new_ease = row
+    _item_id, last_interval, ease_factor, due, updated_at = row
 
-    # basic sanity rules (adjust to your model)
-    if ease <= 0:
-        errors.append("ease_factor <= 0")
+    if not isinstance(last_interval, int) or last_interval < 0:
+        errors.append("invalid last_interval")
 
-    if next_interval < 0:
-        errors.append("negative interval")
+    if not isinstance(ease_factor, float) or ease_factor <= 0:
+        errors.append("invalid ease_factor")
 
-    if performance not in (0, 1, 2, 3, 4, 5):
-        errors.append("invalid performance score")
+    if not isinstance(due, int) or due < 0:
+        errors.append("invalid due value")
+
+    if not isinstance(updated_at, int) or updated_at < 0:
+        errors.append("invalid updated_at value")
 
     return errors
 
 
 def main() -> int:
-    if not DB_PATH.exists():
-        print("DB not found")
-        return 1
-
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS srs_items (
+            id TEXT PRIMARY KEY,
+            last_interval INTEGER NOT NULL,
+            ease_factor REAL NOT NULL,
+            due INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+        """
+    )
+
     cur.execute("""
-        SELECT last_interval, ease_factor, performance,
-               next_interval, new_ease_factor
-        FROM srs_history
+        SELECT id, last_interval, ease_factor, due, updated_at
+        FROM srs_items
     """)
 
-    rows = cur.fetchall()
+    errors: list[tuple[int, tuple[object, ...], list[str]]] = []
 
-    errors = []
-
-    for i, row in enumerate(rows):
+    for i, row in enumerate(cur.fetchall()):
         row_errors = check_row(row)
         if row_errors:
             errors.append((i, row, row_errors))

@@ -1,4 +1,4 @@
-"""Card and Deck data models."""
+"""Card and deck data models."""
 
 from dataclasses import dataclass, field
 from typing import Optional

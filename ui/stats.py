@@ -1,11 +1,10 @@
 """Progress and stats display."""
 
-from datetime import date
 from rich.console import Console
 from rich.table import Table
 
-from src.cards import Deck
-from src import database
+from data import database
+from domain.cards import Deck
 
 console = Console()
 

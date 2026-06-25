@@ -1,6 +1,6 @@
 """Built-in decks: Hiragana, Katakana."""
 
-from src.cards import Card, Deck
+from domain.cards import Card, Deck
 
 # ---------------------------------------------------------------------------
 # Hiragana

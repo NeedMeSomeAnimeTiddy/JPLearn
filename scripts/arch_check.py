@@ -3,7 +3,8 @@ import sys
 from pathlib import Path
 
 
-RULES = {
+RULES: dict[str, dict[str, list[str]]] = {
+    "src": {"forbid": []},
     "domain": {"forbid": ["data", "ui"]},
     "data": {"forbid": ["ui"]},
     "ui": {"forbid": []},
@@ -36,7 +37,7 @@ def extract_imports(file_path: Path) -> set[str]:
 
 def check_file(file_path: Path) -> list[str]:
     layer = get_layer(file_path)
-    if not layer:
+    if not layer or layer not in RULES:
         return []
 
     forbidden = set(RULES[layer]["forbid"])

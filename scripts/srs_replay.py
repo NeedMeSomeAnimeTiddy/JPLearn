@@ -20,7 +20,7 @@ def main() -> int:
         FROM srs_history
     """)
 
-    mismatches = []
+    mismatches: list[tuple[int, object, object]] = []
 
     for i, (li, ef, p, ni, ne) in enumerate(cur.fetchall()):
 

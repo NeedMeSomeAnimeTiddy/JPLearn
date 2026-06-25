@@ -4,9 +4,9 @@ from rich.console import Console
 from rich.prompt import Prompt
 from rich import print as rprint
 
-from src.decks import ALL_DECKS
-from src.quiz import run_flashcard_session
-from src.stats import show_deck_progress
+from domain.decks import ALL_DECKS
+from ui.cli import run_flashcard_session
+from ui.stats import show_deck_progress
 
 console = Console()
 
@@ -25,7 +25,7 @@ def select_deck():
     return ALL_DECKS[deck_key]()
 
 
-def main_menu() -> None:
+def main_menu() -> str:
     console.clear()
     console.rule("[bold yellow]JPLearn[/bold yellow]")
     rprint("\n  [bold]1[/bold]  Flashcard review")

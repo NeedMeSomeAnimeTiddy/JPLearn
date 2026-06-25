@@ -1,13 +1,15 @@
 """tkinter GUI for JPLearn."""
 
 import random
+from functools import partial
+from typing import Any
 import tkinter as tk
 from tkinter import font as tkfont
 
-from src.cards import Card, Deck
-from src.decks import ALL_DECKS
-from src.scheduler import ReviewState, update, AGAIN, HARD, GOOD, EASY
-from src import database
+from data import database
+from domain.cards import Card, Deck
+from domain.decks import ALL_DECKS
+from domain.scheduler import ReviewState, update, AGAIN, HARD, GOOD, EASY
 
 # ---------------------------------------------------------------------------
 # Colour palette
@@ -68,8 +70,8 @@ class HomeFrame(AppFrame):
         tk.Label(self, text="Choose a deck", font=_jp_font(13),
                  bg=BG, fg=FG).pack(pady=(0, 16))
 
-        btn_cfg = dict(width=18, font=_jp_font(13, bold=True),
-                       fg=BTN_FG, relief="flat", cursor="hand2", pady=10)
+        btn_cfg: dict[str, Any] = dict(width=18, font=_jp_font(13, bold=True),
+                                       fg=BTN_FG, relief="flat", cursor="hand2", pady=10)
 
         tk.Button(self, text="ひ  Hiragana", bg="#6c3483",
                   command=lambda: self.app.start_review("hiragana"),
@@ -148,7 +150,7 @@ class FlashcardFrame(AppFrame):
             tk.Button(
                 self._rating_frame, text=label, font=_jp_font(12, bold=True),
                 bg=colour, fg=BTN_FG, relief="flat", cursor="hand2",
-                pady=10, command=lambda q=quality: self._rate(q),
+                pady=10, command=partial(self._rate, quality),
             ).pack(side="left", expand=True, fill="x", padx=4)
 
         self._bind_keys()
@@ -177,9 +179,13 @@ class FlashcardFrame(AppFrame):
         self._next_card()
 
     def _next_card(self) -> None:
+        deck = self._deck
+        if deck is None:
+            return
+
         if not self._queue:
             self._unbind_keys()
-            self.app.show_session_complete(self._correct, self._total, self._deck.name)
+            self.app.show_session_complete(self._correct, self._total, deck.name)
             return
 
         self._current = self._queue.pop(0)
@@ -198,12 +204,13 @@ class FlashcardFrame(AppFrame):
         self._rating_frame.pack(fill="x", padx=30, pady=(0, 30))
 
     def _rate(self, quality: int) -> None:
-        if self._current is None or self._rating_frame.winfo_ismapped() == 0:
+        deck = self._deck
+        if self._current is None or deck is None or self._rating_frame.winfo_ismapped() == 0:
             return
         if quality >= GOOD:
             self._correct += 1
         state = update(self._states[self._current.id], quality)
-        database.save_state(self._deck.name, state)
+        database.save_state(deck.name, state)
         self._next_card()
 
     def show(self):

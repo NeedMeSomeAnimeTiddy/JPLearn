@@ -4,7 +4,7 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-from src.scheduler import ReviewState
+from domain.scheduler import ReviewState
 
 DB_PATH = Path(__file__).parent.parent / "data" / "jplearn.db"
 

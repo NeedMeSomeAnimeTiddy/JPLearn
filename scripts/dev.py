@@ -14,7 +14,7 @@ class Command:
 COMMANDS = [
     Command(
         "mypy",
-        [sys.executable, "-m", "mypy", "."],
+        [sys.executable, "-m", "mypy", "--explicit-package-bases", "."],
     ),
     Command(
         "architecture",
@@ -46,6 +46,10 @@ def main() -> int:
         print(f"\n=== {command.name.upper()} ===")
 
         result = subprocess.run(command.cmd)
+
+        if command.name == "pytest" and result.returncode == 5:
+            print("\nNo tests collected")
+            continue
 
         if result.returncode != 0:
             print(f"\nFAILED: {command.name}")

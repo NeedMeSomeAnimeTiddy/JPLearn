@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 
-RULES = {
+RULES: dict[str, dict[str, set[str]]] = {
     "domain": {"forbid": {"data", "ui"}},
     "data": {"forbid": {"ui"}},
     "ui": {"forbid": set()},
