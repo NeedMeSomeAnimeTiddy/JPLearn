@@ -1,56 +1,44 @@
-"""JPLearn — Japanese learning app entry point."""
+"""JPLearn main entrypoint (GUI-forward)."""
 
-from rich.console import Console
-from rich.prompt import Prompt
-from rich import print as rprint
+from __future__ import annotations
 
-from domain.decks import ALL_DECKS
-from ui.cli import run_flashcard_session
-from ui.stats import show_deck_progress
+import ctypes
+import traceback
 
-console = Console()
-
-DECK_MENU = {
-    "1": "hiragana",
-    "2": "katakana",
-}
+from startup import detach_console_for_gui_launch
 
 
-def select_deck():
-    console.rule("[bold cyan]Select a Deck[/bold cyan]")
-    rprint("  [bold]1[/bold]  Hiragana")
-    rprint("  [bold]2[/bold]  Katakana")
-    choice = Prompt.ask("\nDeck", choices=list(DECK_MENU.keys()))
-    deck_key = DECK_MENU[choice]
-    return ALL_DECKS[deck_key]()
+def run() -> None:
+    from ui.qt_app import run as ui_run
 
-
-def main_menu() -> str:
-    console.clear()
-    console.rule("[bold yellow]JPLearn[/bold yellow]")
-    rprint("\n  [bold]1[/bold]  Flashcard review")
-    rprint("  [bold]2[/bold]  View progress")
-    rprint("  [bold]q[/bold]  Quit\n")
-    return Prompt.ask("Choice", choices=["1", "2", "q"], default="1")
+    ui_run()
 
 
 def main() -> None:
-    while True:
-        choice = main_menu()
+    run()
 
-        if choice == "q":
-            rprint("\n[bold]Goodbye! 頑張って！[/bold]\n")
-            break
 
-        deck = select_deck()
+def _show_startup_error(message: str) -> None:
+    ctypes.windll.user32.MessageBoxW(0, message, "JPLearn startup error", 0x10)
 
-        if choice == "1":
-            run_flashcard_session(deck)
-        elif choice == "2":
-            show_deck_progress(deck)
 
-        Prompt.ask("\n[dim]Press Enter to return to menu[/dim]", default="")
+def launch() -> None:
+    detach_console_for_gui_launch()
+    try:
+        main()
+    except Exception as exc:
+        if isinstance(exc, ModuleNotFoundError) and exc.name == "PySide6":
+            _show_startup_error(
+                "A required package is not installed for the Python interpreter used to open this file.\n\n"
+                "Run this once in the project folder:\n"
+                "python -m pip install -r requirements.txt"
+            )
+            return
+        details = "".join(
+            traceback.format_exception_only(type(exc), exc)
+        ).strip()
+        _show_startup_error(f"JPLearn failed to start.\n\n{details}")
 
 
 if __name__ == "__main__":
-    main()
+    launch()

@@ -27,7 +27,7 @@ python -m pytest tests\path\to\test_file.py::test_name -q
 
 `scripts\dev.py` is the main aggregate check. It runs, in order, `mypy`, the architecture import guard, the DB schema check, the SRS integrity check, and then `pytest`.
 
-There is no packaging/build pipeline in the repository today. The main runnable entry points are `main.py` for the Rich CLI and `gui.py` at the repo root for the Tkinter UI launcher.
+There is no packaging/build pipeline in the repository today. The main runnable entry points are `main.py` and `gui.py` at the repo root for the PySide6 UI launcher.
 
 ## High-level architecture
 
@@ -35,13 +35,13 @@ The canonical layers are:
 
 - `domain\` for deterministic learning logic, models, and built-in deck definitions.
 - `data\` for SQLite persistence and row-to-domain mapping.
-- `ui\` for CLI and Tkinter presentation code.
+- `ui\` for PySide6 presentation code.
 
 `src\` is legacy and should stay minimal. Prefer the layered packages for new work.
 
 The app has two separate persistence flows:
 
-- Current review flow: `domain\decks.py` -> `data\database.py` -> `ui\cli.py` or `ui\tk_app.py` -> `data\database.save_state()`.
+- Current review flow: `domain\decks.py` -> `data\database.py` -> `ui\qt_app.py` -> `data\database.save_state()`.
 - Layered SRS flow: `domain\srs.py` -> `data\srs_repository.py` -> `scripts\srs_apply.py`.
 
 Keep `data\jplearn.db` and `data\app.db` concerns separate.

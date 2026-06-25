@@ -7,7 +7,7 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 
 1. Install dependencies:
    `python -m pip install -r requirements.txt`
-2. Run the CLI app:
+2. Run the main launcher (GUI-forward):
    `python main.py`
 3. Run the GUI app:
    `python gui.py`
@@ -43,12 +43,12 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 - [ ] Add smarter distractor generation for future multiple-choice sessions
 - [ ] Add per-item study history view (last reviews + outcome trend)
 
-### User Experience (CLI + GUI)
-- [x] Maintain working CLI flow (`main.py`)
-- [x] Maintain working Tkinter app flow (`gui.py`)
-- [ ] Add multiple-choice mode
+### User Experience (GUI)
+- [x] Keep `main.py` runnable as a GUI launcher
+- [x] Maintain working PySide6 app flow (`gui.py`)
+- [x] Add multiple-choice mode
 - [ ] Add typed-answer mode with tolerant input checking
-- [ ] Improve session summary screen (time spent, accuracy, weakest items)
+- [x] Improve session summary screen (time spent, accuracy, weakest items)
 - [ ] Add optional stroke-order display where assets are available
 
 ### Progress & Insights

@@ -5,7 +5,7 @@ applyTo: "ui/**/*.py"
 
 # UI Rules
 
-- Presentation only (CLI or UI)
+- Presentation only (GUI)
 - No business logic
 - No database access
 - Must call Domain/Data only
