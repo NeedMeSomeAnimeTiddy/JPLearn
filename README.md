@@ -38,7 +38,7 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 
 ### SRS & Study Logic
 - [x] Persist and apply SRS scheduling in SQLite-backed flow
-- [ ] Add configurable target retention / review load settings
+- [x] Add configurable target retention / review load settings
 - [ ] Add "leech" handling for repeatedly failed items
 - [ ] Add smarter distractor generation for future multiple-choice sessions
 - [ ] Add per-item study history view (last reviews + outcome trend)

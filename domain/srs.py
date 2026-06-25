@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 # -----------------------------
@@ -37,12 +38,45 @@ class SRSResult:
     new_ease_factor: float
 
 
+@dataclass(frozen=True)
+class SRSSettings:
+    """User-tunable settings for interval sizing.
+
+    Attributes:
+        target_retention: Expected long-term recall target.
+            Higher values produce shorter intervals.
+        review_load: Desired daily workload profile.
+            ``"light"`` lowers daily pressure, ``"heavy"`` increases it.
+    """
+
+    target_retention: float = 0.9
+    review_load: Literal["light", "normal", "heavy"] = "normal"
+
+
+def _retention_multiplier(target_retention: float) -> float:
+    if not 0.7 <= target_retention <= 0.99:
+        raise ValueError("target_retention must be between 0.70 and 0.99")
+    # 0.90 is baseline; higher target recall means tighter review spacing.
+    return 0.9 / target_retention
+
+
+def _load_multiplier(review_load: Literal["light", "normal", "heavy"]) -> float:
+    if review_load == "light":
+        return 1.15
+    if review_load == "normal":
+        return 1.0
+    if review_load == "heavy":
+        return 0.9
+    raise ValueError("review_load must be one of: light, normal, heavy")
+
+
 # -----------------------------
 # Core deterministic rule
 # -----------------------------
 def update_srs(
     state: SRSState,
     performance: int,
+    settings: SRSSettings = SRSSettings(),
 ) -> SRSResult:
     """
     Pure deterministic SRS update.
@@ -61,7 +95,10 @@ def update_srs(
     elif performance == 2:
         next_interval = max(1, li)
     else:
-        next_interval = max(1, int(li * ef))
+        interval_multiplier = _retention_multiplier(settings.target_retention) * _load_multiplier(
+            settings.review_load
+        )
+        next_interval = max(1, int(li * ef * interval_multiplier))
 
     # -----------------------------
     # Ease factor adjustment (deterministic)
