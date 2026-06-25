@@ -5,16 +5,18 @@ from __future__ import annotations
 import random
 import time
 from functools import partial
+from pathlib import Path
 from typing import Callable
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QFontDatabase, QKeyEvent
+from PySide6.QtGui import QAction, QFont, QFontDatabase, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QPushButton,
     QScrollArea,
@@ -23,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from data import study_pipeline
+from domain.answer_check import assess_typed_answer
 from domain.cards import Card, Deck
 from domain.decks import ALL_DECKS
 from domain.scheduler import AGAIN, GOOD, ReviewState
@@ -74,11 +77,17 @@ JP_FONT_CANDIDATES = [
 ]
 
 
-def _app_stylesheet() -> str:
+def _app_stylesheet(high_contrast: bool = False) -> str:
+    bg = "#000000" if high_contrast else BG
+    card_bg = "#111111" if high_contrast else CARD_BG
+    fg = "#ffffff" if high_contrast else FG
+    fg_dim = "#dddddd" if high_contrast else FG_DIM
+    accent = "#ffd400" if high_contrast else ACCENT
+    focus = "#00e5ff" if high_contrast else "#8ec5ff"
     return f"""
 QWidget {{
-    background: {BG};
-    color: {FG};
+    background: {bg};
+    color: {fg};
     font-size: 14px;
 }}
 QPushButton {{
@@ -91,16 +100,19 @@ QPushButton {{
 QPushButton:disabled {{
     opacity: 0.8;
 }}
+QPushButton:focus, QLineEdit:focus {{
+    border: 2px solid {focus};
+}}
 QFrame#cardPanel {{
-    background: {CARD_BG};
+    background: {card_bg};
     border: 1px solid #2b3455;
     border-radius: 12px;
 }}
 QLabel#title {{
-    color: {ACCENT};
+    color: {accent};
 }}
 QLabel#dim {{
-    color: {FG_DIM};
+    color: {fg_dim};
 }}
 """
 
@@ -170,6 +182,34 @@ def _button(text: str, color: str, handler: Callable[[], None], size: int = 13) 
     return button
 
 
+def _mode_label_text(mode: str) -> str:
+    if mode == "flashcard":
+        return "Flashcards"
+    if mode == "multiple_choice":
+        return "Multiple choice"
+    if mode == "typed_answer":
+        return "Typed answer"
+    return mode
+
+
+def _find_stroke_order_asset(character: str, search_dirs: list[Path] | None = None) -> Path | None:
+    if not character:
+        return None
+    if search_dirs is None:
+        search_dirs = [Path(__file__).resolve().parent.parent / "assets" / "stroke_order"]
+    codepoint = ord(character)
+    stem_candidates = [character, f"{codepoint:04x}", f"u{codepoint:04x}"]
+    for assets_dir in search_dirs:
+        if not assets_dir.exists():
+            continue
+        for stem in stem_candidates:
+            for extension in ("png", "jpg", "jpeg", "webp", "gif"):
+                candidate = assets_dir / f"{stem}.{extension}"
+                if candidate.exists():
+                    return candidate
+    return None
+
+
 class AppFrame(QWidget):
     def __init__(self, master: "App") -> None:
         super().__init__()
@@ -206,6 +246,14 @@ class HomeFrame(AppFrame):
         prompt.setAlignment(Qt.AlignmentFlag.AlignCenter)
         prompt.setFont(_jp_font(13))
         layout.addWidget(prompt)
+
+        a11y_controls = QHBoxLayout()
+        a11y_controls.addStretch(1)
+        a11y_controls.addWidget(_button("A-", HIGHLIGHT, lambda: self.app.adjust_font_scale(-1), size=10))
+        a11y_controls.addWidget(_button("A+", HIGHLIGHT, lambda: self.app.adjust_font_scale(1), size=10))
+        a11y_controls.addWidget(_button("Contrast", HIGHLIGHT, self.app.toggle_high_contrast, size=10))
+        a11y_controls.addStretch(1)
+        layout.addLayout(a11y_controls)
         layout.addSpacing(8)
 
         for deck_key, loader in ALL_DECKS.items():
@@ -234,6 +282,13 @@ class HomeFrame(AppFrame):
                     partial(self.app.start_review, deck_key, mode="multiple_choice"),
                 )
             )
+            layout.addWidget(
+                _button(
+                    f"{prefix}  {deck.name} - Typed Answer",
+                    theme["multiple_choice_color"],
+                    partial(self.app.start_review, deck_key, mode="typed_answer"),
+                )
+            )
         layout.addSpacing(12)
         layout.addWidget(_button("View Progress", HIGHLIGHT, self.app.show_stats))
         layout.addStretch(2)
@@ -254,6 +309,9 @@ class FlashcardFrame(AppFrame):
         self._mode = "flashcard"
         self._mc_answered = False
         self._mc_options: list[str] = []
+        self._typed_answered = False
+        self._typed_needs_reveal = False
+        self._stroke_order_visible = False
 
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
@@ -281,6 +339,12 @@ class FlashcardFrame(AppFrame):
         self._progress_label.setFont(_jp_font(11))
         header_layout.addWidget(self._progress_label)
 
+        self._switch_mode_btn = _button("Switch Mode", HIGHLIGHT, self._switch_mode, size=10)
+        header_layout.addWidget(self._switch_mode_btn)
+        header_layout.addWidget(_button("A-", HIGHLIGHT, lambda: self.app.adjust_font_scale(-1), size=10))
+        header_layout.addWidget(_button("A+", HIGHLIGHT, lambda: self.app.adjust_font_scale(1), size=10))
+        header_layout.addWidget(_button("Contrast", HIGHLIGHT, self.app.toggle_high_contrast, size=10))
+
         quit_btn = _button("Quit", CARD_BG, self.app.go_home, size=10)
         quit_btn.setObjectName("dim")
         quit_btn.setStyleSheet(f"background: {CARD_BG}; color: {FG_DIM};")
@@ -302,8 +366,28 @@ class FlashcardFrame(AppFrame):
         self._romaji_label.setStyleSheet(f"color: {ACCENT};")
         card_area.addWidget(self._romaji_label)
 
+        self._stroke_toggle_btn = _button("Stroke Order", HIGHLIGHT, self._toggle_stroke_order, size=11)
+        card_area.addWidget(self._stroke_toggle_btn)
+
+        self._stroke_order_image = QLabel("")
+        self._stroke_order_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_area.addWidget(self._stroke_order_image)
+
+        self._stroke_order_hint = QLabel("")
+        self._stroke_order_hint.setObjectName("dim")
+        self._stroke_order_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._stroke_order_hint.setWordWrap(True)
+        self._stroke_order_hint.setFont(_jp_font(10))
+        card_area.addWidget(self._stroke_order_hint)
+
         card_area.addStretch(1)
         root.addLayout(card_area, stretch=1)
+
+        self._shortcut_label = QLabel("")
+        self._shortcut_label.setObjectName("dim")
+        self._shortcut_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._shortcut_label.setFont(_jp_font(10))
+        root.addWidget(self._shortcut_label)
 
         self._reveal_btn = _button("Reveal", ACCENT, self._reveal)
         root.addWidget(self._reveal_btn)
@@ -346,6 +430,32 @@ class FlashcardFrame(AppFrame):
         self._mc_next_btn = _button("Next Question", ACCENT, self._advance_mc, size=15)
         root.addWidget(self._mc_next_btn)
 
+        self._typed_prompt = QLabel("Type the romaji answer")
+        self._typed_prompt.setObjectName("dim")
+        self._typed_prompt.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._typed_prompt.setFont(_jp_font(11))
+        root.addWidget(self._typed_prompt)
+
+        self._typed_input = QLineEdit()
+        self._typed_input.setPlaceholderText("Type romaji and press Enter")
+        self._typed_input.setFont(_jp_font(14))
+        self._typed_input.returnPressed.connect(self._submit_typed_answer)
+        root.addWidget(self._typed_input)
+
+        self._typed_submit_btn = _button("Submit", HIGHLIGHT, self._submit_typed_answer, size=12)
+        root.addWidget(self._typed_submit_btn)
+
+        self._typed_feedback = QLabel("")
+        self._typed_feedback.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._typed_feedback.setFont(_jp_font(14, bold=True))
+        root.addWidget(self._typed_feedback)
+
+        self._typed_reveal_btn = _button("Reveal Answer", BTN_HARD, self._reveal_typed_answer, size=12)
+        root.addWidget(self._typed_reveal_btn)
+
+        self._typed_next_btn = _button("Next Question", ACCENT, self._advance_typed, size=15)
+        root.addWidget(self._typed_next_btn)
+
         self._hide_all_bottom_widgets()
 
     def handle_key(self, key: int) -> None:
@@ -354,17 +464,33 @@ class FlashcardFrame(AppFrame):
                 if self._mc_answered:
                     self._advance_mc()
                 return
+            if self._mode == "typed_answer":
+                if self._typed_answered:
+                    if self._typed_needs_reveal:
+                        self._reveal_typed_answer()
+                    else:
+                        self._advance_typed()
+                    return
+                self._submit_typed_answer()
+                return
+            self._reveal()
+            return
+        if key == Qt.Key.Key_Space and self._mode == "flashcard":
             self._reveal()
             return
         if key == Qt.Key.Key_1:
             if self._mode == "multiple_choice":
                 self._answer_mc(0)
+            elif self._mode == "typed_answer":
+                self._submit_typed_answer()
             else:
                 self._rate(GOOD)
             return
         if key == Qt.Key.Key_2:
             if self._mode == "multiple_choice":
                 self._answer_mc(1)
+            elif self._mode == "typed_answer":
+                self._reveal_typed_answer()
             else:
                 self._rate(AGAIN)
             return
@@ -373,6 +499,9 @@ class FlashcardFrame(AppFrame):
             return
         if key == Qt.Key.Key_4 and self._mode == "multiple_choice":
             self._answer_mc(3)
+            return
+        if key == Qt.Key.Key_N and self._mode == "typed_answer":
+            self._advance_typed()
 
     def _hide_all_bottom_widgets(self) -> None:
         self._reveal_btn.hide()
@@ -382,10 +511,18 @@ class FlashcardFrame(AppFrame):
             btn.hide()
         self._mc_feedback.hide()
         self._mc_next_btn.hide()
+        self._typed_prompt.hide()
+        self._typed_input.hide()
+        self._typed_submit_btn.hide()
+        self._typed_feedback.hide()
+        self._typed_reveal_btn.hide()
+        self._typed_next_btn.hide()
 
     def _show_flashcard_question(self) -> None:
         self._hide_all_bottom_widgets()
+        self._shortcut_label.setText("Enter/Space reveal, 1 knew it, 2 again")
         self._reveal_btn.show()
+        self._refresh_stroke_order()
 
     def _show_mc_question(self) -> None:
         self._hide_all_bottom_widgets()
@@ -393,6 +530,7 @@ class FlashcardFrame(AppFrame):
         deck = self._deck
         if current is None or deck is None:
             return
+        self._shortcut_label.setText("1-4 answer, Enter next")
         self._mc_options = _build_multiple_choice_options(current, deck.cards)
         self._mc_answered = False
         self._mc_prompt.show()
@@ -404,6 +542,77 @@ class FlashcardFrame(AppFrame):
             btn.setEnabled(True)
             btn.setStyleSheet(f"background: {HIGHLIGHT}; color: {BTN_FG};")
             btn.show()
+        self._refresh_stroke_order()
+
+    def _show_typed_question(self) -> None:
+        self._hide_all_bottom_widgets()
+        self._shortcut_label.setText("Enter submit, 2 reveal, N next")
+        self._typed_answered = False
+        self._typed_needs_reveal = False
+        self._typed_prompt.show()
+        self._typed_input.clear()
+        self._typed_input.setEnabled(True)
+        self._typed_input.show()
+        self._typed_submit_btn.show()
+        self._typed_feedback.hide()
+        self._typed_reveal_btn.hide()
+        self._typed_next_btn.hide()
+        self._typed_input.setFocus()
+        self._refresh_stroke_order()
+
+    def _toggle_stroke_order(self) -> None:
+        self._stroke_order_visible = not self._stroke_order_visible
+        self._refresh_stroke_order()
+
+    def _refresh_stroke_order(self) -> None:
+        current = self._current
+        if current is None or not self._stroke_order_visible:
+            self._stroke_order_image.hide()
+            self._stroke_order_hint.hide()
+            return
+
+        asset = _find_stroke_order_asset(current.character)
+        if asset is None:
+            self._stroke_order_image.hide()
+            self._stroke_order_hint.setText(
+                f"No stroke-order asset for {current.character}. Add PNG/JPG/WEBP in assets/stroke_order/."
+            )
+            self._stroke_order_hint.show()
+            return
+
+        pixmap = QPixmap(str(asset))
+        if pixmap.isNull():
+            self._stroke_order_image.hide()
+            self._stroke_order_hint.setText(f"Could not load stroke-order image: {asset.name}")
+            self._stroke_order_hint.show()
+            return
+
+        scaled = pixmap.scaled(280, 280, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self._stroke_order_image.setPixmap(scaled)
+        self._stroke_order_image.show()
+        self._stroke_order_hint.setText(f"Stroke-order asset: {asset.name}")
+        self._stroke_order_hint.show()
+
+    def _switch_mode(self) -> None:
+        modes = ["flashcard", "multiple_choice", "typed_answer"]
+        if self._mode not in modes:
+            self._mode = "flashcard"
+        else:
+            self._mode = modes[(modes.index(self._mode) + 1) % len(modes)]
+        self._mode_label.setText(_mode_label_text(self._mode))
+        self._romaji_label.setText("")
+        if self._current is None:
+            return
+        if self._mode == "multiple_choice":
+            self._char_label.setFont(_jp_font(86, bold=True))
+            self._show_mc_question()
+            return
+        if self._mode == "typed_answer":
+            self._char_label.setFont(_jp_font(98, bold=True))
+            self._show_typed_question()
+            return
+        self._char_label.setFont(_jp_font(110, bold=True))
+        self._show_flashcard_question()
 
     def load(self, deck: Deck, mode: str = "flashcard") -> None:
         self._deck = deck
@@ -418,7 +627,7 @@ class FlashcardFrame(AppFrame):
         self._session_started_at = time.perf_counter()
         self._struggle_counts = {}
         self._deck_label.setText(deck.name)
-        self._mode_label.setText("Flashcards" if mode == "flashcard" else "Multiple choice")
+        self._mode_label.setText(_mode_label_text(mode))
         self._next_card()
 
     def _next_card(self) -> None:
@@ -445,6 +654,9 @@ class FlashcardFrame(AppFrame):
         if self._mode == "multiple_choice":
             self._char_label.setFont(_jp_font(86, bold=True))
             self._show_mc_question()
+        elif self._mode == "typed_answer":
+            self._char_label.setFont(_jp_font(98, bold=True))
+            self._show_typed_question()
         else:
             self._char_label.setFont(_jp_font(110, bold=True))
             self._show_flashcard_question()
@@ -517,8 +729,64 @@ class FlashcardFrame(AppFrame):
             return
         self._next_card()
 
+    def _submit_typed_answer(self) -> None:
+        current = self._current
+        deck = self._deck
+        if self._mode != "typed_answer" or current is None or deck is None or self._typed_answered:
+            return
+
+        user_answer = self._typed_input.text()
+        assessment = assess_typed_answer(current.romaji, user_answer)
+        quality = GOOD if assessment.state == "exact" else AGAIN
+
+        if quality == GOOD:
+            self._correct += 1
+        else:
+            self._struggle_counts[current.id] = self._struggle_counts.get(current.id, 0) + 1
+
+        state = study_pipeline.review_card(deck.name, self._states[current.id], quality)
+        self._states[current.id] = state
+        self._typed_answered = True
+        self._typed_input.setEnabled(False)
+        self._typed_submit_btn.hide()
+
+        if assessment.state == "exact":
+            self._typed_feedback.setText("Exact match")
+            self._typed_feedback.setStyleSheet(f"color: {BTN_GOOD};")
+            self._typed_needs_reveal = False
+            self._typed_next_btn.show()
+        elif assessment.state == "near_miss":
+            self._typed_feedback.setText("Near miss")
+            self._typed_feedback.setStyleSheet(f"color: {BTN_HARD};")
+            self._typed_needs_reveal = True
+            self._typed_reveal_btn.show()
+        else:
+            self._typed_feedback.setText("Incorrect")
+            self._typed_feedback.setStyleSheet(f"color: {BTN_AGAIN};")
+            self._typed_needs_reveal = True
+            self._typed_reveal_btn.show()
+        self._typed_feedback.show()
+
+    def _reveal_typed_answer(self) -> None:
+        if self._mode != "typed_answer" or not self._typed_answered or not self._typed_needs_reveal:
+            return
+        current = self._current
+        if current is None:
+            return
+        self._romaji_label.setText(current.romaji)
+        self._typed_reveal_btn.hide()
+        self._typed_needs_reveal = False
+        self._typed_next_btn.show()
+
+    def _advance_typed(self) -> None:
+        if self._mode != "typed_answer" or not self._typed_answered or self._typed_needs_reveal:
+            return
+        self._next_card()
+
     def on_hide(self) -> None:
         self._hide_all_bottom_widgets()
+        self._stroke_order_image.hide()
+        self._stroke_order_hint.hide()
 
 
 class SessionCompleteFrame(AppFrame):
@@ -607,6 +875,9 @@ class StatsFrame(AppFrame):
         top = QHBoxLayout()
         top.addWidget(_button("Back to Menu", HIGHLIGHT, self.app.go_home, size=12))
         top.addStretch(1)
+        top.addWidget(_button("A-", HIGHLIGHT, lambda: self.app.adjust_font_scale(-1), size=10))
+        top.addWidget(_button("A+", HIGHLIGHT, lambda: self.app.adjust_font_scale(1), size=10))
+        top.addWidget(_button("Contrast", HIGHLIGHT, self.app.toggle_high_contrast, size=10))
         root.addLayout(top)
 
         title = QLabel("Progress")
@@ -740,6 +1011,8 @@ class App(QMainWindow):
         self.setWindowTitle("JPLearn")
         self.setMinimumSize(900, 700)
         self.resize(1100, 820)
+        self._font_scale_steps = 0
+        self._high_contrast = False
 
         root = QWidget()
         self.setCentralWidget(root)
@@ -758,6 +1031,22 @@ class App(QMainWindow):
         for frame in self._frames.values():
             frame.hide()
             self._stack_layout.addWidget(frame)
+
+        view_menu = self.menuBar().addMenu("View")
+        zoom_in = QAction("Increase Font Size", self)
+        zoom_in.setShortcut("Ctrl+=")
+        zoom_in.triggered.connect(lambda: self.adjust_font_scale(1))
+        view_menu.addAction(zoom_in)
+
+        zoom_out = QAction("Decrease Font Size", self)
+        zoom_out.setShortcut("Ctrl+-")
+        zoom_out.triggered.connect(lambda: self.adjust_font_scale(-1))
+        view_menu.addAction(zoom_out)
+
+        contrast_action = QAction("Toggle High Contrast", self)
+        contrast_action.setShortcut("F8")
+        contrast_action.triggered.connect(self.toggle_high_contrast)
+        view_menu.addAction(contrast_action)
 
         self._show_frame("home")
 
@@ -813,6 +1102,32 @@ class App(QMainWindow):
 
     def show_stats(self) -> None:
         self._show_frame("stats")
+
+    def adjust_font_scale(self, delta: int) -> None:
+        if delta == 0:
+            return
+        next_steps = max(-3, min(6, self._font_scale_steps + delta))
+        if next_steps == self._font_scale_steps:
+            return
+        self._font_scale_steps = next_steps
+        for widget in self.findChildren(QWidget):
+            font = widget.font()
+            current_size = font.pointSizeF()
+            if current_size <= 0:
+                continue
+            base_size = widget.property("_base_point_size")
+            if base_size is None:
+                base_size = current_size - (self._font_scale_steps - delta)
+                widget.setProperty("_base_point_size", base_size)
+            scaled_size = max(8.0, float(base_size) + self._font_scale_steps)
+            font.setPointSizeF(scaled_size)
+            widget.setFont(font)
+
+    def toggle_high_contrast(self) -> None:
+        self._high_contrast = not self._high_contrast
+        app = QApplication.instance()
+        if isinstance(app, QApplication):
+            app.setStyleSheet(_app_stylesheet(self._high_contrast))
 
 
 def run() -> None:

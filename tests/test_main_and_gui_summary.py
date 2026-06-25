@@ -48,3 +48,30 @@ def test_build_multiple_choice_options_includes_answer_without_duplicates() -> N
     assert "a" in options
     assert len(options) == 4
     assert len(set(options)) == 4
+
+
+def test_find_stroke_order_asset_prefers_character_file(tmp_path) -> None:
+    stroke_dir = tmp_path / "stroke_order"
+    stroke_dir.mkdir()
+    expected = stroke_dir / "あ.png"
+    expected.write_bytes(b"stub")
+
+    result = qt_app._find_stroke_order_asset("あ", search_dirs=[stroke_dir])
+    assert result == expected
+
+
+def test_find_stroke_order_asset_falls_back_to_codepoint_name(tmp_path) -> None:
+    stroke_dir = tmp_path / "stroke_order"
+    stroke_dir.mkdir()
+    expected = stroke_dir / "3042.webp"
+    expected.write_bytes(b"stub")
+
+    result = qt_app._find_stroke_order_asset("あ", search_dirs=[stroke_dir])
+    assert result == expected
+
+
+def test_find_stroke_order_asset_returns_none_when_missing(tmp_path) -> None:
+    stroke_dir = tmp_path / "stroke_order"
+    stroke_dir.mkdir()
+    result = qt_app._find_stroke_order_asset("あ", search_dirs=[stroke_dir])
+    assert result is None

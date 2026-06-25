@@ -56,9 +56,13 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 - [x] Keep `main.py` runnable as a GUI launcher
 - [x] Maintain working PySide6 app flow (`gui.py`)
 - [x] Add multiple-choice mode
-- [ ] (High) Add typed-answer mode with tolerant input checking
+- [x] (High) Add typed-answer mode with tolerant input checking (kana normalization, punctuation/whitespace-insensitive matching, minor typo tolerance)
+- [x] (High) Add typed-answer feedback states (exact match, near miss, incorrect) before answer reveal
 - [x] Improve session summary screen (time spent, accuracy, weakest items)
-- [ ] Add optional stroke-order display where assets are available
+- [x] (Medium) Add keyboard-first review controls (submit, reveal, grade keys, next card)
+- [x] (Medium) Add review mode controls in-session (multiple-choice/typed mix without restart)
+- [x] (Medium) Add optional stroke-order display where assets are available
+- [x] (Low) Add accessibility polish (font scaling, visible focus states, higher-contrast option)
 
 ### Progress & Insights
 - [x] Show per-deck mastery progress
