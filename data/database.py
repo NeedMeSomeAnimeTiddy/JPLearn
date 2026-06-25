@@ -70,6 +70,7 @@ def init_db() -> None:
                 reviewed_at_utc TEXT NOT NULL DEFAULT '',
                 script_tag  TEXT    NOT NULL DEFAULT '',
                 curriculum_stage INTEGER,
+                prompt_text TEXT    NOT NULL DEFAULT '',
                 tags_csv    TEXT    NOT NULL DEFAULT ''
             )
         """)
@@ -85,6 +86,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE review_events ADD COLUMN reviewed_at_utc TEXT NOT NULL DEFAULT ''")
         if "curriculum_stage" not in existing_columns:
             conn.execute("ALTER TABLE review_events ADD COLUMN curriculum_stage INTEGER")
+        if "prompt_text" not in existing_columns:
+            conn.execute("ALTER TABLE review_events ADD COLUMN prompt_text TEXT NOT NULL DEFAULT ''")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS streak_state (
                 id                   INTEGER PRIMARY KEY CHECK (id = 1),
@@ -189,6 +192,7 @@ def log_review(
     reviewed_at_utc: str | None = None,
     script_tag: str = "",
     curriculum_stage: int | None = None,
+    prompt_text: str = "",
     tags: list[str] | None = None,
 ) -> None:
     """Record one review outcome for daily progress reporting."""
@@ -198,8 +202,8 @@ def log_review(
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO review_events (deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag, curriculum_stage, tags_csv)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO review_events (deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag, curriculum_stage, prompt_text, tags_csv)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 deck_name,
@@ -209,6 +213,7 @@ def log_review(
                 reviewed_utc,
                 script_tag,
                 curriculum_stage,
+                prompt_text.strip(),
                 tags_csv,
             ),
         )
@@ -590,7 +595,7 @@ def load_raw_item_history(limit_items: int = 8, events_per_item: int = 8) -> lis
     with _connect() as conn:
         rows = conn.execute(
             """
-            SELECT id, deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag
+            SELECT id, deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag, prompt_text
             FROM review_events
             ORDER BY
                 CASE
@@ -613,7 +618,7 @@ def load_raw_item_history(limit_items: int = 8, events_per_item: int = 8) -> lis
                 script_tag=str(row["script_tag"] or "unknown"),
                 deck=str(row["deck"]),
                 card_id=int(row["card_id"]),
-                prompt="",
+                prompt=str(row["prompt_text"] or ""),
                 events=[],
                 successes=[],
             )

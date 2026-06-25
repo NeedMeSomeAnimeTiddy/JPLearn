@@ -159,11 +159,29 @@ interface BlockProgressPayload {
   blocks: BlockInfo[]
 }
 
+interface OverviewCharacterCard {
+  id: number
+  character: string
+  romaji: string
+  meaning: string
+  tags: string[]
+}
+
+interface OverviewCharacterMasteryPayload {
+  blocks: {
+    hiragana: BlockInfo[]
+    katakana: BlockInfo[]
+  }
+  kanji_cards: OverviewCharacterCard[]
+}
+
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
   getBlockProgress: (slug: DeckSlug) => Promise<BlockProgressPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
+  getOverviewCharacterMastery: () => Promise<OverviewCharacterMasteryPayload>
+  notifyStartupReady: () => Promise<{ ok: boolean }>
   setStartupTheme: (theme: string) => Promise<{ ok: boolean; theme: string }>
   recordGameResult: (payload: {
     slug: DeckSlug

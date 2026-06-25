@@ -82,6 +82,24 @@ class GameCard:
     character_distractor_ids: list[int]
 
 
+@dataclass(frozen=True)
+class OverviewCharacterCard:
+    id: int
+    character: str
+    romaji: str
+    meaning: str
+    tags: list[str]
+
+
+def _normalize_deck_key(value: str) -> str:
+    return value.strip().lower().replace("_", " ")
+
+
+def _legacy_prompt_label(deck_name: str, card_id: int) -> str:
+    normalized_deck = deck_name.strip() or "Review"
+    return f"{normalized_deck} item #{card_id}"
+
+
 def _mastered_count(states: Mapping[int, object]) -> int:
     # Shared repository rule: mastered means repetitions >= 3 and interval >= 21.
     return sum(
@@ -95,6 +113,7 @@ def build_summary() -> dict[str, object]:
     init_study_db()
     decks: list[DeckSummary] = []
     prompt_lookup: dict[tuple[str, int], str] = {}
+    prompt_lookup_by_id: dict[int, str] = {}
     streak = load_streak_state()
     activity_week = load_activity_summary(7)
     activity_month = load_activity_summary(30)
@@ -117,7 +136,10 @@ def build_summary() -> dict[str, object]:
         states = load_review_states(deck.name, card_ids)
         due_today, completed_today = load_today_progress(deck.name, card_ids)
         for card in deck.cards:
-            prompt_lookup[(deck.name, card.id)] = card.character
+            prompt_text = card.character
+            prompt_lookup[(_normalize_deck_key(deck.name), card.id)] = prompt_text
+            prompt_lookup[(_normalize_deck_key(slug), card.id)] = prompt_text
+            prompt_lookup_by_id[card.id] = prompt_text
         decks.append(
             DeckSummary(
                 slug=slug,
@@ -145,7 +167,12 @@ def build_summary() -> dict[str, object]:
         "item_history": [
             {
                 **asdict(item),
-                "prompt": prompt_lookup.get((item.deck, item.card_id), item.prompt or f"Card {item.card_id}"),
+                "prompt": (
+                    prompt_lookup.get((_normalize_deck_key(item.deck), item.card_id))
+                    or prompt_lookup_by_id.get(item.card_id)
+                    or item.prompt
+                    or _legacy_prompt_label(item.deck, item.card_id)
+                ),
             }
             for item in item_history
         ],
@@ -231,6 +258,42 @@ def build_block_progress(slug: str) -> dict[str, object]:
     return {"slug": slug, "blocks": result}
 
 
+def build_overview_character_mastery() -> dict[str, object]:
+    """Return the overview's character mastery data in one payload.
+
+    The overview only needs block metadata plus lightweight kanji card fields,
+    so avoid the heavier per-deck distractor and curriculum work used by minigames.
+    """
+    init_study_db()
+
+    overview_blocks = {
+        "hiragana": build_block_progress("hiragana")["blocks"],
+        "katakana": build_block_progress("katakana")["blocks"],
+    }
+
+    kanji_cards: list[OverviewCharacterCard] = []
+    for slug in ("kanji_n5", "kanji_n4", "kanji_n3", "kanji_n2", "kanji_n1"):
+        factory = ALL_DECKS.get(slug)
+        if factory is None:
+            raise ValueError(f"Unknown deck slug: {slug}")
+        deck = factory()
+        kanji_cards.extend(
+            OverviewCharacterCard(
+                id=card.id,
+                character=card.character,
+                romaji=card.romaji,
+                meaning=card.meaning,
+                tags=card.tags,
+            )
+            for card in deck.cards
+        )
+
+    return {
+        "blocks": overview_blocks,
+        "kanji_cards": [asdict(card) for card in kanji_cards],
+    }
+
+
 def reset_progress() -> dict[str, object]:
     reset_study_db()
     return {"ok": True}
@@ -258,7 +321,8 @@ def record_game_result(
         raise ValueError(f"Unknown deck slug: {slug}")
 
     deck = factory()
-    if not any(card.id == card_id for card in deck.cards):
+    matching_card = next((card for card in deck.cards if card.id == card_id), None)
+    if matching_card is None:
         raise ValueError(f"Unknown card id {card_id} for deck slug: {slug}")
 
     normalized_minigame = minigame.strip().lower()
@@ -282,6 +346,7 @@ def record_game_result(
         minigame=normalized_minigame,
         curriculum_stage=curriculum_stage,
         script_tag=script_tag,
+        prompt_text=matching_card.character,
         tags=tags,
     )
 
@@ -333,6 +398,10 @@ def main() -> int:
             print(json.dumps({"error": str(exc)}))
             return 2
         print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    if command == "overview-character-mastery":
+        print(json.dumps(build_overview_character_mastery(), ensure_ascii=False))
         return 0
 
     if command == "reset-db":

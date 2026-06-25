@@ -143,18 +143,18 @@ class TestKanjiDecks:
 
 class TestVocabDecks:
     @pytest.mark.parametrize(
-        ("loader", "min_cards", "name", "level"),
+        ("loader", "expected_cards", "name", "level"),
         [
-            (get_vocab_n5_deck, 80, "Vocabulary N5", "n5"),
-            (get_vocab_n4_deck, 80, "Vocabulary N4", "n4"),
-            (get_vocab_n3_deck, 80, "Vocabulary N3", "n3"),
-            (get_vocab_n2_deck, 80, "Vocabulary N2", "n2"),
-            (get_vocab_n1_deck, 50, "Vocabulary N1", "n1"),
+            (get_vocab_n5_deck, 50, "Vocabulary N5", "n5"),
+            (get_vocab_n4_deck, 150, "Vocabulary N4", "n4"),
+            (get_vocab_n3_deck, 300, "Vocabulary N3", "n3"),
+            (get_vocab_n2_deck, 600, "Vocabulary N2", "n2"),
+            (get_vocab_n1_deck, 800, "Vocabulary N1", "n1"),
         ],
     )
-    def test_vocab_deck_structure(self, loader, min_cards: int, name: str, level: str) -> None:
+    def test_vocab_deck_structure(self, loader, expected_cards: int, name: str, level: str) -> None:
         deck = loader()
-        assert len(deck) >= min_cards
+        assert len(deck) == expected_cards
         assert deck.name == name
         for card in deck.cards:
             assert card.character, f"Card {card.id} missing character"
@@ -171,7 +171,7 @@ class TestVocabDecks:
         ids = [c.id for c in loader().cards]
         assert len(ids) == len(set(ids))
 
-    @pytest.mark.parametrize("word", ["たべる", "いく", "くる", "ほん", "がっこう"])
+    @pytest.mark.parametrize("word", ["会う", "青い", "秋", "遊ぶ", "頭"])
     def test_spot_check_key_n5_words_present(self, word: str) -> None:
         chars = {c.character for c in get_vocab_n5_deck().cards}
         assert word in chars, f"Expected N5 word '{word}' not found in deck"

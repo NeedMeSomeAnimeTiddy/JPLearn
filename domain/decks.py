@@ -15,6 +15,13 @@ except ImportError:
 
 _ExternalRow = tuple[str, str, str]
 _EMPTY_EXTERNAL_DATA: list[_ExternalRow] = []
+_VOCAB_LEVEL_LIMITS: dict[str, int] = {
+    "n5": 50,
+    "n4": 150,
+    "n3": 300,
+    "n2": 600,
+    "n1": 800,
+}
 
 if _external_deck_data is None:
     VOCAB_N5_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
@@ -660,27 +667,27 @@ _VOCAB_N5_DATA: list[tuple[str, str, str]] = [
 
 def get_vocab_n5_deck() -> Deck:
     data = VOCAB_N5_EXTERNAL_DATA if VOCAB_N5_EXTERNAL_DATA else _VOCAB_N5_DATA
-    return _build_vocab_deck("Vocabulary N5", data, "n5", id_offset=0)
+    return _build_vocab_deck("Vocabulary N5", data[:_VOCAB_LEVEL_LIMITS["n5"]], "n5", id_offset=0)
 
 
 def get_vocab_n4_deck() -> Deck:
     rows = VOCAB_N4_EXTERNAL_DATA
-    return _build_vocab_deck("Vocabulary N4", rows, "n4", id_offset=10000)
+    return _build_vocab_deck("Vocabulary N4", rows[:_VOCAB_LEVEL_LIMITS["n4"]], "n4", id_offset=10000)
 
 
 def get_vocab_n3_deck() -> Deck:
     rows = VOCAB_N3_EXTERNAL_DATA
-    return _build_vocab_deck("Vocabulary N3", rows, "n3", id_offset=20000)
+    return _build_vocab_deck("Vocabulary N3", rows[:_VOCAB_LEVEL_LIMITS["n3"]], "n3", id_offset=20000)
 
 
 def get_vocab_n2_deck() -> Deck:
     rows = VOCAB_N2_EXTERNAL_DATA
-    return _build_vocab_deck("Vocabulary N2", rows, "n2", id_offset=30000)
+    return _build_vocab_deck("Vocabulary N2", rows[:_VOCAB_LEVEL_LIMITS["n2"]], "n2", id_offset=30000)
 
 
 def get_vocab_n1_deck() -> Deck:
     rows = VOCAB_N1_EXTERNAL_DATA
-    return _build_vocab_deck("Vocabulary N1", rows, "n1", id_offset=40000)
+    return _build_vocab_deck("Vocabulary N1", rows[:_VOCAB_LEVEL_LIMITS["n1"]], "n1", id_offset=40000)
 
 
 # ---------------------------------------------------------------------------

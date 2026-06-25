@@ -35,6 +35,7 @@ def review_card(
     quality: int,
     script_tag: str = "",
     curriculum_stage: int | None = None,
+    prompt_text: str = "",
     tags: list[str] | None = None,
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
@@ -59,6 +60,7 @@ def review_card(
         reviewed_at_utc=review_timestamp_utc,
         script_tag=normalized_script_tag,
         curriculum_stage=curriculum_stage,
+        prompt_text=prompt_text,
         tags=tags,
     )
     database.update_leech_state_for_card(deck_name, updated_state.card_id)
@@ -74,6 +76,7 @@ def review_minigame_result(
     minigame: str = "",
     curriculum_stage: int | None = None,
     script_tag: str = "",
+    prompt_text: str = "",
     tags: list[str] | None = None,
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
@@ -87,6 +90,7 @@ def review_minigame_result(
         quality=quality,
         script_tag=script_tag,
         curriculum_stage=curriculum_stage,
+        prompt_text=prompt_text,
         tags=tags,
         reviewed_on_local=reviewed_on_local,
         reviewed_on_utc=reviewed_on_utc,

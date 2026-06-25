@@ -20,6 +20,8 @@ const baseDesktopApi = {
   versions: { chrome: '0', electron: '0', node: '0' },
   getBlockProgress: async (slug: string) => ({ slug, blocks: [] }),
   getDeckCards: async () => ({ slug: 'hiragana' as const, name: 'Hiragana', cards: [] }),
+  getOverviewCharacterMastery: async () => ({ blocks: { hiragana: [], katakana: [] }, kanji_cards: [] }),
+  notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
   recordGameResult: async () => ({ ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
   resetStudyDb: async () => ({ ok: true }),

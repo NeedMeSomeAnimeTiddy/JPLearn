@@ -4,6 +4,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const repoRoot = path.join(__dirname, '..', '..')
+const startupReadyResolvers = new Map()
 const THEME_STATE_FILENAME = 'jplearn-startup-theme.json'
 const DEFAULT_STARTUP_THEME = 'harbor_mist'
 const VALID_STARTUP_THEMES = new Set([
@@ -321,6 +322,15 @@ ipcMain.handle('study:get-deck-cards', async (_event, slug) => {
   }
 })
 
+ipcMain.handle('study:get-overview-character-mastery', async () => {
+  try {
+    return await runPythonBridge('overview-character-mastery')
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to fetch overview character mastery: ${detail}`)
+  }
+})
+
 ipcMain.handle('study:reset-db', async () => {
   try {
     return await runPythonBridge('reset-db')
@@ -380,6 +390,15 @@ ipcMain.handle('window:close', (event) => {
 ipcMain.handle('ui:set-startup-theme', (_event, theme) => {
   const normalized = saveStartupTheme(theme)
   return { ok: true, theme: normalized }
+})
+
+ipcMain.handle('ui:startup-ready', (event) => {
+  const resolver = startupReadyResolvers.get(event.sender.id)
+  if (resolver) {
+    resolver()
+    startupReadyResolvers.delete(event.sender.id)
+  }
+  return { ok: true }
 })
 
 function createWindow() {
@@ -575,41 +594,56 @@ function loadMainWindow(win) {
 }
 
 async function createWindowWithSplash() {
-  const splashStart = Date.now()
   const minSplashMs = 1100
+  const maxStartupWaitMs = 30000
   const startupTheme = readSavedStartupTheme()
   const splash = createSplashWindow(startupTheme)
   const win = createWindow()
+
+  const startupReadyPromise = new Promise((resolve) => {
+    startupReadyResolvers.set(win.webContents.id, resolve)
+  })
+
+  win.on('closed', () => {
+    startupReadyResolvers.delete(win.webContents.id)
+  })
+
   loadMainWindow(win)
 
-  win.once('ready-to-show', () => {
-    const elapsed = Date.now() - splashStart
-    const remainingDelay = Math.max(0, minSplashMs - elapsed)
-
-    setTimeout(() => {
-      if (!splash.isDestroyed()) {
-        splash.close()
-      }
-      if (!win.isDestroyed()) {
-        win.setOpacity(0)
-        win.show()
-        win.focus()
-        const fadeSteps = 6
-        const fadeInterval = 22
-        let step = 0
-        const timer = setInterval(() => {
-          step += 1
-          const opacity = Math.min(1, step / fadeSteps)
-          if (!win.isDestroyed()) {
-            win.setOpacity(opacity)
-          }
-          if (step >= fadeSteps) {
-            clearInterval(timer)
-          }
-        }, fadeInterval)
-      }
-    }, remainingDelay)
+  const windowReadyPromise = new Promise((resolve) => {
+    win.once('ready-to-show', resolve)
   })
+
+  await Promise.all([
+    windowReadyPromise,
+    Promise.race([
+      startupReadyPromise,
+      new Promise((resolve) => setTimeout(resolve, maxStartupWaitMs)),
+    ]),
+    new Promise((resolve) => setTimeout(resolve, minSplashMs)),
+  ])
+
+  if (!splash.isDestroyed()) {
+    splash.close()
+  }
+  if (!win.isDestroyed()) {
+    win.setOpacity(0)
+    win.show()
+    win.focus()
+    const fadeSteps = 6
+    const fadeInterval = 22
+    let step = 0
+    const timer = setInterval(() => {
+      step += 1
+      const opacity = Math.min(1, step / fadeSteps)
+      if (!win.isDestroyed()) {
+        win.setOpacity(opacity)
+      }
+      if (step >= fadeSteps) {
+        clearInterval(timer)
+      }
+    }, fadeInterval)
+  }
 
   win.on('closed', () => {
     if (!splash.isDestroyed()) {

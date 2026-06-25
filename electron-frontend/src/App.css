@@ -134,6 +134,42 @@
   outline-offset: -1px;
 }
 
+.titlebar-shortcut-parent {
+  font-weight: 700;
+}
+
+.titlebar-shortcut-flyout {
+  position: absolute;
+  top: 8px;
+  left: calc(100% + 8px);
+  width: min(260px, 72vw);
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 32%, var(--panel-border));
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--tone-ocean) 20%, transparent), transparent 48%),
+    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 99%, black), color-mix(in oklab, var(--panel-bg-alt) 99%, black));
+  box-shadow:
+    0 22px 36px -22px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+  z-index: 770;
+}
+
+.titlebar-shortcut-flyout .titlebar-shortcut-item {
+  min-height: 32px;
+  border-radius: 9px;
+  font-size: 0.82rem;
+  color: color-mix(in oklab, var(--text-main) 90%, var(--text-soft));
+}
+
+.titlebar-shortcut-caret {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
 .titlebar-shortcut-icon,
 .titlebar-shortcut-glyph {
   width: 16px;
@@ -278,9 +314,9 @@ button {
 }
 
 .home-menu {
-  padding: 34px;
+  padding: 30px;
   display: grid;
-  gap: 16px;
+  gap: 14px;
   animation: enterUp 420ms ease both;
   border-radius: 28px;
 }
@@ -339,6 +375,7 @@ button {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  grid-auto-rows: 1fr;
 }
 
 .menu-card {
@@ -347,11 +384,13 @@ button {
   background: linear-gradient(150deg, var(--card-bg-top), var(--card-bg-bottom));
   color: var(--text-main);
   border-radius: 16px;
-  padding: 16px;
-  min-height: 170px;
+  padding: 14px;
+  min-height: 180px;
+  height: 100%;
   display: grid;
-  align-content: start;
-  gap: 7px;
+  grid-template-rows: auto auto 1fr;
+  align-content: stretch;
+  gap: 6px;
   cursor: pointer;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
   animation: enterUp 500ms ease both;
@@ -510,8 +549,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px;
-  border-radius: 18px;
+  padding: 12px 16px;
+  border-radius: 16px;
   border-color: color-mix(in oklab, var(--tone-ocean) 26%, var(--panel-border));
   background:
     radial-gradient(circle at 8% -30%, rgba(130, 196, 255, 0.18), transparent 52%),
@@ -541,8 +580,8 @@ button {
   border-radius: 10px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
-  padding: 8px 14px;
-  min-height: 40px;
+  padding: 7px 12px;
+  min-height: 36px;
   cursor: pointer;
   transition: transform 160ms ease;
 }
@@ -552,9 +591,18 @@ button {
   border-color: color-mix(in oklab, var(--tone-ocean) 42%, var(--button-border));
 }
 
+.back-button-icon-only {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
 .brand-block h1 {
   margin: 0;
-  font-size: clamp(26px, 4.5vw, 40px);
+  font-size: clamp(24px, 4.2vw, 34px);
   letter-spacing: -0.02em;
   font-family: var(--display-font);
 }
@@ -583,11 +631,11 @@ button {
   background: var(--chip-bg);
   color: var(--text-main);
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   font-weight: 600;
@@ -652,8 +700,8 @@ button {
   border-radius: 10px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-soft);
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   cursor: pointer;
   font-size: 0.7rem;
   letter-spacing: 0.08em;
@@ -674,24 +722,24 @@ button {
 }
 
 .overview-hero {
-  padding: 20px 22px;
+  padding: 14px 16px;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   animation: enterUp 420ms ease both;
 }
 
 .overview-hero-title {
   margin: 0;
-  font-size: clamp(1.5rem, 3.6vw, 2rem);
+  font-size: clamp(1.26rem, 3.1vw, 1.7rem);
   font-family: var(--display-font);
 }
 
 .overview-hero-actions {
   display: grid;
   justify-items: end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .overview-hero-actions button {
@@ -699,9 +747,29 @@ button {
   border-radius: 10px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
-  padding: 10px 14px;
-  min-height: 42px;
+  padding: 8px 12px;
+  min-height: 36px;
   cursor: pointer;
+}
+
+.overview-hero-actions .icon-action-button {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spin-icon {
+  animation: iconSpin 0.9s linear infinite;
+}
+
+@keyframes iconSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .overview-hero-actions .danger-button,
@@ -736,7 +804,7 @@ button {
 
 .overview-hero-actions span {
   color: var(--text-soft);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
 }
 
 .overview-tile-grid {
@@ -1462,6 +1530,12 @@ button {
   padding: 12px 14px 14px;
 }
 
+.char-mastery-chips-kanji {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 8px;
+}
+
 /* Chip is now a button */
 .char-mastery-chip {
   display: inline-flex;
@@ -1479,9 +1553,67 @@ button {
   padding: 0;
 }
 
+.char-mastery-chip-kanji {
+  width: 100%;
+  min-height: 48px;
+  height: auto;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.char-mastery-chip-glyph {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-family: var(--display-font);
+  font-size: 1.05rem;
+  line-height: 1;
+  background: color-mix(in oklab, currentColor 14%, transparent);
+}
+
+.char-mastery-chip-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.char-mastery-chip-reading,
+.char-mastery-chip-meaning {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.char-mastery-chip-reading {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.char-mastery-chip-meaning {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
 .char-mastery-chip:hover {
   transform: scale(1.18);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+.char-mastery-chip-kanji:hover {
+  transform: translateY(-1px);
 }
 
 /* Score 0 – unknown: red */
@@ -1517,6 +1649,29 @@ button {
   background: rgba(50, 165, 90, 0.28);
   border-color: rgba(50, 165, 90, 0.52);
   color: #70e090;
+}
+
+@media (max-width: 720px) {
+  .char-mastery-chips-kanji {
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  }
+
+  .char-mastery-chip-kanji {
+    min-height: 44px;
+    gap: 8px;
+    padding: 6px 8px;
+  }
+
+  .char-mastery-chip-glyph {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    font-size: 0.98rem;
+  }
+
+  .char-mastery-chip-meaning {
+    font-size: 0.73rem;
+  }
 }
 
 /* ── Character detail modal ─────────────────────────────────────── */

@@ -1,19 +1,25 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, Settings, Shuffle, Square, Target, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, RefreshCw, Settings, Shuffle, Square, Target, Trophy, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
   ReturnType<typeof window.jplearnDesktop.getStudySummary>
 >
+type OverviewCharacterMasteryPayload = Awaited<
+  ReturnType<typeof window.jplearnDesktop.getOverviewCharacterMastery>
+>
 type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
+type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
+type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
 type KanjiDeckSlug = 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1'
 type VocabDeckSlug = 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
+type ShortcutSubmenuKey = 'navigation' | 'tracks' | 'tools'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
 type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
 type NavDirection = 'forward' | 'back'
@@ -437,6 +443,34 @@ const SCRIPT_LABELS: Record<ScriptKey, string> = {
   grammar_patterns: 'Conversational',
 }
 
+const TIMELINE_SCRIPT_LABELS: Record<string, string> = {
+  hiragana: 'Hiragana',
+  katakana: 'Katakana',
+  kanji_n5: 'Kanji',
+  vocab_n5: 'Words',
+  grammar_patterns: 'Conversational',
+  unknown: 'General',
+}
+
+function toTitleWords(value: string): string {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function formatTimelineScriptTag(tag: string): string {
+  const normalized = tag.trim().toLowerCase()
+  return TIMELINE_SCRIPT_LABELS[normalized] ?? toTitleWords(normalized || 'general')
+}
+
+function formatTimelineDeckName(deckName: string): string {
+  const trimmed = deckName.trim()
+  if (!trimmed) return 'Review Deck'
+  return toTitleWords(trimmed)
+}
+
 const SCRIPT_MENU_LINES: Record<ScriptKey, string> = {
   hiragana: 'Start with smooth, foundational sounds.',
   katakana: 'Train sharp symbols for names and loanwords.',
@@ -842,7 +876,7 @@ function narrativePriorityCards(cards: ScriptDeck['cards']): ScriptDeck['cards']
   return cards
 }
 
-function jlptTagFromCard(card: ScriptDeck['cards'][number]): JlptLevel {
+function jlptTagFromCard(card: Pick<ScriptDeck['cards'][number], 'tags'>): JlptLevel {
   for (const tag of card.tags) {
     const normalized = tag.trim().toLowerCase()
     if (normalized === 'n5' || normalized === 'n4' || normalized === 'n3' || normalized === 'n2' || normalized === 'n1') {
@@ -852,7 +886,7 @@ function jlptTagFromCard(card: ScriptDeck['cards'][number]): JlptLevel {
   return 'n5'
 }
 
-function buildJlptLevelProgress(cards: ScriptDeck['cards'], scores: Record<number, number>): JlptLevelProgress[] {
+function buildJlptLevelProgress(cards: JlptProgressCard[], scores: Record<number, number>): JlptLevelProgress[] {
   let canUnlockNext = true
   return JLPT_LEVEL_ORDER.map((level) => {
     const levelCards = cards.filter((card) => jlptTagFromCard(card) === level)
@@ -942,7 +976,7 @@ function App() {
   const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
   const [cardScores, setCardScores] = useState<CardScores>(() => loadCardScores())
   const [overviewBlocks, setOverviewBlocks] = useState<Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>>({})
-  const [overviewKanjiDeck, setOverviewKanjiDeck] = useState<ScriptDeck['cards']>([])
+  const [overviewKanjiDeck, setOverviewKanjiDeck] = useState<OverviewKanjiCard[]>([])
   const [activeKanjiLevel, setActiveKanjiLevel] = useState<JlptLevel>('n5')
   const [activeKanjiDeckSlug, setActiveKanjiDeckSlug] = useState<KanjiDeckSlug>('kanji_n5')
   const [activeVocabLevel, setActiveVocabLevel] = useState<JlptLevel>('n5')
@@ -989,8 +1023,15 @@ function App() {
   const [historyPage, setHistoryPage] = useState(1)
   const [isWindowMaximized, setIsWindowMaximized] = useState(false)
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
+  const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>('navigation')
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
+  const scriptLoadRequestIdRef = useRef<number>(0)
+  const lastLoadedScriptRef = useRef<ScriptKey>('hiragana')
+  const kanjiLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
+  const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
+  const kanjiLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
+  const vocabLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
@@ -1092,13 +1133,92 @@ function App() {
     void loadSummary()
   }, [loadSummary])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function preloadStartupDeckData(): Promise<void> {
+      try {
+        const [kanjiLoads, vocabLoads] = await Promise.all([
+          Promise.all(
+            JLPT_LEVEL_ORDER.map(async (level) => {
+              const slug = KANJI_LEVEL_TO_DECK_SLUG[level]
+              const [deckPayload, blockPayload] = await Promise.all([
+                window.jplearnDesktop.getDeckCards(slug),
+                window.jplearnDesktop.getBlockProgress(slug),
+              ])
+              return { level, cards: deckPayload.cards, blocks: blockPayload.blocks }
+            }),
+          ),
+          Promise.all(
+            JLPT_LEVEL_ORDER.map(async (level) => {
+              const slug = VOCAB_LEVEL_TO_DECK_SLUG[level]
+              const [deckPayload, blockPayload] = await Promise.all([
+                window.jplearnDesktop.getDeckCards(slug),
+                window.jplearnDesktop.getBlockProgress(slug),
+              ])
+              return { level, cards: deckPayload.cards, blocks: blockPayload.blocks }
+            }),
+          ),
+        ])
+
+        if (cancelled) return
+
+        const nextKanjiDecks: Partial<Record<JlptLevel, ScriptDeck['cards']>> = {}
+        const nextVocabDecks: Partial<Record<JlptLevel, ScriptDeck['cards']>> = {}
+
+        for (const load of kanjiLoads) {
+          kanjiLevelDeckCacheRef.current[load.level] = load.cards
+          kanjiLevelBlockCacheRef.current[load.level] = load.blocks
+          nextKanjiDecks[load.level] = load.cards
+        }
+
+        for (const load of vocabLoads) {
+          vocabLevelDeckCacheRef.current[load.level] = load.cards
+          vocabLevelBlockCacheRef.current[load.level] = load.blocks
+          nextVocabDecks[load.level] = load.cards
+        }
+
+        setKanjiDeckCardsByLevel((previous) => ({
+          ...previous,
+          ...nextKanjiDecks,
+        }))
+        setVocabDeckCardsByLevel((previous) => ({
+          ...previous,
+          ...nextVocabDecks,
+        }))
+      } catch {
+        // Allow startup to continue even if preloading fails on some decks.
+      } finally {
+        if (!cancelled) {
+          void window.jplearnDesktop.notifyStartupReady().catch(() => undefined)
+        }
+      }
+    }
+
+    void preloadStartupDeckData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const loadScriptCards = useCallback(async (
     script: ScriptKey,
     kanjiLevel: JlptLevel = activeKanjiLevel,
     vocabLevel: JlptLevel = activeVocabLevel,
   ) => {
+    const requestId = scriptLoadRequestIdRef.current + 1
+    scriptLoadRequestIdRef.current = requestId
     setGameLoading(true)
     setGameError(null)
+
+    const scriptChanged = lastLoadedScriptRef.current !== script
+    if (scriptChanged) {
+      setDeckCards([])
+      setBlockProgress([])
+      setActiveBlockIndex(0)
+    }
+
     setSessionActive(false)
     setRoundState(null)
     setRoundFeedback(null)
@@ -1117,25 +1237,58 @@ function App() {
     try {
       if (script === 'kanji_n5') {
         const selectedKanjiSlug = KANJI_LEVEL_TO_DECK_SLUG[kanjiLevel]
-        const [selectedDeckPayload, blockPayload, n5Deck, n4Deck, n3Deck, n2Deck, n1Deck] = await Promise.all([
-          window.jplearnDesktop.getDeckCards(selectedKanjiSlug),
-          window.jplearnDesktop.getBlockProgress(selectedKanjiSlug),
-          window.jplearnDesktop.getDeckCards('kanji_n5'),
-          window.jplearnDesktop.getDeckCards('kanji_n4'),
-          window.jplearnDesktop.getDeckCards('kanji_n3'),
-          window.jplearnDesktop.getDeckCards('kanji_n2'),
-          window.jplearnDesktop.getDeckCards('kanji_n1'),
-        ])
-        setDeckCards(selectedDeckPayload.cards)
-        setActiveKanjiDeckSlug(selectedDeckPayload.slug as KanjiDeckSlug)
-        setKanjiDeckCardsByLevel({
-          n5: n5Deck.cards,
-          n4: n4Deck.cards,
-          n3: n3Deck.cards,
-          n2: n2Deck.cards,
-          n1: n1Deck.cards,
-        })
-        const blocks = blockPayload.blocks
+        const cachedCards = kanjiLevelDeckCacheRef.current[kanjiLevel]
+        const cachedBlocks = kanjiLevelBlockCacheRef.current[kanjiLevel]
+
+        let selectedCards = cachedCards
+        let selectedBlocks = cachedBlocks
+
+        if (!selectedCards || !selectedBlocks) {
+          const [selectedDeckPayload, blockPayload] = await Promise.all([
+            window.jplearnDesktop.getDeckCards(selectedKanjiSlug),
+            window.jplearnDesktop.getBlockProgress(selectedKanjiSlug),
+          ])
+
+          if (scriptLoadRequestIdRef.current !== requestId) {
+            return
+          }
+
+          selectedCards = selectedDeckPayload.cards
+          selectedBlocks = blockPayload.blocks
+          kanjiLevelDeckCacheRef.current[kanjiLevel] = selectedCards
+          kanjiLevelBlockCacheRef.current[kanjiLevel] = selectedBlocks
+          setKanjiDeckCardsByLevel((previous) => ({
+            ...previous,
+            [kanjiLevel]: selectedCards,
+          }))
+        }
+
+        const resolvedKanjiCards = selectedCards ?? []
+        const resolvedKanjiBlocks = selectedBlocks ?? []
+
+        setDeckCards(resolvedKanjiCards)
+        setActiveKanjiDeckSlug(selectedKanjiSlug)
+
+        for (const level of JLPT_LEVEL_ORDER) {
+          if (level === kanjiLevel || kanjiLevelDeckCacheRef.current[level]) continue
+          void window.jplearnDesktop.getDeckCards(KANJI_LEVEL_TO_DECK_SLUG[level])
+            .then((payload) => {
+              kanjiLevelDeckCacheRef.current[level] = payload.cards
+              setKanjiDeckCardsByLevel((previous) => ({
+                ...previous,
+                [level]: payload.cards,
+              }))
+            })
+            .catch(() => undefined)
+
+          void window.jplearnDesktop.getBlockProgress(KANJI_LEVEL_TO_DECK_SLUG[level])
+            .then((payload) => {
+              kanjiLevelBlockCacheRef.current[level] = payload.blocks
+            })
+            .catch(() => undefined)
+        }
+
+        const blocks = resolvedKanjiBlocks
         setBlockProgress(blocks)
         if (blocks.length > 0) {
           const lastUnlocked = blocks.reduce(
@@ -1148,25 +1301,58 @@ function App() {
         }
       } else if (script === 'vocab_n5') {
         const selectedVocabSlug = VOCAB_LEVEL_TO_DECK_SLUG[vocabLevel]
-        const [selectedDeckPayload, blockPayload, n5Deck, n4Deck, n3Deck, n2Deck, n1Deck] = await Promise.all([
-          window.jplearnDesktop.getDeckCards(selectedVocabSlug),
-          window.jplearnDesktop.getBlockProgress(selectedVocabSlug),
-          window.jplearnDesktop.getDeckCards('vocab_n5'),
-          window.jplearnDesktop.getDeckCards('vocab_n4'),
-          window.jplearnDesktop.getDeckCards('vocab_n3'),
-          window.jplearnDesktop.getDeckCards('vocab_n2'),
-          window.jplearnDesktop.getDeckCards('vocab_n1'),
-        ])
-        setDeckCards(selectedDeckPayload.cards)
-        setActiveVocabDeckSlug(selectedDeckPayload.slug as VocabDeckSlug)
-        setVocabDeckCardsByLevel({
-          n5: n5Deck.cards,
-          n4: n4Deck.cards,
-          n3: n3Deck.cards,
-          n2: n2Deck.cards,
-          n1: n1Deck.cards,
-        })
-        const blocks = blockPayload.blocks
+        const cachedCards = vocabLevelDeckCacheRef.current[vocabLevel]
+        const cachedBlocks = vocabLevelBlockCacheRef.current[vocabLevel]
+
+        let selectedCards = cachedCards
+        let selectedBlocks = cachedBlocks
+
+        if (!selectedCards || !selectedBlocks) {
+          const [selectedDeckPayload, blockPayload] = await Promise.all([
+            window.jplearnDesktop.getDeckCards(selectedVocabSlug),
+            window.jplearnDesktop.getBlockProgress(selectedVocabSlug),
+          ])
+
+          if (scriptLoadRequestIdRef.current !== requestId) {
+            return
+          }
+
+          selectedCards = selectedDeckPayload.cards
+          selectedBlocks = blockPayload.blocks
+          vocabLevelDeckCacheRef.current[vocabLevel] = selectedCards
+          vocabLevelBlockCacheRef.current[vocabLevel] = selectedBlocks
+          setVocabDeckCardsByLevel((previous) => ({
+            ...previous,
+            [vocabLevel]: selectedCards,
+          }))
+        }
+
+        const resolvedVocabCards = selectedCards ?? []
+        const resolvedVocabBlocks = selectedBlocks ?? []
+
+        setDeckCards(resolvedVocabCards)
+        setActiveVocabDeckSlug(selectedVocabSlug)
+
+        for (const level of JLPT_LEVEL_ORDER) {
+          if (level === vocabLevel || vocabLevelDeckCacheRef.current[level]) continue
+          void window.jplearnDesktop.getDeckCards(VOCAB_LEVEL_TO_DECK_SLUG[level])
+            .then((payload) => {
+              vocabLevelDeckCacheRef.current[level] = payload.cards
+              setVocabDeckCardsByLevel((previous) => ({
+                ...previous,
+                [level]: payload.cards,
+              }))
+            })
+            .catch(() => undefined)
+
+          void window.jplearnDesktop.getBlockProgress(VOCAB_LEVEL_TO_DECK_SLUG[level])
+            .then((payload) => {
+              vocabLevelBlockCacheRef.current[level] = payload.blocks
+            })
+            .catch(() => undefined)
+        }
+
+        const blocks = resolvedVocabBlocks
         setBlockProgress(blocks)
         if (blocks.length > 0) {
           const lastUnlocked = blocks.reduce(
@@ -1182,6 +1368,11 @@ function App() {
           window.jplearnDesktop.getDeckCards(script),
           window.jplearnDesktop.getBlockProgress(script),
         ])
+
+        if (scriptLoadRequestIdRef.current !== requestId) {
+          return
+        }
+
         setDeckCards(deckPayload.cards)
         const blocks = blockPayload.blocks
         setBlockProgress(blocks)
@@ -1195,13 +1386,20 @@ function App() {
           setActiveBlockIndex(0)
         }
       }
+
+      lastLoadedScriptRef.current = script
     } catch (err) {
+      if (scriptLoadRequestIdRef.current !== requestId) {
+        return
+      }
       setDeckCards([])
       setBlockProgress([])
       setActiveBlockIndex(0)
       setGameError(err instanceof Error ? err.message : 'Unknown game bridge error')
     } finally {
-      setGameLoading(false)
+      if (scriptLoadRequestIdRef.current === requestId) {
+        setGameLoading(false)
+      }
     }
   }, [activeKanjiLevel, activeVocabLevel, resetRoundCycle])
 
@@ -1924,32 +2122,10 @@ function App() {
   useEffect(() => {
     if (view !== 'overview') return
     setOverviewBlocksLoading(true)
-    void Promise.all([
-      window.jplearnDesktop.getBlockProgress('hiragana'),
-      window.jplearnDesktop.getBlockProgress('katakana'),
-      window.jplearnDesktop.getDeckCards('kanji_n5'),
-      window.jplearnDesktop.getDeckCards('kanji_n4'),
-      window.jplearnDesktop.getDeckCards('kanji_n3'),
-      window.jplearnDesktop.getDeckCards('kanji_n2'),
-      window.jplearnDesktop.getDeckCards('kanji_n1'),
-    ])
-      .then(([
-        hira,
-        kata,
-        kanjiN5Deck,
-        kanjiN4Deck,
-        kanjiN3Deck,
-        kanjiN2Deck,
-        kanjiN1Deck,
-      ]) => {
-        setOverviewBlocks({ hiragana: hira.blocks, katakana: kata.blocks })
-        setOverviewKanjiDeck([
-          ...kanjiN5Deck.cards,
-          ...kanjiN4Deck.cards,
-          ...kanjiN3Deck.cards,
-          ...kanjiN2Deck.cards,
-          ...kanjiN1Deck.cards,
-        ])
+    void window.jplearnDesktop.getOverviewCharacterMastery()
+      .then((payload) => {
+        setOverviewBlocks(payload.blocks)
+        setOverviewKanjiDeck(payload.kanji_cards)
       })
       .catch(() => undefined)
       .finally(() => setOverviewBlocksLoading(false))
@@ -2015,6 +2191,11 @@ function App() {
     setShowSettings(true)
     setShortcutMenuOpen(false)
   }, [])
+
+  const refreshDataFromMenu = useCallback(() => {
+    void loadSummary()
+    setShortcutMenuOpen(false)
+  }, [loadSummary])
 
   const resetStudyDb = useCallback(async () => {
     setResettingDb(true)
@@ -2109,56 +2290,121 @@ function App() {
                 title="Shortcuts"
                 aria-haspopup="menu"
                 aria-expanded={shortcutMenuOpen}
-                onClick={() => setShortcutMenuOpen((open) => !open)}
+                onClick={() => {
+                  setShortcutMenuOpen((open) => {
+                    const next = !open
+                    if (next) {
+                      setActiveShortcutFlyout('navigation')
+                    }
+                    return next
+                  })
+                }}
               >
                 <Menu className="window-nav-icon" strokeWidth={2.2} />
               </button>
               {shortcutMenuOpen ? (
                 <div className="titlebar-shortcut-menu" role="menu" aria-label="Quick locations">
-                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToMainMenu}>
-                    <House className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                    Main Menu
-                  </button>
-                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToOverview}>
-                    <BarChart3 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                    Study Overview
-                  </button>
-                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('hiragana')}>
-                    <span className="titlebar-shortcut-glyph" aria-hidden="true">あ</span>
-                    Hiragana Map
-                  </button>
-                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('katakana')}>
-                    <span className="titlebar-shortcut-glyph" aria-hidden="true">ア</span>
-                    Katakana Map
-                  </button>
-                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('kanji_n5')}>
-                    <span className="titlebar-shortcut-glyph" aria-hidden="true">漢</span>
-                    Kanji Map
-                  </button>
-                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('vocab_n5')}>
-                    <span className="titlebar-shortcut-glyph" aria-hidden="true">語</span>
-                    Words Map
-                  </button>
-                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('grammar_patterns')}>
-                    <span className="titlebar-shortcut-glyph" aria-hidden="true">話</span>
-                    Conversational Map
-                  </button>
-                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={openSettingsFromMenu}>
-                    <Settings className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                    Settings
-                  </button>
                   <button
                     type="button"
                     role="menuitem"
-                    className="titlebar-shortcut-item"
-                    onClick={() => {
-                      void loadSummary()
-                      setShortcutMenuOpen(false)
-                    }}
+                    className="titlebar-shortcut-item titlebar-shortcut-parent"
+                    aria-haspopup="true"
+                    aria-expanded={activeShortcutFlyout === 'navigation'}
+                    onMouseEnter={() => setActiveShortcutFlyout('navigation')}
+                    onFocus={() => setActiveShortcutFlyout('navigation')}
                   >
-                    <Activity className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                    Refresh Data
+                    <House className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Navigation
+                    <span className="titlebar-shortcut-caret" aria-hidden="true">▸</span>
                   </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="titlebar-shortcut-item titlebar-shortcut-parent"
+                    aria-haspopup="true"
+                    aria-expanded={activeShortcutFlyout === 'tracks'}
+                    onMouseEnter={() => setActiveShortcutFlyout('tracks')}
+                    onFocus={() => setActiveShortcutFlyout('tracks')}
+                  >
+                    <ListChecks className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Learning Tracks
+                    <span className="titlebar-shortcut-caret" aria-hidden="true">▸</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="titlebar-shortcut-item titlebar-shortcut-parent"
+                    aria-haspopup="true"
+                    aria-expanded={activeShortcutFlyout === 'tools'}
+                    onMouseEnter={() => setActiveShortcutFlyout('tools')}
+                    onFocus={() => setActiveShortcutFlyout('tools')}
+                  >
+                    <Settings className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Tools
+                    <span className="titlebar-shortcut-caret" aria-hidden="true">▸</span>
+                  </button>
+
+                  {activeShortcutFlyout ? (
+                    <div className="titlebar-shortcut-flyout" role="group" aria-label={`${activeShortcutFlyout} shortcuts`}>
+                      {activeShortcutFlyout === 'navigation' ? (
+                        <>
+                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToMainMenu}>
+                            <House className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                            Main Menu
+                          </button>
+                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToOverview}>
+                            <BarChart3 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                            Study Overview
+                          </button>
+                        </>
+                      ) : null}
+
+                      {activeShortcutFlyout === 'tracks' ? (
+                        <>
+                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('hiragana')}>
+                            <span className="titlebar-shortcut-glyph" aria-hidden="true">あ</span>
+                            Hiragana Map
+                          </button>
+                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('katakana')}>
+                            <span className="titlebar-shortcut-glyph" aria-hidden="true">ア</span>
+                            Katakana Map
+                          </button>
+                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('kanji_n5')}>
+                            <span className="titlebar-shortcut-glyph" aria-hidden="true">漢</span>
+                            Kanji Map
+                          </button>
+                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('vocab_n5')}>
+                            <span className="titlebar-shortcut-glyph" aria-hidden="true">語</span>
+                            Words Map
+                          </button>
+                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('grammar_patterns')}>
+                            <span className="titlebar-shortcut-glyph" aria-hidden="true">話</span>
+                            Conversational Map
+                          </button>
+                        </>
+                      ) : null}
+
+                      {activeShortcutFlyout === 'tools' ? (
+                        <>
+                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={openSettingsFromMenu}>
+                            <Settings className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                            Settings
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="titlebar-shortcut-item"
+                            onClick={refreshDataFromMenu}
+                          >
+                            <Activity className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                            Refresh Data
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -2285,9 +2531,14 @@ function App() {
       {view === 'script_hub' ? (
         <div className={`view-shell view-${navDirection}`}>
           <header className="topbar panel-glass">
-            <button type="button" className="back-button" onClick={goHome}>
+            <button
+              type="button"
+              className="back-button back-button-icon-only"
+              onClick={goHome}
+              aria-label="Back to main menu"
+              title="Back to main menu"
+            >
               <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-              Main Menu
             </button>
             <div className="brand-block">
               <span className="brand-kicker">{SCRIPT_LABELS[activeScript]}</span>
@@ -2324,7 +2575,9 @@ function App() {
               </span>
             </div>
 
-            {blockProgressWithMastery.length > 0 ? (
+            {gameLoading ? (
+              <p className="status-line">Loading deck cards...</p>
+            ) : blockProgressWithMastery.length > 0 ? (
               <div className="block-path">
                 {blockProgressWithMastery.map((block, index) => {
                   const isActive = activeBlockIndex === block.index
@@ -2435,7 +2688,7 @@ function App() {
             ) : null}
 
             {/* Minigame selector – shown below block path once a block is active */}
-            {(blockProgressWithMastery.length === 0 || blockProgressWithMastery[activeBlockIndex]?.unlocked) ? (
+            {!gameLoading && (blockProgressWithMastery.length === 0 || blockProgressWithMastery[activeBlockIndex]?.unlocked) ? (
               <>
                 <div className="panel-head block-minigame-head">
                   <h3>
@@ -2536,7 +2789,6 @@ function App() {
               </>
             ) : null}
 
-            {gameLoading ? <p className="status-line">Loading deck cards...</p> : null}
             {gameError ? <p className="status-line status-error">{gameError}</p> : null}
           </section>
         </div>
@@ -2820,9 +3072,14 @@ function App() {
       {view === 'overview' ? (
         <div className={`view-shell view-${navDirection}`}>
           <header className="topbar panel-glass">
-            <button type="button" className="back-button" onClick={goHome}>
+            <button
+              type="button"
+              className="back-button back-button-icon-only"
+              onClick={goHome}
+              aria-label="Back to main menu"
+              title="Back to main menu"
+            >
               <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-              Main Menu
             </button>
             <div className="brand-block">
               <span className="brand-kicker">JPLearn</span>
@@ -2851,16 +3108,25 @@ function App() {
               <p className="hero-copy">See how much you have mastered, what is due now, and where to focus next.</p>
             </div>
             <div className="overview-hero-actions">
-              <button type="button" onClick={() => void loadSummary()} disabled={loading}>
-                {loading ? 'Refreshing...' : 'Refresh Data'}
+              <button
+                type="button"
+                className="icon-action-button"
+                onClick={() => void loadSummary()}
+                disabled={loading}
+                aria-label={loading ? 'Refreshing data' : 'Refresh data'}
+                title={loading ? 'Refreshing data' : 'Refresh data'}
+              >
+                <RefreshCw aria-hidden="true" className={`inline-button-icon ${loading ? 'spin-icon' : ''}`} strokeWidth={2.2} />
               </button>
               <button
                 type="button"
-                className="danger-button"
+                className="danger-button icon-action-button"
                 onClick={() => setResetConfirmStep(1)}
                 disabled={resettingDb}
+                aria-label={resettingDb ? 'Resetting database' : 'Reset database'}
+                title={resettingDb ? 'Resetting database' : 'Reset database'}
               >
-                {resettingDb ? 'Resetting...' : 'Reset DB'}
+                <AlertTriangle aria-hidden="true" className={`inline-button-icon ${resettingDb ? 'spin-icon' : ''}`} strokeWidth={2.2} />
               </button>
               <span>{lastUpdated ? `Updated ${lastUpdated}` : 'Waiting for first sync'}</span>
             </div>
@@ -2936,7 +3202,7 @@ function App() {
               aria-expanded={charMasteryExpanded}
             >
               <div className="panel-head char-mastery-panel-head">
-                <h2>Character Mastery</h2>
+                <h2 className="panel-title-with-icon"><Languages aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Character Mastery</h2>
                 <div className="panel-actions">
                   <span>{overviewBlocksLoading ? 'Loading…' : 'Color-coded progress for every symbol'}</span>
                 </div>
@@ -3068,7 +3334,7 @@ function App() {
 
                             {isActive ? (
                               <div className="char-mastery-detail-inline">
-                                <div className="char-mastery-chips">
+                                <div className="char-mastery-chips char-mastery-chips-kanji">
                                   {visibleCards.map((card) => {
                                     const score = cardScores.kanji_n5[card.id] ?? 0
                                     const levelScore = Math.min(score, CARD_MASTERY_MAX)
@@ -3076,14 +3342,16 @@ function App() {
                                       <button
                                         key={card.id}
                                         type="button"
-                                        className="char-mastery-chip"
+                                        className="char-mastery-chip char-mastery-chip-kanji"
                                         data-level={levelScore}
                                         aria-label={`${card.character}, ${card.romaji}, ${card.meaning}: ${levelScore}/${CARD_MASTERY_MAX}`}
-                                        lang="ja"
                                         onClick={() => setSelectedChar({ character: card.character, romaji: card.romaji, meaning: card.meaning, label: 'Reading / English meaning', score: levelScore })}
                                       >
-                                        <span className="char-mastery-chip-char">{card.character}</span>
-                                        <span className="char-mastery-chip-reading">{card.romaji}</span>
+                                        <span className="char-mastery-chip-glyph" lang="ja">{card.character}</span>
+                                        <span className="char-mastery-chip-copy">
+                                          <span className="char-mastery-chip-reading">{card.romaji}</span>
+                                          <span className="char-mastery-chip-meaning">{card.meaning}</span>
+                                        </span>
                                       </button>
                                     )
                                   })}
@@ -3363,7 +3631,7 @@ function App() {
                           <h3>{item.prompt}</h3>
                           <span className={`timeline-trend timeline-trend-${item.trend}`}>{item.trend}</span>
                         </div>
-                        <p className="timeline-card-subhead">{item.script_tag} • {item.deck}</p>
+                        <p className="timeline-card-subhead">{formatTimelineScriptTag(item.script_tag)} • {formatTimelineDeckName(item.deck)}</p>
                         <div className="timeline-events">
                           {item.events.map((event, eventIndex) => (
                             <span key={`${item.key}-${eventIndex}`} className={`timeline-event timeline-event-${event.outcome}`}>
@@ -3406,7 +3674,7 @@ function App() {
               aria-controls="overview-deck-snapshot-body"
             >
               <div className="panel-head">
-                <h2>Deck Snapshot</h2>
+                <h2 className="panel-title-with-icon"><ListChecks aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Deck Snapshot</h2>
                 <div className="panel-actions">
                   <span>Mastery and daily completion by deck</span>
                 </div>
