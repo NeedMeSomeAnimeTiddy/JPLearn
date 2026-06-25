@@ -1,111 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --bg-main: #f4f3ee;
+  --bg-subtle: #eceae3;
+  --text-main: #172026;
+  --text-soft: #4e5d65;
+  --accent: #0f8c85;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --blob-left: rgba(15, 140, 133, 0.42);
+  --blob-right: rgba(230, 137, 91, 0.34);
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --panel-bg: rgba(255, 255, 255, 0.8);
+  --panel-bg-alt: rgba(249, 248, 244, 0.7);
+  --panel-border: rgba(34, 46, 56, 0.12);
+  --panel-shadow: 0 26px 40px -30px rgba(23, 32, 38, 0.55);
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --tile-bg: rgba(255, 255, 255, 0.75);
+  --tile-border: rgba(34, 46, 56, 0.12);
+  --tile-shadow: 0 14px 25px -22px rgba(22, 30, 37, 0.7);
+
+  --chip-bg: rgba(255, 255, 255, 0.55);
+  --chip-border: rgba(34, 46, 56, 0.12);
+
+  --button-border: rgba(34, 46, 56, 0.2);
+  --button-bg-top: rgba(255, 255, 255, 0.94);
+  --button-bg-bottom: rgba(238, 238, 232, 0.9);
+
+  --card-border: rgba(31, 43, 52, 0.11);
+  --card-bg-top: rgba(255, 255, 255, 0.83);
+  --card-bg-bottom: rgba(244, 242, 235, 0.78);
+
+  --track-bg: rgba(22, 32, 39, 0.14);
+  --status-error: #a23434;
+
+  --tone-teal: #1b9f97;
+  --tone-ocean: #2878b9;
+  --tone-amber: #de9a2f;
+  --tone-rose: #da6d55;
+
+  --sans: 'Space Grotesk', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+    --bg-main: #11161a;
+    --bg-subtle: #151c20;
+    --text-main: #eef2ef;
+    --text-soft: #b6c3c5;
+    --accent: #5de4d9;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+    --blob-left: rgba(52, 155, 146, 0.32);
+    --blob-right: rgba(194, 115, 71, 0.3);
+
+    --panel-bg: rgba(18, 26, 31, 0.77);
+    --panel-bg-alt: rgba(14, 22, 27, 0.72);
+    --panel-border: rgba(177, 197, 206, 0.18);
+    --panel-shadow: 0 26px 42px -30px rgba(0, 0, 0, 0.82);
+
+    --tile-bg: rgba(19, 28, 33, 0.76);
+    --tile-border: rgba(177, 197, 206, 0.2);
+    --tile-shadow: 0 18px 28px -25px rgba(0, 0, 0, 0.9);
+
+    --chip-bg: rgba(25, 36, 42, 0.65);
+    --chip-border: rgba(177, 197, 206, 0.2);
+
+    --button-border: rgba(177, 197, 206, 0.24);
+    --button-bg-top: rgba(33, 44, 51, 0.9);
+    --button-bg-bottom: rgba(23, 32, 39, 0.9);
+
+    --card-border: rgba(177, 197, 206, 0.18);
+    --card-bg-top: rgba(20, 30, 36, 0.86);
+    --card-bg-bottom: rgba(15, 24, 29, 0.83);
+
+    --track-bg: rgba(214, 227, 231, 0.14);
+    --status-error: #f18181;
+
+    --tone-teal: #3bd4c8;
+    --tone-ocean: #52a7f0;
+    --tone-amber: #f0be58;
+    --tone-rose: #ff8f73;
   }
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+* {
   box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 body {
   margin: 0;
+  font-family: var(--sans);
+  color: var(--text-main);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.4) 0%, transparent 42%),
+    radial-gradient(circle at 78% 38%, rgba(255, 255, 255, 0.26) 0%, transparent 40%),
+    linear-gradient(180deg, var(--bg-main), var(--bg-subtle));
+  font-size: 16px;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
+h2,
+h3,
 p {
   margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
 }
