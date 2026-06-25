@@ -1,2 +1,2 @@
-PySide6>=6.7.0
-pyqtdarktheme>=2.1.0
+# Python GUI dependencies were removed.
+# Frontend is now Electron + React + TypeScript in electron-frontend/.

@@ -1,17 +1,31 @@
-"""JPLearn main entrypoint (GUI-forward)."""
+"""JPLearn Python entrypoint.
+
+The Python desktop UI has been deprecated in favor of the Electron frontend.
+"""
 
 from __future__ import annotations
 
 import ctypes
-import traceback
 
 from startup import detach_console_for_gui_launch
 
 
-def run() -> None:
-    from ui.qt_app import run as ui_run
+DEPRECATION_MESSAGE = (
+    "The Python GUI has been deprecated.\n\n"
+    "Use the Electron frontend instead:\n"
+    "1. cd electron-frontend\n"
+    "2. npm run dev\n"
+    "   or\n"
+    "   npm run build && npm run start"
+)
 
-    ui_run()
+
+class PythonGuiDeprecatedError(RuntimeError):
+    """Raised when the deprecated Python GUI entrypoint is invoked."""
+
+
+def run() -> None:
+    raise PythonGuiDeprecatedError(DEPRECATION_MESSAGE)
 
 
 def main() -> None:
@@ -19,25 +33,15 @@ def main() -> None:
 
 
 def _show_startup_error(message: str) -> None:
-    ctypes.windll.user32.MessageBoxW(0, message, "JPLearn startup error", 0x10)
+    ctypes.windll.user32.MessageBoxW(0, message, "JPLearn", 0x30)
 
 
 def launch() -> None:
     detach_console_for_gui_launch()
     try:
         main()
-    except Exception as exc:
-        if isinstance(exc, ModuleNotFoundError) and exc.name == "PySide6":
-            _show_startup_error(
-                "A required package is not installed for the Python interpreter used to open this file.\n\n"
-                "Run this once in the project folder:\n"
-                "python -m pip install -r requirements.txt"
-            )
-            return
-        details = "".join(
-            traceback.format_exception_only(type(exc), exc)
-        ).strip()
-        _show_startup_error(f"JPLearn failed to start.\n\n{details}")
+    except PythonGuiDeprecatedError as exc:
+        _show_startup_error(str(exc))
 
 
 if __name__ == "__main__":

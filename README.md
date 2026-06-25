@@ -1,5 +1,5 @@
 # JPLearn
-A Python-based Japanese learning app inspired by Anki, covering Hiragana, Katakana, and Kanji using spaced repetition.
+An Electron-based Japanese learning app with a Python backend for domain logic and SQLite persistence.
 
 ---
 
@@ -16,13 +16,17 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 
 1. Install dependencies:
    `python -m pip install -r requirements.txt`
-2. Run the main launcher (GUI-forward):
-   `python main.py`
-3. Run the GUI app:
-   `python gui.py`
-4. Run the full development checks:
+2. Install frontend dependencies:
+   `cd electron-frontend && npm install`
+3. Run the desktop frontend in development:
+   `cd electron-frontend && npm run dev`
+4. Build and run production frontend locally:
+   `cd electron-frontend && npm run build && npm run start`
+5. Build Windows distributables (Forge):
+   `cd electron-frontend && npm run make:win`
+6. Run the full Python development checks:
    `python scripts\dev.py`
-5. Run targeted tests while working:
+7. Run targeted tests while working:
    `python -m pytest tests\path\to\test_file.py -q`
 
 `scripts\dev.py` is the main gate and runs type checks, architecture checks, DB checks, SRS checks, then tests.
@@ -53,8 +57,8 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 - [ ] (Medium) Add smarter distractor generation for future multiple-choice sessions
 
 ### User Experience (GUI)
-- [x] Keep `main.py` runnable as a GUI launcher
-- [x] Maintain working PySide6 app flow (`gui.py`)
+- [x] Deprecate Python GUI entrypoints (`main.py`, `gui.py`)
+- [x] Migrate frontend to Electron + React + TypeScript (`electron-frontend/`)
 - [x] Add multiple-choice mode
 - [x] (High) Add typed-answer mode with tolerant input checking (kana normalization, punctuation/whitespace-insensitive matching, minor typo tolerance)
 - [x] (High) Add typed-answer feedback states (exact match, near miss, incorrect) before answer reveal
@@ -81,6 +85,6 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 ### Stretch Goals
 - [ ] Audio pronunciation playback (pre-recorded or TTS)
 - [ ] Sentence mining/import workflow
-- [ ] Theme/customization options in GUI
+- [ ] Theme/customization options in Electron UI
 - [ ] Optional cloud sync
-- [ ] Optional web frontend
+- [ ] Optional web deployment mode

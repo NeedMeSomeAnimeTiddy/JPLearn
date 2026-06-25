@@ -1,0 +1,73 @@
+.shell {
+  max-width: 840px;
+  margin: 48px auto;
+  padding: 0 24px 48px;
+  text-align: left;
+}
+
+.subtitle {
+  margin-top: -8px;
+  margin-bottom: 24px;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--social-bg);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+}
+
+.panel h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.panel ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.panel-actions button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.panel-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.panel-actions span {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.summary-table th,
+.summary-table td {
+  border-top: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.summary-table th {
+  color: var(--text-h);
+  font-weight: 600;
+}
