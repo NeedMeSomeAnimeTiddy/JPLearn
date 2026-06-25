@@ -8,11 +8,12 @@ from functools import partial
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QFont, QFontDatabase, QKeyEvent, QPixmap
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt
+from PySide6.QtGui import QAction, QColor, QFont, QFontDatabase, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
+    QGraphicsOpacityEffect,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -29,6 +30,11 @@ from domain.answer_check import assess_typed_answer
 from domain.cards import Card, Deck
 from domain.decks import ALL_DECKS
 from domain.scheduler import AGAIN, GOOD, ReviewState
+
+try:
+    import qdarktheme
+except ImportError:  # pragma: no cover - optional dependency
+    qdarktheme = None
 
 BG = "#1a1a2e"
 CARD_BG = "#16213e"
@@ -92,8 +98,8 @@ QWidget {{
 }}
 QPushButton {{
     border: none;
-    border-radius: 8px;
-    padding: 10px 14px;
+    border-radius: 10px;
+    padding: 10px 16px;
     color: {BTN_FG};
     font-weight: 600;
 }}
@@ -113,6 +119,77 @@ QLabel#title {{
 }}
 QLabel#dim {{
     color: {fg_dim};
+}}
+"""
+
+
+def _theme_overrides(high_contrast: bool = False) -> str:
+    if high_contrast:
+        return ""
+    return f"""
+QMainWindow {{
+    background: #0f1423;
+}}
+QWidget#appRoot {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0e1422, stop:1 #161f34);
+}}
+QMenuBar, QMenu {{
+    background: #11182b;
+    color: {FG};
+}}
+QMenu::item:selected {{
+    background: #1f2a45;
+}}
+QPushButton {{
+    border: 1px solid #2d416b;
+}}
+QPushButton:hover {{
+    border: 1px solid #4a67a1;
+}}
+QPushButton:pressed {{
+    border: 1px solid #2a3e64;
+}}
+QLineEdit {{
+    background: #0f1a33;
+    border: 1px solid #2f436e;
+    border-radius: 10px;
+    padding: 8px 10px;
+    selection-background-color: #2e5aac;
+}}
+QScrollBar:vertical {{
+    background: transparent;
+    width: 10px;
+    margin: 2px;
+}}
+QScrollBar::handle:vertical {{
+    background: #445a8e;
+    border-radius: 5px;
+    min-height: 20px;
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0px;
+}}
+QFrame#cardPanel {{
+    border: 1px solid #2f3f66;
+    border-radius: 14px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1a243d, stop:1 #141c30);
+}}
+"""
+
+
+def _button_styles(base_color: str) -> str:
+    base = QColor(base_color)
+    hover = base.lighter(112).name()
+    pressed = base.darker(114).name()
+    return f"""
+QPushButton {{
+    background: {base.name()};
+}}
+QPushButton:hover {{
+    background: {hover};
+}}
+QPushButton:pressed {{
+    background: {pressed};
 }}
 """
 
@@ -177,7 +254,8 @@ def _build_multiple_choice_options(
 def _button(text: str, color: str, handler: Callable[[], None], size: int = 13) -> QPushButton:
     button = QPushButton(text)
     button.setFont(_jp_font(size, bold=True))
-    button.setStyleSheet(f"background: {color};")
+    button.setCursor(Qt.CursorShape.PointingHandCursor)
+    button.setStyleSheet(_button_styles(color))
     button.clicked.connect(handler)
     return button
 
@@ -226,25 +304,25 @@ class HomeFrame(AppFrame):
     def __init__(self, master: "App") -> None:
         super().__init__(master)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(80, 40, 80, 40)
-        layout.setSpacing(12)
+        layout.setContentsMargins(84, 52, 84, 48)
+        layout.setSpacing(14)
         layout.addStretch(1)
 
         title = QLabel("JPLearn")
         title.setObjectName("title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(_jp_font(36, bold=True))
+        title.setFont(_jp_font(44, bold=True))
         layout.addWidget(title)
 
         subtitle = QLabel("日本語を学ぼう")
         subtitle.setObjectName("dim")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setFont(_jp_font(18))
+        subtitle.setFont(_jp_font(19))
         layout.addWidget(subtitle)
 
         prompt = QLabel("Choose a deck and mode")
         prompt.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        prompt.setFont(_jp_font(13))
+        prompt.setFont(_jp_font(14))
         layout.addWidget(prompt)
 
         a11y_controls = QHBoxLayout()
@@ -312,6 +390,8 @@ class FlashcardFrame(AppFrame):
         self._typed_answered = False
         self._typed_needs_reveal = False
         self._stroke_order_visible = False
+        self._char_effect: QGraphicsOpacityEffect | None = None
+        self._romaji_effect: QGraphicsOpacityEffect | None = None
 
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
@@ -358,12 +438,18 @@ class FlashcardFrame(AppFrame):
         self._char_label = QLabel("")
         self._char_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._char_label.setFont(_jp_font(110, bold=True))
+        self._char_effect = QGraphicsOpacityEffect(self._char_label)
+        self._char_label.setGraphicsEffect(self._char_effect)
+        self._char_effect.setOpacity(1.0)
         card_area.addWidget(self._char_label)
 
         self._romaji_label = QLabel("")
         self._romaji_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._romaji_label.setFont(_jp_font(28))
         self._romaji_label.setStyleSheet(f"color: {ACCENT};")
+        self._romaji_effect = QGraphicsOpacityEffect(self._romaji_label)
+        self._romaji_label.setGraphicsEffect(self._romaji_effect)
+        self._romaji_effect.setOpacity(1.0)
         card_area.addWidget(self._romaji_label)
 
         self._stroke_toggle_btn = _button("Stroke Order", HIGHLIGHT, self._toggle_stroke_order, size=11)
@@ -650,6 +736,7 @@ class FlashcardFrame(AppFrame):
         self._progress_label.setText(f"{self._total - remaining + 1} / {self._total}")
         self._char_label.setText(self._current.character)
         self._romaji_label.setText("")
+        self._animate_opacity(self._char_label)
 
         if self._mode == "multiple_choice":
             self._char_label.setFont(_jp_font(86, bold=True))
@@ -665,6 +752,7 @@ class FlashcardFrame(AppFrame):
         if self._mode != "flashcard" or self._current is None:
             return
         self._romaji_label.setText(self._current.romaji)
+        self._animate_opacity(self._romaji_label)
         self._reveal_btn.hide()
         self._fc_actions_wrap.show()
 
@@ -774,6 +862,7 @@ class FlashcardFrame(AppFrame):
         if current is None:
             return
         self._romaji_label.setText(current.romaji)
+        self._animate_opacity(self._romaji_label)
         self._typed_reveal_btn.hide()
         self._typed_needs_reveal = False
         self._typed_next_btn.show()
@@ -787,6 +876,19 @@ class FlashcardFrame(AppFrame):
         self._hide_all_bottom_widgets()
         self._stroke_order_image.hide()
         self._stroke_order_hint.hide()
+
+    def _animate_opacity(self, widget: QWidget) -> None:
+        effect = widget.graphicsEffect()
+        if not isinstance(effect, QGraphicsOpacityEffect):
+            effect = QGraphicsOpacityEffect(widget)
+            widget.setGraphicsEffect(effect)
+        effect.setOpacity(0.2)
+        animation = QPropertyAnimation(effect, b"opacity", self)
+        animation.setDuration(180)
+        animation.setStartValue(0.2)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        animation.start()
 
 
 class SessionCompleteFrame(AppFrame):
@@ -1013,8 +1115,11 @@ class App(QMainWindow):
         self.resize(1100, 820)
         self._font_scale_steps = 0
         self._high_contrast = False
+        self._using_qdarktheme = False
+        self._frame_animation: QPropertyAnimation | None = None
 
         root = QWidget()
+        root.setObjectName("appRoot")
         self.setCentralWidget(root)
         self._stack_layout = QVBoxLayout(root)
         self._stack_layout.setContentsMargins(0, 0, 0, 0)
@@ -1065,6 +1170,20 @@ class App(QMainWindow):
         self._active_frame = frame
         frame.show()
         frame.on_show()
+        self._animate_frame(frame)
+
+    def _animate_frame(self, frame: AppFrame) -> None:
+        effect = frame.graphicsEffect()
+        if not isinstance(effect, QGraphicsOpacityEffect):
+            effect = QGraphicsOpacityEffect(frame)
+            frame.setGraphicsEffect(effect)
+        effect.setOpacity(0.0)
+        self._frame_animation = QPropertyAnimation(effect, b"opacity", self)
+        self._frame_animation.setDuration(220)
+        self._frame_animation.setStartValue(0.0)
+        self._frame_animation.setEndValue(1.0)
+        self._frame_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._frame_animation.start()
 
     def go_home(self) -> None:
         self._show_frame("home")
@@ -1127,7 +1246,14 @@ class App(QMainWindow):
         self._high_contrast = not self._high_contrast
         app = QApplication.instance()
         if isinstance(app, QApplication):
-            app.setStyleSheet(_app_stylesheet(self._high_contrast))
+            if self._high_contrast:
+                app.setStyleSheet(_app_stylesheet(high_contrast=True))
+                return
+            if self._using_qdarktheme and qdarktheme is not None:
+                qdarktheme.setup_theme("auto")
+                app.setStyleSheet(f"{app.styleSheet()}\n{_theme_overrides()}")
+                return
+            app.setStyleSheet(f"{_app_stylesheet()}\n{_theme_overrides()}")
 
 
 def run() -> None:
@@ -1137,7 +1263,12 @@ def run() -> None:
         app = app_instance
     else:
         app = QApplication([])
-    app.setStyleSheet(_app_stylesheet())
     window = App()
+    if qdarktheme is not None:
+        qdarktheme.setup_theme("auto")
+        app.setStyleSheet(f"{app.styleSheet()}\n{_theme_overrides()}")
+        window._using_qdarktheme = True
+    else:
+        app.setStyleSheet(f"{_app_stylesheet()}\n{_theme_overrides()}")
     window.show()
     app.exec()
