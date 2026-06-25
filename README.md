@@ -56,12 +56,47 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 - [x] Show per-deck mastery and due/completed-today indicators
 
 ### Product Priorities (Post-Refactor)
-- [ ] (High) Add daily streak tracking with UTC/local-day handling tests
-- [ ] (High) Add weekly/monthly activity summary cards in Electron overview
-- [ ] (High) Add mistake breakdown by script/tag (hiragana/katakana/kanji/vocab)
-- [ ] (Medium) Add per-item study history timeline (last reviews + trend)
-- [ ] (Medium) Add "leech" handling for repeatedly failed items (auto-tag + focused review mode)
-- [ ] (Medium) Improve distractor generation quality for multiple-choice minigames
+- [ ] (High) Daily streak tracking (UTC-safe + local-day aware)
+   - [ ] Define streak model fields in persistence: `last_study_at_utc`, `current_streak_days`, `best_streak_days`.
+   - [ ] Implement streak update service in Domain with deterministic date-boundary logic.
+   - [ ] Handle same-day repeat studies without double-increment.
+   - [ ] Handle skipped-day reset behavior.
+   - [ ] Add tests for UTC rollover and local timezone edge cases.
+   - [ ] Surface current/best streak in Electron overview.
+
+- [ ] (High) Weekly/monthly activity summary cards in Electron overview
+   - [ ] Add aggregation query for daily activity buckets (last 7 and last 30 days).
+   - [ ] Expose totals: reviewed, correct, incorrect, accuracy, points earned.
+   - [ ] Render 2 overview cards: 7-day and 30-day summaries.
+   - [ ] Add empty-state behavior for new users with no activity.
+   - [ ] Add snapshot/UI tests for overview summary rendering.
+
+- [ ] (High) Mistake breakdown by script/tag (hiragana/katakana/kanji/vocab)
+   - [ ] Persist incorrect attempts with script/tag metadata at review time.
+   - [ ] Add grouped aggregation endpoint for mistake counts and error rates.
+   - [ ] Display breakdown in overview panel with top weak areas first.
+   - [ ] Add regression tests to ensure tag/script grouping stays stable.
+
+- [ ] (Medium) Per-item study history timeline (last reviews + trend)
+   - [ ] Add review event history table keyed by item and timestamp.
+   - [ ] Expose recent review timeline per item (attempt, outcome, timestamp, points delta).
+   - [ ] Add trend summary (improving/stable/declining) based on recent outcomes.
+   - [ ] Add UI panel for item-level history with pagination/limit.
+   - [ ] Add tests for ordering and trend classification rules.
+
+- [ ] (Medium) Leech handling for repeatedly failed items
+   - [ ] Define leech rule (example: failed >= N times within last M attempts).
+   - [ ] Auto-tag leech items in persistence.
+   - [ ] Add focused review mode that prioritizes leech-tagged items.
+   - [ ] Add UI indicator and optional filter for leech items.
+   - [ ] Add tests for entering/exiting leech state.
+
+- [ ] (Medium) Better distractor generation for multiple-choice minigames
+   - [ ] Replace random distractors with rule-based distractor ranking.
+   - [ ] Add script-aware similarity heuristics (shape/readings/meaning proximity).
+   - [ ] Prevent duplicate or obviously invalid distractors.
+   - [ ] Add deterministic tests for distractor quality and uniqueness.
+   - [ ] Add quick benchmark to keep distractor generation within target latency.
 
 ### Electron UX & Accessibility
 - [x] (High) Add deterministic keyboard navigation map (Tab order + Enter/Space shortcuts) across all menus

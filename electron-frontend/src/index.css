@@ -1,53 +1,223 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Fredoka:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Klee+One:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg-main: #191b1f;
-  --bg-subtle: #13151a;
-  --text-main: #f1f2f5;
-  --text-soft: #b5bcc8;
-  --accent: #8ea1ff;
+  --bg-main: #0e151c;
+  --bg-subtle: #14202a;
+  --text-main: #edf4f7;
+  --text-soft: #a8bcc6;
+  --accent: #f2b56f;
+  --accent-soft: #f8cb95;
+  --accent-ink: #573819;
 
   --base-font-size: 16px;
+  --ui-scale: 1;
 
-  --blob-left: rgba(95, 112, 246, 0.28);
-  --blob-right: rgba(55, 173, 152, 0.18);
+  --blob-left: rgba(104, 187, 205, 0.25);
+  --blob-right: rgba(116, 159, 220, 0.22);
+  --blob-top: rgba(242, 181, 111, 0.2);
 
-  --panel-bg: rgba(35, 38, 45, 0.88);
-  --panel-bg-alt: rgba(28, 31, 38, 0.84);
-  --panel-border: rgba(143, 154, 186, 0.21);
-  --panel-shadow: 0 30px 44px -30px rgba(0, 0, 0, 0.95);
+  --panel-bg: rgba(25, 39, 50, 0.84);
+  --panel-bg-alt: rgba(18, 31, 40, 0.8);
+  --panel-border: rgba(153, 196, 215, 0.22);
+  --panel-shadow: 0 30px 44px -30px rgba(0, 0, 0, 0.92);
 
-  --tile-bg: rgba(45, 49, 58, 0.84);
-  --tile-border: rgba(131, 141, 168, 0.2);
+  --tile-bg: rgba(31, 52, 64, 0.84);
+  --tile-border: rgba(144, 188, 209, 0.24);
   --tile-shadow: 0 18px 28px -22px rgba(0, 0, 0, 0.95);
 
-  --chip-bg: rgba(58, 62, 73, 0.73);
-  --chip-border: rgba(131, 141, 168, 0.25);
+  --chip-bg: rgba(45, 66, 79, 0.74);
+  --chip-border: rgba(148, 189, 206, 0.28);
 
-  --button-border: rgba(131, 141, 168, 0.32);
-  --button-bg-top: rgba(79, 86, 102, 0.9);
-  --button-bg-bottom: rgba(56, 61, 74, 0.9);
+  --button-border: rgba(153, 194, 212, 0.34);
+  --button-bg-top: rgba(66, 98, 116, 0.9);
+  --button-bg-bottom: rgba(51, 79, 93, 0.9);
 
-  --card-border: rgba(131, 141, 168, 0.2);
-  --card-bg-top: rgba(49, 53, 63, 0.87);
-  --card-bg-bottom: rgba(37, 41, 50, 0.84);
+  --card-border: rgba(156, 196, 214, 0.24);
+  --card-bg-top: rgba(44, 67, 82, 0.9);
+  --card-bg-bottom: rgba(31, 50, 64, 0.86);
 
-  --track-bg: rgba(201, 209, 224, 0.16);
-  --status-error: #ff8f95;
+  --track-bg: rgba(201, 224, 236, 0.18);
+  --status-error: #ff9e9e;
 
-  --tone-teal: #2dcab4;
-  --tone-ocean: #7aa8ff;
-  --tone-amber: #f0b357;
-  --tone-rose: #ef7f70;
+  --tone-teal: #5bc8b3;
+  --tone-ocean: #7eb8ea;
+  --tone-amber: #f2b56f;
+  --tone-rose: #ee8f87;
 
-  --sans: 'Space Grotesk', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  --display-font: 'M PLUS Rounded 1c', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  --sans: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
-  --button-font: 'Fredoka', 'Space Grotesk', 'Segoe UI', sans-serif;
+  --button-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
 }
 
-html[data-font-size='small']  { --base-font-size: 14px; }
-html[data-font-size='medium'] { --base-font-size: 16px; }
-html[data-font-size='large']  { --base-font-size: 19px; }
+html[data-theme='harbor_mist'] {
+  --bg-main: #0e151c;
+  --bg-subtle: #14202a;
+  --text-main: #edf4f7;
+  --text-soft: #a8bcc6;
+  --accent: #f2b56f;
+  --tone-ocean: #7eb8ea;
+}
+
+html[data-theme='sakura_dawn'] {
+  --bg-main: #1a111a;
+  --bg-subtle: #241926;
+  --text-main: #f9eef3;
+  --text-soft: #d6b8c7;
+  --accent: #ffb1bf;
+  --accent-soft: #ffd3db;
+  --panel-bg: rgba(53, 35, 50, 0.84);
+  --panel-bg-alt: rgba(42, 28, 39, 0.8);
+  --button-bg-top: rgba(124, 77, 98, 0.9);
+  --button-bg-bottom: rgba(94, 57, 74, 0.9);
+  --card-bg-top: rgba(88, 52, 72, 0.9);
+  --card-bg-bottom: rgba(69, 40, 57, 0.86);
+  --tone-ocean: #8ec8e8;
+  --tone-rose: #f5969f;
+}
+
+html[data-theme='forest_ink'] {
+  --bg-main: #0f1714;
+  --bg-subtle: #18251f;
+  --text-main: #edf5ef;
+  --text-soft: #acc7b5;
+  --accent: #89d0a4;
+  --accent-soft: #b8e8c8;
+  --panel-bg: rgba(30, 48, 40, 0.84);
+  --panel-bg-alt: rgba(24, 39, 33, 0.8);
+  --button-bg-top: rgba(68, 108, 84, 0.9);
+  --button-bg-bottom: rgba(49, 82, 64, 0.9);
+  --card-bg-top: rgba(44, 72, 57, 0.9);
+  --card-bg-bottom: rgba(35, 56, 45, 0.86);
+  --tone-teal: #74cfb0;
+  --tone-ocean: #7fbfa3;
+}
+
+html[data-theme='sunset_lacquer'] {
+  --bg-main: #211316;
+  --bg-subtle: #2d1a1f;
+  --text-main: #fff0ea;
+  --text-soft: #e2b8ad;
+  --accent: #ffab73;
+  --accent-soft: #ffd3a7;
+  --panel-bg: rgba(62, 34, 36, 0.84);
+  --panel-bg-alt: rgba(48, 28, 32, 0.8);
+  --button-bg-top: rgba(138, 76, 58, 0.9);
+  --button-bg-bottom: rgba(110, 59, 44, 0.9);
+  --card-bg-top: rgba(90, 47, 45, 0.9);
+  --card-bg-bottom: rgba(69, 36, 35, 0.86);
+  --tone-amber: #ffbc7d;
+  --tone-rose: #f48b74;
+}
+
+html[data-theme='midnight_neon'] {
+  --bg-main: #0d1021;
+  --bg-subtle: #151c34;
+  --text-main: #eaf3ff;
+  --text-soft: #9fb3d8;
+  --accent: #79d5ff;
+  --accent-soft: #aee6ff;
+  --panel-bg: rgba(28, 38, 74, 0.84);
+  --panel-bg-alt: rgba(20, 29, 60, 0.8);
+  --button-bg-top: rgba(70, 90, 150, 0.9);
+  --button-bg-bottom: rgba(50, 67, 122, 0.9);
+  --card-bg-top: rgba(44, 61, 111, 0.9);
+  --card-bg-bottom: rgba(33, 48, 87, 0.86);
+  --tone-ocean: #7ec5ff;
+  --tone-teal: #6fd4dc;
+}
+
+html[data-theme='paper_crane'] {
+  --bg-main: #f2eee6;
+  --bg-subtle: #e8e2d7;
+  --text-main: #2f2a24;
+  --text-soft: #6a6054;
+  --accent: #d18a57;
+  --accent-soft: #e5b48a;
+  --panel-bg: rgba(255, 253, 247, 0.88);
+  --panel-bg-alt: rgba(248, 244, 236, 0.86);
+  --panel-border: rgba(154, 127, 95, 0.28);
+  --button-border: rgba(156, 128, 99, 0.4);
+  --button-bg-top: rgba(217, 196, 163, 0.92);
+  --button-bg-bottom: rgba(191, 166, 130, 0.92);
+  --card-border: rgba(160, 135, 105, 0.3);
+  --card-bg-top: rgba(243, 234, 216, 0.94);
+  --card-bg-bottom: rgba(229, 216, 192, 0.9);
+  --tone-rose: #d28b7c;
+  --tone-ocean: #77a1b9;
+}
+
+html[data-theme='matcha_stone'] {
+  --bg-main: #121912;
+  --bg-subtle: #1a241b;
+  --text-main: #edf2e7;
+  --text-soft: #b4c1a8;
+  --accent: #b6d387;
+  --accent-soft: #d2e6ac;
+  --panel-bg: rgba(35, 48, 35, 0.84);
+  --panel-bg-alt: rgba(28, 38, 28, 0.8);
+  --button-bg-top: rgba(86, 109, 72, 0.9);
+  --button-bg-bottom: rgba(68, 87, 56, 0.9);
+  --card-bg-top: rgba(57, 75, 47, 0.9);
+  --card-bg-bottom: rgba(45, 59, 38, 0.86);
+  --tone-teal: #84c49f;
+  --tone-amber: #d3bf7e;
+}
+
+html[data-theme='ocean_glass'] {
+  --bg-main: #0b1720;
+  --bg-subtle: #122331;
+  --text-main: #eaf8ff;
+  --text-soft: #a7cadb;
+  --accent: #7ed4d0;
+  --accent-soft: #afe9e3;
+  --panel-bg: rgba(20, 50, 66, 0.82);
+  --panel-bg-alt: rgba(16, 39, 52, 0.78);
+  --button-bg-top: rgba(62, 111, 128, 0.9);
+  --button-bg-bottom: rgba(46, 87, 103, 0.9);
+  --card-bg-top: rgba(38, 85, 103, 0.9);
+  --card-bg-bottom: rgba(28, 66, 81, 0.86);
+  --tone-teal: #79d5cc;
+  --tone-ocean: #8ec8f1;
+}
+
+html[data-theme='ember_night'] {
+  --bg-main: #170f12;
+  --bg-subtle: #22161a;
+  --text-main: #fbeeea;
+  --text-soft: #d5b2aa;
+  --accent: #ff9a6a;
+  --accent-soft: #ffc19b;
+  --panel-bg: rgba(49, 30, 35, 0.84);
+  --panel-bg-alt: rgba(37, 24, 28, 0.8);
+  --button-bg-top: rgba(121, 72, 61, 0.9);
+  --button-bg-bottom: rgba(93, 55, 47, 0.9);
+  --card-bg-top: rgba(81, 47, 43, 0.9);
+  --card-bg-bottom: rgba(62, 36, 34, 0.86);
+  --tone-amber: #f4b373;
+  --tone-rose: #f08c7c;
+}
+
+html[data-theme='plum_garden'] {
+  --bg-main: #171220;
+  --bg-subtle: #231a30;
+  --text-main: #f4eefb;
+  --text-soft: #c6b5dd;
+  --accent: #c89cff;
+  --accent-soft: #debeff;
+  --panel-bg: rgba(45, 34, 62, 0.84);
+  --panel-bg-alt: rgba(34, 26, 49, 0.8);
+  --button-bg-top: rgba(97, 74, 132, 0.9);
+  --button-bg-bottom: rgba(74, 57, 104, 0.9);
+  --card-bg-top: rgba(68, 50, 96, 0.9);
+  --card-bg-bottom: rgba(51, 38, 74, 0.86);
+  --tone-ocean: #9db7ff;
+  --tone-rose: #ce97e8;
+}
+
+html[data-font-size='small']  { --base-font-size: 14px; --ui-scale: 0.9; }
+html[data-font-size='medium'] { --base-font-size: 16px; --ui-scale: 1; }
+html[data-font-size='large']  { --base-font-size: 20px; --ui-scale: 1.16; }
 
 * {
   box-sizing: border-box;
@@ -59,15 +229,20 @@ body,
   min-height: 100%;
 }
 
+html {
+  font-size: var(--base-font-size);
+}
+
 body {
   margin: 0;
   font-family: var(--sans);
   color: var(--text-main);
   background:
-    radial-gradient(circle at 14% 14%, rgba(142, 161, 255, 0.16) 0%, transparent 46%),
-    radial-gradient(circle at 78% 40%, rgba(45, 202, 180, 0.1) 0%, transparent 44%),
+    radial-gradient(circle at 12% 16%, rgba(108, 185, 214, 0.17) 0%, transparent 42%),
+    radial-gradient(circle at 82% 34%, rgba(128, 165, 231, 0.15) 0%, transparent 48%),
+    radial-gradient(circle at 48% 2%, rgba(242, 181, 111, 0.12) 0%, transparent 42%),
     linear-gradient(180deg, var(--bg-main), var(--bg-subtle));
-  font-size: var(--base-font-size);
+  font-size: 1rem;
   line-height: 1.45;
   letter-spacing: 0.01em;
   text-rendering: optimizeLegibility;

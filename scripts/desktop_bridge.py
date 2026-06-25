@@ -20,7 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from data.study_pipeline import init_study_db, load_review_states, load_today_progress
+from data.study_pipeline import init_study_db, load_review_states, load_today_progress, reset_study_db
 from domain.decks import ALL_DECKS
 
 
@@ -99,6 +99,11 @@ def build_deck_cards(slug: str) -> dict[str, object]:
     }
 
 
+def reset_progress() -> dict[str, object]:
+    reset_study_db()
+    return {"ok": True}
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Missing command"}))
@@ -121,6 +126,10 @@ def main() -> int:
             print(json.dumps({"error": str(exc)}))
             return 2
         print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    if command == "reset-db":
+        print(json.dumps(reset_progress(), ensure_ascii=False))
         return 0
 
     print(json.dumps({"error": f"Unknown command: {command}"}))

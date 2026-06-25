@@ -14,12 +14,15 @@
     "start": "electron .",
     "forge:start": "npm run build && electron-forge start",
     "lint": "oxlint",
+    "session:recover": "powershell -ExecutionPolicy Bypass -File ./scripts/session-recover.ps1",
+    "session:check": "powershell -ExecutionPolicy Bypass -File ./scripts/session-recover.ps1 -SkipInstall -RunChecks",
     "preview": "vite preview",
     "package": "npm run build && electron-forge package",
     "make": "npm run build && electron-forge make",
     "make:win": "npm run build && electron-forge make --platform=win32"
   },
   "dependencies": {
+    "lucide-react": "^1.21.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

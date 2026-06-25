@@ -13,6 +13,11 @@ def init_study_db() -> None:
     database.init_db()
 
 
+def reset_study_db() -> None:
+    """Clear all review-flow progress data from persistence."""
+    database.reset_db()
+
+
 def load_review_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
     """Load review states for deck cards, creating defaults for missing rows."""
     return database.load_states(deck_name, card_ids)

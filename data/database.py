@@ -41,6 +41,14 @@ def init_db() -> None:
         """)
 
 
+def reset_db() -> None:
+    """Delete all persisted review progress while keeping schema intact."""
+    init_db()
+    with _connect() as conn:
+        conn.execute("DELETE FROM review_events")
+        conn.execute("DELETE FROM review_states")
+
+
 def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
     """Load persisted states for a deck; missing cards get default ReviewState."""
     if not card_ids:

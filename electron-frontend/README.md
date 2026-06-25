@@ -26,3 +26,19 @@ npm run start
 ```
 
 Before `npm run start`, run `npm run build` at least once so `dist/index.html` exists.
+
+## Session Recovery
+
+If session dependencies or local tool binaries disappear, run:
+
+```bash
+npm run session:recover
+```
+
+This restores dev dependencies and verifies required local binaries.
+
+Quick validation mode (no install unless needed):
+
+```bash
+npm run session:check
+```

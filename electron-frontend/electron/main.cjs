@@ -123,8 +123,47 @@ ipcMain.handle('study:get-deck-cards', async (_event, slug) => {
   }
 })
 
+ipcMain.handle('study:reset-db', async () => {
+  try {
+    return await runPythonBridge('reset-db')
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to reset study database: ${detail}`)
+  }
+})
+
+ipcMain.handle('window:minimize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win) win.minimize()
+  return { ok: true }
+})
+
+ipcMain.handle('window:toggle-maximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return { ok: false, isMaximized: false }
+  if (win.isMaximized()) {
+    win.unmaximize()
+  } else {
+    win.maximize()
+  }
+  return { ok: true, isMaximized: win.isMaximized() }
+})
+
+ipcMain.handle('window:is-maximized', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  return { isMaximized: win ? win.isMaximized() : false }
+})
+
+ipcMain.handle('window:close', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win) win.close()
+  return { ok: true }
+})
+
 function createWindow() {
   const win = new BrowserWindow({
+    title: 'JPLearn',
+    frame: false,
     width: 1260,
     height: 820,
     minWidth: 1024,
@@ -158,6 +197,11 @@ function createWindow() {
       validatedURL,
       expectedFile: path.join(__dirname, '..', 'dist', 'index.html'),
     })
+  })
+
+  win.on('page-title-updated', (event) => {
+    event.preventDefault()
+    win.setTitle('JPLearn')
   })
 
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))

@@ -34,6 +34,11 @@ interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
   getDeckCards: (slug: 'hiragana' | 'katakana' | 'kanji_n5') => Promise<ScriptDeckPayload>
+  resetStudyDb: () => Promise<{ ok: boolean }>
+  minimizeWindow: () => Promise<{ ok: boolean }>
+  toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>
+  isWindowMaximized: () => Promise<{ isMaximized: boolean }>
+  closeWindow: () => Promise<{ ok: boolean }>
 }
 
 declare global {
