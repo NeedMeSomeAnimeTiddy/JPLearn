@@ -141,6 +141,25 @@ ipcMain.handle('study:reset-db', async () => {
   }
 })
 
+ipcMain.handle('study:record-game-result', async (_event, payload) => {
+  try {
+    const args = [
+      'record-result',
+      payload.slug,
+      String(payload.cardId),
+      payload.isCorrect ? '1' : '0',
+      payload.minigame || '',
+    ]
+    if (typeof payload.curriculumStage === 'number') {
+      args.push(String(payload.curriculumStage))
+    }
+    return await runPythonBridgeWithArgs(args)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to record game result: ${detail}`)
+  }
+})
+
 ipcMain.handle('window:minimize', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win) win.minimize()

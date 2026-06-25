@@ -58,6 +58,54 @@ interface StudySummary {
       points_delta: number
     }>
   }>
+  curriculum: {
+    context_cloze: {
+      mode: string
+      script_tag: string
+      attempts: number
+      accuracy: number
+      accuracy_7d: number
+      stage_distribution: {
+        1: number
+        2: number
+        3: number
+      }
+    }
+    context_cloze_by_script: Record<'hiragana' | 'katakana' | 'kanji_n5', {
+      mode: string
+      script_tag: string
+      attempts: number
+      accuracy: number
+      accuracy_7d: number
+      stage_distribution: {
+        1: number
+        2: number
+        3: number
+      }
+    }>
+    narrative_story: {
+      mode: string
+      script_tag: string
+      attempts: number
+      accuracy: number
+      chapters: Record<'1' | '2' | '3', {
+        attempts: number
+        accuracy: number
+        completion_rate: number
+      }>
+    }
+    narrative_story_by_script: Record<'hiragana' | 'katakana' | 'kanji_n5', {
+      mode: string
+      script_tag: string
+      attempts: number
+      accuracy: number
+      chapters: Record<'1' | '2' | '3', {
+        attempts: number
+        accuracy: number
+        completion_rate: number
+      }>
+    }>
+  }
 }
 
 interface GameCard {
@@ -67,6 +115,7 @@ interface GameCard {
   meaning: string
   tags: string[]
   is_leech: boolean
+  curriculum_stage: number
   meaning_distractor_ids: number[]
   character_distractor_ids: number[]
 }
@@ -99,6 +148,21 @@ interface DesktopApi {
   getStudySummary: () => Promise<StudySummary>
   getBlockProgress: (slug: 'hiragana' | 'katakana' | 'kanji_n5') => Promise<BlockProgressPayload>
   getDeckCards: (slug: 'hiragana' | 'katakana' | 'kanji_n5') => Promise<ScriptDeckPayload>
+  recordGameResult: (payload: {
+    slug: 'hiragana' | 'katakana' | 'kanji_n5'
+    cardId: number
+    isCorrect: boolean
+    minigame: string
+    curriculumStage?: number
+  }) => Promise<{
+    ok: boolean
+    card_id: number
+    repetitions: number
+    interval: number
+    next_review: string
+    ease_factor: number
+    curriculum_stage?: number | null
+  }>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>

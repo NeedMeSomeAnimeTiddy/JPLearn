@@ -24,12 +24,16 @@ from data.study_pipeline import (
     init_study_db,
     load_activity_summary,
     load_active_leech_card_ids,
+    load_curriculum_stage_summary,
+    load_narrative_chapter_summary,
     load_item_history,
     load_mistake_breakdown,
+    load_curriculum_stages,
     load_review_states,
     load_streak_state,
     load_today_progress,
     reset_study_db,
+    review_minigame_result,
 )
 from domain.blocks import (
     blocks_for_slug,
@@ -64,6 +68,7 @@ class GameCard:
     meaning: str
     tags: list[str]
     is_leech: bool
+    curriculum_stage: int
     meaning_distractor_ids: list[int]
     character_distractor_ids: list[int]
 
@@ -86,6 +91,18 @@ def build_summary() -> dict[str, object]:
     activity_month = load_activity_summary(30)
     mistakes = load_mistake_breakdown(limit=6)
     item_history = load_item_history(limit_items=8, events_per_item=8)
+    curriculum_context_cloze = load_curriculum_stage_summary("context_cloze")
+    curriculum_by_script = {
+        "hiragana": load_curriculum_stage_summary("context_cloze", script_tag="hiragana"),
+        "katakana": load_curriculum_stage_summary("context_cloze", script_tag="katakana"),
+        "kanji_n5": load_curriculum_stage_summary("context_cloze", script_tag="kanji_n5"),
+    }
+    narrative_story = load_narrative_chapter_summary()
+    narrative_story_by_script = {
+        "hiragana": load_narrative_chapter_summary(script_tag="hiragana"),
+        "katakana": load_narrative_chapter_summary(script_tag="katakana"),
+        "kanji_n5": load_narrative_chapter_summary(script_tag="kanji_n5"),
+    }
 
     for slug, factory in ALL_DECKS.items():
         deck = factory()
@@ -125,6 +142,12 @@ def build_summary() -> dict[str, object]:
             }
             for item in item_history
         ],
+        "curriculum": {
+            "context_cloze": curriculum_context_cloze,
+            "context_cloze_by_script": curriculum_by_script,
+            "narrative_story": narrative_story,
+            "narrative_story_by_script": narrative_story_by_script,
+        },
     }
 
 
@@ -136,6 +159,7 @@ def build_deck_cards(slug: str) -> dict[str, object]:
 
     deck = factory()
     active_leech_ids = load_active_leech_card_ids(deck.name)
+    curriculum_stages = load_curriculum_stages(deck.name, "context_cloze", [card.id for card in deck.cards])
     cards = [
         GameCard(
             id=card.id,
@@ -144,6 +168,7 @@ def build_deck_cards(slug: str) -> dict[str, object]:
             meaning=card.meaning,
             tags=card.tags,
             is_leech=card.id in active_leech_ids,
+            curriculum_stage=curriculum_stages.get(card.id, 1),
             meaning_distractor_ids=rank_distractor_ids(deck.cards, card, mode="meaning")[:8],
             character_distractor_ids=rank_distractor_ids(deck.cards, card, mode="character")[:8],
         )
@@ -204,6 +229,61 @@ def reset_progress() -> dict[str, object]:
     return {"ok": True}
 
 
+def _parse_bool_flag(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "y"}:
+        return True
+    if normalized in {"0", "false", "no", "n"}:
+        return False
+    raise ValueError(f"Invalid boolean flag: {value}")
+
+
+def record_game_result(
+    slug: str,
+    card_id: int,
+    is_correct: bool,
+    minigame: str = "",
+    curriculum_stage: int | None = None,
+) -> dict[str, object]:
+    init_study_db()
+    factory = ALL_DECKS.get(slug)
+    if factory is None:
+        raise ValueError(f"Unknown deck slug: {slug}")
+
+    deck = factory()
+    if not any(card.id == card_id for card in deck.cards):
+        raise ValueError(f"Unknown card id {card_id} for deck slug: {slug}")
+
+    normalized_minigame = minigame.strip().lower()
+    stage_mode = "context_cloze" if normalized_minigame == "narrative_story" else normalized_minigame
+    normalized_stage = None if curriculum_stage is None else max(1, min(3, curriculum_stage))
+    tags = [tag for tag in ["minigame", normalized_minigame] if tag]
+    if normalized_minigame == "narrative_story" and normalized_stage is not None:
+        tags.append(f"chapter_{normalized_stage}")
+
+    updated_state = review_minigame_result(
+        deck_name=deck.name,
+        card_id=card_id,
+        is_correct=is_correct,
+        minigame=normalized_minigame,
+        curriculum_stage=curriculum_stage,
+        script_tag=slug,
+        tags=tags,
+    )
+
+    return {
+        "ok": True,
+        "card_id": updated_state.card_id,
+        "repetitions": updated_state.repetitions,
+        "interval": updated_state.interval,
+        "next_review": updated_state.next_review.isoformat(),
+        "ease_factor": updated_state.ease_factor,
+        "curriculum_stage": load_curriculum_stages(deck.name, stage_mode, [card_id]).get(card_id, 1)
+        if stage_mode
+        else None,
+    }
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Missing command"}))
@@ -243,6 +323,29 @@ def main() -> int:
 
     if command == "reset-db":
         print(json.dumps(reset_progress(), ensure_ascii=False))
+        return 0
+
+    if command == "record-result":
+        if len(sys.argv) < 5:
+            print(json.dumps({"error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage]"}))
+            return 2
+        slug = sys.argv[2]
+        try:
+            card_id = int(sys.argv[3])
+            is_correct = _parse_bool_flag(sys.argv[4])
+            minigame = sys.argv[5] if len(sys.argv) > 5 else ""
+            curriculum_stage = int(sys.argv[6]) if len(sys.argv) > 6 and sys.argv[6].strip() else None
+            payload = record_game_result(
+                slug,
+                card_id,
+                is_correct,
+                minigame=minigame,
+                curriculum_stage=curriculum_stage,
+            )
+        except ValueError as exc:
+            print(json.dumps({"error": str(exc)}))
+            return 2
+        print(json.dumps(payload, ensure_ascii=False))
         return 0
 
     print(json.dumps({"error": f"Unknown command: {command}"}))

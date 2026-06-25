@@ -279,3 +279,169 @@ def test_leech_state_enters_and_exits_based_on_recent_attempts(tmp_path: Path, m
 
     active_ids_after = study_pipeline.load_active_leech_card_ids("Hiragana")
     assert 42 not in active_ids_after
+
+
+def test_review_minigame_result_persists_quality_and_tags(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    updated = study_pipeline.review_minigame_result(
+        deck_name="Hiragana",
+        card_id=99,
+        is_correct=False,
+        script_tag="hiragana",
+        tags=["minigame", "interleave_mix"],
+        reviewed_on_local=date(2026, 6, 25),
+        reviewed_on_utc=date(2026, 6, 25),
+    )
+    assert updated.card_id == 99
+
+    states = database.load_states("Hiragana", [99])
+    assert states[99].repetitions == updated.repetitions
+
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        row = conn.execute(
+            """
+            SELECT quality, script_tag, tags_csv
+            FROM review_events
+            WHERE deck=? AND card_id=?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            ("Hiragana", 99),
+        ).fetchone()
+
+    assert row is not None
+    assert row["quality"] == 1
+    assert row["script_tag"] == "hiragana"
+    assert row["tags_csv"] == "minigame,interleave_mix"
+
+
+def test_review_minigame_result_persists_curriculum_stage(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    study_pipeline.review_minigame_result(
+        deck_name="Hiragana",
+        card_id=17,
+        is_correct=True,
+        minigame="context_cloze",
+        curriculum_stage=3,
+        script_tag="hiragana",
+        tags=["minigame", "context_cloze"],
+    )
+
+    stages = study_pipeline.load_curriculum_stages("Hiragana", "context_cloze", [17])
+    assert stages[17] == 3
+
+
+def test_review_minigame_result_narrative_updates_context_cloze_stage(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    study_pipeline.review_minigame_result(
+        deck_name="Hiragana",
+        card_id=18,
+        is_correct=True,
+        minigame="narrative_story",
+        curriculum_stage=2,
+        script_tag="hiragana",
+        tags=["minigame", "narrative_story", "chapter_2"],
+    )
+
+    stages = study_pipeline.load_curriculum_stages("Hiragana", "context_cloze", [18])
+    assert stages[18] == 3
+
+
+def test_load_curriculum_stage_summary_aggregates_distribution_and_accuracy(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    study_pipeline.review_minigame_result(
+        deck_name="Hiragana",
+        card_id=1,
+        is_correct=True,
+        minigame="context_cloze",
+        curriculum_stage=1,
+        script_tag="hiragana",
+        tags=["minigame", "context_cloze"],
+    )
+    study_pipeline.review_minigame_result(
+        deck_name="Hiragana",
+        card_id=2,
+        is_correct=False,
+        minigame="context_cloze",
+        curriculum_stage=3,
+        script_tag="hiragana",
+        tags=["minigame", "context_cloze"],
+    )
+
+    summary = study_pipeline.load_curriculum_stage_summary("context_cloze")
+    assert summary["mode"] == "context_cloze"
+    assert summary["attempts"] == 2
+    assert summary["accuracy"] == 50
+    stage_distribution = summary["stage_distribution"]
+    assert stage_distribution[2] == 2
+    assert stage_distribution[1] == 0
+    assert stage_distribution[3] == 0
+
+
+def test_load_curriculum_stage_summary_supports_script_filter(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    study_pipeline.review_minigame_result(
+        deck_name="Hiragana",
+        card_id=11,
+        is_correct=True,
+        minigame="context_cloze",
+        curriculum_stage=1,
+        script_tag="hiragana",
+        tags=["minigame", "context_cloze"],
+    )
+    study_pipeline.review_minigame_result(
+        deck_name="Kanji N5",
+        card_id=12,
+        is_correct=False,
+        minigame="context_cloze",
+        curriculum_stage=2,
+        script_tag="kanji_n5",
+        tags=["minigame", "context_cloze"],
+    )
+
+    hira = study_pipeline.load_curriculum_stage_summary("context_cloze", script_tag="hiragana")
+    kanji = study_pipeline.load_curriculum_stage_summary("context_cloze", script_tag="kanji_n5")
+
+    assert hira["attempts"] == 1
+    assert hira["accuracy"] == 100
+    assert kanji["attempts"] == 1
+    assert kanji["accuracy"] == 0
+
+
+def test_load_narrative_chapter_summary_aggregates_chapter_metrics(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    study_pipeline.review_minigame_result(
+        deck_name="Hiragana",
+        card_id=21,
+        is_correct=True,
+        minigame="narrative_story",
+        curriculum_stage=1,
+        script_tag="hiragana",
+        tags=["minigame", "narrative_story", "chapter_1"],
+    )
+    study_pipeline.review_minigame_result(
+        deck_name="Hiragana",
+        card_id=22,
+        is_correct=False,
+        minigame="narrative_story",
+        curriculum_stage=2,
+        script_tag="hiragana",
+        tags=["minigame", "narrative_story", "chapter_2"],
+    )
+
+    summary = database.load_narrative_chapter_summary(script_tag="hiragana")
+    assert summary["mode"] == "narrative_story"
+    assert summary["attempts"] == 2
+    assert summary["accuracy"] == 50
+    chapters = summary["chapters"]
+    assert chapters["1"]["attempts"] == 1
+    assert chapters["2"]["attempts"] == 1
+    assert chapters["1"]["completion_rate"] == 100
+    assert chapters["2"]["completion_rate"] == 50
+    assert chapters["3"]["completion_rate"] == 0

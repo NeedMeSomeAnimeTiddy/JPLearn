@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getStudySummary: () => ipcRenderer.invoke('study:get-summary'),
   getBlockProgress: (slug) => ipcRenderer.invoke('study:get-block-progress', slug),
   getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),
+  recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload),
   resetStudyDb: () => ipcRenderer.invoke('study:reset-db'),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize'),

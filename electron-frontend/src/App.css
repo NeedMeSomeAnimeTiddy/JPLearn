@@ -1582,6 +1582,52 @@ button {
   margin-top: -2px;
 }
 
+.interleave-controls {
+  margin-top: 4px;
+  border: 1px solid var(--chip-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--chip-bg);
+  display: grid;
+  gap: 8px;
+}
+
+.interleave-controls-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.interleave-frequency {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.interleave-frequency input {
+  grid-column: 1 / span 1;
+}
+
+.interleave-weight-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.interleave-weight-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
 .intro-actions {
   margin-top: 6px;
 }
@@ -1591,6 +1637,40 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.surprise-pill {
+  margin-left: auto;
+  border: 1px solid color-mix(in oklab, var(--tone-amber) 50%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-amber) 24%, var(--chip-bg));
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: color-mix(in oklab, var(--text-main) 86%, var(--tone-amber));
+}
+
+.stage-pill {
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 42%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-ocean) 24%, var(--chip-bg));
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: color-mix(in oklab, var(--text-main) 88%, var(--tone-ocean));
+}
+
+.chapter-pill {
+  border: 1px solid color-mix(in oklab, var(--tone-teal) 46%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-teal) 22%, var(--chip-bg));
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: color-mix(in oklab, var(--text-main) 88%, var(--tone-teal));
 }
 
 .lives-inline {
@@ -1632,6 +1712,13 @@ button {
 .status-line {
   color: var(--text-soft);
   font-size: 0.87rem;
+}
+
+.game-story-readiness {
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
 }
 
 .round-feedback {
@@ -1808,6 +1895,13 @@ button {
   line-height: 1.16;
   color: var(--text-main);
   font-weight: 700;
+}
+
+.game-hint-text {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
 }
 
 .game-prompt-main.is-japanese {

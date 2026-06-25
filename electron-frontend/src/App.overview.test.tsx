@@ -20,6 +20,7 @@ const baseDesktopApi = {
   versions: { chrome: '0', electron: '0', node: '0' },
   getBlockProgress: async (slug: string) => ({ slug, blocks: [] }),
   getDeckCards: async () => ({ slug: 'hiragana' as const, name: 'Hiragana', cards: [] }),
+  recordGameResult: async () => ({ ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
   resetStudyDb: async () => ({ ok: true }),
   minimizeWindow: async () => ({ ok: true }),
   toggleMaximizeWindow: async () => ({ ok: true, isMaximized: false }),
@@ -40,6 +41,30 @@ describe('Overview activity panel', () => {
         },
         mistakes: [],
         item_history: [],
+        curriculum: {
+          context_cloze: { mode: 'context_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          context_cloze_by_script: {
+            hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          },
+          narrative_story: {
+            mode: 'narrative_story',
+            script_tag: 'all',
+            attempts: 0,
+            accuracy: 0,
+            chapters: {
+              '1': { attempts: 0, accuracy: 0, completion_rate: 100 },
+              '2': { attempts: 0, accuracy: 0, completion_rate: 0 },
+              '3': { attempts: 0, accuracy: 0, completion_rate: 0 },
+            },
+          },
+          narrative_story_by_script: {
+            hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+          },
+        },
       }),
     }
 
@@ -61,6 +86,30 @@ describe('Overview activity panel', () => {
         },
         mistakes: [],
         item_history: [],
+        curriculum: {
+          context_cloze: { mode: 'context_cloze', script_tag: 'all', attempts: 12, accuracy: 75, accuracy_7d: 67, stage_distribution: { 1: 4, 2: 5, 3: 3 } },
+          context_cloze_by_script: {
+            hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 7, accuracy: 71, accuracy_7d: 60, stage_distribution: { 1: 3, 2: 3, 3: 1 } },
+            katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 3, accuracy: 67, accuracy_7d: 67, stage_distribution: { 1: 1, 2: 1, 3: 1 } },
+            kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 2, accuracy: 100, accuracy_7d: 100, stage_distribution: { 1: 0, 2: 1, 3: 1 } },
+          },
+          narrative_story: {
+            mode: 'narrative_story',
+            script_tag: 'all',
+            attempts: 9,
+            accuracy: 67,
+            chapters: {
+              '1': { attempts: 5, accuracy: 80, completion_rate: 100 },
+              '2': { attempts: 3, accuracy: 67, completion_rate: 67 },
+              '3': { attempts: 1, accuracy: 0, completion_rate: 25 },
+            },
+          },
+          narrative_story_by_script: {
+            hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 5, accuracy: 80, chapters: { '1': { attempts: 3, accuracy: 100, completion_rate: 100 }, '2': { attempts: 1, accuracy: 0, completion_rate: 60 }, '3': { attempts: 1, accuracy: 0, completion_rate: 20 } } },
+            katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 3, accuracy: 67, chapters: { '1': { attempts: 2, accuracy: 100, completion_rate: 100 }, '2': { attempts: 1, accuracy: 0, completion_rate: 67 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 1, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 1, accuracy: 0, completion_rate: 50 }, '3': { attempts: 0, accuracy: 0, completion_rate: 50 } } },
+          },
+        },
       }),
     }
 
@@ -69,7 +118,9 @@ describe('Overview activity panel', () => {
 
     expect(await screen.findByText(/Last 7 Days/i)).toBeTruthy()
     expect(await screen.findByText(/Last 30 Days/i)).toBeTruthy()
-    expect(await screen.findByText(/11/)).toBeTruthy()
-    expect(await screen.findByText(/38/)).toBeTruthy()
+    expect((await screen.findAllByText(/Story Progress/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Chapter 3 ready/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/11/)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/38/)).length).toBeGreaterThan(0)
   })
 })

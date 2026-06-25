@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, CalendarDays, Copy, Flame, Heart, History, Keyboard, Languages, ListChecks, Lock, Minus, Settings, Square, Target, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, Keyboard, Languages, ListChecks, Lock, Minus, Settings, Shuffle, Square, Target, Trophy, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -10,7 +10,9 @@ type StudySummaryPayload = Awaited<
 type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
+type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
+type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
 type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
@@ -29,6 +31,219 @@ type ThemeKey =
 
 const FEEDBACK_REVEAL_MS = 2100
 const DEFAULT_LIVES = 3
+const DEFAULT_INTERLEAVE_WEIGHTS: InterleaveWeights = {
+  romaji_sprint: 1,
+  meaning_match: 1,
+  character_match: 1,
+  context_cloze: 1,
+}
+const SURPRISE_PROMPTS = [
+  'Surprise Drill: trust your first instinct.',
+  'Odd Prompt Mode: quick read, clean recall.',
+  'Twist Round: stay sharp and answer fast.',
+] as const
+const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, string[]>> = {
+  hiragana: {
+    romaji_sprint: [
+      'Sound Burst: read it aloud, then type it clean.',
+      'Kana Echo: lock the vowel sound before you answer.',
+    ],
+    meaning_match: [
+      'Kana Context: choose the meaning with the strongest cue.',
+      'Quick Decode: ignore look-alikes and pick the exact sense.',
+    ],
+    character_match: [
+      'Shape Recall: choose the symbol that matches the meaning.',
+      'Script Snap: pick the kana form with confidence.',
+    ],
+    context_cloze: [
+      'Context Ladder: use sentence clues before touching options.',
+      'Meaning Lens: infer the blank, then verify carefully.',
+    ],
+    narrative_story: [
+      'Story Gate: read the scene and infer what completes the moment.',
+      'Chapter Pulse: use narrative clues to choose the strongest fit.',
+    ],
+  },
+  katakana: {
+    romaji_sprint: [
+      'Loanword Sprint: hear the borrowed sound in your head first.',
+      'Sharp Script: lock the consonant-vowel pair quickly.',
+    ],
+    meaning_match: [
+      'Katakana Decode: pick the meaning that fits the imported term.',
+      'Rapid Borrowing: map sound to meaning before selecting.',
+    ],
+    character_match: [
+      'Glyph Match: choose the katakana symbol tied to the prompt.',
+      'Name Lane: select the character used in modern terms.',
+    ],
+    context_cloze: [
+      'Loanword Context: let the sentence guide the missing term.',
+      'Borrowed Meaning: infer from usage before selecting.',
+    ],
+    narrative_story: [
+      'Story Gate: follow the borrowed-word scene and pick the right meaning.',
+      'Chapter Pulse: use the narrative beat before selecting.',
+    ],
+  },
+  kanji_n5: {
+    romaji_sprint: [
+      'Reading Shift: commit to one reading and type decisively.',
+      'Kanji Soundline: connect character to reading in one step.',
+    ],
+    meaning_match: [
+      'Meaning Split: separate close definitions and pick the core one.',
+      'Concept Lock: choose the strongest semantic match.',
+    ],
+    character_match: [
+      'Symbol Meaning Link: pick the kanji with the right concept.',
+      'N5 Recall: choose the character that best fits the cue.',
+    ],
+    context_cloze: [
+      'Semantic Context: use nearby clues to fill the blank.',
+      'N5 Sentence Drill: infer first, then commit to one meaning.',
+    ],
+    narrative_story: [
+      'Story Gate: read the chapter cue and resolve the missing idea.',
+      'Chapter Pulse: infer from the narrative shift before choosing.',
+    ],
+  },
+}
+const TAG_PROMPT_PACKS: Record<string, string[]> = {
+  hiragana: [
+    'Foundations First: this kana appears everywhere.',
+    'Core Sound Check: nail the basic reading under pressure.',
+  ],
+  katakana: [
+    'Borrowed Word Alert: think modern usage before answering.',
+    'Foreign Sound Trace: map the pronunciation to script.',
+  ],
+  kanji: [
+    'Component Clue: use radicals to guide your choice.',
+    'Stroke Memory: visualize the character skeleton first.',
+  ],
+  n5: [
+    'JLPT N5 Pulse: treat this like a fast exam checkpoint.',
+    'N5 Accuracy Push: prioritize correctness over speed.',
+  ],
+}
+const CLOZE_TEMPLATES: Record<ScriptKey, Record<number, string[]>> = {
+  hiragana: {
+    1: [
+      'Beginner line: I am practicing ___ sounds today.',
+      'Warm-up sentence: This kana reads as ___.',
+    ],
+    2: [
+      'Context line: In this reading drill, the missing sound is ___.',
+      'Focus sentence: I recognized ___ while reading slowly.',
+    ],
+    3: [
+      'Challenge line: Under pressure, I still recalled ___ correctly.',
+      'Advanced cue: In mixed review, ___ appeared and I answered cleanly.',
+    ],
+  },
+  katakana: {
+    1: [
+      'Beginner line: This borrowed sound is written as ___.',
+      'Warm-up sentence: The katakana reading here is ___.',
+    ],
+    2: [
+      'Context line: In a loanword context, ___ is the best fit.',
+      'Focus sentence: I saw a modern term and matched it to ___.',
+    ],
+    3: [
+      'Challenge line: Fast recognition still pointed to ___.',
+      'Advanced cue: In a noisy context, I mapped the sound to ___.',
+    ],
+  },
+  kanji_n5: {
+    1: [
+      'Beginner line: This idea is best expressed as ___.',
+      'Warm-up sentence: In simple Japanese text, ___ fits this spot.',
+    ],
+    2: [
+      'Context line: The sentence meaning points toward ___ here.',
+      'Focus sentence: With one clue missing, ___ completes the thought.',
+    ],
+    3: [
+      'Challenge line: Subtle context still leads to ___.',
+      'Advanced cue: In a compressed phrase, ___ is the strongest choice.',
+    ],
+  },
+}
+
+const STORY_CHAPTERS: Record<ScriptKey, Record<1 | 2 | 3, { title: string; lines: string[] }>> = {
+  hiragana: {
+    1: {
+      title: 'Chapter 1: Station Arrival',
+      lines: [
+        'At the station gate, the sign glows and the missing clue is ___.',
+        'A classmate waves from platform two, so the right word is ___.',
+      ],
+    },
+    2: {
+      title: 'Chapter 2: Market Errand',
+      lines: [
+        'At a busy market stand, the sentence only makes sense with ___.',
+        'The vendor repeats one key term, and the best fit is ___.',
+      ],
+    },
+    3: {
+      title: 'Chapter 3: Festival Night',
+      lines: [
+        'Lanterns rise over the street, and the final missing meaning is ___.',
+        'In the closing scene, one precise word completes the line: ___.',
+      ],
+    },
+  },
+  katakana: {
+    1: {
+      title: 'Chapter 1: City Signs',
+      lines: [
+        'Neon signs flash loanwords, and the missing concept is ___.',
+        'A cafe menu uses katakana terms; the strongest fit is ___.',
+      ],
+    },
+    2: {
+      title: 'Chapter 2: Train Transfer',
+      lines: [
+        'Platform announcements blend borrowed words; fill the blank with ___.',
+        'A route map label points to one clear meaning: ___.',
+      ],
+    },
+    3: {
+      title: 'Chapter 3: Live Concert',
+      lines: [
+        'Backstage chatter is fast, but the context still signals ___.',
+        'The encore banner uses a key katakana term; choose ___.',
+      ],
+    },
+  },
+  kanji_n5: {
+    1: {
+      title: 'Chapter 1: Morning Routine',
+      lines: [
+        'A short diary line is missing one core idea: ___.',
+        'The morning schedule sentence is complete only with ___.',
+      ],
+    },
+    2: {
+      title: 'Chapter 2: Office Tasks',
+      lines: [
+        'A memo on the desk has one missing concept: ___.',
+        'The task list reads naturally when the blank is ___.',
+      ],
+    },
+    3: {
+      title: 'Chapter 3: Travel Plan',
+      lines: [
+        'A ticket note implies one exact meaning in the blank: ___.',
+        'In the final itinerary line, the strongest completion is ___.',
+      ],
+    },
+  },
+}
 
 interface AppSettings {
   reducedMotion: boolean
@@ -43,6 +258,12 @@ interface RoundOption {
 
 interface RoundState {
   cardId: number
+  mode: PlayableMinigame
+  surprisePrompt: boolean
+  curriculumStage: 1 | 2 | 3
+  chapterNumber: 1 | 2 | 3 | null
+  chapterLabel: string | null
+  hintText: string | null
   promptLabel: string
   focusText: string
   answer: string
@@ -101,6 +322,21 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
     title: 'Character Match',
     description: 'Pick the correct character for the meaning.',
   },
+  {
+    key: 'context_cloze',
+    title: 'Context Cloze',
+    description: 'Fill sentence blanks using context clues and i+1 progression.',
+  },
+  {
+    key: 'narrative_story',
+    title: 'Narrative Story',
+    description: 'Play chapter scenes unlocked by your persisted curriculum stage.',
+  },
+  {
+    key: 'interleave_mix',
+    title: 'Interleave Mix',
+    description: 'Cycle reading, meaning, and character rounds in one run.',
+  },
 ]
 
 const MINIGAME_INTROS: Record<MinigameKey, MinigameIntro> = {
@@ -119,6 +355,21 @@ const MINIGAME_INTROS: Record<MinigameKey, MinigameIntro> = {
     objective: 'Choose the correct Japanese character for each meaning prompt.',
     tip: 'Compare visual shape first, then verify your recall before selecting.',
   },
+  context_cloze: {
+    vibe: 'Context Ladder',
+    objective: 'Use sentence context to infer the missing meaning.',
+    tip: 'Read the full line before checking options, then pick the best semantic fit.',
+  },
+  narrative_story: {
+    vibe: 'Story Chapters',
+    objective: 'Complete chapter scenes where each card unlocks prompts by persisted stage.',
+    tip: 'Treat each prompt like a mini scene: infer tone first, then choose the exact fit.',
+  },
+  interleave_mix: {
+    vibe: 'Mixed Circuit',
+    objective: 'Rotate across recall styles to build stronger long-term memory.',
+    tip: 'Every few rounds include a surprising prompt to sharpen attention.',
+  },
 }
 
 const SECTION_META: Record<ScriptKey, { glyph: string }> = {
@@ -131,6 +382,9 @@ const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   romaji_sprint: Keyboard,
   meaning_match: ListChecks,
   character_match: Languages,
+  context_cloze: BookText,
+  narrative_story: History,
+  interleave_mix: Shuffle,
 }
 
 const PETAL_STREAM = [
@@ -209,16 +463,25 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
+      narrative_story: { ...EMPTY_MINIGAME_STATS },
+      interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     katakana: {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
+      narrative_story: { ...EMPTY_MINIGAME_STATS },
+      interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     kanji_n5: {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
+      narrative_story: { ...EMPTY_MINIGAME_STATS },
+      interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
   }
 }
@@ -303,6 +566,70 @@ function shuffleArray<T>(items: T[]): T[] {
   return clone
 }
 
+function clampWeight(value: number): number {
+  return Math.max(1, Math.min(5, Math.floor(value)))
+}
+
+function buildInterleaveSequence(weights: InterleaveWeights): PlayableMinigame[] {
+  const sequence: PlayableMinigame[] = []
+  const modes: Array<keyof InterleaveWeights> = ['romaji_sprint', 'meaning_match', 'character_match', 'context_cloze']
+  for (const mode of modes) {
+    const count = clampWeight(weights[mode])
+    for (let i = 0; i < count; i += 1) {
+      sequence.push(mode)
+    }
+  }
+  return sequence.length > 0 ? sequence : ['romaji_sprint', 'meaning_match', 'character_match']
+}
+
+function pickSurprisePrompt(
+  script: ScriptKey,
+  mode: PlayableMinigame,
+  tags: string[],
+  seed: number,
+): string {
+  const scriptPool = SCRIPT_MODE_PROMPT_PACKS[script][mode]
+  const tagPool = tags
+    .map((tag) => TAG_PROMPT_PACKS[tag.toLowerCase()])
+    .filter((pack): pack is string[] => Boolean(pack))
+    .flat()
+  const combined = [...tagPool, ...scriptPool, ...SURPRISE_PROMPTS]
+  return combined[Math.abs(seed) % combined.length]
+}
+
+function curriculumStageFromScore(score: number): 1 | 2 | 3 {
+  if (score >= 3) return 3
+  if (score >= 1) return 2
+  return 1
+}
+
+function normalizeCurriculumStage(stage: number): 1 | 2 | 3 {
+  if (stage >= 3) return 3
+  if (stage >= 2) return 2
+  return 1
+}
+
+function buildClozeLine(script: ScriptKey, stage: 1 | 2 | 3, seed: number): string {
+  const templates = CLOZE_TEMPLATES[script][stage]
+  return templates[Math.abs(seed) % templates.length]
+}
+
+function buildStoryChapter(script: ScriptKey, stage: 1 | 2 | 3, seed: number): { title: string; line: string } {
+  const chapter = STORY_CHAPTERS[script][stage]
+  return {
+    title: chapter.title,
+    line: chapter.lines[Math.abs(seed) % chapter.lines.length],
+  }
+}
+
+function narrativePriorityCards(cards: ScriptDeck['cards']): ScriptDeck['cards'] {
+  const stage3 = cards.filter((card) => normalizeCurriculumStage(card.curriculum_stage) === 3)
+  if (stage3.length > 0) return stage3
+  const stage2 = cards.filter((card) => normalizeCurriculumStage(card.curriculum_stage) === 2)
+  if (stage2.length > 0) return stage2
+  return cards
+}
+
 function App() {
   const [view, setView] = useState<AppView>('home')
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
@@ -336,6 +663,9 @@ function App() {
   const [livesEnabled, setLivesEnabled] = useState<boolean>(false)
   const [livesRemaining, setLivesRemaining] = useState<number>(DEFAULT_LIVES)
   const [leechFocusEnabled, setLeechFocusEnabled] = useState<boolean>(false)
+  const [interleaveWeights, setInterleaveWeights] = useState<InterleaveWeights>({ ...DEFAULT_INTERLEAVE_WEIGHTS })
+  const [interleaveSurpriseEnabled, setInterleaveSurpriseEnabled] = useState<boolean>(true)
+  const [interleaveSurpriseEvery, setInterleaveSurpriseEvery] = useState<number>(5)
 
   const [scriptStats, setScriptStats] = useState<StatsByScript>(() => loadSavedStats())
   const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
@@ -361,10 +691,13 @@ function App() {
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
+  const interleaveCursorRef = useRef<number>(0)
+  const interleaveSequence = useMemo(() => buildInterleaveSequence(interleaveWeights), [interleaveWeights])
 
   const resetRoundCycle = useCallback(() => {
     roundCycleRef.current = []
     roundCursorRef.current = 0
+    interleaveCursorRef.current = 0
   }, [])
 
   const nextCardIndex = useCallback((cardsLength: number): number | null => {
@@ -410,7 +743,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (view !== 'minigame' || activeGame !== 'romaji_sprint' || !sessionActive || !roundState || isRoundResolving) {
+    if (view !== 'minigame' || !sessionActive || !roundState || isRoundResolving || roundState.mode !== 'romaji_sprint') {
       return
     }
 
@@ -419,7 +752,7 @@ function App() {
     })
 
     return () => window.cancelAnimationFrame(focusHandle)
-  }, [activeGame, isRoundResolving, roundState, sessionActive, view])
+  }, [isRoundResolving, roundState, sessionActive, view])
 
   const loadSummary = useCallback(async () => {
     setLoading(true)
@@ -490,15 +823,37 @@ function App() {
   }, [activeScript, loadScriptCards])
 
   const buildRound = useCallback(
-    (cards: ScriptDeck['cards'], minigame: MinigameKey, cardIndex: number): RoundState | null => {
+    (
+      cards: ScriptDeck['cards'],
+      minigame: PlayableMinigame,
+      cardIndex: number,
+      surprisePrompt: boolean,
+      promptSeed: number,
+    ): RoundState | null => {
       if (cards.length === 0) return null
 
       const card = cards[cardIndex]
+      const surpriseLabel = pickSurprisePrompt(activeScript, minigame, card.tags, promptSeed)
+      const currentScore = cardScores[activeScript][card.id] ?? 0
+      const persistedStage = normalizeCurriculumStage(card.curriculum_stage)
+      const scoreStage = curriculumStageFromScore(currentScore)
+      const curriculumStage = (minigame === 'context_cloze' || minigame === 'narrative_story')
+        ? persistedStage
+        : scoreStage
 
       if (minigame === 'romaji_sprint') {
+        const promptLabel = surprisePrompt
+          ? surpriseLabel
+          : 'Type the romaji for this character'
         return {
           cardId: card.id,
-          promptLabel: 'Type the romaji for this character',
+          mode: minigame,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: null,
+          promptLabel,
           focusText: card.character,
           answer: card.romaji,
           options: [],
@@ -545,8 +900,72 @@ function App() {
 
         return {
           cardId: card.id,
-          promptLabel: 'Select the meaning for this character',
+          mode: minigame,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: null,
+          promptLabel: surprisePrompt
+            ? surpriseLabel
+            : 'Select the meaning for this character',
           focusText: card.character,
+          answer: card.meaning,
+          options,
+        }
+      }
+
+      if (minigame === 'context_cloze') {
+        const rankedMeaningDistractors = pickDistractorsFromPool(card.meaning_distractor_ids, 3)
+        const options = shuffleArray([
+          { id: `${card.id}-correct`, label: card.meaning },
+          ...rankedMeaningDistractors.map((candidate) => ({
+            id: `${candidate.id}-cloze-meaning`,
+            label: candidate.meaning,
+          })),
+        ])
+        const clozeSentence = buildClozeLine(activeScript, curriculumStage, promptSeed).replace('___', '_____')
+
+        return {
+          cardId: card.id,
+          mode: minigame,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: `Hint: ${card.character} (${card.romaji})`,
+          promptLabel: surprisePrompt
+            ? surpriseLabel
+            : `Fill the blank using context clues (Stage ${curriculumStage})`,
+          focusText: clozeSentence,
+          answer: card.meaning,
+          options,
+        }
+      }
+
+      if (minigame === 'narrative_story') {
+        const rankedMeaningDistractors = pickDistractorsFromPool(card.meaning_distractor_ids, 3)
+        const options = shuffleArray([
+          { id: `${card.id}-correct`, label: card.meaning },
+          ...rankedMeaningDistractors.map((candidate) => ({
+            id: `${candidate.id}-story-meaning`,
+            label: candidate.meaning,
+          })),
+        ])
+        const chapter = buildStoryChapter(activeScript, curriculumStage, promptSeed)
+
+        return {
+          cardId: card.id,
+          mode: minigame,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: curriculumStage,
+          chapterLabel: chapter.title,
+          hintText: `Story gate: Stage ${curriculumStage} unlocked ${chapter.title}`,
+          promptLabel: surprisePrompt
+            ? surpriseLabel
+            : `${chapter.title} - choose the best completion`,
+          focusText: chapter.line.replace('___', '_____'),
           answer: card.meaning,
           options,
         }
@@ -563,14 +982,36 @@ function App() {
 
       return {
         cardId: card.id,
-        promptLabel: 'Select the character for this meaning',
+        mode: minigame,
+        surprisePrompt,
+        curriculumStage,
+        chapterNumber: null,
+        chapterLabel: null,
+        hintText: null,
+        promptLabel: surprisePrompt
+          ? surpriseLabel
+          : 'Select the character for this meaning',
         focusText: card.meaning,
         answer: card.character,
         options,
       }
     },
-    [],
+    [activeScript, cardScores],
   )
+
+  const nextRoundMode = useCallback((selectedMode: MinigameKey): { mode: PlayableMinigame; surprisePrompt: boolean; promptSeed: number } => {
+    if (selectedMode !== 'interleave_mix') {
+      return { mode: selectedMode, surprisePrompt: false, promptSeed: 0 }
+    }
+
+    const cursor = interleaveCursorRef.current
+    interleaveCursorRef.current += 1
+    return {
+      mode: interleaveSequence[cursor % interleaveSequence.length],
+      surprisePrompt: interleaveSurpriseEnabled && cursor % Math.max(interleaveSurpriseEvery, 1) === 0,
+      promptSeed: cursor,
+    }
+  }, [interleaveSequence, interleaveSurpriseEnabled, interleaveSurpriseEvery])
 
   const leechCards = useMemo(
     () => deckCards.filter((card) => card.is_leech),
@@ -590,8 +1031,14 @@ function App() {
     resetRoundCycle()
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
     const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
-    const index = nextCardIndex(sourceCards.length)
-    const nextRound = index === null ? null : buildRound(sourceCards, activeGame, index)
+    const modeSelection = nextRoundMode(activeGame)
+    const modeCards = modeSelection.mode === 'narrative_story'
+      ? narrativePriorityCards(sourceCards)
+      : sourceCards
+    const index = nextCardIndex(modeCards.length)
+    const nextRound = index === null
+      ? null
+      : buildRound(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
     if (!nextRound) {
       setSessionActive(false)
       setRoundState(null)
@@ -618,13 +1065,19 @@ function App() {
       setSessionScore(0)
       setSessionPoints(0)
     }
-  }, [activeGame, activeBlockCards, buildRound, leechFocusEnabled, nextCardIndex, resetRoundCycle, sessionRounds])
+  }, [activeGame, activeBlockCards, buildRound, leechFocusEnabled, nextCardIndex, nextRoundMode, resetRoundCycle, sessionRounds])
 
   const nextRound = useCallback(() => {
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
     const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
-    const index = nextCardIndex(sourceCards.length)
-    const candidate = index === null ? null : buildRound(sourceCards, activeGame, index)
+    const modeSelection = nextRoundMode(activeGame)
+    const modeCards = modeSelection.mode === 'narrative_story'
+      ? narrativePriorityCards(sourceCards)
+      : sourceCards
+    const index = nextCardIndex(modeCards.length)
+    const candidate = index === null
+      ? null
+      : buildRound(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
     if (!candidate) {
       setRoundState(null)
       setSessionActive(false)
@@ -637,7 +1090,7 @@ function App() {
     setRoundFeedbackTone(null)
     setRoundFeedbackPoints(null)
     setRoundFeedbackAnswer(null)
-  }, [activeGame, activeBlockCards, buildRound, leechFocusEnabled, nextCardIndex])
+  }, [activeGame, activeBlockCards, buildRound, leechFocusEnabled, nextCardIndex, nextRoundMode])
 
   const submitAnswer = useCallback(
     (answer: string) => {
@@ -685,7 +1138,13 @@ function App() {
       if (isCorrect) {
         setSessionScore((value) => value + 1)
         setSessionPoints((value) => value + awardedPoints)
-        setRoundFeedback(`Correct +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'}`)
+        if (roundState.mode === 'narrative_story') {
+          const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
+          const unlockSuffix = nextStage === 3 ? ' Chapter 3 unlocked.' : ''
+          setRoundFeedback(`Correct +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'} · Stage ${roundState.curriculumStage} -> ${nextStage}.${unlockSuffix}`)
+        } else {
+          setRoundFeedback(`Correct +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'}`)
+        }
         setRoundFeedbackTone('success')
         setRoundFeedbackPoints(awardedPoints)
         setRoundFeedbackAnswer(null)
@@ -707,7 +1166,12 @@ function App() {
           nextLives = Math.max(0, livesRemaining - 1)
           setLivesRemaining(nextLives)
         }
-        setRoundFeedback('You got it wrong.')
+        if (roundState.mode === 'narrative_story') {
+          const nextStage = normalizeCurriculumStage(roundState.curriculumStage - 1)
+          setRoundFeedback(`Not quite. Stage ${roundState.curriculumStage} -> ${nextStage}.`)
+        } else {
+          setRoundFeedback('You got it wrong.')
+        }
         setRoundFeedbackTone('error')
         setRoundFeedbackPoints(0)
         setRoundFeedbackAnswer(roundState.answer)
@@ -725,6 +1189,32 @@ function App() {
           }
         })
       }
+
+      void window.jplearnDesktop.recordGameResult({
+        slug: activeScript,
+        cardId: roundState.cardId,
+        isCorrect,
+        minigame: roundState.mode,
+        curriculumStage:
+          roundState.mode === 'context_cloze' || roundState.mode === 'narrative_story'
+            ? roundState.curriculumStage
+            : undefined,
+      }).then((result) => {
+        if (
+          (roundState.mode !== 'context_cloze' && roundState.mode !== 'narrative_story') ||
+          typeof result.curriculum_stage !== 'number'
+        ) {
+          return
+        }
+        const resolvedStage = normalizeCurriculumStage(result.curriculum_stage)
+        setDeckCards((previousCards) =>
+          previousCards.map((entry) =>
+            entry.id === roundState.cardId
+              ? { ...entry, curriculum_stage: resolvedStage }
+              : entry,
+          ),
+        )
+      }).catch(() => undefined)
 
       window.setTimeout(() => {
         if (!isCorrect && livesEnabled && nextLives <= 0) {
@@ -829,6 +1319,73 @@ function App() {
   )
   const mistakes = useMemo(() => summary?.mistakes ?? [], [summary])
   const itemHistory = useMemo(() => summary?.item_history ?? [], [summary])
+  const curriculumSummary = useMemo(
+    () =>
+      summary?.curriculum?.context_cloze ?? {
+        mode: 'context_cloze',
+        script_tag: 'all',
+        attempts: 0,
+        accuracy: 0,
+        accuracy_7d: 0,
+        stage_distribution: { 1: 0, 2: 0, 3: 0 },
+      },
+    [summary],
+  )
+  const curriculumByScript = useMemo(
+    () =>
+      summary?.curriculum?.context_cloze_by_script ?? {
+        hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+        katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+        kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+      },
+    [summary],
+  )
+  const narrativeSummary = useMemo(
+    () =>
+      summary?.curriculum?.narrative_story ?? {
+        mode: 'narrative_story',
+        script_tag: 'all',
+        attempts: 0,
+        accuracy: 0,
+        chapters: {
+          '1': { attempts: 0, accuracy: 0, completion_rate: 0 },
+          '2': { attempts: 0, accuracy: 0, completion_rate: 0 },
+          '3': { attempts: 0, accuracy: 0, completion_rate: 0 },
+        },
+      },
+    [summary],
+  )
+  const narrativeByScript = useMemo(
+    () =>
+      summary?.curriculum?.narrative_story_by_script ?? {
+        hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+        katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+        kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+      },
+    [summary],
+  )
+  const storyReadiness = useMemo(() => {
+    return (['hiragana', 'katakana', 'kanji_n5'] as const).map((script) => {
+      const metric = curriculumByScript[script]
+      const stage1 = metric.stage_distribution[1] ?? 0
+      const stage2 = metric.stage_distribution[2] ?? 0
+      const stage3 = metric.stage_distribution[3] ?? 0
+      const tracked = stage1 + stage2 + stage3
+      const chapter2Ready = stage2 + stage3
+      const chapter3Ready = stage3
+      const chapter2Pct = tracked > 0 ? Math.round((chapter2Ready / tracked) * 100) : 0
+      const chapter3Pct = tracked > 0 ? Math.round((chapter3Ready / tracked) * 100) : 0
+
+      return {
+        script,
+        tracked,
+        chapter2Ready,
+        chapter3Ready,
+        chapter2Pct,
+        chapter3Pct,
+      }
+    })
+  }, [curriculumByScript])
 
   const totals = useMemo(() => {
     const totalCards = decks.reduce((acc, deck) => acc + deck.total, 0)
@@ -857,6 +1414,30 @@ function App() {
   const selectedGameIntro = MINIGAME_INTROS[activeGame]
   const activeScriptStats = scriptStats[activeScript]
   const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : activeBlockCards
+  const narrativeReadiness = useMemo(() => {
+    const stageCounts: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 }
+    for (const card of activeRunCards) {
+      const stage = normalizeCurriculumStage(card.curriculum_stage)
+      stageCounts[stage] += 1
+    }
+    const tracked = stageCounts[1] + stageCounts[2] + stageCounts[3]
+    const chapter2Ready = stageCounts[2] + stageCounts[3]
+    const chapter3Ready = stageCounts[3]
+    return { tracked, chapter2Ready, chapter3Ready }
+  }, [activeRunCards])
+  const narrativeNextUnlockTarget = useMemo(() => {
+    if (narrativeReadiness.tracked === 0) {
+      return 'Next unlock target: start a run in this pool to begin chapter progression.'
+    }
+    if (narrativeReadiness.chapter3Ready === 0) {
+      return 'Next unlock target: promote 1 card to Stage 3 to unlock Chapter 3.'
+    }
+    const remainingToFullChapter3 = Math.max(0, narrativeReadiness.tracked - narrativeReadiness.chapter3Ready)
+    if (remainingToFullChapter3 > 0) {
+      return `Next unlock target: promote ${remainingToFullChapter3} more ${remainingToFullChapter3 === 1 ? 'card' : 'cards'} to Stage 3 for full Chapter 3 coverage.`
+    }
+    return 'Next unlock target: full Chapter 3 coverage reached in this pool.'
+  }, [narrativeReadiness])
 
   // Block progress enhanced with locally-tracked card scores (updates live while playing).
   const blockProgressWithMastery = useMemo(() => {
@@ -1295,6 +1876,9 @@ function App() {
                             <strong>{gameStats.points}</strong>
                           </span>
                         </div>
+                        {game.key === 'narrative_story' ? (
+                          <p className="game-story-readiness">Chapter 3 ready in pool: {narrativeReadiness.chapter3Ready}</p>
+                        ) : null}
                         <button
                           type="button"
                           className="play-cta-button"
@@ -1429,6 +2013,74 @@ function App() {
                   Focused review mode (leech cards first)
                 </label>
 
+                {activeGame === 'interleave_mix' ? (
+                  <section className="interleave-controls" aria-label="Interleave controls">
+                    <p className="interleave-controls-title">Interleave policy</p>
+                    <label className="lives-toggle">
+                      <input
+                        type="checkbox"
+                        checked={interleaveSurpriseEnabled}
+                        onChange={(event) => setInterleaveSurpriseEnabled(event.target.checked)}
+                      />
+                      Enable surprise prompts
+                    </label>
+                    <label className="interleave-frequency">
+                      Surprise frequency (every N rounds)
+                      <input
+                        type="range"
+                        min={2}
+                        max={8}
+                        value={interleaveSurpriseEvery}
+                        disabled={!interleaveSurpriseEnabled}
+                        onChange={(event) => setInterleaveSurpriseEvery(Number(event.target.value))}
+                      />
+                      <span>{interleaveSurpriseEvery}</span>
+                    </label>
+                    <div className="interleave-weight-grid">
+                      {(['romaji_sprint', 'meaning_match', 'character_match', 'context_cloze'] as const).map((mode) => (
+                        <label key={mode} className="interleave-weight-row">
+                          {MINIGAMES.find((game) => game.key === mode)?.title ?? mode}
+                          <input
+                            type="range"
+                            min={1}
+                            max={5}
+                            value={interleaveWeights[mode]}
+                            onChange={(event) => {
+                              const nextValue = clampWeight(Number(event.target.value))
+                              setInterleaveWeights((previous) => ({
+                                ...previous,
+                                [mode]: nextValue,
+                              }))
+                            }}
+                          />
+                          <span>{interleaveWeights[mode]}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {activeGame === 'narrative_story' ? (
+                  <section className="interleave-controls" aria-label="Narrative chapter readiness">
+                    <p className="interleave-controls-title">Story chapter readiness</p>
+                    <div className="activity-window-metrics">
+                      <span className="metric-accent-insight"><strong className="live-value">{narrativeReadiness.tracked}</strong> tracked cards</span>
+                      <span className="metric-accent-ocean"><strong className="live-value">{narrativeReadiness.chapter2Ready}</strong> chapter 2 ready</span>
+                      <span className="metric-accent-streak"><strong className="live-value">{narrativeReadiness.chapter3Ready}</strong> chapter 3 ready</span>
+                    </div>
+                    {narrativeReadiness.tracked === 0 ? (
+                      <p className="status-line">No cards available in this run pool yet.</p>
+                    ) : narrativeReadiness.chapter3Ready === 0 ? (
+                      <p className="status-line">Chapter 3 is still locked for this pool. Promote cards to stage 3 to unlock it.</p>
+                    ) : narrativeReadiness.chapter2Ready === 0 ? (
+                      <p className="status-line">Chapter 2 is still locked for this pool. Promote cards to stage 2 to unlock it.</p>
+                    ) : (
+                      <p className="status-line">Higher chapters are available. Keep pushing stage 3 for full story coverage.</p>
+                    )}
+                    <p className="status-line">{narrativeNextUnlockTarget}</p>
+                  </section>
+                ) : null}
+
                 <div className="game-actions intro-actions">
                   <button type="button" onClick={startSession} disabled={gameLoading || activeRunCards.length === 0}>
                     Play
@@ -1475,16 +2127,25 @@ function App() {
               >
                 <div className="game-round-head">
                   <span>{SCRIPT_LABELS[activeScript]}</span>
-                  <strong>{selectedGameMeta?.title}</strong>
+                  <strong>
+                    {selectedGameMeta?.title}
+                    {activeGame === 'interleave_mix'
+                      ? ` · ${MINIGAMES.find((game) => game.key === roundState.mode)?.title ?? roundState.mode}`
+                      : ''}
+                  </strong>
+                  {roundState.chapterLabel ? <span className="chapter-pill">{roundState.chapterLabel}</span> : null}
+                  <span className="stage-pill">Stage {roundState.curriculumStage}</span>
+                  {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
                 </div>
                 <div className="game-prompt-focus">
                   <p className="game-prompt-label">{roundState.promptLabel}</p>
-                  <p className={`game-prompt-main ${activeGame !== 'character_match' ? 'is-japanese' : ''}`}>
+                  <p className={`game-prompt-main ${roundState.mode !== 'character_match' ? 'is-japanese' : ''}`}>
                     {roundState.focusText}
                   </p>
+                  {roundState.hintText ? <p className="game-hint-text">{roundState.hintText}</p> : null}
                 </div>
 
-                {activeGame === 'romaji_sprint' ? (
+                {roundState.mode === 'romaji_sprint' ? (
                   <form
                     className="game-input-row"
                     onSubmit={(event) => {
@@ -1508,7 +2169,7 @@ function App() {
                       <button
                         key={option.id}
                         type="button"
-                        className={`option-button ${activeGame === 'character_match' ? 'option-button-character' : ''}`}
+                        className={`option-button ${roundState.mode === 'character_match' ? 'option-button-character' : ''}`}
                         disabled={isRoundResolving}
                         onClick={() => submitAnswer(option.label)}
                       >
@@ -1537,6 +2198,9 @@ function App() {
                     </div>
                     {roundFeedbackAnswer ? (
                       <p className="round-feedback-answer">Correct answer: {roundFeedbackAnswer}</p>
+                    ) : null}
+                    {roundState.mode === 'narrative_story' ? (
+                      <p className="round-feedback-answer">Story progress updates chapter access based on stage transitions.</p>
                     ) : null}
                   </div>
                 ) : null}
@@ -1790,6 +2454,99 @@ function App() {
                 ))}
               </div>
             )}
+          </section>
+
+          <section className="panel-glass activity-summary-panel">
+            <div className="panel-head">
+              <h2 className="panel-title-with-icon"><BookText aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Context Cloze Curriculum</h2>
+              <div className="panel-actions">
+                <span>Persisted stage progression and mode accuracy</span>
+              </div>
+            </div>
+
+            <div className="activity-window-grid">
+              <article className="activity-window-card">
+                <h3>Mode Performance</h3>
+                <div className="activity-window-metrics">
+                  <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.attempts}</strong> attempts</span>
+                  <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy}%</strong> accuracy</span>
+                  <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy_7d}%</strong> 7-day accuracy</span>
+                </div>
+              </article>
+              <article className="activity-window-card">
+                <h3>Stage Distribution</h3>
+                <div className="activity-window-metrics">
+                  <span className="metric-accent-warning"><strong className="live-value">{curriculumSummary.stage_distribution[1]}</strong> stage 1</span>
+                  <span className="metric-accent-ocean"><strong className="live-value">{curriculumSummary.stage_distribution[2]}</strong> stage 2</span>
+                  <span className="metric-accent-streak"><strong className="live-value">{curriculumSummary.stage_distribution[3]}</strong> stage 3</span>
+                </div>
+              </article>
+            </div>
+
+            <div className="activity-window-grid" style={{ marginTop: '10px' }}>
+              {(['hiragana', 'katakana', 'kanji_n5'] as const).map((script) => {
+                const metric = curriculumByScript[script]
+                return (
+                  <article key={script} className="activity-window-card">
+                    <h3>{SCRIPT_LABELS[script]}</h3>
+                    <div className="activity-window-metrics">
+                      <span className="metric-accent-insight"><strong className="live-value">{metric.attempts}</strong> attempts</span>
+                      <span className="metric-accent-skill"><strong className="live-value">{metric.accuracy}%</strong> accuracy</span>
+                      <span className="metric-accent-ocean"><strong className="live-value">{metric.accuracy_7d}%</strong> 7-day</span>
+                      <span className="metric-accent-warning"><strong className="live-value">{metric.stage_distribution[1]}/{metric.stage_distribution[2]}/{metric.stage_distribution[3]}</strong> stage 1/2/3</span>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+
+          <section className="panel-glass activity-summary-panel">
+            <div className="panel-head">
+              <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Story Progress</h2>
+              <div className="panel-actions">
+                <span>Narrative attempts, chapter accuracy, and completion readiness</span>
+              </div>
+            </div>
+
+            <div className="activity-window-grid">
+              <article className="activity-window-card">
+                <h3>Narrative Mode Performance</h3>
+                <div className="activity-window-metrics">
+                  <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.attempts}</strong> attempts</span>
+                  <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.accuracy}%</strong> accuracy</span>
+                  <span className="metric-accent-ocean"><strong className="live-value">{narrativeSummary.chapters['3'].completion_rate}%</strong> Chapter 3 completion</span>
+                </div>
+              </article>
+              {(['1', '2', '3'] as const).map((chapterKey) => (
+                <article key={chapterKey} className="activity-window-card">
+                  <h3>Chapter {chapterKey}</h3>
+                  <div className="activity-window-metrics">
+                    <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.chapters[chapterKey].attempts}</strong> attempts</span>
+                    <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.chapters[chapterKey].accuracy}%</strong> accuracy</span>
+                    <span className="metric-accent-streak"><strong className="live-value">{narrativeSummary.chapters[chapterKey].completion_rate}%</strong> completion</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="activity-window-grid">
+              {storyReadiness.map((story, index) => (
+                <article
+                  key={story.script}
+                  className="activity-window-card"
+                  style={{ animationDelay: `${140 + index * 70}ms` }}
+                >
+                  <h3>{SCRIPT_LABELS[story.script]}</h3>
+                  <div className="activity-window-metrics">
+                    <span className="metric-accent-insight"><strong className="live-value">{narrativeByScript[story.script].attempts}</strong> attempts</span>
+                    <span className="metric-accent-skill"><strong className="live-value">{narrativeByScript[story.script].accuracy}%</strong> accuracy</span>
+                    <span className="metric-accent-ocean"><strong className="live-value">{narrativeByScript[story.script].chapters['2'].completion_rate}%</strong> Chapter 2 ready</span>
+                    <span className="metric-accent-streak"><strong className="live-value">{narrativeByScript[story.script].chapters['3'].completion_rate}%</strong> Chapter 3 ready</span>
+                  </div>
+                </article>
+              ))}
+            </div>
           </section>
 
           <section className="panel-glass mistakes-summary-panel">

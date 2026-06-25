@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 
 from data import database
 from domain.activity import ActivitySummary
+from domain.curriculum import next_stage
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
 from domain.mistakes import MistakeBreakdownRow
 from domain.scheduler import ReviewState, update
@@ -61,6 +62,52 @@ def review_card(
     next_streak = apply_study_day(database.load_streak_state(), review_day_utc, review_day_local)
     database.save_streak_state(next_streak)
     return updated_state
+
+
+def review_minigame_result(
+    deck_name: str,
+    card_id: int,
+    is_correct: bool,
+    minigame: str = "",
+    curriculum_stage: int | None = None,
+    script_tag: str = "",
+    tags: list[str] | None = None,
+    reviewed_on_local: date | None = None,
+    reviewed_on_utc: date | None = None,
+) -> ReviewState:
+    """Persist one minigame outcome by mapping correctness to review quality."""
+    state = load_review_states(deck_name, [card_id]).get(card_id, ReviewState(card_id=card_id))
+    quality = 4 if is_correct else 1
+    updated_state = review_card(
+        deck_name,
+        state,
+        quality=quality,
+        script_tag=script_tag,
+        tags=tags,
+        reviewed_on_local=reviewed_on_local,
+        reviewed_on_utc=reviewed_on_utc,
+    )
+    normalized_minigame = minigame.strip().lower()
+    stage_mode = "context_cloze" if normalized_minigame == "narrative_story" else normalized_minigame
+    if curriculum_stage is not None and stage_mode:
+        resolved_stage = next_stage(curriculum_stage, is_correct)
+        database.save_curriculum_stage(deck_name, card_id, stage_mode, resolved_stage)
+    return updated_state
+
+
+def load_curriculum_stages(deck_name: str, mode: str, card_ids: list[int]) -> dict[int, int]:
+    """Load persisted curriculum stages for one deck/mode."""
+    return database.load_curriculum_stages(deck_name, mode, card_ids)
+
+
+def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> dict[str, object]:
+    """Return aggregate curriculum metrics for overview screens."""
+    return database.load_curriculum_stage_summary(mode, script_tag=script_tag)
+
+
+def load_narrative_chapter_summary(script_tag: str | None = None) -> dict[str, object]:
+    """Return chapter-level narrative story metrics for overview screens."""
+    return database.load_narrative_chapter_summary(script_tag=script_tag)
 
 
 def load_today_progress(

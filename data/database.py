@@ -77,6 +77,16 @@ def init_db() -> None:
                 PRIMARY KEY (deck, card_id)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS curriculum_stages (
+                deck               TEXT    NOT NULL,
+                card_id            INTEGER NOT NULL,
+                mode               TEXT    NOT NULL,
+                stage              INTEGER NOT NULL,
+                updated_at_utc     TEXT    NOT NULL,
+                PRIMARY KEY (deck, card_id, mode)
+            )
+        """)
 
 
 def reset_db() -> None:
@@ -87,6 +97,7 @@ def reset_db() -> None:
         conn.execute("DELETE FROM review_states")
         conn.execute("DELETE FROM streak_state")
         conn.execute("DELETE FROM leech_items")
+        conn.execute("DELETE FROM curriculum_stages")
 
 
 def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
@@ -163,6 +174,215 @@ def log_review(
             """,
             (deck_name, card_id, quality, review_day.isoformat(), reviewed_utc, script_tag, tags_csv),
         )
+
+
+def save_curriculum_stage(deck_name: str, card_id: int, mode: str, stage: int) -> None:
+    """Persist one curriculum stage row for a card and mode."""
+    normalized_mode = mode.strip().lower()
+    if not normalized_mode:
+        raise ValueError("mode must not be empty")
+    normalized_stage = max(1, min(3, int(stage)))
+    updated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO curriculum_stages (deck, card_id, mode, stage, updated_at_utc)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(deck, card_id, mode) DO UPDATE SET
+                stage=excluded.stage,
+                updated_at_utc=excluded.updated_at_utc
+            """,
+            (deck_name, card_id, normalized_mode, normalized_stage, updated_at),
+        )
+
+
+def load_curriculum_stages(deck_name: str, mode: str, card_ids: list[int]) -> dict[int, int]:
+    """Load persisted stage map for one deck/mode; missing rows default to stage 1."""
+    if not card_ids:
+        return {}
+
+    normalized_mode = mode.strip().lower()
+    if not normalized_mode:
+        raise ValueError("mode must not be empty")
+
+    placeholders = ",".join("?" * len(card_ids))
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT card_id, stage
+            FROM curriculum_stages
+            WHERE deck=? AND mode=? AND card_id IN ({placeholders})
+            """,
+            [deck_name, normalized_mode, *card_ids],
+        ).fetchall()
+
+    stages = {int(row["card_id"]): max(1, min(3, int(row["stage"]))) for row in rows}
+    for cid in card_ids:
+        if cid not in stages:
+            stages[cid] = 1
+    return stages
+
+
+def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> dict[str, object]:
+    """Return aggregate curriculum stage metrics for one mode."""
+    normalized_mode = mode.strip().lower()
+    if not normalized_mode:
+        raise ValueError("mode must not be empty")
+
+    normalized_script = script_tag.strip().lower() if script_tag and script_tag.strip() else ""
+
+    where_clause = "WHERE mode=?"
+    params: list[object] = [normalized_mode]
+    if normalized_script:
+        where_clause += " AND deck LIKE ?"
+        params.append(f"%{normalized_script.replace('_', ' ').split('_')[0]}%")
+
+    with _connect() as conn:
+        stage_rows = conn.execute(
+            f"""
+            SELECT stage, COUNT(*) AS item_count
+            FROM curriculum_stages
+            {where_clause}
+            GROUP BY stage
+            ORDER BY stage ASC
+            """,
+            params,
+        ).fetchall()
+        accuracy_where = "WHERE tags_csv LIKE ?"
+        accuracy_params: list[object] = [f"%{normalized_mode}%"]
+        if normalized_script:
+            accuracy_where += " AND script_tag=?"
+            accuracy_params.append(normalized_script)
+
+        accuracy_row = conn.execute(
+            f"""
+            SELECT
+                COUNT(*) AS attempts,
+                SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct
+            FROM review_events
+            {accuracy_where}
+            """,
+            accuracy_params,
+        ).fetchone()
+
+        recent_row = conn.execute(
+            f"""
+            SELECT
+                COUNT(*) AS attempts,
+                SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct
+            FROM review_events
+            {accuracy_where} AND reviewed_on >= date('now', '-6 day')
+            """,
+            accuracy_params,
+        ).fetchone()
+
+    stage_distribution = {
+        int(row["stage"]): int(row["item_count"] or 0)
+        for row in stage_rows
+    }
+    for stage in (1, 2, 3):
+        if stage not in stage_distribution:
+            stage_distribution[stage] = 0
+
+    attempts = int((accuracy_row or {})["attempts"] or 0)
+    correct = int((accuracy_row or {})["correct"] or 0)
+    accuracy = round((correct / attempts) * 100) if attempts > 0 else 0
+    recent_attempts = int((recent_row or {})["attempts"] or 0)
+    recent_correct = int((recent_row or {})["correct"] or 0)
+    accuracy_7d = round((recent_correct / recent_attempts) * 100) if recent_attempts > 0 else 0
+
+    return {
+        "mode": normalized_mode,
+        "script_tag": normalized_script or "all",
+        "attempts": attempts,
+        "accuracy": accuracy,
+        "accuracy_7d": accuracy_7d,
+        "stage_distribution": stage_distribution,
+    }
+
+
+def load_narrative_chapter_summary(script_tag: str | None = None) -> dict[str, object]:
+    """Return chapter-level narrative metrics from review events and curriculum stages."""
+    normalized_script = script_tag.strip().lower() if script_tag and script_tag.strip() else ""
+
+    where_clause = "WHERE tags_csv LIKE ?"
+    params: list[object] = ["%narrative_story%"]
+    if normalized_script:
+        where_clause += " AND script_tag=?"
+        params.append(normalized_script)
+
+    with _connect() as conn:
+        overall_row = conn.execute(
+            f"""
+            SELECT
+                COUNT(*) AS attempts,
+                SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct
+            FROM review_events
+            {where_clause}
+            """,
+            params,
+        ).fetchone()
+
+        chapter_rows = conn.execute(
+            f"""
+            SELECT
+                CASE
+                    WHEN tags_csv LIKE '%chapter_1%' THEN 1
+                    WHEN tags_csv LIKE '%chapter_2%' THEN 2
+                    WHEN tags_csv LIKE '%chapter_3%' THEN 3
+                    ELSE 0
+                END AS chapter,
+                COUNT(*) AS attempts,
+                SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct
+            FROM review_events
+            {where_clause}
+            GROUP BY chapter
+            """,
+            params,
+        ).fetchall()
+
+    attempts = int((overall_row or {})["attempts"] or 0)
+    correct = int((overall_row or {})["correct"] or 0)
+    accuracy = round((correct / attempts) * 100) if attempts > 0 else 0
+
+    chapter_stats: dict[int, dict[str, int]] = {
+        1: {"attempts": 0, "accuracy": 0, "completion_rate": 0},
+        2: {"attempts": 0, "accuracy": 0, "completion_rate": 0},
+        3: {"attempts": 0, "accuracy": 0, "completion_rate": 0},
+    }
+    for row in chapter_rows:
+        chapter = int(row["chapter"] or 0)
+        if chapter not in chapter_stats:
+            continue
+        chapter_attempts = int(row["attempts"] or 0)
+        chapter_correct = int(row["correct"] or 0)
+        chapter_accuracy = round((chapter_correct / chapter_attempts) * 100) if chapter_attempts > 0 else 0
+        chapter_stats[chapter]["attempts"] = chapter_attempts
+        chapter_stats[chapter]["accuracy"] = chapter_accuracy
+
+    stage_summary = load_curriculum_stage_summary("context_cloze", script_tag=normalized_script or None)
+    stage_distribution = stage_summary["stage_distribution"]
+    stage_1 = int(stage_distribution[1])
+    stage_2 = int(stage_distribution[2])
+    stage_3 = int(stage_distribution[3])
+    tracked = stage_1 + stage_2 + stage_3
+
+    chapter_stats[1]["completion_rate"] = 100 if tracked > 0 else 0
+    chapter_stats[2]["completion_rate"] = round(((stage_2 + stage_3) / tracked) * 100) if tracked > 0 else 0
+    chapter_stats[3]["completion_rate"] = round((stage_3 / tracked) * 100) if tracked > 0 else 0
+
+    return {
+        "mode": "narrative_story",
+        "script_tag": normalized_script or "all",
+        "attempts": attempts,
+        "accuracy": accuracy,
+        "chapters": {
+            "1": chapter_stats[1],
+            "2": chapter_stats[2],
+            "3": chapter_stats[3],
+        },
+    }
 
 
 def load_today_progress(
