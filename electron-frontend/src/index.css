@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Fredoka:wght@500;600;700&display=swap');
 
 :root {
   --bg-main: #191b1f;
@@ -6,6 +6,8 @@
   --text-main: #f1f2f5;
   --text-soft: #b5bcc8;
   --accent: #8ea1ff;
+
+  --base-font-size: 16px;
 
   --blob-left: rgba(95, 112, 246, 0.28);
   --blob-right: rgba(55, 173, 152, 0.18);
@@ -40,7 +42,12 @@
 
   --sans: 'Space Grotesk', 'Trebuchet MS', 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
+  --button-font: 'Fredoka', 'Space Grotesk', 'Segoe UI', sans-serif;
 }
+
+html[data-font-size='small']  { --base-font-size: 14px; }
+html[data-font-size='medium'] { --base-font-size: 16px; }
+html[data-font-size='large']  { --base-font-size: 19px; }
 
 * {
   box-sizing: border-box;
@@ -60,7 +67,7 @@ body {
     radial-gradient(circle at 14% 14%, rgba(142, 161, 255, 0.16) 0%, transparent 46%),
     radial-gradient(circle at 78% 40%, rgba(45, 202, 180, 0.1) 0%, transparent 44%),
     linear-gradient(180deg, var(--bg-main), var(--bg-subtle));
-  font-size: 16px;
+  font-size: var(--base-font-size);
   line-height: 1.45;
   letter-spacing: 0.01em;
   text-rendering: optimizeLegibility;

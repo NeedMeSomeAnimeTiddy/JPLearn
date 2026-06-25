@@ -35,56 +35,51 @@ An Electron-based Japanese learning app with a Python backend for domain logic a
 
 ## Project TODO
 
-### Architecture & Code Health
-- [x] Keep strict layer boundaries: `domain/`, `data/`, `ui/`
-- [x] Remove or migrate remaining legacy code in `src/`
-- [x] Improve type coverage for public APIs (`mypy --explicit-package-bases`)
-- [x] Add/update docstrings in domain and data public interfaces
-- [x] Add a lightweight "contributing/dev workflow" section to this README
-
-### Learning Content
-- [x] Ship Hiragana deck
-- [x] Ship Katakana deck
-- [x] Add first Kanji deck (start with JLPT N5)
-- [x] Add vocabulary decks grouped by topic and JLPT level
-- [x] Add basic grammar pattern cards (particles, verb forms, sentence templates)
-
-### SRS & Study Logic
-- [x] Persist and apply SRS scheduling in SQLite-backed flow
-- [x] Add configurable target retention / review load settings
-- [ ] (High) Add "leech" handling for repeatedly failed items
-- [ ] (Medium) Add per-item study history view (last reviews + outcome trend)
-- [ ] (Medium) Add smarter distractor generation for future multiple-choice sessions
-
-### User Experience (GUI)
-- [x] Deprecate Python GUI entrypoints (`main.py`, `gui.py`)
+### Recently Completed Milestones
 - [x] Migrate frontend to Electron + React + TypeScript (`electron-frontend/`)
-- [x] Add multiple-choice mode
-- [x] (High) Add typed-answer mode with tolerant input checking (kana normalization, punctuation/whitespace-insensitive matching, minor typo tolerance)
-- [x] (High) Add typed-answer feedback states (exact match, near miss, incorrect) before answer reveal
-- [x] Improve session summary screen (time spent, accuracy, weakest items)
-- [x] (Medium) Add keyboard-first review controls (submit, reveal, grade keys, next card)
-- [x] (Medium) Add review mode controls in-session (multiple-choice/typed mix without restart)
-- [x] (Medium) Add optional stroke-order display where assets are available
-- [x] (Low) Add accessibility polish (font scaling, visible focus states, higher-contrast option)
+- [x] Deprecate Python GUI entrypoints (`main.py`, `gui.py`)
+- [x] Add script-specific minigame menus with back navigation
+- [x] Ship modern dark desktop UI with animated transitions
+- [x] Show per-deck mastery and due/completed-today indicators
 
-### Progress & Insights
-- [x] Show per-deck mastery progress
-- [ ] (High) Add daily streak tracking
-- [ ] Add weekly/monthly activity summary
-- [x] Add "due today vs completed today" progress indicator
-- [ ] Add mistake breakdown by script/tag (hiragana/katakana/kanji/vocab)
+### Product Priorities (Post-Refactor)
+- [ ] (High) Add daily streak tracking with UTC/local-day handling tests
+- [ ] (High) Add weekly/monthly activity summary cards in Electron overview
+- [ ] (High) Add mistake breakdown by script/tag (hiragana/katakana/kanji/vocab)
+- [ ] (Medium) Add per-item study history timeline (last reviews + trend)
+- [ ] (Medium) Add "leech" handling for repeatedly failed items (auto-tag + focused review mode)
+- [ ] (Medium) Improve distractor generation quality for multiple-choice minigames
 
-### Data & Reliability
-- [x] Keep `data/app.db` and `data/jplearn.db` responsibilities separate
-- [ ] (High) Add migration/version marker for DB schema changes
-- [ ] (High) Strengthen normalization checks for Japanese text at data boundaries
+### Electron UX & Accessibility
+- [x] (High) Add deterministic keyboard navigation map (Tab order + Enter/Space shortcuts) across all menus
+- [x] (High) Add explicit visible focus-ring audit for every interactive control
+- [x] (Medium) Add reduced-motion setting and respect OS reduced-motion preference
+- [x] (Medium) Add font-size scaling option in settings (small/medium/large)
+- [x] (Medium) Add in-app command palette / quick switcher for Home, Script Menu, and Overview
+
+### Electron Security & Runtime Hardening
+- [ ] (High) Validate IPC sender/frame for all `ipcMain.handle` routes
+- [ ] (High) Enable renderer sandbox explicitly in `BrowserWindow` webPreferences
+- [ ] (High) Limit navigation and deny unexpected window creation (`will-navigate`, `setWindowOpenHandler`)
+- [ ] (Medium) Add restrictive CSP for packaged renderer (`default-src 'self'` baseline)
+- [ ] (Medium) Evaluate replacing `file://` renderer loads with a custom app protocol
+
+### Performance & Packaging
+- [ ] (High) Bundle fonts locally (remove runtime Google Fonts fetch for offline startup reliability)
+- [ ] (Medium) Add startup performance budget and measurements (cold start + first interaction)
+- [ ] (Medium) Audit heavy startup work in main/renderer and defer non-critical tasks
+- [ ] (Medium) Add packaged smoke test in CI (`npm run build`, `npm run package`, launch check)
+
+### Release, Data & Reliability
+- [ ] (High) Add DB migration/version marker and migration runner for schema changes
+- [ ] (High) Strengthen Japanese text normalization checks at data boundaries
 - [ ] (Medium) Add backup/restore command for local DB files
 - [ ] (Medium) Add import/export for decks and user progress
+- [ ] (Medium) Integrate Electron auto-update flow (Forge publish metadata + update UI prompt)
 
-### Stretch Goals
+### Longer-Term Enhancements
 - [ ] Audio pronunciation playback (pre-recorded or TTS)
 - [ ] Sentence mining/import workflow
-- [ ] Theme/customization options in Electron UI
+- [ ] Theme presets/customization options in Electron UI
 - [ ] Optional cloud sync
 - [ ] Optional web deployment mode

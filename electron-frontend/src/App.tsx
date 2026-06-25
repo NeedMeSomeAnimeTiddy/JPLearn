@@ -7,7 +7,14 @@ type StudySummaryPayload = Awaited<
 type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match'
-type AppView = 'home' | 'games' | 'overview'
+type AppView = 'home' | 'script' | 'overview'
+type NavDirection = 'forward' | 'back'
+type FontSize = 'small' | 'medium' | 'large'
+
+interface AppSettings {
+  reducedMotion: boolean
+  fontSize: FontSize
+}
 
 interface RoundOption {
   id: string
@@ -54,6 +61,19 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
 ]
 
 const STATS_STORAGE_KEY = 'jplearn-desktop-script-stats-v1'
+const SETTINGS_STORAGE_KEY = 'jplearn-desktop-settings-v1'
+
+const COMMAND_ACTIONS = [
+  { id: 'home' as const, label: 'Go Home', hint: 'Esc' },
+  { id: 'hiragana' as const, label: 'Hiragana Mini Games', hint: '1' },
+  { id: 'katakana' as const, label: 'Katakana Mini Games', hint: '2' },
+  { id: 'kanji_n5' as const, label: 'Kanji Mini Games', hint: '3' },
+  { id: 'overview' as const, label: 'Study Overview', hint: '4' },
+  { id: 'settings' as const, label: 'Settings', hint: 'Ctrl+,' },
+] as const
+
+type CommandActionId = (typeof COMMAND_ACTIONS)[number]['id']
+
 const EMPTY_SCRIPT_STATS: ScriptStats = {
   attempted: 0,
   correct: 0,
@@ -87,6 +107,26 @@ function loadSavedStats(): StatsByScript {
   }
 }
 
+function defaultSettings(): AppSettings {
+  return {
+    reducedMotion:
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    fontSize: 'medium',
+  }
+}
+
+function loadSettings(): AppSettings {
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
+    if (!raw) return defaultSettings()
+    const parsed = JSON.parse(raw) as Partial<AppSettings>
+    return { ...defaultSettings(), ...parsed }
+  } catch {
+    return defaultSettings()
+  }
+}
+
 function normalizeText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -113,6 +153,7 @@ function shuffleArray<T>(items: T[]): T[] {
 
 function App() {
   const [view, setView] = useState<AppView>('home')
+  const [navDirection, setNavDirection] = useState<NavDirection>('forward')
   const [summary, setSummary] = useState<StudySummaryPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
@@ -130,6 +171,10 @@ function App() {
   const [sessionRounds, setSessionRounds] = useState<number>(0)
   const [sessionPoints, setSessionPoints] = useState<number>(0)
   const [scriptStats, setScriptStats] = useState<StatsByScript>(() => loadSavedStats())
+  const [showSettings, setShowSettings] = useState(false)
+  const [showCommandPalette, setShowCommandPalette] = useState(false)
+  const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
+  const [commandIndex, setCommandIndex] = useState(0)
 
   useEffect(() => {
     window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(scriptStats))
@@ -178,6 +223,62 @@ function App() {
   useEffect(() => {
     void loadScriptCards(activeScript)
   }, [activeScript, loadScriptCards])
+
+  // Persist settings and apply data attributes to the document root
+  useEffect(() => {
+    window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+    document.documentElement.dataset.fontSize = settings.fontSize
+    document.documentElement.dataset.reducedMotion = String(settings.reducedMotion)
+  }, [settings])
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent): void {
+      const target = event.target as HTMLElement
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+
+      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+        event.preventDefault()
+        setShowCommandPalette((v) => !v)
+        setCommandIndex(0)
+        return
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.key === ',') {
+        event.preventDefault()
+        setShowSettings((v) => !v)
+        return
+      }
+
+      if (event.key === 'Escape') {
+        if (showCommandPalette) { setShowCommandPalette(false); return }
+        if (showSettings) { setShowSettings(false); return }
+      }
+
+      if (showCommandPalette) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault()
+          setCommandIndex((i) => (i + 1) % COMMAND_ACTIONS.length)
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault()
+          setCommandIndex((i) => (i - 1 + COMMAND_ACTIONS.length) % COMMAND_ACTIONS.length)
+        }
+        return
+      }
+
+      if (showSettings || isInput) return
+
+      if (view === 'home') {
+        if (event.key === '1') { setNavDirection('forward'); setActiveScript('hiragana'); setView('script') }
+        if (event.key === '2') { setNavDirection('forward'); setActiveScript('katakana'); setView('script') }
+        if (event.key === '3') { setNavDirection('forward'); setActiveScript('kanji_n5'); setView('script') }
+        if (event.key === '4') { setNavDirection('forward'); setView('overview') }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [view, showCommandPalette, showSettings])
 
   const buildRound = useCallback(
     (cards: ScriptDeck['cards'], minigame: MinigameKey): RoundState | null => {
@@ -328,6 +429,7 @@ function App() {
     { label: 'Mastered', value: `${totals.masteryRate}%`, tone: 'amber' },
     { label: 'Due Today', value: totals.dueToday.toString(), tone: 'rose' },
   ] as const
+  const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
 
   const activeScriptStats = scriptStats[activeScript]
   const activeAccuracy =
@@ -336,11 +438,41 @@ function App() {
       : 0
 
   const goHome = useCallback(() => {
+    setNavDirection('back')
     setView('home')
     setSessionActive(false)
     setRoundState(null)
     setRoundFeedback(null)
+    setShowSettings(false)
+    setShowCommandPalette(false)
   }, [])
+
+  const executeCommandAction = useCallback(
+    (id: CommandActionId) => {
+      setShowCommandPalette(false)
+      switch (id) {
+        case 'home':
+          goHome()
+          break
+        case 'hiragana':
+          setNavDirection('forward'); setActiveScript('hiragana'); setView('script')
+          break
+        case 'katakana':
+          setNavDirection('forward'); setActiveScript('katakana'); setView('script')
+          break
+        case 'kanji_n5':
+          setNavDirection('forward'); setActiveScript('kanji_n5'); setView('script')
+          break
+        case 'overview':
+          setNavDirection('forward'); setView('overview')
+          break
+        case 'settings':
+          setShowSettings(true)
+          break
+      }
+    },
+    [goHome],
+  )
 
   const homeHero = (
     <section className="home-menu panel-glass">
@@ -351,24 +483,47 @@ function App() {
       </p>
 
       <div className="home-actions">
-        {(['hiragana', 'katakana', 'kanji_n5'] as const).map((script) => (
+        {(['hiragana', 'katakana', 'kanji_n5'] as const).map((script, index) => (
           <button
             key={script}
             type="button"
             className="home-action-button"
+            aria-keyshortcuts={String(index + 1)}
             onClick={() => {
+              setNavDirection('forward')
               setActiveScript(script)
-              setView('games')
+              setView('script')
             }}
           >
             {SCRIPT_LABELS[script]} Mini Games
+            <span className="key-hint" aria-hidden="true">{index + 1}</span>
           </button>
         ))}
       </div>
 
-      <button type="button" className="home-secondary-button" onClick={() => setView('overview')}>
-        Study Overview
-      </button>
+      <div className="home-bottom-actions">
+        <button
+          type="button"
+          className="home-secondary-button"
+          aria-keyshortcuts="4"
+          onClick={() => {
+            setNavDirection('forward')
+            setView('overview')
+          }}
+        >
+          Study Overview
+          <span className="key-hint" aria-hidden="true">4</span>
+        </button>
+        <button
+          type="button"
+          className="home-settings-button"
+          onClick={() => setShowSettings(true)}
+          aria-label="Open settings"
+          title="Settings (Ctrl+,)"
+        >
+          ⚙ Settings
+        </button>
+      </div>
     </section>
   )
 
@@ -377,10 +532,10 @@ function App() {
       <div className="atmosphere atmosphere-left" aria-hidden="true" />
       <div className="atmosphere atmosphere-right" aria-hidden="true" />
 
-      {view === 'home' ? homeHero : null}
+      {view === 'home' ? <div className={`view-shell view-${navDirection}`}>{homeHero}</div> : null}
 
-      {view === 'games' ? (
-        <>
+      {view === 'script' ? (
+        <div className={`view-shell view-${navDirection}`}>
           <header className="topbar panel-glass">
             <button type="button" className="back-button" onClick={goHome}>
               Back
@@ -389,28 +544,26 @@ function App() {
               <span className="brand-kicker">{SCRIPT_LABELS[activeScript]}</span>
               <h1>Mini Game Arena</h1>
             </div>
-            <div className="focus-chip">
-              <span>{deckCards.length} Cards Loaded</span>
+            <div className="topbar-end">
+              <div className="focus-chip">
+                <span>{activeScriptStats.bestStreak} Best Streak</span>
+              </div>
+              <button
+                type="button"
+                className="topbar-settings-button"
+                onClick={() => setShowSettings(true)}
+                aria-label="Open settings"
+                title="Settings (Ctrl+,)"
+              >
+                ⚙
+              </button>
             </div>
           </header>
 
           <section className="panel-glass game-panel">
             <div className="panel-head">
-              <h2>Choose Script</h2>
+              <h2>Choose Minigame</h2>
               <span className="game-stats">Session {sessionScore}/{sessionRounds}</span>
-            </div>
-
-            <div className="selector-row">
-              {(['hiragana', 'katakana', 'kanji_n5'] as const).map((script) => (
-                <button
-                  key={script}
-                  type="button"
-                  className={`pill-button ${activeScript === script ? 'is-active' : ''}`}
-                  onClick={() => setActiveScript(script)}
-                >
-                  {SCRIPT_LABELS[script]}
-                </button>
-              ))}
             </div>
 
             <div className="minigame-grid">
@@ -459,7 +612,7 @@ function App() {
               <article className="game-round">
                 <div className="game-round-head">
                   <span>{SCRIPT_LABELS[activeScript]}</span>
-                  <strong>{MINIGAMES.find((game) => game.key === activeGame)?.title}</strong>
+                  <strong>{selectedGameMeta?.title}</strong>
                 </div>
                 <p className="game-prompt">{roundState.prompt}</p>
 
@@ -497,11 +650,11 @@ function App() {
               </article>
             ) : null}
           </section>
-        </>
+        </div>
       ) : null}
 
       {view === 'overview' ? (
-        <>
+        <div className={`view-shell view-${navDirection}`}>
           <header className="topbar panel-glass">
             <button type="button" className="back-button" onClick={goHome}>
               Back
@@ -510,8 +663,19 @@ function App() {
               <span className="brand-kicker">JPLearn</span>
               <h1>Study Overview</h1>
             </div>
-            <div className="focus-chip">
-              <span>Deep Focus Mode</span>
+            <div className="topbar-end">
+              <div className="focus-chip">
+                <span>Deep Focus Mode</span>
+              </div>
+              <button
+                type="button"
+                className="topbar-settings-button"
+                onClick={() => setShowSettings(true)}
+                aria-label="Open settings"
+                title="Settings (Ctrl+,)"
+              >
+                ⚙
+              </button>
             </div>
           </header>
 
@@ -595,7 +759,110 @@ function App() {
               <span>{totals.masteredCards} cards mastered overall</span>
             </footer>
           </section>
-        </>
+        </div>
+      ) : null}
+
+      {showSettings ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowSettings(false) }}
+        >
+          <div
+            className="modal-panel settings-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-title"
+          >
+            <div className="settings-modal-header">
+              <h2 id="settings-title" className="settings-modal-title">Settings</h2>
+              <button
+                type="button"
+                className="modal-close-button"
+                onClick={() => setShowSettings(false)}
+                aria-label="Close settings"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="settings-section">
+              <p className="settings-section-label">Font Size</p>
+              <div className="settings-button-group">
+                {(['small', 'medium', 'large'] as const).map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    className={`settings-option-button ${settings.fontSize === size ? 'is-active' : ''}`}
+                    aria-pressed={settings.fontSize === size}
+                    onClick={() => setSettings((prev) => ({ ...prev, fontSize: size }))}
+                  >
+                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <p className="settings-section-label">Accessibility</p>
+              <button
+                type="button"
+                className={`settings-toggle ${settings.reducedMotion ? 'is-active' : ''}`}
+                onClick={() => setSettings((prev) => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
+                aria-pressed={settings.reducedMotion}
+              >
+                <span className="toggle-indicator" aria-hidden="true" />
+                Reduce Motion
+              </button>
+            </div>
+
+            <div className="settings-section">
+              <p className="settings-section-label">Keyboard Shortcuts</p>
+              <div className="settings-shortcuts">
+                <code className="command-hint">Ctrl+K</code><span>Command palette</span>
+                <code className="command-hint">Ctrl+,</code><span>Settings</span>
+                <code className="command-hint">Esc</code><span>Close modal / back</span>
+                <code className="command-hint">1 / 2 / 3</code><span>Script mini games (home)</span>
+                <code className="command-hint">4</code><span>Study overview (home)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showCommandPalette ? (
+        <div
+          className="modal-backdrop command-palette-backdrop"
+          role="presentation"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCommandPalette(false) }}
+        >
+          <div
+            className="modal-panel command-palette-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="palette-title"
+          >
+            <div className="command-palette-header">
+              <span id="palette-title" className="command-palette-title">Quick Actions</span>
+              <code className="command-hint">Esc to close</code>
+            </div>
+            <ul className="command-palette-list" role="listbox">
+              {COMMAND_ACTIONS.map((action, index) => (
+                <li key={action.id} role="option" aria-selected={commandIndex === index}>
+                  <button
+                    type="button"
+                    className={`command-palette-item ${commandIndex === index ? 'is-selected' : ''}`}
+                    onMouseEnter={() => setCommandIndex(index)}
+                    onClick={() => executeCommandAction(action.id)}
+                  >
+                    <span>{action.label}</span>
+                    <code className="command-hint">{action.hint}</code>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       ) : null}
     </main>
   )

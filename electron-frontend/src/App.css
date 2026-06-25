@@ -8,6 +8,25 @@
   z-index: 1;
 }
 
+.view-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.view-forward {
+  animation: viewSlideForward 260ms ease both;
+}
+
+.view-back {
+  animation: viewSlideBack 240ms ease both;
+}
+
+button {
+  font-family: var(--button-font);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
 .home-menu {
   padding: 28px;
   display: grid;
@@ -48,7 +67,8 @@
   background: linear-gradient(160deg, var(--card-bg-top), var(--card-bg-bottom));
   color: var(--text-main);
   border-radius: 14px;
-  padding: 14px;
+  padding: 16px 18px;
+  min-height: 88px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
@@ -66,7 +86,8 @@
   border-radius: 12px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
-  padding: 10px 14px;
+  padding: 10px 16px;
+  min-height: 42px;
   cursor: pointer;
   font-weight: 600;
 }
@@ -115,7 +136,8 @@
   border-radius: 10px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
-  padding: 7px 13px;
+  padding: 8px 14px;
+  min-height: 40px;
   cursor: pointer;
   transition: transform 160ms ease;
 }
@@ -252,7 +274,8 @@
   border-radius: 10px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
-  padding: 7px 12px;
+  padding: 8px 13px;
+  min-height: 40px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 180ms ease, box-shadow 180ms ease;
@@ -435,7 +458,8 @@
   border: 1px solid var(--card-border);
   border-radius: 12px;
   background: linear-gradient(150deg, var(--card-bg-top), var(--card-bg-bottom));
-  padding: 12px;
+  padding: 14px;
+  min-height: 104px;
   color: var(--text-main);
   cursor: pointer;
   transition: border-color 160ms ease, transform 160ms ease;
@@ -472,7 +496,8 @@
   border-radius: 10px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
-  padding: 8px 13px;
+  padding: 10px 14px;
+  min-height: 42px;
   cursor: pointer;
 }
 
@@ -528,7 +553,8 @@
   border-radius: 10px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
-  padding: 9px 12px;
+  padding: 10px 13px;
+  min-height: 42px;
   cursor: pointer;
 }
 
@@ -545,6 +571,10 @@
   gap: 8px;
 }
 
+.option-button {
+  text-align: left;
+}
+
 @keyframes enterUp {
   from {
     opacity: 0;
@@ -553,6 +583,28 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes viewSlideForward {
+  from {
+    opacity: 0;
+    transform: translateX(12px) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes viewSlideBack {
+  from {
+    opacity: 0;
+    transform: translateX(-12px) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
   }
 }
 
@@ -604,5 +656,353 @@
 @media (max-width: 560px) {
   .tile-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ── Focus rings ────────────────────────────────────────────────── */
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[role='button']:focus-visible,
+[role='option']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Keyboard shortcut hints ────────────────────────────────────── */
+
+.key-hint {
+  display: inline-block;
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  border: 1px solid var(--chip-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+  opacity: 0.8;
+}
+
+/* ── Home bottom actions (Overview + Settings side by side) ─────── */
+
+.home-bottom-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.home-settings-button {
+  border: 1px solid var(--button-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  padding: 10px 16px;
+  min-height: 42px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.home-settings-button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--button-border));
+}
+
+/* ── Topbar end group (chip + settings icon) ────────────────────── */
+
+.topbar-end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-settings-button {
+  border: 1px solid var(--button-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-soft);
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  transition: transform 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.topbar-settings-button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--button-border));
+  color: var(--text-main);
+}
+
+/* ── Modal backdrop ─────────────────────────────────────────────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(5px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 180ms ease both;
+}
+
+.modal-panel {
+  background: linear-gradient(145deg, var(--panel-bg), var(--panel-bg-alt));
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  box-shadow: var(--panel-shadow), 0 0 60px -20px rgba(0, 0, 0, 0.9);
+  width: calc(100% - 32px);
+  max-width: 480px;
+  animation: enterUp 220ms ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Settings modal ─────────────────────────────────────────────── */
+
+.settings-panel {
+  padding: 24px;
+}
+
+.settings-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.settings-modal-title {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.modal-close-button {
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-soft);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  transition: color 160ms ease;
+}
+
+.modal-close-button:hover {
+  color: var(--text-main);
+}
+
+.settings-section {
+  margin-bottom: 22px;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-section-label {
+  margin: 0 0 10px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+.settings-button-group {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-option-button {
+  flex: 1;
+  border: 1px solid var(--button-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  padding: 10px;
+  cursor: pointer;
+  font-family: var(--button-font);
+  font-size: 0.9rem;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.settings-option-button.is-active {
+  border-color: color-mix(in oklab, var(--accent) 70%, var(--button-border));
+  background: color-mix(in oklab, var(--accent) 14%, var(--button-bg-bottom));
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: 1px solid var(--button-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--text-main);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  text-align: left;
+  width: 100%;
+  transition: border-color 160ms ease;
+}
+
+.settings-toggle.is-active {
+  border-color: color-mix(in oklab, var(--accent) 60%, var(--button-border));
+}
+
+.toggle-indicator {
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  border: 1px solid var(--button-border);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.toggle-indicator::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  background: var(--text-soft);
+  transition: transform 200ms ease, background 200ms ease;
+}
+
+.settings-toggle.is-active .toggle-indicator {
+  background: color-mix(in oklab, var(--accent) 22%, var(--chip-bg));
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--button-border));
+}
+
+.settings-toggle.is-active .toggle-indicator::after {
+  transform: translateX(16px);
+  background: var(--accent);
+}
+
+.settings-shortcuts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 14px;
+  align-items: center;
+}
+
+.settings-shortcuts span {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+/* ── Command palette ────────────────────────────────────────────── */
+
+.command-palette-backdrop {
+  align-items: flex-start;
+  padding-top: 80px;
+}
+
+.command-palette-panel {
+  max-width: 540px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.command-palette-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.command-palette-title {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+.command-palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+}
+
+.command-palette-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-main);
+  width: 100%;
+  text-align: left;
+  font-family: var(--sans);
+  font-size: 0.97rem;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.command-palette-item.is-selected,
+.command-palette-item:hover {
+  background: rgba(142, 161, 255, 0.1);
+  border-color: rgba(142, 161, 255, 0.22);
+}
+
+.command-hint {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  border: 1px solid var(--chip-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+/* ── Reduced motion overrides ───────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+html[data-reduced-motion='true'] *,
+html[data-reduced-motion='true'] *::before,
+html[data-reduced-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+
+@media (max-width: 980px) {
+  .topbar-end {
+    flex-direction: row;
   }
 }
