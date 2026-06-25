@@ -7,7 +7,11 @@ import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_WORDS_CSV = ROOT / "data" / "external_sources" / "words_n5.csv"
+DEFAULT_WORDS_N5_CSV = ROOT / "data" / "external_sources" / "words_n5.csv"
+DEFAULT_WORDS_N4_CSV = ROOT / "data" / "external_sources" / "words_n4.csv"
+DEFAULT_WORDS_N3_CSV = ROOT / "data" / "external_sources" / "words_n3.csv"
+DEFAULT_WORDS_N2_CSV = ROOT / "data" / "external_sources" / "words_n2.csv"
+DEFAULT_WORDS_N1_CSV = ROOT / "data" / "external_sources" / "words_n1.csv"
 DEFAULT_CONVERSATIONAL_CSV = ROOT / "data" / "external_sources" / "conversational_n5.csv"
 DEFAULT_KANJI_N5_CSV = ROOT / "data" / "external_sources" / "kanji_n5.csv"
 DEFAULT_KANJI_N4_CSV = ROOT / "data" / "external_sources" / "kanji_n4.csv"
@@ -68,14 +72,22 @@ def _format_rows(name: str, rows: list[tuple[str, str, str]]) -> str:
 
 
 def _render_module(
-    words_rows: list[tuple[str, str, str]],
+    words_n5_rows: list[tuple[str, str, str]],
+    words_n4_rows: list[tuple[str, str, str]],
+    words_n3_rows: list[tuple[str, str, str]],
+    words_n2_rows: list[tuple[str, str, str]],
+    words_n1_rows: list[tuple[str, str, str]],
     conversational_rows: list[tuple[str, str, str]],
     kanji_n5_rows: list[tuple[str, str, str]],
     kanji_n4_rows: list[tuple[str, str, str]],
     kanji_n3_rows: list[tuple[str, str, str]],
     kanji_n2_rows: list[tuple[str, str, str]],
     kanji_n1_rows: list[tuple[str, str, str]],
-    words_source: Path,
+    words_n5_source: Path,
+    words_n4_source: Path,
+    words_n3_source: Path,
+    words_n2_source: Path,
+    words_n1_source: Path,
     conversational_source: Path,
     kanji_n5_source: Path,
     kanji_n4_source: Path,
@@ -86,7 +98,11 @@ def _render_module(
     header = [
         '"""Auto-generated external deck data. Do not edit by hand."""',
         "",
-        f"# Generated from: {_display_source_path(words_source)}",
+        f"# Generated from: {_display_source_path(words_n5_source)}",
+        f"# Generated from: {_display_source_path(words_n4_source)}",
+        f"# Generated from: {_display_source_path(words_n3_source)}",
+        f"# Generated from: {_display_source_path(words_n2_source)}",
+        f"# Generated from: {_display_source_path(words_n1_source)}",
         f"# Generated from: {_display_source_path(conversational_source)}",
         f"# Generated from: {_display_source_path(kanji_n5_source)}",
         f"# Generated from: {_display_source_path(kanji_n4_source)}",
@@ -96,7 +112,15 @@ def _render_module(
         "",
     ]
     body = [
-        _format_rows("VOCAB_N5_EXTERNAL_DATA", words_rows),
+        _format_rows("VOCAB_N5_EXTERNAL_DATA", words_n5_rows),
+        "",
+        _format_rows("VOCAB_N4_EXTERNAL_DATA", words_n4_rows),
+        "",
+        _format_rows("VOCAB_N3_EXTERNAL_DATA", words_n3_rows),
+        "",
+        _format_rows("VOCAB_N2_EXTERNAL_DATA", words_n2_rows),
+        "",
+        _format_rows("VOCAB_N1_EXTERNAL_DATA", words_n1_rows),
         "",
         _format_rows("GRAMMAR_PATTERNS_EXTERNAL_DATA", conversational_rows),
         "",
@@ -115,7 +139,11 @@ def _render_module(
 
 
 def generate_external_deck_module(
-    words_csv: Path,
+    words_n5_csv: Path,
+    words_n4_csv: Path,
+    words_n3_csv: Path,
+    words_n2_csv: Path,
+    words_n1_csv: Path,
     conversational_csv: Path,
     output_module: Path = OUTPUT_MODULE,
     kanji_n5_csv: Path = DEFAULT_KANJI_N5_CSV,
@@ -123,8 +151,12 @@ def generate_external_deck_module(
     kanji_n3_csv: Path = DEFAULT_KANJI_N3_CSV,
     kanji_n2_csv: Path = DEFAULT_KANJI_N2_CSV,
     kanji_n1_csv: Path = DEFAULT_KANJI_N1_CSV,
-) -> tuple[int, int, int, int, int, int, int]:
-    words_rows = _read_csv(words_csv)
+) -> tuple[int, int, int, int, int, int, int, int, int, int, int]:
+    words_n5_rows = _read_csv(words_n5_csv)
+    words_n4_rows = _read_csv(words_n4_csv)
+    words_n3_rows = _read_csv(words_n3_csv)
+    words_n2_rows = _read_csv(words_n2_csv)
+    words_n1_rows = _read_csv(words_n1_csv)
     conversational_rows = _read_csv(conversational_csv)
     kanji_n5_rows = _read_csv(kanji_n5_csv)
     kanji_n4_rows = _read_csv(kanji_n4_csv)
@@ -132,8 +164,16 @@ def generate_external_deck_module(
     kanji_n2_rows = _read_csv(kanji_n2_csv)
     kanji_n1_rows = _read_csv(kanji_n1_csv)
 
-    if len(words_rows) < 80:
-        raise ValueError("Words source must contain at least 80 rows")
+    if len(words_n5_rows) < 80:
+        raise ValueError("Words N5 source must contain at least 80 rows")
+    if len(words_n4_rows) < 80:
+        raise ValueError("Words N4 source must contain at least 80 rows")
+    if len(words_n3_rows) < 80:
+        raise ValueError("Words N3 source must contain at least 80 rows")
+    if len(words_n2_rows) < 80:
+        raise ValueError("Words N2 source must contain at least 80 rows")
+    if len(words_n1_rows) < 80:
+        raise ValueError("Words N1 source must contain at least 80 rows")
     if len(conversational_rows) < 40:
         raise ValueError("Conversational source must contain at least 40 rows")
     if len(kanji_n5_rows) < 80:
@@ -148,14 +188,22 @@ def generate_external_deck_module(
         raise ValueError("Kanji N1 source must contain at least 20 rows")
 
     content = _render_module(
-        words_rows,
+        words_n5_rows,
+        words_n4_rows,
+        words_n3_rows,
+        words_n2_rows,
+        words_n1_rows,
         conversational_rows,
         kanji_n5_rows,
         kanji_n4_rows,
         kanji_n3_rows,
         kanji_n2_rows,
         kanji_n1_rows,
-        words_csv,
+        words_n5_csv,
+        words_n4_csv,
+        words_n3_csv,
+        words_n2_csv,
+        words_n1_csv,
         conversational_csv,
         kanji_n5_csv,
         kanji_n4_csv,
@@ -166,7 +214,11 @@ def generate_external_deck_module(
 
     output_module.write_text(content, encoding="utf-8")
     return (
-        len(words_rows),
+        len(words_n5_rows),
+        len(words_n4_rows),
+        len(words_n3_rows),
+        len(words_n2_rows),
+        len(words_n1_rows),
         len(conversational_rows),
         len(kanji_n5_rows),
         len(kanji_n4_rows),
@@ -181,10 +233,34 @@ def build_parser() -> argparse.ArgumentParser:
         description="Generate domain/external_deck_data.py from external CSV sources.",
     )
     parser.add_argument(
-        "--words-csv",
+        "--words-n5-csv",
         type=Path,
-        default=DEFAULT_WORDS_CSV,
-        help="Path to words CSV (character,romaji,meaning)",
+        default=DEFAULT_WORDS_N5_CSV,
+        help="Path to JLPT N5 words CSV (character,romaji,meaning)",
+    )
+    parser.add_argument(
+        "--words-n4-csv",
+        type=Path,
+        default=DEFAULT_WORDS_N4_CSV,
+        help="Path to JLPT N4 words CSV (character,romaji,meaning)",
+    )
+    parser.add_argument(
+        "--words-n3-csv",
+        type=Path,
+        default=DEFAULT_WORDS_N3_CSV,
+        help="Path to JLPT N3 words CSV (character,romaji,meaning)",
+    )
+    parser.add_argument(
+        "--words-n2-csv",
+        type=Path,
+        default=DEFAULT_WORDS_N2_CSV,
+        help="Path to JLPT N2 words CSV (character,romaji,meaning)",
+    )
+    parser.add_argument(
+        "--words-n1-csv",
+        type=Path,
+        default=DEFAULT_WORDS_N1_CSV,
+        help="Path to JLPT N1 words CSV (character,romaji,meaning)",
     )
     parser.add_argument(
         "--conversational-csv",
@@ -237,7 +313,11 @@ def main() -> int:
 
     try:
         (
-            words_count,
+            words_n5_count,
+            words_n4_count,
+            words_n3_count,
+            words_n2_count,
+            words_n1_count,
             conversational_count,
             kanji_n5_count,
             kanji_n4_count,
@@ -245,7 +325,11 @@ def main() -> int:
             kanji_n2_count,
             kanji_n1_count,
         ) = generate_external_deck_module(
-            words_csv=args.words_csv,
+            words_n5_csv=args.words_n5_csv,
+            words_n4_csv=args.words_n4_csv,
+            words_n3_csv=args.words_n3_csv,
+            words_n2_csv=args.words_n2_csv,
+            words_n1_csv=args.words_n1_csv,
             conversational_csv=args.conversational_csv,
             kanji_n5_csv=args.kanji_n5_csv,
             kanji_n4_csv=args.kanji_n4_csv,
@@ -260,7 +344,9 @@ def main() -> int:
 
     print(
         f"Generated {args.output.relative_to(ROOT)} "
-        f"(words={words_count}, conversational={conversational_count}, "
+        f"(words_n5={words_n5_count}, words_n4={words_n4_count}, "
+        f"words_n3={words_n3_count}, words_n2={words_n2_count}, words_n1={words_n1_count}, "
+        f"conversational={conversational_count}, "
         f"kanji_n5={kanji_n5_count}, kanji_n4={kanji_n4_count}, "
         f"kanji_n3={kanji_n3_count}, kanji_n2={kanji_n2_count}, kanji_n1={kanji_n1_count})"
     )

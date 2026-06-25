@@ -12,6 +12,10 @@ from domain.decks import (
     get_kanji_n4_deck,
     get_kanji_n5_deck,
     get_katakana_deck,
+    get_vocab_n1_deck,
+    get_vocab_n2_deck,
+    get_vocab_n3_deck,
+    get_vocab_n4_deck,
     get_vocab_n5_deck,
 )
 
@@ -27,6 +31,10 @@ class TestAllDecksRegistry:
             "kanji_n2",
             "kanji_n1",
             "vocab_n5",
+            "vocab_n4",
+            "vocab_n3",
+            "vocab_n2",
+            "vocab_n1",
             "grammar_patterns",
         }
 
@@ -133,27 +141,34 @@ class TestKanjiDecks:
         assert kanji in chars, f"Expected N1 kanji '{kanji}' not found in deck"
 
 
-class TestVocabN5Deck:
-    def test_deck_has_minimum_cards(self) -> None:
-        deck = get_vocab_n5_deck()
-        assert len(deck) >= 80
-
-    def test_deck_name(self) -> None:
-        assert get_vocab_n5_deck().name == "Vocabulary N5"
-
-    def test_every_card_has_required_fields(self) -> None:
-        for card in get_vocab_n5_deck().cards:
+class TestVocabDecks:
+    @pytest.mark.parametrize(
+        ("loader", "min_cards", "name", "level"),
+        [
+            (get_vocab_n5_deck, 80, "Vocabulary N5", "n5"),
+            (get_vocab_n4_deck, 80, "Vocabulary N4", "n4"),
+            (get_vocab_n3_deck, 80, "Vocabulary N3", "n3"),
+            (get_vocab_n2_deck, 80, "Vocabulary N2", "n2"),
+            (get_vocab_n1_deck, 80, "Vocabulary N1", "n1"),
+        ],
+    )
+    def test_vocab_deck_structure(self, loader, min_cards: int, name: str, level: str) -> None:
+        deck = loader()
+        assert len(deck) >= min_cards
+        assert deck.name == name
+        for card in deck.cards:
             assert card.character, f"Card {card.id} missing character"
             assert card.romaji, f"Card {card.id} missing romaji"
             assert card.meaning, f"Card {card.id} missing meaning"
-
-    def test_every_card_has_vocab_and_n5_tags(self) -> None:
-        for card in get_vocab_n5_deck().cards:
             assert "vocab" in card.tags
-            assert "n5" in card.tags
+            assert level in card.tags
 
-    def test_card_ids_are_unique(self) -> None:
-        ids = [c.id for c in get_vocab_n5_deck().cards]
+    @pytest.mark.parametrize(
+        "loader",
+        [get_vocab_n5_deck, get_vocab_n4_deck, get_vocab_n3_deck, get_vocab_n2_deck, get_vocab_n1_deck],
+    )
+    def test_vocab_card_ids_are_unique(self, loader) -> None:
+        ids = [c.id for c in loader().cards]
         assert len(ids) == len(set(ids))
 
     @pytest.mark.parametrize("word", ["たべる", "いく", "くる", "ほん", "がっこう"])

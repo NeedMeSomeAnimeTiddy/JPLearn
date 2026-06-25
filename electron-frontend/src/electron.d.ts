@@ -129,6 +129,10 @@ type DeckSlug =
   | 'kanji_n2'
   | 'kanji_n1'
   | 'vocab_n5'
+  | 'vocab_n4'
+  | 'vocab_n3'
+  | 'vocab_n2'
+  | 'vocab_n1'
   | 'grammar_patterns'
 type ScriptCurriculumSlug = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
 

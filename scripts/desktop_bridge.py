@@ -268,7 +268,12 @@ def record_game_result(
     if normalized_minigame == "narrative_story" and normalized_stage is not None:
         tags.append(f"chapter_{normalized_stage}")
 
-    script_tag = "kanji_n5" if slug.startswith("kanji_n") else slug
+    if slug.startswith("kanji_n"):
+        script_tag = "kanji_n5"
+    elif slug.startswith("vocab_n"):
+        script_tag = "vocab_n5"
+    else:
+        script_tag = slug
 
     updated_state = review_minigame_result(
         deck_name=deck.name,

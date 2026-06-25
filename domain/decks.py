@@ -1,4 +1,4 @@
-"""Built-in decks: Hiragana, Katakana, JLPT Kanji, N5 Vocabulary, Grammar Patterns."""
+"""Built-in decks: Hiragana, Katakana, JLPT Kanji, JLPT Vocabulary, Grammar Patterns."""
 
 from types import ModuleType
 from typing import cast
@@ -18,6 +18,10 @@ _EMPTY_EXTERNAL_DATA: list[_ExternalRow] = []
 
 if _external_deck_data is None:
     VOCAB_N5_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    VOCAB_N4_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    VOCAB_N3_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    VOCAB_N2_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    VOCAB_N1_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
     GRAMMAR_PATTERNS_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
     KANJI_N5_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
     KANJI_N4_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
@@ -27,6 +31,18 @@ if _external_deck_data is None:
 else:
     VOCAB_N5_EXTERNAL_DATA = cast(
         list[_ExternalRow], _external_deck_data.VOCAB_N5_EXTERNAL_DATA
+    )
+    VOCAB_N4_EXTERNAL_DATA = cast(
+        list[_ExternalRow], getattr(_external_deck_data, "VOCAB_N4_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
+    )
+    VOCAB_N3_EXTERNAL_DATA = cast(
+        list[_ExternalRow], getattr(_external_deck_data, "VOCAB_N3_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
+    )
+    VOCAB_N2_EXTERNAL_DATA = cast(
+        list[_ExternalRow], getattr(_external_deck_data, "VOCAB_N2_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
+    )
+    VOCAB_N1_EXTERNAL_DATA = cast(
+        list[_ExternalRow], getattr(_external_deck_data, "VOCAB_N1_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
     )
     GRAMMAR_PATTERNS_EXTERNAL_DATA = cast(
         list[_ExternalRow], _external_deck_data.GRAMMAR_PATTERNS_EXTERNAL_DATA
@@ -175,6 +191,25 @@ def _build_kanji_deck(
             romaji=reading,
             meaning=meaning,
             tags=["kanji", level_tag],
+        )
+        for i, (char, reading, meaning) in enumerate(data)
+    ]
+    return Deck(name=name, cards=cards)
+
+
+def _build_vocab_deck(
+    name: str,
+    data: list[tuple[str, str, str]],
+    level_tag: str,
+    id_offset: int,
+) -> Deck:
+    cards = [
+        Card(
+            id=id_offset + i,
+            character=char,
+            romaji=reading,
+            meaning=meaning,
+            tags=["vocab", level_tag],
         )
         for i, (char, reading, meaning) in enumerate(data)
     ]
@@ -625,7 +660,27 @@ _VOCAB_N5_DATA: list[tuple[str, str, str]] = [
 
 def get_vocab_n5_deck() -> Deck:
     data = VOCAB_N5_EXTERNAL_DATA if VOCAB_N5_EXTERNAL_DATA else _VOCAB_N5_DATA
-    return _build_deck_with_meaning("Vocabulary N5", data, ["vocab", "n5"])
+    return _build_vocab_deck("Vocabulary N5", data, "n5", id_offset=0)
+
+
+def get_vocab_n4_deck() -> Deck:
+    rows = VOCAB_N4_EXTERNAL_DATA
+    return _build_vocab_deck("Vocabulary N4", rows, "n4", id_offset=10000)
+
+
+def get_vocab_n3_deck() -> Deck:
+    rows = VOCAB_N3_EXTERNAL_DATA
+    return _build_vocab_deck("Vocabulary N3", rows, "n3", id_offset=20000)
+
+
+def get_vocab_n2_deck() -> Deck:
+    rows = VOCAB_N2_EXTERNAL_DATA
+    return _build_vocab_deck("Vocabulary N2", rows, "n2", id_offset=30000)
+
+
+def get_vocab_n1_deck() -> Deck:
+    rows = VOCAB_N1_EXTERNAL_DATA
+    return _build_vocab_deck("Vocabulary N1", rows, "n1", id_offset=40000)
 
 
 # ---------------------------------------------------------------------------
@@ -729,5 +784,9 @@ ALL_DECKS = {
     "kanji_n2": get_kanji_n2_deck,
     "kanji_n1": get_kanji_n1_deck,
     "vocab_n5": get_vocab_n5_deck,
+    "vocab_n4": get_vocab_n4_deck,
+    "vocab_n3": get_vocab_n3_deck,
+    "vocab_n2": get_vocab_n2_deck,
+    "vocab_n1": get_vocab_n1_deck,
     "grammar_patterns": get_grammar_patterns_deck,
 }

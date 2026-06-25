@@ -11,6 +11,7 @@ type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
 type KanjiDeckSlug = 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1'
+type VocabDeckSlug = 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
@@ -595,6 +596,13 @@ const KANJI_LEVEL_TO_DECK_SLUG: Record<JlptLevel, KanjiDeckSlug> = {
   n2: 'kanji_n2',
   n1: 'kanji_n1',
 }
+const VOCAB_LEVEL_TO_DECK_SLUG: Record<JlptLevel, VocabDeckSlug> = {
+  n5: 'vocab_n5',
+  n4: 'vocab_n4',
+  n3: 'vocab_n3',
+  n2: 'vocab_n2',
+  n1: 'vocab_n1',
+}
 const KANJI_OVERVIEW_PAGE_SIZE = 45
 
 function MinigameIcon({ game }: { game: MinigameKey }) {
@@ -935,9 +943,19 @@ function App() {
   const [cardScores, setCardScores] = useState<CardScores>(() => loadCardScores())
   const [overviewBlocks, setOverviewBlocks] = useState<Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>>({})
   const [overviewKanjiDeck, setOverviewKanjiDeck] = useState<ScriptDeck['cards']>([])
+  const [overviewVocabDeck, setOverviewVocabDeck] = useState<ScriptDeck['cards']>([])
   const [activeKanjiLevel, setActiveKanjiLevel] = useState<JlptLevel>('n5')
   const [activeKanjiDeckSlug, setActiveKanjiDeckSlug] = useState<KanjiDeckSlug>('kanji_n5')
+  const [activeVocabLevel, setActiveVocabLevel] = useState<JlptLevel>('n5')
+  const [activeVocabDeckSlug, setActiveVocabDeckSlug] = useState<VocabDeckSlug>('vocab_n5')
   const [kanjiDeckCardsByLevel, setKanjiDeckCardsByLevel] = useState<Record<JlptLevel, ScriptDeck['cards']>>({
+    n5: [],
+    n4: [],
+    n3: [],
+    n2: [],
+    n1: [],
+  })
+  const [vocabDeckCardsByLevel, setVocabDeckCardsByLevel] = useState<Record<JlptLevel, ScriptDeck['cards']>>({
     n5: [],
     n4: [],
     n3: [],
@@ -1074,7 +1092,11 @@ function App() {
     void loadSummary()
   }, [loadSummary])
 
-  const loadScriptCards = useCallback(async (script: ScriptKey, kanjiLevel: JlptLevel = activeKanjiLevel) => {
+  const loadScriptCards = useCallback(async (
+    script: ScriptKey,
+    kanjiLevel: JlptLevel = activeKanjiLevel,
+    vocabLevel: JlptLevel = activeVocabLevel,
+  ) => {
     setGameLoading(true)
     setGameError(null)
     setSessionActive(false)
@@ -1124,6 +1146,37 @@ function App() {
         } else {
           setActiveBlockIndex(0)
         }
+      } else if (script === 'vocab_n5') {
+        const selectedVocabSlug = VOCAB_LEVEL_TO_DECK_SLUG[vocabLevel]
+        const [selectedDeckPayload, blockPayload, n5Deck, n4Deck, n3Deck, n2Deck, n1Deck] = await Promise.all([
+          window.jplearnDesktop.getDeckCards(selectedVocabSlug),
+          window.jplearnDesktop.getBlockProgress(selectedVocabSlug),
+          window.jplearnDesktop.getDeckCards('vocab_n5'),
+          window.jplearnDesktop.getDeckCards('vocab_n4'),
+          window.jplearnDesktop.getDeckCards('vocab_n3'),
+          window.jplearnDesktop.getDeckCards('vocab_n2'),
+          window.jplearnDesktop.getDeckCards('vocab_n1'),
+        ])
+        setDeckCards(selectedDeckPayload.cards)
+        setActiveVocabDeckSlug(selectedDeckPayload.slug as VocabDeckSlug)
+        setVocabDeckCardsByLevel({
+          n5: n5Deck.cards,
+          n4: n4Deck.cards,
+          n3: n3Deck.cards,
+          n2: n2Deck.cards,
+          n1: n1Deck.cards,
+        })
+        const blocks = blockPayload.blocks
+        setBlockProgress(blocks)
+        if (blocks.length > 0) {
+          const lastUnlocked = blocks.reduce(
+            (best, b) => (b.unlocked ? b.index : best),
+            0,
+          )
+          setActiveBlockIndex(lastUnlocked)
+        } else {
+          setActiveBlockIndex(0)
+        }
       } else {
         const [deckPayload, blockPayload] = await Promise.all([
           window.jplearnDesktop.getDeckCards(script),
@@ -1150,11 +1203,11 @@ function App() {
     } finally {
       setGameLoading(false)
     }
-  }, [activeKanjiLevel, resetRoundCycle])
+  }, [activeKanjiLevel, activeVocabLevel, resetRoundCycle])
 
   useEffect(() => {
-    void loadScriptCards(activeScript, activeKanjiLevel)
-  }, [activeScript, activeKanjiLevel, loadScriptCards])
+    void loadScriptCards(activeScript, activeKanjiLevel, activeVocabLevel)
+  }, [activeScript, activeKanjiLevel, activeVocabLevel, loadScriptCards])
 
   const buildRound = useCallback(
     (
@@ -1368,9 +1421,19 @@ function App() {
     [kanjiDeckCardsByLevel, cardScores.kanji_n5],
   )
 
+  const vocabLevelProgress = useMemo(
+    () => buildJlptLevelProgressFromLevelDecks(vocabDeckCardsByLevel, cardScores.vocab_n5),
+    [vocabDeckCardsByLevel, cardScores.vocab_n5],
+  )
+
   const overviewKanjiLevelProgress = useMemo(
     () => buildJlptLevelProgress(overviewKanjiDeck, cardScores.kanji_n5),
     [overviewKanjiDeck, cardScores.kanji_n5],
+  )
+
+  const overviewVocabLevelProgress = useMemo(
+    () => buildJlptLevelProgress(overviewVocabDeck, cardScores.vocab_n5),
+    [overviewVocabDeck, cardScores.vocab_n5],
   )
 
   // Cards restricted to the active block when block progression is available.
@@ -1547,7 +1610,12 @@ function App() {
       }
 
       void window.jplearnDesktop.recordGameResult({
-        slug: activeScript === 'kanji_n5' ? activeKanjiDeckSlug : activeScript,
+        slug:
+          activeScript === 'kanji_n5'
+            ? activeKanjiDeckSlug
+            : activeScript === 'vocab_n5'
+              ? activeVocabDeckSlug
+              : activeScript,
         cardId: roundState.cardId,
         isCorrect,
         minigame: roundState.mode,
@@ -1593,7 +1661,7 @@ function App() {
         setIsRoundResolving(false)
       }, FEEDBACK_REVEAL_MS)
     },
-    [activeGame, activeKanjiDeckSlug, activeScript, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats],
+    [activeGame, activeKanjiDeckSlug, activeScript, activeVocabDeckSlug, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats],
   )
 
   useEffect(() => {
@@ -1816,8 +1884,11 @@ function App() {
     if (activeScript === 'kanji_n5') {
       return kanjiLevelProgress.find((level) => level.key === activeKanjiLevel)?.label ?? null
     }
+    if (activeScript === 'vocab_n5') {
+      return vocabLevelProgress.find((level) => level.key === activeVocabLevel)?.label ?? null
+    }
     return null
-  }, [blockProgressWithMastery, activeBlockIndex, activeScript, kanjiLevelProgress, activeKanjiLevel])
+  }, [blockProgressWithMastery, activeBlockIndex, activeScript, kanjiLevelProgress, activeKanjiLevel, vocabLevelProgress, activeVocabLevel])
 
   // Block session is complete when every card in the active block has reached max score.
   // sessionRounds > 0 ensures we don't trigger on a pre-mastered block before answering.
@@ -1847,6 +1918,13 @@ function App() {
     setActiveKanjiLevel(fallback.key)
   }, [activeScript, blockProgress.length, kanjiLevelProgress, activeKanjiLevel])
 
+  useEffect(() => {
+    if (activeScript !== 'vocab_n5' || blockProgress.length > 0) return
+    const fallback = vocabLevelProgress.find((level) => level.unlocked) ?? vocabLevelProgress.find((level) => level.total > 0)
+    if (!fallback || fallback.key === activeVocabLevel) return
+    setActiveVocabLevel(fallback.key)
+  }, [activeScript, blockProgress.length, vocabLevelProgress, activeVocabLevel])
+
   // Lazy-load block data for hiragana + katakana when the overview opens.
   useEffect(() => {
     if (view !== 'overview') return
@@ -1859,8 +1937,26 @@ function App() {
       window.jplearnDesktop.getDeckCards('kanji_n3'),
       window.jplearnDesktop.getDeckCards('kanji_n2'),
       window.jplearnDesktop.getDeckCards('kanji_n1'),
+      window.jplearnDesktop.getDeckCards('vocab_n5'),
+      window.jplearnDesktop.getDeckCards('vocab_n4'),
+      window.jplearnDesktop.getDeckCards('vocab_n3'),
+      window.jplearnDesktop.getDeckCards('vocab_n2'),
+      window.jplearnDesktop.getDeckCards('vocab_n1'),
     ])
-      .then(([hira, kata, kanjiN5Deck, kanjiN4Deck, kanjiN3Deck, kanjiN2Deck, kanjiN1Deck]) => {
+      .then(([
+        hira,
+        kata,
+        kanjiN5Deck,
+        kanjiN4Deck,
+        kanjiN3Deck,
+        kanjiN2Deck,
+        kanjiN1Deck,
+        vocabN5Deck,
+        vocabN4Deck,
+        vocabN3Deck,
+        vocabN2Deck,
+        vocabN1Deck,
+      ]) => {
         setOverviewBlocks({ hiragana: hira.blocks, katakana: kata.blocks })
         setOverviewKanjiDeck([
           ...kanjiN5Deck.cards,
@@ -1868,6 +1964,13 @@ function App() {
           ...kanjiN3Deck.cards,
           ...kanjiN2Deck.cards,
           ...kanjiN1Deck.cards,
+        ])
+        setOverviewVocabDeck([
+          ...vocabN5Deck.cards,
+          ...vocabN4Deck.cards,
+          ...vocabN3Deck.cards,
+          ...vocabN2Deck.cards,
+          ...vocabN1Deck.cards,
         ])
       })
       .catch(() => undefined)
@@ -2237,6 +2340,8 @@ function App() {
                   ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length} / ${blockProgressWithMastery.length} blocks mastered`
                   : activeScript === 'kanji_n5'
                     ? `${kanjiLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${kanjiLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
+                    : activeScript === 'vocab_n5'
+                      ? `${vocabLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${vocabLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
                     : 'Choose a minigame to start'}
               </span>
             </div>
@@ -2293,10 +2398,10 @@ function App() {
                   )
                 })}
               </div>
-            ) : activeScript === 'kanji_n5' ? (
-              <div className="jlpt-level-path" role="group" aria-label="Kanji JLPT progression">
-                {kanjiLevelProgress.map((level, index) => {
-                  const isActive = activeKanjiLevel === level.key
+            ) : activeScript === 'kanji_n5' || activeScript === 'vocab_n5' ? (
+              <div className="jlpt-level-path" role="group" aria-label={`${activeScript === 'kanji_n5' ? 'Kanji' : 'Vocabulary'} JLPT progression`}>
+                {(activeScript === 'kanji_n5' ? kanjiLevelProgress : vocabLevelProgress).map((level, index) => {
+                  const isActive = activeScript === 'kanji_n5' ? activeKanjiLevel === level.key : activeVocabLevel === level.key
                   const masteryPct = Math.round(level.mastery * 100)
                   const unavailable = level.total === 0
                   return (
@@ -2310,7 +2415,11 @@ function App() {
                         className="jlpt-level-button"
                         disabled={!level.unlocked || unavailable}
                         onClick={() => {
-                          setActiveKanjiLevel(level.key)
+                          if (activeScript === 'kanji_n5') {
+                            setActiveKanjiLevel(level.key)
+                          } else {
+                            setActiveVocabLevel(level.key)
+                          }
                           setSessionActive(false)
                           setRoundState(null)
                           setRoundFeedback(null)
@@ -2354,7 +2463,7 @@ function App() {
                   <h3>
                     {blockProgressWithMastery.length > 0
                       ? `Choose a minigame — ${blockProgressWithMastery[activeBlockIndex]?.name ?? ''} (${activeBlockCards.length} cards)`
-                      : activeScript === 'kanji_n5'
+                      : activeScript === 'kanji_n5' || activeScript === 'vocab_n5'
                         ? `Choose a minigame — ${activeSectionName ?? 'JLPT Level'} (${activeBlockCards.length} cards)`
                         : 'Choose a minigame'}
                   </h3>
@@ -3029,6 +3138,64 @@ function App() {
                                     </button>
                                   </div>
                                 ) : null}
+                              </div>
+                            ) : null}
+                          </Fragment>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {overviewVocabLevelProgress.some((level) => level.total > 0) ? (
+                  <div className="char-mastery-script">
+                    <h3 className="char-mastery-script-name">Vocabulary by JLPT Level</h3>
+                    <div className="char-mastery-tiles-grid">
+                      {overviewVocabLevelProgress.filter((level) => level.total > 0).map((level) => {
+                        const blockKey = `vocab-${level.key}`
+                        const isActive = expandedBlocks === blockKey
+                        const pct = Math.round(level.mastery * 100)
+                        const visibleCards = overviewVocabDeck.filter((card) => jlptTagFromCard(card) === level.key)
+                        return (
+                          <Fragment key={level.key}>
+                            <button
+                              type="button"
+                              className={`cmb-tile ${isActive ? 'is-active' : ''}`}
+                              onClick={() => setExpandedBlocks(isActive ? null : blockKey)}
+                              aria-expanded={isActive}
+                              aria-label={`${level.label}: ${pct}% mastered`}
+                            >
+                              <div className="cmb-tile-chars" lang="ja" aria-hidden="true">
+                                {level.sampleChars.join(' ')}
+                              </div>
+                              <strong className="cmb-tile-name">{level.label}</strong>
+                              <div className="cmb-bar-wrap">
+                                <div className="cmb-bar" style={{ '--cmb-pct': `${pct}%` } as CSSProperties} />
+                              </div>
+                              <div className="cmb-tile-pct">{level.total} cards • {pct}%</div>
+                            </button>
+
+                            {isActive ? (
+                              <div className="char-mastery-detail-inline">
+                                <div className="char-mastery-chips">
+                                  {visibleCards.map((card) => {
+                                    const score = cardScores.vocab_n5[card.id] ?? 0
+                                    const levelScore = Math.min(score, CARD_MASTERY_MAX)
+                                    return (
+                                      <button
+                                        key={card.id}
+                                        type="button"
+                                        className="char-mastery-chip"
+                                        data-level={levelScore}
+                                        aria-label={`${card.character} (${card.romaji}): ${levelScore}/${CARD_MASTERY_MAX}`}
+                                        lang="ja"
+                                        onClick={() => setSelectedChar({ character: card.character, romaji: card.romaji, meaning: card.meaning, score: levelScore })}
+                                      >
+                                        {card.character}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
                               </div>
                             ) : null}
                           </Fragment>
