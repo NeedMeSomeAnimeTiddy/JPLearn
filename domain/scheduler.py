@@ -6,6 +6,16 @@ from datetime import date, timedelta
 
 @dataclass
 class ReviewState:
+    """Mutable SM-2 scheduling state for one card.
+
+    Attributes:
+        card_id: Matches :attr:`~domain.cards.Card.id` within its deck.
+        ease_factor: SM-2 ease factor; controls interval growth. Min 1.3.
+        interval: Days until the next scheduled review.
+        repetitions: Number of consecutive successful reviews.
+        next_review: Date on which this card is next due.
+    """
+
     card_id: int
     ease_factor: float = 2.5
     interval: int = 1        # days until next review
@@ -13,6 +23,7 @@ class ReviewState:
     next_review: date = field(default_factory=date.today)
 
     def is_due(self) -> bool:
+        """Return ``True`` if this card is due for review today or earlier."""
         return date.today() >= self.next_review
 
 
