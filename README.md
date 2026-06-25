@@ -3,6 +3,15 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 
 ---
 
+## Learning Content Coverage
+
+- **Scripts**: Hiragana, Katakana
+- **JLPT N5 Kanji**: Intro deck included
+- **Vocabulary**: Kana words deck included
+- **Grammar**: Basic pattern cards included
+
+---
+
 ## Contributing / Dev Workflow
 
 1. Install dependencies:
@@ -39,31 +48,31 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 ### SRS & Study Logic
 - [x] Persist and apply SRS scheduling in SQLite-backed flow
 - [x] Add configurable target retention / review load settings
-- [ ] Add "leech" handling for repeatedly failed items
-- [ ] Add smarter distractor generation for future multiple-choice sessions
-- [ ] Add per-item study history view (last reviews + outcome trend)
+- [ ] (High) Add "leech" handling for repeatedly failed items
+- [ ] (Medium) Add per-item study history view (last reviews + outcome trend)
+- [ ] (Medium) Add smarter distractor generation for future multiple-choice sessions
 
 ### User Experience (GUI)
 - [x] Keep `main.py` runnable as a GUI launcher
 - [x] Maintain working PySide6 app flow (`gui.py`)
 - [x] Add multiple-choice mode
-- [ ] Add typed-answer mode with tolerant input checking
+- [ ] (High) Add typed-answer mode with tolerant input checking
 - [x] Improve session summary screen (time spent, accuracy, weakest items)
 - [ ] Add optional stroke-order display where assets are available
 
 ### Progress & Insights
 - [x] Show per-deck mastery progress
-- [ ] Add daily streak tracking
+- [ ] (High) Add daily streak tracking
 - [ ] Add weekly/monthly activity summary
 - [x] Add "due today vs completed today" progress indicator
 - [ ] Add mistake breakdown by script/tag (hiragana/katakana/kanji/vocab)
 
 ### Data & Reliability
 - [x] Keep `data/app.db` and `data/jplearn.db` responsibilities separate
-- [ ] Add backup/restore command for local DB files
-- [ ] Add migration/version marker for DB schema changes
-- [ ] Add import/export for decks and user progress
-- [ ] Strengthen normalization checks for Japanese text at data boundaries
+- [ ] (High) Add migration/version marker for DB schema changes
+- [ ] (High) Strengthen normalization checks for Japanese text at data boundaries
+- [ ] (Medium) Add backup/restore command for local DB files
+- [ ] (Medium) Add import/export for decks and user progress
 
 ### Stretch Goals
 - [ ] Audio pronunciation playback (pre-recorded or TTS)
