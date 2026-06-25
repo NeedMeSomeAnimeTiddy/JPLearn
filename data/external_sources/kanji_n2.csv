@@ -1,71 +1,411 @@
 character,romaji,meaning
+党,tou,"party, faction, clique"
+協,kyou,"co-, cooperation"
+総,sou,"overall, total"
+区,ku/ou/kou,"ward, district"
+領,ryou,"jurisdiction, dominion, territory, fief, reign"
+県,ken/ka.ke,prefecture
+設,setsu/mou.ke,"establishment, provision, prepare"
+改,kai,"reformation, change, modify, mend, renew, examine, inspect, search"
+府,fu,"borough, urban prefecture, govt, office, representative body, storehouse"
+査,sa,investigate
+委,i/yuda.ne,"committee, entrust to, leave to, devote, discard"
+軍,gun,"army, force, troops, war, battle"
+団,dan/ton,"group, association"
+各,kaku/onoo,"each, every, either"
+島,tou,island
+革,kaku,"leather, become serious, skin, hide, pelt"
+村,son/mu,"town, village"
+勢,sei/zei/hazu,"forces, energy, military strength"
+減,gen,"dwindle, decrease, reduce, decline, curtail, get hungry"
+再,sai/sa/futata.,"again, twice, second time"
+税,ze,"tax, duty"
+営,ei,"occupation, camp, perform, build, conduct (business)"
+比,hi/kura.be,"compare, race, ratio, Philipines"
+防,bou/fuse.,"ward off, defend, protect, resist"
+補,ho/ogona,supplement
+境,kyou,"boundary, situation"
+導,dou/michibi.,"guidance, leading, conduct, usher"
+副,fu,"vice-, duplicate, copy"
+算,san,"calculate, divining, number, abacus, probability"
+輸,yu,transport
+述,jutsu,"mention, state, speak, relate"
+線,sen,"line, track"
+農,no,"agriculture, farmers"
+州,shuu/su,"state, province"
+武,bu/mu/take.,"warrior, military, chivalry, arms"
+象,shou/zou,"elephant, pattern after, imitate, image, shape, sign (of the times)"
+域,iki,region
+額,gaku/hita,"forehead, tablet, plaque, framed, picture, sum, amount, volume"
+欧,ou/ha.,Europe
+担,tan,"shouldering, carry, raise, bear"
+準,jun,"semi-, correspond to, proportionate to, conform, imitate, なぞら.える のり, ひと.しい みずもり"
+賞,shou,"prize, reward, praise"
+辺,hen/-,"environs, boundary, border, vicinity"
+造,zou/-zuku.,"create, make, structure, physique"
+被,hi/kou,be subjected
+技,gi,"skill, art, craft, ability, feat, performance, vocation, arts"
+低,tei,"lower, short, humble, ひく.まる, semi-, correspond to, proportionate to, conform, imitate"
+復,fuku,"restore, return to, revert, resume"
+移,i,"shift, move, change, drift, catch, (cold, fire), pass into"
+個,ko/ka,"individual, counter for articles and, military units"
+門,mon,gates
+課,ka,"chapter, lesson, section, department, division, counter for, chapters (of a book)"
+脳,nou/dou,"brain, memory"
+極,kyoku/goku,"poles, settlement, conclusion, end, highest rank, electric poles, very, extremely, most, highly, 10**48"
+含,gan,"include, bear in mind, understand, cherish"
+蔵,zou/sou,"storehouse, hide, own, have, possess"
+量,ryou/haka.,"quantity, measure, weight, amount, consider, estimate, surmise"
+型,kei,"mould, type, model"
+況,kyou,"condition, situation"
+針,shin/ha,"needle, pin, staple, stinger"
+専,sen,"specialty, exclusive, mainly, solely"
+谷,koku/kiwa.ma,"valley, きわ.める きわ.まる, きわ.まり きわ.み き.める -, ぎ.め き.まる"
+史,shi,"history, chronicle"
+階,kai/kizaha,"storey, stair, counter for storeys, of a building"
+管,kan/ku,"pipe, tube, wind instrument, drunken talk"
+兵,hei/hyou,"soldier, private, troops, army, warfare, strategy, tactics"
+接,setsu/shou,"touch, contact, adjoin, piece, together"
+細,sai,"dainty, get thin, taper, slender, narrow"
+効,kou,"merit, efficacy, efficiency, benefit"
+丸,gan/maru.,"round, full, month, perfection, -, ship, pills, make round, roll up, curl up, seduce, explain away"
+湾,wan,"gulf, bay, inlet"
+録,roku,record
+省,sei/habu,"ministry, omit"
+旧,kyuu/furu,"old, former"
+橋,kyou/ha,bridge
+岸,gan/ki,beach
+周,shuu/mawa.,"circumference, circuit, lap"
+材,za,"lumber, log, timber, wood, talent"
+戸,ko,door
+央,o,"center, middle"
+券,ken,ticket
+編,hen/amu,compile
+捜,sou/shu,"search, look for, locate, シュウ"
+竹,chiku/ta,bamboo
+超,chou/ko.,"transcend, super-, ultra-"
+並,hei/hou,"row, and, besides, as well as, line, up, rank with, rival, equal"
+療,ryou,medical treatment
+採,sai,"pick, take, fetch, take up"
+森,shin/mo,"forest, woods"
+競,kyou,compete
+介,ka,"jammed in, shellfish, mediate, concern oneself with"
+根,kon,"root, radical, head (pimple)"
+販,han,sell
+歴,reki/rekki,"curriculum, continuation, passage, of time"
+将,shou/sou,"leader, commander, general, admiral, or, and again, soon, from, now on, just about"
+幅,fuku,"hanging scroll, width"
+般,han,"carrier, carry, all"
+貿,bou,"trade, exchange"
+講,kou,lecture
+林,rin/haya,"grove, forest"
+装,sou/shou,"attire, dress, pretend, disguise, profess"
+諸,sho,various
+劇,geki,drama
+河,ka/ka,river
+航,ko,"navigate, sail, cruise, fly"
+鉄,tetsu/kuroga,iron
+児,ji/ni/gei/-,"newborn babe, child, young of, animals"
+禁,kin,"prohibition, ban, forbid"
+印,in,"stamp, seal, mark, imprint, symbol, emblem, trademark, evidence, souvenir, India"
+逆,gyaku/geki,"inverted, reverse, opposite, wicked"
+換,kan,"interchange, period, charge, change?"
+久,kyuu/ku,"long time, old story, ヒサ.シ"
+短,tan,"short, brevity, fault, defect, weak, point"
+油,yu/yuu,"oil, fat"
+暴,bou/baku,"outburst, rave, fret, force, violence, cruelty, outrage"
+輪,rin,"wheel, ring, circle, link, loop, counter for wheels and flowers"
+占,sen/urana.,"fortune-telling, divining, forecasting, occupy, hold, have, get, take"
+植,shoku/u.wa,plant
+清,sei/shou,"pure, purify, cleanse, exorcise, Manchu dynasty"
+倍,ba,"double, twice, times, fold"
+均,kin/nara.,"level, average"
+億,o,"hundred million, 10**8"
+圧,atsu,pressure
+芸,gei/un/wa,"technique, art, craft, performance, acting, trick, stunt"
+署,sho,government office
+伸,shin/no.,"expand, stretch, extend, lengthen, increase"
+停,tei,"halt, stopping"
+爆,baku,"bomb, burst open, pop, split"
+陸,riku/roku/o,"land, six"
+玉,gyoku/-da,"jewel, ball"
+波,ha/na,"waves, billows, Poland"
+帯,tai/o,"sash, belt, obi, zone, region"
+延,en/no.ba,"prolong, stretching"
+羽,u/ha,"feathers, counter for birds, rabbits"
+固,ko,"harden, set, clot, curdle, かた.まり かた.い"
+則,soku/notto.,"rule, follow, based on, model after"
+乱,ran/ron/wata.,"riot, war, disorder, disturb, みだ おさ.める"
+普,fu/amane,"universal, wide(ly), generally, Prussia"
+測,soku/haka,"measure, predict"
+豊,hou/bu/to,"bountiful, excellent, rich"
+厚,kou/a,"thick, heavy, rich, kind, cordial, brazen, shameless"
+齢,rei,age
+囲,i,"surround, besiege, store, paling, enclosure, encircle, preserve, keep"
+卒,sotsu/shutsu,"graduate, soldier, private, die, ついに にわか"
+略,ryaku,"abbreviation, strategy"
+承,shou/uketa,consent
+順,ju,"obey, order, turn, right, docility, occasion"
+岩,gan,"boulder, rock, cliff"
+練,ren/ne.,"practice, gloss, train, drill, polish, refine"
+軽,kei,"lightly, trifling, unimportant, かろ.んじる"
+了,ryo,"complete, finish"
+庁,chou,agency
+城,jou/shi,castle
+患,kan/wazura.,"afflicted, disease, suffer from, be, ill"
+層,sou,layer
+版,han,"printing block, printing plate, edition, impression, label"
+令,re,"orders, ancient laws, command, decree"
+角,kaku/tsu,"angle, corner, square, horn, antlers"
+絡,raku,"entwine, coil around, get caught, in, abbreviation, omission, outline, shorten, capture, plunder"
+損,son,"damage, loss, disadvantage, hurt, injure, そこ.なう そこ.ねる -, そこ.ねる"
+募,bo,"recruit, campaign, gather, (contributions), enlist, grow, violent"
+裏,ri,"back, amidst, in, reverse, inside, palm, sole, rear, lining, wrong, side"
+仏,butsu/futsu,"Buddha, the dead, France"
+績,se,"exploits, unreeling cocoons"
+築,chiku/kizu,build
+貨,ka,"freight, goods, property"
+混,kon,"mix, blend, confuse, ま.ぜる こ.む"
+昇,shou/nobo.,rise up
+池,chi,"pond, cistern, pool, reservoir"
+血,ketsu,blood
+温,on/nu,"warm, あたた.まる あたた.める"
+季,ki,seasons
+星,sei/shou,"star, spot, dot, mark"
+永,ei/naga.,"eternity, long, lengthy"
+著,cho/chaku,"renowned, publish, write, remarkable, phenomenal, put on, don, wear, arrival, finish (race), damage, loss, disadvantage, hurt, injure, counter for suit"
+誌,shi,"document, records"
+庫,ko/ku,"warehouse, storehouse"
+刊,kan,"publish, carve, engrave"
+像,zo,"statue, picture, image, figure, portrait"
+香,kou/kyou,"incense, smell, perfume, カオ."
+坂,han/sa,"slope, incline, hill"
+底,tei,"bottom, sole, depth, bottom price, base, kind, sort"
+布,fu/nu,"linen, cloth"
+寺,ji,Buddhist temple
+宇,u,"eaves, roof, house, heaven"
+巨,ki,"gigantic, big, large, great"
+震,shin,"quake, shake, tremble, quiver, shiver"
+希,ki/ke/ma,"hope, beg, request, pray, beseech, Greece, dilute (acid), rare, few, phenomenal"
+触,shoku,"contact, touch, feel, hit, proclaim, announce, conflict"
+依,i/e/yo.,"reliant, depend on, consequently, therefore, due to"
+籍,seki,"enroll, domiciliary register, membership"
+汚,o,"dirty, pollute, disgrace, rape, defile, けが.らわしい よご.す, よご.れる きたな.い"
+枚,mai/ba,"sheet of..., counter for flat thin, objects or sheets"
+複,fuku,"duplicate, double, compound, multiple"
+郵,yuu,"mail, stagecoach stop"
+仲,chuu/na,"go-between, relationship"
+栄,ei/you,"flourish, prosperity, honor, glory, splendor"
+札,satsu/fu,"tag, paper money, counter for, bonds, placard, bid"
+板,han/ban,"plank, board, plate, stage"
+骨,kotsu,"skeleton, bone, remains, frame"
+傾,kei,"lean, incline, tilt, trend, wane, sink, ruin, bias, かたぶ.く かた.げる, かし.げる"
+届,kai,"deliver, reach, arrive, report, notify, forward"
+巻,kan/ken,"scroll, volume, book, part, roll up, wind up, tie, coil, counter for texts, (or book scrolls)"
+燃,nen/mo,burn
+跡,seki,"tracks, mark, print, impression"
+包,hou/kuru.,"wrap, pack up, cover, conceal, dirty, pollute, disgrace, rape, defile, lean, incline, tilt, trend, wane, sink, ruin, bias"
+駐,chuu,"stop-over, reside in, resident"
+弱,jaku,"weak, frail, よわ.める"
+紹,sho,"introduce, inherit, help"
+雇,ko,"employ, hire"
+替,tai/ka.wa,"exchange, spare, substitute, per-"
+預,yo/azu,"deposit, entrust"
+焼,shou/ya.ke,"bake, burning"
+簡,kan,"simplicity, brevity"
+章,sho,"badge, chapter, composition, poem, design"
+臓,zou,"entrails, viscera, bowels"
+律,ritsu/richi/re,"rhythm, law, regulation, gauge, control"
+贈,zou/sou,"presents, send, give to, award to, confer on, presenting something"
+照,shou/te.re,"illuminate, shine, compare, bashful"
+薄,haku,"dilute, thin, weak (tea), うす.める うす.まる, うす.らぐ うす.ら-, うす.れる すすき"
+群,gun/mura.ga,"flock, group, crowd, herd, swarm, cluster"
+秒,byou,"second (1, 60 minute)"
+奥,ou/oku/ku,"heart, interior"
+詰,kitsu/kichi/tsu.,"packed, close, pressed, reprove, rebuke, blame"
+双,sou/futa,"pair, set, comparison, counter for, pairs"
+刺,shi,"thorn, pierce, stab, prick, sting, calling card"
+純,ju,"genuine, purity, innocence, net, (profit)"
+翌,yoku,"the following, next"
+快,kai/kokoroyo.,"cheerful, pleasant, agreeable, comfortable"
+片,hen,"one-sided, leaf, sheet"
+敬,kei/kyou,"awe, respect, honor, revere, ウヤマ."
+悩,nou,"trouble, worry, in pain, distress, illness"
+泉,sen/izu,"spring, fountain"
+皮,kegawa,"pelt, skin, hide, leather"
+漁,gyo/ryou,"fishing, fishery"
+荒,kou/susa.,"laid waste, rough, rude, wild, あ.らす -あ.らし"
+貯,cho/takuwa,"save, store"
+硬,kou,"stiff, hard"
+埋,mai,"bury, be filled up, embedded, うず.める うず.まる, い.ける"
+柱,chuu,"pillar, post, cylinder, support"
+祭,sai,"ritual, offer prayers, celebrate, deify, enshrine, worship"
+袋,tai/dai/fuku,"sack, bag, pouch"
+筆,hitsu/fu,"writing brush, writing, painting, brush, handwriting"
+訓,kun/kin,"instruction, Japanese character, reading, explanation, read"
+浴,yoku/a.bise,"bathe, be favored with, bask in"
+童,dou/wara,"juvenile, child"
+宝,hou/taka,"treasure, wealth, valuables"
+封,fuu/hou,"seal, closing"
+胸,kyou,"bosom, breast, chest, heart, feelings"
+砂,sa/sha/su,sand
+塩,en,salt
+賢,ken/kashiko.,"intelligent, wise, wisdom, cleverness"
+腕,wan,"arm, ability, talent"
+兆,chou,"portent, 10**12, trillion, sign, omen, symptoms"
+床,shou,"bed, floor, padding, tatami"
+毛,mou,"fur, hair, feather, down"
+緑,ryoku/roku,green
+尊,son/touto.,"revered, valuable, precious, noble, exalted"
+祝,shuku/shuu,"celebrate, congratulate, イワ."
+柔,juu/nyuu,"tender, weakness, gentleness, softness"
+殿,den/ten/-do,"Mr., hall, mansion, palace, temple, lord"
+濃,nou/ko.,"concentrated, thick, dark, undiluted"
+液,eki,"fluid, liquid, juice, sap, secretion"
+衣,i/e,"garment, clothes, dressing"
+肩,ken,shoulder
+零,rei,"zero, spill, overflow, nothing, cipher"
+幼,you/osana.,"infancy, childhood"
+荷,ka,"baggage, shoulder-pole load, bear (a burden), shoulder (a gun), load, cargo, freight"
+泊,haku/to.me,"overnight, put up at, ride at, anchor, 3-day stay"
+黄,kou/ou,yellow
+甘,kan/uma.,"sweet, coax, pamper, be content, sugary"
+臣,shin/ji,"retainer, subject"
+浅,sen/asa.,"shallow, superficial, frivolous, wretched, shameful"
+掃,sou/shu/ha.,"sweep, brush"
+雲,un/-gu,cloud
+掘,kutsu/ho.,"dig, delve, excavate"
+捨,sha,"discard, throw away, abandon, resign, reject, sacrifice"
+軟,nan,soft
+沈,chin/jin,"sink, be submerged, subside, be, depressed, aloes"
+凍,tou/shi.mi,"frozen, congeal, refrigerate, い.てる"
+乳,nyuu,"milk, breasts"
+恋,ren,"romance, in love, yearn for, miss, darling"
+紅,kou/ku/aka.,"crimson, deep red"
+郊,kou,"outskirts, suburbs, rural area"
+腰,you/ko,"loins, hips, waist, low wainscoting"
+炭,tan,"charcoal, coal"
+踊,you,"jump, dance, leap, skip"
+冊,satsu/saku,"tome, counter for books, volume"
+勇,yuu/isa.,"courage, cheer up, be in high, spirits, bravery, heroism"
+械,kai,"contraption, fetter, machine, instrument"
+菜,sai,"vegetable, side dish, greens"
+珍,chin/taka,"rare, curious, strange"
+卵,ran,"egg, ovum, spawn, roe"
+湖,ko/mizuu,lake
+喫,kitsu,"consume, eat, drink, smoke, receive (a blow)"
+干,kan/hi.,"dry, parch"
+虫,chuu/ki/mu,"insect, bug, temper"
+刷,satsu,"printing, print"
+湯,tou,"hot water, bath, hot spring"
+溶,you,"melt, dissolve, thaw"
+鉱,kou,"mineral, ore"
+涙,rui/rei,"tears, sympathy"
+匹,hitsu,"equal, head, counter for small, animals, roll of cloth"
+孫,son/ma,"grandchild, descendants"
+鋭,ei/surudo.,"pointed, sharpness, edge, weapon, sharp, violent"
+枝,shi/e,"bough, branch, twig, limb"
+塗,to,"paint, plaster, daub, smear, coating"
+軒,ken,"flats, counter for houses, eaves"
+毒,doku,"poison, virus, venom, germ, harm, injury, spite"
+叫,kyou,"shout, exclaim, yell"
+拝,hai,"worship, adore, pray to"
+氷,hyou/koo.,"icicle, ice, hail, freeze, congeal"
+乾,kan/ken,"drought, dry, dessicate, drink up, heaven, emperor"
+棒,bou,"rod, stick, cane, pole, club, line"
+祈,ki/ino.,"pray, wish"
+拾,shuu/juu,"pick up, gather, find, go on foot, ten"
+粉,fun,"flour, powder, dust, デシメートル"
+糸,shi,thread
+綿,men/wa,cotton
+汗,kan,"sweat, perspire"
+銅,dou,copper
+湿,shitsu/shuu,"damp, wet, moist, うるお.す"
+瓶,bin/ka,"flower pot, bottle, vial, jar, jug, vat, urn"
+咲,shou/-za,"blossom, bloom"
+召,shou,"seduce, call, send for, wear, put, on, ride in, buy, eat, drink, catch, (cold)"
+缶,kan/ka,"tin can, container"
+隻,seki,"vessels, counter for ships, fish, birds, arrows, one of a pair"
+脂,shi,"fat, grease, tallow, lard, rosin, gum, tar"
+蒸,jou/sei,"steam, heat, sultry, foment, get, musty"
+肌,ki,"texture, skin, body, grain"
+耕,kou/tagaya.,"till, plow, cultivate"
+鈍,don,"dull, slow, foolish, blunt, なま.る なまく.ら"
+泥,dei/nai/de/ni,"mud, mire, adhere to, be attached, to"
+隅,guu,"corner, nook"
+灯,tou,"lamp, a light, light, counter for, lights"
+辛,shin,"spicy, bitter, hot, acrid, かのと"
+磨,ma/su.,"grind, polish, scour, improve, brush (teeth)"
+麦,baku,"barley, wheat"
+姓,sei/shou,surname
+筒,tou,"cylinder, pipe, tube, gun barrel, sleeve"
+鼻,bi,"nose, snout"
+粒,ryuu,"grains, drop, counter for tiny, particles"
+詞,shi,"part of speech, words, poetry"
+胃,i,"stomach, paunch, crop, craw"
+畳,jou/chou,"tatami mat, counter for tatami, mats, fold, shut up, do away with"
+机,ki,"desk, table"
+膚,fu,"skin, body, grain, texture, disposition"
+濯,taku,"laundry, wash, pour on, rinse"
+塔,tou,"pagoda, tower, steeple"
+沸,futsu,"seethe, boil, ferment, uproar, breed"
+灰,kai,"ashes, puckery juice, cremate"
+菓,ka,"candy, cakes, fruit"
+帽,bou/mou,"cap, headgear"
+枯,ko,"wither, die, dry up, be seasoned"
+涼,ryou/makoto,"refreshing, nice and cool, すず.やか うす.い ひや.す"
+舟,shuu,"boat, ship"
+貝,bai,shellfish
+符,fu,"token, sign, mark, tally, charm"
+憎,zou,"hate, detest, にく.らしい にく.しみ"
+皿,bei,"dish, a helping, plate"
+肯,kou,"agreement, consent, comply with"
+燥,sou,"parch, dry up"
+畜,chiku,"livestock, domestic fowl and, animals"
+挟,kyou/shou,"pinch, between, わきばさ.む さしはさ.む"
+曇,don/kumo.,"cloudy weather, cloud up"
+滴,teki,"drip, drop"
+伺,shi,"pay respects, visit, ask, inquire, question, implore"
 率,ritsu,"ratio, rate"
 責,seki,responsibility
-略,ryaku,"abbreviation, strategy"
 範,han,"scope, model"
 模,mo,"imitation, pattern"
 精,sei,"refined, spirit"
 密,mitsu,"dense, secret"
-講,kou,lecture
 座,za,"seat, sit"
 援,en,"aid, support"
-競,kyou,compete
 争,sou/araso,conflict
 診,shin,diagnose
-療,ryou,"medical treatment"
-預,yo/azu,"deposit, entrust"
-貯,cho/takuwa,"save, store"
-測,soku/haka,"measure, predict"
-況,kyou,"condition, situation"
 資,shi,"resource, capital"
 源,gen/minamoto,"source, origin"
 穏,on/oda,calm
 緊,kin,"tense, urgent"
-圧,atsu,pressure
 縮,shuku/chiji,shrink
 拡,kaku,expand
 訳,yaku/wake,"translate, reason"
-省,sei/habu,"ministry, omit"
-境,kyou,"boundary, situation"
-補,ho/ogona,supplement
-総,sou,"overall, total"
-層,sou,layer
 盤,ban,board
 権,ken,"right, authority"
 益,eki/masu,benefit
-燃,nen/mo,burn
 衛,ei,defend
 警,kei,guard
 裁,sai/tachi,"judge, cut"
 判,han,judge
-署,sho,"government office"
-庁,chou,agency
 庶,sho,masses
 企,ki/kuda,plan
-幹,kan,"main trunk"
+幹,kan,main trunk
 即,soku,immediate
-諸,sho,various
 環,kan,"ring, environment"
-域,iki,region
 促,soku/unaga,prompt
 障,shou/sawa,obstacle
 危,ki/aya,danger
 刑,kei,punishment
-被,hi/kou,be subjected
-旧,kyuu/furu,"old, former"
 沿,en/soi,along
 違,i/chiga,differ
 択,taku,choose
 評,hyou,evaluate
-編,hen/amu,compile
-劇,geki,drama
 演,en/engi,perform
 需,ju,"need, demand"
-輸,yu,transport
-販,han,sell
-築,chiku/kizu,build
 操,sou/ayatsu,operate
 獲,kaku/e,acquire
 撃,geki/utsu,strike
 統,tou/sube,unify
-承,shou/uketa,consent

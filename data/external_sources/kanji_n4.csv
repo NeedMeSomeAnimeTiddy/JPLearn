@@ -3,69 +3,187 @@ character,romaji,meaning
 同,dou/onaji,"same, agree"
 事,ji/koto,"matter, thing"
 自,ji/mizu,self
+社,sha/yashi,"company, firm, office, association, shrine"
+発,hatsu/hotsu,"discharge, departure, publish, emit, start from, disclose"
+者,sha/mono,person
+地,chi,"ground, earth"
+業,gyou/gou,"business, vocation, arts, performance"
+方,hou/kata,"direction, way"
+新,shin,new
+場,jou/ba,place
+員,i,"employee, member, number, the one in charge"
+立,ritsu/ryuu,"stand up, た.てる た.て- たて- -た.て -, だ.て"
+開,kai/hira,open
+手,shu/zu,hand
+力,ryoku/riki,"power, strong, strain, bear up, exert"
+問,mon/to,question
+代,dai/ka,"generation, substitute"
+明,mei/aka,bright
 動,dou/ugo,move
+京,kyou/kei,"capital, 10**16, キン ミヤ"
+目,moku/boku,"eye, class, look, insight, experience, care, favor"
+通,tsuu/tsu/kayo.,"traffic, pass through, avenue, commute, counter for letters"
+言,gen/gon/ko,say
+理,ri/kotowa,"logic, arrangement, reason, justice, truth"
+体,tai/karada,body
+田,den,"rice field, rice paddy"
+主,shu/omo,"main, master"
+題,dai,"topic, subject"
+意,i,"meaning, intention"
+不,fu/bu,"negative, non-, bad, ugly, clumsy"
+作,saku/tsuku,make
+用,you/mochi.i,"utilize, business, service, use, employ"
+度,do/to/taku/-,"degrees, occurrence, time, counter for occurrences"
+強,kyou/tsuyo,strong
+公,kou/ku,"public, prince, official, governmental"
+持,ji/mo,hold
+野,ya/no,"field, plain"
+以,i/mo.,"by means of, because, in view, of, compared with"
+思,shi/omo,think
+家,ka/ie,"house, family"
+世,sei/se/sou,"generation, world, society, public"
+多,ta,"many, frequent, much"
+正,sei/shou,"correct, justice, righteous, 10**40"
+安,an/yasu.ra,"relax, cheap, low, quiet, rested, contented, peaceful"
+院,in,institution
+心,shin/kokoro,"heart, mind"
+界,kai,world
+教,kyou/oshi,teach
+文,bun/mon/a,"sentence, literature, style, art, decoration, figures, plan"
+元,gen/gan/mo,"beginning, former time, origin"
+重,juu/chou,"heavy, heap up, pile up, nest, of boxes, -fold"
+近,kin/chika,near
+考,kou/kanga.,"consider, think over"
+画,ga/kaku,picture
+海,kai/umi,sea
+売,bai/u.re,sell
+知,chi/shi,know
+道,dou/michi,"road, way"
+集,shuu/tsudo.,"gather, meet, congregate, swarm, flock"
+別,betsu/wa.ke,"separate, branch off, diverge, fork, another, extra, specially"
+物,butsu/motsu,"thing, object, matter"
+使,shi/tsuka,use
+品,hin/hon,"goods, refinement, dignity, article, counter for meal, courses"
+計,kei/haka.ra,"plot, plan, scheme, measure"
+死,shi/shi,die
+特,toku,special
+私,shi,"private, I, me"
+始,shi/haji.ma,"commence, begin"
+朝,chou/asa,morning
+運,un,"carry, luck, destiny, fate, lot, transport, progress, advance"
+終,shuu/tsui.,"end, finish, つい"
+台,dai/tai,"pedestal, a stand, counter for, machines and vehicles"
+広,kou,"wide, broad, spacious, ひろ.がる ひろ.げる"
+住,ju/su,"live, reside"
+真,shin/mako,"true, reality, Buddhist sect"
+有,yuu/u/a.,"possess, have, exist, happen, occur, approx"
+口,kou/ku,mouth
+少,shou,"few, little"
+町,chou/machi,town
+料,ryou,"fee, materials"
+工,kou/ku,"craft, construction"
+建,ken/kon/ta.,build
+空,kuu/sora,sky
+急,kyuu,"hurry, emergency, sudden, steep"
+止,shi/-sa.,"stop, halt, と.める -ど.め とど.める とど.め, とど.まる や.める や.む -や.む, よ."
+送,sou,"escort, send"
+切,setsu/sai/-gi.,"cut, cutoff, be sharp, き.れる -き.れる き.れ -き.れ"
+転,ten,"revolve, turn around, change, ころ.ぶ まろ.ぶ うたた うつ.る"
+研,ken/to.,"polish, study of, sharpen"
+足,soku/ta.,"leg, foot, be sufficient, counter, for pairs of footwear"
+究,kyuu/ku,"research, study, キワ.メ"
+楽,gaku/raku,"music, comfort, ease, ゴウ コノ."
+起,ki,"rouse, wake up, get up, た.つ"
+着,chaku/ki,arrive
+店,ten/mise,shop
+病,bou/yamai,sick
+質,shitsu/shichi/chi,"substance, quality, matter, temperament"
+待,tai/ma,wait
+試,shi,"test, try, attempt, experiment, ordeal"
+族,zo,"tribe, family"
+銀,gin/shiroga,silver
+早,sou/sa,"early, fast, はや.める さ"
+映,ei/-ba.,"reflect, reflection, projection"
+親,shin/shita.shi,"parent, intimacy, relative, familiarity, dealer (cards)"
+験,ken/gen,"verification, effect, testing"
+英,ei/hanabu,"England, English"
+医,i,"doctor, medicine"
+仕,shi/tsuka,serve
+去,kyo/ko/-sa.,"gone, past, quit, leave, elapse, eliminate, divorce"
+味,mi,"flavor, taste"
+写,sha/ja,"copy, be photographed, describe"
+字,ji,"character, letter, word, section, of village"
+答,tou/kota,answer
+夜,ya/yoru,night
+音,on/in/-,"sound, noise, ノン"
+注,chuu,"pour, irrigate, shed (tears), flow into, concentrate on, notes, comment, annotate"
+帰,ki,"homecoming, arrive at, lead, to, result in"
+古,ko/-furu.,old
+歌,ka/uta,song
+買,bai,buy
+悪,aku/o,"bad, vice, rascal, false, evil, wrong, にく.い ああ いずくに, いずくんぞ にく.む, bad, vice, rascal, false, evil, wrong"
+図,zu/to/haka.,"map, drawing, plan, unexpected, accidentally"
+週,shuu,week
+室,shitsu,"room, apartment, chamber, greenhouse, cellar"
+歩,ho/aru,walk
+風,fuu/fu/-ka,"wind, air, style, manner"
+紙,shi,paper
+黒,koku,black
+花,ka/ke/ha,flower
+春,shun/ha,"springtime, spring (season)"
+赤,seki/shaku,"red, アカ.ラメ"
+青,sei/shou,"blue, green, アオ."
+館,kan/ta,"building, mansion, large, building, palace"
+屋,oku,"roof, house, shop, dealer, seller"
+色,shoku/shiki,"color, イ"
+走,sou/hashi,run
+秋,shuu/to,autumn
+夏,ka/ga/ge,summer
+習,shuu/ju,learn
+駅,eki,station
+洋,yo,"ocean, western style"
+旅,ryo,"trip, travel"
+服,fu,"clothing, admit, obey, discharge"
+夕,seki/yu,evening
+借,shaku,"borrow, rent"
+曜,yo,weekday
+飲,in/on,"drink, smoke, take"
+肉,niku,meat
+貸,tai,lend
+堂,dou,"public chamber, hall"
+鳥,chou/to,"bird, chicken"
+飯,han/me,"meal, boiled rice"
+勉,ben/tsuto.me,exertion
+冬,tou,winter
+昼,chuu/hiru,noon
+茶,cha,tea
+弟,tei/dai/de,"younger brother, faithful, service to elders"
+牛,gyuu/u,cow
+魚,gyo/-zaka,fish
+兄,kei/kyou,"elder brother, big brother, ア"
+犬,ken,dog
+妹,mai/imou,younger sister
+姉,shi,elder sister
+漢,ka,"Sino-, China"
 内,nai/uchi,inside
 時,ji/toki,time
-者,sha/mono,person
-作,saku/tsuku,make
-思,shi/omo,think
-住,ju/su,"live, reside"
-知,chi/shi,know
-場,jou/ba,place
 名,mei/na,name
 何,nan/nani,what
-体,tai/karada,body
 化,ka/baka,change
-主,shu/omo,"main, master"
-心,shin/kokoro,"heart, mind"
 対,tai,"opposite, versus"
 間,kan/aida,"interval, between"
 相,sou/ai,"mutual, phase"
-意,i,"meaning, intention"
-野,ya/no,"field, plain"
-開,kai/hira,open
 全,zen/sube,"all, whole"
 定,tei/sada,"decide, fixed"
-家,ka/ie,"house, family"
-方,hou/kata,"direction, way"
-代,dai/ka,"generation, substitute"
-道,dou/michi,"road, way"
-海,kai/umi,sea
-空,kuu/sora,sky
-店,ten/mise,shop
-駅,eki,station
 市,shi/ichi,city
-町,chou/machi,town
 村,son/mura,village
 県,ken,prefecture
 都,to/miyako,metropolis
 府,fu,urban prefecture
-近,kin/chika,near
 遠,en/too,far
-明,mei/aka,bright
 暗,an/kura,dark
-夜,ya/yoru,night
-朝,chou/asa,morning
-昼,chuu/hiru,noon
-教,kyou/oshi,teach
-強,kyou/tsuyo,strong
 弱,jaku/yowa,weak
-持,ji/mo,hold
-使,shi/tsuka,use
-待,tai/ma,wait
-走,sou/hashi,run
-歩,ho/aru,walk
 泳,ei/oyo,swim
 乗,jou/no,ride
 降,kou/o,descend
-着,chaku/ki,arrive
-死,shi/shi,die
-病,bou/yamai,sick
-院,in,institution
 薬,yaku/kusuri,medicine
-歌,ka/uta,song
-画,ga/kaku,picture
-界,kai,world
-問,mon/to,question
-答,tou/kota,answer
-仕,shi/tsuka,serve
