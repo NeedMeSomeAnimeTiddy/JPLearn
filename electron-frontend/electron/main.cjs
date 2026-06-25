@@ -411,7 +411,8 @@ function createWindow() {
     minHeight: 700,
     show: false,
     autoHideMenuBar: true,
-    backgroundColor: '#1e1f22',
+    transparent: true,
+    backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -436,7 +437,8 @@ function createSplashWindow(themeKey) {
     alwaysOnTop: true,
     show: false,
     skipTaskbar: true,
-    backgroundColor: palette.bgA,
+    transparent: true,
+    backgroundColor: '#00000000',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -459,14 +461,22 @@ function createSplashWindow(themeKey) {
         display: grid;
         place-items: center;
         font-family: "Segoe UI", "Noto Sans", sans-serif;
+        background: transparent;
+        color: ${palette.title};
+        overflow: hidden;
+      }
+      .stage {
+        position: fixed;
+        inset: 0;
+        border-radius: 24px;
+        overflow: hidden;
         background:
           radial-gradient(circle at 12% 8%, ${palette.glowA}, transparent 42%),
           radial-gradient(circle at 82% 84%, ${palette.glowB}, transparent 44%),
           linear-gradient(165deg, ${palette.bgB}, ${palette.bgA});
-        color: ${palette.title};
-        overflow: hidden;
       }
       .panel {
+        position: relative;
         width: min(340px, 88vw);
         padding: 28px 24px;
         border-radius: 18px;
@@ -546,6 +556,7 @@ function createSplashWindow(themeKey) {
     </style>
   </head>
   <body>
+    <div class="stage" aria-hidden="true"></div>
     <section class="panel" aria-label="Startup status">
       <div class="spinner" aria-hidden="true"></div>
       <p class="brand">JPLearn Desktop</p>
@@ -599,13 +610,14 @@ async function createWindowWithSplash() {
   const startupTheme = readSavedStartupTheme()
   const splash = createSplashWindow(startupTheme)
   const win = createWindow()
+  const webContentsId = win.webContents.id
 
   const startupReadyPromise = new Promise((resolve) => {
-    startupReadyResolvers.set(win.webContents.id, resolve)
+    startupReadyResolvers.set(webContentsId, resolve)
   })
 
   win.on('closed', () => {
-    startupReadyResolvers.delete(win.webContents.id)
+    startupReadyResolvers.delete(webContentsId)
   })
 
   loadMainWindow(win)

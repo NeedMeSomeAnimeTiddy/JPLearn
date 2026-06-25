@@ -19,7 +19,7 @@ type KanjiDeckSlug = 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_
 type VocabDeckSlug = 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
-type ShortcutSubmenuKey = 'navigation' | 'tracks' | 'tools'
+type ShortcutSubmenuKey = 'all_maps' | ScriptKey
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
 type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
 type NavDirection = 'forward' | 'back'
@@ -1023,7 +1023,7 @@ function App() {
   const [historyPage, setHistoryPage] = useState(1)
   const [isWindowMaximized, setIsWindowMaximized] = useState(false)
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
-  const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>('navigation')
+  const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const scriptLoadRequestIdRef = useRef<number>(0)
@@ -1088,7 +1088,6 @@ function App() {
     document.documentElement.dataset.theme = settings.theme
     void window.jplearnDesktop.setStartupTheme(settings.theme).catch(() => undefined)
   }, [settings])
-
   useEffect(() => {
     let mounted = true
     void window.jplearnDesktop
@@ -1871,6 +1870,7 @@ function App() {
       if (event.key === 'Escape') {
         if (shortcutMenuOpen) {
           setShortcutMenuOpen(false)
+          setActiveShortcutFlyout(null)
           return
         }
 
@@ -2161,16 +2161,21 @@ function App() {
     setShowSettings(false)
   }, [resetRoundCycle])
 
+  const closeShortcutMenu = useCallback(() => {
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+  }, [])
+
   const jumpToMainMenu = useCallback(() => {
     goHome()
-    setShortcutMenuOpen(false)
-  }, [goHome])
+    closeShortcutMenu()
+  }, [closeShortcutMenu, goHome])
 
   const jumpToOverview = useCallback(() => {
     setNavDirection('forward')
     setView('overview')
-    setShortcutMenuOpen(false)
-  }, [])
+    closeShortcutMenu()
+  }, [closeShortcutMenu])
 
   const jumpToScriptHub = useCallback((script: ScriptKey) => {
     setNavDirection('forward')
@@ -2184,18 +2189,35 @@ function App() {
     setRoundFeedbackAnswer(null)
     setIsRoundResolving(false)
     resetRoundCycle()
-    setShortcutMenuOpen(false)
-  }, [resetRoundCycle])
+    closeShortcutMenu()
+  }, [closeShortcutMenu, resetRoundCycle])
+
+  const jumpToScriptHubMinigame = useCallback((script: ScriptKey, minigame: MinigameKey) => {
+    setNavDirection('forward')
+    setActiveScript(script)
+    setActiveGame(minigame)
+    setView('minigame')
+    setSessionActive(false)
+    setRoundState(null)
+    setRoundFeedback(null)
+    setRoundFeedbackTone(null)
+    setRoundFeedbackPoints(null)
+    setRoundFeedbackAnswer(null)
+    setIsRoundResolving(false)
+    setLivesRemaining(DEFAULT_LIVES)
+    resetRoundCycle()
+    closeShortcutMenu()
+  }, [closeShortcutMenu, resetRoundCycle])
 
   const openSettingsFromMenu = useCallback(() => {
     setShowSettings(true)
-    setShortcutMenuOpen(false)
-  }, [])
+    closeShortcutMenu()
+  }, [closeShortcutMenu])
 
   const refreshDataFromMenu = useCallback(() => {
     void loadSummary()
-    setShortcutMenuOpen(false)
-  }, [loadSummary])
+    closeShortcutMenu()
+  }, [closeShortcutMenu, loadSummary])
 
   const resetStudyDb = useCallback(async () => {
     setResettingDb(true)
@@ -2270,12 +2292,12 @@ function App() {
     function handlePointerDown(event: MouseEvent): void {
       const target = event.target as Node
       if (shortcutMenuRef.current?.contains(target)) return
-      setShortcutMenuOpen(false)
+      closeShortcutMenu()
     }
 
     window.addEventListener('mousedown', handlePointerDown)
     return () => window.removeEventListener('mousedown', handlePointerDown)
-  }, [shortcutMenuOpen])
+  }, [closeShortcutMenu, shortcutMenuOpen])
 
   return (
     <main className="app-shell">
@@ -2291,120 +2313,108 @@ function App() {
                 aria-haspopup="menu"
                 aria-expanded={shortcutMenuOpen}
                 onClick={() => {
-                  setShortcutMenuOpen((open) => {
-                    const next = !open
-                    if (next) {
-                      setActiveShortcutFlyout('navigation')
-                    }
-                    return next
-                  })
+                  setShortcutMenuOpen((open) => !open)
+                  setActiveShortcutFlyout(null)
                 }}
               >
                 <Menu className="window-nav-icon" strokeWidth={2.2} />
               </button>
               {shortcutMenuOpen ? (
                 <div className="titlebar-shortcut-menu" role="menu" aria-label="Quick locations">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="titlebar-shortcut-item titlebar-shortcut-parent"
-                    aria-haspopup="true"
-                    aria-expanded={activeShortcutFlyout === 'navigation'}
-                    onMouseEnter={() => setActiveShortcutFlyout('navigation')}
-                    onFocus={() => setActiveShortcutFlyout('navigation')}
-                  >
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToMainMenu}>
                     <House className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                    Navigation
-                    <span className="titlebar-shortcut-caret" aria-hidden="true">▸</span>
+                    Main Menu
                   </button>
 
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="titlebar-shortcut-item titlebar-shortcut-parent"
-                    aria-haspopup="true"
-                    aria-expanded={activeShortcutFlyout === 'tracks'}
-                    onMouseEnter={() => setActiveShortcutFlyout('tracks')}
-                    onFocus={() => setActiveShortcutFlyout('tracks')}
-                  >
-                    <ListChecks className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                    Learning Tracks
-                    <span className="titlebar-shortcut-caret" aria-hidden="true">▸</span>
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToOverview}>
+                    <BarChart3 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Study Overview
                   </button>
 
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="titlebar-shortcut-item titlebar-shortcut-parent"
-                    aria-haspopup="true"
-                    aria-expanded={activeShortcutFlyout === 'tools'}
-                    onMouseEnter={() => setActiveShortcutFlyout('tools')}
-                    onFocus={() => setActiveShortcutFlyout('tools')}
-                  >
+                  <div className="titlebar-shortcut-tree-anchor">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="titlebar-shortcut-item titlebar-shortcut-parent"
+                      aria-haspopup="true"
+                      aria-expanded={activeShortcutFlyout !== null}
+                      onClick={() => {
+                        setActiveShortcutFlyout((current) => (current === null ? 'all_maps' : null))
+                      }}
+                    >
+                      <ListChecks className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                      All Maps
+                      <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout !== null ? '▾' : '▸'}</span>
+                    </button>
+
+                    {activeShortcutFlyout !== null ? (
+                      <div className="titlebar-shortcut-righttree" role="group" aria-label="Maps and minigames">
+                        {ALL_SCRIPT_KEYS.map((script) => {
+                          const isScriptExpanded = activeShortcutFlyout === script
+                          return (
+                            <div key={script} className="titlebar-shortcut-map-group">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="titlebar-shortcut-item titlebar-shortcut-child"
+                                aria-haspopup="true"
+                                aria-expanded={isScriptExpanded}
+                                onClick={() => {
+                                  setActiveShortcutFlyout((current) => (current === script ? 'all_maps' : script))
+                                }}
+                              >
+                                <span className="titlebar-shortcut-glyph" aria-hidden="true">{SECTION_META[script].glyph}</span>
+                                {SCRIPT_LABELS[script]} Map
+                                <span className="titlebar-shortcut-caret" aria-hidden="true">{isScriptExpanded ? '▾' : '▸'}</span>
+                              </button>
+                              {isScriptExpanded ? (
+                                <div className="titlebar-shortcut-childmenu" role="group" aria-label={`${SCRIPT_LABELS[script]} minigames`}>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                                    onClick={() => jumpToScriptHub(script)}
+                                  >
+                                    <span className="titlebar-shortcut-glyph" aria-hidden="true">↗</span>
+                                    Open Map
+                                  </button>
+                                  {SCRIPT_MINIGAMES[script].map((gameKey) => {
+                                    const gameTitle = MINIGAMES.find((entry) => entry.key === gameKey)?.title ?? gameKey
+                                    return (
+                                      <button
+                                        key={gameKey}
+                                        type="button"
+                                        role="menuitem"
+                                        className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                                        onClick={() => jumpToScriptHubMinigame(script, gameKey)}
+                                      >
+                                        <MinigameIcon game={gameKey} />
+                                        {gameTitle}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              ) : null}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={openSettingsFromMenu}>
                     <Settings className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                    Tools
-                    <span className="titlebar-shortcut-caret" aria-hidden="true">▸</span>
+                    Settings
                   </button>
-
-                  {activeShortcutFlyout ? (
-                    <div className="titlebar-shortcut-flyout" role="group" aria-label={`${activeShortcutFlyout} shortcuts`}>
-                      {activeShortcutFlyout === 'navigation' ? (
-                        <>
-                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToMainMenu}>
-                            <House className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                            Main Menu
-                          </button>
-                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToOverview}>
-                            <BarChart3 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                            Study Overview
-                          </button>
-                        </>
-                      ) : null}
-
-                      {activeShortcutFlyout === 'tracks' ? (
-                        <>
-                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('hiragana')}>
-                            <span className="titlebar-shortcut-glyph" aria-hidden="true">あ</span>
-                            Hiragana Map
-                          </button>
-                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('katakana')}>
-                            <span className="titlebar-shortcut-glyph" aria-hidden="true">ア</span>
-                            Katakana Map
-                          </button>
-                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('kanji_n5')}>
-                            <span className="titlebar-shortcut-glyph" aria-hidden="true">漢</span>
-                            Kanji Map
-                          </button>
-                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('vocab_n5')}>
-                            <span className="titlebar-shortcut-glyph" aria-hidden="true">語</span>
-                            Words Map
-                          </button>
-                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('grammar_patterns')}>
-                            <span className="titlebar-shortcut-glyph" aria-hidden="true">話</span>
-                            Conversational Map
-                          </button>
-                        </>
-                      ) : null}
-
-                      {activeShortcutFlyout === 'tools' ? (
-                        <>
-                          <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={openSettingsFromMenu}>
-                            <Settings className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                            Settings
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="titlebar-shortcut-item"
-                            onClick={refreshDataFromMenu}
-                          >
-                            <Activity className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                            Refresh Data
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
-                  ) : null}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="titlebar-shortcut-item"
+                    onClick={refreshDataFromMenu}
+                  >
+                    <Activity className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Refresh Data
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -2466,6 +2476,7 @@ function App() {
         ))}
       </div>
 
+      <div className="app-shell-scroll">
       {view === 'home' ? (
         <div className={`view-shell view-${navDirection}`}>
           <section className="home-menu panel-glass">
@@ -2874,37 +2885,47 @@ function App() {
                 <p className="hero-copy">{selectedGameMeta?.description}</p>
                 <p className="intro-objective"><strong>Objective:</strong> {selectedGameIntro.objective}</p>
                 <p className="intro-tip"><strong>Tip:</strong> {selectedGameIntro.tip}</p>
-                <label className="lives-toggle">
-                  <input
-                    type="checkbox"
-                    checked={livesEnabled}
-                    onChange={(event) => {
-                      setLivesEnabled(event.target.checked)
+                <div className="intro-toggle-row" role="group" aria-label="Minigame setup toggles">
+                  <button
+                    type="button"
+                    className={`lives-toggle icon-toggle ${livesEnabled ? 'is-active' : ''}`}
+                    aria-pressed={livesEnabled}
+                    aria-label={`Toggle lives mode (${DEFAULT_LIVES} lives per run)`}
+                    title={`Lives mode (${DEFAULT_LIVES} lives): ${livesEnabled ? 'On' : 'Off'}`}
+                    onClick={() => {
+                      setLivesEnabled((previous) => !previous)
                       setLivesRemaining(DEFAULT_LIVES)
                     }}
-                  />
-                  Enable lives mode ({DEFAULT_LIVES} lives per run)
-                </label>
-                <label className="lives-toggle leech-focus-toggle">
-                  <input
-                    type="checkbox"
-                    checked={leechFocusEnabled}
-                    onChange={(event) => setLeechFocusEnabled(event.target.checked)}
-                  />
-                  Focused review mode (leech cards first)
-                </label>
+                  >
+                    <Heart className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className={`lives-toggle icon-toggle leech-focus-toggle ${leechFocusEnabled ? 'is-active' : ''}`}
+                    aria-pressed={leechFocusEnabled}
+                    aria-label="Toggle focused review mode (leech cards first)"
+                    title={`Focused review mode (leech first): ${leechFocusEnabled ? 'On' : 'Off'}`}
+                    onClick={() => setLeechFocusEnabled((previous) => !previous)}
+                  >
+                    <AlertTriangle className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                  </button>
+                </div>
 
                 {activeGame === 'interleave_mix' ? (
                   <section className="interleave-controls" aria-label="Interleave controls">
-                    <p className="interleave-controls-title">Interleave policy</p>
-                    <label className="lives-toggle">
-                      <input
-                        type="checkbox"
-                        checked={interleaveSurpriseEnabled}
-                        onChange={(event) => setInterleaveSurpriseEnabled(event.target.checked)}
-                      />
-                      Enable surprise prompts
-                    </label>
+                    <div className="interleave-controls-head">
+                      <p className="interleave-controls-title">Interleave policy</p>
+                      <button
+                        type="button"
+                        className={`lives-toggle icon-toggle ${interleaveSurpriseEnabled ? 'is-active' : ''}`}
+                        aria-pressed={interleaveSurpriseEnabled}
+                        aria-label="Toggle surprise prompts"
+                        title={`Surprise prompts: ${interleaveSurpriseEnabled ? 'On' : 'Off'}`}
+                        onClick={() => setInterleaveSurpriseEnabled((previous) => !previous)}
+                      >
+                        <Shuffle className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                      </button>
+                    </div>
                     <label className="interleave-frequency">
                       Surprise frequency (every N rounds)
                       <input
@@ -3868,6 +3889,8 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      </div>
     </main>
   )
 }

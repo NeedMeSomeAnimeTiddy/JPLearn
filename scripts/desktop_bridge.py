@@ -43,6 +43,13 @@ from domain.blocks import (
 )
 from domain.distractors import rank_distractor_ids
 from domain.decks import ALL_DECKS
+from domain.decks import (
+    VOCAB_N1_EXTERNAL_DATA,
+    VOCAB_N2_EXTERNAL_DATA,
+    VOCAB_N3_EXTERNAL_DATA,
+    VOCAB_N4_EXTERNAL_DATA,
+    VOCAB_N5_EXTERNAL_DATA,
+)
 
 SUMMARY_SCRIPT_TAGS = (
     "hiragana",
@@ -100,6 +107,29 @@ def _legacy_prompt_label(deck_name: str, card_id: int) -> str:
     return f"{normalized_deck} item #{card_id}"
 
 
+def _build_legacy_prompt_lookup() -> dict[tuple[str, int], str]:
+    """Build fallback prompt map for historical vocab ids beyond current deck limits."""
+    lookup: dict[tuple[str, int], str] = {}
+    vocab_specs = [
+        ("Vocabulary N5", "vocab_n5", 0, VOCAB_N5_EXTERNAL_DATA),
+        ("Vocabulary N4", "vocab_n4", 10000, VOCAB_N4_EXTERNAL_DATA),
+        ("Vocabulary N3", "vocab_n3", 20000, VOCAB_N3_EXTERNAL_DATA),
+        ("Vocabulary N2", "vocab_n2", 30000, VOCAB_N2_EXTERNAL_DATA),
+        ("Vocabulary N1", "vocab_n1", 40000, VOCAB_N1_EXTERNAL_DATA),
+    ]
+    for deck_name, slug, id_offset, rows in vocab_specs:
+        normalized_deck = _normalize_deck_key(deck_name)
+        normalized_slug = _normalize_deck_key(slug)
+        for index, row in enumerate(rows):
+            character = row[0].strip()
+            if not character:
+                continue
+            card_id = id_offset + index
+            lookup[(normalized_deck, card_id)] = character
+            lookup[(normalized_slug, card_id)] = character
+    return lookup
+
+
 def _mastered_count(states: Mapping[int, object]) -> int:
     # Shared repository rule: mastered means repetitions >= 3 and interval >= 21.
     return sum(
@@ -114,6 +144,7 @@ def build_summary() -> dict[str, object]:
     decks: list[DeckSummary] = []
     prompt_lookup: dict[tuple[str, int], str] = {}
     prompt_lookup_by_id: dict[int, str] = {}
+    legacy_prompt_lookup = _build_legacy_prompt_lookup()
     streak = load_streak_state()
     activity_week = load_activity_summary(7)
     activity_month = load_activity_summary(30)
@@ -169,6 +200,7 @@ def build_summary() -> dict[str, object]:
                 **asdict(item),
                 "prompt": (
                     prompt_lookup.get((_normalize_deck_key(item.deck), item.card_id))
+                    or legacy_prompt_lookup.get((_normalize_deck_key(item.deck), item.card_id))
                     or prompt_lookup_by_id.get(item.card_id)
                     or item.prompt
                     or _legacy_prompt_label(item.deck, item.card_id)

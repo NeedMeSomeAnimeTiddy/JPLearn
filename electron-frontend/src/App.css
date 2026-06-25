@@ -1,16 +1,42 @@
 .app-shell {
   position: relative;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 64px 22px 42px;
-  display: grid;
-  gap: 16px;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  display: block;
   z-index: 1;
   font-size: calc(1rem * var(--ui-scale));
+  border-radius: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(108, 185, 214, 0.17) 0%, transparent 42%),
+    radial-gradient(circle at 82% 34%, rgba(128, 165, 231, 0.15) 0%, transparent 48%),
+    radial-gradient(circle at 48% 2%, rgba(242, 181, 111, 0.12) 0%, transparent 42%),
+    linear-gradient(180deg, var(--bg-main), var(--bg-subtle));
+  isolation: isolate;
+  box-shadow:
+    0 36px 72px -42px rgba(0, 0, 0, 0.92),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.app-shell-scroll {
+  position: absolute;
+  inset: 40px 0 0 0;
+  overflow: auto;
+  padding: 24px 22px 42px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-shell-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .window-titlebar {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -21,9 +47,9 @@
   padding: 0 0 0 12px;
   background: linear-gradient(180deg, rgba(20, 31, 41, 0.68), rgba(18, 28, 37, 0.46));
   backdrop-filter: blur(12px) saturate(120%);
-  border-bottom: 1px solid color-mix(in oklab, var(--tone-ocean) 26%, var(--panel-border));
+  border-radius: 0;
   box-shadow:
-    inset 0 -1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
     0 10px 18px -16px rgba(0, 0, 0, 0.86);
   z-index: 650;
 }
@@ -90,25 +116,26 @@
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  width: min(290px, 78vw);
+  width: min(320px, 82vw);
   border-radius: 14px;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 32%, var(--panel-border));
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 40%, var(--panel-border));
   background:
-    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--tone-ocean) 22%, transparent), transparent 46%),
-    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 99%, black), color-mix(in oklab, var(--panel-bg-alt) 99%, black));
-  backdrop-filter: blur(6px) saturate(115%);
+    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--tone-ocean) 30%, transparent), transparent 44%),
+    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 94%, black), color-mix(in oklab, var(--panel-bg-alt) 93%, black));
+  backdrop-filter: blur(4px) saturate(108%);
   box-shadow:
-    0 18px 34px -20px rgba(0, 0, 0, 0.85),
+    0 18px 34px -20px rgba(0, 0, 0, 0.9),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   padding: 8px;
   display: grid;
   gap: 4px;
+  overflow: visible;
   z-index: 760;
 }
 
 .titlebar-shortcut-item {
   border: none;
-  background: transparent;
+  background: color-mix(in oklab, var(--panel-bg) 72%, transparent);
   color: var(--text-main);
   border-radius: 10px;
   min-height: 36px;
@@ -126,7 +153,7 @@
 }
 
 .titlebar-shortcut-item:hover {
-  background: color-mix(in oklab, var(--tone-ocean) 24%, transparent);
+  background: color-mix(in oklab, var(--tone-ocean) 30%, var(--panel-bg));
 }
 
 .titlebar-shortcut-item:focus-visible {
@@ -138,30 +165,104 @@
   font-weight: 700;
 }
 
-.titlebar-shortcut-flyout {
-  position: absolute;
-  top: 8px;
-  left: calc(100% + 8px);
-  width: min(260px, 72vw);
-  border-radius: 14px;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 32%, var(--panel-border));
-  background:
-    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--tone-ocean) 20%, transparent), transparent 48%),
-    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 99%, black), color-mix(in oklab, var(--panel-bg-alt) 99%, black));
-  box-shadow:
-    0 22px 36px -22px rgba(0, 0, 0, 0.9),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding: 8px;
-  display: grid;
-  gap: 4px;
-  z-index: 770;
+.titlebar-shortcut-tree-anchor {
+  position: relative;
 }
 
-.titlebar-shortcut-flyout .titlebar-shortcut-item {
+.titlebar-shortcut-righttree {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 10px);
+  width: min(320px, 82vw);
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 36%, var(--panel-border));
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--tone-ocean) 28%, transparent), transparent 48%),
+    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 92%, black), color-mix(in oklab, var(--panel-bg-alt) 92%, black));
+  box-shadow:
+    0 18px 34px -20px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+  overflow: visible;
+  animation: shortcutBranchIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  z-index: 780;
+}
+
+.titlebar-shortcut-map-group {
+  position: relative;
+}
+
+.titlebar-shortcut-child,
+.titlebar-shortcut-leaf {
   min-height: 32px;
   border-radius: 9px;
   font-size: 0.82rem;
   color: color-mix(in oklab, var(--text-main) 90%, var(--text-soft));
+}
+
+.titlebar-shortcut-child {
+  padding-left: 12px;
+}
+
+.titlebar-shortcut-childmenu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 10px);
+  width: min(300px, 78vw);
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 34%, var(--panel-border));
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--tone-ocean) 24%, transparent), transparent 50%),
+    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 91%, black), color-mix(in oklab, var(--panel-bg-alt) 91%, black));
+  box-shadow:
+    0 18px 34px -20px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 6px;
+  z-index: 790;
+  animation: shortcutBranchIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.titlebar-shortcut-leaf {
+  padding-left: 12px;
+}
+
+.titlebar-shortcut-childmenu .titlebar-shortcut-item {
+  animation: shortcutLeafIn 210ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.titlebar-shortcut-childmenu .titlebar-shortcut-item:nth-child(1) {
+  animation-delay: 24ms;
+}
+
+.titlebar-shortcut-childmenu .titlebar-shortcut-item:nth-child(2) {
+  animation-delay: 42ms;
+}
+
+.titlebar-shortcut-childmenu .titlebar-shortcut-item:nth-child(3) {
+  animation-delay: 60ms;
+}
+
+.titlebar-shortcut-childmenu .titlebar-shortcut-item:nth-child(4) {
+  animation-delay: 78ms;
+}
+
+.titlebar-shortcut-childmenu .titlebar-shortcut-item:nth-child(5) {
+  animation-delay: 96ms;
+}
+
+.titlebar-shortcut-childmenu .titlebar-shortcut-item:nth-child(6) {
+  animation-delay: 114ms;
+}
+
+.titlebar-shortcut-leaf .titlebar-shortcut-icon,
+.titlebar-shortcut-leaf .game-icon-svg {
+  width: 14px;
+  height: 14px;
 }
 
 .titlebar-shortcut-caret {
@@ -255,7 +356,7 @@ button {
 }
 
 .atmosphere {
-  position: fixed;
+  position: absolute;
   width: 560px;
   height: 560px;
   border-radius: 50%;
@@ -287,7 +388,7 @@ button {
 }
 
 .petal-layer {
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: -1;
@@ -1933,21 +2034,57 @@ button {
   color: var(--text-soft);
 }
 
+.intro-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .lives-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 0;
   color: var(--text-soft);
-  font-size: 0.92rem;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--button-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  cursor: pointer;
+  transition: border-color 140ms ease, background 160ms ease, color 140ms ease;
 }
 
-.lives-toggle input {
-  width: 16px;
-  height: 16px;
+.lives-toggle:hover {
+  border-color: color-mix(in oklab, var(--accent) 58%, var(--button-border));
+}
+
+.toggle-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.lives-toggle.is-active {
+  border-color: color-mix(in oklab, #22c55e 68%, var(--button-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, #22c55e 32%, var(--button-bg-top)),
+      color-mix(in oklab, #16a34a 40%, var(--button-bg-bottom))
+    );
+  color: color-mix(in oklab, white 94%, var(--text-main));
 }
 
 .leech-focus-toggle {
-  margin-top: -2px;
+  margin-top: 0;
+}
+
+.interleave-controls-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .interleave-controls {
@@ -2690,6 +2827,28 @@ select:focus-visible,
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shortcutBranchIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes shortcutLeafIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 

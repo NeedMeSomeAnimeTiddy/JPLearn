@@ -137,3 +137,22 @@ def test_build_summary_includes_extended_script_curriculum_maps(tmp_path: Path, 
     expected = {"hiragana", "katakana", "kanji_n5", "vocab_n5", "grammar_patterns"}
     assert context_keys == expected
     assert narrative_keys == expected
+
+
+def test_build_summary_resolves_legacy_vocab_prompt_text(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    database.init_db()
+
+    database.log_review(
+        "Vocabulary N5",
+        496,
+        4,
+        script_tag="vocab_n5",
+        prompt_text="",
+    )
+
+    summary = cast(dict[str, Any], desktop_bridge.build_summary())
+    item_history = cast(list[dict[str, Any]], summary["item_history"])
+    assert item_history, "Expected at least one timeline item"
+    assert item_history[0]["card_id"] == 496
+    assert item_history[0]["prompt"] != "Vocabulary N5 item #496"

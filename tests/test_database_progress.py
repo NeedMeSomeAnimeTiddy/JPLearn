@@ -217,6 +217,33 @@ def test_load_raw_item_history_orders_events_newest_first(tmp_path: Path, monkey
     assert history[0].events[1].reviewed_at_utc == "2026-03-01T08:00:00+00:00"
 
 
+def test_load_raw_item_history_uses_first_non_empty_prompt(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    database.log_review(
+        "Vocabulary N5",
+        496,
+        4,
+        reviewed_on=date(2026, 3, 2),
+        reviewed_at_utc="2026-03-02T08:00:00+00:00",
+        script_tag="vocab_n5",
+        prompt_text="",
+    )
+    database.log_review(
+        "Vocabulary N5",
+        496,
+        1,
+        reviewed_on=date(2026, 3, 1),
+        reviewed_at_utc="2026-03-01T08:00:00+00:00",
+        script_tag="vocab_n5",
+        prompt_text="食べる",
+    )
+
+    history = database.load_raw_item_history(limit_items=8, events_per_item=8)
+    assert len(history) == 1
+    assert history[0].prompt == "食べる"
+
+
 def test_load_raw_item_history_respects_item_and_event_limits(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

@@ -610,6 +610,7 @@ def load_raw_item_history(limit_items: int = 8, events_per_item: int = 8) -> lis
     grouped: dict[str, RawItemHistoryBucket] = {}
     for row in rows:
         key = f"{row['deck']}:{row['card_id']}"
+        row_prompt_text = str(row["prompt_text"] or "").strip()
         if key not in grouped:
             if len(grouped) >= limit_items:
                 continue
@@ -618,12 +619,23 @@ def load_raw_item_history(limit_items: int = 8, events_per_item: int = 8) -> lis
                 script_tag=str(row["script_tag"] or "unknown"),
                 deck=str(row["deck"]),
                 card_id=int(row["card_id"]),
-                prompt=str(row["prompt_text"] or ""),
+                prompt=row_prompt_text,
                 events=[],
                 successes=[],
             )
 
         bucket = grouped[key]
+        if not bucket.prompt and row_prompt_text:
+            grouped[key] = RawItemHistoryBucket(
+                key=bucket.key,
+                script_tag=bucket.script_tag,
+                deck=bucket.deck,
+                card_id=bucket.card_id,
+                prompt=row_prompt_text,
+                events=bucket.events,
+                successes=bucket.successes,
+            )
+            bucket = grouped[key]
         events = bucket.events
         successes = bucket.successes
         if len(events) >= events_per_item:
