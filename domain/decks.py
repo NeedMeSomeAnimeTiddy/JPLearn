@@ -1,6 +1,51 @@
-"""Built-in decks: Hiragana, Katakana, JLPT N5 Kanji, N5 Vocabulary, Grammar Patterns."""
+"""Built-in decks: Hiragana, Katakana, JLPT Kanji, N5 Vocabulary, Grammar Patterns."""
+
+from types import ModuleType
+from typing import cast
 
 from domain.cards import Card, Deck
+
+_external_deck_data: ModuleType | None
+try:
+    import domain.external_deck_data as _external_deck_data_module
+
+    _external_deck_data = _external_deck_data_module
+except ImportError:
+    _external_deck_data = None
+
+_ExternalRow = tuple[str, str, str]
+_EMPTY_EXTERNAL_DATA: list[_ExternalRow] = []
+
+if _external_deck_data is None:
+    VOCAB_N5_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    GRAMMAR_PATTERNS_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    KANJI_N5_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    KANJI_N4_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    KANJI_N3_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    KANJI_N2_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    KANJI_N1_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+else:
+    VOCAB_N5_EXTERNAL_DATA = cast(
+        list[_ExternalRow], _external_deck_data.VOCAB_N5_EXTERNAL_DATA
+    )
+    GRAMMAR_PATTERNS_EXTERNAL_DATA = cast(
+        list[_ExternalRow], _external_deck_data.GRAMMAR_PATTERNS_EXTERNAL_DATA
+    )
+    KANJI_N5_EXTERNAL_DATA = cast(
+        list[_ExternalRow], getattr(_external_deck_data, "KANJI_N5_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
+    )
+    KANJI_N4_EXTERNAL_DATA = cast(
+        list[_ExternalRow], getattr(_external_deck_data, "KANJI_N4_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
+    )
+    KANJI_N3_EXTERNAL_DATA = cast(
+        list[_ExternalRow], getattr(_external_deck_data, "KANJI_N3_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
+    )
+    KANJI_N2_EXTERNAL_DATA = cast(
+        list[_ExternalRow], getattr(_external_deck_data, "KANJI_N2_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
+    )
+    KANJI_N1_EXTERNAL_DATA = cast(
+        list[_ExternalRow], getattr(_external_deck_data, "KANJI_N1_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
+    )
 
 # ---------------------------------------------------------------------------
 # Hiragana
@@ -112,6 +157,25 @@ def _build_deck_with_meaning(
 ) -> Deck:
     cards = [
         Card(id=i, character=char, romaji=reading, meaning=meaning, tags=list(tags))
+        for i, (char, reading, meaning) in enumerate(data)
+    ]
+    return Deck(name=name, cards=cards)
+
+
+def _build_kanji_deck(
+    name: str,
+    data: list[tuple[str, str, str]],
+    level_tag: str,
+    id_offset: int,
+) -> Deck:
+    cards = [
+        Card(
+            id=id_offset + i,
+            character=char,
+            romaji=reading,
+            meaning=meaning,
+            tags=["kanji", level_tag],
+        )
         for i, (char, reading, meaning) in enumerate(data)
     ]
     return Deck(name=name, cards=cards)
@@ -236,9 +300,178 @@ _KANJI_N5_DATA: list[tuple[str, str, str]] = [
     ("車", "kuruma/sha", "car, vehicle"),
 ]
 
+# ---------------------------------------------------------------------------
+# JLPT N4 Kanji
+# (kanji, primary reading, English meaning)
+# ---------------------------------------------------------------------------
+_KANJI_N4_DATA: list[tuple[str, str, str]] = [
+    ("会", "kai/a", "meeting, association"),
+    ("同", "dou/onaji", "same, agree"),
+    ("事", "ji/koto", "matter, thing"),
+    ("自", "ji/mizu", "self"),
+    ("動", "dou/ugo", "move"),
+    ("内", "nai/uchi", "inside"),
+    ("時", "ji/toki", "time"),
+    ("者", "sha/mono", "person"),
+    ("作", "saku/tsuku", "make"),
+    ("思", "shi/omo", "think"),
+    ("住", "ju/su", "live, reside"),
+    ("知", "chi/shi", "know"),
+    ("場", "jou/ba", "place"),
+    ("名", "mei/na", "name"),
+    ("何", "nan/nani", "what"),
+    ("体", "tai/karada", "body"),
+    ("化", "ka/baka", "change"),
+    ("主", "shu/omo", "main, master"),
+    ("心", "shin/kokoro", "heart, mind"),
+    ("対", "tai", "opposite, versus"),
+    ("間", "kan/aida", "interval, between"),
+    ("相", "sou/ai", "mutual, phase"),
+    ("意", "i", "meaning, intention"),
+    ("野", "ya/no", "field, plain"),
+    ("開", "kai/hira", "open"),
+    ("全", "zen/sube", "all, whole"),
+    ("定", "tei/sada", "decide, fixed"),
+    ("家", "ka/ie", "house, family"),
+    ("方", "hou/kata", "direction, way"),
+    ("代", "dai/ka", "generation, substitute"),
+]
+
+# ---------------------------------------------------------------------------
+# JLPT N3 Kanji
+# (kanji, primary reading, English meaning)
+# ---------------------------------------------------------------------------
+_KANJI_N3_DATA: list[tuple[str, str, str]] = [
+    ("政", "sei/matsuri", "politics, government"),
+    ("保", "ho/tamo", "protect, preserve"),
+    ("所", "sho/tokoro", "place"),
+    ("経", "kei/he", "manage, pass through"),
+    ("応", "ou", "respond"),
+    ("旅", "ryo/tabi", "trip, travel"),
+    ("想", "sou/omo", "concept, think"),
+    ("告", "koku/tsu", "announce"),
+    ("調", "chou/shira", "investigate, tune"),
+    ("連", "ren/tsura", "connect"),
+    ("初", "sho/hatsu", "first, beginning"),
+    ("続", "zoku/tsuzu", "continue"),
+    ("少", "shou/suku", "few, little"),
+    ("急", "kyuu/iso", "sudden, hurry"),
+    ("守", "shu/mamo", "protect, obey"),
+    ("起", "ki/o", "wake, occur"),
+    ("転", "ten/koro", "turn, roll"),
+    ("勝", "shou/ka", "win"),
+    ("負", "fu/ma", "lose, bear"),
+    ("務", "mu/tsuto", "duty"),
+    ("命", "mei/inochi", "life, command"),
+    ("算", "san", "calculate"),
+    ("達", "tatsu", "attain"),
+    ("術", "jutsu", "art, technique"),
+    ("関", "kan/seki", "relation, barrier"),
+    ("要", "you/iru", "need, require"),
+    ("価", "ka/atai", "value, price"),
+    ("差", "sa/sasu", "difference"),
+    ("利", "ri", "benefit, advantage"),
+    ("熱", "netsu/atsu", "heat, fever"),
+]
+
+# ---------------------------------------------------------------------------
+# JLPT N2 Kanji
+# (kanji, primary reading, English meaning)
+# ---------------------------------------------------------------------------
+_KANJI_N2_DATA: list[tuple[str, str, str]] = [
+    ("率", "ritsu", "ratio, rate"),
+    ("責", "seki", "responsibility"),
+    ("略", "ryaku", "abbreviation, strategy"),
+    ("範", "han", "scope, model"),
+    ("模", "mo", "imitation, pattern"),
+    ("精", "sei", "refined, spirit"),
+    ("密", "mitsu", "dense, secret"),
+    ("講", "kou", "lecture"),
+    ("座", "za", "seat, sit"),
+    ("援", "en", "aid, support"),
+    ("競", "kyou", "compete"),
+    ("争", "sou/araso", "conflict"),
+    ("診", "shin", "diagnose"),
+    ("療", "ryou", "medical treatment"),
+    ("預", "yo/azu", "deposit, entrust"),
+    ("貯", "cho/takuwa", "save, store"),
+    ("測", "soku/haka", "measure, predict"),
+    ("況", "kyou", "condition, situation"),
+    ("資", "shi", "resource, capital"),
+    ("源", "gen/minamoto", "source, origin"),
+    ("穏", "on/oda", "calm"),
+    ("緊", "kin", "tense, urgent"),
+    ("圧", "atsu", "pressure"),
+    ("縮", "shuku/chiji", "shrink"),
+    ("拡", "kaku", "expand"),
+    ("訳", "yaku/wake", "translate, reason"),
+    ("省", "sei/habu", "ministry, omit"),
+    ("境", "kyou/sakai", "boundary, situation"),
+    ("補", "ho/ogona", "supplement"),
+    ("総", "sou", "overall, total"),
+]
+
+# ---------------------------------------------------------------------------
+# JLPT N1 Kanji
+# (kanji, primary reading, English meaning)
+# ---------------------------------------------------------------------------
+_KANJI_N1_DATA: list[tuple[str, str, str]] = [
+    ("顕", "ken", "appear, manifest"),
+    ("諭", "yu", "instruct, persuade"),
+    ("憂", "yuu/ure", "grief, worry"),
+    ("曖", "ai", "vague"),
+    ("昧", "mai", "dim, obscure"),
+    ("鬱", "utsu", "depression"),
+    ("償", "shou/tsuguna", "compensate"),
+    ("懸", "ken/kake", "suspend, concern"),
+    ("罰", "batsu", "punishment"),
+    ("遵", "jun", "abide by"),
+    ("擁", "you", "embrace, support"),
+    ("護", "go/mamoru", "safeguard"),
+    ("闘", "tou/tataka", "fight"),
+    ("緩", "kan/yuru", "loosen"),
+    ("隷", "rei", "servant, subordinate"),
+    ("罷", "hi", "dismiss, quit"),
+    ("顧", "ko/kaeri", "look back, consider"),
+    ("諾", "daku", "consent"),
+    ("賛", "san", "approve, praise"),
+    ("璧", "heki", "flawless"),
+    ("巧", "kou/taku", "skillful"),
+    ("繊", "sen", "delicate, fine"),
+    ("維", "i", "maintain"),
+    ("羅", "ra", "gauze, net"),
+    ("宰", "sai", "govern, manager"),
+    ("亜", "a", "sub-, Asia"),
+    ("赴", "fu/omo", "proceed toward"),
+    ("該", "gai", "relevant"),
+    ("勲", "kun", "distinguished service"),
+    ("審", "shin", "judge, examine"),
+]
+
 
 def get_kanji_n5_deck() -> Deck:
-    return _build_deck_with_meaning("Kanji N5", _KANJI_N5_DATA, ["kanji", "n5"])
+    rows = KANJI_N5_EXTERNAL_DATA if KANJI_N5_EXTERNAL_DATA else _KANJI_N5_DATA
+    return _build_kanji_deck("Kanji N5", rows, "n5", id_offset=0)
+
+
+def get_kanji_n4_deck() -> Deck:
+    rows = KANJI_N4_EXTERNAL_DATA if KANJI_N4_EXTERNAL_DATA else _KANJI_N4_DATA
+    return _build_kanji_deck("Kanji N4", rows, "n4", id_offset=1000)
+
+
+def get_kanji_n3_deck() -> Deck:
+    rows = KANJI_N3_EXTERNAL_DATA if KANJI_N3_EXTERNAL_DATA else _KANJI_N3_DATA
+    return _build_kanji_deck("Kanji N3", rows, "n3", id_offset=2000)
+
+
+def get_kanji_n2_deck() -> Deck:
+    rows = KANJI_N2_EXTERNAL_DATA if KANJI_N2_EXTERNAL_DATA else _KANJI_N2_DATA
+    return _build_kanji_deck("Kanji N2", rows, "n2", id_offset=3000)
+
+
+def get_kanji_n1_deck() -> Deck:
+    rows = KANJI_N1_EXTERNAL_DATA if KANJI_N1_EXTERNAL_DATA else _KANJI_N1_DATA
+    return _build_kanji_deck("Kanji N1", rows, "n1", id_offset=4000)
 
 
 # ---------------------------------------------------------------------------
@@ -391,7 +624,8 @@ _VOCAB_N5_DATA: list[tuple[str, str, str]] = [
 
 
 def get_vocab_n5_deck() -> Deck:
-    return _build_deck_with_meaning("Vocabulary N5", _VOCAB_N5_DATA, ["vocab", "n5"])
+    data = VOCAB_N5_EXTERNAL_DATA if VOCAB_N5_EXTERNAL_DATA else _VOCAB_N5_DATA
+    return _build_deck_with_meaning("Vocabulary N5", data, ["vocab", "n5"])
 
 
 # ---------------------------------------------------------------------------
@@ -475,8 +709,13 @@ _GRAMMAR_PATTERNS_DATA: list[tuple[str, str, str]] = [
 
 
 def get_grammar_patterns_deck() -> Deck:
+    data = (
+        GRAMMAR_PATTERNS_EXTERNAL_DATA
+        if GRAMMAR_PATTERNS_EXTERNAL_DATA
+        else _GRAMMAR_PATTERNS_DATA
+    )
     return _build_deck_with_meaning(
-        "Grammar Patterns", _GRAMMAR_PATTERNS_DATA, ["grammar", "n5"]
+        "Grammar Patterns", data, ["grammar", "n5"]
     )
 
 
@@ -485,6 +724,10 @@ ALL_DECKS = {
     "hiragana": get_hiragana_deck,
     "katakana": get_katakana_deck,
     "kanji_n5": get_kanji_n5_deck,
+    "kanji_n4": get_kanji_n4_deck,
+    "kanji_n3": get_kanji_n3_deck,
+    "kanji_n2": get_kanji_n2_deck,
+    "kanji_n1": get_kanji_n1_deck,
     "vocab_n5": get_vocab_n5_deck,
     "grammar_patterns": get_grammar_patterns_deck,
 }

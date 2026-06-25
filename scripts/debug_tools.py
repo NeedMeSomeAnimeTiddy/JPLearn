@@ -6,6 +6,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -126,7 +127,7 @@ def print_snapshot(args: argparse.Namespace) -> int:
     print(f"git: {snapshot['branch']} @ {snapshot['commit']}")
     print(f"dirty: {snapshot['dirty']} ({snapshot['changed_count']} changed)")
 
-    changed_files: list[str] = snapshot["changed_files"]  # type: ignore[assignment]
+    changed_files = cast(list[str], snapshot["changed_files"])
     if changed_files:
         print("changed files:")
         for item in changed_files:
@@ -140,9 +141,9 @@ def print_snapshot(args: argparse.Namespace) -> int:
     print(f"test files: {snapshot['test_file_count']}")
     print("largest python files:")
 
-    largest_items: list[dict[str, object]] = snapshot["largest_python_files"]  # type: ignore[assignment]
-    for item in largest_items:
-        print(f"  {item['path']}: {item['lines']} lines")
+    largest_items = cast(list[dict[str, object]], snapshot["largest_python_files"])
+    for largest_item in largest_items:
+        print(f"  {largest_item['path']}: {largest_item['lines']} lines")
 
     return 0
 

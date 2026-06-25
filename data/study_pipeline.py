@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 from data import database
+from data.database import CurriculumStageSummary, NarrativeChapterSummary
 from domain.activity import ActivitySummary
 from domain.curriculum import next_stage
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
@@ -33,6 +34,7 @@ def review_card(
     state: ReviewState,
     quality: int,
     script_tag: str = "",
+    curriculum_stage: int | None = None,
     tags: list[str] | None = None,
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
@@ -56,6 +58,7 @@ def review_card(
         reviewed_on=review_day_local,
         reviewed_at_utc=review_timestamp_utc,
         script_tag=normalized_script_tag,
+        curriculum_stage=curriculum_stage,
         tags=tags,
     )
     database.update_leech_state_for_card(deck_name, updated_state.card_id)
@@ -83,6 +86,7 @@ def review_minigame_result(
         state,
         quality=quality,
         script_tag=script_tag,
+        curriculum_stage=curriculum_stage,
         tags=tags,
         reviewed_on_local=reviewed_on_local,
         reviewed_on_utc=reviewed_on_utc,
@@ -100,12 +104,12 @@ def load_curriculum_stages(deck_name: str, mode: str, card_ids: list[int]) -> di
     return database.load_curriculum_stages(deck_name, mode, card_ids)
 
 
-def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> dict[str, object]:
+def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> CurriculumStageSummary:
     """Return aggregate curriculum metrics for overview screens."""
     return database.load_curriculum_stage_summary(mode, script_tag=script_tag)
 
 
-def load_narrative_chapter_summary(script_tag: str | None = None) -> dict[str, object]:
+def load_narrative_chapter_summary(script_tag: str | None = None) -> NarrativeChapterSummary:
     """Return chapter-level narrative story metrics for overview screens."""
     return database.load_narrative_chapter_summary(script_tag=script_tag)
 

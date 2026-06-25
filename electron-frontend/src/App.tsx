@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, Keyboard, Languages, ListChecks, Lock, Minus, Settings, Shuffle, Square, Target, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, Settings, Shuffle, Square, Target, Trophy, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -9,7 +9,8 @@ type StudySummaryPayload = Awaited<
 >
 type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
-type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5'
+type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
+type KanjiDeckSlug = 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
@@ -105,8 +106,52 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'N5 Sentence Drill: infer first, then commit to one meaning.',
     ],
     narrative_story: [
-      'Story Gate: read the chapter cue and resolve the missing idea.',
-      'Chapter Pulse: infer from the narrative shift before choosing.',
+      'Story Scene: read the situation and resolve the missing idea.',
+      'Scene Pulse: infer from the narrative shift before choosing.',
+    ],
+  },
+  vocab_n5: {
+    romaji_sprint: [
+      'Word Recall: read the vocab item and type the reading cleanly.',
+      'Sound-to-Word: lock pronunciation before typing.',
+    ],
+    meaning_match: [
+      'Word Sense: choose the exact English meaning.',
+      'Precision Match: avoid near-synonyms and commit.',
+    ],
+    character_match: [
+      'Word Form: choose the Japanese form for the meaning.',
+      'Lexical Link: pick the correct written word.',
+    ],
+    context_cloze: [
+      'Usage Context: use sentence context to place the right word.',
+      'Meaning-in-Use: infer from surrounding clues first.',
+    ],
+    narrative_story: [
+      'Scene Choice: complete the mini situation with the right word.',
+      'Story Fit: pick the option that best matches the scene.',
+    ],
+  },
+  grammar_patterns: {
+    romaji_sprint: [
+      'Pattern Read: confirm reading and type with confidence.',
+      'Structure Sound: hear the phrase in your head, then type.',
+    ],
+    meaning_match: [
+      'Grammar Sense: choose the best function or meaning.',
+      'Pattern Intent: decide what nuance this structure carries.',
+    ],
+    character_match: [
+      'Pattern Form: select the Japanese pattern for this intent.',
+      'Structure Recall: pick the exact expression form.',
+    ],
+    context_cloze: [
+      'Sentence Pattern: complete the line with the right structure.',
+      'Grammar in Context: infer role and choose the best fit.',
+    ],
+    narrative_story: [
+      'Dialogue Scene: choose the pattern that fits the exchange.',
+      'Conversational Fit: select the structure that sounds natural.',
     ],
   },
 }
@@ -131,44 +176,72 @@ const TAG_PROMPT_PACKS: Record<string, string[]> = {
 const CLOZE_TEMPLATES: Record<ScriptKey, Record<number, string[]>> = {
   hiragana: {
     1: [
-      'Beginner line: I am practicing ___ sounds today.',
-      'Warm-up sentence: This kana reads as ___.',
+      'Beginner line: The kana {character} is read as ___.',
+      'Warm-up sentence: When I see {character}, I answer ___.',
     ],
     2: [
-      'Context line: In this reading drill, the missing sound is ___.',
-      'Focus sentence: I recognized ___ while reading slowly.',
+      'Context line: During reading practice, {character} maps to ___.',
+      'Focus sentence: I recognized {character} and chose ___.',
     ],
     3: [
-      'Challenge line: Under pressure, I still recalled ___ correctly.',
-      'Advanced cue: In mixed review, ___ appeared and I answered cleanly.',
+      'Challenge line: Under pressure, {character} still means ___.',
+      'Advanced cue: In mixed review, {character} appeared and I picked ___.',
     ],
   },
   katakana: {
     1: [
-      'Beginner line: This borrowed sound is written as ___.',
-      'Warm-up sentence: The katakana reading here is ___.',
+      'Beginner line: The katakana {character} is read as ___.',
+      'Warm-up sentence: For {character}, the correct reading is ___.',
     ],
     2: [
-      'Context line: In a loanword context, ___ is the best fit.',
-      'Focus sentence: I saw a modern term and matched it to ___.',
+      'Context line: In a loanword drill, {character} maps to ___.',
+      'Focus sentence: I saw {character} in context and selected ___.',
     ],
     3: [
-      'Challenge line: Fast recognition still pointed to ___.',
-      'Advanced cue: In a noisy context, I mapped the sound to ___.',
+      'Challenge line: Fast recognition of {character} still pointed to ___.',
+      'Advanced cue: In noisy context, {character} still resolved to ___.',
     ],
   },
   kanji_n5: {
     1: [
-      'Beginner line: This idea is best expressed as ___.',
-      'Warm-up sentence: In simple Japanese text, ___ fits this spot.',
+      'Beginner line: The kanji {character} is best understood as ___.',
+      'Warm-up sentence: In simple text, {character} fits as ___.',
     ],
     2: [
-      'Context line: The sentence meaning points toward ___ here.',
-      'Focus sentence: With one clue missing, ___ completes the thought.',
+      'Context line: Sentence meaning points to {character} as ___.',
+      'Focus sentence: With one clue missing, {character} completes it as ___.',
     ],
     3: [
-      'Challenge line: Subtle context still leads to ___.',
-      'Advanced cue: In a compressed phrase, ___ is the strongest choice.',
+      'Challenge line: Subtle context still links {character} to ___.',
+      'Advanced cue: In a compressed phrase, {character} is interpreted as ___.',
+    ],
+  },
+  vocab_n5: {
+    1: [
+      'Beginner line: The word {character} means ___.',
+      'Warm-up sentence: For {character} ({romaji}), choose ___.',
+    ],
+    2: [
+      'Context line: In this sentence, {character} contributes ___.',
+      'Focus sentence: Usage clues show that {character} means ___.',
+    ],
+    3: [
+      'Challenge line: Even in subtle context, {character} means ___.',
+      'Advanced cue: Under pressure, {character} is still ___.',
+    ],
+  },
+  grammar_patterns: {
+    1: [
+      'Beginner line: The pattern {character} is used for ___.',
+      'Warm-up sentence: For {character} ({romaji}), the best meaning is ___.',
+    ],
+    2: [
+      'Context line: This exchange calls for {character} to express ___.',
+      'Focus sentence: The grammar cue {character} signals ___.',
+    ],
+    3: [
+      'Challenge line: In nuanced dialogue, {character} still conveys ___.',
+      'Advanced cue: The most natural reading of {character} here is ___.',
     ],
   },
 }
@@ -238,8 +311,54 @@ const STORY_CHAPTERS: Record<ScriptKey, Record<1 | 2 | 3, { title: string; lines
     3: {
       title: 'Chapter 3: Travel Plan',
       lines: [
-        'A ticket note implies one exact meaning in the blank: ___.',
-        'In the final itinerary line, the strongest completion is ___.',
+        'A ticket note uses {character}, so the missing meaning is ___.',
+        'In the final itinerary line, {character} is best read as ___.',
+      ],
+    },
+  },
+  vocab_n5: {
+    1: {
+      title: 'Chapter 1: First Conversation',
+      lines: [
+        'At introductions, the word {character} completes this line as ___.',
+        'A beginner exchange needs {character}; pick ___ to finish it.',
+      ],
+    },
+    2: {
+      title: 'Chapter 2: Daily Routine',
+      lines: [
+        'In a daily routine scene, {character} fits the blank as ___.',
+        'The routine sentence sounds natural only if {character} means ___.',
+      ],
+    },
+    3: {
+      title: 'Chapter 3: Weekend Plans',
+      lines: [
+        'Planning with friends uses {character}; choose ___ to complete it.',
+        'The weekend plan line points to {character} meaning ___.',
+      ],
+    },
+  },
+  grammar_patterns: {
+    1: {
+      title: 'Chapter 1: Polite Basics',
+      lines: [
+        'A polite reply uses {character}, so the blank should be ___.',
+        'This polite scene hinges on {character}; pick ___.',
+      ],
+    },
+    2: {
+      title: 'Chapter 2: Requests and Reasons',
+      lines: [
+        'A request sentence uses {character} to express ___ here.',
+        'The reason-giving line sounds right when {character} means ___.',
+      ],
+    },
+    3: {
+      title: 'Chapter 3: Natural Conversation',
+      lines: [
+        'In natural dialogue, {character} conveys ___ in this scene.',
+        'The final conversation line depends on {character} meaning ___.',
       ],
     },
   },
@@ -291,19 +410,38 @@ interface MinigameIntro {
   tip: string
 }
 
+type JlptLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
+
+interface JlptLevelProgress {
+  key: JlptLevel
+  label: string
+  cardIds: number[]
+  sampleChars: string[]
+  mastery: number
+  unlocked: boolean
+  total: number
+}
+
 type StatsByScript = Record<ScriptKey, ScriptStats>
 type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
+type OverviewSectionKey = 'studyActivity' | 'contextClozeCurriculum' | 'storyProgress' | 'mistakeBreakdown' | 'itemTimeline' | 'deckSnapshot'
+
+const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns'] as const
 
 const SCRIPT_LABELS: Record<ScriptKey, string> = {
   hiragana: 'Hiragana',
   katakana: 'Katakana',
   kanji_n5: 'Kanji',
+  vocab_n5: 'Words',
+  grammar_patterns: 'Conversational',
 }
 
 const SCRIPT_MENU_LINES: Record<ScriptKey, string> = {
   hiragana: 'Start with smooth, foundational sounds.',
   katakana: 'Train sharp symbols for names and loanwords.',
   kanji_n5: 'Build meaning recall one character at a time.',
+  vocab_n5: 'Build practical vocabulary for daily usage.',
+  grammar_patterns: 'Practice conversational patterns and sentence flow.',
 }
 
 const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }> = [
@@ -339,6 +477,22 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
   },
 ]
 
+const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
+  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
+  vocab_n5: ['meaning_match', 'character_match', 'context_cloze', 'narrative_story', 'interleave_mix'],
+  grammar_patterns: ['meaning_match', 'character_match', 'context_cloze', 'narrative_story', 'interleave_mix'],
+}
+
+const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>> = {
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match'],
+  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match'],
+  vocab_n5: ['meaning_match', 'character_match', 'context_cloze'],
+  grammar_patterns: ['meaning_match', 'character_match', 'context_cloze'],
+}
+
 const MINIGAME_INTROS: Record<MinigameKey, MinigameIntro> = {
   romaji_sprint: {
     vibe: 'Speed Trial',
@@ -361,8 +515,8 @@ const MINIGAME_INTROS: Record<MinigameKey, MinigameIntro> = {
     tip: 'Read the full line before checking options, then pick the best semantic fit.',
   },
   narrative_story: {
-    vibe: 'Story Chapters',
-    objective: 'Complete chapter scenes where each card unlocks prompts by persisted stage.',
+    vibe: 'Story Scenes',
+    objective: 'Complete short scenes where each prompt tests contextual meaning recall.',
     tip: 'Treat each prompt like a mini scene: infer tone first, then choose the exact fit.',
   },
   interleave_mix: {
@@ -376,6 +530,8 @@ const SECTION_META: Record<ScriptKey, { glyph: string }> = {
   hiragana: { glyph: 'あ' },
   katakana: { glyph: 'ア' },
   kanji_n5: { glyph: '漢' },
+  vocab_n5: { glyph: '語' },
+  grammar_patterns: { glyph: '話' },
 }
 
 const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
@@ -424,6 +580,23 @@ const THEME_OPTIONS: Array<{ key: ThemeKey; label: string }> = [
   { key: 'plum_garden', label: 'Plum Garden' },
 ]
 
+const JLPT_LEVEL_ORDER: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
+const JLPT_LEVEL_LABELS: Record<JlptLevel, string> = {
+  n5: 'JLPT N5',
+  n4: 'JLPT N4',
+  n3: 'JLPT N3',
+  n2: 'JLPT N2',
+  n1: 'JLPT N1',
+}
+const KANJI_LEVEL_TO_DECK_SLUG: Record<JlptLevel, KanjiDeckSlug> = {
+  n5: 'kanji_n5',
+  n4: 'kanji_n4',
+  n3: 'kanji_n3',
+  n2: 'kanji_n2',
+  n1: 'kanji_n1',
+}
+const KANJI_OVERVIEW_PAGE_SIZE = 45
+
 function MinigameIcon({ game }: { game: MinigameKey }) {
   const Icon = MINIGAME_ICONS[game]
   return <Icon aria-hidden="true" className="glyph-svg" strokeWidth={2.25} />
@@ -454,6 +627,8 @@ function defaultStatsByScript(): StatsByScript {
     hiragana: { ...EMPTY_SCRIPT_STATS },
     katakana: { ...EMPTY_SCRIPT_STATS },
     kanji_n5: { ...EMPTY_SCRIPT_STATS },
+    vocab_n5: { ...EMPTY_SCRIPT_STATS },
+    grammar_patterns: { ...EMPTY_SCRIPT_STATS },
   }
 }
 
@@ -483,6 +658,22 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
+    vocab_n5: {
+      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
+      meaning_match: { ...EMPTY_MINIGAME_STATS },
+      character_match: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
+      narrative_story: { ...EMPTY_MINIGAME_STATS },
+      interleave_mix: { ...EMPTY_MINIGAME_STATS },
+    },
+    grammar_patterns: {
+      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
+      meaning_match: { ...EMPTY_MINIGAME_STATS },
+      character_match: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
+      narrative_story: { ...EMPTY_MINIGAME_STATS },
+      interleave_mix: { ...EMPTY_MINIGAME_STATS },
+    },
   }
 }
 
@@ -496,6 +687,8 @@ function loadSavedStats(): StatsByScript {
       hiragana: { ...EMPTY_SCRIPT_STATS, ...(parsed.hiragana ?? {}) },
       katakana: { ...EMPTY_SCRIPT_STATS, ...(parsed.katakana ?? {}) },
       kanji_n5: { ...EMPTY_SCRIPT_STATS, ...(parsed.kanji_n5 ?? {}) },
+      vocab_n5: { ...EMPTY_SCRIPT_STATS, ...(parsed.vocab_n5 ?? {}) },
+      grammar_patterns: { ...EMPTY_SCRIPT_STATS, ...(parsed.grammar_patterns ?? {}) },
     }
   } catch {
     return defaultStatsByScript()
@@ -528,15 +721,17 @@ type CardScores = Record<ScriptKey, Record<number, number>>
 function loadCardScores(): CardScores {
   try {
     const raw = window.localStorage.getItem(CARD_SCORES_STORAGE_KEY)
-    if (!raw) return { hiragana: {}, katakana: {}, kanji_n5: {} }
+    if (!raw) return { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} }
     const parsed = JSON.parse(raw) as Partial<CardScores>
     return {
       hiragana: parsed.hiragana ?? {},
       katakana: parsed.katakana ?? {},
       kanji_n5: parsed.kanji_n5 ?? {},
+      vocab_n5: parsed.vocab_n5 ?? {},
+      grammar_patterns: parsed.grammar_patterns ?? {},
     }
   } catch {
-    return { hiragana: {}, katakana: {}, kanji_n5: {} }
+    return { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} }
   }
 }
 
@@ -570,16 +765,18 @@ function clampWeight(value: number): number {
   return Math.max(1, Math.min(5, Math.floor(value)))
 }
 
-function buildInterleaveSequence(weights: InterleaveWeights): PlayableMinigame[] {
+function buildInterleaveSequence(
+  weights: InterleaveWeights,
+  allowedModes: Array<keyof InterleaveWeights>,
+): PlayableMinigame[] {
   const sequence: PlayableMinigame[] = []
-  const modes: Array<keyof InterleaveWeights> = ['romaji_sprint', 'meaning_match', 'character_match', 'context_cloze']
-  for (const mode of modes) {
+  for (const mode of allowedModes) {
     const count = clampWeight(weights[mode])
     for (let i = 0; i < count; i += 1) {
       sequence.push(mode)
     }
   }
-  return sequence.length > 0 ? sequence : ['romaji_sprint', 'meaning_match', 'character_match']
+  return sequence.length > 0 ? sequence : allowedModes
 }
 
 function pickSurprisePrompt(
@@ -609,16 +806,23 @@ function normalizeCurriculumStage(stage: number): 1 | 2 | 3 {
   return 1
 }
 
-function buildClozeLine(script: ScriptKey, stage: 1 | 2 | 3, seed: number): string {
-  const templates = CLOZE_TEMPLATES[script][stage]
-  return templates[Math.abs(seed) % templates.length]
+function applyCardTemplate(template: string, card: ScriptDeck['cards'][number]): string {
+  return template
+    .replaceAll('{character}', card.character)
+    .replaceAll('{romaji}', card.romaji)
+    .replaceAll('{meaning}', card.meaning)
 }
 
-function buildStoryChapter(script: ScriptKey, stage: 1 | 2 | 3, seed: number): { title: string; line: string } {
+function buildClozeLine(script: ScriptKey, stage: 1 | 2 | 3, seed: number, card: ScriptDeck['cards'][number]): string {
+  const templates = CLOZE_TEMPLATES[script][stage]
+  return applyCardTemplate(templates[Math.abs(seed) % templates.length], card)
+}
+
+function buildStoryChapter(script: ScriptKey, stage: 1 | 2 | 3, seed: number, card: ScriptDeck['cards'][number]): { title: string; line: string } {
   const chapter = STORY_CHAPTERS[script][stage]
   return {
     title: chapter.title,
-    line: chapter.lines[Math.abs(seed) % chapter.lines.length],
+    line: applyCardTemplate(chapter.lines[Math.abs(seed) % chapter.lines.length], card),
   }
 }
 
@@ -628,6 +832,65 @@ function narrativePriorityCards(cards: ScriptDeck['cards']): ScriptDeck['cards']
   const stage2 = cards.filter((card) => normalizeCurriculumStage(card.curriculum_stage) === 2)
   if (stage2.length > 0) return stage2
   return cards
+}
+
+function jlptTagFromCard(card: ScriptDeck['cards'][number]): JlptLevel {
+  for (const tag of card.tags) {
+    const normalized = tag.trim().toLowerCase()
+    if (normalized === 'n5' || normalized === 'n4' || normalized === 'n3' || normalized === 'n2' || normalized === 'n1') {
+      return normalized
+    }
+  }
+  return 'n5'
+}
+
+function buildJlptLevelProgress(cards: ScriptDeck['cards'], scores: Record<number, number>): JlptLevelProgress[] {
+  let canUnlockNext = true
+  return JLPT_LEVEL_ORDER.map((level) => {
+    const levelCards = cards.filter((card) => jlptTagFromCard(card) === level)
+    const total = levelCards.length
+    const totalScore = levelCards.reduce((sum, card) => sum + (scores[card.id] ?? 0), 0)
+    const mastery = total > 0 ? totalScore / (CARD_MASTERY_MAX * total) : 0
+    const unlocked = total > 0 && canUnlockNext
+    if (total > 0 && mastery < 0.8) {
+      canUnlockNext = false
+    }
+    return {
+      key: level,
+      label: JLPT_LEVEL_LABELS[level],
+      cardIds: levelCards.map((card) => card.id),
+      sampleChars: levelCards.slice(0, 3).map((card) => card.character),
+      mastery,
+      unlocked,
+      total,
+    }
+  })
+}
+
+function buildJlptLevelProgressFromLevelDecks(
+  levelDecks: Record<JlptLevel, ScriptDeck['cards']>,
+  scores: Record<number, number>,
+): JlptLevelProgress[] {
+  let canUnlockNext = true
+  return JLPT_LEVEL_ORDER.map((level) => {
+    const levelCards = levelDecks[level]
+    const total = levelCards.length
+    const totalScore = levelCards.reduce((sum, card) => sum + (scores[card.id] ?? 0), 0)
+    const mastery = total > 0 ? totalScore / (CARD_MASTERY_MAX * total) : 0
+    const unlocked = total > 0 && canUnlockNext
+    if (total > 0 && mastery < 0.8) {
+      canUnlockNext = false
+    }
+    return {
+      key: level,
+      label: JLPT_LEVEL_LABELS[level],
+      cardIds: levelCards.map((card) => card.id),
+      sampleChars: levelCards.slice(0, 3).map((card) => card.character),
+      mastery,
+      unlocked,
+      total,
+    }
+  })
 }
 
 function App() {
@@ -671,9 +934,28 @@ function App() {
   const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
   const [cardScores, setCardScores] = useState<CardScores>(() => loadCardScores())
   const [overviewBlocks, setOverviewBlocks] = useState<Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>>({})
+  const [overviewKanjiDeck, setOverviewKanjiDeck] = useState<ScriptDeck['cards']>([])
+  const [activeKanjiLevel, setActiveKanjiLevel] = useState<JlptLevel>('n5')
+  const [activeKanjiDeckSlug, setActiveKanjiDeckSlug] = useState<KanjiDeckSlug>('kanji_n5')
+  const [kanjiDeckCardsByLevel, setKanjiDeckCardsByLevel] = useState<Record<JlptLevel, ScriptDeck['cards']>>({
+    n5: [],
+    n4: [],
+    n3: [],
+    n2: [],
+    n1: [],
+  })
+  const [kanjiOverviewPage, setKanjiOverviewPage] = useState<Partial<Record<JlptLevel, number>>>({})
   const [overviewBlocksLoading, setOverviewBlocksLoading] = useState(false)
-  const [charMasteryExpanded, setCharMasteryExpanded] = useState(true)
+  const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
+  const [overviewSectionExpanded, setOverviewSectionExpanded] = useState<Record<OverviewSectionKey, boolean>>({
+    studyActivity: false,
+    contextClozeCurriculum: false,
+    storyProgress: false,
+    mistakeBreakdown: false,
+    itemTimeline: false,
+    deckSnapshot: false,
+  })
 
   interface SelectedChar {
     character: string
@@ -688,16 +970,35 @@ function App() {
   const [resettingDb, setResettingDb] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
   const [isWindowMaximized, setIsWindowMaximized] = useState(false)
+  const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
+  const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
-  const interleaveSequence = useMemo(() => buildInterleaveSequence(interleaveWeights), [interleaveWeights])
+  const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
+  const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
+  const interleaveSequence = useMemo(
+    () => buildInterleaveSequence(interleaveWeights, availableInterleaveModes),
+    [interleaveWeights, availableInterleaveModes],
+  )
+
+  useEffect(() => {
+    if (availableMinigames.includes(activeGame)) return
+    setActiveGame(availableMinigames[0])
+  }, [activeGame, availableMinigames])
 
   const resetRoundCycle = useCallback(() => {
     roundCycleRef.current = []
     roundCursorRef.current = 0
     interleaveCursorRef.current = 0
+  }, [])
+
+  const toggleOverviewSection = useCallback((section: OverviewSectionKey) => {
+    setOverviewSectionExpanded((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
   }, [])
 
   const nextCardIndex = useCallback((cardsLength: number): number | null => {
@@ -726,6 +1027,7 @@ function App() {
     document.documentElement.dataset.fontSize = settings.fontSize
     document.documentElement.dataset.reducedMotion = String(settings.reducedMotion)
     document.documentElement.dataset.theme = settings.theme
+    void window.jplearnDesktop.setStartupTheme(settings.theme).catch(() => undefined)
   }, [settings])
 
   useEffect(() => {
@@ -772,7 +1074,7 @@ function App() {
     void loadSummary()
   }, [loadSummary])
 
-  const loadScriptCards = useCallback(async (script: ScriptKey) => {
+  const loadScriptCards = useCallback(async (script: ScriptKey, kanjiLevel: JlptLevel = activeKanjiLevel) => {
     setGameLoading(true)
     setGameError(null)
     setSessionActive(false)
@@ -791,22 +1093,54 @@ function App() {
     resetRoundCycle()
 
     try {
-      const [deckPayload, blockPayload] = await Promise.all([
-        window.jplearnDesktop.getDeckCards(script),
-        window.jplearnDesktop.getBlockProgress(script),
-      ])
-      setDeckCards(deckPayload.cards)
-      const blocks = blockPayload.blocks
-      setBlockProgress(blocks)
-      // Auto-select the last unlocked block so the user lands on the current frontier.
-      if (blocks.length > 0) {
-        const lastUnlocked = blocks.reduce(
-          (best, b) => (b.unlocked ? b.index : best),
-          0,
-        )
-        setActiveBlockIndex(lastUnlocked)
+      if (script === 'kanji_n5') {
+        const selectedKanjiSlug = KANJI_LEVEL_TO_DECK_SLUG[kanjiLevel]
+        const [selectedDeckPayload, blockPayload, n5Deck, n4Deck, n3Deck, n2Deck, n1Deck] = await Promise.all([
+          window.jplearnDesktop.getDeckCards(selectedKanjiSlug),
+          window.jplearnDesktop.getBlockProgress(selectedKanjiSlug),
+          window.jplearnDesktop.getDeckCards('kanji_n5'),
+          window.jplearnDesktop.getDeckCards('kanji_n4'),
+          window.jplearnDesktop.getDeckCards('kanji_n3'),
+          window.jplearnDesktop.getDeckCards('kanji_n2'),
+          window.jplearnDesktop.getDeckCards('kanji_n1'),
+        ])
+        setDeckCards(selectedDeckPayload.cards)
+        setActiveKanjiDeckSlug(selectedDeckPayload.slug as KanjiDeckSlug)
+        setKanjiDeckCardsByLevel({
+          n5: n5Deck.cards,
+          n4: n4Deck.cards,
+          n3: n3Deck.cards,
+          n2: n2Deck.cards,
+          n1: n1Deck.cards,
+        })
+        const blocks = blockPayload.blocks
+        setBlockProgress(blocks)
+        if (blocks.length > 0) {
+          const lastUnlocked = blocks.reduce(
+            (best, b) => (b.unlocked ? b.index : best),
+            0,
+          )
+          setActiveBlockIndex(lastUnlocked)
+        } else {
+          setActiveBlockIndex(0)
+        }
       } else {
-        setActiveBlockIndex(0)
+        const [deckPayload, blockPayload] = await Promise.all([
+          window.jplearnDesktop.getDeckCards(script),
+          window.jplearnDesktop.getBlockProgress(script),
+        ])
+        setDeckCards(deckPayload.cards)
+        const blocks = blockPayload.blocks
+        setBlockProgress(blocks)
+        if (blocks.length > 0) {
+          const lastUnlocked = blocks.reduce(
+            (best, b) => (b.unlocked ? b.index : best),
+            0,
+          )
+          setActiveBlockIndex(lastUnlocked)
+        } else {
+          setActiveBlockIndex(0)
+        }
       }
     } catch (err) {
       setDeckCards([])
@@ -816,11 +1150,11 @@ function App() {
     } finally {
       setGameLoading(false)
     }
-  }, [resetRoundCycle])
+  }, [activeKanjiLevel, resetRoundCycle])
 
   useEffect(() => {
-    void loadScriptCards(activeScript)
-  }, [activeScript, loadScriptCards])
+    void loadScriptCards(activeScript, activeKanjiLevel)
+  }, [activeScript, activeKanjiLevel, loadScriptCards])
 
   const buildRound = useCallback(
     (
@@ -876,7 +1210,18 @@ function App() {
           if (selected.length >= desiredCount) return selected
         }
 
-        // Fallback when ranked pool is insufficient.
+        // Prefer same-tag distractors to keep options semantically coherent.
+        const cardTagSet = new Set(card.tags.map((tag) => tag.toLowerCase()))
+        for (const candidate of cards) {
+          if (candidate.id === card.id || seen.has(candidate.id)) continue
+          const sharesTag = candidate.tags.some((tag) => cardTagSet.has(tag.toLowerCase()))
+          if (!sharesTag) continue
+          selected.push(candidate)
+          seen.add(candidate.id)
+          if (selected.length >= desiredCount) return selected
+        }
+
+        // Final fallback when ranked pool and tag pool are insufficient.
         for (const fallbackIndex of chooseUniqueIndices(cards.length, desiredCount * 2, cardIndex)) {
           const fallbackCard = cards[fallbackIndex]
           if (fallbackCard.id === card.id || seen.has(fallbackCard.id)) continue
@@ -924,7 +1269,7 @@ function App() {
             label: candidate.meaning,
           })),
         ])
-        const clozeSentence = buildClozeLine(activeScript, curriculumStage, promptSeed).replace('___', '_____')
+        const clozeSentence = buildClozeLine(activeScript, curriculumStage, promptSeed, card).replace('___', '_____')
 
         return {
           cardId: card.id,
@@ -933,7 +1278,7 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: `Hint: ${card.character} (${card.romaji})`,
+          hintText: `Focus card: ${card.character} (${card.romaji})`,
           promptLabel: surprisePrompt
             ? surpriseLabel
             : `Fill the blank using context clues (Stage ${curriculumStage})`,
@@ -952,7 +1297,7 @@ function App() {
             label: candidate.meaning,
           })),
         ])
-        const chapter = buildStoryChapter(activeScript, curriculumStage, promptSeed)
+        const chapter = buildStoryChapter(activeScript, curriculumStage, promptSeed, card)
 
         return {
           cardId: card.id,
@@ -960,11 +1305,11 @@ function App() {
           surprisePrompt,
           curriculumStage,
           chapterNumber: curriculumStage,
-          chapterLabel: chapter.title,
-          hintText: `Story gate: Stage ${curriculumStage} unlocked ${chapter.title}`,
+          chapterLabel: null,
+          hintText: `Scene focus: ${card.character} (${card.romaji})`,
           promptLabel: surprisePrompt
             ? surpriseLabel
-            : `${chapter.title} - choose the best completion`,
+            : `Choose the best scene completion (Stage ${curriculumStage})`,
           focusText: chapter.line.replace('___', '_____'),
           answer: card.meaning,
           options,
@@ -1018,9 +1363,21 @@ function App() {
     [deckCards],
   )
 
+  const kanjiLevelProgress = useMemo(
+    () => buildJlptLevelProgressFromLevelDecks(kanjiDeckCardsByLevel, cardScores.kanji_n5),
+    [kanjiDeckCardsByLevel, cardScores.kanji_n5],
+  )
+
+  const overviewKanjiLevelProgress = useMemo(
+    () => buildJlptLevelProgress(overviewKanjiDeck, cardScores.kanji_n5),
+    [overviewKanjiDeck, cardScores.kanji_n5],
+  )
+
   // Cards restricted to the active block when block progression is available.
   const activeBlockCards = useMemo(() => {
-    if (blockProgress.length === 0) return deckCards
+    if (blockProgress.length === 0) {
+      return deckCards
+    }
     const block = blockProgress[activeBlockIndex]
     if (!block) return deckCards
     const idSet = new Set(block.card_ids)
@@ -1140,8 +1497,7 @@ function App() {
         setSessionPoints((value) => value + awardedPoints)
         if (roundState.mode === 'narrative_story') {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
-          const unlockSuffix = nextStage === 3 ? ' Chapter 3 unlocked.' : ''
-          setRoundFeedback(`Correct +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'} · Stage ${roundState.curriculumStage} -> ${nextStage}.${unlockSuffix}`)
+          setRoundFeedback(`Correct +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'} · Stage ${roundState.curriculumStage} -> ${nextStage}.`)
         } else {
           setRoundFeedback(`Correct +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'}`)
         }
@@ -1191,7 +1547,7 @@ function App() {
       }
 
       void window.jplearnDesktop.recordGameResult({
-        slug: activeScript,
+        slug: activeScript === 'kanji_n5' ? activeKanjiDeckSlug : activeScript,
         cardId: roundState.cardId,
         isCorrect,
         minigame: roundState.mode,
@@ -1237,7 +1593,7 @@ function App() {
         setIsRoundResolving(false)
       }, FEEDBACK_REVEAL_MS)
     },
-    [activeGame, activeScript, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats],
+    [activeGame, activeKanjiDeckSlug, activeScript, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats],
   )
 
   useEffect(() => {
@@ -1252,6 +1608,11 @@ function App() {
       }
 
       if (event.key === 'Escape') {
+        if (shortcutMenuOpen) {
+          setShortcutMenuOpen(false)
+          return
+        }
+
         if (selectedChar) {
           setSelectedChar(null)
           return
@@ -1295,6 +1656,16 @@ function App() {
         }
         if (event.key === '4') {
           setNavDirection('forward')
+          setActiveScript('vocab_n5')
+          setView('script_hub')
+        }
+        if (event.key === '5') {
+          setNavDirection('forward')
+          setActiveScript('grammar_patterns')
+          setView('script_hub')
+        }
+        if (event.key === '6') {
+          setNavDirection('forward')
           setView('overview')
         }
       }
@@ -1302,7 +1673,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedChar, showSettings, view])
+  }, [selectedChar, shortcutMenuOpen, showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -1332,12 +1703,14 @@ function App() {
     [summary],
   )
   const curriculumByScript = useMemo(
-    () =>
-      summary?.curriculum?.context_cloze_by_script ?? {
-        hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-        katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-        kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-      },
+    () => ({
+      hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+      katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+      kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+      vocab_n5: { mode: 'context_cloze', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+      grammar_patterns: { mode: 'context_cloze', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+      ...(summary?.curriculum?.context_cloze_by_script ?? {}),
+    }),
     [summary],
   )
   const narrativeSummary = useMemo(
@@ -1356,16 +1729,18 @@ function App() {
     [summary],
   )
   const narrativeByScript = useMemo(
-    () =>
-      summary?.curriculum?.narrative_story_by_script ?? {
-        hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-        katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-        kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-      },
+    () => ({
+      hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+      katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+      kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+      vocab_n5: { mode: 'narrative_story', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+      grammar_patterns: { mode: 'narrative_story', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+      ...(summary?.curriculum?.narrative_story_by_script ?? {}),
+    }),
     [summary],
   )
   const storyReadiness = useMemo(() => {
-    return (['hiragana', 'katakana', 'kanji_n5'] as const).map((script) => {
+    return ALL_SCRIPT_KEYS.map((script) => {
       const metric = curriculumByScript[script]
       const stage1 = metric.stage_distribution[1] ?? 0
       const stage2 = metric.stage_distribution[2] ?? 0
@@ -1414,30 +1789,6 @@ function App() {
   const selectedGameIntro = MINIGAME_INTROS[activeGame]
   const activeScriptStats = scriptStats[activeScript]
   const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : activeBlockCards
-  const narrativeReadiness = useMemo(() => {
-    const stageCounts: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 }
-    for (const card of activeRunCards) {
-      const stage = normalizeCurriculumStage(card.curriculum_stage)
-      stageCounts[stage] += 1
-    }
-    const tracked = stageCounts[1] + stageCounts[2] + stageCounts[3]
-    const chapter2Ready = stageCounts[2] + stageCounts[3]
-    const chapter3Ready = stageCounts[3]
-    return { tracked, chapter2Ready, chapter3Ready }
-  }, [activeRunCards])
-  const narrativeNextUnlockTarget = useMemo(() => {
-    if (narrativeReadiness.tracked === 0) {
-      return 'Next unlock target: start a run in this pool to begin chapter progression.'
-    }
-    if (narrativeReadiness.chapter3Ready === 0) {
-      return 'Next unlock target: promote 1 card to Stage 3 to unlock Chapter 3.'
-    }
-    const remainingToFullChapter3 = Math.max(0, narrativeReadiness.tracked - narrativeReadiness.chapter3Ready)
-    if (remainingToFullChapter3 > 0) {
-      return `Next unlock target: promote ${remainingToFullChapter3} more ${remainingToFullChapter3 === 1 ? 'card' : 'cards'} to Stage 3 for full Chapter 3 coverage.`
-    }
-    return 'Next unlock target: full Chapter 3 coverage reached in this pool.'
-  }, [narrativeReadiness])
 
   // Block progress enhanced with locally-tracked card scores (updates live while playing).
   const blockProgressWithMastery = useMemo(() => {
@@ -1457,6 +1808,16 @@ function App() {
       return { ...block, mastery, unlocked }
     })
   }, [blockProgress, cardScores, activeScript])
+
+  const activeSectionName = useMemo(() => {
+    if (blockProgressWithMastery.length > 0) {
+      return blockProgressWithMastery[activeBlockIndex]?.name ?? null
+    }
+    if (activeScript === 'kanji_n5') {
+      return kanjiLevelProgress.find((level) => level.key === activeKanjiLevel)?.label ?? null
+    }
+    return null
+  }, [blockProgressWithMastery, activeBlockIndex, activeScript, kanjiLevelProgress, activeKanjiLevel])
 
   // Block session is complete when every card in the active block has reached max score.
   // sessionRounds > 0 ensures we don't trigger on a pre-mastered block before answering.
@@ -1479,6 +1840,13 @@ function App() {
     setHistoryPage(1)
   }, [summary])
 
+  useEffect(() => {
+    if (activeScript !== 'kanji_n5' || blockProgress.length > 0) return
+    const fallback = kanjiLevelProgress.find((level) => level.unlocked) ?? kanjiLevelProgress.find((level) => level.total > 0)
+    if (!fallback || fallback.key === activeKanjiLevel) return
+    setActiveKanjiLevel(fallback.key)
+  }, [activeScript, blockProgress.length, kanjiLevelProgress, activeKanjiLevel])
+
   // Lazy-load block data for hiragana + katakana when the overview opens.
   useEffect(() => {
     if (view !== 'overview') return
@@ -1486,9 +1854,21 @@ function App() {
     void Promise.all([
       window.jplearnDesktop.getBlockProgress('hiragana'),
       window.jplearnDesktop.getBlockProgress('katakana'),
+      window.jplearnDesktop.getDeckCards('kanji_n5'),
+      window.jplearnDesktop.getDeckCards('kanji_n4'),
+      window.jplearnDesktop.getDeckCards('kanji_n3'),
+      window.jplearnDesktop.getDeckCards('kanji_n2'),
+      window.jplearnDesktop.getDeckCards('kanji_n1'),
     ])
-      .then(([hira, kata]) => {
+      .then(([hira, kata, kanjiN5Deck, kanjiN4Deck, kanjiN3Deck, kanjiN2Deck, kanjiN1Deck]) => {
         setOverviewBlocks({ hiragana: hira.blocks, katakana: kata.blocks })
+        setOverviewKanjiDeck([
+          ...kanjiN5Deck.cards,
+          ...kanjiN4Deck.cards,
+          ...kanjiN3Deck.cards,
+          ...kanjiN2Deck.cards,
+          ...kanjiN1Deck.cards,
+        ])
       })
       .catch(() => undefined)
       .finally(() => setOverviewBlocksLoading(false))
@@ -1524,17 +1904,50 @@ function App() {
     setShowSettings(false)
   }, [resetRoundCycle])
 
+  const jumpToMainMenu = useCallback(() => {
+    goHome()
+    setShortcutMenuOpen(false)
+  }, [goHome])
+
+  const jumpToOverview = useCallback(() => {
+    setNavDirection('forward')
+    setView('overview')
+    setShortcutMenuOpen(false)
+  }, [])
+
+  const jumpToScriptHub = useCallback((script: ScriptKey) => {
+    setNavDirection('forward')
+    setActiveScript(script)
+    setView('script_hub')
+    setSessionActive(false)
+    setRoundState(null)
+    setRoundFeedback(null)
+    setRoundFeedbackTone(null)
+    setRoundFeedbackPoints(null)
+    setRoundFeedbackAnswer(null)
+    setIsRoundResolving(false)
+    resetRoundCycle()
+    setShortcutMenuOpen(false)
+  }, [resetRoundCycle])
+
+  const openSettingsFromMenu = useCallback(() => {
+    setShowSettings(true)
+    setShortcutMenuOpen(false)
+  }, [])
+
   const resetStudyDb = useCallback(async () => {
     setResettingDb(true)
     setError(null)
     try {
       await window.jplearnDesktop.resetStudyDb()
       // Also wipe all locally-tracked scores and stats so the UI is fully clean.
-      const emptyScores: CardScores = { hiragana: {}, katakana: {}, kanji_n5: {} }
+      const emptyScores: CardScores = { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} }
       const emptyStats: StatsByScript = {
         hiragana: { ...EMPTY_SCRIPT_STATS },
         katakana: { ...EMPTY_SCRIPT_STATS },
         kanji_n5: { ...EMPTY_SCRIPT_STATS },
+        vocab_n5: { ...EMPTY_SCRIPT_STATS },
+        grammar_patterns: { ...EMPTY_SCRIPT_STATS },
       }
       window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(emptyScores))
       window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(emptyStats))
@@ -1589,11 +2002,85 @@ function App() {
   const canTitlebarBack = viewHistoryIndexRef.current > 0
   const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
 
+  useEffect(() => {
+    if (!shortcutMenuOpen) return
+
+    function handlePointerDown(event: MouseEvent): void {
+      const target = event.target as Node
+      if (shortcutMenuRef.current?.contains(target)) return
+      setShortcutMenuOpen(false)
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    return () => window.removeEventListener('mousedown', handlePointerDown)
+  }, [shortcutMenuOpen])
+
   return (
     <main className="app-shell">
       <header className="window-titlebar" aria-label="Window controls">
         <div className="window-titlebar-drag">
           <div className="window-titlebar-nav" role="group" aria-label="App navigation">
+            <div className="titlebar-shortcut-wrap" ref={shortcutMenuRef}>
+              <button
+                type="button"
+                className="window-nav-button"
+                aria-label="Open shortcuts"
+                title="Shortcuts"
+                aria-haspopup="menu"
+                aria-expanded={shortcutMenuOpen}
+                onClick={() => setShortcutMenuOpen((open) => !open)}
+              >
+                <Menu className="window-nav-icon" strokeWidth={2.2} />
+              </button>
+              {shortcutMenuOpen ? (
+                <div className="titlebar-shortcut-menu" role="menu" aria-label="Quick locations">
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToMainMenu}>
+                    <House className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Main Menu
+                  </button>
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToOverview}>
+                    <BarChart3 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Study Overview
+                  </button>
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('hiragana')}>
+                    <span className="titlebar-shortcut-glyph" aria-hidden="true">あ</span>
+                    Hiragana Map
+                  </button>
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('katakana')}>
+                    <span className="titlebar-shortcut-glyph" aria-hidden="true">ア</span>
+                    Katakana Map
+                  </button>
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('kanji_n5')}>
+                    <span className="titlebar-shortcut-glyph" aria-hidden="true">漢</span>
+                    Kanji Map
+                  </button>
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('vocab_n5')}>
+                    <span className="titlebar-shortcut-glyph" aria-hidden="true">語</span>
+                    Words Map
+                  </button>
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={() => jumpToScriptHub('grammar_patterns')}>
+                    <span className="titlebar-shortcut-glyph" aria-hidden="true">話</span>
+                    Conversational Map
+                  </button>
+                  <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={openSettingsFromMenu}>
+                    <Settings className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Settings
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="titlebar-shortcut-item"
+                    onClick={() => {
+                      void loadSummary()
+                      setShortcutMenuOpen(false)
+                    }}
+                  >
+                    <Activity className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Refresh Data
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               className="window-nav-button"
@@ -1657,11 +2144,11 @@ function App() {
           <section className="home-menu panel-glass">
             <h1 className="home-logo">JPLearn</h1>
             <p className="home-copy">
-              Main Menu. Choose a script village, then choose a mini game and jump into the round.
+              Main Menu. Choose a learning track, then pick a minigame and start your run.
             </p>
 
             <div className="menu-grid">
-              {(['hiragana', 'katakana', 'kanji_n5'] as const).map((script, index) => {
+              {(['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns'] as const).map((script, index) => {
                 const glyph = SECTION_META[script].glyph
 
                 return (
@@ -1688,13 +2175,13 @@ function App() {
               <button
                 type="button"
                 className="home-settings-button"
-                aria-keyshortcuts="4"
+                aria-keyshortcuts="6"
                 onClick={() => {
                   setNavDirection('forward')
                   setView('overview')
                 }}
                 aria-label="Open study overview"
-                title="Study Overview (4)"
+                title="Study Overview (6)"
               >
                 <BarChart3 aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
                 Study Overview
@@ -1748,7 +2235,9 @@ function App() {
               <span className="game-stats">
                 {blockProgressWithMastery.length > 0
                   ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length} / ${blockProgressWithMastery.length} blocks mastered`
-                  : 'Choose a minigame to start'}
+                  : activeScript === 'kanji_n5'
+                    ? `${kanjiLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${kanjiLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
+                    : 'Choose a minigame to start'}
               </span>
             </div>
 
@@ -1804,6 +2293,58 @@ function App() {
                   )
                 })}
               </div>
+            ) : activeScript === 'kanji_n5' ? (
+              <div className="jlpt-level-path" role="group" aria-label="Kanji JLPT progression">
+                {kanjiLevelProgress.map((level, index) => {
+                  const isActive = activeKanjiLevel === level.key
+                  const masteryPct = Math.round(level.mastery * 100)
+                  const unavailable = level.total === 0
+                  return (
+                    <article
+                      key={level.key}
+                      className={`jlpt-level-node ${isActive ? 'is-active' : ''} ${(!level.unlocked || unavailable) ? 'is-locked' : ''}`}
+                      style={{ animationDelay: `${80 + index * 45}ms` }}
+                    >
+                      <button
+                        type="button"
+                        className="jlpt-level-button"
+                        disabled={!level.unlocked || unavailable}
+                        onClick={() => {
+                          setActiveKanjiLevel(level.key)
+                          setSessionActive(false)
+                          setRoundState(null)
+                          setRoundFeedback(null)
+                          setRoundFeedbackTone(null)
+                          setRoundFeedbackPoints(null)
+                          setRoundFeedbackAnswer(null)
+                          setIsRoundResolving(false)
+                          setLivesRemaining(DEFAULT_LIVES)
+                          resetRoundCycle()
+                        }}
+                        aria-pressed={isActive}
+                        aria-label={`${level.label}, ${unavailable ? 'no cards yet' : `${masteryPct}% mastered`}`}
+                      >
+                        <div className="jlpt-level-header">
+                          <strong>{level.label}</strong>
+                          {!level.unlocked || unavailable ? (
+                            <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
+                          ) : null}
+                        </div>
+                        <span className="jlpt-level-preview" lang="ja" aria-hidden="true">
+                          {level.sampleChars.length > 0 ? level.sampleChars.join(' ') : '—'}
+                        </span>
+                        <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
+                          <div
+                            className="block-node-bar"
+                            style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties}
+                          />
+                        </div>
+                        <span className="jlpt-level-meta">{level.total} cards • {masteryPct}%</span>
+                      </button>
+                    </article>
+                  )
+                })}
+              </div>
             ) : null}
 
             {/* Minigame selector – shown below block path once a block is active */}
@@ -1813,11 +2354,15 @@ function App() {
                   <h3>
                     {blockProgressWithMastery.length > 0
                       ? `Choose a minigame — ${blockProgressWithMastery[activeBlockIndex]?.name ?? ''} (${activeBlockCards.length} cards)`
-                      : 'Choose a minigame'}
+                      : activeScript === 'kanji_n5'
+                        ? `Choose a minigame — ${activeSectionName ?? 'JLPT Level'} (${activeBlockCards.length} cards)`
+                        : 'Choose a minigame'}
                   </h3>
                 </div>
                 <div className="minigame-grid">
-                  {MINIGAMES.map((game, index) => {
+                  {availableMinigames.map((gameKey, index) => {
+                    const game = MINIGAMES.find((entry) => entry.key === gameKey)
+                    if (!game) return null
                     const gameStats = minigameStats[activeScript][game.key]
                     const accuracy =
                       gameStats.attempted > 0
@@ -1876,9 +2421,6 @@ function App() {
                             <strong>{gameStats.points}</strong>
                           </span>
                         </div>
-                        {game.key === 'narrative_story' ? (
-                          <p className="game-story-readiness">Chapter 3 ready in pool: {narrativeReadiness.chapter3Ready}</p>
-                        ) : null}
                         <button
                           type="button"
                           className="play-cta-button"
@@ -1930,8 +2472,8 @@ function App() {
             <div className="brand-block">
               <span className="brand-kicker">
                 {SCRIPT_LABELS[activeScript]}
-                {blockProgressWithMastery.length > 0 && blockProgressWithMastery[activeBlockIndex]
-                  ? ` · ${blockProgressWithMastery[activeBlockIndex].name}`
+                {activeSectionName
+                  ? ` · ${activeSectionName}`
                   : ' Run'}
               </span>
               <h1>{selectedGameMeta?.title ?? 'Minigame'}</h1>
@@ -1960,7 +2502,7 @@ function App() {
                 <h2 className="block-complete-title">Block complete!</h2>
                 <p className="block-complete-copy">
                   You answered every card in{' '}
-                  <strong>{blockProgressWithMastery[activeBlockIndex]?.name ?? 'this block'}</strong>{' '}
+                  <strong>{activeSectionName ?? 'this section'}</strong>{' '}
                   correctly. Head back to the map to continue your path.
                 </p>
                 <div className="game-actions">
@@ -2037,7 +2579,7 @@ function App() {
                       <span>{interleaveSurpriseEvery}</span>
                     </label>
                     <div className="interleave-weight-grid">
-                      {(['romaji_sprint', 'meaning_match', 'character_match', 'context_cloze'] as const).map((mode) => (
+                      {availableInterleaveModes.map((mode) => (
                         <label key={mode} className="interleave-weight-row">
                           {MINIGAMES.find((game) => game.key === mode)?.title ?? mode}
                           <input
@@ -2057,27 +2599,6 @@ function App() {
                         </label>
                       ))}
                     </div>
-                  </section>
-                ) : null}
-
-                {activeGame === 'narrative_story' ? (
-                  <section className="interleave-controls" aria-label="Narrative chapter readiness">
-                    <p className="interleave-controls-title">Story chapter readiness</p>
-                    <div className="activity-window-metrics">
-                      <span className="metric-accent-insight"><strong className="live-value">{narrativeReadiness.tracked}</strong> tracked cards</span>
-                      <span className="metric-accent-ocean"><strong className="live-value">{narrativeReadiness.chapter2Ready}</strong> chapter 2 ready</span>
-                      <span className="metric-accent-streak"><strong className="live-value">{narrativeReadiness.chapter3Ready}</strong> chapter 3 ready</span>
-                    </div>
-                    {narrativeReadiness.tracked === 0 ? (
-                      <p className="status-line">No cards available in this run pool yet.</p>
-                    ) : narrativeReadiness.chapter3Ready === 0 ? (
-                      <p className="status-line">Chapter 3 is still locked for this pool. Promote cards to stage 3 to unlock it.</p>
-                    ) : narrativeReadiness.chapter2Ready === 0 ? (
-                      <p className="status-line">Chapter 2 is still locked for this pool. Promote cards to stage 2 to unlock it.</p>
-                    ) : (
-                      <p className="status-line">Higher chapters are available. Keep pushing stage 3 for full story coverage.</p>
-                    )}
-                    <p className="status-line">{narrativeNextUnlockTarget}</p>
                   </section>
                 ) : null}
 
@@ -2133,7 +2654,6 @@ function App() {
                       ? ` · ${MINIGAMES.find((game) => game.key === roundState.mode)?.title ?? roundState.mode}`
                       : ''}
                   </strong>
-                  {roundState.chapterLabel ? <span className="chapter-pill">{roundState.chapterLabel}</span> : null}
                   <span className="stage-pill">Stage {roundState.curriculumStage}</span>
                   {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
                 </div>
@@ -2419,285 +2939,449 @@ function App() {
                     </div>
                   )
                 })}
-              </div>
-            </div>
-          </section>
 
-          <section className="panel-glass activity-summary-panel">
-            <div className="panel-head">
-              <h2 className="panel-title-with-icon"><CalendarDays aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Study Activity</h2>
-              <div className="panel-actions">
-                <span>Rolling windows for consistency and momentum</span>
-              </div>
-            </div>
+                {overviewKanjiLevelProgress.some((level) => level.total > 0) ? (
+                  <div className="char-mastery-script">
+                    <h3 className="char-mastery-script-name">Kanji by JLPT Level</h3>
+                    <div className="char-mastery-tiles-grid">
+                      {overviewKanjiLevelProgress.filter((level) => level.total > 0).map((level) => {
+                        const blockKey = `kanji-${level.key}`
+                        const isActive = expandedBlocks === blockKey
+                        const pct = Math.round(level.mastery * 100)
+                        const page = Math.max(1, kanjiOverviewPage[level.key] ?? 1)
+                        const pageCount = Math.max(1, Math.ceil(level.cardIds.length / KANJI_OVERVIEW_PAGE_SIZE))
+                        const clampedPage = Math.min(page, pageCount)
+                        const start = (clampedPage - 1) * KANJI_OVERVIEW_PAGE_SIZE
+                        const visibleCards = overviewKanjiDeck
+                          .filter((card) => jlptTagFromCard(card) === level.key)
+                          .slice(start, start + KANJI_OVERVIEW_PAGE_SIZE)
+                        return (
+                          <Fragment key={level.key}>
+                            <button
+                              type="button"
+                              className={`cmb-tile ${isActive ? 'is-active' : ''}`}
+                              onClick={() => {
+                                setExpandedBlocks(isActive ? null : blockKey)
+                                if (!isActive) {
+                                  setKanjiOverviewPage((previous) => ({ ...previous, [level.key]: 1 }))
+                                }
+                              }}
+                              aria-expanded={isActive}
+                              aria-label={`${level.label}: ${pct}% mastered`}
+                            >
+                              <div className="cmb-tile-chars" lang="ja" aria-hidden="true">
+                                {level.sampleChars.join(' ')}
+                              </div>
+                              <strong className="cmb-tile-name">{level.label}</strong>
+                              <div className="cmb-bar-wrap">
+                                <div className="cmb-bar" style={{ '--cmb-pct': `${pct}%` } as CSSProperties} />
+                              </div>
+                              <div className="cmb-tile-pct">{level.total} cards • {pct}%</div>
+                            </button>
 
-            {!hasAnyActivity ? (
-              <p className="status-line">No recent activity yet. Complete a round to populate weekly and monthly summaries.</p>
-            ) : (
-              <div className="activity-window-grid">
-                {[activity.week, activity.month].map((windowData, index) => (
-                  <article
-                    key={windowData.days}
-                    className="activity-window-card"
-                    style={{ animationDelay: `${140 + index * 80}ms` }}
-                  >
-                    <h3>Last {windowData.days} Days</h3>
-                    <div className="activity-window-metrics">
-                      <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`reviewed-${windowData.days}-${windowData.reviewed}`} className="live-value">{windowData.reviewed}</strong> reviewed</span>
-                      <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`correct-${windowData.days}-${windowData.correct}`} className="live-value">{windowData.correct}</strong> correct</span>
-                      <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`incorrect-${windowData.days}-${windowData.incorrect}`} className="live-value">{windowData.incorrect}</strong> incorrect</span>
-                      <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`accuracy-${windowData.days}-${windowData.accuracy}`} className="live-value">{windowData.accuracy}%</strong> accuracy</span>
-                      <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`earned-${windowData.days}-${windowData.points_earned}`} className="live-value">{windowData.points_earned}</strong> points</span>
-                      <span className="metric-accent-warning"><CalendarDays aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`days-${windowData.days}-${windowData.active_days}`} className="live-value">{windowData.active_days}</strong> active days</span>
+                            {isActive ? (
+                              <div className="char-mastery-detail-inline">
+                                <div className="char-mastery-chips">
+                                  {visibleCards.map((card) => {
+                                    const score = cardScores.kanji_n5[card.id] ?? 0
+                                    const levelScore = Math.min(score, CARD_MASTERY_MAX)
+                                    return (
+                                      <button
+                                        key={card.id}
+                                        type="button"
+                                        className="char-mastery-chip"
+                                        data-level={levelScore}
+                                        aria-label={`${card.character} (${card.romaji}): ${levelScore}/${CARD_MASTERY_MAX}`}
+                                        lang="ja"
+                                        onClick={() => setSelectedChar({ character: card.character, romaji: card.romaji, meaning: card.meaning, score: levelScore })}
+                                      >
+                                        {card.character}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                                {pageCount > 1 ? (
+                                  <div className="kanji-chip-pagination">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setKanjiOverviewPage((previous) => ({
+                                          ...previous,
+                                          [level.key]: Math.max(1, clampedPage - 1),
+                                        }))
+                                      }}
+                                      disabled={clampedPage <= 1}
+                                    >
+                                      Previous
+                                    </button>
+                                    <span>Page {clampedPage} / {pageCount}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setKanjiOverviewPage((previous) => ({
+                                          ...previous,
+                                          [level.key]: Math.min(pageCount, clampedPage + 1),
+                                        }))
+                                      }}
+                                      disabled={clampedPage >= pageCount}
+                                    >
+                                      Next
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </Fragment>
+                        )
+                      })}
                     </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="panel-glass activity-summary-panel">
-            <div className="panel-head">
-              <h2 className="panel-title-with-icon"><BookText aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Context Cloze Curriculum</h2>
-              <div className="panel-actions">
-                <span>Persisted stage progression and mode accuracy</span>
-              </div>
-            </div>
-
-            <div className="activity-window-grid">
-              <article className="activity-window-card">
-                <h3>Mode Performance</h3>
-                <div className="activity-window-metrics">
-                  <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.attempts}</strong> attempts</span>
-                  <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy}%</strong> accuracy</span>
-                  <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy_7d}%</strong> 7-day accuracy</span>
-                </div>
-              </article>
-              <article className="activity-window-card">
-                <h3>Stage Distribution</h3>
-                <div className="activity-window-metrics">
-                  <span className="metric-accent-warning"><strong className="live-value">{curriculumSummary.stage_distribution[1]}</strong> stage 1</span>
-                  <span className="metric-accent-ocean"><strong className="live-value">{curriculumSummary.stage_distribution[2]}</strong> stage 2</span>
-                  <span className="metric-accent-streak"><strong className="live-value">{curriculumSummary.stage_distribution[3]}</strong> stage 3</span>
-                </div>
-              </article>
-            </div>
-
-            <div className="activity-window-grid" style={{ marginTop: '10px' }}>
-              {(['hiragana', 'katakana', 'kanji_n5'] as const).map((script) => {
-                const metric = curriculumByScript[script]
-                return (
-                  <article key={script} className="activity-window-card">
-                    <h3>{SCRIPT_LABELS[script]}</h3>
-                    <div className="activity-window-metrics">
-                      <span className="metric-accent-insight"><strong className="live-value">{metric.attempts}</strong> attempts</span>
-                      <span className="metric-accent-skill"><strong className="live-value">{metric.accuracy}%</strong> accuracy</span>
-                      <span className="metric-accent-ocean"><strong className="live-value">{metric.accuracy_7d}%</strong> 7-day</span>
-                      <span className="metric-accent-warning"><strong className="live-value">{metric.stage_distribution[1]}/{metric.stage_distribution[2]}/{metric.stage_distribution[3]}</strong> stage 1/2/3</span>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </section>
-
-          <section className="panel-glass activity-summary-panel">
-            <div className="panel-head">
-              <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Story Progress</h2>
-              <div className="panel-actions">
-                <span>Narrative attempts, chapter accuracy, and completion readiness</span>
-              </div>
-            </div>
-
-            <div className="activity-window-grid">
-              <article className="activity-window-card">
-                <h3>Narrative Mode Performance</h3>
-                <div className="activity-window-metrics">
-                  <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.attempts}</strong> attempts</span>
-                  <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.accuracy}%</strong> accuracy</span>
-                  <span className="metric-accent-ocean"><strong className="live-value">{narrativeSummary.chapters['3'].completion_rate}%</strong> Chapter 3 completion</span>
-                </div>
-              </article>
-              {(['1', '2', '3'] as const).map((chapterKey) => (
-                <article key={chapterKey} className="activity-window-card">
-                  <h3>Chapter {chapterKey}</h3>
-                  <div className="activity-window-metrics">
-                    <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.chapters[chapterKey].attempts}</strong> attempts</span>
-                    <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.chapters[chapterKey].accuracy}%</strong> accuracy</span>
-                    <span className="metric-accent-streak"><strong className="live-value">{narrativeSummary.chapters[chapterKey].completion_rate}%</strong> completion</span>
                   </div>
-                </article>
-              ))}
-            </div>
-
-            <div className="activity-window-grid">
-              {storyReadiness.map((story, index) => (
-                <article
-                  key={story.script}
-                  className="activity-window-card"
-                  style={{ animationDelay: `${140 + index * 70}ms` }}
-                >
-                  <h3>{SCRIPT_LABELS[story.script]}</h3>
-                  <div className="activity-window-metrics">
-                    <span className="metric-accent-insight"><strong className="live-value">{narrativeByScript[story.script].attempts}</strong> attempts</span>
-                    <span className="metric-accent-skill"><strong className="live-value">{narrativeByScript[story.script].accuracy}%</strong> accuracy</span>
-                    <span className="metric-accent-ocean"><strong className="live-value">{narrativeByScript[story.script].chapters['2'].completion_rate}%</strong> Chapter 2 ready</span>
-                    <span className="metric-accent-streak"><strong className="live-value">{narrativeByScript[story.script].chapters['3'].completion_rate}%</strong> Chapter 3 ready</span>
-                  </div>
-                </article>
-              ))}
+                ) : null}
+              </div>
             </div>
           </section>
 
-          <section className="panel-glass mistakes-summary-panel">
-            <div className="panel-head">
-              <h2 className="panel-title-with-icon"><AlertTriangle aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Mistake Breakdown</h2>
-              <div className="panel-actions">
-                <span>Top weak areas by error rate</span>
+          <section className="panel-glass activity-summary-panel overview-collapsible-panel">
+            <button
+              type="button"
+              className="overview-panel-toggle"
+              onClick={() => toggleOverviewSection('studyActivity')}
+              aria-expanded={overviewSectionExpanded.studyActivity}
+              aria-controls="overview-study-activity-body"
+            >
+              <div className="panel-head">
+                <h2 className="panel-title-with-icon"><CalendarDays aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Study Activity</h2>
+                <div className="panel-actions">
+                  <span>Rolling windows for consistency and momentum</span>
+                </div>
+                <span className={`overview-panel-chevron ${overviewSectionExpanded.studyActivity ? 'is-open' : ''}`} aria-hidden="true">▾</span>
               </div>
-            </div>
+            </button>
 
-            {!hasMistakeData ? (
-              <p className="status-line">No mistake data yet. Incorrect answers will populate script/tag breakdowns here.</p>
-            ) : (
-              <div className="mistake-grid">
-                {mistakes.map((row, index) => (
-                  <article
-                    key={row.key}
-                    className="mistake-card"
-                    style={{ animationDelay: `${140 + index * 60}ms` }}
-                  >
-                    <h3>{row.key}</h3>
-                    <div className="mistake-card-metrics">
-                      <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`rate-${row.key}-${row.error_rate}`} className="live-value">{row.error_rate}%</strong> error rate</span>
-                      <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`mistakes-${row.key}-${row.mistakes}`} className="live-value">{row.mistakes}</strong> mistakes</span>
-                      <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`attempts-${row.key}-${row.attempts}`} className="live-value">{row.attempts}</strong> attempts</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="panel-glass timeline-summary-panel">
-            <div className="panel-head">
-              <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Item Timeline</h2>
-              <div className="panel-actions">
-                <span>Recent review events and trend per item</span>
-              </div>
-            </div>
-
-            {itemHistory.length === 0 ? (
-              <p className="status-line">No item history yet. Complete review rounds to build timelines.</p>
-            ) : (
-              <>
-                <div className="timeline-grid">
-                  {pagedHistory.map((item, index) => (
+            <div id="overview-study-activity-body" className={`overview-panel-body ${overviewSectionExpanded.studyActivity ? 'is-open' : ''}`}>
+              {!hasAnyActivity ? (
+                <p className="status-line">No recent activity yet. Complete a round to populate weekly and monthly summaries.</p>
+              ) : (
+                <div className="activity-window-grid">
+                  {[activity.week, activity.month].map((windowData, index) => (
                     <article
-                      key={item.key}
-                      className="timeline-card"
-                      style={{ animationDelay: `${140 + index * 60}ms` }}
+                      key={windowData.days}
+                      className="activity-window-card"
+                      style={{ animationDelay: `${140 + index * 80}ms` }}
                     >
-                      <div className="timeline-card-head">
-                        <h3>{item.prompt}</h3>
-                        <span className={`timeline-trend timeline-trend-${item.trend}`}>{item.trend}</span>
-                      </div>
-                      <p className="timeline-card-subhead">{item.script_tag} • {item.deck}</p>
-                      <div className="timeline-events">
-                        {item.events.map((event, eventIndex) => (
-                          <span key={`${item.key}-${eventIndex}`} className={`timeline-event timeline-event-${event.outcome}`}>
-                            <strong>{event.outcome === 'correct' ? '✓' : '✕'}</strong>
-                            {event.points_delta} pts
-                          </span>
-                        ))}
+                      <h3>Last {windowData.days} Days</h3>
+                      <div className="activity-window-metrics">
+                        <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`reviewed-${windowData.days}-${windowData.reviewed}`} className="live-value">{windowData.reviewed}</strong> reviewed</span>
+                        <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`correct-${windowData.days}-${windowData.correct}`} className="live-value">{windowData.correct}</strong> correct</span>
+                        <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`incorrect-${windowData.days}-${windowData.incorrect}`} className="live-value">{windowData.incorrect}</strong> incorrect</span>
+                        <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`accuracy-${windowData.days}-${windowData.accuracy}`} className="live-value">{windowData.accuracy}%</strong> accuracy</span>
+                        <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`earned-${windowData.days}-${windowData.points_earned}`} className="live-value">{windowData.points_earned}</strong> points</span>
+                        <span className="metric-accent-warning"><CalendarDays aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`days-${windowData.days}-${windowData.active_days}`} className="live-value">{windowData.active_days}</strong> active days</span>
                       </div>
                     </article>
                   ))}
                 </div>
-                <div className="timeline-pagination">
-                  <button
-                    type="button"
-                    disabled={clampedHistoryPage <= 1}
-                    onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
-                  >
-                    Previous
-                  </button>
-                  <span>Page {clampedHistoryPage} / {historyPageCount}</span>
-                  <button
-                    type="button"
-                    disabled={clampedHistoryPage >= historyPageCount}
-                    onClick={() => setHistoryPage((prev) => Math.min(historyPageCount, prev + 1))}
-                  >
-                    Next
-                  </button>
-                </div>
-              </>
-            )}
+              )}
+            </div>
           </section>
 
-          <section className="panel-glass deck-panel overview-deck-panel">
-            <div className="panel-head">
-              <h2>Deck Snapshot</h2>
-              <div className="panel-actions">
-                <span>Mastery and daily completion by deck</span>
+          <section className="panel-glass activity-summary-panel overview-collapsible-panel">
+            <button
+              type="button"
+              className="overview-panel-toggle"
+              onClick={() => toggleOverviewSection('contextClozeCurriculum')}
+              aria-expanded={overviewSectionExpanded.contextClozeCurriculum}
+              aria-controls="overview-context-cloze-curriculum-body"
+            >
+              <div className="panel-head">
+                <h2 className="panel-title-with-icon"><BookText aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Context Cloze Curriculum</h2>
+                <div className="panel-actions">
+                  <span>Persisted stage progression and mode accuracy</span>
+                </div>
+                <span className={`overview-panel-chevron ${overviewSectionExpanded.contextClozeCurriculum ? 'is-open' : ''}`} aria-hidden="true">▾</span>
               </div>
-            </div>
+            </button>
 
-            {loading && <p className="status-line">Loading deck metrics...</p>}
-            {error && <p className="status-line status-error">Unable to load summary: {error}</p>}
-            {!loading && !error && decks.length === 0 ? <p className="status-line">No decks found.</p> : null}
+            <div id="overview-context-cloze-curriculum-body" className={`overview-panel-body ${overviewSectionExpanded.contextClozeCurriculum ? 'is-open' : ''}`}>
+              <div className="activity-window-grid">
+                <article className="activity-window-card">
+                  <h3>Mode Performance</h3>
+                  <div className="activity-window-metrics">
+                    <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.attempts}</strong> attempts</span>
+                    <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy}%</strong> accuracy</span>
+                    <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy_7d}%</strong> 7-day accuracy</span>
+                  </div>
+                </article>
+                <article className="activity-window-card">
+                  <h3>Stage Distribution</h3>
+                  <div className="activity-window-metrics">
+                    <span className="metric-accent-warning"><strong className="live-value">{curriculumSummary.stage_distribution[1]}</strong> stage 1</span>
+                    <span className="metric-accent-ocean"><strong className="live-value">{curriculumSummary.stage_distribution[2]}</strong> stage 2</span>
+                    <span className="metric-accent-streak"><strong className="live-value">{curriculumSummary.stage_distribution[3]}</strong> stage 3</span>
+                  </div>
+                </article>
+              </div>
 
-            {!loading && !error && decks.length > 0 ? (
-              <div className="deck-grid">
-                {decks.map((deck, index) => {
-                  const mastery = deck.total > 0 ? Math.round((deck.mastered / deck.total) * 100) : 0
-                  const todayProgress =
-                    deck.due_today > 0
-                      ? Math.min(100, Math.round((deck.completed_today / deck.due_today) * 100))
-                      : 0
-
+              <div className="activity-window-grid" style={{ marginTop: '10px' }}>
+                {ALL_SCRIPT_KEYS.map((script) => {
+                  const metric = curriculumByScript[script]
                   return (
-                    <article
-                      key={deck.slug}
-                      className="deck-card"
-                      style={{ animationDelay: `${180 + index * 70}ms` }}
-                    >
-                      <div className="deck-card-head">
-                        <h3>{deck.name}</h3>
-                        <span>{deck.total} cards</span>
-                      </div>
-
-                      <div className="meter">
-                        <div className="meter-label">
-                          <span>Mastery</span>
-                          <strong>{mastery}%</strong>
-                        </div>
-                        <div className="meter-track">
-                          <div className="meter-fill" style={{ width: `${mastery}%` }} />
-                        </div>
-                      </div>
-
-                      <div className="meter">
-                        <div className="meter-label">
-                          <span>Today</span>
-                          <strong>
-                            {deck.completed_today}/{deck.due_today}
-                          </strong>
-                        </div>
-                        <div className="meter-track">
-                          <div className="meter-fill meter-fill-alt" style={{ width: `${todayProgress}%` }} />
-                        </div>
+                    <article key={script} className="activity-window-card">
+                      <h3>{SCRIPT_LABELS[script]}</h3>
+                      <div className="activity-window-metrics">
+                        <span className="metric-accent-insight"><strong className="live-value">{metric.attempts}</strong> attempts</span>
+                        <span className="metric-accent-skill"><strong className="live-value">{metric.accuracy}%</strong> accuracy</span>
+                        <span className="metric-accent-ocean"><strong className="live-value">{metric.accuracy_7d}%</strong> 7-day</span>
+                        <span className="metric-accent-warning"><strong className="live-value">{metric.stage_distribution[1]}/{metric.stage_distribution[2]}/{metric.stage_distribution[3]}</strong> stage 1/2/3</span>
                       </div>
                     </article>
                   )
                 })}
               </div>
-            ) : null}
+            </div>
+          </section>
 
-            <footer className="panel-foot">
-              <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`completed-${totals.completedToday}`} className="live-value">{totals.completedToday}</strong> cards completed today</span>
-              <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`best-day-${streak.best_days}`} className="live-value">{streak.best_days}</strong> day best streak</span>
-            </footer>
+          <section className="panel-glass activity-summary-panel overview-collapsible-panel">
+            <button
+              type="button"
+              className="overview-panel-toggle"
+              onClick={() => toggleOverviewSection('storyProgress')}
+              aria-expanded={overviewSectionExpanded.storyProgress}
+              aria-controls="overview-story-progress-body"
+            >
+              <div className="panel-head">
+                <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Story Progress</h2>
+                <div className="panel-actions">
+                  <span>Narrative attempts, chapter accuracy, and completion readiness</span>
+                </div>
+                <span className={`overview-panel-chevron ${overviewSectionExpanded.storyProgress ? 'is-open' : ''}`} aria-hidden="true">▾</span>
+              </div>
+            </button>
+
+            <div id="overview-story-progress-body" className={`overview-panel-body ${overviewSectionExpanded.storyProgress ? 'is-open' : ''}`}>
+              <div className="activity-window-grid">
+                <article className="activity-window-card">
+                  <h3>Narrative Mode Performance</h3>
+                  <div className="activity-window-metrics">
+                    <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.attempts}</strong> attempts</span>
+                    <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.accuracy}%</strong> accuracy</span>
+                    <span className="metric-accent-ocean"><strong className="live-value">{narrativeSummary.chapters['3'].completion_rate}%</strong> Chapter 3 completion</span>
+                  </div>
+                </article>
+                {(['1', '2', '3'] as const).map((chapterKey) => (
+                  <article key={chapterKey} className="activity-window-card">
+                    <h3>Chapter {chapterKey}</h3>
+                    <div className="activity-window-metrics">
+                      <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.chapters[chapterKey].attempts}</strong> attempts</span>
+                      <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.chapters[chapterKey].accuracy}%</strong> accuracy</span>
+                      <span className="metric-accent-streak"><strong className="live-value">{narrativeSummary.chapters[chapterKey].completion_rate}%</strong> completion</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="activity-window-grid">
+                {storyReadiness.map((story, index) => (
+                  <article
+                    key={story.script}
+                    className="activity-window-card"
+                    style={{ animationDelay: `${140 + index * 70}ms` }}
+                  >
+                    <h3>{SCRIPT_LABELS[story.script]}</h3>
+                    <div className="activity-window-metrics">
+                      <span className="metric-accent-insight"><strong className="live-value">{narrativeByScript[story.script].attempts}</strong> attempts</span>
+                      <span className="metric-accent-skill"><strong className="live-value">{narrativeByScript[story.script].accuracy}%</strong> accuracy</span>
+                      <span className="metric-accent-ocean"><strong className="live-value">{narrativeByScript[story.script].chapters['2'].completion_rate}%</strong> Chapter 2 ready</span>
+                      <span className="metric-accent-streak"><strong className="live-value">{narrativeByScript[story.script].chapters['3'].completion_rate}%</strong> Chapter 3 ready</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="panel-glass mistakes-summary-panel overview-collapsible-panel">
+            <button
+              type="button"
+              className="overview-panel-toggle"
+              onClick={() => toggleOverviewSection('mistakeBreakdown')}
+              aria-expanded={overviewSectionExpanded.mistakeBreakdown}
+              aria-controls="overview-mistake-breakdown-body"
+            >
+              <div className="panel-head">
+                <h2 className="panel-title-with-icon"><AlertTriangle aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Mistake Breakdown</h2>
+                <div className="panel-actions">
+                  <span>Top weak areas by error rate</span>
+                </div>
+                <span className={`overview-panel-chevron ${overviewSectionExpanded.mistakeBreakdown ? 'is-open' : ''}`} aria-hidden="true">▾</span>
+              </div>
+            </button>
+
+            <div id="overview-mistake-breakdown-body" className={`overview-panel-body ${overviewSectionExpanded.mistakeBreakdown ? 'is-open' : ''}`}>
+              {!hasMistakeData ? (
+                <p className="status-line">No mistake data yet. Incorrect answers will populate script/tag breakdowns here.</p>
+              ) : (
+                <div className="mistake-grid">
+                  {mistakes.map((row, index) => (
+                    <article
+                      key={row.key}
+                      className="mistake-card"
+                      style={{ animationDelay: `${140 + index * 60}ms` }}
+                    >
+                      <h3>{row.key}</h3>
+                      <div className="mistake-card-metrics">
+                        <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`rate-${row.key}-${row.error_rate}`} className="live-value">{row.error_rate}%</strong> error rate</span>
+                        <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`mistakes-${row.key}-${row.mistakes}`} className="live-value">{row.mistakes}</strong> mistakes</span>
+                        <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`attempts-${row.key}-${row.attempts}`} className="live-value">{row.attempts}</strong> attempts</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="panel-glass timeline-summary-panel overview-collapsible-panel">
+            <button
+              type="button"
+              className="overview-panel-toggle"
+              onClick={() => toggleOverviewSection('itemTimeline')}
+              aria-expanded={overviewSectionExpanded.itemTimeline}
+              aria-controls="overview-item-timeline-body"
+            >
+              <div className="panel-head">
+                <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Item Timeline</h2>
+                <div className="panel-actions">
+                  <span>Recent review events and trend per item</span>
+                </div>
+                <span className={`overview-panel-chevron ${overviewSectionExpanded.itemTimeline ? 'is-open' : ''}`} aria-hidden="true">▾</span>
+              </div>
+            </button>
+
+            <div id="overview-item-timeline-body" className={`overview-panel-body ${overviewSectionExpanded.itemTimeline ? 'is-open' : ''}`}>
+              {itemHistory.length === 0 ? (
+                <p className="status-line">No item history yet. Complete review rounds to build timelines.</p>
+              ) : (
+                <>
+                  <div className="timeline-grid">
+                    {pagedHistory.map((item, index) => (
+                      <article
+                        key={item.key}
+                        className="timeline-card"
+                        style={{ animationDelay: `${140 + index * 60}ms` }}
+                      >
+                        <div className="timeline-card-head">
+                          <h3>{item.prompt}</h3>
+                          <span className={`timeline-trend timeline-trend-${item.trend}`}>{item.trend}</span>
+                        </div>
+                        <p className="timeline-card-subhead">{item.script_tag} • {item.deck}</p>
+                        <div className="timeline-events">
+                          {item.events.map((event, eventIndex) => (
+                            <span key={`${item.key}-${eventIndex}`} className={`timeline-event timeline-event-${event.outcome}`}>
+                              <strong>{event.outcome === 'correct' ? '✓' : '✕'}</strong>
+                              {event.points_delta} pts
+                            </span>
+                          ))}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="timeline-pagination">
+                    <button
+                      type="button"
+                      disabled={clampedHistoryPage <= 1}
+                      onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
+                    >
+                      Previous
+                    </button>
+                    <span>Page {clampedHistoryPage} / {historyPageCount}</span>
+                    <button
+                      type="button"
+                      disabled={clampedHistoryPage >= historyPageCount}
+                      onClick={() => setHistoryPage((prev) => Math.min(historyPageCount, prev + 1))}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+
+          <section className="panel-glass deck-panel overview-deck-panel overview-collapsible-panel">
+            <button
+              type="button"
+              className="overview-panel-toggle"
+              onClick={() => toggleOverviewSection('deckSnapshot')}
+              aria-expanded={overviewSectionExpanded.deckSnapshot}
+              aria-controls="overview-deck-snapshot-body"
+            >
+              <div className="panel-head">
+                <h2>Deck Snapshot</h2>
+                <div className="panel-actions">
+                  <span>Mastery and daily completion by deck</span>
+                </div>
+                <span className={`overview-panel-chevron ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`} aria-hidden="true">▾</span>
+              </div>
+            </button>
+
+            <div id="overview-deck-snapshot-body" className={`overview-panel-body ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`}>
+              {loading && <p className="status-line">Loading deck metrics...</p>}
+              {error && <p className="status-line status-error">Unable to load summary: {error}</p>}
+              {!loading && !error && decks.length === 0 ? <p className="status-line">No decks found.</p> : null}
+
+              {!loading && !error && decks.length > 0 ? (
+                <div className="deck-grid">
+                  {decks.map((deck, index) => {
+                    const mastery = deck.total > 0 ? Math.round((deck.mastered / deck.total) * 100) : 0
+                    const todayProgress =
+                      deck.due_today > 0
+                        ? Math.min(100, Math.round((deck.completed_today / deck.due_today) * 100))
+                        : 0
+
+                    return (
+                      <article
+                        key={deck.slug}
+                        className="deck-card"
+                        style={{ animationDelay: `${180 + index * 70}ms` }}
+                      >
+                        <div className="deck-card-head">
+                          <h3>{deck.name}</h3>
+                          <span>{deck.total} cards</span>
+                        </div>
+
+                        <div className="meter">
+                          <div className="meter-label">
+                            <span>Mastery</span>
+                            <strong>{mastery}%</strong>
+                          </div>
+                          <div className="meter-track">
+                            <div className="meter-fill" style={{ width: `${mastery}%` }} />
+                          </div>
+                        </div>
+
+                        <div className="meter">
+                          <div className="meter-label">
+                            <span>Today</span>
+                            <strong>
+                              {deck.completed_today}/{deck.due_today}
+                            </strong>
+                          </div>
+                          <div className="meter-track">
+                            <div className="meter-fill meter-fill-alt" style={{ width: `${todayProgress}%` }} />
+                          </div>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              ) : null}
+
+              <footer className="panel-foot">
+                <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`completed-${totals.completedToday}`} className="live-value">{totals.completedToday}</strong> cards completed today</span>
+                <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`best-day-${streak.best_days}`} className="live-value">{streak.best_days}</strong> day best streak</span>
+              </footer>
+            </div>
           </section>
         </div>
       ) : null}
@@ -2779,8 +3463,8 @@ function App() {
               <div className="settings-shortcuts">
                 <code className="command-hint">Ctrl+,</code><span>Settings</span>
                 <code className="command-hint">Esc</code><span>Close modal / back</span>
-                <code className="command-hint">1 / 2 / 3</code><span>Script villages (home)</span>
-                <code className="command-hint">4</code><span>Study overview (home)</span>
+                <code className="command-hint">1 / 2 / 3 / 4 / 5</code><span>Learning tracks (home)</span>
+                <code className="command-hint">6</code><span>Study overview (home)</span>
               </div>
             </div>
           </div>

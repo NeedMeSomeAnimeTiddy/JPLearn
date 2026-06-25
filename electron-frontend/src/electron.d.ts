@@ -71,7 +71,7 @@ interface StudySummary {
         3: number
       }
     }
-    context_cloze_by_script: Record<'hiragana' | 'katakana' | 'kanji_n5', {
+    context_cloze_by_script: Record<ScriptCurriculumSlug, {
       mode: string
       script_tag: string
       attempts: number
@@ -94,7 +94,7 @@ interface StudySummary {
         completion_rate: number
       }>
     }
-    narrative_story_by_script: Record<'hiragana' | 'katakana' | 'kanji_n5', {
+    narrative_story_by_script: Record<ScriptCurriculumSlug, {
       mode: string
       script_tag: string
       attempts: number
@@ -120,8 +120,20 @@ interface GameCard {
   character_distractor_ids: number[]
 }
 
+type DeckSlug =
+  | 'hiragana'
+  | 'katakana'
+  | 'kanji_n5'
+  | 'kanji_n4'
+  | 'kanji_n3'
+  | 'kanji_n2'
+  | 'kanji_n1'
+  | 'vocab_n5'
+  | 'grammar_patterns'
+type ScriptCurriculumSlug = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
+
 interface ScriptDeckPayload {
-  slug: 'hiragana' | 'katakana' | 'kanji_n5'
+  slug: DeckSlug
   name: string
   cards: GameCard[]
 }
@@ -146,10 +158,11 @@ interface BlockProgressPayload {
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
-  getBlockProgress: (slug: 'hiragana' | 'katakana' | 'kanji_n5') => Promise<BlockProgressPayload>
-  getDeckCards: (slug: 'hiragana' | 'katakana' | 'kanji_n5') => Promise<ScriptDeckPayload>
+  getBlockProgress: (slug: DeckSlug) => Promise<BlockProgressPayload>
+  getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
+  setStartupTheme: (theme: string) => Promise<{ ok: boolean; theme: string }>
   recordGameResult: (payload: {
-    slug: 'hiragana' | 'katakana' | 'kanji_n5'
+    slug: DeckSlug
     cardId: number
     isCorrect: boolean
     minigame: string

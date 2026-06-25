@@ -6,7 +6,7 @@ An Electron-based Japanese learning app with a Python backend for domain logic a
 ## Learning Content Coverage
 
 - **Scripts**: Hiragana, Katakana
-- **JLPT N5 Kanji**: Intro deck included
+- **JLPT Kanji**: N5 to N1 progression included
 - **Vocabulary**: Kana words deck included
 - **Grammar**: Basic pattern cards included
 
@@ -28,8 +28,27 @@ An Electron-based Japanese learning app with a Python backend for domain logic a
    `python scripts\dev.py`
 7. Run targeted tests while working:
    `python -m pytest tests\path\to\test_file.py -q`
+8. Regenerate external Words/Conversational content module from CSV sources:
+   `python scripts\import_external_lists.py`
 
 `scripts\dev.py` is the main gate and runs type checks, architecture checks, DB checks, SRS checks, then tests.
+
+### External Content Import Workflow
+
+- Source files:
+   `data\external_sources\words_n5.csv`
+   `data\external_sources\conversational_n5.csv`
+   `data\external_sources\kanji_n5.csv`
+   `data\external_sources\kanji_n4.csv`
+   `data\external_sources\kanji_n3.csv`
+   `data\external_sources\kanji_n2.csv`
+   `data\external_sources\kanji_n1.csv`
+- CSV headers must be exactly:
+   `character,romaji,meaning`
+- Regeneration command:
+   `python scripts\import_external_lists.py`
+- Generated module consumed by decks:
+   `domain\external_deck_data.py`
 
 ### Compact Debug Tools
 

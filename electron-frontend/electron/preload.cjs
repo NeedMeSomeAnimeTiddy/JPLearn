@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),
   recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload),
   resetStudyDb: () => ipcRenderer.invoke('study:reset-db'),
+  setStartupTheme: (theme) => ipcRenderer.invoke('ui:set-startup-theme', theme),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize'),
   isWindowMaximized: () => ipcRenderer.invoke('window:is-maximized'),

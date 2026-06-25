@@ -3,6 +3,7 @@
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import TypedDict, TypeAlias
 
 from domain.activity import ActivitySummary
 from domain.history import ItemHistoryEvent, RawItemHistoryBucket
@@ -12,6 +13,30 @@ from domain.scheduler import ReviewState
 from domain.streaks import StreakState
 
 DB_PATH = Path(__file__).parent.parent / "data" / "jplearn.db"
+
+StageDistribution: TypeAlias = dict[int, int]
+
+class CurriculumStageSummary(TypedDict):
+    mode: str
+    script_tag: str
+    attempts: int
+    accuracy: int
+    accuracy_7d: int
+    stage_distribution: StageDistribution
+
+class NarrativeChapterMetrics(TypedDict):
+    attempts: int
+    accuracy: int
+    completion_rate: int
+
+NarrativeChaptersSummary: TypeAlias = dict[str, NarrativeChapterMetrics]
+
+class NarrativeChapterSummary(TypedDict):
+    mode: str
+    script_tag: str
+    attempts: int
+    accuracy: int
+    chapters: NarrativeChaptersSummary
 
 
 def _connect() -> sqlite3.Connection:
@@ -44,6 +69,7 @@ def init_db() -> None:
                 reviewed_on TEXT    NOT NULL,
                 reviewed_at_utc TEXT NOT NULL DEFAULT '',
                 script_tag  TEXT    NOT NULL DEFAULT '',
+                curriculum_stage INTEGER,
                 tags_csv    TEXT    NOT NULL DEFAULT ''
             )
         """)
@@ -57,6 +83,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE review_events ADD COLUMN tags_csv TEXT NOT NULL DEFAULT ''")
         if "reviewed_at_utc" not in existing_columns:
             conn.execute("ALTER TABLE review_events ADD COLUMN reviewed_at_utc TEXT NOT NULL DEFAULT ''")
+        if "curriculum_stage" not in existing_columns:
+            conn.execute("ALTER TABLE review_events ADD COLUMN curriculum_stage INTEGER")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS streak_state (
                 id                   INTEGER PRIMARY KEY CHECK (id = 1),
@@ -160,6 +188,7 @@ def log_review(
     reviewed_on: date | None = None,
     reviewed_at_utc: str | None = None,
     script_tag: str = "",
+    curriculum_stage: int | None = None,
     tags: list[str] | None = None,
 ) -> None:
     """Record one review outcome for daily progress reporting."""
@@ -169,10 +198,19 @@ def log_review(
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO review_events (deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag, tags_csv)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO review_events (deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag, curriculum_stage, tags_csv)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (deck_name, card_id, quality, review_day.isoformat(), reviewed_utc, script_tag, tags_csv),
+            (
+                deck_name,
+                card_id,
+                quality,
+                review_day.isoformat(),
+                reviewed_utc,
+                script_tag,
+                curriculum_stage,
+                tags_csv,
+            ),
         )
 
 
@@ -224,7 +262,7 @@ def load_curriculum_stages(deck_name: str, mode: str, card_ids: list[int]) -> di
     return stages
 
 
-def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> dict[str, object]:
+def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> CurriculumStageSummary:
     """Return aggregate curriculum stage metrics for one mode."""
     normalized_mode = mode.strip().lower()
     if not normalized_mode:
@@ -302,7 +340,7 @@ def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> d
     }
 
 
-def load_narrative_chapter_summary(script_tag: str | None = None) -> dict[str, object]:
+def load_narrative_chapter_summary(script_tag: str | None = None) -> NarrativeChapterSummary:
     """Return chapter-level narrative metrics from review events and curriculum stages."""
     normalized_script = script_tag.strip().lower() if script_tag and script_tag.strip() else ""
 
@@ -328,6 +366,7 @@ def load_narrative_chapter_summary(script_tag: str | None = None) -> dict[str, o
             f"""
             SELECT
                 CASE
+                    WHEN curriculum_stage IN (1, 2, 3) THEN curriculum_stage
                     WHEN tags_csv LIKE '%chapter_1%' THEN 1
                     WHEN tags_csv LIKE '%chapter_2%' THEN 2
                     WHEN tags_csv LIKE '%chapter_3%' THEN 3
@@ -346,7 +385,7 @@ def load_narrative_chapter_summary(script_tag: str | None = None) -> dict[str, o
     correct = int((overall_row or {})["correct"] or 0)
     accuracy = round((correct / attempts) * 100) if attempts > 0 else 0
 
-    chapter_stats: dict[int, dict[str, int]] = {
+    chapter_stats: dict[int, NarrativeChapterMetrics] = {
         1: {"attempts": 0, "accuracy": 0, "completion_rate": 0},
         2: {"attempts": 0, "accuracy": 0, "completion_rate": 0},
         3: {"attempts": 0, "accuracy": 0, "completion_rate": 0},
@@ -363,6 +402,8 @@ def load_narrative_chapter_summary(script_tag: str | None = None) -> dict[str, o
 
     stage_summary = load_curriculum_stage_summary("context_cloze", script_tag=normalized_script or None)
     stage_distribution = stage_summary["stage_distribution"]
+    if not isinstance(stage_distribution, dict):
+        stage_distribution = {1: 0, 2: 0, 3: 0}
     stage_1 = int(stage_distribution[1])
     stage_2 = int(stage_distribution[2])
     stage_3 = int(stage_distribution[3])
@@ -561,24 +602,25 @@ def load_raw_item_history(limit_items: int = 8, events_per_item: int = 8) -> lis
             """
         ).fetchall()
 
-    grouped: dict[str, dict[str, object]] = {}
+    grouped: dict[str, RawItemHistoryBucket] = {}
     for row in rows:
         key = f"{row['deck']}:{row['card_id']}"
         if key not in grouped:
             if len(grouped) >= limit_items:
                 continue
-            grouped[key] = {
-                "key": key,
-                "script_tag": row["script_tag"] or "unknown",
-                "deck": row["deck"],
-                "card_id": int(row["card_id"]),
-                "events": [],
-                "successes": [],
-            }
+            grouped[key] = RawItemHistoryBucket(
+                key=key,
+                script_tag=str(row["script_tag"] or "unknown"),
+                deck=str(row["deck"]),
+                card_id=int(row["card_id"]),
+                prompt="",
+                events=[],
+                successes=[],
+            )
 
         bucket = grouped[key]
-        events: list[ItemHistoryEvent] = bucket["events"]  # type: ignore[assignment]
-        successes: list[int] = bucket["successes"]  # type: ignore[assignment]
+        events = bucket.events
+        successes = bucket.successes
         if len(events) >= events_per_item:
             continue
 
@@ -593,21 +635,7 @@ def load_raw_item_history(limit_items: int = 8, events_per_item: int = 8) -> lis
         )
         successes.append(is_success)
 
-    result: list[RawItemHistoryBucket] = []
-    for value in grouped.values():
-        result.append(
-            RawItemHistoryBucket(
-                key=value["key"],
-                script_tag=value["script_tag"],
-                deck=value["deck"],
-                card_id=value["card_id"],
-                prompt="",
-                events=value["events"],
-                successes=value["successes"],
-            )
-        )
-
-    return result
+    return list(grouped.values())
 
 
 def update_leech_state_for_card(

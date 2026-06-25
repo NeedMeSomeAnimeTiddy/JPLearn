@@ -10,6 +10,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Mapping
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -43,6 +44,14 @@ from domain.blocks import (
 from domain.distractors import rank_distractor_ids
 from domain.decks import ALL_DECKS
 
+SUMMARY_SCRIPT_TAGS = (
+    "hiragana",
+    "katakana",
+    "kanji_n5",
+    "vocab_n5",
+    "grammar_patterns",
+)
+
 
 @dataclass(frozen=True)
 class DeckSummary:
@@ -73,7 +82,7 @@ class GameCard:
     character_distractor_ids: list[int]
 
 
-def _mastered_count(states: dict[int, object]) -> int:
+def _mastered_count(states: Mapping[int, object]) -> int:
     # Shared repository rule: mastered means repetitions >= 3 and interval >= 21.
     return sum(
         1
@@ -93,15 +102,13 @@ def build_summary() -> dict[str, object]:
     item_history = load_item_history(limit_items=8, events_per_item=8)
     curriculum_context_cloze = load_curriculum_stage_summary("context_cloze")
     curriculum_by_script = {
-        "hiragana": load_curriculum_stage_summary("context_cloze", script_tag="hiragana"),
-        "katakana": load_curriculum_stage_summary("context_cloze", script_tag="katakana"),
-        "kanji_n5": load_curriculum_stage_summary("context_cloze", script_tag="kanji_n5"),
+        script_tag: load_curriculum_stage_summary("context_cloze", script_tag=script_tag)
+        for script_tag in SUMMARY_SCRIPT_TAGS
     }
     narrative_story = load_narrative_chapter_summary()
     narrative_story_by_script = {
-        "hiragana": load_narrative_chapter_summary(script_tag="hiragana"),
-        "katakana": load_narrative_chapter_summary(script_tag="katakana"),
-        "kanji_n5": load_narrative_chapter_summary(script_tag="kanji_n5"),
+        script_tag: load_narrative_chapter_summary(script_tag=script_tag)
+        for script_tag in SUMMARY_SCRIPT_TAGS
     }
 
     for slug, factory in ALL_DECKS.items():
@@ -261,13 +268,15 @@ def record_game_result(
     if normalized_minigame == "narrative_story" and normalized_stage is not None:
         tags.append(f"chapter_{normalized_stage}")
 
+    script_tag = "kanji_n5" if slug.startswith("kanji_n") else slug
+
     updated_state = review_minigame_result(
         deck_name=deck.name,
         card_id=card_id,
         is_correct=is_correct,
         minigame=normalized_minigame,
         curriculum_stage=curriculum_stage,
-        script_tag=slug,
+        script_tag=script_tag,
         tags=tags,
     )
 

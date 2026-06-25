@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 from data import database
 from scripts import desktop_bridge
@@ -56,7 +57,8 @@ def test_build_deck_cards_includes_curriculum_stage(tmp_path: Path, monkeypatch)
     )
 
     payload = desktop_bridge.build_deck_cards("hiragana")
-    first_card = next(card for card in payload["cards"] if card["id"] == 0)
+    cards = cast(list[dict[str, object]], payload["cards"])
+    first_card = next(card for card in cards if card["id"] == 0)
     assert first_card["curriculum_stage"] == 3
 
 
@@ -119,3 +121,19 @@ def test_main_record_result_invalid_boolean_exits_with_error(tmp_path: Path, mon
     assert code == 2
     parsed = json.loads(output)
     assert "Invalid boolean flag" in parsed["error"]
+
+
+def test_build_summary_includes_extended_script_curriculum_maps(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    summary = cast(dict[str, Any], desktop_bridge.build_summary())
+    curriculum = cast(dict[str, Any], summary["curriculum"])
+    context_by_script = cast(dict[str, object], curriculum["context_cloze_by_script"])
+    narrative_by_script = cast(dict[str, object], curriculum["narrative_story_by_script"])
+
+    context_keys = set(context_by_script.keys())
+    narrative_keys = set(narrative_by_script.keys())
+
+    expected = {"hiragana", "katakana", "kanji_n5", "vocab_n5", "grammar_patterns"}
+    assert context_keys == expected
+    assert narrative_keys == expected

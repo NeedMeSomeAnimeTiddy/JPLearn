@@ -1,0 +1,65 @@
+character,romaji,meaning
+〜は〜です,〜 wa 〜 desu,X is Y (polite copula)
+〜は〜ではありません,〜 wa 〜 dewa arimasen,X is not Y (polite negative)
+〜は〜ですか,〜 wa 〜 desu ka,Is X Y? (polite question)
+〜は〜だ,〜 wa 〜 da,X is Y (plain copula)
+〜があります,〜 ga arimasu,"There is/are 〜 (inanimate, polite)"
+〜がいます,〜 ga imasu,"There is/are 〜 (animate, polite)"
+〜は,〜 wa,Topic marker particle
+〜が,〜 ga,Subject marker / emphasis particle
+〜を,〜 wo,Direct object marker particle
+〜に,〜 ni,Location (existence) / direction / time particle
+〜で,〜 de,Location (action) / means / method particle
+〜へ,〜 e,Direction particle (toward)
+〜と,〜 to,And (nouns) / with / quotation particle
+〜の,〜 no,Possessive / noun-modifier particle
+〜も,〜 mo,"Also, too (inclusive particle)"
+〜から,〜 kara,From 〜 (starting point)
+〜まで,〜 made,Until / up to 〜 (ending point)
+〜や〜など,〜 ya 〜 nado,"〜 and 〜, etc. (non-exhaustive list)"
+〜か〜,〜 ka 〜,Or (between nouns)
+〜ます,〜 masu,Polite present / future affirmative verb
+〜ません,〜 masen,Polite present / future negative verb
+〜ました,〜 mashita,Polite past affirmative verb
+〜ませんでした,〜 masen deshita,Polite past negative verb
+〜ますか,〜 masu ka,Polite verb question
+〜ましょう,〜 mashou,Let's 〜 / shall we 〜 (volitional)
+〜ましょうか,〜 mashou ka,Shall I/we 〜? (offer/suggestion)
+〜てください,〜 te kudasai,Please do 〜 (polite request)
+〜ています,〜 te imasu,Is doing 〜 (ongoing action / state)
+〜てもいいですか,〜 te mo ii desu ka,May I 〜? (asking permission)
+〜てはいけません,〜 te wa ikemasen,Must not 〜 (prohibition)
+〜ないでください,〜 nai de kudasai,Please don't 〜
+〜い (present),〜 i (jisho-kei),i-adjective dictionary form (e.g. たかい)
+〜くない,〜 ku nai,i-adjective negative (e.g. たかくない)
+〜かった,〜 katta,i-adjective past (e.g. たかかった)
+〜くなかった,〜 ku nakatta,i-adjective past negative
+〜な (before noun),〜 na (noun),na-adjective attributive form (e.g. きれいな)
+〜です (na-adj),〜 desu,na-adjective polite present (e.g. きれいです)
+〜ではありません (na-adj),〜 dewa arimasen,na-adjective polite negative
+なに/なん,nani/nan,What?
+どこ,doko,Where?
+だれ,dare,Who?
+いつ,itsu,When?
+どれ,dore,Which one?
+どの〜,dono 〜,Which 〜? (before noun)
+どんな〜,donna 〜,What kind of 〜?
+いくら,ikura,How much? (price)
+いくつ,ikutsu,How many? / How old?
+どうやって,dou yatte,How? By what means?
+なぜ/どうして,naze/doushite,Why?
+〜から (reason),〜 kara,Because 〜 (reason clause)
+〜が (contrast),〜 ga,"But, however (mild contrast)"
+〜けど/けれど,〜 kedo/keredo,"But, although (softer contrast)"
+〜そして,soshite,"And then, and also"
+〜でも,demo,"But, however (sentence-initial)"
+〜をください,〜 wo kudasai,Please give me 〜
+〜がほしい,〜 ga hoshii,I want 〜 (noun)
+〜たい,〜 tai,I want to 〜 (verb stem + たい)
+〜に行きます,〜 ni ikimasu,Go to 〜 (destination)
+〜で行きます,〜 de ikimasu,Go by 〜 (means of transport)
+どうぞよろしく,douzo yoroshiku,Nice to meet you / please treat me well
+〜はどうですか,〜 wa dou desu ka,How about 〜? / How is 〜?
+〜はいくらですか,〜 wa ikura desu ka,How much is 〜?
+〜はどこですか,〜 wa doko desu ka,Where is 〜?
+〜はなんじですか,〜 wa nanji desu ka,What time is 〜?

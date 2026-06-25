@@ -82,6 +82,73 @@
   height: calc(14px * var(--ui-scale));
 }
 
+.titlebar-shortcut-wrap {
+  position: relative;
+}
+
+.titlebar-shortcut-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(290px, 78vw);
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 32%, var(--panel-border));
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--tone-ocean) 22%, transparent), transparent 46%),
+    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 99%, black), color-mix(in oklab, var(--panel-bg-alt) 99%, black));
+  backdrop-filter: blur(6px) saturate(115%);
+  box-shadow:
+    0 18px 34px -20px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+  z-index: 760;
+}
+
+.titlebar-shortcut-item {
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  border-radius: 10px;
+  min-height: 36px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--button-font);
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.titlebar-shortcut-item:hover {
+  background: color-mix(in oklab, var(--tone-ocean) 24%, transparent);
+}
+
+.titlebar-shortcut-item:focus-visible {
+  outline: 1px solid color-mix(in oklab, var(--tone-ocean) 72%, white);
+  outline-offset: -1px;
+}
+
+.titlebar-shortcut-icon,
+.titlebar-shortcut-glyph {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.titlebar-shortcut-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
 .window-controls {
   display: inline-flex;
   align-items: center;
@@ -685,6 +752,58 @@ button {
   animation: enterUp 400ms ease both;
 }
 
+.overview-collapsible-panel {
+  padding: 0;
+}
+
+.overview-panel-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 18px 20px 14px;
+  color: inherit;
+  text-align: left;
+  font-family: var(--sans);
+  letter-spacing: normal;
+}
+
+.overview-panel-toggle .panel-head {
+  margin: 0;
+}
+
+.overview-panel-toggle:hover .panel-head h2 {
+  color: color-mix(in oklab, var(--text-main) 85%, var(--tone-ocean));
+}
+
+.overview-panel-chevron {
+  margin-left: auto;
+  font-size: 1rem;
+  color: var(--text-muted);
+  display: inline-block;
+  transition: transform 260ms ease;
+  flex-shrink: 0;
+}
+
+.overview-panel-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.overview-panel-body {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  padding: 0 20px;
+  transition: max-height 340ms ease, opacity 220ms ease, padding-bottom 220ms ease;
+}
+
+.overview-panel-body.is-open {
+  max-height: 6000px;
+  opacity: 1;
+  padding-bottom: 18px;
+  transition: max-height 500ms ease, opacity 260ms ease, padding-bottom 260ms ease;
+}
+
 .activity-window-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -782,6 +901,10 @@ button {
 .timeline-summary-panel {
   padding: 18px 20px;
   animation: enterUp 440ms ease both;
+}
+
+.panel-glass.overview-collapsible-panel {
+  padding: 0;
 }
 
 .timeline-grid {
@@ -1038,6 +1161,66 @@ button {
   color: var(--text-muted);
 }
 
+.jlpt-level-path {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.jlpt-level-node {
+  animation: enterUp 480ms ease both;
+}
+
+.jlpt-level-button {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background: linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
+  padding: 12px 14px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: border-color 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.jlpt-level-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--tone-ocean) 50%, var(--card-border));
+}
+
+.jlpt-level-node.is-active .jlpt-level-button {
+  border-color: color-mix(in oklab, var(--tone-ocean) 70%, var(--card-border));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tone-ocean) 36%, transparent);
+}
+
+.jlpt-level-node.is-locked .jlpt-level-button {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.jlpt-level-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.jlpt-level-preview {
+  font-family: var(--display-font);
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+  color: var(--text-main);
+  min-height: 1.5rem;
+}
+
+.jlpt-level-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .block-minigame-head {
   margin-top: 8px;
   padding-top: 16px;
@@ -1234,6 +1417,35 @@ button {
   color: var(--text-muted);
 }
 
+.kanji-chip-pagination {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.kanji-chip-pagination button {
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  min-height: 32px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.kanji-chip-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kanji-chip-pagination span {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
 /* Inline detail panel — spans full grid row immediately below the active tile */
 .char-mastery-detail-inline {
   grid-column: 1 / -1;
@@ -1410,7 +1622,7 @@ button {
 
 .minigame-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
 }
 
@@ -1420,7 +1632,7 @@ button {
   border-radius: 14px;
   background: linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
   padding: 14px;
-  min-height: 220px;
+  min-height: 206px;
   color: var(--text-main);
   cursor: pointer;
   transition: border-color 180ms ease, transform 180ms ease;
@@ -1460,6 +1672,7 @@ button {
   color: var(--text-soft);
   font-size: 0.84rem;
   margin: 0;
+  line-height: 1.3;
 }
 
 .game-tile-stats {
