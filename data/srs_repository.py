@@ -1,3 +1,5 @@
+"""SQLite-backed SRS item repository (app.db persistence flow)."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -14,6 +16,15 @@ DB_PATH = Path("data/app.db")
 # -----------------------------
 @dataclass(frozen=True)
 class SRSRecord:
+    """Flat representation of one SRS row as stored in ``srs_items``.
+
+    Attributes:
+        id: Opaque string identifier matching the source :class:`~domain.ingestion.LearningItem`.
+        last_interval: Most recent review interval in days.
+        ease_factor: Current ease factor for interval growth.
+        due: Unix timestamp (seconds) when this item next becomes due.
+    """
+
     id: str
     last_interval: int
     ease_factor: float
@@ -24,6 +35,12 @@ class SRSRecord:
 # Repository layer (CRUD only)
 # -----------------------------
 class SRSRepository:
+    """Repository for reading and writing :class:`SRSRecord` rows in ``app.db``.
+
+    Handles schema initialisation automatically on construction.  All SQL
+    operations are parameterised; no business logic lives here.
+    """
+
     def __init__(self, db_path: Path = DB_PATH):
         self.db_path = db_path
         self._init_db()
@@ -49,6 +66,7 @@ class SRSRepository:
     # Read
     # -----------------------------
     def get(self, item_id: str) -> SRSRecord | None:
+        """Return the :class:`SRSRecord` for *item_id*, or ``None`` if not found."""
         with self._connect() as conn:
             cur = conn.execute(
                 """
@@ -69,6 +87,7 @@ class SRSRepository:
     # Write / insert
     # -----------------------------
     def upsert(self, record: SRSRecord) -> None:
+        """Insert or update a :class:`SRSRecord` row, updating ``updated_at`` automatically."""
         with self._connect() as conn:
             conn.execute(
                 """
@@ -93,6 +112,7 @@ class SRSRepository:
     # Convenience helpers
     # -----------------------------
     def all(self) -> list[SRSRecord]:
+        """Return every :class:`SRSRecord` currently stored in the database."""
         with self._connect() as conn:
             cur = conn.execute(
                 """

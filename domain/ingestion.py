@@ -1,3 +1,5 @@
+"""Domain ingestion: convert raw script DTOs into domain entities."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,6 +11,14 @@ from typing import List
 # -----------------------------
 @dataclass(frozen=True)
 class LearningItem:
+    """Immutable domain representation of one reviewable item.
+
+    Attributes:
+        front: The prompt shown to the learner (e.g. a kana character).
+        back: The expected answer (e.g. romaji reading).
+        tags: Immutable tuple of classification labels.
+    """
+
     front: str
     back: str
     tags: tuple[str, ...]
@@ -29,4 +39,5 @@ def ingest_card(card: dict) -> LearningItem:
 
 
 def ingest_batch(cards: list[dict]) -> list[LearningItem]:
+    """Convert a list of raw card dicts into :class:`LearningItem` instances."""
     return [ingest_card(c) for c in cards]
