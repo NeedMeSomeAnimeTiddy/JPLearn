@@ -106,13 +106,16 @@ def _build_deck(name: str, data: list[tuple[str, str]], tag: str) -> Deck:
 
 
 def get_hiragana_deck() -> Deck:
+    """Return a fresh :class:`~domain.cards.Deck` containing all Hiragana cards."""
     return _build_deck("Hiragana", _HIRAGANA_DATA, "hiragana")
 
 
 def get_katakana_deck() -> Deck:
+    """Return a fresh :class:`~domain.cards.Deck` containing all Katakana cards."""
     return _build_deck("Katakana", _KATAKANA_DATA, "katakana")
 
 
+#: Registry mapping deck slug → factory function for all built-in decks.
 ALL_DECKS = {
     "hiragana": get_hiragana_deck,
     "katakana": get_katakana_deck,

@@ -24,9 +24,9 @@ A Python-based Japanese learning app inspired by Anki, covering Hiragana, Kataka
 
 ### Architecture & Code Health
 - [x] Keep strict layer boundaries: `domain/`, `data/`, `ui/`
-- [ ] Remove or migrate remaining legacy code in `src/`
-- [ ] Improve type coverage for public APIs (`mypy --explicit-package-bases`)
-- [ ] Add/update docstrings in domain and data public interfaces
+- [x] Remove or migrate remaining legacy code in `src/`
+- [x] Improve type coverage for public APIs (`mypy --explicit-package-bases`)
+- [x] Add/update docstrings in domain and data public interfaces
 - [x] Add a lightweight "contributing/dev workflow" section to this README
 
 ### Learning Content

@@ -1,3 +1,5 @@
+"""Pure SRS state-transition logic (SM-2 variant)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,6 +10,13 @@ from dataclasses import dataclass
 # -----------------------------
 @dataclass(frozen=True)
 class SRSState:
+    """Immutable snapshot of a card's SRS scheduling parameters.
+
+    Attributes:
+        last_interval: Days of the most recent review interval.
+        ease_factor: Multiplier controlling interval growth. Min 1.3, max 2.8.
+    """
+
     last_interval: int
     ease_factor: float
 
@@ -17,6 +26,13 @@ class SRSState:
 # -----------------------------
 @dataclass(frozen=True)
 class SRSResult:
+    """Immutable output of one SRS update step.
+
+    Attributes:
+        next_interval: Computed days until the next review.
+        new_ease_factor: Updated ease factor after applying performance score.
+    """
+
     next_interval: int
     new_ease_factor: float
 
