@@ -1,92 +1,100 @@
 character,romaji,meaning
-一,ichi,one
-二,ni,two
-三,san,three
-四,yon/shi,four
-五,go,five
-六,roku,six
-七,nana/shichi,seven
-八,hachi,eight
-九,kyuu/ku,nine
-十,juu,ten
-百,hyaku,hundred
-千,sen,thousand
-万,man,ten thousand
-年,nen/toshi,year
-月,tsuki/gatsu,"month, moon"
 日,hi/nichi,"day, sun, Japan"
+一,ichi,one
+国,kuni/koku,country
+人,hito/jin,person
+年,nen/toshi,year
+大,oo/dai,"big, large"
+十,juu,ten
+二,ni,two
+本,hon/moto,"book, origin, Japan"
+中,naka/chuu,"middle, inside"
+長,naga/chou,"long, leader"
+出,de/shutsu,"exit, put out"
+三,san,three
 時,toki/ji,"time, hour"
-分,fun/pun,"minute, part"
-半,han,half
-火,hi/ka,"fire, Tuesday"
-水,mizu/sui,"water, Wednesday"
-木,ki/moku,"tree, Thursday"
+行,i/kou,go
+見,mi/ken,"see, look"
+月,tsuki/gatsu,"month, moon"
+後,ushiro/go,"back, after"
+前,mae/zen,"front, before"
+生,sei/i,"life, birth, student"
+五,go,five
+間,カン ケン,"interval, space"
+上,ue/jou,"up, above"
+東,higashi/tou,east
+四,yon/shi,four
+今,コン キン イ,now
 金,kin/kane,"gold, Friday, money"
-土,tsuchi/do,"earth, Saturday"
+九,kyuu/ku,nine
+入,i/nyuu,enter
+学,gaku/mana,"study, learn"
+高,taka/kou,"high, expensive"
+円,エン マロ.ヤ,"circle, yen, round"
+子,ko/shi,child
+外,soto/gai,outside
+八,hachi,eight
+六,roku,six
+下,shita/ka,"down, below"
+来,ku/rai,come
+気,ki/ke,"spirit, feeling, energy"
+小,chii/shou,"small, little"
+七,nana/shichi,seven
 山,yama/san,mountain
+話,ワ,"tale, talk"
+女,onna/jo,"woman, female"
+北,kita/hoku,north
+午,ゴ,"noon, sign of the horse, 11AM-1PM, seventh sign of Chinese zodiac"
+百,hyaku,hundred
+書,ka/sho,write
+先,sen/saki,"ahead, previous, teacher"
+名,メイ ミョウ -,"name, noted, distinguished, reputation"
 川,kawa/sen,river
+千,sen,thousand
+水,mizu/sui,"water, Wednesday"
+半,han,half
+男,otoko/dan,"man, male"
+西,nishi/sei,west
+電,den,electricity
+校,kou,school
+語,go/kata,"language, word"
+土,tsuchi/do,"earth, Saturday"
+木,ki/moku,"tree, Thursday"
+聞,ki/bun,"hear, listen, ask"
+食,ta/shoku,"eat, food"
+車,kuruma/sha,"car, vehicle"
+何,カ,what
+南,minami/nan,south
+万,man,ten thousand
+毎,マイ -ゴト.,every
+白,shiro/haku,white
+天,ten/ame,"sky, heaven"
+母,haha/bo,mother
+火,hi/ka,"fire, Tuesday"
+右,migi,right
+読,yo/doku,read
+友,tomo/yuu,friend
+左,hidari,left
+休,yasu/kyuu,"rest, holiday"
+父,chichi/fu,father
+雨,ame/u,rain
+分,fun/pun,"minute, part"
 田,ta/den,rice field
 花,hana/ka,flower
-天,ten/ame,"sky, heaven"
-雨,ame/u,rain
-上,ue/jou,"up, above"
-下,shita/ka,"down, below"
-左,hidari,left
-右,migi,right
-前,mae/zen,"front, before"
-後,ushiro/go,"back, after"
-東,higashi/tou,east
-西,nishi/sei,west
-南,minami/nan,south
-北,kita/hoku,north
-中,naka/chuu,"middle, inside"
-外,soto/gai,outside
 内,uchi/nai,inside
-大,oo/dai,"big, large"
-小,chii/shou,"small, little"
-長,naga/chou,"long, leader"
-高,taka/kou,"high, expensive"
 古,furu/ko,old (things)
 新,atara/shin,new
 安,yasu/an,"cheap, safe"
-白,shiro/haku,white
 赤,aka/seki,red
 青,ao/sei,"blue, green"
-人,hito/jin,person
-子,ko/shi,child
-父,chichi/fu,father
-母,haha/bo,mother
-男,otoko/dan,"man, male"
-女,onna/jo,"woman, female"
-友,tomo/yuu,friend
 目,me/moku,eye
 口,kuchi/kou,mouth
 耳,mimi/ji,ear
 手,te/shu,hand
 足,ashi/soku,"foot, leg"
 力,chikara/ryoku,"power, strength"
-気,ki/ke,"spirit, feeling, energy"
-学,gaku/mana,"study, learn"
-校,kou,school
-生,sei/i,"life, birth, student"
-先,sen/saki,"ahead, previous, teacher"
-語,go/kata,"language, word"
-国,kuni/koku,country
 文,bun/fumi,"sentence, writing"
 字,ji/aza,"character, letter"
-本,hon/moto,"book, origin, Japan"
-見,mi/ken,"see, look"
-聞,ki/bun,"hear, listen, ask"
-食,ta/shoku,"eat, food"
 飲,no/in,drink
-来,ku/rai,come
-行,i/kou,go
 帰,kae/ki,return home
-書,ka/sho,write
-読,yo/doku,read
 立,ta/ritsu,stand
-入,i/nyuu,enter
-出,de/shutsu,"exit, put out"
-休,yasu/kyuu,"rest, holiday"
-電,den,electricity
-車,kuruma/sha,"car, vehicle"

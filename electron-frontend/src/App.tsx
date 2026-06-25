@@ -943,7 +943,6 @@ function App() {
   const [cardScores, setCardScores] = useState<CardScores>(() => loadCardScores())
   const [overviewBlocks, setOverviewBlocks] = useState<Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>>({})
   const [overviewKanjiDeck, setOverviewKanjiDeck] = useState<ScriptDeck['cards']>([])
-  const [overviewVocabDeck, setOverviewVocabDeck] = useState<ScriptDeck['cards']>([])
   const [activeKanjiLevel, setActiveKanjiLevel] = useState<JlptLevel>('n5')
   const [activeKanjiDeckSlug, setActiveKanjiDeckSlug] = useState<KanjiDeckSlug>('kanji_n5')
   const [activeVocabLevel, setActiveVocabLevel] = useState<JlptLevel>('n5')
@@ -979,6 +978,7 @@ function App() {
     character: string
     romaji: string
     meaning: string
+    label: string
     score: number
   }
   const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
@@ -1429,11 +1429,6 @@ function App() {
   const overviewKanjiLevelProgress = useMemo(
     () => buildJlptLevelProgress(overviewKanjiDeck, cardScores.kanji_n5),
     [overviewKanjiDeck, cardScores.kanji_n5],
-  )
-
-  const overviewVocabLevelProgress = useMemo(
-    () => buildJlptLevelProgress(overviewVocabDeck, cardScores.vocab_n5),
-    [overviewVocabDeck, cardScores.vocab_n5],
   )
 
   // Cards restricted to the active block when block progression is available.
@@ -1937,11 +1932,6 @@ function App() {
       window.jplearnDesktop.getDeckCards('kanji_n3'),
       window.jplearnDesktop.getDeckCards('kanji_n2'),
       window.jplearnDesktop.getDeckCards('kanji_n1'),
-      window.jplearnDesktop.getDeckCards('vocab_n5'),
-      window.jplearnDesktop.getDeckCards('vocab_n4'),
-      window.jplearnDesktop.getDeckCards('vocab_n3'),
-      window.jplearnDesktop.getDeckCards('vocab_n2'),
-      window.jplearnDesktop.getDeckCards('vocab_n1'),
     ])
       .then(([
         hira,
@@ -1951,11 +1941,6 @@ function App() {
         kanjiN3Deck,
         kanjiN2Deck,
         kanjiN1Deck,
-        vocabN5Deck,
-        vocabN4Deck,
-        vocabN3Deck,
-        vocabN2Deck,
-        vocabN1Deck,
       ]) => {
         setOverviewBlocks({ hiragana: hira.blocks, katakana: kata.blocks })
         setOverviewKanjiDeck([
@@ -1964,13 +1949,6 @@ function App() {
           ...kanjiN3Deck.cards,
           ...kanjiN2Deck.cards,
           ...kanjiN1Deck.cards,
-        ])
-        setOverviewVocabDeck([
-          ...vocabN5Deck.cards,
-          ...vocabN4Deck.cards,
-          ...vocabN3Deck.cards,
-          ...vocabN2Deck.cards,
-          ...vocabN1Deck.cards,
         ])
       })
       .catch(() => undefined)
@@ -3032,7 +3010,7 @@ function App() {
                                           data-level={level}
                                           aria-label={`${char} (${romaji}): ${level}/${CARD_MASTERY_MAX}`}
                                           lang="ja"
-                                          onClick={() => setSelectedChar({ character: char, romaji, meaning, score: level })}
+                                          onClick={() => setSelectedChar({ character: char, romaji, meaning, label: 'Reading / English meaning', score: level })}
                                         >
                                           {char}
                                         </button>
@@ -3100,11 +3078,12 @@ function App() {
                                         type="button"
                                         className="char-mastery-chip"
                                         data-level={levelScore}
-                                        aria-label={`${card.character} (${card.romaji}): ${levelScore}/${CARD_MASTERY_MAX}`}
+                                        aria-label={`${card.character}, ${card.romaji}, ${card.meaning}: ${levelScore}/${CARD_MASTERY_MAX}`}
                                         lang="ja"
-                                        onClick={() => setSelectedChar({ character: card.character, romaji: card.romaji, meaning: card.meaning, score: levelScore })}
+                                        onClick={() => setSelectedChar({ character: card.character, romaji: card.romaji, meaning: card.meaning, label: 'Reading / English meaning', score: levelScore })}
                                       >
-                                        {card.character}
+                                        <span className="char-mastery-chip-char">{card.character}</span>
+                                        <span className="char-mastery-chip-reading">{card.romaji}</span>
                                       </button>
                                     )
                                   })}
@@ -3147,63 +3126,6 @@ function App() {
                   </div>
                 ) : null}
 
-                {overviewVocabLevelProgress.some((level) => level.total > 0) ? (
-                  <div className="char-mastery-script">
-                    <h3 className="char-mastery-script-name">Vocabulary by JLPT Level</h3>
-                    <div className="char-mastery-tiles-grid">
-                      {overviewVocabLevelProgress.filter((level) => level.total > 0).map((level) => {
-                        const blockKey = `vocab-${level.key}`
-                        const isActive = expandedBlocks === blockKey
-                        const pct = Math.round(level.mastery * 100)
-                        const visibleCards = overviewVocabDeck.filter((card) => jlptTagFromCard(card) === level.key)
-                        return (
-                          <Fragment key={level.key}>
-                            <button
-                              type="button"
-                              className={`cmb-tile ${isActive ? 'is-active' : ''}`}
-                              onClick={() => setExpandedBlocks(isActive ? null : blockKey)}
-                              aria-expanded={isActive}
-                              aria-label={`${level.label}: ${pct}% mastered`}
-                            >
-                              <div className="cmb-tile-chars" lang="ja" aria-hidden="true">
-                                {level.sampleChars.join(' ')}
-                              </div>
-                              <strong className="cmb-tile-name">{level.label}</strong>
-                              <div className="cmb-bar-wrap">
-                                <div className="cmb-bar" style={{ '--cmb-pct': `${pct}%` } as CSSProperties} />
-                              </div>
-                              <div className="cmb-tile-pct">{level.total} cards • {pct}%</div>
-                            </button>
-
-                            {isActive ? (
-                              <div className="char-mastery-detail-inline">
-                                <div className="char-mastery-chips">
-                                  {visibleCards.map((card) => {
-                                    const score = cardScores.vocab_n5[card.id] ?? 0
-                                    const levelScore = Math.min(score, CARD_MASTERY_MAX)
-                                    return (
-                                      <button
-                                        key={card.id}
-                                        type="button"
-                                        className="char-mastery-chip"
-                                        data-level={levelScore}
-                                        aria-label={`${card.character} (${card.romaji}): ${levelScore}/${CARD_MASTERY_MAX}`}
-                                        lang="ja"
-                                        onClick={() => setSelectedChar({ character: card.character, romaji: card.romaji, meaning: card.meaning, score: levelScore })}
-                                      >
-                                        {card.character}
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            ) : null}
-                          </Fragment>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ) : null}
               </div>
             </div>
           </section>
@@ -3653,6 +3575,7 @@ function App() {
               onClick={() => setSelectedChar(null)}
               aria-label="Close"
             >✕</button>
+            <div className="char-detail-label">{selectedChar.label}</div>
             <div className="char-detail-char" lang="ja">{selectedChar.character}</div>
             <div className="char-detail-romaji">{selectedChar.romaji}</div>
             {selectedChar.meaning !== selectedChar.romaji ? (

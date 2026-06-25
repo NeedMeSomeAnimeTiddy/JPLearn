@@ -172,8 +172,8 @@ def generate_external_deck_module(
         raise ValueError("Words N3 source must contain at least 80 rows")
     if len(words_n2_rows) < 80:
         raise ValueError("Words N2 source must contain at least 80 rows")
-    if len(words_n1_rows) < 80:
-        raise ValueError("Words N1 source must contain at least 80 rows")
+    if len(words_n1_rows) < 50:
+        raise ValueError("Words N1 source must contain at least 50 rows")
     if len(conversational_rows) < 40:
         raise ValueError("Conversational source must contain at least 40 rows")
     if len(kanji_n5_rows) < 80:

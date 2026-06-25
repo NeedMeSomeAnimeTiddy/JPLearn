@@ -1,2 +1,3 @@
+pdfplumber
 # Python GUI dependencies were removed.
 # Frontend is now Electron + React + TypeScript in electron-frontend/.

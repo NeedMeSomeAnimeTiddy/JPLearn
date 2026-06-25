@@ -129,3 +129,523 @@ character,romaji,meaning
 とき,toki,"time, moment"
 もの,mono,thing (tangible)
 こと,koto,thing (abstract)
+ああ,aa,"Ah!, Oh!"
+会う,au,"to meet, to see"
+青,ao,blue
+青い,aoi,blue
+赤,aka,red
+赤い,akai,red
+明るい,akarui,bright (in reference to personality or weather); cheerful
+秋,aki,fall (season)
+開く,aku,"to open, to become open"
+開ける,akeru,to open (v.t.)
+上げる,ageru,"to raise, to lift"
+朝,asa,morning
+朝御飯,asagohan,breakfast
+明後日,asatte,day after tomorrow
+足; 脚,ashi,foot; leg
+明日,ashita,tomorrow
+あそこ,asoko,"there, over there, that place"
+遊ぶ,asobu,to play; to spend time pleasantly; to hang out
+暖かい,atatakai,warm
+頭,atama,head
+新しい,atarashii,new
+あちら,achira,this way (polite)
+暑い,atsui,"hot (in reference to weather), warm"
+熱い,atsui,hot (objects)
+厚い,atsui,"kind, warm(hearted), thick, deep"
+あっち,acchi,over there
+後,ato,afterwards (later); in the future; the rest; since then
+あなた,anata,you
+兄,ani,(my) older brother (humble)
+姉,ane,(my) older sister (humble)
+アパート,apaato,apartment (abbr.)
+あの,ano,"that over there; like that, that way; um..."
+浴びる,abiru,"to bathe, to shower"
+危ない,abunai,"dangerous, critical"
+甘い,amai,"generous, sweet"
+余り,amari,not very; surplus
+雨,ame,rain
+飴,ame,(hard) candy
+洗う,arau,to wash
+在る,aru,"to be, to have"
+有る,aru,"to be, to have"
+歩く,aruku,to walk
+あれ,are,that one (over there)
+いい; よい,ii yoi,good
+いいえ,iie,"no, not at all"
+言う,iu,to say
+家,ie,"house, home"
+いかが,ikaga,"how, in what way"
+行く,iku yuku,to go
+いくら,ikura,"how much, how many"
+池,ike,pond
+医者,isha,doctor; physician
+椅子,isu,chair
+忙しい,isogashii,"busy (people, days)"
+痛い,itai,hurt; painful; sore
+一,ichi,one
+一日,ichinichi,one day (duration)
+一番,ichiban,"best (most), first, number one"
+いつ,itsu,when
+五日,itsuka,five days; fifth day of the month
+一緒,issho,together
+五つ,itsutsu,five things
+いつも,itsumo,"always, usually, every time, never (with neg. verb)"
+犬,inu,dog
+今,ima,now
+意味,imi,"meaning, significance"
+妹,imouto,younger sister (humble)
+嫌,iya,"disagreeable, detestable, unpleasant"
+入口,iriguchi,entrance
+居る,iru,"(humble) to be (animate), to exist"
+要る,iru,to need
+入れる,ireru,to put in
+色,iro,color
+色々,iroiro,various
+上,ue,"above (up, top, etc.), over, on top of"
+後ろ,ushiro,"back, behind, rear"
+薄い,usui,"thin, weak"
+歌,uta,a song
+歌う,utau,to sing
+うち,uchi,home; house; my place
+生まれる,umareru,to be born
+海,umi,"sea, beach"
+売る,uru,to sell (v.t.)
+うるさい,urusai,noisy; annoying
+上着,uwagi,"coat, jacket"
+絵,e,a painting; a picture; a drawing
+映画,eiga,"movie, film"
+映画館,eigakan,"movie theater, cinema"
+英語,eigo,English (language)
+ええ,ee,yes
+駅,eki,station
+エレベーター,erebeetaa,elevator
+鉛筆,empitsu,pencil
+美味しい,oishii,"delicious, tasty"
+多い,ooi,many; there are a lot
+大きい,ookii,"big, large"
+大きな,ookina,big
+大勢,oozei,great number of people
+お母さん,okaasan,mother (formal)
+お菓子,okashi,"confections, sweets, snack"
+お金,okane,money
+起きる,okiru,"to get up (e.g., from sleeping); to happen"
+置く,oku,to put; to lay; to place
+奥さん,okusan,(someone else's) wife (hon.)
+お酒,osake,sake; alcohol
+お皿,osara,"plate, dish"
+伯父; 叔父さん,ojisan,"uncle, middle-aged man"
+おじいさん,ojiisan,"grandfather, male senior citizen"
+教える,oshieru,"to teach, to inform, to instruct"
+押す,osu,"to push, to press, to stamp (e.g., a passport)"
+遅い,osoi,slow; (to be) late
+お茶,ocha,(green) tea
+お手洗い,otearai,"toilet, restroom, bathroom (lit., a place to wash one's hands)"
+お父さん,otousan,father (formal)
+弟,otouto,younger brother
+男,otoko,"man, male"
+男の子,otokonoko,boy
+一昨日,ototoi,the day before yesterday
+おととし,ototoshi,year before last
+大人,otona,adult
+お腹,onaka,stomach
+同じ,onaji,"same, identical"
+お兄さん,oniisan,(someone else's) older brother (formal)
+お姉さん,oneesan,older sister (formal)
+伯母さん; 叔母さん,obasan,aunt
+おばあさん,obaasan,"grandmother, female senior-citizen"
+お風呂,ofuro,a bath
+お弁当,obentou,a boxed lunch
+覚える,oboeru,"to learn, to commit to memory, to remember, to memorize"
+おまわりさん,omawarisan,policeman (friendly term)
+重い,omoi,heavy; serious
+面白い,omoshiroi,"interesting, amusing"
+泳ぐ,oyogu,to swim
+降りる,oriru,to get off
+終る,owaru,"to finish, to close"
+音楽,ongaku,Music
+女,onna,"woman, female"
+女の子,onnanoko,girl
+外国,gaikoku,foreign country; abroad
+外国人,gaikokujin,foreigner
+会社,kaisha,"company, corporation"
+階段,kaidan,stairs
+買い物,kaimono,shopping
+買う,kau,to buy
+返す,kaesu,to return something
+帰る,kaeru,"to go back, to go home, to return"
+顔,kao,face (body part)
+かかる,kakaru,"it takes (amount of time, money) (v.i.)"
+鍵,kagi,a lock; a key
+書く,kaku,to write
+学生,gakusei,student
+掛ける,kakeru,"to put on (e.g., glasses); to hang (e.g., on a wall)"
+かける,kakeru,"to dial/call (e.g., phone); to sit down"
+傘,kasa,"umbrella, parasol"
+貸す,kasu,to lend
+風,kaze,"wind, breeze"
+風邪,kaze,"cold, flu"
+方,kata,-- honorific form for 人 (ひと) --; way of doing
+家族,kazoku,"family, members of a family"
+片仮名,katakana,katakana
+学校,gakkou,a school
+カップ,kappu,cup
+家庭,katei,home; family
+角,kado,"corner (e.g., desk, pavement)"
+花瓶,kabin,(flower) vase
+かぶる,kaburu,"to wear, to put on (e.g., a hat on the head)"
+紙,kami,paper
+カメラ,kamera,camera
+火曜日,kayoubi,Tuesday
+辛い,karai,hot and spicy; salty
+体,karada,body; health
+借りる,kariru,"to borrow, to owe"
+軽い,karui,"light, non-serious, minor"
+カレー,karee,curry (abbr. for curry and rice)
+カレンダー,karendaa,calendar
+川; 河,kawa,river
+可愛い,kawaii,"cute, adorable"
+漢字,kanji,kanji; Chinese character
+木,ki,"tree, wood, timber"
+黄色,kiiro,yellow
+黄色い,kiiroi,yellow
+消える,kieru,"to vanish, to disappear"
+聞く,kiku,"to hear, to listen, to ask"
+北,kita,north
+ギター,gitaa,guitar
+汚い,kitanai,"dirty, unclean, filthy"
+喫茶店,kissaten,café
+切手,kitte,postal (postage) stamps
+切符,kippu,a ticket
+昨日,kinou,yesterday
+九,kyuu,nine
+牛肉,gyuuniku,beef
+牛乳,gyuunyuu,milk
+今日,kyou,"today, this day"
+教室,kyoushitsu,classroom
+兄弟,kyoudai,"siblings (humble), brothers and sisters"
+去年,kyonen,last year
+嫌い,kirai,dislike
+切る,kiru,to cut; to hang up (a phone)
+着る,kiru,to put on (clothes above your waist); to wear
+綺麗,kirei,"pretty, clean, tidy"
+キロ; キログラム,kiro kiroguramu,(abbr.) kilo (kilogram)
+キロ; キロメートル,kiro kiromeetoru,(abbr.) kilo (kilometer)
+銀行,ginkou,bank
+金曜日,kinyoubi,Friday
+九,ku,nine
+薬,kusuri,medicine
+下さい,kudasai,(with te-form verb) please do for me
+果物,kudamono,fruit
+口,kuchi,job opening; mouth
+靴,kutsu,"shoes, footwear"
+靴下,kutsushita,socks
+国,kuni,country; place of origin
+曇り,kumori,"cloudiness, cloudy weather"
+曇る,kumoru,"to become cloudy, to become dim"
+暗い,kurai,"dark, gloomy"
+クラス,kurasu,a class
+グラム,guramu,gram
+来る,kuru,to come
+車,kuruma,"car, vehicle"
+黒,kuro,black
+黒い,kuroi,black; dark
+警官,keikan,police officer
+今朝,kesa,this morning
+消す,kesu,"to erase, to delete, to turn off power"
+結構,kekkou,"splendid; enough, tolerably"
+結婚,kekkon (suru),marriage (get married)
+月曜日,getsuyoubi,Monday
+玄関,genkan,entrance (to a house or a building)
+元気,genki,"health(y), energetic"
+五,go,five
+公園,kouen,a park
+交差点,kousaten,intersection
+紅茶,koucha,black tea
+交番,kouban,police box
+声,koe,voice
+コート,kooto,"coat; court (e.g., tennis)"
+コーヒー,koohii,coffee
+ここ,koko,"here, this place"
+午後,gogo,"afternoon, P.M."
+九日,kokonoka,nine days; ninth day of the month
+九つ,kokonotsu,nine things
+午前,gozen,"morning, A.M."
+答える,kotaeru,"to answer, to reply"
+こちら,kochira,this person (polite); this way (polite)
+こっち,kocchi,this person; this direction; this side
+コップ,koppu,a tumbler; a glass
+今年,kotoshi,this year
+言葉,kotoba,language; word(s); expression(s)
+子供,kodomo,child(ren)
+この,kono,this
+御飯,gohan,rice (cooked); meal
+コピーする,kopiisuru,to copy
+困る,komaru,"to be bothered, to have difficulty"
+これ,kore,this one
+今月,kongetsu,this month
+今週,konshuu,this week
+こんな,konna,"such, like this"
+今晩,komban,"tonight, this evening"
+さあ,saa,"come now, well"
+財布,saifu,wallet
+魚,sakana,fish
+先,saki,"future; recent, previous"
+咲く,saku,to bloom
+作文,sakubun,essay; composition
+差す,sasu,"to raise (stretch out) hands, to raise (e.g., umbrella)"
+雑誌,zasshi,"magazine, journal"
+砂糖,satou,sugar
+寒い,samui,cold (in reference to weather)
+さ来年,sarainen,year after next
+三,san,three
+散歩,sampo (suru),"walk, stroll"
+四,shi,four
+塩,shio,salt
+しかし,shikashi,however; but
+時間,jikan,time
+仕事,shigoto,"work, job, occupation, employment"
+辞書,jisho,dictionary
+静か,shizuka,"quiet, calm"
+下,shita,"under, below, beneath"
+七,shichi,seven
+質問,shitsumon,"question, inquiry"
+自転車,jitensha,bicycle
+自動車,jidousha,automobile
+死ぬ,shinu,to die
+字引,jibiki,dictionary
+自分,jibun,"myself, oneself"
+閉まる,shimaru,"to close, to be closed"
+閉める,shimeru,"to close, to shut"
+締める,shimeru,"to tie, to fasten, to tighten"
+じゃ; じゃあ,ja jaa,"well, well then"
+写真,shashin,a picture; a photograph
+シャツ,shatsu,shirt
+シャワー,shawaa,shower
+十,juu,ten
+授業,jugyou,a class (of school)
+宿題,shukudai,homework
+上手,jouzu,"be good at, skillful"
+丈夫,joubu,"strong, solid, durable"
+醤油,shouyu,soy sauce
+食堂,shokudou,"cafeteria, dining hall"
+知る,shiru,"to know, to understand"
+白,shiro,white
+白い,shiroi,white
+新聞,shimbun,newspaper
+水曜日,suiyoubi,Wednesday
+吸う,suu,"to breathe in, to suck"
+スカート,sukaato,skirt
+好き,suki,"liking, fondness, love"
+少ない,sukunai,a little; a few
+すぐに,suguni,"immediately, soon"
+少し,sukoshi,"little, few"
+涼しい,suzushii,"cool, refreshing (in reference to weather)"
+ストーブ,sutoobu,heater (lit: stove)
+スプーン,supuun,spoon
+スポーツ,supootsu,sport(s)
+ズボン,zubon,trousers
+住む,sumu,"to reside, to live in"
+座る,suwaru,to sit
+背,sei,"(one's) height, stature"
+生徒,seito,student; pupil
+セーター,seetaa,sweater
+石鹸,sekken,soap
+背広,sebiro,men's suit
+狭い,semai,narrow; not spacious
+ゼロ,zero,zero
+千,sen,thousand
+先月,sengetsu,last month
+先週,senshuu,last week
+先生,sensei,"teacher, professor; master; doctor"
+洗濯,sentaku,"washing, laundry"
+全部,zembu,"all, entire, whole"
+そう; そうです,sou soudesu,"yes; appears, to be the case"
+掃除,souji (suru),"cleaning, sweeping"
+そうして; そして,soushite soshite,"and, like that"
+そこ,soko,"that place, there; bottom, sole"
+そちら,sochira,over there
+そっち,socchi,over there
+外,soto,"outside, exterior"
+その,sono,that
+そば,soba,"near, close, beside; Japanese traditional buckwheat noodle"
+空,sora,sky
+それ,sore,that one
+それから,sorekara,"and then, after that"
+それでは,soredeha,"in that situation, well then..."
+大学,daigaku,college; university
+大使館,taishikan,embassy
+大丈夫,daijoubu,It's ok (all right); No need to worry; Everything is under control
+大好き,daisuki,"very like-able, like very much"
+大切,taisetsu,important
+台所,daidokoro,kitchen
+大変,taihen,"very; difficult, hard"
+高い,takai,"tall, high; expensive"
+沢山,takusan,"many, much"
+タクシー,takushii,taxi
+出す,dasu,to take (something) out; to hand in (something)
+立つ,tatsu,to stand up
+たて,tate,"length, height"
+建物,tatemono,building
+楽しい,tanoshii,"enjoyable, fun"
+頼む,tanomu,"to request, to ask (a favor)"
+たばこ,tabako,"tobacco, cigarettes"
+多分,tabun,"perhaps, probably, maybe"
+食べ物,tabemono,food
+食べる,taberu,to eat
+卵,tamago,egg
+誰,dare,who
+誰か,dareka,someone
+誕生日,tanjoubi,birthday
+段々,dandan,"gradually, by degrees"
+小さい,chiisai,"small, little"
+小さな,chiisana,"small, little"
+近い,chikai,"near, close by, short"
+違う,chigau,to be different; to differ; wrong
+近く,chikaku,nearby; in the neighborhood
+地下鉄,chikatetsu,"underground train, subway"
+地図,chizu,a map
+父,chichi,(my) father
+茶色,chairo,brown
+茶碗,chawan,rice bowl
+丁度,choudo,"just, right, exactly"
+ちょっと,chotto,"a little, somewhat; just a little, somewhat"
+一日,tsuitachi,one day; first day of the month
+使う,tsukau,to use
+疲れる,tsukareru,to get (become) tired; to become fatigued
+次,tsugi,next
+着く,tsuku,"to arrive at, to reach"
+机,tsukue,desk
+作る,tsukuru,"to make, to create"
+つける,tsukeru,"to turn on (e.g., a light); to take"
+勤める,tsutomeru,to work (for)
+冷たい,tsumetai,"cold (things, people)"
+強い,tsuyoi,"strong, powerful"
+手,te,hand
+テープ,teepu,tape
+テープレコーダー,teepurekoodaa,tape recorder
+テーブル,teeburu,table
+出かける,dekakeru,to go out; to depart
+手紙,tegami,letter
+できる,dekiru,to be able to (to accomplish)
+出口,deguchi,an exit
+テスト,tesuto,test
+では,deha,"then, well, so"
+デパート,depaato,(abbr.) department store
+でも,demo,"but, however"
+出る,deru,"to appear, to leave"
+テレビ,terebi,"television, TV"
+天気,tenki,weather
+電気,denki,"electricity, (electric) light"
+電車,densha,electric train
+電話,denwa,a telephone
+戸,to,door (Japanese style)
+ドア,doa,door (Western style)
+トイレ,toire,bathroom; toilet
+どう,dou,"how, in what way"
+どうして,doushite,"why, for what reason"
+どうぞ,douzo,"please, kindly, by all means"
+動物,doubutsu,animal
+どうも,doumo,Thank you; somehow; no matter how hard one may try
+十,(o) too,ten (~)
+遠い,tooi,"far (away), distant"
+十日,tooka,ten days; tenth day of the month
+時々,tokidoki,sometimes
+時計,tokei,a watch; a clock
+どこ,doko,"where, what place"
+所,tokoro,place
+年,toshi,"year, age"
+図書館,toshokan,library
+どちら,dochira,which (one) (way); where (polite)
+どっち,docchi,"which one, which way"
+とても,totemo,"very (much), greatly, exceedingly"
+どなた,donata,who
+隣,tonari,"next to, next door to"
+どの,dono,which
+飛ぶ,tobu,"to fly, to hop"
+止まる,tomaru,to come to a halt
+友達,tomodachi,friend
+土曜日,doyoubi,Saturday
+鳥,tori,"chicken (lit., bird)"
+鶏肉,toriniku,chicken meat
+取る,toru,to take (a class); to get (a grade)
+撮る,toru,"to take (a photo), to make (a film)"
+どれ,dore,which one
+どんな,donna,"what, what kind of"
+ない,nai,"there isn't, doesn't have"
+ナイフ,naifu,knife
+中,naka,"inside, middle, among"
+長い,nagai,"long, lengthy"
+鳴く,naku,to make sound (animal)
+無くす,nakusu,to lose something
+なぜ,naze,why (same as どうして)
+夏,natsu,summer
+夏休み,natsuyasumi,summer vacation
+七つ,nanatsu,seven things
+何,nan nani,what
+七日,nanoka,seven days; seventh day (of the month)
+名前,namae,name
+習う,narau,to learn
+並ぶ,narabu,"to line up, to stand in a line (v.i.)"
+並べる,naraberu,to put (things) side by side; to line up
+なる,naru,to become
+二,ni,two
+にぎやか,nigiyaka,"bustling, busy"
+肉,niku,meat
+西,nishi,west
+日曜日,nichiyoubi,Sunday
+荷物,nimotsu,luggage; baggage
+ニュース,nyuusu,news
+庭,niwa,garden
+脱ぐ,nugu,to take off (clothes)
+温い,nurui,lukewarm
+ネクタイ,nekutai,"tie, necktie"
+猫,neko,cat
+寝る,neru,to sleep; to go to sleep; to go to bed
+登る,noboru,to climb
+飲み物,nomimono,"drink, beverage"
+飲む,nomu,to drink
+乗る,noru,"to get on, to ride in, to board"
+歯,ha,tooth
+パーティー,paateii,a party
+はい,hai,yes
+灰皿,haizara,ashtray
+入る,hairu,"to enter, to contain, to hold"
+葉書,hagaki,postcard
+はく,haku,to put on (items below your waist)
+箱,hako,box
+橋,hashi,bridge
+箸,hashi,chopsticks
+始まる,hajimaru,(something) begins
+初め; 始め,hajime,"beginning, start"
+初めて,hajimete,for the first time
+走る,hashiru,to run
+バター,bataa,butter
+二十歳,hatachi,20 years old
+働く,hataraku,to work
+八,hachi,eight
+二十日,hatsuka,"twenty days, twentieth (day of the month)"
+花,hana,flower
+鼻,hana,nose
+話,hanashi,"talk (chat), story"
+話す,hanasu,to speak
+母,haha,(my) mother
+早い,hayai,early
+速い,hayai,"fast, quick"
+春,haru,spring
+貼る,haru,to post; to paste; to attach
+晴れ,hare,clear (sunny) weather
+晴れる,hareru,to be sunny
+半,han,"half (e.g., にじはん | half-past two)"
+晩,ban,evening
+ハンカチ,hankachi,handkerchief
+番号,bangou,"number, series of digits"
+晩御飯,bangohan,"dinner, evening meal"
+半分,hambun,half
+東,higashi,east
+引く,hiku,"to pull, to draw; subtract"
+弾く,hiku,to play (a string instrument or piano)
+低い,hikui,"short, low"
+飛行機,hikouki,airplane
+左,hidari,left hand side

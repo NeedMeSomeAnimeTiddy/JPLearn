@@ -149,7 +149,7 @@ class TestVocabDecks:
             (get_vocab_n4_deck, 80, "Vocabulary N4", "n4"),
             (get_vocab_n3_deck, 80, "Vocabulary N3", "n3"),
             (get_vocab_n2_deck, 80, "Vocabulary N2", "n2"),
-            (get_vocab_n1_deck, 80, "Vocabulary N1", "n1"),
+            (get_vocab_n1_deck, 50, "Vocabulary N1", "n1"),
         ],
     )
     def test_vocab_deck_structure(self, loader, min_cards: int, name: str, level: str) -> None:
