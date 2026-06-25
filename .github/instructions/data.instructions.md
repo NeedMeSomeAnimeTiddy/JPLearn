@@ -1,5 +1,5 @@
 ---
-description: Data layer rules (SQLite repositories only)
+description: Data layer rules
 applyTo: "data/**/*.py"
 ---
 
@@ -8,16 +8,24 @@ applyTo: "data/**/*.py"
 - SQLite access only
 - Repository pattern only
 - No business logic
-- No UI logic
 - Must return Domain dataclasses only
+- No UI logic
+
+---
 
 # Persistence Rules
 
-- All database operations must be inside repository classes
-- Use parameterized queries only
-- Normalize Japanese text using unicodedata before insert/update
+- All DB operations inside repositories
+- Parameterized SQL only
+- Normalize Japanese text using unicodedata before storage
 
-# Constraints
+---
 
-- No scheduling logic
-- No parsing logic beyond storage formatting
+# Intent Anchor
+
+This layer is ONLY for:
+- SQLite persistence
+- schema + migrations
+- mapping rows ↔ domain models
+
+Not for logic or UI.
