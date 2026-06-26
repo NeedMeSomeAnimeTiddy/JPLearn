@@ -106,7 +106,7 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 - [x] (High) Enforce Japanese normalization at all persistence boundaries
    - Centralize normalization utilities used by all repositories/importers
    - Add regression tests for kana width, prolonged sound marks, and punctuation variants
-- [ ] (Medium) Improve external content ingestion pipeline
+- [x] (Medium) Improve external content ingestion pipeline
    - Add stricter CSV schema checks with actionable error output
    - Add deduplication and conflict reporting across imported lists
 - [ ] (Medium) Add deck import/export workflow
