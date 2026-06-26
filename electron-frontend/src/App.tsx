@@ -456,12 +456,6 @@ interface MinigameStats {
   points: number
 }
 
-interface MinigameIntro {
-  vibe: string
-  objective: string
-  tip: string
-}
-
 type JlptLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
 
 interface JlptLevelProgress {
@@ -610,49 +604,6 @@ const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>>
   kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match'],
   vocab_n5: ['meaning_match', 'character_match', 'context_cloze'],
   grammar_patterns: ['meaning_match', 'character_match', 'context_cloze'],
-}
-
-const MINIGAME_INTROS: Record<MinigameKey, MinigameIntro> = {
-  romaji_sprint: {
-    vibe: 'Speed Trial',
-    objective: 'Read each character and type the romaji before your momentum drops.',
-    tip: 'Stay rhythmic. Short, accurate answers build streak bonuses quickly.',
-  },
-  meaning_match: {
-    vibe: 'Memory Duel',
-    objective: 'Find the correct meaning while avoiding distractor options.',
-    tip: 'Scan all four choices first, then commit to the closest exact meaning.',
-  },
-  character_match: {
-    vibe: 'Symbol Hunt',
-    objective: 'Choose the correct Japanese character for each meaning prompt.',
-    tip: 'Compare visual shape first, then verify your recall before selecting.',
-  },
-  stroke_order: {
-    vibe: 'Stroke Trail',
-    objective: 'Type the kanji character from its meaning and stroke memory.',
-    tip: 'Break the character into parts, then rebuild it from left to right and top to bottom.',
-  },
-  typed_recall: {
-    vibe: 'Active Recall',
-    objective: 'Type the answer from memory with strict but fair matching.',
-    tip: 'Aim for exact answers, but small slips can still count as near misses.',
-  },
-  context_cloze: {
-    vibe: 'Context Ladder',
-    objective: 'Use sentence context to infer the missing meaning.',
-    tip: 'Read the full line before checking options, then pick the best semantic fit.',
-  },
-  narrative_story: {
-    vibe: 'Story Scenes',
-    objective: 'Complete short scenes where each prompt tests contextual meaning recall.',
-    tip: 'Treat each prompt like a mini scene: infer tone first, then choose the exact fit.',
-  },
-  interleave_mix: {
-    vibe: 'Mixed Circuit',
-    objective: 'Rotate across recall styles to build stronger long-term memory.',
-    tip: 'Every few rounds include a surprising prompt to sharpen attention.',
-  },
 }
 
 const SECTION_META: Record<ScriptKey, { glyph: string }> = {
@@ -1368,7 +1319,6 @@ function App() {
   const [sessionRounds, setSessionRounds] = useState<number>(0)
   const [sessionPoints, setSessionPoints] = useState<number>(0)
   const [sessionTargetItems, setSessionTargetItems] = useState<number>(10)
-  const [sessionTargetAccuracy, setSessionTargetAccuracy] = useState<string>('')
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [lastSessionSummary, setLastSessionSummary] = useState<SessionSummaryPayload | null>(null)
   const [sessionSummaryLoading, setSessionSummaryLoading] = useState<boolean>(false)
@@ -1376,9 +1326,9 @@ function App() {
   const [livesEnabled, setLivesEnabled] = useState<boolean>(false)
   const [livesRemaining, setLivesRemaining] = useState<number>(DEFAULT_LIVES)
   const [leechFocusEnabled, setLeechFocusEnabled] = useState<boolean>(false)
-  const [interleaveWeights, setInterleaveWeights] = useState<InterleaveWeights>({ ...DEFAULT_INTERLEAVE_WEIGHTS })
-  const [interleaveSurpriseEnabled, setInterleaveSurpriseEnabled] = useState<boolean>(true)
-  const [interleaveSurpriseEvery, setInterleaveSurpriseEvery] = useState<number>(5)
+  const [interleaveWeights] = useState<InterleaveWeights>({ ...DEFAULT_INTERLEAVE_WEIGHTS })
+  const [interleaveSurpriseEnabled] = useState<boolean>(true)
+  const [interleaveSurpriseEvery] = useState<number>(5)
   const [confidenceCaptureEnabled, setConfidenceCaptureEnabled] = useState<boolean>(false)
   const [selectedConfidenceScore, setSelectedConfidenceScore] = useState<number>(3)
 
@@ -2264,25 +2214,21 @@ function App() {
     return deckCards.filter((c) => idSet.has(c.id))
   }, [deckCards, blockProgress, activeBlockIndex])
 
-  const startSession = useCallback(async () => {
+  const startSession = useCallback(async (selectedGame: MinigameKey = activeGame) => {
     resetRoundCycle()
     setSessionGoalError(null)
     setLastSessionSummary(null)
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
     const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
-    const modeSelection = nextRoundMode(activeGame)
+    const modeSelection = nextRoundMode(selectedGame)
     const modeCards = modeSelection.mode === 'narrative_story'
       ? narrativePriorityCards(sourceCards)
       : sourceCards
     const goalTargetItems = Math.max(1, Math.floor(sessionTargetItems))
-    const parsedTargetAccuracy = sessionTargetAccuracy.trim() === ''
-      ? undefined
-      : Math.max(0, Math.min(100, Math.floor(Number(sessionTargetAccuracy))))
 
     try {
       const goalResponse: SessionGoalStartResponse = await window.jplearnDesktop.startSessionGoal({
         targetItems: goalTargetItems,
-        targetAccuracy: Number.isFinite(parsedTargetAccuracy) ? parsedTargetAccuracy : undefined,
       })
       if (!goalResponse.ok) {
         setSessionGoalError('Unable to start session goal.')
@@ -2335,7 +2281,6 @@ function App() {
     nextRoundMode,
     resetRoundCycle,
     sessionRounds,
-    sessionTargetAccuracy,
     sessionTargetItems,
   ])
 
@@ -2736,7 +2681,6 @@ function App() {
   ] as const
 
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
-  const selectedGameIntro = MINIGAME_INTROS[activeGame]
   const activeScriptStats = scriptStats[activeScript]
   const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : activeBlockCards
 
@@ -3519,6 +3463,94 @@ function App() {
                         : 'Choose a minigame'}
                   </h3>
                 </div>
+
+                <section className="session-goal-controls minigame-quick-setup" aria-label="Minigame quick setup">
+                  <div className="session-goal-fields-inline">
+                    <label className="session-goal-field">
+                      Target items
+                      <input
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={sessionTargetItems}
+                        onChange={(event) => {
+                          const nextValue = Math.max(1, Math.min(200, Number(event.target.value) || 1))
+                          setSessionTargetItems(nextValue)
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="intro-toggle-row" role="group" aria-label="Minigame setup toggles">
+                    <button
+                      type="button"
+                      className={`lives-toggle icon-toggle ${livesEnabled ? 'is-active' : ''}`}
+                      aria-pressed={livesEnabled}
+                      aria-label={`Toggle lives mode (${DEFAULT_LIVES} lives per run)`}
+                      title={`Lives mode (${DEFAULT_LIVES} lives): ${livesEnabled ? 'On' : 'Off'}`}
+                      onClick={() => {
+                        setLivesEnabled((previous) => !previous)
+                        setLivesRemaining(DEFAULT_LIVES)
+                      }}
+                    >
+                      <Heart className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className={`lives-toggle icon-toggle leech-focus-toggle ${leechFocusEnabled ? 'is-active' : ''}`}
+                      aria-pressed={leechFocusEnabled}
+                      aria-label="Toggle focused review mode (leech cards first)"
+                      title={`Focused review mode (leech first): ${leechFocusEnabled ? 'On' : 'Off'}`}
+                      onClick={() => setLeechFocusEnabled((previous) => !previous)}
+                    >
+                      <AlertTriangle className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className={`lives-toggle icon-toggle ${confidenceCaptureEnabled ? 'is-active' : ''}`}
+                      aria-pressed={confidenceCaptureEnabled}
+                      aria-label="Toggle confidence capture"
+                      title={`Confidence capture: ${confidenceCaptureEnabled ? 'On' : 'Off'}`}
+                      onClick={() => setConfidenceCaptureEnabled((previous) => !previous)}
+                    >
+                      <Target className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  {confidenceCaptureEnabled ? (
+                    <section className="confidence-controls" aria-label="Confidence score controls">
+                      <p className="interleave-controls-title">Confidence score</p>
+                      <div className="confidence-chip-row" role="group" aria-label="Select confidence score">
+                        {[1, 2, 3, 4, 5].map((score) => (
+                          <button
+                            key={`confidence-${score}`}
+                            type="button"
+                            className={`confidence-chip ${selectedConfidenceScore === score ? 'is-active' : ''}`}
+                            onClick={() => setSelectedConfidenceScore(score)}
+                            aria-pressed={selectedConfidenceScore === score}
+                          >
+                            {score}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {sessionSummaryLoading ? <p className="status-line">Loading session summary...</p> : null}
+                  {sessionGoalError ? <p className="status-line status-error">{sessionGoalError}</p> : null}
+                  {lastSessionSummary ? (
+                    <section className="session-summary-card" aria-live="polite">
+                      <p className="session-summary-kicker">Last Session</p>
+                      <p className="session-summary-main">
+                        {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} items · {lastSessionSummary.accuracy}% accuracy
+                      </p>
+                      <p className="session-summary-meta">
+                        {lastSessionSummary.goal_met ? 'Goal reached. Keep the streak alive.' : 'Goal not reached yet. Start another run to close the gap.'}
+                      </p>
+                    </section>
+                  ) : null}
+                </section>
+
                 <div className="minigame-grid">
                   {availableMinigames.map((gameKey, index) => {
                     const game = MINIGAMES.find((entry) => entry.key === gameKey)
@@ -3598,6 +3630,7 @@ function App() {
                             setIsRoundResolving(false)
                             setLivesRemaining(DEFAULT_LIVES)
                             resetRoundCycle()
+                            void startSession(game.key)
                           }}
                         >
                           Play
@@ -3686,177 +3719,21 @@ function App() {
                 </div>
               </article>
             ) : !sessionActive ? (
-              <article className="minigame-intro panel-glass">
-                <span className="intro-icon" aria-hidden="true">
-                  <MinigameIcon game={activeGame} />
-                </span>
-                <p className="hero-kicker">{selectedGameIntro.vibe}</p>
-                <h2 className="intro-title">{selectedGameMeta?.title}</h2>
-                <p className="hero-copy">{selectedGameMeta?.description}</p>
-                <p className="intro-objective"><strong>Objective:</strong> {selectedGameIntro.objective}</p>
-                <p className="intro-tip"><strong>Tip:</strong> {selectedGameIntro.tip}</p>
-
-                <section className="session-goal-controls" aria-label="Session goals">
-                  <label className="session-goal-field">
-                    Target items
-                    <input
-                      type="number"
-                      min={1}
-                      max={200}
-                      value={sessionTargetItems}
-                      onChange={(event) => {
-                        const nextValue = Math.max(1, Math.min(200, Number(event.target.value) || 1))
-                        setSessionTargetItems(nextValue)
-                      }}
-                    />
-                  </label>
-                  <label className="session-goal-field">
-                    Target accuracy (optional)
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={sessionTargetAccuracy}
-                      onChange={(event) => {
-                        const raw = event.target.value
-                        if (raw.trim() === '') {
-                          setSessionTargetAccuracy('')
-                          return
-                        }
-                        const clamped = Math.max(0, Math.min(100, Number(raw) || 0))
-                        setSessionTargetAccuracy(String(clamped))
-                      }}
-                      placeholder="e.g. 80"
-                    />
-                  </label>
-                </section>
-
-                {sessionSummaryLoading ? <p className="status-line">Loading session summary...</p> : null}
-                {sessionGoalError ? <p className="status-line status-error">{sessionGoalError}</p> : null}
-                {lastSessionSummary ? (
-                  <section className="session-summary-card" aria-live="polite">
-                    <p className="session-summary-kicker">Last Session</p>
-                    <p className="session-summary-main">
-                      {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} items · {lastSessionSummary.accuracy}% accuracy
-                    </p>
-                    <p className="session-summary-meta">
-                      {lastSessionSummary.goal_met ? 'Goal reached. Keep the streak alive.' : 'Goal not reached yet. Start another run to close the gap.'}
-                    </p>
-                  </section>
-                ) : null}
-                <div className="intro-toggle-row" role="group" aria-label="Minigame setup toggles">
-                  <button
-                    type="button"
-                    className={`lives-toggle icon-toggle ${livesEnabled ? 'is-active' : ''}`}
-                    aria-pressed={livesEnabled}
-                    aria-label={`Toggle lives mode (${DEFAULT_LIVES} lives per run)`}
-                    title={`Lives mode (${DEFAULT_LIVES} lives): ${livesEnabled ? 'On' : 'Off'}`}
-                    onClick={() => {
-                      setLivesEnabled((previous) => !previous)
-                      setLivesRemaining(DEFAULT_LIVES)
-                    }}
-                  >
-                    <Heart className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className={`lives-toggle icon-toggle leech-focus-toggle ${leechFocusEnabled ? 'is-active' : ''}`}
-                    aria-pressed={leechFocusEnabled}
-                    aria-label="Toggle focused review mode (leech cards first)"
-                    title={`Focused review mode (leech first): ${leechFocusEnabled ? 'On' : 'Off'}`}
-                    onClick={() => setLeechFocusEnabled((previous) => !previous)}
-                  >
-                    <AlertTriangle className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className={`lives-toggle icon-toggle ${confidenceCaptureEnabled ? 'is-active' : ''}`}
-                    aria-pressed={confidenceCaptureEnabled}
-                    aria-label="Toggle confidence capture"
-                    title={`Confidence capture: ${confidenceCaptureEnabled ? 'On' : 'Off'}`}
-                    onClick={() => setConfidenceCaptureEnabled((previous) => !previous)}
-                  >
-                    <Target className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
-                  </button>
-                </div>
-
-                {confidenceCaptureEnabled ? (
-                  <section className="confidence-controls" aria-label="Confidence score controls">
-                    <p className="interleave-controls-title">Confidence score</p>
-                    <div className="confidence-chip-row" role="group" aria-label="Select confidence score">
-                      {[1, 2, 3, 4, 5].map((score) => (
-                        <button
-                          key={`confidence-${score}`}
-                          type="button"
-                          className={`confidence-chip ${selectedConfidenceScore === score ? 'is-active' : ''}`}
-                          onClick={() => setSelectedConfidenceScore(score)}
-                          aria-pressed={selectedConfidenceScore === score}
-                        >
-                          {score}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {activeGame === 'interleave_mix' ? (
-                  <section className="interleave-controls" aria-label="Interleave controls">
-                    <div className="interleave-controls-head">
-                      <p className="interleave-controls-title">Interleave policy</p>
-                      <button
-                        type="button"
-                        className={`lives-toggle icon-toggle ${interleaveSurpriseEnabled ? 'is-active' : ''}`}
-                        aria-pressed={interleaveSurpriseEnabled}
-                        aria-label="Toggle surprise prompts"
-                        title={`Surprise prompts: ${interleaveSurpriseEnabled ? 'On' : 'Off'}`}
-                        onClick={() => setInterleaveSurpriseEnabled((previous) => !previous)}
-                      >
-                        <Shuffle className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
-                      </button>
-                    </div>
-                    <label className="interleave-frequency">
-                      Surprise frequency (every N rounds)
-                      <input
-                        type="range"
-                        min={2}
-                        max={8}
-                        value={interleaveSurpriseEvery}
-                        disabled={!interleaveSurpriseEnabled}
-                        onChange={(event) => setInterleaveSurpriseEvery(Number(event.target.value))}
-                      />
-                      <span>{interleaveSurpriseEvery}</span>
-                    </label>
-                    <div className="interleave-weight-grid">
-                      {availableInterleaveModes.map((mode) => (
-                        <label key={mode} className="interleave-weight-row">
-                          {MINIGAMES.find((game) => game.key === mode)?.title ?? mode}
-                          <input
-                            type="range"
-                            min={1}
-                            max={5}
-                            value={interleaveWeights[mode]}
-                            onChange={(event) => {
-                              const nextValue = clampWeight(Number(event.target.value))
-                              setInterleaveWeights((previous) => ({
-                                ...previous,
-                                [mode]: nextValue,
-                              }))
-                            }}
-                          />
-                          <span>{interleaveWeights[mode]}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                <div className="game-actions intro-actions">
-                  <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>
-                    Play
-                  </button>
-                  {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
-                </div>
-              </article>
+              <div className="game-actions">
+                <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>
+                  Play
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNavDirection('back')
+                    setView('script_hub')
+                  }}
+                >
+                  Back to Map
+                </button>
+                {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
+              </div>
             ) : (
               <div className="game-actions">
                 <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>

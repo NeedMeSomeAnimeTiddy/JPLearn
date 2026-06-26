@@ -2526,6 +2526,16 @@ button {
   gap: 8px;
 }
 
+.minigame-quick-setup {
+  margin-bottom: 10px;
+}
+
+.session-goal-fields-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px;
+}
+
 .session-goal-field {
   display: grid;
   grid-template-columns: minmax(150px, 1fr) minmax(120px, 190px);

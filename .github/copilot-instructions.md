@@ -9,23 +9,27 @@
 - Keep code minimal and readable.
 - Read the layer-specific instruction file before editing `domain\`, `data\`, or `ui\` files.
 
-## Run, test, and check commands
+## Quiet-by-default execution policy
 
-```powershell
-python -m pip install -r requirements.txt
-python main.py
-python gui.py
-python scripts\dev.py
-python -m mypy --explicit-package-bases .
-python scripts\arch_check.py
-python scripts\db_check.py
-python scripts\srs_check.py
-python -m pytest -q
-python -m pytest tests\path\to\test_file.py -q
-python -m pytest tests\path\to\test_file.py::test_name -q
-```
+- Prefer read-first analysis before running commands.
+- Use targeted validation for changed files only.
+- Do not run broad/full-suite checks unless the user asks, risk is high, or a change is cross-cutting.
+- If validation is needed, start with the smallest relevant command (for example: a focused pytest target).
+- Escalate to `python scripts\dev.py` only when necessary.
 
-`scripts\dev.py` is the main aggregate check. It runs, in order, `mypy`, the architecture import guard, the DB schema check, the SRS integrity check, and then `pytest`.
+## Useful commands (reference)
+
+- `python -m pip install -r requirements.txt`
+- `python main.py`
+- `python gui.py`
+- `python scripts\dev.py` (full aggregate check)
+- `python -m mypy --explicit-package-bases .`
+- `python scripts\arch_check.py`
+- `python scripts\db_check.py`
+- `python scripts\srs_check.py`
+- `python -m pytest -q`
+- `python -m pytest tests\path\to\test_file.py -q`
+- `python -m pytest tests\path\to\test_file.py::test_name -q`
 
 There is no packaging/build pipeline in the repository today. The main runnable entry points are `main.py` and `gui.py` at the repo root for the PySide6 UI launcher.
 
@@ -53,3 +57,9 @@ Keep `data\jplearn.db` and `data\app.db` concerns separate.
 - `data\database.load_states()` fabricates default `ReviewState` objects for missing rows; they are only persisted after a review.
 - Progress reporting uses the shared mastered threshold: `repetitions >= 3` and `interval >= 21`.
 - The shipped content currently covers Hiragana and Katakana only.
+
+## Tool-noise guardrails
+
+- Keep tool usage minimal and batch related reads where possible.
+- Avoid repeated exploratory searches when one focused search is sufficient.
+- Summarize intent before major tool batches; avoid redundant command reruns.
