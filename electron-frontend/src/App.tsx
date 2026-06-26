@@ -21,7 +21,7 @@ type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
 type KanjiDeckSlug = 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1'
 type VocabDeckSlug = 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'typed_recall' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
@@ -68,6 +68,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Shape Recall: choose the symbol that matches the meaning.',
       'Script Snap: pick the kana form with confidence.',
     ],
+    stroke_order: [
+      'Stroke Trace: picture the write order before you answer.',
+      'Form First: rebuild the symbol one part at a time.',
+    ],
     typed_recall: [
       'Typed Recall: write the meaning from memory with clean spelling.',
       'No options this round: recall first, then type confidently.',
@@ -93,6 +97,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
     character_match: [
       'Glyph Match: choose the katakana symbol tied to the prompt.',
       'Name Lane: select the character used in modern terms.',
+    ],
+    stroke_order: [
+      'Stroke Trace: picture the write order before you answer.',
+      'Form First: rebuild the symbol one part at a time.',
     ],
     typed_recall: [
       'Typed Recall: write the exact meaning from memory.',
@@ -120,6 +128,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Symbol Meaning Link: pick the kanji with the right concept.',
       'N5 Recall: choose the character that best fits the cue.',
     ],
+    stroke_order: [
+      'Writing Trace: start from the meaning and rebuild the character.',
+      'Stroke Path: picture the order before you type the kanji.',
+    ],
     typed_recall: [
       'Concept Recall: type the meaning directly without choices.',
       'Kanji Memory: commit one meaning and type it exactly.',
@@ -146,6 +158,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Word Form: choose the Japanese form for the meaning.',
       'Lexical Link: pick the correct written word.',
     ],
+    stroke_order: [
+      'Stroke Trace: picture the write order before you answer.',
+      'Form First: rebuild the symbol one part at a time.',
+    ],
     typed_recall: [
       'Meaning Recall: type the word meaning from memory.',
       'Precision Recall: type the best English gloss directly.',
@@ -171,6 +187,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
     character_match: [
       'Pattern Form: select the Japanese pattern for this intent.',
       'Structure Recall: pick the exact expression form.',
+    ],
+    stroke_order: [
+      'Stroke Trace: picture the write order before you answer.',
+      'Form First: rebuild the symbol one part at a time.',
     ],
     typed_recall: [
       'Pattern Recall: type the intended meaning in your own words.',
@@ -521,6 +541,11 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
     description: 'Pick the correct character for the meaning.',
   },
   {
+    key: 'stroke_order',
+    title: 'Stroke Order',
+    description: 'Type the kanji from meaning while reinforcing writing sequence.',
+  },
+  {
     key: 'typed_recall',
     title: 'Typed Recall',
     description: 'Type the meaning directly with near-miss tolerance.',
@@ -545,7 +570,7 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
 const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
   hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
   katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
-  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'typed_recall', 'interleave_mix'],
+  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'interleave_mix'],
   vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'interleave_mix'],
   grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'interleave_mix'],
 }
@@ -573,6 +598,11 @@ const MINIGAME_INTROS: Record<MinigameKey, MinigameIntro> = {
     vibe: 'Symbol Hunt',
     objective: 'Choose the correct Japanese character for each meaning prompt.',
     tip: 'Compare visual shape first, then verify your recall before selecting.',
+  },
+  stroke_order: {
+    vibe: 'Stroke Trail',
+    objective: 'Type the kanji character from its meaning and stroke memory.',
+    tip: 'Break the character into parts, then rebuild it from left to right and top to bottom.',
   },
   typed_recall: {
     vibe: 'Active Recall',
@@ -608,6 +638,7 @@ const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   romaji_sprint: Keyboard,
   meaning_match: ListChecks,
   character_match: Languages,
+  stroke_order: Keyboard,
   typed_recall: Keyboard,
   context_cloze: BookText,
   narrative_story: History,
@@ -741,6 +772,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
@@ -750,6 +782,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
@@ -759,6 +792,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
@@ -768,6 +802,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
@@ -777,6 +812,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
@@ -907,6 +943,27 @@ function assessTypedAnswer(expected: string, given: string): TypedAnswerState {
 
 function sanitizeRomajiInput(value: string): string {
   return value.replace(/[^a-zA-Z\s]/g, '')
+}
+
+function normalizeRomajiQuery(value: string): string {
+  return sanitizeRomajiInput(value).toLowerCase().trim()
+}
+
+function getStrokeOrderCandidates(cards: ScriptDeck['cards'], query: string): ScriptDeck['cards'] {
+  const normalizedQuery = normalizeRomajiQuery(query)
+  if (normalizedQuery.length === 0) return []
+
+  return cards
+    .filter((card) => normalizeRomajiQuery(card.romaji).includes(normalizedQuery))
+    .sort((left, right) => {
+      const leftRomaji = normalizeRomajiQuery(left.romaji)
+      const rightRomaji = normalizeRomajiQuery(right.romaji)
+      const leftExact = leftRomaji === normalizedQuery ? 1 : 0
+      const rightExact = rightRomaji === normalizedQuery ? 1 : 0
+      if (leftExact !== rightExact) return rightExact - leftExact
+      return left.character.localeCompare(right.character, 'ja')
+    })
+    .slice(0, 8)
 }
 
 function chooseUniqueIndices(length: number, count: number, exclude: number): number[] {
@@ -1749,6 +1806,28 @@ function App() {
           promptLabel,
           focusText: card.character,
           answer: card.meaning,
+          options: [],
+        }
+      }
+
+      if (minigame === 'stroke_order') {
+        const promptLabel = surprisePrompt
+          ? surpriseLabel
+          : 'Type the reading to reveal kanji candidates'
+        return {
+          cardId: card.id,
+          mode: minigame,
+          audioText: card.character,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: card.example_sentence
+            ? `Stroke memory: type the reading, then choose the kanji for ${card.example_sentence}`
+            : 'Stroke memory: type the reading, then pick the matching kanji candidate.',
+          promptLabel,
+          focusText: card.meaning,
+          answer: card.character,
           options: [],
         }
       }
@@ -3485,7 +3564,48 @@ function App() {
                   {roundState.hintText ? <p className="game-hint-text">{roundState.hintText}</p> : null}
                 </div>
 
-                {roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' ? (
+                {roundState.mode === 'stroke_order' ? (
+                  <div className="stroke-order-picker">
+                    <div className="game-input-row">
+                      <input
+                        ref={answerInputRef}
+                        value={roundInput}
+                        onChange={(event) => setRoundInput(sanitizeRomajiInput(event.target.value))}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'Enter') return
+                          event.preventDefault()
+                          const candidates = getStrokeOrderCandidates(activeBlockCards, roundInput)
+                          if (candidates.length === 1) {
+                            submitAnswer(candidates[0].character)
+                          }
+                        }}
+                        placeholder="Type romaji reading"
+                        autoComplete="off"
+                        disabled={isRoundResolving}
+                      />
+                    </div>
+                    <div className="stroke-order-candidate-wrap" aria-label="Kanji candidates">
+                      {getStrokeOrderCandidates(activeBlockCards, roundInput).length > 0 ? (
+                        <div className="option-grid">
+                          {getStrokeOrderCandidates(activeBlockCards, roundInput).map((candidate) => (
+                            <button
+                              key={candidate.id}
+                              type="button"
+                              className="option-button option-button-character"
+                              disabled={isRoundResolving}
+                              onClick={() => submitAnswer(candidate.character)}
+                            >
+                              <span className="option-button-main" lang="ja">{candidate.character}</span>
+                              <span className="option-button-sub">{candidate.romaji}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="status-line">Type a romaji reading to show matching kanji.</p>
+                      )}
+                    </div>
+                  </div>
+                ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' ? (
                   <form
                     className="game-input-row"
                     onSubmit={(event) => {
@@ -3503,7 +3623,9 @@ function App() {
                             : event.target.value,
                         )
                       }
-                      placeholder={roundState.mode === 'romaji_sprint' ? 'Enter romaji' : 'Type meaning'}
+                      placeholder={roundState.mode === 'romaji_sprint'
+                        ? 'Enter romaji'
+                        : 'Type meaning'}
                       autoComplete="off"
                       disabled={isRoundResolving}
                     />

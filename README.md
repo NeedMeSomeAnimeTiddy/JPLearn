@@ -175,7 +175,7 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 - [ ] (Medium) Add kanji writing and stroke-order practice
    - Support recognition vs. recall vs. writing mastery as separate skills
    - Store stroke hints, writing prompts, and production-specific progress
-   - Kanji character-match rounds now surface a stroke-memory hint for N5 characters
+   - Kanji rounds now include a stroke-order writing drill for N5 characters
 
 #### Phase 3: Personalization
 - [ ] (Medium) Add personalized study plans and JLPT coverage tracking

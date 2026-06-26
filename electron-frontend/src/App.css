@@ -2572,10 +2572,73 @@ button {
   cursor: pointer;
 }
 
+.stroke-order-picker {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 28%, var(--card-border));
+  background:
+    radial-gradient(circle at 14% 0%, rgba(108, 185, 214, 0.15), transparent 38%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 30px -28px rgba(0, 0, 0, 0.7);
+}
+
+.stroke-order-picker .game-input-row {
+  position: relative;
+}
+
+.stroke-order-picker .game-input-row::after {
+  content: 'romaji';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--text-soft) 72%, white);
+  pointer-events: none;
+}
+
+.stroke-order-picker .game-input-row input {
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--chip-bg) 88%, white), var(--chip-bg));
+  border-color: color-mix(in oklab, var(--tone-ocean) 28%, var(--button-border));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding-right: 90px;
+}
+
+.stroke-order-picker .game-input-row input::placeholder {
+  color: color-mix(in oklab, var(--text-soft) 82%, white);
+}
+
+.stroke-order-candidate-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.stroke-order-candidate-wrap .status-line {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in oklab, var(--tone-ocean) 28%, var(--card-border));
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
 .option-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.stroke-order-picker .option-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .option-button {
@@ -2585,10 +2648,47 @@ button {
 }
 
 .option-button-character {
-  font-family: var(--sans);
-  font-size: clamp(1.45rem, 4vw, 2rem);
-  line-height: 1.1;
+  display: grid;
+  gap: 6px;
+  place-items: center;
+  padding: 14px 12px;
+  min-height: 92px;
   text-align: center;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.1), transparent 58%),
+    linear-gradient(180deg, color-mix(in oklab, var(--button-bg-top) 88%, white), var(--button-bg-bottom));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.option-button-character:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--tone-ocean) 42%, var(--button-border));
+  box-shadow:
+    0 14px 20px -18px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.option-button-main {
+  display: block;
+  font-family: var(--sans);
+  font-size: clamp(1.65rem, 4.2vw, 2.45rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.option-button-sub {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.35em;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tone-ocean) 16%, transparent);
+  color: color-mix(in oklab, var(--text-soft) 82%, white);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .tile-grid {

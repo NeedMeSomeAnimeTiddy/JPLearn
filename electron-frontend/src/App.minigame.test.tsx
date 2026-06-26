@@ -40,6 +40,11 @@ const baseCards = [
   { id: 3, character: 'え', romaji: 'e', meaning: 'e', tags: ['hiragana'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 2], character_distractor_ids: [0, 1, 2] },
 ]
 
+const kanjiStrokeCards = [
+  { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
+  { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
+]
+
 const baseDesktopApi = {
   versions: { chrome: '0', electron: '0', node: '0' },
   getStudySummary: async () => ({
@@ -264,5 +269,61 @@ describe('Minigame menu', () => {
     fireEvent.click(within(introPanel).getByRole('button', { name: /^Play$/i }))
 
     expect(await screen.findByText(/Stroke memory: visualize the character skeleton first\./i)).toBeTruthy()
+  })
+
+  it('renders a stroke-order writing drill for kanji rounds', async () => {
+    const recordGameResult = vi.fn(async () => ({ ok: true, card_id: 10, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      recordGameResult,
+      getDeckCards: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => (
+        slug === 'kanji_n5'
+          ? { slug, name: 'Kanji Deck', cards: kanjiStrokeCards }
+          : { slug, name: 'Deck', cards: baseCards }
+      ),
+      getStudyQueue: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => (
+        slug === 'kanji_n5'
+          ? {
+            ok: true,
+            queue: {
+              slug,
+              card_ids: kanjiStrokeCards.map((card) => card.id),
+              indices: kanjiStrokeCards.map((_, index) => index),
+            },
+          }
+          : {
+            ok: true,
+            queue: {
+              slug,
+              card_ids: baseCards.map((card) => card.id),
+              indices: baseCards.map((_, index) => index),
+            },
+          }
+      ),
+    }
+
+    render(<App />)
+    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    clickTopMenuCard('Kanji')
+    const strokeTiles = await screen.findAllByRole('button', { name: /Stroke Order/i })
+    fireEvent.click(within((strokeTiles[0].closest('.game-tile') ?? strokeTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    const introPanels = Array.from(document.querySelectorAll('.minigame-intro')) as HTMLElement[]
+    const introPanel = introPanels[introPanels.length - 1] ?? null
+    expect(introPanel).toBeTruthy()
+    if (introPanel === null) {
+      throw new Error('Minigame intro panel not found')
+    }
+    fireEvent.click(within(introPanel).getByRole('button', { name: /^Play$/i }))
+
+    expect(await screen.findByText(/Type the reading to reveal kanji candidates/i)).toBeTruthy()
+    expect(screen.getByPlaceholderText(/Type romaji reading/i)).toBeTruthy()
+    expect(screen.getByText(/Stroke memory: type the reading, then choose the kanji/i)).toBeTruthy()
+
+    fireEvent.change(screen.getByPlaceholderText(/Type romaji reading/i), { target: { value: 'nichi' } })
+    fireEvent.click(await screen.findByRole('button', { name: /日.*nichi/i }))
+
+    await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
+    expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({ minigame: 'stroke_order' }))
   })
 })
