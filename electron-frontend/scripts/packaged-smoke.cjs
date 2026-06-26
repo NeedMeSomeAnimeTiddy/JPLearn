@@ -7,6 +7,7 @@ const outDir = path.join(repoRoot, 'out')
 const smokeDir = path.join(repoRoot, '.smoke')
 const appDataRoot = path.join(smokeDir, 'appdata')
 const smokeLogPath = path.join(smokeDir, 'packaged-smoke-log.txt')
+const journeyReportPath = path.join(appDataRoot, 'study-journey-smoke.json')
 const maxWaitMs = 45000
 const pollIntervalMs = 500
 
@@ -106,6 +107,20 @@ async function waitForTelemetry(child) {
   throw new Error(`Timed out after ${maxWaitMs}ms waiting for startup telemetry file`)
 }
 
+async function waitForJourneyReport(child) {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < maxWaitMs) {
+    if (child.exitCode !== null && child.exitCode !== 0) {
+      throw new Error(`Packaged app exited early with code ${child.exitCode}`)
+    }
+    if (fs.existsSync(journeyReportPath)) {
+      return journeyReportPath
+    }
+    await sleep(pollIntervalMs)
+  }
+  throw new Error(`Timed out after ${maxWaitMs}ms waiting for study journey smoke report`)
+}
+
 function validateTelemetry(telemetryPath) {
   const parsed = JSON.parse(fs.readFileSync(telemetryPath, 'utf8'))
   const startupSessionMs = parsed?.main?.startupSessionMs
@@ -123,6 +138,31 @@ function validateTelemetry(telemetryPath) {
     startupReadyMs,
     firstSummaryMs: parsed?.renderer?.firstSummaryMs ?? null,
     telemetryPath,
+  }
+}
+
+function validateJourneyReport(reportPath) {
+  const parsed = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
+  if (parsed?.ok !== true) {
+    throw new Error(`Study journey smoke reported failure: ${parsed?.error || 'unknown error'}`)
+  }
+
+  const completedSteps = Array.isArray(parsed.steps) ? parsed.steps : []
+  const requiredSteps = ['summary', 'deck-cards', 'session-start', 'record-result', 'session-summary']
+  const completedStepNames = new Set(completedSteps.map((step) => step.name))
+
+  for (const step of requiredSteps) {
+    if (!completedStepNames.has(step)) {
+      throw new Error(`Study journey smoke report is missing required step: ${step}`)
+    }
+  }
+
+  return {
+    reportPath,
+    durationMs: parsed?.durationMs ?? null,
+    slug: parsed?.slug ?? null,
+    sessionId: parsed?.sessionId ?? null,
+    steps: completedSteps.length,
   }
 }
 
@@ -144,6 +184,10 @@ async function main() {
       ELECTRON_DEV: '0',
       APPDATA: appDataRoot,
       JPLEARN_USER_DATA_DIR: appDataRoot,
+      JPLEARN_SMOKE_JOURNEY: process.env.JPLEARN_SMOKE_JOURNEY || '1',
+      JPLEARN_SMOKE_DECK: process.env.JPLEARN_SMOKE_DECK || 'hiragana',
+      JPLEARN_SMOKE_MINIGAME: process.env.JPLEARN_SMOKE_MINIGAME || 'context_cloze',
+      JPLEARN_SMOKE_RESET_DB: process.env.JPLEARN_SMOKE_RESET_DB || '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -165,6 +209,11 @@ async function main() {
     const metrics = validateTelemetry(telemetryPath)
     appendLog(`Telemetry file: ${metrics.telemetryPath}`)
     appendLog(`startupSessionMs=${metrics.startupSessionMs}, startupReadyMs=${metrics.startupReadyMs}, firstSummaryMs=${metrics.firstSummaryMs}`)
+
+    const reportPath = await waitForJourneyReport(child)
+    const journey = validateJourneyReport(reportPath)
+    appendLog(`Study journey report: ${journey.reportPath}`)
+    appendLog(`journeyDurationMs=${journey.durationMs}, slug=${journey.slug}, sessionId=${journey.sessionId}, steps=${journey.steps}`)
   } finally {
     terminateProcessTree(child.pid)
     fs.writeFileSync(path.join(smokeDir, 'stdout.log'), stdoutLines.join(''), 'utf8')

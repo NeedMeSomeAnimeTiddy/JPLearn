@@ -19,6 +19,7 @@ const windowExpandedStateById = new Map()
 const windowRestoreBoundsById = new Map()
 const THEME_STATE_FILENAME = 'jplearn-startup-theme.json'
 const STARTUP_TELEMETRY_FILENAME = 'startup-telemetry.json'
+const STUDY_JOURNEY_SMOKE_FILENAME = 'study-journey-smoke.json'
 const STARTUP_BUDGETS_MS = {
   startupReady: 5000,
   firstSummary: 2500,
@@ -50,6 +51,10 @@ function getStartupTelemetryPath() {
   return path.join(app.getPath('userData'), STARTUP_TELEMETRY_FILENAME)
 }
 
+function getStudyJourneySmokePath() {
+  return path.join(app.getPath('userData'), STUDY_JOURNEY_SMOKE_FILENAME)
+}
+
 function normalizeStartupTelemetry(payload) {
   if (!payload || typeof payload !== 'object') {
     return null
@@ -73,6 +78,17 @@ function writeStartupTelemetry(payload) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     console.warn('Failed to write startup telemetry:', detail)
+  }
+}
+
+function writeStudyJourneySmoke(payload) {
+  try {
+    const reportPath = getStudyJourneySmokePath()
+    fs.mkdirSync(path.dirname(reportPath), { recursive: true })
+    fs.writeFileSync(reportPath, JSON.stringify(payload, null, 2), 'utf8')
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    console.warn('Failed to write study journey smoke report:', detail)
   }
 }
 
@@ -947,6 +963,118 @@ function loadMainWindow(win) {
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
 }
 
+async function runStudyJourneySmokeIfEnabled() {
+  if (process.env.JPLEARN_SMOKE_JOURNEY !== '1') {
+    return
+  }
+
+  const slug = (process.env.JPLEARN_SMOKE_DECK || 'hiragana').trim().toLowerCase()
+  const minigame = (process.env.JPLEARN_SMOKE_MINIGAME || 'context_cloze').trim().toLowerCase() || 'context_cloze'
+  const shouldResetDb = process.env.JPLEARN_SMOKE_RESET_DB !== '0'
+  const sessionId = `smoke-${Date.now()}`
+  const startedAt = Date.now()
+  const steps = []
+
+  const recordStep = (name, detail) => {
+    steps.push({
+      name,
+      detail,
+      recordedAtUtc: new Date().toISOString(),
+    })
+  }
+
+  const report = {
+    capturedAtUtc: new Date().toISOString(),
+    slug,
+    minigame,
+    sessionId,
+    ok: false,
+    durationMs: 0,
+    steps,
+    error: null,
+  }
+
+  try {
+    if (shouldResetDb) {
+      const resetPayload = await runPythonBridge('reset-db')
+      if (!resetPayload || resetPayload.ok !== true) {
+        throw new Error(`reset-db returned unexpected payload: ${JSON.stringify(resetPayload)}`)
+      }
+      recordStep('reset-db', { ok: true })
+    }
+
+    const summaryPayload = await runPythonBridge('summary')
+    const decks = Array.isArray(summaryPayload?.decks) ? summaryPayload.decks : []
+    const deckExists = decks.some((deck) => deck && deck.slug === slug)
+    if (!deckExists) {
+      throw new Error(`Deck slug not found in summary payload: ${slug}`)
+    }
+    recordStep('summary', { deckCount: decks.length })
+
+    const cardsPayload = await runPythonBridgeWithArgs(['deck-cards', slug])
+    const cards = Array.isArray(cardsPayload?.cards) ? cardsPayload.cards : []
+    const firstCard = cards.find((card) => card && Number.isFinite(card.id))
+    if (!firstCard) {
+      throw new Error(`No playable cards available for slug: ${slug}`)
+    }
+    recordStep('deck-cards', {
+      cardCount: cards.length,
+      firstCardId: firstCard.id,
+    })
+
+    const startGoalPayload = await runPythonBridgeWithArgs(['session-start', '1', '', '', sessionId])
+    if (!startGoalPayload || startGoalPayload.ok !== true) {
+      throw new Error(`session-start returned unexpected payload: ${JSON.stringify(startGoalPayload)}`)
+    }
+    recordStep('session-start', {
+      goal: startGoalPayload.goal || null,
+    })
+
+    const recordResultPayload = await runPythonBridgeWithArgs([
+      'record-result',
+      slug,
+      String(firstCard.id),
+      '1',
+      minigame,
+      '1',
+      sessionId,
+      '4',
+    ])
+    if (!recordResultPayload || recordResultPayload.ok !== true) {
+      throw new Error(`record-result returned unexpected payload: ${JSON.stringify(recordResultPayload)}`)
+    }
+    recordStep('record-result', {
+      cardId: recordResultPayload.card_id,
+      repetitions: recordResultPayload.repetitions,
+      interval: recordResultPayload.interval,
+    })
+
+    const sessionSummaryPayload = await runPythonBridgeWithArgs(['session-summary', sessionId])
+    if (!sessionSummaryPayload || sessionSummaryPayload.ok !== true) {
+      throw new Error(`session-summary returned unexpected payload: ${JSON.stringify(sessionSummaryPayload)}`)
+    }
+    const summary = sessionSummaryPayload.summary || null
+    const completedItems = summary && typeof summary.completed_items === 'number' ? summary.completed_items : 0
+    if (completedItems < 1) {
+      throw new Error(`Session summary did not record reviewed items for session: ${sessionId}`)
+    }
+    recordStep('session-summary', {
+      completedItems,
+      accuracy: summary?.accuracy ?? null,
+      goalMet: summary?.goal_met ?? null,
+    })
+
+    report.ok = true
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    report.error = detail
+    console.error(`Study journey smoke failed: ${detail}`)
+  } finally {
+    report.durationMs = Date.now() - startedAt
+    writeStudyJourneySmoke(report)
+  }
+}
+
 async function createWindowWithSplash() {
   const minSplashMs = 1100
   const maxStartupWaitMs = 30000
@@ -1043,6 +1171,8 @@ async function createWindowWithSplash() {
       splash.close()
     }
   })
+
+  void runStudyJourneySmokeIfEnabled()
 
   return win
 }

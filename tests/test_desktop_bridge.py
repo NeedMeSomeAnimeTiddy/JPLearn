@@ -231,6 +231,24 @@ def test_main_record_result_invalid_boolean_exits_with_error(tmp_path: Path, mon
     assert "Invalid boolean flag" in parsed["error"]
 
 
+def test_main_unknown_command_exits_with_error(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        desktop_bridge.sys,
+        "argv",
+        [
+            "desktop_bridge.py",
+            "unknown-cmd",
+        ],
+    )
+
+    code = desktop_bridge.main()
+    output = capsys.readouterr().out.strip()
+
+    assert code == 2
+    parsed = json.loads(output)
+    assert "Unknown command" in parsed["error"]
+
+
 def test_build_summary_includes_extended_script_curriculum_maps(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
@@ -264,5 +282,70 @@ def test_build_summary_resolves_legacy_vocab_prompt_text(tmp_path: Path, monkeyp
     assert item_history, "Expected at least one timeline item"
     assert item_history[0]["card_id"] == 496
     assert item_history[0]["prompt"] != "Vocabulary N5 item #496"
+
+
+def test_build_summary_contract_shape(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.build_summary()
+    expected_top_level = {
+        "decks",
+        "streak",
+        "activity",
+        "mistakes",
+        "curriculum",
+        "item_history",
+    }
+    assert expected_top_level.issubset(payload.keys())
+
+    decks = cast(list[dict[str, Any]], payload["decks"])
+    assert decks
+    first = decks[0]
+    assert {"slug", "name", "total", "mastered", "due_today", "completed_today"}.issubset(first.keys())
+
+
+def test_start_session_goal_contract_shape(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.start_session_goal(target_items=3, target_minutes=15, target_accuracy=70, session_id="shape-session")
+    assert payload["ok"] is True
+
+    goal = cast(dict[str, Any], payload["goal"])
+    expected_goal_keys = {
+        "session_id",
+        "target_items",
+        "target_minutes",
+        "target_accuracy",
+        "started_at_utc",
+    }
+    assert expected_goal_keys.issubset(goal.keys())
+    assert goal["session_id"] == "shape-session"
+
+
+def test_record_game_result_contract_shape(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.record_game_result(
+        slug="hiragana",
+        card_id=0,
+        is_correct=True,
+        minigame="context_cloze",
+        curriculum_stage=1,
+        confidence_score=4,
+    )
+
+    expected_keys = {
+        "ok",
+        "card_id",
+        "repetitions",
+        "interval",
+        "next_review",
+        "ease_factor",
+        "confidence_score",
+        "curriculum_stage",
+    }
+    assert expected_keys.issubset(payload.keys())
+    assert payload["ok"] is True
+    assert payload["card_id"] == 0
 
 
