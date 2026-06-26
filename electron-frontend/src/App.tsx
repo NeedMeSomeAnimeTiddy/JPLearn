@@ -1810,7 +1810,9 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: exampleSentenceHint,
+          hintText: activeScript === 'kanji_n5'
+            ? 'Stroke memory: visualize the character skeleton first.'
+            : exampleSentenceHint,
           promptLabel: surprisePrompt
             ? surpriseLabel
             : 'Select the meaning for this character',
@@ -1859,6 +1861,8 @@ function App() {
           })),
         ])
         const chapter = buildStoryChapter(activeScript, curriculumStage, promptSeed, card)
+        const readingPassage = card.example_sentence?.trim() ?? ''
+        const readingFocusText = readingPassage.length > 0 ? readingPassage : chapter.line.replace('___', '_____')
 
         return {
           cardId: card.id,
@@ -1868,11 +1872,15 @@ function App() {
           curriculumStage,
           chapterNumber: curriculumStage,
           chapterLabel: null,
-          hintText: exampleSentenceHint ?? `Scene focus: ${card.character} (${card.romaji})`,
+          hintText: readingPassage.length > 0
+            ? `Read the sentence and choose the best meaning for ${card.character}.`
+            : exampleSentenceHint ?? `Scene focus: ${card.character} (${card.romaji})`,
           promptLabel: surprisePrompt
             ? surpriseLabel
-            : `Choose the best scene completion (Stage ${curriculumStage})`,
-          focusText: chapter.line.replace('___', '_____'),
+            : readingPassage.length > 0
+              ? `Read the passage and choose the best meaning (Stage ${curriculumStage})`
+              : `Choose the best scene completion (Stage ${curriculumStage})`,
+          focusText: readingFocusText,
           answer: card.meaning,
           options,
         }
@@ -1895,7 +1903,9 @@ function App() {
         curriculumStage,
         chapterNumber: null,
         chapterLabel: null,
-        hintText: exampleSentenceHint,
+        hintText: activeScript === 'kanji_n5'
+          ? 'Stroke memory: visualize the character skeleton first.'
+          : exampleSentenceHint,
         promptLabel: surprisePrompt
           ? surpriseLabel
           : 'Select the character for this meaning',

@@ -156,15 +156,26 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
    - Verb and adjective forms are covered with the existing review and bridge plumbing
 
 #### Phase 2: Skill Expansion
+- Current focus: move these learning modes from roadmap into implementation.
+- Suggested order:
+   1. Reading practice content first, since it can reuse the existing sentence bank and example content without adding new media plumbing.
+   2. Listening comprehension modes second, once audio delivery and playback strategy are defined.
+   3. Kanji writing and stroke-order practice last, because it needs the most new interaction and progress-tracking work.
+- Shared plan across all three items:
+   - Reuse the existing card/deck model where possible instead of inventing new content types.
+   - Keep progression and mastery tracking aligned with the current review pipeline.
+   - Add focused tests for content shape, progression rules, and visible UI behavior before expanding to the next mode.
 - [ ] (Medium) Add reading practice content
    - Introduce graded passages, short dialogues, and article-style reading sets
    - Track comprehension questions and unknown-word lookups per passage
+   - Narrative story rounds now surface example sentences as reading passages in the app
 - [ ] (High) Add listening comprehension study modes
    - Support prompt-first, audio-first, and dictation-style review flows
    - Reuse the same content items across vocab, grammar, and sentence listening drills
 - [ ] (Medium) Add kanji writing and stroke-order practice
    - Support recognition vs. recall vs. writing mastery as separate skills
    - Store stroke hints, writing prompts, and production-specific progress
+   - Kanji character-match rounds now surface a stroke-memory hint for N5 characters
 
 #### Phase 3: Personalization
 - [ ] (Medium) Add personalized study plans and JLPT coverage tracking

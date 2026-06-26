@@ -220,4 +220,49 @@ describe('Minigame menu', () => {
     expect(promptMain).toBeTruthy()
     expect(screen.getByText(/Example sentence: あさです。/i)).toBeTruthy()
   })
+
+  it('renders reading practice passages in words track using example sentences', async () => {
+    window.jplearnDesktop = baseDesktopApi
+
+    render(<App />)
+    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    clickTopMenuCard('Words')
+    const storyTiles = await screen.findAllByRole('button', { name: /Narrative Story/i })
+    fireEvent.click(within((storyTiles[0].closest('.game-tile') ?? storyTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    const introPanels = Array.from(document.querySelectorAll('.minigame-intro')) as HTMLElement[]
+    const introPanel = introPanels[introPanels.length - 1] ?? null
+    expect(introPanel).toBeTruthy()
+    if (introPanel === null) {
+      throw new Error('Minigame intro panel not found')
+    }
+    fireEvent.click(within(introPanel).getByRole('button', { name: /^Play$/i }))
+
+    const storyPassage = await screen.findByText((content, node) => {
+      if (!node || !node.classList.contains('game-prompt-main')) return false
+      return content.includes('あさです。')
+    })
+    expect(storyPassage).toBeTruthy()
+    expect(screen.getByText(/Read the sentence and choose the best meaning for あ/i)).toBeTruthy()
+  })
+
+  it('shows a stroke-memory hint for kanji character matches', async () => {
+    window.jplearnDesktop = baseDesktopApi
+
+    render(<App />)
+    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    clickTopMenuCard('Kanji')
+    const matchTiles = await screen.findAllByRole('button', { name: /Character Match/i })
+    fireEvent.click(within((matchTiles[0].closest('.game-tile') ?? matchTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    const introPanels = Array.from(document.querySelectorAll('.minigame-intro')) as HTMLElement[]
+    const introPanel = introPanels[introPanels.length - 1] ?? null
+    expect(introPanel).toBeTruthy()
+    if (introPanel === null) {
+      throw new Error('Minigame intro panel not found')
+    }
+    fireEvent.click(within(introPanel).getByRole('button', { name: /^Play$/i }))
+
+    expect(await screen.findByText(/Stroke memory: visualize the character skeleton first\./i)).toBeTruthy()
+  })
 })
