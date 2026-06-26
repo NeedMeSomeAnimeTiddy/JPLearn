@@ -1,6 +1,7 @@
 module.exports = {
   packagerConfig: {
     asar: true,
+    extraResource: ['../scripts', '../data', '../domain'],
   },
   rebuildConfig: {},
   makers: [

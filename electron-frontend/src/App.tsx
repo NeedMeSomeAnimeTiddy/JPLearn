@@ -1028,6 +1028,9 @@ function App() {
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const scriptLoadRequestIdRef = useRef<number>(0)
   const lastLoadedScriptRef = useRef<ScriptKey>('hiragana')
+  const startupBootMarkRef = useRef<number>(performance.now())
+  const startupFirstSummaryMsRef = useRef<number | null>(null)
+  const startupReadySentRef = useRef(false)
   const kanjiLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const kanjiLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
@@ -1120,12 +1123,40 @@ function App() {
     try {
       const payload = await window.jplearnDesktop.getStudySummary()
       setSummary(payload)
+      if (startupFirstSummaryMsRef.current === null) {
+        startupFirstSummaryMsRef.current = Math.round(performance.now() - startupBootMarkRef.current)
+      }
       setLastUpdated(new Date().toLocaleTimeString())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown desktop bridge error')
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  const notifyStartupReady = useCallback((deferredLoadsQueuedAtMs?: number) => {
+    if (startupReadySentRef.current) return
+    startupReadySentRef.current = true
+
+    const startupReadyMs = Math.round(performance.now() - startupBootMarkRef.current)
+    void window.jplearnDesktop
+      .notifyStartupReady({
+        startupReadyMs,
+        firstSummaryMs: startupFirstSummaryMsRef.current,
+        deferredLoadsQueuedAtMs,
+      })
+      .catch(() => undefined)
+  }, [])
+
+  const scheduleDeferredStartupTask = useCallback((task: () => void, delayMs: number) => {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(
+        () => task(),
+        { timeout: Math.max(500, delayMs + 500) },
+      )
+      return
+    }
+    window.setTimeout(task, delayMs)
   }, [])
 
   useEffect(() => {
@@ -1136,60 +1167,81 @@ function App() {
     let cancelled = false
 
     async function preloadStartupDeckData(): Promise<void> {
+      const startupKanjiLevel: JlptLevel = 'n5'
+      const startupVocabLevel: JlptLevel = 'n5'
+      let deferredLoadsQueuedAtMs: number | undefined
+
+      const preloadKanjiLevel = async (level: JlptLevel, shouldHydrateState: boolean): Promise<void> => {
+        if (kanjiLevelDeckCacheRef.current[level] && kanjiLevelBlockCacheRef.current[level]) {
+          return
+        }
+
+        const slug = KANJI_LEVEL_TO_DECK_SLUG[level]
+        const [deckPayload, blockPayload] = await Promise.all([
+          window.jplearnDesktop.getDeckCards(slug),
+          window.jplearnDesktop.getBlockProgress(slug),
+        ])
+        if (cancelled) return
+
+        kanjiLevelDeckCacheRef.current[level] = deckPayload.cards
+        kanjiLevelBlockCacheRef.current[level] = blockPayload.blocks
+        if (shouldHydrateState) {
+          setKanjiDeckCardsByLevel((previous) => ({
+            ...previous,
+            [level]: deckPayload.cards,
+          }))
+        }
+      }
+
+      const preloadVocabLevel = async (level: JlptLevel, shouldHydrateState: boolean): Promise<void> => {
+        if (vocabLevelDeckCacheRef.current[level] && vocabLevelBlockCacheRef.current[level]) {
+          return
+        }
+
+        const slug = VOCAB_LEVEL_TO_DECK_SLUG[level]
+        const [deckPayload, blockPayload] = await Promise.all([
+          window.jplearnDesktop.getDeckCards(slug),
+          window.jplearnDesktop.getBlockProgress(slug),
+        ])
+        if (cancelled) return
+
+        vocabLevelDeckCacheRef.current[level] = deckPayload.cards
+        vocabLevelBlockCacheRef.current[level] = blockPayload.blocks
+        if (shouldHydrateState) {
+          setVocabDeckCardsByLevel((previous) => ({
+            ...previous,
+            [level]: deckPayload.cards,
+          }))
+        }
+      }
+
       try {
-        const [kanjiLoads, vocabLoads] = await Promise.all([
-          Promise.all(
-            JLPT_LEVEL_ORDER.map(async (level) => {
-              const slug = KANJI_LEVEL_TO_DECK_SLUG[level]
-              const [deckPayload, blockPayload] = await Promise.all([
-                window.jplearnDesktop.getDeckCards(slug),
-                window.jplearnDesktop.getBlockProgress(slug),
-              ])
-              return { level, cards: deckPayload.cards, blocks: blockPayload.blocks }
-            }),
-          ),
-          Promise.all(
-            JLPT_LEVEL_ORDER.map(async (level) => {
-              const slug = VOCAB_LEVEL_TO_DECK_SLUG[level]
-              const [deckPayload, blockPayload] = await Promise.all([
-                window.jplearnDesktop.getDeckCards(slug),
-                window.jplearnDesktop.getBlockProgress(slug),
-              ])
-              return { level, cards: deckPayload.cards, blocks: blockPayload.blocks }
-            }),
-          ),
+        await Promise.all([
+          preloadKanjiLevel(startupKanjiLevel, true),
+          preloadVocabLevel(startupVocabLevel, true),
         ])
 
         if (cancelled) return
 
-        const nextKanjiDecks: Partial<Record<JlptLevel, ScriptDeck['cards']>> = {}
-        const nextVocabDecks: Partial<Record<JlptLevel, ScriptDeck['cards']>> = {}
+        const deferredLevels = JLPT_LEVEL_ORDER.filter(
+          (level) => level !== startupKanjiLevel,
+        )
+        deferredLoadsQueuedAtMs = Math.round(performance.now() - startupBootMarkRef.current)
 
-        for (const load of kanjiLoads) {
-          kanjiLevelDeckCacheRef.current[load.level] = load.cards
-          kanjiLevelBlockCacheRef.current[load.level] = load.blocks
-          nextKanjiDecks[load.level] = load.cards
-        }
-
-        for (const load of vocabLoads) {
-          vocabLevelDeckCacheRef.current[load.level] = load.cards
-          vocabLevelBlockCacheRef.current[load.level] = load.blocks
-          nextVocabDecks[load.level] = load.cards
-        }
-
-        setKanjiDeckCardsByLevel((previous) => ({
-          ...previous,
-          ...nextKanjiDecks,
-        }))
-        setVocabDeckCardsByLevel((previous) => ({
-          ...previous,
-          ...nextVocabDecks,
-        }))
+        deferredLevels.forEach((level, index) => {
+          const delayMs = 150 * (index + 1)
+          scheduleDeferredStartupTask(() => {
+            void preloadKanjiLevel(level, true).catch(() => undefined)
+          }, delayMs)
+          scheduleDeferredStartupTask(() => {
+            void preloadVocabLevel(level, true).catch(() => undefined)
+          }, delayMs + 75)
+        })
       } catch {
         // Allow startup to continue even if preloading fails on some decks.
       } finally {
         if (!cancelled) {
-          void window.jplearnDesktop.notifyStartupReady().catch(() => undefined)
+          notifyStartupReady(deferredLoadsQueuedAtMs)
         }
       }
     }
@@ -1199,7 +1251,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [notifyStartupReady, scheduleDeferredStartupTask])
 
   const loadScriptCards = useCallback(async (
     script: ScriptKey,

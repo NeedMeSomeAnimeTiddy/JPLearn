@@ -1,0 +1,62 @@
+name: Electron Packaged Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'electron-frontend/**'
+      - '.github/workflows/electron-packaged-smoke.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'electron-frontend/**'
+      - '.github/workflows/electron-packaged-smoke.yml'
+
+jobs:
+  windows-packaged-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: electron-frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: electron-frontend
+        run: npm ci
+
+      - name: Frontend lint and build
+        working-directory: electron-frontend
+        run: |
+          npm run lint
+          npm run build
+
+      - name: Package Electron app
+        working-directory: electron-frontend
+        run: npm run package
+
+      - name: Run packaged smoke test
+        working-directory: electron-frontend
+        run: npm run smoke:packaged
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-packaged-smoke-artifacts
+          path: |
+            electron-frontend/.smoke/**
+            electron-frontend/out/**
+          if-no-files-found: warn

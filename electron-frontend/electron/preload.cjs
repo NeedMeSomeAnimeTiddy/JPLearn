@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getOverviewCharacterMastery: () => ipcRenderer.invoke('study:get-overview-character-mastery'),
   recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload),
   resetStudyDb: () => ipcRenderer.invoke('study:reset-db'),
-  notifyStartupReady: () => ipcRenderer.invoke('ui:startup-ready'),
+  notifyStartupReady: (payload) => ipcRenderer.invoke('ui:startup-ready', payload),
   setStartupTheme: (theme) => ipcRenderer.invoke('ui:set-startup-theme', theme),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize'),

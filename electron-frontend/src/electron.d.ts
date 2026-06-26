@@ -181,7 +181,11 @@ interface DesktopApi {
   getBlockProgress: (slug: DeckSlug) => Promise<BlockProgressPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getOverviewCharacterMastery: () => Promise<OverviewCharacterMasteryPayload>
-  notifyStartupReady: () => Promise<{ ok: boolean }>
+  notifyStartupReady: (payload?: {
+    startupReadyMs?: number
+    firstSummaryMs?: number | null
+    deferredLoadsQueuedAtMs?: number
+  }) => Promise<{ ok: boolean }>
   setStartupTheme: (theme: string) => Promise<{ ok: boolean; theme: string }>
   recordGameResult: (payload: {
     slug: DeckSlug

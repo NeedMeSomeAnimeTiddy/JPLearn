@@ -67,86 +67,67 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 
 ## Project TODO
 
-### Recently Completed Milestones
-- [x] Migrate frontend to Electron + React + TypeScript (`electron-frontend/`)
-- [x] Deprecate Python GUI entrypoints (`main.py`, `gui.py`)
-- [x] Add script-specific minigame menus with back navigation
-- [x] Ship modern dark desktop UI with animated transitions
-- [x] Show per-deck mastery and due/completed-today indicators
+### Status Snapshot
+- [x] Electron + React + TypeScript desktop client shipped
+- [x] Core SRS mechanics, streaks, history, leech handling, and distractor quality improvements shipped
+- [x] Keyboard accessibility baseline, reduced-motion support, and overview analytics shipped
 
-### Product Priorities (Post-Refactor)
-- [x] (High) Daily streak tracking (UTC-safe + local-day aware)
-   - [x] Define streak model fields in persistence: `last_study_at_utc`, `current_streak_days`, `best_streak_days`.
-   - [x] Implement streak update service in Domain with deterministic date-boundary logic.
-   - [x] Handle same-day repeat studies without double-increment.
-   - [x] Handle skipped-day reset behavior.
-   - [x] Add tests for UTC rollover and local timezone edge cases.
-   - [x] Surface current/best streak in Electron overview.
+### Now / Next (Highest Priority)
+- [x] (High) Harden Electron IPC surface
+   - Validate sender/frame for each `ipcMain.handle` route
+   - Introduce shared request validation helpers and typed payload guards
+   - Add negative tests for malformed and unauthorized renderer requests
+- [x] (High) Enable stricter renderer isolation defaults
+   - Set `sandbox: true` explicitly and verify preload bridge compatibility
+   - Re-audit `contextIsolation`, `nodeIntegration`, and exposed preload API surface
+- [x] (High) Lock down navigation and window creation
+   - Deny unexpected `will-navigate` targets
+   - Enforce strict `setWindowOpenHandler` allowlist policy
+- [ ] (High) Add database migration framework
+   - Add schema version table/marker
+   - Add deterministic migration runner and rollback-safe strategy
+   - Add migration tests for fresh install and upgrade paths
 
-- [x] (High) Weekly/monthly activity summary cards in Electron overview
-   - [x] Add aggregation query for daily activity buckets (last 7 and last 30 days).
-   - [x] Expose totals: reviewed, correct, incorrect, accuracy, points earned.
-   - [x] Render 2 overview cards: 7-day and 30-day summaries.
-   - [x] Add empty-state behavior for new users with no activity.
-   - [x] Add snapshot/UI tests for overview summary rendering.
+### Near-Term Product Roadmap
+- [ ] (High) Introduce adaptive study queue balancing
+   - Blend due items with weak-tag reinforcement and new-item pacing
+   - Add deterministic queue tests to avoid starvation of any deck type
+- [ ] (High) Add session goals and completion tracking
+   - Daily target setting (items/time/accuracy)
+   - End-of-session summary against target with streak-aware messaging
+- [ ] (Medium) Expand answer modes
+   - Typed recall mode for vocab and kanji decks
+   - Optional confidence score capture per review event
+- [ ] (Medium) Add pronunciation/audio support
+   - Pluggable TTS or bundled audio strategy
+   - Cache policy for offline reliability
 
-- [x] (High) Mistake breakdown by script/tag (hiragana/katakana/kanji/vocab)
-   - [x] Persist incorrect attempts with script/tag metadata at review time.
-   - [x] Add grouped aggregation endpoint for mistake counts and error rates.
-   - [x] Display breakdown in overview panel with top weak areas first.
-   - [x] Add regression tests to ensure tag/script grouping stays stable.
+### Data Quality and Content Operations
+- [ ] (High) Enforce Japanese normalization at all persistence boundaries
+   - Centralize normalization utilities used by all repositories/importers
+   - Add regression tests for kana width, prolonged sound marks, and punctuation variants
+- [ ] (Medium) Improve external content ingestion pipeline
+   - Add stricter CSV schema checks with actionable error output
+   - Add deduplication and conflict reporting across imported lists
+- [ ] (Medium) Add deck import/export workflow
+   - Export user progress and custom decks
+   - Import with merge/overwrite conflict modes
 
-- [x] (Medium) Per-item study history timeline (last reviews + trend)
-   - [x] Add review event history table keyed by item and timestamp.
-   - [x] Expose recent review timeline per item (attempt, outcome, timestamp, points delta).
-   - [x] Add trend summary (improving/stable/declining) based on recent outcomes.
-   - [x] Add UI panel for item-level history with pagination/limit.
-   - [x] Add tests for ordering and trend classification rules.
+### Frontend, Performance, and Release Engineering
+- [x] (High) Bundle fonts locally for offline startup reliability
+- [x] (Medium) Add startup performance budget and telemetry checkpoints
+- [x] (Medium) Defer non-critical renderer work until after first meaningful paint
+- [x] (Medium) Add packaged smoke tests in CI (`npm run build`, package, launch check)
+- [x] (Medium) Add restrictive CSP baseline for packaged renderer
 
-- [x] (Medium) Leech handling for repeatedly failed items
-   - [x] Define leech rule (example: failed >= N times within last M attempts).
-   - [x] Auto-tag leech items in persistence.
-   - [x] Add focused review mode that prioritizes leech-tagged items.
-   - [x] Add UI indicator and optional filter for leech items.
-   - [x] Add tests for entering/exiting leech state.
-
-- [x] (Medium) Better distractor generation for multiple-choice minigames
-   - [x] Replace random distractors with rule-based distractor ranking.
-   - [x] Add script-aware similarity heuristics (shape/readings/meaning proximity).
-   - [x] Prevent duplicate or obviously invalid distractors.
-   - [x] Add deterministic tests for distractor quality and uniqueness.
-   - [x] Add quick benchmark to keep distractor generation within target latency.
-
-### Electron UX & Accessibility
-- [x] (High) Add deterministic keyboard navigation map (Tab order + Enter/Space shortcuts) across all menus
-- [x] (High) Add explicit visible focus-ring audit for every interactive control
-- [x] (Medium) Add reduced-motion setting and respect OS reduced-motion preference
-- [x] (Medium) Add font-size scaling option in settings (small/medium/large)
-- [x] (Medium) Add in-app command palette / quick switcher for Home, Script Menu, and Overview
-
-### Electron Security & Runtime Hardening
-- [ ] (High) Validate IPC sender/frame for all `ipcMain.handle` routes
-- [ ] (High) Enable renderer sandbox explicitly in `BrowserWindow` webPreferences
-- [ ] (High) Limit navigation and deny unexpected window creation (`will-navigate`, `setWindowOpenHandler`)
-- [ ] (Medium) Add restrictive CSP for packaged renderer (`default-src 'self'` baseline)
-- [ ] (Medium) Evaluate replacing `file://` renderer loads with a custom app protocol
-
-### Performance & Packaging
-- [ ] (High) Bundle fonts locally (remove runtime Google Fonts fetch for offline startup reliability)
-- [ ] (Medium) Add startup performance budget and measurements (cold start + first interaction)
-- [ ] (Medium) Audit heavy startup work in main/renderer and defer non-critical tasks
-- [ ] (Medium) Add packaged smoke test in CI (`npm run build`, `npm run package`, launch check)
-
-### Release, Data & Reliability
-- [ ] (High) Add DB migration/version marker and migration runner for schema changes
-- [ ] (High) Strengthen Japanese text normalization checks at data boundaries
-- [ ] (Medium) Add backup/restore command for local DB files
-- [ ] (Medium) Add import/export for decks and user progress
-- [ ] (Medium) Integrate Electron auto-update flow (Forge publish metadata + update UI prompt)
+### Quality, Tooling, and Developer Experience
+- [ ] (Medium) Add end-to-end Electron smoke tests for primary user journeys
+- [ ] (Medium) Add API contract tests between Electron preload bridge and Python backend bridge
+- [ ] (Medium) Add unified developer diagnostics command that runs compact checks + focused frontend validation
+- [ ] (Low) Add contributor architecture diagrams and a "how data flows" reference doc
 
 ### Longer-Term Enhancements
-- [ ] Audio pronunciation playback (pre-recorded or TTS)
-- [ ] Sentence mining/import workflow
-- [ ] Theme presets/customization options in Electron UI
-- [ ] Optional cloud sync
-- [ ] Optional web deployment mode
+- [ ] Cloud sync (optional account-based profile sync)
+- [ ] Sentence mining workflow and contextual example cards
+- [ ] Theme presets and advanced UI personalization
+- [ ] Mobile companion app (read-only progress + lightweight reviews)

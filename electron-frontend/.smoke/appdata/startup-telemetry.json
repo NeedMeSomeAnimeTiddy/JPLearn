@@ -1,0 +1,18 @@
+{
+  "capturedAtUtc": "2026-06-26T00:20:11.166Z",
+  "budgetsMs": {
+    "startupReady": 5000,
+    "firstSummary": 2500
+  },
+  "main": {
+    "startupSessionStartedAt": 1782433210021,
+    "startupSessionCompletedAt": 1782433211166,
+    "startupSessionMs": 1145,
+    "startupTheme": "harbor_mist"
+  },
+  "renderer": {
+    "startupReadyMs": 469,
+    "firstSummaryMs": null,
+    "deferredLoadsQueuedAtMs": 469
+  }
+}

@@ -2,10 +2,24 @@ const { app, BrowserWindow, ipcMain } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
+const {
+  assertTrustedIpcSender,
+  isAllowedRendererUrl,
+  validateDeckSlug,
+  validateStartupThemeInput,
+  validateRecordGameResultPayload,
+} = require('./ipc_security.cjs')
 
 const repoRoot = path.join(__dirname, '..', '..')
 const startupReadyResolvers = new Map()
+const startupTelemetryByContentsId = new Map()
 const THEME_STATE_FILENAME = 'jplearn-startup-theme.json'
+const STARTUP_TELEMETRY_FILENAME = 'startup-telemetry.json'
+const STARTUP_BUDGETS_MS = {
+  startupReady: 5000,
+  firstSummary: 2500,
+}
+const FORCED_USER_DATA_DIR = process.env.JPLEARN_USER_DATA_DIR
 const DEFAULT_STARTUP_THEME = 'harbor_mist'
 const VALID_STARTUP_THEMES = new Set([
   'harbor_mist',
@@ -20,8 +34,42 @@ const VALID_STARTUP_THEMES = new Set([
   'plum_garden',
 ])
 
+if (FORCED_USER_DATA_DIR) {
+  app.setPath('userData', FORCED_USER_DATA_DIR)
+}
+
 function getThemeStatePath() {
   return path.join(app.getPath('userData'), THEME_STATE_FILENAME)
+}
+
+function getStartupTelemetryPath() {
+  return path.join(app.getPath('userData'), STARTUP_TELEMETRY_FILENAME)
+}
+
+function normalizeStartupTelemetry(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const toFiniteNumber = (value) =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : null
+
+  return {
+    startupReadyMs: toFiniteNumber(payload.startupReadyMs),
+    firstSummaryMs: toFiniteNumber(payload.firstSummaryMs),
+    deferredLoadsQueuedAtMs: toFiniteNumber(payload.deferredLoadsQueuedAtMs),
+  }
+}
+
+function writeStartupTelemetry(payload) {
+  try {
+    const telemetryPath = getStartupTelemetryPath()
+    fs.mkdirSync(path.dirname(telemetryPath), { recursive: true })
+    fs.writeFileSync(telemetryPath, JSON.stringify(payload, null, 2), 'utf8')
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    console.warn('Failed to write startup telemetry:', detail)
+  }
 }
 
 function normalizeStartupTheme(theme) {
@@ -194,13 +242,39 @@ function getSplashPalette(theme) {
   return palettes[theme] || palettes[DEFAULT_STARTUP_THEME]
 }
 
+function resolvePythonBridgeContext() {
+  const candidateScripts = [
+    path.join(repoRoot, 'scripts', 'desktop_bridge.py'),
+    path.join(process.cwd(), '..', 'scripts', 'desktop_bridge.py'),
+    path.join(process.cwd(), 'scripts', 'desktop_bridge.py'),
+  ]
+
+  for (const candidate of candidateScripts) {
+    if (!fs.existsSync(candidate)) {
+      continue
+    }
+    return {
+      bridgeScript: candidate,
+      projectRoot: path.resolve(candidate, '..', '..'),
+      candidates: candidateScripts,
+    }
+  }
+
+  return {
+    bridgeScript: candidateScripts[0],
+    projectRoot: repoRoot,
+    candidates: candidateScripts,
+  }
+}
+
 function runPythonBridge(command) {
   const pythonCmd = process.env.JPLEARN_PYTHON || 'python'
-  const bridgeScript = path.join(repoRoot, 'scripts', 'desktop_bridge.py')
+  const bridgeContext = resolvePythonBridgeContext()
+  const bridgeScript = bridgeContext.bridgeScript
 
   return new Promise((resolve, reject) => {
     const child = spawn(pythonCmd, [bridgeScript, command], {
-      cwd: repoRoot,
+      cwd: bridgeContext.projectRoot,
       windowsHide: true,
     })
 
@@ -227,6 +301,8 @@ function runPythonBridge(command) {
               `Bridge exited with code ${code}`,
               `Python command: ${pythonCmd}`,
               `Bridge script: ${bridgeScript}`,
+              `Bridge cwd: ${bridgeContext.projectRoot}`,
+              `Bridge candidates: ${bridgeContext.candidates.join(' | ')}`,
               `stderr: ${stderr.trim() || '(empty)'}`,
               `stdout: ${stdout.trim() || '(empty)'}`,
             ].join('\n'),
@@ -246,11 +322,12 @@ function runPythonBridge(command) {
 
 function runPythonBridgeWithArgs(args) {
   const pythonCmd = process.env.JPLEARN_PYTHON || 'python'
-  const bridgeScript = path.join(repoRoot, 'scripts', 'desktop_bridge.py')
+  const bridgeContext = resolvePythonBridgeContext()
+  const bridgeScript = bridgeContext.bridgeScript
 
   return new Promise((resolve, reject) => {
     const child = spawn(pythonCmd, [bridgeScript, ...args], {
-      cwd: repoRoot,
+      cwd: bridgeContext.projectRoot,
       windowsHide: true,
     })
 
@@ -277,6 +354,8 @@ function runPythonBridgeWithArgs(args) {
               `Bridge exited with code ${code}`,
               `Python command: ${pythonCmd}`,
               `Bridge script: ${bridgeScript}`,
+              `Bridge cwd: ${bridgeContext.projectRoot}`,
+              `Bridge candidates: ${bridgeContext.candidates.join(' | ')}`,
               `Bridge args: ${args.join(' ')}`,
               `stderr: ${stderr.trim() || '(empty)'}`,
               `stdout: ${stdout.trim() || '(empty)'}`,
@@ -295,7 +374,11 @@ function runPythonBridgeWithArgs(args) {
   })
 }
 
-ipcMain.handle('study:get-summary', async () => {
+ipcMain.handle('study:get-summary', async (event) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
   try {
     return await runPythonBridge('summary')
   } catch (error) {
@@ -304,25 +387,39 @@ ipcMain.handle('study:get-summary', async () => {
   }
 })
 
-ipcMain.handle('study:get-block-progress', async (_event, slug) => {
+ipcMain.handle('study:get-block-progress', async (event, slug) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
+  const validatedSlug = validateDeckSlug(slug)
   try {
-    return await runPythonBridgeWithArgs(['block-progress', slug])
+    return await runPythonBridgeWithArgs(['block-progress', validatedSlug])
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(`Failed to fetch block progress: ${detail}`)
   }
 })
 
-ipcMain.handle('study:get-deck-cards', async (_event, slug) => {
+ipcMain.handle('study:get-deck-cards', async (event, slug) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
+  const validatedSlug = validateDeckSlug(slug)
   try {
-    return await runPythonBridgeWithArgs(['deck-cards', slug])
+    return await runPythonBridgeWithArgs(['deck-cards', validatedSlug])
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(`Failed to fetch deck cards: ${detail}`)
   }
 })
 
-ipcMain.handle('study:get-overview-character-mastery', async () => {
+ipcMain.handle('study:get-overview-character-mastery', async (event) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
   try {
     return await runPythonBridge('overview-character-mastery')
   } catch (error) {
@@ -331,7 +428,11 @@ ipcMain.handle('study:get-overview-character-mastery', async () => {
   }
 })
 
-ipcMain.handle('study:reset-db', async () => {
+ipcMain.handle('study:reset-db', async (event) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
   try {
     return await runPythonBridge('reset-db')
   } catch (error) {
@@ -340,17 +441,22 @@ ipcMain.handle('study:reset-db', async () => {
   }
 })
 
-ipcMain.handle('study:record-game-result', async (_event, payload) => {
+ipcMain.handle('study:record-game-result', async (event, payload) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
+  const validatedPayload = validateRecordGameResultPayload(payload)
   try {
     const args = [
       'record-result',
-      payload.slug,
-      String(payload.cardId),
-      payload.isCorrect ? '1' : '0',
-      payload.minigame || '',
+      validatedPayload.slug,
+      String(validatedPayload.cardId),
+      validatedPayload.isCorrect ? '1' : '0',
+      validatedPayload.minigame,
     ]
-    if (typeof payload.curriculumStage === 'number') {
-      args.push(String(payload.curriculumStage))
+    if (typeof validatedPayload.curriculumStage === 'number') {
+      args.push(String(validatedPayload.curriculumStage))
     }
     return await runPythonBridgeWithArgs(args)
   } catch (error) {
@@ -360,13 +466,19 @@ ipcMain.handle('study:record-game-result', async (_event, payload) => {
 })
 
 ipcMain.handle('window:minimize', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
+  const win = assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
   if (win) win.minimize()
   return { ok: true }
 })
 
 ipcMain.handle('window:toggle-maximize', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
+  const win = assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
   if (!win) return { ok: false, isMaximized: false }
   if (win.isMaximized()) {
     win.unmaximize()
@@ -377,22 +489,43 @@ ipcMain.handle('window:toggle-maximize', (event) => {
 })
 
 ipcMain.handle('window:is-maximized', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
+  const win = assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
   return { isMaximized: win ? win.isMaximized() : false }
 })
 
 ipcMain.handle('window:close', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
+  const win = assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
   if (win) win.close()
   return { ok: true }
 })
 
-ipcMain.handle('ui:set-startup-theme', (_event, theme) => {
-  const normalized = saveStartupTheme(theme)
+ipcMain.handle('ui:set-startup-theme', (event, theme) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
+  const normalized = saveStartupTheme(validateStartupThemeInput(theme))
   return { ok: true, theme: normalized }
 })
 
-ipcMain.handle('ui:startup-ready', (event) => {
+ipcMain.handle('ui:startup-ready', (event, telemetryPayload) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
+  const normalizedTelemetry = normalizeStartupTelemetry(telemetryPayload)
+  const currentTelemetry = startupTelemetryByContentsId.get(event.sender.id) || {}
+  startupTelemetryByContentsId.set(event.sender.id, {
+    ...currentTelemetry,
+    renderer: normalizedTelemetry,
+  })
+
   const resolver = startupReadyResolvers.get(event.sender.id)
   if (resolver) {
     resolver()
@@ -417,7 +550,13 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
+  })
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    console.warn('Blocked window.open request', { url })
+    return { action: 'deny' }
   })
 
   return win
@@ -442,6 +581,7 @@ function createSplashWindow(themeKey) {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   })
 
@@ -574,6 +714,13 @@ function createSplashWindow(themeKey) {
 }
 
 function loadMainWindow(win) {
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedRendererUrl(url, process.env.ELECTRON_DEV === '1')) {
+      event.preventDefault()
+      console.warn('Blocked renderer navigation', { url })
+    }
+  })
+
   if (process.env.ELECTRON_DEV === '1') {
     win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
       console.error('Renderer failed to load (dev)', {
@@ -607,10 +754,19 @@ function loadMainWindow(win) {
 async function createWindowWithSplash() {
   const minSplashMs = 1100
   const maxStartupWaitMs = 30000
+  const startupSessionStartedAt = Date.now()
   const startupTheme = readSavedStartupTheme()
   const splash = createSplashWindow(startupTheme)
   const win = createWindow()
   const webContentsId = win.webContents.id
+
+  startupTelemetryByContentsId.set(webContentsId, {
+    main: {
+      startupSessionStartedAt,
+      startupTheme,
+      maxStartupWaitMs,
+    },
+  })
 
   const startupReadyPromise = new Promise((resolve) => {
     startupReadyResolvers.set(webContentsId, resolve)
@@ -618,6 +774,7 @@ async function createWindowWithSplash() {
 
   win.on('closed', () => {
     startupReadyResolvers.delete(webContentsId)
+    startupTelemetryByContentsId.delete(webContentsId)
   })
 
   loadMainWindow(win)
@@ -634,6 +791,34 @@ async function createWindowWithSplash() {
     ]),
     new Promise((resolve) => setTimeout(resolve, minSplashMs)),
   ])
+
+  const startupSessionCompletedAt = Date.now()
+  const startupSessionMs = startupSessionCompletedAt - startupSessionStartedAt
+  const telemetryContext = startupTelemetryByContentsId.get(webContentsId) || {}
+  const rendererTelemetry = telemetryContext.renderer || null
+
+  writeStartupTelemetry({
+    capturedAtUtc: new Date().toISOString(),
+    budgetsMs: STARTUP_BUDGETS_MS,
+    main: {
+      startupSessionStartedAt,
+      startupSessionCompletedAt,
+      startupSessionMs,
+      startupTheme,
+    },
+    renderer: rendererTelemetry,
+  })
+
+  if (rendererTelemetry && typeof rendererTelemetry.startupReadyMs === 'number' && rendererTelemetry.startupReadyMs > STARTUP_BUDGETS_MS.startupReady) {
+    console.warn(
+      `Startup budget exceeded: renderer startup-ready in ${rendererTelemetry.startupReadyMs}ms (budget ${STARTUP_BUDGETS_MS.startupReady}ms)`,
+    )
+  }
+  if (rendererTelemetry && typeof rendererTelemetry.firstSummaryMs === 'number' && rendererTelemetry.firstSummaryMs > STARTUP_BUDGETS_MS.firstSummary) {
+    console.warn(
+      `Startup budget exceeded: first summary in ${rendererTelemetry.firstSummaryMs}ms (budget ${STARTUP_BUDGETS_MS.firstSummary}ms)`,
+    )
+  }
 
   if (!splash.isDestroyed()) {
     splash.close()
