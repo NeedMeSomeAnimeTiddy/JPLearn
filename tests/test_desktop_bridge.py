@@ -74,6 +74,35 @@ def test_record_game_result_persists_session_id_when_provided(tmp_path: Path, mo
     assert row["session_id"] == "session-abc"
 
 
+def test_record_game_result_persists_confidence_score_when_provided(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.record_game_result(
+        slug="hiragana",
+        card_id=0,
+        is_correct=True,
+        minigame="meaning_match",
+        confidence_score=5,
+    )
+
+    assert payload["confidence_score"] == 5
+
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        row = conn.execute(
+            """
+            SELECT confidence_score
+            FROM review_events
+            WHERE deck=? AND card_id=?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            ("Hiragana", 0),
+        ).fetchone()
+
+    assert row is not None
+    assert row["confidence_score"] == 5
+
+
 def test_start_session_goal_and_load_summary(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

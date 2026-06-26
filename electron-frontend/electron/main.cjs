@@ -471,14 +471,27 @@ ipcMain.handle('study:record-game-result', async (event, payload) => {
       validatedPayload.isCorrect ? '1' : '0',
       validatedPayload.minigame,
     ]
-    if (typeof validatedPayload.curriculumStage === 'number') {
-      args.push(String(validatedPayload.curriculumStage))
+    const curriculumStageArg =
+      typeof validatedPayload.curriculumStage === 'number'
+        ? String(validatedPayload.curriculumStage)
+        : ''
+    const sessionIdArg =
+      typeof validatedPayload.sessionId === 'string' && validatedPayload.sessionId.trim().length > 0
+        ? validatedPayload.sessionId
+        : ''
+    const confidenceArg =
+      typeof validatedPayload.confidenceScore === 'number'
+        ? String(validatedPayload.confidenceScore)
+        : ''
+
+    if (curriculumStageArg || sessionIdArg || confidenceArg) {
+      args.push(curriculumStageArg)
     }
-    if (typeof validatedPayload.sessionId === 'string' && validatedPayload.sessionId.trim().length > 0) {
-      if (typeof validatedPayload.curriculumStage !== 'number') {
-        args.push('')
-      }
-      args.push(validatedPayload.sessionId)
+    if (sessionIdArg || confidenceArg) {
+      args.push(sessionIdArg)
+    }
+    if (confidenceArg) {
+      args.push(confidenceArg)
     }
     return await runPythonBridgeWithArgs(args)
   } catch (error) {

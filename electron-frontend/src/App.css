@@ -2154,6 +2154,37 @@ button {
   gap: 8px;
 }
 
+.confidence-controls {
+  margin-top: 4px;
+  border: 1px solid var(--chip-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--chip-bg);
+  display: grid;
+  gap: 8px;
+}
+
+.confidence-chip-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.confidence-chip {
+  border: 1px solid var(--button-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  min-height: calc(38px * var(--ui-scale));
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.confidence-chip.is-active {
+  border-color: color-mix(in oklab, var(--tone-ocean) 52%, var(--button-border));
+  background: color-mix(in oklab, var(--tone-ocean) 34%, var(--chip-bg));
+}
+
 .interleave-controls-title {
   margin: 0;
   font-size: 0.8rem;

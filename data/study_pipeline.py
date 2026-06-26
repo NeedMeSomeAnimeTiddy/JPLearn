@@ -39,6 +39,7 @@ def review_card(
     prompt_text: str = "",
     tags: list[str] | None = None,
     session_id: str = "",
+    confidence_score: int | None = None,
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
 ) -> ReviewState:
@@ -65,6 +66,7 @@ def review_card(
         prompt_text=prompt_text,
         tags=tags,
         session_id=session_id,
+        confidence_score=confidence_score,
     )
     database.update_leech_state_for_card(deck_name, updated_state.card_id)
     next_streak = apply_study_day(database.load_streak_state(), review_day_utc, review_day_local)
@@ -82,6 +84,7 @@ def review_minigame_result(
     prompt_text: str = "",
     tags: list[str] | None = None,
     session_id: str = "",
+    confidence_score: int | None = None,
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
 ) -> ReviewState:
@@ -97,6 +100,7 @@ def review_minigame_result(
         prompt_text=prompt_text,
         tags=tags,
         session_id=session_id,
+        confidence_score=confidence_score,
         reviewed_on_local=reviewed_on_local,
         reviewed_on_utc=reviewed_on_utc,
     )

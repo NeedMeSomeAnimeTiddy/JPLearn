@@ -59,6 +59,7 @@ def test_jplearn_db_upgrade_adds_review_event_columns_and_schema_marker(
     assert "curriculum_stage" in columns
     assert "prompt_text" in columns
     assert "session_id" in columns
+    assert "confidence_score" in columns
 
     session_goal_columns = _column_names(db_path, "session_goals")
     assert "session_id" in session_goal_columns

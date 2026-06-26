@@ -379,6 +379,7 @@ def record_game_result(
     minigame: str = "",
     curriculum_stage: int | None = None,
     session_id: str = "",
+    confidence_score: int | None = None,
 ) -> dict[str, object]:
     init_study_db()
     factory = ALL_DECKS.get(slug)
@@ -414,6 +415,7 @@ def record_game_result(
         prompt_text=matching_card.character,
         tags=tags,
         session_id=session_id.strip(),
+        confidence_score=confidence_score,
     )
 
     return {
@@ -423,6 +425,7 @@ def record_game_result(
         "interval": updated_state.interval,
         "next_review": updated_state.next_review.isoformat(),
         "ease_factor": updated_state.ease_factor,
+        "confidence_score": None if confidence_score is None else max(1, min(5, int(confidence_score))),
         "curriculum_stage": load_curriculum_stages(deck.name, stage_mode, [card_id]).get(card_id, 1)
         if stage_mode
         else None,
@@ -534,7 +537,7 @@ def main() -> int:
 
     if command == "record-result":
         if len(sys.argv) < 5:
-            print(json.dumps({"error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage] [session_id]"}))
+            print(json.dumps({"error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage] [session_id] [confidence_score]"}))
             return 2
         slug = sys.argv[2]
         try:
@@ -543,6 +546,7 @@ def main() -> int:
             minigame = sys.argv[5] if len(sys.argv) > 5 else ""
             curriculum_stage = int(sys.argv[6]) if len(sys.argv) > 6 and sys.argv[6].strip() else None
             session_id = sys.argv[7] if len(sys.argv) > 7 else ""
+            confidence_score = int(sys.argv[8]) if len(sys.argv) > 8 and sys.argv[8].strip() else None
             payload = record_game_result(
                 slug,
                 card_id,
@@ -550,6 +554,7 @@ def main() -> int:
                 minigame=minigame,
                 curriculum_stage=curriculum_stage,
                 session_id=session_id,
+                confidence_score=confidence_score,
             )
         except ValueError as exc:
             print(json.dumps({"error": str(exc)}))

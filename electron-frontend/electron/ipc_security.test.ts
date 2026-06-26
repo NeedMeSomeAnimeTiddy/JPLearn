@@ -68,12 +68,14 @@ describe('ipc_security', () => {
       minigame: 'romaji_sprint',
       curriculumStage: 2,
       sessionId: 'session-1',
+      confidenceScore: 4,
     })
 
     expect(valid.slug).toBe('hiragana')
     expect(valid.cardId).toBe(12)
     expect(valid.isCorrect).toBe(true)
     expect(valid.sessionId).toBe('session-1')
+    expect(valid.confidenceScore).toBe(4)
 
     expect(() =>
       validateRecordGameResultPayload({
@@ -100,6 +102,15 @@ describe('ipc_security', () => {
         sessionId: '   ',
       }),
     ).toThrow(/invalid session id/i)
+
+    expect(() =>
+      validateRecordGameResultPayload({
+        slug: 'hiragana',
+        cardId: 12,
+        isCorrect: true,
+        confidenceScore: 0,
+      }),
+    ).toThrow(/invalid confidencescore/i)
   })
 
   it('validates session goal payload and session id values', () => {

@@ -21,7 +21,7 @@ type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
 type KanjiDeckSlug = 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1'
 type VocabDeckSlug = 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'typed_recall' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
@@ -68,6 +68,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Shape Recall: choose the symbol that matches the meaning.',
       'Script Snap: pick the kana form with confidence.',
     ],
+    typed_recall: [
+      'Typed Recall: write the meaning from memory with clean spelling.',
+      'No options this round: recall first, then type confidently.',
+    ],
     context_cloze: [
       'Context Ladder: use sentence clues before touching options.',
       'Meaning Lens: infer the blank, then verify carefully.',
@@ -89,6 +93,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
     character_match: [
       'Glyph Match: choose the katakana symbol tied to the prompt.',
       'Name Lane: select the character used in modern terms.',
+    ],
+    typed_recall: [
+      'Typed Recall: write the exact meaning from memory.',
+      'No hints mode: type what the prompt means in one shot.',
     ],
     context_cloze: [
       'Loanword Context: let the sentence guide the missing term.',
@@ -112,6 +120,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Symbol Meaning Link: pick the kanji with the right concept.',
       'N5 Recall: choose the character that best fits the cue.',
     ],
+    typed_recall: [
+      'Concept Recall: type the meaning directly without choices.',
+      'Kanji Memory: commit one meaning and type it exactly.',
+    ],
     context_cloze: [
       'Semantic Context: use nearby clues to fill the blank.',
       'N5 Sentence Drill: infer first, then commit to one meaning.',
@@ -134,6 +146,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Word Form: choose the Japanese form for the meaning.',
       'Lexical Link: pick the correct written word.',
     ],
+    typed_recall: [
+      'Meaning Recall: type the word meaning from memory.',
+      'Precision Recall: type the best English gloss directly.',
+    ],
     context_cloze: [
       'Usage Context: use sentence context to place the right word.',
       'Meaning-in-Use: infer from surrounding clues first.',
@@ -155,6 +171,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
     character_match: [
       'Pattern Form: select the Japanese pattern for this intent.',
       'Structure Recall: pick the exact expression form.',
+    ],
+    typed_recall: [
+      'Pattern Recall: type the intended meaning in your own words.',
+      'Grammar Recall: type what this expression conveys.',
     ],
     context_cloze: [
       'Sentence Pattern: complete the line with the right structure.',
@@ -500,6 +520,11 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
     description: 'Pick the correct character for the meaning.',
   },
   {
+    key: 'typed_recall',
+    title: 'Typed Recall',
+    description: 'Type the meaning directly with near-miss tolerance.',
+  },
+  {
     key: 'context_cloze',
     title: 'Context Cloze',
     description: 'Fill sentence blanks using context clues and i+1 progression.',
@@ -519,9 +544,9 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
 const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
   hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
   katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
-  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
-  vocab_n5: ['meaning_match', 'character_match', 'context_cloze', 'narrative_story', 'interleave_mix'],
-  grammar_patterns: ['meaning_match', 'character_match', 'context_cloze', 'narrative_story', 'interleave_mix'],
+  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'typed_recall', 'interleave_mix'],
+  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'interleave_mix'],
+  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'interleave_mix'],
 }
 
 const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>> = {
@@ -547,6 +572,11 @@ const MINIGAME_INTROS: Record<MinigameKey, MinigameIntro> = {
     vibe: 'Symbol Hunt',
     objective: 'Choose the correct Japanese character for each meaning prompt.',
     tip: 'Compare visual shape first, then verify your recall before selecting.',
+  },
+  typed_recall: {
+    vibe: 'Active Recall',
+    objective: 'Type the answer from memory with strict but fair matching.',
+    tip: 'Aim for exact answers, but small slips can still count as near misses.',
   },
   context_cloze: {
     vibe: 'Context Ladder',
@@ -577,6 +607,7 @@ const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   romaji_sprint: Keyboard,
   meaning_match: ListChecks,
   character_match: Languages,
+  typed_recall: Keyboard,
   context_cloze: BookText,
   narrative_story: History,
   interleave_mix: Shuffle,
@@ -684,6 +715,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -692,6 +724,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -700,6 +733,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -708,6 +742,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -716,6 +751,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       romaji_sprint: { ...EMPTY_MINIGAME_STATS },
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
+      typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -783,6 +819,64 @@ function loadCardScores(): CardScores {
 
 function normalizeText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function normalizeTypedText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}]+/gu, '')
+}
+
+function isTransposition(left: string, right: string): boolean {
+  if (left.length !== right.length) return false
+  const diffs: number[] = []
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) diffs.push(index)
+  }
+  if (diffs.length !== 2) return false
+  const [i, j] = diffs
+  return left[i] === right[j] && left[j] === right[i]
+}
+
+function levenshteinDistance(left: string, right: string): number {
+  if (left === right) return 0
+  if (!left) return right.length
+  if (!right) return left.length
+
+  let previousRow: number[] = Array.from({ length: right.length + 1 }, (_, index) => index)
+  for (let i = 1; i <= left.length; i += 1) {
+    const currentRow: number[] = [i]
+    for (let j = 1; j <= right.length; j += 1) {
+      const substitutionCost = left[i - 1] === right[j - 1] ? 0 : 1
+      currentRow[j] = Math.min(
+        previousRow[j] + 1,
+        currentRow[j - 1] + 1,
+        previousRow[j - 1] + substitutionCost,
+      )
+    }
+    previousRow = currentRow
+  }
+  return previousRow[right.length]
+}
+
+type TypedAnswerState = 'exact' | 'near_miss' | 'incorrect'
+
+function assessTypedAnswer(expected: string, given: string): TypedAnswerState {
+  const normalizedExpected = normalizeTypedText(expected)
+  const normalizedGiven = normalizeTypedText(given)
+  if (!normalizedExpected || !normalizedGiven) return 'incorrect'
+  if (normalizedExpected === normalizedGiven) return 'exact'
+
+  const distance = levenshteinDistance(normalizedExpected, normalizedGiven)
+  const minLength = Math.min(normalizedExpected.length, normalizedGiven.length)
+  const nearMiss =
+    distance <= 1 ||
+    isTransposition(normalizedExpected, normalizedGiven) ||
+    (distance === 2 && minLength >= 6)
+
+  return nearMiss ? 'near_miss' : 'incorrect'
 }
 
 function sanitizeRomajiInput(value: string): string {
@@ -981,6 +1075,8 @@ function App() {
   const [interleaveWeights, setInterleaveWeights] = useState<InterleaveWeights>({ ...DEFAULT_INTERLEAVE_WEIGHTS })
   const [interleaveSurpriseEnabled, setInterleaveSurpriseEnabled] = useState<boolean>(true)
   const [interleaveSurpriseEvery, setInterleaveSurpriseEvery] = useState<number>(5)
+  const [confidenceCaptureEnabled, setConfidenceCaptureEnabled] = useState<boolean>(false)
+  const [selectedConfidenceScore, setSelectedConfidenceScore] = useState<number>(3)
 
   const [scriptStats, setScriptStats] = useState<StatsByScript>(() => loadSavedStats())
   const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
@@ -1160,7 +1256,13 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (view !== 'minigame' || !sessionActive || !roundState || isRoundResolving || roundState.mode !== 'romaji_sprint') {
+    if (
+      view !== 'minigame' ||
+      !sessionActive ||
+      !roundState ||
+      isRoundResolving ||
+      (roundState.mode !== 'romaji_sprint' && roundState.mode !== 'typed_recall')
+    ) {
       return
     }
 
@@ -1577,6 +1679,25 @@ function App() {
         }
       }
 
+      if (minigame === 'typed_recall') {
+        const promptLabel = surprisePrompt
+          ? surpriseLabel
+          : 'Type the meaning for this prompt'
+        return {
+          cardId: card.id,
+          mode: minigame,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: `Use exact wording when possible. Prompt: ${card.character}`,
+          promptLabel,
+          focusText: card.character,
+          answer: card.meaning,
+          options: [],
+        }
+      }
+
       if (cards.length < 4) return null
 
       const cardsById = new Map(cards.map((entry) => [entry.id, entry]))
@@ -1882,7 +2003,14 @@ function App() {
 
       setIsRoundResolving(true)
 
-      const isCorrect = normalizeText(answer) === normalizeText(roundState.answer)
+      const typedAssessment =
+        roundState.mode === 'typed_recall'
+          ? assessTypedAnswer(roundState.answer, answer)
+          : null
+      const isCorrect =
+        typedAssessment !== null
+          ? typedAssessment !== 'incorrect'
+          : normalizeText(answer) === normalizeText(roundState.answer)
       const previousScript = scriptStats[activeScript]
       const nextStreak = isCorrect ? previousScript.currentStreak + 1 : 0
       const awardedPoints = isCorrect ? 1 + Math.floor(nextStreak / 3) : 0
@@ -1922,7 +2050,9 @@ function App() {
       if (isCorrect) {
         setSessionScore((value) => value + 1)
         setSessionPoints((value) => value + awardedPoints)
-        if (roundState.mode === 'narrative_story') {
+        if (roundState.mode === 'typed_recall' && typedAssessment === 'near_miss') {
+          setRoundFeedback(`Near miss accepted +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'}`)
+        } else if (roundState.mode === 'narrative_story') {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
           setRoundFeedback(`Correct +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'} · Stage ${roundState.curriculumStage} -> ${nextStage}.`)
         } else {
@@ -1988,6 +2118,7 @@ function App() {
             ? roundState.curriculumStage
             : undefined,
         sessionId: activeSessionId ?? undefined,
+        confidenceScore: confidenceCaptureEnabled ? selectedConfidenceScore : undefined,
       }).then((result) => {
         if (
           (roundState.mode !== 'context_cloze' && roundState.mode !== 'narrative_story') ||
@@ -2026,7 +2157,7 @@ function App() {
         setIsRoundResolving(false)
       }, FEEDBACK_REVEAL_MS)
     },
-    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats],
+    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats, selectedConfidenceScore],
   )
 
   useEffect(() => {
@@ -3132,7 +3263,36 @@ function App() {
                   >
                     <AlertTriangle className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
                   </button>
+                  <button
+                    type="button"
+                    className={`lives-toggle icon-toggle ${confidenceCaptureEnabled ? 'is-active' : ''}`}
+                    aria-pressed={confidenceCaptureEnabled}
+                    aria-label="Toggle confidence capture"
+                    title={`Confidence capture: ${confidenceCaptureEnabled ? 'On' : 'Off'}`}
+                    onClick={() => setConfidenceCaptureEnabled((previous) => !previous)}
+                  >
+                    <Target className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                  </button>
                 </div>
+
+                {confidenceCaptureEnabled ? (
+                  <section className="confidence-controls" aria-label="Confidence score controls">
+                    <p className="interleave-controls-title">Confidence score</p>
+                    <div className="confidence-chip-row" role="group" aria-label="Select confidence score">
+                      {[1, 2, 3, 4, 5].map((score) => (
+                        <button
+                          key={`confidence-${score}`}
+                          type="button"
+                          className={`confidence-chip ${selectedConfidenceScore === score ? 'is-active' : ''}`}
+                          onClick={() => setSelectedConfidenceScore(score)}
+                          aria-pressed={selectedConfidenceScore === score}
+                        >
+                          {score}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
 
                 {activeGame === 'interleave_mix' ? (
                   <section className="interleave-controls" aria-label="Interleave controls">
@@ -3248,7 +3408,7 @@ function App() {
                   {roundState.hintText ? <p className="game-hint-text">{roundState.hintText}</p> : null}
                 </div>
 
-                {roundState.mode === 'romaji_sprint' ? (
+                {roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' ? (
                   <form
                     className="game-input-row"
                     onSubmit={(event) => {
@@ -3259,8 +3419,14 @@ function App() {
                     <input
                       ref={answerInputRef}
                       value={roundInput}
-                      onChange={(event) => setRoundInput(sanitizeRomajiInput(event.target.value))}
-                      placeholder="Enter romaji"
+                      onChange={(event) =>
+                        setRoundInput(
+                          roundState.mode === 'romaji_sprint'
+                            ? sanitizeRomajiInput(event.target.value)
+                            : event.target.value,
+                        )
+                      }
+                      placeholder={roundState.mode === 'romaji_sprint' ? 'Enter romaji' : 'Type meaning'}
                       autoComplete="off"
                       disabled={isRoundResolving}
                     />

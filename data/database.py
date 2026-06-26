@@ -15,7 +15,7 @@ from domain.streaks import StreakState
 
 DB_PATH = Path(__file__).parent.parent / "data" / "jplearn.db"
 SCHEMA_VERSION_TABLE = "schema_version"
-LATEST_SCHEMA_VERSION = 2
+LATEST_SCHEMA_VERSION = 3
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -175,9 +175,19 @@ def _migration_0002(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0003(conn: sqlite3.Connection) -> None:
+    existing_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(review_events)").fetchall()
+    }
+    if "confidence_score" not in existing_columns:
+        conn.execute("ALTER TABLE review_events ADD COLUMN confidence_score INTEGER")
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     1: _migration_0001,
     2: _migration_0002,
+    3: _migration_0003,
 }
 
 
@@ -274,17 +284,19 @@ def log_review(
     prompt_text: str = "",
     tags: list[str] | None = None,
     session_id: str = "",
+    confidence_score: int | None = None,
 ) -> None:
     """Record one review outcome for daily progress reporting."""
     review_day = reviewed_on or date.today()
     reviewed_utc = reviewed_at_utc or datetime.now(timezone.utc).isoformat(timespec="seconds")
     tags_csv = ",".join(tags or [])
     normalized_session_id = session_id.strip()
+    normalized_confidence = None if confidence_score is None else max(1, min(5, int(confidence_score)))
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO review_events (deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag, curriculum_stage, prompt_text, tags_csv, session_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO review_events (deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag, curriculum_stage, prompt_text, tags_csv, session_id, confidence_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 deck_name,
@@ -297,6 +309,7 @@ def log_review(
                 prompt_text.strip(),
                 tags_csv,
                 normalized_session_id,
+                normalized_confidence,
             ),
         )
 

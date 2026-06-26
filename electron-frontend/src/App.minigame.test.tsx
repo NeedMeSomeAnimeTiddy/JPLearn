@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 
 afterEach(() => {
@@ -150,6 +150,36 @@ describe('Minigame menu', () => {
     expect((await screen.findAllByText(/Narrative Story/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Interleave Mix/i)).length).toBeGreaterThan(0)
     expect(screen.queryByText(/Romaji Sprint/i)).toBeNull()
+  })
+
+  it('supports typed recall and forwards confidence score to record payload', async () => {
+    const recordGameResult = vi.fn(async (_payload: { minigame: string; confidenceScore?: number }) => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      recordGameResult,
+    }
+
+    render(<App />)
+    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    clickTopMenuCard('Words')
+
+    const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
+    fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    fireEvent.click(await screen.findByRole('button', { name: /toggle confidence capture/i }))
+    fireEvent.click(await screen.findByRole('button', { name: '5' }))
+    const introPlayButtons = await screen.findAllByRole('button', { name: /^Play$/i })
+    fireEvent.click(introPlayButtons[0])
+
+    const typedInput = await screen.findByPlaceholderText(/Type meaning/i)
+    fireEvent.change(typedInput, { target: { value: 'a' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Check$/i }))
+
+    await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
+    expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
+      minigame: 'typed_recall',
+      confidenceScore: 5,
+    }))
   })
 
   it('removes romaji sprint for conversational track', async () => {

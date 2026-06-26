@@ -236,6 +236,7 @@ interface DesktopApi {
     minigame: string
     curriculumStage?: number
     sessionId?: string
+    confidenceScore?: number
   }) => Promise<{
     ok: boolean
     card_id: number
@@ -243,6 +244,7 @@ interface DesktopApi {
     interval: number
     next_review: string
     ease_factor: number
+    confidence_score?: number | null
     curriculum_stage?: number | null
   }>
   startSessionGoal: (payload: {

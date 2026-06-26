@@ -87,6 +87,14 @@ function validateRecordGameResultPayload(payload) {
     }
   }
 
+  let confidenceScore
+  if (payload.confidenceScore != null) {
+    if (!Number.isInteger(payload.confidenceScore) || payload.confidenceScore < 1 || payload.confidenceScore > 5) {
+      throw new Error(`Invalid confidenceScore value: ${String(payload.confidenceScore)}`)
+    }
+    confidenceScore = payload.confidenceScore
+  }
+
   let sessionId
   if (payload.sessionId != null) {
     sessionId = validateSessionId(payload.sessionId)
@@ -99,6 +107,7 @@ function validateRecordGameResultPayload(payload) {
     minigame: payload.minigame || '',
     curriculumStage: payload.curriculumStage,
     sessionId,
+    confidenceScore,
   }
 }
 
