@@ -4,6 +4,7 @@ import pytest
 
 from domain.decks import (
     ALL_DECKS,
+    get_conjugation_training_deck,
     get_grammar_patterns_deck,
     get_hiragana_deck,
     get_kanji_n1_deck,
@@ -12,6 +13,7 @@ from domain.decks import (
     get_kanji_n4_deck,
     get_kanji_n5_deck,
     get_katakana_deck,
+    get_sentence_examples_deck,
     get_vocab_n1_deck,
     get_vocab_n2_deck,
     get_vocab_n3_deck,
@@ -36,6 +38,8 @@ class TestAllDecksRegistry:
             "vocab_n2",
             "vocab_n1",
             "grammar_patterns",
+            "sentence_examples",
+            "conjugation_training",
         }
 
     def test_all_decks_callables_return_decks(self) -> None:
@@ -206,6 +210,69 @@ class TestGrammarPatternsDeck:
     def test_spot_check_key_patterns_present(self, pattern: str) -> None:
         chars = {c.character for c in get_grammar_patterns_deck().cards}
         assert pattern in chars, f"Expected grammar pattern '{pattern}' not found in deck"
+
+
+class TestSentenceExamplesDeck:
+    def test_deck_has_minimum_cards(self) -> None:
+        deck = get_sentence_examples_deck()
+        assert len(deck) >= 40
+
+    def test_deck_name(self) -> None:
+        assert get_sentence_examples_deck().name == "Sentence Examples"
+
+    def test_every_card_has_required_fields(self) -> None:
+        for card in get_sentence_examples_deck().cards:
+            assert card.character, f"Card {card.id} missing character"
+            assert card.romaji, f"Card {card.id} missing romaji"
+            assert card.meaning, f"Card {card.id} missing meaning"
+
+    def test_every_card_has_sentence_and_example_tags(self) -> None:
+        for card in get_sentence_examples_deck().cards:
+            assert "sentence" in card.tags
+            assert "example" in card.tags
+
+    def test_card_ids_are_unique(self) -> None:
+        ids = [c.id for c in get_sentence_examples_deck().cards]
+        assert len(ids) == len(set(ids))
+
+    @pytest.mark.parametrize(
+        "pattern",
+        ["〜は〜です", "〜を", "〜に", "〜ます", "〜てください"],
+    )
+    def test_spot_check_sentence_patterns_present(self, pattern: str) -> None:
+        chars = {c.character for c in get_sentence_examples_deck().cards}
+        assert pattern in chars, f"Expected sentence pattern '{pattern}' not found in deck"
+
+
+class TestConjugationTrainingDeck:
+    def test_deck_has_minimum_cards(self) -> None:
+        deck = get_conjugation_training_deck()
+        assert len(deck) >= 20
+
+    def test_deck_name(self) -> None:
+        assert get_conjugation_training_deck().name == "Conjugation Training"
+
+    def test_every_card_has_required_fields(self) -> None:
+        for card in get_conjugation_training_deck().cards:
+            assert card.character, f"Card {card.id} missing character"
+            assert card.romaji, f"Card {card.id} missing romaji"
+            assert card.meaning, f"Card {card.id} missing meaning"
+
+    def test_every_card_has_conjugation_tag(self) -> None:
+        for card in get_conjugation_training_deck().cards:
+            assert "conjugation" in card.tags
+
+    def test_card_ids_are_unique(self) -> None:
+        ids = [c.id for c in get_conjugation_training_deck().cards]
+        assert len(ids) == len(set(ids))
+
+    @pytest.mark.parametrize(
+        "pattern",
+        ["〜ます", "〜ません", "〜ました", "〜ないでください", "〜かった"],
+    )
+    def test_spot_check_key_conjugation_forms_present(self, pattern: str) -> None:
+        chars = {c.character for c in get_conjugation_training_deck().cards}
+        assert pattern in chars, f"Expected conjugation form '{pattern}' not found in deck"
 
 
 class TestExistingDecksUnchanged:

@@ -1,4 +1,4 @@
-"""Built-in decks: Hiragana, Katakana, JLPT Kanji, JLPT Vocabulary, Grammar Patterns."""
+"""Built-in decks: Hiragana, Katakana, JLPT Kanji, JLPT Vocabulary, Grammar Patterns, Sentence Examples, Conjugation Training."""
 
 from types import ModuleType
 from typing import cast
@@ -30,6 +30,8 @@ if _external_deck_data is None:
     VOCAB_N2_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
     VOCAB_N1_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
     GRAMMAR_PATTERNS_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    SENTENCE_EXAMPLES_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
+    CONJUGATION_TRAINING_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
     KANJI_N5_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
     KANJI_N4_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
     KANJI_N3_EXTERNAL_DATA: list[_ExternalRow] = _EMPTY_EXTERNAL_DATA
@@ -53,6 +55,14 @@ else:
     )
     GRAMMAR_PATTERNS_EXTERNAL_DATA = cast(
         list[_ExternalRow], _external_deck_data.GRAMMAR_PATTERNS_EXTERNAL_DATA
+    )
+    SENTENCE_EXAMPLES_EXTERNAL_DATA = cast(
+        list[_ExternalRow],
+        getattr(_external_deck_data, "SENTENCE_EXAMPLES_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA),
+    )
+    CONJUGATION_TRAINING_EXTERNAL_DATA = cast(
+        list[_ExternalRow],
+        getattr(_external_deck_data, "CONJUGATION_TRAINING_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA),
     )
     KANJI_N5_EXTERNAL_DATA = cast(
         list[_ExternalRow], getattr(_external_deck_data, "KANJI_N5_EXTERNAL_DATA", _EMPTY_EXTERNAL_DATA)
@@ -781,6 +791,60 @@ def get_grammar_patterns_deck() -> Deck:
     )
 
 
+def get_sentence_examples_deck() -> Deck:
+    data = (
+        SENTENCE_EXAMPLES_EXTERNAL_DATA
+        if SENTENCE_EXAMPLES_EXTERNAL_DATA
+        else _GRAMMAR_PATTERNS_DATA
+    )
+    return _build_deck_with_meaning(
+        "Sentence Examples", data, ["sentence", "example", "grammar"]
+    )
+
+
+_CONJUGATION_TRAINING_DATA: list[tuple[str, str, str]] = [
+    # --- Verb forms ---
+    ("〜ます", "〜 masu", "Polite present / future affirmative verb"),
+    ("〜ません", "〜 masen", "Polite present / future negative verb"),
+    ("〜ました", "〜 mashita", "Polite past affirmative verb"),
+    ("〜ませんでした", "〜 masen deshita", "Polite past negative verb"),
+    ("〜ますか", "〜 masu ka", "Polite verb question"),
+    ("〜ましょう", "〜 mashou", "Let's 〜 / shall we 〜 (volitional)"),
+    ("〜ましょうか", "〜 mashou ka", "Shall I/we 〜? (offer/suggestion)"),
+    ("〜てください", "〜 te kudasai", "Please do 〜 (polite request)"),
+    ("〜ています", "〜 te imasu", "Is doing 〜 (ongoing action / state)"),
+    ("〜てもいいですか", "〜 te mo ii desu ka", "May I 〜? (asking permission)"),
+    ("〜てはいけません", "〜 te wa ikemasen", "Must not 〜 (prohibition)"),
+    ("〜ないでください", "〜 nai de kudasai", "Please don't 〜"),
+    # --- i-Adjectives ---
+    ("〜い (present)", "〜 i (jisho-kei)", "i-adjective dictionary form (e.g. たかい)"),
+    ("〜くない", "〜 ku nai", "i-adjective negative (e.g. たかくない)"),
+    ("〜かった", "〜 katta", "i-adjective past (e.g. たかかった)"),
+    ("〜くなかった", "〜 ku nakatta", "i-adjective past negative"),
+    # --- na-Adjectives ---
+    ("〜な (before noun)", "〜 na (noun)", "na-adjective attributive form (e.g. きれいな)"),
+    ("〜です (na-adj)", "〜 desu", "na-adjective polite present (e.g. きれいです)"),
+    ("〜ではありません (na-adj)", "〜 dewa arimasen", "na-adjective polite negative"),
+    # --- Common conjugation-adjacent forms ---
+    ("〜をください", "〜 wo kudasai", "Please give me 〜"),
+    ("〜がほしい", "〜 ga hoshii", "I want 〜 (noun)"),
+    ("〜たい", "〜 tai", "I want to 〜 (verb stem + たい)"),
+    ("〜に行きます", "〜 ni ikimasu", "Go to 〜 (destination)"),
+    ("〜で行きます", "〜 de ikimasu", "Go by 〜 (means of transport)"),
+]
+
+
+def get_conjugation_training_deck() -> Deck:
+    data = (
+        CONJUGATION_TRAINING_EXTERNAL_DATA
+        if CONJUGATION_TRAINING_EXTERNAL_DATA
+        else _CONJUGATION_TRAINING_DATA
+    )
+    return _build_deck_with_meaning(
+        "Conjugation Training", data, ["conjugation", "grammar"]
+    )
+
+
 #: Registry mapping deck slug → factory function for all built-in decks.
 ALL_DECKS = {
     "hiragana": get_hiragana_deck,
@@ -796,4 +860,6 @@ ALL_DECKS = {
     "vocab_n2": get_vocab_n2_deck,
     "vocab_n1": get_vocab_n1_deck,
     "grammar_patterns": get_grammar_patterns_deck,
+    "sentence_examples": get_sentence_examples_deck,
+    "conjugation_training": get_conjugation_training_deck,
 }

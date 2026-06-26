@@ -60,6 +60,31 @@ _KATAKANA_BLOCKS: list[Block] = [
     Block(11, "Digraphs",       list(range(71, 104)), ["キャ", "シャ", "チャ"]),
 ]
 
+# ---------------------------------------------------------------------------
+# Sentence Examples blocks  (card IDs match _GRAMMAR_PATTERNS_DATA indices in
+# domain/decks.py)
+# ---------------------------------------------------------------------------
+_SENTENCE_EXAMPLES_BLOCKS: list[Block] = [
+    Block(0, "Copula / Existence", list(range(0, 6)), ["〜は〜です", "〜があります", "〜がいます"]),
+    Block(1, "Core Particles", list(range(6, 19)), ["〜は", "〜が", "〜を"]),
+    Block(2, "Verb Forms", list(range(19, 31)), ["〜ます", "〜ません", "〜てください"]),
+    Block(3, "i-Adjectives", list(range(31, 35)), ["〜い (present)", "〜くない", "〜かった"]),
+    Block(4, "na-Adjectives", list(range(35, 38)), ["〜な (before noun)", "〜です (na-adj)", "〜ではありません (na-adj)"]),
+    Block(5, "Question Words", list(range(38, 49)), ["なに/なん", "どこ", "だれ"]),
+    Block(6, "Connectives", list(range(49, 54)), ["〜から (reason)", "〜が (contrast)", "〜けど/けれど"]),
+    Block(7, "Common Patterns", list(range(54, 64)), ["〜をください", "〜がほしい", "〜たい"]),
+]
+
+# ---------------------------------------------------------------------------
+# Conjugation Training blocks  (card IDs match the deck order in domain/decks.py)
+# ---------------------------------------------------------------------------
+_CONJUGATION_TRAINING_BLOCKS: list[Block] = [
+    Block(0, "Verb Forms", list(range(0, 12)), ["〜ます", "〜ません", "〜ました"]),
+    Block(1, "i-Adjectives", list(range(12, 16)), ["〜い (present)", "〜くない", "〜かった"]),
+    Block(2, "na-Adjectives", list(range(16, 19)), ["〜な (before noun)", "〜です (na-adj)", "〜ではありません (na-adj)"]),
+    Block(3, "Practical Patterns", list(range(19, 24)), ["〜をください", "〜がほしい", "〜たい"]),
+]
+
 
 def blocks_for_slug(slug: str) -> list[Block]:
     """Return the ordered block sequence for a deck slug.
@@ -71,6 +96,10 @@ def blocks_for_slug(slug: str) -> list[Block]:
         return _HIRAGANA_BLOCKS
     if slug == "katakana":
         return _KATAKANA_BLOCKS
+    if slug == "sentence_examples":
+        return _SENTENCE_EXAMPLES_BLOCKS
+    if slug == "conjugation_training":
+        return _CONJUGATION_TRAINING_BLOCKS
     return []
 
 

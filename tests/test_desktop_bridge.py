@@ -170,6 +170,25 @@ def test_build_deck_cards_includes_curriculum_stage(tmp_path: Path, monkeypatch)
     assert first_card["curriculum_stage"] == 3
 
 
+def test_build_block_progress_includes_new_phase_one_decks(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    sentence_progress = desktop_bridge.build_block_progress("sentence_examples")
+    conjugation_progress = desktop_bridge.build_block_progress("conjugation_training")
+
+    assert sentence_progress["slug"] == "sentence_examples"
+    assert conjugation_progress["slug"] == "conjugation_training"
+    assert len(sentence_progress["blocks"]) >= 2
+    assert len(conjugation_progress["blocks"]) >= 2
+
+    first_sentence_block = sentence_progress["blocks"][0]
+    first_conjugation_block = conjugation_progress["blocks"][0]
+    assert first_sentence_block["unlocked"] is True
+    assert first_conjugation_block["unlocked"] is True
+    assert first_sentence_block["card_ids"]
+    assert first_conjugation_block["card_ids"]
+
+
 def test_record_game_result_narrative_tags_chapter_and_updates_context_stage(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
@@ -302,6 +321,8 @@ def test_build_summary_contract_shape(tmp_path: Path, monkeypatch) -> None:
     assert decks
     first = decks[0]
     assert {"slug", "name", "total", "mastered", "due_today", "completed_today"}.issubset(first.keys())
+    slugs = {deck["slug"] for deck in decks}
+    assert {"sentence_examples", "conjugation_training"}.issubset(slugs)
 
 
 def test_start_session_goal_contract_shape(tmp_path: Path, monkeypatch) -> None:

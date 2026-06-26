@@ -153,6 +153,10 @@ def _render_module(
     kanji_n3_source: Path,
     kanji_n2_source: Path,
     kanji_n1_source: Path,
+    sentence_examples_rows: list[tuple[str, str, str]] | None,
+    conjugation_training_rows: list[tuple[str, str, str]] | None,
+    sentence_examples_source: Path | None,
+    conjugation_training_source: Path | None,
     duplicates_removed_within_lists: int,
     duplicates_across_lists: int,
 ) -> str:
@@ -175,6 +179,10 @@ def _render_module(
         f"# Generated from: {_display_source_path(kanji_n1_source)}",
         "",
     ]
+    if sentence_examples_source is not None:
+        header.append(f"# Generated from: {_display_source_path(sentence_examples_source)}")
+    if conjugation_training_source is not None:
+        header.append(f"# Generated from: {_display_source_path(conjugation_training_source)}")
     body = [
         _format_rows("VOCAB_N5_EXTERNAL_DATA", words_n5_rows),
         "",
@@ -199,6 +207,16 @@ def _render_module(
         _format_rows("KANJI_N1_EXTERNAL_DATA", kanji_n1_rows),
         "",
     ]
+    if sentence_examples_rows is not None:
+        body.extend([
+            _format_rows("SENTENCE_EXAMPLES_EXTERNAL_DATA", sentence_examples_rows),
+            "",
+        ])
+    if conjugation_training_rows is not None:
+        body.extend([
+            _format_rows("CONJUGATION_TRAINING_EXTERNAL_DATA", conjugation_training_rows),
+            "",
+        ])
     return "\n".join(header + body)
 
 
@@ -215,6 +233,8 @@ def generate_external_deck_module(
     kanji_n3_csv: Path = DEFAULT_KANJI_N3_CSV,
     kanji_n2_csv: Path = DEFAULT_KANJI_N2_CSV,
     kanji_n1_csv: Path = DEFAULT_KANJI_N1_CSV,
+    sentence_examples_csv: Path | None = None,
+    conjugation_training_csv: Path | None = None,
 ) -> tuple[int, int, int, int, int, int, int, int, int, int, int]:
     words_n5_sheet = _read_csv(words_n5_csv, "words_n5")
     words_n4_sheet = _read_csv(words_n4_csv, "words_n4")
@@ -227,6 +247,8 @@ def generate_external_deck_module(
     kanji_n3_sheet = _read_csv(kanji_n3_csv, "kanji_n3")
     kanji_n2_sheet = _read_csv(kanji_n2_csv, "kanji_n2")
     kanji_n1_sheet = _read_csv(kanji_n1_csv, "kanji_n1")
+    sentence_examples_sheet = _read_csv(sentence_examples_csv, "sentence_examples") if sentence_examples_csv else None
+    conjugation_training_sheet = _read_csv(conjugation_training_csv, "conjugation_training") if conjugation_training_csv else None
 
     sheets = [
         words_n5_sheet,
@@ -241,6 +263,10 @@ def generate_external_deck_module(
         kanji_n2_sheet,
         kanji_n1_sheet,
     ]
+    if sentence_examples_sheet is not None:
+        sheets.append(sentence_examples_sheet)
+    if conjugation_training_sheet is not None:
+        sheets.append(conjugation_training_sheet)
     duplicates_removed_within_lists = sum(sheet.duplicates_removed for sheet in sheets)
     duplicates_across_lists, conflicts = _build_cross_list_report(sheets)
     if conflicts:
@@ -286,6 +312,10 @@ def generate_external_deck_module(
         raise ValueError("Kanji N2 source must contain at least 20 rows")
     if len(kanji_n1_rows) < 20:
         raise ValueError("Kanji N1 source must contain at least 20 rows")
+    if sentence_examples_sheet is not None and len(sentence_examples_sheet.rows) < 40:
+        raise ValueError("Sentence examples source must contain at least 40 rows")
+    if conjugation_training_sheet is not None and len(conjugation_training_sheet.rows) < 20:
+        raise ValueError("Conjugation training source must contain at least 20 rows")
 
     content = _render_module(
         words_n5_rows,
@@ -310,6 +340,10 @@ def generate_external_deck_module(
         kanji_n3_csv,
         kanji_n2_csv,
         kanji_n1_csv,
+        sentence_examples_sheet.rows if sentence_examples_sheet is not None else None,
+        conjugation_training_sheet.rows if conjugation_training_sheet is not None else None,
+        sentence_examples_csv,
+        conjugation_training_csv,
         duplicates_removed_within_lists,
         duplicates_across_lists,
     )

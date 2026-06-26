@@ -141,6 +141,34 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
    - Pluggable TTS or bundled audio strategy
    - Cache policy for offline reliability
 
+### Content and Learning Expansion
+#### Phase 1: Foundation
+- [ ] (High) Add a large sentence and example bank
+   - Attach example sentences to vocab, kanji, and grammar cards
+   - Include translation, reading support, and difficulty tags for staged exposure
+- [ ] (High) Expand grammar curriculum into a structured path
+   - Add lesson ordering from beginner through intermediate patterns
+   - Include production drills for conjugation, particles, and sentence building
+- [ ] (Medium) Add dedicated conjugation training
+   - Cover verb and adjective forms with tense, polarity, and politeness transformations
+   - Blend explanation cards with rapid-fire drill modes
+
+#### Phase 2: Skill Expansion
+- [ ] (Medium) Add reading practice content
+   - Introduce graded passages, short dialogues, and article-style reading sets
+   - Track comprehension questions and unknown-word lookups per passage
+- [ ] (High) Add listening comprehension study modes
+   - Support prompt-first, audio-first, and dictation-style review flows
+   - Reuse the same content items across vocab, grammar, and sentence listening drills
+- [ ] (Medium) Add kanji writing and stroke-order practice
+   - Support recognition vs. recall vs. writing mastery as separate skills
+   - Store stroke hints, writing prompts, and production-specific progress
+
+#### Phase 3: Personalization
+- [ ] (Medium) Add personalized study plans and JLPT coverage tracking
+   - Show gaps across vocab, kanji, grammar, listening, and reading by level
+   - Generate daily plans based on target exam, timeline, and weak areas
+
 ### Longer-Term Enhancements
 - [ ] Cloud sync (optional account-based profile sync)
 - [ ] Sentence mining workflow and contextual example cards

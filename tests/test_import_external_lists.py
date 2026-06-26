@@ -26,6 +26,14 @@ def _kanji_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path]:
     return kanji_n5_csv, kanji_n4_csv, kanji_n3_csv, kanji_n2_csv, kanji_n1_csv
 
 
+def _phase1_sources(tmp_path: Path) -> tuple[Path, Path]:
+    sentence_examples_csv = tmp_path / "sentence_examples.csv"
+    conjugation_training_csv = tmp_path / "conjugation_training.csv"
+    _write_source(sentence_examples_csv, 40, "例文")
+    _write_source(conjugation_training_csv, 20, "活用")
+    return sentence_examples_csv, conjugation_training_csv
+
+
 def test_generate_external_deck_module_from_csv_sources(tmp_path: Path) -> None:
     words_n5_csv = tmp_path / "words_n5.csv"
     words_n4_csv = tmp_path / "words_n4.csv"
@@ -34,6 +42,7 @@ def test_generate_external_deck_module_from_csv_sources(tmp_path: Path) -> None:
     words_n1_csv = tmp_path / "words_n1.csv"
     conversational_csv = tmp_path / "conversational.csv"
     kanji_n5_csv, kanji_n4_csv, kanji_n3_csv, kanji_n2_csv, kanji_n1_csv = _kanji_sources(tmp_path)
+    sentence_examples_csv, conjugation_training_csv = _phase1_sources(tmp_path)
     output_py = tmp_path / "external_deck_data.py"
 
     _write_source(words_n5_csv, 80, "単語N5")
@@ -67,6 +76,8 @@ def test_generate_external_deck_module_from_csv_sources(tmp_path: Path) -> None:
         kanji_n3_csv=kanji_n3_csv,
         kanji_n2_csv=kanji_n2_csv,
         kanji_n1_csv=kanji_n1_csv,
+        sentence_examples_csv=sentence_examples_csv,
+        conjugation_training_csv=conjugation_training_csv,
         output_module=output_py,
     )
 
@@ -93,6 +104,8 @@ def test_generate_external_deck_module_from_csv_sources(tmp_path: Path) -> None:
     assert "KANJI_N3_EXTERNAL_DATA" in content
     assert "KANJI_N2_EXTERNAL_DATA" in content
     assert "KANJI_N1_EXTERNAL_DATA" in content
+    assert "SENTENCE_EXAMPLES_EXTERNAL_DATA" in content
+    assert "CONJUGATION_TRAINING_EXTERNAL_DATA" in content
 
 
 def test_generate_external_deck_module_enforces_minimum_rows(tmp_path: Path) -> None:
