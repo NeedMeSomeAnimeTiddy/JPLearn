@@ -1,18 +1,18 @@
 {
-  "capturedAtUtc": "2026-06-26T00:42:01.200Z",
+  "capturedAtUtc": "2026-06-26T23:49:23.033Z",
   "budgetsMs": {
     "startupReady": 5000,
     "firstSummary": 2500
   },
   "main": {
-    "startupSessionStartedAt": 1782434520056,
-    "startupSessionCompletedAt": 1782434521200,
-    "startupSessionMs": 1144,
+    "startupSessionStartedAt": 1782517761488,
+    "startupSessionCompletedAt": 1782517763033,
+    "startupSessionMs": 1545,
     "startupTheme": "harbor_mist"
   },
   "renderer": {
-    "startupReadyMs": 440,
+    "startupReadyMs": 696,
     "firstSummaryMs": null,
-    "deferredLoadsQueuedAtMs": 440
+    "deferredLoadsQueuedAtMs": 696
   }
 }

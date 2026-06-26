@@ -43,6 +43,11 @@ type ThemeKey =
 
 const FEEDBACK_REVEAL_MS = 2100
 const DEFAULT_LIVES = 3
+const SESSION_LENGTH_PRESETS = [
+  { key: 'short', label: 'Short', items: 8, icon: Minus },
+  { key: 'medium', label: 'Medium', items: 12, icon: Square },
+  { key: 'long', label: 'Long', items: 20, icon: Plus },
+] as const
 const DEFAULT_INTERLEAVE_WEIGHTS: InterleaveWeights = {
   romaji_sprint: 1,
   meaning_match: 1,
@@ -2214,6 +2219,11 @@ function App() {
     return deckCards.filter((c) => idSet.has(c.id))
   }, [deckCards, blockProgress, activeBlockIndex])
 
+  const activeSessionLengthPreset = useMemo(
+    () => SESSION_LENGTH_PRESETS.find((preset) => preset.items === sessionTargetItems)?.key ?? null,
+    [sessionTargetItems],
+  )
+
   const startSession = useCallback(async (selectedGame: MinigameKey = activeGame) => {
     resetRoundCycle()
     setSessionGoalError(null)
@@ -3464,21 +3474,25 @@ function App() {
                   </h3>
                 </div>
 
-                <section className="session-goal-controls minigame-quick-setup" aria-label="Minigame quick setup">
-                  <div className="session-goal-fields-inline">
-                    <label className="session-goal-field">
-                      Target items
-                      <input
-                        type="number"
-                        min={1}
-                        max={200}
-                        value={sessionTargetItems}
-                        onChange={(event) => {
-                          const nextValue = Math.max(1, Math.min(200, Number(event.target.value) || 1))
-                          setSessionTargetItems(nextValue)
-                        }}
-                      />
-                    </label>
+                <div className="minigame-setup-toolbar" aria-label="Minigame quick setup">
+                  <div className="session-length-row" role="group" aria-label="Session length">
+                    {SESSION_LENGTH_PRESETS.map((preset) => {
+                      const Icon = preset.icon
+                      const isActive = activeSessionLengthPreset === preset.key
+                      return (
+                        <button
+                          key={preset.key}
+                          type="button"
+                          className={`lives-toggle icon-toggle session-length-button session-length-${preset.key} ${isActive ? 'is-active' : ''}`}
+                          aria-pressed={isActive}
+                          aria-label={`Set ${preset.label.toLowerCase()} session length (${preset.items} items)`}
+                          title={`${preset.label} length (${preset.items} items)`}
+                          onClick={() => setSessionTargetItems(preset.items)}
+                        >
+                          <Icon className="toggle-icon" strokeWidth={2.2} aria-hidden="true" />
+                        </button>
+                      )
+                    })}
                   </div>
 
                   <div className="intro-toggle-row" role="group" aria-label="Minigame setup toggles">
@@ -3516,40 +3530,40 @@ function App() {
                       <Target className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
                     </button>
                   </div>
+                </div>
 
-                  {confidenceCaptureEnabled ? (
-                    <section className="confidence-controls" aria-label="Confidence score controls">
-                      <p className="interleave-controls-title">Confidence score</p>
-                      <div className="confidence-chip-row" role="group" aria-label="Select confidence score">
-                        {[1, 2, 3, 4, 5].map((score) => (
-                          <button
-                            key={`confidence-${score}`}
-                            type="button"
-                            className={`confidence-chip ${selectedConfidenceScore === score ? 'is-active' : ''}`}
-                            onClick={() => setSelectedConfidenceScore(score)}
-                            aria-pressed={selectedConfidenceScore === score}
-                          >
-                            {score}
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  ) : null}
+                {confidenceCaptureEnabled ? (
+                  <section className="confidence-controls" aria-label="Confidence score controls">
+                    <p className="interleave-controls-title">Confidence score</p>
+                    <div className="confidence-chip-row" role="group" aria-label="Select confidence score">
+                      {[1, 2, 3, 4, 5].map((score) => (
+                        <button
+                          key={`confidence-${score}`}
+                          type="button"
+                          className={`confidence-chip ${selectedConfidenceScore === score ? 'is-active' : ''}`}
+                          onClick={() => setSelectedConfidenceScore(score)}
+                          aria-pressed={selectedConfidenceScore === score}
+                        >
+                          {score}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
 
-                  {sessionSummaryLoading ? <p className="status-line">Loading session summary...</p> : null}
-                  {sessionGoalError ? <p className="status-line status-error">{sessionGoalError}</p> : null}
-                  {lastSessionSummary ? (
-                    <section className="session-summary-card" aria-live="polite">
-                      <p className="session-summary-kicker">Last Session</p>
-                      <p className="session-summary-main">
-                        {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} items · {lastSessionSummary.accuracy}% accuracy
-                      </p>
-                      <p className="session-summary-meta">
-                        {lastSessionSummary.goal_met ? 'Goal reached. Keep the streak alive.' : 'Goal not reached yet. Start another run to close the gap.'}
-                      </p>
-                    </section>
-                  ) : null}
-                </section>
+                {sessionSummaryLoading ? <p className="status-line">Loading session summary...</p> : null}
+                {sessionGoalError ? <p className="status-line status-error">{sessionGoalError}</p> : null}
+                {lastSessionSummary ? (
+                  <section className="session-summary-card" aria-live="polite">
+                    <p className="session-summary-kicker">Last Session</p>
+                    <p className="session-summary-main">
+                      {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} items · {lastSessionSummary.accuracy}% accuracy
+                    </p>
+                    <p className="session-summary-meta">
+                      {lastSessionSummary.goal_met ? 'Goal reached. Keep the streak alive.' : 'Goal not reached yet. Start another run to close the gap.'}
+                    </p>
+                  </section>
+                ) : null}
 
                 <div className="minigame-grid">
                   {availableMinigames.map((gameKey, index) => {

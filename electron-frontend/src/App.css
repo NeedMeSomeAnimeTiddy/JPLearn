@@ -2517,41 +2517,19 @@ button {
   gap: 8px;
 }
 
-.session-goal-controls {
-  border: 1px solid var(--chip-border);
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: var(--chip-bg);
-  display: grid;
-  gap: 8px;
-}
-
-.minigame-quick-setup {
+.minigame-setup-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 10px;
 }
 
-.session-goal-fields-inline {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 8px;
-}
-
-.session-goal-field {
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(120px, 190px);
+.session-length-row {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  color: var(--text-soft);
-  font-size: 0.88rem;
-}
-
-.session-goal-field input {
-  border: 1px solid var(--button-border);
-  border-radius: 9px;
-  background: color-mix(in oklab, var(--button-bg-top) 62%, transparent);
-  color: var(--text-main);
-  padding: 6px 10px;
-  min-height: calc(36px * var(--ui-scale));
+  gap: 8px;
 }
 
 .session-summary-card {
@@ -2618,6 +2596,58 @@ button {
       color-mix(in oklab, #16a34a 40%, var(--button-bg-bottom))
     );
   color: color-mix(in oklab, white 94%, var(--text-main));
+}
+
+.session-length-button {
+  color: color-mix(in oklab, var(--text-main) 76%, var(--text-soft));
+}
+
+.session-length-button.session-length-short {
+  border-color: color-mix(in oklab, #22c55e 45%, var(--button-border));
+  background: color-mix(in oklab, #22c55e 18%, var(--button-bg-top));
+}
+
+.session-length-button.session-length-medium {
+  border-color: color-mix(in oklab, #facc15 45%, var(--button-border));
+  background: color-mix(in oklab, #facc15 16%, var(--button-bg-top));
+}
+
+.session-length-button.session-length-long {
+  border-color: color-mix(in oklab, #fb923c 45%, var(--button-border));
+  background: color-mix(in oklab, #fb923c 16%, var(--button-bg-top));
+}
+
+.session-length-button.session-length-short.is-active {
+  border-color: color-mix(in oklab, #22c55e 75%, var(--button-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, #22c55e 34%, var(--button-bg-top)),
+      color-mix(in oklab, #16a34a 42%, var(--button-bg-bottom))
+    );
+  color: #f2fff5;
+}
+
+.session-length-button.session-length-medium.is-active {
+  border-color: color-mix(in oklab, #facc15 76%, var(--button-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, #facc15 38%, var(--button-bg-top)),
+      color-mix(in oklab, #eab308 45%, var(--button-bg-bottom))
+    );
+  color: #fffcee;
+}
+
+.session-length-button.session-length-long.is-active {
+  border-color: color-mix(in oklab, #fb923c 76%, var(--button-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, #fb923c 36%, var(--button-bg-top)),
+      color-mix(in oklab, #f97316 46%, var(--button-bg-bottom))
+    );
+  color: #fff6ef;
 }
 
 .leech-focus-toggle {

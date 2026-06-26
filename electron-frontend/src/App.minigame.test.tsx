@@ -236,13 +236,11 @@ describe('Minigame menu', () => {
     await screen.findByRole('heading', { name: /^JPLearn$/i })
     clickTopMenuCard('Words')
 
-    const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
-    fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
-
     fireEvent.click(await screen.findByRole('button', { name: /toggle confidence capture/i }))
     fireEvent.click(await screen.findByRole('button', { name: '5' }))
-    const introPlayButtons = await screen.findAllByRole('button', { name: /^Play$/i })
-    fireEvent.click(introPlayButtons[0])
+
+    const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
+    fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
     const typedInput = await screen.findByPlaceholderText(/Type meaning/i)
     fireEvent.change(typedInput, { target: { value: 'a' } })
@@ -307,14 +305,6 @@ describe('Minigame menu', () => {
     const contextTiles = await screen.findAllByRole('button', { name: /Context Cloze/i })
     fireEvent.click(within((contextTiles[0].closest('.game-tile') ?? contextTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
-    const introPanels = Array.from(document.querySelectorAll('.minigame-intro')) as HTMLElement[]
-    const introPanel = introPanels[introPanels.length - 1] ?? null
-    expect(introPanel).toBeTruthy()
-    if (introPanel === null) {
-      throw new Error('Minigame intro panel not found')
-    }
-    fireEvent.click(within(introPanel).getByRole('button', { name: /^Play$/i }))
-
     const promptMain = await screen.findByText((content, node) => {
       if (!node || !node.classList.contains('game-prompt-main')) return false
       return ['あ', 'い', 'う', 'え'].some((character) => content.includes(character))
@@ -332,14 +322,6 @@ describe('Minigame menu', () => {
     const storyTiles = await screen.findAllByRole('button', { name: /Narrative Story/i })
     fireEvent.click(within((storyTiles[0].closest('.game-tile') ?? storyTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
-    const introPanels = Array.from(document.querySelectorAll('.minigame-intro')) as HTMLElement[]
-    const introPanel = introPanels[introPanels.length - 1] ?? null
-    expect(introPanel).toBeTruthy()
-    if (introPanel === null) {
-      throw new Error('Minigame intro panel not found')
-    }
-    fireEvent.click(within(introPanel).getByRole('button', { name: /^Play$/i }))
-
     const storyPassage = await screen.findByText((content, node) => {
       if (!node || !node.classList.contains('game-prompt-main')) return false
       return content.includes('あさです。')
@@ -356,14 +338,6 @@ describe('Minigame menu', () => {
     clickTopMenuCard('Kanji')
     const matchTiles = await screen.findAllByRole('button', { name: /Character Match/i })
     fireEvent.click(within((matchTiles[0].closest('.game-tile') ?? matchTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
-
-    const introPanels = Array.from(document.querySelectorAll('.minigame-intro')) as HTMLElement[]
-    const introPanel = introPanels[introPanels.length - 1] ?? null
-    expect(introPanel).toBeTruthy()
-    if (introPanel === null) {
-      throw new Error('Minigame intro panel not found')
-    }
-    fireEvent.click(within(introPanel).getByRole('button', { name: /^Play$/i }))
 
     expect(await screen.findByText(/Stroke memory: visualize the character skeleton first\./i)).toBeTruthy()
   })
@@ -404,14 +378,6 @@ describe('Minigame menu', () => {
     clickTopMenuCard('Kanji')
     const strokeTiles = await screen.findAllByRole('button', { name: /Stroke Order/i })
     fireEvent.click(within((strokeTiles[0].closest('.game-tile') ?? strokeTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
-
-    const introPanels = Array.from(document.querySelectorAll('.minigame-intro')) as HTMLElement[]
-    const introPanel = introPanels[introPanels.length - 1] ?? null
-    expect(introPanel).toBeTruthy()
-    if (introPanel === null) {
-      throw new Error('Minigame intro panel not found')
-    }
-    fireEvent.click(within(introPanel).getByRole('button', { name: /^Play$/i }))
 
     expect(await screen.findByText(/Type the reading to reveal kanji candidates/i)).toBeTruthy()
     expect(screen.getByPlaceholderText(/Type romaji reading/i)).toBeTruthy()

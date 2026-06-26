@@ -1,4 +1,6 @@
-[2026-06-26T00:41:59.844Z] Using executable: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\out\electron-frontend-win32-x64\electron-frontend.exe
-[2026-06-26T00:41:59.934Z] [stdout] 
-[2026-06-26T00:42:01.469Z] Telemetry file: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\.smoke\appdata\startup-telemetry.json
-[2026-06-26T00:42:01.469Z] startupSessionMs=1144, startupReadyMs=440, firstSummaryMs=null
+[2026-06-26T23:49:21.191Z] Using executable: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\out\electron-frontend-win32-x64\electron-frontend.exe
+[2026-06-26T23:49:21.326Z] [stdout] 
+[2026-06-26T23:49:23.126Z] Telemetry file: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\.smoke\appdata\startup-telemetry.json
+[2026-06-26T23:49:23.133Z] startupSessionMs=1545, startupReadyMs=696, firstSummaryMs=null
+[2026-06-26T23:49:25.175Z] Study journey report: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\.smoke\appdata\study-journey-smoke.json
+[2026-06-26T23:49:25.176Z] journeyDurationMs=1723, slug=hiragana, sessionId=smoke-1782517763049, steps=6

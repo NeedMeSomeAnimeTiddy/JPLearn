@@ -1,0 +1,64 @@
+{
+  "capturedAtUtc": "2026-06-26T23:49:23.049Z",
+  "slug": "hiragana",
+  "minigame": "context_cloze",
+  "sessionId": "smoke-1782517763049",
+  "ok": true,
+  "durationMs": 1723,
+  "steps": [
+    {
+      "name": "reset-db",
+      "detail": {
+        "ok": true
+      },
+      "recordedAtUtc": "2026-06-26T23:49:23.515Z"
+    },
+    {
+      "name": "summary",
+      "detail": {
+        "deckCount": 15
+      },
+      "recordedAtUtc": "2026-06-26T23:49:23.865Z"
+    },
+    {
+      "name": "deck-cards",
+      "detail": {
+        "cardCount": 104,
+        "firstCardId": 0
+      },
+      "recordedAtUtc": "2026-06-26T23:49:24.126Z"
+    },
+    {
+      "name": "session-start",
+      "detail": {
+        "goal": {
+          "session_id": "smoke-1782517763049",
+          "target_items": 1,
+          "target_minutes": null,
+          "target_accuracy": null,
+          "started_at_utc": "2026-06-26T23:49:24+00:00"
+        }
+      },
+      "recordedAtUtc": "2026-06-26T23:49:24.362Z"
+    },
+    {
+      "name": "record-result",
+      "detail": {
+        "cardId": 0,
+        "repetitions": 1,
+        "interval": 1
+      },
+      "recordedAtUtc": "2026-06-26T23:49:24.585Z"
+    },
+    {
+      "name": "session-summary",
+      "detail": {
+        "completedItems": 1,
+        "accuracy": 100,
+        "goalMet": true
+      },
+      "recordedAtUtc": "2026-06-26T23:49:24.772Z"
+    }
+  ],
+  "error": null
+}
