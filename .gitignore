@@ -203,6 +203,9 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Local TTS model artifacts
+kokoro-assets/
+
 # Ruff stuff:
 .ruff_cache/
 
