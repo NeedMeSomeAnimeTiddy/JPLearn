@@ -98,7 +98,7 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 - [x] (Medium) Expand answer modes
    - Typed recall mode for vocab and kanji decks
    - Optional confidence score capture per review event
-- [x] (Medium) Add pronunciation/audio support
+- [ ] (Medium) Add pronunciation/audio support (deferred)
    - Pluggable TTS or bundled audio strategy
    - Cache policy for offline reliability
 

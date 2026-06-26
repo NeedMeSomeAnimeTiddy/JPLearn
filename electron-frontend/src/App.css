@@ -2863,19 +2863,6 @@ button {
   line-height: 1.35;
 }
 
-.audio-replay-button {
-  border: 1px solid var(--button-border);
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
-  color: var(--text-main);
-  width: calc(34px * var(--ui-scale));
-  height: calc(34px * var(--ui-scale));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
 .toggle-indicator {
   display: inline-block;
   width: 36px;

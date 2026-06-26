@@ -6,7 +6,6 @@ const {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
   validateDeckSlug,
-  validatePronunciationPayload,
   validateSessionGoalPayload,
   validateSessionId,
   validateStartupThemeInput,
@@ -270,9 +269,28 @@ function resolvePythonBridgeContext() {
   }
 }
 
+function resolvePythonCommand(projectRoot) {
+  const explicit = (process.env.JPLEARN_PYTHON || '').trim()
+  if (explicit) {
+    return explicit
+  }
+
+  const candidates = process.platform === 'win32'
+    ? [path.join(projectRoot, '.venv', 'Scripts', 'python.exe')]
+    : [path.join(projectRoot, '.venv', 'bin', 'python3'), path.join(projectRoot, '.venv', 'bin', 'python')]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate
+    }
+  }
+
+  return 'python'
+}
+
 function runPythonBridge(command) {
-  const pythonCmd = process.env.JPLEARN_PYTHON || 'python'
   const bridgeContext = resolvePythonBridgeContext()
+  const pythonCmd = resolvePythonCommand(bridgeContext.projectRoot)
   const bridgeScript = bridgeContext.bridgeScript
 
   return new Promise((resolve, reject) => {
@@ -324,8 +342,8 @@ function runPythonBridge(command) {
 }
 
 function runPythonBridgeWithArgs(args) {
-  const pythonCmd = process.env.JPLEARN_PYTHON || 'python'
   const bridgeContext = resolvePythonBridgeContext()
+  const pythonCmd = resolvePythonCommand(bridgeContext.projectRoot)
   const bridgeScript = bridgeContext.bridgeScript
 
   return new Promise((resolve, reject) => {
@@ -442,34 +460,6 @@ ipcMain.handle('study:get-study-queue', async (event, slug) => {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(`Failed to fetch study queue: ${detail}`)
-  }
-})
-
-ipcMain.handle('study:get-pronunciation-audio', async (event, payload) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  const validatedPayload = validatePronunciationPayload(payload)
-  try {
-    const args = ['pronunciation-audio', validatedPayload.text]
-    if (
-      typeof validatedPayload.provider === 'string' ||
-      typeof validatedPayload.voice === 'string' ||
-      typeof validatedPayload.audioRate === 'number'
-    ) {
-      args.push(validatedPayload.provider || '')
-    }
-    if (typeof validatedPayload.voice === 'string' || typeof validatedPayload.audioRate === 'number') {
-      args.push(validatedPayload.voice || '')
-    }
-    if (typeof validatedPayload.audioRate === 'number') {
-      args.push(String(validatedPayload.audioRate))
-    }
-    return await runPythonBridgeWithArgs(args)
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to build pronunciation audio: ${detail}`)
   }
 })
 

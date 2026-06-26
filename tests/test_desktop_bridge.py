@@ -264,3 +264,5 @@ def test_build_summary_resolves_legacy_vocab_prompt_text(tmp_path: Path, monkeyp
     assert item_history, "Expected at least one timeline item"
     assert item_history[0]["card_id"] == 496
     assert item_history[0]["prompt"] != "Vocabulary N5 item #496"
+
+

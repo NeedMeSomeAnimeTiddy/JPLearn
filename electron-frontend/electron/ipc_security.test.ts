@@ -5,7 +5,6 @@ const {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
   validateDeckSlug,
-  validatePronunciationPayload,
   validateSessionGoalPayload,
   validateSessionId,
   validateStartupThemeInput,
@@ -134,23 +133,4 @@ describe('ipc_security', () => {
     expect(() => validateSessionId('   ')).toThrow(/invalid session id/i)
   })
 
-  it('validates pronunciation payload and rejects malformed values', () => {
-    const valid = validatePronunciationPayload({
-      text: 'こんにちは',
-      provider: 'kokoro_tts',
-      voice: 'ja-JP-NanamiNeural',
-      audioRate: 1,
-    })
-
-    expect(valid.text).toBe('こんにちは')
-    expect(valid.provider).toBe('kokoro_tts')
-    expect(valid.voice).toBe('ja-JP-NanamiNeural')
-    expect(valid.audioRate).toBe(1)
-
-    expect(() => validatePronunciationPayload({ text: '' })).toThrow(/invalid pronunciation text/i)
-    expect(() => validatePronunciationPayload({ text: 'a'.repeat(121) })).toThrow(/invalid pronunciation text/i)
-    expect(() => validatePronunciationPayload({ text: 'ok', provider: 'system_tts' })).toThrow(/invalid pronunciation provider/i)
-    expect(() => validatePronunciationPayload({ text: 'ok', voice: '../bad' })).toThrow(/invalid pronunciation voice/i)
-    expect(() => validatePronunciationPayload({ text: 'ok', audioRate: 2 })).toThrow(/invalid pronunciation audiorate/i)
-  })
 })

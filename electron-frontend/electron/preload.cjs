@@ -11,7 +11,6 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),
   getStudyQueue: (slug) => ipcRenderer.invoke('study:get-study-queue', slug),
   getOverviewCharacterMastery: () => ipcRenderer.invoke('study:get-overview-character-mastery'),
-  getPronunciationAudio: (payload) => ipcRenderer.invoke('study:get-pronunciation-audio', payload),
   recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload),
   startSessionGoal: (payload) => ipcRenderer.invoke('study:start-session-goal', payload),
   getSessionSummary: (sessionId) => ipcRenderer.invoke('study:get-session-summary', sessionId),
