@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 out
+.smoke
+.smoke-e2e
 dist-ssr
 *.local
 
