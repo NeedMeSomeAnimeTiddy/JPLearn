@@ -6,6 +6,7 @@ const {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
   validateDeckSlug,
+  validatePronunciationPayload,
   validateSessionGoalPayload,
   validateSessionId,
   validateStartupThemeInput,
@@ -441,6 +442,34 @@ ipcMain.handle('study:get-study-queue', async (event, slug) => {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(`Failed to fetch study queue: ${detail}`)
+  }
+})
+
+ipcMain.handle('study:get-pronunciation-audio', async (event, payload) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
+  const validatedPayload = validatePronunciationPayload(payload)
+  try {
+    const args = ['pronunciation-audio', validatedPayload.text]
+    if (
+      typeof validatedPayload.provider === 'string' ||
+      typeof validatedPayload.voice === 'string' ||
+      typeof validatedPayload.audioRate === 'number'
+    ) {
+      args.push(validatedPayload.provider || '')
+    }
+    if (typeof validatedPayload.voice === 'string' || typeof validatedPayload.audioRate === 'number') {
+      args.push(validatedPayload.voice || '')
+    }
+    if (typeof validatedPayload.audioRate === 'number') {
+      args.push(String(validatedPayload.audioRate))
+    }
+    return await runPythonBridgeWithArgs(args)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to build pronunciation audio: ${detail}`)
   }
 })
 

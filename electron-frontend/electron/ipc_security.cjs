@@ -161,10 +161,73 @@ function validateSessionGoalPayload(payload) {
   }
 }
 
+function validatePronunciationPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid pronunciation payload: expected object')
+  }
+
+  const text = typeof payload.text === 'string' ? payload.text.trim() : ''
+  if (!text) {
+    throw new Error('Invalid pronunciation text: value must not be empty')
+  }
+  if (text.length > 120) {
+    throw new Error('Invalid pronunciation text: max length is 120 characters')
+  }
+
+  let provider
+  if (payload.provider != null) {
+    if (typeof payload.provider !== 'string') {
+      throw new Error(`Invalid pronunciation provider: ${String(payload.provider)}`)
+    }
+    const normalizedProvider = payload.provider.trim()
+    if (!['edge_tts', 'kokoro_tts'].includes(normalizedProvider)) {
+      throw new Error(`Invalid pronunciation provider: ${String(payload.provider)}`)
+    }
+    provider = normalizedProvider
+  }
+
+  let voice
+  if (payload.voice != null) {
+    if (typeof payload.voice !== 'string') {
+      throw new Error(`Invalid pronunciation voice: ${String(payload.voice)}`)
+    }
+    const normalizedVoice = payload.voice.trim()
+    if (!normalizedVoice) {
+      throw new Error('Invalid pronunciation voice: value must not be empty')
+    }
+    if (normalizedVoice.length > 64) {
+      throw new Error('Invalid pronunciation voice: max length is 64 characters')
+    }
+    if (!/^[A-Za-z0-9_:-]+$/.test(normalizedVoice)) {
+      throw new Error('Invalid pronunciation voice: unsupported characters')
+    }
+    voice = normalizedVoice
+  }
+
+  let audioRate
+  if (payload.audioRate != null) {
+    if (typeof payload.audioRate !== 'number' || !Number.isFinite(payload.audioRate)) {
+      throw new Error(`Invalid pronunciation audioRate: ${String(payload.audioRate)}`)
+    }
+    if (payload.audioRate < 0.8 || payload.audioRate > 1.2) {
+      throw new Error(`Invalid pronunciation audioRate: ${String(payload.audioRate)}`)
+    }
+    audioRate = payload.audioRate
+  }
+
+  return {
+    text,
+    provider,
+    voice,
+    audioRate,
+  }
+}
+
 module.exports = {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
   validateDeckSlug,
+  validatePronunciationPayload,
   validateSessionGoalPayload,
   validateSessionId,
   validateStartupThemeInput,

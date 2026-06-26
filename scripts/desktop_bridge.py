@@ -6,12 +6,22 @@ request JSON payloads over a subprocess boundary.
 
 from __future__ import annotations
 
+import base64
 import json
+import os
+import subprocess
 import sys
+import tempfile
+from asyncio import run as run_async
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Mapping
 from uuid import uuid4
+
+try:
+    import edge_tts
+except Exception:
+    edge_tts = None
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -490,6 +500,115 @@ def build_study_queue_payload(slug: str) -> dict[str, object]:
     }
 
 
+def _to_edge_rate_arg(audio_rate: float | None) -> str:
+    if audio_rate is None:
+        return "+0%"
+    normalized = max(0.8, min(1.2, float(audio_rate)))
+    delta_percent = int(round((normalized - 1.0) * 100))
+    return f"{delta_percent:+d}%"
+
+
+def build_pronunciation_audio(
+    text: str,
+    provider: str = "edge_tts",
+    voice: str = "ja-JP-NanamiNeural",
+    audio_rate: float | None = None,
+) -> dict[str, object]:
+    normalized_text = text.strip()
+    if not normalized_text:
+        raise ValueError("Pronunciation text must not be empty")
+    if len(normalized_text) > 120:
+        raise ValueError("Pronunciation text is too long (max 120 characters)")
+    normalized_provider = provider.strip().lower() if provider.strip() else "edge_tts"
+
+    if normalized_provider == "kokoro_tts":
+        # Kokoro CLI generates local wav output using ONNX model + voice pack.
+        kokoro_voice = voice.strip() or "jf_alpha"
+        if kokoro_voice not in {"jf_alpha", "jf_gongitsune", "jf_nezumi", "jf_tebukuro", "jm_kumo"}:
+            raise ValueError("Unsupported Kokoro Japanese voice")
+
+        normalized_rate = max(0.8, min(1.2, float(audio_rate if audio_rate is not None else 1.0)))
+        kokoro_assets_dir = os.environ.get("JPLEARN_KOKORO_ASSETS_DIR", "").strip()
+        working_dir = Path(kokoro_assets_dir) if kokoro_assets_dir else Path.cwd()
+
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False, mode="w", encoding="utf-8") as temp_input:
+            temp_input.write(normalized_text)
+            input_path = Path(temp_input.name)
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+            temp_path = Path(temp_file.name)
+        try:
+            cmd = [
+                sys.executable,
+                "-m",
+                "kokoro_tts",
+                str(input_path),
+                str(temp_path),
+                "--voice",
+                kokoro_voice,
+                "--lang",
+                "ja",
+                "--speed",
+                f"{normalized_rate:.2f}",
+            ]
+
+            completed = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=working_dir,
+                check=False,
+            )
+            if completed.returncode != 0:
+                stderr = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
+                raise RuntimeError(
+                    "Kokoro synthesis failed. Ensure kokoro-tts is installed and model files are available "
+                    f"in the working directory (or set JPLEARN_KOKORO_ASSETS_DIR). Details: {stderr}"
+                )
+
+            audio_bytes = temp_path.read_bytes()
+        finally:
+            input_path.unlink(missing_ok=True)
+            temp_path.unlink(missing_ok=True)
+
+        return {
+            "ok": True,
+            "provider": "kokoro_tts",
+            "mime_type": "audio/wav",
+            "audio_base64": base64.b64encode(audio_bytes).decode("ascii"),
+            "voice": kokoro_voice,
+            "rate": f"{normalized_rate:.2f}",
+        }
+
+    normalized_voice = voice.strip() or "ja-JP-NanamiNeural"
+
+    if edge_tts is None:
+        raise RuntimeError("edge-tts is not installed. Run: python -m pip install edge-tts")
+
+    rate_arg = _to_edge_rate_arg(audio_rate)
+
+    async def _render_audio_base64() -> str:
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_file:
+            temp_path = Path(temp_file.name)
+        try:
+            communicate = edge_tts.Communicate(normalized_text, voice=normalized_voice, rate=rate_arg)
+            await communicate.save(str(temp_path))
+            audio_bytes = temp_path.read_bytes()
+        finally:
+            temp_path.unlink(missing_ok=True)
+        return base64.b64encode(audio_bytes).decode("ascii")
+
+    audio_base64 = run_async(_render_audio_base64())
+    return {
+        "ok": True,
+        "provider": "edge_tts",
+        "mime_type": "audio/mpeg",
+        "audio_base64": audio_base64,
+        "voice": normalized_voice,
+        "rate": rate_arg,
+    }
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Missing command"}))
@@ -598,6 +717,22 @@ def main() -> int:
         try:
             payload = build_study_queue_payload(sys.argv[2])
         except ValueError as exc:
+            print(json.dumps({"error": str(exc)}))
+            return 2
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    if command == "pronunciation-audio":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "Usage: pronunciation-audio <text> [provider] [voice] [audio_rate]"}))
+            return 2
+        try:
+            text = sys.argv[2]
+            provider = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3].strip() else "edge_tts"
+            voice = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4].strip() else "ja-JP-NanamiNeural"
+            audio_rate = float(sys.argv[5]) if len(sys.argv) > 5 and sys.argv[5].strip() else None
+            payload = build_pronunciation_audio(text=text, provider=provider, voice=voice, audio_rate=audio_rate)
+        except (RuntimeError, ValueError) as exc:
             print(json.dumps({"error": str(exc)}))
             return 2
         print(json.dumps(payload, ensure_ascii=False))

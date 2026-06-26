@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, RefreshCw, Settings, Shuffle, Square, Target, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, RefreshCw, Settings, Shuffle, Square, Target, Trophy, Volume2, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -29,6 +29,8 @@ type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type FeedbackTone = 'success' | 'error' | null
+type AudioProvider = 'auto' | 'system_tts' | 'bundled_audio' | 'edge_tts' | 'kokoro_tts'
+type KokoroJaVoice = 'jf_alpha' | 'jf_gongitsune' | 'jf_nezumi' | 'jf_tebukuro' | 'jm_kumo'
 type ThemeKey =
   | 'harbor_mist'
   | 'sakura_dawn'
@@ -399,7 +401,20 @@ interface AppSettings {
   reducedMotion: boolean
   fontSize: FontSize
   theme: ThemeKey
+  audioEnabled: boolean
+  audioAutoplay: boolean
+  audioRate: number
+  audioProvider: AudioProvider
+  kokoroVoice: KokoroJaVoice
 }
+
+const KOKORO_JAPANESE_VOICES: ReadonlyArray<{ value: KokoroJaVoice; label: string }> = [
+  { value: 'jf_alpha', label: 'Alpha (JF)' },
+  { value: 'jf_gongitsune', label: 'Gongitsune (JF)' },
+  { value: 'jf_nezumi', label: 'Nezumi (JF)' },
+  { value: 'jf_tebukuro', label: 'Tebukuro (JF)' },
+  { value: 'jm_kumo', label: 'Kumo (JM)' },
+] as const
 
 interface RoundOption {
   id: string
@@ -409,6 +424,7 @@ interface RoundOption {
 interface RoundState {
   cardId: number
   mode: PlayableMinigame
+  audioText: string
   surprisePrompt: boolean
   curriculumStage: 1 | 2 | 3
   chapterNumber: 1 | 2 | 3 | null
@@ -784,6 +800,11 @@ function defaultSettings(): AppSettings {
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     fontSize: 'medium',
     theme: 'harbor_mist',
+    audioEnabled: false,
+    audioAutoplay: false,
+    audioRate: 1,
+    audioProvider: 'auto',
+    kokoroVoice: 'jf_alpha',
   }
 }
 
@@ -792,10 +813,34 @@ function loadSettings(): AppSettings {
     const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
     if (!raw) return defaultSettings()
     const parsed = JSON.parse(raw) as Partial<AppSettings>
-    return { ...defaultSettings(), ...parsed }
+    const merged = { ...defaultSettings(), ...parsed }
+    const provider = merged.audioProvider
+    const normalizedProvider: AudioProvider =
+      provider === 'system_tts' || provider === 'bundled_audio' || provider === 'edge_tts' || provider === 'kokoro_tts' || provider === 'auto'
+        ? provider
+        : 'auto'
+    const voice = merged.kokoroVoice
+    const normalizedKokoroVoice: KokoroJaVoice =
+      voice === 'jf_alpha' ||
+      voice === 'jf_gongitsune' ||
+      voice === 'jf_nezumi' ||
+      voice === 'jf_tebukuro' ||
+      voice === 'jm_kumo'
+        ? voice
+        : 'jf_alpha'
+    return {
+      ...merged,
+      audioProvider: normalizedProvider,
+      kokoroVoice: normalizedKokoroVoice,
+      audioRate: clampAudioRate(Number(merged.audioRate)),
+    }
   } catch {
     return defaultSettings()
   }
+}
+
+function clampAudioRate(value: number): number {
+  return Math.max(0.8, Math.min(1.2, Number(value.toFixed(2))))
 }
 
 type CardScores = Record<ScriptKey, Record<number, number>>
@@ -1124,6 +1169,7 @@ function App() {
   const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
+  const [audioError, setAudioError] = useState<string | null>(null)
   const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0)
   const [resettingDb, setResettingDb] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
@@ -1131,6 +1177,11 @@ function App() {
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
+  const audioPhraseCacheRef = useRef<Map<string, string>>(new Map())
+  const edgeTtsAudioCacheRef = useRef<Map<string, string>>(new Map())
+  const edgeTtsActiveAudioRef = useRef<HTMLAudioElement | null>(null)
+  const audioUrlAvailabilityRef = useRef<Map<string, boolean>>(new Map())
+  const audioElementCacheRef = useRef<Map<string, HTMLAudioElement>>(new Map())
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const scriptLoadRequestIdRef = useRef<number>(0)
   const lastLoadedScriptRef = useRef<ScriptKey>('hiragana')
@@ -1146,6 +1197,10 @@ function App() {
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
+  const hasSpeechSynthesis = useMemo(
+    () => typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window,
+    [],
+  )
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
   const interleaveSequence = useMemo(
     () => buildInterleaveSequence(interleaveWeights, availableInterleaveModes),
@@ -1226,6 +1281,262 @@ function App() {
     return index
   }, [])
 
+  const buildBundledAudioCandidates = useCallback((text: string, script: ScriptKey): string[] => {
+    const normalizedText = text.normalize('NFKC').trim()
+    if (!normalizedText) return []
+
+    const encoded = encodeURIComponent(normalizedText)
+    const scriptFolder = script
+    const extensions = ['mp3', 'wav']
+    const urls: string[] = []
+    for (const extension of extensions) {
+      urls.push(`/audio/${scriptFolder}/${encoded}.${extension}`)
+      urls.push(`/audio/common/${encoded}.${extension}`)
+    }
+    return urls
+  }, [])
+
+  const resolveBundledAudio = useCallback(async (url: string): Promise<HTMLAudioElement | null> => {
+    const knownAvailability = audioUrlAvailabilityRef.current.get(url)
+    if (knownAvailability === false) return null
+
+    if (knownAvailability === true) {
+      const cached = audioElementCacheRef.current.get(url)
+      if (cached) {
+        return cached.cloneNode(true) as HTMLAudioElement
+      }
+    }
+
+    const audio = new window.Audio(url)
+    audio.preload = 'auto'
+
+    const loaded = await new Promise<boolean>((resolve) => {
+      let settled = false
+      const onReady = () => {
+        if (settled) return
+        settled = true
+        cleanup()
+        resolve(true)
+      }
+      const onError = () => {
+        if (settled) return
+        settled = true
+        cleanup()
+        resolve(false)
+      }
+      const cleanup = () => {
+        audio.removeEventListener('canplaythrough', onReady)
+        audio.removeEventListener('error', onError)
+      }
+
+      audio.addEventListener('canplaythrough', onReady)
+      audio.addEventListener('error', onError)
+
+      window.setTimeout(onError, 250)
+    })
+
+    audioUrlAvailabilityRef.current.set(url, loaded)
+    if (!loaded) {
+      return null
+    }
+
+    audioElementCacheRef.current.set(url, audio)
+    return audio.cloneNode(true) as HTMLAudioElement
+  }, [])
+
+  const playBundledPronunciation = useCallback(async (text: string, script: ScriptKey): Promise<boolean> => {
+    const candidates = buildBundledAudioCandidates(text, script)
+    for (const candidate of candidates) {
+      const audio = await resolveBundledAudio(candidate)
+      if (!audio) continue
+      try {
+        audio.currentTime = 0
+        await audio.play()
+        setAudioError(null)
+        return true
+      } catch {
+        audioUrlAvailabilityRef.current.set(candidate, false)
+      }
+    }
+    return false
+  }, [buildBundledAudioCandidates, resolveBundledAudio])
+
+  const playEdgeTtsPronunciation = useCallback(async (text: string, forceReplay: boolean): Promise<boolean> => {
+    const normalized = text.trim()
+    if (!normalized || typeof window.jplearnDesktop.getPronunciationAudio !== 'function') {
+      return false
+    }
+
+    const cacheKey = `ja-JP-NanamiNeural|${settings.audioRate.toFixed(2)}|${normalized}`
+    let audioUrl = edgeTtsAudioCacheRef.current.get(cacheKey)
+
+    if (!audioUrl) {
+      try {
+        const payload = await window.jplearnDesktop.getPronunciationAudio({
+          text: normalized,
+          provider: 'edge_tts',
+          voice: 'ja-JP-NanamiNeural',
+          audioRate: settings.audioRate,
+        })
+        if (!payload.ok || !payload.audio_base64) {
+          return false
+        }
+        const mimeType = payload.mime_type || 'audio/mpeg'
+        audioUrl = `data:${mimeType};base64,${payload.audio_base64}`
+        edgeTtsAudioCacheRef.current.set(cacheKey, audioUrl)
+        if (edgeTtsAudioCacheRef.current.size > 64) {
+          const oldestKey = edgeTtsAudioCacheRef.current.keys().next().value
+          if (oldestKey) {
+            edgeTtsAudioCacheRef.current.delete(oldestKey)
+          }
+        }
+      } catch {
+        return false
+      }
+    }
+
+    try {
+      const audio = new window.Audio(audioUrl)
+      if (forceReplay && edgeTtsActiveAudioRef.current) {
+        edgeTtsActiveAudioRef.current.pause()
+      }
+      edgeTtsActiveAudioRef.current = audio
+      audio.currentTime = 0
+      await audio.play()
+      setAudioError(null)
+      return true
+    } catch {
+      return false
+    }
+  }, [settings.audioRate])
+
+  const playKokoroPronunciation = useCallback(async (text: string, forceReplay: boolean): Promise<boolean> => {
+    const normalized = text.trim()
+    if (!normalized || typeof window.jplearnDesktop.getPronunciationAudio !== 'function') {
+      return false
+    }
+
+    const cacheKey = `kokoro_tts|${settings.kokoroVoice}|${settings.audioRate.toFixed(2)}|${normalized}`
+    let audioUrl = edgeTtsAudioCacheRef.current.get(cacheKey)
+
+    if (!audioUrl) {
+      try {
+        const payload = await window.jplearnDesktop.getPronunciationAudio({
+          text: normalized,
+          provider: 'kokoro_tts',
+          voice: settings.kokoroVoice,
+          audioRate: settings.audioRate,
+        })
+        if (!payload.ok || !payload.audio_base64) {
+          return false
+        }
+        const mimeType = payload.mime_type || 'audio/wav'
+        audioUrl = `data:${mimeType};base64,${payload.audio_base64}`
+        edgeTtsAudioCacheRef.current.set(cacheKey, audioUrl)
+        if (edgeTtsAudioCacheRef.current.size > 64) {
+          const oldestKey = edgeTtsAudioCacheRef.current.keys().next().value
+          if (oldestKey) {
+            edgeTtsAudioCacheRef.current.delete(oldestKey)
+          }
+        }
+      } catch {
+        return false
+      }
+    }
+
+    try {
+      const audio = new window.Audio(audioUrl)
+      if (forceReplay && edgeTtsActiveAudioRef.current) {
+        edgeTtsActiveAudioRef.current.pause()
+      }
+      edgeTtsActiveAudioRef.current = audio
+      audio.currentTime = 0
+      await audio.play()
+      setAudioError(null)
+      return true
+    } catch {
+      return false
+    }
+  }, [settings.audioRate, settings.kokoroVoice])
+
+  const speakWithSystemTts = useCallback((text: string, script: ScriptKey, forceReplay: boolean): boolean => {
+    if (!hasSpeechSynthesis) return false
+
+    const normalized = text.trim()
+    if (!normalized) return false
+
+    const lang = script === 'vocab_n5' || script === 'grammar_patterns' ? 'ja-JP' : 'ja-JP'
+    const phraseKey = `${lang}|${settings.audioRate}|${normalized}`
+    if (!audioPhraseCacheRef.current.has(phraseKey)) {
+      audioPhraseCacheRef.current.set(phraseKey, normalized)
+      if (audioPhraseCacheRef.current.size > 240) {
+        const oldestKey = audioPhraseCacheRef.current.keys().next().value
+        if (oldestKey) {
+          audioPhraseCacheRef.current.delete(oldestKey)
+        }
+      }
+    }
+
+    try {
+      const utterance = new window.SpeechSynthesisUtterance(audioPhraseCacheRef.current.get(phraseKey) ?? normalized)
+      utterance.lang = lang
+      utterance.rate = settings.audioRate
+      utterance.pitch = 1
+      if (forceReplay) {
+        window.speechSynthesis.cancel()
+      }
+      window.speechSynthesis.speak(utterance)
+      setAudioError(null)
+      return true
+    } catch {
+      return false
+    }
+  }, [hasSpeechSynthesis, settings.audioRate])
+
+  const speakPronunciation = useCallback(async (text: string, script: ScriptKey, forceReplay = false): Promise<void> => {
+    if (!settings.audioEnabled) return
+
+    const normalized = text.trim()
+    if (!normalized) return
+
+    const provider = settings.audioProvider
+
+    if (provider === 'kokoro_tts') {
+      if (await playKokoroPronunciation(normalized, forceReplay)) return
+      setAudioError('Kokoro could not generate audio. Install kokoro-tts and model files.')
+      return
+    }
+
+    if (provider === 'edge_tts') {
+      if (await playEdgeTtsPronunciation(normalized, forceReplay)) return
+      setAudioError('Edge TTS could not generate audio right now.')
+      return
+    }
+
+    if (provider === 'system_tts') {
+      if (speakWithSystemTts(normalized, script, forceReplay)) return
+      setAudioError('System speech synthesis is unavailable on this device right now.')
+      return
+    }
+
+    if (provider === 'bundled_audio') {
+      if (await playBundledPronunciation(normalized, script)) return
+      setAudioError('Bundled pronunciation file not found for this prompt.')
+      return
+    }
+
+    if (await playEdgeTtsPronunciation(normalized, forceReplay)) return
+    if (speakWithSystemTts(normalized, script, forceReplay)) return
+    if (await playBundledPronunciation(normalized, script)) return
+    if (await playKokoroPronunciation(normalized, forceReplay)) return
+    setAudioError('Pronunciation is unavailable right now. Try switching audio provider in Settings.')
+  }, [playBundledPronunciation, playEdgeTtsPronunciation, playKokoroPronunciation, settings.audioEnabled, settings.audioProvider, speakWithSystemTts])
+
+  const speakRoundPrompt = useCallback((forceReplay = false): void => {
+    if (!roundState) return
+    void speakPronunciation(roundState.audioText, activeScript, forceReplay)
+  }, [activeScript, roundState, speakPronunciation])
+
   useEffect(() => {
     window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(scriptStats))
   }, [scriptStats])
@@ -1272,6 +1583,25 @@ function App() {
 
     return () => window.cancelAnimationFrame(focusHandle)
   }, [isRoundResolving, roundState, sessionActive, view])
+
+  useEffect(() => {
+    if (
+      view !== 'minigame' ||
+      !sessionActive ||
+      !roundState ||
+      isRoundResolving ||
+      !settings.audioEnabled ||
+      !settings.audioAutoplay
+    ) {
+      return
+    }
+
+    const playHandle = window.setTimeout(() => {
+      speakRoundPrompt(false)
+    }, 120)
+
+    return () => window.clearTimeout(playHandle)
+  }, [isRoundResolving, roundState, sessionActive, settings.audioAutoplay, settings.audioEnabled, speakRoundPrompt, view])
 
   useEffect(() => {
     const previouslyActive = previousSessionActiveRef.current
@@ -1667,6 +1997,7 @@ function App() {
         return {
           cardId: card.id,
           mode: minigame,
+          audioText: card.character,
           surprisePrompt,
           curriculumStage,
           chapterNumber: null,
@@ -1686,6 +2017,7 @@ function App() {
         return {
           cardId: card.id,
           mode: minigame,
+          audioText: card.character,
           surprisePrompt,
           curriculumStage,
           chapterNumber: null,
@@ -1750,6 +2082,7 @@ function App() {
         return {
           cardId: card.id,
           mode: minigame,
+          audioText: card.character,
           surprisePrompt,
           curriculumStage,
           chapterNumber: null,
@@ -1778,6 +2111,7 @@ function App() {
         return {
           cardId: card.id,
           mode: minigame,
+          audioText: card.character,
           surprisePrompt,
           curriculumStage,
           chapterNumber: null,
@@ -1806,6 +2140,7 @@ function App() {
         return {
           cardId: card.id,
           mode: minigame,
+          audioText: card.character,
           surprisePrompt,
           curriculumStage,
           chapterNumber: curriculumStage,
@@ -1832,6 +2167,7 @@ function App() {
       return {
         cardId: card.id,
         mode: minigame,
+        audioText: card.character,
         surprisePrompt,
         curriculumStage,
         chapterNumber: null,
@@ -3397,6 +3733,17 @@ function App() {
                       ? ` · ${MINIGAMES.find((game) => game.key === roundState.mode)?.title ?? roundState.mode}`
                       : ''}
                   </strong>
+                  {settings.audioEnabled ? (
+                    <button
+                      type="button"
+                      className="audio-replay-button"
+                      onClick={() => speakRoundPrompt(true)}
+                      aria-label="Play pronunciation audio"
+                      title="Play pronunciation audio"
+                    >
+                      <Volume2 aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                    </button>
+                  ) : null}
                   <span className="stage-pill">Stage {roundState.curriculumStage}</span>
                   {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
                 </div>
@@ -3473,6 +3820,7 @@ function App() {
                     ) : null}
                   </div>
                 ) : null}
+                {audioError ? <p className="status-line status-error">{audioError}</p> : null}
               </article>
             ) : null}
           </section>
@@ -4223,6 +4571,90 @@ function App() {
                 <span className="toggle-indicator" aria-hidden="true" />
                 Reduce Motion
               </button>
+            </div>
+
+            <div className="settings-section">
+              <p className="settings-section-label">Audio</p>
+              <button
+                type="button"
+                className={`settings-toggle ${settings.audioEnabled ? 'is-active' : ''}`}
+                onClick={() => setSettings((prev) => ({ ...prev, audioEnabled: !prev.audioEnabled }))}
+                aria-pressed={settings.audioEnabled}
+              >
+                <span className="toggle-indicator" aria-hidden="true" />
+                Enable pronunciation
+              </button>
+              <label className="settings-slider-field">
+                <span>Audio provider</span>
+                <select
+                  className="settings-theme-select"
+                  value={settings.audioProvider}
+                  onChange={(event) => {
+                    const provider = event.target.value as AudioProvider
+                    setSettings((prev) => ({ ...prev, audioProvider: provider }))
+                  }}
+                  aria-label="Audio provider"
+                  disabled={!settings.audioEnabled}
+                >
+                  <option value="auto">Auto (Edge TTS -&gt; System TTS -&gt; Bundled -&gt; Kokoro)</option>
+                  <option value="kokoro_tts">Kokoro (local/offline)</option>
+                  <option value="edge_tts">Edge TTS (online, no key)</option>
+                  <option value="bundled_audio">Bundled audio only</option>
+                  <option value="system_tts">System TTS only</option>
+                </select>
+              </label>
+              <label className="settings-slider-field">
+                <span>Japanese Voice (Kokoro)</span>
+                <select
+                  className="settings-theme-select"
+                  value={settings.kokoroVoice}
+                  onChange={(event) => {
+                    const voice = event.target.value as KokoroJaVoice
+                    setSettings((prev) => ({ ...prev, kokoroVoice: voice }))
+                  }}
+                  aria-label="Kokoro Japanese voice"
+                  disabled={!settings.audioEnabled || settings.audioProvider !== 'kokoro_tts'}
+                >
+                  {KOKORO_JAPANESE_VOICES.map((voice) => (
+                    <option key={voice.value} value={voice.value}>{voice.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className={`settings-toggle ${settings.audioAutoplay ? 'is-active' : ''}`}
+                onClick={() => setSettings((prev) => ({ ...prev, audioAutoplay: !prev.audioAutoplay }))}
+                aria-pressed={settings.audioAutoplay}
+                disabled={!settings.audioEnabled}
+              >
+                <span className="toggle-indicator" aria-hidden="true" />
+                Autoplay pronunciation each round
+              </button>
+              <label className="settings-slider-field">
+                <span>Speech Rate ({settings.audioRate.toFixed(2)}x)</span>
+                <input
+                  type="range"
+                  min={0.8}
+                  max={1.2}
+                  step={0.05}
+                  value={settings.audioRate}
+                  onChange={(event) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      audioRate: clampAudioRate(Number(event.target.value)),
+                    }))
+                  }
+                  disabled={
+                    !settings.audioEnabled ||
+                    settings.audioProvider === 'bundled_audio' ||
+                    (settings.audioProvider === 'system_tts' && !hasSpeechSynthesis)
+                  }
+                />
+              </label>
+              <p className="settings-note">
+                Kokoro is local/offline when installed with its model files. Edge TTS is online fallback; bundled audio is loaded from local assets when available.
+              </p>
+              {!hasSpeechSynthesis ? <p className="settings-note">Speech synthesis is not available in this environment.</p> : null}
             </div>
 
             <div className="settings-section">

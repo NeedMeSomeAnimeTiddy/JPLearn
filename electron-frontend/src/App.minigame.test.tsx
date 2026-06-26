@@ -4,6 +4,7 @@ import App from './App'
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
 })
 
 function clickTopMenuCard(label: string): void {
@@ -90,6 +91,7 @@ const baseDesktopApi = {
     },
   }),
   getOverviewCharacterMastery: async () => ({ blocks: { hiragana: [], katakana: [] }, kanji_cards: [] }),
+  getPronunciationAudio: async () => ({ ok: false, error: 'not configured' }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
   recordGameResult: async () => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
@@ -180,6 +182,137 @@ describe('Minigame menu', () => {
       minigame: 'typed_recall',
       confidenceScore: 5,
     }))
+  })
+
+  it('plays pronunciation audio from the round header button when enabled in settings', async () => {
+    const speak = vi.fn()
+    const cancel = vi.fn()
+
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        speak,
+        cancel,
+      },
+    })
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', {
+      configurable: true,
+      value: class {
+        text: string
+        lang = ''
+        rate = 1
+        pitch = 1
+
+        constructor(text: string) {
+          this.text = text
+        }
+      },
+    })
+
+    window.jplearnDesktop = baseDesktopApi
+
+    render(<App />)
+    await screen.findByRole('heading', { name: /^JPLearn$/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /open settings/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /enable pronunciation/i }))
+    fireEvent.change(screen.getByRole('combobox', { name: /audio provider/i }), {
+      target: { value: 'system_tts' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /close settings/i }))
+
+    clickTopMenuCard('Words')
+    const meaningTiles = await screen.findAllByRole('button', { name: /Meaning Match/i })
+    fireEvent.click(within((meaningTiles[0].closest('.game-tile') ?? meaningTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    const introPlayButtons = await screen.findAllByRole('button', { name: /^Play$/i })
+    fireEvent.click(introPlayButtons[0])
+
+    fireEvent.click(await screen.findByRole('button', { name: /play pronunciation audio/i }))
+    await waitFor(() => expect(speak).toHaveBeenCalled())
+  })
+
+  it('uses bundled audio provider when selected', async () => {
+    const speak = vi.fn()
+    const cancel = vi.fn()
+    const play = vi.fn(async () => undefined)
+
+    class MockAudio {
+      src: string
+      preload = 'auto'
+      currentTime = 0
+      private listeners: Record<string, Array<() => void>> = {}
+
+      constructor(src: string) {
+        this.src = src
+        window.setTimeout(() => {
+          this.listeners.canplaythrough?.forEach((listener) => listener())
+        }, 0)
+      }
+
+      addEventListener(event: string, listener: () => void): void {
+        this.listeners[event] = this.listeners[event] ?? []
+        this.listeners[event].push(listener)
+      }
+
+      removeEventListener(event: string, listener: () => void): void {
+        this.listeners[event] = (this.listeners[event] ?? []).filter((entry) => entry !== listener)
+      }
+
+      cloneNode(): MockAudio {
+        return new MockAudio(this.src)
+      }
+
+      play = play
+    }
+
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        speak,
+        cancel,
+      },
+    })
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', {
+      configurable: true,
+      value: class {
+        text: string
+        lang = ''
+        rate = 1
+        pitch = 1
+
+        constructor(text: string) {
+          this.text = text
+        }
+      },
+    })
+    Object.defineProperty(window, 'Audio', {
+      configurable: true,
+      value: MockAudio,
+    })
+
+    window.jplearnDesktop = baseDesktopApi
+
+    render(<App />)
+    await screen.findByRole('heading', { name: /^JPLearn$/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /open settings/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /enable pronunciation/i }))
+    fireEvent.change(screen.getByRole('combobox', { name: /audio provider/i }), {
+      target: { value: 'bundled_audio' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /close settings/i }))
+
+    clickTopMenuCard('Words')
+    const meaningTiles = await screen.findAllByRole('button', { name: /Meaning Match/i })
+    fireEvent.click(within((meaningTiles[0].closest('.game-tile') ?? meaningTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    const introPlayButtons = await screen.findAllByRole('button', { name: /^Play$/i })
+    fireEvent.click(introPlayButtons[0])
+
+    fireEvent.click(await screen.findByRole('button', { name: /play pronunciation audio/i }))
+    await waitFor(() => expect(play).toHaveBeenCalled())
+    expect(speak).not.toHaveBeenCalled()
   })
 
   it('removes romaji sprint for conversational track', async () => {

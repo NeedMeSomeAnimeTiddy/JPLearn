@@ -89,16 +89,16 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
    - Add migration tests for fresh install and upgrade paths
 
 ### Near-Term Product Roadmap
-- [ ] (High) Introduce adaptive study queue balancing
+- [x] (High) Introduce adaptive study queue balancing
    - Blend due items with weak-tag reinforcement and new-item pacing
    - Add deterministic queue tests to avoid starvation of any deck type
-- [ ] (High) Add session goals and completion tracking
+- [x] (High) Add session goals and completion tracking
    - Daily target setting (items/time/accuracy)
    - End-of-session summary against target with streak-aware messaging
-- [ ] (Medium) Expand answer modes
+- [x] (Medium) Expand answer modes
    - Typed recall mode for vocab and kanji decks
    - Optional confidence score capture per review event
-- [ ] (Medium) Add pronunciation/audio support
+- [x] (Medium) Add pronunciation/audio support
    - Pluggable TTS or bundled audio strategy
    - Cache policy for offline reliability
 

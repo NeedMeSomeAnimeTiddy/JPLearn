@@ -223,6 +223,20 @@ interface DesktopApi {
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>
   getOverviewCharacterMastery: () => Promise<OverviewCharacterMasteryPayload>
+  getPronunciationAudio: (payload: {
+    text: string
+    provider?: 'edge_tts' | 'kokoro_tts'
+    voice?: string
+    audioRate?: number
+  }) => Promise<{
+    ok: boolean
+    provider?: string
+    mime_type?: string
+    audio_base64?: string
+    voice?: string
+    rate?: string
+    error?: string
+  }>
   notifyStartupReady: (payload?: {
     startupReadyMs?: number
     firstSummaryMs?: number | null
