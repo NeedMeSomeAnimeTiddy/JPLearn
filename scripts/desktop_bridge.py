@@ -571,12 +571,12 @@ def main() -> int:
             target_items = int(sys.argv[2])
             target_minutes = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].strip() else None
             target_accuracy = int(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4].strip() else None
-            session_id = sys.argv[5] if len(sys.argv) > 5 else None
+            session_goal_id = sys.argv[5] if len(sys.argv) > 5 else None
             payload = start_session_goal(
                 target_items=target_items,
                 target_minutes=target_minutes,
                 target_accuracy=target_accuracy,
-                session_id=session_id,
+                session_id=session_goal_id,
             )
         except ValueError as exc:
             print(json.dumps({"error": str(exc)}))

@@ -16,6 +16,9 @@ from data.text_normalization import normalize_japanese_text, normalize_storage_t
 
 DB_PATH = Path(__file__).parent.parent / "data" / "jplearn.db"
 SCHEMA_VERSION_TABLE = "schema_version"
+MIGRATION_V1 = 1
+MIGRATION_V2 = 2
+MIGRATION_V3 = 3
 LATEST_SCHEMA_VERSION = 3
 
 StageDistribution: TypeAlias = dict[int, int]
@@ -186,13 +189,23 @@ def _migration_0003(conn: sqlite3.Connection) -> None:
 
 
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
-    1: _migration_0001,
-    2: _migration_0002,
-    3: _migration_0003,
+    MIGRATION_V1: _migration_0001,
+    MIGRATION_V2: _migration_0002,
+    MIGRATION_V3: _migration_0003,
 }
 
 
+def _validate_migration_plan() -> None:
+    expected = list(range(1, LATEST_SCHEMA_VERSION + 1))
+    observed = sorted(MIGRATIONS.keys())
+    if observed != expected:
+        raise RuntimeError(
+            f"Invalid migration plan: expected versions {expected}, found {observed}"
+        )
+
+
 def _apply_migrations(conn: sqlite3.Connection) -> None:
+    _validate_migration_plan()
     _ensure_schema_version_table(conn)
     current_version = _load_schema_version(conn)
     for target_version in range(current_version + 1, LATEST_SCHEMA_VERSION + 1):

@@ -4,6 +4,7 @@ import argparse
 import csv
 import sys
 from dataclasses import dataclass
+from collections.abc import Sequence
 from pathlib import Path
 
 from data.text_normalization import normalize_japanese_text, normalize_storage_text
@@ -43,7 +44,7 @@ def _display_source_path(path: Path) -> str:
         return path.as_posix()
 
 
-def _validate_headers(path: Path, fieldnames: list[str] | None) -> None:
+def _validate_headers(path: Path, fieldnames: Sequence[str] | None) -> None:
     if fieldnames is None:
         raise ValueError(
             f"CSV {path} is missing a header row; expected: {', '.join(EXPECTED_HEADERS)}"

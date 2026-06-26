@@ -65,6 +65,10 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
    `python scripts\debug_tools.py checks`
 - Include tests in condensed mode:
    `python scripts\debug_tools.py checks --with-tests`
+- Lightweight queue/session/typed diagnostics:
+   `python scripts\debug_tools.py diagnostics`
+- JSON diagnostics output:
+   `python scripts\debug_tools.py diagnostics --json`
 
 ---
 

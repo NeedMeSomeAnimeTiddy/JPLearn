@@ -32,7 +32,7 @@ def _build_prompt_lookup() -> dict[tuple[str, int], str]:
         deck_key = _normalize_deck_key(deck.name)
         slug_key = _normalize_deck_key(slug)
         for card in deck.cards:
-            prompt = _normalize_japanese_text(card.character)
+            prompt = normalize_japanese_text(card.character)
             if not prompt:
                 continue
             lookup[(deck_key, card.id)] = prompt
@@ -49,7 +49,7 @@ def _build_prompt_lookup() -> dict[tuple[str, int], str]:
         deck_key = _normalize_deck_key(deck_name)
         slug_key = _normalize_deck_key(slug)
         for index, row in enumerate(rows):
-            prompt = _normalize_japanese_text(row[0])
+            prompt = normalize_japanese_text(row[0])
             if not prompt:
                 continue
             card_id = id_offset + index

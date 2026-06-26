@@ -14,7 +14,15 @@ class Command:
 COMMANDS = [
     Command(
         "mypy",
-        [sys.executable, "-m", "mypy", "--explicit-package-bases", "."],
+        [
+            sys.executable,
+            "-m",
+            "mypy",
+            "--explicit-package-bases",
+            "--exclude",
+            r"(^|/)electron-frontend/out(/|$)",
+            ".",
+        ],
     ),
     Command(
         "architecture",

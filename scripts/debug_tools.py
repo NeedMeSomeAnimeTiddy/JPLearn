@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from data import database
+
 IGNORED_PARTS = {
     ".git",
     ".venv",
@@ -173,6 +178,144 @@ def print_checks(args: argparse.Namespace) -> int:
     return overall
 
 
+def _connect_progress_db() -> sqlite3.Connection:
+    database.init_db()
+    conn = sqlite3.connect(database.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _load_queue_diagnostics(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    rows = conn.execute(
+        """
+        SELECT
+            deck,
+            COUNT(*) AS total,
+            SUM(CASE WHEN next_review <= date('now') THEN 1 ELSE 0 END) AS due
+        FROM review_states
+        GROUP BY deck
+        ORDER BY due DESC, total DESC, deck ASC
+        LIMIT 12
+        """
+    ).fetchall()
+
+    return [
+        {
+            "deck": str(row["deck"]),
+            "total": int(row["total"] or 0),
+            "due": int(row["due"] or 0),
+        }
+        for row in rows
+    ]
+
+
+def _load_session_goal_diagnostics(conn: sqlite3.Connection) -> list[dict[str, object]]:
+    rows = conn.execute(
+        """
+        SELECT
+            sg.session_id AS session_id,
+            sg.target_items AS target_items,
+            COUNT(DISTINCT re.card_id) AS completed_items,
+            COUNT(re.id) AS reviewed,
+            SUM(CASE WHEN re.quality >= 3 THEN 1 ELSE 0 END) AS correct
+        FROM session_goals sg
+        LEFT JOIN review_events re ON re.session_id = sg.session_id
+        GROUP BY sg.session_id, sg.target_items
+        ORDER BY sg.started_at_utc DESC
+        LIMIT 10
+        """
+    ).fetchall()
+
+    diagnostics: list[dict[str, object]] = []
+    for row in rows:
+        reviewed = int(row["reviewed"] or 0)
+        correct = int(row["correct"] or 0)
+        accuracy = round((correct / reviewed) * 100) if reviewed > 0 else 0
+        target_items = int(row["target_items"])
+        completed_items = int(row["completed_items"] or 0)
+        diagnostics.append(
+            {
+                "session_id": str(row["session_id"]),
+                "target_items": target_items,
+                "completed_items": completed_items,
+                "reviewed": reviewed,
+                "accuracy": accuracy,
+                "goal_met": completed_items >= target_items,
+            }
+        )
+    return diagnostics
+
+
+def _load_typed_outcome_diagnostics(conn: sqlite3.Connection) -> dict[str, int]:
+    row = conn.execute(
+        """
+        SELECT
+            COUNT(*) AS attempts,
+            SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct,
+            SUM(CASE WHEN quality < 3 THEN 1 ELSE 0 END) AS incorrect
+        FROM review_events
+        WHERE tags_csv LIKE '%typed%'
+        """
+    ).fetchone()
+
+    attempts = int((row or {})["attempts"] or 0)
+    correct = int((row or {})["correct"] or 0)
+    incorrect = int((row or {})["incorrect"] or 0)
+    accuracy = round((correct / attempts) * 100) if attempts > 0 else 0
+    return {
+        "attempts": attempts,
+        "correct": correct,
+        "incorrect": incorrect,
+        "accuracy": accuracy,
+    }
+
+
+def build_diagnostics_report() -> dict[str, object]:
+    with _connect_progress_db() as conn:
+        queue = _load_queue_diagnostics(conn)
+        sessions = _load_session_goal_diagnostics(conn)
+        typed = _load_typed_outcome_diagnostics(conn)
+
+    return {
+        "queue_composition": queue,
+        "session_completion": sessions,
+        "typed_outcomes": typed,
+    }
+
+
+def print_diagnostics(args: argparse.Namespace) -> int:
+    report = build_diagnostics_report()
+    if args.json:
+        print(json.dumps(report, indent=2))
+        return 0
+
+    print("== DIAGNOSTICS ==")
+    print("queue composition:")
+    queue_items = cast(list[dict[str, object]], report["queue_composition"])
+    if not queue_items:
+        print("  (no review state rows)")
+    for item in queue_items:
+        print(f"  {item['deck']}: due={item['due']} total={item['total']}")
+
+    print("session completion:")
+    sessions = cast(list[dict[str, object]], report["session_completion"])
+    if not sessions:
+        print("  (no saved session goals)")
+    for session in sessions:
+        print(
+            f"  {session['session_id']}: completed={session['completed_items']}/{session['target_items']} "
+            f"reviewed={session['reviewed']} accuracy={session['accuracy']}% goal_met={session['goal_met']}"
+        )
+
+    typed = cast(dict[str, int], report["typed_outcomes"])
+    print(
+        "typed outcomes: "
+        f"attempts={typed['attempts']} correct={typed['correct']} "
+        f"incorrect={typed['incorrect']} accuracy={typed['accuracy']}%"
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -194,6 +337,13 @@ def build_parser() -> argparse.ArgumentParser:
     checks_parser.add_argument("--max-lines", type=int, default=12, help="Max output lines per check")
     checks_parser.add_argument("--timeout", type=int, default=120, help="Timeout seconds per check command")
     checks_parser.set_defaults(handler=print_checks)
+
+    diagnostics_parser = subparsers.add_parser(
+        "diagnostics",
+        help="Print lightweight queue/session/typed diagnostics",
+    )
+    diagnostics_parser.add_argument("--json", action="store_true", help="Emit JSON diagnostics")
+    diagnostics_parser.set_defaults(handler=print_diagnostics)
 
     return parser
 

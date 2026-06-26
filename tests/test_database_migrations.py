@@ -77,6 +77,105 @@ def test_jplearn_db_upgrade_adds_review_event_columns_and_schema_marker(
     assert int(row[0]) == database.LATEST_SCHEMA_VERSION
 
 
+def test_jplearn_db_upgrade_from_v1_applies_v2_and_v3_in_order(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "jplearn-migration-from-v1.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE schema_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute("INSERT INTO schema_version (id, version) VALUES (1, 1)")
+        conn.execute(
+            """
+            CREATE TABLE review_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                deck TEXT NOT NULL,
+                card_id INTEGER NOT NULL,
+                quality INTEGER NOT NULL,
+                reviewed_on TEXT NOT NULL,
+                reviewed_at_utc TEXT NOT NULL DEFAULT '',
+                script_tag TEXT NOT NULL DEFAULT '',
+                curriculum_stage INTEGER,
+                prompt_text TEXT NOT NULL DEFAULT '',
+                tags_csv TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+
+    database.init_db()
+
+    columns = _column_names(db_path, "review_events")
+    assert "session_id" in columns
+    assert "confidence_score" in columns
+
+    with sqlite3.connect(db_path) as conn:
+        version_row = conn.execute(
+            "SELECT version FROM schema_version WHERE id = 1"
+        ).fetchone()
+
+    assert version_row is not None
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION
+
+
+def test_jplearn_db_upgrade_from_v2_only_applies_confidence_column(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "jplearn-migration-from-v2.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE schema_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute("INSERT INTO schema_version (id, version) VALUES (1, 2)")
+        conn.execute(
+            """
+            CREATE TABLE review_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                deck TEXT NOT NULL,
+                card_id INTEGER NOT NULL,
+                quality INTEGER NOT NULL,
+                reviewed_on TEXT NOT NULL,
+                reviewed_at_utc TEXT NOT NULL DEFAULT '',
+                script_tag TEXT NOT NULL DEFAULT '',
+                curriculum_stage INTEGER,
+                prompt_text TEXT NOT NULL DEFAULT '',
+                tags_csv TEXT NOT NULL DEFAULT '',
+                session_id TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+
+    database.init_db()
+
+    columns = _column_names(db_path, "review_events")
+    assert "session_id" in columns
+    assert "confidence_score" in columns
+
+    with sqlite3.connect(db_path) as conn:
+        version_row = conn.execute(
+            "SELECT version FROM schema_version WHERE id = 1"
+        ).fetchone()
+
+    assert version_row is not None
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION
+
+
 def test_app_db_fresh_install_creates_schema_marker(tmp_path: Path) -> None:
     db_path = tmp_path / "app-migration-fresh.db"
     repo = SRSRepository(db_path=db_path)
