@@ -6,9 +6,12 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 
 DB_PATH = Path("data/app.db")
+SCHEMA_VERSION_TABLE = "schema_version"
+LATEST_SCHEMA_VERSION = 1
 
 
 # -----------------------------
@@ -50,17 +53,71 @@ class SRSRepository:
 
     def _init_db(self) -> None:
         with self._connect() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS srs_items (
-                    id TEXT PRIMARY KEY,
-                    last_interval INTEGER NOT NULL,
-                    ease_factor REAL NOT NULL,
-                    due INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL
-                )
-                """
+            self._apply_migrations(conn)
+
+    def _ensure_schema_version_table(self, conn: sqlite3.Connection) -> None:
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {SCHEMA_VERSION_TABLE} (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
             )
+            """
+        )
+
+    def _load_schema_version(self, conn: sqlite3.Connection) -> int:
+        row = conn.execute(
+            f"SELECT version FROM {SCHEMA_VERSION_TABLE} WHERE id = 1"
+        ).fetchone()
+        if row is None:
+            return 0
+        return int(row[0])
+
+    def _store_schema_version(self, conn: sqlite3.Connection, version: int) -> None:
+        conn.execute(
+            f"""
+            INSERT INTO {SCHEMA_VERSION_TABLE} (id, version)
+            VALUES (1, ?)
+            ON CONFLICT(id) DO UPDATE SET version = excluded.version
+            """,
+            (version,),
+        )
+
+    def _migration_0001(self, conn: sqlite3.Connection) -> None:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS srs_items (
+                id TEXT PRIMARY KEY,
+                last_interval INTEGER NOT NULL,
+                ease_factor REAL NOT NULL,
+                due INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+
+        existing_columns = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(srs_items)").fetchall()
+        }
+        if "updated_at" not in existing_columns:
+            conn.execute("ALTER TABLE srs_items ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0")
+
+    def _migration_map(self) -> dict[int, Callable[[sqlite3.Connection], None]]:
+        return {
+            1: self._migration_0001,
+        }
+
+    def _apply_migrations(self, conn: sqlite3.Connection) -> None:
+        self._ensure_schema_version_table(conn)
+        current_version = self._load_schema_version(conn)
+        migrations = self._migration_map()
+        for target_version in range(current_version + 1, LATEST_SCHEMA_VERSION + 1):
+            migration = migrations.get(target_version)
+            if migration is None:
+                raise RuntimeError(f"Missing migration implementation for version {target_version}")
+            migration(conn)
+            self._store_schema_version(conn, target_version)
 
     # -----------------------------
     # Read

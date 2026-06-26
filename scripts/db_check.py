@@ -6,6 +6,10 @@ from pathlib import Path
 DB_PATH = Path("data/app.db")
 
 REQUIRED = {
+    "schema_version": {
+        "id",
+        "version",
+    },
     "srs_items": {
         "id",
         "last_interval",
@@ -19,6 +23,15 @@ REQUIRED = {
 def main() -> int:
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS schema_version (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            version INTEGER NOT NULL
+        )
+        """
+    )
 
     cur.execute(
         """

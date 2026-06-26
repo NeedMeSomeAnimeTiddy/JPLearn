@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import TypedDict, TypeAlias
+from typing import Callable, TypedDict, TypeAlias
 
 from domain.activity import ActivitySummary
 from domain.history import ItemHistoryEvent, RawItemHistoryBucket
@@ -13,6 +13,8 @@ from domain.scheduler import ReviewState
 from domain.streaks import StreakState
 
 DB_PATH = Path(__file__).parent.parent / "data" / "jplearn.db"
+SCHEMA_VERSION_TABLE = "schema_version"
+LATEST_SCHEMA_VERSION = 1
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -46,78 +48,131 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+def _ensure_schema_version_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {SCHEMA_VERSION_TABLE} (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            version INTEGER NOT NULL
+        )
+        """
+    )
+
+
+def _load_schema_version(conn: sqlite3.Connection) -> int:
+    row = conn.execute(
+        f"SELECT version FROM {SCHEMA_VERSION_TABLE} WHERE id = 1"
+    ).fetchone()
+    if row is None:
+        return 0
+    return int(row["version"])
+
+
+def _store_schema_version(conn: sqlite3.Connection, version: int) -> None:
+    conn.execute(
+        f"""
+        INSERT INTO {SCHEMA_VERSION_TABLE} (id, version)
+        VALUES (1, ?)
+        ON CONFLICT(id) DO UPDATE SET version = excluded.version
+        """,
+        (version,),
+    )
+
+
+def _migration_0001(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS review_states (
+            deck        TEXT    NOT NULL,
+            card_id     INTEGER NOT NULL,
+            ease_factor REAL    NOT NULL DEFAULT 2.5,
+            interval    INTEGER NOT NULL DEFAULT 1,
+            repetitions INTEGER NOT NULL DEFAULT 0,
+            next_review TEXT    NOT NULL,
+            PRIMARY KEY (deck, card_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS review_events (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            deck        TEXT    NOT NULL,
+            card_id     INTEGER NOT NULL,
+            quality     INTEGER NOT NULL,
+            reviewed_on TEXT    NOT NULL,
+            reviewed_at_utc TEXT NOT NULL DEFAULT '',
+            script_tag  TEXT    NOT NULL DEFAULT '',
+            curriculum_stage INTEGER,
+            prompt_text TEXT    NOT NULL DEFAULT '',
+            tags_csv    TEXT    NOT NULL DEFAULT ''
+        )
+    """)
+
+    existing_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(review_events)").fetchall()
+    }
+    if "script_tag" not in existing_columns:
+        conn.execute("ALTER TABLE review_events ADD COLUMN script_tag TEXT NOT NULL DEFAULT ''")
+    if "tags_csv" not in existing_columns:
+        conn.execute("ALTER TABLE review_events ADD COLUMN tags_csv TEXT NOT NULL DEFAULT ''")
+    if "reviewed_at_utc" not in existing_columns:
+        conn.execute("ALTER TABLE review_events ADD COLUMN reviewed_at_utc TEXT NOT NULL DEFAULT ''")
+    if "curriculum_stage" not in existing_columns:
+        conn.execute("ALTER TABLE review_events ADD COLUMN curriculum_stage INTEGER")
+    if "prompt_text" not in existing_columns:
+        conn.execute("ALTER TABLE review_events ADD COLUMN prompt_text TEXT NOT NULL DEFAULT ''")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS streak_state (
+            id                   INTEGER PRIMARY KEY CHECK (id = 1),
+            last_study_day_utc   TEXT,
+            last_study_day_local TEXT,
+            current_streak_days  INTEGER NOT NULL DEFAULT 0,
+            best_streak_days     INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS leech_items (
+            deck                 TEXT    NOT NULL,
+            card_id              INTEGER NOT NULL,
+            is_active            INTEGER NOT NULL DEFAULT 0,
+            attempts_recent      INTEGER NOT NULL DEFAULT 0,
+            failures_recent      INTEGER NOT NULL DEFAULT 0,
+            last_evaluated_utc   TEXT    NOT NULL,
+            PRIMARY KEY (deck, card_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS curriculum_stages (
+            deck               TEXT    NOT NULL,
+            card_id            INTEGER NOT NULL,
+            mode               TEXT    NOT NULL,
+            stage              INTEGER NOT NULL,
+            updated_at_utc     TEXT    NOT NULL,
+            PRIMARY KEY (deck, card_id, mode)
+        )
+    """)
+
+
+MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
+    1: _migration_0001,
+}
+
+
+def _apply_migrations(conn: sqlite3.Connection) -> None:
+    _ensure_schema_version_table(conn)
+    current_version = _load_schema_version(conn)
+    for target_version in range(current_version + 1, LATEST_SCHEMA_VERSION + 1):
+        migration = MIGRATIONS.get(target_version)
+        if migration is None:
+            raise RuntimeError(f"Missing migration implementation for version {target_version}")
+        migration(conn)
+        _store_schema_version(conn, target_version)
+
+
 def init_db() -> None:
     """Create required tables when they do not already exist."""
     with _connect() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS review_states (
-                deck        TEXT    NOT NULL,
-                card_id     INTEGER NOT NULL,
-                ease_factor REAL    NOT NULL DEFAULT 2.5,
-                interval    INTEGER NOT NULL DEFAULT 1,
-                repetitions INTEGER NOT NULL DEFAULT 0,
-                next_review TEXT    NOT NULL,
-                PRIMARY KEY (deck, card_id)
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS review_events (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                deck        TEXT    NOT NULL,
-                card_id     INTEGER NOT NULL,
-                quality     INTEGER NOT NULL,
-                reviewed_on TEXT    NOT NULL,
-                reviewed_at_utc TEXT NOT NULL DEFAULT '',
-                script_tag  TEXT    NOT NULL DEFAULT '',
-                curriculum_stage INTEGER,
-                prompt_text TEXT    NOT NULL DEFAULT '',
-                tags_csv    TEXT    NOT NULL DEFAULT ''
-            )
-        """)
-        existing_columns = {
-            row["name"]
-            for row in conn.execute("PRAGMA table_info(review_events)").fetchall()
-        }
-        if "script_tag" not in existing_columns:
-            conn.execute("ALTER TABLE review_events ADD COLUMN script_tag TEXT NOT NULL DEFAULT ''")
-        if "tags_csv" not in existing_columns:
-            conn.execute("ALTER TABLE review_events ADD COLUMN tags_csv TEXT NOT NULL DEFAULT ''")
-        if "reviewed_at_utc" not in existing_columns:
-            conn.execute("ALTER TABLE review_events ADD COLUMN reviewed_at_utc TEXT NOT NULL DEFAULT ''")
-        if "curriculum_stage" not in existing_columns:
-            conn.execute("ALTER TABLE review_events ADD COLUMN curriculum_stage INTEGER")
-        if "prompt_text" not in existing_columns:
-            conn.execute("ALTER TABLE review_events ADD COLUMN prompt_text TEXT NOT NULL DEFAULT ''")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS streak_state (
-                id                   INTEGER PRIMARY KEY CHECK (id = 1),
-                last_study_day_utc   TEXT,
-                last_study_day_local TEXT,
-                current_streak_days  INTEGER NOT NULL DEFAULT 0,
-                best_streak_days     INTEGER NOT NULL DEFAULT 0
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS leech_items (
-                deck                 TEXT    NOT NULL,
-                card_id              INTEGER NOT NULL,
-                is_active            INTEGER NOT NULL DEFAULT 0,
-                attempts_recent      INTEGER NOT NULL DEFAULT 0,
-                failures_recent      INTEGER NOT NULL DEFAULT 0,
-                last_evaluated_utc   TEXT    NOT NULL,
-                PRIMARY KEY (deck, card_id)
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS curriculum_stages (
-                deck               TEXT    NOT NULL,
-                card_id            INTEGER NOT NULL,
-                mode               TEXT    NOT NULL,
-                stage              INTEGER NOT NULL,
-                updated_at_utc     TEXT    NOT NULL,
-                PRIMARY KEY (deck, card_id, mode)
-            )
-        """)
+        _apply_migrations(conn)
 
 
 def reset_db() -> None:

@@ -83,7 +83,7 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 - [x] (High) Lock down navigation and window creation
    - Deny unexpected `will-navigate` targets
    - Enforce strict `setWindowOpenHandler` allowlist policy
-- [ ] (High) Add database migration framework
+- [x] (High) Add database migration framework
    - Add schema version table/marker
    - Add deterministic migration runner and rollback-safe strategy
    - Add migration tests for fresh install and upgrade paths
