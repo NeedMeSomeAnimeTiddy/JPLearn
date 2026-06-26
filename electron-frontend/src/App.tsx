@@ -474,6 +474,22 @@ interface JlptLevelProgress {
   total: number
 }
 
+interface StudyPlanCoverageRow {
+  key: JlptLevel
+  label: string
+  mastery: number
+  total: number
+  leadingScript: 'kanji' | 'vocab'
+}
+
+interface StudyPlanSnapshot {
+  coverageRows: StudyPlanCoverageRow[]
+  focusRows: StudyPlanCoverageRow[]
+  overallMastery: number
+  recommendedMinutes: number
+  sessionNote: string
+}
+
 type StatsByScript = Record<ScriptKey, ScriptStats>
 type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
 type OverviewSectionKey = 'studyActivity' | 'contextClozeCurriculum' | 'storyProgress' | 'mistakeBreakdown' | 'itemTimeline' | 'deckSnapshot'
@@ -1114,6 +1130,68 @@ function buildJlptLevelProgressFromLevelDecks(
       total,
     }
   })
+}
+
+function buildStudyPlan(
+  kanjiLevels: JlptLevelProgress[],
+  vocabLevels: JlptLevelProgress[],
+  weeklyActivity: StudySummaryPayload['activity'],
+  currentStreak: number,
+): StudyPlanSnapshot {
+  const coverageRows = JLPT_LEVEL_ORDER.map((level) => {
+    const kanji = kanjiLevels.find((entry) => entry.key === level) ?? {
+      key: level,
+      label: JLPT_LEVEL_LABELS[level],
+      mastery: 0,
+      total: 0,
+    }
+    const vocab = vocabLevels.find((entry) => entry.key === level) ?? {
+      key: level,
+      label: JLPT_LEVEL_LABELS[level],
+      mastery: 0,
+      total: 0,
+    }
+    const total = kanji.total + vocab.total
+    const weightedMastery = (kanji.mastery * kanji.total) + (vocab.mastery * vocab.total)
+    const mastery = total > 0 ? weightedMastery / total : 0
+    const leadingScript: StudyPlanCoverageRow['leadingScript'] = kanji.mastery <= vocab.mastery ? 'kanji' : 'vocab'
+
+    return {
+      key: level,
+      label: JLPT_LEVEL_LABELS[level],
+      mastery,
+      total,
+      leadingScript,
+    }
+  }).filter((row) => row.total > 0)
+
+  const focusRows = [...coverageRows]
+    .sort((left, right) => left.mastery - right.mastery || left.total - right.total)
+    .slice(0, 3)
+
+  const totalCards = coverageRows.reduce((sum, row) => sum + row.total, 0)
+  const overallMastery = totalCards > 0
+    ? coverageRows.reduce((sum, row) => sum + (row.mastery * row.total), 0) / totalCards
+    : 0
+  const recommendedMinutes = weeklyActivity.week.reviewed >= 24
+    ? 20
+    : weeklyActivity.week.reviewed >= 10
+      ? 15
+      : 10
+
+  const sessionNote = focusRows.length > 0
+    ? `Start with ${focusRows[0].label} ${focusRows[0].leadingScript} and keep the rest of the run mixed.`
+    : currentStreak > 0
+      ? `Keep the streak alive with a short mixed review.`
+      : 'Build the plan after your first few rounds and it will highlight the weakest JLPT level.'
+
+  return {
+    coverageRows,
+    focusRows,
+    overallMastery,
+    recommendedMinutes,
+    sessionNote,
+  }
 }
 
 function App() {
@@ -2490,6 +2568,11 @@ function App() {
       masteryRate,
     }
   }, [decks])
+
+  const studyPlan = useMemo(
+    () => buildStudyPlan(kanjiLevelProgress, vocabLevelProgress, activity, streak.current_days),
+    [activity, kanjiLevelProgress, streak.current_days, vocabLevelProgress],
+  )
 
   const summaryTiles = [
     { label: 'Decks', value: decks.length.toString(), tone: 'teal', icon: BarChart3, accent: 'insight' },
@@ -4001,6 +4084,61 @@ function App() {
                       })}
                     </div>
                   </div>
+                ) : null}
+
+                {studyPlan.coverageRows.length > 0 ? (
+                  <section className="overview-study-plan-panel">
+                    <div className="panel-head">
+                      <h2 className="panel-title-with-icon"><ListChecks aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Study Plan</h2>
+                      <div className="panel-actions">
+                        <span>Personalized from JLPT coverage and recent activity</span>
+                      </div>
+                    </div>
+
+                    <div className="study-plan-grid">
+                      <article className="study-plan-card study-plan-summary-card">
+                        <p className="hero-kicker">Today's route</p>
+                        <strong className="study-plan-session-title">{studyPlan.recommendedMinutes}-minute mixed session</strong>
+                        <p className="study-plan-session-copy">{studyPlan.sessionNote}</p>
+                        <div className="study-plan-focus-list" aria-label="Study priorities">
+                          {studyPlan.focusRows.map((row, index) => (
+                            <div key={row.key} className="study-plan-focus-item">
+                              <span className="study-plan-focus-rank">0{index + 1}</span>
+                              <div>
+                                <strong>{row.label}</strong>
+                                <p>{Math.round(row.mastery * 100)}% coverage · {row.leadingScript} lagging</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </article>
+
+                      <article className="study-plan-card study-plan-coverage-card">
+                        <p className="hero-kicker">JLPT coverage</p>
+                        <strong className="study-plan-overall">{Math.round(studyPlan.overallMastery * 100)}% overall coverage</strong>
+                        <div className="study-plan-coverage-list">
+                          {studyPlan.coverageRows.map((row) => {
+                            const pct = Math.round(row.mastery * 100)
+                            return (
+                              <div key={row.key} className="study-plan-coverage-row">
+                                <div className="study-plan-coverage-head">
+                                  <strong>{row.label}</strong>
+                                  <span>{pct}%</span>
+                                </div>
+                                <div className="study-plan-coverage-bar" aria-hidden="true">
+                                  <div
+                                    className="study-plan-coverage-fill"
+                                    style={{ '--study-plan-pct': `${pct}%` } as CSSProperties}
+                                  />
+                                </div>
+                                <p className="study-plan-coverage-meta">{row.total} cards tracked · {row.leadingScript} is behind</p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </article>
+                    </div>
+                  </section>
                 ) : null}
 
               </div>

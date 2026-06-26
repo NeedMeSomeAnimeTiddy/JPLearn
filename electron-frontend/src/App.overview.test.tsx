@@ -60,6 +60,8 @@ const baseDesktopApi = {
   closeWindow: async () => ({ ok: true }),
 }
 
+const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
+
 describe('Overview activity panel', () => {
   it('shows empty-state message when there is no activity', async () => {
     window.jplearnDesktop = {
@@ -165,5 +167,96 @@ describe('Overview activity panel', () => {
     expect((await screen.findAllByText(/Chapter 3 ready/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/11/)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/38/)).length).toBeGreaterThan(0)
+  })
+
+  it('shows a personalized study plan and JLPT coverage snapshot', async () => {
+    window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify({
+      hiragana: {},
+      katakana: {},
+      kanji_n5: {
+        10: 4,
+        11: 1,
+      },
+      vocab_n5: {
+        20: 2,
+        21: 0,
+      },
+      grammar_patterns: {},
+    }))
+
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      getStudySummary: async () => ({
+        decks: [],
+        streak: { current_days: 4, best_days: 6 },
+        activity: {
+          week: { days: 7, reviewed: 12, correct: 9, incorrect: 3, accuracy: 75, points_earned: 9, active_days: 5 },
+          month: { days: 30, reviewed: 28, correct: 21, incorrect: 7, accuracy: 75, points_earned: 21, active_days: 11 },
+        },
+        mistakes: [],
+        item_history: [],
+        curriculum: {
+          context_cloze: { mode: 'context_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          context_cloze_by_script: {
+            hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            vocab_n5: { mode: 'context_cloze', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            grammar_patterns: { mode: 'context_cloze', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          },
+          narrative_story: {
+            mode: 'narrative_story',
+            script_tag: 'all',
+            attempts: 0,
+            accuracy: 0,
+            chapters: {
+              '1': { attempts: 0, accuracy: 0, completion_rate: 100 },
+              '2': { attempts: 0, accuracy: 0, completion_rate: 0 },
+              '3': { attempts: 0, accuracy: 0, completion_rate: 0 },
+            },
+          },
+          narrative_story_by_script: {
+            hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            vocab_n5: { mode: 'narrative_story', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            grammar_patterns: { mode: 'narrative_story', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+          },
+        },
+      }),
+      getDeckCards: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => {
+        if (slug === 'kanji_n5') {
+          return {
+            slug,
+            name: 'Kanji N5',
+            cards: [
+              { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
+              { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
+            ],
+          }
+        }
+
+        if (slug === 'vocab_n5') {
+          return {
+            slug,
+            name: 'Vocab N5',
+            cards: [
+              { id: 20, character: '予定', romaji: 'yotei', meaning: 'schedule', tags: ['vocab', 'n5'], example_sentence: '予定 を たてます。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [21], character_distractor_ids: [21] },
+              { id: 21, character: '計画', romaji: 'keikaku', meaning: 'plan', tags: ['vocab', 'n5'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [20], character_distractor_ids: [20] },
+            ],
+          }
+        }
+
+        return { slug, name: 'Deck', cards: [] }
+      },
+    }
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /open study overview/i }))
+
+    expect(await screen.findByText(/Study Plan/i)).toBeTruthy()
+    expect(screen.getByText(/15-minute mixed session/i)).toBeTruthy()
+    expect(screen.getByText(/JLPT N5/i)).toBeTruthy()
+    expect(screen.getByText(/vocab is behind/i)).toBeTruthy()
   })
 })

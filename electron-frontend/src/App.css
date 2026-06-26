@@ -1116,6 +1116,148 @@ button {
   padding: 0;
 }
 
+.overview-study-plan-panel {
+  border-radius: 22px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 28%, var(--card-border));
+  background:
+    radial-gradient(circle at 10% 0%, rgba(108, 185, 214, 0.12), transparent 38%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  padding: 18px 20px 20px;
+  animation: enterUp 420ms ease both;
+}
+
+.study-plan-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+  gap: 14px;
+}
+
+.study-plan-card {
+  border-radius: 18px;
+  border: 1px solid var(--card-border);
+  background: linear-gradient(160deg, var(--card-bg-top), var(--card-bg-bottom));
+  padding: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.study-plan-session-title,
+.study-plan-overall {
+  display: block;
+  margin: 2px 0 8px;
+  font-size: clamp(1.22rem, 2.5vw, 1.6rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+
+.study-plan-session-copy {
+  margin: 0;
+  color: var(--text-soft);
+  max-width: 54ch;
+}
+
+.study-plan-focus-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.study-plan-focus-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 16%, var(--card-border));
+}
+
+.study-plan-focus-item strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.study-plan-focus-item p,
+.study-plan-coverage-meta {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.study-plan-focus-rank {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--tone-ocean) 18%, transparent);
+  color: color-mix(in oklab, var(--tone-ocean) 80%, white);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.study-plan-coverage-card {
+  display: grid;
+  align-content: start;
+}
+
+.study-plan-coverage-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.study-plan-coverage-row {
+  display: grid;
+  gap: 8px;
+}
+
+.study-plan-coverage-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.study-plan-coverage-head strong {
+  font-size: 0.92rem;
+}
+
+.study-plan-coverage-head span {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.study-plan-coverage-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.study-plan-coverage-fill {
+  width: var(--study-plan-pct, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--tone-ocean) 78%, white), color-mix(in oklab, var(--tone-amber) 55%, white));
+  box-shadow: 0 0 14px color-mix(in oklab, var(--tone-ocean) 26%, transparent);
+}
+
+.study-plan-coverage-meta {
+  font-size: 0.78rem;
+}
+
+@media (max-width: 980px) {
+  .study-plan-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .timeline-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

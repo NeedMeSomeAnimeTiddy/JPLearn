@@ -165,20 +165,20 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
    - Reuse the existing card/deck model where possible instead of inventing new content types.
    - Keep progression and mastery tracking aligned with the current review pipeline.
    - Add focused tests for content shape, progression rules, and visible UI behavior before expanding to the next mode.
-- [ ] (Medium) Add reading practice content
+- [x] (Medium) Add reading practice content
    - Introduce graded passages, short dialogues, and article-style reading sets
    - Track comprehension questions and unknown-word lookups per passage
    - Narrative story rounds now surface example sentences as reading passages in the app
 - [ ] (High) Add listening comprehension study modes
    - Support prompt-first, audio-first, and dictation-style review flows
    - Reuse the same content items across vocab, grammar, and sentence listening drills
-- [ ] (Medium) Add kanji writing and stroke-order practice
+- [x] (Medium) Add kanji writing and stroke-order practice
    - Support recognition vs. recall vs. writing mastery as separate skills
    - Store stroke hints, writing prompts, and production-specific progress
    - Kanji rounds now include a stroke-order writing drill for N5 characters
 
 #### Phase 3: Personalization
-- [ ] (Medium) Add personalized study plans and JLPT coverage tracking
+- [x] (Medium) Add personalized study plans and JLPT coverage tracking
    - Show gaps across vocab, kanji, grammar, listening, and reading by level
    - Generate daily plans based on target exam, timeline, and weak areas
 
