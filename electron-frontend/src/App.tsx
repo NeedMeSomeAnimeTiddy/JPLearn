@@ -1410,6 +1410,7 @@ function App() {
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [homeStudyPlanExpanded, setHomeStudyPlanExpanded] = useState(false)
+  const [learningPathExpanded, setLearningPathExpanded] = useState(false)
   const [overviewSectionExpanded, setOverviewSectionExpanded] = useState<Record<OverviewSectionKey, boolean>>({
     studyActivity: false,
     contextClozeCurriculum: false,
@@ -2717,6 +2718,15 @@ function App() {
     () => buildStudyPlan(decks, kanjiLevelProgress, vocabLevelProgress, activity, streak.current_days),
     [activity, decks, kanjiLevelProgress, streak.current_days, vocabLevelProgress],
   )
+  const learningPathTrackRows = useMemo(
+    () => {
+      const trackedKeys: ScriptKey[] = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5']
+      return trackedKeys
+        .map((key) => studyPlan.coverageRows.find((row) => row.key === key))
+        .filter((row): row is StudyPlanCoverageRow => row !== undefined)
+    },
+    [studyPlan.coverageRows],
+  )
 
   const summaryTiles = [
     { label: 'Decks', value: decks.length.toString(), tone: 'teal', icon: BarChart3, accent: 'insight' },
@@ -2748,6 +2758,23 @@ function App() {
       return { ...block, mastery, unlocked }
     })
   }, [blockProgress, cardScores, activeScript])
+
+  useEffect(() => {
+    if (blockProgressWithMastery.length === 0) return
+
+    const current = blockProgressWithMastery[activeBlockIndex]
+    if (current?.unlocked) return
+
+    const firstUnlocked = blockProgressWithMastery.find((block) => block.unlocked)
+    if (firstUnlocked) {
+      setActiveBlockIndex(firstUnlocked.index)
+      return
+    }
+
+    if (activeBlockIndex !== 0) {
+      setActiveBlockIndex(0)
+    }
+  }, [blockProgressWithMastery, activeBlockIndex])
 
   const activeSectionName = useMemo(() => {
     if (blockProgressWithMastery.length > 0) {
@@ -3319,130 +3346,166 @@ function App() {
           </header>
 
           <section className="panel-glass game-panel">
-            <div className="panel-head">
-              <h2>Learning Path</h2>
-              <span className="game-stats">
-                {blockProgressWithMastery.length > 0
-                  ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length} / ${blockProgressWithMastery.length} blocks mastered`
-                  : activeScript === 'kanji_n5'
-                    ? `${kanjiLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${kanjiLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
-                    : activeScript === 'vocab_n5'
-                      ? `${vocabLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${vocabLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
-                    : 'Choose a minigame to start'}
-              </span>
-            </div>
+            <div className="learning-path-shell">
+              <button
+                type="button"
+                className={`learning-path-toggle ${learningPathExpanded ? 'is-expanded' : ''}`}
+                onClick={() => setLearningPathExpanded((expanded) => !expanded)}
+                aria-expanded={learningPathExpanded}
+                aria-controls="learning-path-body"
+              >
+                <div className="panel-head learning-path-head">
+                  <h2>Learning Path</h2>
+                  <span className="game-stats">
+                    {blockProgressWithMastery.length > 0
+                      ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length} / ${blockProgressWithMastery.length} blocks mastered`
+                      : activeScript === 'kanji_n5'
+                        ? `${kanjiLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${kanjiLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
+                        : activeScript === 'vocab_n5'
+                          ? `${vocabLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${vocabLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
+                          : 'Choose a minigame to start'}
+                  </span>
+                </div>
 
-            {gameLoading ? (
-              <p className="status-line">Loading deck cards...</p>
-            ) : blockProgressWithMastery.length > 0 ? (
-              <div className="block-path">
-                {blockProgressWithMastery.map((block, index) => {
-                  const isActive = activeBlockIndex === block.index
-                  const masteryPct = Math.round(block.mastery * 100)
-                  return (
-                    <article
-                      key={block.index}
-                      className={`block-node ${isActive ? 'is-active' : ''} ${!block.unlocked ? 'is-locked' : ''}`}
-                      style={{ animationDelay: `${80 + index * 50}ms` }}
-                    >
-                      <button
-                        type="button"
-                        className="block-node-button"
-                        disabled={!block.unlocked}
-                        onClick={() => {
-                          if (!block.unlocked) return
-                          setActiveBlockIndex(block.index)
-                          setSessionActive(false)
-                          setRoundState(null)
-                          setRoundFeedback(null)
-                          setRoundFeedbackTone(null)
-                          setRoundFeedbackPoints(null)
-                          setRoundFeedbackAnswer(null)
-                          setIsRoundResolving(false)
-                          setLivesRemaining(DEFAULT_LIVES)
-                          resetRoundCycle()
-                        }}
-                        aria-pressed={isActive}
-                        aria-label={`${block.name}, ${block.unlocked ? `${masteryPct}% mastered` : 'locked'}`}
-                      >
-                        <div className="block-node-header">
-                          <div className="block-node-chars" lang="ja" aria-hidden="true">
-                            {block.sample_chars.join(' ')}
+                {!learningPathExpanded ? (
+                  <div className="learning-path-compact" role="group" aria-label="Learning path compact summary">
+                    {learningPathTrackRows.map((row) => {
+                      const masteryPct = Math.round(row.mastery * 100)
+                      return (
+                        <div key={row.key} className="learning-path-compact-row">
+                          <div className="learning-path-compact-head">
+                            <strong>{row.label}</strong>
+                            <span>{masteryPct}%</span>
                           </div>
-                          {!block.unlocked ? (
-                            <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
-                          ) : null}
+                          <div className="study-plan-coverage-bar" aria-hidden="true">
+                            <div className="study-plan-coverage-fill" style={{ '--study-plan-pct': `${masteryPct}%` } as CSSProperties} />
+                          </div>
+                          <p className="learning-path-compact-meta">
+                            {row.total > 0 ? `${row.total} cards tracked` : 'No cards tracked yet'}
+                          </p>
                         </div>
-                        <strong className="block-node-name">{block.name}</strong>
-                        <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
-                          <div
-                            className="block-node-bar"
-                            style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties}
-                          />
-                        </div>
-                        <span className="block-node-pct">{masteryPct}%</span>
-                      </button>
-                    </article>
-                  )
-                })}
+                      )
+                    })}
+                  </div>
+                ) : null}
+              </button>
+
+              <div id="learning-path-body" className={`learning-path-body ${learningPathExpanded ? 'is-open' : ''}`}>
+                <div className="learning-path-body-inner">
+                  {gameLoading ? (
+                    <p className="status-line">Loading deck cards...</p>
+                  ) : blockProgressWithMastery.length > 0 ? (
+                    <div className="block-path">
+                      {blockProgressWithMastery.map((block, index) => {
+                        const isActive = activeBlockIndex === block.index
+                        const masteryPct = Math.round(block.mastery * 100)
+                        return (
+                          <article
+                            key={block.index}
+                            className={`block-node ${isActive ? 'is-active' : ''} ${!block.unlocked ? 'is-locked' : ''}`}
+                            style={{ animationDelay: `${80 + index * 50}ms` }}
+                          >
+                            <button
+                              type="button"
+                              className="block-node-button"
+                              disabled={!block.unlocked}
+                              onClick={() => {
+                                if (!block.unlocked) return
+                                setActiveBlockIndex(block.index)
+                                setSessionActive(false)
+                                setRoundState(null)
+                                setRoundFeedback(null)
+                                setRoundFeedbackTone(null)
+                                setRoundFeedbackPoints(null)
+                                setRoundFeedbackAnswer(null)
+                                setIsRoundResolving(false)
+                                setLivesRemaining(DEFAULT_LIVES)
+                                resetRoundCycle()
+                              }}
+                              aria-pressed={isActive}
+                              aria-label={`${block.name}, ${block.unlocked ? `${masteryPct}% mastered` : 'locked'}`}
+                            >
+                              <div className="block-node-header">
+                                <div className="block-node-chars" lang="ja" aria-hidden="true">
+                                  {block.sample_chars.join(' ')}
+                                </div>
+                                {!block.unlocked ? (
+                                  <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
+                                ) : null}
+                              </div>
+                              <strong className="block-node-name">{block.name}</strong>
+                              <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
+                                <div
+                                  className="block-node-bar"
+                                  style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties}
+                                />
+                              </div>
+                              <span className="block-node-pct">{masteryPct}%</span>
+                            </button>
+                          </article>
+                        )
+                      })}
+                    </div>
+                  ) : activeScript === 'kanji_n5' || activeScript === 'vocab_n5' ? (
+                    <div className="jlpt-level-path" role="group" aria-label={`${activeScript === 'kanji_n5' ? 'Kanji' : 'Vocabulary'} JLPT progression`}>
+                      {(activeScript === 'kanji_n5' ? kanjiLevelProgress : vocabLevelProgress).map((level, index) => {
+                        const isActive = activeScript === 'kanji_n5' ? activeKanjiLevel === level.key : activeVocabLevel === level.key
+                        const masteryPct = Math.round(level.mastery * 100)
+                        const unavailable = level.total === 0
+                        return (
+                          <article
+                            key={level.key}
+                            className={`jlpt-level-node ${isActive ? 'is-active' : ''} ${(!level.unlocked || unavailable) ? 'is-locked' : ''}`}
+                            style={{ animationDelay: `${80 + index * 45}ms` }}
+                          >
+                            <button
+                              type="button"
+                              className="jlpt-level-button"
+                              disabled={!level.unlocked || unavailable}
+                              onClick={() => {
+                                if (activeScript === 'kanji_n5') {
+                                  setActiveKanjiLevel(level.key)
+                                } else {
+                                  setActiveVocabLevel(level.key)
+                                }
+                                setSessionActive(false)
+                                setRoundState(null)
+                                setRoundFeedback(null)
+                                setRoundFeedbackTone(null)
+                                setRoundFeedbackPoints(null)
+                                setRoundFeedbackAnswer(null)
+                                setIsRoundResolving(false)
+                                setLivesRemaining(DEFAULT_LIVES)
+                                resetRoundCycle()
+                              }}
+                              aria-pressed={isActive}
+                              aria-label={`${level.label}, ${unavailable ? 'no cards yet' : `${masteryPct}% mastered`}`}
+                            >
+                              <div className="jlpt-level-header">
+                                <strong>{level.label}</strong>
+                                {!level.unlocked || unavailable ? (
+                                  <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
+                                ) : null}
+                              </div>
+                              <span className="jlpt-level-preview" lang="ja" aria-hidden="true">
+                                {level.sampleChars.length > 0 ? level.sampleChars.join(' ') : '—'}
+                              </span>
+                              <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
+                                <div
+                                  className="block-node-bar"
+                                  style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties}
+                                />
+                              </div>
+                              <span className="jlpt-level-meta">{level.total} cards • {masteryPct}%</span>
+                            </button>
+                          </article>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            ) : activeScript === 'kanji_n5' || activeScript === 'vocab_n5' ? (
-              <div className="jlpt-level-path" role="group" aria-label={`${activeScript === 'kanji_n5' ? 'Kanji' : 'Vocabulary'} JLPT progression`}>
-                {(activeScript === 'kanji_n5' ? kanjiLevelProgress : vocabLevelProgress).map((level, index) => {
-                  const isActive = activeScript === 'kanji_n5' ? activeKanjiLevel === level.key : activeVocabLevel === level.key
-                  const masteryPct = Math.round(level.mastery * 100)
-                  const unavailable = level.total === 0
-                  return (
-                    <article
-                      key={level.key}
-                      className={`jlpt-level-node ${isActive ? 'is-active' : ''} ${(!level.unlocked || unavailable) ? 'is-locked' : ''}`}
-                      style={{ animationDelay: `${80 + index * 45}ms` }}
-                    >
-                      <button
-                        type="button"
-                        className="jlpt-level-button"
-                        disabled={!level.unlocked || unavailable}
-                        onClick={() => {
-                          if (activeScript === 'kanji_n5') {
-                            setActiveKanjiLevel(level.key)
-                          } else {
-                            setActiveVocabLevel(level.key)
-                          }
-                          setSessionActive(false)
-                          setRoundState(null)
-                          setRoundFeedback(null)
-                          setRoundFeedbackTone(null)
-                          setRoundFeedbackPoints(null)
-                          setRoundFeedbackAnswer(null)
-                          setIsRoundResolving(false)
-                          setLivesRemaining(DEFAULT_LIVES)
-                          resetRoundCycle()
-                        }}
-                        aria-pressed={isActive}
-                        aria-label={`${level.label}, ${unavailable ? 'no cards yet' : `${masteryPct}% mastered`}`}
-                      >
-                        <div className="jlpt-level-header">
-                          <strong>{level.label}</strong>
-                          {!level.unlocked || unavailable ? (
-                            <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
-                          ) : null}
-                        </div>
-                        <span className="jlpt-level-preview" lang="ja" aria-hidden="true">
-                          {level.sampleChars.length > 0 ? level.sampleChars.join(' ') : '—'}
-                        </span>
-                        <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
-                          <div
-                            className="block-node-bar"
-                            style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties}
-                          />
-                        </div>
-                        <span className="jlpt-level-meta">{level.total} cards • {masteryPct}%</span>
-                      </button>
-                    </article>
-                  )
-                })}
-              </div>
-            ) : null}
+            </div>
 
             {/* Minigame selector – shown below block path once a block is active */}
             {!gameLoading && (blockProgressWithMastery.length === 0 || blockProgressWithMastery[activeBlockIndex]?.unlocked) ? (

@@ -1640,6 +1640,83 @@ button {
   font-size: 0.9rem;
 }
 
+.learning-path-shell {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.learning-path-toggle {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 72%, transparent);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--panel-bg) 84%, transparent);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 10px 12px;
+}
+
+.learning-path-toggle:hover .panel-head h2 {
+  text-shadow: 0 0 12px color-mix(in oklab, var(--tone-ocean) 26%, transparent);
+}
+
+.learning-path-head {
+  margin-bottom: 0;
+}
+
+.learning-path-compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.learning-path-compact-row {
+  display: grid;
+  gap: 6px;
+}
+
+.learning-path-compact-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.learning-path-compact-head strong {
+  font-size: 0.86rem;
+}
+
+.learning-path-compact-head span {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.learning-path-compact-meta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.learning-path-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 280ms ease, opacity 180ms ease;
+}
+
+.learning-path-body.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.learning-path-body-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* ── Block progression path ─────────────────────────────────────── */
 
 .block-path {
