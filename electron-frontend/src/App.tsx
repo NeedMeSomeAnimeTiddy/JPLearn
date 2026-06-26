@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, RefreshCw, Settings, Shuffle, Square, Target, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, Plus, RefreshCw, Settings, Shuffle, Square, Target, Trophy, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -651,6 +651,31 @@ const THEME_OPTIONS: Array<{ key: ThemeKey; label: string }> = [
   { key: 'plum_garden', label: 'Plum Garden' },
 ]
 
+const THEME_SWATCH_ACCENT: Record<ThemeKey, string> = {
+  harbor_mist: '#f2b56f',
+  sakura_dawn: '#ffb1bf',
+  forest_ink: '#89d0a4',
+  sunset_lacquer: '#ffab73',
+  midnight_neon: '#79d5ff',
+  paper_crane: '#d18a57',
+  matcha_stone: '#b6d387',
+  ocean_glass: '#7ed4d0',
+  ember_night: '#ff9a6a',
+  plum_garden: '#c89cff',
+}
+
+const FONT_SIZE_ORDER: FontSize[] = ['small', 'medium', 'large']
+const FONT_SIZE_ICON: Record<FontSize, LucideIcon> = {
+  small: Minus,
+  medium: Square,
+  large: Plus,
+}
+const FONT_SIZE_LABEL: Record<FontSize, string> = {
+  small: 'Small',
+  medium: 'Medium',
+  large: 'Large',
+}
+
 const JLPT_LEVEL_ORDER: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
 const JLPT_LEVEL_LABELS: Record<JlptLevel, string> = {
   n5: 'JLPT N5',
@@ -1132,6 +1157,7 @@ function App() {
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
+  const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const scriptLoadRequestIdRef = useRef<number>(0)
   const lastLoadedScriptRef = useRef<ScriptKey>('hiragana')
@@ -1171,6 +1197,13 @@ function App() {
       [section]: !prev[section],
     }))
   }, [])
+
+  const advanceFontSize = useCallback(() => {
+    const currentIndex = FONT_SIZE_ORDER.indexOf(settings.fontSize)
+    const nextIndex = (currentIndex + 1) % FONT_SIZE_ORDER.length
+    const nextSize = FONT_SIZE_ORDER[nextIndex]
+    setSettings((prev) => ({ ...prev, fontSize: nextSize }))
+  }, [settings.fontSize])
 
   const activeDeckSlug = useMemo(() => {
     if (activeScript === 'kanji_n5') return activeKanjiDeckSlug
@@ -4170,13 +4203,17 @@ function App() {
           }}
         >
           <div
-            className="modal-panel settings-panel"
+            className="modal-panel settings-panel settings-sheet"
             role="dialog"
             aria-modal="true"
             aria-labelledby="settings-title"
           >
+            <div className="settings-sheet-grabber" aria-hidden="true" />
             <div className="settings-modal-header">
-              <h2 id="settings-title" className="settings-modal-title">Settings</h2>
+              <div>
+                <h2 id="settings-title" className="settings-modal-title">Control Panel</h2>
+                <p className="settings-modal-subtitle">Quick app controls</p>
+              </div>
               <button
                 type="button"
                 className="modal-close-button"
@@ -4187,59 +4224,92 @@ function App() {
               </button>
             </div>
 
-            <div className="settings-section">
-              <p className="settings-section-label">Theme</p>
-              <select
-                className="settings-theme-select"
-                value={settings.theme}
-                onChange={(event) => {
-                  const nextTheme = event.target.value as ThemeKey
-                  setSettings((prev) => ({ ...prev, theme: nextTheme }))
-                }}
-              >
-                {THEME_OPTIONS.map((theme) => (
-                  <option key={theme.key} value={theme.key}>{theme.label}</option>
-                ))}
-              </select>
-            </div>
+            <div className="settings-sheet-body">
+              <div className="settings-control-grid">
+                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                  <div className="settings-control-content">
+                    <p className="settings-section-label">Theme</p>
+                    <div className="settings-theme-grid" role="radiogroup" aria-label="Theme selection">
+                      {THEME_OPTIONS.map((theme) => (
+                        <button
+                          key={theme.key}
+                          type="button"
+                          className={`settings-icon-entry settings-theme-entry ${settings.theme === theme.key ? 'is-active' : ''}`}
+                          style={{ '--theme-color': THEME_SWATCH_ACCENT[theme.key] } as CSSProperties}
+                          onClick={() => setSettings((prev) => ({ ...prev, theme: theme.key }))}
+                          aria-label={`Use ${theme.label} theme`}
+                          aria-pressed={settings.theme === theme.key}
+                          title={theme.label}
+                        >
+                          <span className={`settings-theme-chip ${settings.theme === theme.key ? 'is-active' : ''}`} aria-hidden="true">
+                            <span className="settings-theme-chip-core" aria-hidden="true" />
+                          </span>
+                          <span className="settings-icon-entry-label">{theme.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
-            <div className="settings-section">
-              <p className="settings-section-label">Font Size</p>
-              <div className="settings-button-group">
-                {(['small', 'medium', 'large'] as const).map((size) => (
+                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                  <div className="settings-control-content">
+                    <p className="settings-section-label">Font Size</p>
+                    <button
+                      type="button"
+                      className="settings-icon-entry settings-icon-entry-button"
+                      onClick={advanceFontSize}
+                      aria-label={`Font size: ${FONT_SIZE_LABEL[settings.fontSize]}. Activate to cycle.`}
+                      title={`Font size: ${FONT_SIZE_LABEL[settings.fontSize]}`}
+                    >
+                      <span className="settings-mode-icon-button" aria-hidden="true">
+                        {(() => {
+                          const Icon = FONT_SIZE_ICON[settings.fontSize]
+                          return <Icon className="settings-option-glyph" size={18} strokeWidth={2.25} aria-hidden="true" />
+                        })()}
+                      </span>
+                      <span className="settings-icon-entry-label">{FONT_SIZE_LABEL[settings.fontSize]}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                  <div className="settings-control-content">
+                    <p className="settings-section-label">Accessibility</p>
+                    <button
+                      type="button"
+                      className={`settings-icon-entry settings-icon-entry-button ${settings.reducedMotion ? 'is-enabled' : ''}`}
+                      onClick={() => setSettings((prev) => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
+                      aria-label={settings.reducedMotion ? 'Reduce motion enabled. Activate to disable.' : 'Reduce motion disabled. Activate to enable.'}
+                      aria-pressed={settings.reducedMotion}
+                      title={settings.reducedMotion ? 'Reduce motion enabled' : 'Reduce motion disabled'}
+                    >
+                      <span className={`settings-mode-icon-button ${settings.reducedMotion ? 'is-enabled' : ''}`} aria-hidden="true">
+                        <Activity size={18} strokeWidth={2.25} aria-hidden="true" />
+                      </span>
+                      <span className="settings-icon-entry-label">Reduce Motion</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-section settings-control-row">
                   <button
-                    key={size}
                     type="button"
-                    className={`settings-option-button ${settings.fontSize === size ? 'is-active' : ''}`}
-                    aria-pressed={settings.fontSize === size}
-                    onClick={() => setSettings((prev) => ({ ...prev, fontSize: size }))}
+                    className="settings-icon-tile"
+                    onClick={() => shortcutsSectionRef.current?.focus()}
+                    aria-label="Focus keyboard shortcuts"
                   >
-                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                    <Keyboard size={18} strokeWidth={2.1} />
                   </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <p className="settings-section-label">Accessibility</p>
-              <button
-                type="button"
-                className={`settings-toggle ${settings.reducedMotion ? 'is-active' : ''}`}
-                onClick={() => setSettings((prev) => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
-                aria-pressed={settings.reducedMotion}
-              >
-                <span className="toggle-indicator" aria-hidden="true" />
-                Reduce Motion
-              </button>
-            </div>
-
-            <div className="settings-section">
-              <p className="settings-section-label">Keyboard Shortcuts</p>
-              <div className="settings-shortcuts">
-                <code className="command-hint">Ctrl+,</code><span>Settings</span>
-                <code className="command-hint">Esc</code><span>Close modal / back</span>
-                <code className="command-hint">1 / 2 / 3 / 4 / 5</code><span>Learning tracks (home)</span>
-                <code className="command-hint">6</code><span>Study overview (home)</span>
+                  <div ref={shortcutsSectionRef} className="settings-control-content" tabIndex={-1}>
+                    <p className="settings-section-label">Keyboard Shortcuts</p>
+                    <div className="settings-shortcuts">
+                      <code className="command-hint">Ctrl+,</code><span>Settings</span>
+                      <code className="command-hint">Esc</code><span>Close modal / back</span>
+                      <code className="command-hint">1 / 2 / 3 / 4 / 5</code><span>Learning tracks (home)</span>
+                      <code className="command-hint">6</code><span>Study overview (home)</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
