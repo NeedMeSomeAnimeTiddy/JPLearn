@@ -20,5 +20,10 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize'),
   isWindowMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+  onWindowStateChanged: (listener) => {
+    const handler = (_event, state) => listener(state)
+    ipcRenderer.on('window:state-changed', handler)
+    return () => ipcRenderer.removeListener('window:state-changed', handler)
+  },
   closeWindow: () => ipcRenderer.invoke('window:close'),
 })

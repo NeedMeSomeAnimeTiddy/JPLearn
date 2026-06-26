@@ -305,7 +305,11 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease, transform 140ms ease;
+}
+
+.window-control-button:active {
+  transform: scale(0.94);
 }
 
 .window-control-button:hover {
@@ -326,6 +330,42 @@
 .window-control-icon {
   width: calc(14px * var(--ui-scale));
   height: calc(14px * var(--ui-scale));
+}
+
+.window-control-button-maximize {
+  overflow: hidden;
+}
+
+.window-control-icon-stack {
+  position: relative;
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
+}
+
+.window-control-icon-stack .window-control-icon {
+  position: absolute;
+  inset: 0;
+  transition: opacity 170ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.window-control-icon-maximize {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+.window-control-icon-restore {
+  opacity: 0;
+  transform: scale(0.55) rotate(-14deg);
+}
+
+.window-control-icon-stack.is-maximized .window-control-icon-maximize {
+  opacity: 0;
+  transform: scale(0.55) rotate(12deg);
+}
+
+.window-control-icon-stack.is-maximized .window-control-icon-restore {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
 }
 
 .view-shell {

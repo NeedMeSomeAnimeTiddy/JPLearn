@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, screen } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
@@ -15,6 +15,8 @@ const {
 const repoRoot = path.join(__dirname, '..', '..')
 const startupReadyResolvers = new Map()
 const startupTelemetryByContentsId = new Map()
+const windowExpandedStateById = new Map()
+const windowRestoreBoundsById = new Map()
 const THEME_STATE_FILENAME = 'jplearn-startup-theme.json'
 const STARTUP_TELEMETRY_FILENAME = 'startup-telemetry.json'
 const STARTUP_BUDGETS_MS = {
@@ -572,18 +574,72 @@ ipcMain.handle('window:minimize', (event) => {
   return { ok: true }
 })
 
-ipcMain.handle('window:toggle-maximize', (event) => {
+function getSafeRestoreBounds(win) {
+  const workArea = screen.getDisplayMatching(win.getBounds()).workArea
+  const [minWidth, minHeight] = win.getMinimumSize()
+  const normalBounds = win.getNormalBounds()
+
+  let width = normalBounds.width
+  let height = normalBounds.height
+  let x = normalBounds.x
+  let y = normalBounds.y
+
+  const nearFullWidth = width >= workArea.width - 2
+  const nearFullHeight = height >= workArea.height - 2
+
+  if (nearFullWidth || nearFullHeight) {
+    const targetWidth = Math.max(minWidth, Math.min(workArea.width - 120, Math.floor(workArea.width * 0.9)))
+    const targetHeight = Math.max(minHeight, Math.min(workArea.height - 120, Math.floor(workArea.height * 0.88)))
+
+    width = Math.min(targetWidth, workArea.width)
+    height = Math.min(targetHeight, workArea.height)
+    x = Math.round(workArea.x + (workArea.width - width) / 2)
+    y = Math.round(workArea.y + (workArea.height - height) / 2)
+  }
+
+  return { x, y, width, height }
+}
+
+function isWindowExpanded(win) {
+  const isSnapped = typeof win.isSnapped === 'function' ? win.isSnapped() : false
+  return win.isMaximized() || win.isFullScreen() || isSnapped
+}
+
+ipcMain.handle('window:toggle-maximize', async (event) => {
   const win = assertTrustedIpcSender(event, {
     isDev: process.env.ELECTRON_DEV === '1',
     getWindowFromSender: BrowserWindow.fromWebContents,
   })
   if (!win) return { ok: false, isMaximized: false }
-  if (win.isMaximized()) {
-    win.unmaximize()
-  } else {
-    win.maximize()
+
+  const shouldExitExpanded = isWindowExpanded(win) || win.isMinimized()
+  const normalBounds = windowRestoreBoundsById.get(win.id) || getSafeRestoreBounds(win)
+
+  if (shouldExitExpanded) {
+    if (win.isMinimized()) {
+      win.restore()
+    }
+
+    if (win.isFullScreen()) {
+      win.setFullScreen(false)
+    }
+
+    if (win.isMaximized()) {
+      win.unmaximize()
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    if (!win.isDestroyed()) {
+      win.setBounds(normalBounds)
+    }
+
+    return { ok: true, isMaximized: isWindowExpanded(win) }
   }
-  return { ok: true, isMaximized: win.isMaximized() }
+
+  windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
+  win.maximize()
+  return { ok: true, isMaximized: isWindowExpanded(win) }
 })
 
 ipcMain.handle('window:is-maximized', (event) => {
@@ -591,7 +647,9 @@ ipcMain.handle('window:is-maximized', (event) => {
     isDev: process.env.ELECTRON_DEV === '1',
     getWindowFromSender: BrowserWindow.fromWebContents,
   })
-  return { isMaximized: win ? win.isMaximized() : false }
+  if (!win) return { isMaximized: false }
+
+  return { isMaximized: isWindowExpanded(win) }
 })
 
 ipcMain.handle('window:close', (event) => {
@@ -633,16 +691,25 @@ ipcMain.handle('ui:startup-ready', (event, telemetryPayload) => {
 })
 
 function createWindow() {
+  const workArea = screen.getPrimaryDisplay().workAreaSize
+  const minWidth = Math.min(1024, Math.max(720, workArea.width - 140))
+  const minHeight = Math.min(700, Math.max(560, workArea.height - 140))
+  const width = Math.min(1260, Math.max(minWidth, workArea.width - 80))
+  const height = Math.min(820, Math.max(minHeight, workArea.height - 80))
+
   const win = new BrowserWindow({
     title: 'JPLearn',
     frame: false,
-    width: 1260,
-    height: 820,
-    minWidth: 1024,
-    minHeight: 700,
+    width,
+    height,
+    minWidth,
+    minHeight,
+    resizable: true,
+    maximizable: true,
     show: false,
     autoHideMenuBar: true,
     transparent: true,
+    fullscreenable: false,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -655,6 +722,37 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     console.warn('Blocked window.open request', { url })
     return { action: 'deny' }
+  })
+
+  const pushWindowState = () => {
+    const isExpanded = isWindowExpanded(win)
+    windowExpandedStateById.set(win.id, isExpanded)
+    if (!win.isDestroyed()) {
+      win.webContents.send('window:state-changed', { isMaximized: isExpanded })
+    }
+  }
+
+  windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
+  pushWindowState()
+  win.on('maximize', pushWindowState)
+  win.on('unmaximize', pushWindowState)
+  win.on('enter-full-screen', pushWindowState)
+  win.on('leave-full-screen', pushWindowState)
+  win.on('move', () => {
+    if (win.isNormal()) {
+      windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
+      pushWindowState()
+    }
+  })
+  win.on('resize', () => {
+    if (win.isNormal()) {
+      windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
+      pushWindowState()
+    }
+  })
+  win.on('closed', () => {
+    windowExpandedStateById.delete(win.id)
+    windowRestoreBoundsById.delete(win.id)
   })
 
   return win

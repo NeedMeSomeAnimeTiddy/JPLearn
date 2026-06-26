@@ -1291,6 +1291,21 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const onWindowStateChanged = window.jplearnDesktop.onWindowStateChanged
+    if (!onWindowStateChanged) {
+      return
+    }
+
+    const unsubscribe = onWindowStateChanged((state) => {
+      setIsWindowMaximized(state.isMaximized)
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
     if (
       view !== 'minigame' ||
       !sessionActive ||
@@ -2597,9 +2612,13 @@ function App() {
   }, [])
 
   const toggleMaximizeWindow = useCallback(() => {
-    void window.jplearnDesktop.toggleMaximizeWindow().then((result) => {
-      setIsWindowMaximized(result.isMaximized)
-    })
+    void window.jplearnDesktop
+      .toggleMaximizeWindow()
+      .then(() => window.jplearnDesktop.isWindowMaximized())
+      .then((state) => {
+        setIsWindowMaximized(state.isMaximized)
+      })
+      .catch(() => undefined)
   }, [])
 
   const closeWindow = useCallback(() => {
@@ -2789,12 +2808,16 @@ function App() {
           <button type="button" className="window-control-button" onClick={minimizeWindow} aria-label="Minimize window">
             <Minus className="window-control-icon" strokeWidth={2.2} />
           </button>
-          <button type="button" className="window-control-button" onClick={toggleMaximizeWindow} aria-label={isWindowMaximized ? 'Restore window' : 'Maximize window'}>
-            {isWindowMaximized ? (
-              <Copy className="window-control-icon" strokeWidth={1.9} />
-            ) : (
-              <Square className="window-control-icon" strokeWidth={2} />
-            )}
+          <button
+            type="button"
+            className="window-control-button window-control-button-maximize"
+            onClick={toggleMaximizeWindow}
+            aria-label={isWindowMaximized ? 'Restore window' : 'Maximize window'}
+          >
+            <span className={`window-control-icon-stack ${isWindowMaximized ? 'is-maximized' : ''}`} aria-hidden="true">
+              <Square className="window-control-icon window-control-icon-maximize" strokeWidth={2} />
+              <Copy className="window-control-icon window-control-icon-restore" strokeWidth={1.9} />
+            </span>
           </button>
           <button type="button" className="window-control-button window-control-close" onClick={closeWindow} aria-label="Close window">
             <X className="window-control-icon" strokeWidth={2.2} />
