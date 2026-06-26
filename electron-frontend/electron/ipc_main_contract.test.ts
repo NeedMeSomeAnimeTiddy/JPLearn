@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 const mainPath = path.join(__dirname, 'main.cjs')
 const mainSource = fs.readFileSync(mainPath, 'utf8')
+const handlersPath = path.join(__dirname, 'ipc_handlers.cjs')
+const handlersSource = fs.readFileSync(handlersPath, 'utf8')
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -32,7 +34,7 @@ describe('ipc main contract', () => {
 
     for (const channel of expectedChannels) {
       const pattern = new RegExp(`ipcMain\\.handle\\('${escapeRegExp(channel)}'`, 'g')
-      const matches = mainSource.match(pattern) || []
+      const matches = handlersSource.match(pattern) || []
       expect(matches.length, `Expected single registration for channel ${channel}`).toBe(1)
     }
   })
@@ -58,11 +60,16 @@ describe('ipc main contract', () => {
 
     for (const channel of guardedChannels) {
       const marker = `ipcMain.handle('${channel}'`
-      const startIndex = mainSource.indexOf(marker)
+      const startIndex = handlersSource.indexOf(marker)
       expect(startIndex, `Missing handler marker for ${channel}`).toBeGreaterThanOrEqual(0)
 
-      const localWindow = mainSource.slice(startIndex, startIndex + 900)
+      const localWindow = handlersSource.slice(startIndex, startIndex + 900)
       expect(localWindow, `Expected assertTrustedIpcSender in handler for ${channel}`).toContain('assertTrustedIpcSender(event')
     }
+  })
+
+  it('wires main process to shared ipc handler registration', () => {
+    expect(mainSource).toContain("const { registerIpcHandlers } = require('./ipc_handlers.cjs')")
+    expect(mainSource).toContain('registerIpcHandlers({')
   })
 })

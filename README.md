@@ -94,10 +94,10 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
    - Add schema version table/marker
    - Add deterministic migration runner and rollback-safe strategy
    - Add migration tests for fresh install and upgrade paths
-- [ ] (High) Add end-to-end Electron smoke tests for primary user journeys
+- [x] (High) Add end-to-end Electron smoke tests for primary user journeys
    - Cover app launch, study session start, answer submit, and session completion
    - Run against packaged app artifact in CI for release confidence
-- [ ] (High) Add API contract tests between preload bridge and Python backend bridge
+- [x] (High) Add API contract tests between preload bridge and Python backend bridge
    - Pin request/response schemas for each supported IPC channel
    - Add negative tests for missing fields, wrong types, and unauthorized routes
 - [ ] (Medium) Add unified developer diagnostics command

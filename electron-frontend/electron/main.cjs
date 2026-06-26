@@ -2,14 +2,9 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
+const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const {
-  assertTrustedIpcSender,
   isAllowedRendererUrl,
-  validateDeckSlug,
-  validateSessionGoalPayload,
-  validateSessionId,
-  validateStartupThemeInput,
-  validateRecordGameResultPayload,
 } = require('./ipc_security.cjs')
 
 const repoRoot = path.join(__dirname, '..', '..')
@@ -413,183 +408,6 @@ function runPythonBridgeWithArgs(args) {
   })
 }
 
-ipcMain.handle('study:get-summary', async (event) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  try {
-    return await runPythonBridge('summary')
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to fetch study summary: ${detail}`)
-  }
-})
-
-ipcMain.handle('study:get-block-progress', async (event, slug) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  const validatedSlug = validateDeckSlug(slug)
-  try {
-    return await runPythonBridgeWithArgs(['block-progress', validatedSlug])
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to fetch block progress: ${detail}`)
-  }
-})
-
-ipcMain.handle('study:get-deck-cards', async (event, slug) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  const validatedSlug = validateDeckSlug(slug)
-  try {
-    return await runPythonBridgeWithArgs(['deck-cards', validatedSlug])
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to fetch deck cards: ${detail}`)
-  }
-})
-
-ipcMain.handle('study:get-overview-character-mastery', async (event) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  try {
-    return await runPythonBridge('overview-character-mastery')
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to fetch overview character mastery: ${detail}`)
-  }
-})
-
-ipcMain.handle('study:get-study-queue', async (event, slug) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  const validatedSlug = validateDeckSlug(slug)
-  try {
-    return await runPythonBridgeWithArgs(['study-queue', validatedSlug])
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to fetch study queue: ${detail}`)
-  }
-})
-
-ipcMain.handle('study:reset-db', async (event) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  try {
-    return await runPythonBridge('reset-db')
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to reset study database: ${detail}`)
-  }
-})
-
-ipcMain.handle('study:record-game-result', async (event, payload) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  const validatedPayload = validateRecordGameResultPayload(payload)
-  try {
-    const args = [
-      'record-result',
-      validatedPayload.slug,
-      String(validatedPayload.cardId),
-      validatedPayload.isCorrect ? '1' : '0',
-      validatedPayload.minigame,
-    ]
-    const curriculumStageArg =
-      typeof validatedPayload.curriculumStage === 'number'
-        ? String(validatedPayload.curriculumStage)
-        : ''
-    const sessionIdArg =
-      typeof validatedPayload.sessionId === 'string' && validatedPayload.sessionId.trim().length > 0
-        ? validatedPayload.sessionId
-        : ''
-    const confidenceArg =
-      typeof validatedPayload.confidenceScore === 'number'
-        ? String(validatedPayload.confidenceScore)
-        : ''
-
-    if (curriculumStageArg || sessionIdArg || confidenceArg) {
-      args.push(curriculumStageArg)
-    }
-    if (sessionIdArg || confidenceArg) {
-      args.push(sessionIdArg)
-    }
-    if (confidenceArg) {
-      args.push(confidenceArg)
-    }
-    return await runPythonBridgeWithArgs(args)
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to record game result: ${detail}`)
-  }
-})
-
-ipcMain.handle('study:start-session-goal', async (event, payload) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  const validatedPayload = validateSessionGoalPayload(payload)
-  try {
-    const args = ['session-start', String(validatedPayload.targetItems)]
-    if (typeof validatedPayload.targetMinutes === 'number') {
-      args.push(String(validatedPayload.targetMinutes))
-    } else if (typeof validatedPayload.targetAccuracy === 'number' || typeof validatedPayload.sessionId === 'string') {
-      args.push('')
-    }
-
-    if (typeof validatedPayload.targetAccuracy === 'number') {
-      args.push(String(validatedPayload.targetAccuracy))
-    } else if (typeof validatedPayload.sessionId === 'string') {
-      args.push('')
-    }
-
-    if (typeof validatedPayload.sessionId === 'string') {
-      args.push(validatedPayload.sessionId)
-    }
-    return await runPythonBridgeWithArgs(args)
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to start session goal: ${detail}`)
-  }
-})
-
-ipcMain.handle('study:get-session-summary', async (event, sessionId) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  const validatedSessionId = validateSessionId(sessionId)
-  try {
-    return await runPythonBridgeWithArgs(['session-summary', validatedSessionId])
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to fetch session summary: ${detail}`)
-  }
-})
-
-ipcMain.handle('window:minimize', (event) => {
-  const win = assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  if (win) win.minimize()
-  return { ok: true }
-})
-
 function getSafeRestoreBounds(win) {
   const workArea = screen.getDisplayMatching(win.getBounds()).workArea
   const [minWidth, minHeight] = win.getMinimumSize()
@@ -621,89 +439,19 @@ function isWindowExpanded(win) {
   return win.isMaximized() || win.isFullScreen() || isSnapped
 }
 
-ipcMain.handle('window:toggle-maximize', async (event) => {
-  const win = assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  if (!win) return { ok: false, isMaximized: false }
-
-  const shouldExitExpanded = isWindowExpanded(win) || win.isMinimized()
-  const normalBounds = windowRestoreBoundsById.get(win.id) || getSafeRestoreBounds(win)
-
-  if (shouldExitExpanded) {
-    if (win.isMinimized()) {
-      win.restore()
-    }
-
-    if (win.isFullScreen()) {
-      win.setFullScreen(false)
-    }
-
-    if (win.isMaximized()) {
-      win.unmaximize()
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    if (!win.isDestroyed()) {
-      win.setBounds(normalBounds)
-    }
-
-    return { ok: true, isMaximized: isWindowExpanded(win) }
-  }
-
-  windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
-  win.maximize()
-  return { ok: true, isMaximized: isWindowExpanded(win) }
-})
-
-ipcMain.handle('window:is-maximized', (event) => {
-  const win = assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  if (!win) return { isMaximized: false }
-
-  return { isMaximized: isWindowExpanded(win) }
-})
-
-ipcMain.handle('window:close', (event) => {
-  const win = assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  if (win) win.close()
-  return { ok: true }
-})
-
-ipcMain.handle('ui:set-startup-theme', (event, theme) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  const normalized = saveStartupTheme(validateStartupThemeInput(theme))
-  return { ok: true, theme: normalized }
-})
-
-ipcMain.handle('ui:startup-ready', (event, telemetryPayload) => {
-  assertTrustedIpcSender(event, {
-    isDev: process.env.ELECTRON_DEV === '1',
-    getWindowFromSender: BrowserWindow.fromWebContents,
-  })
-  const normalizedTelemetry = normalizeStartupTelemetry(telemetryPayload)
-  const currentTelemetry = startupTelemetryByContentsId.get(event.sender.id) || {}
-  startupTelemetryByContentsId.set(event.sender.id, {
-    ...currentTelemetry,
-    renderer: normalizedTelemetry,
-  })
-
-  const resolver = startupReadyResolvers.get(event.sender.id)
-  if (resolver) {
-    resolver()
-    startupReadyResolvers.delete(event.sender.id)
-  }
-  return { ok: true }
+registerIpcHandlers({
+  ipcMain,
+  isDev: process.env.ELECTRON_DEV === '1',
+  getWindowFromSender: BrowserWindow.fromWebContents,
+  runPythonBridge,
+  runPythonBridgeWithArgs,
+  saveStartupTheme,
+  normalizeStartupTelemetry,
+  startupTelemetryByContentsId,
+  startupReadyResolvers,
+  isWindowExpanded,
+  getSafeRestoreBounds,
+  windowRestoreBoundsById,
 })
 
 function createWindow() {
