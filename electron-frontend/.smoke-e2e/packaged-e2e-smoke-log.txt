@@ -1,0 +1,5 @@
+[2026-06-26T06:18:41.579Z] Using executable: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\out\electron-frontend-win32-x64\electron-frontend.exe
+[2026-06-26T06:18:41.602Z] [stdout] 
+[2026-06-26T06:18:43.130Z] Telemetry file: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\.smoke-e2e\appdata\startup-telemetry.json
+[2026-06-26T06:18:43.131Z] startupSessionMs=1149, startupReadyMs=419, firstSummaryMs=null
+[2026-06-26T06:18:44.040Z] Journey verified: cardId=0, sessionId=6198468e-b5ac-46ae-8ed3-dbfaa7c3d8aa, reviewed=1, accuracy=100, goalMet=true

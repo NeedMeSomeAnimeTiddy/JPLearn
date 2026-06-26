@@ -20,6 +20,7 @@
     "preview": "vite preview",
     "package": "npm run build && electron-forge package",
     "smoke:packaged": "node ./scripts/packaged-smoke.cjs",
+    "smoke:e2e": "node ./scripts/packaged-e2e-smoke.cjs",
     "make": "npm run build && electron-forge make",
     "make:win": "npm run build && electron-forge make --platform=win32"
   },

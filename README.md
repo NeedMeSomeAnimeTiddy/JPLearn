@@ -94,6 +94,15 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
    - Add schema version table/marker
    - Add deterministic migration runner and rollback-safe strategy
    - Add migration tests for fresh install and upgrade paths
+- [ ] (High) Add end-to-end Electron smoke tests for primary user journeys
+   - Cover app launch, study session start, answer submit, and session completion
+   - Run against packaged app artifact in CI for release confidence
+- [ ] (High) Add API contract tests between preload bridge and Python backend bridge
+   - Pin request/response schemas for each supported IPC channel
+   - Add negative tests for missing fields, wrong types, and unauthorized routes
+- [ ] (Medium) Add unified developer diagnostics command
+   - Chain compact checks with focused frontend validation (`npm run lint`, `npm run build`)
+   - Provide a single pass/fail entry point for pre-commit and CI triage
 
 ### Near-Term Product Roadmap
 - [x] (High) Introduce adaptive study queue balancing
@@ -105,9 +114,6 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 - [x] (Medium) Expand answer modes
    - Typed recall mode for vocab and kanji decks
    - Optional confidence score capture per review event
-- [ ] (Medium) Add pronunciation/audio support (deferred)
-   - Pluggable TTS or bundled audio strategy
-   - Cache policy for offline reliability
 
 ### Data Quality and Content Operations
 - [x] (High) Enforce Japanese normalization at all persistence boundaries
@@ -128,10 +134,12 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 - [x] (Medium) Add restrictive CSP baseline for packaged renderer
 
 ### Quality, Tooling, and Developer Experience
-- [ ] (Medium) Add end-to-end Electron smoke tests for primary user journeys
-- [ ] (Medium) Add API contract tests between Electron preload bridge and Python backend bridge
-- [ ] (Medium) Add unified developer diagnostics command that runs compact checks + focused frontend validation
 - [ ] (Low) Add contributor architecture diagrams and a "how data flows" reference doc
+
+### Deferred Product Additions
+- [ ] (Medium) Add pronunciation/audio support (deferred)
+   - Pluggable TTS or bundled audio strategy
+   - Cache policy for offline reliability
 
 ### Longer-Term Enhancements
 - [ ] Cloud sync (optional account-based profile sync)
