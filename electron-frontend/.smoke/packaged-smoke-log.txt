@@ -1,4 +1,4 @@
-[2026-06-26T00:20:09.770Z] Using executable: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\out\electron-frontend-win32-x64\electron-frontend.exe
-[2026-06-26T00:20:09.868Z] [stdout] 
-[2026-06-26T00:20:11.389Z] Telemetry file: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\.smoke\appdata\startup-telemetry.json
-[2026-06-26T00:20:11.389Z] startupSessionMs=1145, startupReadyMs=469, firstSummaryMs=null
+[2026-06-26T00:41:59.844Z] Using executable: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\out\electron-frontend-win32-x64\electron-frontend.exe
+[2026-06-26T00:41:59.934Z] [stdout] 
+[2026-06-26T00:42:01.469Z] Telemetry file: C:\Users\Robbie\Documents\Projects\JPLearn\electron-frontend\.smoke\appdata\startup-telemetry.json
+[2026-06-26T00:42:01.469Z] startupSessionMs=1144, startupReadyMs=440, firstSummaryMs=null
