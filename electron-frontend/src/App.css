@@ -684,6 +684,140 @@ button {
   flex-wrap: wrap;
 }
 
+.home-study-plan-strip {
+  margin-top: 14px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 22%, var(--panel-border));
+  background:
+    radial-gradient(circle at 10% 0%, rgba(108, 185, 214, 0.1), transparent 32%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  padding: 12px 14px;
+  overflow: hidden;
+}
+
+.home-study-plan-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.home-study-plan-heading {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.home-study-plan-heading strong {
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  letter-spacing: -0.01em;
+}
+
+.home-study-plan-heading span {
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  max-width: 74ch;
+}
+
+.home-study-plan-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.home-study-plan-summary span {
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 20%, var(--card-border));
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.home-study-plan-chevron {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  transition: transform 160ms ease;
+}
+
+.home-study-plan-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.home-study-plan-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms ease;
+}
+
+.home-study-plan-body.is-open {
+  grid-template-rows: 1fr;
+}
+
+.home-study-plan-strip-grid {
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.home-study-plan-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.study-plan-shortcut-button-inline {
+  min-height: 96px;
+  padding: 10px 12px;
+}
+
+.home-study-plan-metrics {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.home-study-plan-metric-row {
+  display: grid;
+  gap: 6px;
+}
+
+.home-study-plan-metric-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.home-study-plan-metric-head strong {
+  font-size: 0.9rem;
+}
+
+.home-study-plan-metric-head span {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.home-study-plan-strip .study-plan-coverage-bar {
+  height: 8px;
+}
+
 .topbar {
   position: relative;
   overflow: hidden;
@@ -1156,6 +1290,32 @@ button {
   max-width: 54ch;
 }
 
+.study-plan-stage-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+  margin-bottom: 12px;
+}
+
+.study-plan-stage-pill {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: color-mix(in oklab, var(--tone-ocean) 15%, transparent);
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 28%, var(--card-border));
+  color: color-mix(in oklab, var(--tone-ocean) 80%, white);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.study-plan-stage-copy {
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  max-width: 56ch;
+}
+
 .study-plan-focus-list {
   display: grid;
   gap: 10px;
@@ -1180,6 +1340,56 @@ button {
 
 .study-plan-focus-item p,
 .study-plan-coverage-meta {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.study-plan-shortcut-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.study-plan-shortcut-button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 22%, var(--card-border));
+  background:
+    radial-gradient(circle at 8% 0%, rgba(108, 185, 214, 0.12), transparent 32%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  color: var(--text-main);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: transform 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+
+.study-plan-shortcut-button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--tone-ocean) 38%, var(--card-border));
+}
+
+.study-plan-shortcut-button:focus-visible {
+  outline: 1px solid color-mix(in oklab, var(--tone-ocean) 72%, white);
+  outline-offset: 2px;
+}
+
+.study-plan-shortcut-kicker {
+  color: color-mix(in oklab, var(--tone-ocean) 72%, var(--text-soft));
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.study-plan-shortcut-button strong {
+  font-size: 0.98rem;
+}
+
+.study-plan-shortcut-button p {
   margin: 0;
   color: var(--text-soft);
   font-size: 0.82rem;
@@ -1254,6 +1464,14 @@ button {
 
 @media (max-width: 980px) {
   .study-plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-study-plan-strip-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-study-plan-shortcuts {
     grid-template-columns: 1fr;
   }
 }

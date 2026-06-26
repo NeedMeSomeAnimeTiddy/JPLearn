@@ -456,10 +456,10 @@ registerIpcHandlers({
 
 function createWindow() {
   const workArea = screen.getPrimaryDisplay().workAreaSize
-  const minWidth = Math.min(1024, Math.max(720, workArea.width - 140))
-  const minHeight = Math.min(700, Math.max(560, workArea.height - 140))
-  const width = Math.min(1260, Math.max(minWidth, workArea.width - 80))
-  const height = Math.min(820, Math.max(minHeight, workArea.height - 80))
+  const minWidth = Math.min(1180, Math.max(860, workArea.width - 140))
+  const minHeight = Math.min(820, Math.max(640, workArea.height - 140))
+  const width = Math.min(1400, Math.max(minWidth, workArea.width - 56))
+  const height = Math.min(940, Math.max(minHeight, workArea.height - 56))
 
   const win = new BrowserWindow({
     title: 'JPLearn',

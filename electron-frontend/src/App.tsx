@@ -475,11 +475,22 @@ interface JlptLevelProgress {
 }
 
 interface StudyPlanCoverageRow {
-  key: JlptLevel
+  key: ScriptKey
   label: string
   mastery: number
   total: number
-  leadingScript: 'kanji' | 'vocab'
+  unlocked: boolean
+  difficulty: number
+}
+
+type StudyPlanStage = 'starter' | 'building' | 'advanced'
+
+interface StudyPlanShortcut {
+  key: string
+  label: string
+  note: string
+  script: ScriptKey
+  minigame: MinigameKey
 }
 
 interface StudyPlanSnapshot {
@@ -488,6 +499,8 @@ interface StudyPlanSnapshot {
   overallMastery: number
   recommendedMinutes: number
   sessionNote: string
+  learnerStage: StudyPlanStage
+  shortcutRows: StudyPlanShortcut[]
 }
 
 type StatsByScript = Record<ScriptKey, ScriptStats>
@@ -1132,47 +1145,156 @@ function buildJlptLevelProgressFromLevelDecks(
   })
 }
 
+function getStudyPlanStage(overallMastery: number, trackedCards: number, currentStreak: number): StudyPlanStage {
+  if (trackedCards < 12 || currentStreak < 2 || overallMastery < 0.25) return 'starter'
+  if (overallMastery < 0.65) return 'building'
+  return 'advanced'
+}
+
+function getStudyPlanShortcutMinigame(row: StudyPlanCoverageRow, stage: StudyPlanStage, index: number): MinigameKey {
+  if (row.key === 'hiragana' || row.key === 'katakana') {
+    if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
+    if (stage === 'building') return index === 0 ? 'character_match' : 'romaji_sprint'
+    return index === 0 ? 'interleave_mix' : 'character_match'
+  }
+
+  if (row.key === 'kanji_n5') {
+    if (stage === 'starter') return index === 0 ? 'character_match' : 'meaning_match'
+    if (stage === 'building') return index === 0 ? 'character_match' : 'typed_recall'
+    return index === 0 ? 'typed_recall' : 'stroke_order'
+  }
+
+  if (row.key === 'vocab_n5') {
+    if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
+    if (stage === 'building') return index === 0 ? 'typed_recall' : 'context_cloze'
+    return index === 0 ? 'context_cloze' : 'narrative_story'
+  }
+
+  if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
+  if (stage === 'building') return index === 0 ? 'context_cloze' : 'typed_recall'
+  return index === 0 ? 'narrative_story' : 'context_cloze'
+}
+
+function getStudyPlanTargetMastery(script: ScriptKey): number {
+  if (script === 'hiragana') return 0.9
+  if (script === 'katakana') return 0.85
+  if (script === 'kanji_n5') return 0.72
+  if (script === 'vocab_n5') return 0.72
+  return 0.68
+}
+
+function aggregateDeckMastery(
+  decks: StudySummaryPayload['decks'],
+  predicate: (slug: string) => boolean,
+): { mastery: number; total: number } {
+  const matchingDecks = decks.filter((deck) => predicate(deck.slug))
+  const total = matchingDecks.reduce((sum, deck) => sum + deck.total, 0)
+  if (total <= 0) {
+    return { mastery: 0, total: 0 }
+  }
+  const mastered = matchingDecks.reduce((sum, deck) => sum + deck.mastered, 0)
+  return {
+    mastery: mastered / total,
+    total,
+  }
+}
+
+function aggregateJlptMastery(levels: JlptLevelProgress[]): { mastery: number; total: number } {
+  const total = levels.reduce((sum, row) => sum + row.total, 0)
+  if (total <= 0) {
+    return { mastery: 0, total: 0 }
+  }
+  const weighted = levels.reduce((sum, row) => sum + (row.mastery * row.total), 0)
+  return {
+    mastery: weighted / total,
+    total,
+  }
+}
+
 function buildStudyPlan(
+  decks: StudySummaryPayload['decks'],
   kanjiLevels: JlptLevelProgress[],
   vocabLevels: JlptLevelProgress[],
   weeklyActivity: StudySummaryPayload['activity'],
   currentStreak: number,
 ): StudyPlanSnapshot {
-  const coverageRows = JLPT_LEVEL_ORDER.map((level) => {
-    const kanji = kanjiLevels.find((entry) => entry.key === level) ?? {
-      key: level,
-      label: JLPT_LEVEL_LABELS[level],
-      mastery: 0,
-      total: 0,
-    }
-    const vocab = vocabLevels.find((entry) => entry.key === level) ?? {
-      key: level,
-      label: JLPT_LEVEL_LABELS[level],
-      mastery: 0,
-      total: 0,
-    }
-    const total = kanji.total + vocab.total
-    const weightedMastery = (kanji.mastery * kanji.total) + (vocab.mastery * vocab.total)
-    const mastery = total > 0 ? weightedMastery / total : 0
-    const leadingScript: StudyPlanCoverageRow['leadingScript'] = kanji.mastery <= vocab.mastery ? 'kanji' : 'vocab'
+  const hiragana = aggregateDeckMastery(decks, (slug) => slug === 'hiragana')
+  const katakana = aggregateDeckMastery(decks, (slug) => slug === 'katakana')
+  const grammar = aggregateDeckMastery(decks, (slug) => slug === 'grammar_patterns')
 
-    return {
-      key: level,
-      label: JLPT_LEVEL_LABELS[level],
-      mastery,
-      total,
-      leadingScript,
-    }
-  }).filter((row) => row.total > 0)
+  const kanjiFromDecks = aggregateDeckMastery(decks, (slug) => slug.startsWith('kanji_'))
+  const vocabFromDecks = aggregateDeckMastery(decks, (slug) => slug.startsWith('vocab_'))
+  const kanjiFallback = aggregateJlptMastery(kanjiLevels)
+  const vocabFallback = aggregateJlptMastery(vocabLevels)
 
-  const focusRows = [...coverageRows]
-    .sort((left, right) => left.mastery - right.mastery || left.total - right.total)
+  const kanji = kanjiFromDecks.total > 0 ? kanjiFromDecks : kanjiFallback
+  const vocab = vocabFromDecks.total > 0 ? vocabFromDecks : vocabFallback
+
+  const hiraganaReady = hiragana.mastery >= 0.35
+  const kanjiReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.45
+  const vocabReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.55
+  const grammarReady = vocab.mastery >= 0.45
+
+  const coverageRows: StudyPlanCoverageRow[] = [
+    {
+      key: 'hiragana',
+      label: SCRIPT_LABELS.hiragana,
+      mastery: hiragana.mastery,
+      total: hiragana.total,
+      unlocked: true,
+      difficulty: 0,
+    },
+    {
+      key: 'katakana',
+      label: SCRIPT_LABELS.katakana,
+      mastery: katakana.mastery,
+      total: katakana.total,
+      unlocked: hiraganaReady,
+      difficulty: 1,
+    },
+    {
+      key: 'kanji_n5',
+      label: SCRIPT_LABELS.kanji_n5,
+      mastery: kanji.mastery,
+      total: kanji.total,
+      unlocked: kanjiReady,
+      difficulty: 2,
+    },
+    {
+      key: 'vocab_n5',
+      label: SCRIPT_LABELS.vocab_n5,
+      mastery: vocab.mastery,
+      total: vocab.total,
+      unlocked: vocabReady,
+      difficulty: 3,
+    },
+    {
+      key: 'grammar_patterns',
+      label: SCRIPT_LABELS.grammar_patterns,
+      mastery: grammar.mastery,
+      total: grammar.total,
+      unlocked: grammarReady,
+      difficulty: 4,
+    },
+  ]
+
+  const unlockedRows = coverageRows.filter((row) => row.unlocked)
+  const needsWorkRows = unlockedRows.filter((row) => row.mastery < getStudyPlanTargetMastery(row.key))
+
+  const focusRows = (needsWorkRows.length > 0 ? needsWorkRows : unlockedRows)
+    .sort((left, right) => {
+      if (Math.abs(left.mastery - right.mastery) > 0.06) {
+        return left.mastery - right.mastery
+      }
+      return left.difficulty - right.difficulty
+    })
     .slice(0, 3)
 
   const totalCards = coverageRows.reduce((sum, row) => sum + row.total, 0)
   const overallMastery = totalCards > 0
     ? coverageRows.reduce((sum, row) => sum + (row.mastery * row.total), 0) / totalCards
     : 0
+  const learnerStage = getStudyPlanStage(overallMastery, totalCards, currentStreak)
   const recommendedMinutes = weeklyActivity.week.reviewed >= 24
     ? 20
     : weeklyActivity.week.reviewed >= 10
@@ -1180,10 +1302,29 @@ function buildStudyPlan(
       : 10
 
   const sessionNote = focusRows.length > 0
-    ? `Start with ${focusRows[0].label} ${focusRows[0].leadingScript} and keep the rest of the run mixed.`
+    ? `Start with ${focusRows[0].label} and move to harder tracks after this block feels steady.`
     : currentStreak > 0
       ? `Keep the streak alive with a short mixed review.`
-      : 'Build the plan after your first few rounds and it will highlight the weakest JLPT level.'
+      : 'Build the plan after your first few rounds and it will highlight your weakest active track.'
+
+  const shortcutRows = focusRows.slice(0, 3).map((row, index) => {
+    const minigame = getStudyPlanShortcutMinigame(row, learnerStage, index)
+    const script: ScriptKey = row.key
+    const title = MINIGAMES.find((game) => game.key === minigame)?.title ?? minigame
+    const stageLabel = learnerStage === 'starter'
+      ? 'Starter-safe'
+      : learnerStage === 'building'
+        ? 'Build-up'
+        : 'Advanced'
+
+    return {
+      key: `${row.key}-${minigame}-${index}`,
+      label: title,
+      note: `${row.label} · ${stageLabel} route`,
+      script,
+      minigame,
+    }
+  })
 
   return {
     coverageRows,
@@ -1191,6 +1332,8 @@ function buildStudyPlan(
     overallMastery,
     recommendedMinutes,
     sessionNote,
+    learnerStage,
+    shortcutRows,
   }
 }
 
@@ -1266,6 +1409,7 @@ function App() {
   const [overviewBlocksLoading, setOverviewBlocksLoading] = useState(false)
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
+  const [homeStudyPlanExpanded, setHomeStudyPlanExpanded] = useState(false)
   const [overviewSectionExpanded, setOverviewSectionExpanded] = useState<Record<OverviewSectionKey, boolean>>({
     studyActivity: false,
     contextClozeCurriculum: false,
@@ -2570,8 +2714,8 @@ function App() {
   }, [decks])
 
   const studyPlan = useMemo(
-    () => buildStudyPlan(kanjiLevelProgress, vocabLevelProgress, activity, streak.current_days),
-    [activity, kanjiLevelProgress, streak.current_days, vocabLevelProgress],
+    () => buildStudyPlan(decks, kanjiLevelProgress, vocabLevelProgress, activity, streak.current_days),
+    [activity, decks, kanjiLevelProgress, streak.current_days, vocabLevelProgress],
   )
 
   const summaryTiles = [
@@ -3078,6 +3222,65 @@ function App() {
                 Settings
               </button>
             </div>
+
+            {studyPlan.coverageRows.length > 0 ? (
+              <section className="home-study-plan-strip panel-glass" aria-label="Study plan">
+                <button
+                  type="button"
+                  className="home-study-plan-toggle"
+                  onClick={() => setHomeStudyPlanExpanded((expanded) => !expanded)}
+                  aria-expanded={homeStudyPlanExpanded}
+                  aria-controls="home-study-plan-body"
+                >
+                  <div className="home-study-plan-heading">
+                    <p className="hero-kicker">Study Plan</p>
+                    <strong>{studyPlan.recommendedMinutes}-minute {studyPlan.learnerStage === 'starter' ? 'starter-safe' : studyPlan.learnerStage === 'building' ? 'build-up' : 'advanced'} session</strong>
+                    <span>{studyPlan.sessionNote}</span>
+                  </div>
+                  <div className="home-study-plan-summary">
+                    <span>{Math.round(studyPlan.overallMastery * 100)}% coverage</span>
+                    <span>{studyPlan.focusRows[0]?.label ?? 'Keep reviewing'}</span>
+                    <span aria-hidden="true" className={`home-study-plan-chevron ${homeStudyPlanExpanded ? 'is-open' : ''}`}>▾</span>
+                  </div>
+                </button>
+
+                <div id="home-study-plan-body" className={`home-study-plan-body ${homeStudyPlanExpanded ? 'is-open' : ''}`}>
+                  <div className="home-study-plan-strip-grid">
+                    <div className="home-study-plan-shortcuts" aria-label="Study plan shortcuts">
+                      {studyPlan.shortcutRows.slice(0, 2).map((shortcut) => (
+                        <button
+                          key={shortcut.key}
+                          type="button"
+                          className="study-plan-shortcut-button study-plan-shortcut-button-inline"
+                          onClick={() => jumpToScriptHubMinigame(shortcut.script, shortcut.minigame)}
+                        >
+                          <span className="study-plan-shortcut-kicker">Quick shortcut</span>
+                          <strong>{shortcut.label}</strong>
+                          <p>{shortcut.note}</p>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="home-study-plan-metrics">
+                      {studyPlan.coverageRows.slice(0, 3).map((row) => {
+                        const pct = Math.round(row.mastery * 100)
+                        return (
+                          <div key={row.key} className="home-study-plan-metric-row">
+                            <div className="home-study-plan-metric-head">
+                              <strong>{row.label}</strong>
+                              <span>{pct}%</span>
+                            </div>
+                            <div className="study-plan-coverage-bar" aria-hidden="true">
+                              <div className="study-plan-coverage-fill" style={{ '--study-plan-pct': `${pct}%` } as CSSProperties} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : null}
           </section>
         </div>
       ) : null}
@@ -4084,61 +4287,6 @@ function App() {
                       })}
                     </div>
                   </div>
-                ) : null}
-
-                {studyPlan.coverageRows.length > 0 ? (
-                  <section className="overview-study-plan-panel">
-                    <div className="panel-head">
-                      <h2 className="panel-title-with-icon"><ListChecks aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Study Plan</h2>
-                      <div className="panel-actions">
-                        <span>Personalized from JLPT coverage and recent activity</span>
-                      </div>
-                    </div>
-
-                    <div className="study-plan-grid">
-                      <article className="study-plan-card study-plan-summary-card">
-                        <p className="hero-kicker">Today's route</p>
-                        <strong className="study-plan-session-title">{studyPlan.recommendedMinutes}-minute mixed session</strong>
-                        <p className="study-plan-session-copy">{studyPlan.sessionNote}</p>
-                        <div className="study-plan-focus-list" aria-label="Study priorities">
-                          {studyPlan.focusRows.map((row, index) => (
-                            <div key={row.key} className="study-plan-focus-item">
-                              <span className="study-plan-focus-rank">0{index + 1}</span>
-                              <div>
-                                <strong>{row.label}</strong>
-                                <p>{Math.round(row.mastery * 100)}% coverage · {row.leadingScript} lagging</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </article>
-
-                      <article className="study-plan-card study-plan-coverage-card">
-                        <p className="hero-kicker">JLPT coverage</p>
-                        <strong className="study-plan-overall">{Math.round(studyPlan.overallMastery * 100)}% overall coverage</strong>
-                        <div className="study-plan-coverage-list">
-                          {studyPlan.coverageRows.map((row) => {
-                            const pct = Math.round(row.mastery * 100)
-                            return (
-                              <div key={row.key} className="study-plan-coverage-row">
-                                <div className="study-plan-coverage-head">
-                                  <strong>{row.label}</strong>
-                                  <span>{pct}%</span>
-                                </div>
-                                <div className="study-plan-coverage-bar" aria-hidden="true">
-                                  <div
-                                    className="study-plan-coverage-fill"
-                                    style={{ '--study-plan-pct': `${pct}%` } as CSSProperties}
-                                  />
-                                </div>
-                                <p className="study-plan-coverage-meta">{row.total} cards tracked · {row.leadingScript} is behind</p>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </article>
-                    </div>
-                  </section>
                 ) : null}
 
               </div>
