@@ -142,6 +142,17 @@ interface ScriptDeckPayload {
   cards: GameCard[]
 }
 
+interface StudyQueuePayload {
+  slug: DeckSlug
+  card_ids: number[]
+  indices: number[]
+}
+
+interface StudyQueueResponse {
+  ok: boolean
+  queue: StudyQueuePayload
+}
+
 interface BlockInfo {
   index: number
   name: string
@@ -175,11 +186,42 @@ interface OverviewCharacterMasteryPayload {
   kanji_cards: OverviewCharacterCard[]
 }
 
+interface SessionGoalPayload {
+  session_id: string
+  target_items: number
+  target_minutes: number | null
+  target_accuracy: number | null
+  started_at_utc: string
+}
+
+interface SessionGoalStartResponse {
+  ok: boolean
+  goal: SessionGoalPayload
+}
+
+interface SessionSummaryPayload {
+  session_id: string
+  target_items: number
+  completed_items: number
+  reviewed: number
+  correct: number
+  accuracy: number
+  target_accuracy: number | null
+  goal_met: boolean
+}
+
+interface SessionSummaryResponse {
+  ok: boolean
+  summary?: SessionSummaryPayload
+  error?: string
+}
+
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
   getBlockProgress: (slug: DeckSlug) => Promise<BlockProgressPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
+  getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>
   getOverviewCharacterMastery: () => Promise<OverviewCharacterMasteryPayload>
   notifyStartupReady: (payload?: {
     startupReadyMs?: number
@@ -193,6 +235,7 @@ interface DesktopApi {
     isCorrect: boolean
     minigame: string
     curriculumStage?: number
+    sessionId?: string
   }) => Promise<{
     ok: boolean
     card_id: number
@@ -202,6 +245,13 @@ interface DesktopApi {
     ease_factor: number
     curriculum_stage?: number | null
   }>
+  startSessionGoal: (payload: {
+    targetItems: number
+    targetMinutes?: number
+    targetAccuracy?: number
+    sessionId?: string
+  }) => Promise<SessionGoalStartResponse>
+  getSessionSummary: (sessionId: string) => Promise<SessionSummaryResponse>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>

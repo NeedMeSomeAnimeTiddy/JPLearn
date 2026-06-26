@@ -45,6 +45,85 @@ def test_record_game_result_persists_review_event(tmp_path: Path, monkeypatch) -
     assert row["tags_csv"] == "minigame,context_cloze"
 
 
+def test_record_game_result_persists_session_id_when_provided(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    desktop_bridge.start_session_goal(target_items=3, session_id="session-abc")
+    desktop_bridge.record_game_result(
+        slug="hiragana",
+        card_id=0,
+        is_correct=True,
+        minigame="context_cloze",
+        curriculum_stage=2,
+        session_id="session-abc",
+    )
+
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        row = conn.execute(
+            """
+            SELECT session_id
+            FROM review_events
+            WHERE deck=? AND card_id=?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            ("Hiragana", 0),
+        ).fetchone()
+
+    assert row is not None
+    assert row["session_id"] == "session-abc"
+
+
+def test_start_session_goal_and_load_summary(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    start_payload = desktop_bridge.start_session_goal(
+        target_items=2,
+        target_accuracy=50,
+        session_id="session-1",
+    )
+    assert start_payload["ok"] is True
+
+    desktop_bridge.record_game_result(
+        slug="hiragana",
+        card_id=0,
+        is_correct=True,
+        minigame="context_cloze",
+        session_id="session-1",
+    )
+    desktop_bridge.record_game_result(
+        slug="hiragana",
+        card_id=1,
+        is_correct=False,
+        minigame="context_cloze",
+        session_id="session-1",
+    )
+
+    summary_payload = desktop_bridge.get_session_goal_summary("session-1")
+    assert summary_payload["ok"] is True
+    summary = cast(dict[str, Any], summary_payload["summary"])
+    assert summary["completed_items"] == 2
+    assert summary["reviewed"] == 2
+    assert summary["correct"] == 1
+    assert summary["accuracy"] == 50
+    assert summary["goal_met"] is True
+
+
+def test_build_study_queue_payload_returns_card_ids_and_indices(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.build_study_queue_payload("hiragana")
+    assert payload["ok"] is True
+
+    queue = cast(dict[str, Any], payload["queue"])
+    assert queue["slug"] == "hiragana"
+
+    card_ids = cast(list[int], queue["card_ids"])
+    indices = cast(list[int], queue["indices"])
+    assert len(card_ids) == len(indices)
+    assert len(card_ids) > 0
+
+
 def test_build_deck_cards_includes_curriculum_stage(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

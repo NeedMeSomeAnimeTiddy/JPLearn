@@ -58,6 +58,14 @@ def test_jplearn_db_upgrade_adds_review_event_columns_and_schema_marker(
     assert "reviewed_at_utc" in columns
     assert "curriculum_stage" in columns
     assert "prompt_text" in columns
+    assert "session_id" in columns
+
+    session_goal_columns = _column_names(db_path, "session_goals")
+    assert "session_id" in session_goal_columns
+    assert "target_items" in session_goal_columns
+    assert "target_minutes" in session_goal_columns
+    assert "target_accuracy" in session_goal_columns
+    assert "started_at_utc" in session_goal_columns
 
     with sqlite3.connect(db_path) as conn:
         row = conn.execute(

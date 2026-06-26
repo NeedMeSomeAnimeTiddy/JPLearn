@@ -11,6 +11,7 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Mapping
+from uuid import uuid4
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -35,6 +36,8 @@ from data.study_pipeline import (
     load_today_progress,
     reset_study_db,
     review_minigame_result,
+    save_session_goal,
+    load_session_summary,
 )
 from domain.blocks import (
     blocks_for_slug,
@@ -43,6 +46,7 @@ from domain.blocks import (
 )
 from domain.distractors import rank_distractor_ids
 from domain.decks import ALL_DECKS
+from domain.queue_builder import build_study_queue
 from domain.decks import (
     VOCAB_N1_EXTERNAL_DATA,
     VOCAB_N2_EXTERNAL_DATA,
@@ -96,6 +100,34 @@ class OverviewCharacterCard:
     romaji: str
     meaning: str
     tags: list[str]
+
+
+@dataclass(frozen=True)
+class SessionGoalPayload:
+    session_id: str
+    target_items: int
+    target_minutes: int | None
+    target_accuracy: int | None
+    started_at_utc: str
+
+
+@dataclass(frozen=True)
+class SessionSummaryPayload:
+    session_id: str
+    target_items: int
+    completed_items: int
+    reviewed: int
+    correct: int
+    accuracy: int
+    target_accuracy: int | None
+    goal_met: bool
+
+
+@dataclass(frozen=True)
+class StudyQueuePayload:
+    slug: str
+    card_ids: list[int]
+    indices: list[int]
 
 
 def _normalize_deck_key(value: str) -> str:
@@ -346,6 +378,7 @@ def record_game_result(
     is_correct: bool,
     minigame: str = "",
     curriculum_stage: int | None = None,
+    session_id: str = "",
 ) -> dict[str, object]:
     init_study_db()
     factory = ALL_DECKS.get(slug)
@@ -380,6 +413,7 @@ def record_game_result(
         script_tag=script_tag,
         prompt_text=matching_card.character,
         tags=tags,
+        session_id=session_id.strip(),
     )
 
     return {
@@ -392,6 +426,64 @@ def record_game_result(
         "curriculum_stage": load_curriculum_stages(deck.name, stage_mode, [card_id]).get(card_id, 1)
         if stage_mode
         else None,
+    }
+
+
+def start_session_goal(
+    target_items: int,
+    target_minutes: int | None = None,
+    target_accuracy: int | None = None,
+    session_id: str | None = None,
+) -> dict[str, object]:
+    init_study_db()
+    normalized_session_id = (session_id or "").strip() or str(uuid4())
+    goal = save_session_goal(
+        session_id=normalized_session_id,
+        target_items=target_items,
+        target_minutes=target_minutes,
+        target_accuracy=target_accuracy,
+    )
+    return {"ok": True, "goal": asdict(SessionGoalPayload(**asdict(goal)))}
+
+
+def get_session_goal_summary(session_id: str) -> dict[str, object]:
+    init_study_db()
+    summary = load_session_summary(session_id)
+    if summary is None:
+        return {"ok": False, "error": f"Unknown session id: {session_id}"}
+    return {"ok": True, "summary": asdict(SessionSummaryPayload(**asdict(summary)))}
+
+
+def build_study_queue_payload(slug: str) -> dict[str, object]:
+    init_study_db()
+    factory = ALL_DECKS.get(slug)
+    if factory is None:
+        raise ValueError(f"Unknown deck slug: {slug}")
+
+    deck = factory()
+    card_ids = [card.id for card in deck.cards]
+    states = load_review_states(deck.name, card_ids)
+    due_card_ids = {card_id for card_id, state in states.items() if state.is_due()}
+    new_card_ids = {card_id for card_id, state in states.items() if state.repetitions <= 0}
+    leech_card_ids = load_active_leech_card_ids(deck.name)
+
+    queue_card_ids = build_study_queue(
+        card_ids=card_ids,
+        due_card_ids=due_card_ids,
+        leech_card_ids=leech_card_ids,
+        new_card_ids=new_card_ids,
+    )
+    id_to_index = {card_id: index for index, card_id in enumerate(card_ids)}
+    queue_indices = [id_to_index[card_id] for card_id in queue_card_ids if card_id in id_to_index]
+    return {
+        "ok": True,
+        "queue": asdict(
+            StudyQueuePayload(
+                slug=slug,
+                card_ids=queue_card_ids,
+                indices=queue_indices,
+            )
+        ),
     }
 
 
@@ -442,7 +534,7 @@ def main() -> int:
 
     if command == "record-result":
         if len(sys.argv) < 5:
-            print(json.dumps({"error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage]"}))
+            print(json.dumps({"error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage] [session_id]"}))
             return 2
         slug = sys.argv[2]
         try:
@@ -450,13 +542,56 @@ def main() -> int:
             is_correct = _parse_bool_flag(sys.argv[4])
             minigame = sys.argv[5] if len(sys.argv) > 5 else ""
             curriculum_stage = int(sys.argv[6]) if len(sys.argv) > 6 and sys.argv[6].strip() else None
+            session_id = sys.argv[7] if len(sys.argv) > 7 else ""
             payload = record_game_result(
                 slug,
                 card_id,
                 is_correct,
                 minigame=minigame,
                 curriculum_stage=curriculum_stage,
+                session_id=session_id,
             )
+        except ValueError as exc:
+            print(json.dumps({"error": str(exc)}))
+            return 2
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    if command == "session-start":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "Usage: session-start <target_items> [target_minutes] [target_accuracy] [session_id]"}))
+            return 2
+        try:
+            target_items = int(sys.argv[2])
+            target_minutes = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].strip() else None
+            target_accuracy = int(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4].strip() else None
+            session_id = sys.argv[5] if len(sys.argv) > 5 else None
+            payload = start_session_goal(
+                target_items=target_items,
+                target_minutes=target_minutes,
+                target_accuracy=target_accuracy,
+                session_id=session_id,
+            )
+        except ValueError as exc:
+            print(json.dumps({"error": str(exc)}))
+            return 2
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    if command == "session-summary":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "Usage: session-summary <session_id>"}))
+            return 2
+        payload = get_session_goal_summary(sys.argv[2])
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    if command == "study-queue":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "Usage: study-queue <slug>"}))
+            return 2
+        try:
+            payload = build_study_queue_payload(sys.argv[2])
         except ValueError as exc:
             print(json.dumps({"error": str(exc)}))
             return 2

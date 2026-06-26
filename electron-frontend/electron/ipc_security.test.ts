@@ -5,6 +5,8 @@ const {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
   validateDeckSlug,
+  validateSessionGoalPayload,
+  validateSessionId,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
 } = require('./ipc_security.cjs')
@@ -65,11 +67,13 @@ describe('ipc_security', () => {
       isCorrect: true,
       minigame: 'romaji_sprint',
       curriculumStage: 2,
+      sessionId: 'session-1',
     })
 
     expect(valid.slug).toBe('hiragana')
     expect(valid.cardId).toBe(12)
     expect(valid.isCorrect).toBe(true)
+    expect(valid.sessionId).toBe('session-1')
 
     expect(() =>
       validateRecordGameResultPayload({
@@ -87,5 +91,34 @@ describe('ipc_security', () => {
         curriculumStage: 9,
       }),
     ).toThrow(/invalid curriculumstage/i)
+
+    expect(() =>
+      validateRecordGameResultPayload({
+        slug: 'hiragana',
+        cardId: 12,
+        isCorrect: true,
+        sessionId: '   ',
+      }),
+    ).toThrow(/invalid session id/i)
+  })
+
+  it('validates session goal payload and session id values', () => {
+    const valid = validateSessionGoalPayload({
+      targetItems: 15,
+      targetMinutes: 20,
+      targetAccuracy: 85,
+      sessionId: 'session-123',
+    })
+
+    expect(valid.targetItems).toBe(15)
+    expect(valid.targetMinutes).toBe(20)
+    expect(valid.targetAccuracy).toBe(85)
+    expect(valid.sessionId).toBe('session-123')
+
+    expect(validateSessionId(' session-abc ')).toBe('session-abc')
+
+    expect(() => validateSessionGoalPayload({ targetItems: 0 })).toThrow(/invalid targetitems/i)
+    expect(() => validateSessionGoalPayload({ targetItems: 3, targetAccuracy: 101 })).toThrow(/invalid targetaccuracy/i)
+    expect(() => validateSessionId('   ')).toThrow(/invalid session id/i)
   })
 })

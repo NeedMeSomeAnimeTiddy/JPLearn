@@ -10,11 +10,12 @@ from domain.history import ItemHistoryEvent, RawItemHistoryBucket
 from domain.leech import evaluate_leech_state
 from domain.mistakes import MistakeBreakdownRow
 from domain.scheduler import ReviewState
+from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState
 
 DB_PATH = Path(__file__).parent.parent / "data" / "jplearn.db"
 SCHEMA_VERSION_TABLE = "schema_version"
-LATEST_SCHEMA_VERSION = 1
+LATEST_SCHEMA_VERSION = 2
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -153,8 +154,30 @@ def _migration_0001(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_0002(conn: sqlite3.Connection) -> None:
+    existing_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(review_events)").fetchall()
+    }
+    if "session_id" not in existing_columns:
+        conn.execute("ALTER TABLE review_events ADD COLUMN session_id TEXT NOT NULL DEFAULT ''")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS session_goals (
+            session_id      TEXT PRIMARY KEY,
+            target_items    INTEGER NOT NULL,
+            target_minutes  INTEGER,
+            target_accuracy INTEGER,
+            started_at_utc  TEXT    NOT NULL
+        )
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     1: _migration_0001,
+    2: _migration_0002,
 }
 
 
@@ -184,6 +207,7 @@ def reset_db() -> None:
         conn.execute("DELETE FROM streak_state")
         conn.execute("DELETE FROM leech_items")
         conn.execute("DELETE FROM curriculum_stages")
+        conn.execute("DELETE FROM session_goals")
 
 
 def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
@@ -249,16 +273,18 @@ def log_review(
     curriculum_stage: int | None = None,
     prompt_text: str = "",
     tags: list[str] | None = None,
+    session_id: str = "",
 ) -> None:
     """Record one review outcome for daily progress reporting."""
     review_day = reviewed_on or date.today()
     reviewed_utc = reviewed_at_utc or datetime.now(timezone.utc).isoformat(timespec="seconds")
     tags_csv = ",".join(tags or [])
+    normalized_session_id = session_id.strip()
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO review_events (deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag, curriculum_stage, prompt_text, tags_csv)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO review_events (deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag, curriculum_stage, prompt_text, tags_csv, session_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 deck_name,
@@ -270,8 +296,110 @@ def log_review(
                 curriculum_stage,
                 prompt_text.strip(),
                 tags_csv,
+                normalized_session_id,
             ),
         )
+
+
+def save_session_goal(
+    session_id: str,
+    target_items: int,
+    target_minutes: int | None = None,
+    target_accuracy: int | None = None,
+    started_at_utc: str | None = None,
+) -> SessionGoal:
+    """Insert or update one session goal row and return the saved payload."""
+    normalized_session_id = session_id.strip()
+    if not normalized_session_id:
+        raise ValueError("session_id must not be empty")
+    if target_items <= 0:
+        raise ValueError("target_items must be positive")
+
+    normalized_target_minutes = None if target_minutes is None else max(1, int(target_minutes))
+    normalized_target_accuracy = None if target_accuracy is None else max(0, min(100, int(target_accuracy)))
+    normalized_started_at = started_at_utc or datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO session_goals (session_id, target_items, target_minutes, target_accuracy, started_at_utc)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET
+                target_items=excluded.target_items,
+                target_minutes=excluded.target_minutes,
+                target_accuracy=excluded.target_accuracy,
+                started_at_utc=excluded.started_at_utc
+            """,
+            (
+                normalized_session_id,
+                int(target_items),
+                normalized_target_minutes,
+                normalized_target_accuracy,
+                normalized_started_at,
+            ),
+        )
+
+    return SessionGoal(
+        session_id=normalized_session_id,
+        target_items=int(target_items),
+        target_minutes=normalized_target_minutes,
+        target_accuracy=normalized_target_accuracy,
+        started_at_utc=normalized_started_at,
+    )
+
+
+def load_session_summary(session_id: str) -> SessionSummary | None:
+    """Return computed completion metrics for one session id."""
+    normalized_session_id = session_id.strip()
+    if not normalized_session_id:
+        raise ValueError("session_id must not be empty")
+
+    with _connect() as conn:
+        goal_row = conn.execute(
+            """
+            SELECT session_id, target_items, target_minutes, target_accuracy, started_at_utc
+            FROM session_goals
+            WHERE session_id=?
+            """,
+            (normalized_session_id,),
+        ).fetchone()
+        if goal_row is None:
+            return None
+
+        metrics_row = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS reviewed,
+                COUNT(DISTINCT card_id) AS completed_items,
+                SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct
+            FROM review_events
+            WHERE session_id=?
+            """,
+            (normalized_session_id,),
+        ).fetchone()
+
+    reviewed = int((metrics_row or {})["reviewed"] or 0)
+    completed_items = int((metrics_row or {})["completed_items"] or 0)
+    correct = int((metrics_row or {})["correct"] or 0)
+    accuracy = round((correct / reviewed) * 100) if reviewed > 0 else 0
+    target_items = int(goal_row["target_items"])
+    target_accuracy_value = (
+        None if goal_row["target_accuracy"] is None else int(goal_row["target_accuracy"])
+    )
+    goal_met = completed_items >= target_items
+    if target_accuracy_value is not None:
+        goal_met = goal_met and accuracy >= target_accuracy_value
+
+    return SessionSummary(
+        session_id=normalized_session_id,
+        target_items=target_items,
+        completed_items=completed_items,
+        reviewed=reviewed,
+        correct=correct,
+        accuracy=accuracy,
+        target_accuracy=target_accuracy_value,
+        goal_met=goal_met,
+    )
 
 
 def save_curriculum_stage(deck_name: str, card_id: int, mode: str, stage: int) -> None:

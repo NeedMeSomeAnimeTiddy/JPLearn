@@ -11,6 +11,10 @@ type OverviewCharacterMasteryPayload = Awaited<
   ReturnType<typeof window.jplearnDesktop.getOverviewCharacterMastery>
 >
 type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
+type StudyQueueResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getStudyQueue>>
+type SessionGoalStartResponse = Awaited<ReturnType<typeof window.jplearnDesktop.startSessionGoal>>
+type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getSessionSummary>>
+type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
 type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
@@ -965,6 +969,12 @@ function App() {
   const [sessionScore, setSessionScore] = useState<number>(0)
   const [sessionRounds, setSessionRounds] = useState<number>(0)
   const [sessionPoints, setSessionPoints] = useState<number>(0)
+  const [sessionTargetItems, setSessionTargetItems] = useState<number>(10)
+  const [sessionTargetAccuracy, setSessionTargetAccuracy] = useState<string>('')
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [lastSessionSummary, setLastSessionSummary] = useState<SessionSummaryPayload | null>(null)
+  const [sessionSummaryLoading, setSessionSummaryLoading] = useState<boolean>(false)
+  const [sessionGoalError, setSessionGoalError] = useState<string | null>(null)
   const [livesEnabled, setLivesEnabled] = useState<boolean>(false)
   const [livesRemaining, setLivesRemaining] = useState<number>(DEFAULT_LIVES)
   const [leechFocusEnabled, setLeechFocusEnabled] = useState<boolean>(false)
@@ -1031,6 +1041,7 @@ function App() {
   const startupBootMarkRef = useRef<number>(performance.now())
   const startupFirstSummaryMsRef = useRef<number | null>(null)
   const startupReadySentRef = useRef(false)
+  const previousSessionActiveRef = useRef(false)
   const kanjiLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const kanjiLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
@@ -1063,12 +1074,55 @@ function App() {
     }))
   }, [])
 
+  const activeDeckSlug = useMemo(() => {
+    if (activeScript === 'kanji_n5') return activeKanjiDeckSlug
+    if (activeScript === 'vocab_n5') return activeVocabDeckSlug
+    return activeScript
+  }, [activeKanjiDeckSlug, activeScript, activeVocabDeckSlug])
+
+  const buildQueueCycle = useCallback((queue: StudyQueueResponse, sourceCards: ScriptDeck['cards']): number[] => {
+    const idToIndex = new Map<number, number>()
+    sourceCards.forEach((card, index) => {
+      idToIndex.set(card.id, index)
+    })
+
+    const ordered: number[] = []
+    const seen = new Set<number>()
+    for (const cardId of queue.queue.card_ids) {
+      const sourceIndex = idToIndex.get(cardId)
+      if (sourceIndex === undefined || seen.has(sourceIndex)) continue
+      ordered.push(sourceIndex)
+      seen.add(sourceIndex)
+    }
+
+    for (let index = 0; index < sourceCards.length; index += 1) {
+      if (seen.has(index)) continue
+      ordered.push(index)
+    }
+
+    return ordered
+  }, [])
+
+  const hydrateRoundCycle = useCallback(async (sourceCards: ScriptDeck['cards']): Promise<void> => {
+    if (sourceCards.length <= 0) {
+      resetRoundCycle()
+      return
+    }
+
+    try {
+      const queue = await window.jplearnDesktop.getStudyQueue(activeDeckSlug)
+      roundCycleRef.current = buildQueueCycle(queue, sourceCards)
+    } catch {
+      roundCycleRef.current = [...Array(sourceCards.length).keys()]
+    }
+    roundCursorRef.current = 0
+  }, [activeDeckSlug, buildQueueCycle, resetRoundCycle])
+
   const nextCardIndex = useCallback((cardsLength: number): number | null => {
     if (cardsLength <= 0) return null
 
     if (roundCycleRef.current.length !== cardsLength || roundCursorRef.current >= roundCycleRef.current.length) {
-      roundCycleRef.current = shuffleArray([...Array(cardsLength).keys()])
-      roundCursorRef.current = 0
+      return null
     }
 
     const index = roundCycleRef.current[roundCursorRef.current]
@@ -1116,6 +1170,33 @@ function App() {
 
     return () => window.cancelAnimationFrame(focusHandle)
   }, [isRoundResolving, roundState, sessionActive, view])
+
+  useEffect(() => {
+    const previouslyActive = previousSessionActiveRef.current
+    previousSessionActiveRef.current = sessionActive
+
+    if (!previouslyActive || sessionActive || !activeSessionId) return
+
+    setSessionSummaryLoading(true)
+    setSessionGoalError(null)
+    void window.jplearnDesktop
+      .getSessionSummary(activeSessionId)
+      .then((response) => {
+        if (!response.ok || !response.summary) {
+          setSessionGoalError(response.error ?? 'Unable to load session summary.')
+          setLastSessionSummary(null)
+          return
+        }
+        setLastSessionSummary(response.summary)
+      })
+      .catch((error: unknown) => {
+        setSessionGoalError(error instanceof Error ? error.message : 'Unable to load session summary.')
+        setLastSessionSummary(null)
+      })
+      .finally(() => {
+        setSessionSummaryLoading(false)
+      })
+  }, [activeSessionId, sessionActive])
 
   const loadSummary = useCallback(async () => {
     setLoading(true)
@@ -1691,14 +1772,37 @@ function App() {
     return deckCards.filter((c) => idSet.has(c.id))
   }, [deckCards, blockProgress, activeBlockIndex])
 
-  const startSession = useCallback(() => {
+  const startSession = useCallback(async () => {
     resetRoundCycle()
+    setSessionGoalError(null)
+    setLastSessionSummary(null)
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
     const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
     const modeSelection = nextRoundMode(activeGame)
     const modeCards = modeSelection.mode === 'narrative_story'
       ? narrativePriorityCards(sourceCards)
       : sourceCards
+    const goalTargetItems = Math.max(1, Math.floor(sessionTargetItems))
+    const parsedTargetAccuracy = sessionTargetAccuracy.trim() === ''
+      ? undefined
+      : Math.max(0, Math.min(100, Math.floor(Number(sessionTargetAccuracy))))
+
+    try {
+      const goalResponse: SessionGoalStartResponse = await window.jplearnDesktop.startSessionGoal({
+        targetItems: goalTargetItems,
+        targetAccuracy: Number.isFinite(parsedTargetAccuracy) ? parsedTargetAccuracy : undefined,
+      })
+      if (!goalResponse.ok) {
+        setSessionGoalError('Unable to start session goal.')
+        return
+      }
+      setActiveSessionId(goalResponse.goal.session_id)
+    } catch (error: unknown) {
+      setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
+      return
+    }
+
+    await hydrateRoundCycle(modeCards)
     const index = nextCardIndex(modeCards.length)
     const nextRound = index === null
       ? null
@@ -1729,16 +1833,32 @@ function App() {
       setSessionScore(0)
       setSessionPoints(0)
     }
-  }, [activeGame, activeBlockCards, buildRound, leechFocusEnabled, nextCardIndex, nextRoundMode, resetRoundCycle, sessionRounds])
+  }, [
+    activeBlockCards,
+    activeGame,
+    buildRound,
+    hydrateRoundCycle,
+    leechFocusEnabled,
+    nextCardIndex,
+    nextRoundMode,
+    resetRoundCycle,
+    sessionRounds,
+    sessionTargetAccuracy,
+    sessionTargetItems,
+  ])
 
-  const nextRound = useCallback(() => {
+  const nextRound = useCallback(async () => {
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
     const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
     const modeSelection = nextRoundMode(activeGame)
     const modeCards = modeSelection.mode === 'narrative_story'
       ? narrativePriorityCards(sourceCards)
       : sourceCards
-    const index = nextCardIndex(modeCards.length)
+    let index = nextCardIndex(modeCards.length)
+    if (index === null) {
+      await hydrateRoundCycle(modeCards)
+      index = nextCardIndex(modeCards.length)
+    }
     const candidate = index === null
       ? null
       : buildRound(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
@@ -1754,7 +1874,7 @@ function App() {
     setRoundFeedbackTone(null)
     setRoundFeedbackPoints(null)
     setRoundFeedbackAnswer(null)
-  }, [activeGame, activeBlockCards, buildRound, leechFocusEnabled, nextCardIndex, nextRoundMode])
+  }, [activeBlockCards, activeGame, buildRound, hydrateRoundCycle, leechFocusEnabled, nextCardIndex, nextRoundMode])
 
   const submitAnswer = useCallback(
     (answer: string) => {
@@ -1867,6 +1987,7 @@ function App() {
           roundState.mode === 'context_cloze' || roundState.mode === 'narrative_story'
             ? roundState.curriculumStage
             : undefined,
+        sessionId: activeSessionId ?? undefined,
       }).then((result) => {
         if (
           (roundState.mode !== 'context_cloze' && roundState.mode !== 'narrative_story') ||
@@ -1897,7 +2018,7 @@ function App() {
           return
         }
 
-        nextRound()
+        void nextRound()
         setRoundFeedback(null)
         setRoundFeedbackTone(null)
         setRoundFeedbackPoints(null)
@@ -1905,7 +2026,7 @@ function App() {
         setIsRoundResolving(false)
       }, FEEDBACK_REVEAL_MS)
     },
-    [activeGame, activeKanjiDeckSlug, activeScript, activeVocabDeckSlug, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats],
+    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats],
   )
 
   useEffect(() => {
@@ -2884,6 +3005,7 @@ function App() {
               <div className="focus-chip">
                 <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`correct-${sessionScore}-${sessionRounds}`} className="live-value">{sessionScore}/{sessionRounds}</strong> Correct</span>
                 <span className="metric-accent-streak"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`points-${sessionPoints}`} className="live-value">{sessionPoints}</strong> Points</span>
+                <span className="metric-accent-insight"><Trophy aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`goal-${sessionRounds}-${sessionTargetItems}`} className="live-value">{sessionRounds}/{sessionTargetItems}</strong> Goal</span>
               </div>
               <button
                 type="button"
@@ -2920,7 +3042,7 @@ function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      startSession()
+                      void startSession()
                     }}
                   >
                     Play Again
@@ -2937,6 +3059,55 @@ function App() {
                 <p className="hero-copy">{selectedGameMeta?.description}</p>
                 <p className="intro-objective"><strong>Objective:</strong> {selectedGameIntro.objective}</p>
                 <p className="intro-tip"><strong>Tip:</strong> {selectedGameIntro.tip}</p>
+
+                <section className="session-goal-controls" aria-label="Session goals">
+                  <label className="session-goal-field">
+                    Target items
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={sessionTargetItems}
+                      onChange={(event) => {
+                        const nextValue = Math.max(1, Math.min(200, Number(event.target.value) || 1))
+                        setSessionTargetItems(nextValue)
+                      }}
+                    />
+                  </label>
+                  <label className="session-goal-field">
+                    Target accuracy (optional)
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={sessionTargetAccuracy}
+                      onChange={(event) => {
+                        const raw = event.target.value
+                        if (raw.trim() === '') {
+                          setSessionTargetAccuracy('')
+                          return
+                        }
+                        const clamped = Math.max(0, Math.min(100, Number(raw) || 0))
+                        setSessionTargetAccuracy(String(clamped))
+                      }}
+                      placeholder="e.g. 80"
+                    />
+                  </label>
+                </section>
+
+                {sessionSummaryLoading ? <p className="status-line">Loading session summary...</p> : null}
+                {sessionGoalError ? <p className="status-line status-error">{sessionGoalError}</p> : null}
+                {lastSessionSummary ? (
+                  <section className="session-summary-card" aria-live="polite">
+                    <p className="session-summary-kicker">Last Session</p>
+                    <p className="session-summary-main">
+                      {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} items · {lastSessionSummary.accuracy}% accuracy
+                    </p>
+                    <p className="session-summary-meta">
+                      {lastSessionSummary.goal_met ? 'Goal reached. Keep the streak alive.' : 'Goal not reached yet. Start another run to close the gap.'}
+                    </p>
+                  </section>
+                ) : null}
                 <div className="intro-toggle-row" role="group" aria-label="Minigame setup toggles">
                   <button
                     type="button"
@@ -3015,7 +3186,7 @@ function App() {
                 ) : null}
 
                 <div className="game-actions intro-actions">
-                  <button type="button" onClick={startSession} disabled={gameLoading || activeRunCards.length === 0}>
+                  <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>
                     Play
                   </button>
                   {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
@@ -3023,7 +3194,7 @@ function App() {
               </article>
             ) : (
               <div className="game-actions">
-                <button type="button" onClick={startSession} disabled={gameLoading || activeRunCards.length === 0}>
+                <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>
                   Restart Challenge
                 </button>
                 {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}

@@ -6,6 +6,8 @@ const {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
   validateDeckSlug,
+  validateSessionGoalPayload,
+  validateSessionId,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
 } = require('./ipc_security.cjs')
@@ -428,6 +430,20 @@ ipcMain.handle('study:get-overview-character-mastery', async (event) => {
   }
 })
 
+ipcMain.handle('study:get-study-queue', async (event, slug) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
+  const validatedSlug = validateDeckSlug(slug)
+  try {
+    return await runPythonBridgeWithArgs(['study-queue', validatedSlug])
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to fetch study queue: ${detail}`)
+  }
+})
+
 ipcMain.handle('study:reset-db', async (event) => {
   assertTrustedIpcSender(event, {
     isDev: process.env.ELECTRON_DEV === '1',
@@ -458,10 +474,60 @@ ipcMain.handle('study:record-game-result', async (event, payload) => {
     if (typeof validatedPayload.curriculumStage === 'number') {
       args.push(String(validatedPayload.curriculumStage))
     }
+    if (typeof validatedPayload.sessionId === 'string' && validatedPayload.sessionId.trim().length > 0) {
+      if (typeof validatedPayload.curriculumStage !== 'number') {
+        args.push('')
+      }
+      args.push(validatedPayload.sessionId)
+    }
     return await runPythonBridgeWithArgs(args)
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(`Failed to record game result: ${detail}`)
+  }
+})
+
+ipcMain.handle('study:start-session-goal', async (event, payload) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
+  const validatedPayload = validateSessionGoalPayload(payload)
+  try {
+    const args = ['session-start', String(validatedPayload.targetItems)]
+    if (typeof validatedPayload.targetMinutes === 'number') {
+      args.push(String(validatedPayload.targetMinutes))
+    } else if (typeof validatedPayload.targetAccuracy === 'number' || typeof validatedPayload.sessionId === 'string') {
+      args.push('')
+    }
+
+    if (typeof validatedPayload.targetAccuracy === 'number') {
+      args.push(String(validatedPayload.targetAccuracy))
+    } else if (typeof validatedPayload.sessionId === 'string') {
+      args.push('')
+    }
+
+    if (typeof validatedPayload.sessionId === 'string') {
+      args.push(validatedPayload.sessionId)
+    }
+    return await runPythonBridgeWithArgs(args)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to start session goal: ${detail}`)
+  }
+})
+
+ipcMain.handle('study:get-session-summary', async (event, sessionId) => {
+  assertTrustedIpcSender(event, {
+    isDev: process.env.ELECTRON_DEV === '1',
+    getWindowFromSender: BrowserWindow.fromWebContents,
+  })
+  const validatedSessionId = validateSessionId(sessionId)
+  try {
+    return await runPythonBridgeWithArgs(['session-summary', validatedSessionId])
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to fetch session summary: ${detail}`)
   }
 })
 

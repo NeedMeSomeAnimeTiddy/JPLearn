@@ -2040,6 +2040,63 @@ button {
   gap: 8px;
 }
 
+.session-goal-controls {
+  border: 1px solid var(--chip-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--chip-bg);
+  display: grid;
+  gap: 8px;
+}
+
+.session-goal-field {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(120px, 190px);
+  align-items: center;
+  gap: 10px;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.session-goal-field input {
+  border: 1px solid var(--button-border);
+  border-radius: 9px;
+  background: color-mix(in oklab, var(--button-bg-top) 62%, transparent);
+  color: var(--text-main);
+  padding: 6px 10px;
+  min-height: calc(36px * var(--ui-scale));
+}
+
+.session-summary-card {
+  border: 1px solid color-mix(in oklab, var(--tone-teal) 38%, var(--chip-border));
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in oklab, var(--tone-teal) 16%, var(--chip-bg));
+  display: grid;
+  gap: 4px;
+}
+
+.session-summary-kicker {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.session-summary-main {
+  margin: 0;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.session-summary-meta {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
 .lives-toggle {
   display: inline-flex;
   align-items: center;

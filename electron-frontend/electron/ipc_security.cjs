@@ -87,12 +87,68 @@ function validateRecordGameResultPayload(payload) {
     }
   }
 
+  let sessionId
+  if (payload.sessionId != null) {
+    sessionId = validateSessionId(payload.sessionId)
+  }
+
   return {
     slug,
     cardId: payload.cardId,
     isCorrect: payload.isCorrect,
     minigame: payload.minigame || '',
     curriculumStage: payload.curriculumStage,
+    sessionId,
+  }
+}
+
+function validateSessionId(value) {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid session id: ${String(value)}`)
+  }
+  const normalized = value.trim()
+  if (!normalized) {
+    throw new Error('Invalid session id: value must not be empty')
+  }
+  return normalized
+}
+
+function validateSessionGoalPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid session goal payload: expected object')
+  }
+
+  const targetItems = payload.targetItems
+  if (!Number.isInteger(targetItems) || targetItems <= 0) {
+    throw new Error(`Invalid targetItems value: ${String(targetItems)}`)
+  }
+
+  let targetMinutes
+  if (payload.targetMinutes != null) {
+    if (!Number.isInteger(payload.targetMinutes) || payload.targetMinutes <= 0) {
+      throw new Error(`Invalid targetMinutes value: ${String(payload.targetMinutes)}`)
+    }
+    targetMinutes = payload.targetMinutes
+  }
+
+  let targetAccuracy
+  if (payload.targetAccuracy != null) {
+    if (!Number.isInteger(payload.targetAccuracy) || payload.targetAccuracy < 0 || payload.targetAccuracy > 100) {
+      throw new Error(`Invalid targetAccuracy value: ${String(payload.targetAccuracy)}`)
+    }
+    targetAccuracy = payload.targetAccuracy
+  }
+
+  let sessionId
+  if (payload.sessionId != null) {
+    sessionId = validateSessionId(payload.sessionId)
+  }
+
+  return {
+    targetItems,
+    targetMinutes,
+    targetAccuracy,
+    sessionId,
   }
 }
 
@@ -100,6 +156,8 @@ module.exports = {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
   validateDeckSlug,
+  validateSessionGoalPayload,
+  validateSessionId,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
 }

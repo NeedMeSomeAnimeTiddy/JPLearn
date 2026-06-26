@@ -11,6 +11,7 @@ from domain.curriculum import next_stage
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
 from domain.mistakes import MistakeBreakdownRow
 from domain.scheduler import ReviewState, update
+from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState, apply_study_day
 
 
@@ -37,6 +38,7 @@ def review_card(
     curriculum_stage: int | None = None,
     prompt_text: str = "",
     tags: list[str] | None = None,
+    session_id: str = "",
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
 ) -> ReviewState:
@@ -62,6 +64,7 @@ def review_card(
         curriculum_stage=curriculum_stage,
         prompt_text=prompt_text,
         tags=tags,
+        session_id=session_id,
     )
     database.update_leech_state_for_card(deck_name, updated_state.card_id)
     next_streak = apply_study_day(database.load_streak_state(), review_day_utc, review_day_local)
@@ -78,6 +81,7 @@ def review_minigame_result(
     script_tag: str = "",
     prompt_text: str = "",
     tags: list[str] | None = None,
+    session_id: str = "",
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
 ) -> ReviewState:
@@ -92,6 +96,7 @@ def review_minigame_result(
         curriculum_stage=curriculum_stage,
         prompt_text=prompt_text,
         tags=tags,
+        session_id=session_id,
         reviewed_on_local=reviewed_on_local,
         reviewed_on_utc=reviewed_on_utc,
     )
@@ -170,3 +175,25 @@ def load_item_history(limit_items: int = 8, events_per_item: int = 8) -> list[It
 def load_active_leech_card_ids(deck_name: str) -> set[int]:
     """Return active leech card ids for one deck."""
     return database.load_active_leech_card_ids(deck_name)
+
+
+def save_session_goal(
+    session_id: str,
+    target_items: int,
+    target_minutes: int | None = None,
+    target_accuracy: int | None = None,
+    started_at_utc: str | None = None,
+) -> SessionGoal:
+    """Persist one session goal payload."""
+    return database.save_session_goal(
+        session_id=session_id,
+        target_items=target_items,
+        target_minutes=target_minutes,
+        target_accuracy=target_accuracy,
+        started_at_utc=started_at_utc,
+    )
+
+
+def load_session_summary(session_id: str) -> SessionSummary | None:
+    """Load computed completion metrics for one session id."""
+    return database.load_session_summary(session_id)
