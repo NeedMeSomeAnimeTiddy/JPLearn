@@ -1709,6 +1709,9 @@ function App() {
       const curriculumStage = (minigame === 'context_cloze' || minigame === 'narrative_story')
         ? persistedStage
         : scoreStage
+      const exampleSentenceHint = card.example_sentence
+        ? `Example sentence: ${card.example_sentence}`
+        : null
 
       if (minigame === 'romaji_sprint') {
         const promptLabel = surprisePrompt
@@ -1722,7 +1725,7 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: null,
+          hintText: exampleSentenceHint,
           promptLabel,
           focusText: card.character,
           answer: card.romaji,
@@ -1742,7 +1745,7 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: `Use exact wording when possible. Prompt: ${card.character}`,
+          hintText: exampleSentenceHint ?? `Use exact wording when possible. Prompt: ${card.character}`,
           promptLabel,
           focusText: card.character,
           answer: card.meaning,
@@ -1807,7 +1810,7 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: null,
+          hintText: exampleSentenceHint,
           promptLabel: surprisePrompt
             ? surpriseLabel
             : 'Select the meaning for this character',
@@ -1836,7 +1839,7 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: `Focus card: ${card.character} (${card.romaji})`,
+          hintText: exampleSentenceHint ?? `Focus card: ${card.character} (${card.romaji})`,
           promptLabel: surprisePrompt
             ? surpriseLabel
             : `Fill the blank using context clues (Stage ${curriculumStage})`,
@@ -1865,7 +1868,7 @@ function App() {
           curriculumStage,
           chapterNumber: curriculumStage,
           chapterLabel: null,
-          hintText: `Scene focus: ${card.character} (${card.romaji})`,
+          hintText: exampleSentenceHint ?? `Scene focus: ${card.character} (${card.romaji})`,
           promptLabel: surprisePrompt
             ? surpriseLabel
             : `Choose the best scene completion (Stage ${curriculumStage})`,
@@ -1892,7 +1895,7 @@ function App() {
         curriculumStage,
         chapterNumber: null,
         chapterLabel: null,
-        hintText: null,
+        hintText: exampleSentenceHint,
         promptLabel: surprisePrompt
           ? surpriseLabel
           : 'Select the character for this meaning',

@@ -114,6 +114,7 @@ interface GameCard {
   romaji: string
   meaning: string
   tags: string[]
+  example_sentence?: string | null
   is_leech: boolean
   curriculum_stage: number
   meaning_distractor_ids: number[]

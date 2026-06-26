@@ -34,10 +34,10 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 const baseCards = [
-  { id: 0, character: 'あ', romaji: 'a', meaning: 'a', tags: ['hiragana'], is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [1, 2, 3], character_distractor_ids: [1, 2, 3] },
-  { id: 1, character: 'い', romaji: 'i', meaning: 'i', tags: ['hiragana'], is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 2, 3], character_distractor_ids: [0, 2, 3] },
-  { id: 2, character: 'う', romaji: 'u', meaning: 'u', tags: ['hiragana'], is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 3], character_distractor_ids: [0, 1, 3] },
-  { id: 3, character: 'え', romaji: 'e', meaning: 'e', tags: ['hiragana'], is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 2], character_distractor_ids: [0, 1, 2] },
+  { id: 0, character: 'あ', romaji: 'a', meaning: 'a', tags: ['hiragana'], example_sentence: 'あさです。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [1, 2, 3], character_distractor_ids: [1, 2, 3] },
+  { id: 1, character: 'い', romaji: 'i', meaning: 'i', tags: ['hiragana'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 2, 3], character_distractor_ids: [0, 2, 3] },
+  { id: 2, character: 'う', romaji: 'u', meaning: 'u', tags: ['hiragana'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 3], character_distractor_ids: [0, 1, 3] },
+  { id: 3, character: 'え', romaji: 'e', meaning: 'e', tags: ['hiragana'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 2], character_distractor_ids: [0, 1, 2] },
 ]
 
 const baseDesktopApi = {
@@ -218,5 +218,6 @@ describe('Minigame menu', () => {
       return ['あ', 'い', 'う', 'え'].some((character) => content.includes(character))
     })
     expect(promptMain).toBeTruthy()
+    expect(screen.getByText(/Example sentence: あさです。/i)).toBeTruthy()
   })
 })
