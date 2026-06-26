@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -244,6 +245,42 @@ def test_load_raw_item_history_uses_first_non_empty_prompt(tmp_path: Path, monke
     assert history[0].prompt == "食べる"
 
 
+def test_log_review_normalizes_japanese_prompt_text_and_deck_name(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "jplearn-test.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+    database.init_db()
+
+    database.log_review(
+        " ｶﾀｶﾅ ",
+        1,
+        4,
+        prompt_text=" ﾊﾟｰﾃｨ—､｡ ",
+        script_tag=" KATAKANA ",
+    )
+
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT deck, prompt_text, script_tag FROM review_events"
+        ).fetchone()
+
+    assert row is not None
+    assert row[0] == "カタカナ"
+    assert row[1] == "パーティー、。"
+    assert row[2] == "katakana"
+
+
+def test_save_state_and_load_states_share_normalized_deck_key(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    database.save_state(
+        " ｶﾀｶﾅ ",
+        ReviewState(card_id=7, repetitions=2, interval=4, next_review=date(2026, 4, 4)),
+    )
+
+    states = database.load_states("カタカナ", [7])
+    assert states[7].interval == 4
+
+
 def test_load_raw_item_history_respects_item_and_event_limits(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
@@ -341,6 +378,35 @@ def test_review_minigame_result_persists_quality_and_tags(tmp_path: Path, monkey
     assert row["quality"] == 1
     assert row["script_tag"] == "hiragana"
     assert row["tags_csv"] == "minigame,interleave_mix"
+
+
+def test_review_minigame_result_uses_normalized_deck_for_default_script_tag(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    study_pipeline.review_minigame_result(
+        deck_name=" ｶﾀｶﾅ deck ",
+        card_id=77,
+        is_correct=True,
+        script_tag="",
+    )
+
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        row = conn.execute(
+            """
+            SELECT script_tag
+            FROM review_events
+            WHERE card_id=?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (77,),
+        ).fetchone()
+
+    assert row is not None
+    assert row["script_tag"] == "カタカナ_deck"
 
 
 def test_review_minigame_result_persists_curriculum_stage(tmp_path: Path, monkeypatch) -> None:

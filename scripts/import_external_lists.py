@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
-import unicodedata
 from pathlib import Path
+
+from data.text_normalization import normalize_japanese_text, normalize_storage_text
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORDS_N5_CSV = ROOT / "data" / "external_sources" / "words_n5.csv"
@@ -22,7 +23,7 @@ OUTPUT_MODULE = ROOT / "domain" / "external_deck_data.py"
 
 
 def _normalize_text(value: str) -> str:
-    return unicodedata.normalize("NFKC", value.strip())
+    return normalize_storage_text(value)
 
 
 def _display_source_path(path: Path) -> str:
@@ -47,7 +48,7 @@ def _read_csv(path: Path) -> list[tuple[str, str, str]]:
         rows: list[tuple[str, str, str]] = []
         seen: set[tuple[str, str]] = set()
         for line_index, row in enumerate(reader, start=2):
-            character = _normalize_text(row.get("character", ""))
+            character = normalize_japanese_text(row.get("character", ""))
             romaji = _normalize_text(row.get("romaji", ""))
             meaning = _normalize_text(row.get("meaning", ""))
 

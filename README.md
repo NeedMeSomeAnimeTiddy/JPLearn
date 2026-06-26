@@ -103,7 +103,7 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
    - Cache policy for offline reliability
 
 ### Data Quality and Content Operations
-- [ ] (High) Enforce Japanese normalization at all persistence boundaries
+- [x] (High) Enforce Japanese normalization at all persistence boundaries
    - Centralize normalization utilities used by all repositories/importers
    - Add regression tests for kana width, prolonged sound marks, and punctuation variants
 - [ ] (Medium) Improve external content ingestion pipeline

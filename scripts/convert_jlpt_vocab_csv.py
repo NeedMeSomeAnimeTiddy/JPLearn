@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 import csv
 import re
-import unicodedata
 from collections.abc import Iterable
 from pathlib import Path
+
+from data.text_normalization import normalize_japanese_text, normalize_storage_text
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "jlpt_vocab.csv"
@@ -141,7 +142,7 @@ _SPACE_LIKE = set(" 　\t\r\n/・,，、;；")
 
 
 def _normalize(text: str) -> str:
-    return unicodedata.normalize("NFKC", text).strip()
+    return normalize_storage_text(text)
 
 
 def _katakana_to_hiragana(text: str) -> str:
@@ -254,8 +255,8 @@ def convert_jlpt_vocab_csv(input_csv: Path, output_dir: Path) -> dict[str, int]:
         if level not in by_level:
             continue
 
-        character = _normalize(row.get("Original", ""))
-        furigana = _normalize(row.get("Furigana", ""))
+        character = normalize_japanese_text(row.get("Original", ""))
+        furigana = normalize_japanese_text(row.get("Furigana", ""))
         meaning = _normalize(row.get("English", ""))
 
         if not character or not furigana or not meaning:

@@ -235,3 +235,43 @@ def test_generate_external_deck_module_dedupes_character_and_romaji_pairs(tmp_pa
     assert kanji_n3_count == 20
     assert kanji_n2_count == 20
     assert kanji_n1_count == 20
+
+
+def test_generate_external_deck_module_normalizes_japanese_character_variants(tmp_path: Path) -> None:
+    words_n5_csv = tmp_path / "words_n5.csv"
+    words_n4_csv = tmp_path / "words_n4.csv"
+    words_n3_csv = tmp_path / "words_n3.csv"
+    words_n2_csv = tmp_path / "words_n2.csv"
+    words_n1_csv = tmp_path / "words_n1.csv"
+    conversational_csv = tmp_path / "conversational.csv"
+    kanji_n5_csv, kanji_n4_csv, kanji_n3_csv, kanji_n2_csv, kanji_n1_csv = _kanji_sources(tmp_path)
+    output_py = tmp_path / "external_deck_data.py"
+
+    words_lines = ["character,romaji,meaning", " ｶｰﾄﾞ—､｡ ,ka-do,card"]
+    for idx in range(79):
+        words_lines.append(f"語{idx},r{idx},meaning {idx}")
+    words_n5_csv.write_text("\n".join(words_lines), encoding="utf-8")
+
+    _write_source(words_n4_csv, 80, "単語N4")
+    _write_source(words_n3_csv, 80, "単語N3")
+    _write_source(words_n2_csv, 80, "単語N2")
+    _write_source(words_n1_csv, 80, "単語N1")
+    _write_source(conversational_csv, 40, "会話")
+
+    import_external_lists.generate_external_deck_module(
+        words_n5_csv=words_n5_csv,
+        words_n4_csv=words_n4_csv,
+        words_n3_csv=words_n3_csv,
+        words_n2_csv=words_n2_csv,
+        words_n1_csv=words_n1_csv,
+        conversational_csv=conversational_csv,
+        kanji_n5_csv=kanji_n5_csv,
+        kanji_n4_csv=kanji_n4_csv,
+        kanji_n3_csv=kanji_n3_csv,
+        kanji_n2_csv=kanji_n2_csv,
+        kanji_n1_csv=kanji_n1_csv,
+        output_module=output_py,
+    )
+
+    content = output_py.read_text(encoding="utf-8")
+    assert "('カードー、。', 'ka-do', 'card')" in content

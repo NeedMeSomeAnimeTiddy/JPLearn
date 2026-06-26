@@ -12,6 +12,7 @@ from domain.mistakes import MistakeBreakdownRow
 from domain.scheduler import ReviewState
 from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState
+from data.text_normalization import normalize_japanese_text, normalize_storage_text
 
 DB_PATH = Path(__file__).parent.parent / "data" / "jplearn.db"
 SCHEMA_VERSION_TABLE = "schema_version"
@@ -208,6 +209,10 @@ def init_db() -> None:
         _apply_migrations(conn)
 
 
+def _normalize_deck_name(deck_name: str) -> str:
+    return normalize_storage_text(deck_name)
+
+
 def reset_db() -> None:
     """Delete all persisted review progress while keeping schema intact."""
     init_db()
@@ -225,11 +230,12 @@ def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
     if not card_ids:
         return {}
 
+    normalized_deck_name = _normalize_deck_name(deck_name)
     with _connect() as conn:
         placeholders = ",".join("?" * len(card_ids))
         rows = conn.execute(
             f"SELECT * FROM review_states WHERE deck=? AND card_id IN ({placeholders})",
-            [deck_name, *card_ids],
+            [normalized_deck_name, *card_ids],
         ).fetchall()
 
     states = {
@@ -251,6 +257,7 @@ def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
 
 def save_state(deck_name: str, state: ReviewState) -> None:
     """Insert or update one review state row."""
+    normalized_deck_name = _normalize_deck_name(deck_name)
     with _connect() as conn:
         conn.execute(
             """
@@ -263,7 +270,7 @@ def save_state(deck_name: str, state: ReviewState) -> None:
                 next_review=excluded.next_review
             """,
             (
-                deck_name,
+                normalized_deck_name,
                 state.card_id,
                 state.ease_factor,
                 state.interval,
@@ -289,8 +296,16 @@ def log_review(
     """Record one review outcome for daily progress reporting."""
     review_day = reviewed_on or date.today()
     reviewed_utc = reviewed_at_utc or datetime.now(timezone.utc).isoformat(timespec="seconds")
-    tags_csv = ",".join(tags or [])
-    normalized_session_id = session_id.strip()
+    normalized_deck_name = _normalize_deck_name(deck_name)
+    normalized_script_tag = normalize_storage_text(script_tag).lower()
+    normalized_prompt_text = normalize_japanese_text(prompt_text)
+    normalized_tags: list[str] = []
+    for tag in tags or []:
+        normalized_tag = normalize_storage_text(tag)
+        if normalized_tag:
+            normalized_tags.append(normalized_tag)
+    tags_csv = ",".join(normalized_tags)
+    normalized_session_id = normalize_storage_text(session_id)
     normalized_confidence = None if confidence_score is None else max(1, min(5, int(confidence_score)))
     with _connect() as conn:
         conn.execute(
@@ -299,14 +314,14 @@ def log_review(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                deck_name,
+                normalized_deck_name,
                 card_id,
                 quality,
                 review_day.isoformat(),
                 reviewed_utc,
-                script_tag,
+                normalized_script_tag,
                 curriculum_stage,
-                prompt_text.strip(),
+                normalized_prompt_text,
                 tags_csv,
                 normalized_session_id,
                 normalized_confidence,
@@ -322,7 +337,7 @@ def save_session_goal(
     started_at_utc: str | None = None,
 ) -> SessionGoal:
     """Insert or update one session goal row and return the saved payload."""
-    normalized_session_id = session_id.strip()
+    normalized_session_id = normalize_storage_text(session_id)
     if not normalized_session_id:
         raise ValueError("session_id must not be empty")
     if target_items <= 0:
@@ -363,7 +378,7 @@ def save_session_goal(
 
 def load_session_summary(session_id: str) -> SessionSummary | None:
     """Return computed completion metrics for one session id."""
-    normalized_session_id = session_id.strip()
+    normalized_session_id = normalize_storage_text(session_id)
     if not normalized_session_id:
         raise ValueError("session_id must not be empty")
 
@@ -417,6 +432,7 @@ def load_session_summary(session_id: str) -> SessionSummary | None:
 
 def save_curriculum_stage(deck_name: str, card_id: int, mode: str, stage: int) -> None:
     """Persist one curriculum stage row for a card and mode."""
+    normalized_deck_name = _normalize_deck_name(deck_name)
     normalized_mode = mode.strip().lower()
     if not normalized_mode:
         raise ValueError("mode must not be empty")
@@ -432,7 +448,7 @@ def save_curriculum_stage(deck_name: str, card_id: int, mode: str, stage: int) -
                 stage=excluded.stage,
                 updated_at_utc=excluded.updated_at_utc
             """,
-            (deck_name, card_id, normalized_mode, normalized_stage, updated_at),
+            (normalized_deck_name, card_id, normalized_mode, normalized_stage, updated_at),
         )
 
 
@@ -441,6 +457,7 @@ def load_curriculum_stages(deck_name: str, mode: str, card_ids: list[int]) -> di
     if not card_ids:
         return {}
 
+    normalized_deck_name = _normalize_deck_name(deck_name)
     normalized_mode = mode.strip().lower()
     if not normalized_mode:
         raise ValueError("mode must not be empty")
@@ -453,7 +470,7 @@ def load_curriculum_stages(deck_name: str, mode: str, card_ids: list[int]) -> di
             FROM curriculum_stages
             WHERE deck=? AND mode=? AND card_id IN ({placeholders})
             """,
-            [deck_name, normalized_mode, *card_ids],
+            [normalized_deck_name, normalized_mode, *card_ids],
         ).fetchall()
 
     stages = {int(row["card_id"]): max(1, min(3, int(row["stage"]))) for row in rows}
@@ -469,7 +486,7 @@ def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> C
     if not normalized_mode:
         raise ValueError("mode must not be empty")
 
-    normalized_script = script_tag.strip().lower() if script_tag and script_tag.strip() else ""
+    normalized_script = normalize_storage_text(script_tag).lower() if script_tag else ""
 
     where_clause = "WHERE mode=?"
     params: list[object] = [normalized_mode]
@@ -543,7 +560,7 @@ def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> C
 
 def load_narrative_chapter_summary(script_tag: str | None = None) -> NarrativeChapterSummary:
     """Return chapter-level narrative metrics from review events and curriculum stages."""
-    normalized_script = script_tag.strip().lower() if script_tag and script_tag.strip() else ""
+    normalized_script = normalize_storage_text(script_tag).lower() if script_tag else ""
 
     where_clause = "WHERE tags_csv LIKE ?"
     params: list[object] = ["%narrative_story%"]
@@ -634,8 +651,9 @@ def load_today_progress(
     if not card_ids:
         return (0, 0)
 
+    normalized_deck_name = _normalize_deck_name(deck_name)
     target_day = on_date or date.today()
-    states = load_states(deck_name, card_ids)
+    states = load_states(normalized_deck_name, card_ids)
     due_remaining = sum(1 for state in states.values() if state.next_review <= target_day)
 
     placeholders = ",".join("?" * len(card_ids))
@@ -646,7 +664,7 @@ def load_today_progress(
             FROM review_events
             WHERE deck=? AND reviewed_on=? AND card_id IN ({placeholders})
             """,
-            [deck_name, target_day.isoformat(), *card_ids],
+            [normalized_deck_name, target_day.isoformat(), *card_ids],
         ).fetchone()[0]
 
     due_today = due_remaining + completed_today
@@ -858,6 +876,7 @@ def update_leech_state_for_card(
     fail_threshold: int = 3,
 ) -> None:
     """Recompute and persist leech state for a card from recent review events."""
+    normalized_deck_name = _normalize_deck_name(deck_name)
     with _connect() as conn:
         rows = conn.execute(
             """
@@ -873,7 +892,7 @@ def update_leech_state_for_card(
                 id DESC
             LIMIT ?
             """,
-            (deck_name, card_id, window_size),
+            (normalized_deck_name, card_id, window_size),
         ).fetchall()
 
     qualities = [int(row["quality"]) for row in rows]
@@ -892,7 +911,7 @@ def update_leech_state_for_card(
                 last_evaluated_utc=excluded.last_evaluated_utc
             """,
             (
-                deck_name,
+                normalized_deck_name,
                 card_id,
                 1 if evaluation.is_active else 0,
                 evaluation.attempts_recent,
@@ -904,6 +923,7 @@ def update_leech_state_for_card(
 
 def load_active_leech_card_ids(deck_name: str) -> set[int]:
     """Return active leech card ids for the given deck."""
+    normalized_deck_name = _normalize_deck_name(deck_name)
     with _connect() as conn:
         rows = conn.execute(
             """
@@ -911,7 +931,7 @@ def load_active_leech_card_ids(deck_name: str) -> set[int]:
             FROM leech_items
             WHERE deck=? AND is_active=1
             """,
-            (deck_name,),
+            (normalized_deck_name,),
         ).fetchall()
 
     return {int(row["card_id"]) for row in rows}

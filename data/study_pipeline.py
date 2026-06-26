@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 
 from data import database
 from data.database import CurriculumStageSummary, NarrativeChapterSummary
+from data.text_normalization import normalize_storage_text
 from domain.activity import ActivitySummary
 from domain.curriculum import next_stage
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
@@ -51,7 +52,9 @@ def review_card(
         if reviewed_on_utc is not None
         else datetime.now(timezone.utc).isoformat(timespec="seconds")
     )
-    normalized_script_tag = script_tag.strip().lower() if script_tag.strip() else deck_name.strip().lower().replace(" ", "_")
+    normalized_script_tag = normalize_storage_text(script_tag).lower()
+    if not normalized_script_tag:
+        normalized_script_tag = normalize_storage_text(deck_name).lower().replace(" ", "_")
 
     updated_state = update(state, quality)
     database.save_state(deck_name, updated_state)

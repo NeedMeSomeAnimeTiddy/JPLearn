@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sqlite3
 import sys
-import unicodedata
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from data import database
+from data.text_normalization import normalize_japanese_text, normalize_storage_text
 from domain.decks import ALL_DECKS
 from domain.decks import (
     VOCAB_N1_EXTERNAL_DATA,
@@ -21,11 +21,7 @@ from domain.decks import (
 
 
 def _normalize_deck_key(value: str) -> str:
-    return value.strip().lower().replace("_", " ")
-
-
-def _normalize_japanese_text(value: str) -> str:
-    return unicodedata.normalize("NFKC", value).strip()
+    return normalize_storage_text(value).lower().replace("_", " ")
 
 
 def _build_prompt_lookup() -> dict[tuple[str, int], str]:
