@@ -30,6 +30,9 @@ An Electron-based Japanese learning app with a Python backend for domain logic a
    `python -m pytest tests\path\to\test_file.py -q`
 8. Regenerate external Words/Conversational content module from CSV sources:
    `python scripts\import_external_lists.py`
+9. Export or import progress snapshots:
+   `python scripts\deck_portability.py export --output data\exports\progress.json`
+   `python scripts\deck_portability.py import --input data\exports\progress.json --mode merge`
 
 `scripts\dev.py` is the main gate and runs type checks, architecture checks, DB checks, SRS checks, then tests.
 
@@ -109,7 +112,7 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 - [x] (Medium) Improve external content ingestion pipeline
    - Add stricter CSV schema checks with actionable error output
    - Add deduplication and conflict reporting across imported lists
-- [ ] (Medium) Add deck import/export workflow
+- [x] (Medium) Add deck import/export workflow
    - Export user progress and custom decks
    - Import with merge/overwrite conflict modes
 
