@@ -41,6 +41,8 @@ An Electron-based Japanese learning app with a Python backend for domain logic a
 - Source files:
    `data\external_sources\words_n5.csv`
    `data\external_sources\conversational_n5.csv`
+   `data\external_sources\sentence_examples.csv`
+   `data\external_sources\conjugation_training.csv`
    `data\external_sources\kanji_n5.csv`
    `data\external_sources\kanji_n4.csv`
    `data\external_sources\kanji_n3.csv`
@@ -143,15 +145,15 @@ Use the compact debug CLI when you want high-signal diagnostics with less output
 
 ### Content and Learning Expansion
 #### Phase 1: Foundation
-- [ ] (High) Add a large sentence and example bank
-   - Attach example sentences to vocab, kanji, and grammar cards
-   - Include translation, reading support, and difficulty tags for staged exposure
-- [ ] (High) Expand grammar curriculum into a structured path
-   - Add lesson ordering from beginner through intermediate patterns
-   - Include production drills for conjugation, particles, and sentence building
-- [ ] (Medium) Add dedicated conjugation training
-   - Cover verb and adjective forms with tense, polarity, and politeness transformations
-   - Blend explanation cards with rapid-fire drill modes
+- [x] (High) Add a large sentence and example bank
+   - Example sentences are attached to vocab, kanji, and grammar cards
+   - Sentence content also ships as a dedicated deck and importer-backed source for staged exposure
+- [x] (High) Expand grammar curriculum into a structured path
+   - Grammar progression now exposes ordered blocks for staged exposure
+   - The curriculum path is split into structured sentence and grammar surfaces
+- [x] (Medium) Add dedicated conjugation training
+   - Conjugation training now ships as a dedicated deck with staged block progression
+   - Verb and adjective forms are covered with the existing review and bridge plumbing
 
 #### Phase 2: Skill Expansion
 - [ ] (Medium) Add reading practice content

@@ -168,6 +168,7 @@ def test_build_deck_cards_includes_curriculum_stage(tmp_path: Path, monkeypatch)
     cards = cast(list[dict[str, object]], payload["cards"])
     first_card = next(card for card in cards if card["id"] == 0)
     assert first_card["curriculum_stage"] == 3
+    assert first_card["example_sentence"]
 
 
 def test_build_block_progress_includes_new_phase_one_decks(tmp_path: Path, monkeypatch) -> None:

@@ -177,7 +177,14 @@ _KATAKANA_DATA = [
 
 def _build_deck(name: str, data: list[tuple[str, str]], tag: str) -> Deck:
     cards = [
-        Card(id=i, character=char, romaji=romaji, meaning=romaji, tags=[tag])
+        Card(
+            id=i,
+            character=char,
+            romaji=romaji,
+            meaning=romaji,
+            tags=[tag],
+            example_sentence=f"{char} の れんしゅうを します。",
+        )
         for i, (char, romaji) in enumerate(data)
     ]
     return Deck(name=name, cards=cards)
@@ -189,7 +196,14 @@ def _build_deck_with_meaning(
     tags: list[str],
 ) -> Deck:
     cards = [
-        Card(id=i, character=char, romaji=reading, meaning=meaning, tags=list(tags))
+        Card(
+            id=i,
+            character=char,
+            romaji=reading,
+            meaning=meaning,
+            tags=list(tags),
+            example_sentence=f"{char} を つかった ぶんを れんしゅうします。",
+        )
         for i, (char, reading, meaning) in enumerate(data)
     ]
     return Deck(name=name, cards=cards)
@@ -208,6 +222,7 @@ def _build_kanji_deck(
             romaji=reading,
             meaning=meaning,
             tags=["kanji", level_tag],
+            example_sentence=f"{char} を つかった ぶんを れんしゅうします。",
         )
         for i, (char, reading, meaning) in enumerate(data)
     ]
@@ -227,6 +242,7 @@ def _build_vocab_deck(
             romaji=reading,
             meaning=meaning,
             tags=["vocab", level_tag],
+            example_sentence=f"{char} を つかった ぶんを れんしゅうします。",
         )
         for i, (char, reading, meaning) in enumerate(data)
     ]

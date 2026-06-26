@@ -86,6 +86,7 @@ class GameCard:
     romaji: str
     meaning: str
     tags: list[str]
+    example_sentence: str | None
     is_leech: bool
     curriculum_stage: int
     meaning_distractor_ids: list[int]
@@ -99,6 +100,7 @@ class OverviewCharacterCard:
     romaji: str
     meaning: str
     tags: list[str]
+    example_sentence: str | None
 
 
 @dataclass(frozen=True)
@@ -264,6 +266,7 @@ def build_deck_cards(slug: str) -> dict[str, object]:
             romaji=card.romaji,
             meaning=card.meaning,
             tags=card.tags,
+            example_sentence=card.example_sentence,
             is_leech=card.id in active_leech_ids,
             curriculum_stage=curriculum_stages.get(card.id, 1),
             meaning_distractor_ids=rank_distractor_ids(deck.cards, card, mode="meaning")[:8],
@@ -347,6 +350,7 @@ def build_overview_character_mastery() -> dict[str, object]:
                 romaji=card.romaji,
                 meaning=card.meaning,
                 tags=card.tags,
+                example_sentence=card.example_sentence,
             )
             for card in deck.cards
         )

@@ -85,6 +85,7 @@ class TestKanjiDecks:
             assert card.character, f"Card {card.id} missing character"
             assert card.romaji, f"Card {card.id} missing romaji"
             assert card.meaning, f"Card {card.id} missing meaning"
+            assert card.example_sentence, f"Card {card.id} missing example sentence"
 
     @pytest.mark.parametrize(
         ("loader", "level"),
@@ -194,6 +195,7 @@ class TestGrammarPatternsDeck:
             assert card.character, f"Card {card.id} missing character"
             assert card.romaji, f"Card {card.id} missing romaji"
             assert card.meaning, f"Card {card.id} missing meaning"
+            assert card.example_sentence, f"Card {card.id} missing example sentence"
 
     def test_every_card_has_grammar_tag(self) -> None:
         for card in get_grammar_patterns_deck().cards:
@@ -225,6 +227,7 @@ class TestSentenceExamplesDeck:
             assert card.character, f"Card {card.id} missing character"
             assert card.romaji, f"Card {card.id} missing romaji"
             assert card.meaning, f"Card {card.id} missing meaning"
+            assert card.example_sentence, f"Card {card.id} missing example sentence"
 
     def test_every_card_has_sentence_and_example_tags(self) -> None:
         for card in get_sentence_examples_deck().cards:
@@ -257,6 +260,7 @@ class TestConjugationTrainingDeck:
             assert card.character, f"Card {card.id} missing character"
             assert card.romaji, f"Card {card.id} missing romaji"
             assert card.meaning, f"Card {card.id} missing meaning"
+            assert card.example_sentence, f"Card {card.id} missing example sentence"
 
     def test_every_card_has_conjugation_tag(self) -> None:
         for card in get_conjugation_training_deck().cards:

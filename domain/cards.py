@@ -15,6 +15,7 @@ class Card:
         meaning: English meaning or gloss.
         tags: Arbitrary labels (e.g. ``"hiragana"``, ``"n5"``).
         example_word: Optional example word using this character.
+        example_sentence: Optional example sentence showing the card in context.
     """
 
     id: int
@@ -23,6 +24,7 @@ class Card:
     meaning: str
     tags: list[str] = field(default_factory=list)
     example_word: Optional[str] = None
+    example_sentence: Optional[str] = None
 
     def __str__(self) -> str:
         return f"{self.character}  ({self.romaji})"
