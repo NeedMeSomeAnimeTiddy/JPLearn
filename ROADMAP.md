@@ -47,6 +47,16 @@ This document tracks delivery status and planned improvements.
 - [x] (Medium) Expand answer modes
   - Typed recall mode for vocab and kanji decks
   - Optional confidence score capture per review event
+- [ ] (Medium) Apply confidence scores to SRS scheduling
+  - Confidence is captured per review event but not yet factored into interval calculation
+  - Define rubric for blending confidence with correctness in ease factor updates
+- [ ] (Medium) Add custom deck builder and card creation workflow
+  - UI for creating, editing, and deleting custom cards and decks
+  - Validation and conflict checking against existing content
+  - Data layer placeholder already exists; needs form UI and bridge routes
+- [ ] (Medium) Add progress analytics export
+  - Export review history, accuracy trends, and mastery snapshots to CSV
+  - Useful for external study tracking and self-audit
 
 ## Data Quality and Content Operations
 
@@ -67,16 +77,34 @@ This document tracks delivery status and planned improvements.
 - [x] (Medium) Defer non-critical renderer work until after first meaningful paint
 - [x] (Medium) Add packaged smoke tests in CI (`npm run build`, package, launch check)
 - [x] (Medium) Add restrictive CSP baseline for packaged renderer
+- [ ] (Medium) Decompose App.tsx monolith into scene-level components
+  - Extract StudyScene, OverviewScene, SettingsScene, and OnboardingScene
+  - Enables targeted component tests and reduces cognitive load per file
 
 ## Quality, Tooling, and Developer Experience
 
+- [ ] (Medium) Add automated accessibility checks
+  - Integrate axe-core or equivalent into the frontend test suite
+  - Cover primary study and overview flows with automated assertions
+- [ ] (Medium) Add performance regression tests for large datasets
+  - Validate queue build, deck summary, and history aggregation with 10k+ items
+  - Establish baseline thresholds to catch regressions before they ship
 - [ ] (Low) Add contributor architecture diagrams and a "how data flows" reference doc
+- [ ] (Low) Clean up empty domain/models.py or consolidate shared model definitions
 
 ## Deferred Product Additions
 
-- [ ] (Medium) Add pronunciation/audio support (deferred)
-  - Pluggable TTS or bundled audio strategy
-  - Cache policy for offline reliability
+- [ ] (Medium) Add pluggable TTS backend selection
+  - VOICEVOX ships and works; Piper backend exists but is not user-selectable
+  - Expose backend choice in settings with per-backend speaker and quality options
+  - Cache policy and warm-up strategy per selected engine
+- [ ] (Medium) Add Anki .apkg import compatibility
+  - Map Anki note types and field names to JPLearn card structure
+  - Preserve deck hierarchy, tags, and review history on import
+- [ ] (Low) Complete LLM tutor integration beyond scripted fallbacks
+  - llama.cpp runtime and chat UI exist; prompt pipeline currently uses scripted stubs
+  - Wire full context assembly (activity, history, mistakes) into live model calls
+  - Add integration tests with a mock model adapter
 
 ## Content and Learning Expansion
 
@@ -114,6 +142,9 @@ This document tracks delivery status and planned improvements.
   - Support recognition vs. recall vs. writing mastery as separate skills
   - Store stroke hints, writing prompts, and production-specific progress
   - Kanji rounds now include a stroke-order writing drill for N5 characters
+- [ ] (Medium) Animate kanji stroke-order playback
+  - Replace static stroke-order hints with animated SVG stroke-by-stroke playback
+  - Show direction, count, and sequence during writing drill mode
 
 ### Phase 3: Personalization
 
@@ -127,3 +158,6 @@ This document tracks delivery status and planned improvements.
 - [ ] Sentence mining workflow and contextual example cards
 - [ ] Theme presets and advanced UI personalization
 - [ ] Mobile companion app (read-only progress + lightweight reviews)
+- [ ] Furigana and reading-aid rendering in card display
+  - Attach ruby/furigana markup to vocabulary and sentence cards
+  - Toggle reading aids on/off per study mode to control difficulty
