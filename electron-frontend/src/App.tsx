@@ -2531,6 +2531,11 @@ function App() {
       interactionType: 'clicked' | 'ignored' | 'expired',
       extraMetadata?: Record<string, string>,
     ): Promise<void> => {
+      // Negative IDs are locally-generated toasts (not in the DB); nothing to track.
+      if (toast.id <= 0) {
+        return
+      }
+
       const trackAssistantEvent = window.jplearnDesktop.trackAssistantEvent
       if (!trackAssistantEvent) {
         return
