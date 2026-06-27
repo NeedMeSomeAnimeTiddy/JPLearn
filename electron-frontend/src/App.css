@@ -211,6 +211,25 @@
   cursor: pointer;
 }
 
+.assistant-chat-runtime-details {
+  display: grid;
+  gap: 2px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 76%, white 24%);
+  background: color-mix(in oklab, var(--panel-bg) 88%, black);
+  padding: 6px 8px;
+}
+
+.assistant-chat-runtime-details span {
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  line-height: 1.28;
+}
+
+.assistant-chat-runtime-warning {
+  color: color-mix(in oklab, var(--tone-danger) 72%, var(--text-main));
+}
+
 .assistant-chat-log {
   max-height: 230px;
   overflow: auto;

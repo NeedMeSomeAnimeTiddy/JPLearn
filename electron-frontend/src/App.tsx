@@ -76,6 +76,10 @@ interface AssistantChatRuntimeStatus {
   loadedAtUtc: string | null
   lastUsedAtUtc: string | null
   inactivityUnloadMs: number
+  configuredProvider?: string
+  activeProvider?: string
+  activeModel?: string
+  lastError?: string | null
 }
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
@@ -1872,6 +1876,26 @@ function App() {
   const backgroundImageCacheRef = useRef<Partial<Record<BackgroundStyle, HTMLImageElement>>>({})
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
+
+  const assistantRuntimeProviderLabel = useMemo(() => {
+    const provider = assistantChatStatus?.activeProvider ?? assistantChatStatus?.configuredProvider ?? null
+    if (!provider) return 'stub'
+    if (provider === 'stub-fallback') return 'stub fallback'
+    return provider
+  }, [assistantChatStatus?.activeProvider, assistantChatStatus?.configuredProvider])
+
+  const assistantRuntimeModelLabel = useMemo(() => {
+    const model = assistantChatStatus?.activeModel
+    if (!model) return null
+    if (model.length <= 28) return model
+    return `${model.slice(0, 25)}...`
+  }, [assistantChatStatus?.activeModel])
+
+  const assistantRuntimeIdleLabel = useMemo(() => {
+    if (!assistantChatStatus) return 'n/a'
+    const minutes = Math.max(1, Math.round(assistantChatStatus.inactivityUnloadMs / 60000))
+    return `${minutes}m`
+  }, [assistantChatStatus])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
   const interleaveSequence = useMemo(
@@ -6167,6 +6191,17 @@ function App() {
                 </button>
               </div>
             </header>
+
+            <div className="assistant-chat-runtime-details" aria-label="Tutor runtime diagnostics">
+              <span>Provider: {assistantRuntimeProviderLabel}</span>
+              <span>Model: {assistantRuntimeModelLabel ?? 'default'}</span>
+              <span>Unload: {assistantRuntimeIdleLabel}</span>
+              {assistantChatStatus?.lastError ? (
+                <span className="assistant-chat-runtime-warning" title={assistantChatStatus.lastError}>
+                  Fallback active: {assistantChatStatus.lastError}
+                </span>
+              ) : null}
+            </div>
 
             <div className="assistant-chat-log" role="log" aria-live="polite">
               {assistantChatMessages.length <= 0 ? (
