@@ -11,9 +11,25 @@ const DEFAULT_HOST = process.env.JPLEARN_VOICEVOX_HOST || '127.0.0.1'
 const DEFAULT_PORT = Number.isFinite(Number(process.env.JPLEARN_VOICEVOX_PORT)) ? Number(process.env.JPLEARN_VOICEVOX_PORT) : 50021
 const DEFAULT_SPEAKER = Number.isFinite(Number(process.env.JPLEARN_VOICEVOX_SPEAKER)) ? Number(process.env.JPLEARN_VOICEVOX_SPEAKER) : 13
 const DEFAULT_SPEED = Number.isFinite(Number(process.env.JPLEARN_VOICEVOX_SPEED)) ? Number(process.env.JPLEARN_VOICEVOX_SPEED) : 1.0
+// Pause-length scale applied to all inter-phrase gaps. VOICEVOX defaults to 1.0
+// which produces ~0.8–1.0 s pauses around unknown characters (〜) and spaces.
+// 0.25 keeps pauses audible but natural for a study context.
+const DEFAULT_PAUSE_SCALE = Number.isFinite(Number(process.env.JPLEARN_VOICEVOX_PAUSE_SCALE)) ? Math.min(2, Math.max(0, Number(process.env.JPLEARN_VOICEVOX_PAUSE_SCALE))) : 0.5
 const DEFAULT_MAX_TEXT_CHARS = 400
 const DEFAULT_REQUEST_TIMEOUT_MS = 30000
 const DEFAULT_STARTUP_TIMEOUT_MS = 60000
+
+// Strip characters that cause VOICEVOX to insert long pauses:
+//   〜 (wave dash) — used as a grammar-pattern placeholder in the UI, treated
+//      as an unknown character by the synthesis engine → ~1 s gap each
+//   ASCII spaces and ideographic spaces — VOICEVOX treats them as phrase
+//      boundaries; Japanese text doesn't need spaces as word separators
+function preprocessForSpeech(text) {
+  return text
+    .replace(/〜/g, '')       // remove grammar-pattern placeholders
+    .replace(/[　 ]+/g, '')   // remove full-width and half-width spaces
+    .trim()
+}
 
 function resolveEnginePath(repoRoot) {
   const candidates = [
@@ -159,6 +175,7 @@ function createVoiceRuntime(options = {}) {
     if (Number.isFinite(speed)) {
       queryObject.speedScale = speed
     }
+    queryObject.pauseLengthScale = DEFAULT_PAUSE_SCALE
 
     const queryBody = Buffer.from(JSON.stringify(queryObject), 'utf8')
     const synthesis = await httpRequest(
@@ -197,7 +214,11 @@ function createVoiceRuntime(options = {}) {
       if (!normalized) {
         throw new Error('Speak text must not be empty')
       }
-      const boundedText = normalized.length <= maxTextChars ? normalized : normalized.slice(0, maxTextChars)
+      const preprocessed = preprocessForSpeech(normalized)
+      if (!preprocessed) {
+        throw new Error('Speak text must not be empty')
+      }
+      const boundedText = preprocessed.length <= maxTextChars ? preprocessed : preprocessed.slice(0, maxTextChars)
 
       await ensureEngine()
 
