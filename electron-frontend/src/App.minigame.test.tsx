@@ -236,13 +236,13 @@ describe('Minigame menu', () => {
     await screen.findByRole('heading', { name: /^JPLearn$/i })
     clickTopMenuCard('Words')
 
-    fireEvent.click(await screen.findByRole('button', { name: /toggle confidence capture/i }))
-    fireEvent.click(await screen.findByRole('button', { name: '5' }))
+    fireEvent.click(await screen.findByRole('button', { name: /toggle answer confidence capture/i }))
 
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
     fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
     const typedInput = await screen.findByPlaceholderText(/Type meaning/i)
+    fireEvent.click(screen.getByRole('button', { name: /confidence high/i }))
     fireEvent.change(typedInput, { target: { value: 'a' } })
     fireEvent.click(screen.getByRole('button', { name: /^Check$/i }))
 

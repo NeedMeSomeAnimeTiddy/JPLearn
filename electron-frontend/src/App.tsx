@@ -28,14 +28,13 @@ interface SessionRunReport {
   targetItems: number
   goalCompletionPct: number
   goalDelta: number
-  pointsPerRound: number
-  pointsPerCorrect: number
   livesEnabled: boolean
   livesRemaining: number
   livesLost: number
   leechFocusEnabled: boolean
   confidenceCaptureEnabled: boolean
-  selectedConfidenceScore: number
+  confidenceCapturedCount: number
+  averageConfidenceScore: number | null
 }
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
@@ -76,6 +75,14 @@ const DEFAULT_INTERLEAVE_WEIGHTS: InterleaveWeights = {
   meaning_match: 1,
   character_match: 1,
   context_cloze: 1,
+}
+const POINT_COMBO_THRESHOLDS = [3, 6, 9] as const
+const POINTS_RULE_COPY = '1 point per correct answer, with combo bonuses at streaks 3, 6, and 9 (max 4 points).'
+const CONFIDENCE_SCORES = [1, 3, 5] as const
+const CONFIDENCE_LEVEL_LABELS: Record<(typeof CONFIDENCE_SCORES)[number], string> = {
+  1: 'Low',
+  3: 'Mid',
+  5: 'High',
 }
 const SURPRISE_PROMPTS = [
   'Surprise Drill: trust your first instinct.',
@@ -1316,6 +1323,14 @@ function buildStudyPlan(
   }
 }
 
+function calculateAwardedPoints(streakAfterCorrect: number): number {
+  const comboBonus = POINT_COMBO_THRESHOLDS.reduce(
+    (count, threshold) => count + (streakAfterCorrect >= threshold ? 1 : 0),
+    0,
+  )
+  return 1 + comboBonus
+}
+
 function App() {
   const [view, setView] = useState<AppView>('home')
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
@@ -1350,6 +1365,8 @@ function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [lastSessionSummary, setLastSessionSummary] = useState<SessionSummaryPayload | null>(null)
   const [sessionRunReport, setSessionRunReport] = useState<SessionRunReport | null>(null)
+  const [resumeRequest, setResumeRequest] = useState<{ script: ScriptKey; minigame: MinigameKey } | null>(null)
+  const [sessionStartPending, setSessionStartPending] = useState<boolean>(false)
   const [sessionSummaryLoading, setSessionSummaryLoading] = useState<boolean>(false)
   const [sessionGoalError, setSessionGoalError] = useState<string | null>(null)
   const [livesEnabled, setLivesEnabled] = useState<boolean>(false)
@@ -1359,7 +1376,9 @@ function App() {
   const [interleaveSurpriseEnabled] = useState<boolean>(true)
   const [interleaveSurpriseEvery] = useState<number>(5)
   const [confidenceCaptureEnabled, setConfidenceCaptureEnabled] = useState<boolean>(false)
-  const [selectedConfidenceScore, setSelectedConfidenceScore] = useState<number>(3)
+  const [roundConfidenceScore, setRoundConfidenceScore] = useState<number>(3)
+  const [sessionConfidenceCount, setSessionConfidenceCount] = useState<number>(0)
+  const [sessionConfidenceTotal, setSessionConfidenceTotal] = useState<number>(0)
 
   const [scriptStats, setScriptStats] = useState<StatsByScript>(() => loadSavedStats())
   const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
@@ -1596,9 +1615,11 @@ function App() {
       ? Math.min(999, Math.round((completedRounds / sessionTargetItems) * 100))
       : 0
     const goalDelta = completedRounds - sessionTargetItems
-    const pointsPerRound = completedRounds > 0 ? Number((sessionPoints / completedRounds).toFixed(2)) : 0
-    const pointsPerCorrect = completedCorrect > 0 ? Number((sessionPoints / completedCorrect).toFixed(2)) : 0
     const livesLost = livesEnabled ? Math.max(0, DEFAULT_LIVES - livesRemaining) : 0
+    const averageConfidenceScore =
+      sessionConfidenceCount > 0
+        ? Number((sessionConfidenceTotal / sessionConfidenceCount).toFixed(2))
+        : null
 
     setSessionRunReport({
       script: activeScript,
@@ -1613,14 +1634,13 @@ function App() {
       targetItems: sessionTargetItems,
       goalCompletionPct,
       goalDelta,
-      pointsPerRound,
-      pointsPerCorrect,
       livesEnabled,
       livesRemaining,
       livesLost,
       leechFocusEnabled,
       confidenceCaptureEnabled,
-      selectedConfidenceScore,
+      confidenceCapturedCount: sessionConfidenceCount,
+      averageConfidenceScore,
     })
 
     setSessionSummaryLoading(true)
@@ -1650,8 +1670,9 @@ function App() {
     leechFocusEnabled,
     livesEnabled,
     livesRemaining,
-    selectedConfidenceScore,
     sessionActive,
+    sessionConfidenceCount,
+    sessionConfidenceTotal,
     sessionPoints,
     sessionRounds,
     sessionScore,
@@ -1822,6 +1843,8 @@ function App() {
     setSessionScore(0)
     setSessionRounds(0)
     setSessionPoints(0)
+    setSessionConfidenceCount(0)
+    setSessionConfidenceTotal(0)
     setLivesRemaining(DEFAULT_LIVES)
     setLeechFocusEnabled(false)
     resetRoundCycle()
@@ -2303,62 +2326,70 @@ function App() {
   }, [activeSessionLengthPreset])
 
   const startSession = useCallback(async (selectedGame: MinigameKey = activeGame) => {
+    setSessionStartPending(true)
     resetRoundCycle()
     setSessionGoalError(null)
     setLastSessionSummary(null)
     setSessionRunReport(null)
-    const leechPool = activeBlockCards.filter((card) => card.is_leech)
-    const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
-    const modeSelection = nextRoundMode(selectedGame)
-    const modeCards = modeSelection.mode === 'narrative_story'
-      ? narrativePriorityCards(sourceCards)
-      : sourceCards
-    const goalTargetItems = Math.max(1, Math.floor(sessionTargetItems))
-
     try {
-      const goalResponse: SessionGoalStartResponse = await window.jplearnDesktop.startSessionGoal({
-        targetItems: goalTargetItems,
-      })
-      if (!goalResponse.ok) {
-        setSessionGoalError('Unable to start session goal.')
+      const leechPool = activeBlockCards.filter((card) => card.is_leech)
+      const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
+      const modeSelection = nextRoundMode(selectedGame)
+      const modeCards = modeSelection.mode === 'narrative_story'
+        ? narrativePriorityCards(sourceCards)
+        : sourceCards
+      const goalTargetItems = Math.max(1, Math.floor(sessionTargetItems))
+
+      try {
+        const goalResponse: SessionGoalStartResponse = await window.jplearnDesktop.startSessionGoal({
+          targetItems: goalTargetItems,
+        })
+        if (!goalResponse.ok) {
+          setSessionGoalError('Unable to start session goal.')
+          return
+        }
+        setActiveSessionId(goalResponse.goal.session_id)
+      } catch (error: unknown) {
+        setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
         return
       }
-      setActiveSessionId(goalResponse.goal.session_id)
-    } catch (error: unknown) {
-      setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
-      return
-    }
 
-    await hydrateRoundCycle(modeCards)
-    const index = nextCardIndex(modeCards.length)
-    const nextRound = index === null
-      ? null
-      : buildRound(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
-    if (!nextRound) {
-      setSessionActive(false)
-      setRoundState(null)
-      if (leechFocusEnabled && leechPool.length === 0) {
-        setGameError('No active leech cards in this block yet. Disable focused review mode to continue.')
-      } else {
-        setGameError('Not enough cards in this block for the selected minigame yet.')
+      await hydrateRoundCycle(modeCards)
+      const index = nextCardIndex(modeCards.length)
+      const nextRound = index === null
+        ? null
+        : buildRound(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
+      if (!nextRound) {
+        setSessionActive(false)
+        setRoundState(null)
+        if (leechFocusEnabled && leechPool.length === 0) {
+          setGameError('No active leech cards in this block yet. Disable focused review mode to continue.')
+        } else {
+          setGameError('Not enough cards in this block for the selected minigame yet.')
+        }
+        return
       }
-      return
-    }
 
-    setSessionActive(true)
-    setRoundState(nextRound)
-    setRoundInput('')
-    setRoundFeedback(null)
-    setRoundFeedbackTone(null)
-    setRoundFeedbackPoints(null)
-    setRoundFeedbackAnswer(null)
-    setIsRoundResolving(false)
-    setGameError(null)
-    setLivesRemaining(DEFAULT_LIVES)
+      setSessionActive(true)
+      setRoundState(nextRound)
+      setRoundInput('')
+      setRoundFeedback(null)
+      setRoundFeedbackTone(null)
+      setRoundFeedbackPoints(null)
+      setRoundFeedbackAnswer(null)
+      setIsRoundResolving(false)
+      setGameError(null)
+      setLivesRemaining(DEFAULT_LIVES)
+      setRoundConfidenceScore(3)
+      setSessionConfidenceCount(0)
+      setSessionConfidenceTotal(0)
 
-    if (sessionRounds === 0) {
-      setSessionScore(0)
-      setSessionPoints(0)
+      if (sessionRounds === 0) {
+        setSessionScore(0)
+        setSessionPoints(0)
+      }
+    } finally {
+      setSessionStartPending(false)
     }
   }, [
     activeBlockCards,
@@ -2372,6 +2403,47 @@ function App() {
     sessionRounds,
     sessionTargetItems,
   ])
+
+  const continueLastSession = useCallback(() => {
+    if (!sessionRunReport) return
+
+    const script = sessionRunReport.script
+    const allowedMinigames = SCRIPT_MINIGAMES[script]
+    const minigame = allowedMinigames.includes(sessionRunReport.minigame)
+      ? sessionRunReport.minigame
+      : allowedMinigames[0]
+
+    setActiveGame(minigame)
+    setNavDirection('forward')
+    setView('minigame')
+    setSessionActive(false)
+    setRoundState(null)
+    setRoundFeedback(null)
+    setRoundFeedbackTone(null)
+    setRoundFeedbackPoints(null)
+    setRoundFeedbackAnswer(null)
+    setIsRoundResolving(false)
+    setLivesRemaining(DEFAULT_LIVES)
+    resetRoundCycle()
+
+    if (script !== activeScript) {
+      setActiveScript(script)
+      setResumeRequest({ script, minigame })
+      return
+    }
+
+    void startSession(minigame)
+  }, [activeScript, resetRoundCycle, sessionRunReport, startSession])
+
+  useEffect(() => {
+    if (!resumeRequest) return
+    if (activeScript !== resumeRequest.script) return
+    if (gameLoading || sessionStartPending) return
+
+    const { minigame } = resumeRequest
+    setResumeRequest(null)
+    void startSession(minigame)
+  }, [activeScript, gameLoading, resumeRequest, sessionStartPending, startSession])
 
   const nextRound = useCallback(async () => {
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
@@ -2420,7 +2492,10 @@ function App() {
           : normalizeText(answer) === normalizeText(roundState.answer)
       const previousScript = scriptStats[activeScript]
       const nextStreak = isCorrect ? previousScript.currentStreak + 1 : 0
-      const awardedPoints = isCorrect ? 1 + Math.floor(nextStreak / 3) : 0
+      const awardedPoints = isCorrect ? calculateAwardedPoints(nextStreak) : 0
+      const comboBonus = Math.max(0, awardedPoints - 1)
+      const pointsCopy = `+${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'}`
+      const comboCopy = comboBonus > 0 ? ` (streak bonus +${comboBonus})` : ''
       let nextLives = livesRemaining
 
       setScriptStats((previous) => {
@@ -2458,12 +2533,12 @@ function App() {
         setSessionScore((value) => value + 1)
         setSessionPoints((value) => value + awardedPoints)
         if (roundState.mode === 'typed_recall' && typedAssessment === 'near_miss') {
-          setRoundFeedback(`Near miss accepted +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'}`)
+          setRoundFeedback(`Near miss accepted ${pointsCopy}${comboCopy}`)
         } else if (roundState.mode === 'narrative_story') {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
-          setRoundFeedback(`Correct +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'} · Stage ${roundState.curriculumStage} -> ${nextStage}.`)
+          setRoundFeedback(`Correct ${pointsCopy}${comboCopy} · Stage ${roundState.curriculumStage} -> ${nextStage}.`)
         } else {
-          setRoundFeedback(`Correct +${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'}`)
+          setRoundFeedback(`Correct ${pointsCopy}${comboCopy}`)
         }
         setRoundFeedbackTone('success')
         setRoundFeedbackPoints(awardedPoints)
@@ -2510,6 +2585,8 @@ function App() {
         })
       }
 
+      const confidenceForAnswer = confidenceCaptureEnabled ? roundConfidenceScore : undefined
+
       void window.jplearnDesktop.recordGameResult({
         slug:
           activeScript === 'kanji_n5'
@@ -2525,7 +2602,7 @@ function App() {
             ? roundState.curriculumStage
             : undefined,
         sessionId: activeSessionId ?? undefined,
-        confidenceScore: confidenceCaptureEnabled ? selectedConfidenceScore : undefined,
+        confidenceScore: confidenceForAnswer,
       }).then((result) => {
         if (
           (roundState.mode !== 'context_cloze' && roundState.mode !== 'narrative_story') ||
@@ -2542,6 +2619,11 @@ function App() {
           ),
         )
       }).catch(() => undefined)
+
+      if (typeof confidenceForAnswer === 'number') {
+        setSessionConfidenceCount((value) => value + 1)
+        setSessionConfidenceTotal((value) => value + confidenceForAnswer)
+      }
 
       window.setTimeout(() => {
         if (!isCorrect && livesEnabled && nextLives <= 0) {
@@ -2575,7 +2657,7 @@ function App() {
         setIsRoundResolving(false)
       }, FEEDBACK_REVEAL_MS)
     },
-    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats, selectedConfidenceScore, sessionRounds, sessionTargetItems],
+    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundConfidenceScore, roundState, scriptStats, sessionRounds, sessionTargetItems],
   )
 
   useEffect(() => {
@@ -3633,7 +3715,7 @@ function App() {
                       type="button"
                       className={`setup-option-button setup-toggle-button ${confidenceCaptureEnabled ? 'is-active' : ''}`}
                       aria-pressed={confidenceCaptureEnabled}
-                      aria-label="Toggle confidence capture"
+                      aria-label="Toggle answer confidence capture"
                       title={`Confidence capture: ${confidenceCaptureEnabled ? 'On' : 'Off'}`}
                       onClick={() => setConfidenceCaptureEnabled((previous) => !previous)}
                     >
@@ -3641,31 +3723,12 @@ function App() {
                         <Target className="toggle-icon" strokeWidth={2.1} />
                       </span>
                       <span className="setup-option-copy">
-                        <span className="setup-option-label">Confidence</span>
-                        <span className="setup-option-meta">{confidenceCaptureEnabled ? 'Tracking enabled' : 'Tracking off'}</span>
+                        <span className="setup-option-label">Answer confidence</span>
+                        <span className="setup-option-meta">{confidenceCaptureEnabled ? 'Rate each answer' : 'Tracking off'}</span>
                       </span>
                     </button>
                   </div>
                 </div>
-
-                {confidenceCaptureEnabled ? (
-                  <section className="confidence-controls" aria-label="Confidence score controls">
-                    <p className="interleave-controls-title">Confidence score</p>
-                    <div className="confidence-chip-row" role="group" aria-label="Select confidence score">
-                      {[1, 2, 3, 4, 5].map((score) => (
-                        <button
-                          key={`confidence-${score}`}
-                          type="button"
-                          className={`confidence-chip ${selectedConfidenceScore === score ? 'is-active' : ''}`}
-                          onClick={() => setSelectedConfidenceScore(score)}
-                          aria-pressed={selectedConfidenceScore === score}
-                        >
-                          {score}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
 
                 {sessionSummaryLoading ? <p className="status-line">Loading session summary...</p> : null}
                 {sessionGoalError ? <p className="status-line status-error">{sessionGoalError}</p> : null}
@@ -3678,16 +3741,23 @@ function App() {
                       </span>
                     </div>
                     <p className="session-summary-main">
-                      {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} items · {lastSessionSummary.accuracy}% accuracy
+                      {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} items · {lastSessionSummary.accuracy}% accuracy · {Math.max(0, lastSessionSummary.reviewed - lastSessionSummary.correct)} misses
                     </p>
-                    <div className="session-summary-metrics" aria-label="Last session details">
-                      <span>{lastSessionSummary.correct} correct</span>
-                      <span>{Math.max(0, lastSessionSummary.reviewed - lastSessionSummary.correct)} misses</span>
-                      <span>{lastSessionSummary.reviewed} reviewed</span>
+                    <div className="session-summary-actions">
+                      <span className="session-summary-context">
+                        {sessionRunReport
+                          ? `${SCRIPT_LABELS[sessionRunReport.script]} · ${MINIGAMES.find((game) => game.key === sessionRunReport.minigame)?.title ?? sessionRunReport.minigame}`
+                          : `${SCRIPT_LABELS[activeScript]} · ${selectedGameMeta?.title ?? 'Minigame'}`}
+                      </span>
+                      <button
+                        type="button"
+                        className="session-summary-continue"
+                        onClick={() => continueLastSession()}
+                        disabled={!sessionRunReport || sessionStartPending}
+                      >
+                        Continue
+                      </button>
                     </div>
-                    <p className="session-summary-meta">
-                      {lastSessionSummary.goal_met ? 'Strong run. Keep momentum with one more round.' : 'Close the gap with a fresh run and lock in the set.'}
-                    </p>
                   </section>
                 ) : null}
 
@@ -3736,26 +3806,30 @@ function App() {
                         }}
                         style={{ animationDelay: `${120 + index * 70}ms` }}
                       >
-                        <span className="game-icon" aria-hidden="true"><MinigameIcon game={game.key} /></span>
-                        <strong>{game.title}</strong>
-                        <p>{game.description}</p>
+                        <div className="game-tile-head">
+                          <span className="game-icon" aria-hidden="true"><MinigameIcon game={game.key} /></span>
+                          <div className="game-tile-copy">
+                            <strong className="game-tile-title">{game.title}</strong>
+                            <p className="game-tile-description">{game.description}</p>
+                          </div>
+                        </div>
                         <div className="game-tile-stats" aria-label="Minigame stats">
-                          <span className="game-tile-stat">
-                            <small>Accuracy</small>
+                          <span className="game-tile-stat" aria-label="Accuracy" title="Accuracy">
+                            <span className="game-tile-stat-label" aria-hidden="true"><Target className="game-tile-stat-icon" strokeWidth={2.1} /></span>
                             <strong>{accuracy}%</strong>
                           </span>
-                          <span className="game-tile-stat">
-                            <small>Best Streak</small>
+                          <span className="game-tile-stat" aria-label="Best streak" title="Best streak">
+                            <span className="game-tile-stat-label" aria-hidden="true"><Flame className="game-tile-stat-icon" strokeWidth={2.1} /></span>
                             <strong>{gameStats.bestStreak}</strong>
                           </span>
-                          <span className="game-tile-stat">
-                            <small>Points</small>
+                          <span className="game-tile-stat" aria-label="Points" title="Points">
+                            <span className="game-tile-stat-label" aria-hidden="true"><Trophy className="game-tile-stat-icon" strokeWidth={2.1} /></span>
                             <strong>{gameStats.points}</strong>
                           </span>
                         </div>
                         <button
                           type="button"
-                          className="play-cta-button"
+                          className="play-cta-button game-tile-play"
                           onClick={(event) => {
                             event.stopPropagation()
                             setActiveGame(game.key)
@@ -3860,7 +3934,7 @@ function App() {
               </article>
             ) : !sessionActive ? (
               <>
-                {sessionRunReport ? (
+                {sessionRunReport && !sessionStartPending ? (
                   <article className="post-session-report" role="status" aria-live="polite">
                     <div className="post-session-head">
                       <div>
@@ -3881,24 +3955,27 @@ function App() {
                       <div className="post-session-cell"><small>Correct</small><strong>{sessionRunReport.correct}</strong></div>
                       <div className="post-session-cell"><small>Misses</small><strong>{sessionRunReport.wrong}</strong></div>
                       <div className="post-session-cell"><small>Points</small><strong>{sessionRunReport.points}</strong></div>
-                      <div className="post-session-cell"><small>Goal Progress</small><strong>{sessionRunReport.rounds}/{sessionRunReport.targetItems}</strong></div>
                       <div className="post-session-cell"><small>Goal Completion</small><strong>{sessionRunReport.goalCompletionPct}%</strong></div>
-                      <div className="post-session-cell"><small>Pts / Round</small><strong>{sessionRunReport.pointsPerRound.toFixed(2)}</strong></div>
-                      <div className="post-session-cell"><small>Pts / Correct</small><strong>{sessionRunReport.pointsPerCorrect.toFixed(2)}</strong></div>
-                      <div className="post-session-cell"><small>Lives</small><strong>{sessionRunReport.livesEnabled ? `${sessionRunReport.livesRemaining}/${DEFAULT_LIVES}` : 'Off'}</strong></div>
-                      <div className="post-session-cell"><small>Lives Lost</small><strong>{sessionRunReport.livesEnabled ? sessionRunReport.livesLost : 0}</strong></div>
-                      <div className="post-session-cell"><small>Leech Focus</small><strong>{sessionRunReport.leechFocusEnabled ? 'On' : 'Off'}</strong></div>
-                      <div className="post-session-cell"><small>Confidence</small><strong>{sessionRunReport.confidenceCaptureEnabled ? `On (${sessionRunReport.selectedConfidenceScore})` : 'Off'}</strong></div>
+                      {sessionRunReport.livesEnabled ? (
+                        <>
+                          <div className="post-session-cell"><small>Lives</small><strong>{sessionRunReport.livesRemaining}/{DEFAULT_LIVES}</strong></div>
+                          <div className="post-session-cell"><small>Lives Lost</small><strong>{sessionRunReport.livesLost}</strong></div>
+                        </>
+                      ) : null}
+                      {sessionRunReport.leechFocusEnabled ? (
+                        <div className="post-session-cell"><small>Leech Focus</small><strong>On</strong></div>
+                      ) : null}
+                      {sessionRunReport.confidenceCaptureEnabled ? (
+                        <>
+                          <div className="post-session-cell"><small>Confidence Captured</small><strong>{sessionRunReport.confidenceCapturedCount}</strong></div>
+                          <div className="post-session-cell"><small>Avg Confidence</small><strong>{sessionRunReport.averageConfidenceScore ?? '-'}</strong></div>
+                        </>
+                      ) : null}
                     </div>
 
                     <div className="post-session-insights">
                       <p>
-                        <strong>Pacing:</strong>{' '}
-                        {sessionRunReport.pointsPerRound >= 1.4
-                          ? 'High-efficiency run with strong point gain each round.'
-                          : sessionRunReport.pointsPerRound >= 1
-                            ? 'Steady pace with consistent scoring.'
-                            : 'Careful pace; focus on cleaner streak chains for better point efficiency.'}
+                        <strong>Points Rule:</strong> {POINTS_RULE_COPY}
                       </p>
                       <p>
                         <strong>Goal Check:</strong>{' '}
@@ -3911,7 +3988,7 @@ function App() {
                 ) : null}
 
                 <div className="game-actions">
-                  <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>
+                  <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading || sessionStartPending}>
                     {sessionRunReport ? 'Play Again' : 'Play'}
                   </button>
                   <button
@@ -3928,7 +4005,7 @@ function App() {
               </>
             ) : (
               <div className="game-actions">
-                <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>
+                <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading || sessionStartPending}>
                   Restart Challenge
                 </button>
                 {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
@@ -4065,6 +4142,28 @@ function App() {
                   </div>
                 )}
 
+                {confidenceCaptureEnabled ? (
+                  <section className="confidence-controls confidence-controls-round" aria-label="Confidence score controls">
+                    <p className="interleave-controls-title">Confidence for this answer</p>
+                    <div className="confidence-chip-row confidence-chip-row-round" role="group" aria-label="Select confidence score for this answer">
+                      {CONFIDENCE_SCORES.map((score) => (
+                        <button
+                          key={`round-confidence-${score}`}
+                          type="button"
+                          className={`confidence-chip confidence-chip-round ${roundConfidenceScore === score ? 'is-active' : ''}`}
+                          onClick={() => setRoundConfidenceScore(score)}
+                          aria-pressed={roundConfidenceScore === score}
+                          aria-label={`Confidence ${CONFIDENCE_LEVEL_LABELS[score]}`}
+                          title={`Confidence: ${CONFIDENCE_LEVEL_LABELS[score]}`}
+                          disabled={isRoundResolving}
+                        >
+                          <span className="confidence-chip-label">{CONFIDENCE_LEVEL_LABELS[score]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
                 {roundFeedback ? (
                   <div
                     className={`round-feedback ${
@@ -4080,13 +4179,17 @@ function App() {
                       <span className="round-feedback-points">
                         {roundFeedbackPoints !== null ? `+${roundFeedbackPoints} pts` : '+0 pts'}
                       </span>
+                      <span className="round-feedback-points-rule">Combo at streaks 3/6/9</span>
                       {roundFeedbackTone === 'error' && livesEnabled ? <span className="round-feedback-life">-1 life</span> : null}
                     </div>
                     {roundFeedbackAnswer ? (
-                      <p className="round-feedback-answer">Correct answer: {roundFeedbackAnswer}</p>
+                      <div className="round-feedback-answer">
+                        <p className="round-feedback-answer-label">Correct answer</p>
+                        <p className="round-feedback-answer-value">{roundFeedbackAnswer}</p>
+                      </div>
                     ) : null}
                     {roundState.mode === 'narrative_story' ? (
-                      <p className="round-feedback-answer">Story progress updates chapter access based on stage transitions.</p>
+                      <p className="round-feedback-note">Story progress updates chapter access based on stage transitions.</p>
                     ) : null}
                   </div>
                 ) : null}
