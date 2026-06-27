@@ -3809,6 +3809,14 @@ button {
   max-width: 620px;
   display: grid;
   gap: 14px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 68%, var(--accent) 32%);
+  background:
+    radial-gradient(circle at 80% -10%, color-mix(in oklab, var(--accent) 28%, transparent), transparent 44%),
+    linear-gradient(170deg, color-mix(in oklab, var(--panel-bg-alt) 94%, black), color-mix(in oklab, var(--panel-bg) 96%, black));
+}
+
+.onboarding-skip {
+  align-self: flex-start;
 }
 
 .onboarding-progress {
@@ -3840,6 +3848,25 @@ button {
 .onboarding-step {
   display: grid;
   gap: 10px;
+}
+
+.onboarding-callout {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 76%, var(--accent) 24%);
+  background: color-mix(in oklab, var(--panel-bg-alt) 90%, black);
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.onboarding-checklist {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: var(--text-soft);
+  font-size: 0.88rem;
 }
 
 .onboarding-summary {
@@ -3894,7 +3921,8 @@ button {
 
 .expertise-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
 }
 

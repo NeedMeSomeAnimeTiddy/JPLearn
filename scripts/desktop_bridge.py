@@ -378,7 +378,8 @@ def reset_progress() -> dict[str, object]:
 def _mastered_seed_state(card_id: int) -> ReviewState:
     state = ReviewState(card_id=card_id)
     # The app treats mastered as repetitions >= 3 and interval >= 21.
-    for _ in range(3):
+    # Four successful reviews reaches interval >= 21 with current scheduler settings.
+    for _ in range(4):
         state = update(state, quality=4)
     return state
 

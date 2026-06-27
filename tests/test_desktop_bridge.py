@@ -326,6 +326,23 @@ def test_build_summary_contract_shape(tmp_path: Path, monkeypatch) -> None:
     assert {"sentence_examples", "conjugation_training"}.issubset(slugs)
 
 
+def test_apply_expertise_level_n5_foundation_marks_target_decks_mastered(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    response = desktop_bridge.apply_expertise_level("jlpt_n5_foundation")
+    assert response["ok"] is True
+    assert response["level"] == "jlpt_n5_foundation"
+
+    summary = cast(dict[str, Any], desktop_bridge.build_summary())
+    decks = cast(list[dict[str, Any]], summary["decks"])
+    by_slug = {deck["slug"]: deck for deck in decks}
+
+    for slug in ("hiragana", "katakana", "kanji_n5", "vocab_n5"):
+        deck = by_slug[slug]
+        assert deck["total"] > 0
+        assert deck["mastered"] == deck["total"]
+
+
 def test_start_session_goal_contract_shape(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

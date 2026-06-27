@@ -51,7 +51,6 @@ type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type FeedbackTone = 'success' | 'error' | null
 type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation'
-type OnboardingEnergy = 'chill' | 'steady' | 'sprint'
 type ThemeKey =
   | 'harbor_mist'
   | 'sakura_dawn'
@@ -770,41 +769,23 @@ const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a c
 const EXPERTISE_OPTIONS: Array<{ level: ExpertiseLevel; title: string; description: string }> = [
   {
     level: 'total_beginner',
-    title: 'Total beginner',
-    description: 'Start from zero with all scripts and levels untouched.',
+    title: 'I am starting from scratch',
+    description: 'No decks are pre-completed. You start at lesson one.',
   },
   {
     level: 'know_hiragana',
-    title: 'I know hiragana',
-    description: 'Mark all hiragana cards as mastered.',
+    title: 'I can already read hiragana',
+    description: 'Completes the Hiragana deck only.',
   },
   {
     level: 'know_kana',
-    title: 'I know hiragana and katakana',
-    description: 'Mark both kana decks as mastered.',
+    title: 'I can read hiragana and katakana',
+    description: 'Completes both Kana decks.',
   },
   {
     level: 'jlpt_n5_foundation',
-    title: 'I am comfortable with N5 basics',
-    description: 'Mark kana, N5 kanji, and N5 vocabulary as mastered.',
-  },
-]
-
-const ONBOARDING_ENERGY_OPTIONS: Array<{ value: OnboardingEnergy; title: string; description: string }> = [
-  {
-    value: 'chill',
-    title: 'Chill mode',
-    description: 'Short, low-pressure sessions. Slow and steady vibes.',
-  },
-  {
-    value: 'steady',
-    title: 'Steady climb',
-    description: 'Balanced pace with a little daily momentum.',
-  },
-  {
-    value: 'sprint',
-    title: 'Sprint mode',
-    description: 'I am here to cook. Give me the challenge.',
+    title: 'I already know JLPT N5 basics',
+    description: 'Completes Hiragana, Katakana, N5 Kanji, and N5 Vocabulary.',
   },
 ]
 
@@ -1496,8 +1477,6 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showExpertisePrompt, setShowExpertisePrompt] = useState<boolean>(false)
   const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1)
-  const [onboardingAlias, setOnboardingAlias] = useState<string>('')
-  const [onboardingEnergy, setOnboardingEnergy] = useState<OnboardingEnergy>('steady')
   const [selectedExpertiseLevel, setSelectedExpertiseLevel] = useState<ExpertiseLevel>('total_beginner')
   const [applyingExpertise, setApplyingExpertise] = useState<boolean>(false)
   const [expertiseError, setExpertiseError] = useState<string | null>(null)
@@ -3197,8 +3176,6 @@ function App() {
       setMinigameStats(defaultMinigameStatsByScript())
       setShowExpertisePrompt(true)
       setOnboardingStep(1)
-      setOnboardingAlias('')
-      setOnboardingEnergy('steady')
       setExpertiseError(null)
       setSelectedExpertiseLevel('total_beginner')
       setResetConfirmStep(0)
@@ -3259,11 +3236,14 @@ function App() {
     })
   }, [])
 
-  const onboardingAliasLabel = onboardingAlias.trim().length > 0 ? onboardingAlias.trim() : 'friend'
+  const skipOnboarding = useCallback(() => {
+    window.localStorage.setItem(EXPERTISE_STORAGE_KEY, 'done')
+    setShowExpertisePrompt(false)
+    setExpertiseError(null)
+    setOnboardingStep(1)
+  }, [])
   const selectedExpertiseOption =
     EXPERTISE_OPTIONS.find((option) => option.level === selectedExpertiseLevel) ?? EXPERTISE_OPTIONS[0]
-  const selectedEnergyOption =
-    ONBOARDING_ENERGY_OPTIONS.find((option) => option.value === onboardingEnergy) ?? ONBOARDING_ENERGY_OPTIONS[1]
 
   const titlebarHistoryBack = useCallback(() => {
     const currentIndex = viewHistoryIndexRef.current
@@ -5061,16 +5041,24 @@ function App() {
             <div className="settings-modal-header">
               <div>
                 <h2 id="expertise-title" className="settings-modal-title">
-                  {onboardingStep === 1 ? 'Let us set your launch profile' : null}
-                  {onboardingStep === 2 ? 'What already feels familiar?' : null}
-                  {onboardingStep === 3 ? `Locked in, ${onboardingAliasLabel}.` : null}
+                  {onboardingStep === 1 ? 'Quick setup before your first session' : null}
+                  {onboardingStep === 2 ? 'How much should we pre-complete for you?' : null}
+                  {onboardingStep === 3 ? 'Confirm your starting point' : null}
                 </h2>
                 <p id="expertise-subtitle" className="settings-modal-subtitle">
-                  {onboardingStep === 1 ? 'Quick setup, two minutes max. Pinky promise.' : null}
-                  {onboardingStep === 2 ? 'Pick your level and we will skip what you already know.' : null}
-                  {onboardingStep === 3 ? 'Final check before we fire up your first session.' : null}
+                  {onboardingStep === 1 ? 'This sets your initial progress so you do not repeat basics.' : null}
+                  {onboardingStep === 2 ? 'Choose the option that matches what you can already read today.' : null}
+                  {onboardingStep === 3 ? 'You can change this later by resetting study progress in settings.' : null}
                 </p>
               </div>
+              <button
+                type="button"
+                className="cta-secondary onboarding-skip"
+                onClick={skipOnboarding}
+                disabled={applyingExpertise}
+              >
+                Skip setup
+              </button>
             </div>
 
             <div className="onboarding-progress" aria-label="Onboarding progress">
@@ -5081,35 +5069,17 @@ function App() {
 
             {onboardingStep === 1 ? (
               <div className="onboarding-step">
-                <label className="settings-label" htmlFor="onboarding-alias">What should we call you?</label>
-                <input
-                  id="onboarding-alias"
-                  className="answer-input"
-                  value={onboardingAlias}
-                  onChange={(event) => setOnboardingAlias(event.target.value)}
-                  maxLength={30}
-                  placeholder="Optional nickname"
-                  autoFocus
-                  disabled={applyingExpertise}
-                />
-                <p className="settings-help">No pressure. You can keep it blank and stay mysterious.</p>
-
-                <p className="settings-label">How do you want this to feel?</p>
-                <div className="expertise-options" role="radiogroup" aria-label="Study energy">
-                  {ONBOARDING_ENERGY_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`expertise-option ${onboardingEnergy === option.value ? 'is-active' : ''}`}
-                      onClick={() => setOnboardingEnergy(option.value)}
-                      aria-pressed={onboardingEnergy === option.value}
-                      disabled={applyingExpertise}
-                    >
-                      <span className="expertise-option-title">{option.title}</span>
-                      <span className="expertise-option-description">{option.description}</span>
-                    </button>
-                  ))}
-                </div>
+                <p className="onboarding-callout">
+                  Practical version: tell us what you already know, and we will mark those decks done.
+                </p>
+                <ul className="onboarding-checklist" aria-label="What this setup does">
+                  <li>Skip decks you have already mastered.</li>
+                  <li>Keep unfinished content untouched.</li>
+                  <li>Still let you reset and start over anytime.</li>
+                </ul>
+                <p className="settings-help">
+                  Tiny quirk: honest picks beat heroic picks. Your future self will thank you.
+                </p>
               </div>
             ) : null}
 
@@ -5139,16 +5109,13 @@ function App() {
             {onboardingStep === 3 ? (
               <div className="onboarding-step onboarding-summary">
                 <p>
-                  <strong>Name:</strong> {onboardingAliasLabel}
+                  <strong>Chosen level:</strong> {selectedExpertiseOption.title}
                 </p>
                 <p>
-                  <strong>Pace:</strong> {selectedEnergyOption.title}
-                </p>
-                <p>
-                  <strong>Starting profile:</strong> {selectedExpertiseOption.title}
+                  <strong>What will be completed:</strong> {selectedExpertiseOption.description}
                 </p>
                 <p className="settings-help">
-                  Quirk activated: if today gets chaotic, even a 3-minute review still counts as a win.
+                  If this looks right, press Start learning and we will apply it now.
                 </p>
               </div>
             ) : null}
