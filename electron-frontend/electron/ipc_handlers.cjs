@@ -270,6 +270,16 @@ function registerIpcHandlers(options) {
     return options.localTutorRuntime.getStatus()
   })
 
+  options.ipcMain.handle('assistant-chat:preload', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await options.localTutorRuntime.preload('renderer-startup')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to preload assistant chat runtime: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('assistant-chat:send-message', async (event, payload) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedPayload = validateAssistantChatRuntimePayload(payload)

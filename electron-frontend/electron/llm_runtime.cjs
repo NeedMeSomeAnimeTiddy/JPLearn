@@ -3,7 +3,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
-const DEFAULT_LLAMACPP_TIMEOUT_MS = 35000
+const DEFAULT_LLAMACPP_TIMEOUT_MS = 90000
 const DEFAULT_MAX_CONTEXT_CHARS = 1800
 const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 700
@@ -123,14 +123,39 @@ function sanitizeContextText(context = {}, options = {}) {
   return pairs.slice(0, 8).join('\n')
 }
 
+function extractCliResponseText(rawOutput, promptText) {
+  const raw = typeof rawOutput === 'string' ? rawOutput : String(rawOutput || '')
+  if (!raw.trim()) {
+    return ''
+  }
+
+  const normalizedPrompt = typeof promptText === 'string' ? promptText.trim() : ''
+  let body = raw
+
+  if (normalizedPrompt) {
+    const echoedPromptMarker = `> ${normalizedPrompt}`
+    const markerIndex = body.lastIndexOf(echoedPromptMarker)
+    if (markerIndex >= 0) {
+      body = body.slice(markerIndex + echoedPromptMarker.length)
+    }
+  }
+
+  // llama-cli single-turn mode appends "Exiting..." after the generated text.
+  body = body.replace(/\r/g, '')
+  body = body.replace(/\n\s*Exiting\.\.\.\s*$/i, '')
+  body = body.trim()
+
+  return body
+}
+
 function buildScriptedFallbackResponse(message, context = {}, detail = '') {
   const focus = typeof context.focus_area === 'string' && context.focus_area.trim().length > 0
     ? context.focus_area.trim()
     : 'today\'s weakest area'
   const messageHint = clipText(message, 120)
-  const detailSuffix = detail ? ` (runtime fallback: ${clipText(detail, 120)})` : ''
+  void detail
   return {
-    text: `Coach fallback: let's keep momentum on ${focus}. Start one focused round, then re-check confidence.${detailSuffix} Your message: ${messageHint}`,
+    text: `Coach note: let's keep momentum on ${focus}. Start one focused round, then re-check confidence. Your message: ${messageHint}`,
     provider: 'scripted-fallback',
     model: 'deterministic-scripted',
   }
@@ -179,8 +204,29 @@ function createLlamaCppCliAdapter(config = {}) {
         modelPath,
         '-p',
         boundedPrompt,
+        '-t',
+        '6',
+        '-tb',
+        '6',
+        '-c',
+        '2048',
+        '-cnv',
+        '-st',
+        '--simple-io',
+        '--no-show-timings',
+        '--no-warmup',
+        '--reasoning',
+        'off',
+        '--reasoning-format',
+        'none',
+        '--repeat-penalty',
+        '1.1',
+        '--repeat-last-n',
+        '128',
         '--temp',
-        '0.6',
+        '0.7',
+        '--top-k',
+        '20',
         '--top-p',
         '0.9',
         '-n',
@@ -257,14 +303,19 @@ function createLlamaCppCliAdapter(config = {}) {
             return
           }
           if (code !== 0) {
-            reject(new Error(`llama.cpp exited with code ${code}: ${stderr.trim() || '(empty stderr)'}`))
+            const stderrText = stderr.trim()
+            if (code === 130) {
+              reject(new InferenceAbortError())
+              return
+            }
+            reject(new Error(`llama.cpp exited with code ${code}: ${stderrText || '(empty stderr)'}`))
             return
           }
           resolve(stdout)
         })
       })
 
-      const text = String(output).trim()
+      const text = extractCliResponseText(output, boundedPrompt)
       if (!text) {
         throw new Error('llama.cpp returned empty response')
       }
@@ -479,7 +530,7 @@ function createTutorChatRuntime(options = {}) {
         }
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
-        if (error instanceof InferenceAbortError) {
+        if (error instanceof InferenceAbortError || /llama\.cpp exited with code 130/i.test(detail)) {
           lastError = 'inference-cancelled'
           throw new Error('Chat inference cancelled')
         }
@@ -514,6 +565,18 @@ function createTutorChatRuntime(options = {}) {
         maxOutputChars,
         maxOutputTokens,
         inferenceActive: isInferenceActive,
+      }
+    },
+
+    async preload(reason = 'startup-preload') {
+      const coldStart = await ensureLoaded()
+      lastUsedAtUtc = new Date().toISOString()
+      scheduleInactivityUnload()
+      return {
+        ok: true,
+        reason,
+        coldStart,
+        loaded,
       }
     },
 

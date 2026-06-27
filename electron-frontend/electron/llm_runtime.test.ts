@@ -116,8 +116,65 @@ describe('llm runtime', () => {
     const response = await runtime.sendMessage('help with kanji', { focus_area: 'kanji_n5' })
     expect(response.ok).toBe(true)
     expect(response.provider).toBe('scripted-fallback')
-    expect(response.text).toMatch(/coach fallback/i)
+    expect(response.text).toMatch(/coach note/i)
     expect(response.text.length).toBeLessThanOrEqual(700)
+  })
+
+  it('treats code 130 runtime text as cancellation instead of surfacing raw errors', async () => {
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer() {
+          throw new Error('llama.cpp exited with code 130: (empty stderr)')
+        },
+      }),
+    })
+
+    await expect(runtime.sendMessage('hello', { focus_area: 'today\'s weakest area' })).rejects.toThrow(
+      /chat inference cancelled/i,
+    )
+  })
+
+  it('treats llama.cpp exit code 130 with stderr text as cancellation', async () => {
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer() {
+          throw new Error('llama.cpp exited with code 130: interrupted')
+        },
+      }),
+    })
+
+    await expect(runtime.sendMessage('cancel me please', { focus_area: 'kanji_n5' })).rejects.toThrow(
+      /chat inference cancelled/i,
+    )
+  })
+
+  it('supports explicit runtime preload before first message', async () => {
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+    })
+
+    const preloadResult = await runtime.preload('test-startup')
+    expect(preloadResult.ok).toBe(true)
+    expect(preloadResult.reason).toBe('test-startup')
+    expect(preloadResult.loaded).toBe(true)
+    expect(typeof preloadResult.coldStart).toBe('boolean')
+
+    const status = runtime.getStatus()
+    expect(status.loaded).toBe(true)
   })
 
   it('cancels active inference and reports cancellation', async () => {

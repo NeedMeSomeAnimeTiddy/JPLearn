@@ -30,6 +30,7 @@ describe('preload contract', () => {
       "appendAssistantChatTurn: (payload) => ipcRenderer.invoke('assistant:append-chat-turn', payload)",
       "getAssistantChatHistory: (limit) => ipcRenderer.invoke('assistant:get-chat-history', limit)",
       "getAssistantChatRuntimeStatus: () => ipcRenderer.invoke('assistant-chat:status')",
+      "preloadAssistantChatRuntime: () => ipcRenderer.invoke('assistant-chat:preload')",
       "sendAssistantChatMessage: (payload) => ipcRenderer.invoke('assistant-chat:send-message', payload)",
       "unloadAssistantChatRuntime: () => ipcRenderer.invoke('assistant-chat:unload')",
       "cancelAssistantChatInference: () => ipcRenderer.invoke('assistant-chat:cancel')",

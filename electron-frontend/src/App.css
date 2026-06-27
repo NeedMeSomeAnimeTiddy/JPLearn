@@ -147,17 +147,17 @@
 
 .assistant-chat-panel {
   pointer-events: auto;
-  border-radius: 13px;
+  border-radius: 16px;
   border: 1px solid color-mix(in oklab, var(--panel-border) 78%, white 22%);
   background:
-    radial-gradient(circle at 10% 12%, color-mix(in oklab, var(--tone-ocean) 22%, transparent), transparent 54%),
+    radial-gradient(circle at 12% 8%, color-mix(in oklab, var(--tone-ocean) 20%, transparent), transparent 48%),
     color-mix(in oklab, var(--panel-bg-alt) 94%, black);
   box-shadow:
-    0 20px 34px -22px rgba(0, 0, 0, 0.9),
+    0 22px 36px -22px rgba(0, 0, 0, 0.9),
     inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  padding: 10px;
+  padding: 11px;
   display: grid;
-  gap: 9px;
+  gap: 10px;
 }
 
 .assistant-chat-header {
@@ -240,11 +240,20 @@
 }
 
 .assistant-chat-log {
-  max-height: 230px;
+  max-height: 250px;
   overflow: auto;
   display: grid;
-  gap: 7px;
-  padding-right: 2px;
+  gap: 8px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 80%, white 20%);
+  background:
+    radial-gradient(circle at 82% 18%, color-mix(in oklab, var(--tone-ocean) 10%, transparent), transparent 42%),
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in oklab, var(--panel-bg) 92%, black) 0 10px,
+      color-mix(in oklab, var(--panel-bg) 88%, black) 10px 20px
+    );
 }
 
 .assistant-chat-empty {
@@ -255,34 +264,60 @@
 }
 
 .assistant-chat-turn {
-  border-radius: 9px;
-  padding: 8px 9px;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 74%, white 26%);
-  background: color-mix(in oklab, var(--panel-bg) 84%, black);
+  display: grid;
+  gap: 4px;
+  width: fit-content;
+  max-width: min(88%, 260px);
 }
 
 .assistant-chat-turn h4 {
   margin: 0;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--text-soft);
+  color: color-mix(in oklab, var(--text-soft) 90%, transparent);
+  padding: 0 6px;
 }
 
 .assistant-chat-turn p {
-  margin: 4px 0 0;
-  font-size: 0.75rem;
-  line-height: 1.35;
+  position: relative;
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.38;
   color: var(--text-main);
   white-space: pre-wrap;
+  border-radius: 16px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 74%, white 26%);
+  box-shadow:
+    0 8px 14px -12px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: color-mix(in oklab, var(--panel-bg) 84%, black);
 }
 
 .assistant-chat-turn-assistant {
-  border-color: color-mix(in oklab, var(--tone-ocean) 48%, var(--panel-border));
+  justify-self: start;
 }
 
 .assistant-chat-turn-user {
-  border-color: color-mix(in oklab, var(--tone-skill) 46%, var(--panel-border));
+  justify-self: end;
+  text-align: right;
+}
+
+.assistant-chat-turn-assistant p {
+  border-color: color-mix(in oklab, var(--tone-ocean) 46%, var(--panel-border));
+  background:
+    radial-gradient(circle at 10% 10%, color-mix(in oklab, var(--tone-ocean) 14%, transparent), transparent 52%),
+    color-mix(in oklab, var(--panel-bg) 84%, black);
+  border-top-left-radius: 7px;
+}
+
+.assistant-chat-turn-user p {
+  border-color: color-mix(in oklab, var(--tone-skill) 44%, var(--panel-border));
+  background:
+    radial-gradient(circle at 84% 12%, color-mix(in oklab, var(--tone-skill) 16%, transparent), transparent 52%),
+    color-mix(in oklab, var(--panel-bg) 72%, var(--tone-skill) 28%);
+  border-top-right-radius: 7px;
 }
 
 .assistant-chat-error {
@@ -292,31 +327,39 @@
 }
 
 .assistant-chat-composer {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 7px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 76%, white 24%);
+  background: color-mix(in oklab, var(--panel-bg) 88%, black);
 }
 
 .assistant-chat-composer textarea {
-  resize: vertical;
-  min-height: 52px;
-  max-height: 120px;
-  border-radius: 9px;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 76%, white 24%);
-  background: color-mix(in oklab, var(--panel-bg) 86%, black);
+  resize: none;
+  min-height: 38px;
+  max-height: 96px;
+  flex: 1;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 82%, white 18%);
+  background: color-mix(in oklab, var(--panel-bg) 92%, black);
   color: var(--text-main);
-  padding: 8px 9px;
+  padding: 9px 11px;
   font-family: var(--body-font);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   line-height: 1.36;
 }
 
 .assistant-chat-composer button {
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 58%, var(--panel-border));
-  background: color-mix(in oklab, var(--panel-bg) 80%, var(--tone-ocean) 20%);
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
+  background:
+    radial-gradient(circle at 20% 15%, color-mix(in oklab, var(--tone-ocean) 20%, transparent), transparent 60%),
+    color-mix(in oklab, var(--panel-bg) 76%, var(--tone-ocean) 24%);
   color: var(--text-main);
-  border-radius: 9px;
-  min-height: 30px;
-  padding: 0 10px;
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -325,13 +368,17 @@
   cursor: pointer;
 }
 
+.assistant-chat-composer button:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--tone-ocean) 72%, var(--panel-border));
+}
+
 .assistant-chat-composer button:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
 .assistant-chat-composer-actions {
-  display: inline-flex;
+  display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 6px;

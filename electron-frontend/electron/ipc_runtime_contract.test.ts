@@ -51,6 +51,7 @@ function createRegisteredHandlers(overrides = {}) {
     startupReadyResolvers: new Map(),
     localTutorRuntime: {
       getStatus: vi.fn(() => ({ loaded: false, loadedAtUtc: null, lastUsedAtUtc: null, inactivityUnloadMs: 300000 })),
+      preload: vi.fn(async () => ({ ok: true, reason: 'renderer-startup', coldStart: false, loaded: false })),
       sendMessage: vi.fn(async () => ({ ok: true, text: 'stub', provider: 'stub', model: 'stub', coldStart: false, elapsedMs: 0 })),
       unload: vi.fn(async () => ({ ok: true, reason: 'manual' })),
       cancelActiveInference: vi.fn(async () => ({ ok: true, cancelled: false, reason: 'renderer-cancel' })),

@@ -1729,13 +1729,6 @@ function describeQueueLoad(remainingDue: number): string {
   return 'Long-term queue available; chip away in small runs.'
 }
 
-function formatAssistantMoodLabel(mood: string): string {
-  if (mood === 'coach_celebratory') return 'Celebrating'
-  if (mood === 'coach_supportive') return 'Supportive'
-  if (mood === 'coach_alert') return 'On Alert'
-  return 'Focused'
-}
-
 function formatAssistantEventTitle(event: AssistantEventPayload): string {
   if (event.event_type === 'session_goal_met') return 'Goal complete'
   if (event.event_type === 'streak_milestone') return 'Streak milestone'
@@ -1874,8 +1867,8 @@ function App() {
   const isHistoryNavigationRef = useRef(false)
   const [loading, setLoading] = useState<boolean>(() => loadSummarySnapshot() === null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  const [assistantState, setAssistantState] = useState<AssistantStatePayload | null>(null)
-  const [assistantProfile, setAssistantProfile] = useState<AssistantProfilePayload | null>(null)
+  const [, setAssistantState] = useState<AssistantStatePayload | null>(null)
+  const [, setAssistantProfile] = useState<AssistantProfilePayload | null>(null)
   const [assistantToasts, setAssistantToasts] = useState<AssistantToast[]>([])
   const [assistantChatOpen, setAssistantChatOpen] = useState(false)
   const [assistantChatInput, setAssistantChatInput] = useState('')
@@ -1992,6 +1985,7 @@ function App() {
   const startupBootMarkRef = useRef<number>(performance.now())
   const startupFirstSummaryMsRef = useRef<number | null>(null)
   const startupReadySentRef = useRef(false)
+  const assistantChatPreloadTriggeredRef = useRef(false)
   const previousSessionActiveRef = useRef(false)
   const kanjiLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
@@ -2006,31 +2000,20 @@ function App() {
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
-  const assistantRuntimeProviderLabel = useMemo(() => {
-    const provider = assistantChatStatus?.activeProvider ?? assistantChatStatus?.configuredProvider ?? null
-    if (!provider) return 'stub'
-    if (provider === 'stub-fallback') return 'stub fallback'
-    return provider
-  }, [assistantChatStatus?.activeProvider, assistantChatStatus?.configuredProvider])
-
-  const assistantRuntimeModelLabel = useMemo(() => {
-    const model = assistantChatStatus?.activeModel
-    if (!model) return null
-    if (model.length <= 28) return model
-    return `${model.slice(0, 25)}...`
-  }, [assistantChatStatus?.activeModel])
-
-  const assistantRuntimeIdleLabel = useMemo(() => {
-    if (!assistantChatStatus) return 'n/a'
-    const minutes = Math.max(1, Math.round(assistantChatStatus.inactivityUnloadMs / 60000))
-    return `${minutes}m`
-  }, [assistantChatStatus])
-
   const assistantRuntimePillLabel = useMemo(() => {
     if (assistantChatWarmup) return 'Warming up'
     if (assistantChatStatus?.loaded) return 'Runtime loaded'
     return 'Runtime idle'
   }, [assistantChatStatus?.loaded, assistantChatWarmup])
+
+  const assistantRuntimeWarningLabel = useMemo(() => {
+    const lastError = assistantChatStatus?.lastError
+    if (!lastError) return null
+    if (lastError === 'inference-cancelled') {
+      return 'Last inference cancelled.'
+    }
+    return 'Fallback active due to runtime issue.'
+  }, [assistantChatStatus?.lastError])
 
   const assistantRuntimePillClassName = useMemo(() => {
     if (assistantChatWarmup) return 'assistant-chat-runtime-pill is-warming'
@@ -2550,6 +2533,19 @@ function App() {
     }
   }, [])
 
+  const preloadAssistantChatRuntime = useCallback(async () => {
+    const preloadRuntime = window.jplearnDesktop.preloadAssistantChatRuntime
+    if (!preloadRuntime) {
+      return
+    }
+    try {
+      await preloadRuntime()
+      await refreshAssistantChatStatus()
+    } catch {
+      // Startup preload is best effort and should never interrupt launch.
+    }
+  }, [refreshAssistantChatStatus])
+
   useEffect(() => {
     if (!settings.assistantChatEnabled || !assistantChatOpen) {
       return
@@ -2584,6 +2580,14 @@ function App() {
     }
     void unloadAssistantChatRuntime().catch(() => undefined)
   }, [settings.assistantChatEnabled])
+
+  useEffect(() => {
+    if (!settings.assistantChatEnabled || assistantChatPreloadTriggeredRef.current) {
+      return
+    }
+    assistantChatPreloadTriggeredRef.current = true
+    void preloadAssistantChatRuntime()
+  }, [preloadAssistantChatRuntime, settings.assistantChatEnabled])
 
   const closeAssistantChat = useCallback(() => {
     setAssistantChatOpen(false)
@@ -2646,7 +2650,12 @@ function App() {
       await refreshAssistantChatHistory()
       await refreshAssistantChatStatus()
     } catch (error: unknown) {
-      setAssistantChatError(error instanceof Error ? error.message : 'Unable to send assistant chat message.')
+      const detail = error instanceof Error ? error.message : 'Unable to send assistant chat message.'
+      if (/llama\.cpp exited with code 130/i.test(detail) || /inference cancelled/i.test(detail)) {
+        setAssistantChatError('Chat inference cancelled.')
+      } else {
+        setAssistantChatError(detail)
+      }
     } finally {
       setAssistantChatWarmup(false)
       setAssistantChatLoading(false)
@@ -6475,20 +6484,6 @@ function App() {
           </div>
         ) : null}
 
-        {assistantState ? (
-          <div className="assistant-status-chip" role="status" aria-atomic="true">
-            <Heart className="assistant-status-icon" strokeWidth={2.1} aria-hidden="true" />
-            <div className="assistant-status-copy">
-              <strong>{assistantProfile?.persona_style === 'coach' ? 'Coach' : 'Tutor'}: {formatAssistantMoodLabel(assistantState.mood)}</strong>
-              <span>
-                Momentum {assistantState.momentum >= 0 ? '+' : ''}{assistantState.momentum}
-                {' · '}
-                Focus {assistantState.focus_area}
-              </span>
-            </div>
-          </div>
-        ) : null}
-
         {settings.assistantChatEnabled && assistantChatOpen ? (
           <section id="assistant-chat-panel" className="assistant-chat-panel" aria-label="Tutor chat panel">
             <header className="assistant-chat-header">
@@ -6508,22 +6503,11 @@ function App() {
               </div>
             </header>
 
-            <div className="assistant-chat-runtime-details" aria-label="Tutor runtime diagnostics">
-              <span>Provider: {assistantRuntimeProviderLabel}</span>
-              <span>Model: {assistantRuntimeModelLabel ?? 'default'}</span>
-              <span>Unload: {assistantRuntimeIdleLabel}</span>
-              {assistantChatWarmup ? (
-                <span className="assistant-chat-runtime-info">Model warmup in progress on first message...</span>
-              ) : null}
-              {assistantChatStatus?.lastError ? (
-                <span className="assistant-chat-runtime-warning" title={assistantChatStatus.lastError}>
-                  Fallback active: {assistantChatStatus.lastError}
-                </span>
-              ) : null}
-              {assistantChatFallbackNote ? (
-                <span className="assistant-chat-runtime-warning">{assistantChatFallbackNote}</span>
-              ) : null}
-            </div>
+            {assistantRuntimeWarningLabel || assistantChatFallbackNote ? (
+              <p className="assistant-chat-error" role="status" aria-live="polite">
+                {assistantRuntimeWarningLabel ?? assistantChatFallbackNote}
+              </p>
+            ) : null}
 
             <div className="assistant-chat-log" role="log" aria-live="polite">
               {assistantChatMessages.length <= 0 ? (
@@ -6546,6 +6530,16 @@ function App() {
               <textarea
                 value={assistantChatInput}
                 onChange={(event) => setAssistantChatInput(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' || event.shiftKey) {
+                    return
+                  }
+                  event.preventDefault()
+                  if (assistantChatLoading || assistantChatInput.trim().length === 0) {
+                    return
+                  }
+                  void sendAssistantChat()
+                }}
                 placeholder="Ask your coach for help with your current weak area..."
                 rows={2}
                 disabled={assistantChatLoading}
