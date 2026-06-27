@@ -13,11 +13,20 @@ function registerIpcHandlers(options) {
     isDev: options.isDev,
     getWindowFromSender: options.getWindowFromSender,
   })
+  const runPythonBridgeRead = (command) =>
+    (options.runPythonBridgeCached || options.runPythonBridge)(command)
+  const runPythonBridgeWithArgsRead = (args) =>
+    (options.runPythonBridgeWithArgsCached || options.runPythonBridgeWithArgs)(args)
+  const clearBridgeReadCaches = () => {
+    if (typeof options.clearBridgeReadCaches === 'function') {
+      options.clearBridgeReadCaches()
+    }
+  }
 
   options.ipcMain.handle('study:get-summary', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await options.runPythonBridge('summary')
+      return await runPythonBridgeRead('summary')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch study summary: ${detail}`)
@@ -28,7 +37,7 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedSlug = validateDeckSlug(slug)
     try {
-      return await options.runPythonBridgeWithArgs(['block-progress', validatedSlug])
+      return await runPythonBridgeWithArgsRead(['block-progress', validatedSlug])
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch block progress: ${detail}`)
@@ -39,7 +48,7 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedSlug = validateDeckSlug(slug)
     try {
-      return await options.runPythonBridgeWithArgs(['deck-cards', validatedSlug])
+      return await runPythonBridgeWithArgsRead(['deck-cards', validatedSlug])
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch deck cards: ${detail}`)
@@ -49,7 +58,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('study:get-overview-character-mastery', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await options.runPythonBridge('overview-character-mastery')
+      return await runPythonBridgeRead('overview-character-mastery')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch overview character mastery: ${detail}`)
@@ -60,7 +69,7 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedSlug = validateDeckSlug(slug)
     try {
-      return await options.runPythonBridgeWithArgs(['study-queue', validatedSlug])
+      return await runPythonBridgeWithArgsRead(['study-queue', validatedSlug])
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch study queue: ${detail}`)
@@ -70,7 +79,9 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('study:reset-db', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await options.runPythonBridge('reset-db')
+      const response = await options.runPythonBridge('reset-db')
+      clearBridgeReadCaches()
+      return response
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to reset study database: ${detail}`)
@@ -110,7 +121,9 @@ function registerIpcHandlers(options) {
       if (confidenceArg) {
         args.push(confidenceArg)
       }
-      return await options.runPythonBridgeWithArgs(args)
+      const response = await options.runPythonBridgeWithArgs(args)
+      clearBridgeReadCaches()
+      return response
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to record game result: ${detail}`)
@@ -159,7 +172,9 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedLevel = validateExpertiseLevelInput(level)
     try {
-      return await options.runPythonBridgeWithArgs(['apply-expertise-level', validatedLevel])
+      const response = await options.runPythonBridgeWithArgs(['apply-expertise-level', validatedLevel])
+      clearBridgeReadCaches()
+      return response
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to apply expertise level: ${detail}`)

@@ -51,12 +51,20 @@
 }
 
 html[data-theme='harbor_mist'] {
-  --bg-main: #0e151c;
-  --bg-subtle: #14202a;
-  --text-main: #edf4f7;
-  --text-soft: #a8bcc6;
-  --accent: #f2b56f;
-  --tone-ocean: #7eb8ea;
+  --bg-main: #0a161f;
+  --bg-subtle: #122633;
+  --text-main: #eaf5fb;
+  --text-soft: #a8c0cf;
+  --accent: #7bc5df;
+  --accent-soft: #a8def0;
+  --panel-bg: rgba(22, 45, 60, 0.84);
+  --panel-bg-alt: rgba(16, 34, 46, 0.8);
+  --button-bg-top: rgba(58, 98, 122, 0.9);
+  --button-bg-bottom: rgba(43, 76, 98, 0.9);
+  --card-bg-top: rgba(40, 75, 94, 0.9);
+  --card-bg-bottom: rgba(30, 60, 76, 0.86);
+  --tone-teal: #6dc5c8;
+  --tone-ocean: #8acbe5;
 }
 
 html[data-theme='sakura_dawn'] {
@@ -128,23 +136,224 @@ html[data-theme='midnight_neon'] {
 }
 
 html[data-theme='paper_crane'] {
-  --bg-main: #f2eee6;
-  --bg-subtle: #e8e2d7;
-  --text-main: #2f2a24;
-  --text-soft: #6a6054;
-  --accent: #d18a57;
-  --accent-soft: #e5b48a;
-  --panel-bg: rgba(255, 253, 247, 0.88);
-  --panel-bg-alt: rgba(248, 244, 236, 0.86);
-  --panel-border: rgba(154, 127, 95, 0.28);
-  --button-border: rgba(156, 128, 99, 0.4);
-  --button-bg-top: rgba(217, 196, 163, 0.92);
-  --button-bg-bottom: rgba(191, 166, 130, 0.92);
-  --card-border: rgba(160, 135, 105, 0.3);
-  --card-bg-top: rgba(243, 234, 216, 0.94);
-  --card-bg-bottom: rgba(229, 216, 192, 0.9);
-  --tone-rose: #d28b7c;
-  --tone-ocean: #77a1b9;
+  --bg-main: #13100e;
+  --bg-subtle: #1c1713;
+  --text-main: #f5ece0;
+  --text-soft: #c7b4a0;
+  --accent: #d4a57d;
+  --accent-soft: #e6c3a4;
+  --panel-bg: rgba(47, 37, 30, 0.86);
+  --panel-bg-alt: rgba(36, 28, 23, 0.82);
+  --panel-border: rgba(175, 140, 109, 0.26);
+  --button-border: rgba(177, 143, 111, 0.36);
+  --button-bg-top: rgba(120, 90, 66, 0.92);
+  --button-bg-bottom: rgba(94, 70, 52, 0.9);
+  --card-border: rgba(172, 138, 108, 0.3);
+  --card-bg-top: rgba(84, 64, 50, 0.9);
+  --card-bg-bottom: rgba(66, 50, 40, 0.88);
+  --tone-amber: #dcb287;
+  --tone-rose: #ce8f80;
+  --tone-ocean: #8fb6c8;
+}
+
+html[data-theme='harbor_mist_light'] {
+  --bg-main: #ecf4f9;
+  --bg-subtle: #dcebf4;
+  --text-main: #1f313e;
+  --text-soft: #557384;
+  --accent: #69abc4;
+  --accent-soft: #98c8da;
+  --panel-bg: rgba(255, 255, 255, 0.88);
+  --panel-bg-alt: rgba(243, 250, 255, 0.86);
+  --panel-border: rgba(99, 146, 171, 0.26);
+  --button-border: rgba(104, 149, 173, 0.34);
+  --button-bg-top: rgba(192, 223, 238, 0.94);
+  --button-bg-bottom: rgba(168, 206, 226, 0.92);
+  --card-border: rgba(106, 152, 176, 0.28);
+  --card-bg-top: rgba(234, 246, 253, 0.94);
+  --card-bg-bottom: rgba(213, 235, 247, 0.9);
+  --tone-teal: #63b8bc;
+  --tone-ocean: #73b3d8;
+}
+
+html[data-theme='sakura_dawn_light'] {
+  --bg-main: #f8edf1;
+  --bg-subtle: #f1e2e9;
+  --text-main: #3b2a35;
+  --text-soft: #7c5f6f;
+  --accent: #e48ea2;
+  --accent-soft: #efb4c2;
+  --panel-bg: rgba(255, 252, 255, 0.9);
+  --panel-bg-alt: rgba(252, 244, 249, 0.88);
+  --panel-border: rgba(169, 118, 137, 0.28);
+  --button-border: rgba(170, 120, 139, 0.36);
+  --button-bg-top: rgba(240, 205, 220, 0.94);
+  --button-bg-bottom: rgba(225, 182, 201, 0.92);
+  --card-border: rgba(173, 124, 143, 0.3);
+  --card-bg-top: rgba(250, 236, 244, 0.94);
+  --card-bg-bottom: rgba(241, 218, 229, 0.9);
+  --tone-rose: #d57f98;
+  --tone-ocean: #86b9cf;
+}
+
+html[data-theme='sunset_lacquer_light'] {
+  --bg-main: #fbf0ea;
+  --bg-subtle: #f5e5dc;
+  --text-main: #3c2b28;
+  --text-soft: #7e635d;
+  --accent: #dd8c62;
+  --accent-soft: #efb799;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg-alt: rgba(254, 247, 243, 0.88);
+  --panel-border: rgba(168, 118, 95, 0.28);
+  --button-border: rgba(172, 122, 99, 0.36);
+  --button-bg-top: rgba(245, 212, 196, 0.94);
+  --button-bg-bottom: rgba(233, 188, 165, 0.92);
+  --card-border: rgba(175, 126, 102, 0.3);
+  --card-bg-top: rgba(252, 238, 229, 0.94);
+  --card-bg-bottom: rgba(245, 222, 207, 0.9);
+  --tone-amber: #e2a36e;
+  --tone-rose: #cf8675;
+}
+
+html[data-theme='midnight_neon_light'] {
+  --bg-main: #edf2fb;
+  --bg-subtle: #dfe7f6;
+  --text-main: #26314b;
+  --text-soft: #5f7096;
+  --accent: #66a8d6;
+  --accent-soft: #98c5e5;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg-alt: rgba(245, 248, 255, 0.88);
+  --panel-border: rgba(103, 132, 182, 0.28);
+  --button-border: rgba(108, 137, 186, 0.36);
+  --button-bg-top: rgba(206, 220, 244, 0.94);
+  --button-bg-bottom: rgba(182, 201, 232, 0.92);
+  --card-border: rgba(111, 141, 190, 0.3);
+  --card-bg-top: rgba(236, 242, 253, 0.94);
+  --card-bg-bottom: rgba(216, 227, 247, 0.9);
+  --tone-ocean: #6eaed8;
+  --tone-teal: #6dbbc2;
+}
+
+html[data-theme='paper_crane_light'] {
+  --bg-main: #f4efe8;
+  --bg-subtle: #ece4d9;
+  --text-main: #352d27;
+  --text-soft: #726257;
+  --accent: #b8906d;
+  --accent-soft: #d2b499;
+  --panel-bg: rgba(255, 253, 249, 0.9);
+  --panel-bg-alt: rgba(249, 244, 236, 0.88);
+  --panel-border: rgba(149, 124, 102, 0.28);
+  --button-border: rgba(154, 128, 106, 0.36);
+  --button-bg-top: rgba(230, 211, 190, 0.94);
+  --button-bg-bottom: rgba(208, 184, 158, 0.92);
+  --card-border: rgba(156, 131, 108, 0.3);
+  --card-bg-top: rgba(245, 235, 220, 0.94);
+  --card-bg-bottom: rgba(233, 219, 199, 0.9);
+  --tone-amber: #c29d78;
+  --tone-ocean: #7ea8ba;
+}
+
+html[data-theme='ember_night_light'] {
+  --bg-main: #faefea;
+  --bg-subtle: #f3e2dc;
+  --text-main: #402b29;
+  --text-soft: #876360;
+  --accent: #d8836f;
+  --accent-soft: #e8ac9d;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg-alt: rgba(253, 245, 241, 0.88);
+  --panel-border: rgba(169, 114, 103, 0.28);
+  --button-border: rgba(173, 118, 106, 0.36);
+  --button-bg-top: rgba(244, 208, 199, 0.94);
+  --button-bg-bottom: rgba(230, 183, 170, 0.92);
+  --card-border: rgba(176, 121, 109, 0.3);
+  --card-bg-top: rgba(252, 236, 229, 0.94);
+  --card-bg-bottom: rgba(244, 218, 208, 0.9);
+  --tone-amber: #e1a077;
+  --tone-rose: #d27e76;
+}
+
+html[data-theme='forest_ink_light'] {
+  --bg-main: #edf5ef;
+  --bg-subtle: #e2efe5;
+  --text-main: #203126;
+  --text-soft: #567261;
+  --accent: #74b591;
+  --accent-soft: #a6d1b9;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg-alt: rgba(244, 250, 246, 0.88);
+  --panel-border: rgba(103, 145, 122, 0.28);
+  --button-border: rgba(108, 149, 126, 0.35);
+  --button-bg-top: rgba(203, 228, 213, 0.94);
+  --button-bg-bottom: rgba(180, 213, 193, 0.92);
+  --card-border: rgba(110, 151, 128, 0.3);
+  --card-bg-top: rgba(236, 247, 240, 0.94);
+  --card-bg-bottom: rgba(217, 237, 224, 0.9);
+  --tone-teal: #68b39f;
+  --tone-ocean: #7caecf;
+}
+
+html[data-theme='ocean_glass_light'] {
+  --bg-main: #eaf7f8;
+  --bg-subtle: #ddf0f3;
+  --text-main: #1d3237;
+  --text-soft: #4f727a;
+  --accent: #63b9b3;
+  --accent-soft: #95d4d0;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg-alt: rgba(242, 252, 251, 0.88);
+  --panel-border: rgba(92, 152, 155, 0.28);
+  --button-border: rgba(98, 156, 159, 0.35);
+  --button-bg-top: rgba(197, 230, 229, 0.94);
+  --button-bg-bottom: rgba(172, 214, 213, 0.92);
+  --card-border: rgba(99, 158, 161, 0.3);
+  --card-bg-top: rgba(234, 248, 248, 0.94);
+  --card-bg-bottom: rgba(213, 238, 239, 0.9);
+  --tone-teal: #57afa8;
+  --tone-ocean: #74b7cc;
+}
+
+html[data-theme='plum_garden_light'] {
+  --bg-main: #f4effa;
+  --bg-subtle: #ece5f6;
+  --text-main: #322748;
+  --text-soft: #72618f;
+  --accent: #ae86e6;
+  --accent-soft: #c8a9ef;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg-alt: rgba(248, 244, 253, 0.88);
+  --panel-border: rgba(137, 109, 184, 0.28);
+  --button-border: rgba(143, 114, 189, 0.36);
+  --button-bg-top: rgba(221, 206, 244, 0.94);
+  --button-bg-bottom: rgba(199, 178, 232, 0.92);
+  --card-border: rgba(146, 117, 192, 0.3);
+  --card-bg-top: rgba(242, 235, 252, 0.94);
+  --card-bg-bottom: rgba(228, 217, 245, 0.9);
+  --tone-rose: #be84cd;
+  --tone-ocean: #89abd8;
+}
+
+html[data-theme='matcha_stone_light'] {
+  --bg-main: #f0f5e8;
+  --bg-subtle: #e8efdd;
+  --text-main: #2d3522;
+  --text-soft: #697657;
+  --accent: #9fbf70;
+  --accent-soft: #bfd79a;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg-alt: rgba(248, 252, 242, 0.88);
+  --panel-border: rgba(128, 150, 92, 0.28);
+  --button-border: rgba(133, 155, 96, 0.35);
+  --button-bg-top: rgba(220, 233, 196, 0.94);
+  --button-bg-bottom: rgba(196, 215, 165, 0.92);
+  --card-border: rgba(135, 157, 98, 0.3);
+  --card-bg-top: rgba(241, 248, 230, 0.94);
+  --card-bg-bottom: rgba(225, 238, 208, 0.9);
+  --tone-teal: #78b29a;
+  --tone-amber: #c3b37b;
 }
 
 html[data-theme='matcha_stone'] {

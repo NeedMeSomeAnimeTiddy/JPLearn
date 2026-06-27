@@ -549,65 +549,52 @@ def build_study_queue_payload(slug: str) -> dict[str, object]:
     }
 
 
+def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if not argv:
+        return 2, {"error": "Missing command"}
 
-
-def main() -> int:
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "Missing command"}))
-        return 2
-
-    command = sys.argv[1]
+    command = argv[0]
 
     if command == "summary":
-        print(json.dumps(build_summary(), ensure_ascii=False))
-        return 0
+        return 0, build_summary()
 
     if command == "deck-cards":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "Missing deck slug"}))
-            return 2
-        slug = sys.argv[2]
+        if len(argv) < 2:
+            return 2, {"error": "Missing deck slug"}
+        slug = argv[1]
         try:
-            payload = build_deck_cards(slug)
+            return 0, build_deck_cards(slug)
         except ValueError as exc:
-            print(json.dumps({"error": str(exc)}))
-            return 2
-        print(json.dumps(payload, ensure_ascii=False))
-        return 0
+            return 2, {"error": str(exc)}
 
     if command == "block-progress":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "Missing deck slug"}))
-            return 2
-        slug = sys.argv[2]
+        if len(argv) < 2:
+            return 2, {"error": "Missing deck slug"}
+        slug = argv[1]
         try:
-            payload = build_block_progress(slug)
+            return 0, build_block_progress(slug)
         except ValueError as exc:
-            print(json.dumps({"error": str(exc)}))
-            return 2
-        print(json.dumps(payload, ensure_ascii=False))
-        return 0
+            return 2, {"error": str(exc)}
 
     if command == "overview-character-mastery":
-        print(json.dumps(build_overview_character_mastery(), ensure_ascii=False))
-        return 0
+        return 0, build_overview_character_mastery()
 
     if command == "reset-db":
-        print(json.dumps(reset_progress(), ensure_ascii=False))
-        return 0
+        return 0, reset_progress()
 
     if command == "record-result":
-        if len(sys.argv) < 5:
-            print(json.dumps({"error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage] [session_id] [confidence_score]"}))
-            return 2
-        slug = sys.argv[2]
+        if len(argv) < 4:
+            return 2, {
+                "error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage] [session_id] [confidence_score]"
+            }
+        slug = argv[1]
         try:
-            card_id = int(sys.argv[3])
-            is_correct = _parse_bool_flag(sys.argv[4])
-            minigame = sys.argv[5] if len(sys.argv) > 5 else ""
-            curriculum_stage = int(sys.argv[6]) if len(sys.argv) > 6 and sys.argv[6].strip() else None
-            session_id = sys.argv[7] if len(sys.argv) > 7 else ""
-            confidence_score = int(sys.argv[8]) if len(sys.argv) > 8 and sys.argv[8].strip() else None
+            card_id = int(argv[2])
+            is_correct = _parse_bool_flag(argv[3])
+            minigame = argv[4] if len(argv) > 4 else ""
+            curriculum_stage = int(argv[5]) if len(argv) > 5 and argv[5].strip() else None
+            session_id = argv[6] if len(argv) > 6 else ""
+            confidence_score = int(argv[7]) if len(argv) > 7 and argv[7].strip() else None
             payload = record_game_result(
                 slug,
                 card_id,
@@ -618,20 +605,17 @@ def main() -> int:
                 confidence_score=confidence_score,
             )
         except ValueError as exc:
-            print(json.dumps({"error": str(exc)}))
-            return 2
-        print(json.dumps(payload, ensure_ascii=False))
-        return 0
+            return 2, {"error": str(exc)}
+        return 0, payload
 
     if command == "session-start":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "Usage: session-start <target_items> [target_minutes] [target_accuracy] [session_id]"}))
-            return 2
+        if len(argv) < 2:
+            return 2, {"error": "Usage: session-start <target_items> [target_minutes] [target_accuracy] [session_id]"}
         try:
-            target_items = int(sys.argv[2])
-            target_minutes = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3].strip() else None
-            target_accuracy = int(sys.argv[4]) if len(sys.argv) > 4 and sys.argv[4].strip() else None
-            session_goal_id = sys.argv[5] if len(sys.argv) > 5 else None
+            target_items = int(argv[1])
+            target_minutes = int(argv[2]) if len(argv) > 2 and argv[2].strip() else None
+            target_accuracy = int(argv[3]) if len(argv) > 3 and argv[3].strip() else None
+            session_goal_id = argv[4] if len(argv) > 4 else None
             payload = start_session_goal(
                 target_items=target_items,
                 target_minutes=target_minutes,
@@ -639,45 +623,73 @@ def main() -> int:
                 session_id=session_goal_id,
             )
         except ValueError as exc:
-            print(json.dumps({"error": str(exc)}))
-            return 2
-        print(json.dumps(payload, ensure_ascii=False))
-        return 0
+            return 2, {"error": str(exc)}
+        return 0, payload
 
     if command == "session-summary":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "Usage: session-summary <session_id>"}))
-            return 2
-        payload = get_session_goal_summary(sys.argv[2])
-        print(json.dumps(payload, ensure_ascii=False))
-        return 0
+        if len(argv) < 2:
+            return 2, {"error": "Usage: session-summary <session_id>"}
+        return 0, get_session_goal_summary(argv[1])
 
     if command == "apply-expertise-level":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "Usage: apply-expertise-level <level>"}))
-            return 2
+        if len(argv) < 2:
+            return 2, {"error": "Usage: apply-expertise-level <level>"}
         try:
-            payload = apply_expertise_level(sys.argv[2])
+            payload = apply_expertise_level(argv[1])
         except ValueError as exc:
-            print(json.dumps({"error": str(exc)}))
-            return 2
-        print(json.dumps(payload, ensure_ascii=False))
-        return 0
+            return 2, {"error": str(exc)}
+        return 0, payload
 
     if command == "study-queue":
-        if len(sys.argv) < 3:
-            print(json.dumps({"error": "Usage: study-queue <slug>"}))
-            return 2
+        if len(argv) < 2:
+            return 2, {"error": "Usage: study-queue <slug>"}
         try:
-            payload = build_study_queue_payload(sys.argv[2])
+            payload = build_study_queue_payload(argv[1])
         except ValueError as exc:
-            print(json.dumps({"error": str(exc)}))
-            return 2
-        print(json.dumps(payload, ensure_ascii=False))
-        return 0
+            return 2, {"error": str(exc)}
+        return 0, payload
 
-    print(json.dumps({"error": f"Unknown command: {command}"}))
-    return 2
+    return 2, {"error": f"Unknown command: {command}"}
+
+
+def _run_server() -> int:
+    for raw_line in sys.stdin:
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        request_id: object = None
+        try:
+            request = json.loads(line)
+            request_id = request.get("id")
+            args = request.get("args")
+            if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
+                raise ValueError("Invalid worker request args")
+            code, payload = _run_command(args)
+        except Exception as exc:  # pragma: no cover - defensive worker envelope.
+            code = 2
+            payload = {"error": str(exc)}
+
+        response = {
+            "id": request_id,
+            "ok": code == 0,
+            "code": code,
+            "payload": payload,
+        }
+        sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
+        sys.stdout.flush()
+
+    return 0
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    if args and args[0] == "--server":
+        return _run_server()
+
+    code, payload = _run_command(args)
+    print(json.dumps(payload, ensure_ascii=False))
+    return code
 
 
 if __name__ == "__main__":

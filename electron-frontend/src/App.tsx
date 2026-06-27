@@ -1,16 +1,18 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, Plus, RefreshCw, Settings, Shuffle, Square, Target, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, Moon, Plus, RefreshCw, Settings, Shuffle, Square, Sun, Target, Trophy, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
   ReturnType<typeof window.jplearnDesktop.getStudySummary>
 >
+type DeckSlugInput = Parameters<typeof window.jplearnDesktop.getDeckCards>[0]
 type OverviewCharacterMasteryPayload = Awaited<
   ReturnType<typeof window.jplearnDesktop.getOverviewCharacterMastery>
 >
 type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
+type BlockProgressPayload = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>
 type StudyQueueResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getStudyQueue>>
 type SessionGoalStartResponse = Awaited<ReturnType<typeof window.jplearnDesktop.startSessionGoal>>
 type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getSessionSummary>>
@@ -70,6 +72,17 @@ type ThemeKey =
   | 'ocean_glass'
   | 'ember_night'
   | 'plum_garden'
+  | 'harbor_mist_light'
+  | 'sakura_dawn_light'
+  | 'sunset_lacquer_light'
+  | 'midnight_neon_light'
+  | 'paper_crane_light'
+  | 'ember_night_light'
+  | 'forest_ink_light'
+  | 'ocean_glass_light'
+  | 'plum_garden_light'
+  | 'matcha_stone_light'
+type ThemeMode = 'dark' | 'light'
 
 const FEEDBACK_REVEAL_MS = 2100
 const DEFAULT_LIVES = 3
@@ -462,6 +475,7 @@ const STORY_CHAPTERS: Record<ScriptKey, Record<1 | 2 | 3, { title: string; lines
 interface AppSettings {
   reducedMotion: boolean
   fontSize: FontSize
+  themeMode: ThemeMode
   theme: ThemeKey
   motionStyle: AnimationStyle
   backgroundStyle: BackgroundStyle
@@ -704,30 +718,85 @@ const PETAL_STREAM = [
   { x: '89%', drift: '-8vw', duration: '12.6s', delay: '-3.3s', size: '10px', opacity: 0.57 },
 ] as const
 
-const THEME_OPTIONS: Array<{ key: ThemeKey; label: string }> = [
-  { key: 'harbor_mist', label: 'Harbor Mist' },
-  { key: 'sakura_dawn', label: 'Sakura Dawn' },
-  { key: 'forest_ink', label: 'Forest Ink' },
-  { key: 'sunset_lacquer', label: 'Sunset Lacquer' },
-  { key: 'midnight_neon', label: 'Midnight Neon' },
-  { key: 'paper_crane', label: 'Paper Crane' },
-  { key: 'matcha_stone', label: 'Matcha Stone' },
-  { key: 'ocean_glass', label: 'Ocean Glass' },
-  { key: 'ember_night', label: 'Ember Night' },
-  { key: 'plum_garden', label: 'Plum Garden' },
+const THEME_OPTIONS: Array<{ key: ThemeKey; label: string; mode: ThemeMode }> = [
+  { key: 'harbor_mist', label: 'Harbor Mist', mode: 'dark' },
+  { key: 'sakura_dawn', label: 'Sakura Dawn', mode: 'dark' },
+  { key: 'forest_ink', label: 'Forest Ink', mode: 'dark' },
+  { key: 'sunset_lacquer', label: 'Sunset Lacquer', mode: 'dark' },
+  { key: 'midnight_neon', label: 'Midnight Neon', mode: 'dark' },
+  { key: 'paper_crane', label: 'Paper Crane', mode: 'dark' },
+  { key: 'matcha_stone', label: 'Matcha Stone', mode: 'dark' },
+  { key: 'ocean_glass', label: 'Ocean Glass', mode: 'dark' },
+  { key: 'ember_night', label: 'Ember Night', mode: 'dark' },
+  { key: 'plum_garden', label: 'Plum Garden', mode: 'dark' },
+  { key: 'harbor_mist_light', label: 'Harbor Mist Light', mode: 'light' },
+  { key: 'sakura_dawn_light', label: 'Sakura Dawn Light', mode: 'light' },
+  { key: 'sunset_lacquer_light', label: 'Sunset Lacquer Light', mode: 'light' },
+  { key: 'midnight_neon_light', label: 'Midnight Neon Light', mode: 'light' },
+  { key: 'paper_crane_light', label: 'Paper Crane Light', mode: 'light' },
+  { key: 'ember_night_light', label: 'Ember Night Light', mode: 'light' },
+  { key: 'forest_ink_light', label: 'Forest Ink Light', mode: 'light' },
+  { key: 'ocean_glass_light', label: 'Ocean Glass Light', mode: 'light' },
+  { key: 'plum_garden_light', label: 'Plum Garden Light', mode: 'light' },
+  { key: 'matcha_stone_light', label: 'Matcha Stone Light', mode: 'light' },
 ]
 
+const THEME_MODE_SECTIONS: Array<{ key: ThemeMode; label: string }> = [
+  { key: 'dark', label: 'Dark Mode' },
+  { key: 'light', label: 'Light Mode' },
+]
+
+const DEFAULT_THEME_BY_MODE: Record<ThemeMode, ThemeKey> = {
+  dark: 'harbor_mist',
+  light: 'harbor_mist_light',
+}
+
+const THEME_MODE_ICON: Record<ThemeMode, LucideIcon> = {
+  dark: Moon,
+  light: Sun,
+}
+
 const THEME_SWATCH_ACCENT: Record<ThemeKey, string> = {
-  harbor_mist: '#f2b56f',
+  harbor_mist: '#7bc5df',
   sakura_dawn: '#ffb1bf',
   forest_ink: '#89d0a4',
   sunset_lacquer: '#ffab73',
   midnight_neon: '#79d5ff',
-  paper_crane: '#d18a57',
+  paper_crane: '#d4a57d',
   matcha_stone: '#b6d387',
   ocean_glass: '#7ed4d0',
   ember_night: '#ff9a6a',
   plum_garden: '#c89cff',
+  harbor_mist_light: '#69abc4',
+  sakura_dawn_light: '#e48ea2',
+  sunset_lacquer_light: '#dd8c62',
+  midnight_neon_light: '#66a8d6',
+  paper_crane_light: '#b8906d',
+  ember_night_light: '#d8836f',
+  forest_ink_light: '#74b591',
+  ocean_glass_light: '#63b9b3',
+  plum_garden_light: '#ae86e6',
+  matcha_stone_light: '#9fbf70',
+}
+
+const THEME_KEY_SET = new Set<ThemeKey>(THEME_OPTIONS.map((theme) => theme.key))
+
+function isThemeMode(value: unknown): value is ThemeMode {
+  return value === 'dark' || value === 'light'
+}
+
+function isThemeKey(value: unknown): value is ThemeKey {
+  return typeof value === 'string' && THEME_KEY_SET.has(value as ThemeKey)
+}
+
+function getThemeModeForTheme(theme: ThemeKey): ThemeMode {
+  const themeOption = THEME_OPTIONS.find((option) => option.key === theme)
+  return themeOption?.mode ?? 'dark'
+}
+
+function getFallbackThemeForMode(mode: ThemeMode): ThemeKey {
+  const firstTheme = THEME_OPTIONS.find((theme) => theme.mode === mode)
+  return firstTheme?.key ?? DEFAULT_THEME_BY_MODE.dark
 }
 
 const FONT_SIZE_ORDER: FontSize[] = ['small', 'medium', 'large']
@@ -833,6 +902,8 @@ function MinigameIcon({ game }: { game: MinigameKey }) {
 const STATS_STORAGE_KEY = 'jplearn-desktop-script-stats-v1'
 const SETTINGS_STORAGE_KEY = 'jplearn-desktop-settings-v1'
 const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
+const SUMMARY_SNAPSHOT_STORAGE_KEY = 'jplearn-desktop-summary-snapshot-v1'
+const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
 const EXPERTISE_STORAGE_KEY = 'jplearn-first-startup-expertise-v1'
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
@@ -970,6 +1041,7 @@ function defaultSettings(): AppSettings {
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     fontSize: 'medium',
+    themeMode: 'dark',
     theme: 'harbor_mist',
     motionStyle: 'glide',
     backgroundStyle: 'classic_scene',
@@ -1045,9 +1117,17 @@ function loadSettings(): AppSettings {
     if (!raw) return defaultSettings()
     const parsed = JSON.parse(raw) as Partial<AppSettings>
     const defaults = defaultSettings()
+    const parsedMode = isThemeMode(parsed.themeMode) ? parsed.themeMode : null
+    const parsedTheme = isThemeKey(parsed.theme) ? parsed.theme : null
+    const normalizedMode = parsedMode ?? (parsedTheme ? getThemeModeForTheme(parsedTheme) : defaults.themeMode)
+    const normalizedTheme = parsedTheme && getThemeModeForTheme(parsedTheme) === normalizedMode
+      ? parsedTheme
+      : getFallbackThemeForMode(normalizedMode)
     return {
       ...defaults,
       ...parsed,
+      themeMode: normalizedMode,
+      theme: normalizedTheme,
       backgroundStyle: isBackgroundStyle(parsed.backgroundStyle) ? parsed.backgroundStyle : defaults.backgroundStyle,
       backgroundBlur: typeof parsed.backgroundBlur === 'number' ? clampBackgroundBlur(parsed.backgroundBlur) : defaults.backgroundBlur,
     }
@@ -1072,6 +1152,55 @@ function loadCardScores(): CardScores {
     }
   } catch {
     return { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} }
+  }
+}
+
+function loadSummarySnapshot(): StudySummaryPayload | null {
+  try {
+    const raw = window.localStorage.getItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw) as {
+      capturedAtUtc?: string
+      payload?: unknown
+    }
+
+    if (typeof parsed.capturedAtUtc !== 'string') {
+      return null
+    }
+
+    const capturedMs = Date.parse(parsed.capturedAtUtc)
+    if (!Number.isFinite(capturedMs) || Date.now() - capturedMs > SUMMARY_SNAPSHOT_MAX_AGE_MS) {
+      window.localStorage.removeItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
+      return null
+    }
+
+    if (!parsed.payload || typeof parsed.payload !== 'object') {
+      return null
+    }
+
+    const payload = parsed.payload as { decks?: unknown }
+    if (!Array.isArray(payload.decks)) {
+      return null
+    }
+
+    return parsed.payload as StudySummaryPayload
+  } catch {
+    return null
+  }
+}
+
+function saveSummarySnapshot(payload: StudySummaryPayload): void {
+  try {
+    window.localStorage.setItem(
+      SUMMARY_SNAPSHOT_STORAGE_KEY,
+      JSON.stringify({
+        capturedAtUtc: new Date().toISOString(),
+        payload,
+      }),
+    )
+  } catch {
+    // Non-fatal: startup can continue even if local snapshot writes fail.
   }
 }
 
@@ -1530,12 +1659,12 @@ function describeQueueLoad(remainingDue: number): string {
 function App() {
   const [view, setView] = useState<AppView>('home')
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
-  const [summary, setSummary] = useState<StudySummaryPayload | null>(null)
+  const [summary, setSummary] = useState<StudySummaryPayload | null>(() => loadSummarySnapshot())
   const [error, setError] = useState<string | null>(null)
   const viewHistoryRef = useRef<AppView[]>(['home'])
   const viewHistoryIndexRef = useRef(0)
   const isHistoryNavigationRef = useRef(false)
-  const [loading, setLoading] = useState<boolean>(true)
+  const [loading, setLoading] = useState<boolean>(() => loadSummarySnapshot() === null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
   const [activeScript, setActiveScript] = useState<ScriptKey>('hiragana')
@@ -1649,6 +1778,8 @@ function App() {
   const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const kanjiLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
   const vocabLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
+  const deckCardsInFlightRef = useRef<Map<string, Promise<ScriptDeck>>>(new Map())
+  const blockProgressInFlightRef = useRef<Map<string, Promise<BlockProgressPayload>>>(new Map())
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
@@ -1691,11 +1822,55 @@ function App() {
     setSettings((prev) => ({ ...prev, fontSize: nextSize }))
   }, [settings.fontSize])
 
+  const availableThemes = useMemo(
+    () => THEME_OPTIONS.filter((theme) => theme.mode === settings.themeMode),
+    [settings.themeMode],
+  )
+
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    setSettings((prev) => {
+      if (prev.themeMode === mode) return prev
+      const currentThemeMode = getThemeModeForTheme(prev.theme)
+      const nextTheme = currentThemeMode === mode ? prev.theme : getFallbackThemeForMode(mode)
+      return {
+        ...prev,
+        themeMode: mode,
+        theme: nextTheme,
+      }
+    })
+  }, [])
+
   const activeDeckSlug = useMemo(() => {
     if (activeScript === 'kanji_n5') return activeKanjiDeckSlug
     if (activeScript === 'vocab_n5') return activeVocabDeckSlug
     return activeScript
   }, [activeKanjiDeckSlug, activeScript, activeVocabDeckSlug])
+
+  const getDeckCardsDeduped = useCallback((slug: DeckSlugInput): Promise<ScriptDeck> => {
+    const inFlight = deckCardsInFlightRef.current.get(slug)
+    if (inFlight) return inFlight
+
+    const request = window.jplearnDesktop.getDeckCards(slug).finally(() => {
+      if (deckCardsInFlightRef.current.get(slug) === request) {
+        deckCardsInFlightRef.current.delete(slug)
+      }
+    })
+    deckCardsInFlightRef.current.set(slug, request)
+    return request
+  }, [])
+
+  const getBlockProgressDeduped = useCallback((slug: DeckSlugInput): Promise<BlockProgressPayload> => {
+    const inFlight = blockProgressInFlightRef.current.get(slug)
+    if (inFlight) return inFlight
+
+    const request = window.jplearnDesktop.getBlockProgress(slug).finally(() => {
+      if (blockProgressInFlightRef.current.get(slug) === request) {
+        blockProgressInFlightRef.current.delete(slug)
+      }
+    })
+    blockProgressInFlightRef.current.set(slug, request)
+    return request
+  }, [])
 
   const buildQueueCycle = useCallback((queue: StudyQueueResponse, sourceCards: ScriptDeck['cards']): number[] => {
     const idToIndex = new Map<number, number>()
@@ -1759,6 +1934,7 @@ function App() {
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
     document.documentElement.dataset.fontSize = settings.fontSize
     document.documentElement.dataset.reducedMotion = String(settings.reducedMotion)
+    document.documentElement.dataset.themeMode = settings.themeMode
     document.documentElement.dataset.theme = settings.theme
     document.documentElement.dataset.motionStyle = settings.motionStyle
     void window.jplearnDesktop.setStartupTheme(settings.theme).catch(() => undefined)
@@ -1908,6 +2084,7 @@ function App() {
     try {
       const payload = await window.jplearnDesktop.getStudySummary()
       setSummary(payload)
+      saveSummarySnapshot(payload)
       if (startupFirstSummaryMsRef.current === null) {
         startupFirstSummaryMsRef.current = Math.round(performance.now() - startupBootMarkRef.current)
       }
@@ -1963,8 +2140,8 @@ function App() {
 
         const slug = KANJI_LEVEL_TO_DECK_SLUG[level]
         const [deckPayload, blockPayload] = await Promise.all([
-          window.jplearnDesktop.getDeckCards(slug),
-          window.jplearnDesktop.getBlockProgress(slug),
+          getDeckCardsDeduped(slug),
+          getBlockProgressDeduped(slug),
         ])
         if (cancelled) return
 
@@ -1987,8 +2164,8 @@ function App() {
 
         const slug = VOCAB_LEVEL_TO_DECK_SLUG[level]
         const [deckPayload, blockPayload] = await Promise.all([
-          window.jplearnDesktop.getDeckCards(slug),
-          window.jplearnDesktop.getBlockProgress(slug),
+          getDeckCardsDeduped(slug),
+          getBlockProgressDeduped(slug),
         ])
         if (cancelled) return
 
@@ -2040,7 +2217,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [notifyStartupReady, scheduleDeferredStartupTask])
+  }, [getBlockProgressDeduped, getDeckCardsDeduped, notifyStartupReady, scheduleDeferredStartupTask])
 
   const loadScriptCards = useCallback(async (
     script: ScriptKey,
@@ -2080,8 +2257,8 @@ function App() {
 
         if (!selectedCards || !selectedBlocks) {
           const [selectedDeckPayload, blockPayload] = await Promise.all([
-            window.jplearnDesktop.getDeckCards(selectedKanjiSlug),
-            window.jplearnDesktop.getBlockProgress(selectedKanjiSlug),
+            getDeckCardsDeduped(selectedKanjiSlug),
+            getBlockProgressDeduped(selectedKanjiSlug),
           ])
 
           if (scriptLoadRequestIdRef.current !== requestId) {
@@ -2106,7 +2283,7 @@ function App() {
 
         for (const level of JLPT_LEVEL_ORDER) {
           if (level === kanjiLevel || kanjiLevelDeckCacheRef.current[level]) continue
-          void window.jplearnDesktop.getDeckCards(KANJI_LEVEL_TO_DECK_SLUG[level])
+          void getDeckCardsDeduped(KANJI_LEVEL_TO_DECK_SLUG[level])
             .then((payload) => {
               const normalizedCards = normalizeDeckCards(payload.cards)
               kanjiLevelDeckCacheRef.current[level] = normalizedCards
@@ -2117,7 +2294,7 @@ function App() {
             })
             .catch(() => undefined)
 
-          void window.jplearnDesktop.getBlockProgress(KANJI_LEVEL_TO_DECK_SLUG[level])
+          void getBlockProgressDeduped(KANJI_LEVEL_TO_DECK_SLUG[level])
             .then((payload) => {
               kanjiLevelBlockCacheRef.current[level] = normalizeBlockList(payload.blocks)
             })
@@ -2145,8 +2322,8 @@ function App() {
 
         if (!selectedCards || !selectedBlocks) {
           const [selectedDeckPayload, blockPayload] = await Promise.all([
-            window.jplearnDesktop.getDeckCards(selectedVocabSlug),
-            window.jplearnDesktop.getBlockProgress(selectedVocabSlug),
+            getDeckCardsDeduped(selectedVocabSlug),
+            getBlockProgressDeduped(selectedVocabSlug),
           ])
 
           if (scriptLoadRequestIdRef.current !== requestId) {
@@ -2171,7 +2348,7 @@ function App() {
 
         for (const level of JLPT_LEVEL_ORDER) {
           if (level === vocabLevel || vocabLevelDeckCacheRef.current[level]) continue
-          void window.jplearnDesktop.getDeckCards(VOCAB_LEVEL_TO_DECK_SLUG[level])
+          void getDeckCardsDeduped(VOCAB_LEVEL_TO_DECK_SLUG[level])
             .then((payload) => {
               const normalizedCards = normalizeDeckCards(payload.cards)
               vocabLevelDeckCacheRef.current[level] = normalizedCards
@@ -2182,7 +2359,7 @@ function App() {
             })
             .catch(() => undefined)
 
-          void window.jplearnDesktop.getBlockProgress(VOCAB_LEVEL_TO_DECK_SLUG[level])
+          void getBlockProgressDeduped(VOCAB_LEVEL_TO_DECK_SLUG[level])
             .then((payload) => {
               vocabLevelBlockCacheRef.current[level] = normalizeBlockList(payload.blocks)
             })
@@ -2202,8 +2379,8 @@ function App() {
         }
       } else {
         const [deckPayload, blockPayload] = await Promise.all([
-          window.jplearnDesktop.getDeckCards(script),
-          window.jplearnDesktop.getBlockProgress(script),
+          getDeckCardsDeduped(script),
+          getBlockProgressDeduped(script),
         ])
 
         if (scriptLoadRequestIdRef.current !== requestId) {
@@ -2238,7 +2415,7 @@ function App() {
         setGameLoading(false)
       }
     }
-  }, [activeKanjiLevel, activeVocabLevel, resetRoundCycle])
+  }, [activeKanjiLevel, activeVocabLevel, getBlockProgressDeduped, getDeckCardsDeduped, resetRoundCycle])
 
   useEffect(() => {
     void loadScriptCards(activeScript, activeKanjiLevel, activeVocabLevel)
@@ -3309,6 +3486,7 @@ function App() {
       }
       window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(emptyScores))
       window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(emptyStats))
+      window.localStorage.removeItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
       window.localStorage.removeItem(EXPERTISE_STORAGE_KEY)
       setCardScores(emptyScores)
       setScriptStats(emptyStats)
@@ -3354,7 +3532,7 @@ function App() {
         setCardScores({ hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} })
       } else {
         const targetScripts = EXPERTISE_LEVEL_TO_SCRIPT_KEYS[selectedExpertiseLevel]
-        const payloads = await Promise.all(targetScripts.map((slug) => window.jplearnDesktop.getDeckCards(slug)))
+        const payloads = await Promise.all(targetScripts.map((slug) => getDeckCardsDeduped(slug)))
         setCardScores((previous) => {
           const next: CardScores = {
             hiragana: { ...previous.hiragana },
@@ -3385,7 +3563,7 @@ function App() {
     } finally {
       setApplyingExpertise(false)
     }
-  }, [loadSummary, selectedExpertiseLevel])
+  }, [getDeckCardsDeduped, loadSummary, selectedExpertiseLevel])
 
   const goToNextOnboardingStep = useCallback(() => {
     setExpertiseError(null)
@@ -5430,14 +5608,43 @@ function App() {
                 <div className="settings-section settings-control-row settings-control-row-no-icon">
                   <div className="settings-control-content">
                     <p className="settings-section-label">Theme</p>
-                    <div className="settings-theme-grid" role="radiogroup" aria-label="Theme selection">
-                      {THEME_OPTIONS.map((theme) => (
+                    <div className="settings-theme-mode-toggle" role="radiogroup" aria-label="Appearance mode">
+                      {THEME_MODE_SECTIONS.map((modeSection) => {
+                        const ModeIcon = THEME_MODE_ICON[modeSection.key]
+                        const isActive = settings.themeMode === modeSection.key
+                        return (
+                          <button
+                            key={modeSection.key}
+                            type="button"
+                            className={`settings-icon-entry settings-theme-mode-entry ${isActive ? 'is-active' : ''}`}
+                            onClick={() => setThemeMode(modeSection.key)}
+                            aria-label={`Use ${modeSection.label}`}
+                            aria-pressed={isActive}
+                            title={modeSection.label}
+                          >
+                            <span className={`settings-mode-icon-button ${isActive ? 'is-enabled' : ''}`} aria-hidden="true">
+                              <ModeIcon size={18} strokeWidth={2.25} aria-hidden="true" />
+                            </span>
+                            <span className="settings-icon-entry-label">{modeSection.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="settings-theme-mode-label">{settings.themeMode === 'dark' ? 'Dark Mode Themes' : 'Light Mode Themes'}</p>
+                    <div className="settings-theme-grid" role="radiogroup" aria-label={`${settings.themeMode} theme selection`}>
+                      {availableThemes.map((theme) => (
                         <button
                           key={theme.key}
                           type="button"
                           className={`settings-icon-entry settings-theme-entry ${settings.theme === theme.key ? 'is-active' : ''}`}
                           style={{ '--theme-color': THEME_SWATCH_ACCENT[theme.key] } as CSSProperties}
-                          onClick={() => setSettings((prev) => ({ ...prev, theme: theme.key }))}
+                          onClick={() =>
+                            setSettings((prev) => ({
+                              ...prev,
+                              themeMode: theme.mode,
+                              theme: theme.key,
+                            }))
+                          }
                           aria-label={`Use ${theme.label} theme`}
                           aria-pressed={settings.theme === theme.key}
                           title={theme.label}

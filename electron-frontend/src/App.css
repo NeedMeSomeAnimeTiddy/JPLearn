@@ -4118,6 +4118,43 @@ button {
   gap: 8px;
 }
 
+.settings-theme-mode-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.settings-theme-mode-entry.is-active {
+  border-color: color-mix(in oklab, var(--accent) 62%, var(--panel-border));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+.settings-theme-mode-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-theme-mode-section {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-theme-mode-label {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+.settings-theme-empty {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+}
+
 .settings-background-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
