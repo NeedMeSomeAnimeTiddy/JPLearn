@@ -265,6 +265,19 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('assistant:get-chat-history-preloaded', (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    if (typeof options.getPreloadedAssistantChatHistory === 'function') {
+      return options.getPreloadedAssistantChatHistory()
+    }
+    return {
+      ok: true,
+      turns: [],
+      runtimeActive: false,
+      source: 'not-configured',
+    }
+  })
+
   options.ipcMain.handle('assistant:clear-chat-history', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {

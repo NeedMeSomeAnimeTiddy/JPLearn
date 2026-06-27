@@ -268,6 +268,13 @@ interface AssistantChatHistoryResponse {
   turns: AssistantChatTurn[]
 }
 
+interface AssistantPreloadedChatHistoryResponse {
+  ok: boolean
+  turns: AssistantChatTurn[]
+  runtimeActive: boolean
+  source?: string
+}
+
 interface AssistantChatRuntimeStatus {
   loaded: boolean
   loadedAtUtc: string | null
@@ -345,6 +352,7 @@ interface DesktopApi {
     content: string
   }) => Promise<{ ok: boolean }>
   getAssistantChatHistory?: (limit?: number) => Promise<AssistantChatHistoryResponse>
+  getPreloadedAssistantChatHistory?: () => Promise<AssistantPreloadedChatHistoryResponse>
   clearAssistantChatHistory?: () => Promise<{ ok: boolean; removed: number }>
   getAssistantChatRuntimeStatus?: () => Promise<AssistantChatRuntimeStatus>
   preloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string; coldStart: boolean; loaded: boolean }>

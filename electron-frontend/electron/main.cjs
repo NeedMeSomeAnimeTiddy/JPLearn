@@ -14,6 +14,14 @@ const startupTelemetryByContentsId = new Map()
 const windowExpandedStateById = new Map()
 const windowRestoreBoundsById = new Map()
 const localTutorRuntime = createTutorChatRuntime()
+let tutorRuntimePreloadTriggered = false
+let tutorRuntimePreloadPromise = null
+let preloadedAssistantChatHistory = {
+  ok: true,
+  turns: [],
+  runtimeActive: false,
+  source: 'startup-none',
+}
 const bridgeReadCache = new Map()
 const bridgeReadInFlight = new Map()
 const bridgeWorkerState = {
@@ -908,7 +916,62 @@ registerIpcHandlers({
   getSafeRestoreBounds,
   windowRestoreBoundsById,
   localTutorRuntime,
+  getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
 })
+
+async function preloadTutorChatStartupData() {
+  if (!tutorRuntimePreloadPromise) {
+    tutorRuntimePreloadPromise = (async () => {
+      try {
+        await localTutorRuntime.preload('splash-startup')
+      } catch {
+        preloadedAssistantChatHistory = {
+          ok: true,
+          turns: [],
+          runtimeActive: false,
+          source: 'startup-preload-failed',
+        }
+        return
+      }
+
+      const status = localTutorRuntime.getStatus()
+      const runtimeActive = Boolean(
+        status
+        && status.loaded
+        && String(status.activeProvider || '').trim().toLowerCase() === 'llama.cpp',
+      )
+      if (!runtimeActive) {
+        preloadedAssistantChatHistory = {
+          ok: true,
+          turns: [],
+          runtimeActive: false,
+          source: 'startup-runtime-inactive',
+        }
+        return
+      }
+
+      try {
+        const payload = await runPythonBridgeWithArgs(['assistant-chat-history', '20'])
+        const turns = Array.isArray(payload?.turns) ? payload.turns : []
+        preloadedAssistantChatHistory = {
+          ok: true,
+          turns,
+          runtimeActive: true,
+          source: 'startup-preloaded',
+        }
+      } catch {
+        preloadedAssistantChatHistory = {
+          ok: true,
+          turns: [],
+          runtimeActive: true,
+          source: 'startup-history-failed',
+        }
+      }
+    })()
+  }
+
+  return tutorRuntimePreloadPromise
+}
 
 function createWindow() {
   const workArea = screen.getPrimaryDisplay().workAreaSize
@@ -1282,11 +1345,18 @@ async function runStudyJourneySmokeIfEnabled() {
 async function createWindowWithSplash() {
   const minSplashMs = 1100
   const maxStartupWaitMs = 30000
+  const maxTutorPreloadWaitMs = 15000
   const startupSessionStartedAt = Date.now()
   const startupTheme = readSavedStartupTheme()
   const splash = createSplashWindow(startupTheme)
   const win = createWindow()
   const webContentsId = win.webContents.id
+
+  if (!tutorRuntimePreloadTriggered) {
+    tutorRuntimePreloadTriggered = true
+    // Warm the local tutor runtime and prefetch chat history during splash.
+    void preloadTutorChatStartupData().catch(() => undefined)
+  }
 
   startupTelemetryByContentsId.set(webContentsId, {
     main: {
@@ -1316,6 +1386,10 @@ async function createWindowWithSplash() {
     Promise.race([
       startupReadyPromise,
       new Promise((resolve) => setTimeout(resolve, maxStartupWaitMs)),
+    ]),
+    Promise.race([
+      preloadTutorChatStartupData(),
+      new Promise((resolve) => setTimeout(resolve, maxTutorPreloadWaitMs)),
     ]),
     new Promise((resolve) => setTimeout(resolve, minSplashMs)),
   ])

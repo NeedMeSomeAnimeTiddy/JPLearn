@@ -1876,8 +1876,8 @@ function App() {
   const [assistantChatLoading, setAssistantChatLoading] = useState(false)
   const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
   const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
-  const [assistantChatWarmup, setAssistantChatWarmup] = useState(false)
-  const [assistantChatFallbackNote, setAssistantChatFallbackNote] = useState<string | null>(null)
+  const [, setAssistantChatWarmup] = useState(false)
+  const [, setAssistantChatFallbackNote] = useState<string | null>(null)
 
   const [activeScript, setActiveScript] = useState<ScriptKey>('hiragana')
   const [activeGame, setActiveGame] = useState<MinigameKey>('romaji_sprint')
@@ -1986,6 +1986,7 @@ function App() {
   const startupFirstSummaryMsRef = useRef<number | null>(null)
   const startupReadySentRef = useRef(false)
   const assistantChatPreloadTriggeredRef = useRef(false)
+  const assistantChatHistoryHydratedRef = useRef(false)
   const previousSessionActiveRef = useRef(false)
   const kanjiLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
@@ -1999,26 +2000,6 @@ function App() {
   const backgroundImageCacheRef = useRef<Partial<Record<BackgroundStyle, HTMLImageElement>>>({})
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
-
-  const assistantRuntimePillLabel = useMemo(() => {
-    if (assistantChatWarmup) return 'Warming up'
-    if (assistantChatStatus?.loaded) return 'Runtime loaded'
-    return 'Runtime idle'
-  }, [assistantChatStatus?.loaded, assistantChatWarmup])
-
-  const assistantRuntimeWarningLabel = useMemo(() => {
-    const lastError = assistantChatStatus?.lastError
-    if (!lastError) return null
-    if (lastError === 'inference-cancelled') {
-      return 'Last inference cancelled.'
-    }
-    return 'Fallback active due to runtime issue.'
-  }, [assistantChatStatus?.lastError])
-
-  const assistantRuntimePillClassName = useMemo(() => {
-    if (assistantChatWarmup) return 'assistant-chat-runtime-pill is-warming'
-    return `assistant-chat-runtime-pill ${assistantChatStatus?.loaded ? 'is-loaded' : 'is-idle'}`
-  }, [assistantChatStatus?.loaded, assistantChatWarmup])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
   const interleaveSequence = useMemo(
@@ -2505,33 +2486,75 @@ function App() {
     }
   }, [assistantToasts, trackAssistantToastInteraction])
 
-  const refreshAssistantChatHistory = useCallback(async () => {
+  const refreshAssistantChatHistory = useCallback(async (): Promise<boolean> => {
     const getAssistantChatHistory = window.jplearnDesktop.getAssistantChatHistory
     if (!getAssistantChatHistory) {
-      return
+      return false
     }
     try {
       const response = await getAssistantChatHistory(20)
       if (response.ok) {
         setAssistantChatMessages(response.turns)
+        return true
       }
+      return false
     } catch {
       // Chat history is optional and should never block study flow.
+      return false
     }
   }, [])
 
-  const refreshAssistantChatStatus = useCallback(async () => {
+  const refreshAssistantChatStatus = useCallback(async (): Promise<AssistantChatRuntimeStatus | null> => {
     const getAssistantChatRuntimeStatus = window.jplearnDesktop.getAssistantChatRuntimeStatus
     if (!getAssistantChatRuntimeStatus) {
-      return
+      return null
     }
     try {
       const status = await getAssistantChatRuntimeStatus()
       setAssistantChatStatus(status)
+      return status
     } catch {
       // Runtime status is optional metadata.
+      return null
     }
   }, [])
+
+  const hydrateAssistantChatFromPreloaded = useCallback(async (): Promise<boolean> => {
+    const getPreloadedAssistantChatHistory = window.jplearnDesktop.getPreloadedAssistantChatHistory
+    if (!getPreloadedAssistantChatHistory) {
+      return false
+    }
+    try {
+      const response = await getPreloadedAssistantChatHistory()
+      if (!response.ok || !response.runtimeActive) {
+        return false
+      }
+      setAssistantChatMessages(response.turns)
+      assistantChatHistoryHydratedRef.current = true
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
+  const isAssistantServerActive = useCallback((status: AssistantChatRuntimeStatus | null): boolean => {
+    if (!status?.loaded) {
+      return false
+    }
+    return String(status.activeProvider || '').trim().toLowerCase() === 'llama.cpp'
+  }, [])
+
+  const hydrateAssistantChatFromRuntime = useCallback(async (): Promise<boolean> => {
+    const status = await refreshAssistantChatStatus()
+    if (!isAssistantServerActive(status)) {
+      return false
+    }
+    const hydrated = await refreshAssistantChatHistory()
+    if (hydrated) {
+      assistantChatHistoryHydratedRef.current = true
+    }
+    return hydrated
+  }, [isAssistantServerActive, refreshAssistantChatHistory, refreshAssistantChatStatus])
 
   const preloadAssistantChatRuntime = useCallback(async () => {
     const preloadRuntime = window.jplearnDesktop.preloadAssistantChatRuntime
@@ -2547,27 +2570,65 @@ function App() {
   }, [refreshAssistantChatStatus])
 
   useEffect(() => {
+    if (!settings.assistantChatEnabled) {
+      return
+    }
+
+    let disposed = false
+
+    const tryHydrate = async (): Promise<void> => {
+      if (assistantChatHistoryHydratedRef.current || disposed) {
+        return
+      }
+      const hydratedFromPreload = await hydrateAssistantChatFromPreloaded()
+      if (hydratedFromPreload || assistantChatHistoryHydratedRef.current) {
+        return
+      }
+      await hydrateAssistantChatFromRuntime()
+    }
+
+    void tryHydrate()
+
+    const startupHydrationPollHandle = window.setInterval(() => {
+      void tryHydrate()
+    }, 2000)
+
+    return () => {
+      disposed = true
+      window.clearInterval(startupHydrationPollHandle)
+    }
+  }, [hydrateAssistantChatFromPreloaded, hydrateAssistantChatFromRuntime, settings.assistantChatEnabled])
+
+  useEffect(() => {
     if (!settings.assistantChatEnabled || !assistantChatOpen) {
       return
     }
 
-    void refreshAssistantChatHistory()
-    void refreshAssistantChatStatus()
+    let disposed = false
+
+    async function hydrateAssistantChatPanel(): Promise<void> {
+      await hydrateAssistantChatFromRuntime()
+      if (disposed) return
+    }
+
+    void hydrateAssistantChatPanel()
 
     const statusPollHandle = window.setInterval(() => {
-      void refreshAssistantChatStatus()
+      void hydrateAssistantChatFromRuntime()
     }, 10000)
 
     return () => {
+      disposed = true
       window.clearInterval(statusPollHandle)
     }
-  }, [assistantChatOpen, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled])
+  }, [assistantChatOpen, hydrateAssistantChatFromRuntime, refreshAssistantChatStatus, settings.assistantChatEnabled])
 
   useEffect(() => {
     if (settings.assistantChatEnabled) {
       return
     }
 
+    assistantChatHistoryHydratedRef.current = false
     setAssistantChatOpen(false)
     setAssistantChatLoading(false)
     setAssistantChatWarmup(false)
@@ -2594,13 +2655,6 @@ function App() {
     setAssistantChatError(null)
     setAssistantChatWarmup(false)
     setAssistantChatFallbackNote(null)
-    setAssistantChatMessages([])
-    // Clear stored conversation so reopening starts fresh, but keep the local
-    // model server warm so the next message stays fast.
-    const clearAssistantChatHistory = window.jplearnDesktop.clearAssistantChatHistory
-    if (clearAssistantChatHistory) {
-      void clearAssistantChatHistory().catch(() => undefined)
-    }
   }, [])
 
   const cancelAssistantChatInference = useCallback(async () => {
@@ -2649,8 +2703,8 @@ function App() {
         setAssistantChatFallbackNote(null)
       }
       setAssistantChatInput('')
-      await refreshAssistantChatHistory()
       await refreshAssistantChatStatus()
+      await refreshAssistantChatHistory()
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : 'Unable to send assistant chat message.'
       if (/llama\.cpp exited with code 130/i.test(detail) || /inference cancelled/i.test(detail)) {
@@ -6467,7 +6521,7 @@ function App() {
       ) : null}
 
       <aside className="assistant-overlay" aria-live="polite" aria-label="Tutor companion">
-        {settings.assistantChatEnabled ? (
+        {settings.assistantChatEnabled && !assistantChatOpen ? (
           <div className="assistant-chat-controls">
             <button
               type="button"
@@ -6489,11 +6543,7 @@ function App() {
         {settings.assistantChatEnabled && assistantChatOpen ? (
           <section id="assistant-chat-panel" className="assistant-chat-panel" aria-label="Tutor chat panel">
             <header className="assistant-chat-header">
-              <h3>Coach Chat</h3>
               <div className="assistant-chat-header-actions">
-                <span className={assistantRuntimePillClassName}>
-                  {assistantRuntimePillLabel}
-                </span>
                 <button
                   type="button"
                   className="assistant-chat-close"
@@ -6505,19 +6555,15 @@ function App() {
               </div>
             </header>
 
-            {assistantRuntimeWarningLabel || assistantChatFallbackNote ? (
-              <p className="assistant-chat-error" role="status" aria-live="polite">
-                {assistantRuntimeWarningLabel ?? assistantChatFallbackNote}
-              </p>
-            ) : null}
-
             <div className="assistant-chat-log" role="log" aria-live="polite">
               {assistantChatMessages.length <= 0 ? (
                 <p className="assistant-chat-empty">Start a chat when you want strategy help or encouragement.</p>
               ) : (
                 assistantChatMessages.map((turn, index) => (
                   <article key={`${turn.created_at_utc}-${index}`} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
-                    <h4>{turn.role === 'assistant' ? 'Coach' : 'You'}</h4>
+                    <div className="assistant-chat-turn-meta">
+                      <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
+                    </div>
                     <p>{turn.content}</p>
                   </article>
                 ))
