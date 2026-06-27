@@ -23,7 +23,8 @@ MIGRATION_V2 = 2
 MIGRATION_V3 = 3
 MIGRATION_V4 = 4
 MIGRATION_V5 = 5
-LATEST_SCHEMA_VERSION = 5
+MIGRATION_V6 = 6
+LATEST_SCHEMA_VERSION = 6
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -278,12 +279,33 @@ def _migration_0005(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0006(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS assistant_event_interactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id INTEGER NOT NULL,
+            interaction_type TEXT NOT NULL,
+            metadata_json TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_assistant_event_interactions_event_id
+        ON assistant_event_interactions (event_id)
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
     MIGRATION_V3: _migration_0003,
     MIGRATION_V4: _migration_0004,
     MIGRATION_V5: _migration_0005,
+    MIGRATION_V6: _migration_0006,
 }
 
 
@@ -332,6 +354,7 @@ def reset_db() -> None:
         conn.execute("DELETE FROM assistant_events")
         conn.execute("DELETE FROM assistant_chat_turns")
         conn.execute("DELETE FROM assistant_memory_facts")
+        conn.execute("DELETE FROM assistant_event_interactions")
 
 
 def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
@@ -1499,4 +1522,40 @@ def trim_assistant_chat_turns(max_turns: int = 20) -> None:
             )
             """,
             (max_turns,),
+        )
+
+
+def log_assistant_event_interaction(
+    event_id: int,
+    interaction_type: str,
+    metadata: dict[str, str] | None = None,
+) -> None:
+    """Persist renderer interaction telemetry for one assistant popup event."""
+    if event_id <= 0:
+        raise ValueError("event_id must be positive")
+
+    normalized_type = normalize_storage_text(interaction_type).lower()
+    if normalized_type not in {"clicked", "ignored", "expired"}:
+        raise ValueError("interaction_type must be clicked, ignored, or expired")
+
+    normalized_metadata: dict[str, str] = {}
+    for key, value in (metadata or {}).items():
+        normalized_key = normalize_storage_text(str(key)).lower()
+        normalized_value = normalize_japanese_text(str(value))
+        if normalized_key and normalized_value:
+            normalized_metadata[normalized_key] = normalized_value
+
+    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO assistant_event_interactions (event_id, interaction_type, metadata_json, created_at_utc)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                int(event_id),
+                normalized_type,
+                json.dumps(normalized_metadata, ensure_ascii=False, sort_keys=True),
+                created_at,
+            ),
         )

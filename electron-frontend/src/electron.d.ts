@@ -335,6 +335,11 @@ interface DesktopApi {
   getAssistantSnapshot?: (sessionId?: string) => Promise<AssistantSnapshotResponse>
   getAssistantEvents?: (limit?: number) => Promise<AssistantEventsResponse>
   consumeAssistantEvents?: (eventIds: number[]) => Promise<{ ok: boolean; consumed: number }>
+  trackAssistantEvent?: (payload: {
+    eventId: number
+    interactionType: 'clicked' | 'ignored' | 'expired'
+    metadata?: Record<string, string>
+  }) => Promise<{ ok: boolean }>
   appendAssistantChatTurn?: (payload: {
     role: 'user' | 'assistant'
     content: string

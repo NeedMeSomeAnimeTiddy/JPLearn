@@ -43,6 +43,7 @@ from data.study_pipeline import (
     review_minigame_result,
     save_session_goal,
     load_session_summary,
+    track_assistant_event_interaction,
 )
 from data.database import save_state
 from domain.blocks import (
@@ -579,6 +580,20 @@ def consume_pending_assistant_events(event_ids: list[int]) -> dict[str, object]:
     }
 
 
+def track_assistant_event(
+    event_id: int,
+    interaction_type: str,
+    metadata: Mapping[str, str] | None = None,
+) -> dict[str, object]:
+    init_study_db()
+    track_assistant_event_interaction(
+        event_id=event_id,
+        interaction_type=interaction_type,
+        metadata=None if metadata is None else dict(metadata),
+    )
+    return {"ok": True}
+
+
 def append_chat_turn(role: str, content: str) -> dict[str, object]:
     init_study_db()
     append_assistant_chat_turn(role, content)
@@ -715,6 +730,23 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             ]
             payload = consume_pending_assistant_events(event_ids)
         except ValueError as exc:
+            return 2, {"error": str(exc)}
+        return 0, payload
+
+    if command == "assistant-events-track":
+        if len(argv) < 3:
+            return 2, {"error": "Usage: assistant-events-track <event_id> <interaction_type> [metadata_json]"}
+        try:
+            event_id = int(argv[1])
+            interaction_type = argv[2]
+            metadata: Mapping[str, str] | None = None
+            if len(argv) > 3 and argv[3].strip():
+                decoded = json.loads(argv[3])
+                if not isinstance(decoded, dict):
+                    raise ValueError("metadata_json must decode to object")
+                metadata = {str(key): str(value) for key, value in decoded.items()}
+            payload = track_assistant_event(event_id, interaction_type, metadata)
+        except (ValueError, json.JSONDecodeError) as exc:
             return 2, {"error": str(exc)}
         return 0, payload
 

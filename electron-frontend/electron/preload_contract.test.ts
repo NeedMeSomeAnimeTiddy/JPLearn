@@ -26,6 +26,7 @@ describe('preload contract', () => {
       "getAssistantSnapshot: (sessionId) => ipcRenderer.invoke('assistant:get-snapshot', sessionId)",
       "getAssistantEvents: (limit) => ipcRenderer.invoke('assistant:get-events', limit)",
       "consumeAssistantEvents: (eventIds) => ipcRenderer.invoke('assistant:consume-events', eventIds)",
+      "trackAssistantEvent: (payload) => ipcRenderer.invoke('assistant:track-event', payload)",
       "appendAssistantChatTurn: (payload) => ipcRenderer.invoke('assistant:append-chat-turn', payload)",
       "getAssistantChatHistory: (limit) => ipcRenderer.invoke('assistant:get-chat-history', limit)",
       "getAssistantChatRuntimeStatus: () => ipcRenderer.invoke('assistant-chat:status')",

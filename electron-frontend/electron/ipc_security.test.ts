@@ -8,6 +8,7 @@ const {
   validateExpertiseLevelInput,
   validateSessionGoalPayload,
   validateSessionId,
+  validateAssistantEventInteractionPayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
 } = require('./ipc_security.cjs')
@@ -135,6 +136,43 @@ describe('ipc_security', () => {
     expect(() => validateSessionGoalPayload({ targetItems: 0 })).toThrow(/invalid targetitems/i)
     expect(() => validateSessionGoalPayload({ targetItems: 3, targetAccuracy: 101 })).toThrow(/invalid targetaccuracy/i)
     expect(() => validateSessionId('   ')).toThrow(/invalid session id/i)
+  })
+
+  it('validates assistant event interaction payload', () => {
+    const valid = validateAssistantEventInteractionPayload({
+      eventId: 12,
+      interactionType: 'clicked',
+      metadata: {
+        target_mode: 'context_cloze',
+        reason: 'cta',
+      },
+    })
+
+    expect(valid.eventId).toBe(12)
+    expect(valid.interactionType).toBe('clicked')
+    expect(valid.metadata.target_mode).toBe('context_cloze')
+
+    expect(() =>
+      validateAssistantEventInteractionPayload({
+        eventId: 0,
+        interactionType: 'clicked',
+      }),
+    ).toThrow(/invalid assistant event id/i)
+
+    expect(() =>
+      validateAssistantEventInteractionPayload({
+        eventId: 5,
+        interactionType: 'unknown',
+      }),
+    ).toThrow(/invalid assistant interaction type/i)
+
+    expect(() =>
+      validateAssistantEventInteractionPayload({
+        eventId: 5,
+        interactionType: 'expired',
+        metadata: 'bad',
+      }),
+    ).toThrow(/invalid assistant interaction metadata/i)
   })
 
 })

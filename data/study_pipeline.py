@@ -319,6 +319,19 @@ def consume_assistant_events(event_ids: list[int]) -> None:
     database.mark_assistant_events_consumed(event_ids)
 
 
+def track_assistant_event_interaction(
+    event_id: int,
+    interaction_type: str,
+    metadata: dict[str, str] | None = None,
+) -> None:
+    """Persist renderer telemetry for scripted tutor event interactions."""
+    database.log_assistant_event_interaction(
+        event_id=event_id,
+        interaction_type=interaction_type,
+        metadata=metadata,
+    )
+
+
 def append_assistant_chat_turn(role: str, content: str) -> None:
     """Persist one local tutor chat turn and enforce minimal retention."""
     database.append_assistant_chat_turn(role, content)

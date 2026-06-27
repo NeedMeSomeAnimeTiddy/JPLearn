@@ -253,6 +253,47 @@ function validateAssistantChatRuntimePayload(payload) {
   }
 }
 
+function validateAssistantEventInteractionPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid assistant event interaction payload: expected object')
+  }
+
+  const eventId = payload.eventId
+  if (!Number.isInteger(eventId) || eventId <= 0) {
+    throw new Error(`Invalid assistant event id: ${String(eventId)}`)
+  }
+
+  const interactionType =
+    typeof payload.interactionType === 'string'
+      ? payload.interactionType.trim().toLowerCase()
+      : ''
+  if (!new Set(['clicked', 'ignored', 'expired']).has(interactionType)) {
+    throw new Error(`Invalid assistant interaction type: ${String(payload.interactionType)}`)
+  }
+
+  let metadata = {}
+  if (payload.metadata != null) {
+    if (typeof payload.metadata !== 'object' || Array.isArray(payload.metadata)) {
+      throw new Error('Invalid assistant interaction metadata: expected object')
+    }
+    const normalized = {}
+    for (const [key, value] of Object.entries(payload.metadata)) {
+      const normalizedKey = String(key).trim()
+      if (!normalizedKey) {
+        continue
+      }
+      normalized[normalizedKey] = String(value)
+    }
+    metadata = normalized
+  }
+
+  return {
+    eventId,
+    interactionType,
+    metadata,
+  }
+}
+
 module.exports = {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
@@ -263,6 +304,7 @@ module.exports = {
   validateOptionalSessionId,
   validatePositiveLimit,
   validateAssistantEventIdsPayload,
+  validateAssistantEventInteractionPayload,
   validateAssistantChatAppendPayload,
   validateAssistantChatRuntimePayload,
   validateStartupThemeInput,

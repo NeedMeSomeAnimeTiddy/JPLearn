@@ -63,10 +63,13 @@ interface AssistantEventPayload {
 interface AssistantToast {
   id: number
   priority: AssistantEventPayload['priority']
+  eventType: string
+  messageKey: string
   title: string
   body: string
   targetMode: MinigameKey | null
   focusArea: string | null
+  actionType: string | null
   actionLabel: string
 }
 interface AssistantChatTurn {
@@ -2335,6 +2338,48 @@ function App() {
     window.setTimeout(task, delayMs)
   }, [])
 
+  const trackAssistantToastInteraction = useCallback(
+    async (
+      toast: AssistantToast,
+      interactionType: 'clicked' | 'ignored' | 'expired',
+      extraMetadata?: Record<string, string>,
+    ): Promise<void> => {
+      const trackAssistantEvent = window.jplearnDesktop.trackAssistantEvent
+      if (!trackAssistantEvent) {
+        return
+      }
+
+      const metadata: Record<string, string> = {
+        event_type: toast.eventType,
+        message_key: toast.messageKey,
+      }
+
+      if (toast.targetMode) metadata.target_mode = toast.targetMode
+      if (toast.focusArea) metadata.focus_area = toast.focusArea
+      if (toast.actionType) metadata.action_type = toast.actionType
+      if (extraMetadata) {
+        for (const [key, value] of Object.entries(extraMetadata)) {
+          const normalizedKey = key.trim()
+          const normalizedValue = value.trim()
+          if (normalizedKey && normalizedValue) {
+            metadata[normalizedKey] = normalizedValue
+          }
+        }
+      }
+
+      try {
+        await trackAssistantEvent({
+          eventId: toast.id,
+          interactionType,
+          metadata,
+        })
+      } catch {
+        // Telemetry path is best-effort only.
+      }
+    },
+    [],
+  )
+
   useEffect(() => {
     void loadSummary()
   }, [loadSummary])
@@ -2390,10 +2435,13 @@ function App() {
           const toasts = fresh.map((event) => ({
             id: event.id,
             priority: event.priority,
+            eventType: event.event_type,
+            messageKey: event.message_key,
             title: formatAssistantEventTitle(event),
             body: formatAssistantEventBody(event),
             targetMode: parseAssistantTargetMode(event.metadata.target_mode),
             focusArea: event.metadata.focus_area ?? null,
+            actionType: event.metadata.action_type ?? null,
             actionLabel: formatAssistantActionLabel(event),
           }))
           setAssistantToasts((previous) => [...previous, ...toasts].slice(-ASSISTANT_MAX_TOASTS))
@@ -2422,13 +2470,15 @@ function App() {
     }
 
     const timeoutHandle = window.setTimeout(() => {
+      const expiredToast = assistantToasts[0]
+      void trackAssistantToastInteraction(expiredToast, 'expired', { reason: 'ttl' })
       setAssistantToasts((previous) => previous.slice(1))
     }, ASSISTANT_TOAST_TTL_MS)
 
     return () => {
       window.clearTimeout(timeoutHandle)
     }
-  }, [assistantToasts])
+  }, [assistantToasts, trackAssistantToastInteraction])
 
   const refreshAssistantChatHistory = useCallback(async () => {
     const getAssistantChatHistory = window.jplearnDesktop.getAssistantChatHistory
@@ -3196,7 +3246,13 @@ function App() {
     sessionTargetItems,
   ])
 
+  const dismissAssistantToast = useCallback((toast: AssistantToast) => {
+    void trackAssistantToastInteraction(toast, 'ignored', { reason: 'manual-dismiss' })
+    setAssistantToasts((previous) => previous.filter((item) => item.id !== toast.id))
+  }, [trackAssistantToastInteraction])
+
   const launchAssistantToastAction = useCallback((toast: AssistantToast) => {
+    void trackAssistantToastInteraction(toast, 'clicked', { reason: 'cta-click' })
     const suggestedScript = inferScriptFromFocusArea(toast.focusArea) ?? activeScript
     const suggestedGame = toast.targetMode ?? 'interleave_mix'
     const minigame = resolveScriptMinigame(suggestedScript, suggestedGame)
@@ -3222,7 +3278,7 @@ function App() {
     }
 
     void startSession(minigame)
-  }, [activeScript, resetRoundCycle, resolveScriptMinigame, startSession])
+  }, [activeScript, resetRoundCycle, resolveScriptMinigame, startSession, trackAssistantToastInteraction])
 
   const continueLastSession = useCallback(() => {
     if (!sessionRunReport) return
@@ -6381,15 +6437,24 @@ function App() {
               <article key={toast.id} className={`assistant-toast assistant-toast-${toast.priority}`}>
                 <h3>{toast.title}</h3>
                 <p>{toast.body}</p>
-                {toast.targetMode ? (
+                <div className="assistant-toast-controls">
+                  {toast.targetMode ? (
+                    <button
+                      type="button"
+                      className="assistant-toast-action"
+                      onClick={() => launchAssistantToastAction(toast)}
+                    >
+                      {toast.actionLabel}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
-                    className="assistant-toast-action"
-                    onClick={() => launchAssistantToastAction(toast)}
+                    className="assistant-toast-dismiss"
+                    onClick={() => dismissAssistantToast(toast)}
                   >
-                    {toast.actionLabel}
+                    Dismiss
                   </button>
-                ) : null}
+                </div>
               </article>
             ))}
           </div>

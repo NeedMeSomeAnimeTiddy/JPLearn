@@ -95,6 +95,11 @@ def test_jplearn_db_upgrade_adds_review_event_columns_and_schema_marker(
     assert "fact_value" in assistant_memory_columns
     assert "source" in assistant_memory_columns
 
+    assistant_interaction_columns = _column_names(db_path, "assistant_event_interactions")
+    assert "event_id" in assistant_interaction_columns
+    assert "interaction_type" in assistant_interaction_columns
+    assert "metadata_json" in assistant_interaction_columns
+
     with sqlite3.connect(db_path) as conn:
         row = conn.execute(
             "SELECT version FROM schema_version WHERE id = 1"
@@ -247,6 +252,7 @@ def test_jplearn_db_upgrade_from_v3_applies_assistant_tables(
     assert "role" in _column_names(db_path, "assistant_chat_turns")
     assert "dedup_key" in _column_names(db_path, "assistant_events")
     assert "fact_key" in _column_names(db_path, "assistant_memory_facts")
+    assert "interaction_type" in _column_names(db_path, "assistant_event_interactions")
 
     with sqlite3.connect(db_path) as conn:
         version_row = conn.execute(

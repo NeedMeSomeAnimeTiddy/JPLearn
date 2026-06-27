@@ -395,8 +395,14 @@
   color: var(--text-soft);
 }
 
-.assistant-toast-action {
+.assistant-toast-controls {
   margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-toast-action {
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
   background: color-mix(in oklab, var(--panel-bg) 80%, var(--tone-ocean) 20%);
   color: var(--text-main);
@@ -413,6 +419,26 @@
 
 .assistant-toast-action:hover {
   border-color: color-mix(in oklab, var(--tone-ocean) 72%, var(--panel-border));
+}
+
+.assistant-toast-dismiss {
+  border: 1px solid color-mix(in oklab, var(--panel-border) 86%, black);
+  background: color-mix(in oklab, var(--panel-bg-alt) 92%, black);
+  color: var(--text-soft);
+  border-radius: 8px;
+  min-height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--button-font);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.assistant-toast-dismiss:hover {
+  color: var(--text-main);
+  border-color: color-mix(in oklab, var(--panel-border) 70%, white);
 }
 
 .assistant-toast-info {

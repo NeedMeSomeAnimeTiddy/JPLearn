@@ -361,6 +361,35 @@ def test_start_session_goal_contract_shape(tmp_path: Path, monkeypatch) -> None:
     assert goal["session_id"] == "shape-session"
 
 
+def test_track_assistant_event_persists_interaction(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.track_assistant_event(
+        event_id=3,
+        interaction_type="clicked",
+        metadata={"reason": "cta", "target_mode": "context_cloze"},
+    )
+
+    assert payload["ok"] is True
+
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        row = conn.execute(
+            """
+            SELECT event_id, interaction_type, metadata_json
+            FROM assistant_event_interactions
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+
+    assert row is not None
+    assert row["event_id"] == 3
+    assert row["interaction_type"] == "clicked"
+    metadata = cast(dict[str, str], json.loads(str(row["metadata_json"])))
+    assert metadata["reason"] == "cta"
+    assert metadata["target_mode"] == "context_cloze"
+
+
 def test_record_game_result_contract_shape(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

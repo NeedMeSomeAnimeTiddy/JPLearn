@@ -6,6 +6,7 @@ const {
   validateOptionalSessionId,
   validatePositiveLimit,
   validateAssistantEventIdsPayload,
+  validateAssistantEventInteractionPayload,
   validateAssistantChatAppendPayload,
   validateAssistantChatRuntimePayload,
   validateStartupThemeInput,
@@ -219,6 +220,22 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to consume assistant events: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('assistant:track-event', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateAssistantEventInteractionPayload(payload)
+    try {
+      return await options.runPythonBridgeWithArgs([
+        'assistant-events-track',
+        String(validatedPayload.eventId),
+        validatedPayload.interactionType,
+        JSON.stringify(validatedPayload.metadata),
+      ])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to track assistant event interaction: ${detail}`)
     }
   })
 
