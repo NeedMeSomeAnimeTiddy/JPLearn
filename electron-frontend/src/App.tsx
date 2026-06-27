@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, SendHorizontal, Settings, Shuffle, Square, Sun, Target, Trash2, Trophy, Volume2, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, LoaderCircle, Lock, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, SendHorizontal, Settings, Shuffle, Square, Sun, Target, Trash2, Trophy, Volume2, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -145,7 +145,7 @@ type SettingsTabKey = 'theme' | 'background' | 'font_size' | 'animations' | 'tut
 
 const FEEDBACK_REVEAL_MS = 2100
 const ASSISTANT_EVENT_POLL_MS = 15000
-const ASSISTANT_TOAST_TTL_MS = 5200
+const ASSISTANT_TOAST_TTL_MS = 3800
 const ROUND_QUEUE_TIMEOUT_MS = 1200
 const ASSISTANT_MAX_TOASTS = 1
 const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
@@ -3638,11 +3638,6 @@ function App() {
     sessionTargetItems,
   ])
 
-  const dismissAssistantToast = useCallback((toast: AssistantToast) => {
-    void trackAssistantToastInteraction(toast, 'ignored', { reason: 'manual-dismiss' })
-    setAssistantToasts((previous) => previous.filter((item) => item.id !== toast.id))
-  }, [trackAssistantToastInteraction])
-
   const launchAssistantToastAction = useCallback((toast: AssistantToast) => {
     void trackAssistantToastInteraction(toast, 'clicked', { reason: 'cta-click' })
     const suggestedScript = inferScriptFromFocusArea(toast.focusArea) ?? activeScript
@@ -5325,14 +5320,15 @@ function App() {
           <header className="topbar panel-glass">
             <button
               type="button"
-              className="back-button"
+              className="back-button back-button-icon-only"
               onClick={() => {
                 setNavDirection('back')
                 setView('script_hub')
               }}
+              aria-label="Back to map"
+              title="Back to map"
             >
               <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-              Back to Map
             </button>
             <div className="brand-block">
               <span className="brand-kicker">
@@ -5374,12 +5370,15 @@ function App() {
                 <div className="game-actions">
                   <button
                     type="button"
+                    className="back-button back-button-icon-only"
                     onClick={() => {
                       setNavDirection('back')
                       setView('script_hub')
                     }}
+                    aria-label="Back to map"
+                    title="Back to map"
                   >
-                    Back to Map
+                    <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
                   </button>
                   <button
                     type="button"
@@ -5452,12 +5451,15 @@ function App() {
                   </button>
                   <button
                     type="button"
+                    className="back-button back-button-icon-only"
                     onClick={() => {
                       setNavDirection('back')
                       setView('script_hub')
                     }}
+                    aria-label="Back to map"
+                    title="Back to map"
                   >
-                    Back to Map
+                    <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
                   </button>
                   {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
                 </div>
@@ -5485,6 +5487,13 @@ function App() {
                 </div>
               </div>
             )}
+
+            {((sessionStartPending && !sessionActive) || (sessionActive && !roundState)) ? (
+              <div className="minigame-loading" role="status" aria-live="polite">
+                <LoaderCircle className="inline-button-icon spin-icon" strokeWidth={2.2} aria-hidden="true" />
+                <span>{sessionStartPending ? 'Preparing your round...' : 'Loading next card...'}</span>
+              </div>
+            ) : null}
 
             {gameError ? <p className="status-line status-error">{gameError}</p> : null}
 
@@ -7113,8 +7122,8 @@ function App() {
             <article key={activeAssistantToast.id} className={`assistant-toast assistant-toast-${activeAssistantToast.priority}`}>
               <h3>{activeAssistantToast.title}</h3>
               <p>{activeAssistantToast.body}</p>
-              <div className="assistant-toast-controls">
-                {activeAssistantToast.targetMode ? (
+              {activeAssistantToast.targetMode ? (
+                <div className="assistant-toast-controls">
                   <button
                     type="button"
                     className="assistant-toast-action"
@@ -7122,15 +7131,8 @@ function App() {
                   >
                     {activeAssistantToast.actionLabel}
                   </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="assistant-toast-dismiss"
-                  onClick={() => dismissAssistantToast(activeAssistantToast)}
-                >
-                  Dismiss
-                </button>
-              </div>
+                </div>
+              ) : null}
             </article>
           </div>
         ) : null}

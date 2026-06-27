@@ -1110,15 +1110,6 @@ function createSplashWindow(themeKey) {
         text-align: center;
         animation: panelIn 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
       }
-      .spinner {
-        width: 44px;
-        height: 44px;
-        margin: 0 auto 16px;
-        border-radius: 999px;
-        border: 3px solid ${palette.spinnerTrack};
-        border-top-color: ${palette.spinnerHead};
-        animation: spin 860ms linear infinite;
-      }
       .brand {
         margin: 0 0 8px;
         font-size: 0.72rem;
@@ -1138,22 +1129,27 @@ function createSplashWindow(themeKey) {
         color: ${palette.subtitle};
         font-size: 0.92rem;
       }
+      .status-detail {
+        min-height: 1.35em;
+      }
       .progress {
         width: 100%;
-        height: 5px;
+        height: 7px;
         border-radius: 999px;
         background: rgba(255, 255, 255, 0.08);
         overflow: hidden;
       }
-      .progress::after {
-        content: "";
-        display: block;
-        width: 36%;
+      .progress-fill {
+        width: 0%;
         height: 100%;
         border-radius: inherit;
-        background: linear-gradient(90deg, transparent, ${palette.accent}, transparent);
-        transform: translateX(-120%);
-        animation: sweep 1.2s ease-in-out infinite;
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, ${palette.accent} 74%, white),
+          ${palette.accent}
+        );
+        box-shadow: 0 0 14px color-mix(in srgb, ${palette.accent} 46%, transparent);
+        transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
       }
       @keyframes panelIn {
         from {
@@ -1165,27 +1161,34 @@ function createSplashWindow(themeKey) {
           transform: translateY(0) scale(1);
         }
       }
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-      @keyframes sweep {
-        to {
-          transform: translateX(320%);
-        }
-      }
     </style>
   </head>
   <body>
     <div class="stage" aria-hidden="true"></div>
     <section class="panel" aria-label="Startup status">
-      <div class="spinner" aria-hidden="true"></div>
       <p class="brand">JPLearn Desktop</p>
-      <h1>Starting JPLearn...</h1>
-      <p>Loading decks, stats, and bridge services.</p>
-      <div class="progress" aria-hidden="true"></div>
+      <h1 id="startup-title">Starting JPLearn...</h1>
+      <p id="startup-detail" class="status-detail" aria-live="polite">Loading decks, stats, and bridge services.</p>
+      <div class="progress" aria-hidden="true"><div id="startup-progress-fill" class="progress-fill"></div></div>
     </section>
+    <script>
+      window.__setSplashStatus = function(title, detail, pct) {
+        const heading = document.getElementById('startup-title')
+        const body = document.getElementById('startup-detail')
+        const fill = document.getElementById('startup-progress-fill')
+        if (heading && typeof title === 'string' && title.trim().length > 0) {
+          heading.textContent = title
+        }
+        if (body && typeof detail === 'string' && detail.trim().length > 0) {
+          body.textContent = detail
+        }
+        if (fill) {
+          const numericPct = Number.isFinite(Number(pct)) ? Number(pct) : 0
+          const clampedPct = Math.max(0, Math.min(100, numericPct))
+          fill.style.width = clampedPct + '%'
+        }
+      }
+    </script>
   </body>
 </html>`
 
@@ -1193,6 +1196,19 @@ function createSplashWindow(themeKey) {
   splash.once('ready-to-show', () => splash.show())
 
   return splash
+}
+
+function updateSplashStatus(splash, title, detail, pct = 0) {
+  if (!splash || splash.isDestroyed()) return
+
+  const safeTitle = typeof title === 'string' ? title : 'Starting JPLearn...'
+  const safeDetail = typeof detail === 'string' ? detail : 'Loading...'
+  const safePct = Number.isFinite(pct) ? Math.max(0, Math.min(100, Math.floor(pct))) : 0
+
+  splash.webContents.executeJavaScript(
+    `window.__setSplashStatus(${JSON.stringify(safeTitle)}, ${JSON.stringify(safeDetail)}, ${safePct});`,
+    true,
+  ).catch(() => undefined)
 }
 
 function loadMainWindow(win) {
@@ -1355,9 +1371,12 @@ async function createWindowWithSplash() {
   const win = createWindow()
   const webContentsId = win.webContents.id
 
+  updateSplashStatus(splash, 'Starting JPLearn...', 'Preparing desktop window...', 8)
+
   if (!tutorRuntimePreloadTriggered) {
     tutorRuntimePreloadTriggered = true
     // Warm the local tutor runtime and prefetch chat history during splash.
+    updateSplashStatus(splash, 'Loading tutor services...', 'Warming local coach runtime...', 28)
     void preloadTutorChatStartupData().catch(() => undefined)
   }
 
@@ -1378,22 +1397,35 @@ async function createWindowWithSplash() {
     startupTelemetryByContentsId.delete(webContentsId)
   })
 
+  updateSplashStatus(splash, 'Loading interface...', 'Booting renderer and UI shell...', 44)
   loadMainWindow(win)
 
   const windowReadyPromise = new Promise((resolve) => {
     win.once('ready-to-show', resolve)
   })
 
-  await Promise.all([
+  updateSplashStatus(splash, 'Loading study data...', 'Decks, stats, and progress are syncing...', 70)
+
+  const rendererStartupPromise = Promise.all([
     windowReadyPromise,
     Promise.race([
       startupReadyPromise,
       new Promise((resolve) => setTimeout(resolve, maxStartupWaitMs)),
     ]),
-    Promise.race([
-      preloadTutorChatStartupData(),
-      new Promise((resolve) => setTimeout(resolve, maxTutorPreloadWaitMs)),
-    ]),
+  ]).then(() => {
+    updateSplashStatus(splash, 'Finalizing startup...', 'Preparing your first screen...', 92)
+  })
+
+  const tutorStartupPromise = Promise.race([
+    preloadTutorChatStartupData(),
+    new Promise((resolve) => setTimeout(resolve, maxTutorPreloadWaitMs)),
+  ]).then(() => {
+    updateSplashStatus(splash, 'Finalizing startup...', 'Almost ready to study.', 96)
+  })
+
+  await Promise.all([
+    rendererStartupPromise,
+    tutorStartupPromise,
     new Promise((resolve) => setTimeout(resolve, minSplashMs)),
   ])
 
@@ -1425,6 +1457,8 @@ async function createWindowWithSplash() {
       `Startup budget exceeded: first summary in ${rendererTelemetry.firstSummaryMs}ms (budget ${STARTUP_BUDGETS_MS.firstSummary}ms)`,
     )
   }
+
+  updateSplashStatus(splash, 'Welcome', 'Ready to study.', 100)
 
   if (!splash.isDestroyed()) {
     splash.close()
