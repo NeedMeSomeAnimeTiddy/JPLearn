@@ -5747,8 +5747,8 @@ function App() {
 
                 <div className="settings-section settings-control-row settings-control-row-no-icon">
                   <div className="settings-control-content">
-                    <p className="settings-section-label">Accessibility</p>
-                    <div className="settings-theme-grid" role="radiogroup" aria-label="Animation style">
+                    <p className="settings-section-label">Animations</p>
+                    <div className="settings-animation-grid" role="radiogroup" aria-label="Animation style">
                       {MOTION_STYLE_OPTIONS.map((motionStyle) => (
                         <button
                           key={motionStyle.key}
@@ -5771,20 +5771,20 @@ function App() {
                           <span className="settings-icon-entry-label">{MOTION_STYLE_LABEL[motionStyle.key]}</span>
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        className={`settings-icon-entry settings-theme-entry ${settings.reducedMotion ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
+                        aria-label={settings.reducedMotion ? 'Reduce motion enabled. Activate to disable.' : 'Reduce motion disabled. Activate to enable.'}
+                        aria-pressed={settings.reducedMotion}
+                        title={settings.reducedMotion ? 'Reduce motion enabled' : 'Reduce motion disabled'}
+                      >
+                        <span className={`settings-mode-icon-button ${settings.reducedMotion ? 'is-enabled' : ''}`} aria-hidden="true">
+                          <Activity size={18} strokeWidth={2.25} aria-hidden="true" />
+                        </span>
+                        <span className="settings-icon-entry-label">Reduce Motion</span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className={`settings-icon-entry settings-icon-entry-button ${settings.reducedMotion ? 'is-enabled' : ''}`}
-                      onClick={() => setSettings((prev) => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
-                      aria-label={settings.reducedMotion ? 'Reduce motion enabled. Activate to disable.' : 'Reduce motion disabled. Activate to enable.'}
-                      aria-pressed={settings.reducedMotion}
-                      title={settings.reducedMotion ? 'Reduce motion enabled' : 'Reduce motion disabled'}
-                    >
-                      <span className={`settings-mode-icon-button ${settings.reducedMotion ? 'is-enabled' : ''}`} aria-hidden="true">
-                        <Activity size={18} strokeWidth={2.25} aria-hidden="true" />
-                      </span>
-                      <span className="settings-icon-entry-label">Reduce Motion</span>
-                    </button>
                   </div>
                 </div>
 

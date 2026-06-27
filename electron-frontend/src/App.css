@@ -4118,6 +4118,17 @@ button {
   gap: 8px;
 }
 
+.settings-animation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+.settings-animation-grid .settings-icon-entry {
+  min-height: 54px;
+}
+
 .settings-theme-mode-toggle {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4615,6 +4626,10 @@ button {
   }
 
   .settings-theme-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-animation-grid {
     grid-template-columns: 1fr;
   }
 }
