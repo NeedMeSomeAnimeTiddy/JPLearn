@@ -3371,6 +3371,29 @@ function App() {
     }
   }, [activeKanjiLevel, activeVocabLevel, getBlockProgressDeduped, getDeckCardsDeduped, resetRoundCycle])
 
+  // After the backend SRS states change wholesale (onboarding seeding or a reset),
+  // the cached deck/block progress no longer matches the database. Drop every cache
+  // and refetch so the minigame learning path and overview block tiles reflect the
+  // new unlock/mastery state instead of showing stale "locked"/0% data.
+  const refreshDeckProgressAfterSeedChange = useCallback(() => {
+    scriptDeckCacheRef.current = {}
+    scriptBlockCacheRef.current = {}
+    kanjiLevelDeckCacheRef.current = {}
+    kanjiLevelBlockCacheRef.current = {}
+    vocabLevelDeckCacheRef.current = {}
+    vocabLevelBlockCacheRef.current = {}
+    studyQueueCacheRef.current.clear()
+
+    void loadScriptCards(activeScript, activeKanjiLevel, activeVocabLevel)
+    void window.jplearnDesktop
+      .getOverviewCharacterMastery()
+      .then((payload) => {
+        setOverviewBlocks(payload.blocks)
+        setOverviewKanjiDeck(payload.kanji_cards)
+      })
+      .catch(() => undefined)
+  }, [activeScript, activeKanjiLevel, activeVocabLevel, loadScriptCards])
+
   useEffect(() => {
     void loadScriptCards(activeScript, activeKanjiLevel, activeVocabLevel)
   }, [activeScript, activeKanjiLevel, activeVocabLevel, loadScriptCards])
@@ -4506,13 +4529,14 @@ function App() {
       setExpertiseError(null)
       setSelectedExpertiseLevel('total_beginner')
       setResetConfirmStep(0)
+      refreshDeckProgressAfterSeedChange()
       await loadSummary()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown reset error')
     } finally {
       setResettingDb(false)
     }
-  }, [loadSummary])
+  }, [loadSummary, refreshDeckProgressAfterSeedChange])
 
   const minimizeWindow = useCallback(() => {
     void window.jplearnDesktop.minimizeWindow()
@@ -4567,13 +4591,14 @@ function App() {
 
       window.localStorage.setItem(EXPERTISE_STORAGE_KEY, 'done')
       setShowExpertisePrompt(false)
+      refreshDeckProgressAfterSeedChange()
       await loadSummary()
     } catch (err) {
       setExpertiseError(err instanceof Error ? err.message : 'Could not apply expertise profile.')
     } finally {
       setApplyingExpertise(false)
     }
-  }, [getDeckCardsDeduped, loadSummary, selectedExpertiseLevel])
+  }, [getDeckCardsDeduped, loadSummary, refreshDeckProgressAfterSeedChange, selectedExpertiseLevel])
 
   const goToNextOnboardingStep = useCallback(() => {
     setExpertiseError(null)
