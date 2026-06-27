@@ -395,6 +395,26 @@
   color: var(--text-soft);
 }
 
+.assistant-toast-action {
+  margin-top: 8px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
+  background: color-mix(in oklab, var(--panel-bg) 80%, var(--tone-ocean) 20%);
+  color: var(--text-main);
+  border-radius: 8px;
+  min-height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--button-font);
+  font-size: 0.71rem;
+  cursor: pointer;
+}
+
+.assistant-toast-action:hover {
+  border-color: color-mix(in oklab, var(--tone-ocean) 72%, var(--panel-border));
+}
+
 .assistant-toast-info {
   border-color: color-mix(in oklab, var(--tone-ocean) 45%, var(--panel-border));
 }

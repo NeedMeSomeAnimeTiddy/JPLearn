@@ -65,6 +65,9 @@ interface AssistantToast {
   priority: AssistantEventPayload['priority']
   title: string
   body: string
+  targetMode: MinigameKey | null
+  focusArea: string | null
+  actionLabel: string
 }
 interface AssistantChatTurn {
   role: 'user' | 'assistant'
@@ -1799,6 +1802,44 @@ function formatAssistantEventBody(event: AssistantEventPayload): string {
   return `Quick check-in: stay steady and finish this block cleanly. ${recommendation}`
 }
 
+function parseAssistantTargetMode(mode: string | undefined): MinigameKey | null {
+  if (!mode) return null
+  const normalized = mode.trim().toLowerCase()
+  if (
+    normalized === 'romaji_sprint' ||
+    normalized === 'meaning_match' ||
+    normalized === 'character_match' ||
+    normalized === 'stroke_order' ||
+    normalized === 'typed_recall' ||
+    normalized === 'context_cloze' ||
+    normalized === 'narrative_story' ||
+    normalized === 'interleave_mix'
+  ) {
+    return normalized
+  }
+  return null
+}
+
+function inferScriptFromFocusArea(focusArea: string | null): ScriptKey | null {
+  if (!focusArea) return null
+  const normalized = focusArea.trim().toLowerCase()
+  if (normalized === 'hiragana') return 'hiragana'
+  if (normalized === 'katakana') return 'katakana'
+  if (normalized.includes('kanji')) return 'kanji_n5'
+  if (normalized.includes('vocab')) return 'vocab_n5'
+  if (normalized.includes('grammar') || normalized.includes('conversational')) return 'grammar_patterns'
+  return null
+}
+
+function formatAssistantActionLabel(event: AssistantEventPayload): string {
+  const actionType = event.metadata.action_type ?? ''
+  if (actionType === 'session_recovery') return 'Start recovery drill'
+  if (actionType === 'curriculum_recovery') return 'Run cloze recovery'
+  if (actionType === 'stretch_push') return 'Start stretch round'
+  if (actionType === 'streak_keepalive' || actionType === 'consistency_nudge') return 'Start quick round'
+  return 'Start suggested drill'
+}
+
 function App() {
   const [view, setView] = useState<AppView>('home')
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
@@ -2351,6 +2392,9 @@ function App() {
             priority: event.priority,
             title: formatAssistantEventTitle(event),
             body: formatAssistantEventBody(event),
+            targetMode: parseAssistantTargetMode(event.metadata.target_mode),
+            focusArea: event.metadata.focus_area ?? null,
+            actionLabel: formatAssistantActionLabel(event),
           }))
           setAssistantToasts((previous) => [...previous, ...toasts].slice(-ASSISTANT_MAX_TOASTS))
         }
@@ -3151,6 +3195,34 @@ function App() {
     sessionRounds,
     sessionTargetItems,
   ])
+
+  const launchAssistantToastAction = useCallback((toast: AssistantToast) => {
+    const suggestedScript = inferScriptFromFocusArea(toast.focusArea) ?? activeScript
+    const suggestedGame = toast.targetMode ?? 'interleave_mix'
+    const minigame = resolveScriptMinigame(suggestedScript, suggestedGame)
+
+    setActiveGame(minigame)
+    setNavDirection('forward')
+    setView('minigame')
+    setSessionActive(false)
+    setRoundState(null)
+    setRoundFeedback(null)
+    setRoundFeedbackTone(null)
+    setRoundFeedbackPoints(null)
+    setRoundFeedbackAnswer(null)
+    setIsRoundResolving(false)
+    setLivesRemaining(DEFAULT_LIVES)
+    resetRoundCycle()
+    setAssistantToasts((previous) => previous.filter((item) => item.id !== toast.id))
+
+    if (suggestedScript !== activeScript) {
+      setActiveScript(suggestedScript)
+      setResumeRequest({ script: suggestedScript, minigame })
+      return
+    }
+
+    void startSession(minigame)
+  }, [activeScript, resetRoundCycle, resolveScriptMinigame, startSession])
 
   const continueLastSession = useCallback(() => {
     if (!sessionRunReport) return
@@ -6309,6 +6381,15 @@ function App() {
               <article key={toast.id} className={`assistant-toast assistant-toast-${toast.priority}`}>
                 <h3>{toast.title}</h3>
                 <p>{toast.body}</p>
+                {toast.targetMode ? (
+                  <button
+                    type="button"
+                    className="assistant-toast-action"
+                    onClick={() => launchAssistantToastAction(toast)}
+                  >
+                    {toast.actionLabel}
+                  </button>
+                ) : null}
               </article>
             ))}
           </div>
