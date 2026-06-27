@@ -47,10 +47,13 @@ An Electron-based Japanese learning app with a Python backend for domain logic a
 - place model files here:
    `models\llama\`
 - runtime auto-detects the first `*.gguf` in `models\llama\` and uses llama.cpp automatically.
+- tutor behavior instructions can be customized in:
+   `models\\llama\\instructions.txt`
 - explicit environment overrides are still supported:
    `JPLEARN_TUTOR_PROVIDER`
    `JPLEARN_LLAMA_CPP_PATH`
    `JPLEARN_LLAMA_MODEL_PATH`
+   `JPLEARN_TUTOR_SYSTEM_PROMPT`
 
 ### External Content Import Workflow
 

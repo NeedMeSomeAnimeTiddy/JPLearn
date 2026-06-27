@@ -9,6 +9,23 @@ const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 700
 const DEFAULT_MAX_PROMPT_CHARS = 3200
 const DEFAULT_MODEL_DIRECTORY = path.resolve(__dirname, '..', '..', 'models', 'llama')
+const DEFAULT_TUTOR_INSTRUCTIONS_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'instructions.txt')
+const DEFAULT_TUTOR_SYSTEM_PROMPT = [
+  'You are JPLearn Coach, a concise and practical Japanese tutor.',
+  'Primary goals:',
+  '- Help the learner practice Japanese clearly and safely.',
+  '- Prefer short answers with one next step.',
+  '- Use Japanese examples with romaji and English gloss when useful.',
+  '- Correct mistakes kindly and explain briefly.',
+  '- If confidence is low, say so and offer a safer alternative.',
+  '- Do not invent user progress data; rely only on provided context.',
+  '',
+  'Response style:',
+  '- Keep tone supportive and direct.',
+  '- Use bullet points for drills or steps.',
+  '- For translations, preserve nuance and provide one natural option first.',
+  '- For grammar questions: meaning, structure, one example sentence, and one short practice prompt.',
+].join('\n')
 
 function resolveBundledLlamaCppPath() {
   const candidates = [
@@ -28,6 +45,26 @@ function resolveBundledModelPath() {
     .map((entry) => path.join(DEFAULT_MODEL_DIRECTORY, entry.name))
     .sort()
   return models[0] || ''
+}
+
+function resolveTutorSystemPrompt() {
+  const envPrompt = typeof process.env.JPLEARN_TUTOR_SYSTEM_PROMPT === 'string'
+    ? process.env.JPLEARN_TUTOR_SYSTEM_PROMPT.trim()
+    : ''
+  if (envPrompt) {
+    return envPrompt
+  }
+  if (fs.existsSync(DEFAULT_TUTOR_INSTRUCTIONS_PATH)) {
+    try {
+      const filePrompt = fs.readFileSync(DEFAULT_TUTOR_INSTRUCTIONS_PATH, 'utf8').trim()
+      if (filePrompt) {
+        return filePrompt
+      }
+    } catch {
+      // Ignore unreadable local instruction files and use built-in defaults.
+    }
+  }
+  return DEFAULT_TUTOR_SYSTEM_PROMPT
 }
 
 class InferenceAbortError extends Error {
@@ -128,9 +165,10 @@ function createLlamaCppCliAdapter(config = {}) {
 
     async infer(message, context = {}, runtimeOptions = {}) {
       const contextText = sanitizeContextText(context, runtimeOptions)
+      const systemPrompt = resolveTutorSystemPrompt()
       const prompt = contextText
-        ? `You are a concise Japanese tutor companion.\n${contextText}\n\nUser: ${message}\nTutor:`
-        : `You are a concise Japanese tutor companion.\n\nUser: ${message}\nTutor:`
+        ? `${systemPrompt}\n${contextText}\n\nUser: ${message}\nTutor:`
+        : `${systemPrompt}\n\nUser: ${message}\nTutor:`
       const boundedPrompt = clipText(prompt, runtimeOptions.maxPromptChars || DEFAULT_MAX_PROMPT_CHARS)
       const maxOutputTokens = Number.isFinite(runtimeOptions.maxOutputTokens)
         ? Math.max(24, Math.floor(runtimeOptions.maxOutputTokens))
