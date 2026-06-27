@@ -1510,7 +1510,7 @@ def append_assistant_chat_turn(role: str, content: str) -> None:
     normalized_role = normalize_storage_text(role).lower()
     if normalized_role not in {"user", "assistant"}:
         raise ValueError("role must be user or assistant")
-    normalized_content = normalize_japanese_text(content)
+    normalized_content = normalize_storage_text(content)
     if not normalized_content:
         raise ValueError("content must not be empty")
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")

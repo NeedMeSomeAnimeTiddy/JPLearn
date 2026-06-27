@@ -13,20 +13,19 @@ const DEFAULT_MAX_PROMPT_CHARS = 3200
 const DEFAULT_MODEL_DIRECTORY = path.resolve(__dirname, '..', '..', 'models', 'llama')
 const DEFAULT_TUTOR_INSTRUCTIONS_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'instructions.txt')
 const DEFAULT_TUTOR_SYSTEM_PROMPT = [
-  'You are JPLearn Coach, a concise and practical Japanese tutor.',
-  'Primary goals:',
-  '- Help the learner practice Japanese clearly and safely.',
-  '- Prefer short answers with one next step.',
-  '- Use Japanese examples with romaji and English gloss when useful.',
-  '- Correct mistakes kindly and explain briefly.',
-  '- If confidence is low, say so and offer a safer alternative.',
-  '- Do not invent user progress data; rely only on provided context.',
+  'You are JPLearn Coach, a warm and friendly Japanese tutor and conversation partner.',
+  'Reply directly with your answer only. Do not show reasoning, planning, or system notes.',
   '',
-  'Response style:',
-  '- Keep tone supportive and direct.',
-  '- Use bullet points for drills or steps.',
-  '- For translations, preserve nuance and provide one natural option first.',
-  '- For grammar questions: meaning, structure, one example sentence, and one short practice prompt.',
+  'How to talk:',
+  '- Be human and conversational, like a friendly tutor. Keep replies short: 1 to 3 sentences. Never write long essays.',
+  '- Mirror the user\'s language: if they write in Japanese, reply in Japanese; if in English, reply in English. If mixed, follow whichever they used most.',
+  '- When replying in Japanese and a word may be hard, add a tiny gloss in parentheses, e.g. 美味しい (oishii, "tasty"). Do not over-explain.',
+  '',
+  'Helping them learn:',
+  '- If asked a Japanese question (grammar, translation, a word, pronunciation), answer directly and accurately with one short example if helpful.',
+  '- Correct mistakes kindly and briefly, then keep the conversation going.',
+  '- If unsure of the correct Japanese, say so instead of guessing.',
+  '- Do not invent the user\'s progress or personal facts.',
 ].join('\n')
 
 function resolveBundledLlamaServerPath() {
@@ -166,8 +165,9 @@ function buildScriptedFallbackResponse(message, context = {}, detail = '') {
     : 'today\'s weakest area'
   const messageHint = clipText(message, 120)
   void detail
+  void messageHint
   return {
-    text: `Coach note: let's keep momentum on ${focus}. Start one focused round, then re-check confidence. Your message: ${messageHint}`,
+    text: `Coach note: let's keep momentum on ${focus}. Start one focused round, then re-check your confidence on the items that felt shaky.`,
     provider: 'scripted-fallback',
     model: 'deterministic-scripted',
   }
@@ -389,11 +389,12 @@ function createStubAdapter() {
       return undefined
     },
     async infer(message, context = {}) {
+      void message
       const focus = typeof context.focus_area === 'string' && context.focus_area.trim().length > 0
         ? context.focus_area.trim()
         : 'today\'s weakest area'
       return {
-        text: `Coach note: I can help with ${focus}. Local llama.cpp model integration is scaffolded and ready for adapter wiring. Your message was: ${clipText(message, 200)}`,
+        text: `Let's keep your momentum going on ${focus}. Try one short, focused round and notice which items feel shaky, then we can work through those together.`,
         provider: 'stub',
         model: 'llama.cpp-pending',
       }
@@ -432,9 +433,22 @@ function createTutorChatRuntime(options = {}) {
     || process.env.JPLEARN_TUTOR_PROVIDER
     || (discoveredLlamaServerPath && discoveredModelPath ? 'llama.cpp' : 'stub'),
   )
+  // Explicit options are honored as-is. For ambient environment variables we
+  // fall back to the discovered on-disk model/server when the configured path
+  // is missing (e.g. a stale variable points at a model that no longer exists);
+  // otherwise the runtime would fail to load and silently drop to the stub.
+  const preferExistingPath = (preferredPath, fallbackPath) => {
+    const trimmedPreferred = typeof preferredPath === 'string' ? preferredPath.trim() : ''
+    if (trimmedPreferred && fs.existsSync(trimmedPreferred)) {
+      return trimmedPreferred
+    }
+    return fallbackPath
+  }
   const llamaCppConfig = {
-    executablePath: options.llamaServerPath || process.env.JPLEARN_LLAMA_SERVER_PATH || discoveredLlamaServerPath,
-    modelPath: options.llamaModelPath || process.env.JPLEARN_LLAMA_MODEL_PATH || discoveredModelPath,
+    executablePath: options.llamaServerPath
+      || preferExistingPath(process.env.JPLEARN_LLAMA_SERVER_PATH, discoveredLlamaServerPath),
+    modelPath: options.llamaModelPath
+      || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, discoveredModelPath),
     timeoutMs: options.llamaTimeoutMs,
     startupTimeoutMs: options.llamaServerStartupTimeoutMs,
   }

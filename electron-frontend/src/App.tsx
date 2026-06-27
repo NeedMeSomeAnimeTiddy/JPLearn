@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, SendHorizontal, Settings, Shuffle, Square, Sun, Target, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, SendHorizontal, Settings, Shuffle, Square, Sun, Target, Trash2, Trophy, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -1987,6 +1987,8 @@ function App() {
   const startupReadySentRef = useRef(false)
   const assistantChatPreloadTriggeredRef = useRef(false)
   const assistantChatHistoryHydratedRef = useRef(false)
+  const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
+  const assistantChatClearTokenRef = useRef(0)
   const previousSessionActiveRef = useRef(false)
   const kanjiLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
@@ -2491,8 +2493,14 @@ function App() {
     if (!getAssistantChatHistory) {
       return false
     }
+    const clearTokenAtStart = assistantChatClearTokenRef.current
     try {
       const response = await getAssistantChatHistory(20)
+      if (assistantChatClearTokenRef.current !== clearTokenAtStart) {
+        // The chat was cleared while this read was in flight; do not resurrect
+        // the old turns with stale data.
+        return false
+      }
       if (response.ok) {
         setAssistantChatMessages(response.turns)
         return true
@@ -2524,8 +2532,12 @@ function App() {
     if (!getPreloadedAssistantChatHistory) {
       return false
     }
+    const clearTokenAtStart = assistantChatClearTokenRef.current
     try {
       const response = await getPreloadedAssistantChatHistory()
+      if (assistantChatClearTokenRef.current !== clearTokenAtStart) {
+        return false
+      }
       if (!response.ok || !response.runtimeActive) {
         return false
       }
@@ -2584,7 +2596,16 @@ function App() {
       if (hydratedFromPreload || assistantChatHistoryHydratedRef.current) {
         return
       }
-      await hydrateAssistantChatFromRuntime()
+      const hydratedFromRuntime = await hydrateAssistantChatFromRuntime()
+      if (hydratedFromRuntime || assistantChatHistoryHydratedRef.current || disposed) {
+        return
+      }
+      // No live runtime (e.g. local model not installed): load any persisted
+      // chat history directly so earlier conversations appear on startup.
+      const loadedFromStore = await refreshAssistantChatHistory()
+      if (loadedFromStore) {
+        assistantChatHistoryHydratedRef.current = true
+      }
     }
 
     void tryHydrate()
@@ -2597,7 +2618,7 @@ function App() {
       disposed = true
       window.clearInterval(startupHydrationPollHandle)
     }
-  }, [hydrateAssistantChatFromPreloaded, hydrateAssistantChatFromRuntime, settings.assistantChatEnabled])
+  }, [hydrateAssistantChatFromPreloaded, hydrateAssistantChatFromRuntime, refreshAssistantChatHistory, settings.assistantChatEnabled])
 
   useEffect(() => {
     if (!settings.assistantChatEnabled || !assistantChatOpen) {
@@ -2607,6 +2628,10 @@ function App() {
     let disposed = false
 
     async function hydrateAssistantChatPanel(): Promise<void> {
+      // Always surface persisted history when the panel opens, then layer in
+      // any live-runtime hydration on top.
+      await refreshAssistantChatHistory()
+      if (disposed) return
       await hydrateAssistantChatFromRuntime()
       if (disposed) return
     }
@@ -2621,7 +2646,7 @@ function App() {
       disposed = true
       window.clearInterval(statusPollHandle)
     }
-  }, [assistantChatOpen, hydrateAssistantChatFromRuntime, refreshAssistantChatStatus, settings.assistantChatEnabled])
+  }, [assistantChatOpen, hydrateAssistantChatFromRuntime, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled])
 
   useEffect(() => {
     if (settings.assistantChatEnabled) {
@@ -2657,18 +2682,34 @@ function App() {
     setAssistantChatFallbackNote(null)
   }, [])
 
-  const cancelAssistantChatInference = useCallback(async () => {
-    const cancelInference = window.jplearnDesktop.cancelAssistantChatInference
-    if (!cancelInference) {
+  const clearAssistantChat = useCallback(async () => {
+    // Invalidate any in-flight history reads so a slow background fetch can't
+    // resurrect the conversation after the user clears it.
+    assistantChatClearTokenRef.current += 1
+    assistantChatHistoryHydratedRef.current = true
+    setAssistantChatMessages([])
+    setAssistantChatError(null)
+    const clearHistory = window.jplearnDesktop.clearAssistantChatHistory
+    if (!clearHistory) {
       return
     }
     try {
-      await cancelInference()
-      await refreshAssistantChatStatus()
+      await clearHistory()
     } catch {
-      // Best-effort cancellation path.
+      // Clearing persisted history is best effort; the visible log is already empty.
     }
-  }, [refreshAssistantChatStatus])
+  }, [])
+
+  useEffect(() => {
+    if (!assistantChatOpen) {
+      return
+    }
+    const log = assistantChatLogRef.current
+    if (!log) {
+      return
+    }
+    log.scrollTop = log.scrollHeight
+  }, [assistantChatOpen, assistantChatMessages, assistantChatLoading])
 
   const sendAssistantChat = useCallback(async () => {
     if (!settings.assistantChatEnabled) {
@@ -2687,6 +2728,16 @@ function App() {
       return
     }
 
+    // Optimistically render the user's message immediately, then show a typing
+    // indicator while the model responds (refreshAssistantChatHistory replaces
+    // these turns with the authoritative server history once the reply lands).
+    const optimisticTurn: AssistantChatTurn = {
+      role: 'user',
+      content: message,
+      created_at_utc: new Date().toISOString(),
+    }
+    setAssistantChatMessages((previous) => [...previous, optimisticTurn])
+    setAssistantChatInput('')
     setAssistantChatLoading(true)
     setAssistantChatError(null)
     setAssistantChatWarmup(!assistantChatStatus?.loaded)
@@ -2702,7 +2753,6 @@ function App() {
       } else {
         setAssistantChatFallbackNote(null)
       }
-      setAssistantChatInput('')
       await refreshAssistantChatStatus()
       await refreshAssistantChatHistory()
     } catch (error: unknown) {
@@ -6543,7 +6593,29 @@ function App() {
         {settings.assistantChatEnabled && assistantChatOpen ? (
           <section id="assistant-chat-panel" className="assistant-chat-panel" aria-label="Tutor chat panel">
             <header className="assistant-chat-header">
+              <div className="assistant-chat-identity">
+                <span className="assistant-chat-avatar" aria-hidden="true">
+                  <MessageCircle size={18} strokeWidth={2.2} />
+                  <span className="assistant-chat-presence" />
+                </span>
+                <span className="assistant-chat-identity-text">
+                  <span className="assistant-chat-title">Study Coach</span>
+                  <span className="assistant-chat-subtitle">
+                    {assistantChatLoading ? 'Typing…' : 'Online · here to help'}
+                  </span>
+                </span>
+              </div>
               <div className="assistant-chat-header-actions">
+                <button
+                  type="button"
+                  className="assistant-chat-clear"
+                  onClick={() => void clearAssistantChat()}
+                  disabled={assistantChatMessages.length <= 0 || assistantChatLoading}
+                  aria-label="Clear chat history"
+                  title="Clear chat"
+                >
+                  <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                </button>
                 <button
                   type="button"
                   className="assistant-chat-close"
@@ -6555,18 +6627,32 @@ function App() {
               </div>
             </header>
 
-            <div className="assistant-chat-log" role="log" aria-live="polite">
-              {assistantChatMessages.length <= 0 ? (
+            <div className="assistant-chat-log" role="log" aria-live="polite" ref={assistantChatLogRef}>
+              {assistantChatMessages.length <= 0 && !assistantChatLoading ? (
                 <p className="assistant-chat-empty">Start a chat when you want strategy help or encouragement.</p>
               ) : (
-                assistantChatMessages.map((turn, index) => (
-                  <article key={`${turn.created_at_utc}-${index}`} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
-                    <div className="assistant-chat-turn-meta">
-                      <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
-                    </div>
-                    <p>{turn.content}</p>
-                  </article>
-                ))
+                <>
+                  {assistantChatMessages.map((turn, index) => (
+                    <article key={`${turn.created_at_utc}-${index}`} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
+                      <div className="assistant-chat-turn-meta">
+                        <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
+                      </div>
+                      <p>{turn.content}</p>
+                    </article>
+                  ))}
+                  {assistantChatLoading ? (
+                    <article className="assistant-chat-turn assistant-chat-turn-assistant assistant-chat-turn-typing" aria-label="Coach is typing">
+                      <div className="assistant-chat-turn-meta">
+                        <span className="assistant-chat-turn-role">Coach</span>
+                      </div>
+                      <p className="assistant-chat-typing" aria-hidden="true">
+                        <span className="assistant-chat-typing-dot" />
+                        <span className="assistant-chat-typing-dot" />
+                        <span className="assistant-chat-typing-dot" />
+                      </p>
+                    </article>
+                  ) : null}
+                </>
               )}
             </div>
 
@@ -6575,42 +6661,33 @@ function App() {
             ) : null}
 
             <footer className="assistant-chat-composer">
-              <textarea
-                value={assistantChatInput}
-                onChange={(event) => setAssistantChatInput(event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' || event.shiftKey) {
-                    return
-                  }
-                  event.preventDefault()
-                  if (assistantChatLoading || assistantChatInput.trim().length === 0) {
-                    return
-                  }
-                  void sendAssistantChat()
-                }}
-                placeholder="Ask your coach for help with your current weak area..."
-                rows={2}
-                disabled={assistantChatLoading}
-              />
-              <div className="assistant-chat-composer-actions">
-                {assistantChatLoading ? (
-                  <button
-                    type="button"
-                    className="assistant-chat-cancel"
-                    onClick={() => void cancelAssistantChatInference()}
-                    aria-label="Cancel tutor chat inference"
-                  >
-                    Cancel
-                  </button>
-                ) : null}
+              <div className="assistant-chat-input-wrap">
+                <textarea
+                  value={assistantChatInput}
+                  onChange={(event) => setAssistantChatInput(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' || event.shiftKey) {
+                      return
+                    }
+                    event.preventDefault()
+                    if (assistantChatLoading || assistantChatInput.trim().length === 0) {
+                      return
+                    }
+                    void sendAssistantChat()
+                  }}
+                  placeholder="Ask your coach for help with your current weak area..."
+                  rows={2}
+                  disabled={assistantChatLoading}
+                />
                 <button
                   type="button"
+                  className="assistant-chat-send"
                   onClick={() => void sendAssistantChat()}
                   disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
                   aria-label="Send tutor chat message"
+                  title="Send"
                 >
-                  <SendHorizontal size={14} strokeWidth={2.2} aria-hidden="true" />
-                  {assistantChatLoading ? 'Sending...' : 'Send'}
+                  <SendHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
                 </button>
               </div>
             </footer>
