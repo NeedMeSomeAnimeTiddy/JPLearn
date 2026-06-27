@@ -273,6 +273,10 @@ interface AssistantChatRuntimeStatus {
   loadedAtUtc: string | null
   lastUsedAtUtc: string | null
   inactivityUnloadMs: number
+  configuredProvider?: string
+  activeProvider?: string
+  activeModel?: string
+  lastError?: string | null
 }
 
 interface AssistantChatRuntimeResponse {
