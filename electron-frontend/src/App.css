@@ -586,50 +586,69 @@
 }
 
 .assistant-toast {
+  position: relative;
   pointer-events: auto;
-  border-radius: 11px;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 78%, white 22%);
-  background: color-mix(in oklab, var(--panel-bg-alt) 92%, black);
+  border-radius: 16px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 28%, var(--panel-border));
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--tone-streak) 24%, transparent), transparent 52%),
+    radial-gradient(circle at 86% 100%, color-mix(in oklab, var(--tone-ocean) 26%, transparent), transparent 56%),
+    color-mix(in oklab, var(--panel-bg-alt) 90%, white 10%);
   box-shadow:
-    0 14px 24px -18px rgba(0, 0, 0, 0.88),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding: 10px 11px;
+    0 16px 30px -22px rgba(0, 0, 0, 0.82),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(5px);
+  padding: 11px 12px;
   animation: assistantToastIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.assistant-toast::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--tone-streak) 78%, white 22%);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--panel-bg) 72%, transparent),
+    0 0 10px color-mix(in oklab, var(--tone-streak) 42%, transparent);
 }
 
 .assistant-toast h3 {
   margin: 0;
-  font-size: 0.81rem;
+  font-size: 0.82rem;
   color: var(--text-main);
-  letter-spacing: 0.01em;
+  letter-spacing: 0.015em;
 }
 
 .assistant-toast p {
-  margin: 5px 0 0;
+  margin: 6px 0 0;
   font-size: 0.75rem;
-  line-height: 1.35;
+  line-height: 1.38;
   color: var(--text-soft);
 }
 
 .assistant-toast-controls {
-  margin-top: 8px;
+  margin-top: 9px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .assistant-toast-action {
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
-  background: color-mix(in oklab, var(--panel-bg) 80%, var(--tone-ocean) 20%);
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 46%, var(--panel-border));
+  background: color-mix(in oklab, var(--tone-ocean) 22%, var(--panel-bg));
   color: var(--text-main);
-  border-radius: 8px;
-  min-height: 28px;
-  padding: 0 10px;
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 0 11px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-family: var(--button-font);
-  font-size: 0.71rem;
+  font-size: 0.7rem;
   cursor: pointer;
 }
 
@@ -639,16 +658,16 @@
 
 .assistant-toast-dismiss {
   border: 1px solid color-mix(in oklab, var(--panel-border) 86%, black);
-  background: color-mix(in oklab, var(--panel-bg-alt) 92%, black);
+  background: color-mix(in oklab, var(--panel-bg-alt) 94%, black);
   color: var(--text-soft);
-  border-radius: 8px;
-  min-height: 28px;
-  padding: 0 10px;
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 0 11px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-family: var(--button-font);
-  font-size: 0.68rem;
+  font-size: 0.69rem;
   cursor: pointer;
 }
 

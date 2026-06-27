@@ -146,12 +146,10 @@ type SettingsTabKey = 'theme' | 'background' | 'font_size' | 'animations' | 'tut
 const FEEDBACK_REVEAL_MS = 2100
 const ASSISTANT_EVENT_POLL_MS = 15000
 const ASSISTANT_TOAST_TTL_MS = 5200
-const ASSISTANT_MAX_TOASTS = 4
-const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1 | 2 | 4; label: string }> = [
+const ASSISTANT_MAX_TOASTS = 1
+const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
-  { value: 1, label: 'Low' },
-  { value: 2, label: 'Medium' },
-  { value: 4, label: 'High' },
+  { value: 1, label: 'On' },
 ]
 const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
   { key: 'theme', label: 'Theme', icon: Sun },
@@ -558,7 +556,7 @@ interface AppSettings {
   motionStyle: AnimationStyle
   backgroundStyle: BackgroundStyle
   backgroundBlur: number
-  assistantToastLimit: 0 | 1 | 2 | 4
+  assistantToastLimit: 0 | 1
   assistantChatEnabled: boolean
   voiceEnabled: boolean
   voiceSpeaker: number
@@ -1173,8 +1171,8 @@ function defaultSettings(): AppSettings {
   }
 }
 
-function isAssistantToastLimit(value: unknown): value is 0 | 1 | 2 | 4 {
-  return value === 0 || value === 1 || value === 2 || value === 4
+function isAssistantToastLimit(value: unknown): value is 0 | 1 {
+  return value === 0 || value === 1
 }
 
 function isBackgroundStyle(value: unknown): value is BackgroundStyle {
@@ -1799,110 +1797,153 @@ function describeQueueLoad(remainingDue: number): string {
 }
 
 function formatAssistantEventTitle(event: AssistantEventPayload): string {
-  if (event.event_type === 'session_goal_met') return 'Goal complete'
-  if (event.event_type === 'streak_milestone') return 'Streak milestone'
-  if (event.event_type === 'leech_intervention') return 'Tough items spotted'
-  if (event.event_type === 'weakness_spike') return 'Practice recommendation'
-  if (event.event_type === 'curriculum_stall') return 'Curriculum slowdown'
-  if (event.event_type === 'activity_nudge') return 'Consistency reminder'
-  if (event.event_type === 'session_recovery') return 'Recovery plan'
-  if (event.event_type === 'momentum_encouragement') return 'Momentum boost'
-  return 'Coach update'
-}
-
-function formatAssistantRecommendation(event: AssistantEventPayload): string {
-  const actionType = event.metadata.action_type ?? ''
-  const targetMode = event.metadata.target_mode ?? 'review'
-  const suggestedRounds = event.metadata.suggested_rounds ?? ''
-  const suggestedMinutes = event.metadata.suggested_minutes ?? ''
-
-  if (actionType) {
-    const roundsLabel = suggestedRounds ? `${suggestedRounds} rounds` : 'a short set'
-    const minutesLabel = suggestedMinutes ? `${suggestedMinutes} min` : 'quick run'
-    const modeLabel = targetMode.replace(/_/g, ' ')
-    return `Next: ${roundsLabel} in ${modeLabel} (${minutesLabel}).`
-  }
-
-  const recommendation = event.metadata.recommendation_key ?? ''
-  if (recommendation === 'rec.short_follow_up_session') {
-    return 'Next: run one short follow-up set to lock retention.'
-  }
-  if (recommendation === 'rec.protect_streak_chain') {
-    return 'Next: complete at least one quick round today.'
-  }
-  if (recommendation === 'rec.typed_recall_focus') {
-    return 'Next: switch to typed recall and target your hardest prompts.'
-  }
-  if (recommendation === 'rec.focused_block_retry') {
-    return 'Next: replay the weakest block with slower pacing.'
-  }
-  if (recommendation === 'rec.context_cloze_recovery') {
-    return 'Next: do a context-cloze recovery pass before mixed drills.'
-  }
-  if (recommendation === 'rec.short_reminder_session') {
-    return 'Next: run a 5-minute reminder session to rebuild rhythm.'
-  }
-  if (recommendation === 'rec.recovery_loop') {
-    return 'Next: do one recovery loop on missed items, then retest.'
-  }
-  if (recommendation === 'rec.stretch_goal_push') {
-    return 'Next: push one stretch round while momentum is high.'
-  }
-  return 'Next: keep a steady cadence and finish this block.'
+  if (event.event_type === 'session_goal_met') return 'You did it'
+  if (event.event_type === 'streak_milestone') return 'Streak glow'
+  if (event.event_type === 'leech_intervention') return 'Keep going'
+  if (event.event_type === 'weakness_spike') return 'You are improving'
+  if (event.event_type === 'curriculum_stall') return 'Progress takes time'
+  if (event.event_type === 'activity_nudge') return 'Small steps count'
+  if (event.event_type === 'session_recovery') return 'Fresh start'
+  if (event.event_type === 'momentum_encouragement') return 'Nice momentum'
+  return 'You are doing great'
 }
 
 function formatAssistantEventBody(event: AssistantEventPayload): string {
-  const recommendation = formatAssistantRecommendation(event)
   if (event.message_key === 'coach.goal_met') {
-    return `Excellent run. Lock in the momentum with one short follow-up session. ${recommendation}`
+    return 'Great focus. Keep that same calm pace on the next card.'
   }
   if (event.message_key === 'coach.streak_milestone') {
     const days = event.metadata.days ?? '0'
-    return `${days}-day streak reached. Keep the chain alive with a quick review. ${recommendation}`
+    return `${days}-day streak. Your consistency is paying off.`
   }
   if (event.message_key === 'coach.leech_intervention') {
-    const count = event.metadata.leech_count ?? '0'
-    return `${count} leech cards are active. Prioritize focused typed recall on weak prompts. ${recommendation}`
+    return 'Tough cards happen. You are still moving forward.'
   }
   if (event.message_key === 'coach.weakness_focus') {
-    const focusArea = event.metadata.focus_area ?? 'general'
-    const errorRate = event.metadata.error_rate ?? '0'
-    return `Focus on ${focusArea}. Recent error rate is ${errorRate}% in this area. ${recommendation}`
+    return 'This is a growth zone, not a setback. Keep practicing.'
   }
   if (event.message_key === 'coach.curriculum_stall') {
-    const accuracy = event.metadata.accuracy_7d ?? '0'
-    return `Context-cloze accuracy is trending low at ${accuracy}%. ${recommendation}`
+    return 'Learning curves are normal. Your next clean answer matters most.'
   }
   if (event.message_key === 'coach.activity_nudge') {
-    const activeDays = event.metadata.active_days ?? '0'
-    return `Only ${activeDays} active study days this week so far. ${recommendation}`
+    return 'Even short sessions build real progress. Nice effort today.'
   }
   if (event.message_key === 'coach.session_recovery') {
-    const accuracy = event.metadata.accuracy ?? '0'
-    return `Latest session ended below target at ${accuracy}% accuracy. ${recommendation}`
+    return 'New round, new chance. You have got this.'
   }
   if (event.message_key === 'coach.momentum_encouragement') {
-    const momentum = event.metadata.momentum ?? '0'
-    return `Your momentum score is +${momentum}. ${recommendation}`
+    return 'You are in a good flow right now. Keep riding it.'
   }
-  return `Quick check-in: stay steady and finish this block cleanly. ${recommendation}`
+  return 'Nice work showing up and practicing. Keep going.'
 }
 
-function parseAssistantTargetMode(mode: string | undefined): MinigameKey | null {
-  if (!mode) return null
-  const normalized = mode.trim().toLowerCase()
-  if (
-    normalized === 'romaji_sprint' ||
-    normalized === 'meaning_match' ||
-    normalized === 'character_match' ||
-    normalized === 'stroke_order' ||
-    normalized === 'typed_recall' ||
-    normalized === 'context_cloze' ||
-    normalized === 'narrative_story' ||
-    normalized === 'interleave_mix'
-  ) {
-    return normalized
+function formatRoundModeLabel(mode: PlayableMinigame): string {
+  if (mode === 'romaji_sprint') return 'Romaji Sprint'
+  if (mode === 'meaning_match') return 'Meaning Match'
+  if (mode === 'character_match') return 'Character Match'
+  if (mode === 'stroke_order') return 'Stroke Order'
+  if (mode === 'typed_recall') return 'Typed Recall'
+  if (mode === 'context_cloze') return 'Context Cloze'
+  return 'Story Mode'
+}
+
+function getRoundRecoveryTip(mode: PlayableMinigame): string {
+  if (mode === 'romaji_sprint') return 'Take a breath and try the next reading.'
+  if (mode === 'meaning_match') return 'You are close. Trust your first clear meaning.'
+  if (mode === 'character_match') return 'You are building pattern memory one step at a time.'
+  if (mode === 'stroke_order') return 'Nice attempt. Visual memory gets stronger with reps.'
+  if (mode === 'typed_recall') return 'Great effort. Keep the next answer short and clear.'
+  if (mode === 'context_cloze') return 'Good try. Let the sentence mood guide your choice.'
+  return 'You are learning the pattern. Keep going.'
+}
+
+function buildRoundCoachToast(
+  id: number,
+  payload: {
+    isCorrect: boolean
+    mode: PlayableMinigame
+    nextStreak: number
+    answer: string
+    completedRoundsAfterAnswer: number
+    targetRounds: number
+    typedAssessment: TypedAnswerState | null
+  },
+): AssistantToast | null {
+  if (!payload.isCorrect) {
+    return {
+      id,
+      priority: 'coaching',
+      eventType: 'round_feedback',
+      messageKey: 'coach.round_recovery',
+      title: 'You are still doing great',
+      body: getRoundRecoveryTip(payload.mode),
+      targetMode: null,
+      focusArea: null,
+      actionType: null,
+      actionLabel: 'Keep going',
+    }
   }
+
+  if (payload.mode === 'typed_recall' && payload.typedAssessment === 'near_miss') {
+    return {
+      id,
+      priority: 'coaching',
+      eventType: 'round_feedback',
+      messageKey: 'coach.round_near_miss',
+      title: 'Nice save',
+      body: 'That was close and you handled it well.',
+      targetMode: null,
+      focusArea: null,
+      actionType: null,
+      actionLabel: 'Got it',
+    }
+  }
+
+  if (payload.nextStreak === 3 || payload.nextStreak === 6 || payload.nextStreak === 9) {
+    return {
+      id,
+      priority: 'celebration',
+      eventType: 'round_feedback',
+      messageKey: 'coach.round_streak',
+      title: `Streak x${payload.nextStreak}`,
+      body: `Lovely rhythm. ${formatRoundModeLabel(payload.mode)} is clicking for you.`,
+      targetMode: null,
+      focusArea: null,
+      actionType: null,
+      actionLabel: 'Nice',
+    }
+  }
+
+  if (payload.completedRoundsAfterAnswer === payload.targetRounds - 1) {
+    return {
+      id,
+      priority: 'coaching',
+      eventType: 'round_feedback',
+      messageKey: 'coach.round_final_push',
+      title: 'Almost there',
+      body: 'One more card. You have got this.',
+      targetMode: null,
+      focusArea: null,
+      actionType: null,
+      actionLabel: 'Finish run',
+    }
+  }
+
+  if (payload.nextStreak > 0 && payload.nextStreak % 2 === 0) {
+    return {
+      id,
+      priority: 'info',
+      eventType: 'round_feedback',
+      messageKey: 'coach.round_encouragement',
+      title: 'Nice one',
+      body: 'Clean answer. Keep this gentle pace.',
+      targetMode: null,
+      focusArea: null,
+      actionType: null,
+      actionLabel: 'Yay',
+    }
+  }
+
   return null
 }
 
@@ -1915,15 +1956,6 @@ function inferScriptFromFocusArea(focusArea: string | null): ScriptKey | null {
   if (normalized.includes('vocab')) return 'vocab_n5'
   if (normalized.includes('grammar') || normalized.includes('conversational')) return 'grammar_patterns'
   return null
-}
-
-function formatAssistantActionLabel(event: AssistantEventPayload): string {
-  const actionType = event.metadata.action_type ?? ''
-  if (actionType === 'session_recovery') return 'Start recovery drill'
-  if (actionType === 'curriculum_recovery') return 'Run cloze recovery'
-  if (actionType === 'stretch_push') return 'Start stretch round'
-  if (actionType === 'streak_keepalive' || actionType === 'consistency_nudge') return 'Start quick round'
-  return 'Start suggested drill'
 }
 
 function App() {
@@ -2063,6 +2095,7 @@ function App() {
   const assistantChatHistoryHydratedRef = useRef(false)
   const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
   const assistantChatClearTokenRef = useRef(0)
+  const localToastIdRef = useRef(-1)
   const previousSessionActiveRef = useRef(false)
   const kanjiLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
@@ -2498,6 +2531,13 @@ function App() {
     [],
   )
 
+  const queueAssistantToast = useCallback((toast: AssistantToast | null) => {
+    if (!toast || settings.assistantToastLimit <= 0) {
+      return
+    }
+    setAssistantToasts([toast])
+  }, [settings.assistantToastLimit])
+
   useEffect(() => {
     void loadSummary()
   }, [loadSummary])
@@ -2549,20 +2589,29 @@ function App() {
           assistantSeenEventIdsRef.current.add(event.id)
         }
 
-        if (fresh.length > 0 && settings.assistantToastLimit > 0) {
-          const toasts = fresh.map((event) => ({
-            id: event.id,
-            priority: event.priority,
-            eventType: event.event_type,
-            messageKey: event.message_key,
-            title: formatAssistantEventTitle(event),
-            body: formatAssistantEventBody(event),
-            targetMode: parseAssistantTargetMode(event.metadata.target_mode),
-            focusArea: event.metadata.focus_area ?? null,
-            actionType: event.metadata.action_type ?? null,
-            actionLabel: formatAssistantActionLabel(event),
-          }))
-          setAssistantToasts((previous) => [...previous, ...toasts].slice(-settings.assistantToastLimit))
+        const canShowToast = view === 'minigame' && sessionActive && roundState !== null
+        if (fresh.length > 0 && settings.assistantToastLimit > 0 && canShowToast) {
+          const priorityWeight: Record<AssistantEventPayload['priority'], number> = {
+            critical: 4,
+            coaching: 3,
+            celebration: 2,
+            info: 1,
+          }
+          const selectedEvent = fresh.reduce((best, candidate) => (
+            priorityWeight[candidate.priority] >= priorityWeight[best.priority] ? candidate : best
+          ))
+          queueAssistantToast({
+            id: selectedEvent.id,
+            priority: selectedEvent.priority,
+            eventType: selectedEvent.event_type,
+            messageKey: selectedEvent.message_key,
+            title: formatAssistantEventTitle(selectedEvent),
+            body: formatAssistantEventBody(selectedEvent),
+            targetMode: null,
+            focusArea: selectedEvent.metadata.focus_area ?? null,
+            actionType: null,
+            actionLabel: 'Got it',
+          })
         }
 
         await consumeAssistantEventsFn!(response.events.map((event) => event.id))
@@ -2580,7 +2629,7 @@ function App() {
       disposed = true
       window.clearInterval(pollHandle)
     }
-  }, [settings.assistantToastLimit])
+  }, [queueAssistantToast, roundState, sessionActive, settings.assistantToastLimit, view])
 
   useEffect(() => {
     if (settings.assistantToastLimit <= 0) {
@@ -2589,6 +2638,13 @@ function App() {
     }
     setAssistantToasts((previous) => previous.slice(-settings.assistantToastLimit))
   }, [settings.assistantToastLimit])
+
+  useEffect(() => {
+    if (view === 'minigame' && sessionActive && roundState !== null) {
+      return
+    }
+    setAssistantToasts([])
+  }, [roundState, sessionActive, view])
 
   useEffect(() => {
     if (assistantToasts.length <= 0) {
@@ -3816,6 +3872,18 @@ function App() {
         setSessionConfidenceTotal((value) => value + confidenceForAnswer)
       }
 
+      const nextToastId = localToastIdRef.current - 1
+      localToastIdRef.current = nextToastId
+      queueAssistantToast(buildRoundCoachToast(nextToastId, {
+        isCorrect,
+        mode: roundState.mode,
+        nextStreak,
+        answer: roundState.answer,
+        completedRoundsAfterAnswer,
+        targetRounds,
+        typedAssessment,
+      }))
+
       window.setTimeout(() => {
         if (!isCorrect && livesEnabled && nextLives <= 0) {
           setSessionActive(false)
@@ -3848,7 +3916,7 @@ function App() {
         setIsRoundResolving(false)
       }, FEEDBACK_REVEAL_MS)
     },
-    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundConfidenceScore, roundState, scriptStats, sessionRounds, sessionTargetItems],
+    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionRounds, sessionTargetItems],
   )
 
   useEffect(() => {
@@ -4483,6 +4551,7 @@ function App() {
 
   const canTitlebarBack = viewHistoryIndexRef.current > 0
   const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
+  const activeAssistantToast = assistantToasts[0] ?? null
 
   useEffect(() => {
     if (!shortcutMenuOpen) return
@@ -7021,32 +7090,30 @@ function App() {
           </section>
         ) : null}
 
-        {settings.assistantToastLimit > 0 && assistantToasts.length > 0 ? (
+        {settings.assistantToastLimit > 0 && activeAssistantToast ? (
           <div className="assistant-toast-stack" role="status" aria-label="Tutor updates">
-            {assistantToasts.map((toast) => (
-              <article key={toast.id} className={`assistant-toast assistant-toast-${toast.priority}`}>
-                <h3>{toast.title}</h3>
-                <p>{toast.body}</p>
-                <div className="assistant-toast-controls">
-                  {toast.targetMode ? (
-                    <button
-                      type="button"
-                      className="assistant-toast-action"
-                      onClick={() => launchAssistantToastAction(toast)}
-                    >
-                      {toast.actionLabel}
-                    </button>
-                  ) : null}
+            <article key={activeAssistantToast.id} className={`assistant-toast assistant-toast-${activeAssistantToast.priority}`}>
+              <h3>{activeAssistantToast.title}</h3>
+              <p>{activeAssistantToast.body}</p>
+              <div className="assistant-toast-controls">
+                {activeAssistantToast.targetMode ? (
                   <button
                     type="button"
-                    className="assistant-toast-dismiss"
-                    onClick={() => dismissAssistantToast(toast)}
+                    className="assistant-toast-action"
+                    onClick={() => launchAssistantToastAction(activeAssistantToast)}
                   >
-                    Dismiss
+                    {activeAssistantToast.actionLabel}
                   </button>
-                </div>
-              </article>
-            ))}
+                ) : null}
+                <button
+                  type="button"
+                  className="assistant-toast-dismiss"
+                  onClick={() => dismissAssistantToast(activeAssistantToast)}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </article>
           </div>
         ) : null}
       </aside>
