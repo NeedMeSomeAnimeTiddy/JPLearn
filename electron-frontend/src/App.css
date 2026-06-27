@@ -4162,11 +4162,17 @@ button {
   letter-spacing: 0.02em;
 }
 
+.game-speak-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .game-speak-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 12px;
   padding: 6px 12px;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 40%, var(--card-border));
   border-radius: 999px;

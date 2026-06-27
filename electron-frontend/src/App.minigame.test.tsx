@@ -304,6 +304,71 @@ describe('Minigame menu', () => {
     expect(screen.queryByText(/Romaji Sprint/i)).toBeNull()
   })
 
+  it('plays both target words and example sentence in conversational rounds', async () => {
+    const conversationalCards = [
+      { id: 30, character: 'です', romaji: 'desu', meaning: 'to be', tags: ['grammar_patterns'], example_sentence: 'これは ほん です。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [31, 32, 33], character_distractor_ids: [31, 32, 33] },
+      { id: 31, character: 'ます', romaji: 'masu', meaning: 'polite verb ending', tags: ['grammar_patterns'], example_sentence: 'べんきょう します。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 32, 33], character_distractor_ids: [30, 32, 33] },
+      { id: 32, character: 'から', romaji: 'kara', meaning: 'because', tags: ['grammar_patterns'], example_sentence: 'あめ です から。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 33], character_distractor_ids: [30, 31, 33] },
+      { id: 33, character: 'けど', romaji: 'kedo', meaning: 'but', tags: ['grammar_patterns'], example_sentence: 'いきたい けど、いけません。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 32], character_distractor_ids: [30, 31, 32] },
+    ]
+    const speakText = vi.fn(async (_payload: string | { text: string; speaker?: number; speed?: number }) => ({
+      ok: true,
+      format: 'wav' as const,
+      sampleRate: 24000,
+      voiceId: 13,
+      audioBase64: '',
+    }))
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      speakText,
+      getDeckCards: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => (
+        slug === 'grammar_patterns'
+          ? { slug, name: 'Conversational Deck', cards: conversationalCards }
+          : { slug, name: 'Deck', cards: baseCards }
+      ),
+      getStudyQueue: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => (
+        slug === 'grammar_patterns'
+          ? {
+            ok: true,
+            queue: {
+              slug,
+              card_ids: conversationalCards.map((card) => card.id),
+              indices: conversationalCards.map((_, index) => index),
+            },
+          }
+          : {
+            ok: true,
+            queue: {
+              slug,
+              card_ids: baseCards.map((card) => card.id),
+              indices: baseCards.map((_, index) => index),
+            },
+          }
+      ),
+    }
+
+    render(<App />)
+    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    clickTopMenuCard('Conversational')
+
+    const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
+    fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    fireEvent.click(await screen.findByRole('button', { name: /play target words/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /play example sentence/i }))
+
+    await waitFor(() => expect(speakText).toHaveBeenCalledTimes(2))
+    const expectedWords = new Set(conversationalCards.map((card) => card.character))
+    const expectedSentences = new Set(conversationalCards.map((card) => card.example_sentence))
+    const calls = speakText.mock.calls as Array<[string | { text: string; speaker?: number; speed?: number }]>
+    const firstPayload = calls[0][0]
+    const secondPayload = calls[1][0]
+    const firstText = typeof firstPayload === 'string' ? firstPayload : firstPayload.text
+    const secondText = typeof secondPayload === 'string' ? secondPayload : secondPayload.text
+    expect(expectedWords.has(firstText)).toBe(true)
+    expect(expectedSentences.has(secondText)).toBe(true)
+  })
+
   it('renders context cloze prompts in words track with card-specific context', async () => {
     window.jplearnDesktop = baseDesktopApi
 

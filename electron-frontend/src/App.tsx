@@ -47,7 +47,6 @@ interface AssistantStatePayload {
 }
 interface AssistantProfilePayload {
   persona_style: string
-  popup_cadence: string
   emotion_persistence: string
   llm_backend: string
   chat_retention: string
@@ -572,6 +571,7 @@ interface RoundState {
   cardId: number
   mode: PlayableMinigame
   audioText: string
+  exampleSentenceAudioText: string | null
   surprisePrompt: boolean
   curriculumStage: 1 | 2 | 3
   chapterNumber: 1 | 2 | 3 | null
@@ -3268,6 +3268,7 @@ function App() {
       const curriculumStage = (minigame === 'context_cloze' || minigame === 'narrative_story')
         ? persistedStage
         : scoreStage
+      const exampleSentenceAudioText = card.example_sentence?.trim() || null
       const exampleSentenceHint = card.example_sentence
         ? `Example sentence: ${card.example_sentence}`
         : null
@@ -3280,6 +3281,7 @@ function App() {
           cardId: card.id,
           mode: minigame,
           audioText: card.character,
+          exampleSentenceAudioText,
           surprisePrompt,
           curriculumStage,
           chapterNumber: null,
@@ -3300,6 +3302,7 @@ function App() {
           cardId: card.id,
           mode: minigame,
           audioText: card.character,
+          exampleSentenceAudioText,
           surprisePrompt,
           curriculumStage,
           chapterNumber: null,
@@ -3320,6 +3323,7 @@ function App() {
           cardId: card.id,
           mode: minigame,
           audioText: card.character,
+          exampleSentenceAudioText,
           surprisePrompt,
           curriculumStage,
           chapterNumber: null,
@@ -3387,6 +3391,7 @@ function App() {
           cardId: card.id,
           mode: minigame,
           audioText: card.character,
+          exampleSentenceAudioText,
           surprisePrompt,
           curriculumStage,
           chapterNumber: null,
@@ -3418,6 +3423,7 @@ function App() {
           cardId: card.id,
           mode: minigame,
           audioText: card.character,
+          exampleSentenceAudioText,
           surprisePrompt,
           curriculumStage,
           chapterNumber: null,
@@ -3449,6 +3455,7 @@ function App() {
           cardId: card.id,
           mode: minigame,
           audioText: card.character,
+          exampleSentenceAudioText,
           surprisePrompt,
           curriculumStage,
           chapterNumber: curriculumStage,
@@ -3480,6 +3487,7 @@ function App() {
         cardId: card.id,
         mode: minigame,
         audioText: card.character,
+        exampleSentenceAudioText,
         surprisePrompt,
         curriculumStage,
         chapterNumber: null,
@@ -5524,18 +5532,35 @@ function App() {
                   <p className={`game-prompt-main ${roundState.mode !== 'character_match' ? 'is-japanese' : ''}`}>
                     {roundState.focusText}
                   </p>
-                  {settings.voiceEnabled && roundState.audioText ? (
-                    <button
-                      type="button"
-                      className="game-speak-button"
-                      onClick={() => void playQuestionAudio(roundState.audioText)}
-                      disabled={voiceBusy}
-                      aria-label="Play pronunciation"
-                      title={voiceUnavailable ? 'Voice playback unavailable' : 'Play pronunciation'}
-                    >
-                      <Volume2 size={16} aria-hidden="true" />
-                      <span>{voiceBusy ? 'Loading…' : voiceUnavailable ? 'Voice unavailable' : 'Listen'}</span>
-                    </button>
+                  {settings.voiceEnabled && (roundState.audioText || (activeScript === 'grammar_patterns' && roundState.exampleSentenceAudioText)) ? (
+                    <div className="game-speak-controls">
+                      {roundState.audioText ? (
+                        <button
+                          type="button"
+                          className="game-speak-button"
+                          onClick={() => void playQuestionAudio(roundState.audioText)}
+                          disabled={voiceBusy}
+                          aria-label="Play target words"
+                          title={voiceUnavailable ? 'Voice playback unavailable' : 'Play target words'}
+                        >
+                          <Volume2 size={16} aria-hidden="true" />
+                          <span>{voiceBusy ? 'Loading…' : voiceUnavailable ? 'Voice unavailable' : 'Play words'}</span>
+                        </button>
+                      ) : null}
+                      {activeScript === 'grammar_patterns' && roundState.exampleSentenceAudioText ? (
+                        <button
+                          type="button"
+                          className="game-speak-button"
+                          onClick={() => void playQuestionAudio(roundState.exampleSentenceAudioText!)}
+                          disabled={voiceBusy}
+                          aria-label="Play example sentence"
+                          title={voiceUnavailable ? 'Voice playback unavailable' : 'Play example sentence'}
+                        >
+                          <Volume2 size={16} aria-hidden="true" />
+                          <span>{voiceBusy ? 'Loading…' : voiceUnavailable ? 'Voice unavailable' : 'Play sentence'}</span>
+                        </button>
+                      ) : null}
+                    </div>
                   ) : null}
                   {roundState.hintText ? <p className="game-hint-text">{roundState.hintText}</p> : null}
                 </div>
@@ -7144,3 +7169,4 @@ function App() {
 }
 
 export default App
+
