@@ -248,6 +248,93 @@ def test_evaluate_assistant_events_emits_session_recovery_for_missed_goal() -> N
     assert any(event.event_type == "session_recovery" for event in events)
 
 
+def test_evaluate_assistant_events_emits_momentum_encouragement() -> None:
+    state = AssistantState(
+        mood="coach_celebratory",
+        momentum=66,
+        confidence_level=82,
+        focus_area="general",
+        last_major_event="momentum_rise",
+    )
+    streak = StreakState(
+        last_study_day_utc=date(2026, 6, 27),
+        last_study_day_local=date(2026, 6, 27),
+        current_streak_days=4,
+        best_streak_days=9,
+    )
+
+    events = evaluate_assistant_events(
+        state=state,
+        activity_week=ActivitySummary(
+            days=7,
+            reviewed=42,
+            correct=36,
+            incorrect=6,
+            accuracy=86,
+            points_earned=36,
+            active_days=6,
+        ),
+        streak=streak,
+        mistakes=[],
+        leech_count=0,
+        session_summary=None,
+        now_utc=datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert any(event.event_type == "momentum_encouragement" for event in events)
+
+
+def test_evaluate_assistant_events_low_cadence_caps_and_prioritizes() -> None:
+    state = AssistantState(
+        mood="coach_alert",
+        momentum=40,
+        confidence_level=66,
+        focus_area="kanji_n5",
+        last_major_event="high_difficulty",
+    )
+    streak = StreakState(
+        last_study_day_utc=date(2026, 6, 27),
+        last_study_day_local=date(2026, 6, 27),
+        current_streak_days=7,
+        best_streak_days=7,
+    )
+    summary = SessionSummary(
+        session_id="cap-1",
+        target_items=12,
+        completed_items=12,
+        reviewed=14,
+        correct=11,
+        accuracy=78,
+        target_accuracy=70,
+        goal_met=True,
+    )
+    mistakes = [MistakeBreakdownRow(key="kanji_n5", attempts=12, mistakes=8, error_rate=66)]
+
+    events = evaluate_assistant_events(
+        state=state,
+        activity_week=ActivitySummary(
+            days=7,
+            reviewed=10,
+            correct=6,
+            incorrect=4,
+            accuracy=60,
+            points_earned=6,
+            active_days=2,
+        ),
+        streak=streak,
+        mistakes=mistakes,
+        leech_count=4,
+        session_summary=summary,
+        now_utc=datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc),
+        popup_cadence="low",
+        curriculum_attempts=12,
+        curriculum_accuracy_7d=55,
+    )
+
+    assert len(events) == 2
+    assert events[0].priority == "critical"
+
+
 def test_assistant_profile_and_events_round_trip(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

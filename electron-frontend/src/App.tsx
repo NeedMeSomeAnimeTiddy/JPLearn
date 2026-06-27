@@ -1714,27 +1714,77 @@ function formatAssistantEventTitle(event: AssistantEventPayload): string {
   if (event.event_type === 'streak_milestone') return 'Streak milestone'
   if (event.event_type === 'leech_intervention') return 'Tough items spotted'
   if (event.event_type === 'weakness_spike') return 'Practice recommendation'
+  if (event.event_type === 'curriculum_stall') return 'Curriculum slowdown'
+  if (event.event_type === 'activity_nudge') return 'Consistency reminder'
+  if (event.event_type === 'session_recovery') return 'Recovery plan'
+  if (event.event_type === 'momentum_encouragement') return 'Momentum boost'
   return 'Coach update'
 }
 
+function formatAssistantRecommendation(event: AssistantEventPayload): string {
+  const recommendation = event.metadata.recommendation_key ?? ''
+  if (recommendation === 'rec.short_follow_up_session') {
+    return 'Next: run one short follow-up set to lock retention.'
+  }
+  if (recommendation === 'rec.protect_streak_chain') {
+    return 'Next: complete at least one quick round today.'
+  }
+  if (recommendation === 'rec.typed_recall_focus') {
+    return 'Next: switch to typed recall and target your hardest prompts.'
+  }
+  if (recommendation === 'rec.focused_block_retry') {
+    return 'Next: replay the weakest block with slower pacing.'
+  }
+  if (recommendation === 'rec.context_cloze_recovery') {
+    return 'Next: do a context-cloze recovery pass before mixed drills.'
+  }
+  if (recommendation === 'rec.short_reminder_session') {
+    return 'Next: run a 5-minute reminder session to rebuild rhythm.'
+  }
+  if (recommendation === 'rec.recovery_loop') {
+    return 'Next: do one recovery loop on missed items, then retest.'
+  }
+  if (recommendation === 'rec.stretch_goal_push') {
+    return 'Next: push one stretch round while momentum is high.'
+  }
+  return 'Next: keep a steady cadence and finish this block.'
+}
+
 function formatAssistantEventBody(event: AssistantEventPayload): string {
+  const recommendation = formatAssistantRecommendation(event)
   if (event.message_key === 'coach.goal_met') {
-    return 'Excellent run. Lock in the momentum with one short follow-up session.'
+    return `Excellent run. Lock in the momentum with one short follow-up session. ${recommendation}`
   }
   if (event.message_key === 'coach.streak_milestone') {
     const days = event.metadata.days ?? '0'
-    return `${days}-day streak reached. Keep the chain alive with a quick review.`
+    return `${days}-day streak reached. Keep the chain alive with a quick review. ${recommendation}`
   }
   if (event.message_key === 'coach.leech_intervention') {
     const count = event.metadata.leech_count ?? '0'
-    return `${count} leech cards are active. Prioritize focused typed recall on weak prompts.`
+    return `${count} leech cards are active. Prioritize focused typed recall on weak prompts. ${recommendation}`
   }
   if (event.message_key === 'coach.weakness_focus') {
     const focusArea = event.metadata.focus_area ?? 'general'
     const errorRate = event.metadata.error_rate ?? '0'
-    return `Focus on ${focusArea}. Recent error rate is ${errorRate}% in this area.`
+    return `Focus on ${focusArea}. Recent error rate is ${errorRate}% in this area. ${recommendation}`
   }
-  return 'Quick check-in: stay steady and finish this block cleanly.'
+  if (event.message_key === 'coach.curriculum_stall') {
+    const accuracy = event.metadata.accuracy_7d ?? '0'
+    return `Context-cloze accuracy is trending low at ${accuracy}%. ${recommendation}`
+  }
+  if (event.message_key === 'coach.activity_nudge') {
+    const activeDays = event.metadata.active_days ?? '0'
+    return `Only ${activeDays} active study days this week so far. ${recommendation}`
+  }
+  if (event.message_key === 'coach.session_recovery') {
+    const accuracy = event.metadata.accuracy ?? '0'
+    return `Latest session ended below target at ${accuracy}% accuracy. ${recommendation}`
+  }
+  if (event.message_key === 'coach.momentum_encouragement') {
+    const momentum = event.metadata.momentum ?? '0'
+    return `Your momentum score is +${momentum}. ${recommendation}`
+  }
+  return `Quick check-in: stay steady and finish this block cleanly. ${recommendation}`
 }
 
 function App() {
