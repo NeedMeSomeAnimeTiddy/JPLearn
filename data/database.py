@@ -1,11 +1,13 @@
 """SQLite persistence for review states and progress."""
 
+import json
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, TypedDict, TypeAlias
+from typing import Callable, TypedDict, TypeAlias, cast
 
 from domain.activity import ActivitySummary
+from domain.assistant import AssistantEvent, AssistantEventPriority, AssistantMood, AssistantState
 from domain.history import ItemHistoryEvent, RawItemHistoryBucket
 from domain.leech import evaluate_leech_state
 from domain.mistakes import MistakeBreakdownRow
@@ -19,7 +21,8 @@ SCHEMA_VERSION_TABLE = "schema_version"
 MIGRATION_V1 = 1
 MIGRATION_V2 = 2
 MIGRATION_V3 = 3
-LATEST_SCHEMA_VERSION = 3
+MIGRATION_V4 = 4
+LATEST_SCHEMA_VERSION = 4
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -44,6 +47,15 @@ class NarrativeChapterSummary(TypedDict):
     attempts: int
     accuracy: int
     chapters: NarrativeChaptersSummary
+
+
+class AssistantProfile(TypedDict):
+    persona_style: str
+    popup_cadence: str
+    emotion_persistence: str
+    llm_backend: str
+    chat_retention: str
+    updated_at_utc: str
 
 
 def _connect() -> sqlite3.Connection:
@@ -188,10 +200,63 @@ def _migration_0003(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE review_events ADD COLUMN confidence_score INTEGER")
 
 
+def _migration_0004(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS assistant_profile (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            persona_style TEXT NOT NULL DEFAULT 'coach',
+            popup_cadence TEXT NOT NULL DEFAULT 'high',
+            emotion_persistence TEXT NOT NULL DEFAULT 'long_memory',
+            llm_backend TEXT NOT NULL DEFAULT 'llama.cpp',
+            chat_retention TEXT NOT NULL DEFAULT 'minimal',
+            updated_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS assistant_state_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mood TEXT NOT NULL,
+            momentum INTEGER NOT NULL,
+            confidence_level INTEGER NOT NULL,
+            focus_area TEXT NOT NULL,
+            last_major_event TEXT NOT NULL,
+            recorded_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS assistant_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            message_key TEXT NOT NULL,
+            metadata_json TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            consumed INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS assistant_chat_turns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
     MIGRATION_V3: _migration_0003,
+    MIGRATION_V4: _migration_0004,
 }
 
 
@@ -236,6 +301,9 @@ def reset_db() -> None:
         conn.execute("DELETE FROM leech_items")
         conn.execute("DELETE FROM curriculum_stages")
         conn.execute("DELETE FROM session_goals")
+        conn.execute("DELETE FROM assistant_state_snapshots")
+        conn.execute("DELETE FROM assistant_events")
+        conn.execute("DELETE FROM assistant_chat_turns")
 
 
 def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
@@ -948,3 +1016,274 @@ def load_active_leech_card_ids(deck_name: str) -> set[int]:
         ).fetchall()
 
     return {int(row["card_id"]) for row in rows}
+
+
+def load_active_leech_count() -> int:
+    """Return total count of active leech cards across all decks."""
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM leech_items
+            WHERE is_active=1
+            """
+        ).fetchone()
+    return int((row or {})["total"] or 0)
+
+
+def save_assistant_profile(
+    persona_style: str,
+    popup_cadence: str,
+    emotion_persistence: str,
+    llm_backend: str,
+    chat_retention: str,
+) -> AssistantProfile:
+    """Persist singleton assistant profile configuration."""
+    normalized_persona_style = normalize_storage_text(persona_style).lower() or "coach"
+    normalized_popup_cadence = normalize_storage_text(popup_cadence).lower() or "high"
+    normalized_emotion_persistence = normalize_storage_text(emotion_persistence).lower() or "long_memory"
+    normalized_llm_backend = normalize_storage_text(llm_backend).lower() or "llama.cpp"
+    normalized_chat_retention = normalize_storage_text(chat_retention).lower() or "minimal"
+    updated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO assistant_profile (id, persona_style, popup_cadence, emotion_persistence, llm_backend, chat_retention, updated_at_utc)
+            VALUES (1, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                persona_style=excluded.persona_style,
+                popup_cadence=excluded.popup_cadence,
+                emotion_persistence=excluded.emotion_persistence,
+                llm_backend=excluded.llm_backend,
+                chat_retention=excluded.chat_retention,
+                updated_at_utc=excluded.updated_at_utc
+            """,
+            (
+                normalized_persona_style,
+                normalized_popup_cadence,
+                normalized_emotion_persistence,
+                normalized_llm_backend,
+                normalized_chat_retention,
+                updated_at,
+            ),
+        )
+
+    return {
+        "persona_style": normalized_persona_style,
+        "popup_cadence": normalized_popup_cadence,
+        "emotion_persistence": normalized_emotion_persistence,
+        "llm_backend": normalized_llm_backend,
+        "chat_retention": normalized_chat_retention,
+        "updated_at_utc": updated_at,
+    }
+
+
+def load_assistant_profile() -> AssistantProfile:
+    """Load assistant profile, creating defaults on first access."""
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT persona_style, popup_cadence, emotion_persistence, llm_backend, chat_retention, updated_at_utc
+            FROM assistant_profile
+            WHERE id = 1
+            """
+        ).fetchone()
+
+    if row is None:
+        return save_assistant_profile(
+            persona_style="coach",
+            popup_cadence="high",
+            emotion_persistence="long_memory",
+            llm_backend="llama.cpp",
+            chat_retention="minimal",
+        )
+
+    return {
+        "persona_style": str(row["persona_style"]),
+        "popup_cadence": str(row["popup_cadence"]),
+        "emotion_persistence": str(row["emotion_persistence"]),
+        "llm_backend": str(row["llm_backend"]),
+        "chat_retention": str(row["chat_retention"]),
+        "updated_at_utc": str(row["updated_at_utc"]),
+    }
+
+
+def save_assistant_state_snapshot(state: AssistantState) -> None:
+    """Append an assistant emotional-state snapshot."""
+    recorded_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO assistant_state_snapshots (mood, momentum, confidence_level, focus_area, last_major_event, recorded_at_utc)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                state.mood,
+                state.momentum,
+                state.confidence_level,
+                normalize_storage_text(state.focus_area) or "general",
+                normalize_storage_text(state.last_major_event) or "steady_progress",
+                recorded_at,
+            ),
+        )
+
+
+def load_latest_assistant_state() -> AssistantState | None:
+    """Return latest assistant state snapshot if available."""
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT mood, momentum, confidence_level, focus_area, last_major_event
+            FROM assistant_state_snapshots
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return AssistantState(
+        mood=cast(AssistantMood, str(row["mood"])),
+        momentum=int(row["momentum"]),
+        confidence_level=int(row["confidence_level"]),
+        focus_area=str(row["focus_area"]),
+        last_major_event=str(row["last_major_event"]),
+    )
+
+
+def enqueue_assistant_events(events: list[AssistantEvent]) -> None:
+    """Persist scripted assistant events for popup consumption."""
+    if not events:
+        return
+    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with _connect() as conn:
+        conn.executemany(
+            """
+            INSERT INTO assistant_events (event_type, priority, message_key, metadata_json, created_at_utc, consumed)
+            VALUES (?, ?, ?, ?, ?, 0)
+            """,
+            [
+                (
+                    normalize_storage_text(event.event_type),
+                    normalize_storage_text(event.priority),
+                    normalize_storage_text(event.message_key),
+                    json.dumps(event.metadata, ensure_ascii=False, sort_keys=True),
+                    created_at,
+                )
+                for event in events
+            ],
+        )
+
+
+def load_pending_assistant_events(limit: int = 8) -> list[tuple[int, AssistantEvent]]:
+    """Load oldest unconsumed assistant events with ids."""
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, event_type, priority, message_key, metadata_json
+            FROM assistant_events
+            WHERE consumed=0
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    pending: list[tuple[int, AssistantEvent]] = []
+    for row in rows:
+        metadata = json.loads(str(row["metadata_json"]))
+        normalized_metadata = {
+            str(key): str(value)
+            for key, value in metadata.items()
+        }
+        pending.append(
+            (
+                int(row["id"]),
+                AssistantEvent(
+                    event_type=str(row["event_type"]),
+                    priority=cast(AssistantEventPriority, str(row["priority"])),
+                    message_key=str(row["message_key"]),
+                    metadata=normalized_metadata,
+                ),
+            )
+        )
+    return pending
+
+
+def mark_assistant_events_consumed(event_ids: list[int]) -> None:
+    """Mark assistant events as consumed after renderer acknowledgement."""
+    if not event_ids:
+        return
+    placeholders = ",".join("?" for _ in event_ids)
+    with _connect() as conn:
+        conn.execute(
+            f"UPDATE assistant_events SET consumed=1 WHERE id IN ({placeholders})",
+            [int(event_id) for event_id in event_ids],
+        )
+
+
+def append_assistant_chat_turn(role: str, content: str) -> None:
+    """Persist a single assistant/user chat turn."""
+    normalized_role = normalize_storage_text(role).lower()
+    if normalized_role not in {"user", "assistant"}:
+        raise ValueError("role must be user or assistant")
+    normalized_content = normalize_japanese_text(content)
+    if not normalized_content:
+        raise ValueError("content must not be empty")
+    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO assistant_chat_turns (role, content, created_at_utc)
+            VALUES (?, ?, ?)
+            """,
+            (normalized_role, normalized_content, created_at),
+        )
+
+
+def load_recent_assistant_chat_turns(limit: int = 20) -> list[dict[str, str]]:
+    """Return most recent assistant chat turns ordered oldest to newest."""
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT role, content, created_at_utc
+            FROM assistant_chat_turns
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return [
+        {
+            "role": str(row["role"]),
+            "content": str(row["content"]),
+            "created_at_utc": str(row["created_at_utc"]),
+        }
+        for row in reversed(rows)
+    ]
+
+
+def trim_assistant_chat_turns(max_turns: int = 20) -> None:
+    """Keep only the latest ``max_turns`` chat turns for minimal retention."""
+    if max_turns <= 0:
+        raise ValueError("max_turns must be positive")
+    with _connect() as conn:
+        conn.execute(
+            """
+            DELETE FROM assistant_chat_turns
+            WHERE id NOT IN (
+                SELECT id
+                FROM assistant_chat_turns
+                ORDER BY id DESC
+                LIMIT ?
+            )
+            """,
+            (max_turns,),
+        )

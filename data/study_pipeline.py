@@ -8,6 +8,7 @@ from data import database
 from data.database import CurriculumStageSummary, NarrativeChapterSummary
 from data.text_normalization import normalize_storage_text
 from domain.activity import ActivitySummary
+from domain.assistant import compute_assistant_state, evaluate_assistant_events
 from domain.curriculum import next_stage
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
 from domain.mistakes import MistakeBreakdownRow
@@ -204,3 +205,87 @@ def save_session_goal(
 def load_session_summary(session_id: str) -> SessionSummary | None:
     """Load computed completion metrics for one session id."""
     return database.load_session_summary(session_id)
+
+
+def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
+    """Compute deterministic tutor state/events and persist a new snapshot."""
+    profile = database.load_assistant_profile()
+    activity_week = database.load_activity_summary(7)
+    streak = database.load_streak_state()
+    mistakes = database.load_mistake_breakdown(limit=6)
+    item_history = load_item_history(limit_items=8, events_per_item=8)
+    leech_count = database.load_active_leech_count()
+    session_summary = database.load_session_summary(session_id) if session_id else None
+    latest_state = database.load_latest_assistant_state()
+    prior_momentum = latest_state.momentum if latest_state is not None else 0
+
+    state = compute_assistant_state(
+        activity_week=activity_week,
+        streak=streak,
+        mistakes=mistakes,
+        item_history=item_history,
+        leech_count=leech_count,
+        session_summary=session_summary,
+        prior_momentum=prior_momentum,
+    )
+    events = evaluate_assistant_events(
+        state=state,
+        streak=streak,
+        mistakes=mistakes,
+        leech_count=leech_count,
+        session_summary=session_summary,
+    )
+
+    database.save_assistant_state_snapshot(state)
+    database.enqueue_assistant_events(events)
+
+    return {
+        "profile": profile,
+        "state": {
+            "mood": state.mood,
+            "momentum": state.momentum,
+            "confidence_level": state.confidence_level,
+            "focus_area": state.focus_area,
+            "last_major_event": state.last_major_event,
+        },
+        "events": [
+            {
+                "event_type": event.event_type,
+                "priority": event.priority,
+                "message_key": event.message_key,
+                "metadata": event.metadata,
+            }
+            for event in events
+        ],
+    }
+
+
+def load_pending_assistant_events(limit: int = 8) -> list[dict[str, object]]:
+    """Return pending scripted tutor events for renderer consumption."""
+    pending = database.load_pending_assistant_events(limit=limit)
+    return [
+        {
+            "id": event_id,
+            "event_type": event.event_type,
+            "priority": event.priority,
+            "message_key": event.message_key,
+            "metadata": event.metadata,
+        }
+        for event_id, event in pending
+    ]
+
+
+def consume_assistant_events(event_ids: list[int]) -> None:
+    """Acknowledge rendered tutor events so they are not replayed."""
+    database.mark_assistant_events_consumed(event_ids)
+
+
+def append_assistant_chat_turn(role: str, content: str) -> None:
+    """Persist one local tutor chat turn and enforce minimal retention."""
+    database.append_assistant_chat_turn(role, content)
+    database.trim_assistant_chat_turns(max_turns=20)
+
+
+def load_recent_assistant_chat_turns(limit: int = 20) -> list[dict[str, str]]:
+    """Load recent local tutor chat turns for context assembly."""
+    return database.load_recent_assistant_chat_turns(limit=limit)

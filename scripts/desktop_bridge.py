@@ -23,11 +23,16 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from data.study_pipeline import (
+    append_assistant_chat_turn,
+    consume_assistant_events,
     init_study_db,
     load_activity_summary,
     load_active_leech_card_ids,
+    load_assistant_snapshot,
     load_curriculum_stage_summary,
     load_narrative_chapter_summary,
+    load_pending_assistant_events,
+    load_recent_assistant_chat_turns,
     load_item_history,
     load_mistake_breakdown,
     load_curriculum_stages,
@@ -549,6 +554,45 @@ def build_study_queue_payload(slug: str) -> dict[str, object]:
     }
 
 
+def build_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
+    init_study_db()
+    return {
+        "ok": True,
+        "snapshot": load_assistant_snapshot(session_id=session_id),
+    }
+
+
+def get_pending_assistant_events(limit: int = 8) -> dict[str, object]:
+    init_study_db()
+    return {
+        "ok": True,
+        "events": load_pending_assistant_events(limit=limit),
+    }
+
+
+def consume_pending_assistant_events(event_ids: list[int]) -> dict[str, object]:
+    init_study_db()
+    consume_assistant_events(event_ids)
+    return {
+        "ok": True,
+        "consumed": len(event_ids),
+    }
+
+
+def append_chat_turn(role: str, content: str) -> dict[str, object]:
+    init_study_db()
+    append_assistant_chat_turn(role, content)
+    return {"ok": True}
+
+
+def get_recent_chat_turns(limit: int = 20) -> dict[str, object]:
+    init_study_db()
+    return {
+        "ok": True,
+        "turns": load_recent_assistant_chat_turns(limit=limit),
+    }
+
+
 def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
     if not argv:
         return 2, {"error": "Missing command"}
@@ -648,6 +692,47 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         except ValueError as exc:
             return 2, {"error": str(exc)}
         return 0, payload
+
+    if command == "assistant-snapshot":
+        session_id = argv[1] if len(argv) > 1 and argv[1].strip() else None
+        return 0, build_assistant_snapshot(session_id=session_id)
+
+    if command == "assistant-events":
+        try:
+            limit = int(argv[1]) if len(argv) > 1 and argv[1].strip() else 8
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+        return 0, get_pending_assistant_events(limit=limit)
+
+    if command == "assistant-events-consume":
+        if len(argv) < 2:
+            return 2, {"error": "Usage: assistant-events-consume <id_csv>"}
+        try:
+            event_ids = [
+                int(value)
+                for value in argv[1].split(",")
+                if value.strip()
+            ]
+            payload = consume_pending_assistant_events(event_ids)
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+        return 0, payload
+
+    if command == "assistant-chat-append":
+        if len(argv) < 3:
+            return 2, {"error": "Usage: assistant-chat-append <role> <content>"}
+        try:
+            payload = append_chat_turn(argv[1], argv[2])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+        return 0, payload
+
+    if command == "assistant-chat-history":
+        try:
+            limit = int(argv[1]) if len(argv) > 1 and argv[1].strip() else 20
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+        return 0, get_recent_chat_turns(limit=limit)
 
     return 2, {"error": f"Unknown command: {command}"}
 

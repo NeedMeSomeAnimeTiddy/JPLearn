@@ -169,6 +169,63 @@ function validateSessionGoalPayload(payload) {
   }
 }
 
+function validateOptionalSessionId(value) {
+  if (value == null) {
+    return undefined
+  }
+  return validateSessionId(value)
+}
+
+function validatePositiveLimit(value, fallback) {
+  if (value == null) {
+    return fallback
+  }
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`Invalid positive limit value: ${String(value)}`)
+  }
+  return value
+}
+
+function validateAssistantEventIdsPayload(payload) {
+  if (!Array.isArray(payload)) {
+    throw new Error('Invalid assistant event ids payload: expected array')
+  }
+  const uniqueIds = []
+  const seen = new Set()
+  for (const value of payload) {
+    if (!Number.isInteger(value) || value <= 0) {
+      throw new Error(`Invalid assistant event id: ${String(value)}`)
+    }
+    if (seen.has(value)) {
+      continue
+    }
+    seen.add(value)
+    uniqueIds.push(value)
+  }
+  return uniqueIds
+}
+
+function validateAssistantChatAppendPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid assistant chat append payload: expected object')
+  }
+  const role = typeof payload.role === 'string' ? payload.role.trim().toLowerCase() : ''
+  if (role !== 'user' && role !== 'assistant') {
+    throw new Error(`Invalid assistant chat role: ${String(payload.role)}`)
+  }
+  const content = typeof payload.content === 'string' ? payload.content.trim() : ''
+  if (!content) {
+    throw new Error('Invalid assistant chat content: value must not be empty')
+  }
+  if (content.length > 4000) {
+    throw new Error('Invalid assistant chat content: maximum length exceeded')
+  }
+  return {
+    role,
+    content,
+  }
+}
+
 module.exports = {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
@@ -176,6 +233,10 @@ module.exports = {
   validateExpertiseLevelInput,
   validateSessionGoalPayload,
   validateSessionId,
+  validateOptionalSessionId,
+  validatePositiveLimit,
+  validateAssistantEventIdsPayload,
+  validateAssistantChatAppendPayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
 }

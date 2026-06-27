@@ -68,6 +68,25 @@ def test_jplearn_db_upgrade_adds_review_event_columns_and_schema_marker(
     assert "target_accuracy" in session_goal_columns
     assert "started_at_utc" in session_goal_columns
 
+    assistant_profile_columns = _column_names(db_path, "assistant_profile")
+    assert "persona_style" in assistant_profile_columns
+    assert "popup_cadence" in assistant_profile_columns
+    assert "emotion_persistence" in assistant_profile_columns
+    assert "llm_backend" in assistant_profile_columns
+    assert "chat_retention" in assistant_profile_columns
+
+    assistant_state_columns = _column_names(db_path, "assistant_state_snapshots")
+    assert "mood" in assistant_state_columns
+    assert "momentum" in assistant_state_columns
+
+    assistant_events_columns = _column_names(db_path, "assistant_events")
+    assert "event_type" in assistant_events_columns
+    assert "metadata_json" in assistant_events_columns
+
+    assistant_chat_columns = _column_names(db_path, "assistant_chat_turns")
+    assert "role" in assistant_chat_columns
+    assert "content" in assistant_chat_columns
+
     with sqlite3.connect(db_path) as conn:
         row = conn.execute(
             "SELECT version FROM schema_version WHERE id = 1"
@@ -166,6 +185,58 @@ def test_jplearn_db_upgrade_from_v2_only_applies_confidence_column(
     columns = _column_names(db_path, "review_events")
     assert "session_id" in columns
     assert "confidence_score" in columns
+
+    with sqlite3.connect(db_path) as conn:
+        version_row = conn.execute(
+            "SELECT version FROM schema_version WHERE id = 1"
+        ).fetchone()
+
+    assert version_row is not None
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION
+
+
+def test_jplearn_db_upgrade_from_v3_applies_assistant_tables(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "jplearn-migration-from-v3.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE schema_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute("INSERT INTO schema_version (id, version) VALUES (1, 3)")
+        conn.execute(
+            """
+            CREATE TABLE review_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                deck TEXT NOT NULL,
+                card_id INTEGER NOT NULL,
+                quality INTEGER NOT NULL,
+                reviewed_on TEXT NOT NULL,
+                reviewed_at_utc TEXT NOT NULL DEFAULT '',
+                script_tag TEXT NOT NULL DEFAULT '',
+                curriculum_stage INTEGER,
+                prompt_text TEXT NOT NULL DEFAULT '',
+                tags_csv TEXT NOT NULL DEFAULT '',
+                session_id TEXT NOT NULL DEFAULT '',
+                confidence_score INTEGER
+            )
+            """
+        )
+
+    database.init_db()
+
+    assert "persona_style" in _column_names(db_path, "assistant_profile")
+    assert "mood" in _column_names(db_path, "assistant_state_snapshots")
+    assert "event_type" in _column_names(db_path, "assistant_events")
+    assert "role" in _column_names(db_path, "assistant_chat_turns")
 
     with sqlite3.connect(db_path) as conn:
         version_row = conn.execute(

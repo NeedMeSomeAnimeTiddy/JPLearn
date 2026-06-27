@@ -218,6 +218,56 @@ interface SessionSummaryResponse {
   error?: string
 }
 
+interface AssistantProfile {
+  persona_style: string
+  popup_cadence: string
+  emotion_persistence: string
+  llm_backend: string
+  chat_retention: string
+  updated_at_utc: string
+}
+
+interface AssistantStatePayload {
+  mood: string
+  momentum: number
+  confidence_level: number
+  focus_area: string
+  last_major_event: string
+}
+
+interface AssistantEventPayload {
+  id?: number
+  event_type: string
+  priority: 'info' | 'coaching' | 'critical' | 'celebration'
+  message_key: string
+  metadata: Record<string, string>
+}
+
+interface AssistantSnapshotResponse {
+  ok: boolean
+  snapshot: {
+    profile: AssistantProfile
+    state: AssistantStatePayload
+    events: AssistantEventPayload[]
+  }
+}
+
+interface AssistantEventsResponse {
+  ok: boolean
+  events: Array<AssistantEventPayload & { id: number }>
+}
+
+interface AssistantChatTurn {
+  role: 'user' | 'assistant'
+  content: string
+  created_at_utc: string
+}
+
+interface AssistantChatHistoryResponse {
+  ok: boolean
+  turns: AssistantChatTurn[]
+}
+
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
@@ -262,6 +312,14 @@ interface DesktopApi {
     seeded_cards: number
     decks: string[]
   }>
+  getAssistantSnapshot?: (sessionId?: string) => Promise<AssistantSnapshotResponse>
+  getAssistantEvents?: (limit?: number) => Promise<AssistantEventsResponse>
+  consumeAssistantEvents?: (eventIds: number[]) => Promise<{ ok: boolean; consumed: number }>
+  appendAssistantChatTurn?: (payload: {
+    role: 'user' | 'assistant'
+    content: string
+  }) => Promise<{ ok: boolean }>
+  getAssistantChatHistory?: (limit?: number) => Promise<AssistantChatHistoryResponse>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>

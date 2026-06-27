@@ -3,6 +3,10 @@ const {
   validateDeckSlug,
   validateSessionGoalPayload,
   validateSessionId,
+  validateOptionalSessionId,
+  validatePositiveLimit,
+  validateAssistantEventIdsPayload,
+  validateAssistantChatAppendPayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
   validateExpertiseLevelInput,
@@ -178,6 +182,68 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to apply expertise level: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('assistant:get-snapshot', async (event, sessionId) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedSessionId = validateOptionalSessionId(sessionId)
+    try {
+      if (validatedSessionId) {
+        return await options.runPythonBridgeWithArgs(['assistant-snapshot', validatedSessionId])
+      }
+      return await options.runPythonBridge('assistant-snapshot')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch assistant snapshot: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('assistant:get-events', async (event, limit) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedLimit = validatePositiveLimit(limit, 8)
+    try {
+      return await options.runPythonBridgeWithArgs(['assistant-events', String(validatedLimit)])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch assistant events: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('assistant:consume-events', async (event, eventIds) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedIds = validateAssistantEventIdsPayload(eventIds)
+    try {
+      return await options.runPythonBridgeWithArgs(['assistant-events-consume', validatedIds.join(',')])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to consume assistant events: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('assistant:append-chat-turn', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateAssistantChatAppendPayload(payload)
+    try {
+      return await options.runPythonBridgeWithArgs([
+        'assistant-chat-append',
+        validatedPayload.role,
+        validatedPayload.content,
+      ])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to append assistant chat turn: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('assistant:get-chat-history', async (event, limit) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedLimit = validatePositiveLimit(limit, 20)
+    try {
+      return await options.runPythonBridgeWithArgs(['assistant-chat-history', String(validatedLimit)])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch assistant chat history: ${detail}`)
     }
   })
 
