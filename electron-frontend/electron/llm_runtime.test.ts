@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 
-const { createTutorChatRuntime, createAdapterRegistry } = require('./llm_runtime.cjs')
+const { createTutorChatRuntime, createAdapterRegistry, extractCliResponseText } = require('./llm_runtime.cjs')
 
 describe('llm runtime', () => {
   it('uses stub provider by default', async () => {
@@ -209,5 +209,68 @@ describe('llm runtime', () => {
     expect(cancelPayload.ok).toBe(true)
     expect(cancelPayload.cancelled).toBe(true)
     await expect(pending).resolves.toMatchObject({ ok: true, provider: 'scripted-fallback' })
+  })
+})
+
+describe('extractCliResponseText', () => {
+  it('strips llama-cli banner, command list, prompt echo, and exit marker', () => {
+    const raw = [
+      '',
+      'Loading model... ',
+      '',
+      '\u2584\u2584 \u2584\u2584',
+      'build      : b1-050ee92',
+      'model      : C:/models/Qwen3.5.gguf',
+      'modalities : text',
+      'using custom system prompt',
+      '',
+      'available commands:',
+      '  /exit or Ctrl+C     stop or exit',
+      '  /glob <pattern>     add text files using globbing pattern',
+      '',
+      '',
+      '> hello',
+      '',
+      'Hello! How can I help you today?',
+      '',
+      'Exiting...',
+      '',
+    ].join('\n')
+
+    expect(extractCliResponseText(raw)).toBe('Hello! How can I help you today?')
+  })
+
+  it('strips a plain-text [Start thinking] reasoning block', () => {
+    const raw = [
+      'available commands:',
+      '  /glob <pattern>     add text files using globbing pattern',
+      '',
+      '> hello',
+      '',
+      '[Start thinking]',
+      'The user said hello. I should greet them warmly in a short reply.',
+      'Maybe add a little Japanese.',
+      '[End thinking]',
+      '',
+      'Hello! How is your day? \u304a\u5143\u6c17\uff1f',
+      'Exiting...',
+    ].join('\n')
+
+    expect(extractCliResponseText(raw)).toBe('Hello! How is your day? \u304a\u5143\u6c17\uff1f')
+  })
+
+  it('drops an unterminated thinking block so partial reasoning never leaks', () => {
+    const raw = [
+      '> hello',
+      '',
+      '[Start thinking]',
+      'Analyzing the request and it got cut off mid-thought',
+    ].join('\n')
+
+    expect(extractCliResponseText(raw)).toBe('')
+  })
+
+  it('returns empty string for empty output', () => {
+    expect(extractCliResponseText('')).toBe('')
   })
 })

@@ -527,6 +527,12 @@ def load_recent_assistant_chat_turns(limit: int = 20) -> list[dict[str, str]]:
     return database.load_recent_assistant_chat_turns(limit=limit)
 
 
+def clear_assistant_chat() -> int:
+    """Remove all stored local tutor chat turns and summaries."""
+    return database.clear_assistant_chat()
+
+
+
 def assemble_assistant_chat_context(session_id: str | None = None, user_message: str | None = None) -> dict[str, str]:
     """Build deterministic, compact chat context from assistant memory tiers."""
     profile = database.load_assistant_profile()

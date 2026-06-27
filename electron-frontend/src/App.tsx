@@ -2594,6 +2594,11 @@ function App() {
     setAssistantChatError(null)
     setAssistantChatWarmup(false)
     setAssistantChatFallbackNote(null)
+    setAssistantChatMessages([])
+    const clearAssistantChatHistory = window.jplearnDesktop.clearAssistantChatHistory
+    if (clearAssistantChatHistory) {
+      void clearAssistantChatHistory().catch(() => undefined)
+    }
     const unloadAssistantChatRuntime = window.jplearnDesktop.unloadAssistantChatRuntime
     if (!unloadAssistantChatRuntime) {
       return

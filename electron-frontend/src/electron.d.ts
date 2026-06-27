@@ -345,6 +345,7 @@ interface DesktopApi {
     content: string
   }) => Promise<{ ok: boolean }>
   getAssistantChatHistory?: (limit?: number) => Promise<AssistantChatHistoryResponse>
+  clearAssistantChatHistory?: () => Promise<{ ok: boolean; removed: number }>
   getAssistantChatRuntimeStatus?: () => Promise<AssistantChatRuntimeStatus>
   preloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string; coldStart: boolean; loaded: boolean }>
   sendAssistantChatMessage?: (payload: {

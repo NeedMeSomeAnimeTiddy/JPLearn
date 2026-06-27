@@ -123,29 +123,39 @@ function sanitizeContextText(context = {}, options = {}) {
   return pairs.slice(0, 8).join('\n')
 }
 
-function extractCliResponseText(rawOutput, promptText) {
+function extractCliResponseText(rawOutput) {
   const raw = typeof rawOutput === 'string' ? rawOutput : String(rawOutput || '')
   if (!raw.trim()) {
     return ''
   }
 
-  const normalizedPrompt = typeof promptText === 'string' ? promptText.trim() : ''
-  let body = raw
+  let lines = raw.replace(/\r/g, '').split('\n')
 
-  if (normalizedPrompt) {
-    const echoedPromptMarker = `> ${normalizedPrompt}`
-    const markerIndex = body.lastIndexOf(echoedPromptMarker)
-    if (markerIndex >= 0) {
-      body = body.slice(markerIndex + echoedPromptMarker.length)
+  // llama-cli single-turn mode appends a standalone "Exiting..." footer line.
+  lines = lines.filter((line) => !/^\s*Exiting\.\.\.\s*$/i.test(line))
+
+  // The conversation UI echoes the user message on a line starting with "> ".
+  // Everything after the last echo line is the model turn (banner/header dropped).
+  let echoIndex = -1
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (/^\s*>\s/.test(lines[index]) || /^\s*>$/.test(lines[index])) {
+      echoIndex = index
+      break
     }
   }
 
-  // llama-cli single-turn mode appends "Exiting..." after the generated text.
-  body = body.replace(/\r/g, '')
-  body = body.replace(/\n\s*Exiting\.\.\.\s*$/i, '')
-  body = body.trim()
+  let body = echoIndex >= 0 ? lines.slice(echoIndex + 1).join('\n') : lines.join('\n')
 
-  return body
+  // This model emits reasoning as plain "[Start thinking] ... [End thinking]" text
+  // rather than standard <think> tags, so strip it here. Handle unterminated blocks.
+  body = body.replace(/\[\s*start thinking\s*\][\s\S]*?\[\s*end thinking\s*\]/gi, '')
+  body = body.replace(/\[\s*start thinking\s*\][\s\S]*$/i, '')
+
+  // Defensive: also strip standard think tags if a future model uses them.
+  body = body.replace(/<think>[\s\S]*?<\/think>/gi, '')
+  body = body.replace(/<think>[\s\S]*$/i, '')
+
+  return body.trim()
 }
 
 function buildScriptedFallbackResponse(message, context = {}, detail = '') {
@@ -191,19 +201,22 @@ function createLlamaCppCliAdapter(config = {}) {
     async infer(message, context = {}, runtimeOptions = {}) {
       const contextText = sanitizeContextText(context, runtimeOptions)
       const systemPrompt = resolveTutorSystemPrompt()
-      const prompt = contextText
-        ? `${systemPrompt}\n${contextText}\n\nUser: ${message}\nTutor:`
-        : `${systemPrompt}\n\nUser: ${message}\nTutor:`
-      const boundedPrompt = clipText(prompt, runtimeOptions.maxPromptChars || DEFAULT_MAX_PROMPT_CHARS)
+      const composedSystemPrompt = contextText
+        ? `${systemPrompt}\n\nCurrent context:\n${contextText}`
+        : systemPrompt
+      const boundedSystemPrompt = clipText(composedSystemPrompt, runtimeOptions.maxPromptChars || DEFAULT_MAX_PROMPT_CHARS)
+      const boundedMessage = clipText(message, DEFAULT_MAX_MESSAGE_CHARS)
       const maxOutputTokens = Number.isFinite(runtimeOptions.maxOutputTokens)
         ? Math.max(24, Math.floor(runtimeOptions.maxOutputTokens))
-        : 180
+        : 256
 
       const args = [
         '-m',
         modelPath,
+        '-sys',
+        boundedSystemPrompt,
         '-p',
-        boundedPrompt,
+        boundedMessage,
         '-t',
         '6',
         '-tb',
@@ -215,10 +228,12 @@ function createLlamaCppCliAdapter(config = {}) {
         '--simple-io',
         '--no-show-timings',
         '--no-warmup',
+        '--chat-template',
+        'chatml',
         '--reasoning',
         'off',
-        '--reasoning-format',
-        'none',
+        '--reasoning-budget',
+        '0',
         '--repeat-penalty',
         '1.1',
         '--repeat-last-n',
@@ -315,7 +330,7 @@ function createLlamaCppCliAdapter(config = {}) {
         })
       })
 
-      const text = extractCliResponseText(output, boundedPrompt)
+      const text = extractCliResponseText(output)
       if (!text) {
         throw new Error('llama.cpp returned empty response')
       }
@@ -625,4 +640,5 @@ function createTutorChatRuntime(options = {}) {
 module.exports = {
   createTutorChatRuntime,
   createAdapterRegistry,
+  extractCliResponseText,
 }

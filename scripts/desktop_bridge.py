@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from data.study_pipeline import (
     append_assistant_chat_turn,
     assemble_assistant_chat_context,
+    clear_assistant_chat,
     consume_assistant_events,
     init_study_db,
     load_activity_summary,
@@ -609,6 +610,12 @@ def get_recent_chat_turns(limit: int = 20) -> dict[str, object]:
     }
 
 
+def clear_chat_history() -> dict[str, object]:
+    init_study_db()
+    removed = clear_assistant_chat()
+    return {"ok": True, "removed": removed}
+
+
 def get_assistant_chat_context(session_id: str | None = None, user_message: str | None = None) -> dict[str, object]:
     init_study_db()
     return {
@@ -774,6 +781,9 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         except ValueError as exc:
             return 2, {"error": str(exc)}
         return 0, get_recent_chat_turns(limit=limit)
+
+    if command == "assistant-chat-clear":
+        return 0, clear_chat_history()
 
     if command == "assistant-chat-context":
         session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None

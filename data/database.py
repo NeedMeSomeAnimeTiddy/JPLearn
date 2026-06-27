@@ -1549,6 +1549,19 @@ def load_recent_assistant_chat_turns(limit: int = 20) -> list[dict[str, str]]:
     ]
 
 
+def clear_assistant_chat() -> int:
+    """Delete all stored assistant chat turns and summaries.
+
+    Returns the number of chat turns removed.
+    """
+    with _connect() as conn:
+        removed = conn.execute("SELECT COUNT(*) FROM assistant_chat_turns").fetchone()[0]
+        conn.execute("DELETE FROM assistant_chat_turns")
+        conn.execute("DELETE FROM assistant_chat_summaries")
+    return int(removed)
+
+
+
 def _clip_compact_text(value: str, max_chars: int = 72) -> str:
     if max_chars <= 3:
         raise ValueError("max_chars must be greater than 3")

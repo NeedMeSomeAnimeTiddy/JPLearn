@@ -265,6 +265,16 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('assistant:clear-chat-history', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await options.runPythonBridgeWithArgs(['assistant-chat-clear'])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to clear assistant chat history: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('assistant-chat:status', (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     return options.localTutorRuntime.getStatus()
