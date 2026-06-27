@@ -2129,6 +2129,8 @@ function App() {
   const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const kanjiLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
   const vocabLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
+  const scriptDeckCacheRef = useRef<Partial<Record<ScriptKey, ScriptDeck['cards']>>>({})
+  const scriptBlockCacheRef = useRef<Partial<Record<ScriptKey, BlockInfo[]>>>({})
   const deckCardsInFlightRef = useRef<Map<string, Promise<ScriptDeck>>>(new Map())
   const blockProgressInFlightRef = useRef<Map<string, Promise<BlockProgressPayload>>>(new Map())
   const roundCycleRef = useRef<number[]>([])
@@ -2992,7 +2994,23 @@ function App() {
     async function preloadStartupDeckData(): Promise<void> {
       const startupKanjiLevel: JlptLevel = 'n5'
       const startupVocabLevel: JlptLevel = 'n5'
+      const startupScripts: ScriptKey[] = ['hiragana', 'katakana', 'grammar_patterns']
       let deferredLoadsQueuedAtMs: number | undefined
+
+      const preloadScript = async (script: ScriptKey): Promise<void> => {
+        if (scriptDeckCacheRef.current[script] && scriptBlockCacheRef.current[script]) {
+          return
+        }
+
+        const [deckPayload, blockPayload] = await Promise.all([
+          getDeckCardsDeduped(script),
+          getBlockProgressDeduped(script),
+        ])
+        if (cancelled) return
+
+        scriptDeckCacheRef.current[script] = normalizeDeckCards(deckPayload.cards)
+        scriptBlockCacheRef.current[script] = normalizeBlockList(blockPayload.blocks)
+      }
 
       const preloadKanjiLevel = async (level: JlptLevel, shouldHydrateState: boolean): Promise<void> => {
         if (kanjiLevelDeckCacheRef.current[level] && kanjiLevelBlockCacheRef.current[level]) {
@@ -3044,6 +3062,7 @@ function App() {
 
       try {
         await Promise.all([
+          ...startupScripts.map((script) => preloadScript(script)),
           preloadKanjiLevel(startupKanjiLevel, true),
           preloadVocabLevel(startupVocabLevel, true),
         ])
@@ -3239,17 +3258,30 @@ function App() {
           setActiveBlockIndex(0)
         }
       } else {
-        const [deckPayload, blockPayload] = await Promise.all([
-          getDeckCardsDeduped(script),
-          getBlockProgressDeduped(script),
-        ])
+        const cachedDeck = scriptDeckCacheRef.current[script]
+        const cachedBlocks = scriptBlockCacheRef.current[script]
 
-        if (scriptLoadRequestIdRef.current !== requestId) {
-          return
+        let resolvedCards = cachedDeck
+        let resolvedBlocks = cachedBlocks
+
+        if (!resolvedCards || !resolvedBlocks) {
+          const [deckPayload, blockPayload] = await Promise.all([
+            getDeckCardsDeduped(script),
+            getBlockProgressDeduped(script),
+          ])
+
+          if (scriptLoadRequestIdRef.current !== requestId) {
+            return
+          }
+
+          resolvedCards = normalizeDeckCards(deckPayload.cards)
+          resolvedBlocks = normalizeBlockList(blockPayload.blocks)
+          scriptDeckCacheRef.current[script] = resolvedCards
+          scriptBlockCacheRef.current[script] = resolvedBlocks
         }
 
-        setDeckCards(normalizeDeckCards(deckPayload.cards))
-        const blocks = normalizeBlockList(blockPayload.blocks)
+        setDeckCards(resolvedCards ?? [])
+        const blocks = resolvedBlocks ?? []
         setBlockProgress(blocks)
         if (blocks.length > 0) {
           const lastUnlocked = blocks.reduce(
