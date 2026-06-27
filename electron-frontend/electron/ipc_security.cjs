@@ -64,6 +64,14 @@ function validateStartupThemeInput(theme) {
   return theme
 }
 
+function validateExpertiseLevelInput(level) {
+  const allowed = new Set(['total_beginner', 'know_hiragana', 'know_kana', 'jlpt_n5_foundation'])
+  if (typeof level !== 'string' || !allowed.has(level)) {
+    throw new Error(`Invalid expertise level value: ${String(level)}`)
+  }
+  return level
+}
+
 function validateRecordGameResultPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Invalid record game result payload: expected object')
@@ -165,6 +173,7 @@ module.exports = {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
   validateDeckSlug,
+  validateExpertiseLevelInput,
   validateSessionGoalPayload,
   validateSessionId,
   validateStartupThemeInput,

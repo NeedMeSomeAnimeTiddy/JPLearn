@@ -39,6 +39,7 @@ from data.study_pipeline import (
     save_session_goal,
     load_session_summary,
 )
+from data.database import save_state
 from domain.blocks import (
     blocks_for_slug,
     compute_block_mastery,
@@ -46,6 +47,7 @@ from domain.blocks import (
 )
 from domain.distractors import rank_distractor_ids
 from domain.decks import ALL_DECKS
+from domain.scheduler import ReviewState, update
 from domain.queue_builder import build_study_queue
 from domain.decks import (
     VOCAB_N1_EXTERNAL_DATA,
@@ -62,6 +64,13 @@ SUMMARY_SCRIPT_TAGS = (
     "vocab_n5",
     "grammar_patterns",
 )
+
+EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
+    "total_beginner": (),
+    "know_hiragana": ("hiragana",),
+    "know_kana": ("hiragana", "katakana"),
+    "jlpt_n5_foundation": ("hiragana", "katakana", "kanji_n5", "vocab_n5"),
+}
 
 @dataclass(frozen=True)
 class DeckSummary:
@@ -366,6 +375,52 @@ def reset_progress() -> dict[str, object]:
     return {"ok": True}
 
 
+def _mastered_seed_state(card_id: int) -> ReviewState:
+    state = ReviewState(card_id=card_id)
+    # The app treats mastered as repetitions >= 3 and interval >= 21.
+    for _ in range(3):
+        state = update(state, quality=4)
+    return state
+
+
+def apply_expertise_level(level: str) -> dict[str, object]:
+    init_study_db()
+    normalized_level = level.strip().lower()
+    target_slugs = EXPERTISE_LEVEL_TO_SLUGS.get(normalized_level)
+    if target_slugs is None:
+        raise ValueError(f"Unknown expertise level: {level}")
+
+    seeded_cards = 0
+    touched_decks: list[str] = []
+    for slug in target_slugs:
+        factory = ALL_DECKS.get(slug)
+        if factory is None:
+            continue
+        deck = factory()
+        target_state_by_id = {card.id: _mastered_seed_state(card.id) for card in deck.cards}
+        states = load_review_states(deck.name, list(target_state_by_id.keys()))
+
+        for card_id, target_state in target_state_by_id.items():
+            current = states.get(card_id)
+            if current is None:
+                save_state(deck.name, target_state)
+                seeded_cards += 1
+                continue
+            if current.repetitions >= target_state.repetitions and current.interval >= target_state.interval:
+                continue
+            save_state(deck.name, target_state)
+            seeded_cards += 1
+
+        touched_decks.append(deck.name)
+
+    return {
+        "ok": True,
+        "level": normalized_level,
+        "seeded_cards": seeded_cards,
+        "decks": touched_decks,
+    }
+
+
 def _parse_bool_flag(value: str) -> bool:
     normalized = value.strip().lower()
     if normalized in {"1", "true", "yes", "y"}:
@@ -593,6 +648,18 @@ def main() -> int:
             print(json.dumps({"error": "Usage: session-summary <session_id>"}))
             return 2
         payload = get_session_goal_summary(sys.argv[2])
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    if command == "apply-expertise-level":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "Usage: apply-expertise-level <level>"}))
+            return 2
+        try:
+            payload = apply_expertise_level(sys.argv[2])
+        except ValueError as exc:
+            print(json.dumps({"error": str(exc)}))
+            return 2
         print(json.dumps(payload, ensure_ascii=False))
         return 0
 

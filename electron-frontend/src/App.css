@@ -3801,6 +3801,109 @@ button {
   height: 0;
 }
 
+.expertise-backdrop {
+  z-index: 380;
+}
+
+.expertise-panel {
+  max-width: 620px;
+  display: grid;
+  gap: 14px;
+}
+
+.onboarding-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.onboarding-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--heading-font);
+  font-size: 0.86rem;
+  color: var(--text-soft);
+  border: 1px solid color-mix(in oklab, var(--panel-border) 85%, transparent);
+  background: color-mix(in oklab, var(--panel-bg) 86%, black);
+}
+
+.onboarding-dot.is-active {
+  color: color-mix(in oklab, white 88%, var(--text-main));
+  border-color: color-mix(in oklab, var(--accent) 72%, var(--panel-border));
+  background: color-mix(in oklab, var(--accent) 46%, var(--panel-bg));
+}
+
+.onboarding-step {
+  display: grid;
+  gap: 10px;
+}
+
+.onboarding-summary {
+  border: 1px solid color-mix(in oklab, var(--panel-border) 82%, var(--accent) 18%);
+  border-radius: 12px;
+  padding: 12px;
+  background: color-mix(in oklab, var(--panel-bg-alt) 88%, black);
+}
+
+.onboarding-summary p {
+  margin: 0;
+}
+
+.expertise-options {
+  display: grid;
+  gap: 10px;
+}
+
+.expertise-option {
+  border: 1px solid color-mix(in oklab, var(--panel-border) 80%, var(--accent) 20%);
+  background: linear-gradient(150deg, color-mix(in oklab, var(--panel-bg-alt) 90%, black), color-mix(in oklab, var(--panel-bg) 92%, black));
+  border-radius: 14px;
+  color: var(--text-main);
+  text-align: left;
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 180ms ease;
+}
+
+.expertise-option:hover {
+  border-color: color-mix(in oklab, var(--accent) 56%, var(--panel-border));
+}
+
+.expertise-option.is-active {
+  border-color: color-mix(in oklab, var(--accent) 76%, var(--panel-border));
+  box-shadow: 0 10px 26px -16px color-mix(in oklab, var(--accent) 62%, transparent);
+  transform: translateY(-1px);
+}
+
+.expertise-option-title {
+  font-family: var(--heading-font);
+  font-size: 0.98rem;
+  letter-spacing: 0.01em;
+}
+
+.expertise-option-description {
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
+.expertise-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.expertise-error {
+  margin: 0;
+  color: color-mix(in oklab, #ff8e94 85%, var(--text-main));
+  font-size: 0.86rem;
+}
+
 .settings-control-grid {
   display: grid;
   gap: 10px;

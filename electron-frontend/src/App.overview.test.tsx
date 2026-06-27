@@ -53,6 +53,12 @@ const baseDesktopApi = {
       goal_met: false,
     },
   }),
+  applyExpertiseLevel: async (level: 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation') => ({
+    ok: true,
+    level,
+    seeded_cards: 0,
+    decks: [],
+  }),
   resetStudyDb: async () => ({ ok: true }),
   minimizeWindow: async () => ({ ok: true }),
   toggleMaximizeWindow: async () => ({ ok: true, isMaximized: false }),

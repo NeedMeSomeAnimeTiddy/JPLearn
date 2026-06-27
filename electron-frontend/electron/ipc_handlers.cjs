@@ -5,6 +5,7 @@ const {
   validateSessionId,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
+  validateExpertiseLevelInput,
 } = require('./ipc_security.cjs')
 
 function registerIpcHandlers(options) {
@@ -151,6 +152,17 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch session summary: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:apply-expertise-level', async (event, level) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedLevel = validateExpertiseLevelInput(level)
+    try {
+      return await options.runPythonBridgeWithArgs(['apply-expertise-level', validatedLevel])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to apply expertise level: ${detail}`)
     }
   })
 

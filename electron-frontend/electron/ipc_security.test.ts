@@ -5,6 +5,7 @@ const {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
   validateDeckSlug,
+  validateExpertiseLevelInput,
   validateSessionGoalPayload,
   validateSessionId,
   validateStartupThemeInput,
@@ -58,6 +59,9 @@ describe('ipc_security', () => {
 
     expect(validateStartupThemeInput('harbor_mist')).toBe('harbor_mist')
     expect(() => validateStartupThemeInput(42)).toThrow(/invalid startup theme/i)
+
+    expect(validateExpertiseLevelInput('total_beginner')).toBe('total_beginner')
+    expect(() => validateExpertiseLevelInput('expert')).toThrow(/invalid expertise level/i)
   })
 
   it('validates record game result payload and rejects malformed values', () => {

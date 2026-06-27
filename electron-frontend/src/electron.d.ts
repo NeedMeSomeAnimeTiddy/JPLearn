@@ -136,6 +136,7 @@ type DeckSlug =
   | 'vocab_n1'
   | 'grammar_patterns'
 type ScriptCurriculumSlug = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
+type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation'
 
 interface ScriptDeckPayload {
   slug: DeckSlug
@@ -255,6 +256,12 @@ interface DesktopApi {
     sessionId?: string
   }) => Promise<SessionGoalStartResponse>
   getSessionSummary: (sessionId: string) => Promise<SessionSummaryResponse>
+  applyExpertiseLevel: (level: ExpertiseLevel) => Promise<{
+    ok: boolean
+    level: ExpertiseLevel
+    seeded_cards: number
+    decks: string[]
+  }>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>

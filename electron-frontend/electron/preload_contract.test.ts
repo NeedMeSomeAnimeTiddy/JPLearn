@@ -22,6 +22,7 @@ describe('preload contract', () => {
       "recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload)",
       "startSessionGoal: (payload) => ipcRenderer.invoke('study:start-session-goal', payload)",
       "getSessionSummary: (sessionId) => ipcRenderer.invoke('study:get-session-summary', sessionId)",
+      "applyExpertiseLevel: (level) => ipcRenderer.invoke('study:apply-expertise-level', level)",
       "resetStudyDb: () => ipcRenderer.invoke('study:reset-db')",
       "notifyStartupReady: (payload) => ipcRenderer.invoke('ui:startup-ready', payload)",
       "setStartupTheme: (theme) => ipcRenderer.invoke('ui:set-startup-theme', theme)",
