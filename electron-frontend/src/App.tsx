@@ -146,6 +146,7 @@ type SettingsTabKey = 'theme' | 'background' | 'font_size' | 'animations' | 'tut
 const FEEDBACK_REVEAL_MS = 2100
 const ASSISTANT_EVENT_POLL_MS = 15000
 const ASSISTANT_TOAST_TTL_MS = 5200
+const ROUND_QUEUE_TIMEOUT_MS = 1200
 const ASSISTANT_MAX_TOASTS = 1
 const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
@@ -2269,8 +2270,19 @@ function App() {
     }
 
     try {
-      const queue = await window.jplearnDesktop.getStudyQueue(activeDeckSlug)
-      roundCycleRef.current = buildQueueCycle(queue, sourceCards)
+      // Keep round startup responsive even if queue IPC is temporarily slow.
+      const queuePromise = window.jplearnDesktop
+        .getStudyQueue(activeDeckSlug)
+        .catch(() => null)
+      const queue = await Promise.race<StudyQueueResponse | null>([
+        queuePromise,
+        new Promise<null>((resolve) => {
+          window.setTimeout(() => resolve(null), ROUND_QUEUE_TIMEOUT_MS)
+        }),
+      ])
+      roundCycleRef.current = queue
+        ? buildQueueCycle(queue, sourceCards)
+        : [...Array(sourceCards.length).keys()]
     } catch {
       roundCycleRef.current = [...Array(sourceCards.length).keys()]
     }
@@ -3547,6 +3559,15 @@ function App() {
     setSessionGoalError(null)
     setLastSessionSummary(null)
     setSessionRunReport(null)
+    setActiveSessionId(null)
+
+    setSessionScore(0)
+    setSessionRounds(0)
+    setSessionPoints(0)
+    setSessionConfidenceCount(0)
+    setSessionConfidenceTotal(0)
+    setLivesRemaining(DEFAULT_LIVES)
+
     try {
       const leechPool = activeBlockCards.filter((card) => card.is_leech)
       const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
@@ -3556,19 +3577,9 @@ function App() {
         : sourceCards
       const goalTargetItems = Math.max(1, Math.floor(sessionTargetItems))
 
-      try {
-        const goalResponse: SessionGoalStartResponse = await window.jplearnDesktop.startSessionGoal({
+      const goalRequest = window.jplearnDesktop.startSessionGoal({
           targetItems: goalTargetItems,
         })
-        if (!goalResponse.ok) {
-          setSessionGoalError('Unable to start session goal.')
-          return
-        }
-        setActiveSessionId(goalResponse.goal.session_id)
-      } catch (error: unknown) {
-        setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
-        return
-      }
 
       await hydrateRoundCycle(modeCards)
       const index = nextCardIndex(modeCards.length)
@@ -3595,15 +3606,23 @@ function App() {
       setRoundFeedbackAnswer(null)
       setIsRoundResolving(false)
       setGameError(null)
-      setLivesRemaining(DEFAULT_LIVES)
       setRoundConfidenceScore(3)
-      setSessionConfidenceCount(0)
-      setSessionConfidenceTotal(0)
-
-      if (sessionRounds === 0) {
-        setSessionScore(0)
-        setSessionPoints(0)
-      }
+      void goalRequest
+        .then((goalResponse: SessionGoalStartResponse) => {
+          if (!goalResponse.ok) {
+            setSessionGoalError('Unable to start session goal.')
+            return
+          }
+          setActiveSessionId(goalResponse.goal.session_id)
+        })
+        .catch((error: unknown) => {
+          setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
+        })
+    } catch (error: unknown) {
+      setSessionActive(false)
+      setRoundState(null)
+      setGameError(error instanceof Error ? error.message : 'Unable to start session.')
+      setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session.')
     } finally {
       setSessionStartPending(false)
     }
@@ -3616,7 +3635,6 @@ function App() {
     nextCardIndex,
     nextRoundMode,
     resetRoundCycle,
-    sessionRounds,
     sessionTargetItems,
   ])
 
