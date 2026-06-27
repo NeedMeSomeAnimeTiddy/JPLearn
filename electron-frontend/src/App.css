@@ -520,6 +520,7 @@ button {
 }
 
 .menu-card {
+  position: relative;
   text-align: left;
   border: 1px solid var(--card-border);
   background: linear-gradient(150deg, var(--card-bg-top), var(--card-bg-bottom));
@@ -535,6 +536,51 @@ button {
   cursor: pointer;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
   animation: enterUp 500ms ease both;
+}
+
+.menu-card-difficulty {
+  --difficulty-tone: var(--tone-ocean);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in oklab, var(--difficulty-tone) 58%, var(--card-border));
+  background: color-mix(in oklab, var(--difficulty-tone) 18%, var(--card-bg-top));
+  color: color-mix(in oklab, var(--difficulty-tone) 82%, white);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.menu-card-difficulty-icon {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
+.menu-card-difficulty-1 {
+  --difficulty-tone: var(--tone-teal);
+}
+
+.menu-card-difficulty-2 {
+  --difficulty-tone: var(--tone-ocean);
+}
+
+.menu-card-difficulty-3 {
+  --difficulty-tone: color-mix(in oklab, var(--tone-ocean) 55%, var(--tone-amber));
+}
+
+.menu-card-difficulty-4 {
+  --difficulty-tone: var(--tone-amber);
+}
+
+.menu-card-difficulty-5 {
+  --difficulty-tone: var(--tone-rose);
 }
 
 .menu-card:hover {

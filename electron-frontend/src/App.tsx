@@ -582,6 +582,14 @@ const SCRIPT_MENU_LINES: Record<ScriptKey, string> = {
   grammar_patterns: 'Practice conversational patterns and sentence flow.',
 }
 
+const SCRIPT_DIFFICULTY_META: Record<ScriptKey, { label: string; tier: 1 | 2 | 3 | 4 | 5; icon: LucideIcon }> = {
+  hiragana: { label: 'Easy', tier: 1, icon: BookText },
+  katakana: { label: 'Easy+', tier: 2, icon: Languages },
+  kanji_n5: { label: 'Medium', tier: 3, icon: Target },
+  vocab_n5: { label: 'Hard', tier: 4, icon: Flame },
+  grammar_patterns: { label: 'Expert', tier: 5, icon: Trophy },
+}
+
 const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }> = [
   {
     key: 'romaji_sprint',
@@ -3330,6 +3338,8 @@ function App() {
             <div className="menu-grid">
               {(['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns'] as const).map((script, index) => {
                 const glyph = SECTION_META[script].glyph
+                const difficulty = SCRIPT_DIFFICULTY_META[script]
+                const DifficultyIcon = difficulty.icon
 
                 return (
                   <button
@@ -3343,6 +3353,14 @@ function App() {
                       setView('script_hub')
                     }}
                   >
+                    <span
+                      className={`menu-card-difficulty menu-card-difficulty-${difficulty.tier}`}
+                      aria-label={`Difficulty: ${difficulty.label}`}
+                      title={`Difficulty: ${difficulty.label}`}
+                    >
+                      <DifficultyIcon className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
+                      <span>{difficulty.label}</span>
+                    </span>
                     <span className="menu-script-glyph" aria-hidden="true" lang="ja">{glyph}</span>
                     <strong>{SCRIPT_LABELS[script]}</strong>
                     <p>{SCRIPT_MENU_LINES[script]}</p>
