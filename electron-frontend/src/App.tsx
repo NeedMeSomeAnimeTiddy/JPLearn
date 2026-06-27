@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, Minus, Moon, Plus, RefreshCw, Settings, Shuffle, Square, Sun, Target, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, SendHorizontal, Settings, Shuffle, Square, Sun, Target, Trophy, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -65,6 +65,17 @@ interface AssistantToast {
   priority: AssistantEventPayload['priority']
   title: string
   body: string
+}
+interface AssistantChatTurn {
+  role: 'user' | 'assistant'
+  content: string
+  created_at_utc: string
+}
+interface AssistantChatRuntimeStatus {
+  loaded: boolean
+  loadedAtUtc: string | null
+  lastUsedAtUtc: string | null
+  inactivityUnloadMs: number
 }
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
@@ -1735,6 +1746,12 @@ function App() {
   const [assistantState, setAssistantState] = useState<AssistantStatePayload | null>(null)
   const [assistantProfile, setAssistantProfile] = useState<AssistantProfilePayload | null>(null)
   const [assistantToasts, setAssistantToasts] = useState<AssistantToast[]>([])
+  const [assistantChatOpen, setAssistantChatOpen] = useState(false)
+  const [assistantChatInput, setAssistantChatInput] = useState('')
+  const [assistantChatMessages, setAssistantChatMessages] = useState<AssistantChatTurn[]>([])
+  const [assistantChatLoading, setAssistantChatLoading] = useState(false)
+  const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
+  const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
 
   const [activeScript, setActiveScript] = useState<ScriptKey>('hiragana')
   const [activeGame, setActiveGame] = useState<MinigameKey>('romaji_sprint')
@@ -2282,6 +2299,94 @@ function App() {
       window.clearTimeout(timeoutHandle)
     }
   }, [assistantToasts])
+
+  const refreshAssistantChatHistory = useCallback(async () => {
+    const getAssistantChatHistory = window.jplearnDesktop.getAssistantChatHistory
+    if (!getAssistantChatHistory) {
+      return
+    }
+    try {
+      const response = await getAssistantChatHistory(20)
+      if (response.ok) {
+        setAssistantChatMessages(response.turns)
+      }
+    } catch {
+      // Chat history is optional and should never block study flow.
+    }
+  }, [])
+
+  const refreshAssistantChatStatus = useCallback(async () => {
+    const getAssistantChatRuntimeStatus = window.jplearnDesktop.getAssistantChatRuntimeStatus
+    if (!getAssistantChatRuntimeStatus) {
+      return
+    }
+    try {
+      const status = await getAssistantChatRuntimeStatus()
+      setAssistantChatStatus(status)
+    } catch {
+      // Runtime status is optional metadata.
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!assistantChatOpen) {
+      return
+    }
+
+    void refreshAssistantChatHistory()
+    void refreshAssistantChatStatus()
+
+    const statusPollHandle = window.setInterval(() => {
+      void refreshAssistantChatStatus()
+    }, 10000)
+
+    return () => {
+      window.clearInterval(statusPollHandle)
+    }
+  }, [assistantChatOpen, refreshAssistantChatHistory, refreshAssistantChatStatus])
+
+  const closeAssistantChat = useCallback(() => {
+    setAssistantChatOpen(false)
+    setAssistantChatError(null)
+    const unloadAssistantChatRuntime = window.jplearnDesktop.unloadAssistantChatRuntime
+    if (!unloadAssistantChatRuntime) {
+      return
+    }
+    void unloadAssistantChatRuntime().catch(() => undefined)
+  }, [])
+
+  const sendAssistantChat = useCallback(async () => {
+    const sendAssistantChatMessage = window.jplearnDesktop.sendAssistantChatMessage
+    if (!sendAssistantChatMessage) {
+      setAssistantChatError('Assistant chat runtime is unavailable in this build.')
+      return
+    }
+
+    const message = assistantChatInput.trim()
+    if (!message) {
+      return
+    }
+
+    setAssistantChatLoading(true)
+    setAssistantChatError(null)
+    try {
+      await sendAssistantChatMessage({
+        message,
+        context: {
+          mood: assistantState?.mood ?? 'coach_neutral',
+          focus_area: assistantState?.focus_area ?? 'general',
+          persona_style: assistantProfile?.persona_style ?? 'coach',
+        },
+      })
+      setAssistantChatInput('')
+      await refreshAssistantChatHistory()
+      await refreshAssistantChatStatus()
+    } catch (error: unknown) {
+      setAssistantChatError(error instanceof Error ? error.message : 'Unable to send assistant chat message.')
+    } finally {
+      setAssistantChatLoading(false)
+    }
+  }, [assistantChatInput, assistantProfile?.persona_style, assistantState?.focus_area, assistantState?.mood, refreshAssistantChatHistory, refreshAssistantChatStatus])
 
   useEffect(() => {
     let cancelled = false
@@ -6013,6 +6118,23 @@ function App() {
       ) : null}
 
       <aside className="assistant-overlay" aria-live="polite" aria-label="Tutor companion">
+        <div className="assistant-chat-controls">
+          <button
+            type="button"
+            className="assistant-chat-toggle"
+            onClick={() => {
+              setAssistantChatOpen((open) => !open)
+              setAssistantChatError(null)
+            }}
+            aria-expanded={assistantChatOpen}
+            aria-controls="assistant-chat-panel"
+            title="Open tutor chat"
+          >
+            <MessageCircle className="assistant-chat-toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+            Chat
+          </button>
+        </div>
+
         {assistantState ? (
           <div className="assistant-status-chip" role="status" aria-atomic="true">
             <Heart className="assistant-status-icon" strokeWidth={2.1} aria-hidden="true" />
@@ -6025,6 +6147,63 @@ function App() {
               </span>
             </div>
           </div>
+        ) : null}
+
+        {assistantChatOpen ? (
+          <section id="assistant-chat-panel" className="assistant-chat-panel" aria-label="Tutor chat panel">
+            <header className="assistant-chat-header">
+              <h3>Coach Chat</h3>
+              <div className="assistant-chat-header-actions">
+                <span className={`assistant-chat-runtime-pill ${assistantChatStatus?.loaded ? 'is-loaded' : 'is-idle'}`}>
+                  {assistantChatStatus?.loaded ? 'Runtime loaded' : 'Runtime idle'}
+                </span>
+                <button
+                  type="button"
+                  className="assistant-chat-close"
+                  onClick={closeAssistantChat}
+                  aria-label="Close tutor chat"
+                >
+                  <X size={14} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+              </div>
+            </header>
+
+            <div className="assistant-chat-log" role="log" aria-live="polite">
+              {assistantChatMessages.length <= 0 ? (
+                <p className="assistant-chat-empty">Start a chat when you want strategy help or encouragement.</p>
+              ) : (
+                assistantChatMessages.map((turn, index) => (
+                  <article key={`${turn.created_at_utc}-${index}`} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
+                    <h4>{turn.role === 'assistant' ? 'Coach' : 'You'}</h4>
+                    <p>{turn.content}</p>
+                  </article>
+                ))
+              )}
+            </div>
+
+            {assistantChatError ? (
+              <p className="assistant-chat-error">{assistantChatError}</p>
+            ) : null}
+
+            <footer className="assistant-chat-composer">
+              <textarea
+                value={assistantChatInput}
+                onChange={(event) => setAssistantChatInput(event.currentTarget.value)}
+                placeholder="Ask your coach for help with your current weak area..."
+                rows={2}
+                disabled={assistantChatLoading}
+              />
+              <button
+                type="button"
+                onClick={() => void sendAssistantChat()}
+                disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
+                aria-label="Send tutor chat message"
+              >
+                <SendHorizontal size={14} strokeWidth={2.2} aria-hidden="true" />
+                {assistantChatLoading ? 'Sending...' : 'Send'}
+              </button>
+            </footer>
+          </section>
         ) : null}
 
         {assistantToasts.length > 0 ? (
