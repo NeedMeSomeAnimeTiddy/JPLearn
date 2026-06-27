@@ -2070,6 +2070,8 @@ function App() {
   })
   const [kanjiOverviewPage, setKanjiOverviewPage] = useState<Partial<Record<JlptLevel, number>>>({})
   const [overviewBlocksLoading, setOverviewBlocksLoading] = useState(false)
+
+  const pageLoading = loading || gameLoading || overviewBlocksLoading
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [homeStudyPlanExpanded, setHomeStudyPlanExpanded] = useState(false)
@@ -4794,6 +4796,17 @@ function App() {
               } as CSSProperties}
             />
           ))}
+        </div>
+      ) : null}
+
+      {pageLoading ? (
+        <div className="page-loading-overlay" role="status" aria-label="Loading">
+          <div className="page-loading-widget">
+            <LoaderCircle className="page-loading-icon" aria-hidden="true" strokeWidth={2} />
+            <div className="page-loading-track">
+              <div className="page-loading-fill" />
+            </div>
+          </div>
         </div>
       ) : null}
 

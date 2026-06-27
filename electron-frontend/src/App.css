@@ -5073,6 +5073,66 @@ button {
   gap: 2px;
 }
 
+/* ── Page loading overlay ─────────────────────────────────────── */
+.page-loading-overlay {
+  position: absolute;
+  inset: 40px 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  pointer-events: none;
+}
+
+.page-loading-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 40px;
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--panel-bg) 85%, transparent);
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 36%, var(--panel-border));
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.35);
+}
+
+.page-loading-icon {
+  width: 26px;
+  height: 26px;
+  color: color-mix(in oklab, var(--tone-ocean) 80%, white);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.page-loading-track {
+  position: relative;
+  width: 180px;
+  height: 4px;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--tone-ocean) 16%, var(--panel-border));
+  overflow: hidden;
+}
+
+.page-loading-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 55%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, var(--tone-ocean), color-mix(in oklab, var(--tone-ocean) 70%, white));
+  animation: page-bar-run 1.4s ease-in-out infinite;
+}
+
+@keyframes page-bar-run {
+  0%   { left: -55%; }
+  100% { left: 110%; }
+}
+
 .settings-background-note {
   color: var(--text-soft);
   font-size: 0.72rem;
