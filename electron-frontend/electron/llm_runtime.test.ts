@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 
-const { createTutorChatRuntime } = require('./llm_runtime.cjs')
+const { createTutorChatRuntime, createAdapterRegistry } = require('./llm_runtime.cjs')
 
 describe('llm runtime', () => {
   it('uses stub provider by default', async () => {
@@ -31,5 +31,126 @@ describe('llm runtime', () => {
     expect(status.loaded).toBe(true)
     expect(status.activeProvider).toBe('stub-fallback')
     expect(typeof status.lastError).toBe('string')
+  })
+
+  it('supports swappable provider adapters via registry', async () => {
+    const registry = createAdapterRegistry()
+    registry.register('custom-provider', () => ({
+      async load() {
+        return undefined
+      },
+      async unload() {
+        return undefined
+      },
+      async infer(message) {
+        return {
+          text: `custom:${message}`,
+          provider: 'custom-provider',
+          model: 'custom-model',
+        }
+      },
+    }))
+
+    const runtime = createTutorChatRuntime({
+      provider: 'custom-provider',
+      adapterRegistry: registry,
+    })
+
+    const response = await runtime.sendMessage('hello coach')
+    expect(response.provider).toBe('custom-provider')
+    expect(response.model).toBe('custom-model')
+    expect(response.text).toContain('custom:hello coach')
+  })
+
+  it('enforces single active inference', async () => {
+    const gate = {
+      release: null,
+    }
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer() {
+          await new Promise((resolve) => {
+            gate.release = resolve
+          })
+          return {
+            text: 'first done',
+            provider: 'stub',
+            model: 'stub-model',
+          }
+        },
+      }),
+    })
+
+    const first = runtime.sendMessage('first')
+    while (!gate.release) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    await expect(runtime.sendMessage('second')).rejects.toThrow(/already active/i)
+    gate.release()
+    await expect(first).resolves.toMatchObject({ ok: true })
+  })
+
+  it('returns scripted fallback response when adapter inference fails', async () => {
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer() {
+          throw new Error('adapter boom')
+        },
+      }),
+    })
+
+    const response = await runtime.sendMessage('help with kanji', { focus_area: 'kanji_n5' })
+    expect(response.ok).toBe(true)
+    expect(response.provider).toBe('scripted-fallback')
+    expect(response.text).toMatch(/coach fallback/i)
+    expect(response.text.length).toBeLessThanOrEqual(700)
+  })
+
+  it('cancels active inference and reports cancellation', async () => {
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer(_message, _context, options) {
+          await new Promise((resolve, reject) => {
+            options.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+            setTimeout(resolve, 200)
+          })
+          return {
+            text: 'should not complete',
+            provider: 'stub',
+            model: 'stub',
+          }
+        },
+      }),
+    })
+
+    const pending = runtime.sendMessage('cancel me')
+    while (!runtime.getStatus().inferenceActive) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    const cancelPayload = await runtime.cancelActiveInference('test-cancel')
+    expect(cancelPayload.ok).toBe(true)
+    expect(cancelPayload.cancelled).toBe(true)
+    await expect(pending).resolves.toMatchObject({ ok: true, provider: 'scripted-fallback' })
   })
 })

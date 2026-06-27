@@ -351,6 +351,7 @@ interface DesktopApi {
     context?: Record<string, string>
   }) => Promise<AssistantChatRuntimeResponse>
   unloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string }>
+  cancelAssistantChatInference?: () => Promise<{ ok: boolean; cancelled: boolean; reason: string }>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>

@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getAssistantChatRuntimeStatus: () => ipcRenderer.invoke('assistant-chat:status'),
   sendAssistantChatMessage: (payload) => ipcRenderer.invoke('assistant-chat:send-message', payload),
   unloadAssistantChatRuntime: () => ipcRenderer.invoke('assistant-chat:unload'),
+  cancelAssistantChatInference: () => ipcRenderer.invoke('assistant-chat:cancel'),
   resetStudyDb: () => ipcRenderer.invoke('study:reset-db'),
   notifyStartupReady: (payload) => ipcRenderer.invoke('ui:startup-ready', payload),
   setStartupTheme: (theme) => ipcRenderer.invoke('ui:set-startup-theme', theme),

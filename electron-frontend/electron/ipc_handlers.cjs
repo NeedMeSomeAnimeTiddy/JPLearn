@@ -335,6 +335,16 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('assistant-chat:cancel', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await options.localTutorRuntime.cancelActiveInference('renderer-cancel')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to cancel assistant chat inference: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('window:minimize', (event) => {
     const win = assertTrustedIpcSender(event, trustedSenderOptions())
     if (win) win.minimize()

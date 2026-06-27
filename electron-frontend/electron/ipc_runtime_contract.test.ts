@@ -53,6 +53,7 @@ function createRegisteredHandlers(overrides = {}) {
       getStatus: vi.fn(() => ({ loaded: false, loadedAtUtc: null, lastUsedAtUtc: null, inactivityUnloadMs: 300000 })),
       sendMessage: vi.fn(async () => ({ ok: true, text: 'stub', provider: 'stub', model: 'stub', coldStart: false, elapsedMs: 0 })),
       unload: vi.fn(async () => ({ ok: true, reason: 'manual' })),
+      cancelActiveInference: vi.fn(async () => ({ ok: true, cancelled: false, reason: 'renderer-cancel' })),
     },
     isWindowExpanded: vi.fn(() => false),
     getSafeRestoreBounds: vi.fn(() => ({ x: 0, y: 0, width: 800, height: 600 })),
