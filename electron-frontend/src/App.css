@@ -5097,16 +5097,11 @@ button {
   box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.35);
 }
 
-.page-loading-icon {
-  width: 26px;
-  height: 26px;
+.page-loading-label {
+  font-size: 0.9rem;
+  font-weight: 500;
   color: color-mix(in oklab, var(--tone-ocean) 80%, white);
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  letter-spacing: 0.01em;
 }
 
 .page-loading-track {

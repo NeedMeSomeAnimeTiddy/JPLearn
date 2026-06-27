@@ -2072,6 +2072,7 @@ function App() {
   const [overviewBlocksLoading, setOverviewBlocksLoading] = useState(false)
 
   const pageLoading = loading || gameLoading || overviewBlocksLoading
+  const pageLoadingLabel = gameLoading ? 'Loading deck cards…' : overviewBlocksLoading ? 'Loading overview…' : 'Loading…'
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [homeStudyPlanExpanded, setHomeStudyPlanExpanded] = useState(false)
@@ -4800,9 +4801,9 @@ function App() {
       ) : null}
 
       {pageLoading ? (
-        <div className="page-loading-overlay" role="status" aria-label="Loading">
+        <div className="page-loading-overlay" role="status" aria-label={pageLoadingLabel}>
           <div className="page-loading-widget">
-            <LoaderCircle className="page-loading-icon" aria-hidden="true" strokeWidth={2} />
+            <span className="page-loading-label">{pageLoadingLabel}</span>
             <div className="page-loading-track">
               <div className="page-loading-fill" />
             </div>
