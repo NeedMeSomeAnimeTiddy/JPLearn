@@ -393,7 +393,7 @@ def test_track_assistant_event_persists_interaction(tmp_path: Path, monkeypatch)
 def test_get_assistant_chat_context_returns_compact_context(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
-    payload = desktop_bridge.get_assistant_chat_context()
+    payload = desktop_bridge.get_assistant_chat_context(user_message="need kanji help")
     assert payload["ok"] is True
 
     context = cast(dict[str, str], payload["context"])

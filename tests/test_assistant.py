@@ -438,3 +438,29 @@ def test_assistant_chat_context_assembler_exposes_required_context_tiers(tmp_pat
     assert expected_keys.issubset(context.keys())
     assert "style=coach" in context["persona"]
     assert context["memory"]
+
+
+def test_assistant_chat_context_prefers_relevant_memory_for_user_message(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    database.upsert_assistant_memory_fact("study.focus.kanji", "kanji confusion in compounds", source="test")
+    database.upsert_assistant_memory_fact("study.focus.vocab", "vocab ordering mistakes", source="test")
+    database.upsert_assistant_memory_fact("study.focus.grammar", "grammar tense slips", source="test")
+
+    context = study_pipeline.assemble_assistant_chat_context(user_message="help me with kanji")
+    assert "kanji" in context["memory"].lower()
+
+
+def test_prune_assistant_memory_facts_keeps_recent_entries_only(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    for index in range(30):
+        database.upsert_assistant_memory_fact(
+            fact_key=f"test.fact.{index}",
+            fact_value=f"value-{index}",
+            source="test",
+        )
+
+    database.prune_assistant_memory_facts(max_facts=12)
+    facts = database.load_assistant_memory_facts(limit=100)
+    assert len(facts) == 12

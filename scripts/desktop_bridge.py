@@ -609,11 +609,11 @@ def get_recent_chat_turns(limit: int = 20) -> dict[str, object]:
     }
 
 
-def get_assistant_chat_context(session_id: str | None = None) -> dict[str, object]:
+def get_assistant_chat_context(session_id: str | None = None, user_message: str | None = None) -> dict[str, object]:
     init_study_db()
     return {
         "ok": True,
-        "context": assemble_assistant_chat_context(session_id=session_id),
+        "context": assemble_assistant_chat_context(session_id=session_id, user_message=user_message),
     }
 
 
@@ -777,7 +777,8 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
 
     if command == "assistant-chat-context":
         session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
-        return 0, get_assistant_chat_context(session_id=session_id)
+        user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
+        return 0, get_assistant_chat_context(session_id=session_id, user_message=user_message)
 
     return 2, {"error": f"Unknown command: {command}"}
 

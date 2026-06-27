@@ -295,6 +295,7 @@ function registerIpcHandlers(options) {
         const contextResponse = await options.runPythonBridgeWithArgs([
           'assistant-chat-context',
           requestedSessionId,
+          validatedPayload.message,
         ])
         if (contextResponse && contextResponse.ok && contextResponse.context && typeof contextResponse.context === 'object') {
           assembledContext = contextResponse.context

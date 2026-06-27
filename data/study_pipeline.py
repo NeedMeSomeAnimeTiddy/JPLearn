@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timezone
 
 from data import database
@@ -15,6 +16,9 @@ from domain.mistakes import MistakeBreakdownRow
 from domain.scheduler import ReviewState, update
 from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState, apply_study_day
+
+PHASE3_CONTEXT_FACT_LIMIT = 4
+PHASE3_CONTEXT_SUMMARY_LIMIT = 2
 
 
 def _format_strengths(activity_week: ActivitySummary, streak: StreakState) -> str:
@@ -80,20 +84,90 @@ def _format_commitments() -> str:
     return "No outstanding assistant commitments logged."
 
 
-def _format_memory_rollup() -> str:
-    facts = database.load_assistant_memory_facts(limit=6)
-    summaries = database.load_recent_assistant_chat_summaries(limit=3)
+def _extract_query_terms(user_message: str | None) -> list[str]:
+    if not user_message:
+        return []
+    tokens = re.findall(r"[a-z0-9_]+", user_message.lower())
+    seen: list[str] = []
+    for token in tokens:
+        if len(token) < 3:
+            continue
+        if token in seen:
+            continue
+        seen.append(token)
+    return seen[:10]
+
+
+def _score_relevance(text: str, query_terms: list[str]) -> int:
+    if not query_terms:
+        return 0
+    lowered = text.lower()
+    return sum(1 for term in query_terms if term in lowered)
+
+
+def _select_relevant_facts(
+    facts: list[dict[str, str | int | None]],
+    query_terms: list[str],
+    max_items: int,
+) -> list[dict[str, str | int | None]]:
+    if max_items <= 0:
+        return []
+
+    ranked = sorted(
+        facts,
+        key=lambda fact: (
+            _score_relevance(f"{fact['fact_key']} {fact['fact_value']}", query_terms),
+            str(fact["updated_at_utc"]),
+        ),
+        reverse=True,
+    )
+    return ranked[:max_items]
+
+
+def _select_relevant_summaries(
+    summaries: list[dict[str, str | int]],
+    query_terms: list[str],
+    max_items: int,
+) -> list[dict[str, str | int]]:
+    if max_items <= 0:
+        return []
+
+    ranked = sorted(
+        summaries,
+        key=lambda summary: (
+            _score_relevance(
+                f"{summary.get('focus_tags', '')} {summary.get('latest_user_intent', '')} {summary.get('latest_coach_reply', '')}",
+                query_terms,
+            ),
+            str(summary.get("created_at_utc", "")),
+        ),
+        reverse=True,
+    )
+    return ranked[:max_items]
+
+
+def _format_memory_rollup(user_message: str | None = None) -> str:
+    query_terms = _extract_query_terms(user_message)
+    facts = database.load_assistant_memory_facts(limit=24)
+    summaries = database.load_recent_assistant_chat_summaries(limit=8)
+
+    selected_facts = _select_relevant_facts(facts, query_terms, PHASE3_CONTEXT_FACT_LIMIT)
+    selected_summaries = _select_relevant_summaries(
+        summaries,
+        query_terms,
+        PHASE3_CONTEXT_SUMMARY_LIMIT,
+    )
 
     fact_fragments = [
         f"{fact['fact_key']}={fact['fact_value']}"
-        for fact in facts
+        for fact in selected_facts
     ]
     summary_fragments = [
         (
             f"focus={summary.get('focus_tags', 'general')};"
             f"intent={summary.get('latest_user_intent', '')}"
         )
-        for summary in summaries
+        for summary in selected_summaries
     ]
 
     left = " | ".join(fact_fragments[:4]) if fact_fragments else "no semantic facts"
@@ -385,6 +459,7 @@ def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
         if focus_area:
             database.upsert_assistant_memory_fact("coach.commitment.focus_area", focus_area, source="events")
 
+    database.prune_assistant_memory_facts(max_facts=120)
     database.compact_assistant_chat_memory(max_turns=20, summary_batch_size=12, max_summaries=40)
 
     return {
@@ -452,7 +527,7 @@ def load_recent_assistant_chat_turns(limit: int = 20) -> list[dict[str, str]]:
     return database.load_recent_assistant_chat_turns(limit=limit)
 
 
-def assemble_assistant_chat_context(session_id: str | None = None) -> dict[str, str]:
+def assemble_assistant_chat_context(session_id: str | None = None, user_message: str | None = None) -> dict[str, str]:
     """Build deterministic, compact chat context from assistant memory tiers."""
     profile = database.load_assistant_profile()
     state = database.load_latest_assistant_state()
@@ -477,5 +552,5 @@ def assemble_assistant_chat_context(session_id: str | None = None) -> dict[str, 
         "weaknesses": _format_weaknesses(mistakes, leech_count),
         "recent_activity": _format_recent_activity(activity_week, item_history),
         "commitments": _format_commitments(),
-        "memory": _format_memory_rollup(),
+        "memory": _format_memory_rollup(user_message=user_message),
     }

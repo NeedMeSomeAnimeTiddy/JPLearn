@@ -1485,6 +1485,26 @@ def load_assistant_memory_facts(limit: int = 40) -> list[dict[str, str | int | N
     ]
 
 
+def prune_assistant_memory_facts(max_facts: int = 120) -> None:
+    """Enforce bounded semantic fact storage by keeping newest entries only."""
+    if max_facts <= 0:
+        raise ValueError("max_facts must be positive")
+
+    with _connect() as conn:
+        conn.execute(
+            """
+            DELETE FROM assistant_memory_facts
+            WHERE fact_key NOT IN (
+                SELECT fact_key
+                FROM assistant_memory_facts
+                ORDER BY updated_at_utc DESC, fact_key ASC
+                LIMIT ?
+            )
+            """,
+            (max_facts,),
+        )
+
+
 def append_assistant_chat_turn(role: str, content: str) -> None:
     """Persist a single assistant/user chat turn."""
     normalized_role = normalize_storage_text(role).lower()
