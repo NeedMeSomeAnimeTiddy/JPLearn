@@ -55,6 +55,63 @@ SCRIPTED_CONTENT_REGISTRY: dict[str, dict[str, str]] = {
     },
 }
 
+SCRIPTED_RECOMMENDATION_PAYLOADS: dict[str, dict[str, str]] = {
+    "rec.short_follow_up_session": {
+        "action_type": "follow_up",
+        "target_mode": "interleave_mix",
+        "suggested_rounds": "8",
+        "suggested_minutes": "6",
+    },
+    "rec.protect_streak_chain": {
+        "action_type": "streak_keepalive",
+        "target_mode": "meaning_match",
+        "suggested_rounds": "5",
+        "suggested_minutes": "5",
+    },
+    "rec.typed_recall_focus": {
+        "action_type": "recovery_drill",
+        "target_mode": "typed_recall",
+        "suggested_rounds": "10",
+        "suggested_minutes": "10",
+    },
+    "rec.focused_block_retry": {
+        "action_type": "focused_retry",
+        "target_mode": "meaning_match",
+        "suggested_rounds": "8",
+        "suggested_minutes": "8",
+    },
+    "rec.context_cloze_recovery": {
+        "action_type": "curriculum_recovery",
+        "target_mode": "context_cloze",
+        "suggested_rounds": "7",
+        "suggested_minutes": "9",
+    },
+    "rec.short_reminder_session": {
+        "action_type": "consistency_nudge",
+        "target_mode": "interleave_mix",
+        "suggested_rounds": "6",
+        "suggested_minutes": "5",
+    },
+    "rec.recovery_loop": {
+        "action_type": "session_recovery",
+        "target_mode": "typed_recall",
+        "suggested_rounds": "9",
+        "suggested_minutes": "10",
+    },
+    "rec.stretch_goal_push": {
+        "action_type": "stretch_push",
+        "target_mode": "interleave_mix",
+        "suggested_rounds": "12",
+        "suggested_minutes": "12",
+    },
+    "rec.maintain_consistency": {
+        "action_type": "steady_progress",
+        "target_mode": "meaning_match",
+        "suggested_rounds": "5",
+        "suggested_minutes": "5",
+    },
+}
+
 
 @dataclass(frozen=True)
 class AssistantState:
@@ -168,7 +225,13 @@ def _create_scripted_event(
     metadata: dict[str, str],
 ) -> AssistantEvent:
     registry = SCRIPTED_CONTENT_REGISTRY[event_type]
-    normalized_metadata = {**metadata, "recommendation_key": registry["recommendation_key"]}
+    recommendation_key = registry["recommendation_key"]
+    recommendation_payload = SCRIPTED_RECOMMENDATION_PAYLOADS.get(recommendation_key, {})
+    normalized_metadata = {
+        **metadata,
+        "recommendation_key": recommendation_key,
+        **recommendation_payload,
+    }
     return AssistantEvent(
         event_type=event_type,
         priority=priority,

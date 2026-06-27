@@ -1722,6 +1722,18 @@ function formatAssistantEventTitle(event: AssistantEventPayload): string {
 }
 
 function formatAssistantRecommendation(event: AssistantEventPayload): string {
+  const actionType = event.metadata.action_type ?? ''
+  const targetMode = event.metadata.target_mode ?? 'review'
+  const suggestedRounds = event.metadata.suggested_rounds ?? ''
+  const suggestedMinutes = event.metadata.suggested_minutes ?? ''
+
+  if (actionType) {
+    const roundsLabel = suggestedRounds ? `${suggestedRounds} rounds` : 'a short set'
+    const minutesLabel = suggestedMinutes ? `${suggestedMinutes} min` : 'quick run'
+    const modeLabel = targetMode.replace(/_/g, ' ')
+    return `Next: ${roundsLabel} in ${modeLabel} (${minutesLabel}).`
+  }
+
   const recommendation = event.metadata.recommendation_key ?? ''
   if (recommendation === 'rec.short_follow_up_session') {
     return 'Next: run one short follow-up set to lock retention.'

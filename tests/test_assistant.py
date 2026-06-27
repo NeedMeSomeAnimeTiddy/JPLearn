@@ -117,6 +117,8 @@ def test_evaluate_assistant_events_emits_goal_and_streak() -> None:
     assert "session_goal_met" in event_types
     assert "streak_milestone" in event_types
     assert all(event.dedup_key for event in events)
+    assert all("action_type" in event.metadata for event in events)
+    assert all("target_mode" in event.metadata for event in events)
 
 
 def test_evaluate_assistant_events_respects_recent_dedup_keys() -> None:
@@ -246,6 +248,9 @@ def test_evaluate_assistant_events_emits_session_recovery_for_missed_goal() -> N
     )
 
     assert any(event.event_type == "session_recovery" for event in events)
+    recovery_event = next(event for event in events if event.event_type == "session_recovery")
+    assert recovery_event.metadata["action_type"] == "session_recovery"
+    assert recovery_event.metadata["target_mode"] == "typed_recall"
 
 
 def test_evaluate_assistant_events_emits_momentum_encouragement() -> None:
