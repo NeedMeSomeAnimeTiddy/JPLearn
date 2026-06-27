@@ -17,6 +17,90 @@ from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState, apply_study_day
 
 
+def _format_strengths(activity_week: ActivitySummary, streak: StreakState) -> str:
+    if activity_week.accuracy >= 82 and activity_week.reviewed >= 20:
+        return "High recent consistency and accuracy in review flow."
+    if streak.current_streak_days >= 5:
+        return f"Reliable study rhythm with {streak.current_streak_days}-day streak."
+    if activity_week.points_earned >= 20:
+        return "Solid momentum with steady points earned this week."
+    return "Early momentum in progress; preserve daily study cadence."
+
+
+def _format_weaknesses(mistakes: list[MistakeBreakdownRow], leech_count: int) -> str:
+    weakest = mistakes[0] if mistakes else None
+    if weakest is None:
+        if leech_count > 0:
+            return f"Leech pressure remains active ({leech_count} cards)."
+        return "No acute weak area detected in current window."
+
+    suffix = f"; {leech_count} leech cards active" if leech_count > 0 else ""
+    return f"Weakest area: {weakest.key} ({weakest.error_rate}% error){suffix}."
+
+
+def _format_recent_activity(activity_week: ActivitySummary, item_history: list[ItemHistory]) -> str:
+    recent_items = ", ".join(f"{item.script_tag}:{item.trend}" for item in item_history[:3])
+    if not recent_items:
+        recent_items = "no recent item trend snapshots"
+    return (
+        f"7d reviewed={activity_week.reviewed}, accuracy={activity_week.accuracy}%, "
+        f"active_days={activity_week.active_days}; trends={recent_items}"
+    )
+
+
+def _format_goals(session_summary: SessionSummary | None) -> str:
+    if session_summary is None:
+        return "No active session goal context in memory."
+    status = "met" if session_summary.goal_met else "in-progress"
+    return (
+        f"Session {session_summary.session_id} {status}: completed={session_summary.completed_items}/"
+        f"{session_summary.target_items}, accuracy={session_summary.accuracy}%"
+    )
+
+
+def _format_commitments() -> str:
+    commitments = database.load_recent_assistant_commitments(limit=3)
+    if commitments:
+        encoded = [
+            f"{item['action_type'] or 'action'}:{item['target_mode'] or 'mode'}:{item['focus_area'] or 'general'}"
+            for item in commitments
+        ]
+        return "; ".join(encoded)
+
+    facts = database.load_assistant_memory_facts(limit=20)
+    fact_map = {
+        str(fact["fact_key"]): str(fact["fact_value"])
+        for fact in facts
+    }
+    action = fact_map.get("coach.commitment.action", "")
+    target = fact_map.get("coach.commitment.target_mode", "")
+    focus = fact_map.get("coach.commitment.focus_area", "")
+    if action or target or focus:
+        return f"{action or 'action'}:{target or 'mode'}:{focus or 'general'}"
+    return "No outstanding assistant commitments logged."
+
+
+def _format_memory_rollup() -> str:
+    facts = database.load_assistant_memory_facts(limit=6)
+    summaries = database.load_recent_assistant_chat_summaries(limit=3)
+
+    fact_fragments = [
+        f"{fact['fact_key']}={fact['fact_value']}"
+        for fact in facts
+    ]
+    summary_fragments = [
+        (
+            f"focus={summary.get('focus_tags', 'general')};"
+            f"intent={summary.get('latest_user_intent', '')}"
+        )
+        for summary in summaries
+    ]
+
+    left = " | ".join(fact_fragments[:4]) if fact_fragments else "no semantic facts"
+    right = " | ".join(summary_fragments[:2]) if summary_fragments else "no chat summaries"
+    return f"facts[{left}] summaries[{right}]"
+
+
 def init_study_db() -> None:
     """Ensure review-flow tables exist."""
     database.init_db()
@@ -269,7 +353,19 @@ def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
 
     database.upsert_assistant_memory_fact("coach.focus_area", state.focus_area, source="snapshot")
     database.upsert_assistant_memory_fact("coach.last_major_event", state.last_major_event, source="snapshot")
+    database.upsert_assistant_memory_fact("coach.mood", state.mood, source="snapshot")
+    database.upsert_assistant_memory_fact("coach.momentum", str(state.momentum), source="snapshot")
+    database.upsert_assistant_memory_fact("coach.confidence", str(state.confidence_level), source="snapshot")
     database.upsert_assistant_memory_fact("study.streak_days", str(streak.current_streak_days), source="signals")
+    database.upsert_assistant_memory_fact("study.week_reviewed", str(activity_week.reviewed), source="signals")
+    database.upsert_assistant_memory_fact("study.week_accuracy", str(activity_week.accuracy), source="signals")
+    database.upsert_assistant_memory_fact("study.activity_days_7d", str(activity_week.active_days), source="signals")
+    database.upsert_assistant_memory_fact("study.leech_count", str(leech_count), source="signals")
+    database.upsert_assistant_memory_fact(
+        "study.curriculum_accuracy_7d",
+        str(curriculum_summary["accuracy_7d"]),
+        source="signals",
+    )
     if mistakes:
         database.upsert_assistant_memory_fact("study.weakest_bucket", mistakes[0].key, source="signals")
         database.upsert_assistant_memory_fact(
@@ -277,6 +373,19 @@ def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
             str(mistakes[0].error_rate),
             source="signals",
         )
+    if events:
+        top_event = events[0]
+        action_type = top_event.metadata.get("action_type", "")
+        target_mode = top_event.metadata.get("target_mode", "")
+        focus_area = top_event.metadata.get("focus_area", state.focus_area)
+        if action_type:
+            database.upsert_assistant_memory_fact("coach.commitment.action", action_type, source="events")
+        if target_mode:
+            database.upsert_assistant_memory_fact("coach.commitment.target_mode", target_mode, source="events")
+        if focus_area:
+            database.upsert_assistant_memory_fact("coach.commitment.focus_area", focus_area, source="events")
+
+    database.compact_assistant_chat_memory(max_turns=20, summary_batch_size=12, max_summaries=40)
 
     return {
         "profile": profile,
@@ -335,9 +444,38 @@ def track_assistant_event_interaction(
 def append_assistant_chat_turn(role: str, content: str) -> None:
     """Persist one local tutor chat turn and enforce minimal retention."""
     database.append_assistant_chat_turn(role, content)
-    database.trim_assistant_chat_turns(max_turns=20)
+    database.compact_assistant_chat_memory(max_turns=20, summary_batch_size=12, max_summaries=40)
 
 
 def load_recent_assistant_chat_turns(limit: int = 20) -> list[dict[str, str]]:
     """Load recent local tutor chat turns for context assembly."""
     return database.load_recent_assistant_chat_turns(limit=limit)
+
+
+def assemble_assistant_chat_context(session_id: str | None = None) -> dict[str, str]:
+    """Build deterministic, compact chat context from assistant memory tiers."""
+    profile = database.load_assistant_profile()
+    state = database.load_latest_assistant_state()
+    streak = database.load_streak_state()
+    activity_week = database.load_activity_summary(7)
+    mistakes = database.load_mistake_breakdown(limit=3)
+    leech_count = database.load_active_leech_count()
+    item_history = load_item_history(limit_items=4, events_per_item=3)
+    session_summary = database.load_session_summary(session_id) if session_id else None
+
+    emotional_state = (
+        f"mood={state.mood}, momentum={state.momentum}, confidence={state.confidence_level}, focus={state.focus_area}"
+        if state is not None
+        else "mood=coach_neutral, momentum=0, confidence=50, focus=general"
+    )
+
+    return {
+        "persona": f"style={profile['persona_style']}, backend={profile['llm_backend']}",
+        "emotional_state": emotional_state,
+        "goals": _format_goals(session_summary),
+        "strengths": _format_strengths(activity_week, streak),
+        "weaknesses": _format_weaknesses(mistakes, leech_count),
+        "recent_activity": _format_recent_activity(activity_week, item_history),
+        "commitments": _format_commitments(),
+        "memory": _format_memory_rollup(),
+    }

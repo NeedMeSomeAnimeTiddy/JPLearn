@@ -286,7 +286,28 @@ function registerIpcHandlers(options) {
     }
 
     try {
-      const response = await options.localTutorRuntime.sendMessage(validatedPayload.message, validatedPayload.context)
+      let assembledContext = {}
+      try {
+        const requestedSessionId =
+          typeof validatedPayload.context?.session_id === 'string'
+            ? validatedPayload.context.session_id.trim()
+            : ''
+        const contextResponse = await options.runPythonBridgeWithArgs([
+          'assistant-chat-context',
+          requestedSessionId,
+        ])
+        if (contextResponse && contextResponse.ok && contextResponse.context && typeof contextResponse.context === 'object') {
+          assembledContext = contextResponse.context
+        }
+      } catch {
+        // Fallback to renderer-provided context when context assembly fails.
+      }
+
+      const runtimeContext = {
+        ...assembledContext,
+        ...validatedPayload.context,
+      }
+      const response = await options.localTutorRuntime.sendMessage(validatedPayload.message, runtimeContext)
       try {
         await options.runPythonBridgeWithArgs([
           'assistant-chat-append',

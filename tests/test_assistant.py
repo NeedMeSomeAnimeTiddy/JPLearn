@@ -382,3 +382,59 @@ def test_study_pipeline_assistant_snapshot(tmp_path: Path, monkeypatch) -> None:
     assert snapshot["profile"]["llm_backend"] == "llama.cpp"
     assert "state" in snapshot
     assert isinstance(snapshot["events"], list)
+
+
+def test_assistant_chat_memory_compaction_creates_summaries(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    for index in range(30):
+        role = "user" if index % 2 == 0 else "assistant"
+        content = "Need help with kanji and streak goals" if role == "user" else "Next: run typed recall"
+        study_pipeline.append_assistant_chat_turn(role, content)
+
+    turns = study_pipeline.load_recent_assistant_chat_turns(limit=100)
+    assert len(turns) <= 20
+
+    summaries = database.load_recent_assistant_chat_summaries(limit=5)
+    assert summaries
+    assert "focus_tags" in summaries[0]
+
+
+def test_assistant_chat_context_assembler_exposes_required_context_tiers(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    database.log_review("Hiragana", 1, 4, script_tag="hiragana", prompt_text="あ")
+    database.log_review("Kanji N5", 2, 1, script_tag="kanji_n5", prompt_text="学")
+    study_pipeline.load_assistant_snapshot()
+
+    database.log_assistant_event_interaction(
+        event_id=1,
+        interaction_type="clicked",
+        metadata={
+            "action_type": "session_recovery",
+            "target_mode": "typed_recall",
+            "focus_area": "kanji_n5",
+        },
+    )
+
+    for index in range(10):
+        study_pipeline.append_assistant_chat_turn(
+            "user" if index % 2 == 0 else "assistant",
+            "Need context cloze support" if index % 2 == 0 else "Try one short cloze loop.",
+        )
+
+    context = study_pipeline.assemble_assistant_chat_context()
+
+    expected_keys = {
+        "persona",
+        "emotional_state",
+        "goals",
+        "strengths",
+        "weaknesses",
+        "recent_activity",
+        "commitments",
+        "memory",
+    }
+    assert expected_keys.issubset(context.keys())
+    assert "style=coach" in context["persona"]
+    assert context["memory"]

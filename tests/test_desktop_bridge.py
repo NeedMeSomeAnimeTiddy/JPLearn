@@ -390,6 +390,18 @@ def test_track_assistant_event_persists_interaction(tmp_path: Path, monkeypatch)
     assert metadata["target_mode"] == "context_cloze"
 
 
+def test_get_assistant_chat_context_returns_compact_context(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.get_assistant_chat_context()
+    assert payload["ok"] is True
+
+    context = cast(dict[str, str], payload["context"])
+    assert "persona" in context
+    assert "emotional_state" in context
+    assert "memory" in context
+
+
 def test_record_game_result_contract_shape(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

@@ -24,6 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from data.study_pipeline import (
     append_assistant_chat_turn,
+    assemble_assistant_chat_context,
     consume_assistant_events,
     init_study_db,
     load_activity_summary,
@@ -608,6 +609,14 @@ def get_recent_chat_turns(limit: int = 20) -> dict[str, object]:
     }
 
 
+def get_assistant_chat_context(session_id: str | None = None) -> dict[str, object]:
+    init_study_db()
+    return {
+        "ok": True,
+        "context": assemble_assistant_chat_context(session_id=session_id),
+    }
+
+
 def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
     if not argv:
         return 2, {"error": "Missing command"}
@@ -765,6 +774,10 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         except ValueError as exc:
             return 2, {"error": str(exc)}
         return 0, get_recent_chat_turns(limit=limit)
+
+    if command == "assistant-chat-context":
+        session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
+        return 0, get_assistant_chat_context(session_id=session_id)
 
     return 2, {"error": f"Unknown command: {command}"}
 

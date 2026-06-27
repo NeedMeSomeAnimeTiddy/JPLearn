@@ -24,7 +24,8 @@ MIGRATION_V3 = 3
 MIGRATION_V4 = 4
 MIGRATION_V5 = 5
 MIGRATION_V6 = 6
-LATEST_SCHEMA_VERSION = 6
+MIGRATION_V7 = 7
+LATEST_SCHEMA_VERSION = 7
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -299,6 +300,26 @@ def _migration_0006(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0007(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS assistant_chat_summaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            start_turn_id INTEGER NOT NULL,
+            end_turn_id INTEGER NOT NULL,
+            summary_json TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_assistant_chat_summaries_turn_window
+        ON assistant_chat_summaries (start_turn_id, end_turn_id)
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -306,6 +327,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V4: _migration_0004,
     MIGRATION_V5: _migration_0005,
     MIGRATION_V6: _migration_0006,
+    MIGRATION_V7: _migration_0007,
 }
 
 
@@ -355,6 +377,7 @@ def reset_db() -> None:
         conn.execute("DELETE FROM assistant_chat_turns")
         conn.execute("DELETE FROM assistant_memory_facts")
         conn.execute("DELETE FROM assistant_event_interactions")
+        conn.execute("DELETE FROM assistant_chat_summaries")
 
 
 def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
@@ -1506,6 +1529,187 @@ def load_recent_assistant_chat_turns(limit: int = 20) -> list[dict[str, str]]:
     ]
 
 
+def _clip_compact_text(value: str, max_chars: int = 72) -> str:
+    if max_chars <= 3:
+        raise ValueError("max_chars must be greater than 3")
+    normalized = normalize_japanese_text(value)
+    if len(normalized) <= max_chars:
+        return normalized
+    return normalized[: max_chars - 3] + "..."
+
+
+def _derive_focus_tags(turns: list[dict[str, str]]) -> str:
+    keyword_map = {
+        "kanji": "kanji",
+        "vocab": "vocab",
+        "grammar": "grammar",
+        "streak": "streak",
+        "goal": "goal",
+        "accuracy": "accuracy",
+        "typed": "typed_recall",
+        "cloze": "context_cloze",
+        "story": "narrative",
+        "leech": "leech",
+    }
+    seen: list[str] = []
+    for turn in turns:
+        text = str(turn["content"]).lower()
+        for token, tag in keyword_map.items():
+            if token in text and tag not in seen:
+                seen.append(tag)
+    if not seen:
+        return "general"
+    return ", ".join(seen[:3])
+
+
+def _summarize_chat_turns(turns: list[dict[str, str]]) -> dict[str, str]:
+    if not turns:
+        raise ValueError("turns must not be empty")
+
+    user_turns = [turn for turn in turns if turn["role"] == "user"]
+    assistant_turns = [turn for turn in turns if turn["role"] == "assistant"]
+    latest_user = user_turns[-1]["content"] if user_turns else ""
+    latest_assistant = assistant_turns[-1]["content"] if assistant_turns else ""
+
+    return {
+        "window": f"{turns[0]['created_at_utc']}..{turns[-1]['created_at_utc']}",
+        "user_turns": str(len(user_turns)),
+        "assistant_turns": str(len(assistant_turns)),
+        "focus_tags": _derive_focus_tags(turns),
+        "latest_user_intent": _clip_compact_text(latest_user, max_chars=90) if latest_user else "",
+        "latest_coach_reply": _clip_compact_text(latest_assistant, max_chars=90) if latest_assistant else "",
+    }
+
+
+def load_recent_assistant_chat_summaries(limit: int = 6) -> list[dict[str, str | int]]:
+    """Return recent compacted chat summaries ordered newest first."""
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, start_turn_id, end_turn_id, summary_json, created_at_utc
+            FROM assistant_chat_summaries
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    summaries: list[dict[str, str | int]] = []
+    for row in rows:
+        payload = json.loads(str(row["summary_json"]))
+        normalized_payload = {str(key): str(value) for key, value in payload.items()}
+        summaries.append(
+            {
+                "id": int(row["id"]),
+                "start_turn_id": int(row["start_turn_id"]),
+                "end_turn_id": int(row["end_turn_id"]),
+                "created_at_utc": str(row["created_at_utc"]),
+                **normalized_payload,
+            }
+        )
+    return summaries
+
+
+def compact_assistant_chat_memory(
+    max_turns: int = 20,
+    summary_batch_size: int = 12,
+    max_summaries: int = 40,
+) -> None:
+    """Summarize oldest chat turns and enforce bounded chat storage."""
+    if max_turns <= 0:
+        raise ValueError("max_turns must be positive")
+    if summary_batch_size <= 0:
+        raise ValueError("summary_batch_size must be positive")
+    if max_summaries <= 0:
+        raise ValueError("max_summaries must be positive")
+
+    with _connect() as conn:
+        total_turns_row = conn.execute("SELECT COUNT(*) AS count FROM assistant_chat_turns").fetchone()
+        total_turns = int(total_turns_row["count"]) if total_turns_row is not None else 0
+        overflow = total_turns - max_turns
+        if overflow > 0:
+            rows = conn.execute(
+                """
+                SELECT id, role, content, created_at_utc
+                FROM assistant_chat_turns
+                ORDER BY id ASC
+                LIMIT ?
+                """,
+                (overflow,),
+            ).fetchall()
+
+            turns_to_compact = [
+                {
+                    "id": int(row["id"]),
+                    "role": str(row["role"]),
+                    "content": str(row["content"]),
+                    "created_at_utc": str(row["created_at_utc"]),
+                }
+                for row in rows
+            ]
+
+            if turns_to_compact:
+                batches: list[list[dict[str, str | int]]] = []
+                current: list[dict[str, str | int]] = []
+                for turn in turns_to_compact:
+                    current.append(turn)
+                    if len(current) >= summary_batch_size:
+                        batches.append(current)
+                        current = []
+                if current:
+                    batches.append(current)
+
+                for batch in batches:
+                    start_turn_id = int(batch[0]["id"])
+                    end_turn_id = int(batch[-1]["id"])
+                    summary_payload = _summarize_chat_turns(
+                        [
+                            {
+                                "role": str(item["role"]),
+                                "content": str(item["content"]),
+                                "created_at_utc": str(item["created_at_utc"]),
+                            }
+                            for item in batch
+                        ]
+                    )
+                    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                    conn.execute(
+                        """
+                        INSERT INTO assistant_chat_summaries (start_turn_id, end_turn_id, summary_json, created_at_utc)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (
+                            start_turn_id,
+                            end_turn_id,
+                            json.dumps(summary_payload, ensure_ascii=False, sort_keys=True),
+                            created_at,
+                        ),
+                    )
+
+                delete_ids = [int(turn["id"]) for turn in turns_to_compact]
+                placeholders = ",".join("?" for _ in delete_ids)
+                conn.execute(
+                    f"DELETE FROM assistant_chat_turns WHERE id IN ({placeholders})",
+                    delete_ids,
+                )
+
+        conn.execute(
+            """
+            DELETE FROM assistant_chat_summaries
+            WHERE id NOT IN (
+                SELECT id
+                FROM assistant_chat_summaries
+                ORDER BY id DESC
+                LIMIT ?
+            )
+            """,
+            (max_summaries,),
+        )
+
+
 def trim_assistant_chat_turns(max_turns: int = 20) -> None:
     """Keep only the latest ``max_turns`` chat turns for minimal retention."""
     if max_turns <= 0:
@@ -1559,3 +1763,50 @@ def log_assistant_event_interaction(
                 created_at,
             ),
         )
+
+
+def load_recent_assistant_commitments(limit: int = 4) -> list[dict[str, str]]:
+    """Load recently accepted assistant actions from click interactions."""
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT ai.metadata_json AS interaction_metadata, ae.metadata_json AS event_metadata, ai.created_at_utc
+            FROM assistant_event_interactions ai
+            LEFT JOIN assistant_events ae ON ae.id = ai.event_id
+            WHERE ai.interaction_type='clicked'
+            ORDER BY ai.id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    commitments: list[dict[str, str]] = []
+    for row in rows:
+        interaction_meta = {
+            str(key): str(value)
+            for key, value in json.loads(str(row["interaction_metadata"])).items()
+        }
+        event_meta_raw = row["event_metadata"]
+        event_meta = (
+            {str(key): str(value) for key, value in json.loads(str(event_meta_raw)).items()}
+            if event_meta_raw
+            else {}
+        )
+        merged = {**event_meta, **interaction_meta}
+        action_type = merged.get("action_type", "")
+        target_mode = merged.get("target_mode", "")
+        focus_area = merged.get("focus_area", "")
+        if not (action_type or target_mode or focus_area):
+            continue
+        commitments.append(
+            {
+                "action_type": action_type,
+                "target_mode": target_mode,
+                "focus_area": focus_area,
+                "created_at_utc": str(row["created_at_utc"]),
+            }
+        )
+    return commitments
