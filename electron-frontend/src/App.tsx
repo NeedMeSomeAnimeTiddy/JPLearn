@@ -2595,15 +2595,12 @@ function App() {
     setAssistantChatWarmup(false)
     setAssistantChatFallbackNote(null)
     setAssistantChatMessages([])
+    // Clear stored conversation so reopening starts fresh, but keep the local
+    // model server warm so the next message stays fast.
     const clearAssistantChatHistory = window.jplearnDesktop.clearAssistantChatHistory
     if (clearAssistantChatHistory) {
       void clearAssistantChatHistory().catch(() => undefined)
     }
-    const unloadAssistantChatRuntime = window.jplearnDesktop.unloadAssistantChatRuntime
-    if (!unloadAssistantChatRuntime) {
-      return
-    }
-    void unloadAssistantChatRuntime().catch(() => undefined)
   }, [])
 
   const cancelAssistantChatInference = useCallback(async () => {

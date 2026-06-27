@@ -1,6 +1,8 @@
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
+const http = require('node:http')
+const net = require('node:net')
 
 const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
 const DEFAULT_LLAMACPP_TIMEOUT_MS = 90000
@@ -27,10 +29,10 @@ const DEFAULT_TUTOR_SYSTEM_PROMPT = [
   '- For grammar questions: meaning, structure, one example sentence, and one short practice prompt.',
 ].join('\n')
 
-function resolveBundledLlamaCppPath() {
+function resolveBundledLlamaServerPath() {
   const candidates = [
-    path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-cli.exe'),
-    path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'llama-cli.exe'),
+    path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-server.exe'),
+    path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'llama-server.exe'),
   ]
   return candidates.find((candidate) => fs.existsSync(candidate)) || ''
 }
@@ -171,20 +173,108 @@ function buildScriptedFallbackResponse(message, context = {}, detail = '') {
   }
 }
 
-function createLlamaCppCliAdapter(config = {}) {
+function findFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer()
+    probe.unref()
+    probe.on('error', reject)
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address()
+      const resolvedPort = address && typeof address === 'object' ? address.port : 0
+      probe.close(() => resolve(resolvedPort))
+    })
+  })
+}
+
+function httpRequestJson(requestOptions, payload, signal) {
+  return new Promise((resolve, reject) => {
+    const data = payload ? Buffer.from(JSON.stringify(payload), 'utf8') : null
+    const req = http.request(requestOptions, (res) => {
+      let raw = ''
+      res.setEncoding('utf8')
+      res.on('data', (chunk) => {
+        raw += chunk
+      })
+      res.on('end', () => resolve({ status: res.statusCode || 0, body: raw }))
+    })
+    req.on('error', (error) => reject(error))
+    if (signal && typeof signal.addEventListener === 'function') {
+      const onAbort = () => req.destroy(new InferenceAbortError())
+      if (signal.aborted) {
+        onAbort()
+      } else {
+        signal.addEventListener('abort', onAbort, { once: true })
+      }
+    }
+    if (data) {
+      req.setHeader('Content-Type', 'application/json')
+      req.setHeader('Content-Length', data.length)
+      req.write(data)
+    }
+    req.end()
+  })
+}
+
+function stripThinkTags(rawText) {
+  return String(rawText || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<think>[\s\S]*$/i, '')
+    .trim()
+}
+
+function createLlamaServerAdapter(config = {}) {
   const executablePath = typeof config.executablePath === 'string' ? config.executablePath.trim() : ''
   const modelPath = typeof config.modelPath === 'string' ? config.modelPath.trim() : ''
-  const timeoutMs = Number.isFinite(config.timeoutMs)
+  const requestTimeoutMs = Number.isFinite(config.timeoutMs)
     ? Math.max(5000, Math.floor(config.timeoutMs))
     : DEFAULT_LLAMACPP_TIMEOUT_MS
+  const startupTimeoutMs = Number.isFinite(config.startupTimeoutMs)
+    ? Math.max(10000, Math.floor(config.startupTimeoutMs))
+    : 120000
+  const host = '127.0.0.1'
+
+  let serverProcess = null
+  let port = 0
+  let exitHandlerRegistered = false
+
+  function stopServer() {
+    if (serverProcess && serverProcess.exitCode === null) {
+      try {
+        serverProcess.kill()
+      } catch {
+        // Process may already be gone.
+      }
+    }
+    serverProcess = null
+    port = 0
+  }
+
+  async function waitForHealth() {
+    const deadline = Date.now() + startupTimeoutMs
+    while (Date.now() < deadline) {
+      if (serverProcess && serverProcess.exitCode !== null) {
+        throw new Error('llama-server exited before becoming ready')
+      }
+      try {
+        const res = await httpRequestJson({ host, port, path: '/health', method: 'GET', timeout: 4000 })
+        if (res.status === 200) {
+          return
+        }
+      } catch {
+        // Server not accepting connections yet; keep polling.
+      }
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 600))
+    }
+    throw new Error('llama-server did not become healthy in time')
+  }
 
   return {
     async load() {
       if (!executablePath) {
-        throw new Error('llama.cpp runtime requires JPLEARN_LLAMA_CPP_PATH')
+        throw new Error('llama.cpp server requires JPLEARN_LLAMA_SERVER_PATH or a built llama-server.exe')
       }
       if (!fs.existsSync(executablePath)) {
-        throw new Error(`llama.cpp executable not found: ${executablePath}`)
+        throw new Error(`llama-server executable not found: ${executablePath}`)
       }
       if (!modelPath) {
         throw new Error(`llama.cpp runtime requires JPLEARN_LLAMA_MODEL_PATH or a .gguf model in ${DEFAULT_MODEL_DIRECTORY}`)
@@ -192,9 +282,37 @@ function createLlamaCppCliAdapter(config = {}) {
       if (!fs.existsSync(modelPath)) {
         throw new Error(`llama.cpp model not found: ${modelPath}`)
       }
+
+      if (serverProcess && serverProcess.exitCode === null && port) {
+        // Server already running and ready for reuse.
+        return
+      }
+
+      const configuredPort = Number(process.env.JPLEARN_LLAMA_SERVER_PORT)
+      port = Number.isFinite(configuredPort) && configuredPort > 0 ? configuredPort : await findFreePort()
+
+      const args = [
+        '-m', modelPath,
+        '-c', '2048',
+        '-t', '6',
+        '--host', host,
+        '--port', String(port),
+        '--no-webui',
+        '--chat-template', 'chatml',
+      ]
+      serverProcess = spawn(executablePath, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'ignore'] })
+      serverProcess.on('error', () => stopServer())
+
+      if (!exitHandlerRegistered) {
+        exitHandlerRegistered = true
+        process.once('exit', stopServer)
+      }
+
+      await waitForHealth()
     },
 
     async unload() {
+      stopServer()
       return undefined
     },
 
@@ -210,135 +328,53 @@ function createLlamaCppCliAdapter(config = {}) {
         ? Math.max(24, Math.floor(runtimeOptions.maxOutputTokens))
         : 256
 
-      const args = [
-        '-m',
-        modelPath,
-        '-sys',
-        boundedSystemPrompt,
-        '-p',
-        boundedMessage,
-        '-t',
-        '6',
-        '-tb',
-        '6',
-        '-c',
-        '2048',
-        '-cnv',
-        '-st',
-        '--simple-io',
-        '--no-show-timings',
-        '--no-warmup',
-        '--chat-template',
-        'chatml',
-        '--reasoning',
-        'off',
-        '--reasoning-budget',
-        '0',
-        '--repeat-penalty',
-        '1.1',
-        '--repeat-last-n',
-        '128',
-        '--temp',
-        '0.7',
-        '--top-k',
-        '20',
-        '--top-p',
-        '0.9',
-        '-n',
-        String(maxOutputTokens),
-        '--no-display-prompt',
-      ]
+      if (!serverProcess || serverProcess.exitCode !== null) {
+        throw new Error('llama-server is not running')
+      }
 
-      const output = await new Promise((resolve, reject) => {
-        const child = spawn(executablePath, args, {
-          windowsHide: true,
-          stdio: ['ignore', 'pipe', 'pipe'],
-        })
+      const payload = {
+        messages: [
+          { role: 'system', content: boundedSystemPrompt },
+          { role: 'user', content: boundedMessage },
+        ],
+        temperature: 0.6,
+        top_p: 0.9,
+        top_k: 20,
+        repeat_penalty: 1.1,
+        max_tokens: maxOutputTokens,
+        cache_prompt: true,
+        stream: false,
+      }
 
-        let stdout = ''
-        let stderr = ''
-        let timedOut = false
-        let cancelled = false
-        let finished = false
+      const response = await httpRequestJson(
+        { host, port, path: '/v1/chat/completions', method: 'POST', timeout: requestTimeoutMs },
+        payload,
+        runtimeOptions.signal,
+      )
 
-        const timeoutHandle = setTimeout(() => {
-          timedOut = true
-          child.kill()
-        }, timeoutMs)
+      if (response.status !== 200) {
+        throw new Error(`llama-server returned status ${response.status}`)
+      }
 
-        const signal = runtimeOptions.signal
-        const onAbort = () => {
-          cancelled = true
-          child.kill()
-        }
-        if (signal && typeof signal.addEventListener === 'function') {
-          if (signal.aborted) {
-            onAbort()
-          } else {
-            signal.addEventListener('abort', onAbort, { once: true })
-          }
-        }
+      let parsed
+      try {
+        parsed = JSON.parse(response.body)
+      } catch {
+        throw new Error('llama-server returned malformed JSON')
+      }
 
-        const cleanup = () => {
-          if (finished) {
-            return
-          }
-          finished = true
-          clearTimeout(timeoutHandle)
-          if (signal && typeof signal.removeEventListener === 'function') {
-            signal.removeEventListener('abort', onAbort)
-          }
-        }
-
-        child.stdout.on('data', (chunk) => {
-          stdout += chunk.toString('utf8')
-        })
-
-        child.stderr.on('data', (chunk) => {
-          stderr += chunk.toString('utf8')
-        })
-
-        child.on('error', (error) => {
-          cleanup()
-          if (cancelled) {
-            reject(new InferenceAbortError())
-            return
-          }
-          reject(error)
-        })
-
-        child.on('close', (code) => {
-          cleanup()
-          if (cancelled) {
-            reject(new InferenceAbortError())
-            return
-          }
-          if (timedOut) {
-            reject(new Error(`llama.cpp inference timed out after ${timeoutMs}ms`))
-            return
-          }
-          if (code !== 0) {
-            const stderrText = stderr.trim()
-            if (code === 130) {
-              reject(new InferenceAbortError())
-              return
-            }
-            reject(new Error(`llama.cpp exited with code ${code}: ${stderrText || '(empty stderr)'}`))
-            return
-          }
-          resolve(stdout)
-        })
-      })
-
-      const text = extractCliResponseText(output)
+      const content = parsed && Array.isArray(parsed.choices) && parsed.choices[0] && parsed.choices[0].message
+        ? parsed.choices[0].message.content
+        : ''
+      const text = stripThinkTags(content)
       if (!text) {
-        throw new Error('llama.cpp returned empty response')
+        throw new Error('llama-server returned empty response')
       }
 
       return {
         text,
         provider: 'llama.cpp',
-        model: modelPath,
+        model: path.basename(modelPath),
       }
     },
   }
@@ -389,17 +425,18 @@ function createTutorChatRuntime(options = {}) {
     ? Math.max(15000, Math.floor(options.inactivityUnloadMs))
     : DEFAULT_INACTIVITY_UNLOAD_MS
 
-  const discoveredLlamaCppPath = resolveBundledLlamaCppPath()
+  const discoveredLlamaServerPath = resolveBundledLlamaServerPath()
   const discoveredModelPath = resolveBundledModelPath()
   const configuredProvider = normalizeProviderName(
     options.provider
     || process.env.JPLEARN_TUTOR_PROVIDER
-    || (discoveredLlamaCppPath && discoveredModelPath ? 'llama.cpp' : 'stub'),
+    || (discoveredLlamaServerPath && discoveredModelPath ? 'llama.cpp' : 'stub'),
   )
   const llamaCppConfig = {
-    executablePath: options.llamaCppPath || process.env.JPLEARN_LLAMA_CPP_PATH || discoveredLlamaCppPath,
+    executablePath: options.llamaServerPath || process.env.JPLEARN_LLAMA_SERVER_PATH || discoveredLlamaServerPath,
     modelPath: options.llamaModelPath || process.env.JPLEARN_LLAMA_MODEL_PATH || discoveredModelPath,
     timeoutMs: options.llamaTimeoutMs,
+    startupTimeoutMs: options.llamaServerStartupTimeoutMs,
   }
 
   const maxContextChars = Number.isFinite(options.maxContextChars)
@@ -420,7 +457,7 @@ function createTutorChatRuntime(options = {}) {
 
   const adapterRegistry = options.adapterRegistry || createAdapterRegistry()
   if (!adapterRegistry.has('llama.cpp')) {
-    adapterRegistry.register('llama.cpp', () => createLlamaCppCliAdapter(llamaCppConfig))
+    adapterRegistry.register('llama.cpp', () => createLlamaServerAdapter(llamaCppConfig))
   }
   if (!adapterRegistry.has('stub')) {
     adapterRegistry.register('stub', () => createStubAdapter())

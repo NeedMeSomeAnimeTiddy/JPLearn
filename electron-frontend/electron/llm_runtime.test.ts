@@ -19,7 +19,7 @@ describe('llm runtime', () => {
   it('falls back to stub when llama.cpp is not configured', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'llama.cpp',
-      llamaCppPath: 'C:/missing/llama-cli.exe',
+      llamaServerPath: 'C:/missing/llama-server.exe',
       llamaModelPath: 'C:/missing/model.gguf',
     })
 
