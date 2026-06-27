@@ -35,9 +35,9 @@ Object.defineProperty(window, 'matchMedia', {
 
 const baseCards = [
   { id: 0, character: 'あ', romaji: 'a', meaning: 'a', tags: ['hiragana'], example_sentence: 'あさです。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [1, 2, 3], character_distractor_ids: [1, 2, 3] },
-  { id: 1, character: 'い', romaji: 'i', meaning: 'i', tags: ['hiragana'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 2, 3], character_distractor_ids: [0, 2, 3] },
-  { id: 2, character: 'う', romaji: 'u', meaning: 'u', tags: ['hiragana'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 3], character_distractor_ids: [0, 1, 3] },
-  { id: 3, character: 'え', romaji: 'e', meaning: 'e', tags: ['hiragana'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 2], character_distractor_ids: [0, 1, 2] },
+  { id: 1, character: 'い', romaji: 'i', meaning: 'i', tags: ['hiragana'], example_sentence: 'いまです。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 2, 3], character_distractor_ids: [0, 2, 3] },
+  { id: 2, character: 'う', romaji: 'u', meaning: 'u', tags: ['hiragana'], example_sentence: 'うみです。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 3], character_distractor_ids: [0, 1, 3] },
+  { id: 3, character: 'え', romaji: 'e', meaning: 'e', tags: ['hiragana'], example_sentence: 'えきです。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 2], character_distractor_ids: [0, 1, 2] },
 ]
 
 const kanjiStudyPlanCards = [
@@ -383,7 +383,7 @@ describe('Minigame menu', () => {
       return ['あ', 'い', 'う', 'え'].some((character) => content.includes(character))
     })
     expect(promptMain).toBeTruthy()
-    expect(screen.getByText(/Example: あさです。/i)).toBeTruthy()
+    expect(screen.getByText(/Example:\s*(あさです。|いまです。|うみです。|えきです。)/i)).toBeTruthy()
   })
 
   it('renders reading practice passages in words track using example sentences', async () => {
@@ -397,10 +397,10 @@ describe('Minigame menu', () => {
 
     const storyPassage = await screen.findByText((content, node) => {
       if (!node || !node.classList.contains('game-prompt-main')) return false
-      return content.includes('あさです。')
+      return ['あさです。', 'いまです。', 'うみです。', 'えきです。'].some((line) => content.includes(line))
     })
     expect(storyPassage).toBeTruthy()
-    expect(screen.getByText(/The sentence uses あ.*choose its meaning/i)).toBeTruthy()
+    expect(screen.getByText(/The sentence uses (あ|い|う|え).*choose its meaning/i)).toBeTruthy()
   })
 
   it('shows a stroke-memory hint for kanji character matches', async () => {

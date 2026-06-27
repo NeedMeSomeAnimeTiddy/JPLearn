@@ -2287,7 +2287,7 @@ function App() {
       ordered.push(index)
     }
 
-    return ordered
+    return shuffleArray(ordered)
   }, [])
 
   const hydrateRoundCycle = useCallback(async (sourceCards: ScriptDeck['cards']): Promise<void> => {
@@ -2309,9 +2309,9 @@ function App() {
       ])
       roundCycleRef.current = queue
         ? buildQueueCycle(queue, sourceCards)
-        : [...Array(sourceCards.length).keys()]
+        : shuffleArray([...Array(sourceCards.length).keys()])
     } catch {
-      roundCycleRef.current = [...Array(sourceCards.length).keys()]
+      roundCycleRef.current = shuffleArray([...Array(sourceCards.length).keys()])
     }
     roundCursorRef.current = 0
   }, [activeDeckSlug, buildQueueCycle, resetRoundCycle])

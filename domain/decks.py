@@ -202,11 +202,53 @@ def _build_deck_with_meaning(
             romaji=reading,
             meaning=meaning,
             tags=list(tags),
-            example_sentence=f"{char} を つかった ぶんを れんしゅうします。",
+            example_sentence=_natural_example_sentence(char, tags),
         )
         for i, (char, reading, meaning) in enumerate(data)
     ]
     return Deck(name=name, cards=cards)
+
+
+_GRAMMAR_PATTERN_EXAMPLES: dict[str, str] = {
+    "〜は〜です": "これは本です。",
+    "〜は〜ではありません": "私は先生ではありません。",
+    "〜は〜ですか": "これはあなたの傘ですか。",
+    "〜は〜だ": "今日は休みだ。",
+    "〜があります": "机の上に本があります。",
+    "〜がいます": "公園に子どもがいます。",
+    "〜をください": "コーヒーをください。",
+    "〜てもいいですか": "ここに座ってもいいですか。",
+    "〜てください": "ゆっくり話してください。",
+    "〜ないでください": "ここで写真を撮らないでください。",
+    "〜がほしい": "新しいノートがほしいです。",
+    "〜たい": "週末は映画を見たいです。",
+    "〜に行きます": "明日、東京に行きます。",
+    "〜で行きます": "学校まで電車で行きます。",
+    "〜はどうですか": "この店はどうですか。",
+    "〜はいくらですか": "このTシャツはいくらですか。",
+    "〜はどこですか": "駅はどこですか。",
+    "〜はなんじですか": "会議は何時ですか。",
+    "どうぞよろしく": "はじめまして。どうぞよろしくお願いします。",
+}
+
+
+def _natural_example_sentence(text: str, tags: list[str]) -> str:
+    if "grammar" in tags:
+        return _natural_grammar_example(text)
+    if "kanji" in tags:
+        return f"この漢字は「{text}」です。"
+    return f"会話で「{text}」をよく使います。"
+
+
+def _natural_grammar_example(pattern: str) -> str:
+    explicit = _GRAMMAR_PATTERN_EXAMPLES.get(pattern)
+    if explicit is not None:
+        return explicit
+
+    if "〜" in pattern:
+        return "それ、会話でよく使う言い方ですね。"
+
+    return f"「{pattern}」は会話でよく使います。"
 
 
 def _build_kanji_deck(
@@ -222,7 +264,7 @@ def _build_kanji_deck(
             romaji=reading,
             meaning=meaning,
             tags=["kanji", level_tag],
-            example_sentence=f"{char} を つかった ぶんを れんしゅうします。",
+            example_sentence=f"この漢字は「{char}」です。",
         )
         for i, (char, reading, meaning) in enumerate(data)
     ]
@@ -242,7 +284,7 @@ def _build_vocab_deck(
             romaji=reading,
             meaning=meaning,
             tags=["vocab", level_tag],
-            example_sentence=f"{char} を つかった ぶんを れんしゅうします。",
+            example_sentence=f"会話で「{char}」をよく使います。",
         )
         for i, (char, reading, meaning) in enumerate(data)
     ]
