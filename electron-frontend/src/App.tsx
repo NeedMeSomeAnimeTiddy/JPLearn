@@ -6170,8 +6170,17 @@ function App() {
                   <li>Avoids repeating content you already know.</li>
                   <li>You can reset and redo this anytime.</li>
                 </ul>
+                <button
+                  type="button"
+                  className={`onboarding-btn ${settings.assistantChatEnabled ? 'onboarding-btn-secondary' : 'onboarding-btn-primary'}`}
+                  onClick={() => setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))}
+                  aria-pressed={settings.assistantChatEnabled}
+                  disabled={applyingExpertise}
+                >
+                  {settings.assistantChatEnabled ? 'Disable coach' : 'Enable coach'}
+                </button>
                 <p className="settings-help">
-                  Tiny quirk: choosing lower is a power move. Momentum beats ego.
+                  Coach is currently <strong>{settings.assistantChatEnabled ? 'enabled' : 'disabled'}</strong>. Tiny quirk: choosing lower is a power move. Momentum beats ego.
                 </p>
               </div>
             ) : null}
