@@ -1339,6 +1339,13 @@ function calculateAwardedPoints(streakAfterCorrect: number): number {
   return 1 + comboBonus
 }
 
+function describeQueueLoad(remainingDue: number): string {
+  if (remainingDue <= 0) return 'All caught up for now.'
+  if (remainingDue <= DEFAULT_SESSION_LENGTH_PRESET.items) return 'Ready to clear in one short session.'
+  if (remainingDue <= 60) return 'Enough queued for a few sessions.'
+  return 'Long-term queue available; chip away in small runs.'
+}
+
 function App() {
   const [view, setView] = useState<AppView>('home')
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
@@ -2840,6 +2847,7 @@ function App() {
     const masteredCards = decks.reduce((acc, deck) => acc + deck.mastered, 0)
     const dueToday = decks.reduce((acc, deck) => acc + deck.due_today, 0)
     const completedToday = decks.reduce((acc, deck) => acc + deck.completed_today, 0)
+    const remainingDue = Math.max(0, dueToday - completedToday)
     const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0
 
     return {
@@ -2847,6 +2855,7 @@ function App() {
       masteredCards,
       dueToday,
       completedToday,
+      remainingDue,
       masteryRate,
     }
   }, [decks])
@@ -2869,7 +2878,14 @@ function App() {
     { label: 'Decks', value: decks.length.toString(), tone: 'teal', icon: BarChart3, accent: 'insight' },
     { label: 'Current Streak', value: `${streak.current_days} days`, tone: 'ocean', icon: Flame, accent: 'streak' },
     { label: 'Mastered', value: `${totals.masteryRate}%`, tone: 'amber', icon: Trophy, accent: 'mastery' },
-    { label: 'Due Today', value: totals.dueToday.toString(), tone: 'rose', icon: CalendarDays, accent: 'warning' },
+    {
+      label: 'Next Session',
+      value: `${Math.min(totals.remainingDue, DEFAULT_SESSION_LENGTH_PRESET.items)} cards`,
+      note: describeQueueLoad(totals.remainingDue),
+      tone: 'rose',
+      icon: CalendarDays,
+      accent: 'warning',
+    },
   ] as const
 
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
@@ -4253,7 +4269,20 @@ function App() {
             <div className="overview-hero-copy">
               <p className="hero-kicker">Session Snapshot</p>
               <h2 className="overview-hero-title">Your Learning Pulse</h2>
-              <p className="hero-copy">See how much you have mastered, what is due now, and where to focus next.</p>
+              <p className="hero-copy">See how much you have mastered and what to tackle in your next focused run.</p>
+              <div className="overview-snapshot-grid" aria-label="Session snapshot metrics">
+                {summaryTiles.map((tile, index) => (
+                  <article
+                    key={`${tile.label}-${tile.value}`}
+                    className={`overview-snapshot-tile tone-${tile.tone}`}
+                    style={{ animationDelay: `${120 + index * 80}ms` }}
+                    title={'note' in tile ? tile.note : undefined}
+                  >
+                    <p><tile.icon aria-hidden="true" className={`metric-icon icon-${tile.accent}`} strokeWidth={2.2} />{tile.label}</p>
+                    <strong className="live-value">{tile.value}</strong>
+                  </article>
+                ))}
+              </div>
             </div>
             <div className="overview-hero-actions">
               <button
@@ -4327,19 +4356,6 @@ function App() {
               )}
             </section>
           ) : null}
-
-          <section className="tile-grid overview-tile-grid">
-            {summaryTiles.map((tile, index) => (
-              <article
-                key={`${tile.label}-${tile.value}`}
-                className={`metric-tile tone-${tile.tone}`}
-                style={{ animationDelay: `${120 + index * 80}ms` }}
-              >
-                <p><tile.icon aria-hidden="true" className={`metric-icon icon-${tile.accent}`} strokeWidth={2.2} />{tile.label}</p>
-                <strong className="live-value">{tile.value}</strong>
-              </article>
-            ))}
-          </section>
 
           {/* ── Character mastery grid ────────────────────────────────── */}
           <section className="panel-glass char-mastery-panel">
