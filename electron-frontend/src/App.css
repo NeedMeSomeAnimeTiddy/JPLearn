@@ -2513,6 +2513,7 @@ button {
 
 .intro-toggle-row {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -2527,18 +2528,72 @@ button {
 }
 
 .session-length-row {
-  display: inline-flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
   gap: 8px;
+  width: min(560px, 100%);
+}
+.session-length-hint {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+}
+.session-length-hint strong {
+  color: var(--text-main);
 }
 
 .session-summary-card {
-  border: 1px solid color-mix(in oklab, var(--tone-teal) 38%, var(--chip-border));
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: color-mix(in oklab, var(--tone-teal) 16%, var(--chip-bg));
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 52%, var(--chip-border));
+  border-radius: 14px;
+  padding: 12px 14px;
+  background:
+    radial-gradient(circle at 90% 0%, color-mix(in oklab, var(--tone-teal) 22%, transparent), transparent 50%),
+    linear-gradient(145deg, color-mix(in oklab, var(--chip-bg) 94%, var(--tone-ocean)), color-mix(in oklab, var(--chip-bg) 88%, var(--tone-teal)));
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  box-shadow:
+    0 14px 24px -18px color-mix(in oklab, var(--tone-ocean) 48%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.session-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.session-summary-pill {
+  border-radius: 999px;
+  border: 1px solid var(--chip-border);
+  padding: 3px 9px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.session-summary-pill.is-success {
+  border-color: color-mix(in oklab, #75d48f 58%, var(--chip-border));
+  background: color-mix(in oklab, #75d48f 24%, transparent);
+  color: color-mix(in oklab, #9bf0b4 72%, white);
+}
+.session-summary-pill.is-warn {
+  border-color: color-mix(in oklab, var(--tone-amber) 56%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-amber) 24%, transparent);
+  color: color-mix(in oklab, var(--tone-amber) 78%, white);
+}
+.session-summary-metrics {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.session-summary-metrics span {
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 34%, var(--chip-border));
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 0.74rem;
+  color: color-mix(in oklab, var(--text-main) 88%, var(--tone-ocean));
 }
 
 .session-summary-kicker {
@@ -2562,24 +2617,69 @@ button {
   font-size: 0.86rem;
 }
 
-.lives-toggle {
+.setup-option-button {
+  --setup-accent: #22c55e;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0;
-  color: var(--text-soft);
-  width: 40px;
-  height: 40px;
-  padding: 0;
+  gap: 10px;
+  color: var(--text-main);
+  min-height: 44px;
+  min-width: 156px;
+  padding: 2px 12px 2px 2px;
   border: 1px solid var(--button-border);
   border-radius: 10px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  font-family: var(--button-font);
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+  text-align: left;
   cursor: pointer;
-  transition: border-color 140ms ease, background 160ms ease, color 140ms ease;
+  transition: border-color 140ms ease, background 160ms ease, color 140ms ease, transform 120ms ease;
 }
 
-.lives-toggle:hover {
+.setup-option-button:hover {
   border-color: color-mix(in oklab, var(--accent) 58%, var(--button-border));
+}
+
+.setup-option-button:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--tone-ocean) 74%, white);
+  outline-offset: 2px;
+}
+
+.setup-option-button:active {
+  transform: translateY(1px);
+}
+
+.setup-option-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  border: 1px solid var(--button-border);
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.setup-option-copy {
+  display: grid;
+  gap: 1px;
+}
+
+.setup-option-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.setup-option-meta {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  line-height: 1.1;
+}
+
+.setup-toggle-button {
+  min-width: 170px;
 }
 
 .toggle-icon {
@@ -2587,67 +2687,53 @@ button {
   height: 17px;
 }
 
-.lives-toggle.is-active {
-  border-color: color-mix(in oklab, #22c55e 68%, var(--button-border));
+.setup-option-button.is-active {
+  border-color: color-mix(in oklab, var(--setup-accent) 68%, var(--button-border));
   background:
     linear-gradient(
       180deg,
-      color-mix(in oklab, #22c55e 32%, var(--button-bg-top)),
-      color-mix(in oklab, #16a34a 40%, var(--button-bg-bottom))
+      color-mix(in oklab, var(--setup-accent) 32%, var(--button-bg-top)),
+      color-mix(in oklab, var(--setup-accent) 40%, var(--button-bg-bottom))
     );
   color: color-mix(in oklab, white 94%, var(--text-main));
 }
 
+.setup-option-button.is-active .setup-option-icon {
+  border-color: color-mix(in oklab, var(--setup-accent) 70%, var(--button-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--setup-accent) 36%, var(--button-bg-top)),
+      color-mix(in oklab, var(--setup-accent) 44%, var(--button-bg-bottom))
+    );
+}
+
+.setup-option-button.is-active .setup-option-meta {
+  color: color-mix(in oklab, white 86%, var(--text-main));
+}
+
 .session-length-button {
+  min-width: 0;
+  width: 100%;
   color: color-mix(in oklab, var(--text-main) 76%, var(--text-soft));
 }
 
-.session-length-button.session-length-short {
-  border-color: color-mix(in oklab, #22c55e 45%, var(--button-border));
-  background: color-mix(in oklab, #22c55e 18%, var(--button-bg-top));
+.setup-option-button.session-length-short {
+  --setup-accent: #22c55e;
 }
 
-.session-length-button.session-length-medium {
-  border-color: color-mix(in oklab, #facc15 45%, var(--button-border));
-  background: color-mix(in oklab, #facc15 16%, var(--button-bg-top));
+.setup-option-button.session-length-medium {
+  --setup-accent: #facc15;
 }
 
-.session-length-button.session-length-long {
-  border-color: color-mix(in oklab, #fb923c 45%, var(--button-border));
-  background: color-mix(in oklab, #fb923c 16%, var(--button-bg-top));
+.setup-option-button.session-length-long {
+  --setup-accent: #fb923c;
 }
 
-.session-length-button.session-length-short.is-active {
-  border-color: color-mix(in oklab, #22c55e 75%, var(--button-border));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, #22c55e 34%, var(--button-bg-top)),
-      color-mix(in oklab, #16a34a 42%, var(--button-bg-bottom))
-    );
-  color: #f2fff5;
-}
-
-.session-length-button.session-length-medium.is-active {
-  border-color: color-mix(in oklab, #facc15 76%, var(--button-border));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, #facc15 38%, var(--button-bg-top)),
-      color-mix(in oklab, #eab308 45%, var(--button-bg-bottom))
-    );
-  color: #fffcee;
-}
-
-.session-length-button.session-length-long.is-active {
-  border-color: color-mix(in oklab, #fb923c 76%, var(--button-border));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, #fb923c 36%, var(--button-bg-top)),
-      color-mix(in oklab, #f97316 46%, var(--button-bg-bottom))
-    );
-  color: #fff6ef;
+@media (max-width: 900px) {
+  .session-length-row {
+    width: 100%;
+  }
 }
 
 .leech-focus-toggle {
@@ -2747,6 +2833,82 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.post-session-report {
+  margin-top: 10px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
+  border-radius: 14px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in oklab, var(--tone-amber) 18%, transparent), transparent 45%),
+    radial-gradient(circle at 95% 10%, color-mix(in oklab, var(--tone-teal) 22%, transparent), transparent 52%),
+    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 96%, var(--tone-ocean)), color-mix(in oklab, var(--panel-bg-alt) 94%, var(--tone-teal)));
+  box-shadow:
+    0 20px 34px -26px color-mix(in oklab, var(--tone-ocean) 56%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 10px;
+}
+.post-session-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.post-session-kicker {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.post-session-head h2 {
+  margin: 2px 0 0;
+  font-size: 1.1rem;
+}
+.post-session-time {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+.post-session-note {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+.post-session-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.post-session-cell {
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 30%, var(--chip-border));
+  border-radius: 10px;
+  padding: 8px 9px;
+  background: color-mix(in oklab, var(--chip-bg) 82%, transparent);
+  display: grid;
+  gap: 2px;
+}
+.post-session-cell small {
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.post-session-cell strong {
+  color: var(--text-main);
+  font-size: 0.96rem;
+}
+.post-session-insights {
+  border-top: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--chip-border));
+  padding-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+.post-session-insights p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.84rem;
 }
 
 .surprise-pill {
@@ -3511,6 +3673,9 @@ button {
 .settings-theme-entry {
   width: 100%;
 }
+  .post-session-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
 .settings-theme-entry.is-active {
   border-color: color-mix(in oklab, var(--theme-color, var(--accent)) 74%, var(--panel-border));

@@ -11,6 +11,7 @@
     "dev:electron": "wait-on tcp:5173 && cross-env ELECTRON_DEV=1 electron .",
     "dev": "concurrently -k \"npm:dev:web\" \"npm:dev:electron\"",
     "build": "tsc -b && vite build",
+    "build:quiet": "tsc -b && vite build --logLevel error",
     "start": "electron .",
     "forge:start": "npm run build && electron-forge start",
     "lint": "oxlint",

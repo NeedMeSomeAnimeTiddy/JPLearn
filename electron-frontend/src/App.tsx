@@ -15,6 +15,28 @@ type StudyQueueResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getStu
 type SessionGoalStartResponse = Awaited<ReturnType<typeof window.jplearnDesktop.startSessionGoal>>
 type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getSessionSummary>>
 type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
+interface SessionRunReport {
+  script: ScriptKey
+  minigame: MinigameKey
+  sectionName: string | null
+  completedAt: string
+  rounds: number
+  correct: number
+  wrong: number
+  accuracy: number
+  points: number
+  targetItems: number
+  goalCompletionPct: number
+  goalDelta: number
+  pointsPerRound: number
+  pointsPerCorrect: number
+  livesEnabled: boolean
+  livesRemaining: number
+  livesLost: number
+  leechFocusEnabled: boolean
+  confidenceCaptureEnabled: boolean
+  selectedConfidenceScore: number
+}
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
 type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
@@ -48,6 +70,7 @@ const SESSION_LENGTH_PRESETS = [
   { key: 'medium', label: 'Medium', items: 12, icon: Square },
   { key: 'long', label: 'Long', items: 20, icon: Plus },
 ] as const
+const DEFAULT_SESSION_LENGTH_PRESET = SESSION_LENGTH_PRESETS[1]
 const DEFAULT_INTERLEAVE_WEIGHTS: InterleaveWeights = {
   romaji_sprint: 1,
   meaning_match: 1,
@@ -1323,9 +1346,10 @@ function App() {
   const [sessionScore, setSessionScore] = useState<number>(0)
   const [sessionRounds, setSessionRounds] = useState<number>(0)
   const [sessionPoints, setSessionPoints] = useState<number>(0)
-  const [sessionTargetItems, setSessionTargetItems] = useState<number>(10)
+  const [sessionTargetItems, setSessionTargetItems] = useState<number>(DEFAULT_SESSION_LENGTH_PRESET.items)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [lastSessionSummary, setLastSessionSummary] = useState<SessionSummaryPayload | null>(null)
+  const [sessionRunReport, setSessionRunReport] = useState<SessionRunReport | null>(null)
   const [sessionSummaryLoading, setSessionSummaryLoading] = useState<boolean>(false)
   const [sessionGoalError, setSessionGoalError] = useState<string | null>(null)
   const [livesEnabled, setLivesEnabled] = useState<boolean>(false)
@@ -1564,6 +1588,41 @@ function App() {
 
     if (!previouslyActive || sessionActive || !activeSessionId) return
 
+    const completedRounds = sessionRounds
+    const completedCorrect = sessionScore
+    const completedWrong = Math.max(0, completedRounds - completedCorrect)
+    const accuracy = completedRounds > 0 ? Math.round((completedCorrect / completedRounds) * 100) : 0
+    const goalCompletionPct = sessionTargetItems > 0
+      ? Math.min(999, Math.round((completedRounds / sessionTargetItems) * 100))
+      : 0
+    const goalDelta = completedRounds - sessionTargetItems
+    const pointsPerRound = completedRounds > 0 ? Number((sessionPoints / completedRounds).toFixed(2)) : 0
+    const pointsPerCorrect = completedCorrect > 0 ? Number((sessionPoints / completedCorrect).toFixed(2)) : 0
+    const livesLost = livesEnabled ? Math.max(0, DEFAULT_LIVES - livesRemaining) : 0
+
+    setSessionRunReport({
+      script: activeScript,
+      minigame: activeGame,
+      sectionName: null,
+      completedAt: new Date().toLocaleTimeString(),
+      rounds: completedRounds,
+      correct: completedCorrect,
+      wrong: completedWrong,
+      accuracy,
+      points: sessionPoints,
+      targetItems: sessionTargetItems,
+      goalCompletionPct,
+      goalDelta,
+      pointsPerRound,
+      pointsPerCorrect,
+      livesEnabled,
+      livesRemaining,
+      livesLost,
+      leechFocusEnabled,
+      confidenceCaptureEnabled,
+      selectedConfidenceScore,
+    })
+
     setSessionSummaryLoading(true)
     setSessionGoalError(null)
     void window.jplearnDesktop
@@ -1583,7 +1642,21 @@ function App() {
       .finally(() => {
         setSessionSummaryLoading(false)
       })
-  }, [activeSessionId, sessionActive])
+  }, [
+    activeGame,
+    activeScript,
+    activeSessionId,
+    confidenceCaptureEnabled,
+    leechFocusEnabled,
+    livesEnabled,
+    livesRemaining,
+    selectedConfidenceScore,
+    sessionActive,
+    sessionPoints,
+    sessionRounds,
+    sessionScore,
+    sessionTargetItems,
+  ])
 
   const loadSummary = useCallback(async () => {
     setLoading(true)
@@ -2220,14 +2293,20 @@ function App() {
   }, [deckCards, blockProgress, activeBlockIndex])
 
   const activeSessionLengthPreset = useMemo(
-    () => SESSION_LENGTH_PRESETS.find((preset) => preset.items === sessionTargetItems)?.key ?? null,
+    () => SESSION_LENGTH_PRESETS.find((preset) => preset.items === sessionTargetItems) ?? null,
     [sessionTargetItems],
   )
+
+  useEffect(() => {
+    if (activeSessionLengthPreset) return
+    setSessionTargetItems(DEFAULT_SESSION_LENGTH_PRESET.items)
+  }, [activeSessionLengthPreset])
 
   const startSession = useCallback(async (selectedGame: MinigameKey = activeGame) => {
     resetRoundCycle()
     setSessionGoalError(null)
     setLastSessionSummary(null)
+    setSessionRunReport(null)
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
     const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
     const modeSelection = nextRoundMode(selectedGame)
@@ -2328,6 +2407,8 @@ function App() {
       if (!roundState || isRoundResolving) return
 
       setIsRoundResolving(true)
+      const completedRoundsAfterAnswer = sessionRounds + 1
+      const targetRounds = Math.max(1, Math.floor(sessionTargetItems))
 
       const typedAssessment =
         roundState.mode === 'typed_recall'
@@ -2475,6 +2556,17 @@ function App() {
           return
         }
 
+        if (completedRoundsAfterAnswer >= targetRounds) {
+          setSessionActive(false)
+          setRoundState(null)
+          setRoundFeedback(null)
+          setRoundFeedbackTone(null)
+          setRoundFeedbackPoints(null)
+          setRoundFeedbackAnswer(null)
+          setIsRoundResolving(false)
+          return
+        }
+
         void nextRound()
         setRoundFeedback(null)
         setRoundFeedbackTone(null)
@@ -2483,7 +2575,7 @@ function App() {
         setIsRoundResolving(false)
       }, FEEDBACK_REVEAL_MS)
     },
-    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats, selectedConfidenceScore],
+    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, roundState, scriptStats, selectedConfidenceScore, sessionRounds, sessionTargetItems],
   )
 
   useEffect(() => {
@@ -3478,18 +3570,24 @@ function App() {
                   <div className="session-length-row" role="group" aria-label="Session length">
                     {SESSION_LENGTH_PRESETS.map((preset) => {
                       const Icon = preset.icon
-                      const isActive = activeSessionLengthPreset === preset.key
+                      const isActive = activeSessionLengthPreset?.key === preset.key
                       return (
                         <button
                           key={preset.key}
                           type="button"
-                          className={`lives-toggle icon-toggle session-length-button session-length-${preset.key} ${isActive ? 'is-active' : ''}`}
+                          className={`setup-option-button session-length-button session-length-${preset.key} ${isActive ? 'is-active' : ''}`}
                           aria-pressed={isActive}
                           aria-label={`Set ${preset.label.toLowerCase()} session length (${preset.items} items)`}
                           title={`${preset.label} length (${preset.items} items)`}
                           onClick={() => setSessionTargetItems(preset.items)}
                         >
-                          <Icon className="toggle-icon" strokeWidth={2.2} aria-hidden="true" />
+                          <span className="setup-option-icon" aria-hidden="true">
+                            <Icon className="toggle-icon" strokeWidth={2.2} />
+                          </span>
+                          <span className="setup-option-copy">
+                            <span className="setup-option-label">{preset.label}</span>
+                            <span className="setup-option-meta">{preset.items} items</span>
+                          </span>
                         </button>
                       )
                     })}
@@ -3498,7 +3596,7 @@ function App() {
                   <div className="intro-toggle-row" role="group" aria-label="Minigame setup toggles">
                     <button
                       type="button"
-                      className={`lives-toggle icon-toggle ${livesEnabled ? 'is-active' : ''}`}
+                      className={`setup-option-button setup-toggle-button ${livesEnabled ? 'is-active' : ''}`}
                       aria-pressed={livesEnabled}
                       aria-label={`Toggle lives mode (${DEFAULT_LIVES} lives per run)`}
                       title={`Lives mode (${DEFAULT_LIVES} lives): ${livesEnabled ? 'On' : 'Off'}`}
@@ -3507,27 +3605,45 @@ function App() {
                         setLivesRemaining(DEFAULT_LIVES)
                       }}
                     >
-                      <Heart className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                      <span className="setup-option-icon" aria-hidden="true">
+                        <Heart className="toggle-icon" strokeWidth={2.1} />
+                      </span>
+                      <span className="setup-option-copy">
+                        <span className="setup-option-label">Lives mode</span>
+                        <span className="setup-option-meta">{livesEnabled ? `${DEFAULT_LIVES} lives active` : 'Off'}</span>
+                      </span>
                     </button>
                     <button
                       type="button"
-                      className={`lives-toggle icon-toggle leech-focus-toggle ${leechFocusEnabled ? 'is-active' : ''}`}
+                      className={`setup-option-button setup-toggle-button leech-focus-toggle ${leechFocusEnabled ? 'is-active' : ''}`}
                       aria-pressed={leechFocusEnabled}
                       aria-label="Toggle focused review mode (leech cards first)"
                       title={`Focused review mode (leech first): ${leechFocusEnabled ? 'On' : 'Off'}`}
                       onClick={() => setLeechFocusEnabled((previous) => !previous)}
                     >
-                      <AlertTriangle className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                      <span className="setup-option-icon" aria-hidden="true">
+                        <AlertTriangle className="toggle-icon" strokeWidth={2.1} />
+                      </span>
+                      <span className="setup-option-copy">
+                        <span className="setup-option-label">Focused review</span>
+                        <span className="setup-option-meta">{leechFocusEnabled ? 'Leech cards first' : 'Mixed queue'}</span>
+                      </span>
                     </button>
                     <button
                       type="button"
-                      className={`lives-toggle icon-toggle ${confidenceCaptureEnabled ? 'is-active' : ''}`}
+                      className={`setup-option-button setup-toggle-button ${confidenceCaptureEnabled ? 'is-active' : ''}`}
                       aria-pressed={confidenceCaptureEnabled}
                       aria-label="Toggle confidence capture"
                       title={`Confidence capture: ${confidenceCaptureEnabled ? 'On' : 'Off'}`}
                       onClick={() => setConfidenceCaptureEnabled((previous) => !previous)}
                     >
-                      <Target className="toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+                      <span className="setup-option-icon" aria-hidden="true">
+                        <Target className="toggle-icon" strokeWidth={2.1} />
+                      </span>
+                      <span className="setup-option-copy">
+                        <span className="setup-option-label">Confidence</span>
+                        <span className="setup-option-meta">{confidenceCaptureEnabled ? 'Tracking enabled' : 'Tracking off'}</span>
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -3555,12 +3671,22 @@ function App() {
                 {sessionGoalError ? <p className="status-line status-error">{sessionGoalError}</p> : null}
                 {lastSessionSummary ? (
                   <section className="session-summary-card" aria-live="polite">
-                    <p className="session-summary-kicker">Last Session</p>
+                    <div className="session-summary-head">
+                      <p className="session-summary-kicker">Last Session</p>
+                      <span className={`session-summary-pill ${lastSessionSummary.goal_met ? 'is-success' : 'is-warn'}`}>
+                        {lastSessionSummary.goal_met ? 'Goal Met' : 'In Progress'}
+                      </span>
+                    </div>
                     <p className="session-summary-main">
                       {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} items · {lastSessionSummary.accuracy}% accuracy
                     </p>
+                    <div className="session-summary-metrics" aria-label="Last session details">
+                      <span>{lastSessionSummary.correct} correct</span>
+                      <span>{Math.max(0, lastSessionSummary.reviewed - lastSessionSummary.correct)} misses</span>
+                      <span>{lastSessionSummary.reviewed} reviewed</span>
+                    </div>
                     <p className="session-summary-meta">
-                      {lastSessionSummary.goal_met ? 'Goal reached. Keep the streak alive.' : 'Goal not reached yet. Start another run to close the gap.'}
+                      {lastSessionSummary.goal_met ? 'Strong run. Keep momentum with one more round.' : 'Close the gap with a fresh run and lock in the set.'}
                     </p>
                   </section>
                 ) : null}
@@ -3733,21 +3859,73 @@ function App() {
                 </div>
               </article>
             ) : !sessionActive ? (
-              <div className="game-actions">
-                <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>
-                  Play
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNavDirection('back')
-                    setView('script_hub')
-                  }}
-                >
-                  Back to Map
-                </button>
-                {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
-              </div>
+              <>
+                {sessionRunReport ? (
+                  <article className="post-session-report" role="status" aria-live="polite">
+                    <div className="post-session-head">
+                      <div>
+                        <p className="post-session-kicker">Session Report</p>
+                        <h2>Run Complete · {MINIGAMES.find((game) => game.key === sessionRunReport.minigame)?.title ?? sessionRunReport.minigame}</h2>
+                      </div>
+                      <span className="post-session-time">Finished {sessionRunReport.completedAt}</span>
+                    </div>
+
+                    <p className="post-session-note">
+                      {sessionRunReport.sectionName
+                        ? `${SCRIPT_LABELS[sessionRunReport.script]} · ${sessionRunReport.sectionName}`
+                        : SCRIPT_LABELS[sessionRunReport.script]}
+                    </p>
+
+                    <div className="post-session-grid" aria-label="Session performance metrics">
+                      <div className="post-session-cell"><small>Accuracy</small><strong>{sessionRunReport.accuracy}%</strong></div>
+                      <div className="post-session-cell"><small>Correct</small><strong>{sessionRunReport.correct}</strong></div>
+                      <div className="post-session-cell"><small>Misses</small><strong>{sessionRunReport.wrong}</strong></div>
+                      <div className="post-session-cell"><small>Points</small><strong>{sessionRunReport.points}</strong></div>
+                      <div className="post-session-cell"><small>Goal Progress</small><strong>{sessionRunReport.rounds}/{sessionRunReport.targetItems}</strong></div>
+                      <div className="post-session-cell"><small>Goal Completion</small><strong>{sessionRunReport.goalCompletionPct}%</strong></div>
+                      <div className="post-session-cell"><small>Pts / Round</small><strong>{sessionRunReport.pointsPerRound.toFixed(2)}</strong></div>
+                      <div className="post-session-cell"><small>Pts / Correct</small><strong>{sessionRunReport.pointsPerCorrect.toFixed(2)}</strong></div>
+                      <div className="post-session-cell"><small>Lives</small><strong>{sessionRunReport.livesEnabled ? `${sessionRunReport.livesRemaining}/${DEFAULT_LIVES}` : 'Off'}</strong></div>
+                      <div className="post-session-cell"><small>Lives Lost</small><strong>{sessionRunReport.livesEnabled ? sessionRunReport.livesLost : 0}</strong></div>
+                      <div className="post-session-cell"><small>Leech Focus</small><strong>{sessionRunReport.leechFocusEnabled ? 'On' : 'Off'}</strong></div>
+                      <div className="post-session-cell"><small>Confidence</small><strong>{sessionRunReport.confidenceCaptureEnabled ? `On (${sessionRunReport.selectedConfidenceScore})` : 'Off'}</strong></div>
+                    </div>
+
+                    <div className="post-session-insights">
+                      <p>
+                        <strong>Pacing:</strong>{' '}
+                        {sessionRunReport.pointsPerRound >= 1.4
+                          ? 'High-efficiency run with strong point gain each round.'
+                          : sessionRunReport.pointsPerRound >= 1
+                            ? 'Steady pace with consistent scoring.'
+                            : 'Careful pace; focus on cleaner streak chains for better point efficiency.'}
+                      </p>
+                      <p>
+                        <strong>Goal Check:</strong>{' '}
+                        {sessionRunReport.goalDelta >= 0
+                          ? `Goal cleared by ${sessionRunReport.goalDelta} item${sessionRunReport.goalDelta === 1 ? '' : 's'}.`
+                          : `${Math.abs(sessionRunReport.goalDelta)} item${Math.abs(sessionRunReport.goalDelta) === 1 ? '' : 's'} short of goal.`}
+                      </p>
+                    </div>
+                  </article>
+                ) : null}
+
+                <div className="game-actions">
+                  <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>
+                    {sessionRunReport ? 'Play Again' : 'Play'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNavDirection('back')
+                      setView('script_hub')
+                    }}
+                  >
+                    Back to Map
+                  </button>
+                  {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
+                </div>
+              </>
             ) : (
               <div className="game-actions">
                 <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading}>
