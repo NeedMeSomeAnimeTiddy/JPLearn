@@ -146,6 +146,7 @@ const FEEDBACK_REVEAL_MS = 2100
 const ASSISTANT_EVENT_POLL_MS = 15000
 const ASSISTANT_TOAST_TTL_MS = 3800
 const ROUND_QUEUE_TIMEOUT_MS = 1200
+const STUDY_QUEUE_CACHE_TTL_MS = 45000
 const ASSISTANT_MAX_TOASTS = 1
 const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
@@ -2133,6 +2134,8 @@ function App() {
   const scriptBlockCacheRef = useRef<Partial<Record<ScriptKey, BlockInfo[]>>>({})
   const deckCardsInFlightRef = useRef<Map<string, Promise<ScriptDeck>>>(new Map())
   const blockProgressInFlightRef = useRef<Map<string, Promise<BlockProgressPayload>>>(new Map())
+  const studyQueueInFlightRef = useRef<Map<string, Promise<StudyQueueResponse>>>(new Map())
+  const studyQueueCacheRef = useRef<Map<string, { payload: StudyQueueResponse; cachedAtMs: number }>>(new Map())
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
@@ -2244,6 +2247,10 @@ function App() {
   }, [activeKanjiDeckSlug, activeScript, activeVocabDeckSlug])
 
   const getDeckCardsDeduped = useCallback((slug: DeckSlugInput): Promise<ScriptDeck> => {
+    if (typeof window === 'undefined' || !window.jplearnDesktop?.getDeckCards) {
+      return Promise.reject(new Error('Deck cards API unavailable'))
+    }
+
     const inFlight = deckCardsInFlightRef.current.get(slug)
     if (inFlight) return inFlight
 
@@ -2257,6 +2264,10 @@ function App() {
   }, [])
 
   const getBlockProgressDeduped = useCallback((slug: DeckSlugInput): Promise<BlockProgressPayload> => {
+    if (typeof window === 'undefined' || !window.jplearnDesktop?.getBlockProgress) {
+      return Promise.reject(new Error('Block progress API unavailable'))
+    }
+
     const inFlight = blockProgressInFlightRef.current.get(slug)
     if (inFlight) return inFlight
 
@@ -2268,6 +2279,45 @@ function App() {
     blockProgressInFlightRef.current.set(slug, request)
     return request
   }, [])
+
+  const getStudyQueueDeduped = useCallback(
+    (slug: DeckSlugInput, options?: { preferCache?: boolean }): Promise<StudyQueueResponse> => {
+      if (typeof window === 'undefined' || !window.jplearnDesktop?.getStudyQueue) {
+        return Promise.reject(new Error('Study queue API unavailable'))
+      }
+
+      const cacheKey = slug
+      const preferCache = options?.preferCache ?? true
+      if (preferCache) {
+        const cached = studyQueueCacheRef.current.get(cacheKey)
+        if (cached && performance.now() - cached.cachedAtMs <= STUDY_QUEUE_CACHE_TTL_MS) {
+          return Promise.resolve(cached.payload)
+        }
+      }
+
+      const inFlight = studyQueueInFlightRef.current.get(cacheKey)
+      if (inFlight) return inFlight
+
+      const request = window.jplearnDesktop
+        .getStudyQueue(slug)
+        .then((payload) => {
+          studyQueueCacheRef.current.set(cacheKey, {
+            payload,
+            cachedAtMs: performance.now(),
+          })
+          return payload
+        })
+        .finally(() => {
+          if (studyQueueInFlightRef.current.get(cacheKey) === request) {
+            studyQueueInFlightRef.current.delete(cacheKey)
+          }
+        })
+
+      studyQueueInFlightRef.current.set(cacheKey, request)
+      return request
+    },
+    [],
+  )
 
   const buildQueueCycle = useCallback((queue: StudyQueueResponse, sourceCards: ScriptDeck['cards']): number[] => {
     const idToIndex = new Map<number, number>()
@@ -2300,8 +2350,7 @@ function App() {
 
     try {
       // Keep round startup responsive even if queue IPC is temporarily slow.
-      const queuePromise = window.jplearnDesktop
-        .getStudyQueue(activeDeckSlug)
+      const queuePromise = getStudyQueueDeduped(activeDeckSlug)
         .catch(() => null)
       const queue = await Promise.race<StudyQueueResponse | null>([
         queuePromise,
@@ -2316,7 +2365,7 @@ function App() {
       roundCycleRef.current = shuffleArray([...Array(sourceCards.length).keys()])
     }
     roundCursorRef.current = 0
-  }, [activeDeckSlug, buildQueueCycle, resetRoundCycle])
+  }, [activeDeckSlug, buildQueueCycle, getStudyQueueDeduped, resetRoundCycle])
 
   const nextCardIndex = useCallback((cardsLength: number): number | null => {
     if (cardsLength <= 0) return null
@@ -2995,6 +3044,11 @@ function App() {
       const startupKanjiLevel: JlptLevel = 'n5'
       const startupVocabLevel: JlptLevel = 'n5'
       const startupScripts: ScriptKey[] = ['hiragana', 'katakana', 'grammar_patterns']
+      const startupQueueSlugs: DeckSlugInput[] = [
+        ...startupScripts,
+        KANJI_LEVEL_TO_DECK_SLUG[startupKanjiLevel],
+        VOCAB_LEVEL_TO_DECK_SLUG[startupVocabLevel],
+      ]
       let deferredLoadsQueuedAtMs: number | undefined
 
       const preloadScript = async (script: ScriptKey): Promise<void> => {
@@ -3065,6 +3119,7 @@ function App() {
           ...startupScripts.map((script) => preloadScript(script)),
           preloadKanjiLevel(startupKanjiLevel, true),
           preloadVocabLevel(startupVocabLevel, true),
+          ...startupQueueSlugs.map((slug) => getStudyQueueDeduped(slug, { preferCache: false }).catch(() => undefined)),
         ])
 
         if (cancelled) return
@@ -3080,8 +3135,14 @@ function App() {
             void preloadKanjiLevel(level, true).catch(() => undefined)
           }, delayMs)
           scheduleDeferredStartupTask(() => {
+            void getStudyQueueDeduped(KANJI_LEVEL_TO_DECK_SLUG[level], { preferCache: false }).catch(() => undefined)
+          }, delayMs + 30)
+          scheduleDeferredStartupTask(() => {
             void preloadVocabLevel(level, true).catch(() => undefined)
           }, delayMs + 75)
+          scheduleDeferredStartupTask(() => {
+            void getStudyQueueDeduped(VOCAB_LEVEL_TO_DECK_SLUG[level], { preferCache: false }).catch(() => undefined)
+          }, delayMs + 105)
         })
       } catch {
         // Allow startup to continue even if preloading fails on some decks.
@@ -3097,7 +3158,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [getBlockProgressDeduped, getDeckCardsDeduped, notifyStartupReady, scheduleDeferredStartupTask])
+  }, [getBlockProgressDeduped, getDeckCardsDeduped, getStudyQueueDeduped, notifyStartupReady, scheduleDeferredStartupTask])
 
   const loadScriptCards = useCallback(async (
     script: ScriptKey,
@@ -3917,13 +3978,16 @@ function App() {
 
       const confidenceForAnswer = confidenceCaptureEnabled ? roundConfidenceScore : undefined
 
+      const resultSlug: DeckSlugInput =
+        activeScript === 'kanji_n5'
+          ? activeKanjiDeckSlug
+          : activeScript === 'vocab_n5'
+            ? activeVocabDeckSlug
+            : activeScript
+      studyQueueCacheRef.current.delete(resultSlug)
+
       void window.jplearnDesktop.recordGameResult({
-        slug:
-          activeScript === 'kanji_n5'
-            ? activeKanjiDeckSlug
-            : activeScript === 'vocab_n5'
-              ? activeVocabDeckSlug
-              : activeScript,
+        slug: resultSlug,
         cardId: roundState.cardId,
         isCorrect,
         minigame: roundState.mode,
