@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from data import database
@@ -101,11 +101,51 @@ def test_evaluate_assistant_events_emits_goal_and_streak() -> None:
         mistakes=[],
         leech_count=0,
         session_summary=summary,
+        now_utc=datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc),
     )
 
     event_types = [event.event_type for event in events]
     assert "session_goal_met" in event_types
     assert "streak_milestone" in event_types
+    assert all(event.dedup_key for event in events)
+
+
+def test_evaluate_assistant_events_respects_recent_dedup_keys() -> None:
+    state = AssistantState(
+        mood="coach_celebratory",
+        momentum=52,
+        confidence_level=76,
+        focus_area="kanji_n5",
+        last_major_event="session_goal_met",
+    )
+    streak = StreakState(
+        last_study_day_utc=date(2026, 6, 27),
+        last_study_day_local=date(2026, 6, 27),
+        current_streak_days=7,
+        best_streak_days=7,
+    )
+    summary = SessionSummary(
+        session_id="abc",
+        target_items=10,
+        completed_items=10,
+        reviewed=11,
+        correct=9,
+        accuracy=82,
+        target_accuracy=70,
+        goal_met=True,
+    )
+
+    events = evaluate_assistant_events(
+        state=state,
+        streak=streak,
+        mistakes=[],
+        leech_count=0,
+        session_summary=summary,
+        now_utc=datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc),
+        recently_emitted_dedup_keys={"goal:abc"},
+    )
+
+    assert all(event.dedup_key != "goal:abc" for event in events)
 
 
 def test_assistant_profile_and_events_round_trip(tmp_path: Path, monkeypatch) -> None:
@@ -132,6 +172,15 @@ def test_assistant_profile_and_events_round_trip(tmp_path: Path, monkeypatch) ->
 
     database.mark_assistant_events_consumed([event_id])
     assert database.load_pending_assistant_events(limit=5) == []
+
+    database.upsert_assistant_memory_fact(
+        fact_key="coach.focus_area",
+        fact_value="kanji_n5",
+        source="test",
+    )
+    facts = database.load_assistant_memory_facts(limit=10)
+    assert facts[0]["fact_key"] == "coach.focus_area"
+    assert facts[0]["fact_value"] == "kanji_n5"
 
 
 def test_study_pipeline_assistant_snapshot(tmp_path: Path, monkeypatch) -> None:

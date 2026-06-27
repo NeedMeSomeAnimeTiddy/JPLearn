@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 from domain.activity import ActivitySummary
@@ -13,6 +14,34 @@ from domain.streaks import StreakState
 
 AssistantMood = Literal["coach_neutral", "coach_supportive", "coach_celebratory", "coach_alert"]
 AssistantEventPriority = Literal["info", "coaching", "critical", "celebration"]
+AssistantPopupCadence = Literal["low", "medium", "high"]
+
+SCRIPTED_CONTENT_REGISTRY: dict[str, dict[str, str]] = {
+    "session_goal_met": {
+        "message_key": "coach.goal_met",
+        "recommendation_key": "rec.short_follow_up_session",
+    },
+    "streak_milestone": {
+        "message_key": "coach.streak_milestone",
+        "recommendation_key": "rec.protect_streak_chain",
+    },
+    "leech_intervention": {
+        "message_key": "coach.leech_intervention",
+        "recommendation_key": "rec.typed_recall_focus",
+    },
+    "weakness_spike": {
+        "message_key": "coach.weakness_focus",
+        "recommendation_key": "rec.focused_block_retry",
+    },
+    "curriculum_stall": {
+        "message_key": "coach.curriculum_stall",
+        "recommendation_key": "rec.context_cloze_recovery",
+    },
+    "ambient_checkin": {
+        "message_key": "coach.ambient_checkin",
+        "recommendation_key": "rec.maintain_consistency",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -34,6 +63,8 @@ class AssistantEvent:
     priority: AssistantEventPriority
     message_key: str
     metadata: dict[str, str]
+    dedup_key: str = ""
+    cooldown_minutes: int = 60
 
 
 def _clamp(value: int, minimum: int, maximum: int) -> int:
@@ -58,6 +89,78 @@ def _resolve_focus_area(mistakes: list[MistakeBreakdownRow]) -> str:
     return weakest.key
 
 
+def _priority_sort_value(priority: AssistantEventPriority) -> int:
+    if priority == "critical":
+        return 0
+    if priority == "celebration":
+        return 1
+    if priority == "coaching":
+        return 2
+    return 3
+
+
+def _max_events_for_cadence(popup_cadence: AssistantPopupCadence) -> int:
+    if popup_cadence == "high":
+        return 4
+    if popup_cadence == "medium":
+        return 3
+    return 2
+
+
+def _cooldown_minutes_for_event(
+    event_priority: AssistantEventPriority,
+    popup_cadence: AssistantPopupCadence,
+) -> int:
+    base_by_priority = {
+        "critical": 20,
+        "celebration": 60,
+        "coaching": 45,
+        "info": 90,
+    }
+    cadence_multiplier = {
+        "high": 1.0,
+        "medium": 1.6,
+        "low": 2.4,
+    }
+    base = base_by_priority[event_priority]
+    return max(10, round(base * cadence_multiplier[popup_cadence]))
+
+
+def build_assistant_event_dedup_key(event_type: str, metadata: dict[str, str]) -> str:
+    """Build deterministic dedup key from event type and stable metadata fields."""
+
+    if event_type == "session_goal_met":
+        session_id = metadata.get("session_id", "")
+        return f"goal:{session_id or 'unknown'}"
+    if event_type == "streak_milestone":
+        return f"streak:{metadata.get('days', '0')}"
+    if event_type == "leech_intervention":
+        return f"leech:{metadata.get('leech_count', '0')}"
+    if event_type == "weakness_spike":
+        return f"weakness:{metadata.get('focus_area', 'general')}:{metadata.get('error_rate', '0')}"
+    if event_type == "curriculum_stall":
+        return f"curriculum:{metadata.get('mode', 'context_cloze')}:{metadata.get('accuracy_7d', '0')}"
+    return f"ambient:{metadata.get('mood', 'coach_neutral')}"
+
+
+def _create_scripted_event(
+    event_type: str,
+    priority: AssistantEventPriority,
+    popup_cadence: AssistantPopupCadence,
+    metadata: dict[str, str],
+) -> AssistantEvent:
+    registry = SCRIPTED_CONTENT_REGISTRY[event_type]
+    normalized_metadata = {**metadata, "recommendation_key": registry["recommendation_key"]}
+    return AssistantEvent(
+        event_type=event_type,
+        priority=priority,
+        message_key=registry["message_key"],
+        metadata=normalized_metadata,
+        dedup_key=build_assistant_event_dedup_key(event_type, normalized_metadata),
+        cooldown_minutes=_cooldown_minutes_for_event(priority, popup_cadence),
+    )
+
+
 def compute_assistant_state(
     activity_week: ActivitySummary,
     streak: StreakState,
@@ -66,6 +169,9 @@ def compute_assistant_state(
     leech_count: int,
     session_summary: SessionSummary | None,
     prior_momentum: int = 0,
+    long_horizon_momentum: int = 0,
+    curriculum_attempts: int = 0,
+    curriculum_accuracy_7d: int = 100,
 ) -> AssistantState:
     """Compute deterministic coach mood and momentum from study signals."""
 
@@ -80,9 +186,15 @@ def compute_assistant_state(
     if session_summary is not None and session_summary.goal_met:
         momentum_delta += 12
 
-    momentum = _clamp(round((prior_momentum * 0.7) + momentum_delta), -100, 100)
+    if curriculum_attempts >= 8 and curriculum_accuracy_7d < 60:
+        momentum_delta -= _clamp((60 - curriculum_accuracy_7d) // 2, 0, 15)
+
+    smoothed_prior = round((prior_momentum * 0.6) + (long_horizon_momentum * 0.4))
+    momentum = _clamp(round((smoothed_prior * 0.7) + momentum_delta), -100, 100)
     confidence_level = _clamp(50 + round(momentum * 0.4), 0, 100)
     focus_area = _resolve_focus_area(mistakes)
+    if focus_area == "general" and curriculum_attempts >= 8 and curriculum_accuracy_7d < 60:
+        focus_area = "context_cloze"
 
     mood: AssistantMood = "coach_neutral"
     last_major_event = "steady_progress"
@@ -95,6 +207,9 @@ def compute_assistant_state(
     elif momentum <= -25:
         mood = "coach_supportive"
         last_major_event = "momentum_drop"
+    elif curriculum_attempts >= 8 and curriculum_accuracy_7d < 60:
+        mood = "coach_supportive"
+        last_major_event = "curriculum_stall"
     elif momentum >= 25:
         mood = "coach_celebratory"
         last_major_event = "momentum_rise"
@@ -114,47 +229,53 @@ def evaluate_assistant_events(
     mistakes: list[MistakeBreakdownRow],
     leech_count: int,
     session_summary: SessionSummary | None,
+    now_utc: datetime,
+    popup_cadence: AssistantPopupCadence = "high",
+    recently_emitted_dedup_keys: set[str] | None = None,
+    curriculum_attempts: int = 0,
+    curriculum_accuracy_7d: int = 100,
 ) -> list[AssistantEvent]:
     """Evaluate deterministic scripted popup events for the companion UI."""
 
-    events: list[AssistantEvent] = []
+    _ = now_utc  # Explicit injection keeps clock ownership outside domain logic.
+    candidates: list[AssistantEvent] = []
 
     if session_summary is not None and session_summary.goal_met:
-        events.append(
-            AssistantEvent(
+        candidates.append(
+            _create_scripted_event(
                 event_type="session_goal_met",
                 priority="celebration",
-                message_key="coach.goal_met",
+                popup_cadence=popup_cadence,
                 metadata={"session_id": session_summary.session_id},
             )
         )
 
     if streak.current_streak_days > 0 and streak.current_streak_days in {3, 7, 14, 30}:
-        events.append(
-            AssistantEvent(
+        candidates.append(
+            _create_scripted_event(
                 event_type="streak_milestone",
                 priority="celebration",
-                message_key="coach.streak_milestone",
+                popup_cadence=popup_cadence,
                 metadata={"days": str(streak.current_streak_days)},
             )
         )
 
     if leech_count >= 3:
-        events.append(
-            AssistantEvent(
+        candidates.append(
+            _create_scripted_event(
                 event_type="leech_intervention",
                 priority="critical",
-                message_key="coach.leech_intervention",
+                popup_cadence=popup_cadence,
                 metadata={"leech_count": str(leech_count)},
             )
         )
 
     if mistakes and mistakes[0].error_rate >= 60:
-        events.append(
-            AssistantEvent(
+        candidates.append(
+            _create_scripted_event(
                 event_type="weakness_spike",
                 priority="coaching",
-                message_key="coach.weakness_focus",
+                popup_cadence=popup_cadence,
                 metadata={
                     "focus_area": state.focus_area,
                     "error_rate": str(mistakes[0].error_rate),
@@ -162,14 +283,38 @@ def evaluate_assistant_events(
             )
         )
 
-    if not events:
-        events.append(
-            AssistantEvent(
+    if curriculum_attempts >= 8 and curriculum_accuracy_7d < 60:
+        candidates.append(
+            _create_scripted_event(
+                event_type="curriculum_stall",
+                priority="coaching",
+                popup_cadence=popup_cadence,
+                metadata={
+                    "mode": "context_cloze",
+                    "accuracy_7d": str(curriculum_accuracy_7d),
+                },
+            )
+        )
+
+    if not candidates:
+        candidates.append(
+            _create_scripted_event(
                 event_type="ambient_checkin",
                 priority="info",
-                message_key="coach.ambient_checkin",
+                popup_cadence=popup_cadence,
                 metadata={"mood": state.mood},
             )
         )
 
-    return events
+    seen = set(recently_emitted_dedup_keys or set())
+    selected: list[AssistantEvent] = []
+    for event in sorted(candidates, key=lambda item: _priority_sort_value(item.priority)):
+        if event.dedup_key and event.dedup_key in seen:
+            continue
+        selected.append(event)
+        if event.dedup_key:
+            seen.add(event.dedup_key)
+        if len(selected) >= _max_events_for_cadence(popup_cadence):
+            break
+
+    return selected

@@ -210,14 +210,30 @@ def load_session_summary(session_id: str) -> SessionSummary | None:
 def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
     """Compute deterministic tutor state/events and persist a new snapshot."""
     profile = database.load_assistant_profile()
+    popup_cadence = str(profile.get("popup_cadence", "high")).lower()
+    if popup_cadence not in {"low", "medium", "high"}:
+        popup_cadence = "high"
+
+    dedup_window_by_cadence = {
+        "high": 180,
+        "medium": 240,
+        "low": 360,
+    }
+
     activity_week = database.load_activity_summary(7)
     streak = database.load_streak_state()
     mistakes = database.load_mistake_breakdown(limit=6)
     item_history = load_item_history(limit_items=8, events_per_item=8)
     leech_count = database.load_active_leech_count()
+    curriculum_summary = database.load_curriculum_stage_summary(mode="context_cloze")
     session_summary = database.load_session_summary(session_id) if session_id else None
     latest_state = database.load_latest_assistant_state()
     prior_momentum = latest_state.momentum if latest_state is not None else 0
+    long_horizon_momentum = database.load_assistant_long_horizon_momentum(limit=24)
+    recent_dedup_keys = database.load_recent_assistant_event_dedup_keys(
+        window_minutes=dedup_window_by_cadence[popup_cadence],
+    )
+    now_utc = datetime.now(timezone.utc)
 
     state = compute_assistant_state(
         activity_week=activity_week,
@@ -227,6 +243,9 @@ def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
         leech_count=leech_count,
         session_summary=session_summary,
         prior_momentum=prior_momentum,
+        long_horizon_momentum=long_horizon_momentum,
+        curriculum_attempts=curriculum_summary["attempts"],
+        curriculum_accuracy_7d=curriculum_summary["accuracy_7d"],
     )
     events = evaluate_assistant_events(
         state=state,
@@ -234,10 +253,29 @@ def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
         mistakes=mistakes,
         leech_count=leech_count,
         session_summary=session_summary,
+        now_utc=now_utc,
+        popup_cadence=popup_cadence,
+        recently_emitted_dedup_keys=recent_dedup_keys,
+        curriculum_attempts=curriculum_summary["attempts"],
+        curriculum_accuracy_7d=curriculum_summary["accuracy_7d"],
     )
 
     database.save_assistant_state_snapshot(state)
-    database.enqueue_assistant_events(events)
+    database.enqueue_assistant_events(
+        events,
+        dedup_window_minutes=dedup_window_by_cadence[popup_cadence],
+    )
+
+    database.upsert_assistant_memory_fact("coach.focus_area", state.focus_area, source="snapshot")
+    database.upsert_assistant_memory_fact("coach.last_major_event", state.last_major_event, source="snapshot")
+    database.upsert_assistant_memory_fact("study.streak_days", str(streak.current_streak_days), source="signals")
+    if mistakes:
+        database.upsert_assistant_memory_fact("study.weakest_bucket", mistakes[0].key, source="signals")
+        database.upsert_assistant_memory_fact(
+            "study.weakest_error_rate",
+            str(mistakes[0].error_rate),
+            source="signals",
+        )
 
     return {
         "profile": profile,

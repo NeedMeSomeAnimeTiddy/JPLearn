@@ -22,7 +22,8 @@ MIGRATION_V1 = 1
 MIGRATION_V2 = 2
 MIGRATION_V3 = 3
 MIGRATION_V4 = 4
-LATEST_SCHEMA_VERSION = 4
+MIGRATION_V5 = 5
+LATEST_SCHEMA_VERSION = 5
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -252,11 +253,37 @@ def _migration_0004(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0005(conn: sqlite3.Connection) -> None:
+    existing_event_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(assistant_events)").fetchall()
+    }
+    if "dedup_key" not in existing_event_columns:
+        conn.execute("ALTER TABLE assistant_events ADD COLUMN dedup_key TEXT NOT NULL DEFAULT ''")
+    if "cooldown_minutes" not in existing_event_columns:
+        conn.execute("ALTER TABLE assistant_events ADD COLUMN cooldown_minutes INTEGER NOT NULL DEFAULT 60")
+    if "consumed_at_utc" not in existing_event_columns:
+        conn.execute("ALTER TABLE assistant_events ADD COLUMN consumed_at_utc TEXT")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS assistant_memory_facts (
+            fact_key TEXT PRIMARY KEY,
+            fact_value TEXT NOT NULL,
+            source TEXT NOT NULL,
+            linked_event_id INTEGER,
+            updated_at_utc TEXT NOT NULL
+        )
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
     MIGRATION_V3: _migration_0003,
     MIGRATION_V4: _migration_0004,
+    MIGRATION_V5: _migration_0005,
 }
 
 
@@ -304,6 +331,7 @@ def reset_db() -> None:
         conn.execute("DELETE FROM assistant_state_snapshots")
         conn.execute("DELETE FROM assistant_events")
         conn.execute("DELETE FROM assistant_chat_turns")
+        conn.execute("DELETE FROM assistant_memory_facts")
 
 
 def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
@@ -1153,16 +1181,103 @@ def load_latest_assistant_state() -> AssistantState | None:
     )
 
 
-def enqueue_assistant_events(events: list[AssistantEvent]) -> None:
+def load_assistant_state_timeline(limit: int = 60) -> list[AssistantState]:
+    """Return recent assistant emotional timeline, oldest to newest."""
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT mood, momentum, confidence_level, focus_area, last_major_event
+            FROM assistant_state_snapshots
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    timeline = [
+        AssistantState(
+            mood=cast(AssistantMood, str(row["mood"])),
+            momentum=int(row["momentum"]),
+            confidence_level=int(row["confidence_level"]),
+            focus_area=str(row["focus_area"]),
+            last_major_event=str(row["last_major_event"]),
+        )
+        for row in rows
+    ]
+    return list(reversed(timeline))
+
+
+def load_assistant_long_horizon_momentum(limit: int = 24) -> int:
+    """Return averaged momentum over recent snapshots for long-memory blending."""
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT momentum
+            FROM assistant_state_snapshots
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    if not rows:
+        return 0
+    total = sum(int(row["momentum"]) for row in rows)
+    return round(total / len(rows))
+
+
+def load_recent_assistant_event_dedup_keys(window_minutes: int = 180) -> set[str]:
+    """Return event dedup keys emitted in a rolling UTC window."""
+    if window_minutes <= 0:
+        raise ValueError("window_minutes must be positive")
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=window_minutes)).isoformat(timespec="seconds")
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT dedup_key
+            FROM assistant_events
+            WHERE dedup_key != '' AND created_at_utc >= ?
+            """,
+            (cutoff,),
+        ).fetchall()
+
+    return {str(row["dedup_key"]) for row in rows if str(row["dedup_key"]).strip()}
+
+
+def enqueue_assistant_events(events: list[AssistantEvent], dedup_window_minutes: int = 180) -> None:
     """Persist scripted assistant events for popup consumption."""
     if not events:
         return
+    if dedup_window_minutes <= 0:
+        raise ValueError("dedup_window_minutes must be positive")
+
+    recent_keys = load_recent_assistant_event_dedup_keys(window_minutes=dedup_window_minutes)
+    unique_events: list[AssistantEvent] = []
+    seen_in_batch = set()
+    for event in events:
+        dedup_key = event.dedup_key.strip()
+        if dedup_key and (dedup_key in recent_keys or dedup_key in seen_in_batch):
+            continue
+        unique_events.append(event)
+        if dedup_key:
+            seen_in_batch.add(dedup_key)
+
+    if not unique_events:
+        return
+
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with _connect() as conn:
         conn.executemany(
             """
-            INSERT INTO assistant_events (event_type, priority, message_key, metadata_json, created_at_utc, consumed)
-            VALUES (?, ?, ?, ?, ?, 0)
+            INSERT INTO assistant_events (event_type, priority, message_key, metadata_json, created_at_utc, consumed, dedup_key, cooldown_minutes)
+            VALUES (?, ?, ?, ?, ?, 0, ?, ?)
             """,
             [
                 (
@@ -1171,8 +1286,10 @@ def enqueue_assistant_events(events: list[AssistantEvent]) -> None:
                     normalize_storage_text(event.message_key),
                     json.dumps(event.metadata, ensure_ascii=False, sort_keys=True),
                     created_at,
+                    normalize_storage_text(event.dedup_key),
+                    max(1, int(event.cooldown_minutes)),
                 )
-                for event in events
+                for event in unique_events
             ],
         )
 
@@ -1184,7 +1301,7 @@ def load_pending_assistant_events(limit: int = 8) -> list[tuple[int, AssistantEv
     with _connect() as conn:
         rows = conn.execute(
             """
-            SELECT id, event_type, priority, message_key, metadata_json
+            SELECT id, event_type, priority, message_key, metadata_json, dedup_key, cooldown_minutes
             FROM assistant_events
             WHERE consumed=0
             ORDER BY id ASC
@@ -1208,6 +1325,8 @@ def load_pending_assistant_events(limit: int = 8) -> list[tuple[int, AssistantEv
                     priority=cast(AssistantEventPriority, str(row["priority"])),
                     message_key=str(row["message_key"]),
                     metadata=normalized_metadata,
+                    dedup_key=str(row["dedup_key"]),
+                    cooldown_minutes=int(row["cooldown_minutes"]),
                 ),
             )
         )
@@ -1218,12 +1337,78 @@ def mark_assistant_events_consumed(event_ids: list[int]) -> None:
     """Mark assistant events as consumed after renderer acknowledgement."""
     if not event_ids:
         return
+    consumed_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     placeholders = ",".join("?" for _ in event_ids)
     with _connect() as conn:
         conn.execute(
-            f"UPDATE assistant_events SET consumed=1 WHERE id IN ({placeholders})",
-            [int(event_id) for event_id in event_ids],
+            f"UPDATE assistant_events SET consumed=1, consumed_at_utc=? WHERE id IN ({placeholders})",
+            [consumed_at, *[int(event_id) for event_id in event_ids]],
         )
+
+
+def upsert_assistant_memory_fact(
+    fact_key: str,
+    fact_value: str,
+    source: str,
+    linked_event_id: int | None = None,
+) -> None:
+    """Persist one assistant long-memory fact as latest known value."""
+    normalized_key = normalize_storage_text(fact_key).lower()
+    normalized_value = normalize_japanese_text(fact_value)
+    normalized_source = normalize_storage_text(source).lower() or "system"
+    if not normalized_key:
+        raise ValueError("fact_key must not be empty")
+    if not normalized_value:
+        raise ValueError("fact_value must not be empty")
+
+    updated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO assistant_memory_facts (fact_key, fact_value, source, linked_event_id, updated_at_utc)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(fact_key) DO UPDATE SET
+                fact_value=excluded.fact_value,
+                source=excluded.source,
+                linked_event_id=excluded.linked_event_id,
+                updated_at_utc=excluded.updated_at_utc
+            """,
+            (
+                normalized_key,
+                normalized_value,
+                normalized_source,
+                linked_event_id,
+                updated_at,
+            ),
+        )
+
+
+def load_assistant_memory_facts(limit: int = 40) -> list[dict[str, str | int | None]]:
+    """Load assistant long-memory facts ordered by most recently updated."""
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT fact_key, fact_value, source, linked_event_id, updated_at_utc
+            FROM assistant_memory_facts
+            ORDER BY updated_at_utc DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return [
+        {
+            "fact_key": str(row["fact_key"]),
+            "fact_value": str(row["fact_value"]),
+            "source": str(row["source"]),
+            "linked_event_id": None if row["linked_event_id"] is None else int(row["linked_event_id"]),
+            "updated_at_utc": str(row["updated_at_utc"]),
+        }
+        for row in rows
+    ]
 
 
 def append_assistant_chat_turn(role: str, content: str) -> None:

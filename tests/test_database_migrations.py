@@ -82,10 +82,18 @@ def test_jplearn_db_upgrade_adds_review_event_columns_and_schema_marker(
     assistant_events_columns = _column_names(db_path, "assistant_events")
     assert "event_type" in assistant_events_columns
     assert "metadata_json" in assistant_events_columns
+    assert "dedup_key" in assistant_events_columns
+    assert "cooldown_minutes" in assistant_events_columns
+    assert "consumed_at_utc" in assistant_events_columns
 
     assistant_chat_columns = _column_names(db_path, "assistant_chat_turns")
     assert "role" in assistant_chat_columns
     assert "content" in assistant_chat_columns
+
+    assistant_memory_columns = _column_names(db_path, "assistant_memory_facts")
+    assert "fact_key" in assistant_memory_columns
+    assert "fact_value" in assistant_memory_columns
+    assert "source" in assistant_memory_columns
 
     with sqlite3.connect(db_path) as conn:
         row = conn.execute(
@@ -237,6 +245,8 @@ def test_jplearn_db_upgrade_from_v3_applies_assistant_tables(
     assert "mood" in _column_names(db_path, "assistant_state_snapshots")
     assert "event_type" in _column_names(db_path, "assistant_events")
     assert "role" in _column_names(db_path, "assistant_chat_turns")
+    assert "dedup_key" in _column_names(db_path, "assistant_events")
+    assert "fact_key" in _column_names(db_path, "assistant_memory_facts")
 
     with sqlite3.connect(db_path) as conn:
         version_row = conn.execute(
