@@ -383,7 +383,7 @@ describe('Minigame menu', () => {
       return ['あ', 'い', 'う', 'え'].some((character) => content.includes(character))
     })
     expect(promptMain).toBeTruthy()
-    expect(screen.getByText(/Example sentence: あさです。/i)).toBeTruthy()
+    expect(screen.getByText(/Example: あさです。/i)).toBeTruthy()
   })
 
   it('renders reading practice passages in words track using example sentences', async () => {
@@ -400,7 +400,7 @@ describe('Minigame menu', () => {
       return content.includes('あさです。')
     })
     expect(storyPassage).toBeTruthy()
-    expect(screen.getByText(/Read the sentence and choose the best meaning for あ/i)).toBeTruthy()
+    expect(screen.getByText(/The sentence uses あ.*choose its meaning/i)).toBeTruthy()
   })
 
   it('shows a stroke-memory hint for kanji character matches', async () => {
@@ -412,7 +412,7 @@ describe('Minigame menu', () => {
     const matchTiles = await screen.findAllByRole('button', { name: /Character Match/i })
     fireEvent.click(within((matchTiles[0].closest('.game-tile') ?? matchTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
-    expect(await screen.findByText(/Stroke memory: visualize the character skeleton first\./i)).toBeTruthy()
+    expect(await screen.findByText(/Think about how this kanji looks/i)).toBeTruthy()
   })
 
   it('renders a stroke-order writing drill for kanji rounds', async () => {
@@ -452,9 +452,9 @@ describe('Minigame menu', () => {
     const strokeTiles = await screen.findAllByRole('button', { name: /Stroke Order/i })
     fireEvent.click(within((strokeTiles[0].closest('.game-tile') ?? strokeTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
-    expect(await screen.findByText(/Type the reading to reveal kanji candidates/i)).toBeTruthy()
+    expect(await screen.findByText(/Type the romaji reading to see kanji options/i)).toBeTruthy()
     expect(screen.getByPlaceholderText(/Type romaji reading/i)).toBeTruthy()
-    expect(screen.getByText(/Stroke memory: type the reading, then choose the kanji/i)).toBeTruthy()
+    expect(screen.getByText(/Type the reading, then select the matching kanji/i)).toBeTruthy()
 
     fireEvent.change(screen.getByPlaceholderText(/Type romaji reading/i), { target: { value: 'nichi' } })
     fireEvent.click(await screen.findByRole('button', { name: /日.*nichi/i }))

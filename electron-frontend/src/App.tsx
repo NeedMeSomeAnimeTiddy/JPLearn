@@ -359,72 +359,72 @@ const TAG_PROMPT_PACKS: Record<string, string[]> = {
 const CLOZE_TEMPLATES: Record<ScriptKey, Record<number, string[]>> = {
   hiragana: {
     1: [
-      'Beginner line: The kana {character} is read as ___.',
-      'Warm-up sentence: When I see {character}, I answer ___.',
+      'The kana {character} is read as ___.',
+      'When I see {character}, I write ___.',
     ],
     2: [
-      'Context line: During reading practice, {character} maps to ___.',
-      'Focus sentence: I recognized {character} and chose ___.',
+      'During reading practice, {character} maps to ___.',
+      'I recognised {character} and filled in ___.',
     ],
     3: [
-      'Challenge line: Under pressure, {character} still means ___.',
-      'Advanced cue: In mixed review, {character} appeared and I picked ___.',
+      'Under pressure, {character} still means ___.',
+      'In a mixed drill, {character} came up and I chose ___.',
     ],
   },
   katakana: {
     1: [
-      'Beginner line: The katakana {character} is read as ___.',
-      'Warm-up sentence: For {character}, the correct reading is ___.',
+      'The katakana {character} is read as ___.',
+      'For {character}, the reading is ___.',
     ],
     2: [
-      'Context line: In a loanword drill, {character} maps to ___.',
-      'Focus sentence: I saw {character} in context and selected ___.',
+      'In a loanword context, {character} maps to ___.',
+      'I came across {character} in a sentence and filled in ___.',
     ],
     3: [
-      'Challenge line: Fast recognition of {character} still pointed to ___.',
-      'Advanced cue: In noisy context, {character} still resolved to ___.',
+      'Even at speed, {character} still points to ___.',
+      'In a complex sentence, {character} still means ___.',
     ],
   },
   kanji_n5: {
     1: [
-      'Beginner line: The kanji {character} is best understood as ___.',
-      'Warm-up sentence: In simple text, {character} fits as ___.',
+      'The kanji {character} is best understood as ___.',
+      'In simple text, {character} fits as ___.',
     ],
     2: [
-      'Context line: Sentence meaning points to {character} as ___.',
-      'Focus sentence: With one clue missing, {character} completes it as ___.',
+      'Based on the context, {character} means ___.',
+      'With one clue missing, {character} fills the gap as ___.',
     ],
     3: [
-      'Challenge line: Subtle context still links {character} to ___.',
-      'Advanced cue: In a compressed phrase, {character} is interpreted as ___.',
+      'Even in a subtle context, {character} links to ___.',
+      'In a compressed phrase, {character} is best read as ___.',
     ],
   },
   vocab_n5: {
     1: [
-      'Beginner line: The word {character} means ___.',
-      'Warm-up sentence: For {character} ({romaji}), choose ___.',
+      'The word {character} means ___.',
+      'For {character} ({romaji}), the best meaning is ___.',
     ],
     2: [
-      'Context line: In this sentence, {character} contributes ___.',
-      'Focus sentence: Usage clues show that {character} means ___.',
+      'In this sentence, {character} contributes ___.',
+      'From the context clues, {character} means ___.',
     ],
     3: [
-      'Challenge line: Even in subtle context, {character} means ___.',
-      'Advanced cue: Under pressure, {character} is still ___.',
+      'Even in a subtle context, {character} means ___.',
+      'Under pressure, {character} is still ___.',
     ],
   },
   grammar_patterns: {
     1: [
-      'Beginner line: The pattern {character} is used for ___.',
-      'Warm-up sentence: For {character} ({romaji}), the best meaning is ___.',
+      'The pattern {character} is used for ___.',
+      'For {character} ({romaji}), the best meaning is ___.',
     ],
     2: [
-      'Context line: This exchange calls for {character} to express ___.',
-      'Focus sentence: The grammar cue {character} signals ___.',
+      'This exchange uses {character} to express ___.',
+      'The grammar pattern {character} signals ___.',
     ],
     3: [
-      'Challenge line: In nuanced dialogue, {character} still conveys ___.',
-      'Advanced cue: The most natural reading of {character} here is ___.',
+      'In nuanced dialogue, {character} still conveys ___.',
+      'The most natural reading of {character} here is ___.',
     ],
   },
 }
@@ -495,7 +495,7 @@ const STORY_CHAPTERS: Record<ScriptKey, Record<1 | 2 | 3, { title: string; lines
       title: 'Chapter 3: Travel Plan',
       lines: [
         'A ticket note uses {character}, so the missing meaning is ___.',
-        'In the final itinerary line, {character} is best read as ___.',
+        'In the final itinerary line, {character} means ___.',
       ],
     },
   },
@@ -504,7 +504,7 @@ const STORY_CHAPTERS: Record<ScriptKey, Record<1 | 2 | 3, { title: string; lines
       title: 'Chapter 1: First Conversation',
       lines: [
         'At introductions, the word {character} completes this line as ___.',
-        'A beginner exchange needs {character}; pick ___ to finish it.',
+        'In this beginner exchange, {character} fills the blank as ___.',
       ],
     },
     2: {
@@ -518,7 +518,7 @@ const STORY_CHAPTERS: Record<ScriptKey, Record<1 | 2 | 3, { title: string; lines
       title: 'Chapter 3: Weekend Plans',
       lines: [
         'Planning with friends uses {character}; choose ___ to complete it.',
-        'The weekend plan line points to {character} meaning ___.',
+        'In this weekend scene, {character} means ___.',
       ],
     },
   },
@@ -541,7 +541,7 @@ const STORY_CHAPTERS: Record<ScriptKey, Record<1 | 2 | 3, { title: string; lines
       title: 'Chapter 3: Natural Conversation',
       lines: [
         'In natural dialogue, {character} conveys ___ in this scene.',
-        'The final conversation line depends on {character} meaning ___.',
+        'In the final exchange, {character} carries the meaning ___.',
       ],
     },
   },
@@ -1846,6 +1846,30 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'typed_recall') return 'Typed Recall'
   if (mode === 'context_cloze') return 'Context Cloze'
   return 'Story Mode'
+}
+
+function formatExpectedAnswer(rawAnswer: string): string {
+  const compact = rawAnswer.trim().replace(/\s+/g, ' ')
+  if (!compact) return rawAnswer
+
+  const parts = compact
+    .split(/[;,]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+
+  if (parts.length <= 1) return compact
+  if (parts.length === 2) return `${parts[0]} or ${parts[1]}`
+
+  return `${parts.slice(0, -1).join(', ')}, or ${parts[parts.length - 1]}`
+}
+
+function formatFeedbackAnswerLabel(mode: PlayableMinigame): string {
+  if (mode === 'romaji_sprint') return 'The reading'
+  if (mode === 'stroke_order' || mode === 'character_match') return 'The character'
+  if (mode === 'meaning_match' || mode === 'typed_recall' || mode === 'context_cloze' || mode === 'narrative_story') {
+    return 'The answer'
+  }
+  return 'The answer'
 }
 
 function getRoundRecoveryTip(mode: PlayableMinigame): string {
@@ -3270,13 +3294,13 @@ function App() {
         : scoreStage
       const exampleSentenceAudioText = card.example_sentence?.trim() || null
       const exampleSentenceHint = card.example_sentence
-        ? `Example sentence: ${card.example_sentence}`
+        ? `Example: ${card.example_sentence}`
         : null
 
       if (minigame === 'romaji_sprint') {
         const promptLabel = surprisePrompt
           ? surpriseLabel
-          : 'Type the romaji for this character'
+          : 'What is the reading? Type in romaji.'
         return {
           cardId: card.id,
           mode: minigame,
@@ -3297,7 +3321,7 @@ function App() {
       if (minigame === 'typed_recall') {
         const promptLabel = surprisePrompt
           ? surpriseLabel
-          : 'Type the meaning for this prompt'
+          : 'What does this mean? Type your answer.'
         return {
           cardId: card.id,
           mode: minigame,
@@ -3307,7 +3331,7 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: exampleSentenceHint ?? `Use exact wording when possible. Prompt: ${card.character}`,
+          hintText: exampleSentenceHint ?? `Think about what ${card.character} means.`,
           promptLabel,
           focusText: card.character,
           answer: card.meaning,
@@ -3318,7 +3342,7 @@ function App() {
       if (minigame === 'stroke_order') {
         const promptLabel = surprisePrompt
           ? surpriseLabel
-          : 'Type the reading to reveal kanji candidates'
+          : 'Type the romaji reading to see kanji options.'
         return {
           cardId: card.id,
           mode: minigame,
@@ -3328,9 +3352,7 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: card.example_sentence
-            ? `Stroke memory: type the reading, then choose the kanji for ${card.example_sentence}`
-            : 'Stroke memory: type the reading, then pick the matching kanji candidate.',
+          hintText: 'Type the reading, then select the matching kanji from the options.',
           promptLabel,
           focusText: card.meaning,
           answer: card.character,
@@ -3397,11 +3419,11 @@ function App() {
           chapterNumber: null,
           chapterLabel: null,
           hintText: activeScript === 'kanji_n5'
-            ? 'Stroke memory: visualize the character skeleton first.'
+            ? 'Think about how this kanji looks — its structure can help you recall it.'
             : exampleSentenceHint,
           promptLabel: surprisePrompt
             ? surpriseLabel
-            : 'Select the meaning for this character',
+            : 'What does this character mean?',
           focusText: card.character,
           answer: card.meaning,
           options,
@@ -3428,10 +3450,10 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: exampleSentenceHint ?? `Focus card: ${card.character} (${card.romaji})`,
+          hintText: exampleSentenceHint ?? `The word is ${card.character} (${card.romaji}).`,
           promptLabel: surprisePrompt
             ? surpriseLabel
-            : `Fill the blank using context clues (Stage ${curriculumStage})`,
+            : 'Fill in the blank.',
           focusText: clozeSentence,
           answer: card.meaning,
           options,
@@ -3461,13 +3483,13 @@ function App() {
           chapterNumber: curriculumStage,
           chapterLabel: null,
           hintText: readingPassage.length > 0
-            ? `Read the sentence and choose the best meaning for ${card.character}.`
-            : exampleSentenceHint ?? `Scene focus: ${card.character} (${card.romaji})`,
+            ? `The sentence uses ${card.character} — choose its meaning.`
+            : exampleSentenceHint ?? `This scene features ${card.character} — read as "${card.romaji}".`,
           promptLabel: surprisePrompt
             ? surpriseLabel
             : readingPassage.length > 0
-              ? `Read the passage and choose the best meaning (Stage ${curriculumStage})`
-              : `Choose the best scene completion (Stage ${curriculumStage})`,
+              ? 'Read the passage and choose the best answer.'
+              : 'Which word best completes this scene?',
           focusText: readingFocusText,
           answer: card.meaning,
           options,
@@ -3493,11 +3515,11 @@ function App() {
         chapterNumber: null,
         chapterLabel: null,
         hintText: activeScript === 'kanji_n5'
-          ? 'Stroke memory: visualize the character skeleton first.'
+          ? 'Think about how this kanji looks — its structure can help you recall it.'
           : exampleSentenceHint,
         promptLabel: surprisePrompt
           ? surpriseLabel
-          : 'Select the character for this meaning',
+          : 'Which character matches this meaning?',
         focusText: card.meaning,
         answer: card.character,
         options,
@@ -3801,12 +3823,12 @@ function App() {
         setSessionScore((value) => value + 1)
         setSessionPoints((value) => value + awardedPoints)
         if (roundState.mode === 'typed_recall' && typedAssessment === 'near_miss') {
-          setRoundFeedback(`Near miss accepted ${pointsCopy}${comboCopy}`)
+          setRoundFeedback(`Close enough — we’ll count it! ${pointsCopy}${comboCopy}.`)
         } else if (roundState.mode === 'narrative_story') {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
-          setRoundFeedback(`Correct ${pointsCopy}${comboCopy} · Stage ${roundState.curriculumStage} -> ${nextStage}.`)
+          setRoundFeedback(`Nice work! ${pointsCopy}${comboCopy}. Stage ${roundState.curriculumStage} → ${nextStage}.`)
         } else {
-          setRoundFeedback(`Correct ${pointsCopy}${comboCopy}`)
+          setRoundFeedback(`Nice work! ${pointsCopy}${comboCopy}.`)
         }
         setRoundFeedbackTone('success')
         setRoundFeedbackPoints(awardedPoints)
@@ -3831,13 +3853,13 @@ function App() {
         }
         if (roundState.mode === 'narrative_story') {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage - 1)
-          setRoundFeedback(`Not quite. Stage ${roundState.curriculumStage} -> ${nextStage}.`)
+          setRoundFeedback(`Not quite. Stage ${roundState.curriculumStage} → ${nextStage}.`)
         } else {
-          setRoundFeedback('You got it wrong.')
+          setRoundFeedback('Not quite — the answer is shown below.')
         }
         setRoundFeedbackTone('error')
         setRoundFeedbackPoints(0)
-        setRoundFeedbackAnswer(roundState.answer)
+        setRoundFeedbackAnswer(formatExpectedAnswer(roundState.answer))
 
         // Wrong answer deducts 1 from the card score (floored at 0).
         const answeredCardId = roundState.cardId
@@ -5690,7 +5712,7 @@ function App() {
                     </div>
                     {roundFeedbackAnswer ? (
                       <div className="round-feedback-answer">
-                        <p className="round-feedback-answer-label">Correct answer</p>
+                        <p className="round-feedback-answer-label">{formatFeedbackAnswerLabel(roundState.mode)}</p>
                         <p className="round-feedback-answer-value">{roundFeedbackAnswer}</p>
                       </div>
                     ) : null}
