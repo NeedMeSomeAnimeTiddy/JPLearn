@@ -1862,6 +1862,8 @@ function App() {
   const [assistantChatLoading, setAssistantChatLoading] = useState(false)
   const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
   const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
+  const [assistantChatWarmup, setAssistantChatWarmup] = useState(false)
+  const [assistantChatFallbackNote, setAssistantChatFallbackNote] = useState<string | null>(null)
 
   const [activeScript, setActiveScript] = useState<ScriptKey>('hiragana')
   const [activeGame, setActiveGame] = useState<MinigameKey>('romaji_sprint')
@@ -2002,6 +2004,17 @@ function App() {
     const minutes = Math.max(1, Math.round(assistantChatStatus.inactivityUnloadMs / 60000))
     return `${minutes}m`
   }, [assistantChatStatus])
+
+  const assistantRuntimePillLabel = useMemo(() => {
+    if (assistantChatWarmup) return 'Warming up'
+    if (assistantChatStatus?.loaded) return 'Runtime loaded'
+    return 'Runtime idle'
+  }, [assistantChatStatus?.loaded, assistantChatWarmup])
+
+  const assistantRuntimePillClassName = useMemo(() => {
+    if (assistantChatWarmup) return 'assistant-chat-runtime-pill is-warming'
+    return `assistant-chat-runtime-pill ${assistantChatStatus?.loaded ? 'is-loaded' : 'is-idle'}`
+  }, [assistantChatStatus?.loaded, assistantChatWarmup])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
   const interleaveSequence = useMemo(
@@ -2528,12 +2541,27 @@ function App() {
   const closeAssistantChat = useCallback(() => {
     setAssistantChatOpen(false)
     setAssistantChatError(null)
+    setAssistantChatWarmup(false)
+    setAssistantChatFallbackNote(null)
     const unloadAssistantChatRuntime = window.jplearnDesktop.unloadAssistantChatRuntime
     if (!unloadAssistantChatRuntime) {
       return
     }
     void unloadAssistantChatRuntime().catch(() => undefined)
   }, [])
+
+  const cancelAssistantChatInference = useCallback(async () => {
+    const cancelInference = window.jplearnDesktop.cancelAssistantChatInference
+    if (!cancelInference) {
+      return
+    }
+    try {
+      await cancelInference()
+      await refreshAssistantChatStatus()
+    } catch {
+      // Best-effort cancellation path.
+    }
+  }, [refreshAssistantChatStatus])
 
   const sendAssistantChat = useCallback(async () => {
     const sendAssistantChatMessage = window.jplearnDesktop.sendAssistantChatMessage
@@ -2549,24 +2577,29 @@ function App() {
 
     setAssistantChatLoading(true)
     setAssistantChatError(null)
+    setAssistantChatWarmup(!assistantChatStatus?.loaded)
     try {
-      await sendAssistantChatMessage({
+      const response = await sendAssistantChatMessage({
         message,
         context: {
-          mood: assistantState?.mood ?? 'coach_neutral',
-          focus_area: assistantState?.focus_area ?? 'general',
-          persona_style: assistantProfile?.persona_style ?? 'coach',
+          session_id: activeSessionId ?? '',
         },
       })
+      if (response.provider === 'scripted-fallback' || response.provider === 'stub-fallback') {
+        setAssistantChatFallbackNote('Local model unavailable. Scripted coach mode is active for this chat turn.')
+      } else {
+        setAssistantChatFallbackNote(null)
+      }
       setAssistantChatInput('')
       await refreshAssistantChatHistory()
       await refreshAssistantChatStatus()
     } catch (error: unknown) {
       setAssistantChatError(error instanceof Error ? error.message : 'Unable to send assistant chat message.')
     } finally {
+      setAssistantChatWarmup(false)
       setAssistantChatLoading(false)
     }
-  }, [assistantChatInput, assistantProfile?.persona_style, assistantState?.focus_area, assistantState?.mood, refreshAssistantChatHistory, refreshAssistantChatStatus])
+  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus])
 
   useEffect(() => {
     let cancelled = false
@@ -6368,8 +6401,8 @@ function App() {
             <header className="assistant-chat-header">
               <h3>Coach Chat</h3>
               <div className="assistant-chat-header-actions">
-                <span className={`assistant-chat-runtime-pill ${assistantChatStatus?.loaded ? 'is-loaded' : 'is-idle'}`}>
-                  {assistantChatStatus?.loaded ? 'Runtime loaded' : 'Runtime idle'}
+                <span className={assistantRuntimePillClassName}>
+                  {assistantRuntimePillLabel}
                 </span>
                 <button
                   type="button"
@@ -6386,10 +6419,16 @@ function App() {
               <span>Provider: {assistantRuntimeProviderLabel}</span>
               <span>Model: {assistantRuntimeModelLabel ?? 'default'}</span>
               <span>Unload: {assistantRuntimeIdleLabel}</span>
+              {assistantChatWarmup ? (
+                <span className="assistant-chat-runtime-info">Model warmup in progress on first message...</span>
+              ) : null}
               {assistantChatStatus?.lastError ? (
                 <span className="assistant-chat-runtime-warning" title={assistantChatStatus.lastError}>
                   Fallback active: {assistantChatStatus.lastError}
                 </span>
+              ) : null}
+              {assistantChatFallbackNote ? (
+                <span className="assistant-chat-runtime-warning">{assistantChatFallbackNote}</span>
               ) : null}
             </div>
 
@@ -6418,15 +6457,27 @@ function App() {
                 rows={2}
                 disabled={assistantChatLoading}
               />
-              <button
-                type="button"
-                onClick={() => void sendAssistantChat()}
-                disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
-                aria-label="Send tutor chat message"
-              >
-                <SendHorizontal size={14} strokeWidth={2.2} aria-hidden="true" />
-                {assistantChatLoading ? 'Sending...' : 'Send'}
-              </button>
+              <div className="assistant-chat-composer-actions">
+                {assistantChatLoading ? (
+                  <button
+                    type="button"
+                    className="assistant-chat-cancel"
+                    onClick={() => void cancelAssistantChatInference()}
+                    aria-label="Cancel tutor chat inference"
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void sendAssistantChat()}
+                  disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
+                  aria-label="Send tutor chat message"
+                >
+                  <SendHorizontal size={14} strokeWidth={2.2} aria-hidden="true" />
+                  {assistantChatLoading ? 'Sending...' : 'Send'}
+                </button>
+              </div>
             </footer>
           </section>
         ) : null}

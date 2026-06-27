@@ -198,6 +198,11 @@
   border-color: color-mix(in oklab, var(--tone-ocean) 48%, var(--panel-border));
 }
 
+.assistant-chat-runtime-pill.is-warming {
+  border-color: color-mix(in oklab, var(--tone-amber) 62%, var(--panel-border));
+  color: color-mix(in oklab, var(--text-main) 84%, var(--tone-amber));
+}
+
 .assistant-chat-close {
   border: 1px solid color-mix(in oklab, var(--panel-border) 76%, white 24%);
   background: color-mix(in oklab, var(--panel-bg) 88%, black);
@@ -228,6 +233,10 @@
 
 .assistant-chat-runtime-warning {
   color: color-mix(in oklab, var(--tone-danger) 72%, var(--text-main));
+}
+
+.assistant-chat-runtime-info {
+  color: color-mix(in oklab, var(--tone-amber) 72%, var(--text-main));
 }
 
 .assistant-chat-log {
@@ -302,7 +311,6 @@
 }
 
 .assistant-chat-composer button {
-  justify-self: end;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 58%, var(--panel-border));
   background: color-mix(in oklab, var(--panel-bg) 80%, var(--tone-ocean) 20%);
   color: var(--text-main);
@@ -320,6 +328,18 @@
 .assistant-chat-composer button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.assistant-chat-composer-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.assistant-chat-cancel {
+  border-color: color-mix(in oklab, var(--tone-danger) 58%, var(--panel-border));
+  background: color-mix(in oklab, var(--panel-bg) 82%, var(--tone-danger) 18%);
 }
 
 .assistant-status-chip {

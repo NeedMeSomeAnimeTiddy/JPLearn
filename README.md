@@ -33,8 +33,24 @@ An Electron-based Japanese learning app with a Python backend for domain logic a
 9. Export or import progress snapshots:
    `python scripts\deck_portability.py export --output data\exports\progress.json`
    `python scripts\deck_portability.py import --input data\exports\progress.json --mode merge`
+10. Configure local llama.cpp tutor runtime (optional):
+   `powershell -ExecutionPolicy Bypass -File scripts\setup_llama_env.ps1`
 
 `scripts\dev.py` is the main gate and runs type checks, architecture checks, DB checks, SRS checks, then tests.
+
+### Local llama.cpp Tutor Setup
+
+- llama.cpp source is installed at:
+   `tools\llama.cpp`
+- built CLI binary is at:
+   `tools\llama.cpp\build\bin\Release\llama-cli.exe`
+- place model files here:
+   `models\llama\`
+- runtime auto-detects the first `*.gguf` in `models\llama\` and uses llama.cpp automatically.
+- explicit environment overrides are still supported:
+   `JPLEARN_TUTOR_PROVIDER`
+   `JPLEARN_LLAMA_CPP_PATH`
+   `JPLEARN_LLAMA_MODEL_PATH`
 
 ### External Content Import Workflow
 

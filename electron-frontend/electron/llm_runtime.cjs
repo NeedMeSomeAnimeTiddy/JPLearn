@@ -1,5 +1,6 @@
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
+const path = require('node:path')
 
 const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
 const DEFAULT_LLAMACPP_TIMEOUT_MS = 35000
@@ -7,6 +8,27 @@ const DEFAULT_MAX_CONTEXT_CHARS = 1800
 const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 700
 const DEFAULT_MAX_PROMPT_CHARS = 3200
+const DEFAULT_MODEL_DIRECTORY = path.resolve(__dirname, '..', '..', 'models', 'llama')
+
+function resolveBundledLlamaCppPath() {
+  const candidates = [
+    path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-cli.exe'),
+    path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'llama-cli.exe'),
+  ]
+  return candidates.find((candidate) => fs.existsSync(candidate)) || ''
+}
+
+function resolveBundledModelPath() {
+  if (!fs.existsSync(DEFAULT_MODEL_DIRECTORY)) {
+    return ''
+  }
+  const entries = fs.readdirSync(DEFAULT_MODEL_DIRECTORY, { withFileTypes: true })
+  const models = entries
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.gguf'))
+    .map((entry) => path.join(DEFAULT_MODEL_DIRECTORY, entry.name))
+    .sort()
+  return models[0] || ''
+}
 
 class InferenceAbortError extends Error {
   constructor(message = 'Inference cancelled') {
@@ -93,7 +115,7 @@ function createLlamaCppCliAdapter(config = {}) {
         throw new Error(`llama.cpp executable not found: ${executablePath}`)
       }
       if (!modelPath) {
-        throw new Error('llama.cpp runtime requires JPLEARN_LLAMA_MODEL_PATH')
+        throw new Error(`llama.cpp runtime requires JPLEARN_LLAMA_MODEL_PATH or a .gguf model in ${DEFAULT_MODEL_DIRECTORY}`)
       }
       if (!fs.existsSync(modelPath)) {
         throw new Error(`llama.cpp model not found: ${modelPath}`)
@@ -263,12 +285,16 @@ function createTutorChatRuntime(options = {}) {
     ? Math.max(15000, Math.floor(options.inactivityUnloadMs))
     : DEFAULT_INACTIVITY_UNLOAD_MS
 
+  const discoveredLlamaCppPath = resolveBundledLlamaCppPath()
+  const discoveredModelPath = resolveBundledModelPath()
   const configuredProvider = normalizeProviderName(
-    options.provider || process.env.JPLEARN_TUTOR_PROVIDER || 'stub',
+    options.provider
+    || process.env.JPLEARN_TUTOR_PROVIDER
+    || (discoveredLlamaCppPath && discoveredModelPath ? 'llama.cpp' : 'stub'),
   )
   const llamaCppConfig = {
-    executablePath: options.llamaCppPath || process.env.JPLEARN_LLAMA_CPP_PATH || '',
-    modelPath: options.llamaModelPath || process.env.JPLEARN_LLAMA_MODEL_PATH || '',
+    executablePath: options.llamaCppPath || process.env.JPLEARN_LLAMA_CPP_PATH || discoveredLlamaCppPath,
+    modelPath: options.llamaModelPath || process.env.JPLEARN_LLAMA_MODEL_PATH || discoveredModelPath,
     timeoutMs: options.llamaTimeoutMs,
   }
 
