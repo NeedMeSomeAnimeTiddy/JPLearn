@@ -789,6 +789,13 @@ const EXPERTISE_OPTIONS: Array<{ level: ExpertiseLevel; title: string; descripti
   },
 ]
 
+const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
+  total_beginner: [],
+  know_hiragana: ['hiragana'],
+  know_kana: ['hiragana', 'katakana'],
+  jlpt_n5_foundation: ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
+}
+
 const EMPTY_SCRIPT_STATS: ScriptStats = {
   attempted: 0,
   correct: 0,
@@ -2950,24 +2957,10 @@ function App() {
   const activeScriptStats = scriptStats[activeScript]
   const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : activeBlockCards
 
-  // Block progress enhanced with locally-tracked card scores (updates live while playing).
+  // Use backend block mastery/unlock values so script hub and overview stay consistent.
   const blockProgressWithMastery = useMemo(() => {
-    const scores = cardScores[activeScript]
-    return blockProgress.map((block) => {
-      const total = block.card_ids.reduce((sum, id) => sum + (scores[id] ?? 0), 0)
-      const mastery = block.card_ids.length > 0 ? total / (CARD_MASTERY_MAX * block.card_ids.length) : 0
-      const unlocked = block.index === 0 || (() => {
-        for (let i = 0; i < block.index; i++) {
-          const prev = blockProgress[i]
-          const prevTotal = prev.card_ids.reduce((sum, id) => sum + (scores[id] ?? 0), 0)
-          const prevMastery = prev.card_ids.length > 0 ? prevTotal / (CARD_MASTERY_MAX * prev.card_ids.length) : 0
-          if (prevMastery < 0.8) return false
-        }
-        return true
-      })()
-      return { ...block, mastery, unlocked }
-    })
-  }, [blockProgress, cardScores, activeScript])
+    return blockProgress
+  }, [blockProgress])
 
   useEffect(() => {
     if (blockProgressWithMastery.length === 0) return
@@ -3210,6 +3203,34 @@ function App() {
     setExpertiseError(null)
     try {
       await window.jplearnDesktop.applyExpertiseLevel(selectedExpertiseLevel)
+
+      if (selectedExpertiseLevel === 'total_beginner') {
+        setCardScores({ hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} })
+      } else {
+        const targetScripts = EXPERTISE_LEVEL_TO_SCRIPT_KEYS[selectedExpertiseLevel]
+        const payloads = await Promise.all(targetScripts.map((slug) => window.jplearnDesktop.getDeckCards(slug)))
+        setCardScores((previous) => {
+          const next: CardScores = {
+            hiragana: { ...previous.hiragana },
+            katakana: { ...previous.katakana },
+            kanji_n5: { ...previous.kanji_n5 },
+            vocab_n5: { ...previous.vocab_n5 },
+            grammar_patterns: { ...previous.grammar_patterns },
+          }
+
+          targetScripts.forEach((scriptKey, index) => {
+            const deck = payloads[index]
+            const seeded = { ...next[scriptKey] }
+            deck.cards.forEach((card) => {
+              seeded[card.id] = CARD_MASTERY_MAX
+            })
+            next[scriptKey] = seeded
+          })
+
+          return next
+        })
+      }
+
       window.localStorage.setItem(EXPERTISE_STORAGE_KEY, 'done')
       setShowExpertisePrompt(false)
       await loadSummary()
@@ -4521,10 +4542,7 @@ function App() {
                         {blocks.map((block) => {
                           const blockKey = `${script}-${block.index}`
                           const isActive = expandedBlocks === blockKey
-                          const blockTotal = block.card_ids.reduce((sum, id) => sum + (scores[id] ?? 0), 0)
-                          const pct = block.card_ids.length > 0
-                            ? Math.round(blockTotal / (CARD_MASTERY_MAX * block.card_ids.length) * 100)
-                            : 0
+                          const pct = Math.round(block.mastery * 100)
                           return (
                             <Fragment key={block.index}>
                               <button
@@ -4532,7 +4550,7 @@ function App() {
                                 className={`cmb-tile ${isActive ? 'is-active' : ''}`}
                                 onClick={() => setExpandedBlocks(isActive ? null : blockKey)}
                                 aria-expanded={isActive}
-                                aria-label={`${block.name}: ${pct}% mastered`}
+                                aria-label={`${block.name}: ${block.unlocked ? `${pct}% mastered` : 'locked'}`}
                               >
                                 <div className="cmb-tile-chars" lang="ja" aria-hidden="true">
                                   {block.sample_chars.join(' ')}
@@ -5041,19 +5059,19 @@ function App() {
             <div className="settings-modal-header">
               <div>
                 <h2 id="expertise-title" className="settings-modal-title">
-                  {onboardingStep === 1 ? 'Quick setup before your first session' : null}
+                  {onboardingStep === 1 ? 'Where should your learning start?' : null}
                   {onboardingStep === 2 ? 'How much should we pre-complete for you?' : null}
                   {onboardingStep === 3 ? 'Confirm your starting point' : null}
                 </h2>
                 <p id="expertise-subtitle" className="settings-modal-subtitle">
-                  {onboardingStep === 1 ? 'This sets your initial progress so you do not repeat basics.' : null}
+                  {onboardingStep === 1 ? 'Choose setup or skip. We will only ask this once.' : null}
                   {onboardingStep === 2 ? 'Choose the option that matches what you can already read today.' : null}
                   {onboardingStep === 3 ? 'You can change this later by resetting study progress in settings.' : null}
                 </p>
               </div>
               <button
                 type="button"
-                className="cta-secondary onboarding-skip"
+                className="onboarding-btn onboarding-btn-ghost onboarding-skip"
                 onClick={skipOnboarding}
                 disabled={applyingExpertise}
               >
@@ -5070,15 +5088,15 @@ function App() {
             {onboardingStep === 1 ? (
               <div className="onboarding-step">
                 <p className="onboarding-callout">
-                  Practical version: tell us what you already know, and we will mark those decks done.
+                  Are you new to Japanese, or should we pre-complete basics you already know?
                 </p>
                 <ul className="onboarding-checklist" aria-label="What this setup does">
-                  <li>Skip decks you have already mastered.</li>
-                  <li>Keep unfinished content untouched.</li>
-                  <li>Still let you reset and start over anytime.</li>
+                  <li>Matches your starting level in one click.</li>
+                  <li>Avoids repeating content you already know.</li>
+                  <li>You can reset and redo this anytime.</li>
                 </ul>
                 <p className="settings-help">
-                  Tiny quirk: honest picks beat heroic picks. Your future self will thank you.
+                  Tiny quirk: choosing lower is a power move. Momentum beats ego.
                 </p>
               </div>
             ) : null}
@@ -5126,7 +5144,7 @@ function App() {
               {onboardingStep > 1 ? (
                 <button
                   type="button"
-                  className="cta-secondary"
+                  className="onboarding-btn onboarding-btn-secondary"
                   onClick={goToPreviousOnboardingStep}
                   disabled={applyingExpertise}
                 >
@@ -5136,16 +5154,16 @@ function App() {
               {onboardingStep < 3 ? (
                 <button
                   type="button"
-                  className="cta-primary"
+                  className="onboarding-btn onboarding-btn-primary"
                   onClick={goToNextOnboardingStep}
                   disabled={applyingExpertise}
                 >
-                  Next
+                  Continue
                 </button>
               ) : (
                 <button
                   type="button"
-                  className="cta-primary"
+                  className="onboarding-btn onboarding-btn-primary"
                   onClick={() => void applyExpertiseSelection()}
                   disabled={applyingExpertise}
                 >

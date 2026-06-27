@@ -3819,6 +3819,46 @@ button {
   align-self: flex-start;
 }
 
+.onboarding-btn {
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--chip-border) 82%, transparent);
+  color: var(--text-main);
+  background: color-mix(in oklab, var(--chip-bg) 88%, transparent);
+  padding: 9px 14px;
+  font-size: 0.84rem;
+  letter-spacing: 0.02em;
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 180ms ease, background-color 140ms ease;
+}
+
+.onboarding-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--tone-ocean) 56%, var(--chip-border));
+  box-shadow: 0 10px 20px -16px color-mix(in oklab, var(--tone-ocean) 62%, transparent);
+}
+
+.onboarding-btn:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.onboarding-btn-primary {
+  border-color: color-mix(in oklab, var(--tone-ocean) 56%, var(--chip-border));
+  background: linear-gradient(140deg, color-mix(in oklab, var(--tone-ocean) 38%, var(--chip-bg)), color-mix(in oklab, var(--tone-teal) 32%, var(--chip-bg)));
+}
+
+.onboarding-btn-secondary {
+  border-color: color-mix(in oklab, var(--panel-border) 82%, transparent);
+  background: color-mix(in oklab, var(--panel-bg) 84%, black);
+  color: var(--text-soft);
+}
+
+.onboarding-btn-ghost {
+  border-color: color-mix(in oklab, var(--panel-border) 75%, transparent);
+  background: color-mix(in oklab, var(--panel-bg) 82%, transparent);
+}
+
 .onboarding-progress {
   display: flex;
   align-items: center;
