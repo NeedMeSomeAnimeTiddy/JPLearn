@@ -3,29 +3,9 @@ description: Data layer rules
 applyTo: "data/**/*.py"
 ---
 
-# Data Rules
+# Data Rules (Lean)
 
-- SQLite access only
-- Repository pattern only
-- No business logic
-- Must return Domain dataclasses only
-- No UI logic
-
----
-
-# Persistence Rules
-
-- All DB operations inside repositories
-- Parameterized SQL only
-- Normalize Japanese text using unicodedata before storage
-
----
-
-# Intent Anchor
-
-This layer is ONLY for:
-- SQLite persistence
-- schema + migrations
-- mapping rows ↔ domain models
-
-Not for logic or UI.
+- Responsibility: SQLite persistence, schema/migrations, row <-> domain mapping.
+- Allowed: repository methods and parameterized SQL only.
+- Required: normalize Japanese text before storage.
+- Forbidden: business logic and UI behavior.

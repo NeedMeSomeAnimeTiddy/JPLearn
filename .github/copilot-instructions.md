@@ -1,65 +1,45 @@
 # JPLearn Copilot Instructions
 
-## Core rules
+## Core Rules
 
 - Python 3.11+
-- Type hints are required for public APIs.
-- Prefer simple, direct implementations.
-- Use `pytest` for tests.
-- Keep code minimal and readable.
-- Read the layer-specific instruction file before editing `domain\`, `data\`, or `ui\` files.
+- Public APIs require type hints
+- Keep implementations simple
+- Use `pytest`
+- Read the matching layer instruction before editing `domain/`, `data/`, or `electron-frontend/`
 
-## Quiet-by-default execution policy
+## Context-Budget Policy
 
-- Prefer read-first analysis before running commands.
-- Use targeted validation for changed files only.
-- Do not run broad/full-suite checks unless the user asks, risk is high, or a change is cross-cutting.
-- If validation is needed, start with the smallest relevant command (for example: a focused pytest target).
-- Escalate to `python scripts\dev.py` only when necessary.
+- Load only the instruction files that apply to touched paths
+- Avoid loading skill docs unless the task explicitly matches that skill
+- Prefer focused searches and batched reads
 
-## Useful commands (reference)
+## Validation Policy (Quiet by Default)
 
-- `python -m pip install -r requirements.txt`
-- `python main.py`
-- `python gui.py`
-- `python scripts\dev.py` (full aggregate check)
-- `python -m mypy --explicit-package-bases .`
-- `python scripts\arch_check.py`
-- `python scripts\db_check.py`
-- `python scripts\srs_check.py`
+- Read first, run commands second
+- Validate only changed files by default
+- Start with the smallest relevant check
+- Run full checks only on request or high cross-cutting risk
+- Escalate to `python scripts/dev.py` only when needed
+
+## Architecture Snapshot
+
+- `domain/`: deterministic learning logic
+- `data/`: SQLite persistence and mapping
+- `electron-frontend/`: active UI surface and IPC wiring
+- `src/` is legacy; prefer layered packages for new work
+- Keep `data/jplearn.db` and `data/app.db` concerns separate
+
+## Repo Conventions
+
+- Respect layer boundaries and `scripts/arch_check.py`
+- Normalize Japanese text before storage (data layer)
+- `data/database.load_states()` may fabricate default `ReviewState`; persist only after review
+- Mastered threshold: `repetitions >= 3` and `interval >= 21`
+
+## High-Value Commands
+
 - `python -m pytest -q`
-- `python -m pytest tests\path\to\test_file.py -q`
-- `python -m pytest tests\path\to\test_file.py::test_name -q`
-
-There is no packaging/build pipeline in the repository today. The main runnable entry points are `main.py` and `gui.py` at the repo root for the PySide6 UI launcher.
-
-## High-level architecture
-
-The canonical layers are:
-
-- `domain\` for deterministic learning logic, models, and built-in deck definitions.
-- `data\` for SQLite persistence and row-to-domain mapping.
-- `ui\` for PySide6 presentation code.
-
-`src\` is legacy and should stay minimal. Prefer the layered packages for new work.
-
-The app has two separate persistence flows:
-
-- Current review flow: `domain\decks.py` -> `data\database.py` -> `ui\qt_app.py` -> `data\database.save_state()`.
-- Layered SRS flow: `domain\srs.py` -> `data\srs_repository.py` -> `scripts\srs_apply.py`.
-
-Keep `data\jplearn.db` and `data\app.db` concerns separate.
-
-## Repository-specific conventions
-
-- Respect the layer boundaries enforced by the instruction files and `scripts\arch_check.py`.
-- Normalize Japanese text before storage in the data layer.
-- `data\database.load_states()` fabricates default `ReviewState` objects for missing rows; they are only persisted after a review.
-- Progress reporting uses the shared mastered threshold: `repetitions >= 3` and `interval >= 21`.
-- The shipped content currently covers Hiragana and Katakana only.
-
-## Tool-noise guardrails
-
-- Keep tool usage minimal and batch related reads where possible.
-- Avoid repeated exploratory searches when one focused search is sufficient.
-- Summarize intent before major tool batches; avoid redundant command reruns.
+- `python -m pytest tests/path/to/test_file.py -q`
+- `python scripts/arch_check.py`
+- `python scripts/dev.py` (full aggregate check)

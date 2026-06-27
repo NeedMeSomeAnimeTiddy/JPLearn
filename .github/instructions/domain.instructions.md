@@ -3,31 +3,10 @@ description: Domain layer rules
 applyTo: "domain/**/*.py"
 ---
 
-# Domain Rules
+# Domain Rules (Lean)
 
-- Pure logic only (SRS, active recall, parsing)
-- No database access
-- No UI code
-- No file I/O
-- Must be deterministic
-- No hidden state or randomness
-
----
-
-# SRS Contract
-
-(last_interval, ease_factor, performance)
-→ (next_interval, new_ease_factor)
-
-- No time dependency (inject externally if needed)
-
----
-
-# Intent Anchor
-
-This layer is ONLY for:
-- deterministic learning logic
-- SRS calculations
-- domain models
-
-Not for storage or UI behavior.
+- Responsibility: deterministic learning logic, SRS calculations, and domain models.
+- Required: pure functions where practical; no hidden state or randomness.
+- SRS contract: `(last_interval, ease_factor, performance) -> (next_interval, new_ease_factor)`.
+- Forbidden: database access, UI code, and file I/O.
+- Time dependency must be injected externally.
