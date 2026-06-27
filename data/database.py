@@ -1251,6 +1251,32 @@ def load_recent_assistant_event_dedup_keys(window_minutes: int = 180) -> set[str
     return {str(row["dedup_key"]) for row in rows if str(row["dedup_key"]).strip()}
 
 
+def _event_dedup_key_is_in_cooldown(dedup_key: str, cooldown_minutes: int) -> bool:
+    if not dedup_key.strip() or cooldown_minutes <= 0:
+        return False
+
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=cooldown_minutes)
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT created_at_utc
+            FROM assistant_events
+            WHERE dedup_key=?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (dedup_key,),
+        ).fetchone()
+
+    if row is None:
+        return False
+    try:
+        created_at = datetime.fromisoformat(str(row["created_at_utc"]))
+    except ValueError:
+        return False
+    return created_at >= cutoff
+
+
 def enqueue_assistant_events(events: list[AssistantEvent], dedup_window_minutes: int = 180) -> None:
     """Persist scripted assistant events for popup consumption."""
     if not events:
@@ -1264,6 +1290,8 @@ def enqueue_assistant_events(events: list[AssistantEvent], dedup_window_minutes:
     for event in events:
         dedup_key = event.dedup_key.strip()
         if dedup_key and (dedup_key in recent_keys or dedup_key in seen_in_batch):
+            continue
+        if dedup_key and _event_dedup_key_is_in_cooldown(dedup_key, int(event.cooldown_minutes)):
             continue
         unique_events.append(event)
         if dedup_key:

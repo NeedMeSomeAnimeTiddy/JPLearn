@@ -249,6 +249,7 @@ def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
     )
     events = evaluate_assistant_events(
         state=state,
+        activity_week=activity_week,
         streak=streak,
         mistakes=mistakes,
         leech_count=leech_count,

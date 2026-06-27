@@ -37,6 +37,18 @@ SCRIPTED_CONTENT_REGISTRY: dict[str, dict[str, str]] = {
         "message_key": "coach.curriculum_stall",
         "recommendation_key": "rec.context_cloze_recovery",
     },
+    "activity_nudge": {
+        "message_key": "coach.activity_nudge",
+        "recommendation_key": "rec.short_reminder_session",
+    },
+    "session_recovery": {
+        "message_key": "coach.session_recovery",
+        "recommendation_key": "rec.recovery_loop",
+    },
+    "momentum_encouragement": {
+        "message_key": "coach.momentum_encouragement",
+        "recommendation_key": "rec.stretch_goal_push",
+    },
     "ambient_checkin": {
         "message_key": "coach.ambient_checkin",
         "recommendation_key": "rec.maintain_consistency",
@@ -140,6 +152,12 @@ def build_assistant_event_dedup_key(event_type: str, metadata: dict[str, str]) -
         return f"weakness:{metadata.get('focus_area', 'general')}:{metadata.get('error_rate', '0')}"
     if event_type == "curriculum_stall":
         return f"curriculum:{metadata.get('mode', 'context_cloze')}:{metadata.get('accuracy_7d', '0')}"
+    if event_type == "activity_nudge":
+        return f"activity:{metadata.get('active_days', '0')}:{metadata.get('reviewed', '0')}"
+    if event_type == "session_recovery":
+        return f"recovery:{metadata.get('session_id', 'unknown')}:{metadata.get('accuracy', '0')}"
+    if event_type == "momentum_encouragement":
+        return f"momentum:{metadata.get('momentum_band', 'steady')}"
     return f"ambient:{metadata.get('mood', 'coach_neutral')}"
 
 
@@ -225,6 +243,7 @@ def compute_assistant_state(
 
 def evaluate_assistant_events(
     state: AssistantState,
+    activity_week: ActivitySummary,
     streak: StreakState,
     mistakes: list[MistakeBreakdownRow],
     leech_count: int,
@@ -292,6 +311,48 @@ def evaluate_assistant_events(
                 metadata={
                     "mode": "context_cloze",
                     "accuracy_7d": str(curriculum_accuracy_7d),
+                },
+            )
+        )
+
+    if activity_week.active_days <= 2 or activity_week.reviewed < 12:
+        candidates.append(
+            _create_scripted_event(
+                event_type="activity_nudge",
+                priority="coaching",
+                popup_cadence=popup_cadence,
+                metadata={
+                    "active_days": str(activity_week.active_days),
+                    "reviewed": str(activity_week.reviewed),
+                },
+            )
+        )
+
+    if session_summary is not None and not session_summary.goal_met and session_summary.accuracy < 70:
+        candidates.append(
+            _create_scripted_event(
+                event_type="session_recovery",
+                priority="coaching",
+                popup_cadence=popup_cadence,
+                metadata={
+                    "session_id": session_summary.session_id,
+                    "accuracy": str(session_summary.accuracy),
+                    "target_items": str(session_summary.target_items),
+                    "completed_items": str(session_summary.completed_items),
+                },
+            )
+        )
+
+    if state.momentum >= 35 and state.mood == "coach_celebratory":
+        momentum_band = "high" if state.momentum >= 60 else "rising"
+        candidates.append(
+            _create_scripted_event(
+                event_type="momentum_encouragement",
+                priority="celebration",
+                popup_cadence=popup_cadence,
+                metadata={
+                    "momentum_band": momentum_band,
+                    "momentum": str(state.momentum),
                 },
             )
         )

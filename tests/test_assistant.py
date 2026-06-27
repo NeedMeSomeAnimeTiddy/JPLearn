@@ -97,6 +97,15 @@ def test_evaluate_assistant_events_emits_goal_and_streak() -> None:
 
     events = evaluate_assistant_events(
         state=state,
+        activity_week=ActivitySummary(
+            days=7,
+            reviewed=40,
+            correct=30,
+            incorrect=10,
+            accuracy=75,
+            points_earned=30,
+            active_days=5,
+        ),
         streak=streak,
         mistakes=[],
         leech_count=0,
@@ -137,6 +146,15 @@ def test_evaluate_assistant_events_respects_recent_dedup_keys() -> None:
 
     events = evaluate_assistant_events(
         state=state,
+        activity_week=ActivitySummary(
+            days=7,
+            reviewed=35,
+            correct=28,
+            incorrect=7,
+            accuracy=80,
+            points_earned=28,
+            active_days=5,
+        ),
         streak=streak,
         mistakes=[],
         leech_count=0,
@@ -146,6 +164,88 @@ def test_evaluate_assistant_events_respects_recent_dedup_keys() -> None:
     )
 
     assert all(event.dedup_key != "goal:abc" for event in events)
+
+
+def test_evaluate_assistant_events_emits_activity_nudge_for_low_activity() -> None:
+    state = AssistantState(
+        mood="coach_supportive",
+        momentum=-8,
+        confidence_level=46,
+        focus_area="general",
+        last_major_event="steady_progress",
+    )
+    streak = StreakState(
+        last_study_day_utc=date(2026, 6, 27),
+        last_study_day_local=date(2026, 6, 27),
+        current_streak_days=1,
+        best_streak_days=4,
+    )
+
+    events = evaluate_assistant_events(
+        state=state,
+        activity_week=ActivitySummary(
+            days=7,
+            reviewed=8,
+            correct=5,
+            incorrect=3,
+            accuracy=62,
+            points_earned=5,
+            active_days=2,
+        ),
+        streak=streak,
+        mistakes=[],
+        leech_count=0,
+        session_summary=None,
+        now_utc=datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert any(event.event_type == "activity_nudge" for event in events)
+
+
+def test_evaluate_assistant_events_emits_session_recovery_for_missed_goal() -> None:
+    state = AssistantState(
+        mood="coach_supportive",
+        momentum=-20,
+        confidence_level=40,
+        focus_area="vocab_n5",
+        last_major_event="momentum_drop",
+    )
+    streak = StreakState(
+        last_study_day_utc=date(2026, 6, 27),
+        last_study_day_local=date(2026, 6, 27),
+        current_streak_days=2,
+        best_streak_days=6,
+    )
+    summary = SessionSummary(
+        session_id="recover-1",
+        target_items=20,
+        completed_items=10,
+        reviewed=16,
+        correct=10,
+        accuracy=62,
+        target_accuracy=75,
+        goal_met=False,
+    )
+
+    events = evaluate_assistant_events(
+        state=state,
+        activity_week=ActivitySummary(
+            days=7,
+            reviewed=24,
+            correct=14,
+            incorrect=10,
+            accuracy=58,
+            points_earned=14,
+            active_days=4,
+        ),
+        streak=streak,
+        mistakes=[],
+        leech_count=0,
+        session_summary=summary,
+        now_utc=datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert any(event.event_type == "session_recovery" for event in events)
 
 
 def test_assistant_profile_and_events_round_trip(tmp_path: Path, monkeypatch) -> None:
