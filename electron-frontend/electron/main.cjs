@@ -15,11 +15,7 @@ const startupTelemetryByContentsId = new Map()
 const windowExpandedStateById = new Map()
 const windowRestoreBoundsById = new Map()
 const localTutorRuntime = createTutorChatRuntime()
-const localVoiceRuntime = createVoiceRuntime({
-  resolvePython: () => resolvePythonCommand(resolvePythonBridgeContext().projectRoot),
-  workerScript: path.join(repoRoot, 'scripts', 'tts_worker.py'),
-  cwd: repoRoot,
-})
+const localVoiceRuntime = createVoiceRuntime({ repoRoot })
 let tutorRuntimePreloadTriggered = false
 let tutorRuntimePreloadPromise = null
 let preloadedAssistantChatHistory = {

@@ -1,8 +1,10 @@
-# Optional text-to-speech dependencies (Kokoro-82M + Japanese g2p).
-# Install into the project venv to enable the in-app "Listen" button:
-#   pip install -r requirements-tts.txt
+# Optional dependency for fetching the VOICEVOX text-to-speech engine.
 #
-# misaki[ja] pulls in pyopenjtalk + fugashi + unidic-lite for accurate Japanese
-# pronunciation. kokoro-onnx pulls in onnxruntime + numpy for synthesis.
-kokoro-onnx
-misaki[ja]
+# The app uses the VOICEVOX engine (a local HTTP TTS server) for natural Japanese
+# speech. py7zr is only needed to extract the prebuilt engine archive:
+#   pip install -r requirements-tts.txt
+#   python scripts/get_voicevox.py
+#
+# The engine is downloaded by get_voicevox.py (not via pip). At runtime the app
+# talks to the engine over HTTP, so no Python TTS packages are required.
+py7zr

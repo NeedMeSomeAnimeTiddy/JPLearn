@@ -27,9 +27,9 @@ describe('ipc_security', () => {
 
   it('normalizes and bounds speak payloads', () => {
     expect(validateSpeakPayload('  あ  ')).toEqual({ text: 'あ' })
-    expect(validateSpeakPayload({ text: 'こんにちは', voiceId: 2, speed: 1.2 })).toEqual({
+    expect(validateSpeakPayload({ text: 'こんにちは', speaker: 13, speed: 1.2 })).toEqual({
       text: 'こんにちは',
-      voiceId: 2,
+      speaker: 13,
       speed: 1.2,
     })
     expect(validateSpeakPayload({ text: 'x'.repeat(600) }).text).toHaveLength(400)
@@ -38,7 +38,7 @@ describe('ipc_security', () => {
   it('rejects invalid speak payloads', () => {
     expect(() => validateSpeakPayload('   ')).toThrow(/must not be empty/i)
     expect(() => validateSpeakPayload(42)).toThrow(/expected string or object/i)
-    expect(() => validateSpeakPayload({ text: 'a', voiceId: -1 })).toThrow(/Invalid voiceId/i)
+    expect(() => validateSpeakPayload({ text: 'a', speaker: -1 })).toThrow(/Invalid speaker/i)
     expect(() => validateSpeakPayload({ text: 'a', speed: 9 })).toThrow(/Invalid speed/i)
   })
 

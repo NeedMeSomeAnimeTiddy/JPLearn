@@ -296,13 +296,13 @@ function validateAssistantEventInteractionPayload(payload) {
 
 function validateSpeakPayload(payload) {
   let rawText
-  let rawVoiceId
+  let rawSpeaker
   let rawSpeed
   if (typeof payload === 'string') {
     rawText = payload
   } else if (payload && typeof payload === 'object') {
     rawText = payload.text
-    rawVoiceId = payload.voiceId
+    rawSpeaker = payload.speaker
     rawSpeed = payload.speed
   } else {
     throw new Error('Invalid speak payload: expected string or object')
@@ -318,11 +318,11 @@ function validateSpeakPayload(payload) {
 
   const result = { text: text.slice(0, 400) }
 
-  if (rawVoiceId != null) {
-    if (!Number.isInteger(rawVoiceId) || rawVoiceId < 0 || rawVoiceId > 2000) {
-      throw new Error(`Invalid voiceId value: ${String(rawVoiceId)}`)
+  if (rawSpeaker != null) {
+    if (!Number.isInteger(rawSpeaker) || rawSpeaker < 0 || rawSpeaker > 100000) {
+      throw new Error(`Invalid speaker value: ${String(rawSpeaker)}`)
     }
-    result.voiceId = rawVoiceId
+    result.speaker = rawSpeaker
   }
 
   if (rawSpeed != null) {

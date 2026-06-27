@@ -389,7 +389,7 @@ function registerIpcHandlers(options) {
     const validatedPayload = validateSpeakPayload(payload)
     try {
       return await options.localVoiceRuntime.speak(validatedPayload.text, {
-        voiceId: validatedPayload.voiceId,
+        speaker: validatedPayload.speaker,
         speed: validatedPayload.speed,
       })
     } catch (error) {

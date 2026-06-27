@@ -205,6 +205,8 @@ tempCodeRunnerFile.py
 
 # Local TTS model artifacts
 kokoro-assets/
+data/voice-models/
+data/voicevox/
 
 # Local llama.cpp model artifacts
 models/llama/*.gguf

@@ -362,7 +362,7 @@ interface DesktopApi {
   }) => Promise<AssistantChatRuntimeResponse>
   unloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string }>
   cancelAssistantChatInference?: () => Promise<{ ok: boolean; cancelled: boolean; reason: string }>
-  speakText?: (payload: string | { text: string; voiceId?: number; speed?: number }) => Promise<VoiceSpeakResponse>
+  speakText?: (payload: string | { text: string; speaker?: number; speed?: number }) => Promise<VoiceSpeakResponse>
   getVoiceStatus?: () => Promise<VoiceStatus>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>

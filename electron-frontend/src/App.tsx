@@ -540,6 +540,8 @@ interface AppSettings {
   backgroundBlur: number
   assistantToastLimit: 0 | 1 | 2 | 4
   assistantChatEnabled: boolean
+  voiceEnabled: boolean
+  voiceSpeaker: number
 }
 
 interface RoundOption {
@@ -967,6 +969,19 @@ const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
 const EXPERTISE_STORAGE_KEY = 'jplearn-first-startup-expertise-v1'
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
+// Curated VOICEVOX voices offered to the user. `id` is the engine speaker id.
+const VOICE_SAMPLE_LINE = 'こんにちは。いっしょにがんばりましょう。'
+const VOICE_OPTIONS: Array<{ id: number; name: string; jp: string }> = [
+  { id: 16, name: 'Sora', jp: '九州そら' },
+  { id: 20, name: 'Mochiko', jp: 'もち子さん' },
+  { id: 8, name: 'Tsumugi', jp: '春日部つむぎ' },
+  { id: 29, name: 'No.7', jp: 'No.7' },
+  { id: 61, name: 'Usagi', jp: '中国うさぎ' },
+  { id: 11, name: 'Takehiro', jp: '玄野武宏' },
+  { id: 13, name: 'Ryusei', jp: '青山龍星' },
+]
+const VOICE_OPTION_IDS = new Set<number>(VOICE_OPTIONS.map((option) => option.id))
+
 const EXPERTISE_OPTIONS: Array<{ level: ExpertiseLevel; title: string; description: string }> = [
   {
     level: 'total_beginner',
@@ -1108,6 +1123,8 @@ function defaultSettings(): AppSettings {
     backgroundBlur: BACKGROUND_BLUR_DEFAULT,
     assistantToastLimit: ASSISTANT_MAX_TOASTS,
     assistantChatEnabled: true,
+    voiceEnabled: true,
+    voiceSpeaker: 13,
   }
 }
 
@@ -1203,6 +1220,12 @@ function loadSettings(): AppSettings {
         typeof parsed.assistantChatEnabled === 'boolean'
           ? parsed.assistantChatEnabled
           : defaults.assistantChatEnabled,
+      voiceEnabled:
+        typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
+      voiceSpeaker:
+        typeof parsed.voiceSpeaker === 'number' && VOICE_OPTION_IDS.has(parsed.voiceSpeaker)
+          ? parsed.voiceSpeaker
+          : defaults.voiceSpeaker,
     }
   } catch {
     return defaultSettings()
@@ -2028,7 +2051,7 @@ function App() {
     interleaveCursorRef.current = 0
   }, [])
 
-  const playQuestionAudio = useCallback(async (text: string) => {
+  const playQuestionAudio = useCallback(async (text: string, speaker?: number) => {
     const spoken = typeof text === 'string' ? text.trim() : ''
     if (!spoken || voiceBusy) {
       return
@@ -2040,7 +2063,7 @@ function App() {
     }
     setVoiceBusy(true)
     try {
-      const result = await speak(spoken)
+      const result = await speak({ text: spoken, speaker: speaker ?? settings.voiceSpeaker })
       if (result?.audioBase64) {
         if (voiceAudioRef.current) {
           voiceAudioRef.current.pause()
@@ -2055,7 +2078,7 @@ function App() {
     } finally {
       setVoiceBusy(false)
     }
-  }, [voiceBusy])
+  }, [voiceBusy, settings.voiceSpeaker])
 
   const toggleOverviewSection = useCallback((section: OverviewSectionKey) => {
     setOverviewSectionExpanded((prev) => ({
@@ -5340,7 +5363,7 @@ function App() {
                   <p className={`game-prompt-main ${roundState.mode !== 'character_match' ? 'is-japanese' : ''}`}>
                     {roundState.focusText}
                   </p>
-                  {roundState.audioText ? (
+                  {settings.voiceEnabled && roundState.audioText ? (
                     <button
                       type="button"
                       className="game-speak-button"
@@ -6227,6 +6250,38 @@ function App() {
                 <p className="settings-help">
                   Coach is currently <strong>{settings.assistantChatEnabled ? 'enabled' : 'disabled'}</strong>. Tiny quirk: choosing lower is a power move. Momentum beats ego.
                 </p>
+                <button
+                  type="button"
+                  className={`onboarding-btn ${settings.voiceEnabled ? 'onboarding-btn-secondary' : 'onboarding-btn-primary'}`}
+                  onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
+                  aria-pressed={settings.voiceEnabled}
+                  disabled={applyingExpertise}
+                >
+                  {settings.voiceEnabled ? 'Disable voice' : 'Enable voice'}
+                </button>
+                {settings.voiceEnabled ? (
+                  <div className="expertise-options" role="radiogroup" aria-label="Choose a voice">
+                    {VOICE_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`expertise-option ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
+                        onClick={() => {
+                          setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
+                          void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
+                        }}
+                        aria-pressed={settings.voiceSpeaker === option.id}
+                        disabled={applyingExpertise || voiceBusy}
+                      >
+                        <span className="expertise-option-title">{option.name}</span>
+                        <span className="expertise-option-description">{option.jp}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="settings-help">
+                  Voice is <strong>{settings.voiceEnabled ? 'on' : 'off'}</strong>. Tap a voice to hear a sample. You can change this later in Settings.
+                </p>
               </div>
             ) : null}
 
@@ -6555,6 +6610,56 @@ function App() {
                       ))}
                     </div>
                     <p className="settings-help">Turn Chat with Tutor off to unload the local model runtime. Set toasts to Off to disable popup notifications.</p>
+                  </div>
+                </div>
+
+                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                  <div className="settings-control-content">
+                    <p className="settings-section-label">Voice</p>
+                    <div className="settings-animation-grid" role="group" aria-label="Voice controls">
+                      <button
+                        type="button"
+                        className={`settings-icon-entry settings-theme-entry ${settings.voiceEnabled ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
+                        aria-label={settings.voiceEnabled ? 'Spoken prompts enabled. Activate to disable.' : 'Spoken prompts disabled. Activate to enable.'}
+                        aria-pressed={settings.voiceEnabled}
+                        title={settings.voiceEnabled ? 'Spoken prompts enabled' : 'Spoken prompts disabled'}
+                      >
+                        <span className={`settings-mode-icon-button ${settings.voiceEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+                          <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                        </span>
+                        <span className="settings-icon-entry-label">{settings.voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
+                      </button>
+
+                      {settings.voiceEnabled
+                        ? VOICE_OPTIONS.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className={`settings-icon-entry settings-theme-entry ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
+                            onClick={() => {
+                              setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
+                              void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
+                            }}
+                            disabled={voiceBusy}
+                            aria-label={`Use voice ${option.name} (${option.jp}) and hear a sample`}
+                            aria-pressed={settings.voiceSpeaker === option.id}
+                            title={`${option.name} · ${option.jp} — click to hear a sample`}
+                          >
+                            <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
+                              <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                            </span>
+                            <span className="settings-icon-entry-label">{option.name}</span>
+                          </button>
+                        ))
+                        : null}
+                    </div>
+                    <p className="settings-help">
+                      {settings.voiceEnabled
+                        ? 'Click a voice to hear a sample. The speaker button in games reads the prompt aloud.'
+                        : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
+                      {voiceUnavailable ? ' (Voice engine unavailable right now.)' : ''}
+                    </p>
                   </div>
                 </div>
 
