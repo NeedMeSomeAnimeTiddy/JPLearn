@@ -1,208 +1,107 @@
 # JPLearn
-An Electron-based Japanese learning app with a Python backend for domain logic and SQLite persistence.
 
----
+JPLearn is a desktop Japanese learning app with an Electron frontend and a Python backend.
+It combines game-like practice modes, spaced repetition scheduling, and progress analytics in one local app.
 
-## Learning Content Coverage
+## Feature Highlights
 
-- **Scripts**: Hiragana, Katakana
-- **JLPT Kanji**: N5 to N1 progression included
-- **Vocabulary**: Kana words deck included
-- **Grammar**: Basic pattern cards included
+- Study tracks: Hiragana, Katakana, JLPT Kanji (N5-N1), JLPT Vocabulary (N5-N1), and grammar patterns.
+- Practice modes: Romaji Sprint, Meaning Match, Character Match, Stroke Order, Typed Recall, Context Cloze, Narrative Story, and Interleave Mix.
+- Adaptive scheduling: queue balancing across due, new, and leech cards with spaced-repetition updates per answer.
+- Progress visibility: streaks, 7-day/30-day activity, mistake trends, deck mastery, and session summaries.
+- Assistant features: event feed, contextual coaching, persistent chat history, and local runtime chat controls.
+- Personalization: themes, backgrounds, fonts, animations, tutor settings, voice settings, and shortcut controls.
 
----
+For the full product-style list, see [FEATURES.md](FEATURES.md).
 
-## Contributing / Dev Workflow
+## Documentation
 
-1. Install dependencies:
-   `python -m pip install -r requirements.txt`
-2. Install frontend dependencies:
-   `cd electron-frontend && npm install`
-3. Run the desktop frontend in development:
-   `cd electron-frontend && npm run dev`
-4. Build and run production frontend locally:
-   `cd electron-frontend && npm run build && npm run start`
-5. Build Windows distributables (Forge):
-   `cd electron-frontend && npm run make:win`
-6. Run the full Python development checks:
-   `python scripts\dev.py`
-7. Run targeted tests while working:
-   `python -m pytest tests\path\to\test_file.py -q`
-8. Regenerate external Words/Conversational content module from CSV sources:
-   `python scripts\import_external_lists.py`
-9. Export or import progress snapshots:
-   `python scripts\deck_portability.py export --output data\exports\progress.json`
-   `python scripts\deck_portability.py import --input data\exports\progress.json --mode merge`
-10. Configure local llama.cpp tutor runtime (optional):
-   `powershell -ExecutionPolicy Bypass -File scripts\setup_llama_env.ps1`
+- Feature list: [FEATURES.md](FEATURES.md)
+- Product roadmap: [ROADMAP.md](ROADMAP.md)
 
-`scripts\dev.py` is the main gate and runs type checks, architecture checks, DB checks, SRS checks, then tests.
+## Quick Start
 
-### Local llama.cpp Tutor Setup
+### Requirements
 
-- llama.cpp source is installed at:
-   `tools\llama.cpp`
-- built CLI binary is at:
-   `tools\llama.cpp\build\bin\Release\llama-cli.exe`
-- place model files here:
-   `models\llama\`
-- runtime auto-detects the first `*.gguf` in `models\llama\` and uses llama.cpp automatically.
-- tutor behavior instructions can be customized in:
-   `models\\llama\\instructions.txt`
-- explicit environment overrides are still supported:
-   `JPLEARN_TUTOR_PROVIDER`
-   `JPLEARN_LLAMA_CPP_PATH`
-   `JPLEARN_LLAMA_MODEL_PATH`
-   `JPLEARN_TUTOR_SYSTEM_PROMPT`
+- Python 3.11+
+- Node.js 20+
 
-### External Content Import Workflow
+### Install
 
-- Source files:
-   `data\external_sources\words_n5.csv`
-   `data\external_sources\conversational_n5.csv`
-   `data\external_sources\sentence_examples.csv`
-   `data\external_sources\conjugation_training.csv`
-   `data\external_sources\kanji_n5.csv`
-   `data\external_sources\kanji_n4.csv`
-   `data\external_sources\kanji_n3.csv`
-   `data\external_sources\kanji_n2.csv`
-   `data\external_sources\kanji_n1.csv`
-- CSV headers must be exactly:
-   `character,romaji,meaning`
-- Regeneration command:
-   `python scripts\import_external_lists.py`
-- Generated module consumed by decks:
-   `domain\external_deck_data.py`
+```bash
+python -m pip install -r requirements.txt
+cd electron-frontend && npm install
+```
 
-### Compact Debug Tools
+### Run in Development
 
-Use the compact debug CLI when you want high-signal diagnostics with less output noise:
+```bash
+cd electron-frontend
+npm run dev
+```
 
-- Quick workspace snapshot:
-   `python scripts\debug_tools.py snapshot`
-- JSON snapshot (easy to parse):
-   `python scripts\debug_tools.py snapshot --json`
-- Condensed architecture/DB/SRS checks:
-   `python scripts\debug_tools.py checks`
-- Include tests in condensed mode:
-   `python scripts\debug_tools.py checks --with-tests`
-- Lightweight queue/session/typed diagnostics:
-   `python scripts\debug_tools.py diagnostics`
-- JSON diagnostics output:
-   `python scripts\debug_tools.py diagnostics --json`
+### Run Built App Locally
 
----
+```bash
+cd electron-frontend
+npm run build
+npm run start
+```
 
-## Project TODO
+## Common Developer Commands
 
-### Status Snapshot
-- [x] Electron + React + TypeScript desktop client shipped
-- [x] Core SRS mechanics, streaks, history, leech handling, and distractor quality improvements shipped
-- [x] Keyboard accessibility baseline, reduced-motion support, and overview analytics shipped
+### Validate Python side
 
-### Now / Next (Highest Priority)
-- [x] (High) Harden Electron IPC surface
-   - Validate sender/frame for each `ipcMain.handle` route
-   - Introduce shared request validation helpers and typed payload guards
-   - Add negative tests for malformed and unauthorized renderer requests
-- [x] (High) Enable stricter renderer isolation defaults
-   - Set `sandbox: true` explicitly and verify preload bridge compatibility
-   - Re-audit `contextIsolation`, `nodeIntegration`, and exposed preload API surface
-- [x] (High) Lock down navigation and window creation
-   - Deny unexpected `will-navigate` targets
-   - Enforce strict `setWindowOpenHandler` allowlist policy
-- [x] (High) Add database migration framework
-   - Add schema version table/marker
-   - Add deterministic migration runner and rollback-safe strategy
-   - Add migration tests for fresh install and upgrade paths
-- [x] (High) Add end-to-end Electron smoke tests for primary user journeys
-   - Cover app launch, study session start, answer submit, and session completion
-   - Run against packaged app artifact in CI for release confidence
-- [x] (High) Add API contract tests between preload bridge and Python backend bridge
-   - Pin request/response schemas for each supported IPC channel
-   - Add negative tests for missing fields, wrong types, and unauthorized routes
-- [ ] (Medium) Add unified developer diagnostics command
-   - Chain compact checks with focused frontend validation (`npm run lint`, `npm run build`)
-   - Provide a single pass/fail entry point for pre-commit and CI triage
+```bash
+python scripts/dev.py
+```
 
-### Near-Term Product Roadmap
-- [x] (High) Introduce adaptive study queue balancing
-   - Blend due items with weak-tag reinforcement and new-item pacing
-   - Add deterministic queue tests to avoid starvation of any deck type
-- [x] (High) Add session goals and completion tracking
-   - Daily target setting (items/time/accuracy)
-   - End-of-session summary against target with streak-aware messaging
-- [x] (Medium) Expand answer modes
-   - Typed recall mode for vocab and kanji decks
-   - Optional confidence score capture per review event
+### Run targeted tests
 
-### Data Quality and Content Operations
-- [x] (High) Enforce Japanese normalization at all persistence boundaries
-   - Centralize normalization utilities used by all repositories/importers
-   - Add regression tests for kana width, prolonged sound marks, and punctuation variants
-- [x] (Medium) Improve external content ingestion pipeline
-   - Add stricter CSV schema checks with actionable error output
-   - Add deduplication and conflict reporting across imported lists
-- [x] (Medium) Add deck import/export workflow
-   - Export user progress and custom decks
-   - Import with merge/overwrite conflict modes
+```bash
+python -m pytest tests/path/to/test_file.py -q
+```
 
-### Frontend, Performance, and Release Engineering
-- [x] (High) Bundle fonts locally for offline startup reliability
-- [x] (Medium) Add startup performance budget and telemetry checkpoints
-- [x] (Medium) Defer non-critical renderer work until after first meaningful paint
-- [x] (Medium) Add packaged smoke tests in CI (`npm run build`, package, launch check)
-- [x] (Medium) Add restrictive CSP baseline for packaged renderer
+### Build Windows package
 
-### Quality, Tooling, and Developer Experience
-- [ ] (Low) Add contributor architecture diagrams and a "how data flows" reference doc
+```bash
+cd electron-frontend
+npm run make:win
+```
 
-### Deferred Product Additions
-- [ ] (Medium) Add pronunciation/audio support (deferred)
-   - Pluggable TTS or bundled audio strategy
-   - Cache policy for offline reliability
+### Regenerate external content module from CSV
 
-### Content and Learning Expansion
-#### Phase 1: Foundation
-- [x] (High) Add a large sentence and example bank
-   - Example sentences are attached to vocab, kanji, and grammar cards
-   - Sentence content also ships as a dedicated deck and importer-backed source for staged exposure
-- [x] (High) Expand grammar curriculum into a structured path
-   - Grammar progression now exposes ordered blocks for staged exposure
-   - The curriculum path is split into structured sentence and grammar surfaces
-- [x] (Medium) Add dedicated conjugation training
-   - Conjugation training now ships as a dedicated deck with staged block progression
-   - Verb and adjective forms are covered with the existing review and bridge plumbing
+```bash
+python scripts/import_external_lists.py
+```
 
-#### Phase 2: Skill Expansion
-- Current focus: move these learning modes from roadmap into implementation.
-- Suggested order:
-   1. Reading practice content first, since it can reuse the existing sentence bank and example content without adding new media plumbing.
-   2. Listening comprehension modes second, once audio delivery and playback strategy are defined.
-   3. Kanji writing and stroke-order practice last, because it needs the most new interaction and progress-tracking work.
-- Shared plan across all three items:
-   - Reuse the existing card/deck model where possible instead of inventing new content types.
-   - Keep progression and mastery tracking aligned with the current review pipeline.
-   - Add focused tests for content shape, progression rules, and visible UI behavior before expanding to the next mode.
-- [x] (Medium) Add reading practice content
-   - Introduce graded passages, short dialogues, and article-style reading sets
-   - Track comprehension questions and unknown-word lookups per passage
-   - Narrative story rounds now surface example sentences as reading passages in the app
-- [ ] (High) Add listening comprehension study modes
-   - Support prompt-first, audio-first, and dictation-style review flows
-   - Reuse the same content items across vocab, grammar, and sentence listening drills
-- [x] (Medium) Add kanji writing and stroke-order practice
-   - Support recognition vs. recall vs. writing mastery as separate skills
-   - Store stroke hints, writing prompts, and production-specific progress
-   - Kanji rounds now include a stroke-order writing drill for N5 characters
+### Export / import progress snapshots
 
-#### Phase 3: Personalization
-- [x] (Medium) Add personalized study plans and JLPT coverage tracking
-   - Show gaps across vocab, kanji, grammar, listening, and reading by level
-   - Generate daily plans based on target exam, timeline, and weak areas
+```bash
+python scripts/deck_portability.py export --output data/exports/progress.json
+python scripts/deck_portability.py import --input data/exports/progress.json --mode merge
+```
 
-### Longer-Term Enhancements
-- [ ] Cloud sync (optional account-based profile sync)
-- [ ] Sentence mining workflow and contextual example cards
-- [ ] Theme presets and advanced UI personalization
-- [ ] Mobile companion app (read-only progress + lightweight reviews)
+### Compact debug tools
+
+```bash
+python scripts/debug_tools.py snapshot
+python scripts/debug_tools.py checks
+python scripts/debug_tools.py diagnostics
+```
+
+## Optional Local Tutor Runtime (llama.cpp)
+
+- llama.cpp source: `tools/llama.cpp`
+- expected binary: `tools/llama.cpp/build/bin/Release/llama-cli.exe`
+- model folder: `models/llama/`
+- optional setup helper:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/setup_llama_env.ps1
+```
+
+## Notes
+
+- The legacy Python GUI entrypoint is deprecated.
+- The supported interactive surface is the Electron frontend.

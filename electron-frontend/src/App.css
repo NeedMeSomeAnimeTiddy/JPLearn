@@ -4476,9 +4476,10 @@ button {
 }
 
 .settings-sheet {
-  width: min(90vw, 560px, calc(100dvh - 32px));
-  aspect-ratio: 1 / 1;
-  max-height: calc(100dvh - 32px);
+  width: min(96vw, 980px);
+  max-width: min(96vw, 980px);
+  aspect-ratio: 16 / 10;
+  max-height: min(calc(100dvh - 40px), 760px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -4498,6 +4499,53 @@ button {
   scrollbar-width: none;
   -ms-overflow-style: none;
   overscroll-behavior: contain;
+}
+
+.settings-tab-list {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 2px 0 8px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--panel-bg) 94%, black), color-mix(in oklab, var(--panel-bg) 68%, transparent));
+  backdrop-filter: blur(4px);
+}
+
+.settings-tab-button {
+  appearance: none;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 86%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--panel-bg-alt) 72%, transparent);
+  color: var(--text-soft);
+  min-height: 38px;
+  padding: 6px 8px;
+  font-family: var(--button-font);
+  font-size: 0.76rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 120ms ease;
+}
+
+.settings-tab-button:hover {
+  border-color: color-mix(in oklab, var(--accent) 52%, var(--panel-border));
+  color: var(--text-main);
+}
+
+.settings-tab-button:active {
+  transform: scale(0.98);
+}
+
+.settings-tab-button.is-active {
+  border-color: color-mix(in oklab, var(--accent) 68%, var(--panel-border));
+  color: var(--text-main);
+  background: linear-gradient(150deg, color-mix(in oklab, var(--accent) 20%, var(--panel-bg-alt)), color-mix(in oklab, var(--accent) 8%, var(--panel-bg)));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 24%, transparent);
 }
 
 .settings-sheet-body::-webkit-scrollbar {
@@ -5282,9 +5330,15 @@ button {
   }
 
   .settings-sheet {
-    width: min(94vw, calc(100dvh - 24px));
-    max-height: calc(100dvh - 24px);
+    width: min(98vw, calc(100dvh - 12px));
+    max-width: min(98vw, calc(100dvh - 12px));
+    aspect-ratio: 1 / 1;
+    max-height: calc(100dvh - 12px);
     border-radius: 22px;
+  }
+
+  .settings-tab-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .settings-panel {

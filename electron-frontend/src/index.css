@@ -46,8 +46,74 @@
   --sans: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
   --button-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --heading-font: var(--display-font);
+  --body-font: var(--sans);
 
   font-family: var(--sans);
+}
+
+html[data-app-font='zen_kaku'] {
+  --display-font: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --sans: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --button-font: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --heading-font: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --body-font: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+}
+
+html[data-app-font='mplus_rounded'] {
+  --display-font: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
+  --sans: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
+  --button-font: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
+  --heading-font: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
+  --body-font: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
+}
+
+html[data-app-font='klee_one'] {
+  --display-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --sans: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --button-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --heading-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --body-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+}
+
+html[data-app-font='noto_sans_jp'] {
+  --display-font: 'Noto Sans JP', 'Segoe UI', sans-serif;
+  --sans: 'Noto Sans JP', 'Segoe UI', sans-serif;
+  --button-font: 'Noto Sans JP', 'Segoe UI', sans-serif;
+  --heading-font: 'Noto Sans JP', 'Segoe UI', sans-serif;
+  --body-font: 'Noto Sans JP', 'Segoe UI', sans-serif;
+}
+
+html[data-app-font='shippori_mincho'] {
+  --display-font: 'Shippori Mincho', 'Zen Old Mincho', 'Yu Mincho', serif;
+  --sans: 'Shippori Mincho', 'Zen Old Mincho', 'Yu Mincho', serif;
+  --button-font: 'Shippori Mincho', 'Zen Old Mincho', 'Yu Mincho', serif;
+  --heading-font: 'Shippori Mincho', 'Zen Old Mincho', 'Yu Mincho', serif;
+  --body-font: 'Shippori Mincho', 'Zen Old Mincho', 'Yu Mincho', serif;
+}
+
+html[data-app-font='zen_old_mincho'] {
+  --display-font: 'Zen Old Mincho', 'Shippori Mincho', 'Yu Mincho', serif;
+  --sans: 'Zen Old Mincho', 'Shippori Mincho', 'Yu Mincho', serif;
+  --button-font: 'Zen Old Mincho', 'Shippori Mincho', 'Yu Mincho', serif;
+  --heading-font: 'Zen Old Mincho', 'Shippori Mincho', 'Yu Mincho', serif;
+  --body-font: 'Zen Old Mincho', 'Shippori Mincho', 'Yu Mincho', serif;
+}
+
+html[data-app-font='dotgothic16'] {
+  --display-font: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --sans: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --button-font: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --heading-font: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --body-font: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+}
+
+html[data-app-font='system_ui'] {
+  --display-font: 'Segoe UI', 'Meiryo UI', sans-serif;
+  --sans: 'Segoe UI', 'Meiryo UI', sans-serif;
+  --button-font: 'Segoe UI', 'Meiryo UI', sans-serif;
+  --heading-font: 'Segoe UI', 'Meiryo UI', sans-serif;
+  --body-font: 'Segoe UI', 'Meiryo UI', sans-serif;
 }
 
 html[data-theme='harbor_mist'] {

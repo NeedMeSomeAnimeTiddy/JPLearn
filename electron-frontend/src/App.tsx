@@ -100,6 +100,15 @@ type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_m
 type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
+type AppFontPreset =
+  | 'zen_kaku'
+  | 'mplus_rounded'
+  | 'klee_one'
+  | 'noto_sans_jp'
+  | 'shippori_mincho'
+  | 'zen_old_mincho'
+  | 'dotgothic16'
+  | 'system_ui'
 type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
 type BackgroundStyle =
   | 'classic_scene'
@@ -132,6 +141,7 @@ type ThemeKey =
   | 'plum_garden_light'
   | 'matcha_stone_light'
 type ThemeMode = 'dark' | 'light'
+type SettingsTabKey = 'theme' | 'background' | 'font_size' | 'animations' | 'tutor' | 'voice' | 'shortcuts'
 
 const FEEDBACK_REVEAL_MS = 2100
 const ASSISTANT_EVENT_POLL_MS = 15000
@@ -142,6 +152,15 @@ const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1 | 2 | 4; label: string
   { value: 1, label: 'Low' },
   { value: 2, label: 'Medium' },
   { value: 4, label: 'High' },
+]
+const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
+  { key: 'theme', label: 'Theme', icon: Sun },
+  { key: 'background', label: 'Background', icon: House },
+  { key: 'font_size', label: 'Font', icon: BookText },
+  { key: 'animations', label: 'Animations', icon: Activity },
+  { key: 'tutor', label: 'Tutor', icon: MessageCircle },
+  { key: 'voice', label: 'Voice', icon: Volume2 },
+  { key: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
 ]
 const DEFAULT_LIVES = 3
 const SESSION_LENGTH_PRESETS = [
@@ -533,6 +552,7 @@ const STORY_CHAPTERS: Record<ScriptKey, Record<1 | 2 | 3, { title: string; lines
 interface AppSettings {
   reducedMotion: boolean
   fontSize: FontSize
+  appFont: AppFontPreset
   themeMode: ThemeMode
   theme: ThemeKey
   motionStyle: AnimationStyle
@@ -873,6 +893,30 @@ const FONT_SIZE_LABEL: Record<FontSize, string> = {
   large: 'Large',
 }
 
+const APP_FONT_OPTIONS: Array<{ key: AppFontPreset; label: string }> = [
+  { key: 'zen_kaku', label: 'Zen Kaku Gothic' },
+  { key: 'mplus_rounded', label: 'M PLUS Rounded' },
+  { key: 'klee_one', label: 'Klee One' },
+  { key: 'noto_sans_jp', label: 'Noto Sans JP' },
+  { key: 'shippori_mincho', label: 'Shippori Mincho' },
+  { key: 'zen_old_mincho', label: 'Zen Old Mincho' },
+  { key: 'dotgothic16', label: 'DotGothic16' },
+  { key: 'system_ui', label: 'System UI' },
+]
+
+function isAppFontPreset(value: unknown): value is AppFontPreset {
+  return (
+    value === 'zen_kaku'
+    || value === 'mplus_rounded'
+    || value === 'klee_one'
+    || value === 'noto_sans_jp'
+    || value === 'shippori_mincho'
+    || value === 'zen_old_mincho'
+    || value === 'dotgothic16'
+    || value === 'system_ui'
+  )
+}
+
 const MOTION_STYLE_OPTIONS: Array<{ key: AnimationStyle; label: string }> = [
   { key: 'calm_fade', label: 'Calm Fade' },
   { key: 'glide', label: 'Glide' },
@@ -1116,6 +1160,7 @@ function defaultSettings(): AppSettings {
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     fontSize: 'medium',
+    appFont: 'zen_kaku',
     themeMode: 'dark',
     theme: 'harbor_mist',
     motionStyle: 'glide',
@@ -1209,6 +1254,7 @@ function loadSettings(): AppSettings {
     return {
       ...defaults,
       ...parsed,
+      appFont: isAppFontPreset(parsed.appFont) ? parsed.appFont : defaults.appFont,
       themeMode: normalizedMode,
       theme: normalizedTheme,
       backgroundStyle: isBackgroundStyle(parsed.backgroundStyle) ? parsed.backgroundStyle : defaults.backgroundStyle,
@@ -1989,6 +2035,7 @@ function App() {
   }
   const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('theme')
   const [showExpertisePrompt, setShowExpertisePrompt] = useState<boolean>(false)
   const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3 | 4>(1)
   const [selectedExpertiseLevel, setSelectedExpertiseLevel] = useState<ExpertiseLevel>('total_beginner')
@@ -2220,6 +2267,7 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
     document.documentElement.dataset.fontSize = settings.fontSize
+    document.documentElement.dataset.appFont = settings.appFont
     document.documentElement.dataset.reducedMotion = String(settings.reducedMotion)
     document.documentElement.dataset.themeMode = settings.themeMode
     document.documentElement.dataset.theme = settings.theme
@@ -6418,8 +6466,36 @@ function App() {
             </div>
 
             <div className="settings-sheet-body">
+              <div className="settings-tab-list" role="tablist" aria-label="Settings sections">
+                {SETTINGS_TABS.map((tab) => {
+                  const TabIcon = tab.icon
+                  const isActive = activeSettingsTab === tab.key
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      aria-controls={`settings-panel-${tab.key}`}
+                      id={`settings-tab-${tab.key}`}
+                      className={`settings-tab-button ${isActive ? 'is-active' : ''}`}
+                      onClick={() => setActiveSettingsTab(tab.key)}
+                    >
+                      <TabIcon size={15} strokeWidth={2.2} aria-hidden="true" />
+                      <span>{tab.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
               <div className="settings-control-grid">
-                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                {activeSettingsTab === 'theme' ? (
+                <div
+                  className="settings-section settings-control-row settings-control-row-no-icon"
+                  role="tabpanel"
+                  id="settings-panel-theme"
+                  aria-labelledby="settings-tab-theme"
+                >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Theme</p>
                     <div className="settings-theme-mode-toggle" role="radiogroup" aria-label="Appearance mode">
@@ -6472,8 +6548,15 @@ function App() {
                     </div>
                   </div>
                 </div>
+                ) : null}
 
-                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                {activeSettingsTab === 'background' ? (
+                <div
+                  className="settings-section settings-control-row settings-control-row-no-icon"
+                  role="tabpanel"
+                  id="settings-panel-background"
+                  aria-labelledby="settings-tab-background"
+                >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Background</p>
                     <div className="settings-background-grid" role="radiogroup" aria-label="Background selection">
@@ -6537,8 +6620,15 @@ function App() {
                     </div>
                   </div>
                 </div>
+                ) : null}
 
-                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                {activeSettingsTab === 'font_size' ? (
+                <div
+                  className="settings-section settings-control-row settings-control-row-no-icon"
+                  role="tabpanel"
+                  id="settings-panel-font_size"
+                  aria-labelledby="settings-tab-font_size"
+                >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Font Size</p>
                     <button
@@ -6556,10 +6646,38 @@ function App() {
                       </span>
                       <span className="settings-icon-entry-label">{FONT_SIZE_LABEL[settings.fontSize]}</span>
                     </button>
+
+                    <p className="settings-section-label" style={{ marginTop: 12 }}>Font Family</p>
+                    <div className="settings-animation-grid" role="radiogroup" aria-label="App font family">
+                      {APP_FONT_OPTIONS.map((fontOption) => (
+                        <button
+                          key={fontOption.key}
+                          type="button"
+                          className={`settings-icon-entry settings-theme-entry ${settings.appFont === fontOption.key ? 'is-active' : ''}`}
+                          onClick={() => setSettings((prev) => ({ ...prev, appFont: fontOption.key }))}
+                          aria-label={`Use ${fontOption.label} font`}
+                          aria-pressed={settings.appFont === fontOption.key}
+                          title={fontOption.label}
+                        >
+                          <span className={`settings-mode-icon-button ${settings.appFont === fontOption.key ? 'is-enabled' : ''}`} aria-hidden="true">
+                            <BookText size={18} strokeWidth={2.25} aria-hidden="true" />
+                          </span>
+                          <span className="settings-icon-entry-label">{fontOption.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="settings-help">Applies to interface text across the app.</p>
                   </div>
                 </div>
+                ) : null}
 
-                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                {activeSettingsTab === 'animations' ? (
+                <div
+                  className="settings-section settings-control-row settings-control-row-no-icon"
+                  role="tabpanel"
+                  id="settings-panel-animations"
+                  aria-labelledby="settings-tab-animations"
+                >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Animations</p>
                     <div className="settings-animation-grid" role="radiogroup" aria-label="Animation style">
@@ -6601,8 +6719,15 @@ function App() {
                     </div>
                   </div>
                 </div>
+                ) : null}
 
-                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                {activeSettingsTab === 'tutor' ? (
+                <div
+                  className="settings-section settings-control-row settings-control-row-no-icon"
+                  role="tabpanel"
+                  id="settings-panel-tutor"
+                  aria-labelledby="settings-tab-tutor"
+                >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Tutor Companion</p>
                     <div className="settings-animation-grid" role="group" aria-label="Tutor companion controls">
@@ -6640,8 +6765,15 @@ function App() {
                     <p className="settings-help">Turn Chat with Tutor off to unload the local model runtime. Set toasts to Off to disable popup notifications.</p>
                   </div>
                 </div>
+                ) : null}
 
-                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                {activeSettingsTab === 'voice' ? (
+                <div
+                  className="settings-section settings-control-row settings-control-row-no-icon"
+                  role="tabpanel"
+                  id="settings-panel-voice"
+                  aria-labelledby="settings-tab-voice"
+                >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Voice</p>
                     <div className="settings-animation-grid" role="group" aria-label="Voice controls">
@@ -6690,8 +6822,15 @@ function App() {
                     </p>
                   </div>
                 </div>
+                ) : null}
 
-                <div className="settings-section settings-control-row">
+                {activeSettingsTab === 'shortcuts' ? (
+                <div
+                  className="settings-section settings-control-row"
+                  role="tabpanel"
+                  id="settings-panel-shortcuts"
+                  aria-labelledby="settings-tab-shortcuts"
+                >
                   <button
                     type="button"
                     className="settings-icon-tile"
@@ -6710,6 +6849,7 @@ function App() {
                     </div>
                   </div>
                 </div>
+                ) : null}
               </div>
             </div>
           </div>
