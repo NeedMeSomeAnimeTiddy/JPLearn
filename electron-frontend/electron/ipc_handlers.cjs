@@ -7,6 +7,7 @@ const {
   validatePositiveLimit,
   validateAssistantEventIdsPayload,
   validateAssistantChatAppendPayload,
+  validateAssistantChatRuntimePayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
   validateExpertiseLevelInput,
@@ -244,6 +245,54 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch assistant chat history: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('assistant-chat:status', (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    return options.localTutorRuntime.getStatus()
+  })
+
+  options.ipcMain.handle('assistant-chat:send-message', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateAssistantChatRuntimePayload(payload)
+
+    try {
+      // Chat transcript persistence is best-effort and isolated from inference lifecycle.
+      await options.runPythonBridgeWithArgs([
+        'assistant-chat-append',
+        'user',
+        validatedPayload.message,
+      ])
+    } catch {
+      // Keep chat runtime responsive even if persistence fails.
+    }
+
+    try {
+      const response = await options.localTutorRuntime.sendMessage(validatedPayload.message, validatedPayload.context)
+      try {
+        await options.runPythonBridgeWithArgs([
+          'assistant-chat-append',
+          'assistant',
+          response.text,
+        ])
+      } catch {
+        // Best-effort persistence only.
+      }
+      return response
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to send assistant chat message: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('assistant-chat:unload', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await options.localTutorRuntime.unload('manual')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to unload assistant chat runtime: ${detail}`)
     }
   })
 

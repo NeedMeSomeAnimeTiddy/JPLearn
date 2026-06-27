@@ -226,6 +226,33 @@ function validateAssistantChatAppendPayload(payload) {
   }
 }
 
+function validateAssistantChatRuntimePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid assistant chat runtime payload: expected object')
+  }
+
+  const message = typeof payload.message === 'string' ? payload.message.trim() : ''
+  if (!message) {
+    throw new Error('Invalid assistant chat runtime message: value must not be empty')
+  }
+  if (message.length > 4000) {
+    throw new Error('Invalid assistant chat runtime message: maximum length exceeded')
+  }
+
+  let context = {}
+  if (payload.context != null) {
+    if (typeof payload.context !== 'object' || Array.isArray(payload.context)) {
+      throw new Error('Invalid assistant chat runtime context: expected object')
+    }
+    context = payload.context
+  }
+
+  return {
+    message,
+    context,
+  }
+}
+
 module.exports = {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
@@ -237,6 +264,7 @@ module.exports = {
   validatePositiveLimit,
   validateAssistantEventIdsPayload,
   validateAssistantChatAppendPayload,
+  validateAssistantChatRuntimePayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
 }

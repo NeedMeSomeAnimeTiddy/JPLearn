@@ -38,6 +38,34 @@ interface SessionRunReport {
   confidenceCapturedCount: number
   averageConfidenceScore: number | null
 }
+interface AssistantStatePayload {
+  mood: string
+  momentum: number
+  confidence_level: number
+  focus_area: string
+  last_major_event: string
+}
+interface AssistantProfilePayload {
+  persona_style: string
+  popup_cadence: string
+  emotion_persistence: string
+  llm_backend: string
+  chat_retention: string
+  updated_at_utc: string
+}
+interface AssistantEventPayload {
+  id: number
+  event_type: string
+  priority: 'info' | 'coaching' | 'critical' | 'celebration'
+  message_key: string
+  metadata: Record<string, string>
+}
+interface AssistantToast {
+  id: number
+  priority: AssistantEventPayload['priority']
+  title: string
+  body: string
+}
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
 type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
@@ -85,6 +113,9 @@ type ThemeKey =
 type ThemeMode = 'dark' | 'light'
 
 const FEEDBACK_REVEAL_MS = 2100
+const ASSISTANT_EVENT_POLL_MS = 15000
+const ASSISTANT_TOAST_TTL_MS = 5200
+const ASSISTANT_MAX_TOASTS = 4
 const DEFAULT_LIVES = 3
 const SESSION_LENGTH_PRESETS = [
   { key: 'short', label: 'Short', items: 8, icon: Minus },
@@ -1656,6 +1687,41 @@ function describeQueueLoad(remainingDue: number): string {
   return 'Long-term queue available; chip away in small runs.'
 }
 
+function formatAssistantMoodLabel(mood: string): string {
+  if (mood === 'coach_celebratory') return 'Celebrating'
+  if (mood === 'coach_supportive') return 'Supportive'
+  if (mood === 'coach_alert') return 'On Alert'
+  return 'Focused'
+}
+
+function formatAssistantEventTitle(event: AssistantEventPayload): string {
+  if (event.event_type === 'session_goal_met') return 'Goal complete'
+  if (event.event_type === 'streak_milestone') return 'Streak milestone'
+  if (event.event_type === 'leech_intervention') return 'Tough items spotted'
+  if (event.event_type === 'weakness_spike') return 'Practice recommendation'
+  return 'Coach update'
+}
+
+function formatAssistantEventBody(event: AssistantEventPayload): string {
+  if (event.message_key === 'coach.goal_met') {
+    return 'Excellent run. Lock in the momentum with one short follow-up session.'
+  }
+  if (event.message_key === 'coach.streak_milestone') {
+    const days = event.metadata.days ?? '0'
+    return `${days}-day streak reached. Keep the chain alive with a quick review.`
+  }
+  if (event.message_key === 'coach.leech_intervention') {
+    const count = event.metadata.leech_count ?? '0'
+    return `${count} leech cards are active. Prioritize focused typed recall on weak prompts.`
+  }
+  if (event.message_key === 'coach.weakness_focus') {
+    const focusArea = event.metadata.focus_area ?? 'general'
+    const errorRate = event.metadata.error_rate ?? '0'
+    return `Focus on ${focusArea}. Recent error rate is ${errorRate}% in this area.`
+  }
+  return 'Quick check-in: stay steady and finish this block cleanly.'
+}
+
 function App() {
   const [view, setView] = useState<AppView>('home')
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
@@ -1666,6 +1732,9 @@ function App() {
   const isHistoryNavigationRef = useRef(false)
   const [loading, setLoading] = useState<boolean>(() => loadSummarySnapshot() === null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [assistantState, setAssistantState] = useState<AssistantStatePayload | null>(null)
+  const [assistantProfile, setAssistantProfile] = useState<AssistantProfilePayload | null>(null)
+  const [assistantToasts, setAssistantToasts] = useState<AssistantToast[]>([])
 
   const [activeScript, setActiveScript] = useState<ScriptKey>('hiragana')
   const [activeGame, setActiveGame] = useState<MinigameKey>('romaji_sprint')
@@ -1784,6 +1853,7 @@ function App() {
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
   const backgroundImageCacheRef = useRef<Partial<Record<BackgroundStyle, HTMLImageElement>>>({})
+  const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
@@ -2124,6 +2194,94 @@ function App() {
   useEffect(() => {
     void loadSummary()
   }, [loadSummary])
+
+  useEffect(() => {
+    const getAssistantSnapshotFn = window.jplearnDesktop.getAssistantSnapshot
+    if (!getAssistantSnapshotFn) {
+      return
+    }
+
+    let cancelled = false
+
+    async function refreshAssistantSnapshot(): Promise<void> {
+      try {
+        const response = await getAssistantSnapshotFn!(activeSessionId ?? undefined)
+        if (!response.ok || cancelled) return
+        setAssistantProfile(response.snapshot.profile)
+        setAssistantState(response.snapshot.state)
+      } catch {
+        // Snapshot is supplementary; keep study loop uninterrupted.
+      }
+    }
+
+    void refreshAssistantSnapshot()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeSessionId, summary])
+
+  useEffect(() => {
+    const getAssistantEventsFn = window.jplearnDesktop.getAssistantEvents
+    const consumeAssistantEventsFn = window.jplearnDesktop.consumeAssistantEvents
+    if (!getAssistantEventsFn || !consumeAssistantEventsFn) {
+      return
+    }
+
+    let disposed = false
+
+    async function pullAssistantEvents(): Promise<void> {
+      try {
+        const response = await getAssistantEventsFn!(8)
+        if (!response.ok || disposed || response.events.length === 0) {
+          return
+        }
+
+        const fresh = response.events.filter((event) => !assistantSeenEventIdsRef.current.has(event.id))
+        for (const event of fresh) {
+          assistantSeenEventIdsRef.current.add(event.id)
+        }
+
+        if (fresh.length > 0) {
+          const toasts = fresh.map((event) => ({
+            id: event.id,
+            priority: event.priority,
+            title: formatAssistantEventTitle(event),
+            body: formatAssistantEventBody(event),
+          }))
+          setAssistantToasts((previous) => [...previous, ...toasts].slice(-ASSISTANT_MAX_TOASTS))
+        }
+
+        await consumeAssistantEventsFn!(response.events.map((event) => event.id))
+      } catch {
+        // Non-blocking polling path.
+      }
+    }
+
+    void pullAssistantEvents()
+    const pollHandle = window.setInterval(() => {
+      void pullAssistantEvents()
+    }, ASSISTANT_EVENT_POLL_MS)
+
+    return () => {
+      disposed = true
+      window.clearInterval(pollHandle)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (assistantToasts.length <= 0) {
+      return
+    }
+
+    const timeoutHandle = window.setTimeout(() => {
+      setAssistantToasts((previous) => previous.slice(1))
+    }, ASSISTANT_TOAST_TTL_MS)
+
+    return () => {
+      window.clearTimeout(timeoutHandle)
+    }
+  }, [assistantToasts])
 
   useEffect(() => {
     let cancelled = false
@@ -5853,6 +6011,33 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      <aside className="assistant-overlay" aria-live="polite" aria-label="Tutor companion">
+        {assistantState ? (
+          <div className="assistant-status-chip" role="status" aria-atomic="true">
+            <Heart className="assistant-status-icon" strokeWidth={2.1} aria-hidden="true" />
+            <div className="assistant-status-copy">
+              <strong>{assistantProfile?.persona_style === 'coach' ? 'Coach' : 'Tutor'}: {formatAssistantMoodLabel(assistantState.mood)}</strong>
+              <span>
+                Momentum {assistantState.momentum >= 0 ? '+' : ''}{assistantState.momentum}
+                {' · '}
+                Focus {assistantState.focus_area}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        {assistantToasts.length > 0 ? (
+          <div className="assistant-toast-stack" role="status" aria-label="Tutor updates">
+            {assistantToasts.map((toast) => (
+              <article key={toast.id} className={`assistant-toast assistant-toast-${toast.priority}`}>
+                <h3>{toast.title}</h3>
+                <p>{toast.body}</p>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </aside>
 
       </div>
     </main>

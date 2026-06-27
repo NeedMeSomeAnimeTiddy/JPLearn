@@ -268,6 +268,22 @@ interface AssistantChatHistoryResponse {
   turns: AssistantChatTurn[]
 }
 
+interface AssistantChatRuntimeStatus {
+  loaded: boolean
+  loadedAtUtc: string | null
+  lastUsedAtUtc: string | null
+  inactivityUnloadMs: number
+}
+
+interface AssistantChatRuntimeResponse {
+  ok: boolean
+  text: string
+  provider: string
+  model: string
+  coldStart: boolean
+  elapsedMs: number
+}
+
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
@@ -320,6 +336,12 @@ interface DesktopApi {
     content: string
   }) => Promise<{ ok: boolean }>
   getAssistantChatHistory?: (limit?: number) => Promise<AssistantChatHistoryResponse>
+  getAssistantChatRuntimeStatus?: () => Promise<AssistantChatRuntimeStatus>
+  sendAssistantChatMessage?: (payload: {
+    message: string
+    context?: Record<string, string>
+  }) => Promise<AssistantChatRuntimeResponse>
+  unloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string }>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>

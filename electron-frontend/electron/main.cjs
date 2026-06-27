@@ -3,6 +3,7 @@ const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
+const { createTutorChatRuntime } = require('./llm_runtime.cjs')
 const {
   isAllowedRendererUrl,
 } = require('./ipc_security.cjs')
@@ -12,6 +13,7 @@ const startupReadyResolvers = new Map()
 const startupTelemetryByContentsId = new Map()
 const windowExpandedStateById = new Map()
 const windowRestoreBoundsById = new Map()
+const localTutorRuntime = createTutorChatRuntime()
 const bridgeReadCache = new Map()
 const bridgeReadInFlight = new Map()
 const bridgeWorkerState = {
@@ -905,6 +907,7 @@ registerIpcHandlers({
   isWindowExpanded,
   getSafeRestoreBounds,
   windowRestoreBoundsById,
+  localTutorRuntime,
 })
 
 function createWindow() {
@@ -1390,6 +1393,7 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
+  void localTutorRuntime.unload('before-quit').catch(() => undefined)
   writeBridgeTelemetry()
   stopPythonBridgeWorker()
 })

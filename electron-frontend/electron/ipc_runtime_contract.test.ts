@@ -49,6 +49,11 @@ function createRegisteredHandlers(overrides = {}) {
     normalizeStartupTelemetry: vi.fn((payload) => payload),
     startupTelemetryByContentsId: new Map(),
     startupReadyResolvers: new Map(),
+    localTutorRuntime: {
+      getStatus: vi.fn(() => ({ loaded: false, loadedAtUtc: null, lastUsedAtUtc: null, inactivityUnloadMs: 300000 })),
+      sendMessage: vi.fn(async () => ({ ok: true, text: 'stub', provider: 'stub', model: 'stub', coldStart: false, elapsedMs: 0 })),
+      unload: vi.fn(async () => ({ ok: true, reason: 'manual' })),
+    },
     isWindowExpanded: vi.fn(() => false),
     getSafeRestoreBounds: vi.fn(() => ({ x: 0, y: 0, width: 800, height: 600 })),
     windowRestoreBoundsById: new Map(),
