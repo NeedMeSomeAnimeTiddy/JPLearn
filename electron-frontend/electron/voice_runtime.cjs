@@ -178,6 +178,8 @@ function createVoiceRuntime(options = {}) {
     return synthesis.buffer
   }
 
+  const warmedSpeakers = new Set()
+
   const runtime = {
     getStatus() {
       return {
@@ -207,6 +209,7 @@ function createVoiceRuntime(options = {}) {
         throw new Error('VOICEVOX returned empty audio')
       }
 
+      warmedSpeakers.add(speaker)
       lastError = null
       return {
         ok: true,
@@ -214,6 +217,27 @@ function createVoiceRuntime(options = {}) {
         sampleRate: 24000,
         voiceId: speaker,
         audioBase64: wav.toString('base64'),
+      }
+    },
+
+    // Start (or connect to) the engine ahead of time and warm a speaker so the
+    // first real synthesis is fast. Best-effort: failures are swallowed.
+    async preload(speaker) {
+      try {
+        await ensureEngine()
+        const target = Number.isInteger(speaker) ? speaker : DEFAULT_SPEAKER
+        if (!warmedSpeakers.has(target)) {
+          try {
+            await synthesize('あ', target, DEFAULT_SPEED)
+            warmedSpeakers.add(target)
+          } catch {
+            // Warmup is best-effort; the engine is still usable on the next call.
+          }
+        }
+        lastError = null
+        return { ok: true, ready: true }
+      } catch {
+        return { ok: false, ready: false }
       }
     },
 

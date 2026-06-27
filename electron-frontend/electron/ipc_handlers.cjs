@@ -384,6 +384,17 @@ function registerIpcHandlers(options) {
     return options.localVoiceRuntime.getStatus()
   })
 
+  options.ipcMain.handle('audio:preload', async (event, speaker) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const requestedSpeaker = Number.isInteger(speaker) && speaker >= 0 && speaker <= 100000 ? speaker : undefined
+    try {
+      return await options.localVoiceRuntime.preload(requestedSpeaker)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to preload voice: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('audio:speak', async (event, payload) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedPayload = validateSpeakPayload(payload)

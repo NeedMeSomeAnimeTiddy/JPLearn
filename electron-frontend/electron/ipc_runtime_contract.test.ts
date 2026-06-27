@@ -57,8 +57,9 @@ function createRegisteredHandlers(overrides = {}) {
       cancelActiveInference: vi.fn(async () => ({ ok: true, cancelled: false, reason: 'renderer-cancel' })),
     },
     localVoiceRuntime: {
-      getStatus: vi.fn(() => ({ available: false, modelReady: false, downloading: false, downloadProgress: 0, modelName: 'kokoro-multi-lang-v1_1', lastError: null })),
-      speak: vi.fn(async () => ({ ok: true, format: 'wav', sampleRate: 24000, voiceId: 0, audioBase64: '' })),
+      getStatus: vi.fn(() => ({ available: false, modelReady: false, downloading: false, downloadProgress: 0, modelName: 'voicevox:13', lastError: null })),
+      speak: vi.fn(async () => ({ ok: true, format: 'wav', sampleRate: 24000, voiceId: 13, audioBase64: '' })),
+      preload: vi.fn(async () => ({ ok: true, ready: true })),
       unload: vi.fn(async () => ({ ok: true })),
     },
     isWindowExpanded: vi.fn(() => false),

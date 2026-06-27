@@ -4594,6 +4594,53 @@ button {
   gap: 10px;
 }
 
+.onboarding-voice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.onboarding-voice-option {
+  border: 1px solid color-mix(in oklab, var(--panel-border) 84%, var(--accent) 16%);
+  background: color-mix(in oklab, var(--panel-bg-alt) 92%, black);
+  border-radius: 10px;
+  color: var(--text-main);
+  text-align: left;
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+  min-height: 52px;
+  transition: border-color 130ms ease, transform 130ms ease, box-shadow 170ms ease;
+}
+
+.onboarding-voice-option:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--accent) 58%, var(--panel-border));
+  transform: translateY(-1px);
+}
+
+.onboarding-voice-option:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.onboarding-voice-option.is-active {
+  border-color: color-mix(in oklab, var(--accent) 80%, var(--panel-border));
+  background: linear-gradient(145deg, color-mix(in oklab, var(--accent) 18%, var(--panel-bg-alt)), color-mix(in oklab, var(--panel-bg) 94%, black));
+  box-shadow: 0 8px 20px -16px color-mix(in oklab, var(--accent) 62%, transparent);
+}
+
+.onboarding-voice-option .expertise-option-title {
+  font-size: 0.87rem;
+}
+
+.onboarding-voice-option .expertise-option-description {
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
 .onboarding-callout {
   margin: 0;
   padding: 10px 12px;

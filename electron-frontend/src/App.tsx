@@ -1990,7 +1990,7 @@ function App() {
   const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showExpertisePrompt, setShowExpertisePrompt] = useState<boolean>(false)
-  const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1)
+  const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3 | 4>(1)
   const [selectedExpertiseLevel, setSelectedExpertiseLevel] = useState<ExpertiseLevel>('total_beginner')
   const [applyingExpertise, setApplyingExpertise] = useState<boolean>(false)
   const [expertiseError, setExpertiseError] = useState<string | null>(null)
@@ -2004,6 +2004,7 @@ function App() {
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null)
+  const voicePreloadTriggeredRef = useRef<boolean>(false)
   const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const scriptLoadRequestIdRef = useRef<number>(0)
@@ -2079,6 +2080,20 @@ function App() {
       setVoiceBusy(false)
     }
   }, [voiceBusy, settings.voiceSpeaker])
+
+  // Warm the voice engine in the background once voice is enabled so the first
+  // spoken prompt doesn't pay the engine cold-start cost.
+  useEffect(() => {
+    if (!settings.voiceEnabled || voicePreloadTriggeredRef.current) {
+      return
+    }
+    const preloadVoice = window.jplearnDesktop.preloadVoice
+    if (!preloadVoice) {
+      return
+    }
+    voicePreloadTriggeredRef.current = true
+    void preloadVoice(settings.voiceSpeaker).catch(() => {})
+  }, [settings.voiceEnabled, settings.voiceSpeaker])
 
   const toggleOverviewSection = useCallback((section: OverviewSectionKey) => {
     setOverviewSectionExpanded((prev) => ({
@@ -4301,13 +4316,15 @@ function App() {
     setExpertiseError(null)
     setOnboardingStep((prev) => {
       if (prev === 1) return 2
-      return 3
+      if (prev === 2) return 3
+      return 4
     })
   }, [])
 
   const goToPreviousOnboardingStep = useCallback(() => {
     setExpertiseError(null)
     setOnboardingStep((prev) => {
+      if (prev === 4) return 3
       if (prev === 3) return 2
       return 1
     })
@@ -6202,14 +6219,16 @@ function App() {
             <div className="settings-modal-header">
               <div>
                 <h2 id="expertise-title" className="settings-modal-title">
-                  {onboardingStep === 1 ? 'Where should your learning start?' : null}
-                  {onboardingStep === 2 ? 'How much should we pre-complete for you?' : null}
-                  {onboardingStep === 3 ? 'Confirm your starting point' : null}
+                  {onboardingStep === 1 ? 'Pick your study companion' : null}
+                  {onboardingStep === 2 ? 'Choose a voice' : null}
+                  {onboardingStep === 3 ? 'How much should we pre-complete for you?' : null}
+                  {onboardingStep === 4 ? 'Confirm your starting point' : null}
                 </h2>
                 <p id="expertise-subtitle" className="settings-modal-subtitle">
-                  {onboardingStep === 1 ? 'Choose setup or skip. We will only ask this once.' : null}
-                  {onboardingStep === 2 ? 'Choose the option that matches what you can already read today.' : null}
-                  {onboardingStep === 3 ? 'You can change this later by resetting study progress in settings.' : null}
+                  {onboardingStep === 1 ? 'Turn the coach on or off. You can change this anytime.' : null}
+                  {onboardingStep === 2 ? 'Hear prompts read aloud. Tap a voice to sample it.' : null}
+                  {onboardingStep === 3 ? 'Choose the option that matches what you can already read today.' : null}
+                  {onboardingStep === 4 ? 'You can change this later by resetting study progress in settings.' : null}
                 </p>
               </div>
               <button
@@ -6226,17 +6245,18 @@ function App() {
               <span className={`onboarding-dot ${onboardingStep >= 1 ? 'is-active' : ''}`}>1</span>
               <span className={`onboarding-dot ${onboardingStep >= 2 ? 'is-active' : ''}`}>2</span>
               <span className={`onboarding-dot ${onboardingStep >= 3 ? 'is-active' : ''}`}>3</span>
+              <span className={`onboarding-dot ${onboardingStep >= 4 ? 'is-active' : ''}`}>4</span>
             </div>
 
             {onboardingStep === 1 ? (
               <div className="onboarding-step">
                 <p className="onboarding-callout">
-                  Are you new to Japanese, or should we pre-complete basics you already know?
+                  Want a study coach companion alongside your lessons?
                 </p>
-                <ul className="onboarding-checklist" aria-label="What this setup does">
-                  <li>Matches your starting level in one click.</li>
-                  <li>Avoids repeating content you already know.</li>
-                  <li>You can reset and redo this anytime.</li>
+                <ul className="onboarding-checklist" aria-label="What the coach does">
+                  <li>Gives quick nudges and encouragement.</li>
+                  <li>Runs a small local model when enabled.</li>
+                  <li>You can toggle it anytime in settings.</li>
                 </ul>
                 <button
                   type="button"
@@ -6250,6 +6270,14 @@ function App() {
                 <p className="settings-help">
                   Coach is currently <strong>{settings.assistantChatEnabled ? 'enabled' : 'disabled'}</strong>. Tiny quirk: choosing lower is a power move. Momentum beats ego.
                 </p>
+              </div>
+            ) : null}
+
+            {onboardingStep === 2 ? (
+              <div className="onboarding-step">
+                <p className="onboarding-callout">
+                  Read prompts aloud during games?
+                </p>
                 <button
                   type="button"
                   className={`onboarding-btn ${settings.voiceEnabled ? 'onboarding-btn-secondary' : 'onboarding-btn-primary'}`}
@@ -6260,12 +6288,12 @@ function App() {
                   {settings.voiceEnabled ? 'Disable voice' : 'Enable voice'}
                 </button>
                 {settings.voiceEnabled ? (
-                  <div className="expertise-options" role="radiogroup" aria-label="Choose a voice">
+                  <div className="onboarding-voice-grid" role="radiogroup" aria-label="Choose a voice">
                     {VOICE_OPTIONS.map((option) => (
                       <button
                         key={option.id}
                         type="button"
-                        className={`expertise-option ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
+                        className={`onboarding-voice-option ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
                         onClick={() => {
                           setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
                           void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
@@ -6285,7 +6313,7 @@ function App() {
               </div>
             ) : null}
 
-            {onboardingStep === 2 ? (
+            {onboardingStep === 3 ? (
               <div className="onboarding-step">
                 <p className="settings-help">
                   Be honest, not heroic. We can always level up later.
@@ -6308,7 +6336,7 @@ function App() {
               </div>
             ) : null}
 
-            {onboardingStep === 3 ? (
+            {onboardingStep === 4 ? (
               <div className="onboarding-step onboarding-summary">
                 <p>
                   <strong>Chosen level:</strong> {selectedExpertiseOption.title}
@@ -6335,7 +6363,7 @@ function App() {
                   Back
                 </button>
               ) : null}
-              {onboardingStep < 3 ? (
+              {onboardingStep < 4 ? (
                 <button
                   type="button"
                   className="onboarding-btn onboarding-btn-primary"

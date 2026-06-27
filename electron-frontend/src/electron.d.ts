@@ -364,6 +364,7 @@ interface DesktopApi {
   cancelAssistantChatInference?: () => Promise<{ ok: boolean; cancelled: boolean; reason: string }>
   speakText?: (payload: string | { text: string; speaker?: number; speed?: number }) => Promise<VoiceSpeakResponse>
   getVoiceStatus?: () => Promise<VoiceStatus>
+  preloadVoice?: (speaker?: number) => Promise<{ ok: boolean; ready: boolean }>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>
