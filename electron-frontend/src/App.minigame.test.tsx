@@ -253,7 +253,7 @@ describe('Minigame menu', () => {
     }))
   })
 
-  it('shows a starter-safe study plan strip on the main menu and opens the suggested game', async () => {
+  it('shows a starter-safe study plan strip on the main menu and opens the suggested setup page', async () => {
     window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify({
       hiragana: {},
       katakana: {},
@@ -280,7 +280,9 @@ describe('Minigame menu', () => {
     const shortcutButton = await screen.findByRole('button', { name: /meaning match/i })
     fireEvent.click(shortcutButton)
 
-    expect((await screen.findAllByRole('heading', { name: /Meaning Match/i })).length).toBeGreaterThan(0)
+    expect(await screen.findByRole('heading', { name: /Mini Game Map/i })).toBeTruthy()
+    expect((await screen.findAllByText(/Meaning Match/i)).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /back to map/i })).toBeNull()
   })
 
   it('removes romaji sprint for conversational track', async () => {

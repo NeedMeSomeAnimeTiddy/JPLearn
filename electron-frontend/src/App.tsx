@@ -902,6 +902,14 @@ function loadCardScores(): CardScores {
   }
 }
 
+function normalizeDeckCards(cards: unknown): ScriptDeck['cards'] {
+  return Array.isArray(cards) ? cards as ScriptDeck['cards'] : []
+}
+
+function normalizeBlockList(blocks: unknown): BlockInfo[] {
+  return Array.isArray(blocks) ? blocks as BlockInfo[] : []
+}
+
 function normalizeText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -1478,6 +1486,11 @@ function App() {
     setActiveGame(availableMinigames[0])
   }, [activeGame, availableMinigames])
 
+  const resolveScriptMinigame = useCallback((script: ScriptKey, minigame: MinigameKey): MinigameKey => {
+    const allowedMinigames = SCRIPT_MINIGAMES[script]
+    return allowedMinigames.includes(minigame) ? minigame : allowedMinigames[0]
+  }, [])
+
   const resetRoundCycle = useCallback(() => {
     roundCycleRef.current = []
     roundCursorRef.current = 0
@@ -1760,12 +1773,14 @@ function App() {
         ])
         if (cancelled) return
 
-        kanjiLevelDeckCacheRef.current[level] = deckPayload.cards
-        kanjiLevelBlockCacheRef.current[level] = blockPayload.blocks
+        const normalizedCards = normalizeDeckCards(deckPayload.cards)
+        const normalizedBlocks = normalizeBlockList(blockPayload.blocks)
+        kanjiLevelDeckCacheRef.current[level] = normalizedCards
+        kanjiLevelBlockCacheRef.current[level] = normalizedBlocks
         if (shouldHydrateState) {
           setKanjiDeckCardsByLevel((previous) => ({
             ...previous,
-            [level]: deckPayload.cards,
+            [level]: normalizedCards,
           }))
         }
       }
@@ -1782,12 +1797,14 @@ function App() {
         ])
         if (cancelled) return
 
-        vocabLevelDeckCacheRef.current[level] = deckPayload.cards
-        vocabLevelBlockCacheRef.current[level] = blockPayload.blocks
+        const normalizedCards = normalizeDeckCards(deckPayload.cards)
+        const normalizedBlocks = normalizeBlockList(blockPayload.blocks)
+        vocabLevelDeckCacheRef.current[level] = normalizedCards
+        vocabLevelBlockCacheRef.current[level] = normalizedBlocks
         if (shouldHydrateState) {
           setVocabDeckCardsByLevel((previous) => ({
             ...previous,
-            [level]: deckPayload.cards,
+            [level]: normalizedCards,
           }))
         }
       }
@@ -1883,8 +1900,8 @@ function App() {
             return
           }
 
-          selectedCards = selectedDeckPayload.cards
-          selectedBlocks = blockPayload.blocks
+          selectedCards = normalizeDeckCards(selectedDeckPayload.cards)
+          selectedBlocks = normalizeBlockList(blockPayload.blocks)
           kanjiLevelDeckCacheRef.current[kanjiLevel] = selectedCards
           kanjiLevelBlockCacheRef.current[kanjiLevel] = selectedBlocks
           setKanjiDeckCardsByLevel((previous) => ({
@@ -1903,17 +1920,18 @@ function App() {
           if (level === kanjiLevel || kanjiLevelDeckCacheRef.current[level]) continue
           void window.jplearnDesktop.getDeckCards(KANJI_LEVEL_TO_DECK_SLUG[level])
             .then((payload) => {
-              kanjiLevelDeckCacheRef.current[level] = payload.cards
+              const normalizedCards = normalizeDeckCards(payload.cards)
+              kanjiLevelDeckCacheRef.current[level] = normalizedCards
               setKanjiDeckCardsByLevel((previous) => ({
                 ...previous,
-                [level]: payload.cards,
+                [level]: normalizedCards,
               }))
             })
             .catch(() => undefined)
 
           void window.jplearnDesktop.getBlockProgress(KANJI_LEVEL_TO_DECK_SLUG[level])
             .then((payload) => {
-              kanjiLevelBlockCacheRef.current[level] = payload.blocks
+              kanjiLevelBlockCacheRef.current[level] = normalizeBlockList(payload.blocks)
             })
             .catch(() => undefined)
         }
@@ -1947,8 +1965,8 @@ function App() {
             return
           }
 
-          selectedCards = selectedDeckPayload.cards
-          selectedBlocks = blockPayload.blocks
+          selectedCards = normalizeDeckCards(selectedDeckPayload.cards)
+          selectedBlocks = normalizeBlockList(blockPayload.blocks)
           vocabLevelDeckCacheRef.current[vocabLevel] = selectedCards
           vocabLevelBlockCacheRef.current[vocabLevel] = selectedBlocks
           setVocabDeckCardsByLevel((previous) => ({
@@ -1967,17 +1985,18 @@ function App() {
           if (level === vocabLevel || vocabLevelDeckCacheRef.current[level]) continue
           void window.jplearnDesktop.getDeckCards(VOCAB_LEVEL_TO_DECK_SLUG[level])
             .then((payload) => {
-              vocabLevelDeckCacheRef.current[level] = payload.cards
+              const normalizedCards = normalizeDeckCards(payload.cards)
+              vocabLevelDeckCacheRef.current[level] = normalizedCards
               setVocabDeckCardsByLevel((previous) => ({
                 ...previous,
-                [level]: payload.cards,
+                [level]: normalizedCards,
               }))
             })
             .catch(() => undefined)
 
           void window.jplearnDesktop.getBlockProgress(VOCAB_LEVEL_TO_DECK_SLUG[level])
             .then((payload) => {
-              vocabLevelBlockCacheRef.current[level] = payload.blocks
+              vocabLevelBlockCacheRef.current[level] = normalizeBlockList(payload.blocks)
             })
             .catch(() => undefined)
         }
@@ -2003,8 +2022,8 @@ function App() {
           return
         }
 
-        setDeckCards(deckPayload.cards)
-        const blocks = blockPayload.blocks
+        setDeckCards(normalizeDeckCards(deckPayload.cards))
+        const blocks = normalizeBlockList(blockPayload.blocks)
         setBlockProgress(blocks)
         if (blocks.length > 0) {
           const lastUnlocked = blocks.reduce(
@@ -2423,10 +2442,7 @@ function App() {
     if (!sessionRunReport) return
 
     const script = sessionRunReport.script
-    const allowedMinigames = SCRIPT_MINIGAMES[script]
-    const minigame = allowedMinigames.includes(sessionRunReport.minigame)
-      ? sessionRunReport.minigame
-      : allowedMinigames[0]
+    const minigame = resolveScriptMinigame(script, sessionRunReport.minigame)
 
     setActiveGame(minigame)
     setNavDirection('forward')
@@ -2448,7 +2464,7 @@ function App() {
     }
 
     void startSession(minigame)
-  }, [activeScript, resetRoundCycle, sessionRunReport, startSession])
+  }, [activeScript, resetRoundCycle, resolveScriptMinigame, sessionRunReport, startSession])
 
   useEffect(() => {
     if (!resumeRequest) return
@@ -3051,9 +3067,10 @@ function App() {
   }, [closeShortcutMenu, resetRoundCycle])
 
   const jumpToScriptHubMinigame = useCallback((script: ScriptKey, minigame: MinigameKey) => {
+    const resolvedMinigame = resolveScriptMinigame(script, minigame)
     setNavDirection('forward')
     setActiveScript(script)
-    setActiveGame(minigame)
+    setActiveGame(resolvedMinigame)
     setView('minigame')
     setSessionActive(false)
     setRoundState(null)
@@ -3065,7 +3082,25 @@ function App() {
     setLivesRemaining(DEFAULT_LIVES)
     resetRoundCycle()
     closeShortcutMenu()
-  }, [closeShortcutMenu, resetRoundCycle])
+  }, [closeShortcutMenu, resetRoundCycle, resolveScriptMinigame])
+
+  const jumpToScriptHubSetup = useCallback((script: ScriptKey, minigame: MinigameKey) => {
+    const resolvedMinigame = resolveScriptMinigame(script, minigame)
+    setNavDirection('forward')
+    setActiveScript(script)
+    setActiveGame(resolvedMinigame)
+    setView('script_hub')
+    setSessionActive(false)
+    setRoundState(null)
+    setRoundFeedback(null)
+    setRoundFeedbackTone(null)
+    setRoundFeedbackPoints(null)
+    setRoundFeedbackAnswer(null)
+    setIsRoundResolving(false)
+    setLivesRemaining(DEFAULT_LIVES)
+    resetRoundCycle()
+    closeShortcutMenu()
+  }, [closeShortcutMenu, resetRoundCycle, resolveScriptMinigame])
 
   const openSettingsFromMenu = useCallback(() => {
     setShowSettings(true)
@@ -3441,7 +3476,7 @@ function App() {
                           key={shortcut.key}
                           type="button"
                           className="study-plan-shortcut-button study-plan-shortcut-button-inline"
-                          onClick={() => jumpToScriptHubMinigame(shortcut.script, shortcut.minigame)}
+                          onClick={() => jumpToScriptHubSetup(shortcut.script, shortcut.minigame)}
                         >
                           <span className="study-plan-shortcut-kicker">Quick shortcut</span>
                           <strong>{shortcut.label}</strong>
