@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, SendHorizontal, Settings, Shuffle, Square, Sun, Target, Trash2, Trophy, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, Lock, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, SendHorizontal, Settings, Shuffle, Square, Sun, Target, Trash2, Trophy, Volume2, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -1890,6 +1890,8 @@ function App() {
   const [sessionActive, setSessionActive] = useState<boolean>(false)
   const [roundState, setRoundState] = useState<RoundState | null>(null)
   const [roundInput, setRoundInput] = useState<string>('')
+  const [voiceBusy, setVoiceBusy] = useState<boolean>(false)
+  const [voiceUnavailable, setVoiceUnavailable] = useState<boolean>(false)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
   const [roundFeedbackTone, setRoundFeedbackTone] = useState<FeedbackTone>(null)
   const [roundFeedbackPoints, setRoundFeedbackPoints] = useState<number | null>(null)
@@ -1978,6 +1980,7 @@ function App() {
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null)
   const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const scriptLoadRequestIdRef = useRef<number>(0)
@@ -2024,6 +2027,35 @@ function App() {
     roundCursorRef.current = 0
     interleaveCursorRef.current = 0
   }, [])
+
+  const playQuestionAudio = useCallback(async (text: string) => {
+    const spoken = typeof text === 'string' ? text.trim() : ''
+    if (!spoken || voiceBusy) {
+      return
+    }
+    const speak = window.jplearnDesktop.speakText
+    if (!speak) {
+      setVoiceUnavailable(true)
+      return
+    }
+    setVoiceBusy(true)
+    try {
+      const result = await speak(spoken)
+      if (result?.audioBase64) {
+        if (voiceAudioRef.current) {
+          voiceAudioRef.current.pause()
+        }
+        const audio = new Audio(`data:audio/wav;base64,${result.audioBase64}`)
+        voiceAudioRef.current = audio
+        await audio.play()
+        setVoiceUnavailable(false)
+      }
+    } catch {
+      setVoiceUnavailable(true)
+    } finally {
+      setVoiceBusy(false)
+    }
+  }, [voiceBusy])
 
   const toggleOverviewSection = useCallback((section: OverviewSectionKey) => {
     setOverviewSectionExpanded((prev) => ({
@@ -5308,6 +5340,19 @@ function App() {
                   <p className={`game-prompt-main ${roundState.mode !== 'character_match' ? 'is-japanese' : ''}`}>
                     {roundState.focusText}
                   </p>
+                  {roundState.audioText ? (
+                    <button
+                      type="button"
+                      className="game-speak-button"
+                      onClick={() => void playQuestionAudio(roundState.audioText)}
+                      disabled={voiceBusy}
+                      aria-label="Play pronunciation"
+                      title={voiceUnavailable ? 'Voice playback unavailable' : 'Play pronunciation'}
+                    >
+                      <Volume2 size={16} aria-hidden="true" />
+                      <span>{voiceBusy ? 'Loading…' : voiceUnavailable ? 'Voice unavailable' : 'Listen'}</span>
+                    </button>
+                  ) : null}
                   {roundState.hintText ? <p className="game-hint-text">{roundState.hintText}</p> : null}
                 </div>
 

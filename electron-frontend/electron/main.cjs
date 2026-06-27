@@ -4,6 +4,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
+const { createVoiceRuntime } = require('./voice_runtime.cjs')
 const {
   isAllowedRendererUrl,
 } = require('./ipc_security.cjs')
@@ -14,6 +15,11 @@ const startupTelemetryByContentsId = new Map()
 const windowExpandedStateById = new Map()
 const windowRestoreBoundsById = new Map()
 const localTutorRuntime = createTutorChatRuntime()
+const localVoiceRuntime = createVoiceRuntime({
+  resolvePython: () => resolvePythonCommand(resolvePythonBridgeContext().projectRoot),
+  workerScript: path.join(repoRoot, 'scripts', 'tts_worker.py'),
+  cwd: repoRoot,
+})
 let tutorRuntimePreloadTriggered = false
 let tutorRuntimePreloadPromise = null
 let preloadedAssistantChatHistory = {
@@ -916,6 +922,7 @@ registerIpcHandlers({
   getSafeRestoreBounds,
   windowRestoreBoundsById,
   localTutorRuntime,
+  localVoiceRuntime,
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
 })
 

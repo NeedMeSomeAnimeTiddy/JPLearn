@@ -11,6 +11,7 @@ const {
   validateAssistantEventInteractionPayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
+  validateSpeakPayload,
 } = require('./ipc_security.cjs')
 
 describe('ipc_security', () => {
@@ -22,6 +23,23 @@ describe('ipc_security', () => {
   it('rejects untrusted renderer URLs', () => {
     expect(isAllowedRendererUrl('https://example.com', true)).toBe(false)
     expect(isAllowedRendererUrl('https://example.com', false)).toBe(false)
+  })
+
+  it('normalizes and bounds speak payloads', () => {
+    expect(validateSpeakPayload('  あ  ')).toEqual({ text: 'あ' })
+    expect(validateSpeakPayload({ text: 'こんにちは', voiceId: 2, speed: 1.2 })).toEqual({
+      text: 'こんにちは',
+      voiceId: 2,
+      speed: 1.2,
+    })
+    expect(validateSpeakPayload({ text: 'x'.repeat(600) }).text).toHaveLength(400)
+  })
+
+  it('rejects invalid speak payloads', () => {
+    expect(() => validateSpeakPayload('   ')).toThrow(/must not be empty/i)
+    expect(() => validateSpeakPayload(42)).toThrow(/expected string or object/i)
+    expect(() => validateSpeakPayload({ text: 'a', voiceId: -1 })).toThrow(/Invalid voiceId/i)
+    expect(() => validateSpeakPayload({ text: 'a', speed: 9 })).toThrow(/Invalid speed/i)
   })
 
   it('rejects IPC when sender frame is not the main frame', () => {

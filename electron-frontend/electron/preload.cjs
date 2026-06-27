@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   sendAssistantChatMessage: (payload) => ipcRenderer.invoke('assistant-chat:send-message', payload),
   unloadAssistantChatRuntime: () => ipcRenderer.invoke('assistant-chat:unload'),
   cancelAssistantChatInference: () => ipcRenderer.invoke('assistant-chat:cancel'),
+  speakText: (payload) => ipcRenderer.invoke('audio:speak', payload),
+  getVoiceStatus: () => ipcRenderer.invoke('audio:voice-status'),
   resetStudyDb: () => ipcRenderer.invoke('study:reset-db'),
   notifyStartupReady: (payload) => ipcRenderer.invoke('ui:startup-ready', payload),
   setStartupTheme: (theme) => ipcRenderer.invoke('ui:set-startup-theme', theme),

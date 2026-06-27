@@ -362,12 +362,31 @@ interface DesktopApi {
   }) => Promise<AssistantChatRuntimeResponse>
   unloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string }>
   cancelAssistantChatInference?: () => Promise<{ ok: boolean; cancelled: boolean; reason: string }>
+  speakText?: (payload: string | { text: string; voiceId?: number; speed?: number }) => Promise<VoiceSpeakResponse>
+  getVoiceStatus?: () => Promise<VoiceStatus>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>
   isWindowMaximized: () => Promise<{ isMaximized: boolean }>
   onWindowStateChanged?: (listener: (state: { isMaximized: boolean }) => void) => () => void
   closeWindow: () => Promise<{ ok: boolean }>
+}
+
+interface VoiceStatus {
+  available: boolean
+  modelReady: boolean
+  downloading: boolean
+  downloadProgress: number
+  modelName: string
+  lastError: string | null
+}
+
+interface VoiceSpeakResponse {
+  ok: boolean
+  format: 'wav'
+  sampleRate: number
+  voiceId: number
+  audioBase64: string
 }
 
 declare global {

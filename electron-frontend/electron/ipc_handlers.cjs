@@ -12,6 +12,7 @@ const {
   validateStartupThemeInput,
   validateRecordGameResultPayload,
   validateExpertiseLevelInput,
+  validateSpeakPayload,
 } = require('./ipc_security.cjs')
 
 function registerIpcHandlers(options) {
@@ -375,6 +376,25 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to cancel assistant chat inference: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('audio:voice-status', (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    return options.localVoiceRuntime.getStatus()
+  })
+
+  options.ipcMain.handle('audio:speak', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateSpeakPayload(payload)
+    try {
+      return await options.localVoiceRuntime.speak(validatedPayload.text, {
+        voiceId: validatedPayload.voiceId,
+        speed: validatedPayload.speed,
+      })
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to synthesize speech: ${detail}`)
     }
   })
 

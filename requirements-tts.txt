@@ -1,0 +1,8 @@
+# Optional text-to-speech dependencies (Kokoro-82M + Japanese g2p).
+# Install into the project venv to enable the in-app "Listen" button:
+#   pip install -r requirements-tts.txt
+#
+# misaki[ja] pulls in pyopenjtalk + fugashi + unidic-lite for accurate Japanese
+# pronunciation. kokoro-onnx pulls in onnxruntime + numpy for synthesis.
+kokoro-onnx
+misaki[ja]

@@ -294,6 +294,47 @@ function validateAssistantEventInteractionPayload(payload) {
   }
 }
 
+function validateSpeakPayload(payload) {
+  let rawText
+  let rawVoiceId
+  let rawSpeed
+  if (typeof payload === 'string') {
+    rawText = payload
+  } else if (payload && typeof payload === 'object') {
+    rawText = payload.text
+    rawVoiceId = payload.voiceId
+    rawSpeed = payload.speed
+  } else {
+    throw new Error('Invalid speak payload: expected string or object')
+  }
+
+  if (typeof rawText !== 'string') {
+    throw new Error(`Invalid speak text: ${String(rawText)}`)
+  }
+  const text = rawText.trim()
+  if (!text) {
+    throw new Error('Invalid speak text: value must not be empty')
+  }
+
+  const result = { text: text.slice(0, 400) }
+
+  if (rawVoiceId != null) {
+    if (!Number.isInteger(rawVoiceId) || rawVoiceId < 0 || rawVoiceId > 2000) {
+      throw new Error(`Invalid voiceId value: ${String(rawVoiceId)}`)
+    }
+    result.voiceId = rawVoiceId
+  }
+
+  if (rawSpeed != null) {
+    if (typeof rawSpeed !== 'number' || !Number.isFinite(rawSpeed) || rawSpeed < 0.5 || rawSpeed > 2) {
+      throw new Error(`Invalid speed value: ${String(rawSpeed)}`)
+    }
+    result.speed = rawSpeed
+  }
+
+  return result
+}
+
 module.exports = {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
@@ -309,4 +350,5 @@ module.exports = {
   validateAssistantChatRuntimePayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
+  validateSpeakPayload,
 }
