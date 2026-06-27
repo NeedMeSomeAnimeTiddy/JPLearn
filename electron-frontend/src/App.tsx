@@ -137,6 +137,12 @@ const FEEDBACK_REVEAL_MS = 2100
 const ASSISTANT_EVENT_POLL_MS = 15000
 const ASSISTANT_TOAST_TTL_MS = 5200
 const ASSISTANT_MAX_TOASTS = 4
+const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1 | 2 | 4; label: string }> = [
+  { value: 0, label: 'Off' },
+  { value: 1, label: 'Low' },
+  { value: 2, label: 'Medium' },
+  { value: 4, label: 'High' },
+]
 const DEFAULT_LIVES = 3
 const SESSION_LENGTH_PRESETS = [
   { key: 'short', label: 'Short', items: 8, icon: Minus },
@@ -532,6 +538,8 @@ interface AppSettings {
   motionStyle: AnimationStyle
   backgroundStyle: BackgroundStyle
   backgroundBlur: number
+  assistantToastLimit: 0 | 1 | 2 | 4
+  assistantChatEnabled: boolean
 }
 
 interface RoundOption {
@@ -1098,7 +1106,13 @@ function defaultSettings(): AppSettings {
     motionStyle: 'glide',
     backgroundStyle: 'classic_scene',
     backgroundBlur: BACKGROUND_BLUR_DEFAULT,
+    assistantToastLimit: ASSISTANT_MAX_TOASTS,
+    assistantChatEnabled: true,
   }
+}
+
+function isAssistantToastLimit(value: unknown): value is 0 | 1 | 2 | 4 {
+  return value === 0 || value === 1 || value === 2 || value === 4
 }
 
 function isBackgroundStyle(value: unknown): value is BackgroundStyle {
@@ -1182,6 +1196,13 @@ function loadSettings(): AppSettings {
       theme: normalizedTheme,
       backgroundStyle: isBackgroundStyle(parsed.backgroundStyle) ? parsed.backgroundStyle : defaults.backgroundStyle,
       backgroundBlur: typeof parsed.backgroundBlur === 'number' ? clampBackgroundBlur(parsed.backgroundBlur) : defaults.backgroundBlur,
+      assistantToastLimit: isAssistantToastLimit(parsed.assistantToastLimit)
+        ? parsed.assistantToastLimit
+        : defaults.assistantToastLimit,
+      assistantChatEnabled:
+        typeof parsed.assistantChatEnabled === 'boolean'
+          ? parsed.assistantChatEnabled
+          : defaults.assistantChatEnabled,
     }
   } catch {
     return defaultSettings()
@@ -2444,7 +2465,7 @@ function App() {
           assistantSeenEventIdsRef.current.add(event.id)
         }
 
-        if (fresh.length > 0) {
+        if (fresh.length > 0 && settings.assistantToastLimit > 0) {
           const toasts = fresh.map((event) => ({
             id: event.id,
             priority: event.priority,
@@ -2457,7 +2478,7 @@ function App() {
             actionType: event.metadata.action_type ?? null,
             actionLabel: formatAssistantActionLabel(event),
           }))
-          setAssistantToasts((previous) => [...previous, ...toasts].slice(-ASSISTANT_MAX_TOASTS))
+          setAssistantToasts((previous) => [...previous, ...toasts].slice(-settings.assistantToastLimit))
         }
 
         await consumeAssistantEventsFn!(response.events.map((event) => event.id))
@@ -2475,7 +2496,15 @@ function App() {
       disposed = true
       window.clearInterval(pollHandle)
     }
-  }, [])
+  }, [settings.assistantToastLimit])
+
+  useEffect(() => {
+    if (settings.assistantToastLimit <= 0) {
+      setAssistantToasts([])
+      return
+    }
+    setAssistantToasts((previous) => previous.slice(-settings.assistantToastLimit))
+  }, [settings.assistantToastLimit])
 
   useEffect(() => {
     if (assistantToasts.length <= 0) {
@@ -2522,7 +2551,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!assistantChatOpen) {
+    if (!settings.assistantChatEnabled || !assistantChatOpen) {
       return
     }
 
@@ -2536,7 +2565,25 @@ function App() {
     return () => {
       window.clearInterval(statusPollHandle)
     }
-  }, [assistantChatOpen, refreshAssistantChatHistory, refreshAssistantChatStatus])
+  }, [assistantChatOpen, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled])
+
+  useEffect(() => {
+    if (settings.assistantChatEnabled) {
+      return
+    }
+
+    setAssistantChatOpen(false)
+    setAssistantChatLoading(false)
+    setAssistantChatWarmup(false)
+    setAssistantChatError(null)
+    setAssistantChatFallbackNote(null)
+
+    const unloadAssistantChatRuntime = window.jplearnDesktop.unloadAssistantChatRuntime
+    if (!unloadAssistantChatRuntime) {
+      return
+    }
+    void unloadAssistantChatRuntime().catch(() => undefined)
+  }, [settings.assistantChatEnabled])
 
   const closeAssistantChat = useCallback(() => {
     setAssistantChatOpen(false)
@@ -2564,6 +2611,11 @@ function App() {
   }, [refreshAssistantChatStatus])
 
   const sendAssistantChat = useCallback(async () => {
+    if (!settings.assistantChatEnabled) {
+      setAssistantChatError('Chatbot is disabled in settings.')
+      return
+    }
+
     const sendAssistantChatMessage = window.jplearnDesktop.sendAssistantChatMessage
     if (!sendAssistantChatMessage) {
       setAssistantChatError('Assistant chat runtime is unavailable in this build.')
@@ -2599,7 +2651,7 @@ function App() {
       setAssistantChatWarmup(false)
       setAssistantChatLoading(false)
     }
-  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus])
+  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled])
 
   useEffect(() => {
     let cancelled = false
@@ -6298,6 +6350,45 @@ function App() {
                   </div>
                 </div>
 
+                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                  <div className="settings-control-content">
+                    <p className="settings-section-label">Tutor Companion</p>
+                    <div className="settings-animation-grid" role="group" aria-label="Tutor companion controls">
+                      <button
+                        type="button"
+                        className={`settings-icon-entry settings-theme-entry ${settings.assistantChatEnabled ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))}
+                        aria-label={settings.assistantChatEnabled ? 'Chat with Tutor enabled. Activate to disable.' : 'Chat with Tutor disabled. Activate to enable.'}
+                        aria-pressed={settings.assistantChatEnabled}
+                        title={settings.assistantChatEnabled ? 'Chat with Tutor enabled' : 'Chat with Tutor disabled'}
+                      >
+                        <span className={`settings-mode-icon-button ${settings.assistantChatEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+                          <MessageCircle size={18} strokeWidth={2.25} aria-hidden="true" />
+                        </span>
+                        <span className="settings-icon-entry-label">Chat with Tutor</span>
+                      </button>
+
+                      {ASSISTANT_TOAST_LIMIT_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={`settings-icon-entry settings-theme-entry ${settings.assistantToastLimit === option.value ? 'is-active' : ''}`}
+                          onClick={() => setSettings((prev) => ({ ...prev, assistantToastLimit: option.value }))}
+                          aria-label={`Set tutor toast amount to ${option.label}`}
+                          aria-pressed={settings.assistantToastLimit === option.value}
+                          title={`Toast amount: ${option.label}`}
+                        >
+                          <span className={`settings-mode-icon-button ${settings.assistantToastLimit === option.value ? 'is-enabled' : ''}`} aria-hidden="true">
+                            <AlertTriangle size={18} strokeWidth={2.25} aria-hidden="true" />
+                          </span>
+                          <span className="settings-icon-entry-label">Toasts {option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="settings-help">Turn Chat with Tutor off to unload the local model runtime. Set toasts to Off to disable popup notifications.</p>
+                  </div>
+                </div>
+
                 <div className="settings-section settings-control-row">
                   <button
                     type="button"
@@ -6365,22 +6456,24 @@ function App() {
       ) : null}
 
       <aside className="assistant-overlay" aria-live="polite" aria-label="Tutor companion">
-        <div className="assistant-chat-controls">
-          <button
-            type="button"
-            className="assistant-chat-toggle"
-            onClick={() => {
-              setAssistantChatOpen((open) => !open)
-              setAssistantChatError(null)
-            }}
-            aria-expanded={assistantChatOpen}
-            aria-controls="assistant-chat-panel"
-            title="Open tutor chat"
-          >
-            <MessageCircle className="assistant-chat-toggle-icon" strokeWidth={2.1} aria-hidden="true" />
-            Chat
-          </button>
-        </div>
+        {settings.assistantChatEnabled ? (
+          <div className="assistant-chat-controls">
+            <button
+              type="button"
+              className="assistant-chat-toggle"
+              onClick={() => {
+                setAssistantChatOpen((open) => !open)
+                setAssistantChatError(null)
+              }}
+              aria-expanded={assistantChatOpen}
+              aria-controls="assistant-chat-panel"
+              title="Open tutor chat"
+            >
+              <MessageCircle className="assistant-chat-toggle-icon" strokeWidth={2.1} aria-hidden="true" />
+              Chat
+            </button>
+          </div>
+        ) : null}
 
         {assistantState ? (
           <div className="assistant-status-chip" role="status" aria-atomic="true">
@@ -6396,7 +6489,7 @@ function App() {
           </div>
         ) : null}
 
-        {assistantChatOpen ? (
+        {settings.assistantChatEnabled && assistantChatOpen ? (
           <section id="assistant-chat-panel" className="assistant-chat-panel" aria-label="Tutor chat panel">
             <header className="assistant-chat-header">
               <h3>Coach Chat</h3>
@@ -6482,7 +6575,7 @@ function App() {
           </section>
         ) : null}
 
-        {assistantToasts.length > 0 ? (
+        {settings.assistantToastLimit > 0 && assistantToasts.length > 0 ? (
           <div className="assistant-toast-stack" role="status" aria-label="Tutor updates">
             {assistantToasts.map((toast) => (
               <article key={toast.id} className={`assistant-toast assistant-toast-${toast.priority}`}>
