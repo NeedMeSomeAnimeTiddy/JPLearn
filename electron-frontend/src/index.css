@@ -240,11 +240,8 @@ body {
   margin: 0;
   font-family: var(--sans);
   color: var(--text-main);
-  background:
-    radial-gradient(circle at 12% 16%, rgba(108, 185, 214, 0.17) 0%, transparent 42%),
-    radial-gradient(circle at 82% 34%, rgba(128, 165, 231, 0.15) 0%, transparent 48%),
-    radial-gradient(circle at 48% 2%, rgba(242, 181, 111, 0.12) 0%, transparent 42%),
-    linear-gradient(180deg, var(--bg-main), var(--bg-subtle));
+  background-color: var(--bg-main);
+  background: linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg-main) 100%);
   font-size: 1rem;
   line-height: 1.45;
   letter-spacing: 0.01em;

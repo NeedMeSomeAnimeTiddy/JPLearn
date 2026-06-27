@@ -50,6 +50,13 @@ type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
+type BackgroundStyle =
+  | 'classic_scene'
+  | 'fuji_view'
+  | 'torii_gate'
+  | 'temple_reflection'
+  | 'garden_bridge'
+  | 'autumn_pond'
 type FeedbackTone = 'success' | 'error' | null
 type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation'
 type ThemeKey =
@@ -457,6 +464,8 @@ interface AppSettings {
   fontSize: FontSize
   theme: ThemeKey
   motionStyle: AnimationStyle
+  backgroundStyle: BackgroundStyle
+  backgroundBlur: number
 }
 
 interface RoundOption {
@@ -745,6 +754,53 @@ const MOTION_STYLE_LABEL: Record<AnimationStyle, string> = {
   lively: 'Lively',
 }
 
+const BACKGROUND_BLUR_MIN = 0
+const BACKGROUND_BLUR_MAX = 12
+const BACKGROUND_BLUR_DEFAULT = 4
+
+const BACKGROUND_OPTIONS: Array<{
+  key: BackgroundStyle
+  label: string
+  note: string
+  imagePath?: string
+}> = [
+  {
+    key: 'classic_scene',
+    label: 'No Background',
+    note: 'Uses a neutral app background with no image overlay.',
+  },
+  {
+    key: 'fuji_view',
+    label: 'Fuji Outlook',
+    note: 'Pagoda and mountain skyline.',
+    imagePath: 'backgrounds/fuji.jpg',
+  },
+  {
+    key: 'torii_gate',
+    label: 'Water Torii',
+    note: 'Floating torii at dusk on calm water.',
+    imagePath: 'backgrounds/torii.jpg',
+  },
+  {
+    key: 'temple_reflection',
+    label: 'Temple Reflection',
+    note: 'Temple architecture mirrored in still water.',
+    imagePath: 'backgrounds/house.jpg',
+  },
+  {
+    key: 'garden_bridge',
+    label: 'Garden Bridge',
+    note: 'Red bridge across deep green garden water.',
+    imagePath: 'backgrounds/bridge.jpg',
+  },
+  {
+    key: 'autumn_pond',
+    label: 'Autumn Pond',
+    note: 'Warm maple tones and morning light rays.',
+    imagePath: 'backgrounds/lake.jpg',
+  },
+]
+
 const JLPT_LEVEL_ORDER: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
 const JLPT_LEVEL_LABELS: Record<JlptLevel, string> = {
   n5: 'JLPT N5',
@@ -916,6 +972,70 @@ function defaultSettings(): AppSettings {
     fontSize: 'medium',
     theme: 'harbor_mist',
     motionStyle: 'glide',
+    backgroundStyle: 'classic_scene',
+    backgroundBlur: BACKGROUND_BLUR_DEFAULT,
+  }
+}
+
+function isBackgroundStyle(value: unknown): value is BackgroundStyle {
+  return (
+    value === 'classic_scene' ||
+    value === 'fuji_view' ||
+    value === 'torii_gate' ||
+    value === 'temple_reflection' ||
+    value === 'garden_bridge' ||
+    value === 'autumn_pond'
+  )
+}
+
+function clampBackgroundBlur(value: number): number {
+  return Math.max(BACKGROUND_BLUR_MIN, Math.min(BACKGROUND_BLUR_MAX, Math.round(value)))
+}
+
+function resolveBackgroundImageUrl(imagePath: string): string {
+  if (typeof window === 'undefined') return imagePath
+  try {
+    return new URL(imagePath, window.location.href).toString()
+  } catch {
+    return imagePath
+  }
+}
+
+function createBackgroundPreviewDataUrl(source: HTMLImageElement, width: number, height: number): string | null {
+  if (typeof document === 'undefined') return null
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) return null
+
+  const sourceWidth = source.naturalWidth || source.width
+  const sourceHeight = source.naturalHeight || source.height
+  if (sourceWidth <= 0 || sourceHeight <= 0) return null
+
+  const targetRatio = width / height
+  const sourceRatio = sourceWidth / sourceHeight
+
+  let sx = 0
+  let sy = 0
+  let sw = sourceWidth
+  let sh = sourceHeight
+
+  if (sourceRatio > targetRatio) {
+    sw = Math.round(sourceHeight * targetRatio)
+    sx = Math.round((sourceWidth - sw) / 2)
+  } else if (sourceRatio < targetRatio) {
+    sh = Math.round(sourceWidth / targetRatio)
+    sy = Math.round((sourceHeight - sh) / 2)
+  }
+
+  context.drawImage(source, sx, sy, sw, sh, 0, 0, width, height)
+
+  try {
+    return canvas.toDataURL('image/webp', 0.72)
+  } catch {
+    return canvas.toDataURL('image/jpeg', 0.78)
   }
 }
 
@@ -924,7 +1044,13 @@ function loadSettings(): AppSettings {
     const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
     if (!raw) return defaultSettings()
     const parsed = JSON.parse(raw) as Partial<AppSettings>
-    return { ...defaultSettings(), ...parsed }
+    const defaults = defaultSettings()
+    return {
+      ...defaults,
+      ...parsed,
+      backgroundStyle: isBackgroundStyle(parsed.backgroundStyle) ? parsed.backgroundStyle : defaults.backgroundStyle,
+      backgroundBlur: typeof parsed.backgroundBlur === 'number' ? clampBackgroundBlur(parsed.backgroundBlur) : defaults.backgroundBlur,
+    }
   } catch {
     return defaultSettings()
   }
@@ -1503,6 +1629,7 @@ function App() {
   const [applyingExpertise, setApplyingExpertise] = useState<boolean>(false)
   const [expertiseError, setExpertiseError] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
+  const [backgroundPreviewUrls, setBackgroundPreviewUrls] = useState<Partial<Record<BackgroundStyle, string>>>({})
   const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0)
   const [resettingDb, setResettingDb] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
@@ -1525,6 +1652,7 @@ function App() {
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
+  const backgroundImageCacheRef = useRef<Partial<Record<BackgroundStyle, HTMLImageElement>>>({})
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
@@ -3284,6 +3412,78 @@ function App() {
   const selectedExpertiseOption =
     EXPERTISE_OPTIONS.find((option) => option.level === selectedExpertiseLevel) ?? EXPERTISE_OPTIONS[0]
 
+  const resolvedBackgroundUrls = useMemo(() => {
+    const next: Partial<Record<BackgroundStyle, string>> = {}
+    BACKGROUND_OPTIONS.forEach((option) => {
+      if (!option.imagePath) return
+      next[option.key] = resolveBackgroundImageUrl(option.imagePath)
+    })
+    return next
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function preloadBackgroundAssets(): Promise<void> {
+      const photoOptions = BACKGROUND_OPTIONS.filter(
+        (option): option is (typeof BACKGROUND_OPTIONS)[number] & { imagePath: string } => Boolean(option.imagePath),
+      )
+
+      const previewMap: Partial<Record<BackgroundStyle, string>> = {}
+
+      await Promise.all(
+        photoOptions.map(async (option) => {
+          const src = resolvedBackgroundUrls[option.key]
+          if (!src) return
+
+          const image = new Image()
+          image.decoding = 'async'
+          image.src = src
+
+          try {
+            await image.decode()
+          } catch {
+            await new Promise<void>((resolve) => {
+              image.onload = () => resolve()
+              image.onerror = () => resolve()
+            })
+          }
+
+          if (cancelled) return
+          backgroundImageCacheRef.current[option.key] = image
+
+          const previewDataUrl = createBackgroundPreviewDataUrl(image, 272, 112)
+          if (previewDataUrl) {
+            previewMap[option.key] = previewDataUrl
+          }
+        }),
+      )
+
+      if (!cancelled) {
+        setBackgroundPreviewUrls((previous) => ({
+          ...previous,
+          ...previewMap,
+        }))
+      }
+    }
+
+    void preloadBackgroundAssets()
+
+    return () => {
+      cancelled = true
+    }
+  }, [resolvedBackgroundUrls])
+
+  const selectedBackgroundOption =
+    BACKGROUND_OPTIONS.find((option) => option.key === settings.backgroundStyle) ?? BACKGROUND_OPTIONS[0]
+  const selectedBackgroundUrl = selectedBackgroundOption.imagePath
+    ? resolvedBackgroundUrls[selectedBackgroundOption.key]
+    : undefined
+  const appShellStyle = {
+    '--background-image': selectedBackgroundUrl ? `url("${selectedBackgroundUrl}")` : 'none',
+    '--background-blur': `${clampBackgroundBlur(settings.backgroundBlur)}px`,
+  } as CSSProperties
+
   const titlebarHistoryBack = useCallback(() => {
     const currentIndex = viewHistoryIndexRef.current
     if (currentIndex <= 0) return
@@ -3323,7 +3523,7 @@ function App() {
   }, [closeShortcutMenu, shortcutMenuOpen])
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-background-style={settings.backgroundStyle} style={appShellStyle}>
       <header className="window-titlebar" aria-label="Window controls">
         <div className="window-titlebar-drag">
           <div className="window-titlebar-nav" role="group" aria-label="App navigation">
@@ -5248,6 +5448,71 @@ function App() {
                           <span className="settings-icon-entry-label">{theme.label}</span>
                         </button>
                       ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section settings-control-row settings-control-row-no-icon">
+                  <div className="settings-control-content">
+                    <p className="settings-section-label">Background</p>
+                    <div className="settings-background-grid" role="radiogroup" aria-label="Background selection">
+                      {BACKGROUND_OPTIONS.map((background) => {
+                        const isActive = settings.backgroundStyle === background.key
+                        return (
+                          <button
+                            key={background.key}
+                            type="button"
+                            className={`settings-icon-entry settings-background-entry ${isActive ? 'is-active' : ''}`}
+                            onClick={() => setSettings((prev) => ({ ...prev, backgroundStyle: background.key }))}
+                            aria-label={`Use ${background.label} background`}
+                            aria-pressed={isActive}
+                            title={background.label}
+                          >
+                            <span
+                              className={`settings-background-preview ${background.imagePath ? 'is-photo' : 'is-classic'}`}
+                              aria-hidden="true"
+                            >
+                              {background.imagePath ? (
+                                <img
+                                  className="settings-background-preview-image"
+                                  src={backgroundPreviewUrls[background.key] ?? resolvedBackgroundUrls[background.key]}
+                                  alt=""
+                                  loading="eager"
+                                  decoding="async"
+                                />
+                              ) : null}
+                            </span>
+                            <span className="settings-background-copy">
+                              <span className="settings-icon-entry-label">{background.label}</span>
+                              <span className="settings-background-note">{background.note}</span>
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <div className="settings-background-slider">
+                      <div className="settings-background-slider-head">
+                        <span>Blur amount</span>
+                        <span>{clampBackgroundBlur(settings.backgroundBlur)}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={BACKGROUND_BLUR_MIN}
+                        max={BACKGROUND_BLUR_MAX}
+                        step={1}
+                        className="settings-range"
+                        value={clampBackgroundBlur(settings.backgroundBlur)}
+                        onChange={(event) => {
+                          const nextBlur = Number(event.currentTarget.value)
+                          setSettings((prev) => ({ ...prev, backgroundBlur: clampBackgroundBlur(nextBlur) }))
+                        }}
+                        aria-label="Background blur amount"
+                        disabled={settings.backgroundStyle === 'classic_scene'}
+                      />
+                      <p className="settings-help">
+                        Applies to photo backgrounds. Choose No Background to restore the simpler pre-drawing background.
+                      </p>
                     </div>
                   </div>
                 </div>
