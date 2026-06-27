@@ -374,11 +374,11 @@
 }
 
 .view-forward {
-  animation: viewSlideForward 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: viewSlideForward var(--motion-view-duration, 280ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 
 .view-back {
-  animation: viewSlideBack 300ms cubic-bezier(0.32, 0, 0.67, 0) both;
+  animation: viewSlideBack var(--motion-view-duration, 280ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 
 button {
@@ -433,6 +433,7 @@ button {
   pointer-events: none;
   z-index: -1;
   overflow: hidden;
+  contain: strict;
 }
 
 .petal {
@@ -452,6 +453,7 @@ button {
   transform: translate3d(0, -12vh, 0) rotate(12deg);
   animation: petalFall var(--petal-duration) linear infinite;
   animation-delay: var(--petal-delay);
+  will-change: transform, opacity;
 }
 
 .home-menu {
@@ -970,7 +972,7 @@ button {
 
 .live-value {
   display: inline-block;
-  animation: valuePop 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: none;
 }
 
 .metric-accent-streak .chip-icon,
@@ -3317,7 +3319,7 @@ button {
   border-radius: 12px;
   padding: 12px 14px;
   backdrop-filter: blur(8px);
-  animation: toastSlideIn 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: toastSlideIn var(--motion-feedback-duration, 240ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 
 .round-feedback-toast strong {
@@ -3352,7 +3354,7 @@ button {
   border-radius: 16px;
   background: linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
   padding: 18px;
-  animation: roundSwapIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: roundSwapIn var(--motion-feedback-duration, 240ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 
 .game-round.is-wrong {
@@ -3361,8 +3363,8 @@ button {
     linear-gradient(155deg, rgba(122, 45, 45, 0.24), rgba(66, 24, 24, 0.3)),
     linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
   animation:
-    roundSwapIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both,
-    roundShake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+    roundSwapIn var(--motion-feedback-duration, 240ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both,
+    roundShake var(--motion-emphasis-duration, 300ms) cubic-bezier(0.36, 0.07, 0.19, 0.97);
 }
 
 .game-round.is-correct {
@@ -3371,8 +3373,8 @@ button {
     linear-gradient(155deg, rgba(63, 133, 86, 0.2), rgba(28, 64, 42, 0.24)),
     linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
   animation:
-    roundSwapIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both,
-    roundPulseSuccess 360ms ease-out;
+    roundSwapIn var(--motion-feedback-duration, 240ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both,
+    roundPulseSuccess var(--motion-emphasis-duration, 300ms) ease-out;
 }
 
 .game-round-head {
@@ -4440,10 +4442,44 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+html[data-motion-style='calm_fade'] {
+  --motion-ease: ease;
+  --motion-view-duration: 180ms;
+  --motion-feedback-duration: 170ms;
+  --motion-emphasis-duration: 1ms;
+  --motion-view-shift-x: 0px;
+  --motion-view-shift-y: 0px;
+  --motion-enter-shift-y: 6px;
+}
+
+html[data-motion-style='glide'] {
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-view-duration: 260ms;
+  --motion-feedback-duration: 230ms;
+  --motion-emphasis-duration: 280ms;
+  --motion-view-shift-x: 10px;
+  --motion-view-shift-y: 4px;
+  --motion-enter-shift-y: 10px;
+}
+
+html[data-motion-style='lively'] {
+  --motion-ease: cubic-bezier(0.2, 0.95, 0.3, 1);
+  --motion-view-duration: 320ms;
+  --motion-feedback-duration: 280ms;
+  --motion-emphasis-duration: 360ms;
+  --motion-view-shift-x: 16px;
+  --motion-view-shift-y: 7px;
+  --motion-enter-shift-y: 14px;
+}
+
+html[data-motion-style='lively'] .live-value {
+  animation: valuePop 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 @keyframes enterUp {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.99);
+    transform: translateY(var(--motion-enter-shift-y, 14px)) scale(0.99);
   }
   to {
     opacity: 1;
@@ -4498,7 +4534,7 @@ select:focus-visible,
 @keyframes viewSlideForward {
   from {
     opacity: 0;
-    transform: translateX(14px) translateY(6px);
+    transform: translateX(var(--motion-view-shift-x, 14px)) translateY(var(--motion-view-shift-y, 6px));
   }
   to {
     opacity: 1;
@@ -4509,7 +4545,7 @@ select:focus-visible,
 @keyframes viewSlideBack {
   from {
     opacity: 0;
-    transform: translateX(-14px) translateY(6px);
+    transform: translateX(calc(-1 * var(--motion-view-shift-x, 14px))) translateY(var(--motion-view-shift-y, 6px));
   }
   to {
     opacity: 1;

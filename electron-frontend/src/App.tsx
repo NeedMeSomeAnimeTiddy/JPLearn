@@ -49,6 +49,7 @@ type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_m
 type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
+type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
 type FeedbackTone = 'success' | 'error' | null
 type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation'
 type ThemeKey =
@@ -455,6 +456,7 @@ interface AppSettings {
   reducedMotion: boolean
   fontSize: FontSize
   theme: ThemeKey
+  motionStyle: AnimationStyle
 }
 
 interface RoundOption {
@@ -731,6 +733,18 @@ const FONT_SIZE_LABEL: Record<FontSize, string> = {
   large: 'Large',
 }
 
+const MOTION_STYLE_OPTIONS: Array<{ key: AnimationStyle; label: string }> = [
+  { key: 'calm_fade', label: 'Calm Fade' },
+  { key: 'glide', label: 'Glide' },
+  { key: 'lively', label: 'Lively' },
+]
+
+const MOTION_STYLE_LABEL: Record<AnimationStyle, string> = {
+  calm_fade: 'Calm Fade',
+  glide: 'Glide',
+  lively: 'Lively',
+}
+
 const JLPT_LEVEL_ORDER: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
 const JLPT_LEVEL_LABELS: Record<JlptLevel, string> = {
   n5: 'JLPT N5',
@@ -901,6 +915,7 @@ function defaultSettings(): AppSettings {
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     fontSize: 'medium',
     theme: 'harbor_mist',
+    motionStyle: 'glide',
   }
 }
 
@@ -1617,8 +1632,18 @@ function App() {
     document.documentElement.dataset.fontSize = settings.fontSize
     document.documentElement.dataset.reducedMotion = String(settings.reducedMotion)
     document.documentElement.dataset.theme = settings.theme
+    document.documentElement.dataset.motionStyle = settings.motionStyle
     void window.jplearnDesktop.setStartupTheme(settings.theme).catch(() => undefined)
   }, [settings])
+
+  const activePetalStream = useMemo(() => {
+    if (settings.reducedMotion || settings.motionStyle === 'calm_fade') return []
+    const count = settings.motionStyle === 'lively' ? 14 : 10
+    return PETAL_STREAM.slice(0, count)
+  }, [settings.motionStyle, settings.reducedMotion])
+
+  const showPetalLayer = activePetalStream.length > 0 && !(view === 'minigame' && sessionActive)
+
   useEffect(() => {
     let mounted = true
     void window.jplearnDesktop
@@ -1898,13 +1923,6 @@ function App() {
     scriptLoadRequestIdRef.current = requestId
     setGameLoading(true)
     setGameError(null)
-
-    const scriptChanged = lastLoadedScriptRef.current !== script
-    if (scriptChanged) {
-      setDeckCards([])
-      setBlockProgress([])
-      setActiveBlockIndex(0)
-    }
 
     setSessionActive(false)
     setRoundState(null)
@@ -3468,22 +3486,24 @@ function App() {
       <div className="atmosphere atmosphere-left" aria-hidden="true" />
       <div className="atmosphere atmosphere-right" aria-hidden="true" />
       <div className="atmosphere atmosphere-top" aria-hidden="true" />
-      <div className="petal-layer" aria-hidden="true">
-        {PETAL_STREAM.map((petal, index) => (
-          <span
-            key={`petal-${index}`}
-            className="petal"
-            style={{
-              left: petal.x,
-              '--petal-drift': petal.drift,
-              '--petal-duration': petal.duration,
-              '--petal-delay': petal.delay,
-              '--petal-size': petal.size,
-              opacity: petal.opacity,
-            } as CSSProperties}
-          />
-        ))}
-      </div>
+      {showPetalLayer ? (
+        <div className="petal-layer" aria-hidden="true">
+          {activePetalStream.map((petal, index) => (
+            <span
+              key={`petal-${index}`}
+              className="petal"
+              style={{
+                left: petal.x,
+                '--petal-drift': petal.drift,
+                '--petal-duration': petal.duration,
+                '--petal-delay': petal.delay,
+                '--petal-size': petal.size,
+                opacity: petal.opacity,
+              } as CSSProperties}
+            />
+          ))}
+        </div>
+      ) : null}
 
       <div className="app-shell-scroll">
       {view === 'home' ? (
@@ -5256,6 +5276,30 @@ function App() {
                 <div className="settings-section settings-control-row settings-control-row-no-icon">
                   <div className="settings-control-content">
                     <p className="settings-section-label">Accessibility</p>
+                    <div className="settings-theme-grid" role="radiogroup" aria-label="Animation style">
+                      {MOTION_STYLE_OPTIONS.map((motionStyle) => (
+                        <button
+                          key={motionStyle.key}
+                          type="button"
+                          className={`settings-icon-entry settings-theme-entry ${settings.motionStyle === motionStyle.key ? 'is-active' : ''}`}
+                          onClick={() => setSettings((prev) => ({ ...prev, motionStyle: motionStyle.key }))}
+                          aria-label={`Use ${motionStyle.label} animation style`}
+                          aria-pressed={settings.motionStyle === motionStyle.key}
+                          title={motionStyle.label}
+                        >
+                          <span className={`settings-mode-icon-button ${settings.motionStyle === motionStyle.key ? 'is-enabled' : ''}`} aria-hidden="true">
+                            {motionStyle.key === 'calm_fade' ? (
+                              <Minus size={18} strokeWidth={2.25} aria-hidden="true" />
+                            ) : motionStyle.key === 'glide' ? (
+                              <ArrowRight size={18} strokeWidth={2.25} aria-hidden="true" />
+                            ) : (
+                              <Flame size={18} strokeWidth={2.25} aria-hidden="true" />
+                            )}
+                          </span>
+                          <span className="settings-icon-entry-label">{MOTION_STYLE_LABEL[motionStyle.key]}</span>
+                        </button>
+                      ))}
+                    </div>
                     <button
                       type="button"
                       className={`settings-icon-entry settings-icon-entry-button ${settings.reducedMotion ? 'is-enabled' : ''}`}
