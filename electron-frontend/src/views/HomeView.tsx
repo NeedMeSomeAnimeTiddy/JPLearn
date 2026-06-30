@@ -7,7 +7,6 @@ import {
   SECTION_META,
 } from '../constants'
 import { BarChart3, CalendarDays, Flame, Lock, Target } from 'lucide-react'
-import { XPBar } from '../components/XPBar'
 import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
 
@@ -15,12 +14,6 @@ interface StatsStrip {
   streak: number
   masteryPct: number
   dueCount: number
-}
-
-interface XPProgressStrip {
-  level: number
-  xpToNextLevel: number
-  xpForCurrentLevel: number
 }
 
 interface TutorBannerData {
@@ -44,7 +37,6 @@ interface HomeViewProps {
   studyPlan: StudyPlanSnapshot
   homeStudyPlanExpanded: boolean
   statsStrip?: StatsStrip
-  xpProgress?: XPProgressStrip | null
   tutorBanner?: TutorBannerData | null
   recommendations?: RecommendationData[]
   onSelectScript: (script: ScriptKey) => void
@@ -61,7 +53,6 @@ export function HomeView({
   studyPlan,
   homeStudyPlanExpanded,
   statsStrip,
-  xpProgress,
   tutorBanner,
   recommendations,
   onSelectScript,
@@ -261,15 +252,6 @@ export function HomeView({
                 <CalendarDays aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
                 <span>{statsStrip.dueCount} due</span>
               </button>
-            ) : null}
-            {xpProgress ? (
-              <div className="home-stats-xp">
-                <XPBar
-                  level={xpProgress.level}
-                  xpToNextLevel={xpProgress.xpToNextLevel}
-                  xpForCurrentLevel={xpProgress.xpForCurrentLevel}
-                />
-              </div>
             ) : null}
           </div>
         ) : null}

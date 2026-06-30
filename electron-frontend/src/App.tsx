@@ -2005,6 +2005,7 @@ function App() {
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [homeStudyPlanExpanded, setHomeStudyPlanExpanded] = useState(false)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
+  const [unlockedFeatureIds, setUnlockedFeatureIds] = useState<Set<string>>(new Set())
   const [tutorReactions, setTutorReactions] = useState<TutorReactionItem[]>([])
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
   const [learningPathExpanded, setLearningPathExpanded] = useState(false)
@@ -2451,6 +2452,12 @@ function App() {
       .finally(() => {
         setSessionSummaryLoading(false)
       })
+
+    // Refresh XP after each session so the titlebar badge stays current (Q1-A: pull after session end).
+    const getXpProgress = window.jplearnDesktop.getXpProgress
+    if (getXpProgress) {
+      void getXpProgress().then((xp) => { if (xp) setXpProgress(xp) }).catch(() => undefined)
+    }
   }, [
     activeGame,
     activeScript,
@@ -2569,20 +2576,23 @@ function App() {
     void loadSummary()
   }, [loadSummary])
 
-  // Fetch XP progress, study recommendations, and tutor reactions on mount
-  // and whenever the summary refreshes (pull model, Q3-A).
+  // Fetch XP progress, feature unlocks, study recommendations, and tutor reactions
+  // on mount and whenever the summary refreshes.
   useEffect(() => {
     let mounted = true
     const getXp = window.jplearnDesktop.getXpProgress
+    const getFeatures = window.jplearnDesktop.getFeatureState
     const getRecs = window.jplearnDesktop.getRecommendations
     const getTutor = window.jplearnDesktop.getTutorReactions
     void Promise.all([
       getXp ? getXp().catch(() => null) : Promise.resolve(null),
+      getFeatures ? getFeatures().catch(() => null) : Promise.resolve(null),
       getRecs ? getRecs().catch(() => null) : Promise.resolve(null),
       getTutor ? getTutor().catch(() => null) : Promise.resolve(null),
-    ]).then(([xp, recs, tutor]) => {
+    ]).then(([xp, features, recs, tutor]) => {
       if (!mounted) return
       if (xp) setXpProgress(xp)
+      if (features) setUnlockedFeatureIds(new Set(features.features.filter((f) => f.is_unlocked).map((f) => f.feature_id)))
       if (recs) setRecommendations(recs.recommendations)
       if (tutor) setTutorReactions(tutor.reactions)
     })
@@ -4843,6 +4853,27 @@ function App() {
             </button>
           </div>
         </div>
+        {xpProgress ? (
+          <div
+            className="titlebar-xp"
+            title={`Level ${xpProgress.level} — ${xpProgress.xp_for_current_level - xpProgress.xp_to_next_level} / ${xpProgress.xp_for_current_level} XP`}
+            aria-label={`Level ${xpProgress.level}`}
+          >
+            <span className="titlebar-xp-badge" aria-hidden="true">{xpProgress.level}</span>
+            <div
+              className="titlebar-xp-track"
+              role="progressbar"
+              aria-valuenow={xpProgress.xp_for_current_level > 0 ? Math.round(((xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) / xpProgress.xp_for_current_level) * 100) : 0}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className="titlebar-xp-fill"
+                style={{ '--xp-pct': `${xpProgress.xp_for_current_level > 0 ? Math.round(((xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) / xpProgress.xp_for_current_level) * 100) : 0}%` } as CSSProperties}
+              />
+            </div>
+          </div>
+        ) : null}
         <div className="window-controls" role="group" aria-label="Window actions">
           <button type="button" className="window-control-button" onClick={minimizeWindow} aria-label="Minimize window">
             <Minus className="window-control-icon" strokeWidth={2.2} />
@@ -4947,11 +4978,6 @@ function App() {
           studyPlan={studyPlan}
           homeStudyPlanExpanded={homeStudyPlanExpanded}
           statsStrip={{ streak: streak.current_days, masteryPct: totals.masteryRate, dueCount: totals.remainingDue }}
-          xpProgress={xpProgress ? {
-            level: xpProgress.level,
-            xpToNextLevel: xpProgress.xp_to_next_level,
-            xpForCurrentLevel: xpProgress.xp_for_current_level,
-          } : null}
           tutorBanner={tutorReactions[0] ? {
             dedupKey: tutorReactions[0].dedup_key,
             headline: tutorReactions[0].headline,
@@ -5633,14 +5659,20 @@ function App() {
                 >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Tutor Companion</p>
+                    {!unlockedFeatureIds.has('tutor_chat') && (
+                      <p className="settings-help" style={{ marginBottom: 8, color: 'var(--tone-amber)' }}>
+                        🔒 Tutor Chat unlocks after mastering Grammar N5 and unlocking Conversation Mode.
+                      </p>
+                    )}
                     <div className="settings-animation-grid" role="group" aria-label="Tutor companion controls">
                       <button
                         type="button"
-                        className={`settings-icon-entry settings-theme-entry ${settings.assistantChatEnabled ? 'is-active' : ''}`}
-                        onClick={() => setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))}
-                        aria-label={settings.assistantChatEnabled ? 'Chat with Tutor enabled. Activate to disable.' : 'Chat with Tutor disabled. Activate to enable.'}
-                        aria-pressed={settings.assistantChatEnabled}
-                        title={settings.assistantChatEnabled ? 'Chat with Tutor enabled' : 'Chat with Tutor disabled'}
+                        className={`settings-icon-entry settings-theme-entry ${settings.assistantChatEnabled && unlockedFeatureIds.has('tutor_chat') ? 'is-active' : ''}`}
+                        onClick={() => unlockedFeatureIds.has('tutor_chat') && setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))}
+                        aria-label={unlockedFeatureIds.has('tutor_chat') ? (settings.assistantChatEnabled ? 'Chat with Tutor enabled. Activate to disable.' : 'Chat with Tutor disabled. Activate to enable.') : 'Chat with Tutor locked'}
+                        aria-pressed={settings.assistantChatEnabled && unlockedFeatureIds.has('tutor_chat')}
+                        title={unlockedFeatureIds.has('tutor_chat') ? (settings.assistantChatEnabled ? 'Chat with Tutor enabled' : 'Chat with Tutor disabled') : 'Unlock Conversation Mode first'}
+                        style={!unlockedFeatureIds.has('tutor_chat') ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
                       >
                         <span className={`settings-mode-icon-button ${settings.assistantChatEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
                           <MessageCircle size={18} strokeWidth={2.25} aria-hidden="true" />
