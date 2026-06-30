@@ -46,6 +46,24 @@ export type KanjiCategory =
   | 'people_body'
   | 'study_language'
   | 'actions_travel'
+  // N4 thematic categories
+  | 'n4_society_roles'
+  | 'n4_mind_thought'
+  | 'n4_daily_life'
+  | 'n4_time_action'
+  // N3 thematic categories
+  | 'n3_governance'
+  | 'n3_communication'
+  | 'n3_movement'
+  | 'n3_achievement'
+  // N2 thematic categories
+  | 'n2_professionalism'
+  | 'n2_economics'
+  | 'n2_analysis'
+  // N1 thematic categories
+  | 'n1_law_order'
+  | 'n1_ideology'
+  | 'n1_literary'
 
 export type VocabCategorySlug =
   | 'vocab_greetings'
@@ -67,6 +85,20 @@ export type KanjiCategorySlug =
   | 'kanji_people_body'
   | 'kanji_study_language'
   | 'kanji_actions_travel'
+  | 'kanji_n4_society_roles'
+  | 'kanji_n4_mind_thought'
+  | 'kanji_n4_daily_life'
+  | 'kanji_n4_time_action'
+  | 'kanji_n3_governance'
+  | 'kanji_n3_communication'
+  | 'kanji_n3_movement'
+  | 'kanji_n3_achievement'
+  | 'kanji_n2_professionalism'
+  | 'kanji_n2_economics'
+  | 'kanji_n2_analysis'
+  | 'kanji_n1_law_order'
+  | 'kanji_n1_ideology'
+  | 'kanji_n1_literary'
 
 export interface CategoryProgress {
   key: string

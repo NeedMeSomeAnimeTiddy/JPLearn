@@ -103,8 +103,8 @@ type OverviewCategoryBlocks = OverviewCharacterMasteryPayload['category_blocks']
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
 type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' | 'food_drink' | 'school_study' | 'places' | 'transport' | 'adjectives' | 'verbs' | 'nouns'
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
-type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel'
-type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel'
+type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
+type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey
@@ -1353,18 +1353,54 @@ const VOCAB_CATEGORY_TO_DECK_SLUG: Record<VocabCategory, VocabCategorySlug> = {
 
 const KANJI_CATEGORY_ORDER: KanjiCategory[] = [
   'numbers_time', 'nature_world', 'people_body', 'study_language', 'actions_travel',
+  'n4_society_roles', 'n4_mind_thought', 'n4_daily_life', 'n4_time_action',
+  'n3_governance', 'n3_communication', 'n3_movement', 'n3_achievement',
+  'n2_professionalism', 'n2_economics', 'n2_analysis',
+  'n1_law_order', 'n1_ideology', 'n1_literary',
 ]
 
 const KANJI_CATEGORY_LABELS: Record<KanjiCategory, string> = {
-  numbers_time: 'Numbers & Time', nature_world: 'Nature & World',
-  people_body: 'People & Body', study_language: 'Study & Language',
-  actions_travel: 'Actions & Travel',
+  numbers_time:      'N5 · Numbers & Time',
+  nature_world:      'N5 · Nature & World',
+  people_body:       'N5 · People & Body',
+  study_language:    'N5 · Study & Language',
+  actions_travel:    'N5 · Actions & Travel',
+  n4_society_roles:  'N4 · Society & Roles',
+  n4_mind_thought:   'N4 · Mind & Thought',
+  n4_daily_life:     'N4 · Daily Life',
+  n4_time_action:    'N4 · Time & Action',
+  n3_governance:     'N3 · Governance',
+  n3_communication:  'N3 · Communication',
+  n3_movement:       'N3 · Movement',
+  n3_achievement:    'N3 · Achievement',
+  n2_professionalism:'N2 · Professionalism',
+  n2_economics:      'N2 · Economics',
+  n2_analysis:       'N2 · Analysis',
+  n1_law_order:      'N1 · Law & Order',
+  n1_ideology:       'N1 · Society & Power',
+  n1_literary:       'N1 · Literary Arts',
 }
 
 const KANJI_CATEGORY_TO_DECK_SLUG: Record<KanjiCategory, KanjiCategorySlug> = {
-  numbers_time: 'kanji_numbers_time', nature_world: 'kanji_nature_world',
-  people_body: 'kanji_people_body', study_language: 'kanji_study_language',
-  actions_travel: 'kanji_actions_travel',
+  numbers_time:      'kanji_numbers_time',
+  nature_world:      'kanji_nature_world',
+  people_body:       'kanji_people_body',
+  study_language:    'kanji_study_language',
+  actions_travel:    'kanji_actions_travel',
+  n4_society_roles:  'kanji_n4_society_roles',
+  n4_mind_thought:   'kanji_n4_mind_thought',
+  n4_daily_life:     'kanji_n4_daily_life',
+  n4_time_action:    'kanji_n4_time_action',
+  n3_governance:     'kanji_n3_governance',
+  n3_communication:  'kanji_n3_communication',
+  n3_movement:       'kanji_n3_movement',
+  n3_achievement:    'kanji_n3_achievement',
+  n2_professionalism:'kanji_n2_professionalism',
+  n2_economics:      'kanji_n2_economics',
+  n2_analysis:       'kanji_n2_analysis',
+  n1_law_order:      'kanji_n1_law_order',
+  n1_ideology:       'kanji_n1_ideology',
+  n1_literary:       'kanji_n1_literary',
 }
 
 function MinigameIcon({ game }: { game: MinigameKey }) {
@@ -2558,6 +2594,10 @@ function App() {
   const [activeVocabCategory, setActiveVocabCategory] = useState<VocabCategory>('greetings')
   const [kanjiDeckCardsByCategory, setKanjiDeckCardsByCategory] = useState<Record<KanjiCategory, ScriptDeck['cards']>>({
     numbers_time: [], nature_world: [], people_body: [], study_language: [], actions_travel: [],
+    n4_society_roles: [], n4_mind_thought: [], n4_daily_life: [], n4_time_action: [],
+    n3_governance: [], n3_communication: [], n3_movement: [], n3_achievement: [],
+    n2_professionalism: [], n2_economics: [], n2_analysis: [],
+    n1_law_order: [], n1_ideology: [], n1_literary: [],
   })
   const [vocabDeckCardsByCategory, setVocabDeckCardsByCategory] = useState<Record<VocabCategory, ScriptDeck['cards']>>({
     greetings: [], numbers: [], time_days: [], family: [], body: [],

@@ -156,6 +156,32 @@ KANJI_N5_CATEGORY_SLUGS: tuple[str, ...] = (
     "kanji_actions_travel",
 )
 
+KANJI_N4_CATEGORY_SLUGS: tuple[str, ...] = (
+    "kanji_n4_society_roles",
+    "kanji_n4_mind_thought",
+    "kanji_n4_daily_life",
+    "kanji_n4_time_action",
+)
+
+KANJI_N3_CATEGORY_SLUGS: tuple[str, ...] = (
+    "kanji_n3_governance",
+    "kanji_n3_communication",
+    "kanji_n3_movement",
+    "kanji_n3_achievement",
+)
+
+KANJI_N2_CATEGORY_SLUGS: tuple[str, ...] = (
+    "kanji_n2_professionalism",
+    "kanji_n2_economics",
+    "kanji_n2_analysis",
+)
+
+KANJI_N1_CATEGORY_SLUGS: tuple[str, ...] = (
+    "kanji_n1_law_order",
+    "kanji_n1_ideology",
+    "kanji_n1_literary",
+)
+
 EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
     "total_beginner": (),
     "know_hiragana": ("hiragana",),
@@ -176,6 +202,7 @@ EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
         "vocab_n5",
         *VOCAB_N5_CATEGORY_SLUGS,
         "kanji_n4",
+        *KANJI_N4_CATEGORY_SLUGS,
         "vocab_n4",
     ),
     "jlpt_n3_foundation": (
@@ -186,8 +213,10 @@ EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
         "vocab_n5",
         *VOCAB_N5_CATEGORY_SLUGS,
         "kanji_n4",
+        *KANJI_N4_CATEGORY_SLUGS,
         "vocab_n4",
         "kanji_n3",
+        *KANJI_N3_CATEGORY_SLUGS,
         "vocab_n3",
     ),
     "jlpt_n2_foundation": (
@@ -198,10 +227,13 @@ EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
         "vocab_n5",
         *VOCAB_N5_CATEGORY_SLUGS,
         "kanji_n4",
+        *KANJI_N4_CATEGORY_SLUGS,
         "vocab_n4",
         "kanji_n3",
+        *KANJI_N3_CATEGORY_SLUGS,
         "vocab_n3",
         "kanji_n2",
+        *KANJI_N2_CATEGORY_SLUGS,
         "vocab_n2",
     ),
     "jlpt_n1_foundation": (
@@ -212,12 +244,16 @@ EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
         "vocab_n5",
         *VOCAB_N5_CATEGORY_SLUGS,
         "kanji_n4",
+        *KANJI_N4_CATEGORY_SLUGS,
         "vocab_n4",
         "kanji_n3",
+        *KANJI_N3_CATEGORY_SLUGS,
         "vocab_n3",
         "kanji_n2",
+        *KANJI_N2_CATEGORY_SLUGS,
         "vocab_n2",
         "kanji_n1",
+        *KANJI_N1_CATEGORY_SLUGS,
         "vocab_n1",
     ),
 }

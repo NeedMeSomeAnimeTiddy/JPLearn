@@ -13,6 +13,24 @@ const VALID_DECK_SLUGS = new Set([
   'kanji_people_body',
   'kanji_study_language',
   'kanji_actions_travel',
+  // Kanji — N4 thematic categories
+  'kanji_n4_society_roles',
+  'kanji_n4_mind_thought',
+  'kanji_n4_daily_life',
+  'kanji_n4_time_action',
+  // Kanji — N3 thematic categories
+  'kanji_n3_governance',
+  'kanji_n3_communication',
+  'kanji_n3_movement',
+  'kanji_n3_achievement',
+  // Kanji — N2 thematic categories
+  'kanji_n2_professionalism',
+  'kanji_n2_economics',
+  'kanji_n2_analysis',
+  // Kanji — N1 thematic categories
+  'kanji_n1_law_order',
+  'kanji_n1_ideology',
+  'kanji_n1_literary',
   // Vocabulary — JLPT levels
   'vocab_n5',
   'vocab_n4',
