@@ -2044,6 +2044,8 @@ function App() {
   const assistantChatClearTokenRef = useRef(0)
   const localToastIdRef = useRef(-1)
   const previousSessionActiveRef = useRef(false)
+  const feedbackTimerRef = useRef<number | null>(null)
+  const feedbackAdvanceRef = useRef<(() => void) | null>(null)
   const kanjiLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
   const kanjiLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
@@ -3710,6 +3712,15 @@ function App() {
     sessionTargetItems,
   ])
 
+  const skipFeedback = useCallback(() => {
+    if (feedbackTimerRef.current !== null) {
+      clearTimeout(feedbackTimerRef.current)
+      feedbackTimerRef.current = null
+      feedbackAdvanceRef.current?.()
+      feedbackAdvanceRef.current = null
+    }
+  }, [])
+
   const launchAssistantToastAction = useCallback((toast: AssistantToast) => {
     void trackAssistantToastInteraction(toast, 'clicked', { reason: 'cta-click' })
     const suggestedScript = inferScriptFromFocusArea(toast.focusArea) ?? activeScript
@@ -3972,7 +3983,9 @@ function App() {
         typedAssessment,
       }))
 
-      window.setTimeout(() => {
+      const advanceFeedback = () => {
+        feedbackTimerRef.current = null
+        feedbackAdvanceRef.current = null
         if (!isCorrect && livesEnabled && nextLives <= 0) {
           setSessionActive(false)
           setRoundState(null)
@@ -4002,7 +4015,9 @@ function App() {
         setRoundFeedbackPoints(null)
         setRoundFeedbackAnswer(null)
         setIsRoundResolving(false)
-      }, FEEDBACK_REVEAL_MS)
+      }
+      feedbackAdvanceRef.current = advanceFeedback
+      feedbackTimerRef.current = window.setTimeout(advanceFeedback, FEEDBACK_REVEAL_MS)
     },
     [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionRounds, sessionTargetItems],
   )
@@ -4881,6 +4896,7 @@ function App() {
         startSession: (game) => { void startSession(game) },
         submitAnswer,
         continueLastSession,
+        skipFeedback,
         setRoundInput,
         setRoundConfidence: setRoundConfidenceScore,
         setSessionLength: setSessionTargetItems,

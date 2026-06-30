@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   Activity,
   ArrowLeft,
@@ -16,6 +17,7 @@ import {
   MINIGAMES,
   POINTS_RULE_COPY,
   SCRIPT_LABELS,
+  formatExpectedAnswer,
   formatFeedbackAnswerLabel,
 } from '../constants'
 import { getStrokeOrderCandidates, sanitizeRomajiInput } from '../utils'
@@ -80,8 +82,83 @@ export function MinigameView({
     setRoundInput,
     setRoundConfidence,
     playAudio,
+    skipFeedback,
   } = useSession()
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
+
+  // ── Phase 7: Progressive hint ladder ────────────────────────────────────────
+  // 0 = no hint shown, 1 = prompt type label, 2 = hintText, 3 = full answer giveaway
+  const [hintStep, setHintStep] = useState<0 | 1 | 2 | 3>(0)
+
+  // Reset hint when a new round starts.
+  useEffect(() => {
+    setHintStep(0)
+  }, [roundState?.cardId])
+
+  // ── Phase 6 + 7: Keyboard shortcuts ─────────────────────────────────────────
+  useEffect(() => {
+    if (!sessionActive || !roundState) return
+    const activeRound = roundState
+
+    const isMultipleChoice =
+      activeRound.mode === 'meaning_match' ||
+      activeRound.mode === 'character_match' ||
+      activeRound.mode === 'context_cloze' ||
+      activeRound.mode === 'narrative_story'
+
+    const isTyped =
+      activeRound.mode === 'romaji_sprint' ||
+      activeRound.mode === 'typed_recall' ||
+      activeRound.mode === 'stroke_order'
+
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement
+      const isInputFocused =
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+
+      // Enter: skip feedback delay when in resolving phase
+      if (event.key === 'Enter' && isRoundResolving && roundFeedback !== null && !isInputFocused) {
+        event.preventDefault()
+        skipFeedback()
+        return
+      }
+
+      // H: increment hint step (only while waiting for answer, not during feedback)
+      if ((event.key === 'h' || event.key === 'H') && !isRoundResolving && !isInputFocused) {
+        event.preventDefault()
+        setHintStep((s) => (s < 3 ? ((s + 1) as 0 | 1 | 2 | 3) : 3))
+        return
+      }
+
+      // Space: replay audio (only when not typing)
+      if (event.key === ' ' && voiceEnabled && activeRound.audioText && !isInputFocused) {
+        event.preventDefault()
+        playAudio(activeRound.audioText)
+        return
+      }
+
+      // 1-4: select MC option (only for multiple-choice modes, not while resolving, not in input)
+      if (isMultipleChoice && !isRoundResolving && !isInputFocused && !isTyped) {
+        const index = parseInt(event.key, 10) - 1
+        if (index >= 0 && index < activeRound.options.length) {
+          event.preventDefault()
+          submitAnswer(activeRound.options[index].label)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [
+    sessionActive,
+    roundState,
+    isRoundResolving,
+    roundFeedback,
+    voiceEnabled,
+    skipFeedback,
+    playAudio,
+    submitAnswer,
+  ])
 
   return (
     <div className={`view-shell view-${navDirection}`}>
@@ -393,9 +470,60 @@ export function MinigameView({
                   ) : null}
                 </div>
               ) : null}
-              {roundState.hintText ? (
-                <p className="game-hint-text">{roundState.hintText}</p>
-              ) : null}
+              {/* Phase 7 — progressive hint ladder (typed/MC modes only; context modes always show) */}
+              {(() => {
+                const alwaysShowHint =
+                  roundState.mode !== 'romaji_sprint' &&
+                  roundState.mode !== 'typed_recall'
+
+                if (alwaysShowHint) {
+                  return roundState.hintText ? (
+                    <p className="game-hint-text">{roundState.hintText}</p>
+                  ) : null
+                }
+
+                if (isRoundResolving) return null
+
+                return hintStep === 0 ? (
+                  <button
+                    type="button"
+                    className="game-hint-toggle"
+                    onClick={() => setHintStep(1)}
+                    title="Show hint (H)"
+                    aria-label="Show hint"
+                  >
+                    <span className="game-hint-toggle-label">Press H for hint</span>
+                  </button>
+                ) : (
+                  <div className="game-hint-ladder" aria-live="polite">
+                    {hintStep >= 1 ? (
+                      <p className="game-hint-text game-hint-type">
+                        {roundState.promptLabel}
+                      </p>
+                    ) : null}
+                    {hintStep >= 2 && roundState.hintText ? (
+                      <p className="game-hint-text">
+                        {roundState.hintText}
+                      </p>
+                    ) : null}
+                    {hintStep >= 3 ? (
+                      <p className="game-hint-text game-hint-answer">
+                        Answer: {formatExpectedAnswer(roundState.answer)}
+                      </p>
+                    ) : null}
+                    {hintStep < 3 ? (
+                      <button
+                        type="button"
+                        className="game-hint-toggle"
+                        onClick={() => setHintStep((s) => (s < 3 ? (s + 1) as 0 | 1 | 2 | 3 : 3))}
+                        aria-label="Show more hint"
+                      >
+                        <span className="game-hint-toggle-label">More hint (H)</span>
+                      </button>
+                    ) : null}
+                  </div>
+                )
+              })()}
             </div>
 
             {roundState.mode === 'stroke_order' ? (
@@ -471,7 +599,7 @@ export function MinigameView({
               </form>
             ) : (
               <div className="option-grid">
-                {roundState.options.map((option: RoundOption) => (
+                {roundState.options.map((option: RoundOption, index) => (
                   <button
                     key={option.id}
                     type="button"
@@ -481,6 +609,7 @@ export function MinigameView({
                     disabled={isRoundResolving}
                     onClick={() => submitAnswer(option.label)}
                   >
+                    <span className="option-key-hint" aria-hidden="true">[{index + 1}]</span>
                     {option.label}
                   </button>
                 ))}
@@ -555,6 +684,15 @@ export function MinigameView({
                     Story progress updates chapter access based on stage transitions.
                   </p>
                 ) : null}
+                <button
+                  type="button"
+                  className="round-feedback-skip"
+                  onClick={skipFeedback}
+                  aria-label="Continue to next card"
+                  title="Continue (Enter)"
+                >
+                  Continue ↵
+                </button>
               </div>
             ) : null}
           </article>

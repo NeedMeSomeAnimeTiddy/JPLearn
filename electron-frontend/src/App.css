@@ -4050,6 +4050,23 @@ button {
   font-size: 0.92rem;
 }
 
+.round-feedback-skip {
+  margin-top: 12px;
+  padding: 5px 14px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 70%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.round-feedback-skip:hover {
+  background: color-mix(in oklab, var(--panel-border) 30%, transparent);
+  color: var(--text-main);
+}
+
 .round-feedback-toast {
   position: fixed;
   top: 22px;
@@ -4160,6 +4177,46 @@ button {
   color: var(--text-soft);
   font-size: 0.82rem;
   letter-spacing: 0.02em;
+}
+
+.game-hint-type {
+  color: var(--tone-ocean);
+  font-weight: 600;
+}
+
+.game-hint-answer {
+  color: var(--tone-warning);
+  font-weight: 600;
+}
+
+.game-hint-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.game-hint-toggle {
+  margin-top: 8px;
+  padding: 4px 10px;
+  border: 1px dashed color-mix(in oklab, var(--panel-border) 80%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-faint, var(--text-soft));
+  font-size: 0.78rem;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: border-color 0.1s, color 0.1s;
+}
+
+.game-hint-toggle:hover {
+  border-color: var(--panel-border);
+  color: var(--text-soft);
+}
+
+.game-hint-toggle-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
 }
 
 .game-speak-controls {
@@ -4302,6 +4359,24 @@ button {
   text-align: left;
   font-size: 1rem;
   font-weight: 600;
+  position: relative;
+}
+
+.option-key-hint {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: color-mix(in oklab, var(--text-soft) 55%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+.option-button:disabled .option-key-hint,
+.option-button[data-active='true'] .option-key-hint {
+  opacity: 0.4;
 }
 
 .option-button-character {

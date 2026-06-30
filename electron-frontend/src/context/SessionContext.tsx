@@ -73,6 +73,7 @@ export interface SessionContextValue {
   startSession: (game?: MinigameKey) => void
   submitAnswer: (answer: string) => void
   continueLastSession: () => void
+  skipFeedback: () => void
   setRoundInput: (value: string) => void
   setRoundConfidence: (score: number) => void
   setSessionLength: (items: number) => void
