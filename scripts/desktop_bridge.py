@@ -767,7 +767,8 @@ def build_tutor_reactions_payload() -> dict[str, object]:
                 unlock=FU(access_descriptor=f"{feat.feature_id}_access"),
             )
             ev = from_feature_event(fe, features=JPLEARN_FEATURES)
-            tutor_events.append(ev)
+            if ev is not None:
+                tutor_events.append(ev)
 
     # XP level event (if level > 1)
     progress = _load_user_progress()

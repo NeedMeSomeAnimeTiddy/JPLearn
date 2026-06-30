@@ -94,6 +94,18 @@ This document tracks delivery status and planned improvements.
 
 ## Deferred Product Additions
 
+- [ ] (Medium) Add Reading Mode feature UI
+  - Reading mode is defined in feature catalog but not yet integrated into main UI
+  - Implement as a dedicated study mode for graded passages and reading comprehension
+  - Reuse existing sentence bank and example content
+- [ ] (Medium) Add Advanced Analytics dashboard
+  - Advanced analytics feature is defined in catalog but not yet implemented
+  - Surface granular progress metrics, error patterns, and retention curves
+  - Build on top of existing review history and progress tracking
+- [ ] (Medium) Add JLPT Dashboard feature
+  - JLPT dashboard is defined in feature catalog but not yet integrated into UI
+  - Display JLPT-level-specific progress across vocab, kanji, grammar, listening, and reading
+  - Show exam readiness assessment and content gaps
 - [ ] (Medium) Add pluggable TTS backend selection
   - VOICEVOX ships and works; Piper backend exists but is not user-selectable
   - Expose backend choice in settings with per-backend speaker and quality options

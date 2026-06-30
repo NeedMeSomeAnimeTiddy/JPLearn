@@ -207,18 +207,33 @@ def from_progression_event(
 def from_feature_event(
     event: FeatureEvent,
     features: Sequence[Feature] | None = None,
-) -> TutorEvent:
+) -> TutorEvent | None:
     """Convert a :class:`~domain.features.FeatureEvent` to a TutorEvent.
+
+    Returns None for features with no requirements (always available),
+    since these don't need unlock notifications.
 
     Args:
         event: The feature unlock event.
         features: Optional feature catalog; used to resolve the human-readable
-            feature name.  Falls back to a title-cased conversion of
-            ``event.feature_id`` when not supplied.
+            feature name and to check if the feature has requirements.
+            Falls back to a title-cased conversion of ``event.feature_id``
+            when not supplied.
     """
+    # Check if feature has requirements (if catalog is provided)
     if features:
         feat = next((f for f in features if f.feature_id == event.feature_id), None)
-        label = feat.name if feat is not None else event.feature_id.replace("_", " ").title()
+        if feat is not None:
+            # Don't notify for features with no requirements (always available)
+            has_requirements = (
+                feat.requirement.progression_conditions
+                or feat.requirement.feature_dependencies
+            )
+            if not has_requirements:
+                return None
+            label = feat.name
+        else:
+            label = event.feature_id.replace("_", " ").title()
     else:
         label = event.feature_id.replace("_", " ").title()
 
