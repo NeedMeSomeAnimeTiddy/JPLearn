@@ -1,7 +1,11 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, Heart, History, House, Keyboard, Languages, ListChecks, LoaderCircle, Lock, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, SendHorizontal, Settings, Shuffle, Square, Sun, Target, Trash2, Trophy, Volume2, X } from 'lucide-react'
+import { HomeView } from './views/HomeView'
+import { ScriptHubView } from './views/ScriptHubView'
+import { MinigameView } from './views/MinigameView'
+import { OverviewView } from './views/OverviewView'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Trophy, Volume2, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -175,13 +179,6 @@ const DEFAULT_INTERLEAVE_WEIGHTS: InterleaveWeights = {
   context_cloze: 1,
 }
 const POINT_COMBO_THRESHOLDS = [3, 6, 9] as const
-const POINTS_RULE_COPY = '1 point per correct answer, with combo bonuses at streaks 3, 6, and 9 (max 4 points).'
-const CONFIDENCE_SCORES = [1, 3, 5] as const
-const CONFIDENCE_LEVEL_LABELS: Record<(typeof CONFIDENCE_SCORES)[number], string> = {
-  1: 'Low',
-  3: 'Mid',
-  5: 'High',
-}
 const SURPRISE_PROMPTS = [
   'Surprise Drill: trust your first instinct.',
   'Odd Prompt Mode: quick read, clean recall.',
@@ -654,50 +651,6 @@ const SCRIPT_LABELS: Record<ScriptKey, string> = {
   grammar_patterns: 'Conversational',
 }
 
-const TIMELINE_SCRIPT_LABELS: Record<string, string> = {
-  hiragana: 'Hiragana',
-  katakana: 'Katakana',
-  kanji_n5: 'Kanji',
-  vocab_n5: 'Words',
-  grammar_patterns: 'Conversational',
-  unknown: 'General',
-}
-
-function toTitleWords(value: string): string {
-  return value
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase())
-}
-
-function formatTimelineScriptTag(tag: string): string {
-  const normalized = tag.trim().toLowerCase()
-  return TIMELINE_SCRIPT_LABELS[normalized] ?? toTitleWords(normalized || 'general')
-}
-
-function formatTimelineDeckName(deckName: string): string {
-  const trimmed = deckName.trim()
-  if (!trimmed) return 'Review Deck'
-  return toTitleWords(trimmed)
-}
-
-const SCRIPT_MENU_LINES: Record<ScriptKey, string> = {
-  hiragana: 'Start with smooth, foundational sounds.',
-  katakana: 'Train sharp symbols for names and loanwords.',
-  kanji_n5: 'Build meaning recall one character at a time.',
-  vocab_n5: 'Build practical vocabulary for daily usage.',
-  grammar_patterns: 'Practice conversational patterns and sentence flow.',
-}
-
-const SCRIPT_DIFFICULTY_META: Record<ScriptKey, { label: string; tier: 1 | 2 | 3 | 4 | 5; icon: LucideIcon }> = {
-  hiragana: { label: 'Easy', tier: 1, icon: BookText },
-  katakana: { label: 'Easy+', tier: 2, icon: Languages },
-  kanji_n5: { label: 'Medium', tier: 3, icon: Target },
-  vocab_n5: { label: 'Hard', tier: 4, icon: Flame },
-  grammar_patterns: { label: 'Expert', tier: 5, icon: Trophy },
-}
-
 const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }> = [
   {
     key: 'romaji_sprint',
@@ -998,8 +951,6 @@ const VOCAB_LEVEL_TO_DECK_SLUG: Record<JlptLevel, VocabDeckSlug> = {
   n2: 'vocab_n2',
   n1: 'vocab_n1',
 }
-const KANJI_OVERVIEW_PAGE_SIZE = 45
-
 function MinigameIcon({ game }: { game: MinigameKey }) {
   const Icon = MINIGAME_ICONS[game]
   return <Icon aria-hidden="true" className="glyph-svg" strokeWidth={2.25} />
@@ -1414,31 +1365,6 @@ function assessTypedAnswer(expected: string, given: string): TypedAnswerState {
     (distance === 2 && minLength >= 6)
 
   return nearMiss ? 'near_miss' : 'incorrect'
-}
-
-function sanitizeRomajiInput(value: string): string {
-  return value.replace(/[^a-zA-Z\s]/g, '')
-}
-
-function normalizeRomajiQuery(value: string): string {
-  return sanitizeRomajiInput(value).toLowerCase().trim()
-}
-
-function getStrokeOrderCandidates(cards: ScriptDeck['cards'], query: string): ScriptDeck['cards'] {
-  const normalizedQuery = normalizeRomajiQuery(query)
-  if (normalizedQuery.length === 0) return []
-
-  return cards
-    .filter((card) => normalizeRomajiQuery(card.romaji).includes(normalizedQuery))
-    .sort((left, right) => {
-      const leftRomaji = normalizeRomajiQuery(left.romaji)
-      const rightRomaji = normalizeRomajiQuery(right.romaji)
-      const leftExact = leftRomaji === normalizedQuery ? 1 : 0
-      const rightExact = rightRomaji === normalizedQuery ? 1 : 0
-      if (leftExact !== rightExact) return rightExact - leftExact
-      return left.character.localeCompare(right.character, 'ja')
-    })
-    .slice(0, 8)
 }
 
 function chooseUniqueIndices(length: number, count: number, exclude: number): number[] {
@@ -1862,15 +1788,6 @@ function formatExpectedAnswer(rawAnswer: string): string {
   if (parts.length === 2) return `${parts[0]} or ${parts[1]}`
 
   return `${parts.slice(0, -1).join(', ')}, or ${parts[parts.length - 1]}`
-}
-
-function formatFeedbackAnswerLabel(mode: PlayableMinigame): string {
-  if (mode === 'romaji_sprint') return 'The reading'
-  if (mode === 'stroke_order' || mode === 'character_match') return 'The character'
-  if (mode === 'meaning_match' || mode === 'typed_recall' || mode === 'context_cloze' || mode === 'narrative_story') {
-    return 'The answer'
-  }
-  return 'The answer'
 }
 
 function getRoundRecoveryTip(mode: PlayableMinigame): string {
@@ -4309,7 +4226,6 @@ function App() {
     },
   ] as const
 
-  const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
   const activeScriptStats = scriptStats[activeScript]
   const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : activeBlockCards
 
@@ -4934,1608 +4850,227 @@ function App() {
 
       <div className="app-shell-scroll">
       {view === 'home' ? (
-        <div className={`view-shell view-${navDirection}`}>
-          <section className="home-menu panel-glass">
-            <h1 className="home-logo">JPLearn</h1>
-            <p className="home-copy">
-              Main Menu. Choose a learning track, then pick a minigame and start your run.
-            </p>
-
-            <div className="menu-grid">
-              {(['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns'] as const).map((script, index) => {
-                const glyph = SECTION_META[script].glyph
-                const difficulty = SCRIPT_DIFFICULTY_META[script]
-                const DifficultyIcon = difficulty.icon
-
-                return (
-                  <button
-                    key={script}
-                    type="button"
-                    className="menu-card"
-                    aria-keyshortcuts={String(index + 1)}
-                    onClick={() => {
-                      setNavDirection('forward')
-                      setActiveScript(script)
-                      setView('script_hub')
-                    }}
-                  >
-                    <span
-                      className={`menu-card-difficulty menu-card-difficulty-${difficulty.tier}`}
-                      aria-label={`Difficulty: ${difficulty.label}`}
-                      title={`Difficulty: ${difficulty.label}`}
-                    >
-                      <DifficultyIcon className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
-                      <span>{difficulty.label}</span>
-                    </span>
-                    <span className="menu-script-glyph" aria-hidden="true" lang="ja">{glyph}</span>
-                    <strong>{SCRIPT_LABELS[script]}</strong>
-                    <p>{SCRIPT_MENU_LINES[script]}</p>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="home-actions">
-              <button
-                type="button"
-                className="home-settings-button"
-                aria-keyshortcuts="6"
-                onClick={() => {
-                  setNavDirection('forward')
-                  setView('overview')
-                }}
-                aria-label="Open study overview"
-                title="Study Overview (6)"
-              >
-                <BarChart3 aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-                Study Overview
-              </button>
-
-              <button
-                type="button"
-                className="home-settings-button"
-                onClick={() => setShowSettings(true)}
-                aria-label="Open settings"
-                title="Settings (Ctrl+,)"
-              >
-                Settings
-              </button>
-            </div>
-
-            {studyPlan.coverageRows.length > 0 ? (
-              <section className="home-study-plan-strip panel-glass" aria-label="Study plan">
-                <button
-                  type="button"
-                  className="home-study-plan-toggle"
-                  onClick={() => setHomeStudyPlanExpanded((expanded) => !expanded)}
-                  aria-expanded={homeStudyPlanExpanded}
-                  aria-controls="home-study-plan-body"
-                >
-                  <div className="home-study-plan-heading">
-                    <p className="hero-kicker">Study Plan</p>
-                    <strong>{studyPlan.recommendedMinutes}-minute {studyPlan.learnerStage === 'starter' ? 'starter-safe' : studyPlan.learnerStage === 'building' ? 'build-up' : 'advanced'} session</strong>
-                    <span>{studyPlan.sessionNote}</span>
-                  </div>
-                  <div className="home-study-plan-summary">
-                    <span>{Math.round(studyPlan.overallMastery * 100)}% coverage</span>
-                    <span>{studyPlan.focusRows[0]?.label ?? 'Keep reviewing'}</span>
-                    <span aria-hidden="true" className={`home-study-plan-chevron ${homeStudyPlanExpanded ? 'is-open' : ''}`}>▾</span>
-                  </div>
-                </button>
-
-                <div id="home-study-plan-body" className={`home-study-plan-body ${homeStudyPlanExpanded ? 'is-open' : ''}`}>
-                  <div className="home-study-plan-strip-grid">
-                    <div className="home-study-plan-shortcuts" aria-label="Study plan shortcuts">
-                      {studyPlan.shortcutRows.slice(0, 2).map((shortcut) => (
-                        <button
-                          key={shortcut.key}
-                          type="button"
-                          className="study-plan-shortcut-button study-plan-shortcut-button-inline"
-                          onClick={() => jumpToScriptHubSetup(shortcut.script, shortcut.minigame)}
-                        >
-                          <span className="study-plan-shortcut-kicker">Quick shortcut</span>
-                          <strong>{shortcut.label}</strong>
-                          <p>{shortcut.note}</p>
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="home-study-plan-metrics">
-                      {studyPlan.coverageRows.slice(0, 3).map((row) => {
-                        const pct = Math.round(row.mastery * 100)
-                        return (
-                          <div key={row.key} className="home-study-plan-metric-row">
-                            <div className="home-study-plan-metric-head">
-                              <strong>{row.label}</strong>
-                              <span>{pct}%</span>
-                            </div>
-                            <div className="study-plan-coverage-bar" aria-hidden="true">
-                              <div className="study-plan-coverage-fill" style={{ '--study-plan-pct': `${pct}%` } as CSSProperties} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </section>
-            ) : null}
-          </section>
-        </div>
+        <HomeView
+          navDirection={navDirection}
+          studyPlan={studyPlan}
+          homeStudyPlanExpanded={homeStudyPlanExpanded}
+          onSelectScript={(script) => {
+            setNavDirection('forward')
+            setActiveScript(script)
+            setView('script_hub')
+          }}
+          onGoOverview={() => {
+            setNavDirection('forward')
+            setView('overview')
+          }}
+          onOpenSettings={() => setShowSettings(true)}
+          onToggleStudyPlan={() => setHomeStudyPlanExpanded((expanded) => !expanded)}
+          onJumpToSetup={jumpToScriptHubSetup}
+        />
       ) : null}
 
       {view === 'script_hub' ? (
-        <div className={`view-shell view-${navDirection}`}>
-          <header className="topbar panel-glass">
-            <button
-              type="button"
-              className="back-button back-button-icon-only"
-              onClick={goHome}
-              aria-label="Back to main menu"
-              title="Back to main menu"
-            >
-              <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-            </button>
-            <div className="brand-block">
-              <span className="brand-kicker">{SCRIPT_LABELS[activeScript]}</span>
-              <h1>Mini Game Map</h1>
-            </div>
-            <div className="topbar-end">
-              <div className="focus-chip">
-                <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`best-${activeScriptStats.bestStreak}`} className="live-value">{activeScriptStats.bestStreak}</strong> Best Streak</span>
-                <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`leech-${leechCards.length}`} className="live-value">{leechCards.length}</strong> Leeches</span>
-              </div>
-              <button
-                type="button"
-                className="topbar-settings-button"
-                onClick={() => setShowSettings(true)}
-                aria-label="Open settings"
-                title="Settings (Ctrl+,)"
-              >
-                <Settings aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-              </button>
-            </div>
-          </header>
-
-          <section className="panel-glass game-panel">
-            <div className="learning-path-shell">
-              <button
-                type="button"
-                className={`learning-path-toggle ${learningPathExpanded ? 'is-expanded' : ''}`}
-                onClick={() => setLearningPathExpanded((expanded) => !expanded)}
-                aria-expanded={learningPathExpanded}
-                aria-controls="learning-path-body"
-              >
-                <div className="panel-head learning-path-head">
-                  <h2>Learning Path</h2>
-                  <span className="game-stats">
-                    {blockProgressWithMastery.length > 0
-                      ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length} / ${blockProgressWithMastery.length} blocks mastered`
-                      : activeScript === 'kanji_n5'
-                        ? `${kanjiLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${kanjiLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
-                        : activeScript === 'vocab_n5'
-                          ? `${vocabLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${vocabLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
-                          : 'Choose a minigame to start'}
-                  </span>
-                </div>
-
-                {!learningPathExpanded ? (
-                  <div className="learning-path-compact" role="group" aria-label="Learning path compact summary">
-                    {learningPathTrackRows.map((row) => {
-                      const masteryPct = Math.round(row.mastery * 100)
-                      return (
-                        <div key={row.key} className="learning-path-compact-row">
-                          <div className="learning-path-compact-head">
-                            <strong>{row.label}</strong>
-                            <span>{masteryPct}%</span>
-                          </div>
-                          <div className="study-plan-coverage-bar" aria-hidden="true">
-                            <div className="study-plan-coverage-fill" style={{ '--study-plan-pct': `${masteryPct}%` } as CSSProperties} />
-                          </div>
-                          <p className="learning-path-compact-meta">
-                            {row.total > 0 ? `${row.total} cards tracked` : 'No cards tracked yet'}
-                          </p>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : null}
-              </button>
-
-              <div id="learning-path-body" className={`learning-path-body ${learningPathExpanded ? 'is-open' : ''}`}>
-                <div className="learning-path-body-inner">
-                  {gameLoading ? (
-                    <p className="status-line">Loading deck cards...</p>
-                  ) : blockProgressWithMastery.length > 0 ? (
-                    <div className="block-path">
-                      {blockProgressWithMastery.map((block, index) => {
-                        const isActive = activeBlockIndex === block.index
-                        const masteryPct = Math.round(block.mastery * 100)
-                        return (
-                          <article
-                            key={block.index}
-                            className={`block-node ${isActive ? 'is-active' : ''} ${!block.unlocked ? 'is-locked' : ''}`}
-                            style={{ animationDelay: `${80 + index * 50}ms` }}
-                          >
-                            <button
-                              type="button"
-                              className="block-node-button"
-                              disabled={!block.unlocked}
-                              onClick={() => {
-                                if (!block.unlocked) return
-                                setActiveBlockIndex(block.index)
-                                setSessionActive(false)
-                                setRoundState(null)
-                                setRoundFeedback(null)
-                                setRoundFeedbackTone(null)
-                                setRoundFeedbackPoints(null)
-                                setRoundFeedbackAnswer(null)
-                                setIsRoundResolving(false)
-                                setLivesRemaining(DEFAULT_LIVES)
-                                resetRoundCycle()
-                              }}
-                              aria-pressed={isActive}
-                              aria-label={`${block.name}, ${block.unlocked ? `${masteryPct}% mastered` : 'locked'}`}
-                            >
-                              <div className="block-node-header">
-                                <div className="block-node-chars" lang="ja" aria-hidden="true">
-                                  {block.sample_chars.join(' ')}
-                                </div>
-                                {!block.unlocked ? (
-                                  <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
-                                ) : null}
-                              </div>
-                              <strong className="block-node-name">{block.name}</strong>
-                              <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
-                                <div
-                                  className="block-node-bar"
-                                  style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties}
-                                />
-                              </div>
-                              <span className="block-node-pct">{masteryPct}%</span>
-                            </button>
-                          </article>
-                        )
-                      })}
-                    </div>
-                  ) : activeScript === 'kanji_n5' || activeScript === 'vocab_n5' ? (
-                    <div className="jlpt-level-path" role="group" aria-label={`${activeScript === 'kanji_n5' ? 'Kanji' : 'Vocabulary'} JLPT progression`}>
-                      {(activeScript === 'kanji_n5' ? kanjiLevelProgress : vocabLevelProgress).map((level, index) => {
-                        const isActive = activeScript === 'kanji_n5' ? activeKanjiLevel === level.key : activeVocabLevel === level.key
-                        const masteryPct = Math.round(level.mastery * 100)
-                        const unavailable = level.total === 0
-                        return (
-                          <article
-                            key={level.key}
-                            className={`jlpt-level-node ${isActive ? 'is-active' : ''} ${(!level.unlocked || unavailable) ? 'is-locked' : ''}`}
-                            style={{ animationDelay: `${80 + index * 45}ms` }}
-                          >
-                            <button
-                              type="button"
-                              className="jlpt-level-button"
-                              disabled={!level.unlocked || unavailable}
-                              onClick={() => {
-                                if (activeScript === 'kanji_n5') {
-                                  setActiveKanjiLevel(level.key)
-                                } else {
-                                  setActiveVocabLevel(level.key)
-                                }
-                                setSessionActive(false)
-                                setRoundState(null)
-                                setRoundFeedback(null)
-                                setRoundFeedbackTone(null)
-                                setRoundFeedbackPoints(null)
-                                setRoundFeedbackAnswer(null)
-                                setIsRoundResolving(false)
-                                setLivesRemaining(DEFAULT_LIVES)
-                                resetRoundCycle()
-                              }}
-                              aria-pressed={isActive}
-                              aria-label={`${level.label}, ${unavailable ? 'no cards yet' : `${masteryPct}% mastered`}`}
-                            >
-                              <div className="jlpt-level-header">
-                                <strong>{level.label}</strong>
-                                {!level.unlocked || unavailable ? (
-                                  <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
-                                ) : null}
-                              </div>
-                              <span className="jlpt-level-preview" lang="ja" aria-hidden="true">
-                                {level.sampleChars.length > 0 ? level.sampleChars.join(' ') : '—'}
-                              </span>
-                              <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
-                                <div
-                                  className="block-node-bar"
-                                  style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties}
-                                />
-                              </div>
-                              <span className="jlpt-level-meta">{level.total} cards • {masteryPct}%</span>
-                            </button>
-                          </article>
-                        )
-                      })}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-
-            {/* Minigame selector – shown below block path once a block is active */}
-            {!gameLoading && (blockProgressWithMastery.length === 0 || blockProgressWithMastery[activeBlockIndex]?.unlocked) ? (
-              <>
-                <div className="panel-head block-minigame-head">
-                  <h3>
-                    {blockProgressWithMastery.length > 0
-                      ? `Choose a minigame — ${blockProgressWithMastery[activeBlockIndex]?.name ?? ''} (${activeBlockCards.length} cards)`
-                      : activeScript === 'kanji_n5' || activeScript === 'vocab_n5'
-                        ? `Choose a minigame — ${activeSectionName ?? 'JLPT Level'} (${activeBlockCards.length} cards)`
-                        : 'Choose a minigame'}
-                  </h3>
-                </div>
-
-                <div className="minigame-setup-toolbar" aria-label="Minigame quick setup">
-                  <div className="session-length-row" role="group" aria-label="Session length">
-                    {SESSION_LENGTH_PRESETS.map((preset) => {
-                      const Icon = preset.icon
-                      const isActive = activeSessionLengthPreset?.key === preset.key
-                      return (
-                        <button
-                          key={preset.key}
-                          type="button"
-                          className={`setup-option-button session-length-button session-length-${preset.key} ${isActive ? 'is-active' : ''}`}
-                          aria-pressed={isActive}
-                          aria-label={`Set ${preset.label.toLowerCase()} session length (${preset.items} items)`}
-                          title={`${preset.label} length (${preset.items} items)`}
-                          onClick={() => setSessionTargetItems(preset.items)}
-                        >
-                          <span className="setup-option-icon" aria-hidden="true">
-                            <Icon className="toggle-icon" strokeWidth={2.2} />
-                          </span>
-                          <span className="setup-option-copy">
-                            <span className="setup-option-label">{preset.label}</span>
-                            <span className="setup-option-meta">{preset.items} items</span>
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <div className="intro-toggle-row" role="group" aria-label="Minigame setup toggles">
-                    <button
-                      type="button"
-                      className={`setup-option-button setup-toggle-button ${livesEnabled ? 'is-active' : ''}`}
-                      aria-pressed={livesEnabled}
-                      aria-label={`Toggle lives mode (${DEFAULT_LIVES} lives per run)`}
-                      title={`Lives mode (${DEFAULT_LIVES} lives): ${livesEnabled ? 'On' : 'Off'}`}
-                      onClick={() => {
-                        setLivesEnabled((previous) => !previous)
-                        setLivesRemaining(DEFAULT_LIVES)
-                      }}
-                    >
-                      <span className="setup-option-icon" aria-hidden="true">
-                        <Heart className="toggle-icon" strokeWidth={2.1} />
-                      </span>
-                      <span className="setup-option-copy">
-                        <span className="setup-option-label">Lives mode</span>
-                        <span className="setup-option-meta">{livesEnabled ? `${DEFAULT_LIVES} lives active` : 'Off'}</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`setup-option-button setup-toggle-button leech-focus-toggle ${leechFocusEnabled ? 'is-active' : ''}`}
-                      aria-pressed={leechFocusEnabled}
-                      aria-label="Toggle focused review mode (leech cards first)"
-                      title={`Focused review mode (leech first): ${leechFocusEnabled ? 'On' : 'Off'}`}
-                      onClick={() => setLeechFocusEnabled((previous) => !previous)}
-                    >
-                      <span className="setup-option-icon" aria-hidden="true">
-                        <AlertTriangle className="toggle-icon" strokeWidth={2.1} />
-                      </span>
-                      <span className="setup-option-copy">
-                        <span className="setup-option-label">Focused review</span>
-                        <span className="setup-option-meta">{leechFocusEnabled ? 'Leech cards first' : 'Mixed queue'}</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`setup-option-button setup-toggle-button ${confidenceCaptureEnabled ? 'is-active' : ''}`}
-                      aria-pressed={confidenceCaptureEnabled}
-                      aria-label="Toggle answer confidence capture"
-                      title={`Confidence capture: ${confidenceCaptureEnabled ? 'On' : 'Off'}`}
-                      onClick={() => setConfidenceCaptureEnabled((previous) => !previous)}
-                    >
-                      <span className="setup-option-icon" aria-hidden="true">
-                        <Target className="toggle-icon" strokeWidth={2.1} />
-                      </span>
-                      <span className="setup-option-copy">
-                        <span className="setup-option-label">Answer confidence</span>
-                        <span className="setup-option-meta">{confidenceCaptureEnabled ? 'Rate each answer' : 'Tracking off'}</span>
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {sessionSummaryLoading ? <p className="status-line">Loading session summary...</p> : null}
-                {sessionGoalError ? <p className="status-line status-error">{sessionGoalError}</p> : null}
-                {lastSessionSummary ? (
-                  <section className="session-summary-card" aria-live="polite">
-                    <div className="session-summary-head">
-                      <p className="session-summary-kicker">Last Session</p>
-                      <span className={`session-summary-pill ${lastSessionSummary.goal_met ? 'is-success' : 'is-warn'}`}>
-                        {lastSessionSummary.goal_met ? 'Goal Met' : 'In Progress'}
-                      </span>
-                    </div>
-                    <p className="session-summary-main">
-                      {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} items · {lastSessionSummary.accuracy}% accuracy · {Math.max(0, lastSessionSummary.reviewed - lastSessionSummary.correct)} misses
-                    </p>
-                    <div className="session-summary-actions">
-                      <span className="session-summary-context">
-                        {sessionRunReport
-                          ? `${SCRIPT_LABELS[sessionRunReport.script]} · ${MINIGAMES.find((game) => game.key === sessionRunReport.minigame)?.title ?? sessionRunReport.minigame}`
-                          : `${SCRIPT_LABELS[activeScript]} · ${selectedGameMeta?.title ?? 'Minigame'}`}
-                      </span>
-                      <button
-                        type="button"
-                        className="session-summary-continue"
-                        onClick={() => continueLastSession()}
-                        disabled={!sessionRunReport || sessionStartPending}
-                      >
-                        Continue
-                      </button>
-                    </div>
-                  </section>
-                ) : null}
-
-                <div className="minigame-grid">
-                  {availableMinigames.map((gameKey, index) => {
-                    const game = MINIGAMES.find((entry) => entry.key === gameKey)
-                    if (!game) return null
-                    const gameStats = minigameStats[activeScript][game.key]
-                    const accuracy =
-                      gameStats.attempted > 0
-                        ? Math.round((gameStats.correct / gameStats.attempted) * 100)
-                        : 0
-
-                    return (
-                      <article
-                        key={game.key}
-                        role="button"
-                        tabIndex={0}
-                        className={`game-tile ${activeGame === game.key ? 'is-active' : ''}`}
-                        onClick={() => {
-                          setActiveGame(game.key)
-                          setSessionActive(false)
-                          setRoundState(null)
-                          setRoundFeedback(null)
-                          setRoundFeedbackTone(null)
-                          setRoundFeedbackPoints(null)
-                          setRoundFeedbackAnswer(null)
-                          setIsRoundResolving(false)
-                          setLivesRemaining(DEFAULT_LIVES)
-                          resetRoundCycle()
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault()
-                            setActiveGame(game.key)
-                            setSessionActive(false)
-                            setRoundState(null)
-                            setRoundFeedback(null)
-                            setRoundFeedbackTone(null)
-                            setRoundFeedbackPoints(null)
-                            setRoundFeedbackAnswer(null)
-                            setIsRoundResolving(false)
-                            setLivesRemaining(DEFAULT_LIVES)
-                            resetRoundCycle()
-                          }
-                        }}
-                        style={{ animationDelay: `${120 + index * 70}ms` }}
-                      >
-                        <div className="game-tile-head">
-                          <span className="game-icon" aria-hidden="true"><MinigameIcon game={game.key} /></span>
-                          <div className="game-tile-copy">
-                            <strong className="game-tile-title">{game.title}</strong>
-                            <p className="game-tile-description">{game.description}</p>
-                          </div>
-                        </div>
-                        <div className="game-tile-stats" aria-label="Minigame stats">
-                          <span className="game-tile-stat" aria-label="Accuracy" title="Accuracy">
-                            <span className="game-tile-stat-label" aria-hidden="true"><Target className="game-tile-stat-icon" strokeWidth={2.1} /></span>
-                            <strong>{accuracy}%</strong>
-                          </span>
-                          <span className="game-tile-stat" aria-label="Best streak" title="Best streak">
-                            <span className="game-tile-stat-label" aria-hidden="true"><Flame className="game-tile-stat-icon" strokeWidth={2.1} /></span>
-                            <strong>{gameStats.bestStreak}</strong>
-                          </span>
-                          <span className="game-tile-stat" aria-label="Points" title="Points">
-                            <span className="game-tile-stat-label" aria-hidden="true"><Trophy className="game-tile-stat-icon" strokeWidth={2.1} /></span>
-                            <strong>{gameStats.points}</strong>
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="play-cta-button game-tile-play"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setActiveGame(game.key)
-                            setNavDirection('forward')
-                            setView('minigame')
-                            setSessionActive(false)
-                            setRoundState(null)
-                            setRoundFeedback(null)
-                            setRoundFeedbackTone(null)
-                            setRoundFeedbackPoints(null)
-                            setRoundFeedbackAnswer(null)
-                            setIsRoundResolving(false)
-                            setLivesRemaining(DEFAULT_LIVES)
-                            resetRoundCycle()
-                            void startSession(game.key)
-                          }}
-                        >
-                          Play
-                        </button>
-                      </article>
-                    )
-                  })}
-                </div>
-              </>
-            ) : null}
-
-            {gameError ? <p className="status-line status-error">{gameError}</p> : null}
-          </section>
-        </div>
+        <ScriptHubView
+          navDirection={navDirection}
+          activeScript={activeScript}
+          activeGame={activeGame}
+          activeBlockIndex={activeBlockIndex}
+          gameLoading={gameLoading}
+          gameError={gameError}
+          blockProgressWithMastery={blockProgressWithMastery}
+          activeBlockCards={activeBlockCards}
+          activeRunCardsLength={activeRunCards.length}
+          kanjiLevelProgress={kanjiLevelProgress}
+          vocabLevelProgress={vocabLevelProgress}
+          activeKanjiLevel={activeKanjiLevel}
+          activeVocabLevel={activeVocabLevel}
+          learningPathExpanded={learningPathExpanded}
+          learningPathTrackRows={learningPathTrackRows}
+          leechCardsLength={leechCards.length}
+          minigameStats={minigameStats}
+          sessionTargetItems={sessionTargetItems}
+          livesEnabled={livesEnabled}
+          leechFocusEnabled={leechFocusEnabled}
+          confidenceCaptureEnabled={confidenceCaptureEnabled}
+          sessionSummaryLoading={sessionSummaryLoading}
+          sessionGoalError={sessionGoalError}
+          lastSessionSummary={lastSessionSummary}
+          sessionRunReport={sessionRunReport}
+          sessionStartPending={sessionStartPending}
+          activeSessionLengthPreset={activeSessionLengthPreset}
+          availableMinigames={availableMinigames}
+          activeScriptStats={activeScriptStats}
+          activeSectionName={activeSectionName}
+          onBack={goHome}
+          onOpenSettings={() => setShowSettings(true)}
+          onSelectBlock={(index) => {
+            setActiveBlockIndex(index)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onSelectKanjiLevel={(level) => {
+            setActiveKanjiLevel(level)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onSelectVocabLevel={(level) => {
+            setActiveVocabLevel(level)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onToggleLearningPath={() => setLearningPathExpanded((expanded) => !expanded)}
+          onSelectGame={(game) => {
+            setActiveGame(game)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onPlayGame={(game) => {
+            setActiveGame(game)
+            setNavDirection('forward')
+            setView('minigame')
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+            void startSession(game)
+          }}
+          onSetSessionLength={setSessionTargetItems}
+          onToggleLives={() => {
+            setLivesEnabled((previous) => !previous)
+            setLivesRemaining(DEFAULT_LIVES)
+          }}
+          onToggleLeechFocus={() => setLeechFocusEnabled((previous) => !previous)}
+          onToggleConfidence={() => setConfidenceCaptureEnabled((previous) => !previous)}
+          onContinueSession={continueLastSession}
+        />
       ) : null}
 
       {view === 'minigame' ? (
-        <div className={`view-shell view-${navDirection}`}>
-          <header className="topbar panel-glass">
-            <button
-              type="button"
-              className="back-button back-button-icon-only"
-              onClick={() => {
-                setNavDirection('back')
-                setView('script_hub')
-              }}
-              aria-label="Back to map"
-              title="Back to map"
-            >
-              <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-            </button>
-            <div className="brand-block">
-              <span className="brand-kicker">
-                {SCRIPT_LABELS[activeScript]}
-                {activeSectionName
-                  ? ` · ${activeSectionName}`
-                  : ' Run'}
-              </span>
-              <h1>{selectedGameMeta?.title ?? 'Minigame'}</h1>
-            </div>
-            <div className="topbar-end">
-              <div className="focus-chip">
-                <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`correct-${sessionScore}-${sessionRounds}`} className="live-value">{sessionScore}/{sessionRounds}</strong> Correct</span>
-                <span className="metric-accent-streak"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`points-${sessionPoints}`} className="live-value">{sessionPoints}</strong> Points</span>
-                <span className="metric-accent-insight"><Trophy aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`goal-${sessionRounds}-${sessionTargetItems}`} className="live-value">{sessionRounds}/{sessionTargetItems}</strong> Goal</span>
-              </div>
-              <button
-                type="button"
-                className="topbar-settings-button"
-                onClick={() => setShowSettings(true)}
-                aria-label="Open settings"
-                title="Settings (Ctrl+,)"
-              >
-                <Settings aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-              </button>
-            </div>
-          </header>
-
-          <section className="panel-glass game-panel">
-            {blockSessionComplete && sessionActive ? (
-              <article className="block-complete-banner panel-glass" role="status">
-                <span className="block-complete-icon" aria-hidden="true">🎉</span>
-                <h2 className="block-complete-title">Block complete!</h2>
-                <p className="block-complete-copy">
-                  You answered every card in{' '}
-                  <strong>{activeSectionName ?? 'this section'}</strong>{' '}
-                  correctly. Head back to the map to continue your path.
-                </p>
-                <div className="game-actions">
-                  <button
-                    type="button"
-                    className="back-button back-button-icon-only"
-                    onClick={() => {
-                      setNavDirection('back')
-                      setView('script_hub')
-                    }}
-                    aria-label="Back to map"
-                    title="Back to map"
-                  >
-                    <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void startSession()
-                    }}
-                  >
-                    Play Again
-                  </button>
-                </div>
-              </article>
-            ) : !sessionActive ? (
-              <>
-                {sessionRunReport && !sessionStartPending ? (
-                  <article className="post-session-report" role="status" aria-live="polite">
-                    <div className="post-session-head">
-                      <div>
-                        <p className="post-session-kicker">Session Report</p>
-                        <h2>Run Complete · {MINIGAMES.find((game) => game.key === sessionRunReport.minigame)?.title ?? sessionRunReport.minigame}</h2>
-                      </div>
-                      <span className="post-session-time">Finished {sessionRunReport.completedAt}</span>
-                    </div>
-
-                    <p className="post-session-note">
-                      {sessionRunReport.sectionName
-                        ? `${SCRIPT_LABELS[sessionRunReport.script]} · ${sessionRunReport.sectionName}`
-                        : SCRIPT_LABELS[sessionRunReport.script]}
-                    </p>
-
-                    <div className="post-session-grid" aria-label="Session performance metrics">
-                      <div className="post-session-cell"><small>Accuracy</small><strong>{sessionRunReport.accuracy}%</strong></div>
-                      <div className="post-session-cell"><small>Correct</small><strong>{sessionRunReport.correct}</strong></div>
-                      <div className="post-session-cell"><small>Misses</small><strong>{sessionRunReport.wrong}</strong></div>
-                      <div className="post-session-cell"><small>Points</small><strong>{sessionRunReport.points}</strong></div>
-                      <div className="post-session-cell"><small>Goal Completion</small><strong>{sessionRunReport.goalCompletionPct}%</strong></div>
-                      {sessionRunReport.livesEnabled ? (
-                        <>
-                          <div className="post-session-cell"><small>Lives</small><strong>{sessionRunReport.livesRemaining}/{DEFAULT_LIVES}</strong></div>
-                          <div className="post-session-cell"><small>Lives Lost</small><strong>{sessionRunReport.livesLost}</strong></div>
-                        </>
-                      ) : null}
-                      {sessionRunReport.leechFocusEnabled ? (
-                        <div className="post-session-cell"><small>Leech Focus</small><strong>On</strong></div>
-                      ) : null}
-                      {sessionRunReport.confidenceCaptureEnabled ? (
-                        <>
-                          <div className="post-session-cell"><small>Confidence Captured</small><strong>{sessionRunReport.confidenceCapturedCount}</strong></div>
-                          <div className="post-session-cell"><small>Avg Confidence</small><strong>{sessionRunReport.averageConfidenceScore ?? '-'}</strong></div>
-                        </>
-                      ) : null}
-                    </div>
-
-                    <div className="post-session-insights">
-                      <p>
-                        <strong>Points Rule:</strong> {POINTS_RULE_COPY}
-                      </p>
-                      <p>
-                        <strong>Goal Check:</strong>{' '}
-                        {sessionRunReport.goalDelta >= 0
-                          ? `Goal cleared by ${sessionRunReport.goalDelta} item${sessionRunReport.goalDelta === 1 ? '' : 's'}.`
-                          : `${Math.abs(sessionRunReport.goalDelta)} item${Math.abs(sessionRunReport.goalDelta) === 1 ? '' : 's'} short of goal.`}
-                      </p>
-                    </div>
-                  </article>
-                ) : null}
-
-                <div className="game-actions">
-                  <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading || sessionStartPending}>
-                    {sessionRunReport ? 'Play Again' : 'Play'}
-                  </button>
-                  <button
-                    type="button"
-                    className="back-button back-button-icon-only"
-                    onClick={() => {
-                      setNavDirection('back')
-                      setView('script_hub')
-                    }}
-                    aria-label="Back to map"
-                    title="Back to map"
-                  >
-                    <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-                  </button>
-                  {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
-                </div>
-              </>
-            ) : (
-              <div className="game-actions">
-                <button type="button" onClick={() => { void startSession() }} disabled={gameLoading || activeRunCards.length === 0 || sessionSummaryLoading || sessionStartPending}>
-                  Restart Challenge
-                </button>
-                {gameLoading ? <span>Loading deck...</span> : <span>{activeRunCards.length} cards available</span>}
-                <div className="lives-inline" aria-live="polite">
-                  {livesEnabled ? (
-                    [...Array(DEFAULT_LIVES).keys()].map((life) => (
-                      <span
-                        key={`life-${life}`}
-                        className={`life-heart ${life < livesRemaining ? 'is-active' : 'is-lost'}`}
-                        aria-hidden="true"
-                      >
-                        <Heart className="inline-button-icon" strokeWidth={2.2} fill="currentColor" />
-                      </span>
-                    ))
-                  ) : (
-                    <span>Lives off</span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {((sessionStartPending && !sessionActive) || (sessionActive && !roundState)) ? (
-              <div className="minigame-loading" role="status" aria-live="polite">
-                <LoaderCircle className="inline-button-icon spin-icon" strokeWidth={2.2} aria-hidden="true" />
-                <span>{sessionStartPending ? 'Preparing your round...' : 'Loading next card...'}</span>
-              </div>
-            ) : null}
-
-            {gameError ? <p className="status-line status-error">{gameError}</p> : null}
-
-            {sessionActive && roundState ? (
-              <article
-                className={`game-round ${
-                  roundFeedbackTone === 'error'
-                    ? 'is-wrong'
-                    : roundFeedbackTone === 'success'
-                      ? 'is-correct'
-                      : ''
-                }`}
-                key={`round-${sessionRounds}-${roundState.focusText}-${roundState.answer}`}
-              >
-                <div className="game-round-head">
-                  <span>{SCRIPT_LABELS[activeScript]}</span>
-                  <strong>
-                    {selectedGameMeta?.title}
-                    {activeGame === 'interleave_mix'
-                      ? ` · ${MINIGAMES.find((game) => game.key === roundState.mode)?.title ?? roundState.mode}`
-                      : ''}
-                  </strong>
-                  <span className="stage-pill">Stage {roundState.curriculumStage}</span>
-                  {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
-                </div>
-                <div className="game-prompt-focus">
-                  <p className="game-prompt-label">{roundState.promptLabel}</p>
-                  <p className={`game-prompt-main ${roundState.mode !== 'character_match' ? 'is-japanese' : ''}`}>
-                    {roundState.focusText}
-                  </p>
-                  {settings.voiceEnabled && (roundState.audioText || (activeScript === 'grammar_patterns' && roundState.exampleSentenceAudioText)) ? (
-                    <div className="game-speak-controls">
-                      {roundState.audioText ? (
-                        <button
-                          type="button"
-                          className="game-speak-button"
-                          onClick={() => void playQuestionAudio(roundState.audioText)}
-                          disabled={voiceBusy}
-                          aria-label="Play target words"
-                          title={voiceUnavailable ? 'Voice playback unavailable' : 'Play target words'}
-                        >
-                          <Volume2 size={16} aria-hidden="true" />
-                          <span>{voiceBusy ? 'Loading…' : voiceUnavailable ? 'Voice unavailable' : 'Play words'}</span>
-                        </button>
-                      ) : null}
-                      {activeScript === 'grammar_patterns' && roundState.exampleSentenceAudioText ? (
-                        <button
-                          type="button"
-                          className="game-speak-button"
-                          onClick={() => void playQuestionAudio(roundState.exampleSentenceAudioText!)}
-                          disabled={voiceBusy}
-                          aria-label="Play example sentence"
-                          title={voiceUnavailable ? 'Voice playback unavailable' : 'Play example sentence'}
-                        >
-                          <Volume2 size={16} aria-hidden="true" />
-                          <span>{voiceBusy ? 'Loading…' : voiceUnavailable ? 'Voice unavailable' : 'Play sentence'}</span>
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {roundState.hintText ? <p className="game-hint-text">{roundState.hintText}</p> : null}
-                </div>
-
-                {roundState.mode === 'stroke_order' ? (
-                  <div className="stroke-order-picker">
-                    <div className="game-input-row">
-                      <input
-                        ref={answerInputRef}
-                        value={roundInput}
-                        onChange={(event) => setRoundInput(sanitizeRomajiInput(event.target.value))}
-                        onKeyDown={(event) => {
-                          if (event.key !== 'Enter') return
-                          event.preventDefault()
-                          const candidates = getStrokeOrderCandidates(activeBlockCards, roundInput)
-                          if (candidates.length === 1) {
-                            submitAnswer(candidates[0].character)
-                          }
-                        }}
-                        placeholder="Type romaji reading"
-                        autoComplete="off"
-                        disabled={isRoundResolving}
-                      />
-                    </div>
-                    <div className="stroke-order-candidate-wrap" aria-label="Kanji candidates">
-                      {getStrokeOrderCandidates(activeBlockCards, roundInput).length > 0 ? (
-                        <div className="option-grid">
-                          {getStrokeOrderCandidates(activeBlockCards, roundInput).map((candidate) => (
-                            <button
-                              key={candidate.id}
-                              type="button"
-                              className="option-button option-button-character"
-                              disabled={isRoundResolving}
-                              onClick={() => submitAnswer(candidate.character)}
-                            >
-                              <span className="option-button-main" lang="ja">{candidate.character}</span>
-                              <span className="option-button-sub">{candidate.romaji}</span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="status-line">Type a romaji reading to show matching kanji.</p>
-                      )}
-                    </div>
-                  </div>
-                ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' ? (
-                  <form
-                    className="game-input-row"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      submitAnswer(roundInput)
-                    }}
-                  >
-                    <input
-                      ref={answerInputRef}
-                      value={roundInput}
-                      onChange={(event) =>
-                        setRoundInput(
-                          roundState.mode === 'romaji_sprint'
-                            ? sanitizeRomajiInput(event.target.value)
-                            : event.target.value,
-                        )
-                      }
-                      placeholder={roundState.mode === 'romaji_sprint'
-                        ? 'Enter romaji'
-                        : 'Type meaning'}
-                      autoComplete="off"
-                      disabled={isRoundResolving}
-                    />
-                    <button type="submit" disabled={isRoundResolving}>Check</button>
-                  </form>
-                ) : (
-                  <div className="option-grid">
-                    {roundState.options.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`option-button ${roundState.mode === 'character_match' ? 'option-button-character' : ''}`}
-                        disabled={isRoundResolving}
-                        onClick={() => submitAnswer(option.label)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {confidenceCaptureEnabled ? (
-                  <section className="confidence-controls confidence-controls-round" aria-label="Confidence score controls">
-                    <p className="interleave-controls-title">Confidence for this answer</p>
-                    <div className="confidence-chip-row confidence-chip-row-round" role="group" aria-label="Select confidence score for this answer">
-                      {CONFIDENCE_SCORES.map((score) => (
-                        <button
-                          key={`round-confidence-${score}`}
-                          type="button"
-                          className={`confidence-chip confidence-chip-round ${roundConfidenceScore === score ? 'is-active' : ''}`}
-                          onClick={() => setRoundConfidenceScore(score)}
-                          aria-pressed={roundConfidenceScore === score}
-                          aria-label={`Confidence ${CONFIDENCE_LEVEL_LABELS[score]}`}
-                          title={`Confidence: ${CONFIDENCE_LEVEL_LABELS[score]}`}
-                          disabled={isRoundResolving}
-                        >
-                          <span className="confidence-chip-label">{CONFIDENCE_LEVEL_LABELS[score]}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {roundFeedback ? (
-                  <div
-                    className={`round-feedback ${
-                      roundFeedbackTone === 'success'
-                        ? 'round-feedback-success'
-                        : roundFeedbackTone === 'error'
-                          ? 'round-feedback-error'
-                          : ''
-                    }`}
-                  >
-                    <p className="round-feedback-message">{roundFeedback}</p>
-                    <div className="round-feedback-meta">
-                      <span className="round-feedback-points">
-                        {roundFeedbackPoints !== null ? `+${roundFeedbackPoints} pts` : '+0 pts'}
-                      </span>
-                      <span className="round-feedback-points-rule">Combo at streaks 3/6/9</span>
-                      {roundFeedbackTone === 'error' && livesEnabled ? <span className="round-feedback-life">-1 life</span> : null}
-                    </div>
-                    {roundFeedbackAnswer ? (
-                      <div className="round-feedback-answer">
-                        <p className="round-feedback-answer-label">{formatFeedbackAnswerLabel(roundState.mode)}</p>
-                        <p className="round-feedback-answer-value">{roundFeedbackAnswer}</p>
-                      </div>
-                    ) : null}
-                    {roundState.mode === 'narrative_story' ? (
-                      <p className="round-feedback-note">Story progress updates chapter access based on stage transitions.</p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </article>
-            ) : null}
-          </section>
-        </div>
+        <MinigameView
+          navDirection={navDirection}
+          activeScript={activeScript}
+          activeGame={activeGame}
+          activeSectionName={activeSectionName}
+          sessionScore={sessionScore}
+          sessionRounds={sessionRounds}
+          sessionPoints={sessionPoints}
+          sessionTargetItems={sessionTargetItems}
+          blockSessionComplete={blockSessionComplete}
+          sessionActive={sessionActive}
+          sessionRunReport={sessionRunReport}
+          sessionStartPending={sessionStartPending}
+          sessionSummaryLoading={sessionSummaryLoading}
+          gameLoading={gameLoading}
+          gameError={gameError}
+          activeRunCardsLength={activeRunCards.length}
+          livesEnabled={livesEnabled}
+          livesRemaining={livesRemaining}
+          roundState={roundState}
+          roundFeedback={roundFeedback}
+          roundFeedbackTone={roundFeedbackTone}
+          roundFeedbackAnswer={roundFeedbackAnswer}
+          roundFeedbackPoints={roundFeedbackPoints}
+          isRoundResolving={isRoundResolving}
+          roundInput={roundInput}
+          voiceBusy={voiceBusy}
+          voiceUnavailable={voiceUnavailable}
+          voiceEnabled={settings.voiceEnabled}
+          confidenceCaptureEnabled={confidenceCaptureEnabled}
+          roundConfidenceScore={roundConfidenceScore}
+          activeBlockCards={activeBlockCards}
+          answerInputRef={answerInputRef}
+          onBack={() => {
+            setNavDirection('back')
+            setView('script_hub')
+          }}
+          onOpenSettings={() => setShowSettings(true)}
+          onStartSession={(game) => { void startSession(game) }}
+          onSubmitAnswer={submitAnswer}
+          onSetRoundInput={setRoundInput}
+          onSetRoundConfidence={setRoundConfidenceScore}
+          onPlayAudio={(text) => { void playQuestionAudio(text) }}
+        />
       ) : null}
 
       {view === 'overview' ? (
-        <div className={`view-shell view-${navDirection}`}>
-          <header className="topbar panel-glass">
-            <button
-              type="button"
-              className="back-button back-button-icon-only"
-              onClick={goHome}
-              aria-label="Back to main menu"
-              title="Back to main menu"
-            >
-              <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-            </button>
-            <div className="brand-block">
-              <span className="brand-kicker">JPLearn</span>
-              <h1>Study Overview</h1>
-            </div>
-            <div className="topbar-end">
-              <div className="focus-chip">
-                <span>Progress Board</span>
-              </div>
-              <button
-                type="button"
-                className="topbar-settings-button"
-                onClick={() => setShowSettings(true)}
-                aria-label="Open settings"
-                title="Settings (Ctrl+,)"
-              >
-                <Settings aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-              </button>
-            </div>
-          </header>
-
-          <section className="panel-glass overview-hero">
-            <div className="overview-hero-copy">
-              <p className="hero-kicker">Session Snapshot</p>
-              <h2 className="overview-hero-title">Your Learning Pulse</h2>
-              <p className="hero-copy">See how much you have mastered and what to tackle in your next focused run.</p>
-              <div className="overview-snapshot-grid" aria-label="Session snapshot metrics">
-                {summaryTiles.map((tile, index) => (
-                  <article
-                    key={`${tile.label}-${tile.value}`}
-                    className={`overview-snapshot-tile tone-${tile.tone}`}
-                    style={{ animationDelay: `${120 + index * 80}ms` }}
-                    title={'note' in tile ? tile.note : undefined}
-                  >
-                    <p><tile.icon aria-hidden="true" className={`metric-icon icon-${tile.accent}`} strokeWidth={2.2} />{tile.label}</p>
-                    <strong className="live-value">{tile.value}</strong>
-                  </article>
-                ))}
-              </div>
-            </div>
-            <div className="overview-hero-actions">
-              <button
-                type="button"
-                className="icon-action-button"
-                onClick={() => void loadSummary()}
-                disabled={loading}
-                aria-label={loading ? 'Refreshing data' : 'Refresh data'}
-                title={loading ? 'Refreshing data' : 'Refresh data'}
-              >
-                <RefreshCw aria-hidden="true" className={`inline-button-icon ${loading ? 'spin-icon' : ''}`} strokeWidth={2.2} />
-              </button>
-              <button
-                type="button"
-                className="danger-button icon-action-button"
-                onClick={() => setResetConfirmStep(1)}
-                disabled={resettingDb}
-                aria-label={resettingDb ? 'Resetting database' : 'Reset database'}
-                title={resettingDb ? 'Resetting database' : 'Reset database'}
-              >
-                <AlertTriangle aria-hidden="true" className={`inline-button-icon ${resettingDb ? 'spin-icon' : ''}`} strokeWidth={2.2} />
-              </button>
-              <span>{lastUpdated ? `Updated ${lastUpdated}` : 'Waiting for first sync'}</span>
-            </div>
-          </section>
-
-          {resetConfirmStep > 0 ? (
-            <section className="panel-glass reset-confirm-panel" role="alertdialog" aria-modal="true">
-              {resetConfirmStep === 1 ? (
-                <>
-                  <h3>Reset all progress?</h3>
-                  <p>
-                    This will permanently delete all review history, streaks, leech data,
-                    and locally-tracked character scores. There is no undo.
-                  </p>
-                  <div className="reset-confirm-actions">
-                    <button
-                      type="button"
-                      className="danger-button"
-                      onClick={() => setResetConfirmStep(2)}
-                      disabled={resettingDb}
-                    >
-                      I understand — continue
-                    </button>
-                    <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h3>Final confirmation</h3>
-                  <p>
-                    <strong>All your progress will be erased.</strong>{' '}
-                    Click the button below to permanently delete everything.
-                  </p>
-                  <div className="reset-confirm-actions">
-                    <button
-                      type="button"
-                      className="danger-button danger-button-final"
-                      onClick={() => void resetStudyDb()}
-                      disabled={resettingDb}
-                    >
-                      {resettingDb ? 'Resetting…' : '⚠ Yes, delete everything'}
-                    </button>
-                    <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              )}
-            </section>
-          ) : null}
-
-          {/* ── Character mastery grid ────────────────────────────────── */}
-          <section className="panel-glass char-mastery-panel">
-            <button
-              type="button"
-              className="char-mastery-toggle"
-              onClick={() => setCharMasteryExpanded((v) => !v)}
-              aria-expanded={charMasteryExpanded}
-            >
-              <div className="panel-head char-mastery-panel-head">
-                <h2 className="panel-title-with-icon"><Languages aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Character Mastery</h2>
-                <div className="panel-actions">
-                  <span>{overviewBlocksLoading ? 'Loading…' : 'Color-coded progress for every symbol'}</span>
-                </div>
-                <span className={`char-mastery-chevron ${charMasteryExpanded ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-              </div>
-            </button>
-
-            {/* max-height wrapper — inner div carries padding so wrapper can collapse to 0 cleanly */}
-            <div className={`char-mastery-body ${charMasteryExpanded ? 'is-open' : ''}`}>
-              <div className="char-mastery-body-inner">
-                {(['hiragana', 'katakana'] as const).map((script) => {
-                  const blocks = overviewBlocks[script]
-                  if (!blocks || blocks.length === 0) return null
-                  const scores = cardScores[script]
-
-                  return (
-                    <div key={script} className="char-mastery-script">
-                      <h3 className="char-mastery-script-name">
-                        {script === 'hiragana' ? 'Hiragana' : 'Katakana'}
-                      </h3>
-
-                      {/*
-                        CSS-Grid inline-expand pattern (css-tricks.com/expandable-sections-within-a-css-grid):
-                        Tiles sit in an auto-fill grid. The active block's detail panel is injected
-                        directly after its tile with grid-column: 1 / -1 so it spans the full row.
-                        grid-auto-flow: dense fills any gaps in the tile row before the detail panel,
-                        keeping the visual tile order stable.
-                      */}
-                      <div className="char-mastery-tiles-grid">
-                        {blocks.map((block) => {
-                          const blockKey = `${script}-${block.index}`
-                          const isActive = expandedBlocks === blockKey
-                          const pct = Math.round(block.mastery * 100)
-                          return (
-                            <Fragment key={block.index}>
-                              <button
-                                type="button"
-                                className={`cmb-tile ${isActive ? 'is-active' : ''}`}
-                                onClick={() => setExpandedBlocks(isActive ? null : blockKey)}
-                                aria-expanded={isActive}
-                                aria-label={`${block.name}: ${block.unlocked ? `${pct}% mastered` : 'locked'}`}
-                              >
-                                <div className="cmb-tile-chars" lang="ja" aria-hidden="true">
-                                  {block.sample_chars.join(' ')}
-                                </div>
-                                <strong className="cmb-tile-name">{block.name}</strong>
-                                <div className="cmb-bar-wrap">
-                                  <div className="cmb-bar" style={{ '--cmb-pct': `${pct}%` } as React.CSSProperties} />
-                                </div>
-                                <div className="cmb-tile-pct">{pct}%</div>
-                              </button>
-
-                              {/* Detail panel: grid-column 1/-1 makes it span the full row right below this tile */}
-                              {isActive ? (
-                                <div className="char-mastery-detail-inline">
-                                  <div className="char-mastery-chips">
-                                    {block.card_ids.map((id, charIdx) => {
-                                      const score = scores[id] ?? 0
-                                      const level = Math.min(score, CARD_MASTERY_MAX)
-                                      const char = block.characters?.[charIdx] ?? ''
-                                      const meaning = block.meanings?.[charIdx] ?? ''
-                                      const romaji = block.romajis?.[charIdx] ?? ''
-                                      return (
-                                        <button
-                                          key={id}
-                                          type="button"
-                                          className="char-mastery-chip"
-                                          data-level={level}
-                                          aria-label={`${char} (${romaji}): ${level}/${CARD_MASTERY_MAX}`}
-                                          lang="ja"
-                                          onClick={() => setSelectedChar({ character: char, romaji, meaning, label: 'Reading / English meaning', score: level })}
-                                        >
-                                          {char}
-                                        </button>
-                                      )
-                                    })}
-                                  </div>
-                                </div>
-                              ) : null}
-                            </Fragment>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {overviewKanjiLevelProgress.some((level) => level.total > 0) ? (
-                  <div className="char-mastery-script">
-                    <h3 className="char-mastery-script-name">Kanji by JLPT Level</h3>
-                    <div className="char-mastery-tiles-grid">
-                      {overviewKanjiLevelProgress.filter((level) => level.total > 0).map((level) => {
-                        const blockKey = `kanji-${level.key}`
-                        const isActive = expandedBlocks === blockKey
-                        const pct = Math.round(level.mastery * 100)
-                        const page = Math.max(1, kanjiOverviewPage[level.key] ?? 1)
-                        const pageCount = Math.max(1, Math.ceil(level.cardIds.length / KANJI_OVERVIEW_PAGE_SIZE))
-                        const clampedPage = Math.min(page, pageCount)
-                        const start = (clampedPage - 1) * KANJI_OVERVIEW_PAGE_SIZE
-                        const visibleCards = overviewKanjiDeck
-                          .filter((card) => jlptTagFromCard(card) === level.key)
-                          .slice(start, start + KANJI_OVERVIEW_PAGE_SIZE)
-                        return (
-                          <Fragment key={level.key}>
-                            <button
-                              type="button"
-                              className={`cmb-tile ${isActive ? 'is-active' : ''}`}
-                              onClick={() => {
-                                setExpandedBlocks(isActive ? null : blockKey)
-                                if (!isActive) {
-                                  setKanjiOverviewPage((previous) => ({ ...previous, [level.key]: 1 }))
-                                }
-                              }}
-                              aria-expanded={isActive}
-                              aria-label={`${level.label}: ${pct}% mastered`}
-                            >
-                              <div className="cmb-tile-chars" lang="ja" aria-hidden="true">
-                                {level.sampleChars.join(' ')}
-                              </div>
-                              <strong className="cmb-tile-name">{level.label}</strong>
-                              <div className="cmb-bar-wrap">
-                                <div className="cmb-bar" style={{ '--cmb-pct': `${pct}%` } as CSSProperties} />
-                              </div>
-                              <div className="cmb-tile-pct">{level.total} cards • {pct}%</div>
-                            </button>
-
-                            {isActive ? (
-                              <div className="char-mastery-detail-inline">
-                                <div className="char-mastery-chips char-mastery-chips-kanji">
-                                  {visibleCards.map((card) => {
-                                    const score = cardScores.kanji_n5[card.id] ?? 0
-                                    const levelScore = Math.min(score, CARD_MASTERY_MAX)
-                                    return (
-                                      <button
-                                        key={card.id}
-                                        type="button"
-                                        className="char-mastery-chip char-mastery-chip-kanji"
-                                        data-level={levelScore}
-                                        aria-label={`${card.character}, ${card.romaji}, ${card.meaning}: ${levelScore}/${CARD_MASTERY_MAX}`}
-                                        onClick={() => setSelectedChar({ character: card.character, romaji: card.romaji, meaning: card.meaning, label: 'Reading / English meaning', score: levelScore })}
-                                      >
-                                        <span className="char-mastery-chip-glyph" lang="ja">{card.character}</span>
-                                        <span className="char-mastery-chip-copy">
-                                          <span className="char-mastery-chip-reading">{card.romaji}</span>
-                                          <span className="char-mastery-chip-meaning">{card.meaning}</span>
-                                        </span>
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-                                {pageCount > 1 ? (
-                                  <div className="kanji-chip-pagination">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setKanjiOverviewPage((previous) => ({
-                                          ...previous,
-                                          [level.key]: Math.max(1, clampedPage - 1),
-                                        }))
-                                      }}
-                                      disabled={clampedPage <= 1}
-                                    >
-                                      Previous
-                                    </button>
-                                    <span>Page {clampedPage} / {pageCount}</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setKanjiOverviewPage((previous) => ({
-                                          ...previous,
-                                          [level.key]: Math.min(pageCount, clampedPage + 1),
-                                        }))
-                                      }}
-                                      disabled={clampedPage >= pageCount}
-                                    >
-                                      Next
-                                    </button>
-                                  </div>
-                                ) : null}
-                              </div>
-                            ) : null}
-                          </Fragment>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
-              </div>
-            </div>
-          </section>
-
-          <section className="panel-glass activity-summary-panel overview-collapsible-panel">
-            <button
-              type="button"
-              className="overview-panel-toggle"
-              onClick={() => toggleOverviewSection('studyActivity')}
-              aria-expanded={overviewSectionExpanded.studyActivity}
-              aria-controls="overview-study-activity-body"
-            >
-              <div className="panel-head">
-                <h2 className="panel-title-with-icon"><CalendarDays aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Study Activity</h2>
-                <div className="panel-actions">
-                  <span>Rolling windows for consistency and momentum</span>
-                </div>
-                <span className={`overview-panel-chevron ${overviewSectionExpanded.studyActivity ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-              </div>
-            </button>
-
-            <div id="overview-study-activity-body" className={`overview-panel-body ${overviewSectionExpanded.studyActivity ? 'is-open' : ''}`}>
-              {!hasAnyActivity ? (
-                <p className="status-line">No recent activity yet. Complete a round to populate weekly and monthly summaries.</p>
-              ) : (
-                <div className="activity-window-grid">
-                  {[activity.week, activity.month].map((windowData, index) => (
-                    <article
-                      key={windowData.days}
-                      className="activity-window-card"
-                      style={{ animationDelay: `${140 + index * 80}ms` }}
-                    >
-                      <h3>Last {windowData.days} Days</h3>
-                      <div className="activity-window-metrics">
-                        <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`reviewed-${windowData.days}-${windowData.reviewed}`} className="live-value">{windowData.reviewed}</strong> reviewed</span>
-                        <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`correct-${windowData.days}-${windowData.correct}`} className="live-value">{windowData.correct}</strong> correct</span>
-                        <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`incorrect-${windowData.days}-${windowData.incorrect}`} className="live-value">{windowData.incorrect}</strong> incorrect</span>
-                        <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`accuracy-${windowData.days}-${windowData.accuracy}`} className="live-value">{windowData.accuracy}%</strong> accuracy</span>
-                        <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`earned-${windowData.days}-${windowData.points_earned}`} className="live-value">{windowData.points_earned}</strong> points</span>
-                        <span className="metric-accent-warning"><CalendarDays aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`days-${windowData.days}-${windowData.active_days}`} className="live-value">{windowData.active_days}</strong> active days</span>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="panel-glass activity-summary-panel overview-collapsible-panel">
-            <button
-              type="button"
-              className="overview-panel-toggle"
-              onClick={() => toggleOverviewSection('contextClozeCurriculum')}
-              aria-expanded={overviewSectionExpanded.contextClozeCurriculum}
-              aria-controls="overview-context-cloze-curriculum-body"
-            >
-              <div className="panel-head">
-                <h2 className="panel-title-with-icon"><BookText aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Context Cloze Curriculum</h2>
-                <div className="panel-actions">
-                  <span>Persisted stage progression and mode accuracy</span>
-                </div>
-                <span className={`overview-panel-chevron ${overviewSectionExpanded.contextClozeCurriculum ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-              </div>
-            </button>
-
-            <div id="overview-context-cloze-curriculum-body" className={`overview-panel-body ${overviewSectionExpanded.contextClozeCurriculum ? 'is-open' : ''}`}>
-              <div className="activity-window-grid">
-                <article className="activity-window-card">
-                  <h3>Mode Performance</h3>
-                  <div className="activity-window-metrics">
-                    <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.attempts}</strong> attempts</span>
-                    <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy}%</strong> accuracy</span>
-                    <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy_7d}%</strong> 7-day accuracy</span>
-                  </div>
-                </article>
-                <article className="activity-window-card">
-                  <h3>Stage Distribution</h3>
-                  <div className="activity-window-metrics">
-                    <span className="metric-accent-warning"><strong className="live-value">{curriculumSummary.stage_distribution[1]}</strong> stage 1</span>
-                    <span className="metric-accent-ocean"><strong className="live-value">{curriculumSummary.stage_distribution[2]}</strong> stage 2</span>
-                    <span className="metric-accent-streak"><strong className="live-value">{curriculumSummary.stage_distribution[3]}</strong> stage 3</span>
-                  </div>
-                </article>
-              </div>
-
-              <div className="activity-window-grid" style={{ marginTop: '10px' }}>
-                {ALL_SCRIPT_KEYS.map((script) => {
-                  const metric = curriculumByScript[script]
-                  return (
-                    <article key={script} className="activity-window-card">
-                      <h3>{SCRIPT_LABELS[script]}</h3>
-                      <div className="activity-window-metrics">
-                        <span className="metric-accent-insight"><strong className="live-value">{metric.attempts}</strong> attempts</span>
-                        <span className="metric-accent-skill"><strong className="live-value">{metric.accuracy}%</strong> accuracy</span>
-                        <span className="metric-accent-ocean"><strong className="live-value">{metric.accuracy_7d}%</strong> 7-day</span>
-                        <span className="metric-accent-warning"><strong className="live-value">{metric.stage_distribution[1]}/{metric.stage_distribution[2]}/{metric.stage_distribution[3]}</strong> stage 1/2/3</span>
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-            </div>
-          </section>
-
-          <section className="panel-glass activity-summary-panel overview-collapsible-panel">
-            <button
-              type="button"
-              className="overview-panel-toggle"
-              onClick={() => toggleOverviewSection('storyProgress')}
-              aria-expanded={overviewSectionExpanded.storyProgress}
-              aria-controls="overview-story-progress-body"
-            >
-              <div className="panel-head">
-                <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Story Progress</h2>
-                <div className="panel-actions">
-                  <span>Narrative attempts, chapter accuracy, and completion readiness</span>
-                </div>
-                <span className={`overview-panel-chevron ${overviewSectionExpanded.storyProgress ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-              </div>
-            </button>
-
-            <div id="overview-story-progress-body" className={`overview-panel-body ${overviewSectionExpanded.storyProgress ? 'is-open' : ''}`}>
-              <div className="activity-window-grid">
-                <article className="activity-window-card">
-                  <h3>Narrative Mode Performance</h3>
-                  <div className="activity-window-metrics">
-                    <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.attempts}</strong> attempts</span>
-                    <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.accuracy}%</strong> accuracy</span>
-                    <span className="metric-accent-ocean"><strong className="live-value">{narrativeSummary.chapters['3'].completion_rate}%</strong> Chapter 3 completion</span>
-                  </div>
-                </article>
-                {(['1', '2', '3'] as const).map((chapterKey) => (
-                  <article key={chapterKey} className="activity-window-card">
-                    <h3>Chapter {chapterKey}</h3>
-                    <div className="activity-window-metrics">
-                      <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.chapters[chapterKey].attempts}</strong> attempts</span>
-                      <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.chapters[chapterKey].accuracy}%</strong> accuracy</span>
-                      <span className="metric-accent-streak"><strong className="live-value">{narrativeSummary.chapters[chapterKey].completion_rate}%</strong> completion</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              <div className="activity-window-grid">
-                {storyReadiness.map((story, index) => (
-                  <article
-                    key={story.script}
-                    className="activity-window-card"
-                    style={{ animationDelay: `${140 + index * 70}ms` }}
-                  >
-                    <h3>{SCRIPT_LABELS[story.script]}</h3>
-                    <div className="activity-window-metrics">
-                      <span className="metric-accent-insight"><strong className="live-value">{narrativeByScript[story.script].attempts}</strong> attempts</span>
-                      <span className="metric-accent-skill"><strong className="live-value">{narrativeByScript[story.script].accuracy}%</strong> accuracy</span>
-                      <span className="metric-accent-ocean"><strong className="live-value">{narrativeByScript[story.script].chapters['2'].completion_rate}%</strong> Chapter 2 ready</span>
-                      <span className="metric-accent-streak"><strong className="live-value">{narrativeByScript[story.script].chapters['3'].completion_rate}%</strong> Chapter 3 ready</span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="panel-glass mistakes-summary-panel overview-collapsible-panel">
-            <button
-              type="button"
-              className="overview-panel-toggle"
-              onClick={() => toggleOverviewSection('mistakeBreakdown')}
-              aria-expanded={overviewSectionExpanded.mistakeBreakdown}
-              aria-controls="overview-mistake-breakdown-body"
-            >
-              <div className="panel-head">
-                <h2 className="panel-title-with-icon"><AlertTriangle aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Mistake Breakdown</h2>
-                <div className="panel-actions">
-                  <span>Top weak areas by error rate</span>
-                </div>
-                <span className={`overview-panel-chevron ${overviewSectionExpanded.mistakeBreakdown ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-              </div>
-            </button>
-
-            <div id="overview-mistake-breakdown-body" className={`overview-panel-body ${overviewSectionExpanded.mistakeBreakdown ? 'is-open' : ''}`}>
-              {!hasMistakeData ? (
-                <p className="status-line">No mistake data yet. Incorrect answers will populate script/tag breakdowns here.</p>
-              ) : (
-                <div className="mistake-grid">
-                  {mistakes.map((row, index) => (
-                    <article
-                      key={row.key}
-                      className="mistake-card"
-                      style={{ animationDelay: `${140 + index * 60}ms` }}
-                    >
-                      <h3>{row.key}</h3>
-                      <div className="mistake-card-metrics">
-                        <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`rate-${row.key}-${row.error_rate}`} className="live-value">{row.error_rate}%</strong> error rate</span>
-                        <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`mistakes-${row.key}-${row.mistakes}`} className="live-value">{row.mistakes}</strong> mistakes</span>
-                        <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`attempts-${row.key}-${row.attempts}`} className="live-value">{row.attempts}</strong> attempts</span>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="panel-glass timeline-summary-panel overview-collapsible-panel">
-            <button
-              type="button"
-              className="overview-panel-toggle"
-              onClick={() => toggleOverviewSection('itemTimeline')}
-              aria-expanded={overviewSectionExpanded.itemTimeline}
-              aria-controls="overview-item-timeline-body"
-            >
-              <div className="panel-head">
-                <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Item Timeline</h2>
-                <div className="panel-actions">
-                  <span>Recent review events and trend per item</span>
-                </div>
-                <span className={`overview-panel-chevron ${overviewSectionExpanded.itemTimeline ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-              </div>
-            </button>
-
-            <div id="overview-item-timeline-body" className={`overview-panel-body ${overviewSectionExpanded.itemTimeline ? 'is-open' : ''}`}>
-              {itemHistory.length === 0 ? (
-                <p className="status-line">No item history yet. Complete review rounds to build timelines.</p>
-              ) : (
-                <>
-                  <div className="timeline-grid">
-                    {pagedHistory.map((item, index) => (
-                      <article
-                        key={item.key}
-                        className="timeline-card"
-                        style={{ animationDelay: `${140 + index * 60}ms` }}
-                      >
-                        <div className="timeline-card-head">
-                          <h3>{item.prompt}</h3>
-                          <span className={`timeline-trend timeline-trend-${item.trend}`}>{item.trend}</span>
-                        </div>
-                        <p className="timeline-card-subhead">{formatTimelineScriptTag(item.script_tag)} • {formatTimelineDeckName(item.deck)}</p>
-                        <div className="timeline-events">
-                          {item.events.map((event, eventIndex) => (
-                            <span key={`${item.key}-${eventIndex}`} className={`timeline-event timeline-event-${event.outcome}`}>
-                              <strong>{event.outcome === 'correct' ? '✓' : '✕'}</strong>
-                              {event.points_delta} pts
-                            </span>
-                          ))}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                  <div className="timeline-pagination">
-                    <button
-                      type="button"
-                      disabled={clampedHistoryPage <= 1}
-                      onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
-                    >
-                      Previous
-                    </button>
-                    <span>Page {clampedHistoryPage} / {historyPageCount}</span>
-                    <button
-                      type="button"
-                      disabled={clampedHistoryPage >= historyPageCount}
-                      onClick={() => setHistoryPage((prev) => Math.min(historyPageCount, prev + 1))}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </section>
-
-          <section className="panel-glass deck-panel overview-deck-panel overview-collapsible-panel">
-            <button
-              type="button"
-              className="overview-panel-toggle"
-              onClick={() => toggleOverviewSection('deckSnapshot')}
-              aria-expanded={overviewSectionExpanded.deckSnapshot}
-              aria-controls="overview-deck-snapshot-body"
-            >
-              <div className="panel-head">
-                <h2 className="panel-title-with-icon"><ListChecks aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Deck Snapshot</h2>
-                <div className="panel-actions">
-                  <span>Mastery and daily completion by deck</span>
-                </div>
-                <span className={`overview-panel-chevron ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-              </div>
-            </button>
-
-            <div id="overview-deck-snapshot-body" className={`overview-panel-body ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`}>
-              {loading && <p className="status-line">Loading deck metrics...</p>}
-              {error && <p className="status-line status-error">Unable to load summary: {error}</p>}
-              {!loading && !error && decks.length === 0 ? <p className="status-line">No decks found.</p> : null}
-
-              {!loading && !error && decks.length > 0 ? (
-                <div className="deck-grid">
-                  {decks.map((deck, index) => {
-                    const mastery = deck.total > 0 ? Math.round((deck.mastered / deck.total) * 100) : 0
-                    const todayProgress =
-                      deck.due_today > 0
-                        ? Math.min(100, Math.round((deck.completed_today / deck.due_today) * 100))
-                        : 0
-
-                    return (
-                      <article
-                        key={deck.slug}
-                        className="deck-card"
-                        style={{ animationDelay: `${180 + index * 70}ms` }}
-                      >
-                        <div className="deck-card-head">
-                          <h3>{deck.name}</h3>
-                          <span>{deck.total} cards</span>
-                        </div>
-
-                        <div className="meter">
-                          <div className="meter-label">
-                            <span>Mastery</span>
-                            <strong>{mastery}%</strong>
-                          </div>
-                          <div className="meter-track">
-                            <div className="meter-fill" style={{ width: `${mastery}%` }} />
-                          </div>
-                        </div>
-
-                        <div className="meter">
-                          <div className="meter-label">
-                            <span>Today</span>
-                            <strong>
-                              {deck.completed_today}/{deck.due_today}
-                            </strong>
-                          </div>
-                          <div className="meter-track">
-                            <div className="meter-fill meter-fill-alt" style={{ width: `${todayProgress}%` }} />
-                          </div>
-                        </div>
-                      </article>
-                    )
-                  })}
-                </div>
-              ) : null}
-
-              <footer className="panel-foot">
-                <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`completed-${totals.completedToday}`} className="live-value">{totals.completedToday}</strong> cards completed today</span>
-                <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`best-day-${streak.best_days}`} className="live-value">{streak.best_days}</strong> day best streak</span>
-              </footer>
-            </div>
-          </section>
-        </div>
+        <OverviewView
+          navDirection={navDirection}
+          loading={loading}
+          error={error}
+          lastUpdated={lastUpdated}
+          decks={decks}
+          streak={streak}
+          activity={activity}
+          summaryTiles={summaryTiles as unknown as Parameters<typeof OverviewView>[0]['summaryTiles']}
+          curriculumSummary={curriculumSummary}
+          curriculumByScript={curriculumByScript}
+          narrativeSummary={narrativeSummary}
+          narrativeByScript={narrativeByScript}
+          storyReadiness={storyReadiness}
+          overviewBlocks={overviewBlocks}
+          overviewKanjiDeck={overviewKanjiDeck}
+          overviewKanjiLevelProgress={overviewKanjiLevelProgress}
+          overviewBlocksLoading={overviewBlocksLoading}
+          mistakes={mistakes}
+          itemHistory={itemHistory}
+          pagedHistory={pagedHistory}
+          clampedHistoryPage={clampedHistoryPage}
+          historyPageCount={historyPageCount}
+          hasAnyActivity={hasAnyActivity}
+          hasMistakeData={hasMistakeData}
+          charMasteryExpanded={charMasteryExpanded}
+          expandedBlocks={expandedBlocks}
+          overviewSectionExpanded={overviewSectionExpanded}
+          resetConfirmStep={resetConfirmStep}
+          resettingDb={resettingDb}
+          cardScores={cardScores}
+          kanjiOverviewPage={kanjiOverviewPage}
+          totals={{ completedToday: totals.completedToday }}
+          onBack={goHome}
+          onOpenSettings={() => setShowSettings(true)}
+          onRefresh={() => void loadSummary()}
+          onToggleCharMastery={() => setCharMasteryExpanded((v) => !v)}
+          onSetExpandedBlocks={setExpandedBlocks}
+          onToggleSection={toggleOverviewSection}
+          onResetConfirmStep={setResetConfirmStep}
+          onResetDb={() => void resetStudyDb()}
+          onSetHistoryPage={setHistoryPage}
+          onSetKanjiOverviewPage={setKanjiOverviewPage}
+          onSetSelectedChar={setSelectedChar}
+        />
       ) : null}
 
       {showExpertisePrompt ? (
