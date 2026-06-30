@@ -192,6 +192,10 @@ interface OverviewCharacterMasteryPayload {
     hiragana: BlockInfo[]
     katakana: BlockInfo[]
   }
+  category_blocks: {
+    vocab_n5: BlockInfo[]
+    grammar_patterns: BlockInfo[]
+  }
   kanji_cards: OverviewCharacterCard[]
 }
 

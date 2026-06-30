@@ -26,7 +26,11 @@ const baseDesktopApi = {
   getBlockProgress: async (slug: string) => ({ slug, blocks: [] }),
   getDeckCards: async () => ({ slug: 'hiragana' as const, name: 'Hiragana', cards: [] }),
   getStudyQueue: async () => ({ ok: true, queue: { slug: 'hiragana' as const, card_ids: [], indices: [] } }),
-  getOverviewCharacterMastery: async () => ({ blocks: { hiragana: [], katakana: [] }, kanji_cards: [] }),
+  getOverviewCharacterMastery: async () => ({
+    blocks: { hiragana: [], katakana: [] },
+    category_blocks: { vocab_n5: [], grammar_patterns: [] },
+    kanji_cards: [],
+  }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
   recordGameResult: async () => ({ ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
@@ -171,6 +175,93 @@ describe('Overview activity panel', () => {
     expect((await screen.findAllByText(/Chapter 3 ready/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/11/)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/38/)).length).toBeGreaterThan(0)
+  })
+
+  it('shows vocabulary and conversational sections in character mastery', async () => {
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      getStudySummary: async () => ({
+        decks: [],
+        streak: { current_days: 0, best_days: 0 },
+        activity: {
+          week: { days: 7, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
+          month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
+        },
+        mistakes: [],
+        item_history: [],
+        curriculum: {
+          context_cloze: { mode: 'context_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          context_cloze_by_script: {
+            hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            vocab_n5: { mode: 'context_cloze', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+            grammar_patterns: { mode: 'context_cloze', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          },
+          narrative_story: {
+            mode: 'narrative_story',
+            script_tag: 'all',
+            attempts: 0,
+            accuracy: 0,
+            chapters: {
+              '1': { attempts: 0, accuracy: 0, completion_rate: 100 },
+              '2': { attempts: 0, accuracy: 0, completion_rate: 0 },
+              '3': { attempts: 0, accuracy: 0, completion_rate: 0 },
+            },
+          },
+          narrative_story_by_script: {
+            hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            vocab_n5: { mode: 'narrative_story', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+            grammar_patterns: { mode: 'narrative_story', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+          },
+        },
+      }),
+      getOverviewCharacterMastery: async () => ({
+        blocks: { hiragana: [], katakana: [] },
+        category_blocks: {
+          vocab_n5: [
+            {
+              index: 0,
+              name: 'Greetings',
+              card_ids: [200, 201],
+              sample_chars: ['日本', '先生'],
+              characters: ['日本', '先生'],
+              meanings: ['Japan', 'teacher'],
+              romajis: ['nihon', 'sensei'],
+              mastery: 0,
+              unlocked: true,
+            },
+          ],
+          grammar_patterns: [
+            {
+              index: 0,
+              name: 'Common Patterns',
+              card_ids: [300],
+              sample_chars: ['です'],
+              characters: ['です'],
+              meanings: ['copula'],
+              romajis: ['desu'],
+              mastery: 0,
+              unlocked: true,
+            },
+          ],
+        },
+        kanji_cards: [],
+      }),
+    }
+
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /open study overview/i }))
+    const masteryToggle = document.querySelector('.char-mastery-toggle') as HTMLButtonElement | null
+    if (!masteryToggle) {
+      throw new Error('Expected mastery toggle button to be present')
+    }
+    fireEvent.click(masteryToggle)
+
+    expect(await screen.findByText('Greetings')).toBeTruthy()
+    expect(await screen.findByText('Common Patterns')).toBeTruthy()
   })
 
 })

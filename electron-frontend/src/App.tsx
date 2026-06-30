@@ -98,6 +98,7 @@ interface AssistantChatRuntimeStatus {
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
 type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
+type OverviewCategoryBlocks = OverviewCharacterMasteryPayload['category_blocks']
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
 type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' | 'food_drink' | 'school_study' | 'places' | 'transport' | 'adjectives' | 'verbs' | 'nouns'
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
@@ -724,7 +725,7 @@ const SCRIPT_LABELS: Record<ScriptKey, string> = {
   hiragana: 'Hiragana',
   katakana: 'Katakana',
   kanji_n5: 'Kanji',
-  vocab_n5: 'Words',
+  vocab_n5: 'Vocabulary',
   grammar_patterns: 'Conversational',
 }
 
@@ -2369,7 +2370,7 @@ function buildRoundCoachToast(
 
 function normalizeTrackTerms(text: string): string {
   return text
-    .replace(/Vocabulary\s*N5/gi, 'Words (Vocabulary N5)')
+    .replace(/Vocabulary\s*N5/gi, 'Vocabulary (N5)')
     .replace(/Grammar\s*N5/gi, 'Conversational (Grammar N5)')
 }
 
@@ -2520,6 +2521,10 @@ function App() {
   const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
   const [cardScores, setCardScores] = useState<CardScores>(() => loadCardScores())
   const [overviewBlocks, setOverviewBlocks] = useState<Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>>({})
+  const [overviewCategoryBlocks, setOverviewCategoryBlocks] = useState<OverviewCategoryBlocks>({
+    vocab_n5: [],
+    grammar_patterns: [],
+  })
   const [overviewKanjiDeck, setOverviewKanjiDeck] = useState<OverviewKanjiCard[]>([])
   const [activeKanjiLevel, setActiveKanjiLevel] = useState<JlptLevel>('n5')
   const [activeVocabLevel, setActiveVocabLevel] = useState<JlptLevel>('n5')
@@ -4301,6 +4306,7 @@ function App() {
       .getOverviewCharacterMastery()
       .then((payload) => {
         setOverviewBlocks(payload.blocks)
+        setOverviewCategoryBlocks(payload.category_blocks)
         setOverviewKanjiDeck(payload.kanji_cards)
       })
       .catch(() => undefined)
@@ -5233,6 +5239,7 @@ function App() {
     void window.jplearnDesktop.getOverviewCharacterMastery()
       .then((payload) => {
         setOverviewBlocks(payload.blocks)
+        setOverviewCategoryBlocks(payload.category_blocks)
         setOverviewKanjiDeck(payload.kanji_cards)
       })
       .catch(() => undefined)
@@ -6244,6 +6251,7 @@ function App() {
               decks={decks}
               activity={activity}
               overviewBlocks={overviewBlocks}
+              overviewCategoryBlocks={overviewCategoryBlocks}
               overviewKanjiDeck={overviewKanjiDeck}
               overviewKanjiLevelProgress={overviewKanjiLevelProgress}
               overviewBlocksLoading={overviewBlocksLoading}

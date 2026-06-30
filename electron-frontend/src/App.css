@@ -2969,6 +2969,27 @@ button {
   grid-auto-flow: dense; /* fills row gaps left by the injected detail panel */
 }
 
+/* Keep category sections compact so a small number of tiles do not stretch too wide. */
+.char-mastery-script.is-category-script .char-mastery-tiles-grid {
+  grid-template-columns: repeat(auto-fill, minmax(138px, 168px));
+  justify-content: start;
+}
+
+.char-mastery-script.is-category-script .cmb-tile {
+  align-content: start;
+  min-height: 0;
+}
+
+.char-mastery-script.is-category-script .cmb-tile-name {
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: unset;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .char-mastery-block-group { /* kept for any stray references */ }
 
 /* Individual compact tile */
@@ -2976,6 +2997,7 @@ button {
   display: grid;
   gap: 4px;
   text-align: left;
+  min-width: 0;
   border: 1px solid var(--card-border);
   border-radius: 12px;
   background: linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
@@ -3068,6 +3090,7 @@ button {
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 55%, var(--card-border));
   border-radius: 12px;
   background: linear-gradient(155deg, var(--card-bg-top), var(--card-bg-bottom));
+  overflow: hidden;
   animation: enterUp 200ms ease both;
 }
 
@@ -3082,6 +3105,16 @@ button {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
   gap: 8px;
+}
+
+.char-mastery-chips-category {
+  grid-template-columns: repeat(auto-fill, minmax(208px, 1fr));
+}
+
+@media (max-width: 980px) {
+  .char-mastery-chips-category {
+    grid-template-columns: repeat(auto-fill, minmax(186px, 1fr));
+  }
 }
 
 /* Chip is now a button */
@@ -3112,6 +3145,42 @@ button {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.char-mastery-chip-kanji.is-category-chip {
+  min-height: 0;
+  align-items: center;
+  padding: 9px 11px;
+}
+
+.char-mastery-chip-kanji.is-category-chip .char-mastery-chip-glyph {
+  width: 98px;
+  min-width: 98px;
+  height: auto;
+  min-height: 0;
+  padding: 7px 8px 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 0.92rem;
+  line-height: 1.24;
+  letter-spacing: 0.01em;
+  text-align: left;
+  max-height: calc(2 * 1.24em + 12px);
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.char-mastery-chip-kanji.is-category-chip .char-mastery-chip-reading {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+}
+
+.char-mastery-chip-kanji.is-category-chip .char-mastery-chip-meaning {
+  font-size: 0.73rem;
+}
+
 .char-mastery-chip-glyph {
   display: grid;
   place-items: center;
@@ -3124,6 +3193,7 @@ button {
   line-height: 1;
   background: color-mix(in oklab, currentColor 14%, transparent);
 }
+
 
 .char-mastery-chip-copy {
   min-width: 0;
@@ -3156,12 +3226,16 @@ button {
 }
 
 .char-mastery-chip:hover {
-  transform: scale(1.18);
+  transform: translateY(-1px) scale(1.04);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
 }
 
 .char-mastery-chip-kanji:hover {
   transform: translateY(-1px);
+}
+
+.char-mastery-chip-copy.is-kana-chip {
+  gap: 0;
 }
 
 /* Score 0 – unknown: red */
@@ -3202,6 +3276,19 @@ button {
 @media (max-width: 720px) {
   .char-mastery-chips-kanji {
     grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  }
+
+  .char-mastery-chips-category {
+    grid-template-columns: 1fr;
+  }
+
+  .char-mastery-chip-kanji.is-category-chip {
+    padding: 10px 11px;
+  }
+
+  .char-mastery-chip-kanji.is-category-chip .char-mastery-chip-glyph {
+    width: 92px;
+    min-width: 92px;
   }
 
   .char-mastery-chip-kanji {

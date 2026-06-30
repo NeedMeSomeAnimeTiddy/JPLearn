@@ -87,6 +87,7 @@ interface OverviewViewProps {
   decks: DeckSummary[]
   activity: ActivityData
   overviewBlocks: Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>
+  overviewCategoryBlocks: Record<'vocab_n5' | 'grammar_patterns', BlockInfo[]>
   overviewKanjiDeck: KanjiCard[]
   overviewKanjiLevelProgress: JlptLevelProgress[]
   overviewBlocksLoading: boolean
@@ -117,6 +118,7 @@ export function OverviewView({
   decks,
   activity,
   overviewBlocks,
+  overviewCategoryBlocks,
   overviewKanjiDeck,
   overviewKanjiLevelProgress,
   overviewBlocksLoading,
@@ -194,7 +196,7 @@ export function OverviewView({
         )
       })() : null}
 
-      {/* ── Character mastery grid ────────────────────────────────── */}
+      {/* ── Mastery grid ──────────────────────────────────────────── */}
       <section className="panel-glass char-mastery-panel">
         <button
           type="button"
@@ -203,9 +205,9 @@ export function OverviewView({
           aria-expanded={charMasteryExpanded}
         >
           <div className="panel-head char-mastery-panel-head">
-            <h2 className="panel-title-with-icon"><Languages aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Character Mastery</h2>
+            <h2 className="panel-title-with-icon"><Languages aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Mastery</h2>
             <div className="panel-actions">
-              <span>{overviewBlocksLoading ? 'Loading…' : 'Color-coded progress for every symbol'}</span>
+              <span>{overviewBlocksLoading ? 'Loading…' : 'Color-coded progress for every section'}</span>
             </div>
             <span className={`char-mastery-chevron ${charMasteryExpanded ? 'is-open' : ''}`} aria-hidden="true">▾</span>
           </div>
@@ -218,7 +220,7 @@ export function OverviewView({
               if (!blocks || blocks.length === 0) return null
               const scores = cardScores[script]
               return (
-                <div key={script} className="char-mastery-script">
+                <div key={script} className="char-mastery-script is-category-script">
                   <h3 className="char-mastery-script-name">
                     {script === 'hiragana' ? 'Hiragana' : 'Katakana'}
                   </h3>
@@ -248,7 +250,7 @@ export function OverviewView({
 
                           {isActive ? (
                             <div className="char-mastery-detail-inline">
-                              <div className="char-mastery-chips">
+                              <div className="char-mastery-chips char-mastery-chips-kanji">
                                 {block.card_ids.map((id, charIdx) => {
                                   const score = scores[id] ?? 0
                                   const level = Math.min(score, CARD_MASTERY_MAX)
@@ -259,13 +261,15 @@ export function OverviewView({
                                     <button
                                       key={id}
                                       type="button"
-                                      className="char-mastery-chip"
+                                      className="char-mastery-chip char-mastery-chip-kanji"
                                       data-level={level}
                                       aria-label={`${char} (${romaji}): ${level}/${CARD_MASTERY_MAX}`}
-                                      lang="ja"
                                       onClick={() => onSetSelectedChar({ character: char, romaji, meaning, label: 'Reading / English meaning', score: level })}
                                     >
-                                      {char}
+                                      <span className="char-mastery-chip-glyph" lang="ja">{char}</span>
+                                      <span className="char-mastery-chip-copy is-kana-chip">
+                                        <span className="char-mastery-chip-reading">{romaji}</span>
+                                      </span>
                                     </button>
                                   )
                                 })}
@@ -380,6 +384,77 @@ export function OverviewView({
                 </div>
               </div>
             ) : null}
+
+            {([
+              ['vocab_n5', 'Vocabulary'],
+              ['grammar_patterns', 'Conversational'],
+            ] as const).map(([script, label]) => {
+              const blocks = overviewCategoryBlocks[script]
+              if (!blocks || blocks.length === 0) return null
+              const scores = cardScores[script]
+              return (
+                <div key={script} className="char-mastery-script">
+                  <h3 className="char-mastery-script-name">{label}</h3>
+                  <div className="char-mastery-tiles-grid">
+                    {blocks.map((block) => {
+                      const blockKey = `${script}-${block.index}`
+                      const isActive = expandedBlocks === blockKey
+                      const pct = Math.round(block.mastery * 100)
+                      return (
+                        <Fragment key={block.index}>
+                          <button
+                            type="button"
+                            className={`cmb-tile ${isActive ? 'is-active' : ''}`}
+                            onClick={() => onSetExpandedBlocks(isActive ? null : blockKey)}
+                            aria-expanded={isActive}
+                            aria-label={`${block.name}: ${block.unlocked ? `${pct}% mastered` : 'locked'}`}
+                          >
+                            <div className="cmb-tile-chars" lang="ja" aria-hidden="true">
+                              {block.sample_chars.join(' ')}
+                            </div>
+                            <strong className="cmb-tile-name">{block.name}</strong>
+                            <div className="cmb-bar-wrap">
+                              <div className="cmb-bar" style={{ '--cmb-pct': `${pct}%` } as CSSProperties} />
+                            </div>
+                            <div className="cmb-tile-pct">{pct}%</div>
+                          </button>
+
+                          {isActive ? (
+                            <div className="char-mastery-detail-inline">
+                              <div className="char-mastery-chips char-mastery-chips-kanji char-mastery-chips-category">
+                                {block.card_ids.map((id, charIdx) => {
+                                  const score = scores[id] ?? 0
+                                  const level = Math.min(score, CARD_MASTERY_MAX)
+                                  const char = block.characters?.[charIdx] ?? ''
+                                  const meaning = block.meanings?.[charIdx] ?? ''
+                                  const romaji = block.romajis?.[charIdx] ?? ''
+                                  return (
+                                    <button
+                                      key={id}
+                                      type="button"
+                                      className="char-mastery-chip char-mastery-chip-kanji is-category-chip"
+                                      data-level={level}
+                                      aria-label={`${char} (${romaji}): ${level}/${CARD_MASTERY_MAX}`}
+                                      onClick={() => onSetSelectedChar({ character: char, romaji, meaning, label: 'Reading / English meaning', score: level })}
+                                    >
+                                      <span className="char-mastery-chip-glyph" lang="ja">{char}</span>
+                                      <span className="char-mastery-chip-copy">
+                                        <span className="char-mastery-chip-reading">{romaji}</span>
+                                        <span className="char-mastery-chip-meaning">{meaning}</span>
+                                      </span>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
+                        </Fragment>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>

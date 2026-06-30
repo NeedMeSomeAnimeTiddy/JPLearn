@@ -111,6 +111,21 @@ SUMMARY_SCRIPT_TAGS = (
     "grammar_patterns",
 )
 
+OVERVIEW_WORDS_CATEGORY_SPECS: tuple[tuple[str, str], ...] = (
+    ("Greetings", "vocab_greetings"),
+    ("Numbers", "vocab_numbers"),
+    ("Time & Days", "vocab_time_days"),
+    ("Family", "vocab_family"),
+    ("Body", "vocab_body"),
+    ("Food & Drink", "vocab_food_drink"),
+    ("School & Study", "vocab_school_study"),
+    ("Places", "vocab_places"),
+    ("Transport", "vocab_transport"),
+    ("Adjectives", "vocab_adjectives"),
+    ("Verbs", "vocab_verbs"),
+    ("Common Nouns", "vocab_nouns"),
+)
+
 EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
     "total_beginner": (),
     "know_hiragana": ("hiragana",),
@@ -456,8 +471,47 @@ def build_overview_character_mastery() -> dict[str, object]:
             for card in deck.cards
         )
 
+    words_category_blocks: list[dict[str, object]] = []
+    can_unlock_next = True
+    for index, (label, slug) in enumerate(OVERVIEW_WORDS_CATEGORY_SPECS):
+        factory = ALL_DECKS.get(slug)
+        if factory is None:
+            continue
+        deck = factory()
+        card_ids = [card.id for card in deck.cards]
+        states = load_review_states(deck.name, card_ids)
+        repetitions_map: dict[int, int] = {
+            cid: getattr(states.get(cid), "repetitions", 0) for cid in card_ids
+        }
+        total = len(card_ids)
+        passed = sum(1 for cid in card_ids if repetitions_map.get(cid, 0) >= 1)
+        mastery = (passed / total) if total > 0 else 0.0
+        unlocked = can_unlock_next
+        if total > 0 and mastery < 0.7:
+            can_unlock_next = False
+
+        words_category_blocks.append(
+            {
+                "index": index,
+                "name": label,
+                "card_ids": card_ids,
+                "sample_chars": [card.character for card in deck.cards[:3]],
+                "characters": [card.character for card in deck.cards],
+                "meanings": [card.meaning for card in deck.cards],
+                "romajis": [card.romaji for card in deck.cards],
+                "mastery": round(mastery, 3),
+                "unlocked": unlocked,
+            }
+        )
+
+    category_blocks = {
+        "vocab_n5": words_category_blocks,
+        "grammar_patterns": build_block_progress("grammar_patterns").get("blocks", []),
+    }
+
     return {
         "blocks": overview_blocks,
+        "category_blocks": category_blocks,
         "kanji_cards": [asdict(card) for card in kanji_cards],
     }
 

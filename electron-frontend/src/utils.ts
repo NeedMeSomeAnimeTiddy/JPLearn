@@ -25,7 +25,7 @@ export function formatTimelineScriptTag(tag: string): string {
     hiragana: 'Hiragana',
     katakana: 'Katakana',
     kanji_n5: 'Kanji',
-    vocab_n5: 'Words',
+    vocab_n5: 'Vocabulary',
     grammar_patterns: 'Conversational',
     unknown: 'General',
   }

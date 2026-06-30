@@ -107,7 +107,11 @@ const baseDesktopApi = {
       indices: baseCards.map((_, index) => index),
     },
   }),
-  getOverviewCharacterMastery: async () => ({ blocks: { hiragana: [], katakana: [] }, kanji_cards: [] }),
+  getOverviewCharacterMastery: async () => ({
+    blocks: { hiragana: [], katakana: [] },
+    category_blocks: { vocab_n5: [], grammar_patterns: [] },
+    kanji_cards: [],
+  }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
   recordGameResult: async () => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
