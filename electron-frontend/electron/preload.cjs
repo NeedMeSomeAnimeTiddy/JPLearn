@@ -53,4 +53,6 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   buildJLPTExamQueue: (level, mode, count) => ipcRenderer.invoke('jlpt:build-exam-queue', level, mode, count),
   saveJLPTExamResult: (payload) => ipcRenderer.invoke('jlpt:save-exam-result', payload),
   getJLPTExamHistory: (level, mode) => ipcRenderer.invoke('jlpt:get-exam-history', level, mode),
+  getLearningPathStatus: () => ipcRenderer.invoke('learning-path:get-status'),
+  setLearningPath: (pathId) => ipcRenderer.invoke('learning-path:set', pathId),
 })

@@ -18,6 +18,7 @@ const {
   validateOptionalJLPTLevel,
   validateOptionalJLPTMode,
   validateJLPTSaveResultPayload,
+  validateLearningPathId,
 } = require('./ipc_security.cjs')
 
 function registerIpcHandlers(options) {
@@ -612,6 +613,31 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch JLPT exam history: ${detail}`)
+    }
+  })
+
+  // ---- Learning path / guided system ----
+
+  options.ipcMain.handle('learning-path:get-status', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('learning-path-status')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch learning path status: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('learning-path:set', async (event, pathId) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validPathId = validateLearningPathId(pathId)
+    try {
+      const response = await options.runPythonBridgeWithArgs(['set-learning-path', validPathId])
+      clearBridgeReadCaches()
+      return response
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to set learning path: ${detail}`)
     }
   })
 }

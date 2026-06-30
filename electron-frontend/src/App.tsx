@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ChangeEvent } from 'react'
 import type { LucideIcon } from 'lucide-react'
+import type { LearningPathStatus, SectionReadiness } from './types'
 import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
 import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
+import { OnboardingView } from './views/OnboardingView'
+import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
 import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, Copy, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
 import './App.css'
@@ -2616,6 +2619,14 @@ function App() {
   const [unlockedFeatureIds, setUnlockedFeatureIds] = useState<Set<string>>(new Set())
   const [tutorReactions, setTutorReactions] = useState<TutorReactionItem[]>([])
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
+  const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
+  const [warningModal, setWarningModal] = useState<{
+    sectionId: ScriptKey
+    label: string
+    readiness: SectionReadiness
+    reason: string
+  } | null>(null)
+  const warnedSectionsRef = useRef<Set<string>>(new Set())
   const [learningPathExpanded, setLearningPathExpanded] = useState(false)
   const [overviewSectionExpanded, setOverviewSectionExpanded] = useState<Record<OverviewSectionKey, boolean>>({
     studyActivity: false,
@@ -3596,17 +3607,20 @@ function App() {
     const getFeatures = window.jplearnDesktop.getFeatureState
     const getRecs = window.jplearnDesktop.getRecommendations
     const getTutor = window.jplearnDesktop.getTutorReactions
+    const getPath = window.jplearnDesktop.getLearningPathStatus
     void Promise.all([
       getXp ? getXp().catch(() => null) : Promise.resolve(null),
       getFeatures ? getFeatures().catch(() => null) : Promise.resolve(null),
       getRecs ? getRecs().catch(() => null) : Promise.resolve(null),
       getTutor ? getTutor().catch(() => null) : Promise.resolve(null),
-    ]).then(([xp, features, recs, tutor]) => {
+      getPath ? getPath().catch(() => null) : Promise.resolve(null),
+    ]).then(([xp, features, recs, tutor, path]) => {
       if (!mounted) return
       if (xp) setXpProgress(xp)
       if (features) setUnlockedFeatureIds(new Set(features.features.filter((f) => f.is_unlocked).map((f) => f.feature_id)))
       if (recs) setRecommendations(recs.recommendations)
       if (tutor) setTutorReactions(tutor.reactions)
+      if (path) setLearningPathStatus(path as LearningPathStatus)
     })
     return () => { mounted = false }
   }, [summary])
@@ -6125,11 +6139,25 @@ function App() {
         playAudio: (text) => { void playQuestionAudio(text) },
       }}>
       {/* Home is the main landing surface; keep it mounted only for home view. */}
-      {view === 'home' ? (
+      {view === 'home' && !loading && learningPathStatus && !learningPathStatus.onboarding_complete ? (
+        <OnboardingView
+          navDirection={navDirection}
+          onSelectPath={(pathId) => {
+            void window.jplearnDesktop.setLearningPath?.(pathId).then((result) => {
+              if (result) setLearningPathStatus(result as LearningPathStatus)
+            }).catch(() => undefined)
+          }}
+          onSkip={() => {
+            // Mark onboarding done without setting a path
+            setLearningPathStatus((prev) => prev ? { ...prev, onboarding_complete: true } : prev)
+          }}
+        />
+      ) : view === 'home' ? (
         <HomeView
           navDirection={navDirection}
           studyPlan={studyPlan}
           homeStudyPlanExpanded={homeStudyPlanExpanded}
+          learningPathStatus={learningPathStatus}
           tutorBanner={tutorReactions[0] ? {
             dedupKey: tutorReactions[0].dedup_key,
             headline: normalizeTrackTerms(tutorReactions[0].headline),
@@ -6156,17 +6184,62 @@ function App() {
             const script = scriptMap[nodeId] as ScriptKey | undefined
             if (script) jumpToScriptHub(script)
           }}
-          onSelectScript={(script) => {
+          onContinuePath={(sectionId) => {
+            const script = sectionId as ScriptKey
             setNavDirection('forward')
             setActiveScript(script)
             setView('script_hub')
           }}
+          onChangePath={() => {
+            // Re-open onboarding by resetting onboarding_complete in local state
+            setLearningPathStatus((prev) => prev ? { ...prev, onboarding_complete: false } : prev)
+          }}
+          onSelectScript={(script) => {
+            // Check readiness before navigating — show modal for challenging/advanced
+            const readiness = learningPathStatus?.steps.find((s) => s.section_id === script)?.readiness
+            const needsWarning = (readiness === 'challenging' || readiness === 'advanced') && !warnedSectionsRef.current.has(script)
+            if (needsWarning) {
+              const LABELS: Record<ScriptKey, string> = {
+                hiragana: 'Hiragana', katakana: 'Katakana', kanji_n5: 'Kanji (N5)',
+                vocab_n5: 'N5 Vocabulary', grammar_patterns: 'N5 Grammar',
+              }
+              setWarningModal({
+                sectionId: script,
+                label: LABELS[script] ?? script,
+                readiness: readiness as SectionReadiness,
+                reason: readiness === 'advanced'
+                  ? 'This section builds on content you haven\'t started yet.'
+                  : 'Prerequisites are still in progress.',
+              })
+            } else {
+              setNavDirection('forward')
+              setActiveScript(script)
+              setView('script_hub')
+            }
+          }}
           onToggleStudyPlan={() => setHomeStudyPlanExpanded((expanded) => !expanded)}
           onJumpToSetup={jumpToScriptHubSetup}
-          isJLPTPrepUnlocked={isJLPTPrepUnlocked}
           onSelectJLPTPrep={() => { setNavDirection('forward'); setView('jlpt_prep') }}
         />
       ) : null}
+
+      {/* Readiness warning modal — shown before navigating to a non-recommended section */}
+      {warningModal && (
+        <ReadinessWarningModal
+          sectionLabel={warningModal.label}
+          readiness={warningModal.readiness}
+          reason={warningModal.reason}
+          onCancel={() => setWarningModal(null)}
+          onContinue={() => {
+            const { sectionId } = warningModal
+            warnedSectionsRef.current.add(sectionId)
+            setWarningModal(null)
+            setNavDirection('forward')
+            setActiveScript(sectionId)
+            setView('script_hub')
+          }}
+        />
+      )}
 
       {/* ScriptHub uses a full view so setup content has enough space. */}
       {view === 'script_hub' ? (

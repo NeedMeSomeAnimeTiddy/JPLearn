@@ -27,7 +27,8 @@ MIGRATION_V6 = 6
 MIGRATION_V7 = 7
 MIGRATION_V8 = 8
 MIGRATION_V9 = 9
-LATEST_SCHEMA_VERSION = 9
+MIGRATION_V10 = 10
+LATEST_SCHEMA_VERSION = 10
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -380,6 +381,18 @@ def _migration_0009(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0010(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_settings (
+            key        TEXT PRIMARY KEY,
+            value      TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -390,6 +403,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V7: _migration_0007,
     MIGRATION_V8: _migration_0008,
     MIGRATION_V9: _migration_0009,
+    MIGRATION_V10: _migration_0010,
 }
 
 

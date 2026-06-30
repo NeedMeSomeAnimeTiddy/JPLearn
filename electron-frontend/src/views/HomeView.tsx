@@ -1,20 +1,23 @@
 import type { CSSProperties } from 'react'
-import type { MinigameKey, NavDirection, ScriptKey, StudyPlanSnapshot } from '../types'
+import type { LearningPathStatus, MinigameKey, NavDirection, ScriptKey, SectionReadiness, StudyPlanSnapshot } from '../types'
 import {
   SCRIPT_DIFFICULTY_META,
   SCRIPT_LABELS,
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { Languages, Lock } from 'lucide-react'
+import { AlertTriangle, Languages, Zap } from 'lucide-react'
 import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
+import { LearningPathPanel } from '../components/LearningPathPanel'
 
-const LOCK_HINTS: Partial<Record<ScriptKey, string>> = {
-  katakana: 'Unlocks after Hiragana reaches 35% mastery.',
-  kanji_n5: 'Unlocks after Hiragana reaches 70% and Katakana reaches 45%.',
-  vocab_n5: 'Unlocks after Hiragana reaches 70% and Katakana reaches 55%.',
-  grammar_patterns: 'Unlocks after Vocabulary reaches 45% mastery.',
+// Readiness badge meta — label and icon for each state shown on section cards
+const READINESS_BADGE: Record<SectionReadiness, { label: string; className: string }> = {
+  completed: { label: 'Complete', className: 'badge-completed' },
+  suggested_next: { label: 'Start Here', className: 'badge-suggested' },
+  recommended: { label: 'Recommended', className: 'badge-recommended' },
+  challenging: { label: 'Challenging', className: 'badge-challenging' },
+  advanced: { label: 'Advanced', className: 'badge-advanced' },
 }
 
 interface TutorBannerData {
@@ -39,12 +42,14 @@ interface HomeViewProps {
   homeStudyPlanExpanded: boolean
   tutorBanner?: TutorBannerData | null
   recommendations?: RecommendationData[]
+  learningPathStatus?: LearningPathStatus | null
   onSelectScript: (script: ScriptKey) => void
   onToggleStudyPlan: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
   onDismissTutorBanner?: (dedupKey: string) => void
   onStartRecommendation?: (nodeId: string) => void
-  isJLPTPrepUnlocked?: boolean
+  onContinuePath?: (sectionId: string) => void
+  onChangePath?: () => void
   onSelectJLPTPrep?: () => void
 }
 
@@ -54,14 +59,23 @@ export function HomeView({
   homeStudyPlanExpanded,
   tutorBanner,
   recommendations,
+  learningPathStatus,
   onSelectScript,
   onToggleStudyPlan,
   onJumpToSetup,
   onDismissTutorBanner,
   onStartRecommendation,
-  isJLPTPrepUnlocked = false,
+  onContinuePath,
+  onChangePath,
   onSelectJLPTPrep,
 }: HomeViewProps) {
+  // Build a readiness lookup from the learning path steps
+  const readinessBySection: Partial<Record<string, SectionReadiness>> = {}
+  if (learningPathStatus?.steps) {
+    for (const step of learningPathStatus.steps) {
+      readinessBySection[step.section_id] = step.readiness
+    }
+  }
   return (
     <div className={`view-shell view-${navDirection}`}>
       {tutorBanner && onDismissTutorBanner && (
@@ -79,14 +93,13 @@ export function HomeView({
           {onSelectJLPTPrep ? (
             <button
               type="button"
-              className={`home-jlpt-btn${!isJLPTPrepUnlocked ? ' is-locked' : ''}`}
-              onClick={isJLPTPrepUnlocked ? onSelectJLPTPrep : undefined}
-              title={isJLPTPrepUnlocked ? 'JLPT Preparation' : 'Unlocks after starting N5 Vocabulary'}
-              aria-label={isJLPTPrepUnlocked ? 'Open JLPT Preparation' : 'JLPT Prep — locked'}
+              className="home-jlpt-btn"
+              onClick={onSelectJLPTPrep}
+              title="JLPT Preparation"
+              aria-label="Open JLPT Preparation"
             >
               <Languages size={14} strokeWidth={2.2} aria-hidden="true" />
               JLPT Prep
-              {!isJLPTPrepUnlocked ? <Lock size={11} strokeWidth={2.2} aria-hidden="true" /> : null}
             </button>
           ) : null}
         </div>
@@ -94,38 +107,58 @@ export function HomeView({
           Main Menu. Choose a learning track, then pick a minigame and start your run.
         </p>
 
+        {learningPathStatus && onContinuePath && onChangePath && learningPathStatus.path_id && (
+          <LearningPathPanel
+            status={learningPathStatus}
+            onContinue={onContinuePath}
+            onChangePath={onChangePath}
+          />
+        )}
+
         <div className="menu-grid">
           {(['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns'] as const).map((script, index) => {
             const glyph = SECTION_META[script].glyph
             const difficulty = SCRIPT_DIFFICULTY_META[script]
             const DifficultyIcon = difficulty.icon
             const coverageRow = studyPlan.coverageRows.find((r) => r.key === script)
-            const isLocked = coverageRow ? !coverageRow.unlocked : false
-            const lockHint = LOCK_HINTS[script] ?? 'Keep progressing your earlier tracks.'
+            const readiness = readinessBySection[script]
+            const badgeMeta = readiness ? READINESS_BADGE[readiness] : null
+            const isNeedsWarning = readiness === 'challenging' || readiness === 'advanced'
 
             return (
               <button
                 key={script}
                 type="button"
-                className={`menu-card${isLocked ? ' is-locked' : ''}`}
-                aria-keyshortcuts={isLocked ? undefined : String(index + 1)}
-                aria-label={isLocked ? `${SCRIPT_LABELS[script]} — locked. ${lockHint}` : undefined}
-                title={isLocked ? lockHint : undefined}
-                disabled={isLocked}
+                className={`menu-card${readiness ? ` menu-card--${readiness}` : ''}`}
+                aria-keyshortcuts={String(index + 1)}
                 onClick={() => onSelectScript(script)}
               >
-                <span
-                  className={`menu-card-difficulty menu-card-difficulty-${difficulty.tier}`}
-                  aria-label={`Difficulty: ${difficulty.label}`}
-                  title={`Difficulty: ${difficulty.label}`}
-                >
-                  <DifficultyIcon className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
-                  <span>{difficulty.label}</span>
-                </span>
+                {badgeMeta && (
+                  <span className={`menu-card-readiness-badge ${badgeMeta.className}`} aria-hidden="true">
+                    {isNeedsWarning && <AlertTriangle size={10} strokeWidth={2.2} aria-hidden="true" />}
+                    {readiness === 'suggested_next' && <Zap size={10} strokeWidth={2.2} aria-hidden="true" />}
+                    {badgeMeta.label}
+                  </span>
+                )}
                 <span className="menu-script-glyph" aria-hidden="true" lang="ja">{glyph}</span>
                 <strong>{SCRIPT_LABELS[script]}</strong>
                 <p>{SCRIPT_MENU_LINES[script]}</p>
-                {!isLocked && coverageRow && coverageRow.total > 0 ? (
+                <div className="menu-card-footer-row">
+                  <span
+                    className={`menu-card-difficulty menu-card-difficulty-${difficulty.tier}`}
+                    aria-label={`Difficulty: ${difficulty.label}`}
+                    title={`Difficulty: ${difficulty.label}`}
+                  >
+                    <DifficultyIcon className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
+                    <span>{difficulty.label}</span>
+                  </span>
+                  {coverageRow && coverageRow.total > 0 ? (
+                    <span className="menu-card-mastery-pct" aria-label={`${Math.round(coverageRow.mastery * 100)}% mastered`}>
+                      {Math.round(coverageRow.mastery * 100)}%
+                    </span>
+                  ) : null}
+                </div>
+                {coverageRow && coverageRow.total > 0 ? (
                   <div className="menu-card-progress-track" aria-hidden="true">
                     <div
                       className="menu-card-progress-fill"
@@ -133,13 +166,6 @@ export function HomeView({
                     />
                   </div>
                 ) : null}
-                {isLocked && (
-                  <span className="menu-card-lock-overlay" aria-hidden="true">
-                    <Lock className="menu-card-lock-icon" strokeWidth={2.1} />
-                    <span className="menu-card-lock-label">Locked</span>
-                    <span className="menu-card-lock-hint">{lockHint}</span>
-                  </span>
-                )}
               </button>
             )
           })}

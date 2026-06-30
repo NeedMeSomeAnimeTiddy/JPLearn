@@ -107,6 +107,11 @@ from data.jlpt_repository import (
     load_jlpt_exam_history,
     save_jlpt_exam_result,
 )
+from data.settings_repository import get_setting, set_setting
+from domain.readiness import (
+    LEARNING_PATHS,
+    build_learning_path_status,
+)
 from domain.jlpt_readiness import (
     JLPT_LEVEL_SPECS,
     LEVEL_ORDER,
@@ -708,6 +713,53 @@ def _load_user_progress() -> UserProgress:
 def _save_user_progress(progress: UserProgress) -> None:
     keys_json = json.dumps(sorted(progress.applied_dedup_keys))
     save_user_xp(progress.total_xp, progress.level, keys_json)
+
+
+# ---------------------------------------------------------------------------
+# Learning path bridge helpers
+# ---------------------------------------------------------------------------
+
+_VALID_LEARNING_PATH_IDS: frozenset[str] = frozenset(LEARNING_PATHS.keys())
+
+
+def build_learning_path_status_payload() -> dict[str, object]:
+    """Return the learner's current learning path status."""
+    init_study_db()
+    path_id_raw = get_setting("active_learning_path")
+    path_id = path_id_raw if path_id_raw in _VALID_LEARNING_PATH_IDS else None
+    onboarding_raw = get_setting("onboarding_complete")
+    onboarding_complete = onboarding_raw == "1"
+    prog_state = _load_progression_state()
+    status = build_learning_path_status(
+        path_id=path_id,  # type: ignore[arg-type]
+        onboarding_complete=onboarding_complete,
+        state=prog_state,
+    )
+    return {
+        "path_id": status.path_id,
+        "path_name": status.path_name,
+        "onboarding_complete": status.onboarding_complete,
+        "suggested_next": status.suggested_next,
+        "steps": [
+            {
+                "section_id": step.section_id,
+                "label": step.label,
+                "readiness": step.readiness,
+                "mastery_pct": round(step.mastery_pct, 3),
+            }
+            for step in status.steps
+        ],
+    }
+
+
+def set_learning_path_handler(path_id: str) -> dict[str, object]:
+    """Persist the learner's chosen path and return the updated status."""
+    if path_id not in _VALID_LEARNING_PATH_IDS:
+        raise ValueError(f"Unknown learning path: {path_id!r}")
+    init_study_db()
+    set_setting("active_learning_path", path_id)
+    set_setting("onboarding_complete", "1")
+    return build_learning_path_status_payload()
 
 
 # ---------------------------------------------------------------------------
@@ -1633,6 +1685,20 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             results = load_jlpt_exam_history(level=lv, mode=md)
             return 0, {"results": results}
         except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "learning-path-status":
+        try:
+            return 0, build_learning_path_status_payload()
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "set-learning-path":
+        if len(argv) < 2:
+            return 2, {"error": "Usage: set-learning-path <path_id>"}
+        try:
+            return 0, set_learning_path_handler(argv[1])
+        except ValueError as exc:
             return 2, {"error": str(exc)}
 
     return 2, {"error": f"Unknown command: {command}"}

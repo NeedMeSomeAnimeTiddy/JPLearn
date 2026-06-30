@@ -178,6 +178,30 @@ export interface MinigameStats {
 export type StatsByScript = Record<ScriptKey, ScriptStats>
 export type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
 
+// ── Learning path / guided system ─────────────────────────────────────────
+
+export type SectionReadiness =
+  | 'completed'
+  | 'suggested_next'
+  | 'recommended'
+  | 'challenging'
+  | 'advanced'
+
+export interface LearningPathStep {
+  section_id: string
+  label: string
+  readiness: SectionReadiness
+  mastery_pct: number
+}
+
+export interface LearningPathStatus {
+  path_id: string | null
+  path_name: string | null
+  onboarding_complete: boolean
+  suggested_next: string | null
+  steps: LearningPathStep[]
+}
+
 export type CardScores = Record<ScriptKey, Record<number, number>>
 
 export interface JlptLevelProgress {

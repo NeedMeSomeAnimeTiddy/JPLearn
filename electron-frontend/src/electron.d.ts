@@ -391,6 +391,8 @@ interface DesktopApi {
   buildJLPTExamQueue?: (level: JLPTLevel, mode: JLPTExamMode, count?: number) => Promise<JLPTExamQueuePayload>
   saveJLPTExamResult?: (payload: JLPTSaveResultPayload) => Promise<{ ok: boolean; id: number }>
   getJLPTExamHistory?: (level?: JLPTLevel | '', mode?: JLPTExamMode | '') => Promise<JLPTExamHistoryPayload>
+  getLearningPathStatus?: () => Promise<LearningPathStatusPayload>
+  setLearningPath?: (pathId: string) => Promise<LearningPathStatusPayload>
 }
 
 interface VoiceStatus {
@@ -511,6 +513,29 @@ interface TutorReactionItem extends Omit<TutorReactionPayload, 'priority' | 'mes
 
 interface TutorReactionsPayload {
   reactions: TutorReactionItem[]
+}
+
+// ---- Guided learning path types ----
+type SectionReadiness =
+  | 'completed'
+  | 'suggested_next'
+  | 'recommended'
+  | 'challenging'
+  | 'advanced'
+
+interface LearningPathStep {
+  section_id: string
+  label: string
+  readiness: SectionReadiness
+  mastery_pct: number
+}
+
+interface LearningPathStatusPayload {
+  path_id: string | null
+  path_name: string | null
+  onboarding_complete: boolean
+  suggested_next: string | null
+  steps: LearningPathStep[]
 }
 
 declare global {

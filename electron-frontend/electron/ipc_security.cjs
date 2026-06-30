@@ -448,4 +448,14 @@ module.exports = {
   validateOptionalJLPTLevel,
   validateOptionalJLPTMode,
   validateJLPTSaveResultPayload,
+  validateLearningPathId,
+}
+
+const VALID_LEARNING_PATH_IDS = new Set(['complete_beginner'])
+
+function validateLearningPathId(value) {
+  if (typeof value !== 'string' || !VALID_LEARNING_PATH_IDS.has(value)) {
+    throw new Error(`Invalid learning path id: ${String(value)}`)
+  }
+  return value
 }
