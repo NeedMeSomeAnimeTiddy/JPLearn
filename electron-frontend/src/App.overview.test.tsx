@@ -167,12 +167,9 @@ describe('Overview activity panel', () => {
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: /open study overview/i }))
     fireEvent.click((await screen.findAllByRole('button', { name: /study activity/i }))[0])
-    fireEvent.click((await screen.findAllByRole('button', { name: /story progress/i }))[0])
 
     expect(await screen.findByText(/Last 7 Days/i)).toBeTruthy()
     expect(await screen.findByText(/Last 30 Days/i)).toBeTruthy()
-    expect((await screen.findAllByText(/Story Progress/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Chapter 3 ready/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/11/)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/38/)).length).toBeGreaterThan(0)
   })

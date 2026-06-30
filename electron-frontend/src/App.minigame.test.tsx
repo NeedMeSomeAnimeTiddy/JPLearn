@@ -211,7 +211,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Hiragana')
 
     expect((await screen.findAllByText(/Romaji Sprint/i)).length).toBeGreaterThan(0)
@@ -226,13 +226,31 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
 
     expect((await screen.findAllByText(/Context Cloze/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Narrative Story/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Interleave Mix/i)).length).toBeGreaterThan(0)
     expect(screen.queryByText(/Romaji Sprint/i)).toBeNull()
+  })
+
+  it('starts a fresh run when launching a minigame from the shortcuts menu', async () => {
+    window.jplearnDesktop = baseDesktopApi
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /open shortcuts/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /all maps/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /hiragana map/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /meaning match/i }))
+
+    await screen.findByRole('heading', { name: /Meaning Match/i })
+    await screen.findByRole('button', { name: /restart challenge/i })
+
+    expect(screen.queryByRole('button', { name: /^Play$/i })).toBeNull()
+    expect(screen.queryByText(/Session Report/i)).toBeNull()
   })
 
   it('supports typed recall and forwards confidence score to record payload', async () => {
@@ -243,7 +261,7 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
 
     fireEvent.click(await screen.findByRole('button', { name: /toggle answer confidence capture/i }))
@@ -281,7 +299,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = buildStudyPlanDesktopApi()
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
 
     expect(await screen.findByText(/Study Plan/i)).toBeTruthy()
     expect(screen.getByText(/starter-safe session/i)).toBeTruthy()
@@ -299,7 +317,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Conversational')
 
     expect((await screen.findAllByText(/Context Cloze/i)).length).toBeGreaterThan(0)
@@ -352,7 +370,7 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Conversational')
 
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
@@ -377,7 +395,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
     const contextTiles = await screen.findAllByRole('button', { name: /Context Cloze/i })
     fireEvent.click(within((contextTiles[0].closest('.game-tile') ?? contextTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
@@ -394,7 +412,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
     const storyTiles = await screen.findAllByRole('button', { name: /Narrative Story/i })
     fireEvent.click(within((storyTiles[0].closest('.game-tile') ?? storyTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
@@ -411,7 +429,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Kanji')
     const matchTiles = await screen.findAllByRole('button', { name: /Character Match/i })
     fireEvent.click(within((matchTiles[0].closest('.game-tile') ?? matchTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
@@ -425,12 +443,12 @@ describe('Minigame menu', () => {
       ...baseDesktopApi,
       recordGameResult,
       getDeckCards: async (slug: string) => (
-        slug === 'kanji_n5'
+        slug.includes('kanji')
           ? { slug, name: 'Kanji Deck', cards: kanjiStrokeCards }
           : { slug: slug as any, name: 'Deck', cards: baseCards }
       ),
       getStudyQueue: async (slug: string) => (
-        slug === 'kanji_n5'
+        slug.includes('kanji')
           ? {
             ok: true,
             queue: {
@@ -451,7 +469,7 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('heading', { name: /^JPLearn$/i })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Kanji')
     const strokeTiles = await screen.findAllByRole('button', { name: /Stroke Order/i })
     fireEvent.click(within((strokeTiles[0].closest('.game-tile') ?? strokeTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
@@ -461,7 +479,9 @@ describe('Minigame menu', () => {
     expect(screen.getByText(/Type the reading, then select the matching kanji/i)).toBeTruthy()
 
     fireEvent.change(screen.getByPlaceholderText(/Type romaji reading/i), { target: { value: 'nichi' } })
-    fireEvent.click(await screen.findByRole('button', { name: /日.*nichi/i }))
+    const candidateList = await screen.findByLabelText(/kanji candidates/i)
+    const candidateButtons = within(candidateList).getAllByRole('button')
+    fireEvent.click(candidateButtons[0])
 
     await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
     expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({ minigame: 'stroke_order' }))

@@ -5346,7 +5346,10 @@ function App() {
   const jumpToScriptHubMinigame = useCallback((script: ScriptKey, minigame: MinigameKey) => {
     const resolvedMinigame = resolveScriptMinigame(script, minigame)
     setNavDirection('forward')
-    setActiveScript(script)
+    setShowOverview(false)
+    setShowSettings(false)
+    setLastSessionSummary(null)
+    setSessionRunReport(null)
     setActiveGame(resolvedMinigame)
     setView('minigame')
     setSessionActive(false)
@@ -5358,8 +5361,17 @@ function App() {
     setIsRoundResolving(false)
     setLivesRemaining(DEFAULT_LIVES)
     resetRoundCycle()
+
+    if (script !== activeScript) {
+      setActiveScript(script)
+      setResumeRequest({ script, minigame: resolvedMinigame })
+      closeShortcutMenu()
+      return
+    }
+
+    void startSession(resolvedMinigame)
     closeShortcutMenu()
-  }, [closeShortcutMenu, resetRoundCycle, resolveScriptMinigame])
+  }, [activeScript, closeShortcutMenu, resetRoundCycle, resolveScriptMinigame, startSession])
 
   const jumpToScriptHubSetup = useCallback((script: ScriptKey, minigame: MinigameKey) => {
     const resolvedMinigame = resolveScriptMinigame(script, minigame)
