@@ -106,6 +106,14 @@ export function HomeView({
                 <span className="menu-script-glyph" aria-hidden="true" lang="ja">{glyph}</span>
                 <strong>{SCRIPT_LABELS[script]}</strong>
                 <p>{SCRIPT_MENU_LINES[script]}</p>
+                {!isLocked && coverageRow && coverageRow.total > 0 ? (
+                  <div className="menu-card-progress-track" aria-hidden="true">
+                    <div
+                      className="menu-card-progress-fill"
+                      style={{ width: `${Math.round(coverageRow.mastery * 100)}%` }}
+                    />
+                  </div>
+                ) : null}
                 {isLocked && (
                   <span className="menu-card-lock-overlay" aria-hidden="true">
                     <Lock className="menu-card-lock-icon" strokeWidth={2.1} />

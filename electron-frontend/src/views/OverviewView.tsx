@@ -1,45 +1,24 @@
 import type { CSSProperties } from 'react'
 import { Fragment } from 'react'
-import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
   AlertTriangle,
-  ArrowLeft,
   BarChart3,
-  BookText,
   CalendarDays,
   Flame,
-  History,
   Languages,
   ListChecks,
   RefreshCw,
-  Settings,
   Target,
+  X,
 } from 'lucide-react'
-import type {
-  CardScores,
-  JlptLevel,
-  JlptLevelProgress,
-  NavDirection,
-  ScriptKey,
-} from '../types'
-import {
-  ALL_SCRIPT_KEYS,
-  JLPT_LEVEL_LABELS,
-  KANJI_OVERVIEW_PAGE_SIZE,
-  SCRIPT_LABELS,
-} from '../constants'
-import { formatTimelineDeckName, formatTimelineScriptTag, jlptTagFromCard } from '../utils'
+import type { CardScores, JlptLevel, JlptLevelProgress } from '../types'
+import { KANJI_OVERVIEW_PAGE_SIZE } from '../constants'
+import { jlptTagFromCard } from '../utils'
 
 const CARD_MASTERY_MAX = 4
 
-type OverviewSectionKey =
-  | 'studyActivity'
-  | 'contextClozeCurriculum'
-  | 'storyProgress'
-  | 'mistakeBreakdown'
-  | 'itemTimeline'
-  | 'deckSnapshot'
+export type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'deckSnapshot'
 
 interface DeckSummary {
   slug: string
@@ -63,38 +42,6 @@ interface ActivityWindow {
 interface ActivityData {
   week: ActivityWindow
   month: ActivityWindow
-}
-
-interface SummaryTile {
-  label: string
-  value: string
-  tone: string
-  icon: LucideIcon
-  accent: string
-  note?: string
-}
-
-interface CurriculumMode {
-  attempts: number
-  accuracy: number
-  accuracy_7d: number
-  stage_distribution: Record<1 | 2 | 3, number>
-}
-
-interface ChapterStats {
-  attempts: number
-  accuracy: number
-  completion_rate: number
-}
-
-interface NarrativeMode {
-  attempts: number
-  accuracy: number
-  chapters: Record<'1' | '2' | '3', ChapterStats>
-}
-
-interface StoryReadiness {
-  script: ScriptKey
 }
 
 interface BlockInfo {
@@ -124,15 +71,6 @@ interface MistakeRow {
   error_rate: number
 }
 
-interface ItemHistoryEntry {
-  key: string
-  prompt: string
-  trend: string
-  script_tag: string
-  deck: string
-  events: Array<{ outcome: string; points_delta: number }>
-}
-
 interface SelectedChar {
   character: string
   romaji: string
@@ -142,227 +80,119 @@ interface SelectedChar {
 }
 
 interface OverviewViewProps {
-  navDirection: NavDirection
   loading: boolean
   error: string | null
   lastUpdated: string | null
-  decks: DeckSummary[]
   streak: { current_days: number; best_days: number }
+  decks: DeckSummary[]
   activity: ActivityData
-  summaryTiles: SummaryTile[]
-  curriculumSummary: CurriculumMode
-  curriculumByScript: Record<ScriptKey, CurriculumMode>
-  narrativeSummary: NarrativeMode
-  narrativeByScript: Record<ScriptKey, NarrativeMode>
-  storyReadiness: StoryReadiness[]
   overviewBlocks: Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>
   overviewKanjiDeck: KanjiCard[]
   overviewKanjiLevelProgress: JlptLevelProgress[]
   overviewBlocksLoading: boolean
   mistakes: MistakeRow[]
-  itemHistory: ItemHistoryEntry[]
-  pagedHistory: ItemHistoryEntry[]
-  clampedHistoryPage: number
-  historyPageCount: number
   hasAnyActivity: boolean
   hasMistakeData: boolean
   charMasteryExpanded: boolean
   expandedBlocks: string | null
   overviewSectionExpanded: Record<OverviewSectionKey, boolean>
-  resetConfirmStep: 0 | 1 | 2
-  resettingDb: boolean
   cardScores: CardScores
   kanjiOverviewPage: Partial<Record<JlptLevel, number>>
-  totals: { completedToday: number }
-  isOverlay?: boolean
-  // callbacks
-  onBack: () => void
-  onOpenSettings: () => void
+  onClose: () => void
   onRefresh: () => void
   onToggleCharMastery: () => void
   onSetExpandedBlocks: (key: string | null) => void
   onToggleSection: (section: OverviewSectionKey) => void
-  onResetConfirmStep: (step: 0 | 1 | 2) => void
-  onResetDb: () => void
-  onSetHistoryPage: (updater: (prev: number) => number) => void
   onSetKanjiOverviewPage: (
     updater: (prev: Partial<Record<JlptLevel, number>>) => Partial<Record<JlptLevel, number>>,
   ) => void
   onSetSelectedChar: (char: SelectedChar) => void
 }
 
-// Suppress unused-import warning for JLPT_LEVEL_LABELS (available for consumers/future use)
-void JLPT_LEVEL_LABELS
-
 export function OverviewView({
-  navDirection,
   loading,
   error,
   lastUpdated,
-  decks,
   streak,
+  decks,
   activity,
-  summaryTiles,
-  curriculumSummary,
-  curriculumByScript,
-  narrativeSummary,
-  narrativeByScript,
-  storyReadiness,
   overviewBlocks,
   overviewKanjiDeck,
   overviewKanjiLevelProgress,
   overviewBlocksLoading,
   mistakes,
-  itemHistory,
-  pagedHistory,
-  clampedHistoryPage,
-  historyPageCount,
   hasAnyActivity,
   hasMistakeData,
   charMasteryExpanded,
   expandedBlocks,
   overviewSectionExpanded,
-  resetConfirmStep,
-  resettingDb,
   cardScores,
   kanjiOverviewPage,
-  totals,
-  onBack,
-  onOpenSettings,
+  onClose,
   onRefresh,
   onToggleCharMastery,
   onSetExpandedBlocks,
   onToggleSection,
-  onResetConfirmStep,
-  onResetDb,
-  onSetHistoryPage,
   onSetKanjiOverviewPage,
   onSetSelectedChar,
-  isOverlay = false,
 }: OverviewViewProps) {
   return (
-    <div className={isOverlay ? 'overview-overlay-content' : `view-shell view-${navDirection}`}>
-      <header className="topbar panel-glass">
-        <button
-          type="button"
-          className="back-button back-button-icon-only"
-          onClick={onBack}
-          aria-label="Back to main menu"
-          title="Back to main menu"
-        >
-          <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-        </button>
-        <div className="brand-block">
-          <span className="brand-kicker">JPLearn</span>
-          <h1>Study Overview</h1>
-        </div>
-        <div className="topbar-end">
-          <div className="focus-chip">
-            <span>Progress Board</span>
-          </div>
+    <div className="overview-popup-content">
+      <header className="overview-popup-header">
+        <h2 className="overview-popup-title">Study Overview</h2>
+        <div className="overview-popup-actions">
+          {lastUpdated ? <span className="overview-popup-updated">{lastUpdated}</span> : null}
           <button
             type="button"
             className="topbar-settings-button"
-            onClick={onOpenSettings}
-            aria-label="Open settings"
-            title="Settings (Ctrl+,)"
-          >
-            <Settings aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-          </button>
-        </div>
-      </header>
-
-      <section className="panel-glass overview-hero">
-        <div className="overview-hero-copy">
-          <p className="hero-kicker">Session Snapshot</p>
-          <h2 className="overview-hero-title">Your Learning Pulse</h2>
-          <p className="hero-copy">See how much you have mastered and what to tackle in your next focused run.</p>
-          <div className="overview-snapshot-grid" aria-label="Session snapshot metrics">
-            {summaryTiles.map((tile, index) => (
-              <article
-                key={`${tile.label}-${tile.value}`}
-                className={`overview-snapshot-tile tone-${tile.tone}`}
-                style={{ animationDelay: `${120 + index * 80}ms` }}
-                title={'note' in tile ? tile.note : undefined}
-              >
-                <p><tile.icon aria-hidden="true" className={`metric-icon icon-${tile.accent}`} strokeWidth={2.2} />{tile.label}</p>
-                <strong className="live-value">{tile.value}</strong>
-              </article>
-            ))}
-          </div>
-        </div>
-        <div className="overview-hero-actions">
-          <button
-            type="button"
-            className="icon-action-button"
             onClick={onRefresh}
             disabled={loading}
             aria-label={loading ? 'Refreshing data' : 'Refresh data'}
-            title={loading ? 'Refreshing data' : 'Refresh data'}
+            title={loading ? 'Refreshing' : 'Refresh (R)'}
           >
             <RefreshCw aria-hidden="true" className={`inline-button-icon ${loading ? 'spin-icon' : ''}`} strokeWidth={2.2} />
           </button>
           <button
             type="button"
-            className="danger-button icon-action-button"
-            onClick={() => onResetConfirmStep(1)}
-            disabled={resettingDb}
-            aria-label={resettingDb ? 'Resetting database' : 'Reset database'}
-            title={resettingDb ? 'Resetting database' : 'Reset database'}
+            className="topbar-settings-button"
+            onClick={onClose}
+            aria-label="Close overview"
+            title="Close (Escape)"
           >
-            <AlertTriangle aria-hidden="true" className={`inline-button-icon ${resettingDb ? 'spin-icon' : ''}`} strokeWidth={2.2} />
+            <X aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
           </button>
-          <span>{lastUpdated ? `Updated ${lastUpdated}` : 'Waiting for first sync'}</span>
         </div>
-      </section>
+      </header>
 
-      {resetConfirmStep > 0 ? (
-        <section className="panel-glass reset-confirm-panel" role="alertdialog" aria-modal="true">
-          {resetConfirmStep === 1 ? (
-            <>
-              <h3>Reset all progress?</h3>
-              <p>
-                This will permanently delete all review history, streaks, leech data,
-                and locally-tracked character scores. There is no undo.
-              </p>
-              <div className="reset-confirm-actions">
-                <button
-                  type="button"
-                  className="danger-button"
-                  onClick={() => onResetConfirmStep(2)}
-                  disabled={resettingDb}
-                >
-                  I understand — continue
-                </button>
-                <button type="button" onClick={() => onResetConfirmStep(0)} disabled={resettingDb}>
-                  Cancel
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h3>Final confirmation</h3>
-              <p>
-                <strong>All your progress will be erased.</strong>{' '}
-                Click the button below to permanently delete everything.
-              </p>
-              <div className="reset-confirm-actions">
-                <button
-                  type="button"
-                  className="danger-button danger-button-final"
-                  onClick={onResetDb}
-                  disabled={resettingDb}
-                >
-                  {resettingDb ? 'Resetting…' : '⚠ Yes, delete everything'}
-                </button>
-                <button type="button" onClick={() => onResetConfirmStep(0)} disabled={resettingDb}>
-                  Cancel
-                </button>
-              </div>
-            </>
-          )}
-        </section>
-      ) : null}
+      {error ? <p className="status-line status-error overview-popup-error">Unable to load summary: {error}</p> : null}
+
+      {/* ── Snap metrics strip ─────────────────────────────────────── */}
+      {decks.length > 0 ? (() => {
+        const masteredCards = decks.reduce((acc, d) => acc + d.mastered, 0)
+        const totalCards = decks.reduce((acc, d) => acc + d.total, 0)
+        const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0
+        const completedToday = decks.reduce((acc, d) => acc + d.completed_today, 0)
+        const dueToday = decks.reduce((acc, d) => acc + d.due_today, 0)
+        return (
+          <div className="overview-snap-strip" aria-label="Quick stats">
+            <span className="overview-snap-tile">
+              <Flame aria-hidden="true" className="chip-icon metric-accent-streak" strokeWidth={2.2} />
+              <strong className="live-value">{streak.current_days}</strong>
+              <span>day streak</span>
+            </span>
+            <span className="overview-snap-tile">
+              <Target aria-hidden="true" className="chip-icon metric-accent-skill" strokeWidth={2.2} />
+              <strong className="live-value">{masteryRate}%</strong>
+              <span>mastered</span>
+            </span>
+            <span className="overview-snap-tile">
+              <BarChart3 aria-hidden="true" className="chip-icon metric-accent-insight" strokeWidth={2.2} />
+              <strong className="live-value">{completedToday}/{dueToday}</strong>
+              <span>done today</span>
+            </span>
+          </div>
+        )
+      })() : null}
 
       {/* ── Character mastery grid ────────────────────────────────── */}
       <section className="panel-glass char-mastery-panel">
@@ -381,27 +211,17 @@ export function OverviewView({
           </div>
         </button>
 
-        {/* max-height wrapper — inner div carries padding so wrapper can collapse to 0 cleanly */}
         <div className={`char-mastery-body ${charMasteryExpanded ? 'is-open' : ''}`}>
           <div className="char-mastery-body-inner">
             {(['hiragana', 'katakana'] as const).map((script) => {
               const blocks = overviewBlocks[script]
               if (!blocks || blocks.length === 0) return null
               const scores = cardScores[script]
-
               return (
                 <div key={script} className="char-mastery-script">
                   <h3 className="char-mastery-script-name">
                     {script === 'hiragana' ? 'Hiragana' : 'Katakana'}
                   </h3>
-
-                  {/*
-                    CSS-Grid inline-expand pattern (css-tricks.com/expandable-sections-within-a-css-grid):
-                    Tiles sit in an auto-fill grid. The active block's detail panel is injected
-                    directly after its tile with grid-column: 1 / -1 so it spans the full row.
-                    grid-auto-flow: dense fills any gaps in the tile row before the detail panel,
-                    keeping the visual tile order stable.
-                  */}
                   <div className="char-mastery-tiles-grid">
                     {blocks.map((block) => {
                       const blockKey = `${script}-${block.index}`
@@ -426,7 +246,6 @@ export function OverviewView({
                             <div className="cmb-tile-pct">{pct}%</div>
                           </button>
 
-                          {/* Detail panel: grid-column 1/-1 makes it span the full row right below this tile */}
                           {isActive ? (
                             <div className="char-mastery-detail-inline">
                               <div className="char-mastery-chips">
@@ -561,11 +380,11 @@ export function OverviewView({
                 </div>
               </div>
             ) : null}
-
           </div>
         </div>
       </section>
 
+      {/* ── Study Activity ───────────────────────────────────────────── */}
       <section className="panel-glass activity-summary-panel overview-collapsible-panel">
         <button
           type="button"
@@ -610,121 +429,7 @@ export function OverviewView({
         </div>
       </section>
 
-      <section className="panel-glass activity-summary-panel overview-collapsible-panel">
-        <button
-          type="button"
-          className="overview-panel-toggle"
-          onClick={() => onToggleSection('contextClozeCurriculum')}
-          aria-expanded={overviewSectionExpanded.contextClozeCurriculum}
-          aria-controls="overview-context-cloze-curriculum-body"
-        >
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon"><BookText aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Context Cloze Curriculum</h2>
-            <div className="panel-actions">
-              <span>Persisted stage progression and mode accuracy</span>
-            </div>
-            <span className={`overview-panel-chevron ${overviewSectionExpanded.contextClozeCurriculum ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-          </div>
-        </button>
-
-        <div id="overview-context-cloze-curriculum-body" className={`overview-panel-body ${overviewSectionExpanded.contextClozeCurriculum ? 'is-open' : ''}`}>
-          <div className="activity-window-grid">
-            <article className="activity-window-card">
-              <h3>Mode Performance</h3>
-              <div className="activity-window-metrics">
-                <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.attempts}</strong> attempts</span>
-                <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy}%</strong> accuracy</span>
-                <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong className="live-value">{curriculumSummary.accuracy_7d}%</strong> 7-day accuracy</span>
-              </div>
-            </article>
-            <article className="activity-window-card">
-              <h3>Stage Distribution</h3>
-              <div className="activity-window-metrics">
-                <span className="metric-accent-warning"><strong className="live-value">{curriculumSummary.stage_distribution[1]}</strong> stage 1</span>
-                <span className="metric-accent-ocean"><strong className="live-value">{curriculumSummary.stage_distribution[2]}</strong> stage 2</span>
-                <span className="metric-accent-streak"><strong className="live-value">{curriculumSummary.stage_distribution[3]}</strong> stage 3</span>
-              </div>
-            </article>
-          </div>
-
-          <div className="activity-window-grid" style={{ marginTop: '10px' }}>
-            {ALL_SCRIPT_KEYS.map((script) => {
-              const metric = curriculumByScript[script]
-              return (
-                <article key={script} className="activity-window-card">
-                  <h3>{SCRIPT_LABELS[script]}</h3>
-                  <div className="activity-window-metrics">
-                    <span className="metric-accent-insight"><strong className="live-value">{metric.attempts}</strong> attempts</span>
-                    <span className="metric-accent-skill"><strong className="live-value">{metric.accuracy}%</strong> accuracy</span>
-                    <span className="metric-accent-ocean"><strong className="live-value">{metric.accuracy_7d}%</strong> 7-day</span>
-                    <span className="metric-accent-warning"><strong className="live-value">{metric.stage_distribution[1]}/{metric.stage_distribution[2]}/{metric.stage_distribution[3]}</strong> stage 1/2/3</span>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="panel-glass activity-summary-panel overview-collapsible-panel">
-        <button
-          type="button"
-          className="overview-panel-toggle"
-          onClick={() => onToggleSection('storyProgress')}
-          aria-expanded={overviewSectionExpanded.storyProgress}
-          aria-controls="overview-story-progress-body"
-        >
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Story Progress</h2>
-            <div className="panel-actions">
-              <span>Narrative attempts, chapter accuracy, and completion readiness</span>
-            </div>
-            <span className={`overview-panel-chevron ${overviewSectionExpanded.storyProgress ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-          </div>
-        </button>
-
-        <div id="overview-story-progress-body" className={`overview-panel-body ${overviewSectionExpanded.storyProgress ? 'is-open' : ''}`}>
-          <div className="activity-window-grid">
-            <article className="activity-window-card">
-              <h3>Narrative Mode Performance</h3>
-              <div className="activity-window-metrics">
-                <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.attempts}</strong> attempts</span>
-                <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.accuracy}%</strong> accuracy</span>
-                <span className="metric-accent-ocean"><strong className="live-value">{narrativeSummary.chapters['3'].completion_rate}%</strong> Chapter 3 completion</span>
-              </div>
-            </article>
-            {(['1', '2', '3'] as const).map((chapterKey) => (
-              <article key={chapterKey} className="activity-window-card">
-                <h3>Chapter {chapterKey}</h3>
-                <div className="activity-window-metrics">
-                  <span className="metric-accent-insight"><strong className="live-value">{narrativeSummary.chapters[chapterKey].attempts}</strong> attempts</span>
-                  <span className="metric-accent-skill"><strong className="live-value">{narrativeSummary.chapters[chapterKey].accuracy}%</strong> accuracy</span>
-                  <span className="metric-accent-streak"><strong className="live-value">{narrativeSummary.chapters[chapterKey].completion_rate}%</strong> completion</span>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="activity-window-grid">
-            {storyReadiness.map((story, index) => (
-              <article
-                key={story.script}
-                className="activity-window-card"
-                style={{ animationDelay: `${140 + index * 70}ms` }}
-              >
-                <h3>{SCRIPT_LABELS[story.script]}</h3>
-                <div className="activity-window-metrics">
-                  <span className="metric-accent-insight"><strong className="live-value">{narrativeByScript[story.script].attempts}</strong> attempts</span>
-                  <span className="metric-accent-skill"><strong className="live-value">{narrativeByScript[story.script].accuracy}%</strong> accuracy</span>
-                  <span className="metric-accent-ocean"><strong className="live-value">{narrativeByScript[story.script].chapters['2'].completion_rate}%</strong> Chapter 2 ready</span>
-                  <span className="metric-accent-streak"><strong className="live-value">{narrativeByScript[story.script].chapters['3'].completion_rate}%</strong> Chapter 3 ready</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
+      {/* ── Mistake Breakdown ─────────────────────────────────────────── */}
       <section className="panel-glass mistakes-summary-panel overview-collapsible-panel">
         <button
           type="button"
@@ -766,104 +471,32 @@ export function OverviewView({
         </div>
       </section>
 
-      <section className="panel-glass timeline-summary-panel overview-collapsible-panel">
-        <button
-          type="button"
-          className="overview-panel-toggle"
-          onClick={() => onToggleSection('itemTimeline')}
-          aria-expanded={overviewSectionExpanded.itemTimeline}
-          aria-controls="overview-item-timeline-body"
-        >
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon"><History aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Item Timeline</h2>
-            <div className="panel-actions">
-              <span>Recent review events and trend per item</span>
-            </div>
-            <span className={`overview-panel-chevron ${overviewSectionExpanded.itemTimeline ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-          </div>
-        </button>
-
-        <div id="overview-item-timeline-body" className={`overview-panel-body ${overviewSectionExpanded.itemTimeline ? 'is-open' : ''}`}>
-          {itemHistory.length === 0 ? (
-            <p className="status-line">No item history yet. Complete review rounds to build timelines.</p>
-          ) : (
-            <>
-              <div className="timeline-grid">
-                {pagedHistory.map((item, index) => (
-                  <article
-                    key={item.key}
-                    className="timeline-card"
-                    style={{ animationDelay: `${140 + index * 60}ms` }}
-                  >
-                    <div className="timeline-card-head">
-                      <h3>{item.prompt}</h3>
-                      <span className={`timeline-trend timeline-trend-${item.trend}`}>{item.trend}</span>
-                    </div>
-                    <p className="timeline-card-subhead">{formatTimelineScriptTag(item.script_tag)} • {formatTimelineDeckName(item.deck)}</p>
-                    <div className="timeline-events">
-                      {item.events.map((event, eventIndex) => (
-                        <span key={`${item.key}-${eventIndex}`} className={`timeline-event timeline-event-${event.outcome}`}>
-                          <strong>{event.outcome === 'correct' ? '✓' : '✕'}</strong>
-                          {event.points_delta} pts
-                        </span>
-                      ))}
-                    </div>
-                  </article>
-                ))}
+      {/* ── Deck Snapshot ─────────────────────────────────────────── */}
+      {decks.length > 0 ? (
+        <section className="panel-glass deck-panel overview-deck-panel overview-collapsible-panel">
+          <button
+            type="button"
+            className="overview-panel-toggle"
+            onClick={() => onToggleSection('deckSnapshot')}
+            aria-expanded={overviewSectionExpanded.deckSnapshot}
+            aria-controls="overview-deck-snapshot-body"
+          >
+            <div className="panel-head">
+              <h2 className="panel-title-with-icon"><ListChecks aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Deck Snapshot</h2>
+              <div className="panel-actions">
+                <span>Mastery and daily completion per deck</span>
               </div>
-              <div className="timeline-pagination">
-                <button
-                  type="button"
-                  disabled={clampedHistoryPage <= 1}
-                  onClick={() => onSetHistoryPage((prev) => Math.max(1, prev - 1))}
-                >
-                  Previous
-                </button>
-                <span>Page {clampedHistoryPage} / {historyPageCount}</span>
-                <button
-                  type="button"
-                  disabled={clampedHistoryPage >= historyPageCount}
-                  onClick={() => onSetHistoryPage((prev) => Math.min(historyPageCount, prev + 1))}
-                >
-                  Next
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
-
-      <section className="panel-glass deck-panel overview-deck-panel overview-collapsible-panel">
-        <button
-          type="button"
-          className="overview-panel-toggle"
-          onClick={() => onToggleSection('deckSnapshot')}
-          aria-expanded={overviewSectionExpanded.deckSnapshot}
-          aria-controls="overview-deck-snapshot-body"
-        >
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon"><ListChecks aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Deck Snapshot</h2>
-            <div className="panel-actions">
-              <span>Mastery and daily completion by deck</span>
+              <span className={`overview-panel-chevron ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`} aria-hidden="true">▾</span>
             </div>
-            <span className={`overview-panel-chevron ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-          </div>
-        </button>
+          </button>
 
-        <div id="overview-deck-snapshot-body" className={`overview-panel-body ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`}>
-          {loading && <p className="status-line">Loading deck metrics...</p>}
-          {error && <p className="status-line status-error">Unable to load summary: {error}</p>}
-          {!loading && !error && decks.length === 0 ? <p className="status-line">No decks found.</p> : null}
-
-          {!loading && !error && decks.length > 0 ? (
+          <div id="overview-deck-snapshot-body" className={`overview-panel-body ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`}>
             <div className="deck-grid">
               {decks.map((deck, index) => {
                 const mastery = deck.total > 0 ? Math.round((deck.mastered / deck.total) * 100) : 0
-                const todayProgress =
-                  deck.due_today > 0
-                    ? Math.min(100, Math.round((deck.completed_today / deck.due_today) * 100))
-                    : 0
-
+                const todayProgress = deck.due_today > 0
+                  ? Math.min(100, Math.round((deck.completed_today / deck.due_today) * 100))
+                  : 0
                 return (
                   <article
                     key={deck.slug}
@@ -874,7 +507,6 @@ export function OverviewView({
                       <h3>{deck.name}</h3>
                       <span>{deck.total} cards</span>
                     </div>
-
                     <div className="meter">
                       <div className="meter-label">
                         <span>Mastery</span>
@@ -884,13 +516,10 @@ export function OverviewView({
                         <div className="meter-fill" style={{ width: `${mastery}%` }} />
                       </div>
                     </div>
-
                     <div className="meter">
                       <div className="meter-label">
                         <span>Today</span>
-                        <strong>
-                          {deck.completed_today}/{deck.due_today}
-                        </strong>
+                        <strong>{deck.completed_today}/{deck.due_today}</strong>
                       </div>
                       <div className="meter-track">
                         <div className="meter-fill meter-fill-alt" style={{ width: `${todayProgress}%` }} />
@@ -900,14 +529,9 @@ export function OverviewView({
                 )
               })}
             </div>
-          ) : null}
-
-          <footer className="panel-foot">
-            <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`completed-${totals.completedToday}`} className="live-value">{totals.completedToday}</strong> cards completed today</span>
-            <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`best-day-${streak.best_days}`} className="live-value">{streak.best_days}</strong> day best streak</span>
-          </footer>
-        </div>
-      </section>
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }

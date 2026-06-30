@@ -6,7 +6,7 @@ import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
 import { OverviewView } from './views/OverviewView'
 import { SessionProvider } from './context/SessionContext'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Trophy, Volume2, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, Copy, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -106,7 +106,7 @@ type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stro
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
-type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
+type AppView = 'home' | 'script_hub' | 'minigame'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type AppFontPreset =
@@ -150,7 +150,7 @@ type ThemeKey =
   | 'plum_garden_light'
   | 'matcha_stone_light'
 type ThemeMode = 'dark' | 'light'
-type SettingsTabKey = 'theme' | 'background' | 'font_size' | 'animations' | 'tutor' | 'voice' | 'shortcuts'
+type SettingsTabKey = 'theme' | 'background' | 'font_size' | 'animations' | 'tutor' | 'voice' | 'shortcuts' | 'data'
 
 const FEEDBACK_REVEAL_MS = 2100
 const ASSISTANT_EVENT_POLL_MS = 15000
@@ -170,6 +170,7 @@ const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIco
   { key: 'tutor', label: 'Tutor', icon: MessageCircle },
   { key: 'voice', label: 'Voice', icon: Volume2 },
   { key: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
+  { key: 'data', label: 'Data', icon: Trash2 },
 ]
 const DEFAULT_LIVES = 3
 const SESSION_LENGTH_PRESETS = [
@@ -657,7 +658,7 @@ interface StudyPlanSnapshot {
 
 type StatsByScript = Record<ScriptKey, ScriptStats>
 type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
-type OverviewSectionKey = 'studyActivity' | 'contextClozeCurriculum' | 'storyProgress' | 'mistakeBreakdown' | 'itemTimeline' | 'deckSnapshot'
+type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'deckSnapshot'
 
 const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns'] as const
 
@@ -1798,13 +1799,6 @@ function calculateAwardedPoints(streakAfterCorrect: number): number {
   return 1 + comboBonus
 }
 
-function describeQueueLoad(remainingDue: number): string {
-  if (remainingDue <= 0) return 'All caught up for now.'
-  if (remainingDue <= DEFAULT_SESSION_LENGTH_PRESET.items) return 'Ready to clear in one short session.'
-  if (remainingDue <= 60) return 'Enough queued for a few sessions.'
-  return 'Long-term queue available; chip away in small runs.'
-}
-
 function formatAssistantEventTitle(event: AssistantEventPayload): string {
   if (event.event_type === 'session_goal_met') return 'You did it'
   if (event.event_type === 'streak_milestone') return 'Streak glow'
@@ -2076,8 +2070,8 @@ function App() {
   const [kanjiOverviewPage, setKanjiOverviewPage] = useState<Partial<Record<JlptLevel, number>>>({})
   const [overviewBlocksLoading, setOverviewBlocksLoading] = useState(false)
 
-  const pageLoading = loading || gameLoading || overviewBlocksLoading
-  const pageLoadingLabel = gameLoading ? 'Loading deck cards…' : overviewBlocksLoading ? 'Loading overview…' : 'Loading…'
+  const pageLoading = loading || gameLoading
+  const pageLoadingLabel = gameLoading ? 'Loading deck cards…' : 'Loading…'
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [homeStudyPlanExpanded, setHomeStudyPlanExpanded] = useState(false)
@@ -2088,10 +2082,7 @@ function App() {
   const [learningPathExpanded, setLearningPathExpanded] = useState(false)
   const [overviewSectionExpanded, setOverviewSectionExpanded] = useState<Record<OverviewSectionKey, boolean>>({
     studyActivity: false,
-    contextClozeCurriculum: false,
-    storyProgress: false,
     mistakeBreakdown: false,
-    itemTimeline: false,
     deckSnapshot: false,
   })
 
@@ -2113,9 +2104,9 @@ function App() {
   const [expertiseError, setExpertiseError] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
   const [backgroundPreviewUrls, setBackgroundPreviewUrls] = useState<Partial<Record<BackgroundStyle, string>>>({})
+  const [showOverview, setShowOverview] = useState(false)
   const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0)
   const [resettingDb, setResettingDb] = useState(false)
-  const [historyPage, setHistoryPage] = useState(1)
   const [isWindowMaximized, setIsWindowMaximized] = useState(false)
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
@@ -4176,7 +4167,12 @@ function App() {
 
       if ((event.ctrlKey || event.metaKey) && event.key === ',') {
         event.preventDefault()
-        setShowSettings((v) => !v)
+        if (showSettings) {
+          setShowSettings(false)
+        } else {
+          setShowOverview(false)
+          setShowSettings(true)
+        }
         return
       }
 
@@ -4203,14 +4199,28 @@ function App() {
           return
         }
 
-        if (view === 'script_hub' || view === 'overview') {
+        if (view === 'script_hub') {
           setNavDirection('back')
           setView('home')
+          return
+        }
+
+        if (showOverview) {
+          setShowOverview(false)
           return
         }
       }
 
       if (showSettings || isInput) return
+
+      if (event.key === '6') {
+        setShowOverview(true)
+        setShowSettings(false)
+        void loadSummary()
+        setShortcutMenuOpen(false)
+        setActiveShortcutFlyout(null)
+        return
+      }
 
       if (view === 'home') {
         if (event.key === '1') {
@@ -4238,16 +4248,12 @@ function App() {
           setActiveScript('grammar_patterns')
           setView('script_hub')
         }
-        if (event.key === '6') {
-          setNavDirection('forward')
-          setView('overview')
-        }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedChar, shortcutMenuOpen, showExpertisePrompt, showSettings, view])
+  }, [loadSummary, selectedChar, shortcutMenuOpen, showExpertisePrompt, showOverview, showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -4263,97 +4269,6 @@ function App() {
     [summary],
   )
   const mistakes = useMemo(() => summary?.mistakes ?? [], [summary])
-  const itemHistory = useMemo(() => summary?.item_history ?? [], [summary])
-  const curriculumSummary = useMemo(
-    () =>
-      summary?.curriculum?.context_cloze ?? {
-        mode: 'context_cloze',
-        script_tag: 'all',
-        attempts: 0,
-        accuracy: 0,
-        accuracy_7d: 0,
-        stage_distribution: { 1: 0, 2: 0, 3: 0 },
-      },
-    [summary],
-  )
-  const curriculumByScript = useMemo(
-    () => ({
-      hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-      katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-      kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-      vocab_n5: { mode: 'context_cloze', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-      grammar_patterns: { mode: 'context_cloze', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-      ...(summary?.curriculum?.context_cloze_by_script ?? {}),
-    }),
-    [summary],
-  )
-  const narrativeSummary = useMemo(
-    () =>
-      summary?.curriculum?.narrative_story ?? {
-        mode: 'narrative_story',
-        script_tag: 'all',
-        attempts: 0,
-        accuracy: 0,
-        chapters: {
-          '1': { attempts: 0, accuracy: 0, completion_rate: 0 },
-          '2': { attempts: 0, accuracy: 0, completion_rate: 0 },
-          '3': { attempts: 0, accuracy: 0, completion_rate: 0 },
-        },
-      },
-    [summary],
-  )
-  const narrativeByScript = useMemo(
-    () => ({
-      hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-      katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-      kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-      vocab_n5: { mode: 'narrative_story', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-      grammar_patterns: { mode: 'narrative_story', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 0 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-      ...(summary?.curriculum?.narrative_story_by_script ?? {}),
-    }),
-    [summary],
-  )
-  const storyReadiness = useMemo(() => {
-    return ALL_SCRIPT_KEYS.map((script) => {
-      const metric = curriculumByScript[script]
-      const stage1 = metric.stage_distribution[1] ?? 0
-      const stage2 = metric.stage_distribution[2] ?? 0
-      const stage3 = metric.stage_distribution[3] ?? 0
-      const tracked = stage1 + stage2 + stage3
-      const chapter2Ready = stage2 + stage3
-      const chapter3Ready = stage3
-      const chapter2Pct = tracked > 0 ? Math.round((chapter2Ready / tracked) * 100) : 0
-      const chapter3Pct = tracked > 0 ? Math.round((chapter3Ready / tracked) * 100) : 0
-
-      return {
-        script,
-        tracked,
-        chapter2Ready,
-        chapter3Ready,
-        chapter2Pct,
-        chapter3Pct,
-      }
-    })
-  }, [curriculumByScript])
-
-  const totals = useMemo(() => {
-    const totalCards = decks.reduce((acc, deck) => acc + deck.total, 0)
-    const masteredCards = decks.reduce((acc, deck) => acc + deck.mastered, 0)
-    const dueToday = decks.reduce((acc, deck) => acc + deck.due_today, 0)
-    const completedToday = decks.reduce((acc, deck) => acc + deck.completed_today, 0)
-    const remainingDue = Math.max(0, dueToday - completedToday)
-    const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0
-
-    return {
-      totalCards,
-      masteredCards,
-      dueToday,
-      completedToday,
-      remainingDue,
-      masteryRate,
-    }
-  }, [decks])
-
   const studyPlan = useMemo(
     () => buildStudyPlan(decks, kanjiLevelProgress, vocabLevelProgress, activity, streak.current_days),
     [activity, decks, kanjiLevelProgress, streak.current_days, vocabLevelProgress],
@@ -4367,20 +4282,6 @@ function App() {
     },
     [studyPlan.coverageRows],
   )
-
-  const summaryTiles = [
-    { label: 'Decks', value: decks.length.toString(), tone: 'teal', icon: BarChart3, accent: 'insight' },
-    { label: 'Current Streak', value: `${streak.current_days} days`, tone: 'ocean', icon: Flame, accent: 'streak' },
-    { label: 'Mastered', value: `${totals.masteryRate}%`, tone: 'amber', icon: Trophy, accent: 'mastery' },
-    {
-      label: 'Next Session',
-      value: `${Math.min(totals.remainingDue, DEFAULT_SESSION_LENGTH_PRESET.items)} cards`,
-      note: describeQueueLoad(totals.remainingDue),
-      tone: 'rose',
-      icon: CalendarDays,
-      accent: 'warning',
-    },
-  ] as const
 
   const activeScriptStats = scriptStats[activeScript]
   const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : activeBlockCards
@@ -4429,17 +4330,6 @@ function App() {
   }, [sessionActive, sessionRounds, activeBlockCards, cardScores, activeScript])
   const hasAnyActivity = activity.week.reviewed > 0 || activity.month.reviewed > 0
   const hasMistakeData = mistakes.length > 0
-  const historyPageSize = 4
-  const historyPageCount = Math.max(1, Math.ceil(itemHistory.length / historyPageSize))
-  const clampedHistoryPage = Math.min(historyPage, historyPageCount)
-  const pagedHistory = itemHistory.slice(
-    (clampedHistoryPage - 1) * historyPageSize,
-    clampedHistoryPage * historyPageSize,
-  )
-
-  useEffect(() => {
-    setHistoryPage(1)
-  }, [summary])
 
   useEffect(() => {
     if (activeScript !== 'kanji_n5' || blockProgress.length > 0) return
@@ -4459,9 +4349,9 @@ function App() {
     setActiveVocabCategory(fallback.key as VocabCategory)
   }, [activeScript, blockProgress.length, vocabCategoryProgress, activeVocabCategory])
 
-  // Lazy-load block data for hiragana + katakana when the overview opens.
+  // Lazy-load block data for hiragana + katakana when the overview popup opens.
   useEffect(() => {
-    if (view !== 'overview') return
+    if (!showOverview) return
     setOverviewBlocksLoading(true)
     void window.jplearnDesktop.getOverviewCharacterMastery()
       .then((payload) => {
@@ -4470,7 +4360,7 @@ function App() {
       })
       .catch(() => undefined)
       .finally(() => setOverviewBlocksLoading(false))
-  }, [view])
+  }, [showOverview])
 
   useEffect(() => {
     if (isHistoryNavigationRef.current) {
@@ -4513,10 +4403,11 @@ function App() {
   }, [closeShortcutMenu, goHome])
 
   const jumpToOverview = useCallback(() => {
-    setNavDirection('forward')
-    setView('overview')
+    setShowOverview(true)
+    setShowSettings(false)
+    void loadSummary()
     closeShortcutMenu()
-  }, [closeShortcutMenu])
+  }, [closeShortcutMenu, loadSummary])
 
   const jumpToScriptHub = useCallback((script: ScriptKey) => {
     setNavDirection('forward')
@@ -4571,6 +4462,7 @@ function App() {
 
   const openSettingsFromMenu = useCallback(() => {
     setShowSettings(true)
+    setShowOverview(false)
     closeShortcutMenu()
   }, [closeShortcutMenu])
 
@@ -4584,7 +4476,6 @@ function App() {
     setError(null)
     try {
       await window.jplearnDesktop.resetStudyDb()
-      // Also wipe all locally-tracked scores and stats so the UI is fully clean.
       const emptyScores: CardScores = { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} }
       const emptyStats: StatsByScript = {
         hiragana: { ...EMPTY_SCRIPT_STATS },
@@ -5273,10 +5164,10 @@ function App() {
         toggleConfidence: () => setConfidenceCaptureEnabled((previous) => !previous),
         playAudio: (text) => { void playQuestionAudio(text) },
       }}>
-      {/* Home is the main landing surface; keep it mounted only for home/overview. */}
-      {(view === 'home' || view === 'overview') ? (
+      {/* Home is the main landing surface; keep it mounted only for home view. */}
+      {view === 'home' ? (
         <HomeView
-          navDirection={view === 'home' ? navDirection : 'forward'}
+          navDirection={navDirection}
           studyPlan={studyPlan}
           homeStudyPlanExpanded={homeStudyPlanExpanded}
           tutorBanner={tutorReactions[0] ? {
@@ -5342,7 +5233,7 @@ function App() {
           activeScriptStats={activeScriptStats}
           activeSectionName={activeSectionName}
           onBack={goHome}
-          onOpenSettings={() => setShowSettings(true)}
+          onOpenSettings={() => { setShowOverview(false); setShowSettings(true) }}
           onSelectBlock={(index) => {
             setActiveBlockIndex(index)
             setSessionActive(false)
@@ -5450,59 +5341,52 @@ function App() {
             setNavDirection('back')
             setView('script_hub')
           }}
-          onOpenSettings={() => setShowSettings(true)}
+          onOpenSettings={() => { setShowOverview(false); setShowSettings(true) }}
         />
       ) : null}
 
-      {/* Phase 9: OverviewView as full-screen overlay */}
-      {view === 'overview' ? (
-        <div className="overview-overlay">
-          <OverviewView
-            isOverlay
-            navDirection={navDirection}
-            loading={loading}
-            error={error}
-            lastUpdated={lastUpdated}
-            decks={decks}
-            streak={streak}
-            activity={activity}
-            summaryTiles={summaryTiles as unknown as Parameters<typeof OverviewView>[0]['summaryTiles']}
-            curriculumSummary={curriculumSummary}
-            curriculumByScript={curriculumByScript}
-            narrativeSummary={narrativeSummary}
-            narrativeByScript={narrativeByScript}
-            storyReadiness={storyReadiness}
-            overviewBlocks={overviewBlocks}
-            overviewKanjiDeck={overviewKanjiDeck}
-            overviewKanjiLevelProgress={overviewKanjiLevelProgress}
-            overviewBlocksLoading={overviewBlocksLoading}
-            mistakes={mistakes}
-            itemHistory={itemHistory}
-            pagedHistory={pagedHistory}
-            clampedHistoryPage={clampedHistoryPage}
-            historyPageCount={historyPageCount}
-            hasAnyActivity={hasAnyActivity}
-            hasMistakeData={hasMistakeData}
-            charMasteryExpanded={charMasteryExpanded}
-            expandedBlocks={expandedBlocks}
-            overviewSectionExpanded={overviewSectionExpanded}
-            resetConfirmStep={resetConfirmStep}
-            resettingDb={resettingDb}
-            cardScores={cardScores}
-            kanjiOverviewPage={kanjiOverviewPage}
-            totals={{ completedToday: totals.completedToday }}
-            onBack={goHome}
-            onOpenSettings={() => setShowSettings(true)}
-            onRefresh={() => void loadSummary()}
-            onToggleCharMastery={() => setCharMasteryExpanded((v) => !v)}
-            onSetExpandedBlocks={setExpandedBlocks}
-            onToggleSection={toggleOverviewSection}
-            onResetConfirmStep={setResetConfirmStep}
-            onResetDb={() => void resetStudyDb()}
-            onSetHistoryPage={setHistoryPage}
-            onSetKanjiOverviewPage={setKanjiOverviewPage}
-            onSetSelectedChar={setSelectedChar}
-          />
+      {/* Study Overview popup — accessible on top of any view */}
+      {showOverview ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => setShowOverview(false)}
+        >
+          <div
+            className="overview-popup-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Study Overview"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <OverviewView
+              loading={loading}
+              error={error}
+              lastUpdated={lastUpdated}
+              streak={streak}
+              decks={decks}
+              activity={activity}
+              overviewBlocks={overviewBlocks}
+              overviewKanjiDeck={overviewKanjiDeck}
+              overviewKanjiLevelProgress={overviewKanjiLevelProgress}
+              overviewBlocksLoading={overviewBlocksLoading}
+              mistakes={mistakes}
+              hasAnyActivity={hasAnyActivity}
+              hasMistakeData={hasMistakeData}
+              charMasteryExpanded={charMasteryExpanded}
+              expandedBlocks={expandedBlocks}
+              overviewSectionExpanded={overviewSectionExpanded}
+              cardScores={cardScores}
+              kanjiOverviewPage={kanjiOverviewPage}
+              onClose={() => setShowOverview(false)}
+              onRefresh={() => void loadSummary()}
+              onToggleCharMastery={() => setCharMasteryExpanded((v) => !v)}
+              onSetExpandedBlocks={setExpandedBlocks}
+              onToggleSection={toggleOverviewSection}
+              onSetKanjiOverviewPage={setKanjiOverviewPage}
+              onSetSelectedChar={setSelectedChar}
+            />
+          </div>
         </div>
       ) : null}
 
@@ -6122,6 +6006,68 @@ function App() {
                       <code className="command-hint">6</code><span>Study overview (home)</span>
                     </div>
                     <p className="settings-help">When off, shortcut keys still work but hint labels stay hidden in game rounds.</p>
+                  </div>
+                </div>
+                ) : null}
+
+                {activeSettingsTab === 'data' ? (
+                <div
+                  className="settings-section settings-control-row settings-control-row-no-icon"
+                  role="tabpanel"
+                  id="settings-panel-data"
+                  aria-labelledby="settings-tab-data"
+                >
+                  <div className="settings-control-content">
+                    <p className="settings-section-label">Data Management</p>
+                    <p className="settings-help">
+                      Reset all study progress — review history, streaks, leech data, and locally-tracked scores.
+                      This cannot be undone.
+                    </p>
+                    {resetConfirmStep === 0 ? (
+                      <button
+                        type="button"
+                        className="settings-reset-button"
+                        onClick={() => setResetConfirmStep(1)}
+                        disabled={resettingDb}
+                      >
+                        <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
+                        Reset all progress
+                      </button>
+                    ) : resetConfirmStep === 1 ? (
+                      <div className="settings-reset-confirm">
+                        <p className="settings-reset-warning">Are you sure? All progress will be permanently deleted.</p>
+                        <div className="reset-confirm-actions">
+                          <button
+                            type="button"
+                            className="danger-button"
+                        onClick={() => setResetConfirmStep(2)}
+                            disabled={resettingDb}
+                          >
+                            I understand — continue
+                          </button>
+                          <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="settings-reset-confirm">
+                        <p className="settings-reset-warning"><strong>Final step:</strong> this will erase everything.</p>
+                        <div className="reset-confirm-actions">
+                          <button
+                            type="button"
+                            className="danger-button danger-button-final"
+                            onClick={() => void resetStudyDb()}
+                            disabled={resettingDb}
+                          >
+                            {resettingDb ? 'Resetting…' : '⚠ Yes, delete everything'}
+                          </button>
+                          <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 ) : null}
