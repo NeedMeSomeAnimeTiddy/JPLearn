@@ -6,7 +6,7 @@ import {
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { Lock } from 'lucide-react'
+import { Languages, Lock } from 'lucide-react'
 import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
 
@@ -44,6 +44,8 @@ interface HomeViewProps {
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
   onDismissTutorBanner?: (dedupKey: string) => void
   onStartRecommendation?: (nodeId: string) => void
+  isJLPTPrepUnlocked?: boolean
+  onSelectJLPTPrep?: () => void
 }
 
 export function HomeView({
@@ -57,6 +59,8 @@ export function HomeView({
   onJumpToSetup,
   onDismissTutorBanner,
   onStartRecommendation,
+  isJLPTPrepUnlocked = false,
+  onSelectJLPTPrep,
 }: HomeViewProps) {
   return (
     <div className={`view-shell view-${navDirection}`}>
@@ -70,7 +74,22 @@ export function HomeView({
         />
       )}
       <section className="home-menu panel-glass">
-        <h1 className="home-logo">JPLearn</h1>
+        <div className="home-header-row">
+          <h1 className="home-logo">JPLearn</h1>
+          {onSelectJLPTPrep ? (
+            <button
+              type="button"
+              className={`home-jlpt-btn${!isJLPTPrepUnlocked ? ' is-locked' : ''}`}
+              onClick={isJLPTPrepUnlocked ? onSelectJLPTPrep : undefined}
+              title={isJLPTPrepUnlocked ? 'JLPT Preparation' : 'Unlocks after starting N5 Vocabulary'}
+              aria-label={isJLPTPrepUnlocked ? 'Open JLPT Preparation' : 'JLPT Prep — locked'}
+            >
+              <Languages size={14} strokeWidth={2.2} aria-hidden="true" />
+              JLPT Prep
+              {!isJLPTPrepUnlocked ? <Lock size={11} strokeWidth={2.2} aria-hidden="true" /> : null}
+            </button>
+          ) : null}
+        </div>
         <p className="home-copy">
           Main Menu. Choose a learning track, then pick a minigame and start your run.
         </p>

@@ -102,6 +102,24 @@ from data.database import (
     save_user_xp,
     upsert_progression_node,
 )
+from data.jlpt_repository import (
+    load_card_accuracy_map,
+    load_jlpt_exam_history,
+    save_jlpt_exam_result,
+)
+from domain.jlpt_readiness import (
+    JLPT_LEVEL_SPECS,
+    LEVEL_ORDER,
+    compute_readiness_report,
+)
+from domain.jlpt_sessions import (
+    JLPTExamMode,
+    build_adaptive_review_queue,
+    build_diagnostic_queue,
+    build_mock_exam_queue,
+    build_weak_area_queue,
+    project_mock_score,
+)
 
 SUMMARY_SCRIPT_TAGS = (
     "hiragana",
@@ -1158,6 +1176,132 @@ def get_assistant_chat_context(session_id: str | None = None, user_message: str 
     }
 
 
+# ---------------------------------------------------------------------------
+# JLPT preparation commands
+# ---------------------------------------------------------------------------
+
+_VALID_JLPT_LEVELS = frozenset(LEVEL_ORDER)
+_VALID_JLPT_MODES: frozenset[str] = frozenset(
+    ["mock_exam", "diagnostic", "adaptive_review", "weak_area_drill"]
+)
+
+
+def build_jlpt_readiness_payload() -> dict[str, object]:
+    """Return readiness report for all 5 JLPT levels."""
+    init_study_db()
+    states_by_deck: dict[str, dict[int, object]] = {}
+    for level_key in LEVEL_ORDER:
+        spec = JLPT_LEVEL_SPECS[level_key]
+        for deck_name in (spec.vocab_deck, spec.kanji_deck):
+            factory = ALL_DECKS.get(deck_name)
+            if factory is None:
+                states_by_deck[deck_name] = {}
+                continue
+            deck = factory()
+            card_ids = [card.id for card in deck.cards]
+            states_by_deck[deck_name] = load_review_states(deck.name, card_ids)
+
+    report = compute_readiness_report(states_by_deck)  # type: ignore[arg-type]
+    return {
+        "recommended_target": report.recommended_target,
+        "levels": {
+            key: {
+                "level": lr.level,
+                "mastered_vocab": lr.mastered_vocab,
+                "total_vocab": lr.total_vocab,
+                "mastered_kanji": lr.mastered_kanji,
+                "total_kanji": lr.total_kanji,
+                "readiness_pct": lr.readiness_pct,
+                "is_ready": lr.is_ready,
+                "pass_mark": JLPT_LEVEL_SPECS[key].pass_mark,
+                "vocab_grammar_section_max": JLPT_LEVEL_SPECS[key].vocab_grammar_section_max,
+                "vocab_grammar_pass_mark": JLPT_LEVEL_SPECS[key].vocab_grammar_pass_mark,
+            }
+            for key, lr in report.levels.items()
+        },
+    }
+
+
+def build_jlpt_exam_queue_payload(
+    level: str, mode: str, count: int
+) -> dict[str, object]:
+    """Return an enriched exam question queue for the given level and mode."""
+    init_study_db()
+
+    # Load cards for both decks of this level (or all levels for diagnostic)
+    target_levels = list(LEVEL_ORDER) if mode == "diagnostic" else [level]
+    cards_by_deck: dict[str, list] = {}
+    states_by_deck: dict[str, dict[int, object]] = {}
+    leech_ids_by_deck: dict[str, set[int]] = {}
+
+    for lv in target_levels:
+        spec = JLPT_LEVEL_SPECS[lv]
+        for deck_name in (spec.vocab_deck, spec.kanji_deck):
+            factory = ALL_DECKS.get(deck_name)
+            if factory is None:
+                cards_by_deck[deck_name] = []
+                states_by_deck[deck_name] = {}
+                leech_ids_by_deck[deck_name] = set()
+                continue
+            deck = factory()
+            card_ids = [card.id for card in deck.cards]
+            cards_by_deck[deck_name] = deck.cards
+            states_by_deck[deck_name] = load_review_states(deck.name, card_ids)
+            if mode in ("weak_area_drill",):
+                leech_ids_by_deck[deck_name] = load_active_leech_card_ids(deck.name)
+
+    # Load accuracy map for modes that need it
+    accuracy_map: dict[tuple[str, int], float] = {}
+    if mode in ("mock_exam", "weak_area_drill"):
+        all_deck_names = list(cards_by_deck.keys())
+        accuracy_map = load_card_accuracy_map(all_deck_names)
+
+    # Build queue
+    if mode == "mock_exam":
+        queue = build_mock_exam_queue(level, cards_by_deck, accuracy_map, count)
+    elif mode == "diagnostic":
+        queue = build_diagnostic_queue(cards_by_deck, states_by_deck)  # type: ignore[arg-type]
+    elif mode == "adaptive_review":
+        queue = build_adaptive_review_queue(level, cards_by_deck, states_by_deck, count=count)  # type: ignore[arg-type]
+    else:  # weak_area_drill
+        queue = build_weak_area_queue(level, cards_by_deck, leech_ids_by_deck, accuracy_map, count)
+
+    # Enrich each question with card data and meaning distractors
+    card_lookup: dict[tuple[str, int], object] = {}
+    distractor_pool_by_deck: dict[str, list] = {}
+    for deck_name, cards in cards_by_deck.items():
+        distractor_pool_by_deck[deck_name] = cards
+        for card in cards:
+            card_lookup[(deck_name, card.id)] = card
+
+    enriched: list[dict[str, object]] = []
+    for q in queue:
+        card = card_lookup.get((q.deck, q.card_id))
+        if card is None:
+            continue
+        pool = distractor_pool_by_deck.get(q.deck, [])
+        distractor_ids = rank_distractor_ids(pool, card, mode="meaning")[:3]
+        distractor_cards = [c for c in pool if c.id in distractor_ids]
+        enriched.append({
+            "card_id": q.card_id,
+            "deck": q.deck,
+            "question_type": q.question_type,
+            "level": q.level,
+            "card": {
+                "id": card.id,
+                "character": card.character,
+                "romaji": card.romaji,
+                "meaning": card.meaning,
+                "tags": card.tags,
+                "example_sentence": card.example_sentence,
+            },
+            "distractor_meanings": [c.meaning for c in distractor_cards],
+            "distractor_card_ids": distractor_ids,
+        })
+
+    return {"level": level, "mode": mode, "questions": enriched}
+
+
 def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
     if not argv:
         return 2, {"error": "Missing command"}
@@ -1349,6 +1493,59 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         if len(argv) < 2:
             return 2, {"error": "Usage: tutor-dismiss <dedup_key>"}
         return 0, dismiss_tutor_reaction_key(argv[1])
+
+    if command == "jlpt-readiness":
+        try:
+            return 0, build_jlpt_readiness_payload()
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "jlpt-exam-queue":
+        if len(argv) < 3:
+            return 2, {"error": "Usage: jlpt-exam-queue <level> <mode> [count]"}
+        lv = argv[1].lower()
+        md = argv[2].lower()
+        if lv not in _VALID_JLPT_LEVELS:
+            return 2, {"error": f"Invalid JLPT level: {lv}"}
+        if md not in _VALID_JLPT_MODES:
+            return 2, {"error": f"Invalid JLPT mode: {md}"}
+        try:
+            cnt = int(argv[3]) if len(argv) > 3 and argv[3].strip() else 30
+            return 0, build_jlpt_exam_queue_payload(lv, md, cnt)
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "jlpt-save-result":
+        if len(argv) < 6:
+            return 2, {"error": "Usage: jlpt-save-result <level> <mode> <questions_answered> <correct> <accuracy> [projected_score]"}
+        try:
+            lv = argv[1].lower()
+            md = argv[2].lower()
+            if lv not in _VALID_JLPT_LEVELS:
+                return 2, {"error": f"Invalid JLPT level: {lv}"}
+            if md not in _VALID_JLPT_MODES:
+                return 2, {"error": f"Invalid JLPT mode: {md}"}
+            qa = int(argv[3])
+            correct = int(argv[4])
+            accuracy = float(argv[5])
+            projected: int | None = int(argv[6]) if len(argv) > 6 and argv[6].strip() else None
+            row_id = save_jlpt_exam_result(lv, md, qa, correct, accuracy, projected)
+            return 0, {"ok": True, "id": row_id}
+        except (ValueError, IndexError) as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "jlpt-exam-history":
+        try:
+            lv = argv[1].lower() if len(argv) > 1 and argv[1].strip() else None
+            md = argv[2].lower() if len(argv) > 2 and argv[2].strip() else None
+            if lv and lv not in _VALID_JLPT_LEVELS:
+                return 2, {"error": f"Invalid JLPT level: {lv}"}
+            if md and md not in _VALID_JLPT_MODES:
+                return 2, {"error": f"Invalid JLPT mode: {md}"}
+            results = load_jlpt_exam_history(level=lv, mode=md)
+            return 0, {"results": results}
+        except Exception as exc:
+            return 2, {"error": str(exc)}
 
     return 2, {"error": f"Unknown command: {command}"}
 

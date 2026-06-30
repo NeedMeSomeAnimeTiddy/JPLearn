@@ -369,6 +369,10 @@ interface DesktopApi {
   getRecommendations?: () => Promise<RecommendationsPayload>
   getTutorReactions?: () => Promise<TutorReactionsPayload>
   dismissTutorReaction?: (dedupKey: string) => Promise<{ ok: boolean }>
+  getJLPTReadiness?: () => Promise<JLPTReadinessPayload>
+  buildJLPTExamQueue?: (level: JLPTLevel, mode: JLPTExamMode, count?: number) => Promise<JLPTExamQueuePayload>
+  saveJLPTExamResult?: (payload: JLPTSaveResultPayload) => Promise<{ ok: boolean; id: number }>
+  getJLPTExamHistory?: (level?: JLPTLevel | '', mode?: JLPTExamMode | '') => Promise<JLPTExamHistoryPayload>
 }
 
 interface VoiceStatus {
@@ -386,6 +390,77 @@ interface VoiceSpeakResponse {
   sampleRate: number
   voiceId: number
   audioBase64: string
+}
+
+// ---- JLPT preparation types ----
+type JLPTLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
+type JLPTExamMode = 'mock_exam' | 'diagnostic' | 'adaptive_review' | 'weak_area_drill'
+
+interface JLPTLevelReadiness {
+  level: JLPTLevel
+  mastered_vocab: number
+  total_vocab: number
+  mastered_kanji: number
+  total_kanji: number
+  readiness_pct: number
+  is_ready: boolean
+  pass_mark: number
+  vocab_grammar_section_max: number
+  vocab_grammar_pass_mark: number
+}
+
+interface JLPTReadinessPayload {
+  recommended_target: JLPTLevel
+  levels: Record<JLPTLevel, JLPTLevelReadiness>
+}
+
+interface JLPTExamCardData {
+  id: number
+  character: string
+  romaji: string
+  meaning: string
+  tags: string[]
+  example_sentence: string | null
+}
+
+interface JLPTExamQuestion {
+  card_id: number
+  deck: string
+  question_type: string
+  level: JLPTLevel
+  card: JLPTExamCardData
+  distractor_meanings: string[]
+  distractor_card_ids: number[]
+}
+
+interface JLPTExamQueuePayload {
+  level: JLPTLevel
+  mode: JLPTExamMode
+  questions: JLPTExamQuestion[]
+}
+
+interface JLPTSaveResultPayload {
+  level: JLPTLevel
+  mode: JLPTExamMode
+  questionsAnswered: number
+  correct: number
+  accuracy: number
+  projectedScore: number | null
+}
+
+interface JLPTExamResultRecord {
+  id: number
+  level: JLPTLevel
+  mode: JLPTExamMode
+  questions_answered: number
+  correct: number
+  accuracy: number
+  projected_score: number | null
+  completed_at_utc: string
+}
+
+interface JLPTExamHistoryPayload {
+  results: JLPTExamResultRecord[]
 }
 
 // ProgressionNodeStatus keeps a narrow status union; the generated type uses string.

@@ -466,11 +466,17 @@ class TestJPLearnCatalog:
         new_state, _ = evaluate_features(JPLEARN_FEATURES, prog, state, TODAY)
         assert new_state.statuses["kanji_mode"] == "locked"
 
-    def test_jlpt_dashboard_unlocks_when_jlpt_n5_unlocked(self):
-        prog = _prog_state(jlpt_n5="unlocked")
+    def test_jlpt_dashboard_unlocks_when_vocabulary_n5_unlocked(self):
+        prog = _prog_state(vocabulary_n5="unlocked")
         state = build_feature_state(JPLEARN_FEATURES)
         new_state, _ = evaluate_features(JPLEARN_FEATURES, prog, state, TODAY)
         assert new_state.statuses["jlpt_dashboard"] == "unlocked"
+
+    def test_jlpt_dashboard_stays_locked_without_vocabulary_n5(self):
+        prog = _prog_state()
+        state = build_feature_state(JPLEARN_FEATURES)
+        new_state, _ = evaluate_features(JPLEARN_FEATURES, prog, state, TODAY)
+        assert new_state.statuses["jlpt_dashboard"] == "locked"
 
     def test_nothing_beyond_tier1_unlocks_without_progression(self):
         """With no progression, only no-requirement features should unlock."""

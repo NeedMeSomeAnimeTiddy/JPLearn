@@ -357,6 +357,58 @@ function validateSpeakPayload(payload) {
   return result
 }
 
+const VALID_JLPT_LEVELS = new Set(['n5', 'n4', 'n3', 'n2', 'n1'])
+const VALID_JLPT_MODES = new Set(['mock_exam', 'diagnostic', 'adaptive_review', 'weak_area_drill'])
+
+function validateJLPTLevel(value) {
+  if (typeof value !== 'string' || !VALID_JLPT_LEVELS.has(value)) {
+    throw new Error(`Invalid JLPT level: ${String(value)}`)
+  }
+  return value
+}
+
+function validateJLPTMode(value) {
+  if (typeof value !== 'string' || !VALID_JLPT_MODES.has(value)) {
+    throw new Error(`Invalid JLPT exam mode: ${String(value)}`)
+  }
+  return value
+}
+
+function validateOptionalJLPTLevel(value) {
+  if (value == null || value === '') return null
+  return validateJLPTLevel(value)
+}
+
+function validateOptionalJLPTMode(value) {
+  if (value == null || value === '') return null
+  return validateJLPTMode(value)
+}
+
+function validateJLPTSaveResultPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid JLPT save result payload: expected object')
+  }
+  const level = validateJLPTLevel(payload.level)
+  const mode = validateJLPTMode(payload.mode)
+  const questionsAnswered = Number(payload.questionsAnswered)
+  const correct = Number(payload.correct)
+  const accuracy = Number(payload.accuracy)
+  if (!Number.isFinite(questionsAnswered) || questionsAnswered < 0) {
+    throw new Error('Invalid questionsAnswered')
+  }
+  if (!Number.isFinite(correct) || correct < 0) {
+    throw new Error('Invalid correct count')
+  }
+  if (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 1) {
+    throw new Error('Invalid accuracy value')
+  }
+  const projectedScore = payload.projectedScore != null ? Number(payload.projectedScore) : null
+  if (projectedScore !== null && !Number.isFinite(projectedScore)) {
+    throw new Error('Invalid projectedScore')
+  }
+  return { level, mode, questionsAnswered, correct, accuracy, projectedScore }
+}
+
 module.exports = {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
@@ -373,4 +425,9 @@ module.exports = {
   validateStartupThemeInput,
   validateRecordGameResultPayload,
   validateSpeakPayload,
+  validateJLPTLevel,
+  validateJLPTMode,
+  validateOptionalJLPTLevel,
+  validateOptionalJLPTMode,
+  validateJLPTSaveResultPayload,
 }

@@ -49,4 +49,8 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getRecommendations: () => ipcRenderer.invoke('recommendations:get'),
   getTutorReactions: () => ipcRenderer.invoke('tutor:get-reactions'),
   dismissTutorReaction: (dedupKey) => ipcRenderer.invoke('tutor:dismiss-reaction', dedupKey),
+  getJLPTReadiness: () => ipcRenderer.invoke('jlpt:get-readiness'),
+  buildJLPTExamQueue: (level, mode, count) => ipcRenderer.invoke('jlpt:build-exam-queue', level, mode, count),
+  saveJLPTExamResult: (payload) => ipcRenderer.invoke('jlpt:save-exam-result', payload),
+  getJLPTExamHistory: (level, mode) => ipcRenderer.invoke('jlpt:get-exam-history', level, mode),
 })

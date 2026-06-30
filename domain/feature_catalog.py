@@ -128,7 +128,7 @@ JPLEARN_FEATURES: list[Feature] = [
         category="ui",
         requirement=FeatureRequirement(
             progression_conditions=(
-                ProgressionCondition(node_id="jlpt_n5", required_status="unlocked"),
+                ProgressionCondition(node_id="vocabulary_n5", required_status="unlocked"),
             )
         ),
         unlock=_unlock(

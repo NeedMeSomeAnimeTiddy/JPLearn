@@ -6,6 +6,7 @@ import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
 import { OverviewView } from './views/OverviewView'
+import { JLPTPrepView } from './views/JLPTPrepView'
 import { SessionProvider } from './context/SessionContext'
 import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, Copy, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
 import './App.css'
@@ -108,7 +109,7 @@ type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stro
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
-type AppView = 'home' | 'script_hub' | 'minigame'
+type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type AppFontPreset =
@@ -5088,6 +5089,12 @@ function App() {
           return
         }
 
+        if (view === 'jlpt_prep') {
+          setNavDirection('back')
+          setView('home')
+          return
+        }
+
         if (showOverview) {
           setShowOverview(false)
           return
@@ -5576,6 +5583,7 @@ function App() {
   const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
   const activeAssistantToast = assistantToasts[0] ?? null
   const isTutorChatUnlocked = unlockedFeatureIds.has('tutor_chat')
+  const isJLPTPrepUnlocked = unlockedFeatureIds.has('jlpt_dashboard')
   const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
   const xpLevelCap = xpProgress?.xp_for_current_level ?? 0
   const xpPercent = xpLevelCap > 0 ? Math.round((xpInLevel / xpLevelCap) * 100) : 0
@@ -5643,6 +5651,18 @@ function App() {
                   <button type="button" role="menuitem" className="titlebar-shortcut-item" onClick={jumpToOverview}>
                     <BarChart3 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
                     Study Overview
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="titlebar-shortcut-item"
+                    onClick={() => { setView('jlpt_prep'); setShortcutMenuOpen(false) }}
+                    title={isJLPTPrepUnlocked ? 'JLPT Prep' : 'JLPT Prep (unlocks at JLPT N5 node)'}
+                    style={!isJLPTPrepUnlocked ? { opacity: 0.6 } : undefined}
+                  >
+                    <Languages className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    JLPT Prep{!isJLPTPrepUnlocked ? ' 🔒' : ''}
                   </button>
 
                   <div className="titlebar-shortcut-tree-anchor">
@@ -6087,6 +6107,8 @@ function App() {
           }}
           onToggleStudyPlan={() => setHomeStudyPlanExpanded((expanded) => !expanded)}
           onJumpToSetup={jumpToScriptHubSetup}
+          isJLPTPrepUnlocked={isJLPTPrepUnlocked}
+          onSelectJLPTPrep={() => { setNavDirection('forward'); setView('jlpt_prep') }}
         />
       ) : null}
 
@@ -6226,6 +6248,15 @@ function App() {
             setView('script_hub')
           }}
           onOpenSettings={() => { setShowOverview(false); setShowSettings(true) }}
+        />
+      ) : null}
+
+      {view === 'jlpt_prep' ? (
+        <JLPTPrepView
+          onBack={() => {
+            setNavDirection('back')
+            setView('home')
+          }}
         />
       ) : null}
 

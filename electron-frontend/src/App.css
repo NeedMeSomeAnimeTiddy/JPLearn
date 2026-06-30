@@ -1312,6 +1312,32 @@ button {
   text-shadow: 0 12px 30px rgba(24, 18, 14, 0.24);
 }
 
+.home-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.home-jlpt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  border: 1px solid var(--button-border);
+  background: linear-gradient(to bottom, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-bottom: 0.6rem;
+  transition: border-color 0.15s, opacity 0.15s;
+}
+.home-jlpt-btn:hover:not(.is-locked) { border-color: var(--accent); color: var(--accent); }
+.home-jlpt-btn.is-locked { opacity: 0.45; cursor: default; }
+
 .home-copy {
   color: var(--text-soft);
   max-width: 62ch;
@@ -7053,3 +7079,391 @@ html[data-reduced-motion='true'] *::after {
   animation-duration: 0.001ms !important;
   transition-duration: 0.001ms !important;
 }
+
+/* ============================================================
+   JLPT Preparation View
+   ============================================================ */
+
+.jlpt-prep-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 1.75rem;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.jlpt-prep-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.jlpt-prep-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.jlpt-prep-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.jlpt-prep-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.jlpt-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  transition: color 0.15s;
+}
+.jlpt-back-btn:hover { color: var(--accent); }
+
+.jlpt-error-banner {
+  background: color-mix(in srgb, var(--status-error) 15%, transparent);
+  border: 1px solid var(--status-error);
+  color: var(--status-error);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.82rem;
+}
+
+/* Level grid */
+.jlpt-levels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.jlpt-readiness-card {
+  background: var(--card-bg-top);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  transition: border-color 0.2s;
+}
+.jlpt-readiness-card.is-ready { border-color: var(--accent); }
+.jlpt-readiness-card-skeleton { opacity: 0.4; pointer-events: none; }
+
+.jlpt-readiness-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.jlpt-readiness-level {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.jlpt-ready-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 20px;
+  padding: 0.15rem 0.5rem;
+}
+
+.jlpt-readiness-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--track-bg);
+  overflow: hidden;
+}
+.jlpt-readiness-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.jlpt-readiness-counts {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.jlpt-mode-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.jlpt-mode-btn {
+  font-size: 0.73rem;
+  font-weight: 500;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--button-border);
+  background: linear-gradient(to bottom, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  cursor: pointer;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.jlpt-mode-btn:hover:not(:disabled) { border-color: var(--accent); }
+.jlpt-mode-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* History */
+.jlpt-section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin: 0 0 0.6rem;
+}
+
+.jlpt-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.jlpt-history-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
+  border-radius: 7px;
+  font-size: 0.78rem;
+}
+.jlpt-history-level { font-weight: 700; color: var(--accent); min-width: 2.5rem; }
+.jlpt-history-mode  { flex: 1; color: var(--text-main); }
+.jlpt-history-accuracy { font-weight: 600; color: var(--text-main); }
+.jlpt-history-projected { display: flex; align-items: center; gap: 0.2rem; color: var(--text-soft); }
+.jlpt-history-date  { color: var(--text-soft); margin-left: auto; }
+
+/* Exam runner */
+.jlpt-exam-runner {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  padding: 1.5rem 1.75rem;
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.jlpt-exam-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.jlpt-question-counter {
+  flex: 1;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.jlpt-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+}
+.jlpt-timer.is-urgent { color: var(--status-error); font-weight: 700; }
+
+.jlpt-mode-label {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.jlpt-timer-bar {
+  height: 3px;
+  background: var(--track-bg);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.jlpt-timer-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 1s linear;
+}
+
+.jlpt-exam-card {
+  text-align: center;
+  padding: 1.5rem;
+  background: var(--card-bg-top);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+}
+
+.jlpt-card-level-tag {
+  font-size: 0.72rem;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.jlpt-card-character {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.jlpt-card-romaji {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  margin-top: 0.35rem;
+}
+
+.jlpt-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.jlpt-choice {
+  padding: 0.75rem 1rem;
+  border-radius: 9px;
+  border: 1px solid var(--button-border);
+  background: linear-gradient(to bottom, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, opacity 0.2s;
+  text-align: center;
+}
+.jlpt-choice:hover:not(:disabled) { border-color: var(--accent); }
+.jlpt-choice.is-correct  { border-color: var(--tone-teal);  background: color-mix(in srgb, var(--tone-teal)  18%, var(--card-bg-top)); }
+.jlpt-choice.is-wrong    { border-color: var(--status-error); background: color-mix(in srgb, var(--status-error) 15%, var(--card-bg-top)); }
+.jlpt-choice.is-dim      { opacity: 0.45; }
+
+.jlpt-example-sentence {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  text-align: center;
+  padding: 0.6rem;
+  border-radius: 7px;
+  background: var(--bg-subtle);
+}
+
+/* Results */
+.jlpt-results-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  padding: 1.5rem 1.75rem;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.jlpt-results-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.jlpt-results-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.jlpt-results-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.jlpt-stat-chip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.8rem;
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
+  border-radius: 9px;
+}
+.jlpt-stat-value { font-size: 1.4rem; font-weight: 700; color: var(--text-main); }
+.jlpt-stat-label { font-size: 0.75rem; color: var(--text-soft); }
+
+.jlpt-score-section {
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-top);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.jlpt-score-section.is-pass { border-color: var(--tone-teal); }
+.jlpt-score-section.is-fail { border-color: var(--status-error); }
+
+.jlpt-score-label { font-size: 0.78rem; color: var(--text-soft); font-weight: 600; }
+.jlpt-score-value { font-size: 1.7rem; font-weight: 700; color: var(--text-main); }
+.jlpt-score-passmark {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.is-pass .jlpt-score-passmark { color: var(--tone-teal); }
+.is-fail .jlpt-score-passmark { color: var(--status-error); }
+.jlpt-score-listening { font-size: 0.77rem; color: var(--text-soft); }
+.jlpt-score-note      { font-size: 0.72rem; color: var(--text-soft); font-style: italic; }
+
+.jlpt-diagnostic-note {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  padding: 0.75rem 1rem;
+  background: var(--bg-subtle);
+  border-radius: 8px;
+}
+
+.jlpt-results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.jlpt-action-btn {
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  border: 1px solid var(--button-border);
+  background: linear-gradient(to bottom, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.jlpt-action-btn:hover { border-color: var(--accent); }
+.jlpt-action-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.jlpt-action-primary:hover { opacity: 0.9; }

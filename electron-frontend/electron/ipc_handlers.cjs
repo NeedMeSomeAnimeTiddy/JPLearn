@@ -13,6 +13,11 @@ const {
   validateRecordGameResultPayload,
   validateExpertiseLevelInput,
   validateSpeakPayload,
+  validateJLPTLevel,
+  validateJLPTMode,
+  validateOptionalJLPTLevel,
+  validateOptionalJLPTMode,
+  validateJLPTSaveResultPayload,
 } = require('./ipc_security.cjs')
 
 function registerIpcHandlers(options) {
@@ -546,6 +551,67 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to dismiss tutor reaction: ${detail}`)
+    }
+  })
+
+  // ---- JLPT preparation ----
+
+  options.ipcMain.handle('jlpt:get-readiness', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeWithArgsRead(['jlpt-readiness'])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch JLPT readiness: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('jlpt:build-exam-queue', async (event, level, mode, count) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validLevel = validateJLPTLevel(level)
+    const validMode = validateJLPTMode(mode)
+    const safeCount = (typeof count === 'number' && Number.isFinite(count) && count > 0)
+      ? String(Math.min(count, 60))
+      : '30'
+    try {
+      return await options.runPythonBridgeWithArgs(['jlpt-exam-queue', validLevel, validMode, safeCount])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to build JLPT exam queue: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('jlpt:save-exam-result', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const p = validateJLPTSaveResultPayload(payload)
+    try {
+      const args = [
+        'jlpt-save-result',
+        p.level,
+        p.mode,
+        String(p.questionsAnswered),
+        String(p.correct),
+        String(p.accuracy),
+      ]
+      if (p.projectedScore !== null) args.push(String(p.projectedScore))
+      const response = await options.runPythonBridgeWithArgs(args)
+      clearBridgeReadCaches()
+      return response
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to save JLPT exam result: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('jlpt:get-exam-history', async (event, level, mode) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validLevel = validateOptionalJLPTLevel(level) ?? ''
+    const validMode = validateOptionalJLPTMode(mode) ?? ''
+    try {
+      return await runPythonBridgeWithArgsRead(['jlpt-exam-history', validLevel, validMode])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch JLPT exam history: ${detail}`)
     }
   })
 }
