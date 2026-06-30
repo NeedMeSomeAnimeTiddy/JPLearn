@@ -20,10 +20,14 @@ import {
 } from 'lucide-react'
 import type {
   JlptLevel,
+  KanjiCategory,
+  KanjiCategorySlug,
   KanjiDeckSlug,
   MinigameKey,
   PlayableMinigame,
   ScriptKey,
+  VocabCategory,
+  VocabCategorySlug,
   VocabDeckSlug,
 } from './types'
 
@@ -41,7 +45,7 @@ export const SCRIPT_LABELS: Record<ScriptKey, string> = {
   hiragana: 'Hiragana',
   katakana: 'Katakana',
   kanji_n5: 'Kanji',
-  vocab_n5: 'Words',
+  vocab_n5: 'Vocabulary',
   grammar_patterns: 'Conversational',
 }
 
@@ -49,7 +53,7 @@ export const TIMELINE_SCRIPT_LABELS: Record<string, string> = {
   hiragana: 'Hiragana',
   katakana: 'Katakana',
   kanji_n5: 'Kanji',
-  vocab_n5: 'Words',
+  vocab_n5: 'Vocabulary',
   grammar_patterns: 'Conversational',
   unknown: 'General',
 }
@@ -58,7 +62,7 @@ export const SCRIPT_MENU_LINES: Record<ScriptKey, string> = {
   hiragana: 'Start with smooth, foundational sounds.',
   katakana: 'Train sharp symbols for names and loanwords.',
   kanji_n5: 'Build meaning recall one character at a time.',
-  vocab_n5: 'Build practical vocabulary for daily usage.',
+  vocab_n5: 'Learn everyday words grouped by topic.',
   grammar_patterns: 'Practice conversational patterns and sentence flow.',
 }
 
@@ -220,6 +224,80 @@ export const VOCAB_LEVEL_TO_DECK_SLUG: Record<JlptLevel, VocabDeckSlug> = {
 }
 
 export const KANJI_OVERVIEW_PAGE_SIZE = 45
+
+// ── Thematic category metadata ────────────────────────────────────────────────
+
+/** Mastery fraction of the previous category needed to unlock the next one. */
+export const CATEGORY_UNLOCK_THRESHOLD = 0.7
+
+export const VOCAB_CATEGORY_ORDER: VocabCategory[] = [
+  'greetings',
+  'numbers',
+  'time_days',
+  'family',
+  'body',
+  'food_drink',
+  'school_study',
+  'places',
+  'transport',
+  'adjectives',
+  'verbs',
+  'nouns',
+]
+
+export const VOCAB_CATEGORY_LABELS: Record<VocabCategory, string> = {
+  greetings:    'Greetings',
+  numbers:      'Numbers',
+  time_days:    'Time & Days',
+  family:       'Family',
+  body:         'Body',
+  food_drink:   'Food & Drink',
+  school_study: 'School & Study',
+  places:       'Places',
+  transport:    'Transport',
+  adjectives:   'Adjectives',
+  verbs:        'Verbs',
+  nouns:        'Common Nouns',
+}
+
+export const VOCAB_CATEGORY_TO_DECK_SLUG: Record<VocabCategory, VocabCategorySlug> = {
+  greetings:    'vocab_greetings',
+  numbers:      'vocab_numbers',
+  time_days:    'vocab_time_days',
+  family:       'vocab_family',
+  body:         'vocab_body',
+  food_drink:   'vocab_food_drink',
+  school_study: 'vocab_school_study',
+  places:       'vocab_places',
+  transport:    'vocab_transport',
+  adjectives:   'vocab_adjectives',
+  verbs:        'vocab_verbs',
+  nouns:        'vocab_nouns',
+}
+
+export const KANJI_CATEGORY_ORDER: KanjiCategory[] = [
+  'numbers_time',
+  'nature_world',
+  'people_body',
+  'study_language',
+  'actions_travel',
+]
+
+export const KANJI_CATEGORY_LABELS: Record<KanjiCategory, string> = {
+  numbers_time:    'Numbers & Time',
+  nature_world:    'Nature & World',
+  people_body:     'People & Body',
+  study_language:  'Study & Language',
+  actions_travel:  'Actions & Travel',
+}
+
+export const KANJI_CATEGORY_TO_DECK_SLUG: Record<KanjiCategory, KanjiCategorySlug> = {
+  numbers_time:    'kanji_numbers_time',
+  nature_world:    'kanji_nature_world',
+  people_body:     'kanji_people_body',
+  study_language:  'kanji_study_language',
+  actions_travel:  'kanji_actions_travel',
+}
 
 // ── Interleave ───────────────────────────────────────────────────────────────
 

@@ -98,8 +98,8 @@ const baseDesktopApi = {
     },
   }),
   getBlockProgress: async (slug: string) => ({ slug, blocks: [] }),
-  getDeckCards: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => ({ slug, name: 'Deck', cards: baseCards }),
-  getStudyQueue: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => ({
+  getDeckCards: async (slug: string) => ({ slug: slug as any, name: 'Deck', cards: baseCards }),
+  getStudyQueue: async (slug: string) => ({
     ok: true,
     queue: {
       slug,
@@ -188,7 +188,7 @@ function buildStudyPlanDesktopApi() {
         },
       },
     }),
-    getDeckCards: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => {
+    getDeckCards: async (slug: string) => {
       if (slug === 'kanji_n5') {
         return { slug, name: 'Kanji N5', cards: kanjiStudyPlanCards }
       }
@@ -197,7 +197,7 @@ function buildStudyPlanDesktopApi() {
         return { slug, name: 'Vocab N5', cards: vocabStudyPlanCards }
       }
 
-      return { slug, name: 'Deck', cards: baseCards }
+      return { slug: slug as any, name: 'Deck', cards: baseCards }
     },
   }
 }
@@ -223,7 +223,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('heading', { name: /^JPLearn$/i })
-    clickTopMenuCard('Words')
+    clickTopMenuCard('Vocabulary')
 
     expect((await screen.findAllByText(/Context Cloze/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Narrative Story/i)).length).toBeGreaterThan(0)
@@ -240,7 +240,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('heading', { name: /^JPLearn$/i })
-    clickTopMenuCard('Words')
+    clickTopMenuCard('Vocabulary')
 
     fireEvent.click(await screen.findByRole('button', { name: /toggle answer confidence capture/i }))
 
@@ -321,12 +321,12 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = {
       ...baseDesktopApi,
       speakText,
-      getDeckCards: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => (
+      getDeckCards: async (slug: string) => (
         slug === 'grammar_patterns'
           ? { slug, name: 'Conversational Deck', cards: conversationalCards }
-          : { slug, name: 'Deck', cards: baseCards }
+          : { slug: slug as any, name: 'Deck', cards: baseCards }
       ),
-      getStudyQueue: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => (
+      getStudyQueue: async (slug: string) => (
         slug === 'grammar_patterns'
           ? {
             ok: true,
@@ -374,7 +374,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('heading', { name: /^JPLearn$/i })
-    clickTopMenuCard('Words')
+    clickTopMenuCard('Vocabulary')
     const contextTiles = await screen.findAllByRole('button', { name: /Context Cloze/i })
     fireEvent.click(within((contextTiles[0].closest('.game-tile') ?? contextTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
@@ -391,7 +391,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('heading', { name: /^JPLearn$/i })
-    clickTopMenuCard('Words')
+    clickTopMenuCard('Vocabulary')
     const storyTiles = await screen.findAllByRole('button', { name: /Narrative Story/i })
     fireEvent.click(within((storyTiles[0].closest('.game-tile') ?? storyTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
@@ -420,12 +420,12 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = {
       ...baseDesktopApi,
       recordGameResult,
-      getDeckCards: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => (
+      getDeckCards: async (slug: string) => (
         slug === 'kanji_n5'
           ? { slug, name: 'Kanji Deck', cards: kanjiStrokeCards }
-          : { slug, name: 'Deck', cards: baseCards }
+          : { slug: slug as any, name: 'Deck', cards: baseCards }
       ),
-      getStudyQueue: async (slug: 'hiragana' | 'katakana' | 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1' | 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1' | 'grammar_patterns') => (
+      getStudyQueue: async (slug: string) => (
         slug === 'kanji_n5'
           ? {
             ok: true,

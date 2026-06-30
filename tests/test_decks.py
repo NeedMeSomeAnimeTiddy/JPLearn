@@ -27,16 +27,38 @@ class TestAllDecksRegistry:
         assert set(ALL_DECKS.keys()) == {
             "hiragana",
             "katakana",
+            # Kanji JLPT levels
             "kanji_n5",
             "kanji_n4",
             "kanji_n3",
             "kanji_n2",
             "kanji_n1",
+            # Kanji thematic categories
+            "kanji_numbers_time",
+            "kanji_nature_world",
+            "kanji_people_body",
+            "kanji_study_language",
+            "kanji_actions_travel",
+            # Vocabulary JLPT levels
             "vocab_n5",
             "vocab_n4",
             "vocab_n3",
             "vocab_n2",
             "vocab_n1",
+            # Vocabulary thematic categories
+            "vocab_greetings",
+            "vocab_numbers",
+            "vocab_time_days",
+            "vocab_family",
+            "vocab_body",
+            "vocab_food_drink",
+            "vocab_school_study",
+            "vocab_places",
+            "vocab_transport",
+            "vocab_adjectives",
+            "vocab_verbs",
+            "vocab_nouns",
+            # Grammar / Conversational
             "grammar_patterns",
             "sentence_examples",
             "conjugation_training",

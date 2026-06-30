@@ -98,8 +98,10 @@ type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgres
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
 type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
-type KanjiDeckSlug = 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1'
-type VocabDeckSlug = 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1'
+type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' | 'food_drink' | 'school_study' | 'places' | 'transport' | 'adjectives' | 'verbs' | 'nouns'
+type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
+type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel'
+type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey
@@ -613,6 +615,17 @@ interface JlptLevelProgress {
   total: number
 }
 
+interface CategoryProgress {
+  key: string
+  label: string
+  slug: string
+  cardIds: number[]
+  sampleChars: string[]
+  mastery: number
+  unlocked: boolean
+  total: number
+}
+
 interface StudyPlanCoverageRow {
   key: ScriptKey
   label: string
@@ -942,20 +955,45 @@ const JLPT_LEVEL_LABELS: Record<JlptLevel, string> = {
   n2: 'JLPT N2',
   n1: 'JLPT N1',
 }
-const KANJI_LEVEL_TO_DECK_SLUG: Record<JlptLevel, KanjiDeckSlug> = {
-  n5: 'kanji_n5',
-  n4: 'kanji_n4',
-  n3: 'kanji_n3',
-  n2: 'kanji_n2',
-  n1: 'kanji_n1',
+
+// ── Thematic category constants ───────────────────────────────────────────────
+const CATEGORY_UNLOCK_THRESHOLD = 0.7  // 70% mastery unlocks next category
+
+const VOCAB_CATEGORY_ORDER: VocabCategory[] = [
+  'greetings', 'numbers', 'time_days', 'family', 'body',
+  'food_drink', 'school_study', 'places', 'transport', 'adjectives', 'verbs', 'nouns',
+]
+
+const VOCAB_CATEGORY_LABELS: Record<VocabCategory, string> = {
+  greetings: 'Greetings', numbers: 'Numbers', time_days: 'Time & Days',
+  family: 'Family', body: 'Body', food_drink: 'Food & Drink',
+  school_study: 'School & Study', places: 'Places', transport: 'Transport',
+  adjectives: 'Adjectives', verbs: 'Verbs', nouns: 'Common Nouns',
 }
-const VOCAB_LEVEL_TO_DECK_SLUG: Record<JlptLevel, VocabDeckSlug> = {
-  n5: 'vocab_n5',
-  n4: 'vocab_n4',
-  n3: 'vocab_n3',
-  n2: 'vocab_n2',
-  n1: 'vocab_n1',
+
+const VOCAB_CATEGORY_TO_DECK_SLUG: Record<VocabCategory, VocabCategorySlug> = {
+  greetings: 'vocab_greetings', numbers: 'vocab_numbers', time_days: 'vocab_time_days',
+  family: 'vocab_family', body: 'vocab_body', food_drink: 'vocab_food_drink',
+  school_study: 'vocab_school_study', places: 'vocab_places', transport: 'vocab_transport',
+  adjectives: 'vocab_adjectives', verbs: 'vocab_verbs', nouns: 'vocab_nouns',
 }
+
+const KANJI_CATEGORY_ORDER: KanjiCategory[] = [
+  'numbers_time', 'nature_world', 'people_body', 'study_language', 'actions_travel',
+]
+
+const KANJI_CATEGORY_LABELS: Record<KanjiCategory, string> = {
+  numbers_time: 'Numbers & Time', nature_world: 'Nature & World',
+  people_body: 'People & Body', study_language: 'Study & Language',
+  actions_travel: 'Actions & Travel',
+}
+
+const KANJI_CATEGORY_TO_DECK_SLUG: Record<KanjiCategory, KanjiCategorySlug> = {
+  numbers_time: 'kanji_numbers_time', nature_world: 'kanji_nature_world',
+  people_body: 'kanji_people_body', study_language: 'kanji_study_language',
+  actions_travel: 'kanji_actions_travel',
+}
+
 function MinigameIcon({ game }: { game: MinigameKey }) {
   const Icon = MINIGAME_ICONS[game]
   return <Icon aria-hidden="true" className="glyph-svg" strokeWidth={2.25} />
@@ -1527,6 +1565,39 @@ function buildJlptLevelProgressFromLevelDecks(
   })
 }
 
+/** Build thematic category progress for vocab or kanji sections.
+ *  First category is always unlocked; subsequent categories unlock when
+ *  the previous reaches CATEGORY_UNLOCK_THRESHOLD (70%). */
+function buildCategoryProgress<T extends string>(
+  categoryOrder: T[],
+  categoryLabels: Record<T, string>,
+  categoryToSlug: Record<T, string>,
+  categoryDecks: Record<T, ScriptDeck['cards']>,
+  scores: Record<number, number>,
+): CategoryProgress[] {
+  let canUnlockNext = true
+  return categoryOrder.map((category) => {
+    const categoryCards = categoryDecks[category] ?? []
+    const total = categoryCards.length
+    const totalScore = categoryCards.reduce((sum, card) => sum + (scores[card.id] ?? 0), 0)
+    const mastery = total > 0 ? totalScore / (CARD_MASTERY_MAX * total) : 0
+    const unlocked = canUnlockNext  // first category always unlocked; rest need prior
+    if (total > 0 && mastery < CATEGORY_UNLOCK_THRESHOLD) {
+      canUnlockNext = false
+    }
+    return {
+      key: category,
+      label: categoryLabels[category],
+      slug: categoryToSlug[category],
+      cardIds: categoryCards.map((card) => card.id),
+      sampleChars: categoryCards.slice(0, 3).map((card) => card.character),
+      mastery,
+      unlocked,
+      total,
+    }
+  })
+}
+
 function getStudyPlanStage(overallMastery: number, trackedCards: number, currentStreak: number): StudyPlanStage {
   if (trackedCards < 12 || currentStreak < 2 || overallMastery < 0.25) return 'starter'
   if (overallMastery < 0.65) return 'building'
@@ -1985,22 +2056,22 @@ function App() {
   const [overviewBlocks, setOverviewBlocks] = useState<Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>>({})
   const [overviewKanjiDeck, setOverviewKanjiDeck] = useState<OverviewKanjiCard[]>([])
   const [activeKanjiLevel, setActiveKanjiLevel] = useState<JlptLevel>('n5')
-  const [activeKanjiDeckSlug, setActiveKanjiDeckSlug] = useState<KanjiDeckSlug>('kanji_n5')
   const [activeVocabLevel, setActiveVocabLevel] = useState<JlptLevel>('n5')
-  const [activeVocabDeckSlug, setActiveVocabDeckSlug] = useState<VocabDeckSlug>('vocab_n5')
-  const [kanjiDeckCardsByLevel, setKanjiDeckCardsByLevel] = useState<Record<JlptLevel, ScriptDeck['cards']>>({
-    n5: [],
-    n4: [],
-    n3: [],
-    n2: [],
-    n1: [],
+  const [kanjiDeckCardsByLevel] = useState<Record<JlptLevel, ScriptDeck['cards']>>({
+    n5: [], n4: [], n3: [], n2: [], n1: [],
   })
-  const [vocabDeckCardsByLevel, setVocabDeckCardsByLevel] = useState<Record<JlptLevel, ScriptDeck['cards']>>({
-    n5: [],
-    n4: [],
-    n3: [],
-    n2: [],
-    n1: [],
+  const [vocabDeckCardsByLevel] = useState<Record<JlptLevel, ScriptDeck['cards']>>({
+    n5: [], n4: [], n3: [], n2: [], n1: [],
+  })
+  const [activeKanjiCategory, setActiveKanjiCategory] = useState<KanjiCategory>('numbers_time')
+  const [activeVocabCategory, setActiveVocabCategory] = useState<VocabCategory>('greetings')
+  const [kanjiDeckCardsByCategory, setKanjiDeckCardsByCategory] = useState<Record<KanjiCategory, ScriptDeck['cards']>>({
+    numbers_time: [], nature_world: [], people_body: [], study_language: [], actions_travel: [],
+  })
+  const [vocabDeckCardsByCategory, setVocabDeckCardsByCategory] = useState<Record<VocabCategory, ScriptDeck['cards']>>({
+    greetings: [], numbers: [], time_days: [], family: [], body: [],
+    food_drink: [], school_study: [], places: [], transport: [],
+    adjectives: [], verbs: [], nouns: [],
   })
   const [kanjiOverviewPage, setKanjiOverviewPage] = useState<Partial<Record<JlptLevel, number>>>({})
   const [overviewBlocksLoading, setOverviewBlocksLoading] = useState(false)
@@ -2067,10 +2138,10 @@ function App() {
   const previousSessionActiveRef = useRef(false)
   const feedbackTimerRef = useRef<number | null>(null)
   const feedbackAdvanceRef = useRef<(() => void) | null>(null)
-  const kanjiLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
-  const vocabLevelDeckCacheRef = useRef<Partial<Record<JlptLevel, ScriptDeck['cards']>>>({})
-  const kanjiLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
-  const vocabLevelBlockCacheRef = useRef<Partial<Record<JlptLevel, BlockInfo[]>>>({})
+  const kanjiCategoryDeckCacheRef = useRef<Partial<Record<KanjiCategory, ScriptDeck['cards']>>>({})
+  const vocabCategoryDeckCacheRef = useRef<Partial<Record<VocabCategory, ScriptDeck['cards']>>>({})
+  const kanjiCategoryBlockCacheRef = useRef<Partial<Record<KanjiCategory, BlockInfo[]>>>({})
+  const vocabCategoryBlockCacheRef = useRef<Partial<Record<VocabCategory, BlockInfo[]>>>({})
   const scriptDeckCacheRef = useRef<Partial<Record<ScriptKey, ScriptDeck['cards']>>>({})
   const scriptBlockCacheRef = useRef<Partial<Record<ScriptKey, BlockInfo[]>>>({})
   const deckCardsInFlightRef = useRef<Map<string, Promise<ScriptDeck>>>(new Map())
@@ -2182,10 +2253,10 @@ function App() {
   }, [])
 
   const activeDeckSlug = useMemo(() => {
-    if (activeScript === 'kanji_n5') return activeKanjiDeckSlug
-    if (activeScript === 'vocab_n5') return activeVocabDeckSlug
+    if (activeScript === 'kanji_n5') return KANJI_CATEGORY_TO_DECK_SLUG[activeKanjiCategory]
+    if (activeScript === 'vocab_n5') return VOCAB_CATEGORY_TO_DECK_SLUG[activeVocabCategory]
     return activeScript
-  }, [activeKanjiDeckSlug, activeScript, activeVocabDeckSlug])
+  }, [activeKanjiCategory, activeScript, activeVocabCategory])
 
   const getDeckCardsDeduped = useCallback((slug: DeckSlugInput): Promise<ScriptDeck> => {
     if (typeof window === 'undefined' || !window.jplearnDesktop?.getDeckCards) {
@@ -3011,13 +3082,13 @@ function App() {
     let cancelled = false
 
     async function preloadStartupDeckData(): Promise<void> {
-      const startupKanjiLevel: JlptLevel = 'n5'
-      const startupVocabLevel: JlptLevel = 'n5'
+      const startupKanjiCategory: KanjiCategory = 'numbers_time'
+      const startupVocabCategory: VocabCategory = 'greetings'
       const startupScripts: ScriptKey[] = ['hiragana', 'katakana', 'grammar_patterns']
       const startupQueueSlugs: DeckSlugInput[] = [
         ...startupScripts,
-        KANJI_LEVEL_TO_DECK_SLUG[startupKanjiLevel],
-        VOCAB_LEVEL_TO_DECK_SLUG[startupVocabLevel],
+        KANJI_CATEGORY_TO_DECK_SLUG[startupKanjiCategory],
+        VOCAB_CATEGORY_TO_DECK_SLUG[startupVocabCategory],
       ]
       let deferredLoadsQueuedAtMs: number | undefined
 
@@ -3036,12 +3107,12 @@ function App() {
         scriptBlockCacheRef.current[script] = normalizeBlockList(blockPayload.blocks)
       }
 
-      const preloadKanjiLevel = async (level: JlptLevel, shouldHydrateState: boolean): Promise<void> => {
-        if (kanjiLevelDeckCacheRef.current[level] && kanjiLevelBlockCacheRef.current[level]) {
+      const preloadKanjiCategory = async (cat: KanjiCategory, shouldHydrateState: boolean): Promise<void> => {
+        if (kanjiCategoryDeckCacheRef.current[cat] && kanjiCategoryBlockCacheRef.current[cat]) {
           return
         }
 
-        const slug = KANJI_LEVEL_TO_DECK_SLUG[level]
+        const slug = KANJI_CATEGORY_TO_DECK_SLUG[cat]
         const [deckPayload, blockPayload] = await Promise.all([
           getDeckCardsDeduped(slug),
           getBlockProgressDeduped(slug),
@@ -3050,22 +3121,22 @@ function App() {
 
         const normalizedCards = normalizeDeckCards(deckPayload.cards)
         const normalizedBlocks = normalizeBlockList(blockPayload.blocks)
-        kanjiLevelDeckCacheRef.current[level] = normalizedCards
-        kanjiLevelBlockCacheRef.current[level] = normalizedBlocks
+        kanjiCategoryDeckCacheRef.current[cat] = normalizedCards
+        kanjiCategoryBlockCacheRef.current[cat] = normalizedBlocks
         if (shouldHydrateState) {
-          setKanjiDeckCardsByLevel((previous) => ({
+          setKanjiDeckCardsByCategory((previous) => ({
             ...previous,
-            [level]: normalizedCards,
+            [cat]: normalizedCards,
           }))
         }
       }
 
-      const preloadVocabLevel = async (level: JlptLevel, shouldHydrateState: boolean): Promise<void> => {
-        if (vocabLevelDeckCacheRef.current[level] && vocabLevelBlockCacheRef.current[level]) {
+      const preloadVocabCategory = async (cat: VocabCategory, shouldHydrateState: boolean): Promise<void> => {
+        if (vocabCategoryDeckCacheRef.current[cat] && vocabCategoryBlockCacheRef.current[cat]) {
           return
         }
 
-        const slug = VOCAB_LEVEL_TO_DECK_SLUG[level]
+        const slug = VOCAB_CATEGORY_TO_DECK_SLUG[cat]
         const [deckPayload, blockPayload] = await Promise.all([
           getDeckCardsDeduped(slug),
           getBlockProgressDeduped(slug),
@@ -3074,12 +3145,12 @@ function App() {
 
         const normalizedCards = normalizeDeckCards(deckPayload.cards)
         const normalizedBlocks = normalizeBlockList(blockPayload.blocks)
-        vocabLevelDeckCacheRef.current[level] = normalizedCards
-        vocabLevelBlockCacheRef.current[level] = normalizedBlocks
+        vocabCategoryDeckCacheRef.current[cat] = normalizedCards
+        vocabCategoryBlockCacheRef.current[cat] = normalizedBlocks
         if (shouldHydrateState) {
-          setVocabDeckCardsByLevel((previous) => ({
+          setVocabDeckCardsByCategory((previous) => ({
             ...previous,
-            [level]: normalizedCards,
+            [cat]: normalizedCards,
           }))
         }
       }
@@ -3087,32 +3158,35 @@ function App() {
       try {
         await Promise.all([
           ...startupScripts.map((script) => preloadScript(script)),
-          preloadKanjiLevel(startupKanjiLevel, true),
-          preloadVocabLevel(startupVocabLevel, true),
+          preloadKanjiCategory(startupKanjiCategory, true),
+          preloadVocabCategory(startupVocabCategory, true),
           ...startupQueueSlugs.map((slug) => getStudyQueueDeduped(slug, { preferCache: false }).catch(() => undefined)),
         ])
 
         if (cancelled) return
 
-        const deferredLevels = JLPT_LEVEL_ORDER.filter(
-          (level) => level !== startupKanjiLevel,
-        )
         deferredLoadsQueuedAtMs = Math.round(performance.now() - startupBootMarkRef.current)
 
-        deferredLevels.forEach((level, index) => {
+        const deferredKanjiCats = KANJI_CATEGORY_ORDER.filter((c) => c !== startupKanjiCategory)
+        const deferredVocabCats = VOCAB_CATEGORY_ORDER.filter((c) => c !== startupVocabCategory)
+
+        deferredKanjiCats.forEach((cat, index) => {
           const delayMs = 150 * (index + 1)
           scheduleDeferredStartupTask(() => {
-            void preloadKanjiLevel(level, true).catch(() => undefined)
+            void preloadKanjiCategory(cat, true).catch(() => undefined)
           }, delayMs)
           scheduleDeferredStartupTask(() => {
-            void getStudyQueueDeduped(KANJI_LEVEL_TO_DECK_SLUG[level], { preferCache: false }).catch(() => undefined)
+            void getStudyQueueDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat], { preferCache: false }).catch(() => undefined)
           }, delayMs + 30)
+        })
+        deferredVocabCats.forEach((cat, index) => {
+          const delayMs = 150 * (index + 1) + 75
           scheduleDeferredStartupTask(() => {
-            void preloadVocabLevel(level, true).catch(() => undefined)
-          }, delayMs + 75)
+            void preloadVocabCategory(cat, true).catch(() => undefined)
+          }, delayMs)
           scheduleDeferredStartupTask(() => {
-            void getStudyQueueDeduped(VOCAB_LEVEL_TO_DECK_SLUG[level], { preferCache: false }).catch(() => undefined)
-          }, delayMs + 105)
+            void getStudyQueueDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat], { preferCache: false }).catch(() => undefined)
+          }, delayMs + 30)
         })
       } catch {
         // Allow startup to continue even if preloading fails on some decks.
@@ -3132,8 +3206,8 @@ function App() {
 
   const loadScriptCards = useCallback(async (
     script: ScriptKey,
-    kanjiLevel: JlptLevel = activeKanjiLevel,
-    vocabLevel: JlptLevel = activeVocabLevel,
+    kanjiCategory: KanjiCategory = activeKanjiCategory,
+    vocabCategory: VocabCategory = activeVocabCategory,
   ) => {
     const requestId = scriptLoadRequestIdRef.current + 1
     scriptLoadRequestIdRef.current = requestId
@@ -3159,9 +3233,9 @@ function App() {
 
     try {
       if (script === 'kanji_n5') {
-        const selectedKanjiSlug = KANJI_LEVEL_TO_DECK_SLUG[kanjiLevel]
-        const cachedCards = kanjiLevelDeckCacheRef.current[kanjiLevel]
-        const cachedBlocks = kanjiLevelBlockCacheRef.current[kanjiLevel]
+        const selectedKanjiSlug = KANJI_CATEGORY_TO_DECK_SLUG[kanjiCategory]
+        const cachedCards = kanjiCategoryDeckCacheRef.current[kanjiCategory]
+        const cachedBlocks = kanjiCategoryBlockCacheRef.current[kanjiCategory]
 
         let selectedCards = cachedCards
         let selectedBlocks = cachedBlocks
@@ -3178,11 +3252,11 @@ function App() {
 
           selectedCards = normalizeDeckCards(selectedDeckPayload.cards)
           selectedBlocks = normalizeBlockList(blockPayload.blocks)
-          kanjiLevelDeckCacheRef.current[kanjiLevel] = selectedCards
-          kanjiLevelBlockCacheRef.current[kanjiLevel] = selectedBlocks
-          setKanjiDeckCardsByLevel((previous) => ({
+          kanjiCategoryDeckCacheRef.current[kanjiCategory] = selectedCards
+          kanjiCategoryBlockCacheRef.current[kanjiCategory] = selectedBlocks
+          setKanjiDeckCardsByCategory((previous) => ({
             ...previous,
-            [kanjiLevel]: selectedCards,
+            [kanjiCategory]: selectedCards,
           }))
         }
 
@@ -3190,24 +3264,24 @@ function App() {
         const resolvedKanjiBlocks = selectedBlocks ?? []
 
         setDeckCards(resolvedKanjiCards)
-        setActiveKanjiDeckSlug(selectedKanjiSlug)
 
-        for (const level of JLPT_LEVEL_ORDER) {
-          if (level === kanjiLevel || kanjiLevelDeckCacheRef.current[level]) continue
-          void getDeckCardsDeduped(KANJI_LEVEL_TO_DECK_SLUG[level])
+        // Preload remaining kanji categories in background
+        for (const cat of KANJI_CATEGORY_ORDER) {
+          if (cat === kanjiCategory || kanjiCategoryDeckCacheRef.current[cat]) continue
+          void getDeckCardsDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat])
             .then((payload) => {
               const normalizedCards = normalizeDeckCards(payload.cards)
-              kanjiLevelDeckCacheRef.current[level] = normalizedCards
-              setKanjiDeckCardsByLevel((previous) => ({
+              kanjiCategoryDeckCacheRef.current[cat] = normalizedCards
+              setKanjiDeckCardsByCategory((previous) => ({
                 ...previous,
-                [level]: normalizedCards,
+                [cat]: normalizedCards,
               }))
             })
             .catch(() => undefined)
 
-          void getBlockProgressDeduped(KANJI_LEVEL_TO_DECK_SLUG[level])
+          void getBlockProgressDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat])
             .then((payload) => {
-              kanjiLevelBlockCacheRef.current[level] = normalizeBlockList(payload.blocks)
+              kanjiCategoryBlockCacheRef.current[cat] = normalizeBlockList(payload.blocks)
             })
             .catch(() => undefined)
         }
@@ -3224,9 +3298,9 @@ function App() {
           setActiveBlockIndex(0)
         }
       } else if (script === 'vocab_n5') {
-        const selectedVocabSlug = VOCAB_LEVEL_TO_DECK_SLUG[vocabLevel]
-        const cachedCards = vocabLevelDeckCacheRef.current[vocabLevel]
-        const cachedBlocks = vocabLevelBlockCacheRef.current[vocabLevel]
+        const selectedVocabSlug = VOCAB_CATEGORY_TO_DECK_SLUG[vocabCategory]
+        const cachedCards = vocabCategoryDeckCacheRef.current[vocabCategory]
+        const cachedBlocks = vocabCategoryBlockCacheRef.current[vocabCategory]
 
         let selectedCards = cachedCards
         let selectedBlocks = cachedBlocks
@@ -3243,11 +3317,11 @@ function App() {
 
           selectedCards = normalizeDeckCards(selectedDeckPayload.cards)
           selectedBlocks = normalizeBlockList(blockPayload.blocks)
-          vocabLevelDeckCacheRef.current[vocabLevel] = selectedCards
-          vocabLevelBlockCacheRef.current[vocabLevel] = selectedBlocks
-          setVocabDeckCardsByLevel((previous) => ({
+          vocabCategoryDeckCacheRef.current[vocabCategory] = selectedCards
+          vocabCategoryBlockCacheRef.current[vocabCategory] = selectedBlocks
+          setVocabDeckCardsByCategory((previous) => ({
             ...previous,
-            [vocabLevel]: selectedCards,
+            [vocabCategory]: selectedCards,
           }))
         }
 
@@ -3255,24 +3329,24 @@ function App() {
         const resolvedVocabBlocks = selectedBlocks ?? []
 
         setDeckCards(resolvedVocabCards)
-        setActiveVocabDeckSlug(selectedVocabSlug)
 
-        for (const level of JLPT_LEVEL_ORDER) {
-          if (level === vocabLevel || vocabLevelDeckCacheRef.current[level]) continue
-          void getDeckCardsDeduped(VOCAB_LEVEL_TO_DECK_SLUG[level])
+        // Preload remaining vocab categories in background
+        for (const cat of VOCAB_CATEGORY_ORDER) {
+          if (cat === vocabCategory || vocabCategoryDeckCacheRef.current[cat]) continue
+          void getDeckCardsDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat])
             .then((payload) => {
               const normalizedCards = normalizeDeckCards(payload.cards)
-              vocabLevelDeckCacheRef.current[level] = normalizedCards
-              setVocabDeckCardsByLevel((previous) => ({
+              vocabCategoryDeckCacheRef.current[cat] = normalizedCards
+              setVocabDeckCardsByCategory((previous) => ({
                 ...previous,
-                [level]: normalizedCards,
+                [cat]: normalizedCards,
               }))
             })
             .catch(() => undefined)
 
-          void getBlockProgressDeduped(VOCAB_LEVEL_TO_DECK_SLUG[level])
+          void getBlockProgressDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat])
             .then((payload) => {
-              vocabLevelBlockCacheRef.current[level] = normalizeBlockList(payload.blocks)
+              vocabCategoryBlockCacheRef.current[cat] = normalizeBlockList(payload.blocks)
             })
             .catch(() => undefined)
         }
@@ -3339,7 +3413,7 @@ function App() {
         setGameLoading(false)
       }
     }
-  }, [activeKanjiLevel, activeVocabLevel, getBlockProgressDeduped, getDeckCardsDeduped, resetRoundCycle])
+  }, [activeKanjiCategory, activeVocabCategory, getBlockProgressDeduped, getDeckCardsDeduped, resetRoundCycle])
 
   // After the backend SRS states change wholesale (onboarding seeding or a reset),
   // the cached deck/block progress no longer matches the database. Drop every cache
@@ -3348,13 +3422,13 @@ function App() {
   const refreshDeckProgressAfterSeedChange = useCallback(() => {
     scriptDeckCacheRef.current = {}
     scriptBlockCacheRef.current = {}
-    kanjiLevelDeckCacheRef.current = {}
-    kanjiLevelBlockCacheRef.current = {}
-    vocabLevelDeckCacheRef.current = {}
-    vocabLevelBlockCacheRef.current = {}
+    kanjiCategoryDeckCacheRef.current = {}
+    kanjiCategoryBlockCacheRef.current = {}
+    vocabCategoryDeckCacheRef.current = {}
+    vocabCategoryBlockCacheRef.current = {}
     studyQueueCacheRef.current.clear()
 
-    void loadScriptCards(activeScript, activeKanjiLevel, activeVocabLevel)
+    void loadScriptCards(activeScript, activeKanjiCategory, activeVocabCategory)
     void window.jplearnDesktop
       .getOverviewCharacterMastery()
       .then((payload) => {
@@ -3362,11 +3436,11 @@ function App() {
         setOverviewKanjiDeck(payload.kanji_cards)
       })
       .catch(() => undefined)
-  }, [activeScript, activeKanjiLevel, activeVocabLevel, loadScriptCards])
+  }, [activeScript, activeKanjiCategory, activeVocabCategory, loadScriptCards])
 
   useEffect(() => {
-    void loadScriptCards(activeScript, activeKanjiLevel, activeVocabLevel)
-  }, [activeScript, activeKanjiLevel, activeVocabLevel, loadScriptCards])
+    void loadScriptCards(activeScript, activeKanjiCategory, activeVocabCategory)
+  }, [activeScript, activeKanjiCategory, activeVocabCategory, loadScriptCards])
 
   const buildRound = useCallback(
     (
@@ -3649,6 +3723,22 @@ function App() {
   const vocabLevelProgress = useMemo(
     () => buildJlptLevelProgressFromLevelDecks(vocabDeckCardsByLevel, cardScores.vocab_n5),
     [vocabDeckCardsByLevel, cardScores.vocab_n5],
+  )
+
+  const kanjiCategoryProgress = useMemo(
+    () => buildCategoryProgress(
+      KANJI_CATEGORY_ORDER, KANJI_CATEGORY_LABELS, KANJI_CATEGORY_TO_DECK_SLUG,
+      kanjiDeckCardsByCategory, cardScores.kanji_n5,
+    ),
+    [kanjiDeckCardsByCategory, cardScores.kanji_n5],
+  )
+
+  const vocabCategoryProgress = useMemo(
+    () => buildCategoryProgress(
+      VOCAB_CATEGORY_ORDER, VOCAB_CATEGORY_LABELS, VOCAB_CATEGORY_TO_DECK_SLUG,
+      vocabDeckCardsByCategory, cardScores.vocab_n5,
+    ),
+    [vocabDeckCardsByCategory, cardScores.vocab_n5],
   )
 
   const overviewKanjiLevelProgress = useMemo(
@@ -3982,9 +4072,9 @@ function App() {
 
       const resultSlug: DeckSlugInput =
         activeScript === 'kanji_n5'
-          ? activeKanjiDeckSlug
+          ? KANJI_CATEGORY_TO_DECK_SLUG[activeKanjiCategory]
           : activeScript === 'vocab_n5'
-            ? activeVocabDeckSlug
+            ? VOCAB_CATEGORY_TO_DECK_SLUG[activeVocabCategory]
             : activeScript
       studyQueueCacheRef.current.delete(resultSlug)
 
@@ -4069,7 +4159,7 @@ function App() {
       feedbackAdvanceRef.current = advanceFeedback
       feedbackTimerRef.current = window.setTimeout(advanceFeedback, FEEDBACK_REVEAL_MS)
     },
-    [activeGame, activeKanjiDeckSlug, activeScript, activeSessionId, activeVocabDeckSlug, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionRounds, sessionTargetItems],
+    [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionRounds, sessionTargetItems],
   )
 
   useEffect(() => {
@@ -4322,13 +4412,13 @@ function App() {
       return blockProgressWithMastery.find((block) => block.index === activeBlockIndex)?.name ?? null
     }
     if (activeScript === 'kanji_n5') {
-      return kanjiLevelProgress.find((level) => level.key === activeKanjiLevel)?.label ?? null
+      return kanjiCategoryProgress.find((cat) => cat.key === activeKanjiCategory)?.label ?? null
     }
     if (activeScript === 'vocab_n5') {
-      return vocabLevelProgress.find((level) => level.key === activeVocabLevel)?.label ?? null
+      return vocabCategoryProgress.find((cat) => cat.key === activeVocabCategory)?.label ?? null
     }
     return null
-  }, [blockProgressWithMastery, activeBlockIndex, activeScript, kanjiLevelProgress, activeKanjiLevel, vocabLevelProgress, activeVocabLevel])
+  }, [blockProgressWithMastery, activeBlockIndex, activeScript, kanjiCategoryProgress, activeKanjiCategory, vocabCategoryProgress, activeVocabCategory])
 
   // Block session is complete when every card in the active block has reached max score.
   // sessionRounds > 0 ensures we don't trigger on a pre-mastered block before answering.
@@ -4353,21 +4443,21 @@ function App() {
 
   useEffect(() => {
     if (activeScript !== 'kanji_n5' || blockProgress.length > 0) return
-    const activeLevel = kanjiLevelProgress.find((level) => level.key === activeKanjiLevel)
-    if (activeLevel?.total && activeLevel.total > 0) return
-    const fallback = kanjiLevelProgress.find((level) => level.unlocked) ?? kanjiLevelProgress.find((level) => level.total > 0)
-    if (!fallback || fallback.key === activeKanjiLevel) return
-    setActiveKanjiLevel(fallback.key)
-  }, [activeScript, blockProgress.length, kanjiLevelProgress, activeKanjiLevel])
+    const activeCat = kanjiCategoryProgress.find((cat) => cat.key === activeKanjiCategory)
+    if (activeCat?.total && activeCat.total > 0) return
+    const fallback = kanjiCategoryProgress.find((cat) => cat.unlocked) ?? kanjiCategoryProgress.find((cat) => cat.total > 0)
+    if (!fallback || fallback.key === activeKanjiCategory) return
+    setActiveKanjiCategory(fallback.key as KanjiCategory)
+  }, [activeScript, blockProgress.length, kanjiCategoryProgress, activeKanjiCategory])
 
   useEffect(() => {
     if (activeScript !== 'vocab_n5' || blockProgress.length > 0) return
-    const activeLevel = vocabLevelProgress.find((level) => level.key === activeVocabLevel)
-    if (activeLevel?.total && activeLevel.total > 0) return
-    const fallback = vocabLevelProgress.find((level) => level.unlocked) ?? vocabLevelProgress.find((level) => level.total > 0)
-    if (!fallback || fallback.key === activeVocabLevel) return
-    setActiveVocabLevel(fallback.key)
-  }, [activeScript, blockProgress.length, vocabLevelProgress, activeVocabLevel])
+    const activeCat = vocabCategoryProgress.find((cat) => cat.key === activeVocabCategory)
+    if (activeCat?.total && activeCat.total > 0) return
+    const fallback = vocabCategoryProgress.find((cat) => cat.unlocked) ?? vocabCategoryProgress.find((cat) => cat.total > 0)
+    if (!fallback || fallback.key === activeVocabCategory) return
+    setActiveVocabCategory(fallback.key as VocabCategory)
+  }, [activeScript, blockProgress.length, vocabCategoryProgress, activeVocabCategory])
 
   // Lazy-load block data for hiragana + katakana when the overview opens.
   useEffect(() => {
@@ -5240,6 +5330,10 @@ function App() {
           vocabLevelProgress={vocabLevelProgress}
           activeKanjiLevel={activeKanjiLevel}
           activeVocabLevel={activeVocabLevel}
+          kanjiCategoryProgress={kanjiCategoryProgress}
+          vocabCategoryProgress={vocabCategoryProgress}
+          activeKanjiCategory={activeKanjiCategory}
+          activeVocabCategory={activeVocabCategory}
           learningPathExpanded={learningPathExpanded}
           learningPathTrackRows={learningPathTrackRows}
           leechCardsLength={leechCards.length}
@@ -5275,6 +5369,30 @@ function App() {
           }}
           onSelectVocabLevel={(level) => {
             setActiveVocabLevel(level)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onSelectKanjiCategory={(cat) => {
+            setActiveKanjiCategory(cat)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onSelectVocabCategory={(cat) => {
+            setActiveVocabCategory(cat)
             setSessionActive(false)
             setRoundState(null)
             setRoundFeedback(null)

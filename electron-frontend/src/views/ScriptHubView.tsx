@@ -10,13 +10,16 @@ import {
   Trophy,
 } from 'lucide-react'
 import type {
+  CategoryProgress,
   JlptLevel,
   JlptLevelProgress,
+  KanjiCategory,
   MinigameKey,
   MinigameStatsByScript,
   NavDirection,
   ScriptKey,
   StudyPlanCoverageRow,
+  VocabCategory,
 } from '../types'
 import {
   CONFIDENCE_LEVEL_LABELS,
@@ -58,6 +61,10 @@ interface ScriptHubViewProps {
   vocabLevelProgress: JlptLevelProgress[]
   activeKanjiLevel: JlptLevel
   activeVocabLevel: JlptLevel
+  kanjiCategoryProgress: CategoryProgress[]
+  vocabCategoryProgress: CategoryProgress[]
+  activeKanjiCategory: KanjiCategory
+  activeVocabCategory: VocabCategory
   learningPathExpanded: boolean
   learningPathTrackRows: StudyPlanCoverageRow[]
   leechCardsLength: number
@@ -72,6 +79,8 @@ interface ScriptHubViewProps {
   onSelectBlock: (index: number) => void
   onSelectKanjiLevel: (level: JlptLevel) => void
   onSelectVocabLevel: (level: JlptLevel) => void
+  onSelectKanjiCategory: (cat: KanjiCategory) => void
+  onSelectVocabCategory: (cat: VocabCategory) => void
   onToggleLearningPath: () => void
   onSelectGame: (game: MinigameKey) => void
   onPlayGame: (game: MinigameKey) => void
@@ -82,7 +91,6 @@ void CONFIDENCE_LEVEL_LABELS
 void CONFIDENCE_SCORES
 void DEFAULT_SESSION_LENGTH_PRESET
 void JLPT_LEVEL_LABELS
-
 export function ScriptHubView({
   navDirection,
   activeScript,
@@ -92,10 +100,14 @@ export function ScriptHubView({
   gameError,
   blockProgressWithMastery,
   activeBlockCards,
-  kanjiLevelProgress,
-  vocabLevelProgress,
-  activeKanjiLevel,
-  activeVocabLevel,
+  kanjiLevelProgress: _kanjiLevelProgress,
+  vocabLevelProgress: _vocabLevelProgress,
+  activeKanjiLevel: _activeKanjiLevel,
+  activeVocabLevel: _activeVocabLevel,
+  kanjiCategoryProgress,
+  vocabCategoryProgress,
+  activeKanjiCategory,
+  activeVocabCategory,
   learningPathExpanded,
   learningPathTrackRows,
   leechCardsLength,
@@ -107,8 +119,10 @@ export function ScriptHubView({
   onBack,
   onOpenSettings,
   onSelectBlock,
-  onSelectKanjiLevel,
-  onSelectVocabLevel,
+  onSelectKanjiLevel: _onSelectKanjiLevel,
+  onSelectVocabLevel: _onSelectVocabLevel,
+  onSelectKanjiCategory,
+  onSelectVocabCategory,
   onToggleLearningPath,
   onSelectGame,
   onPlayGame,
@@ -192,9 +206,9 @@ export function ScriptHubView({
                 {blockProgressWithMastery.length > 0
                   ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length} / ${blockProgressWithMastery.length} blocks mastered`
                   : activeScript === 'kanji_n5'
-                    ? `${kanjiLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${kanjiLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
+                    ? `${kanjiCategoryProgress.filter((cat) => cat.mastery >= 0.7 && cat.total > 0).length} / ${kanjiCategoryProgress.filter((cat) => cat.total > 0).length} categories mastered`
                     : activeScript === 'vocab_n5'
-                      ? `${vocabLevelProgress.filter((level) => level.mastery >= 0.8 && level.total > 0).length} / ${vocabLevelProgress.filter((level) => level.total > 0).length} JLPT levels mastered`
+                      ? `${vocabCategoryProgress.filter((cat) => cat.mastery >= 0.7 && cat.total > 0).length} / ${vocabCategoryProgress.filter((cat) => cat.total > 0).length} categories mastered`
                       : 'Choose a minigame to start'}
               </span>
             </div>
@@ -237,7 +251,7 @@ export function ScriptHubView({
                     const previousBlock = index > 0 ? blockProgressWithMastery[index - 1] : null
                     const lockReason = !block.unlocked
                       ? previousBlock
-                        ? `Complete ${previousBlock.name} first.`
+                        ? `Complete 70% of ${previousBlock.name} to unlock.`
                         : 'Complete the previous foundation block first.'
                       : null
                     return (
@@ -287,55 +301,55 @@ export function ScriptHubView({
                 <div
                   className="jlpt-level-path"
                   role="group"
-                  aria-label={`${activeScript === 'kanji_n5' ? 'Kanji' : 'Vocabulary'} JLPT progression`}
+                  aria-label={`${activeScript === 'kanji_n5' ? 'Kanji' : 'Vocabulary'} categories`}
                 >
-                  {(activeScript === 'kanji_n5' ? kanjiLevelProgress : vocabLevelProgress).map((level, index, levels) => {
-                    const isActive = activeScript === 'kanji_n5' ? activeKanjiLevel === level.key : activeVocabLevel === level.key
-                    const masteryPct = Math.round(level.mastery * 100)
-                    const unavailable = level.total === 0
-                    const previousTrackLevel = levels
+                  {(activeScript === 'kanji_n5' ? kanjiCategoryProgress : vocabCategoryProgress).map((cat, index, cats) => {
+                    const isActive = activeScript === 'kanji_n5' ? activeKanjiCategory === cat.key : activeVocabCategory === cat.key
+                    const masteryPct = Math.round(cat.mastery * 100)
+                    const unavailable = cat.total === 0
+                    const previousCat = cats
                       .slice(0, index)
                       .reverse()
                       .find((candidate) => candidate.total > 0)
                     const lockReason = unavailable
-                      ? 'No cards available in this level yet.'
-                      : !level.unlocked
-                        ? previousTrackLevel
-                          ? `Master ${previousTrackLevel.label} first.`
-                          : 'Master the previous level first.'
+                      ? 'No cards available in this category yet.'
+                      : !cat.unlocked
+                        ? previousCat
+                          ? `Complete 70% of ${previousCat.label} to unlock.`
+                          : 'Complete the previous category first.'
                         : null
                     return (
                       <article
-                        key={level.key}
-                        className={`jlpt-level-node ${isActive ? 'is-active' : ''} ${(!level.unlocked || unavailable) ? 'is-locked' : ''}`}
+                        key={cat.key}
+                        className={`jlpt-level-node ${isActive ? 'is-active' : ''} ${(!cat.unlocked || unavailable) ? 'is-locked' : ''}`}
                         style={{ animationDelay: `${80 + index * 45}ms` }}
                       >
                         <button
                           type="button"
                           className="jlpt-level-button"
-                          disabled={!level.unlocked || unavailable}
+                          disabled={!cat.unlocked || unavailable}
                           onClick={() => {
                             if (activeScript === 'kanji_n5') {
-                              onSelectKanjiLevel(level.key)
+                              onSelectKanjiCategory(cat.key as KanjiCategory)
                             } else {
-                              onSelectVocabLevel(level.key)
+                              onSelectVocabCategory(cat.key as VocabCategory)
                             }
                           }}
                           aria-pressed={isActive}
-                          aria-label={(!level.unlocked || unavailable)
-                            ? `${level.label}, locked. ${lockReason}`
-                            : `${level.label}, ${masteryPct}% mastered`}
+                          aria-label={(!cat.unlocked || unavailable)
+                            ? `${cat.label}, locked. ${lockReason}`
+                            : `${cat.label}, ${masteryPct}% mastered`}
                         >
                           <div className="jlpt-level-header">
-                            <strong>{level.label}</strong>
-                            {!level.unlocked || unavailable ? (
+                            <strong>{cat.label}</strong>
+                            {!cat.unlocked || unavailable ? (
                               <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
                             ) : null}
                           </div>
                           <span className="jlpt-level-preview" lang="ja" aria-hidden="true">
-                            {level.sampleChars.length > 0 ? level.sampleChars.join(' ') : '—'}
+                            {cat.sampleChars.length > 0 ? cat.sampleChars.join(' ') : '—'}
                           </span>
-                          {!level.unlocked || unavailable ? (
+                          {!cat.unlocked || unavailable ? (
                             <span className="jlpt-level-lock-reason">{lockReason}</span>
                           ) : null}
                           <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
@@ -345,7 +359,7 @@ export function ScriptHubView({
                             />
                           </div>
                           <span className="jlpt-level-meta">
-                            {level.total} cards • {masteryPct}%
+                            {cat.total} cards • {masteryPct}%
                           </span>
                         </button>
                       </article>
@@ -365,7 +379,7 @@ export function ScriptHubView({
                 {blockProgressWithMastery.length > 0
                   ? `Choose a minigame — ${activeBlock?.name ?? ''} (${activeBlockCards.length} cards)`
                   : activeScript === 'kanji_n5' || activeScript === 'vocab_n5'
-                    ? `Choose a minigame — ${activeSectionName ?? 'JLPT Level'} (${activeBlockCards.length} cards)`
+                      ? `Choose a minigame — ${activeSectionName ?? 'Category'} (${activeBlockCards.length} cards)`
                     : 'Choose a minigame'}
               </h3>
             </div>

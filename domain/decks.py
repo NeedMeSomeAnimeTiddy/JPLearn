@@ -759,6 +759,134 @@ def get_vocab_n1_deck() -> Deck:
 
 
 # ---------------------------------------------------------------------------
+# Thematic Vocabulary Categories
+#
+# Derived from _VOCAB_N5_DATA (topic-grouped sections) plus a new Greetings
+# category.  Card IDs are sequential across all categories so they can share
+# the same cardScores['vocab_n5'] map in the frontend without collision.
+#
+# ID allocation:
+#   Greetings   0–14   (15 items, new data)
+#   Numbers     15–20  (_VOCAB_N5_DATA[0:6])
+#   Time & Days 21–32  (_VOCAB_N5_DATA[6:18])
+#   Family      33–40  (_VOCAB_N5_DATA[18:26])
+#   Body        41–46  (_VOCAB_N5_DATA[26:32])
+#   Food&Drink  47–59  (_VOCAB_N5_DATA[32:45])
+#   School&Study 60–71 (_VOCAB_N5_DATA[45:57])
+#   Places      72–79  (_VOCAB_N5_DATA[57:65])
+#   Transport   80–86  (_VOCAB_N5_DATA[65:72])
+#   Adjectives  87–103 (_VOCAB_N5_DATA[72:89])
+#   Verbs       104–123(_VOCAB_N5_DATA[89:109])
+#   Common Nouns 124–144(_VOCAB_N5_DATA[109:130])
+# ---------------------------------------------------------------------------
+
+_VOCAB_GREETINGS_DATA: list[tuple[str, str, str]] = [
+    ("おはよう", "ohayou", "good morning (casual)"),
+    ("おはようございます", "ohayou gozaimasu", "good morning (polite)"),
+    ("こんにちは", "konnichiwa", "hello / good afternoon"),
+    ("こんばんは", "konbanwa", "good evening"),
+    ("おやすみなさい", "oyasumi nasai", "good night"),
+    ("さようなら", "sayounara", "goodbye"),
+    ("ありがとう", "arigatou", "thank you (casual)"),
+    ("ありがとうございます", "arigatou gozaimasu", "thank you (polite)"),
+    ("すみません", "sumimasen", "excuse me / I'm sorry"),
+    ("ごめんなさい", "gomen nasai", "I'm sorry"),
+    ("はじめまして", "hajimemashite", "nice to meet you"),
+    ("よろしくおねがいします", "yoroshiku onegaishimasu", "please treat me well"),
+    ("いってきます", "ittekimasu", "I'm off (leaving the house)"),
+    ("ただいま", "tadaima", "I'm home"),
+    ("どういたしまして", "dou itashimashite", "you're welcome"),
+]
+
+
+def get_vocab_greetings_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Greetings", _VOCAB_GREETINGS_DATA, "vocab_greetings", id_offset=0)
+
+
+def get_vocab_numbers_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Numbers", _VOCAB_N5_DATA[0:6], "vocab_numbers", id_offset=15)
+
+
+def get_vocab_time_days_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Time & Days", _VOCAB_N5_DATA[6:18], "vocab_time_days", id_offset=21)
+
+
+def get_vocab_family_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Family", _VOCAB_N5_DATA[18:26], "vocab_family", id_offset=33)
+
+
+def get_vocab_body_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Body", _VOCAB_N5_DATA[26:32], "vocab_body", id_offset=41)
+
+
+def get_vocab_food_drink_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Food & Drink", _VOCAB_N5_DATA[32:45], "vocab_food_drink", id_offset=47)
+
+
+def get_vocab_school_study_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: School & Study", _VOCAB_N5_DATA[45:57], "vocab_school_study", id_offset=60)
+
+
+def get_vocab_places_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Places", _VOCAB_N5_DATA[57:65], "vocab_places", id_offset=72)
+
+
+def get_vocab_transport_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Transport", _VOCAB_N5_DATA[65:72], "vocab_transport", id_offset=80)
+
+
+def get_vocab_adjectives_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Adjectives", _VOCAB_N5_DATA[72:89], "vocab_adjectives", id_offset=87)
+
+
+def get_vocab_verbs_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Verbs", _VOCAB_N5_DATA[89:109], "vocab_verbs", id_offset=104)
+
+
+def get_vocab_nouns_deck() -> Deck:
+    return _build_vocab_deck("Vocabulary: Common Nouns", _VOCAB_N5_DATA[109:130], "vocab_nouns", id_offset=124)
+
+
+# ---------------------------------------------------------------------------
+# Thematic Kanji Categories
+#
+# Derived from _KANJI_N5_DATA (already topic-grouped).  IDs match the
+# original list indices so existing SRS data for kanji_n5 cards is preserved.
+#
+# ID allocation (contiguous, matching _KANJI_N5_DATA order):
+#   Numbers & Time  0–23  (13 Numbers + 6 Time + 5 Calendar)
+#   Nature & World  24–52 (6 Nature + 13 Directions + 10 Size/Desc)
+#   People & Body   53–66 (7 People/Family + 7 Body)
+#   Study & Language 67–75 (9 School/Language)
+#   Actions & Travel 76–90 (13 Actions + 2 Transport)
+# ---------------------------------------------------------------------------
+
+def get_kanji_numbers_time_deck() -> Deck:
+    data = _KANJI_N5_DATA[0:24]
+    return _build_kanji_deck("Kanji: Numbers & Time", data, "kanji_numbers_time", id_offset=0)
+
+
+def get_kanji_nature_world_deck() -> Deck:
+    data = _KANJI_N5_DATA[24:53]
+    return _build_kanji_deck("Kanji: Nature & World", data, "kanji_nature_world", id_offset=24)
+
+
+def get_kanji_people_body_deck() -> Deck:
+    data = _KANJI_N5_DATA[53:67]
+    return _build_kanji_deck("Kanji: People & Body", data, "kanji_people_body", id_offset=53)
+
+
+def get_kanji_study_language_deck() -> Deck:
+    data = _KANJI_N5_DATA[67:76]
+    return _build_kanji_deck("Kanji: Study & Language", data, "kanji_study_language", id_offset=67)
+
+
+def get_kanji_actions_travel_deck() -> Deck:
+    data = _KANJI_N5_DATA[76:91]
+    return _build_kanji_deck("Kanji: Actions & Travel", data, "kanji_actions_travel", id_offset=76)
+
+
+# ---------------------------------------------------------------------------
 # Grammar Patterns
 # (pattern, romanized pattern, English explanation)
 # ---------------------------------------------------------------------------
@@ -907,16 +1035,38 @@ def get_conjugation_training_deck() -> Deck:
 ALL_DECKS = {
     "hiragana": get_hiragana_deck,
     "katakana": get_katakana_deck,
+    # Kanji — JLPT levels (kept for backward compatibility)
     "kanji_n5": get_kanji_n5_deck,
     "kanji_n4": get_kanji_n4_deck,
     "kanji_n3": get_kanji_n3_deck,
     "kanji_n2": get_kanji_n2_deck,
     "kanji_n1": get_kanji_n1_deck,
+    # Kanji — thematic categories
+    "kanji_numbers_time": get_kanji_numbers_time_deck,
+    "kanji_nature_world": get_kanji_nature_world_deck,
+    "kanji_people_body": get_kanji_people_body_deck,
+    "kanji_study_language": get_kanji_study_language_deck,
+    "kanji_actions_travel": get_kanji_actions_travel_deck,
+    # Vocabulary — JLPT levels (kept for backward compatibility)
     "vocab_n5": get_vocab_n5_deck,
     "vocab_n4": get_vocab_n4_deck,
     "vocab_n3": get_vocab_n3_deck,
     "vocab_n2": get_vocab_n2_deck,
     "vocab_n1": get_vocab_n1_deck,
+    # Vocabulary — thematic categories
+    "vocab_greetings": get_vocab_greetings_deck,
+    "vocab_numbers": get_vocab_numbers_deck,
+    "vocab_time_days": get_vocab_time_days_deck,
+    "vocab_family": get_vocab_family_deck,
+    "vocab_body": get_vocab_body_deck,
+    "vocab_food_drink": get_vocab_food_drink_deck,
+    "vocab_school_study": get_vocab_school_study_deck,
+    "vocab_places": get_vocab_places_deck,
+    "vocab_transport": get_vocab_transport_deck,
+    "vocab_adjectives": get_vocab_adjectives_deck,
+    "vocab_verbs": get_vocab_verbs_deck,
+    "vocab_nouns": get_vocab_nouns_deck,
+    # Grammar / Conversational
     "grammar_patterns": get_grammar_patterns_deck,
     "sentence_examples": get_sentence_examples_deck,
     "conjugation_training": get_conjugation_training_deck,

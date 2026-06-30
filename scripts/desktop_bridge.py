@@ -53,6 +53,7 @@ from domain.blocks import (
     blocks_for_slug,
     compute_block_mastery,
     compute_unlocked_count,
+    unlock_threshold_for_slug,
 )
 from domain.distractors import rank_distractor_ids
 from domain.decks import ALL_DECKS
@@ -399,7 +400,7 @@ def build_block_progress(slug: str) -> dict[str, object]:
         cid: getattr(states.get(cid), "repetitions", 0) for cid in card_ids
     }
 
-    unlocked_count = compute_unlocked_count(blocks, repetitions_map)
+    unlocked_count = compute_unlocked_count(blocks, repetitions_map, unlock_threshold_for_slug(slug))
     char_map: dict[int, str] = {card.id: card.character for card in deck.cards}
     meaning_map: dict[int, str] = {card.id: card.meaning for card in deck.cards}
     romaji_map: dict[int, str] = {card.id: card.romaji for card in deck.cards}

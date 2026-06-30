@@ -13,6 +13,10 @@ from dataclasses import dataclass
 # following block becomes available.
 UNLOCK_THRESHOLD = 0.8
 
+# Lower threshold used for thematic category blocks (vocab/kanji/grammar
+# categories) so users can progress without mastering every card first.
+CATEGORY_UNLOCK_THRESHOLD = 0.7
+
 
 @dataclass(frozen=True)
 class Block:
@@ -85,6 +89,20 @@ _CONJUGATION_TRAINING_BLOCKS: list[Block] = [
     Block(3, "Practical Patterns", list(range(19, 24)), ["〜をください", "〜がほしい", "〜たい"]),
 ]
 
+# ---------------------------------------------------------------------------
+# Grammar Patterns blocks  (card IDs match _GRAMMAR_PATTERNS_DATA indices in
+# domain/decks.py).  Uses CATEGORY_UNLOCK_THRESHOLD (0.70) instead of the
+# standard 0.80 so learners advance after completing most of each group.
+# ---------------------------------------------------------------------------
+_GRAMMAR_PATTERNS_BLOCKS: list[Block] = [
+    Block(0, "Copula & Existence",      list(range(0,  6)),  ["〜は〜です", "〜があります", "〜がいます"]),
+    Block(1, "Core Particles",          list(range(6,  19)), ["〜は", "〜が", "〜を"]),
+    Block(2, "Verb Forms",              list(range(19, 31)), ["〜ます", "〜ません", "〜ました"]),
+    Block(3, "Descriptions & Questions",list(range(31, 49)), ["〜い", "〜な", "なに/なん"]),
+    Block(4, "Connectives",             list(range(49, 54)), ["〜から", "〜が (contrast)", "〜けど"]),
+    Block(5, "Key Expressions",         list(range(54, 64)), ["〜をください", "〜がほしい", "どうぞよろしく"]),
+]
+
 
 def blocks_for_slug(slug: str) -> list[Block]:
     """Return the ordered block sequence for a deck slug.
@@ -96,11 +114,24 @@ def blocks_for_slug(slug: str) -> list[Block]:
         return _HIRAGANA_BLOCKS
     if slug == "katakana":
         return _KATAKANA_BLOCKS
+    if slug == "grammar_patterns":
+        return _GRAMMAR_PATTERNS_BLOCKS
     if slug == "sentence_examples":
         return _SENTENCE_EXAMPLES_BLOCKS
     if slug == "conjugation_training":
         return _CONJUGATION_TRAINING_BLOCKS
     return []
+
+
+def unlock_threshold_for_slug(slug: str) -> float:
+    """Return the mastery threshold required to unlock the next block.
+
+    Grammar patterns and other category-based sections use a lower threshold
+    so learners can progress after mastering 70 % instead of 80 %.
+    """
+    if slug in ("grammar_patterns", "sentence_examples", "conjugation_training"):
+        return CATEGORY_UNLOCK_THRESHOLD
+    return UNLOCK_THRESHOLD
 
 
 def compute_block_mastery(block: Block, repetitions_map: dict[int, int]) -> float:
@@ -116,16 +147,16 @@ def compute_block_mastery(block: Block, repetitions_map: dict[int, int]) -> floa
     return passed / len(block.card_ids)
 
 
-def compute_unlocked_count(blocks: list[Block], repetitions_map: dict[int, int]) -> int:
+def compute_unlocked_count(blocks: list[Block], repetitions_map: dict[int, int], threshold: float = UNLOCK_THRESHOLD) -> int:
     """Return how many blocks are currently accessible (always at least 1).
 
     Blocks unlock sequentially: block *i* is unlocked once block *i − 1*
-    reaches :data:`UNLOCK_THRESHOLD`.
+    reaches *threshold*.
     """
     unlocked = 1
     for i in range(1, len(blocks)):
         prev_mastery = compute_block_mastery(blocks[i - 1], repetitions_map)
-        if prev_mastery >= UNLOCK_THRESHOLD:
+        if prev_mastery >= threshold:
             unlocked = i + 1
         else:
             break

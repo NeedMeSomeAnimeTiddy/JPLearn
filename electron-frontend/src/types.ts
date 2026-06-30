@@ -24,6 +24,61 @@ export type JlptLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
 export type KanjiDeckSlug = 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1'
 export type VocabDeckSlug = 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1'
 
+// ── Thematic category types ───────────────────────────────────────────────────
+
+export type VocabCategory =
+  | 'greetings'
+  | 'numbers'
+  | 'time_days'
+  | 'family'
+  | 'body'
+  | 'food_drink'
+  | 'school_study'
+  | 'places'
+  | 'transport'
+  | 'adjectives'
+  | 'verbs'
+  | 'nouns'
+
+export type KanjiCategory =
+  | 'numbers_time'
+  | 'nature_world'
+  | 'people_body'
+  | 'study_language'
+  | 'actions_travel'
+
+export type VocabCategorySlug =
+  | 'vocab_greetings'
+  | 'vocab_numbers'
+  | 'vocab_time_days'
+  | 'vocab_family'
+  | 'vocab_body'
+  | 'vocab_food_drink'
+  | 'vocab_school_study'
+  | 'vocab_places'
+  | 'vocab_transport'
+  | 'vocab_adjectives'
+  | 'vocab_verbs'
+  | 'vocab_nouns'
+
+export type KanjiCategorySlug =
+  | 'kanji_numbers_time'
+  | 'kanji_nature_world'
+  | 'kanji_people_body'
+  | 'kanji_study_language'
+  | 'kanji_actions_travel'
+
+export interface CategoryProgress {
+  key: string
+  label: string
+  slug: string
+  cardIds: number[]
+  sampleChars: string[]
+  mastery: number
+  unlocked: boolean
+  total: number
+}
+
 export type FeedbackTone = 'success' | 'error' | null
 
 export type NavDirection = 'forward' | 'back'
