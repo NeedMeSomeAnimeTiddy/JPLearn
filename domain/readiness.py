@@ -86,7 +86,7 @@ SECTION_LABELS: dict[str, str] = {
 LEARNING_PATHS: dict[str, dict] = {
     "complete_beginner": {
         "name": "Complete Beginner",
-        "steps": ["hiragana", "katakana", "vocab_n5", "grammar_patterns"],
+        "steps": ["hiragana", "katakana", "vocab_n5", "grammar_patterns", "kanji_n5"],
     },
 }
 

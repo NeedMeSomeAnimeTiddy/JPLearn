@@ -3605,6 +3605,10 @@ button {
   app-region: no-drag;
 }
 
+.titlebar-streak {
+  position: relative;
+}
+
 .titlebar-streak-chip {
   border: 1px solid color-mix(in oklab, var(--tone-streak, #ffb563) 32%, var(--button-border));
   border-radius: 999px;
@@ -3627,6 +3631,56 @@ button {
 .titlebar-streak-icon {
   width: 13px;
   height: 13px;
+}
+
+.titlebar-streak-details {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  border: 1px solid color-mix(in oklab, var(--tone-streak, #ffb563) 38%, var(--panel-border));
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--tone-streak, #ffb563) 18%, transparent), transparent 58%),
+    color-mix(in oklab, var(--panel-bg-alt) 92%, black);
+  box-shadow: 0 18px 36px -22px rgba(0, 0, 0, 0.85);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+  z-index: 960;
+}
+
+.titlebar-streak-details.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.titlebar-streak-details-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: color-mix(in oklab, var(--tone-streak, #ffb563) 85%, var(--text-main));
+  margin: 0;
+}
+
+.titlebar-streak-details-row {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.titlebar-streak-details-tip {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  opacity: 0.8;
+  margin: 5px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--panel-border);
 }
 
 .titlebar-xp-button {

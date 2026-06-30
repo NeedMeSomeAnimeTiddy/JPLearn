@@ -89,7 +89,6 @@ export function HomeView({
       )}
       <section className="home-menu panel-glass">
         <div className="home-header-row">
-          <h1 className="home-logo">JPLearn</h1>
           {onSelectJLPTPrep ? (
             <button
               type="button"

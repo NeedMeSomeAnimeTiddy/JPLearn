@@ -2617,6 +2617,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('theme')
   const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
+  const [streakDetailsOpen, setStreakDetailsOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
   const [collapsedThemeSections, setCollapsedThemeSections] = useState<Partial<Record<string, boolean>>>({})
   const [customThemeActionMessage, setCustomThemeActionMessage] = useState<string | null>(null)
@@ -2643,6 +2644,7 @@ function App() {
   const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
   const assistantChatClearTokenRef = useRef(0)
   const xpDetailsRef = useRef<HTMLDivElement | null>(null)
+  const streakDetailsRef = useRef<HTMLDivElement | null>(null)
   const localToastIdRef = useRef(-1)
   const previousSessionActiveRef = useRef(false)
   const feedbackTimerRef = useRef<number | null>(null)
@@ -5615,6 +5617,19 @@ function App() {
   }, [xpDetailsOpen])
 
   useEffect(() => {
+    if (!streakDetailsOpen) return
+
+    function handlePointerDown(event: MouseEvent): void {
+      const target = event.target as Node
+      if (streakDetailsRef.current?.contains(target)) return
+      setStreakDetailsOpen(false)
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    return () => window.removeEventListener('mousedown', handlePointerDown)
+  }, [streakDetailsOpen])
+
+  useEffect(() => {
     if (isTutorChatUnlocked) {
       return
     }
@@ -5920,16 +5935,36 @@ function App() {
           </div>
         </div>
         <div className="titlebar-progress-cluster">
-          <button
-            type="button"
-            className="titlebar-streak-chip"
-            onClick={jumpToOverview}
-            title="Open study overview"
-            aria-label={`${streak.current_days} day streak`}
-          >
-            <Flame className="titlebar-streak-icon" strokeWidth={2.1} aria-hidden="true" />
-            <span>{streak.current_days}d streak</span>
-          </button>
+          <div className="titlebar-streak" ref={streakDetailsRef}>
+            <button
+              type="button"
+              className="titlebar-streak-chip"
+              onClick={() => setStreakDetailsOpen((open) => !open)}
+              title="View streak details"
+              aria-label={`${streak.current_days} day streak`}
+              aria-expanded={streakDetailsOpen}
+              aria-controls="titlebar-streak-details"
+            >
+              <Flame className="titlebar-streak-icon" strokeWidth={2.1} aria-hidden="true" />
+              <span>{streak.current_days}d streak</span>
+            </button>
+            <div
+              id="titlebar-streak-details"
+              className={`titlebar-streak-details ${streakDetailsOpen ? 'is-open' : ''}`}
+              role="dialog"
+              aria-label="Streak details"
+            >
+              <p className="titlebar-streak-details-title">
+                {streak.current_days > 0 ? `${streak.current_days}-day streak 🔥` : 'No active streak'}
+              </p>
+              <p className="titlebar-streak-details-row">Best: {streak.best_days} days</p>
+              <p className="titlebar-streak-details-tip">
+                {streak.current_days > 0
+                  ? 'Keep it up — review something today!'
+                  : 'Complete a session to start your streak.'}
+              </p>
+            </div>
+          </div>
 
           {xpProgress ? (
             <div className="titlebar-xp" ref={xpDetailsRef}>
