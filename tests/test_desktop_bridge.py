@@ -337,7 +337,15 @@ def test_apply_expertise_level_n5_foundation_marks_target_decks_mastered(tmp_pat
     decks = cast(list[dict[str, Any]], summary["decks"])
     by_slug = {deck["slug"]: deck for deck in decks}
 
-    for slug in ("hiragana", "katakana", "kanji_n5", "vocab_n5"):
+    for slug in (
+        "hiragana",
+        "katakana",
+        "kanji_n5",
+        "kanji_numbers_time",
+        "vocab_n5",
+        "vocab_greetings",
+        "vocab_numbers",
+    ):
         deck = by_slug[slug]
         assert deck["total"] > 0
         assert deck["mastered"] == deck["total"]

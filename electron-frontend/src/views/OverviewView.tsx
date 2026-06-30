@@ -399,7 +399,11 @@ export function OverviewView({
                     {blocks.map((block) => {
                       const blockKey = `${script}-${block.index}`
                       const isActive = expandedBlocks === blockKey
-                      const pct = Math.round(block.mastery * 100)
+                      // Derive mastery from the same cardScores the chips use so they are always in sync.
+                      const totalScore = block.card_ids.reduce((sum, id) => sum + (scores[id] ?? 0), 0)
+                      const pct = block.card_ids.length > 0
+                        ? Math.round(totalScore / (CARD_MASTERY_MAX * block.card_ids.length) * 100)
+                        : 0
                       return (
                         <Fragment key={block.index}>
                           <button

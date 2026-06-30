@@ -126,11 +126,30 @@ OVERVIEW_WORDS_CATEGORY_SPECS: tuple[tuple[str, str], ...] = (
     ("Common Nouns", "vocab_nouns"),
 )
 
+VOCAB_N5_CATEGORY_SLUGS: tuple[str, ...] = tuple(
+    slug for _, slug in OVERVIEW_WORDS_CATEGORY_SPECS
+)
+
+KANJI_N5_CATEGORY_SLUGS: tuple[str, ...] = (
+    "kanji_numbers_time",
+    "kanji_nature_world",
+    "kanji_people_body",
+    "kanji_study_language",
+    "kanji_actions_travel",
+)
+
 EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
     "total_beginner": (),
     "know_hiragana": ("hiragana",),
     "know_kana": ("hiragana", "katakana"),
-    "jlpt_n5_foundation": ("hiragana", "katakana", "kanji_n5", "vocab_n5"),
+    "jlpt_n5_foundation": (
+        "hiragana",
+        "katakana",
+        "kanji_n5",
+        *KANJI_N5_CATEGORY_SLUGS,
+        "vocab_n5",
+        *VOCAB_N5_CATEGORY_SLUGS,
+    ),
 }
 
 @dataclass(frozen=True)
