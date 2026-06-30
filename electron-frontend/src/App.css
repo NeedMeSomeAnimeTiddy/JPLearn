@@ -1276,9 +1276,9 @@ button {
 }
 
 .home-menu {
-  padding: 30px;
+  padding: 27px;
   display: grid;
-  gap: 14px;
+  gap: 12px;
   animation: enterUp 420ms ease both;
   border-radius: 28px;
 }
@@ -1361,7 +1361,7 @@ button {
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
   grid-auto-rows: 1fr;
 }
 
@@ -1372,12 +1372,12 @@ button {
   background: linear-gradient(150deg, var(--card-bg-top), var(--card-bg-bottom));
   color: var(--text-main);
   border-radius: 16px;
-  padding: 14px;
-  min-height: 180px;
+  padding: 12px;
+  min-height: 166px;
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
   animation: enterUp 500ms ease both;
@@ -1387,22 +1387,22 @@ button {
   --difficulty-tone: var(--tone-ocean);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border: 1px solid color-mix(in oklab, var(--difficulty-tone) 58%, var(--card-border));
   background: color-mix(in oklab, var(--difficulty-tone) 18%, var(--card-bg-top));
   color: color-mix(in oklab, var(--difficulty-tone) 82%, white);
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  align-self: flex-start;
+  align-self: center;
 }
 
 .menu-card-difficulty-icon {
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   flex-shrink: 0;
 }
 
@@ -1433,27 +1433,35 @@ button {
 }
 
 .menu-card strong {
-  font-size: 1.08rem;
+  font-size: 1.02rem;
 }
 
 .menu-card p {
   margin: 0;
   color: var(--text-soft);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
   flex: 1;
+}
+
+.menu-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .menu-card-footer-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 6px;
   margin-top: auto;
-  padding-top: 2px;
+  padding-top: 1px;
 }
 
 .menu-card-mastery-pct {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 700;
   color: var(--text-soft);
   font-variant-numeric: tabular-nums;
@@ -1478,7 +1486,7 @@ button {
   border-radius: 2px;
   background: color-mix(in oklab, var(--panel-border) 80%, transparent);
   overflow: hidden;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
 .menu-card-progress-fill {
@@ -1539,9 +1547,9 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 72px;
-  height: 72px;
-  margin-bottom: 4px;
+  width: 66px;
+  height: 66px;
+  margin-bottom: 2px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: linear-gradient(155deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
@@ -1639,13 +1647,13 @@ button {
 }
 
 .home-study-plan-strip {
-  margin-top: 14px;
+  margin-top: 12px;
   border-radius: 18px;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 22%, var(--panel-border));
   background:
     radial-gradient(circle at 10% 0%, rgba(108, 185, 214, 0.1), transparent 32%),
     linear-gradient(155deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  padding: 12px 14px;
+  padding: 11px 13px;
   overflow: hidden;
 }
 
@@ -1725,14 +1733,14 @@ button {
   overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-  gap: 12px;
-  padding-top: 12px;
+  gap: 10px;
+  padding-top: 10px;
 }
 
 .home-study-plan-shortcuts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 9px;
 }
 
 .study-plan-shortcut-button-inline {
@@ -1742,7 +1750,7 @@ button {
 
 .home-study-plan-metrics {
   display: grid;
-  gap: 10px;
+  gap: 9px;
   align-content: start;
 }
 
@@ -3882,23 +3890,23 @@ button {
 
 /* ── Home recommendations section ─────────────────────────────── */
 .home-recommendations {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .home-recommendations-heading {
-  margin: 0 0 8px;
+  margin: 0 0 7px;
 }
 
 .home-recommendations-list {
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .recommendation-card {
   display: grid;
   grid-template-rows: auto auto auto;
-  gap: 5px;
-  padding: 11px 13px;
+  gap: 4px;
+  padding: 10px 12px;
   border: 1px solid var(--card-border);
   border-radius: 12px;
   background: linear-gradient(150deg, var(--card-bg-top), var(--card-bg-bottom));
@@ -7750,13 +7758,15 @@ html[data-reduced-motion='true'] *::after {
 
 /* ── Readiness badges on menu cards ────────────────────────────── */
 .menu-card-readiness-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  align-self: flex-start;
   border-radius: 999px;
-  padding: 3px 8px;
-  font-size: 0.66rem;
+  padding: 2px 7px;
+  font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -7802,9 +7812,9 @@ html[data-reduced-motion='true'] *::after {
 
 /* ── Learning Path Panel ────────────────────────────────────────── */
 .learning-path-panel {
-  padding: 10px 14px;
+  padding: 9px 12px;
   border-radius: 14px;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
 }
 
 .lpp-header {

@@ -120,9 +120,8 @@ export function HomeView({
                   </span>
                 )}
                 <span className="menu-script-glyph" aria-hidden="true" lang="ja">{glyph}</span>
-                <strong>{SCRIPT_LABELS[script]}</strong>
-                <p>{SCRIPT_MENU_LINES[script]}</p>
-                <div className="menu-card-footer-row">
+                <div className="menu-card-header-row">
+                  <strong>{SCRIPT_LABELS[script]}</strong>
                   <span
                     className={`menu-card-difficulty menu-card-difficulty-${difficulty.tier}`}
                     aria-label={`Difficulty: ${difficulty.label}`}
@@ -131,6 +130,9 @@ export function HomeView({
                     <DifficultyIcon className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
                     <span>{difficulty.label}</span>
                   </span>
+                </div>
+                <p>{SCRIPT_MENU_LINES[script]}</p>
+                <div className="menu-card-footer-row">
                   {coverageRow && coverageRow.total > 0 ? (
                     <span className="menu-card-mastery-pct" aria-label={`${Math.round(coverageRow.mastery * 100)}% mastered`}>
                       {Math.round(coverageRow.mastery * 100)}%
