@@ -62,6 +62,7 @@ const STARTUP_BUDGETS_MS = {
   firstSummary: 2500,
 }
 const FORCED_USER_DATA_DIR = process.env.JPLEARN_USER_DATA_DIR
+const FORCED_SESSION_DATA_DIR = process.env.JPLEARN_SESSION_DATA_DIR
 const DEFAULT_STARTUP_THEME = 'harbor_mist'
 const VALID_STARTUP_THEMES = new Set([
   'harbor_mist',
@@ -86,8 +87,33 @@ const VALID_STARTUP_THEMES = new Set([
   'matcha_stone_light',
 ])
 
+function ensureAppPath(pathKey, targetDir) {
+  try {
+    fs.mkdirSync(targetDir, { recursive: true })
+    app.setPath(pathKey, targetDir)
+    return app.getPath(pathKey)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    console.warn(`Failed to set ${pathKey} path:`, detail)
+    return app.getPath(pathKey)
+  }
+}
+
 if (FORCED_USER_DATA_DIR) {
-  app.setPath('userData', FORCED_USER_DATA_DIR)
+  ensureAppPath('userData', FORCED_USER_DATA_DIR)
+}
+
+const resolvedSessionDataPath = ensureAppPath(
+  'sessionData',
+  FORCED_SESSION_DATA_DIR || path.join(app.getPath('temp'), 'jplearn-electron', 'session-data')
+)
+const resolvedDiskCachePath = path.join(resolvedSessionDataPath, 'Cache')
+try {
+  fs.mkdirSync(resolvedDiskCachePath, { recursive: true })
+  app.commandLine.appendSwitch('disk-cache-dir', resolvedDiskCachePath)
+} catch (error) {
+  const detail = error instanceof Error ? error.message : String(error)
+  console.warn('Failed to configure disk cache dir:', detail)
 }
 
 function getThemeStatePath() {

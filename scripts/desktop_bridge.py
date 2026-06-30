@@ -710,9 +710,7 @@ def build_recommendations_payload() -> dict[str, object]:
         category_metrics=tuple(metrics),
         progression_state=prog_state,
         days_since_last_study=(
-            max(0, (_date.today() - __import__("datetime").date.fromisoformat(
-                streak.last_study_day_utc[:10]
-            )).days)
+            max(0, (_date.today() - streak.last_study_day_utc).days)
             if streak.last_study_day_utc
             else 0
         ),
