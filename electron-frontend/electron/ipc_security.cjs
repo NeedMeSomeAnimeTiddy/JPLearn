@@ -87,7 +87,7 @@ function validateStartupThemeInput(theme) {
 }
 
 function validateExpertiseLevelInput(level) {
-  const allowed = new Set(['total_beginner', 'know_hiragana', 'know_kana', 'jlpt_n5_foundation'])
+  const allowed = new Set(['total_beginner', 'know_hiragana', 'know_kana', 'jlpt_n5_foundation', 'jlpt_n4_foundation', 'jlpt_n3_foundation', 'jlpt_n2_foundation', 'jlpt_n1_foundation'])
   if (typeof level !== 'string' || !allowed.has(level)) {
     throw new Error(`Invalid expertise level value: ${String(level)}`)
   }

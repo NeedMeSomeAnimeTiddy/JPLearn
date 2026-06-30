@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, CheckCircle, Clock, Target, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Clock, Lock, Target, XCircle } from 'lucide-react'
 
 type JLPTLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
 type JLPTExamMode = 'mock_exam' | 'diagnostic' | 'adaptive_review' | 'weak_area_drill'
@@ -18,6 +18,7 @@ const MODE_META: Record<JLPTExamMode, { label: string; description: string }> = 
 }
 
 const MOCK_EXAM_SECONDS = 30 * 60   // 30 minutes for mock exam
+const JLPT_UNLOCK_THRESHOLD = 30    // % readiness on previous level required to unlock the next
 
 interface JLPTPrepViewProps {
   onBack: () => void
@@ -281,17 +282,22 @@ interface ReadinessCardProps {
   data: JLPTLevelReadinessData & { mastered_vocab: number; total_vocab: number; mastered_kanji: number; total_kanji: number }
   onStartMode: (level: JLPTLevel, mode: JLPTExamMode) => void
   loading: boolean
+  isLocked: boolean
+  lockHint: string
 }
 
-function ReadinessCard({ level, data, onStartMode, loading }: ReadinessCardProps) {
-  const totalMastered = data.mastered_vocab + data.mastered_kanji
+function ReadinessCard({ level, data, onStartMode, loading, isLocked, lockHint }: ReadinessCardProps) {
   const totalCards = data.total_vocab + data.total_kanji
+  const kanjiPct = data.total_kanji > 0 ? Math.round((data.mastered_kanji / data.total_kanji) * 100) : null
+  const vocabPct = data.total_vocab > 0 ? Math.round((data.mastered_vocab / data.total_vocab) * 100) : null
 
   return (
-    <div className={`jlpt-readiness-card ${data.is_ready ? 'is-ready' : ''}`}>
+    <div className={`jlpt-readiness-card${data.is_ready && !isLocked ? ' is-ready' : ''}${isLocked ? ' is-locked' : ''}`}>
       <div className="jlpt-readiness-card-header">
         <span className="jlpt-readiness-level">{LEVEL_LABELS[level]}</span>
-        {data.is_ready ? (
+        {isLocked ? (
+          <span className="jlpt-locked-badge"><Lock size={12} aria-hidden="true" /> Locked</span>
+        ) : data.is_ready ? (
           <span className="jlpt-ready-badge"><CheckCircle size={12} aria-hidden="true" /> Ready</span>
         ) : null}
       </div>
@@ -307,25 +313,62 @@ function ReadinessCard({ level, data, onStartMode, loading }: ReadinessCardProps
         <div className="jlpt-readiness-fill" style={{ width: `${data.readiness_pct}%` }} />
       </div>
 
-      <div className="jlpt-readiness-counts">
-        <span>{data.readiness_pct}% mastered</span>
-        <span>{totalMastered}/{totalCards > 0 ? totalCards : '—'} cards</span>
+      <div className="jlpt-level-breakdown">
+        <div className="jlpt-breakdown-row">
+          <span className="jlpt-breakdown-label">Kanji</span>
+          <div
+            className="jlpt-breakdown-bar"
+            role="progressbar"
+            aria-valuenow={kanjiPct ?? 0}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${kanjiPct ?? 0}% kanji mastered`}
+          >
+            <div className="jlpt-breakdown-fill" style={{ width: `${kanjiPct ?? 0}%` }} />
+          </div>
+          <span className="jlpt-breakdown-count">
+            {kanjiPct !== null ? `${kanjiPct}%` : '—'} · {data.mastered_kanji}/{data.total_kanji > 0 ? data.total_kanji : '—'}
+          </span>
+        </div>
+        <div className="jlpt-breakdown-row">
+          <span className="jlpt-breakdown-label">Vocab</span>
+          <div
+            className="jlpt-breakdown-bar"
+            role="progressbar"
+            aria-valuenow={vocabPct ?? 0}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${vocabPct ?? 0}% vocabulary mastered`}
+          >
+            <div className="jlpt-breakdown-fill" style={{ width: `${vocabPct ?? 0}%` }} />
+          </div>
+          <span className="jlpt-breakdown-count">
+            {vocabPct !== null ? `${vocabPct}%` : '—'} · {data.mastered_vocab}/{data.total_vocab > 0 ? data.total_vocab : '—'}
+          </span>
+        </div>
       </div>
 
-      <div className="jlpt-mode-buttons" role="group" aria-label={`Start ${LEVEL_LABELS[level]} session`}>
-        {(['diagnostic', 'mock_exam', 'adaptive_review', 'weak_area_drill'] as JLPTExamMode[]).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            className="jlpt-mode-btn"
-            onClick={() => onStartMode(level, mode)}
-            disabled={loading || totalCards === 0}
-            title={MODE_META[mode].description}
-          >
-            {MODE_META[mode].label}
-          </button>
-        ))}
-      </div>
+      {isLocked ? (
+        <div className="jlpt-card-lock-notice" aria-label={lockHint}>
+          <Lock size={13} strokeWidth={2.2} aria-hidden="true" />
+          <span>{lockHint}</span>
+        </div>
+      ) : (
+        <div className="jlpt-mode-buttons" role="group" aria-label={`Start ${LEVEL_LABELS[level]} session`}>
+          {(['diagnostic', 'mock_exam', 'adaptive_review', 'weak_area_drill'] as JLPTExamMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              className="jlpt-mode-btn"
+              onClick={() => onStartMode(level, mode)}
+              disabled={loading || totalCards === 0}
+              title={MODE_META[mode].description}
+            >
+              {MODE_META[mode].label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -475,7 +518,8 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
   }
 
   return (
-    <div className="jlpt-prep-view">
+    <div className="view-shell">
+      <section className="jlpt-prep-view panel-glass">
       <header className="jlpt-prep-header">
         <button type="button" className="jlpt-back-btn" onClick={onBack} aria-label="Back to home">
           <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" /> Home
@@ -499,7 +543,7 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
       ) : null}
 
       <section className="jlpt-levels-grid" aria-label="JLPT level readiness">
-        {LEVEL_ORDER.map((level) => {
+        {LEVEL_ORDER.map((level, idx) => {
           const data = readiness?.levels[level]
           if (readinessLoading || !data) {
             return (
@@ -510,6 +554,12 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
               </div>
             )
           }
+          const prevLevel = idx > 0 ? LEVEL_ORDER[idx - 1] : null
+          const prevData = prevLevel ? (readiness?.levels[prevLevel] ?? null) : null
+          const isLocked = prevLevel !== null && (prevData === null || prevData.readiness_pct < JLPT_UNLOCK_THRESHOLD)
+          const lockHint = prevLevel
+            ? `Reach ${JLPT_UNLOCK_THRESHOLD}% readiness in ${LEVEL_LABELS[prevLevel]} to unlock`
+            : ''
           return (
             <ReadinessCard
               key={level}
@@ -517,6 +567,8 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
               data={data}
               onStartMode={startExam}
               loading={examLoading}
+              isLocked={isLocked}
+              lockHint={lockHint}
             />
           )
         })}
@@ -544,6 +596,7 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
           </ul>
         </section>
       ) : null}
+      </section>
     </div>
   )
 }

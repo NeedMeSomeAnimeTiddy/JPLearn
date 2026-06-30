@@ -151,7 +151,7 @@ type DeckSlug =
   // Grammar / Conversational
   | 'grammar_patterns'
 type ScriptCurriculumSlug = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
-type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation'
+type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation'
 
 interface ScriptDeckPayload {
   slug: string

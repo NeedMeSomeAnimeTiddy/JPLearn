@@ -130,7 +130,7 @@ type BackgroundStyle =
   | 'garden_bridge'
   | 'autumn_pond'
 type FeedbackTone = 'success' | 'error' | null
-type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation'
+type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation'
 type ThemeKey =
   | 'harbor_mist'
   | 'sakura_dawn'
@@ -1393,34 +1393,53 @@ const VOICE_OPTIONS: Array<{ id: number; name: string; jp: string }> = [
 ]
 const VOICE_OPTION_IDS = new Set<number>(VOICE_OPTIONS.map((option) => option.id))
 
-const EXPERTISE_OPTIONS: Array<{ level: ExpertiseLevel; title: string; description: string }> = [
-  {
-    level: 'total_beginner',
-    title: 'I am starting from scratch',
-    description: 'No decks are pre-completed. You start at lesson one.',
-  },
-  {
-    level: 'know_hiragana',
-    title: 'I can already read hiragana',
-    description: 'Completes the Hiragana deck only.',
-  },
-  {
-    level: 'know_kana',
-    title: 'I can read hiragana and katakana',
-    description: 'Completes both Kana decks.',
-  },
-  {
-    level: 'jlpt_n5_foundation',
-    title: 'I already know JLPT N5 basics',
-    description: 'Completes Hiragana, Katakana, N5 Kanji, and N5 Vocabulary.',
-  },
+const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
+  total_beginner:       [],
+  know_hiragana:        ['hiragana'],
+  know_kana:            ['hiragana', 'katakana'],
+  jlpt_n5_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
+  jlpt_n4_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
+  jlpt_n3_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
+  jlpt_n2_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
+  jlpt_n1_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
+}
+
+// All slugs pre-completed at each level (includes N4+ slugs not in ScriptKey)
+const EXPERTISE_LEVEL_TO_DISPLAY_SLUGS: Record<ExpertiseLevel, string[]> = {
+  total_beginner:       [],
+  know_hiragana:        ['hiragana'],
+  know_kana:            ['hiragana', 'katakana'],
+  jlpt_n5_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
+  jlpt_n4_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'kanji_n4', 'vocab_n4'],
+  jlpt_n3_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'kanji_n4', 'vocab_n4', 'kanji_n3', 'vocab_n3'],
+  jlpt_n2_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'kanji_n4', 'vocab_n4', 'kanji_n3', 'vocab_n3', 'kanji_n2', 'vocab_n2'],
+  jlpt_n1_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'kanji_n4', 'vocab_n4', 'kanji_n3', 'vocab_n3', 'kanji_n2', 'vocab_n2', 'kanji_n1', 'vocab_n1'],
+}
+
+const PREREQ_ITEMS: Array<{ key: string; label: string; description: string }> = [
+  { key: 'hiragana',  label: 'Hiragana',        description: 'The 46 basic phonetic characters used in everyday Japanese' },
+  { key: 'katakana',  label: 'Katakana',        description: 'The phonetic script for loanwords and foreign names' },
+  { key: 'kanji_n5',  label: 'N5 Kanji',        description: 'The ~100 basic Chinese-origin characters at the JLPT N5 level' },
+  { key: 'vocab_n5',  label: 'N5 Vocabulary',   description: 'The ~800 essential words tested at the JLPT N5 level' },
+  { key: 'kanji_n4',  label: 'N4 Kanji',        description: 'Intermediate characters — ~300 kanji at the JLPT N4 level' },
+  { key: 'vocab_n4',  label: 'N4 Vocabulary',   description: '~1,500 words required for everyday conversation at N4' },
+  { key: 'kanji_n3',  label: 'N3 Kanji',        description: '~650 kanji bridging beginner and intermediate Japanese' },
+  { key: 'vocab_n3',  label: 'N3 Vocabulary',   description: '~3,700 words at the mid-level JLPT N3 threshold' },
+  { key: 'kanji_n2',  label: 'N2 Kanji',        description: '~1,000 kanji required for upper-intermediate proficiency' },
+  { key: 'vocab_n2',  label: 'N2 Vocabulary',   description: '~6,000 words covering advanced reading and comprehension' },
+  { key: 'kanji_n1',  label: 'N1 Kanji',        description: '~2,000 kanji — the full set expected at JLPT N1' },
+  { key: 'vocab_n1',  label: 'N1 Vocabulary',   description: '~10,000 words for near-native Japanese proficiency' },
 ]
 
-const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
-  total_beginner: [],
-  know_hiragana: ['hiragana'],
-  know_kana: ['hiragana', 'katakana'],
-  jlpt_n5_foundation: ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
+function deriveExpertiseLevelFromChecked(checked: Set<string>): ExpertiseLevel {
+  if (checked.has('kanji_n1') || checked.has('vocab_n1')) return 'jlpt_n1_foundation'
+  if (checked.has('kanji_n2') || checked.has('vocab_n2')) return 'jlpt_n2_foundation'
+  if (checked.has('kanji_n3') || checked.has('vocab_n3')) return 'jlpt_n3_foundation'
+  if (checked.has('kanji_n4') || checked.has('vocab_n4')) return 'jlpt_n4_foundation'
+  if (checked.has('kanji_n5') || checked.has('vocab_n5')) return 'jlpt_n5_foundation'
+  if (checked.has('katakana')) return 'know_kana'
+  if (checked.has('hiragana')) return 'know_hiragana'
+  return 'total_beginner'
 }
 
 const EMPTY_SCRIPT_STATS: ScriptStats = {
@@ -2576,8 +2595,8 @@ function App() {
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('theme')
   const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
   const [showExpertisePrompt, setShowExpertisePrompt] = useState<boolean>(false)
-  const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3 | 4>(1)
-  const [selectedExpertiseLevel, setSelectedExpertiseLevel] = useState<ExpertiseLevel>('total_beginner')
+  const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1)
+  const [checkedScripts, setCheckedScripts] = useState<Set<string>>(new Set())
   const [applyingExpertise, setApplyingExpertise] = useState<boolean>(false)
   const [expertiseError, setExpertiseError] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
@@ -5385,7 +5404,7 @@ function App() {
       setShowExpertisePrompt(true)
       setOnboardingStep(1)
       setExpertiseError(null)
-      setSelectedExpertiseLevel('total_beginner')
+      setCheckedScripts(new Set())
       setResetConfirmStep(0)
       refreshDeckProgressAfterSeedChange()
       await loadSummary()
@@ -5415,15 +5434,16 @@ function App() {
   }, [])
 
   const applyExpertiseSelection = useCallback(async () => {
+    const level = deriveExpertiseLevelFromChecked(checkedScripts)
     setApplyingExpertise(true)
     setExpertiseError(null)
     try {
-      await window.jplearnDesktop.applyExpertiseLevel(selectedExpertiseLevel)
+      await window.jplearnDesktop.applyExpertiseLevel(level)
 
-      if (selectedExpertiseLevel === 'total_beginner') {
+      if (level === 'total_beginner') {
         setCardScores({ hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} })
       } else {
-        const targetScripts = EXPERTISE_LEVEL_TO_SCRIPT_KEYS[selectedExpertiseLevel]
+        const targetScripts = EXPERTISE_LEVEL_TO_SCRIPT_KEYS[level]
         const payloads = await Promise.all(targetScripts.map((slug) => getDeckCardsDeduped(slug)))
         setCardScores((previous) => {
           const next: CardScores = {
@@ -5456,21 +5476,19 @@ function App() {
     } finally {
       setApplyingExpertise(false)
     }
-  }, [getDeckCardsDeduped, loadSummary, refreshDeckProgressAfterSeedChange, selectedExpertiseLevel])
+  }, [getDeckCardsDeduped, loadSummary, refreshDeckProgressAfterSeedChange, checkedScripts])
 
   const goToNextOnboardingStep = useCallback(() => {
     setExpertiseError(null)
     setOnboardingStep((prev) => {
       if (prev === 1) return 2
-      if (prev === 2) return 3
-      return 4
+      return 3
     })
   }, [])
 
   const goToPreviousOnboardingStep = useCallback(() => {
     setExpertiseError(null)
     setOnboardingStep((prev) => {
-      if (prev === 4) return 3
       if (prev === 3) return 2
       return 1
     })
@@ -5482,8 +5500,6 @@ function App() {
     setExpertiseError(null)
     setOnboardingStep(1)
   }, [])
-  const selectedExpertiseOption =
-    EXPERTISE_OPTIONS.find((option) => option.level === selectedExpertiseLevel) ?? EXPERTISE_OPTIONS[0]
 
   const resolvedBackgroundUrls = useMemo(() => {
     const next: Partial<Record<BackgroundStyle, string>> = {}
@@ -6320,16 +6336,14 @@ function App() {
             <div className="settings-modal-header">
               <div>
                 <h2 id="expertise-title" className="settings-modal-title">
-                  {onboardingStep === 1 ? 'Pick your study companion' : null}
-                  {onboardingStep === 2 ? 'Choose a voice' : null}
-                  {onboardingStep === 3 ? 'How much should we pre-complete for you?' : null}
-                  {onboardingStep === 4 ? 'Confirm your starting point' : null}
+                  {onboardingStep === 1 ? 'Choose a voice' : null}
+                  {onboardingStep === 2 ? 'What have you already mastered?' : null}
+                  {onboardingStep === 3 ? 'Confirm your starting point' : null}
                 </h2>
                 <p id="expertise-subtitle" className="settings-modal-subtitle">
-                  {onboardingStep === 1 ? 'Turn the coach on or off. You can change this anytime.' : null}
-                  {onboardingStep === 2 ? 'Hear prompts read aloud. Tap a voice to sample it.' : null}
-                  {onboardingStep === 3 ? 'Choose the option that matches what you can already read today.' : null}
-                  {onboardingStep === 4 ? 'You can change this later by resetting study progress in settings.' : null}
+                  {onboardingStep === 1 ? 'Hear prompts read aloud. Tap a voice to sample it.' : null}
+                  {onboardingStep === 2 ? 'Check everything you already know. Leave the rest unchecked.' : null}
+                  {onboardingStep === 3 ? 'You can change this later by resetting study progress in settings.' : null}
                 </p>
               </div>
               <button
@@ -6346,112 +6360,111 @@ function App() {
               <span className={`onboarding-dot ${onboardingStep >= 1 ? 'is-active' : ''}`}>1</span>
               <span className={`onboarding-dot ${onboardingStep >= 2 ? 'is-active' : ''}`}>2</span>
               <span className={`onboarding-dot ${onboardingStep >= 3 ? 'is-active' : ''}`}>3</span>
-              <span className={`onboarding-dot ${onboardingStep >= 4 ? 'is-active' : ''}`}>4</span>
             </div>
 
-            {onboardingStep === 1 ? (
-              <div className="onboarding-step">
-                <p className="onboarding-callout">
-                  Want a study coach companion alongside your lessons?
-                </p>
-                <ul className="onboarding-checklist" aria-label="What the coach does">
-                  <li>Gives quick nudges and encouragement.</li>
-                  <li>Runs a small local model when enabled.</li>
-                  <li>You can toggle it anytime in settings.</li>
-                </ul>
-                <button
-                  type="button"
-                  className={`onboarding-btn ${settings.assistantChatEnabled ? 'onboarding-btn-secondary' : 'onboarding-btn-primary'}`}
-                  onClick={() => setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))}
-                  aria-pressed={settings.assistantChatEnabled}
-                  disabled={applyingExpertise}
-                >
-                  {settings.assistantChatEnabled ? 'Disable coach' : 'Enable coach'}
-                </button>
-                <p className="settings-help">
-                  Coach is currently <strong>{settings.assistantChatEnabled ? 'enabled' : 'disabled'}</strong>. Tiny quirk: choosing lower is a power move. Momentum beats ego.
-                </p>
-              </div>
-            ) : null}
-
-            {onboardingStep === 2 ? (
-              <div className="onboarding-step">
-                <p className="onboarding-callout">
-                  Read prompts aloud during games?
-                </p>
-                <button
-                  type="button"
-                  className={`onboarding-btn ${settings.voiceEnabled ? 'onboarding-btn-secondary' : 'onboarding-btn-primary'}`}
-                  onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
-                  aria-pressed={settings.voiceEnabled}
-                  disabled={applyingExpertise}
-                >
-                  {settings.voiceEnabled ? 'Disable voice' : 'Enable voice'}
-                </button>
-                {settings.voiceEnabled ? (
-                  <div className="onboarding-voice-grid" role="radiogroup" aria-label="Choose a voice">
-                    {VOICE_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`onboarding-voice-option ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
-                        onClick={() => {
-                          setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
-                          void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
-                        }}
-                        aria-pressed={settings.voiceSpeaker === option.id}
-                        disabled={applyingExpertise || voiceBusy}
-                      >
-                        <span className="expertise-option-title">{option.name}</span>
-                        <span className="expertise-option-description">{option.jp}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                <p className="settings-help">
-                  Voice is <strong>{settings.voiceEnabled ? 'on' : 'off'}</strong>. Tap a voice to hear a sample. You can change this later in Settings.
-                </p>
-              </div>
-            ) : null}
-
-            {onboardingStep === 3 ? (
-              <div className="onboarding-step">
-                <p className="settings-help">
-                  Be honest, not heroic. We can always level up later.
-                </p>
-                <div className="expertise-options" role="radiogroup" aria-label="Expertise level">
-                  {EXPERTISE_OPTIONS.map((option) => (
-                    <button
-                      key={option.level}
-                      type="button"
-                      className={`expertise-option ${selectedExpertiseLevel === option.level ? 'is-active' : ''}`}
-                      onClick={() => setSelectedExpertiseLevel(option.level)}
-                      aria-pressed={selectedExpertiseLevel === option.level}
-                      disabled={applyingExpertise}
-                    >
-                      <span className="expertise-option-title">{option.title}</span>
-                      <span className="expertise-option-description">{option.description}</span>
-                    </button>
-                  ))}
+            <div className="onboarding-step-body">
+              {onboardingStep === 1 ? (
+                <div className="onboarding-step">
+                  <p className="onboarding-callout">
+                    Read prompts aloud during games?
+                  </p>
+                  <button
+                    type="button"
+                    className={`onboarding-btn ${settings.voiceEnabled ? 'onboarding-btn-secondary' : 'onboarding-btn-primary'}`}
+                    onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
+                    aria-pressed={settings.voiceEnabled}
+                    disabled={applyingExpertise}
+                  >
+                    {settings.voiceEnabled ? 'Disable voice' : 'Enable voice'}
+                  </button>
+                  {settings.voiceEnabled ? (
+                    <div className="onboarding-voice-grid" role="radiogroup" aria-label="Choose a voice">
+                      {VOICE_OPTIONS.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={`onboarding-voice-option ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
+                          onClick={() => {
+                            setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
+                            void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
+                          }}
+                          aria-pressed={settings.voiceSpeaker === option.id}
+                          disabled={applyingExpertise || voiceBusy}
+                        >
+                          <span className="expertise-option-title">{option.name}</span>
+                          <span className="expertise-option-description">{option.jp}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <p className="settings-help">
+                    Voice is <strong>{settings.voiceEnabled ? 'on' : 'off'}</strong>. Tap a voice to hear a sample. You can change this later in Settings.
+                  </p>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {onboardingStep === 4 ? (
-              <div className="onboarding-step onboarding-summary">
-                <p>
-                  <strong>Chosen level:</strong> {selectedExpertiseOption.title}
-                </p>
-                <p>
-                  <strong>What will be completed:</strong> {selectedExpertiseOption.description}
-                </p>
-                <p className="settings-help">
-                  If this looks right, press Start learning and we will apply it now.
-                </p>
-              </div>
-            ) : null}
+              {onboardingStep === 2 ? (
+                <div className="onboarding-step">
+                  <p className="settings-help">
+                    Tick everything you can already do confidently. We will skip those decks so you start where it counts.
+                  </p>
+                  <div className="onboarding-prereq-list" role="group" aria-label="Prior knowledge checklist">
+                    {PREREQ_ITEMS.map((item) => {
+                      const isChecked = checkedScripts.has(item.key)
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={`onboarding-prereq-item${isChecked ? ' is-checked' : ''}`}
+                          onClick={() => setCheckedScripts((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(item.key)) next.delete(item.key)
+                            else next.add(item.key)
+                            return next
+                          })}
+                          aria-pressed={isChecked}
+                          disabled={applyingExpertise}
+                        >
+                          <span className="onboarding-prereq-check" aria-hidden="true" />
+                          <span className="onboarding-prereq-text">
+                            <span className="onboarding-prereq-title">{item.label}</span>
+                            <span className="onboarding-prereq-desc">{item.description}</span>
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
 
-            {expertiseError ? <p className="expertise-error">{expertiseError}</p> : null}
+              {onboardingStep === 3 ? (() => {
+                const level = deriveExpertiseLevelFromChecked(checkedScripts)
+                const willComplete = EXPERTISE_LEVEL_TO_DISPLAY_SLUGS[level]
+                return (
+                  <div className="onboarding-step onboarding-summary">
+                    <p className="settings-help">
+                      If this looks right, press <strong>Start learning</strong> to apply it now.
+                    </p>
+                    <div className="onboarding-prereq-list" aria-label="What will be pre-completed">
+                      {PREREQ_ITEMS.map((item) => {
+                        const done = willComplete.includes(item.key)
+                        return (
+                          <div key={item.key} className={`onboarding-prereq-item is-summary${done ? ' is-checked' : ' is-skipped'}`}>
+                            <span className="onboarding-prereq-check" aria-hidden="true" />
+                            <span className="onboarding-prereq-text">
+                              <span className="onboarding-prereq-title">{item.label}</span>
+                              <span className="onboarding-prereq-desc">{done ? 'Will be marked complete' : 'You will study this from the start'}</span>
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })() : null}
+
+              {expertiseError ? <p className="expertise-error">{expertiseError}</p> : null}
+            </div>
 
             <div className="expertise-actions">
               {onboardingStep > 1 ? (
@@ -6464,7 +6477,7 @@ function App() {
                   Back
                 </button>
               ) : null}
-              {onboardingStep < 4 ? (
+              {onboardingStep < 3 ? (
                 <button
                   type="button"
                   className="onboarding-btn onboarding-btn-primary"

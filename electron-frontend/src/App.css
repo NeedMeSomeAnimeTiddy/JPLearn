@@ -5500,12 +5500,34 @@ button {
 
 .expertise-panel {
   max-width: 620px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  height: 520px;
   border: 1px solid color-mix(in oklab, var(--panel-border) 68%, var(--accent) 32%);
   background:
     radial-gradient(circle at 80% -10%, color-mix(in oklab, var(--accent) 28%, transparent), transparent 44%),
     linear-gradient(170deg, color-mix(in oklab, var(--panel-bg-alt) 94%, black), color-mix(in oklab, var(--panel-bg) 96%, black));
+}
+
+.onboarding-step-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.onboarding-step-body::-webkit-scrollbar {
+  width: 4px;
+}
+.onboarding-step-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.onboarding-step-body::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--panel-border) 60%, transparent);
+  border-radius: 2px;
 }
 
 .onboarding-skip {
@@ -5658,6 +5680,97 @@ button {
 
 .onboarding-summary p {
   margin: 0;
+}
+
+/* ── Prior-knowledge checklist ─────────────────────────────────────── */
+.onboarding-prereq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.onboarding-prereq-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 80%, var(--accent) 20%);
+  background: linear-gradient(150deg, color-mix(in oklab, var(--panel-bg-alt) 90%, black), color-mix(in oklab, var(--panel-bg) 92%, black));
+  border-radius: 12px;
+  color: var(--text-main);
+  text-align: left;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 140ms ease, transform 130ms ease, box-shadow 160ms ease;
+  width: 100%;
+}
+
+.onboarding-prereq-item.is-summary {
+  cursor: default;
+}
+
+.onboarding-prereq-item:hover:not(:disabled):not(.is-summary) {
+  border-color: color-mix(in oklab, var(--accent) 52%, var(--panel-border));
+  transform: translateY(-1px);
+}
+
+.onboarding-prereq-item:disabled { opacity: 0.56; cursor: not-allowed; }
+
+.onboarding-prereq-item.is-checked {
+  border-color: color-mix(in oklab, var(--accent) 72%, var(--panel-border));
+  background: linear-gradient(150deg, color-mix(in oklab, var(--accent) 14%, var(--panel-bg-alt)), color-mix(in oklab, var(--panel-bg) 94%, black));
+  box-shadow: 0 8px 20px -14px color-mix(in oklab, var(--accent) 56%, transparent);
+}
+
+.onboarding-prereq-item.is-skipped {
+  opacity: 0.55;
+}
+
+.onboarding-prereq-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 5px;
+  border: 1.5px solid color-mix(in oklab, var(--panel-border) 80%, var(--accent) 20%);
+  background: color-mix(in oklab, var(--panel-bg) 86%, black);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 130ms ease, background 130ms ease;
+}
+
+.onboarding-prereq-item.is-checked .onboarding-prereq-check {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 22%, var(--panel-bg));
+}
+
+.onboarding-prereq-item.is-checked .onboarding-prereq-check::after {
+  content: '';
+  display: block;
+  width: 5px;
+  height: 9px;
+  border-right: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  transform: rotate(40deg) translate(-1px, -1px);
+}
+
+.onboarding-prereq-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.onboarding-prereq-title {
+  font-family: var(--heading-font);
+  font-size: 0.92rem;
+  letter-spacing: 0.01em;
+}
+
+.onboarding-prereq-desc {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  line-height: 1.35;
 }
 
 .expertise-options {
@@ -7159,6 +7272,7 @@ html[data-reduced-motion='true'] *::after {
   transition: border-color 0.2s;
 }
 .jlpt-readiness-card.is-ready { border-color: var(--accent); }
+.jlpt-readiness-card.is-locked { opacity: 0.65; }
 .jlpt-readiness-card-skeleton { opacity: 0.4; pointer-events: none; }
 
 .jlpt-readiness-card-header {
@@ -7185,6 +7299,28 @@ html[data-reduced-motion='true'] *::after {
   padding: 0.15rem 0.5rem;
 }
 
+.jlpt-locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  background: color-mix(in srgb, var(--text-soft) 10%, transparent);
+  border-radius: 20px;
+  padding: 0.15rem 0.5rem;
+}
+
+.jlpt-card-lock-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  padding: 0.4rem 0;
+  line-height: 1.4;
+}
+
 .jlpt-readiness-bar {
   height: 6px;
   border-radius: 3px;
@@ -7203,6 +7339,46 @@ html[data-reduced-motion='true'] *::after {
   justify-content: space-between;
   font-size: 0.76rem;
   color: var(--text-soft);
+}
+
+/* ── Per-level Kanji / Vocab breakdown ─────────────────────────────── */
+.jlpt-level-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.jlpt-breakdown-row {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.jlpt-breakdown-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.jlpt-breakdown-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--track-bg);
+  overflow: hidden;
+}
+
+.jlpt-breakdown-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: width 0.4s ease;
+}
+
+.jlpt-breakdown-count {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  white-space: nowrap;
 }
 
 .jlpt-mode-buttons {
