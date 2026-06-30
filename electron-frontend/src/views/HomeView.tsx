@@ -6,12 +6,19 @@ import {
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, CalendarDays, Flame, Target } from 'lucide-react'
+
+interface StatsStrip {
+  streak: number
+  masteryPct: number
+  dueCount: number
+}
 
 interface HomeViewProps {
   navDirection: NavDirection
   studyPlan: StudyPlanSnapshot
   homeStudyPlanExpanded: boolean
+  statsStrip?: StatsStrip
   onSelectScript: (script: ScriptKey) => void
   onGoOverview: () => void
   onOpenSettings: () => void
@@ -23,6 +30,7 @@ export function HomeView({
   navDirection,
   studyPlan,
   homeStudyPlanExpanded,
+  statsStrip,
   onSelectScript,
   onGoOverview,
   onOpenSettings,
@@ -168,7 +176,73 @@ export function HomeView({
             </div>
           </section>
         ) : null}
-      </section>
+
+        {statsStrip ? (
+          <div className="home-stats-strip" aria-label="Quick stats">
+            <button
+              type="button"
+              className="home-stats-chip home-stats-chip-streak"
+              onClick={onGoOverview}
+              title="Open study overview"
+            >
+              <Flame aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
+              <span>{statsStrip.streak}d streak</span>
+            </button>
+            <button
+              type="button"
+              className="home-stats-chip home-stats-chip-mastery"
+              onClick={onGoOverview}
+              title="Open study overview"
+            >
+              <Target aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
+              <span>{statsStrip.masteryPct}% mastered</span>
+            </button>
+            {statsStrip.dueCount > 0 ? (
+              <button
+                type="button"
+                className="home-stats-chip home-stats-chip-due"
+                onClick={onGoOverview}
+                title="Open study overview"
+              >
+                <CalendarDays aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
+                <span>{statsStrip.dueCount} due</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {statsStrip ? (
+          <div className="home-stats-strip" aria-label="Quick stats">
+            <button
+              type="button"
+              className="home-stats-chip home-stats-chip-streak"
+              onClick={onGoOverview}
+              title="Open study overview"
+            >
+              <Flame aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
+              <span>{statsStrip.streak}d streak</span>
+            </button>
+            <button
+              type="button"
+              className="home-stats-chip home-stats-chip-mastery"
+              onClick={onGoOverview}
+              title="Open study overview"
+            >
+              <Target aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
+              <span>{statsStrip.masteryPct}% mastered</span>
+            </button>
+            {statsStrip.dueCount > 0 ? (
+              <button
+                type="button"
+                className="home-stats-chip home-stats-chip-due"
+                onClick={onGoOverview}
+                title="Open study overview"
+              >
+                <CalendarDays aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
+                <span>{statsStrip.dueCount} due</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}      </section>
     </div>
   )
 }

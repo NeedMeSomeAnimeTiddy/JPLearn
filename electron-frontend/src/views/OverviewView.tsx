@@ -174,6 +174,7 @@ interface OverviewViewProps {
   cardScores: CardScores
   kanjiOverviewPage: Partial<Record<JlptLevel, number>>
   totals: { completedToday: number }
+  isOverlay?: boolean
   // callbacks
   onBack: () => void
   onOpenSettings: () => void
@@ -237,9 +238,10 @@ export function OverviewView({
   onSetHistoryPage,
   onSetKanjiOverviewPage,
   onSetSelectedChar,
+  isOverlay = false,
 }: OverviewViewProps) {
   return (
-    <div className={`view-shell view-${navDirection}`}>
+    <div className={isOverlay ? 'overview-overlay-content' : `view-shell view-${navDirection}`}>
       <header className="topbar panel-glass">
         <button
           type="button"

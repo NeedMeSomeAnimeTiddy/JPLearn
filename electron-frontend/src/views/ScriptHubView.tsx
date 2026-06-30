@@ -65,6 +65,7 @@ interface ScriptHubViewProps {
   availableMinigames: MinigameKey[]
   activeScriptStats: { bestStreak: number }
   activeSectionName: string | null
+  isSheet?: boolean
   // callbacks (navigation / deck selection only)
   onBack: () => void
   onOpenSettings: () => void
@@ -102,6 +103,7 @@ export function ScriptHubView({
   availableMinigames,
   activeScriptStats,
   activeSectionName,
+  isSheet = false,
   onBack,
   onOpenSettings,
   onSelectBlock,
@@ -130,7 +132,7 @@ export function ScriptHubView({
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
 
   return (
-    <div className={`view-shell view-${navDirection}`}>
+    <div className={isSheet ? 'script-hub-sheet-content' : `view-shell view-${navDirection}`}>
       <header className="topbar panel-glass">
         <button
           type="button"
