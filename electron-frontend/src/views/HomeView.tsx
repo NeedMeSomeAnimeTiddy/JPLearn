@@ -6,7 +6,7 @@ import {
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { BarChart3, CalendarDays, Flame, Target } from 'lucide-react'
+import { BarChart3, CalendarDays, Flame, Lock, Target } from 'lucide-react'
 import { XPBar } from '../components/XPBar'
 import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
@@ -94,13 +94,17 @@ export function HomeView({
             const glyph = SECTION_META[script].glyph
             const difficulty = SCRIPT_DIFFICULTY_META[script]
             const DifficultyIcon = difficulty.icon
+            const coverageRow = studyPlan.coverageRows.find((r) => r.key === script)
+            const isLocked = coverageRow ? !coverageRow.unlocked : false
 
             return (
               <button
                 key={script}
                 type="button"
-                className="menu-card"
-                aria-keyshortcuts={String(index + 1)}
+                className={`menu-card${isLocked ? ' is-locked' : ''}`}
+                aria-keyshortcuts={isLocked ? undefined : String(index + 1)}
+                aria-label={isLocked ? `${SCRIPT_LABELS[script]} — locked` : undefined}
+                disabled={isLocked}
                 onClick={() => onSelectScript(script)}
               >
                 <span
@@ -114,6 +118,12 @@ export function HomeView({
                 <span className="menu-script-glyph" aria-hidden="true" lang="ja">{glyph}</span>
                 <strong>{SCRIPT_LABELS[script]}</strong>
                 <p>{SCRIPT_MENU_LINES[script]}</p>
+                {isLocked && (
+                  <span className="menu-card-lock-overlay" aria-hidden="true">
+                    <Lock className="menu-card-lock-icon" strokeWidth={2.1} />
+                    <span className="menu-card-lock-label">Locked</span>
+                  </span>
+                )}
               </button>
             )
           })}

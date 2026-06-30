@@ -1372,6 +1372,49 @@ button {
   font-size: 0.84rem;
 }
 
+/* Locked menu card state */
+.menu-card.is-locked {
+  opacity: 0.52;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.menu-card.is-locked:hover {
+  transform: none;
+  border-color: var(--card-border);
+  box-shadow: none;
+}
+
+.menu-card-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: inherit;
+  background: color-mix(in oklab, var(--card-bg-top) 50%, transparent);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+.menu-card-lock-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-soft);
+  opacity: 0.75;
+}
+
+.menu-card-lock-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  opacity: 0.8;
+}
+
 .menu-script-glyph {
   display: inline-flex;
   align-items: center;
@@ -3243,6 +3286,70 @@ button {
 .home-stats-chip-streak { color: var(--tone-streak, var(--text-soft)); }
 .home-stats-chip-mastery { color: var(--tone-skill, var(--text-soft)); }
 .home-stats-chip-due { color: var(--tone-warning, var(--text-soft)); }
+
+/* XP bar widget in stats strip */
+.home-stats-xp {
+  display: flex;
+  align-items: center;
+}
+
+.xp-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 3px 3px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 38%, var(--panel-border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tone-ocean) 8%, var(--panel-bg));
+  min-width: 164px;
+}
+
+.xp-bar-level {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--tone-ocean);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+  box-shadow: 0 1px 6px color-mix(in oklab, var(--tone-ocean) 45%, transparent);
+}
+
+.xp-bar-track {
+  flex: 1;
+  height: 5px;
+  background: color-mix(in oklab, var(--tone-ocean) 18%, var(--panel-bg));
+  border-radius: 999px;
+  overflow: hidden;
+  min-width: 56px;
+}
+
+.xp-bar-fill {
+  height: 100%;
+  width: var(--xp-pct, 0%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--tone-ocean) 90%, white),
+    color-mix(in oklab, var(--accent) 55%, var(--tone-ocean))
+  );
+  border-radius: 999px;
+  transition: width 600ms ease;
+}
+
+.xp-bar-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--tone-ocean) 80%, var(--text-soft));
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+}
 
 .home-stats-icon {
   width: 13px;

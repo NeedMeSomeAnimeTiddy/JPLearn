@@ -2,10 +2,15 @@
 // Run: python scripts/generate_ts_types.py
 import type {
   DeckSummary,
+  FeatureStatusPayload,
   GameCard,
   OverviewCharacterCard,
+  ProgressionNodeStatusPayload,
+  RecommendationPayload,
   SessionGoalPayload,
   SessionSummaryPayload,
+  TutorReactionPayload,
+  XPProgressPayload,
 } from './generated/types'
 
 interface DesktopVersions {
@@ -357,57 +362,32 @@ interface VoiceSpeakResponse {
   audioBase64: string
 }
 
-interface ProgressionNodeStatus {
-  node_id: string
-  name: string
+// ProgressionNodeStatus keeps a narrow status union; the generated type uses string.
+interface ProgressionNodeStatus extends Omit<ProgressionNodeStatusPayload, 'status'> {
   status: 'locked' | 'unlocked' | 'active' | 'mastered'
-  mastered_ratio: number
-  is_reachable: boolean
 }
 
 interface ProgressionStatePayload {
   nodes: ProgressionNodeStatus[]
 }
 
-interface FeatureStatus {
-  feature_id: string
-  name: string
-  category: string
-  is_unlocked: boolean
-}
+// FeatureStatus, XPProgress, RecommendationItem — identical to generated; use aliases.
+type FeatureStatus = FeatureStatusPayload
+type XPProgress = XPProgressPayload
+type RecommendationItem = RecommendationPayload
 
 interface FeatureStatePayload {
   features: FeatureStatus[]
-}
-
-interface XPProgress {
-  level: number
-  total_xp: number
-  xp_to_next_level: number
-  xp_for_current_level: number
-}
-
-interface RecommendationItem {
-  node_id: string
-  display_label: string
-  review_count: number
-  difficulty: string
-  reason: string
-  priority: number
 }
 
 interface RecommendationsPayload {
   recommendations: RecommendationItem[]
 }
 
-interface TutorReactionItem {
-  dedup_key: string
-  event_type: string
+// TutorReactionItem keeps narrow priority/message_type unions; the generated type uses string.
+interface TutorReactionItem extends Omit<TutorReactionPayload, 'priority' | 'message_type'> {
   priority: 'low' | 'normal' | 'high'
   message_type: 'congratulation' | 'encouragement' | 'guidance' | 'acknowledgement'
-  headline: string
-  body: string
-  cta: string
 }
 
 interface TutorReactionsPayload {

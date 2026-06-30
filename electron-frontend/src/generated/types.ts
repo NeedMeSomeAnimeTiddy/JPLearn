@@ -64,3 +64,44 @@ export interface StudyQueuePayload {
   card_ids: number[]
   indices: number[]
 }
+
+export interface ProgressionNodeStatusPayload {
+  node_id: string
+  name: string
+  status: string
+  mastered_ratio: number
+  is_reachable: boolean
+}
+
+export interface FeatureStatusPayload {
+  feature_id: string
+  name: string
+  category: string
+  is_unlocked: boolean
+}
+
+export interface XPProgressPayload {
+  level: number
+  total_xp: number
+  xp_to_next_level: number
+  xp_for_current_level: number
+}
+
+export interface RecommendationPayload {
+  node_id: string
+  display_label: string
+  review_count: number
+  difficulty: string
+  reason: string
+  priority: number
+}
+
+export interface TutorReactionPayload {
+  dedup_key: string
+  event_type: string
+  priority: string
+  message_type: string
+  headline: string
+  body: string
+  cta: string
+}
