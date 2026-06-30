@@ -35,6 +35,7 @@ interface MinigameViewProps {
   gameError: string | null
   activeRunCardsLength: number
   voiceEnabled: boolean
+  showKeyboardPrompts: boolean
   activeBlockCards: BasicCard[]
   onBack: () => void
   onOpenSettings: () => void
@@ -49,6 +50,7 @@ export function MinigameView({
   gameError,
   activeRunCardsLength,
   voiceEnabled,
+  showKeyboardPrompts,
   activeBlockCards,
   onBack,
   onOpenSettings,
@@ -489,10 +491,12 @@ export function MinigameView({
                     type="button"
                     className="game-hint-toggle"
                     onClick={() => setHintStep(1)}
-                    title="Show hint (H)"
+                    title={showKeyboardPrompts ? 'Show hint (H)' : 'Show hint'}
                     aria-label="Show hint"
                   >
-                    <span className="game-hint-toggle-label">Press H for hint</span>
+                    <span className="game-hint-toggle-label">
+                      {showKeyboardPrompts ? 'Press H for hint' : 'Show hint'}
+                    </span>
                   </button>
                 ) : (
                   <div className="game-hint-ladder" aria-live="polite">
@@ -518,7 +522,9 @@ export function MinigameView({
                         onClick={() => setHintStep((s) => (s < 3 ? (s + 1) as 0 | 1 | 2 | 3 : 3))}
                         aria-label="Show more hint"
                       >
-                        <span className="game-hint-toggle-label">More hint (H)</span>
+                        <span className="game-hint-toggle-label">
+                          {showKeyboardPrompts ? 'More hint (H)' : 'More hint'}
+                        </span>
                       </button>
                     ) : null}
                   </div>
@@ -609,7 +615,7 @@ export function MinigameView({
                     disabled={isRoundResolving}
                     onClick={() => submitAnswer(option.label)}
                   >
-                    <span className="option-key-hint" aria-hidden="true">[{index + 1}]</span>
+                      {showKeyboardPrompts ? <span className="option-key-hint" aria-hidden="true">[{index + 1}]</span> : null}
                     {option.label}
                   </button>
                 ))}
@@ -689,9 +695,9 @@ export function MinigameView({
                   className="round-feedback-skip"
                   onClick={skipFeedback}
                   aria-label="Continue to next card"
-                  title="Continue (Enter)"
+                  title={showKeyboardPrompts ? 'Continue (Enter)' : 'Continue'}
                 >
-                  Continue ↵
+                  {showKeyboardPrompts ? 'Continue ↵' : 'Continue'}
                 </button>
               </div>
             ) : null}

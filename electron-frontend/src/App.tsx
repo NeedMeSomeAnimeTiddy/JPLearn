@@ -557,6 +557,7 @@ interface AppSettings {
   backgroundBlur: number
   assistantToastLimit: 0 | 1
   assistantChatEnabled: boolean
+  showKeyboardPrompts: boolean
   voiceEnabled: boolean
   voiceSpeaker: number
 }
@@ -1120,6 +1121,7 @@ function defaultSettings(): AppSettings {
     backgroundBlur: BACKGROUND_BLUR_DEFAULT,
     assistantToastLimit: ASSISTANT_MAX_TOASTS,
     assistantChatEnabled: true,
+    showKeyboardPrompts: false,
     voiceEnabled: true,
     voiceSpeaker: 13,
   }
@@ -1218,6 +1220,10 @@ function loadSettings(): AppSettings {
         typeof parsed.assistantChatEnabled === 'boolean'
           ? parsed.assistantChatEnabled
           : defaults.assistantChatEnabled,
+      showKeyboardPrompts:
+        typeof parsed.showKeyboardPrompts === 'boolean'
+          ? parsed.showKeyboardPrompts
+          : defaults.showKeyboardPrompts,
       voiceEnabled:
         typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
       voiceSpeaker:
@@ -5031,6 +5037,7 @@ function App() {
           gameError={gameError}
           activeRunCardsLength={activeRunCards.length}
           voiceEnabled={settings.voiceEnabled}
+          showKeyboardPrompts={settings.showKeyboardPrompts}
           activeBlockCards={activeBlockCards}
           onBack={() => {
             setNavDirection('back')
@@ -5680,12 +5687,28 @@ function App() {
                   </button>
                   <div ref={shortcutsSectionRef} className="settings-control-content" tabIndex={-1}>
                     <p className="settings-section-label">Keyboard Shortcuts</p>
+                    <div className="settings-animation-grid" role="group" aria-label="Keyboard prompt controls">
+                      <button
+                        type="button"
+                        className={`settings-icon-entry settings-theme-entry ${settings.showKeyboardPrompts ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({ ...prev, showKeyboardPrompts: !prev.showKeyboardPrompts }))}
+                        aria-label={settings.showKeyboardPrompts ? 'Keyboard prompts visible. Activate to hide.' : 'Keyboard prompts hidden. Activate to show.'}
+                        aria-pressed={settings.showKeyboardPrompts}
+                        title={settings.showKeyboardPrompts ? 'Keyboard prompts visible' : 'Keyboard prompts hidden'}
+                      >
+                        <span className={`settings-mode-icon-button ${settings.showKeyboardPrompts ? 'is-enabled' : ''}`} aria-hidden="true">
+                          <Keyboard size={18} strokeWidth={2.25} aria-hidden="true" />
+                        </span>
+                        <span className="settings-icon-entry-label">Show key prompts</span>
+                      </button>
+                    </div>
                     <div className="settings-shortcuts">
                       <code className="command-hint">Ctrl+,</code><span>Settings</span>
                       <code className="command-hint">Esc</code><span>Close modal / back</span>
                       <code className="command-hint">1 / 2 / 3 / 4 / 5</code><span>Learning tracks (home)</span>
                       <code className="command-hint">6</code><span>Study overview (home)</span>
                     </div>
+                    <p className="settings-help">When off, shortcut keys still work but hint labels stay hidden in game rounds.</p>
                   </div>
                 </div>
                 ) : null}
@@ -5736,7 +5759,7 @@ function App() {
         </div>
       ) : null}
 
-      <aside className="assistant-overlay" aria-live="polite" aria-label="Tutor companion">
+      <aside className={`assistant-overlay ${assistantChatOpen ? 'is-open' : ''}`} aria-live="polite" aria-label="Tutor companion">
         {settings.assistantChatEnabled && !assistantChatOpen ? (
           <div className="assistant-chat-controls">
             <button

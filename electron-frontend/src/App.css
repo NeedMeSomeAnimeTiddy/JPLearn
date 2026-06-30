@@ -99,15 +99,32 @@
 }
 
 .assistant-overlay {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
   display: grid;
   justify-items: end;
   gap: 10px;
-  z-index: 920;
+  z-index: 1100;
   pointer-events: none;
   width: min(384px, calc(100vw - 36px));
+  animation: assistantDockIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.assistant-overlay.is-open {
+  width: min(420px, calc(100vw - 36px));
+}
+
+@keyframes assistantDockIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .assistant-chat-controls {
@@ -135,10 +152,18 @@
   box-shadow:
     0 16px 24px -18px rgba(0, 0, 0, 0.88),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 160ms ease,
+    box-shadow 180ms ease;
 }
 
 .assistant-chat-toggle:hover {
   border-color: color-mix(in oklab, var(--tone-ocean) 72%, var(--panel-border));
+  transform: translateY(-1px);
+  box-shadow:
+    0 20px 30px -20px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .assistant-chat-toggle-icon {
@@ -162,6 +187,20 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  transform-origin: bottom right;
+  animation: assistantPanelIn 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes assistantPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .assistant-chat-header {
