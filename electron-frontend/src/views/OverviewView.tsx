@@ -637,9 +637,17 @@ export function OverviewView({
       ) : null}
 
       {window.jplearnDesktop.exportAnalyticsCSV ? (
-        <section className="overview-export-section" aria-label="Export data">
-          <h3 className="overview-section-title">Export Data</h3>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+        <section className="panel-glass activity-summary-panel" aria-label="Export data">
+          <div className="panel-head">
+            <h2 className="panel-title-with-icon">
+              <Download aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />
+              Export Data
+            </h2>
+            <div className="panel-actions">
+              <span>Download study data as CSV</span>
+            </div>
+          </div>
+          <div className="jlpt-results-actions" style={{ marginTop: '14px' }}>
             {(
               [
                 { type: 'review_history', label: 'Review History' },
@@ -650,20 +658,17 @@ export function OverviewView({
               <button
                 key={type}
                 type="button"
-                className="topbar-settings-button"
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', fontSize: '0.78rem' }}
+                className="jlpt-action-btn"
                 onClick={() => { void handleExport(type) }}
                 disabled={exportLoading}
                 aria-label={`Export ${label} as CSV`}
-                title={`Export ${label} as CSV`}
               >
-                <Download aria-hidden="true" className="inline-button-icon" strokeWidth={2} />
                 {label}
               </button>
             ))}
           </div>
           {exportMessage ? (
-            <p style={{ marginTop: '6px', fontSize: '0.75rem', opacity: 0.75 }}>{exportMessage}</p>
+            <p className="status-line" style={{ marginTop: '10px' }}>{exportMessage}</p>
           ) : null}
         </section>
       ) : null}
