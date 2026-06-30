@@ -107,6 +107,7 @@ from data.jlpt_repository import (
     load_jlpt_exam_history,
     save_jlpt_exam_result,
 )
+from data import deck_portability
 from data.settings_repository import get_setting, set_setting
 from domain.readiness import (
     LEARNING_PATHS,
@@ -1725,6 +1726,21 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             daily_minutes = argv[2] if len(argv) > 2 and argv[2].strip() else None
             target_level = argv[3] if len(argv) > 3 and argv[3].strip() else None
             return 0, complete_onboarding_handler(goal, daily_minutes, target_level)
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "analytics-export":
+        if len(argv) < 2:
+            return 2, {"error": "Missing analytics export type"}
+        export_type = argv[1]
+        try:
+            if export_type == "review_history":
+                return 0, {"csv": deck_portability.export_review_history_csv(), "type": export_type}
+            if export_type == "accuracy_trends":
+                return 0, {"csv": deck_portability.export_accuracy_trends_csv(), "type": export_type}
+            if export_type == "mastery_snapshot":
+                return 0, {"csv": deck_portability.export_mastery_snapshot_csv(), "type": export_type}
+            return 2, {"error": f"Unknown analytics export type: {export_type}"}
         except Exception as exc:
             return 2, {"error": str(exc)}
 

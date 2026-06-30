@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -67,7 +68,26 @@ def main() -> int:
             print(f"\nFAILED: {command.name}")
             return result.returncode
 
+    rc = _check_frontend()
+    if rc != 0:
+        return rc
+
     print("\nALL CHECKS PASSED")
+    return 0
+
+
+def _check_frontend() -> int:
+    frontend_dir = Path(__file__).parent.parent / "electron-frontend"
+    for script in ("lint", "build"):
+        print(f"\n=== FRONTEND:{script.upper()} ===")
+        result = subprocess.run(
+            f"npm run {script}",
+            shell=True,
+            cwd=str(frontend_dir),
+        )
+        if result.returncode != 0:
+            print(f"\nFAILED: frontend:{script}")
+            return result.returncode
     return 0
 
 

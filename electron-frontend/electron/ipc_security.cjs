@@ -449,6 +449,7 @@ module.exports = {
   validateOptionalJLPTMode,
   validateJLPTSaveResultPayload,
   validateLearningPathId,
+  validateAnalyticsExportType,
 }
 
 const VALID_LEARNING_PATH_IDS = new Set(['complete_beginner'])
@@ -458,4 +459,13 @@ function validateLearningPathId(value) {
     throw new Error(`Invalid learning path id: ${String(value)}`)
   }
   return value
+}
+
+const VALID_ANALYTICS_EXPORT_TYPES = new Set(['review_history', 'accuracy_trends', 'mastery_snapshot'])
+
+function validateAnalyticsExportType(type) {
+  if (typeof type !== 'string' || !VALID_ANALYTICS_EXPORT_TYPES.has(type)) {
+    throw new Error(`Invalid analytics export type: ${String(type)}`)
+  }
+  return type
 }

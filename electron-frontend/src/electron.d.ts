@@ -394,6 +394,9 @@ interface DesktopApi {
   getLearningPathStatus?: () => Promise<LearningPathStatusPayload>
   setLearningPath?: (pathId: string) => Promise<LearningPathStatusPayload>
   completeOnboarding?: (payload: OnboardingCompletionPayload) => Promise<LearningPathStatusPayload>
+  exportAnalyticsCSV?: (
+    type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot',
+  ) => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
 }
 
 interface OnboardingCompletionPayload {

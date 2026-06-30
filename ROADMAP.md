@@ -32,7 +32,7 @@ This document tracks delivery status and planned improvements.
 - [x] (High) Add API contract tests between preload bridge and Python backend bridge
   - Pin request/response schemas for each supported IPC channel
   - Add negative tests for missing fields, wrong types, and unauthorized routes
-- [ ] (Medium) Add unified developer diagnostics command
+- [x] (Medium) Add unified developer diagnostics command
   - Chain compact checks with focused frontend validation (`npm run lint`, `npm run build`)
   - Provide a single pass/fail entry point for pre-commit and CI triage
 
@@ -47,14 +47,14 @@ This document tracks delivery status and planned improvements.
 - [x] (Medium) Expand answer modes
   - Typed recall mode for vocab and kanji decks
   - Optional confidence score capture per review event
-- [ ] (Medium) Apply confidence scores to SRS scheduling
+- [x] (Medium) Apply confidence scores to SRS scheduling
   - Confidence is captured per review event but not yet factored into interval calculation
   - Define rubric for blending confidence with correctness in ease factor updates
 - [ ] (Medium) Add custom deck builder and card creation workflow
   - UI for creating, editing, and deleting custom cards and decks
   - Validation and conflict checking against existing content
   - Data layer placeholder already exists; needs form UI and bridge routes
-- [ ] (Medium) Add progress analytics export
+- [x] (Medium) Add progress analytics export
   - Export review history, accuracy trends, and mastery snapshots to CSV
   - Useful for external study tracking and self-audit
 
@@ -83,10 +83,10 @@ This document tracks delivery status and planned improvements.
 
 ## Quality, Tooling, and Developer Experience
 
-- [ ] (Medium) Add automated accessibility checks
+- [x] (Medium) Add automated accessibility checks
   - Integrate axe-core or equivalent into the frontend test suite
   - Cover primary study and overview flows with automated assertions
-- [ ] (Medium) Add performance regression tests for large datasets
+- [x] (Medium) Add performance regression tests for large datasets
   - Validate queue build, deck summary, and history aggregation with 10k+ items
   - Establish baseline thresholds to catch regressions before they ship
 - [ ] (Low) Add contributor architecture diagrams and a "how data flows" reference doc

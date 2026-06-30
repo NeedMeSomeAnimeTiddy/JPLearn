@@ -215,7 +215,7 @@ def review_card(
     if not normalized_script_tag:
         normalized_script_tag = normalize_storage_text(deck_name).lower().replace(" ", "_")
 
-    updated_state = update(state, quality)
+    updated_state = update(state, quality, confidence=confidence_score)
     database.save_state(deck_name, updated_state)
     database.log_review(
         deck_name,

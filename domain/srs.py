@@ -77,22 +77,31 @@ def update_srs(
     state: SRSState,
     performance: int,
     settings: SRSSettings = SRSSettings(),
+    *,
+    confidence: int | None = None,
 ) -> SRSResult:
     """
     Pure deterministic SRS update.
 
     performance: 0–5 scale (or your chosen rubric)
+    confidence: optional 1–5 self-assessed confidence score. When provided,
+        the effective performance is blended: round(performance * 0.7 + confidence * 0.3).
+        Defaults to None (no blending; existing behaviour preserved).
     """
 
     li = state.last_interval
     ef = state.ease_factor
 
+    effective_performance = (
+        round(performance * 0.7 + confidence * 0.3) if confidence is not None else performance
+    )
+
     # -----------------------------
     # Interval logic (simple spaced repetition growth model)
     # -----------------------------
-    if performance <= 1:
+    if effective_performance <= 1:
         next_interval = 1
-    elif performance == 2:
+    elif effective_performance == 2:
         next_interval = max(1, li)
     else:
         interval_multiplier = _retention_multiplier(settings.target_retention) * _load_multiplier(
@@ -103,9 +112,9 @@ def update_srs(
     # -----------------------------
     # Ease factor adjustment (deterministic)
     # -----------------------------
-    if performance >= 4:
+    if effective_performance >= 4:
         new_ef = ef + 0.1
-    elif performance == 3:
+    elif effective_performance == 3:
         new_ef = ef
     else:
         new_ef = ef - 0.2

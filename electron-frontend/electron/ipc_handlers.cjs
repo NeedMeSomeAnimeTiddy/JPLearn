@@ -19,6 +19,7 @@ const {
   validateOptionalJLPTMode,
   validateJLPTSaveResultPayload,
   validateLearningPathId,
+  validateAnalyticsExportType,
 } = require('./ipc_security.cjs')
 
 function registerIpcHandlers(options) {
@@ -653,6 +654,31 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to complete onboarding: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('analytics:export-and-save-csv', async (event, type) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedType = validateAnalyticsExportType(type)
+    try {
+      const response = await runPythonBridgeWithArgsRead(['analytics-export', validatedType])
+      if (!response || typeof response.csv !== 'string') {
+        throw new Error('Invalid analytics export response from bridge')
+      }
+      const { dialog, app } = require('electron')
+      const defaultFilename = `jplearn-${validatedType}-${new Date().toISOString().slice(0, 10)}.csv`
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        defaultPath: require('path').join(app.getPath('downloads'), defaultFilename),
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      })
+      if (canceled || !filePath) {
+        return { ok: false, cancelled: true }
+      }
+      require('fs').writeFileSync(filePath, response.csv, 'utf-8')
+      return { ok: true, path: filePath }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to export analytics CSV: ${detail}`)
     }
   })
 }

@@ -34,9 +34,18 @@ GOOD = 4
 EASY = 5
 
 
-def update(state: ReviewState, quality: int) -> ReviewState:
-    """Apply one SM-2 review. quality must be 0-5."""
-    if quality < 3:
+def update(state: ReviewState, quality: int, *, confidence: int | None = None) -> ReviewState:
+    """Apply one SM-2 review. quality must be 0-5.
+
+    confidence: optional 1–5 self-assessed confidence score. When provided,
+        the effective quality is blended: round(quality * 0.7 + confidence * 0.3).
+        Defaults to None (no blending; existing behaviour preserved).
+    """
+    effective_quality = (
+        round(quality * 0.7 + confidence * 0.3) if confidence is not None else quality
+    )
+
+    if effective_quality < 3:
         # Failed: reset repetitions and shrink interval
         state.repetitions = 0
         state.interval = 1
@@ -52,7 +61,7 @@ def update(state: ReviewState, quality: int) -> ReviewState:
     # Update ease factor (minimum 1.3)
     state.ease_factor = max(
         1.3,
-        state.ease_factor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02),
+        state.ease_factor + 0.1 - (5 - effective_quality) * (0.08 + (5 - effective_quality) * 0.02),
     )
     state.next_review = date.today() + timedelta(days=state.interval)
     return state

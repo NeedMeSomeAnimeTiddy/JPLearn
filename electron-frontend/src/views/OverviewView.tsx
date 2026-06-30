@@ -1,10 +1,11 @@
 import type { CSSProperties } from 'react'
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
   BarChart3,
   CalendarDays,
+  Download,
   Flame,
   Languages,
   ListChecks,
@@ -138,6 +139,29 @@ export function OverviewView({
   onSetKanjiOverviewPage,
   onSetSelectedChar,
 }: OverviewViewProps) {
+  const [exportMessage, setExportMessage] = useState<string | null>(null)
+  const [exportLoading, setExportLoading] = useState(false)
+
+  const handleExport = async (type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot') => {
+    if (!window.jplearnDesktop.exportAnalyticsCSV) return
+    setExportLoading(true)
+    setExportMessage(null)
+    try {
+      const result = await window.jplearnDesktop.exportAnalyticsCSV(type)
+      if (result.cancelled) {
+        setExportMessage(null)
+      } else if (result.ok) {
+        setExportMessage(`Saved: ${result.path ?? 'file'}`)
+      } else {
+        setExportMessage('Export failed.')
+      }
+    } catch {
+      setExportMessage('Export failed.')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   return (
     <div className="overview-popup-content">
       <header className="overview-popup-header">
@@ -609,6 +633,38 @@ export function OverviewView({
               })}
             </div>
           </div>
+        </section>
+      ) : null}
+
+      {window.jplearnDesktop.exportAnalyticsCSV ? (
+        <section className="overview-export-section" aria-label="Export data">
+          <h3 className="overview-section-title">Export Data</h3>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+            {(
+              [
+                { type: 'review_history', label: 'Review History' },
+                { type: 'accuracy_trends', label: 'Accuracy Trends' },
+                { type: 'mastery_snapshot', label: 'Mastery Snapshot' },
+              ] as const
+            ).map(({ type, label }) => (
+              <button
+                key={type}
+                type="button"
+                className="topbar-settings-button"
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', fontSize: '0.78rem' }}
+                onClick={() => { void handleExport(type) }}
+                disabled={exportLoading}
+                aria-label={`Export ${label} as CSV`}
+                title={`Export ${label} as CSV`}
+              >
+                <Download aria-hidden="true" className="inline-button-icon" strokeWidth={2} />
+                {label}
+              </button>
+            ))}
+          </div>
+          {exportMessage ? (
+            <p style={{ marginTop: '6px', fontSize: '0.75rem', opacity: 0.75 }}>{exportMessage}</p>
+          ) : null}
         </section>
       ) : null}
     </div>

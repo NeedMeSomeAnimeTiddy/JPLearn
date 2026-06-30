@@ -56,4 +56,5 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getLearningPathStatus: () => ipcRenderer.invoke('learning-path:get-status'),
   setLearningPath: (pathId) => ipcRenderer.invoke('learning-path:set', pathId),
   completeOnboarding: (payload) => ipcRenderer.invoke('learning-path:complete-onboarding', payload),
+  exportAnalyticsCSV: (type) => ipcRenderer.invoke('analytics:export-and-save-csv', type),
 })

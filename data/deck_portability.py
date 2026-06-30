@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any
@@ -316,3 +318,85 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
         "session_goals": len(session_goals),
         "custom_decks": len(custom_decks),
     }
+
+
+# ---------------------------------------------------------------------------
+# CSV analytics exports
+# ---------------------------------------------------------------------------
+
+def export_review_history_csv() -> str:
+    """Return all review events as a CSV string."""
+    database.init_db()
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            "SELECT id, deck, card_id, quality, confidence_score, reviewed_on,"
+            " reviewed_at_utc, session_id, tags_csv"
+            " FROM review_events ORDER BY reviewed_at_utc"
+        ).fetchall()
+    finally:
+        conn.close()
+    fieldnames = ["id", "deck", "card_id", "quality", "confidence_score",
+                  "reviewed_on", "reviewed_at_utc", "session_id", "tags_csv"]
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(dict(row))
+    return buf.getvalue()
+
+
+def export_accuracy_trends_csv() -> str:
+    """Return per-day accuracy aggregate as a CSV string."""
+    database.init_db()
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT reviewed_on AS date,
+                   COUNT(*) AS total_reviews,
+                   SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct_count,
+                   ROUND(100.0 * SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) / COUNT(*), 1)
+                       AS accuracy_pct
+            FROM review_events
+            GROUP BY reviewed_on
+            ORDER BY reviewed_on
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+    fieldnames = ["date", "total_reviews", "correct_count", "accuracy_pct"]
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(dict(row))
+    return buf.getvalue()
+
+
+def export_mastery_snapshot_csv() -> str:
+    """Return current card mastery state as a CSV string.
+
+    Mastered threshold: repetitions >= 3 and interval >= 21.
+    """
+    database.init_db()
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT deck, card_id, interval, repetitions, ease_factor, next_review,
+                   CASE WHEN repetitions >= 3 AND interval >= 21 THEN 1 ELSE 0 END AS is_mastered
+            FROM review_states
+            ORDER BY deck, card_id
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+    fieldnames = ["deck", "card_id", "interval", "repetitions",
+                  "ease_factor", "next_review", "is_mastered"]
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(dict(row))
+    return buf.getvalue()
