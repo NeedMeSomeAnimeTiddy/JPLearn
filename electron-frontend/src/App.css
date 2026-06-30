@@ -5334,7 +5334,7 @@ button {
   top: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin: 0 0 10px;
   padding: 2px 0 8px;
@@ -5674,6 +5674,26 @@ button {
   min-width: 0;
 }
 
+.settings-theme-card {
+  border: 1px solid color-mix(in oklab, var(--panel-border) 86%, transparent);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in oklab, var(--panel-bg-alt) 58%, transparent);
+}
+
+.settings-theme-card + .settings-theme-card {
+  margin-top: 10px;
+}
+
+.settings-theme-card-custom {
+  border-color: color-mix(in oklab, var(--accent) 26%, var(--panel-border));
+  background: linear-gradient(
+    170deg,
+    color-mix(in oklab, var(--accent) 9%, var(--panel-bg-alt)),
+    color-mix(in oklab, var(--panel-bg-alt) 68%, transparent)
+  );
+}
+
 .settings-theme-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5961,6 +5981,267 @@ button {
 .settings-theme-chip.is-active {
   border-color: color-mix(in oklab, var(--theme-color, var(--accent)) 84%, white);
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--theme-color, var(--accent)) 35%, transparent);
+}
+
+.settings-theme-custom-head {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-inline-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.settings-inline-button {
+  appearance: none;
+  border: 1px solid var(--button-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.settings-inline-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-inline-icon-button {
+  appearance: none;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--tone-rose) 46%, var(--button-border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--tone-rose) 18%, var(--button-bg-top)),
+    color-mix(in oklab, var(--tone-rose) 14%, var(--button-bg-bottom))
+  );
+  color: var(--text-main);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.settings-hidden-file-input {
+  display: none;
+}
+
+.settings-help-inline {
+  margin-top: 8px;
+}
+
+.settings-custom-theme-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.settings-custom-theme-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-custom-theme-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-custom-theme-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-theme-note {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
+.settings-custom-editor {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.settings-custom-editor-head {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-custom-editor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-small-label {
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 700;
+}
+
+.settings-text-input,
+.settings-select {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 88%, transparent);
+  background: color-mix(in oklab, var(--panel-bg-alt) 70%, transparent);
+  color: var(--text-main);
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
+.settings-theme-section-editor {
+  border: 1px solid color-mix(in oklab, var(--panel-border) 90%, transparent);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in oklab, var(--panel-bg-alt) 62%, transparent);
+  display: grid;
+  gap: 8px;
+}
+
+.settings-theme-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-theme-section-title {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.settings-theme-section-copy {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.settings-theme-section-subtitle {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
+.settings-theme-variable-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-theme-variable-field {
+  display: grid;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 72%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--panel-bg-alt) 36%, transparent);
+}
+
+.settings-theme-variable-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-theme-variable-title-block {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-theme-variable-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.settings-theme-variable-badge {
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 88%, transparent);
+  padding: 2px 8px;
+  font-size: 0.66rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+}
+
+.settings-theme-variable-badge.is-override {
+  border-color: color-mix(in oklab, var(--accent) 52%, var(--panel-border));
+  color: color-mix(in oklab, var(--accent) 78%, var(--text-main));
+}
+
+.settings-theme-variable-input-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-theme-variable-input-wrap.is-picker {
+  grid-template-columns: auto;
+}
+
+.settings-theme-variable-color-picker {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.settings-theme-variable-swatch-picker {
+  position: relative;
+  cursor: pointer;
+}
+
+.settings-theme-variable-help {
+  color: var(--text-soft);
+  font-size: 0.67rem;
+  line-height: 1.25;
+}
+
+.settings-theme-variable-swatch {
+  width: 42px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 88%, transparent);
+  background: color-mix(in oklab, var(--panel-bg) 70%, black);
+}
+
+.settings-theme-variable-key {
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-family: var(--mono);
 }
 
 .settings-mode-icon-button {
