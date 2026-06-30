@@ -43,4 +43,10 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
     return () => ipcRenderer.removeListener('window:state-changed', handler)
   },
   closeWindow: () => ipcRenderer.invoke('window:close'),
+  getProgressionState: () => ipcRenderer.invoke('progression:get-state'),
+  getFeatureState: () => ipcRenderer.invoke('features:get-state'),
+  getXpProgress: () => ipcRenderer.invoke('xp:get-progress'),
+  getRecommendations: () => ipcRenderer.invoke('recommendations:get'),
+  getTutorReactions: () => ipcRenderer.invoke('tutor:get-reactions'),
+  dismissTutorReaction: (dedupKey) => ipcRenderer.invoke('tutor:dismiss-reaction', dedupKey),
 })

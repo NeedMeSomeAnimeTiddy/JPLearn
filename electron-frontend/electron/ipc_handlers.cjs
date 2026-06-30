@@ -484,6 +484,70 @@ function registerIpcHandlers(options) {
     }
     return { ok: true }
   })
+
+  // ---- Progression, features, XP, recommendations, tutor ----
+
+  options.ipcMain.handle('progression:get-state', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('progression')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch progression state: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('features:get-state', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('feature-unlocks')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch feature state: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('xp:get-progress', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('xp-progress')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch XP progress: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('recommendations:get', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('recommendations')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch recommendations: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('tutor:get-reactions', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('tutor-reactions')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch tutor reactions: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('tutor:dismiss-reaction', async (event, dedupKey) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const safeKey = typeof dedupKey === 'string' ? dedupKey.slice(0, 256) : ''
+    if (!safeKey) return { ok: false, error: 'Invalid dedup key' }
+    try {
+      return await options.runPythonBridgeWithArgs(['tutor-dismiss', safeKey])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to dismiss tutor reaction: ${detail}`)
+    }
+  })
 }
 
 module.exports = {

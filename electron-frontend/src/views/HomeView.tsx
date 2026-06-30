@@ -7,6 +7,9 @@ import {
   SECTION_META,
 } from '../constants'
 import { BarChart3, CalendarDays, Flame, Target } from 'lucide-react'
+import { XPBar } from '../components/XPBar'
+import { TutorBanner } from '../components/TutorBanner'
+import { RecommendationCard } from '../components/RecommendationCard'
 
 interface StatsStrip {
   streak: number
@@ -14,16 +17,43 @@ interface StatsStrip {
   dueCount: number
 }
 
+interface XPProgressStrip {
+  level: number
+  xpToNextLevel: number
+  xpForCurrentLevel: number
+}
+
+interface TutorBannerData {
+  dedupKey: string
+  headline: string
+  body: string
+  cta: string
+  messageType: 'congratulation' | 'encouragement' | 'guidance' | 'acknowledgement'
+}
+
+interface RecommendationData {
+  nodeId: string
+  displayLabel: string
+  reviewCount: number
+  difficulty: string
+  reason: string
+}
+
 interface HomeViewProps {
   navDirection: NavDirection
   studyPlan: StudyPlanSnapshot
   homeStudyPlanExpanded: boolean
   statsStrip?: StatsStrip
+  xpProgress?: XPProgressStrip | null
+  tutorBanner?: TutorBannerData | null
+  recommendations?: RecommendationData[]
   onSelectScript: (script: ScriptKey) => void
   onGoOverview: () => void
   onOpenSettings: () => void
   onToggleStudyPlan: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
+  onDismissTutorBanner?: (dedupKey: string) => void
+  onStartRecommendation?: (nodeId: string) => void
 }
 
 export function HomeView({
@@ -31,14 +61,28 @@ export function HomeView({
   studyPlan,
   homeStudyPlanExpanded,
   statsStrip,
+  xpProgress,
+  tutorBanner,
+  recommendations,
   onSelectScript,
   onGoOverview,
   onOpenSettings,
   onToggleStudyPlan,
   onJumpToSetup,
+  onDismissTutorBanner,
+  onStartRecommendation,
 }: HomeViewProps) {
   return (
     <div className={`view-shell view-${navDirection}`}>
+      {tutorBanner && onDismissTutorBanner && (
+        <TutorBanner
+          headline={tutorBanner.headline}
+          body={tutorBanner.body}
+          cta={tutorBanner.cta}
+          messageType={tutorBanner.messageType}
+          onDismiss={() => onDismissTutorBanner(tutorBanner.dedupKey)}
+        />
+      )}
       <section className="home-menu panel-glass">
         <h1 className="home-logo">JPLearn</h1>
         <p className="home-copy">
@@ -208,7 +252,34 @@ export function HomeView({
                 <span>{statsStrip.dueCount} due</span>
               </button>
             ) : null}
+            {xpProgress ? (
+              <div className="home-stats-xp">
+                <XPBar
+                  level={xpProgress.level}
+                  xpToNextLevel={xpProgress.xpToNextLevel}
+                  xpForCurrentLevel={xpProgress.xpForCurrentLevel}
+                />
+              </div>
+            ) : null}
           </div>
+        ) : null}
+
+        {recommendations && recommendations.length > 0 && onStartRecommendation ? (
+          <section className="home-recommendations" aria-label="Study recommendations">
+            <p className="home-recommendations-heading hero-kicker">Recommended</p>
+            <div className="home-recommendations-list">
+              {recommendations.slice(0, 3).map((rec) => (
+                <RecommendationCard
+                  key={rec.nodeId}
+                  displayLabel={rec.displayLabel}
+                  reviewCount={rec.reviewCount}
+                  difficulty={rec.difficulty}
+                  reason={rec.reason}
+                  onStart={() => onStartRecommendation(rec.nodeId)}
+                />
+              ))}
+            </div>
+          </section>
         ) : null}
       </section>
     </div>

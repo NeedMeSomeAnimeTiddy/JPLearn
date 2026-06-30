@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import sys
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping
 from uuid import uuid4
@@ -63,6 +64,42 @@ from domain.decks import (
     VOCAB_N3_EXTERNAL_DATA,
     VOCAB_N4_EXTERNAL_DATA,
     VOCAB_N5_EXTERNAL_DATA,
+)
+from domain.progression import NodeProgressionState, ProgressionState
+from domain.progression_curriculum import JPLEARN_GRAPH
+from domain.progression_service import (
+    build_initial_state,
+    reachable_nodes,
+)
+from domain.feature_catalog import JPLEARN_FEATURES
+from domain.feature_service import build_feature_state, evaluate_features
+from domain.features import FeatureState
+from domain.xp import DEFAULT_CURVE, XP_CORRECT_ANSWER, UserProgress, XPEvent
+from domain.level_service import (
+    apply_xp,
+    compute_level as compute_xp_level,
+    xp_for_level_up,
+    xp_to_next_level as xp_left,
+)
+from domain.recommendation import CategoryMetrics, StudySnapshot
+from domain.recommendation_service import generate_recommendations
+from domain.tutor_service import (
+    active_reactions,
+    from_feature_event,
+    from_level_event,
+    from_progression_event,
+    from_recommendation,
+    generate_reactions,
+)
+from data.database import (
+    load_feature_unlocks,
+    load_tutor_seen_keys,
+    load_user_progression,
+    load_user_xp,
+    save_feature_unlock,
+    save_tutor_seen_key,
+    save_user_xp,
+    upsert_progression_node,
 )
 
 SUMMARY_SCRIPT_TAGS = (
@@ -146,6 +183,52 @@ class StudyQueuePayload:
     slug: str
     card_ids: list[int]
     indices: list[int]
+
+
+@dataclass(frozen=True)
+class ProgressionNodeStatusPayload:
+    node_id: str
+    name: str
+    status: str
+    mastered_ratio: float
+    is_reachable: bool
+
+
+@dataclass(frozen=True)
+class FeatureStatusPayload:
+    feature_id: str
+    name: str
+    category: str
+    is_unlocked: bool
+
+
+@dataclass(frozen=True)
+class XPProgressPayload:
+    level: int
+    total_xp: int
+    xp_to_next_level: int
+    xp_for_current_level: int
+
+
+@dataclass(frozen=True)
+class RecommendationPayload:
+    node_id: str
+    display_label: str
+    review_count: int
+    difficulty: str
+    reason: str
+    priority: int
+
+
+@dataclass(frozen=True)
+class TutorReactionPayload:
+    dedup_key: str
+    event_type: str
+    priority: str
+    message_type: str
+    headline: str
+    body: str
+    cta: str
 
 
 def _normalize_deck_key(value: str) -> str:
@@ -383,6 +466,362 @@ def reset_progress() -> dict[str, object]:
     return {"ok": True}
 
 
+# ---------------------------------------------------------------------------
+# Node → deck slug mapping for recommendations
+# ---------------------------------------------------------------------------
+
+_NODE_TO_DECK_SLUG: dict[str, str] = {
+    "hiragana": "hiragana",
+    "katakana": "katakana",
+    "vocabulary_n5": "vocab_n5",
+    "grammar_n5": "grammar_patterns",
+    "kanji_n5": "kanji_n5",
+}
+
+_NOW_UTC = lambda: datetime.now(timezone.utc).isoformat()  # noqa: E731
+
+
+# ---------------------------------------------------------------------------
+# Helpers to reconstruct domain state from database
+# ---------------------------------------------------------------------------
+
+
+def _load_progression_state() -> ProgressionState:
+    rows = load_user_progression()
+    if not rows:
+        return build_initial_state(JPLEARN_GRAPH)
+    node_states: dict[str, NodeProgressionState] = {}
+    for row in rows:
+        node_states[row["node_id"]] = NodeProgressionState(
+            node_id=row["node_id"],
+            status=row["status"],
+            mastered_item_count=row["mastered_item_count"],
+            total_item_count=row["total_item_count"],
+        )
+    # Fill any missing nodes with locked defaults
+    for node_id in JPLEARN_GRAPH.nodes:
+        if node_id not in node_states:
+            status = "unlocked" if node_id == JPLEARN_GRAPH.root_id else "locked"
+            node_states[node_id] = NodeProgressionState(node_id=node_id, status=status)
+    return ProgressionState(node_states=node_states)
+
+
+def _load_feature_state() -> FeatureState:
+    unlocked_ids = load_feature_unlocks()
+    statuses: dict[str, str] = {}
+    for feat in JPLEARN_FEATURES:
+        statuses[feat.feature_id] = "unlocked" if feat.feature_id in unlocked_ids else "locked"
+    return FeatureState(statuses=statuses)
+
+
+def _load_user_progress() -> UserProgress:
+    row = load_user_xp()
+    total_xp = int(row["total_xp"])
+    level = int(row["level"])
+    try:
+        keys = frozenset(json.loads(str(row["applied_dedup_keys_json"])))
+    except Exception:
+        keys = frozenset()
+    return UserProgress(total_xp=total_xp, level=level, applied_dedup_keys=keys)
+
+
+def _save_user_progress(progress: UserProgress) -> None:
+    keys_json = json.dumps(sorted(progress.applied_dedup_keys))
+    save_user_xp(progress.total_xp, progress.level, keys_json)
+
+
+# ---------------------------------------------------------------------------
+# New bridge commands
+# ---------------------------------------------------------------------------
+
+
+def build_progression_status() -> dict[str, object]:
+    """Return the learner's current progression state for all nodes."""
+    init_study_db()
+    prog_state = _load_progression_state()
+    reachable = reachable_nodes(JPLEARN_GRAPH, prog_state)
+    result = []
+    for node_id, node in JPLEARN_GRAPH.nodes.items():
+        ns = prog_state.node_states.get(node_id)
+        status = ns.status if ns else "locked"
+        mastered_ratio = (
+            ns.mastered_item_count / ns.total_item_count
+            if ns and ns.total_item_count > 0
+            else 0.0
+        )
+        result.append(
+            asdict(
+                ProgressionNodeStatusPayload(
+                    node_id=node_id,
+                    name=node.name,
+                    status=status,
+                    mastered_ratio=round(mastered_ratio, 3),
+                    is_reachable=node_id in reachable,
+                )
+            )
+        )
+    return {"nodes": result}
+
+
+def build_feature_unlock_status() -> dict[str, object]:
+    """Return unlock status for all features in the catalog."""
+    init_study_db()
+    feat_state = _load_feature_state()
+    # Evaluate in case progression unlocks new features
+    prog_state = _load_progression_state()
+    feat_state, events = evaluate_features(JPLEARN_FEATURES, prog_state, feat_state, __import__("datetime").date.today())
+    # Persist any newly unlocked features
+    now = _NOW_UTC()
+    for ev in events:
+        save_feature_unlock(ev.feature_id, now)
+    result = []
+    for feat in JPLEARN_FEATURES:
+        result.append(
+            asdict(
+                FeatureStatusPayload(
+                    feature_id=feat.feature_id,
+                    name=feat.name,
+                    category=feat.category,
+                    is_unlocked=feat_state.statuses.get(feat.feature_id) == "unlocked",
+                )
+            )
+        )
+    return {"features": result}
+
+
+def build_xp_progress() -> dict[str, object]:
+    """Return the learner's current XP and level data."""
+    init_study_db()
+    progress = _load_user_progress()
+    level = compute_xp_level(progress.total_xp, DEFAULT_CURVE)
+    remaining = xp_left(progress.total_xp, DEFAULT_CURVE)
+    level_threshold = xp_for_level_up(level, DEFAULT_CURVE)
+    return asdict(
+        XPProgressPayload(
+            level=level,
+            total_xp=progress.total_xp,
+            xp_to_next_level=remaining,
+            xp_for_current_level=level_threshold,
+        )
+    )
+
+
+def _build_category_metrics_for_node(node_id: str) -> CategoryMetrics:
+    """Aggregate SRS metrics for a single progression node."""
+    deck_slug = _NODE_TO_DECK_SLUG.get(node_id)
+    if deck_slug is None:
+        return CategoryMetrics(
+            node_id=node_id,
+            due_count=0,
+            overdue_count=0,
+            new_count=0,
+            leech_count=0,
+            accuracy_7d=1.0,
+            mastered_ratio=0.0,
+            total_items=0,
+        )
+    factory = ALL_DECKS.get(deck_slug)
+    if factory is None:
+        return CategoryMetrics(
+            node_id=node_id,
+            due_count=0,
+            overdue_count=0,
+            new_count=0,
+            leech_count=0,
+            accuracy_7d=1.0,
+            mastered_ratio=0.0,
+            total_items=0,
+        )
+    deck = factory()
+    card_ids = [card.id for card in deck.cards]
+    states = load_review_states(deck.name, card_ids)
+
+    from datetime import date as _date
+    today = _date.today()
+    due_count = 0
+    overdue_count = 0
+    new_count = 0
+    mastered_count = 0
+    for cid, state in states.items():
+        if state.repetitions <= 0:
+            new_count += 1
+        elif state.next_review <= today:
+            if state.next_review < today:
+                overdue_count += 1
+            else:
+                due_count += 1
+        if state.repetitions >= 3 and state.interval >= 21:
+            mastered_count += 1
+
+    from data.study_pipeline import load_active_leech_card_ids
+    leech_ids = load_active_leech_card_ids(deck.name)
+    leech_count = len(leech_ids)
+
+    # 7-day accuracy from review events
+    from data.database import _connect, init_db
+    init_db()
+    import sqlite3
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct,
+                COUNT(*) AS total
+            FROM review_events
+            WHERE deck = ?
+              AND reviewed_on >= date('now', '-7 days')
+            """,
+            (_normalize_deck_key(deck.name),),
+        ).fetchone()
+    correct = row["correct"] or 0
+    total_reviews = row["total"] or 0
+    accuracy_7d = (correct / total_reviews) if total_reviews > 0 else 1.0
+
+    return CategoryMetrics(
+        node_id=node_id,
+        due_count=due_count,
+        overdue_count=overdue_count,
+        new_count=new_count,
+        leech_count=leech_count,
+        accuracy_7d=round(accuracy_7d, 3),
+        mastered_ratio=round(mastered_count / len(card_ids), 3) if card_ids else 0.0,
+        total_items=len(card_ids),
+    )
+
+
+def build_recommendations_payload() -> dict[str, object]:
+    """Return prioritised study recommendations for the current learner state."""
+    init_study_db()
+    prog_state = _load_progression_state()
+    streak = load_streak_state()
+    activity = load_activity_summary(7)
+
+    # Build CategoryMetrics for mapped nodes only
+    metrics = [
+        _build_category_metrics_for_node(node_id)
+        for node_id in _NODE_TO_DECK_SLUG
+    ]
+    # Filter to nodes that have items
+    metrics = [m for m in metrics if m.total_items > 0]
+
+    from datetime import date as _date
+    snapshot = StudySnapshot(
+        date=_date.today(),
+        category_metrics=tuple(metrics),
+        progression_state=prog_state,
+        days_since_last_study=(
+            max(0, (_date.today() - __import__("datetime").date.fromisoformat(
+                streak.last_study_day_utc[:10]
+            )).days)
+            if streak.last_study_day_utc
+            else 0
+        ),
+        current_streak=streak.current_streak_days,
+        xp_last_7_days=activity.points_earned,
+    )
+    recs = generate_recommendations(snapshot, JPLEARN_GRAPH)
+    return {
+        "recommendations": [
+            asdict(RecommendationPayload(
+                node_id=r.node_id,
+                display_label=r.display_label,
+                review_count=r.review_count,
+                difficulty=r.difficulty,
+                reason=r.reason,
+                priority=r.priority,
+            ))
+            for r in recs
+        ]
+    }
+
+
+def build_tutor_reactions_payload() -> dict[str, object]:
+    """Return active tutor reactions based on recent progression and state."""
+    init_study_db()
+    seen_keys = load_tutor_seen_keys()
+    tutor_events = []
+
+    # Recent mastery events (nodes mastered in DB)
+    rows = load_user_progression()
+    for row in rows:
+        if row["status"] == "mastered" and row["mastered_at"]:
+            from domain.progression import ProgressionEvent as PE
+            import datetime as _dt
+            try:
+                d = _dt.date.fromisoformat(row["mastered_at"][:10])
+            except Exception:
+                d = _dt.date.today()
+            pe = PE(event_type="node_mastered", node_id=row["node_id"], date=d)
+            ev = from_progression_event(pe, JPLEARN_GRAPH)
+            if ev:
+                tutor_events.append(ev)
+
+    # Feature unlock events
+    unlocked_ids = load_feature_unlocks()
+    for feat in JPLEARN_FEATURES:
+        if feat.feature_id in unlocked_ids:
+            from domain.features import FeatureEvent as FE, FeatureUnlock as FU
+            import datetime as _dt
+            fe = FE(
+                event_type="feature_unlocked",
+                feature_id=feat.feature_id,
+                date=_dt.date.today(),
+                unlock=FU(access_descriptor=f"{feat.feature_id}_access"),
+            )
+            ev = from_feature_event(fe, features=JPLEARN_FEATURES)
+            tutor_events.append(ev)
+
+    # XP level event (if level > 1)
+    progress = _load_user_progress()
+    if progress.level > 1:
+        import datetime as _dt
+        from domain.xp import LevelEvent as LE
+        lev = LE(new_level=progress.level, date=_dt.date.today(), xp_at_level_up=progress.total_xp)
+        tutor_events.append(from_level_event(lev))
+
+    # Top recommendation as a tutor event
+    recs_payload = build_recommendations_payload()
+    for r in recs_payload.get("recommendations", [])[:1]:
+        rec_obj = generate_recommendations.__module__  # just to get the type
+        # Reconstruct StudyRecommendation from payload dict
+        from domain.recommendation import StudyRecommendation as SR
+        sr = SR(
+            node_id=r["node_id"],
+            display_label=r["display_label"],
+            review_count=r["review_count"],
+            difficulty=r["difficulty"],
+            reason=r["reason"],
+            focus_areas=(),
+            priority=r["priority"],
+        )
+        import datetime as _dt
+        tutor_events.append(from_recommendation(sr, _dt.date.today(), graph=JPLEARN_GRAPH))
+
+    reactions = generate_reactions(tutor_events, seen_dedup_keys=frozenset(seen_keys))
+    active = active_reactions(reactions)
+    return {
+        "reactions": [
+            asdict(TutorReactionPayload(
+                dedup_key=r.dedup_key,
+                event_type=r.event.event_type,
+                priority=r.event.priority,
+                message_type=r.message.message_type,
+                headline=r.message.headline,
+                body=r.message.body,
+                cta=r.message.cta,
+            ))
+            for r in active
+        ]
+    }
+
+
+def dismiss_tutor_reaction_key(dedup_key: str) -> dict[str, object]:
+    """Persist a tutor reaction dedup key as seen."""
+    init_study_db()
+    save_tutor_seen_key(dedup_key, _NOW_UTC())
+    return {"ok": True}
+
+
 def _mastered_seed_state(card_id: int) -> ReviewState:
     state = ReviewState(card_id=card_id)
     # The app treats mastered as repetitions >= 3 and interval >= 21.
@@ -485,6 +924,25 @@ def record_game_result(
         confidence_score=confidence_score,
     )
 
+    # Q1: Award XP piggybacked on this call (correct answer only).
+    xp_gained = 0
+    level_before = 1
+    level_after = 1
+    if is_correct:
+        progress = _load_user_progress()
+        level_before = progress.level
+        dedup = f"correct:{slug}:{card_id}:{updated_state.next_review.isoformat()}"
+        xp_event = XPEvent(
+            source="correct_answer",
+            amount=XP_CORRECT_ANSWER,
+            dedup_key=dedup,
+            date=updated_state.next_review,
+        )
+        new_progress, _ = apply_xp(progress, xp_event, DEFAULT_CURVE, updated_state.next_review)
+        _save_user_progress(new_progress)
+        xp_gained = XP_CORRECT_ANSWER if dedup not in progress.applied_dedup_keys else 0
+        level_after = new_progress.level
+
     return {
         "ok": True,
         "card_id": updated_state.card_id,
@@ -496,6 +954,9 @@ def record_game_result(
         "curriculum_stage": load_curriculum_stages(deck.name, stage_mode, [card_id]).get(card_id, 1)
         if stage_mode
         else None,
+        "xp_gained": xp_gained,
+        "level_before": level_before,
+        "level_after": level_after,
     }
 
 
@@ -789,6 +1250,32 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
         user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
         return 0, get_assistant_chat_context(session_id=session_id, user_message=user_message)
+
+    if command == "progression":
+        return 0, build_progression_status()
+
+    if command == "feature-unlocks":
+        return 0, build_feature_unlock_status()
+
+    if command == "xp-progress":
+        return 0, build_xp_progress()
+
+    if command == "recommendations":
+        try:
+            return 0, build_recommendations_payload()
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "tutor-reactions":
+        try:
+            return 0, build_tutor_reactions_payload()
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "tutor-dismiss":
+        if len(argv) < 2:
+            return 2, {"error": "Usage: tutor-dismiss <dedup_key>"}
+        return 0, dismiss_tutor_reaction_key(argv[1])
 
     return 2, {"error": f"Unknown command: {command}"}
 

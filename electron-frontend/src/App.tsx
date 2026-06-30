@@ -22,6 +22,9 @@ type StudyQueueResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getStu
 type SessionGoalStartResponse = Awaited<ReturnType<typeof window.jplearnDesktop.startSessionGoal>>
 type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getSessionSummary>>
 type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
+type XPProgress = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getXpProgress>>>
+type TutorReactionItem = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getTutorReactions>>>['reactions'][number]
+type RecommendationItem = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getRecommendations>>>['recommendations'][number]
 interface SessionRunReport {
   script: ScriptKey
   minigame: MinigameKey
@@ -2001,6 +2004,9 @@ function App() {
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [homeStudyPlanExpanded, setHomeStudyPlanExpanded] = useState(false)
+  const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
+  const [tutorReactions, setTutorReactions] = useState<TutorReactionItem[]>([])
+  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
   const [learningPathExpanded, setLearningPathExpanded] = useState(false)
   const [overviewSectionExpanded, setOverviewSectionExpanded] = useState<Record<OverviewSectionKey, boolean>>({
     studyActivity: false,
@@ -2562,6 +2568,26 @@ function App() {
   useEffect(() => {
     void loadSummary()
   }, [loadSummary])
+
+  // Fetch XP progress, study recommendations, and tutor reactions on mount
+  // and whenever the summary refreshes (pull model, Q3-A).
+  useEffect(() => {
+    let mounted = true
+    const getXp = window.jplearnDesktop.getXpProgress
+    const getRecs = window.jplearnDesktop.getRecommendations
+    const getTutor = window.jplearnDesktop.getTutorReactions
+    void Promise.all([
+      getXp ? getXp().catch(() => null) : Promise.resolve(null),
+      getRecs ? getRecs().catch(() => null) : Promise.resolve(null),
+      getTutor ? getTutor().catch(() => null) : Promise.resolve(null),
+    ]).then(([xp, recs, tutor]) => {
+      if (!mounted) return
+      if (xp) setXpProgress(xp)
+      if (recs) setRecommendations(recs.recommendations)
+      if (tutor) setTutorReactions(tutor.reactions)
+    })
+    return () => { mounted = false }
+  }, [summary])
 
   useEffect(() => {
     const getAssistantSnapshotFn = window.jplearnDesktop.getAssistantSnapshot
@@ -4921,6 +4947,37 @@ function App() {
           studyPlan={studyPlan}
           homeStudyPlanExpanded={homeStudyPlanExpanded}
           statsStrip={{ streak: streak.current_days, masteryPct: totals.masteryRate, dueCount: totals.remainingDue }}
+          xpProgress={xpProgress ? {
+            level: xpProgress.level,
+            xpToNextLevel: xpProgress.xp_to_next_level,
+            xpForCurrentLevel: xpProgress.xp_for_current_level,
+          } : null}
+          tutorBanner={tutorReactions[0] ? {
+            dedupKey: tutorReactions[0].dedup_key,
+            headline: tutorReactions[0].headline,
+            body: tutorReactions[0].body,
+            cta: tutorReactions[0].cta,
+            messageType: tutorReactions[0].message_type,
+          } : null}
+          recommendations={recommendations.map((r) => ({
+            nodeId: r.node_id,
+            displayLabel: r.display_label,
+            reviewCount: r.review_count,
+            difficulty: r.difficulty,
+            reason: r.reason,
+          }))}
+          onDismissTutorBanner={(key) => {
+            setTutorReactions((prev) => prev.filter((r) => r.dedup_key !== key))
+            void window.jplearnDesktop.dismissTutorReaction?.(key).catch(() => undefined)
+          }}
+          onStartRecommendation={(nodeId) => {
+            const scriptMap: Record<string, string> = {
+              hiragana: 'hiragana', katakana: 'katakana',
+              vocabulary_n5: 'vocab_n5', grammar_n5: 'grammar_patterns', kanji_n5: 'kanji_n5',
+            }
+            const script = scriptMap[nodeId] as ScriptKey | undefined
+            if (script) jumpToScriptHub(script)
+          }}
           onSelectScript={(script) => {
             setNavDirection('forward')
             setActiveScript(script)

@@ -25,7 +25,8 @@ MIGRATION_V4 = 4
 MIGRATION_V5 = 5
 MIGRATION_V6 = 6
 MIGRATION_V7 = 7
-LATEST_SCHEMA_VERSION = 7
+MIGRATION_V8 = 8
+LATEST_SCHEMA_VERSION = 8
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -320,6 +321,47 @@ def _migration_0007(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0008(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_progression (
+            node_id                TEXT PRIMARY KEY,
+            status                 TEXT NOT NULL DEFAULT 'locked',
+            mastered_item_count    INTEGER NOT NULL DEFAULT 0,
+            total_item_count       INTEGER NOT NULL DEFAULT 0,
+            first_activated_at     TEXT,
+            mastered_at            TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_feature_unlocks (
+            feature_id   TEXT PRIMARY KEY,
+            unlocked_at  TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_xp (
+            id                      INTEGER PRIMARY KEY CHECK (id = 1),
+            total_xp                INTEGER NOT NULL DEFAULT 0,
+            level                   INTEGER NOT NULL DEFAULT 1,
+            applied_dedup_keys_json TEXT    NOT NULL DEFAULT '[]'
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tutor_reactions_seen (
+            dedup_key    TEXT PRIMARY KEY,
+            dismissed_at TEXT NOT NULL
+        )
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -328,6 +370,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V5: _migration_0005,
     MIGRATION_V6: _migration_0006,
     MIGRATION_V7: _migration_0007,
+    MIGRATION_V8: _migration_0008,
 }
 
 
@@ -378,6 +421,129 @@ def reset_db() -> None:
         conn.execute("DELETE FROM assistant_memory_facts")
         conn.execute("DELETE FROM assistant_event_interactions")
         conn.execute("DELETE FROM assistant_chat_summaries")
+        conn.execute("DELETE FROM user_progression")
+        conn.execute("DELETE FROM user_feature_unlocks")
+        conn.execute("DELETE FROM user_xp")
+        conn.execute("DELETE FROM tutor_reactions_seen")
+
+
+# ---------------------------------------------------------------------------
+# Progression, feature, XP, and tutor state repositories (V8)
+# ---------------------------------------------------------------------------
+
+
+def load_user_progression(conn: sqlite3.Connection | None = None) -> list[sqlite3.Row]:
+    """Return all rows from user_progression."""
+    def _query(c: sqlite3.Connection) -> list[sqlite3.Row]:
+        return c.execute("SELECT * FROM user_progression").fetchall()
+
+    if conn is not None:
+        return _query(conn)
+    init_db()
+    with _connect() as c:
+        return _query(c)
+
+
+def upsert_progression_node(
+    node_id: str,
+    status: str,
+    mastered_item_count: int,
+    total_item_count: int,
+    first_activated_at: str | None,
+    mastered_at: str | None,
+) -> None:
+    """Insert or update one progression node row."""
+    init_db()
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO user_progression
+                (node_id, status, mastered_item_count, total_item_count,
+                 first_activated_at, mastered_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(node_id) DO UPDATE SET
+                status              = excluded.status,
+                mastered_item_count = excluded.mastered_item_count,
+                total_item_count    = excluded.total_item_count,
+                first_activated_at  = excluded.first_activated_at,
+                mastered_at         = excluded.mastered_at
+            """,
+            (node_id, status, mastered_item_count, total_item_count,
+             first_activated_at, mastered_at),
+        )
+
+
+def load_feature_unlocks() -> set[str]:
+    """Return the set of unlocked feature_ids."""
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute("SELECT feature_id FROM user_feature_unlocks").fetchall()
+    return {row["feature_id"] for row in rows}
+
+
+def save_feature_unlock(feature_id: str, unlocked_at: str) -> None:
+    """Record a feature as unlocked (idempotent)."""
+    init_db()
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO user_feature_unlocks (feature_id, unlocked_at)
+            VALUES (?, ?)
+            """,
+            (feature_id, unlocked_at),
+        )
+
+
+def load_user_xp() -> dict[str, object]:
+    """Return the single user_xp row as a dict, or defaults if absent."""
+    init_db()
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM user_xp WHERE id = 1").fetchone()
+    if row is None:
+        return {"total_xp": 0, "level": 1, "applied_dedup_keys_json": "[]"}
+    return {
+        "total_xp": row["total_xp"],
+        "level": row["level"],
+        "applied_dedup_keys_json": row["applied_dedup_keys_json"],
+    }
+
+
+def save_user_xp(total_xp: int, level: int, applied_dedup_keys_json: str) -> None:
+    """Upsert the user_xp row."""
+    init_db()
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO user_xp (id, total_xp, level, applied_dedup_keys_json)
+            VALUES (1, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                total_xp                = excluded.total_xp,
+                level                   = excluded.level,
+                applied_dedup_keys_json = excluded.applied_dedup_keys_json
+            """,
+            (total_xp, level, applied_dedup_keys_json),
+        )
+
+
+def load_tutor_seen_keys() -> set[str]:
+    """Return all dedup_keys already seen by the tutor."""
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute("SELECT dedup_key FROM tutor_reactions_seen").fetchall()
+    return {row["dedup_key"] for row in rows}
+
+
+def save_tutor_seen_key(dedup_key: str, dismissed_at: str) -> None:
+    """Persist a tutor reaction dedup key (idempotent)."""
+    init_db()
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO tutor_reactions_seen (dedup_key, dismissed_at)
+            VALUES (?, ?)
+            """,
+            (dedup_key, dismissed_at),
+        )
 
 
 def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:

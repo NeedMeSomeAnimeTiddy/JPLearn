@@ -332,6 +332,12 @@ interface DesktopApi {
   isWindowMaximized: () => Promise<{ isMaximized: boolean }>
   onWindowStateChanged?: (listener: (state: { isMaximized: boolean }) => void) => () => void
   closeWindow: () => Promise<{ ok: boolean }>
+  getProgressionState?: () => Promise<ProgressionStatePayload>
+  getFeatureState?: () => Promise<FeatureStatePayload>
+  getXpProgress?: () => Promise<XPProgress>
+  getRecommendations?: () => Promise<RecommendationsPayload>
+  getTutorReactions?: () => Promise<TutorReactionsPayload>
+  dismissTutorReaction?: (dedupKey: string) => Promise<{ ok: boolean }>
 }
 
 interface VoiceStatus {
@@ -349,6 +355,63 @@ interface VoiceSpeakResponse {
   sampleRate: number
   voiceId: number
   audioBase64: string
+}
+
+interface ProgressionNodeStatus {
+  node_id: string
+  name: string
+  status: 'locked' | 'unlocked' | 'active' | 'mastered'
+  mastered_ratio: number
+  is_reachable: boolean
+}
+
+interface ProgressionStatePayload {
+  nodes: ProgressionNodeStatus[]
+}
+
+interface FeatureStatus {
+  feature_id: string
+  name: string
+  category: string
+  is_unlocked: boolean
+}
+
+interface FeatureStatePayload {
+  features: FeatureStatus[]
+}
+
+interface XPProgress {
+  level: number
+  total_xp: number
+  xp_to_next_level: number
+  xp_for_current_level: number
+}
+
+interface RecommendationItem {
+  node_id: string
+  display_label: string
+  review_count: number
+  difficulty: string
+  reason: string
+  priority: number
+}
+
+interface RecommendationsPayload {
+  recommendations: RecommendationItem[]
+}
+
+interface TutorReactionItem {
+  dedup_key: string
+  event_type: string
+  priority: 'low' | 'normal' | 'high'
+  message_type: 'congratulation' | 'encouragement' | 'guidance' | 'acknowledgement'
+  headline: string
+  body: string
+  cta: string
+}
+
+interface TutorReactionsPayload {
+  reactions: TutorReactionItem[]
 }
 
 declare global {
