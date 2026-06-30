@@ -2588,7 +2588,6 @@ function App() {
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [homeStudyPlanExpanded, setHomeStudyPlanExpanded] = useState(false)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
-  const [unlockedFeatureIds, setUnlockedFeatureIds] = useState<Set<string>>(new Set())
   const [tutorReactions, setTutorReactions] = useState<TutorReactionItem[]>([])
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
@@ -3565,25 +3564,22 @@ function App() {
     void loadSummary()
   }, [loadSummary])
 
-  // Fetch XP progress, feature unlocks, study recommendations, and tutor reactions
+  // Fetch XP progress, study recommendations, and tutor reactions
   // on mount and whenever the summary refreshes.
   useEffect(() => {
     let mounted = true
     const getXp = window.jplearnDesktop.getXpProgress
-    const getFeatures = window.jplearnDesktop.getFeatureState
     const getRecs = window.jplearnDesktop.getRecommendations
     const getTutor = window.jplearnDesktop.getTutorReactions
     const getPath = window.jplearnDesktop.getLearningPathStatus
     void Promise.all([
       getXp ? getXp().catch(() => null) : Promise.resolve(null),
-      getFeatures ? getFeatures().catch(() => null) : Promise.resolve(null),
       getRecs ? getRecs().catch(() => null) : Promise.resolve(null),
       getTutor ? getTutor().catch(() => null) : Promise.resolve(null),
       getPath ? getPath().catch(() => null) : Promise.resolve(null),
-    ]).then(([xp, features, recs, tutor, path]) => {
+    ]).then(([xp, recs, tutor, path]) => {
       if (!mounted) return
       if (xp) setXpProgress(xp)
-      if (features) setUnlockedFeatureIds(new Set(features.features.filter((f) => f.is_unlocked).map((f) => f.feature_id)))
       if (recs) setRecommendations(recs.recommendations)
       if (tutor) setTutorReactions(tutor.reactions)
       if (path) setLearningPathStatus(path as LearningPathStatus)
@@ -5584,8 +5580,6 @@ function App() {
   const canTitlebarBack = viewHistoryIndexRef.current > 0
   const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
   const activeAssistantToast = assistantToasts[0] ?? null
-  const isTutorChatUnlocked = unlockedFeatureIds.has('tutor_chat')
-  const isJLPTPrepUnlocked = unlockedFeatureIds.has('jlpt_dashboard')
   const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
   const xpLevelCap = xpProgress?.xp_for_current_level ?? 0
   const xpPercent = xpLevelCap > 0 ? Math.round((xpInLevel / xpLevelCap) * 100) : 0
@@ -5629,16 +5623,10 @@ function App() {
     return () => window.removeEventListener('mousedown', handlePointerDown)
   }, [streakDetailsOpen])
 
-  useEffect(() => {
-    if (isTutorChatUnlocked) {
-      return
-    }
-    setAssistantChatOpen(false)
-  }, [isTutorChatUnlocked])
-
   return (
     <main className="app-shell" data-background-style={settings.backgroundStyle} style={appShellStyle}>
       <header className="window-titlebar" aria-label="Window controls">
+        <span className="window-titlebar-wordmark" aria-hidden="true">JPLearn</span>
         <div className="window-titlebar-drag">
           <div className="window-titlebar-nav" role="group" aria-label="App navigation">
             <div className="titlebar-shortcut-wrap" ref={shortcutMenuRef}>
@@ -5673,11 +5661,10 @@ function App() {
                     role="menuitem"
                     className="titlebar-shortcut-item"
                     onClick={() => { setView('jlpt_prep'); setShortcutMenuOpen(false) }}
-                    title={isJLPTPrepUnlocked ? 'JLPT Prep' : 'JLPT Prep (unlocks at JLPT N5 node)'}
-                    style={!isJLPTPrepUnlocked ? { opacity: 0.6 } : undefined}
+                    title="JLPT Prep"
                   >
                     <Languages className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                    JLPT Prep{!isJLPTPrepUnlocked ? ' 🔒' : ''}
+                    JLPT Prep
                   </button>
 
                   <div className="titlebar-shortcut-tree-anchor">
@@ -5799,6 +5786,15 @@ function App() {
             <button
               type="button"
               className="window-nav-button"
+              onClick={() => { setNavDirection('forward'); setView('jlpt_prep') }}
+              aria-label="JLPT Preparation"
+              title="JLPT Prep"
+            >
+              <Languages className="window-nav-icon" strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              className="window-nav-button"
               onClick={openSettingsFromMenu}
               aria-label="Open settings"
               title="Settings"
@@ -5816,18 +5812,17 @@ function App() {
                         setAssistantChatOpen((open) => !open)
                         setAssistantChatError(null)
                       }}
-                      disabled={!isTutorChatUnlocked}
                       aria-expanded={assistantChatOpen}
                       aria-controls="assistant-chat-panel"
-                      aria-label={isTutorChatUnlocked ? 'Open tutor chat' : 'Tutor chat locked'}
-                      title={isTutorChatUnlocked ? 'Open tutor chat' : 'Unlock Conversation Mode first'}
+                      aria-label="Open tutor chat"
+                      title="Open tutor chat"
                     >
                       <MessageCircle className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
                     </button>
                   </div>
                 ) : null}
 
-                {assistantChatOpen && isTutorChatUnlocked ? (
+                {assistantChatOpen ? (
                   <section id="assistant-chat-panel" className="assistant-chat-panel" aria-label="Tutor chat panel">
                     <header className="assistant-chat-header">
                       <div className="assistant-chat-identity">
@@ -6190,7 +6185,6 @@ function App() {
           }}
           onToggleStudyPlan={() => setHomeStudyPlanExpanded((expanded) => !expanded)}
           onJumpToSetup={jumpToScriptHubSetup}
-          onSelectJLPTPrep={() => { setNavDirection('forward'); setView('jlpt_prep') }}
         />
       ) : null}
 
@@ -6960,20 +6954,14 @@ function App() {
                 >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Tutor Companion</p>
-                    {!unlockedFeatureIds.has('tutor_chat') && (
-                      <p className="settings-help" style={{ marginBottom: 8, color: 'var(--tone-amber)' }}>
-                        🔒 Tutor Chat unlocks after mastering Conversational (Grammar N5).
-                      </p>
-                    )}
                     <div className="settings-animation-grid" role="group" aria-label="Tutor companion controls">
                       <button
                         type="button"
-                        className={`settings-icon-entry settings-theme-entry ${settings.assistantChatEnabled && unlockedFeatureIds.has('tutor_chat') ? 'is-active' : ''}`}
-                        onClick={() => unlockedFeatureIds.has('tutor_chat') && setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))}
-                        aria-label={unlockedFeatureIds.has('tutor_chat') ? (settings.assistantChatEnabled ? 'Chat with Tutor enabled. Activate to disable.' : 'Chat with Tutor disabled. Activate to enable.') : 'Chat with Tutor locked'}
-                        aria-pressed={settings.assistantChatEnabled && unlockedFeatureIds.has('tutor_chat')}
-                        title={unlockedFeatureIds.has('tutor_chat') ? (settings.assistantChatEnabled ? 'Chat with Tutor enabled' : 'Chat with Tutor disabled') : 'Unlock Conversation Mode first'}
-                        style={!unlockedFeatureIds.has('tutor_chat') ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                        className={`settings-icon-entry settings-theme-entry ${settings.assistantChatEnabled ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))}
+                        aria-label={settings.assistantChatEnabled ? 'Chat with Tutor enabled. Activate to disable.' : 'Chat with Tutor disabled. Activate to enable.'}
+                        aria-pressed={settings.assistantChatEnabled}
+                        title={settings.assistantChatEnabled ? 'Chat with Tutor enabled' : 'Chat with Tutor disabled'}
                       >
                         <span className={`settings-mode-icon-button ${settings.assistantChatEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
                           <MessageCircle size={18} strokeWidth={2.25} aria-hidden="true" />

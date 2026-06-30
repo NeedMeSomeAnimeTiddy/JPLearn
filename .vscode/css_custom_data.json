@@ -1,0 +1,22 @@
+{
+  "version": 1.1,
+  "properties": [
+    {
+      "name": "app-region",
+      "description": "Electron-specific property for defining window drag regions. Values: drag | no-drag.",
+      "browsers": [],
+      "values": [
+        { "name": "drag" },
+        { "name": "no-drag" }
+      ],
+      "syntax": "drag | no-drag",
+      "relevance": 0,
+      "references": [
+        {
+          "name": "Electron docs",
+          "url": "https://www.electronjs.org/docs/latest/tutorial/window-customization#set-custom-draggable-region"
+        }
+      ]
+    }
+  ]
+}

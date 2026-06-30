@@ -6,7 +6,7 @@ import {
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { AlertTriangle, Languages, Zap } from 'lucide-react'
+import { AlertTriangle, Zap } from 'lucide-react'
 import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
 import { LearningPathPanel } from '../components/LearningPathPanel'
@@ -50,7 +50,6 @@ interface HomeViewProps {
   onStartRecommendation?: (nodeId: string) => void
   onContinuePath?: (sectionId: string) => void
   onChangePath?: () => void
-  onSelectJLPTPrep?: () => void
 }
 
 export function HomeView({
@@ -67,7 +66,6 @@ export function HomeView({
   onStartRecommendation,
   onContinuePath,
   onChangePath,
-  onSelectJLPTPrep,
 }: HomeViewProps) {
   // Build a readiness lookup from the learning path steps
   const readinessBySection: Partial<Record<string, SectionReadiness>> = {}
@@ -88,24 +86,6 @@ export function HomeView({
         />
       )}
       <section className="home-menu panel-glass">
-        <div className="home-header-row">
-          {onSelectJLPTPrep ? (
-            <button
-              type="button"
-              className="home-jlpt-btn"
-              onClick={onSelectJLPTPrep}
-              title="JLPT Preparation"
-              aria-label="Open JLPT Preparation"
-            >
-              <Languages size={14} strokeWidth={2.2} aria-hidden="true" />
-              JLPT Prep
-            </button>
-          ) : null}
-        </div>
-        <p className="home-copy">
-          Main Menu. Choose a learning track, then pick a minigame and start your run.
-        </p>
-
         {learningPathStatus && onContinuePath && onChangePath && learningPathStatus.path_id && (
           <LearningPathPanel
             status={learningPathStatus}

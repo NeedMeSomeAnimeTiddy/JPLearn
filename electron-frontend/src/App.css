@@ -868,6 +868,22 @@
   app-region: drag;
 }
 
+.window-titlebar-wordmark {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--text-soft) 65%, var(--text-main));
+  pointer-events: none;
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
+  white-space: nowrap;
+}
+
 .window-titlebar-nav {
   display: inline-flex;
   align-items: center;
@@ -1332,7 +1348,6 @@ button {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  margin-bottom: 0.6rem;
   transition: border-color 0.15s, opacity 0.15s;
 }
 .home-jlpt-btn:hover:not(.is-locked) { border-color: var(--accent); color: var(--accent); }
@@ -3028,10 +3043,9 @@ button {
   line-height: 1.2;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-
-.char-mastery-block-group { /* kept for any stray references */ }
 
 /* Individual compact tile */
 .cmb-tile {
@@ -3200,6 +3214,7 @@ button {
   padding: 7px 8px 10px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   font-size: 0.92rem;
   line-height: 1.24;
@@ -4124,6 +4139,7 @@ button {
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -7786,9 +7802,9 @@ html[data-reduced-motion='true'] *::after {
 
 /* ── Learning Path Panel ────────────────────────────────────────── */
 .learning-path-panel {
-  padding: 14px 16px;
+  padding: 10px 14px;
   border-radius: 14px;
-  margin-bottom: 14px;
+  margin-bottom: 8px;
 }
 
 .lpp-header {
@@ -7796,7 +7812,7 @@ html[data-reduced-motion='true'] *::after {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .lpp-title-group {
@@ -7833,15 +7849,15 @@ html[data-reduced-motion='true'] *::after {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
 
 .lpp-step {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: 8px;
   border: 1px solid transparent;
   transition: background 140ms ease;
 }
@@ -7859,8 +7875,8 @@ html[data-reduced-motion='true'] *::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   border: 1px solid var(--panel-border);
   color: var(--text-soft);
@@ -7888,7 +7904,7 @@ html[data-reduced-motion='true'] *::after {
 }
 
 .lpp-step-label {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-main);
   white-space: nowrap;
@@ -7908,8 +7924,8 @@ html[data-reduced-motion='true'] *::after {
 
 .lpp-continue-btn {
   flex-shrink: 0;
-  padding: 5px 12px;
-  font-size: 0.8rem;
+  padding: 3px 10px;
+  font-size: 0.76rem;
 }
 
 .lpp-step-badge {
