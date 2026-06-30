@@ -13,6 +13,10 @@ class Command:
 
 COMMANDS = [
     Command(
+        "ts_codegen",
+        [sys.executable, "scripts/generate_ts_types.py", "--check"],
+    ),
+    Command(
         "mypy",
         [
             sys.executable,

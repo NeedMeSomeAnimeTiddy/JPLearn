@@ -1,16 +1,17 @@
+// Core payload types are generated from Python dataclasses in desktop_bridge.py.
+// Run: python scripts/generate_ts_types.py
+import type {
+  DeckSummary,
+  GameCard,
+  OverviewCharacterCard,
+  SessionGoalPayload,
+  SessionSummaryPayload,
+} from './generated/types'
+
 interface DesktopVersions {
   chrome: string
   electron: string
   node: string
-}
-
-interface DeckSummary {
-  slug: string
-  name: string
-  total: number
-  mastered: number
-  due_today: number
-  completed_today: number
 }
 
 interface StudySummary {
@@ -108,19 +109,6 @@ interface StudySummary {
   }
 }
 
-interface GameCard {
-  id: number
-  character: string
-  romaji: string
-  meaning: string
-  tags: string[]
-  example_sentence?: string | null
-  is_leech: boolean
-  curriculum_stage: number
-  meaning_distractor_ids: number[]
-  character_distractor_ids: number[]
-}
-
 type DeckSlug =
   | 'hiragana'
   | 'katakana'
@@ -172,14 +160,6 @@ interface BlockProgressPayload {
   blocks: BlockInfo[]
 }
 
-interface OverviewCharacterCard {
-  id: number
-  character: string
-  romaji: string
-  meaning: string
-  tags: string[]
-}
-
 interface OverviewCharacterMasteryPayload {
   blocks: {
     hiragana: BlockInfo[]
@@ -188,28 +168,9 @@ interface OverviewCharacterMasteryPayload {
   kanji_cards: OverviewCharacterCard[]
 }
 
-interface SessionGoalPayload {
-  session_id: string
-  target_items: number
-  target_minutes: number | null
-  target_accuracy: number | null
-  started_at_utc: string
-}
-
 interface SessionGoalStartResponse {
   ok: boolean
   goal: SessionGoalPayload
-}
-
-interface SessionSummaryPayload {
-  session_id: string
-  target_items: number
-  completed_items: number
-  reviewed: number
-  correct: number
-  accuracy: number
-  target_accuracy: number | null
-  goal_met: boolean
 }
 
 interface SessionSummaryResponse {
