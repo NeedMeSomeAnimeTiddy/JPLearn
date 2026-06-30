@@ -11,10 +11,10 @@ import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
 
 const LOCK_HINTS: Partial<Record<ScriptKey, string>> = {
-  katakana: 'Raise Hiragana to 35% mastery.',
-  kanji_n5: 'Raise Hiragana to 70% and Katakana to 45%.',
-  vocab_n5: 'Raise Hiragana to 70% and Katakana to 55%.',
-  grammar_patterns: 'Raise Words (Vocabulary N5) to 45% mastery.',
+  katakana: 'Unlocks after Hiragana reaches 35% mastery.',
+  kanji_n5: 'Unlocks after Hiragana reaches 70% and Katakana reaches 45%.',
+  vocab_n5: 'Unlocks after Hiragana reaches 70% and Katakana reaches 55%.',
+  grammar_patterns: 'Unlocks after Words (Vocabulary N5) reaches 45% mastery.',
 }
 
 interface TutorBannerData {

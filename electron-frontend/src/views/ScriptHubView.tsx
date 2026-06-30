@@ -234,6 +234,12 @@ export function ScriptHubView({
                   {blockProgressWithMastery.map((block, index) => {
                     const isActive = activeBlockIndex === block.index
                     const masteryPct = Math.round(block.mastery * 100)
+                    const previousBlock = index > 0 ? blockProgressWithMastery[index - 1] : null
+                    const lockReason = !block.unlocked
+                      ? previousBlock
+                        ? `Complete ${previousBlock.name} first.`
+                        : 'Complete the previous foundation block first.'
+                      : null
                     return (
                       <article
                         key={block.index}
@@ -249,7 +255,9 @@ export function ScriptHubView({
                             onSelectBlock(block.index)
                           }}
                           aria-pressed={isActive}
-                          aria-label={`${block.name}, ${block.unlocked ? `${masteryPct}% mastered` : 'locked'}`}
+                          aria-label={block.unlocked
+                            ? `${block.name}, ${masteryPct}% mastered`
+                            : `${block.name}, locked. ${lockReason}`}
                         >
                           <div className="block-node-header">
                             <div className="block-node-chars" lang="ja" aria-hidden="true">
@@ -260,6 +268,9 @@ export function ScriptHubView({
                             ) : null}
                           </div>
                           <strong className="block-node-name">{block.name}</strong>
+                          {!block.unlocked && lockReason ? (
+                            <span className="block-node-lock-reason">{lockReason}</span>
+                          ) : null}
                           <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
                             <div
                               className="block-node-bar"
@@ -278,10 +289,21 @@ export function ScriptHubView({
                   role="group"
                   aria-label={`${activeScript === 'kanji_n5' ? 'Kanji' : 'Vocabulary'} JLPT progression`}
                 >
-                  {(activeScript === 'kanji_n5' ? kanjiLevelProgress : vocabLevelProgress).map((level, index) => {
+                  {(activeScript === 'kanji_n5' ? kanjiLevelProgress : vocabLevelProgress).map((level, index, levels) => {
                     const isActive = activeScript === 'kanji_n5' ? activeKanjiLevel === level.key : activeVocabLevel === level.key
                     const masteryPct = Math.round(level.mastery * 100)
                     const unavailable = level.total === 0
+                    const previousTrackLevel = levels
+                      .slice(0, index)
+                      .reverse()
+                      .find((candidate) => candidate.total > 0)
+                    const lockReason = unavailable
+                      ? 'No cards available in this level yet.'
+                      : !level.unlocked
+                        ? previousTrackLevel
+                          ? `Master ${previousTrackLevel.label} first.`
+                          : 'Master the previous level first.'
+                        : null
                     return (
                       <article
                         key={level.key}
@@ -300,7 +322,9 @@ export function ScriptHubView({
                             }
                           }}
                           aria-pressed={isActive}
-                          aria-label={`${level.label}, ${unavailable ? 'no cards yet' : `${masteryPct}% mastered`}`}
+                          aria-label={(!level.unlocked || unavailable)
+                            ? `${level.label}, locked. ${lockReason}`
+                            : `${level.label}, ${masteryPct}% mastered`}
                         >
                           <div className="jlpt-level-header">
                             <strong>{level.label}</strong>
@@ -311,6 +335,9 @@ export function ScriptHubView({
                           <span className="jlpt-level-preview" lang="ja" aria-hidden="true">
                             {level.sampleChars.length > 0 ? level.sampleChars.join(' ') : '—'}
                           </span>
+                          {!level.unlocked || unavailable ? (
+                            <span className="jlpt-level-lock-reason">{lockReason}</span>
+                          ) : null}
                           <div className="block-node-bar-wrap" aria-label={`Mastery: ${masteryPct}%`}>
                             <div
                               className="block-node-bar"
