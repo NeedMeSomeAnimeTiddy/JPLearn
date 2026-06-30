@@ -173,3 +173,4 @@ This document tracks delivery status and planned improvements.
 - [ ] Furigana and reading-aid rendering in card display
   - Attach ruby/furigana markup to vocabulary and sentence cards
   - Toggle reading aids on/off per study mode to control difficulty
+  

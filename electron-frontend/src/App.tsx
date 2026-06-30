@@ -108,7 +108,7 @@ type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' |
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
 type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'context_cloze' | 'narrative_story' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'context_cloze' | 'narrative_story' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
@@ -281,6 +281,14 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Story Gate: read the scene and infer what completes the moment.',
       'Chapter Pulse: use narrative clues to choose the strongest fit.',
     ],
+    listening_audio_first: [
+      'Audio Challenge: listen closely before selecting the meaning.',
+      'Ear First: trust what you hear and choose with confidence.',
+    ],
+    listening_prompt_first: [
+      'Sound Reinforcement: see the character and hear it pronounced.',
+      'Character-Audio Link: connect the form to its sound and meaning.',
+    ],
   },
   katakana: {
     romaji_sprint: [
@@ -310,6 +318,14 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
     narrative_story: [
       'Story Gate: follow the borrowed-word scene and pick the right meaning.',
       'Chapter Pulse: use the narrative beat before selecting.',
+    ],
+    listening_audio_first: [
+      'Audio Challenge: listen closely before selecting the meaning.',
+      'Ear First: trust what you hear and choose with confidence.',
+    ],
+    listening_prompt_first: [
+      'Sound Reinforcement: see the character and hear it pronounced.',
+      'Character-Audio Link: connect the katakana form to its sound.',
     ],
   },
   kanji_n5: {
@@ -341,6 +357,14 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Story Scene: read the situation and resolve the missing idea.',
       'Scene Pulse: infer from the narrative shift before choosing.',
     ],
+    listening_audio_first: [
+      'Kanji Audio Drill: hear the reading and choose the meaning.',
+      'Sound Recognition: identify the kanji from its spoken form.',
+    ],
+    listening_prompt_first: [
+      'Reading Reinforcement: see the kanji while hearing its reading.',
+      'Audio Anchor: link the character to its spoken pronunciation.',
+    ],
   },
   vocab_n5: {
     romaji_sprint: [
@@ -371,6 +395,14 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Scene Choice: complete the mini situation with the right word.',
       'Story Fit: pick the option that best matches the scene.',
     ],
+    listening_audio_first: [
+      'Vocab Audio Drill: hear the word and choose the meaning.',
+      'Listening Recognition: identify the vocab from spoken form.',
+    ],
+    listening_prompt_first: [
+      'Word-Sound Pair: see the word and confirm its pronunciation.',
+      'Audio Reinforcement: connect reading to meaning through sound.',
+    ],
   },
   grammar_patterns: {
     romaji_sprint: [
@@ -400,6 +432,14 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
     narrative_story: [
       'Dialogue Scene: choose the pattern that fits the exchange.',
       'Conversational Fit: select the structure that sounds natural.',
+    ],
+    listening_audio_first: [
+      'Pattern Audio: hear the expression and choose its meaning.',
+      'Grammar Ear: recognise patterns by sound before selecting.',
+    ],
+    listening_prompt_first: [
+      'Pattern Sound Link: see the grammar point while hearing it.',
+      'Audio Anchor: connect the written form to spoken usage.',
     ],
   },
 }
@@ -770,6 +810,16 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
     description: 'Play chapter scenes unlocked by your persisted curriculum stage.',
   },
   {
+    key: 'listening_audio_first',
+    title: 'Listening: Audio First',
+    description: 'Hear a word and choose its meaning — character hidden until feedback.',
+  },
+  {
+    key: 'listening_prompt_first',
+    title: 'Listening: Prompt First',
+    description: 'See the character while audio plays, then choose the meaning.',
+  },
+  {
     key: 'interleave_mix',
     title: 'Interleave Mix',
     description: 'Cycle reading, meaning, and character rounds in one run.',
@@ -779,9 +829,9 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
 const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
   hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
   katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
-  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'interleave_mix'],
-  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'interleave_mix'],
-  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'interleave_mix'],
+  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
 }
 
 const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>> = {
@@ -808,6 +858,8 @@ const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   typed_recall: Keyboard,
   context_cloze: BookText,
   narrative_story: History,
+  listening_audio_first: Volume2,
+  listening_prompt_first: Volume2,
   interleave_mix: Shuffle,
 }
 
@@ -1488,6 +1540,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
+      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
+      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     katakana: {
@@ -1498,6 +1552,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
+      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
+      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     kanji_n5: {
@@ -1508,6 +1564,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
+      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
+      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     vocab_n5: {
@@ -1518,6 +1576,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
+      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
+      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     grammar_patterns: {
@@ -1528,6 +1588,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
+      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
+      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
   }
@@ -2281,6 +2343,8 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'stroke_order') return 'Stroke Order'
   if (mode === 'typed_recall') return 'Typed Recall'
   if (mode === 'context_cloze') return 'Context Cloze'
+  if (mode === 'listening_audio_first') return 'Listening: Audio First'
+  if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
   return 'Story Mode'
 }
 
@@ -2306,6 +2370,8 @@ function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'stroke_order') return 'Nice attempt. Visual memory gets stronger with reps.'
   if (mode === 'typed_recall') return 'Great effort. Keep the next answer short and clear.'
   if (mode === 'context_cloze') return 'Good try. Let the sentence mood guide your choice.'
+  if (mode === 'listening_audio_first') return 'Keep listening. Audio recognition builds over time.'
+  if (mode === 'listening_prompt_first') return 'Connect the sound to the character. It gets natural.'
   return 'You are learning the pattern. Keep going.'
 }
 
@@ -4569,6 +4635,58 @@ function App() {
               ? 'Read the passage and choose the best answer.'
               : 'Which word best completes this scene?',
           focusText: readingFocusText,
+          answer: card.meaning,
+          options,
+        }
+      }
+
+      if (minigame === 'listening_audio_first') {
+        const rankedMeaningDistractors = pickDistractorsFromPool(card.meaning_distractor_ids, 3)
+        const options = shuffleArray([
+          { id: `${card.id}-correct`, label: card.meaning },
+          ...rankedMeaningDistractors.map((candidate) => ({
+            id: `${candidate.id}-listening-audio-meaning`,
+            label: candidate.meaning,
+          })),
+        ])
+        return {
+          cardId: card.id,
+          mode: minigame,
+          audioText: card.character,
+          exampleSentenceAudioText,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: `The character is ${card.character} (${card.romaji}).`,
+          promptLabel: surprisePrompt ? surpriseLabel : 'Listen and choose the meaning.',
+          focusText: card.character,
+          answer: card.meaning,
+          options,
+        }
+      }
+
+      if (minigame === 'listening_prompt_first') {
+        const rankedMeaningDistractors = pickDistractorsFromPool(card.meaning_distractor_ids, 3)
+        const options = shuffleArray([
+          { id: `${card.id}-correct`, label: card.meaning },
+          ...rankedMeaningDistractors.map((candidate) => ({
+            id: `${candidate.id}-listening-prompt-meaning`,
+            label: candidate.meaning,
+          })),
+        ])
+        return {
+          cardId: card.id,
+          mode: minigame,
+          audioText: card.character,
+          exampleSentenceAudioText,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: exampleSentenceHint ?? `Hear ${card.character} and choose its meaning.`,
+          promptLabel: surprisePrompt ? surpriseLabel : 'Hear the pronunciation and choose the meaning.',
+          focusText: card.character,
           answer: card.meaning,
           options,
         }

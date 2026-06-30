@@ -106,7 +106,9 @@ export function MinigameView({
       activeRound.mode === 'meaning_match' ||
       activeRound.mode === 'character_match' ||
       activeRound.mode === 'context_cloze' ||
-      activeRound.mode === 'narrative_story'
+      activeRound.mode === 'narrative_story' ||
+      activeRound.mode === 'listening_audio_first' ||
+      activeRound.mode === 'listening_prompt_first'
 
     const isTyped =
       activeRound.mode === 'romaji_sprint' ||
@@ -161,6 +163,18 @@ export function MinigameView({
     playAudio,
     submitAnswer,
   ])
+
+  // Auto-play audio when a listening round starts.
+  useEffect(() => {
+    if (!roundState) return
+    if (
+      roundState.mode !== 'listening_audio_first' &&
+      roundState.mode !== 'listening_prompt_first'
+    ) return
+    if (!voiceEnabled || !roundState.audioText) return
+    playAudio(roundState.audioText)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundState?.cardId, roundState?.mode])
 
   return (
     <div className={`view-shell view-${navDirection}`}>
@@ -425,10 +439,37 @@ export function MinigameView({
 
             <div className="game-prompt-focus">
               <p className="game-prompt-label">{roundState.promptLabel}</p>
-              <p className={`game-prompt-main ${roundState.mode !== 'character_match' ? 'is-japanese' : ''}`}>
-                {roundState.focusText}
-              </p>
-              {voiceEnabled &&
+              {roundState.mode === 'listening_audio_first' ? (
+                <div className="game-listen-prompt">
+                  <button
+                    type="button"
+                    className="game-listen-play-button"
+                    onClick={() => playAudio(roundState.audioText)}
+                    disabled={voiceBusy || !voiceEnabled}
+                    aria-label="Play audio prompt"
+                    title={voiceUnavailable ? 'Voice playback unavailable' : 'Replay audio'}
+                  >
+                    <Volume2 size={28} aria-hidden="true" />
+                    <span>
+                      {voiceBusy
+                        ? 'Loading…'
+                        : voiceUnavailable
+                          ? 'Voice unavailable'
+                          : 'Replay audio'}
+                    </span>
+                  </button>
+                  {roundFeedback ? (
+                    <p className="game-prompt-main is-japanese game-listen-reveal">
+                      {roundState.focusText}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className={`game-prompt-main ${roundState.mode !== 'character_match' ? 'is-japanese' : ''}`}>
+                  {roundState.focusText}
+                </p>
+              )}
+              {roundState.mode !== 'listening_audio_first' && voiceEnabled &&
               (roundState.audioText ||
                 (activeScript === 'grammar_patterns' && roundState.exampleSentenceAudioText)) ? (
                 <div className="game-speak-controls">
@@ -476,7 +517,8 @@ export function MinigameView({
               {(() => {
                 const alwaysShowHint =
                   roundState.mode !== 'romaji_sprint' &&
-                  roundState.mode !== 'typed_recall'
+                  roundState.mode !== 'typed_recall' &&
+                  roundState.mode !== 'listening_audio_first'
 
                 if (alwaysShowHint) {
                   return roundState.hintText ? (

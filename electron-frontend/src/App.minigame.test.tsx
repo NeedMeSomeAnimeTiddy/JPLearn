@@ -486,4 +486,110 @@ describe('Minigame menu', () => {
     await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
     expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({ minigame: 'stroke_order' }))
   })
+
+  it('shows listening modes for kanji and vocab tracks but not for hiragana', async () => {
+    window.jplearnDesktop = baseDesktopApi
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+
+    // Hiragana: listening modes must not appear
+    clickTopMenuCard('Hiragana')
+    await screen.findAllByText(/Romaji Sprint/i)
+    expect(screen.queryByText(/Listening: Audio First/i)).toBeNull()
+    expect(screen.queryByText(/Listening: Prompt First/i)).toBeNull()
+
+    cleanup()
+    window.localStorage.clear()
+
+    window.jplearnDesktop = baseDesktopApi
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+
+    // Vocabulary: both listening modes must appear
+    clickTopMenuCard('Vocabulary')
+    expect((await screen.findAllByText(/Listening: Audio First/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Listening: Prompt First/i)).length).toBeGreaterThan(0)
+  })
+
+  it('listening audio first mode hides character prompt and records correct minigame key', async () => {
+    const recordGameResult = vi.fn(async () => ({
+      ok: true,
+      card_id: 0,
+      repetitions: 0,
+      interval: 1,
+      next_review: '2026-01-01',
+      ease_factor: 2.5,
+    }))
+    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    clickTopMenuCard('Vocabulary')
+
+    const audioTiles = await screen.findAllByRole('button', { name: /Listening: Audio First/i })
+    fireEvent.click(within((audioTiles[0].closest('.game-tile') ?? audioTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    // Play audio prompt button must be present (it replaces the character display)
+    await screen.findByRole('button', { name: /play audio prompt/i })
+
+    // Character text must NOT appear in the prompt-main area before answer
+    const promptMainWithChar = screen.queryByText((content, node) => {
+      if (!node || !node.classList.contains('game-prompt-main')) return false
+      return ['あ', 'い', 'う', 'え'].some((c) => content.includes(c))
+    })
+    expect(promptMainWithChar).toBeNull()
+
+    // Select the first option to submit an answer
+    const optionGrid = document.querySelector('.option-grid')!
+    const optionButtons = within(optionGrid as HTMLElement).getAllByRole('button')
+    fireEvent.click(optionButtons[0])
+
+    await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
+    expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
+      minigame: 'listening_audio_first',
+    }))
+
+    // Character must be revealed in feedback
+    expect(await screen.findByText((content, node) => {
+      if (!node || !node.classList.contains('game-prompt-main')) return false
+      return ['あ', 'い', 'う', 'え'].some((c) => content.includes(c))
+    })).toBeTruthy()
+  })
+
+  it('listening prompt first mode shows character and records correct minigame key', async () => {
+    const recordGameResult = vi.fn(async () => ({
+      ok: true,
+      card_id: 0,
+      repetitions: 0,
+      interval: 1,
+      next_review: '2026-01-01',
+      ease_factor: 2.5,
+    }))
+    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    clickTopMenuCard('Vocabulary')
+
+    const promptTiles = await screen.findAllByRole('button', { name: /Listening: Prompt First/i })
+    fireEvent.click(within((promptTiles[0].closest('.game-tile') ?? promptTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    // Character must be visible in the prompt-main area
+    expect(await screen.findByText((content, node) => {
+      if (!node || !node.classList.contains('game-prompt-main')) return false
+      return ['あ', 'い', 'う', 'え'].some((c) => content.includes(c))
+    })).toBeTruthy()
+
+    // Select the first option to submit an answer
+    const optionGrid = document.querySelector('.option-grid')!
+    const optionButtons = within(optionGrid as HTMLElement).getAllByRole('button')
+    fireEvent.click(optionButtons[0])
+
+    await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
+    expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
+      minigame: 'listening_prompt_first',
+    }))
+  })
 })
+

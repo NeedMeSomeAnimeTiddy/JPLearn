@@ -8,6 +8,8 @@ export type MinigameKey =
   | 'typed_recall'
   | 'context_cloze'
   | 'narrative_story'
+  | 'listening_audio_first'
+  | 'listening_prompt_first'
   | 'interleave_mix'
 
 export type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>

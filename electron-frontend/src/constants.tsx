@@ -17,6 +17,7 @@ import {
   Square,
   Target,
   Trophy,
+  Volume2,
 } from 'lucide-react'
 import type {
   JlptLevel,
@@ -124,6 +125,16 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
     description: 'Play chapter scenes unlocked by your persisted curriculum stage.',
   },
   {
+    key: 'listening_audio_first',
+    title: 'Listening: Audio First',
+    description: 'Hear a word and choose its meaning — character hidden until feedback.',
+  },
+  {
+    key: 'listening_prompt_first',
+    title: 'Listening: Prompt First',
+    description: 'See the character while audio plays, then choose the meaning.',
+  },
+  {
     key: 'interleave_mix',
     title: 'Interleave Mix',
     description: 'Cycle reading, meaning, and character rounds in one run.',
@@ -139,6 +150,8 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'character_match',
     'stroke_order',
     'typed_recall',
+    'listening_audio_first',
+    'listening_prompt_first',
     'interleave_mix',
   ],
   vocab_n5: [
@@ -147,6 +160,8 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'typed_recall',
     'context_cloze',
     'narrative_story',
+    'listening_audio_first',
+    'listening_prompt_first',
     'interleave_mix',
   ],
   grammar_patterns: [
@@ -155,6 +170,8 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'typed_recall',
     'context_cloze',
     'narrative_story',
+    'listening_audio_first',
+    'listening_prompt_first',
     'interleave_mix',
   ],
 }
@@ -167,6 +184,8 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   typed_recall: Keyboard,
   context_cloze: BookText,
   narrative_story: History,
+  listening_audio_first: Volume2,
+  listening_prompt_first: Volume2,
   interleave_mix: Shuffle,
 }
 
@@ -362,6 +381,8 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'stroke_order') return 'Stroke Order'
   if (mode === 'typed_recall') return 'Typed Recall'
   if (mode === 'context_cloze') return 'Context Cloze'
+  if (mode === 'listening_audio_first') return 'Listening: Audio First'
+  if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
   return 'Story Mode'
 }
 
