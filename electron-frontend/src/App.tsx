@@ -4908,8 +4908,8 @@ function App() {
         toggleConfidence: () => setConfidenceCaptureEnabled((previous) => !previous),
         playAudio: (text) => { void playQuestionAudio(text) },
       }}>
-      {/* Phase 8+9: HomeView stays mounted as background for sheet/overlay */}
-      {(view === 'home' || view === 'script_hub' || view === 'overview') ? (
+      {/* Home is the main landing surface; keep it mounted only for home/overview. */}
+      {(view === 'home' || view === 'overview') ? (
         <HomeView
           navDirection={view === 'home' ? navDirection : 'forward'}
           studyPlan={studyPlan}
@@ -4930,100 +4930,95 @@ function App() {
         />
       ) : null}
 
-      {/* Phase 8: ScriptHub as side sheet */}
+      {/* ScriptHub uses a full view so setup content has enough space. */}
       {view === 'script_hub' ? (
-        <div className="side-sheet-backdrop" role="presentation" onClick={goHome}>
-          <div className="side-sheet-right" onClick={(e) => e.stopPropagation()}>
-            <ScriptHubView
-              isSheet
-              navDirection={navDirection}
-              activeScript={activeScript}
-              activeGame={activeGame}
-              activeBlockIndex={activeBlockIndex}
-              gameLoading={gameLoading}
-              gameError={gameError}
-              blockProgressWithMastery={blockProgressWithMastery}
-              activeBlockCards={activeBlockCards}
-              kanjiLevelProgress={kanjiLevelProgress}
-              vocabLevelProgress={vocabLevelProgress}
-              activeKanjiLevel={activeKanjiLevel}
-              activeVocabLevel={activeVocabLevel}
-              learningPathExpanded={learningPathExpanded}
-              learningPathTrackRows={learningPathTrackRows}
-              leechCardsLength={leechCards.length}
-              minigameStats={minigameStats}
-              availableMinigames={availableMinigames}
-              activeScriptStats={activeScriptStats}
-              activeSectionName={activeSectionName}
-              onBack={goHome}
-              onOpenSettings={() => setShowSettings(true)}
-              onSelectBlock={(index) => {
-                setActiveBlockIndex(index)
-                setSessionActive(false)
-                setRoundState(null)
-                setRoundFeedback(null)
-                setRoundFeedbackTone(null)
-                setRoundFeedbackPoints(null)
-                setRoundFeedbackAnswer(null)
-                setIsRoundResolving(false)
-                setLivesRemaining(DEFAULT_LIVES)
-                resetRoundCycle()
-              }}
-              onSelectKanjiLevel={(level) => {
-                setActiveKanjiLevel(level)
-                setSessionActive(false)
-                setRoundState(null)
-                setRoundFeedback(null)
-                setRoundFeedbackTone(null)
-                setRoundFeedbackPoints(null)
-                setRoundFeedbackAnswer(null)
-                setIsRoundResolving(false)
-                setLivesRemaining(DEFAULT_LIVES)
-                resetRoundCycle()
-              }}
-              onSelectVocabLevel={(level) => {
-                setActiveVocabLevel(level)
-                setSessionActive(false)
-                setRoundState(null)
-                setRoundFeedback(null)
-                setRoundFeedbackTone(null)
-                setRoundFeedbackPoints(null)
-                setRoundFeedbackAnswer(null)
-                setIsRoundResolving(false)
-                setLivesRemaining(DEFAULT_LIVES)
-                resetRoundCycle()
-              }}
-              onToggleLearningPath={() => setLearningPathExpanded((expanded) => !expanded)}
-              onSelectGame={(game) => {
-                setActiveGame(game)
-                setSessionActive(false)
-                setRoundState(null)
-                setRoundFeedback(null)
-                setRoundFeedbackTone(null)
-                setRoundFeedbackPoints(null)
-                setRoundFeedbackAnswer(null)
-                setIsRoundResolving(false)
-                setLivesRemaining(DEFAULT_LIVES)
-                resetRoundCycle()
-              }}
-              onPlayGame={(game) => {
-                setActiveGame(game)
-                setNavDirection('forward')
-                setView('minigame')
-                setSessionActive(false)
-                setRoundState(null)
-                setRoundFeedback(null)
-                setRoundFeedbackTone(null)
-                setRoundFeedbackPoints(null)
-                setRoundFeedbackAnswer(null)
-                setIsRoundResolving(false)
-                setLivesRemaining(DEFAULT_LIVES)
-                resetRoundCycle()
-                void startSession(game)
-              }}
-            />
-          </div>
-        </div>
+        <ScriptHubView
+          navDirection={navDirection}
+          activeScript={activeScript}
+          activeGame={activeGame}
+          activeBlockIndex={activeBlockIndex}
+          gameLoading={gameLoading}
+          gameError={gameError}
+          blockProgressWithMastery={blockProgressWithMastery}
+          activeBlockCards={activeBlockCards}
+          kanjiLevelProgress={kanjiLevelProgress}
+          vocabLevelProgress={vocabLevelProgress}
+          activeKanjiLevel={activeKanjiLevel}
+          activeVocabLevel={activeVocabLevel}
+          learningPathExpanded={learningPathExpanded}
+          learningPathTrackRows={learningPathTrackRows}
+          leechCardsLength={leechCards.length}
+          minigameStats={minigameStats}
+          availableMinigames={availableMinigames}
+          activeScriptStats={activeScriptStats}
+          activeSectionName={activeSectionName}
+          onBack={goHome}
+          onOpenSettings={() => setShowSettings(true)}
+          onSelectBlock={(index) => {
+            setActiveBlockIndex(index)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onSelectKanjiLevel={(level) => {
+            setActiveKanjiLevel(level)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onSelectVocabLevel={(level) => {
+            setActiveVocabLevel(level)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onToggleLearningPath={() => setLearningPathExpanded((expanded) => !expanded)}
+          onSelectGame={(game) => {
+            setActiveGame(game)
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+          }}
+          onPlayGame={(game) => {
+            setActiveGame(game)
+            setNavDirection('forward')
+            setView('minigame')
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+            void startSession(game)
+          }}
+        />
       ) : null}
 
       {view === 'minigame' ? (

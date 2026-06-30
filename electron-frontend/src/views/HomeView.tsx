@@ -210,39 +210,7 @@ export function HomeView({
             ) : null}
           </div>
         ) : null}
-        {statsStrip ? (
-          <div className="home-stats-strip" aria-label="Quick stats">
-            <button
-              type="button"
-              className="home-stats-chip home-stats-chip-streak"
-              onClick={onGoOverview}
-              title="Open study overview"
-            >
-              <Flame aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
-              <span>{statsStrip.streak}d streak</span>
-            </button>
-            <button
-              type="button"
-              className="home-stats-chip home-stats-chip-mastery"
-              onClick={onGoOverview}
-              title="Open study overview"
-            >
-              <Target aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
-              <span>{statsStrip.masteryPct}% mastered</span>
-            </button>
-            {statsStrip.dueCount > 0 ? (
-              <button
-                type="button"
-                className="home-stats-chip home-stats-chip-due"
-                onClick={onGoOverview}
-                title="Open study overview"
-              >
-                <CalendarDays aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
-                <span>{statsStrip.dueCount} due</span>
-              </button>
-            ) : null}
-          </div>
-        ) : null}      </section>
+      </section>
     </div>
   )
 }
