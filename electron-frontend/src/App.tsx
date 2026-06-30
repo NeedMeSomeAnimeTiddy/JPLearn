@@ -1900,6 +1900,12 @@ function buildRoundCoachToast(
   return null
 }
 
+function normalizeTrackTerms(text: string): string {
+  return text
+    .replace(/Vocabulary\s*N5/gi, 'Words (Vocabulary N5)')
+    .replace(/Grammar\s*N5/gi, 'Conversational (Grammar N5)')
+}
+
 function inferScriptFromFocusArea(focusArea: string | null): ScriptKey | null {
   if (!focusArea) return null
   const normalized = focusArea.trim().toLowerCase()
@@ -2028,6 +2034,7 @@ function App() {
   const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('theme')
+  const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
   const [showExpertisePrompt, setShowExpertisePrompt] = useState<boolean>(false)
   const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3 | 4>(1)
   const [selectedExpertiseLevel, setSelectedExpertiseLevel] = useState<ExpertiseLevel>('total_beginner')
@@ -2055,6 +2062,7 @@ function App() {
   const assistantChatHistoryHydratedRef = useRef(false)
   const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
   const assistantChatClearTokenRef = useRef(0)
+  const xpDetailsRef = useRef<HTMLDivElement | null>(null)
   const localToastIdRef = useRef(-1)
   const previousSessionActiveRef = useRef(false)
   const feedbackTimerRef = useRef<number | null>(null)
@@ -3653,7 +3661,7 @@ function App() {
     if (blockProgress.length === 0) {
       return deckCards
     }
-    const block = blockProgress[activeBlockIndex]
+    const block = blockProgress.find((entry) => entry.index === activeBlockIndex)
     if (!block) return deckCards
     const idSet = new Set(block.card_ids)
     return deckCards.filter((c) => idSet.has(c.id))
@@ -4295,7 +4303,7 @@ function App() {
   useEffect(() => {
     if (blockProgressWithMastery.length === 0) return
 
-    const current = blockProgressWithMastery[activeBlockIndex]
+    const current = blockProgressWithMastery.find((block) => block.index === activeBlockIndex)
     if (current?.unlocked) return
 
     const firstUnlocked = blockProgressWithMastery.find((block) => block.unlocked)
@@ -4311,7 +4319,7 @@ function App() {
 
   const activeSectionName = useMemo(() => {
     if (blockProgressWithMastery.length > 0) {
-      return blockProgressWithMastery[activeBlockIndex]?.name ?? null
+      return blockProgressWithMastery.find((block) => block.index === activeBlockIndex)?.name ?? null
     }
     if (activeScript === 'kanji_n5') {
       return kanjiLevelProgress.find((level) => level.key === activeKanjiLevel)?.label ?? null
@@ -4345,6 +4353,8 @@ function App() {
 
   useEffect(() => {
     if (activeScript !== 'kanji_n5' || blockProgress.length > 0) return
+    const activeLevel = kanjiLevelProgress.find((level) => level.key === activeKanjiLevel)
+    if (activeLevel?.total && activeLevel.total > 0) return
     const fallback = kanjiLevelProgress.find((level) => level.unlocked) ?? kanjiLevelProgress.find((level) => level.total > 0)
     if (!fallback || fallback.key === activeKanjiLevel) return
     setActiveKanjiLevel(fallback.key)
@@ -4352,6 +4362,8 @@ function App() {
 
   useEffect(() => {
     if (activeScript !== 'vocab_n5' || blockProgress.length > 0) return
+    const activeLevel = vocabLevelProgress.find((level) => level.key === activeVocabLevel)
+    if (activeLevel?.total && activeLevel.total > 0) return
     const fallback = vocabLevelProgress.find((level) => level.unlocked) ?? vocabLevelProgress.find((level) => level.total > 0)
     if (!fallback || fallback.key === activeVocabLevel) return
     setActiveVocabLevel(fallback.key)
@@ -4698,6 +4710,10 @@ function App() {
   const canTitlebarBack = viewHistoryIndexRef.current > 0
   const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
   const activeAssistantToast = assistantToasts[0] ?? null
+  const isTutorChatUnlocked = unlockedFeatureIds.has('tutor_chat')
+  const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
+  const xpLevelCap = xpProgress?.xp_for_current_level ?? 0
+  const xpPercent = xpLevelCap > 0 ? Math.round((xpInLevel / xpLevelCap) * 100) : 0
 
   useEffect(() => {
     if (!shortcutMenuOpen) return
@@ -4711,6 +4727,26 @@ function App() {
     window.addEventListener('mousedown', handlePointerDown)
     return () => window.removeEventListener('mousedown', handlePointerDown)
   }, [closeShortcutMenu, shortcutMenuOpen])
+
+  useEffect(() => {
+    if (!xpDetailsOpen) return
+
+    function handlePointerDown(event: MouseEvent): void {
+      const target = event.target as Node
+      if (xpDetailsRef.current?.contains(target)) return
+      setXpDetailsOpen(false)
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    return () => window.removeEventListener('mousedown', handlePointerDown)
+  }, [xpDetailsOpen])
+
+  useEffect(() => {
+    if (isTutorChatUnlocked) {
+      return
+    }
+    setAssistantChatOpen(false)
+  }, [isTutorChatUnlocked])
 
   return (
     <main className="app-shell" data-background-style={settings.backgroundStyle} style={appShellStyle}>
@@ -4851,29 +4887,205 @@ function App() {
             >
               <ArrowRight className="window-nav-icon" strokeWidth={2.2} />
             </button>
+            <button
+              type="button"
+              className="window-nav-button"
+              onClick={jumpToOverview}
+              aria-label="Open study overview"
+              title="Study Overview"
+            >
+              <BookText className="window-nav-icon" strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              className="window-nav-button"
+              onClick={openSettingsFromMenu}
+              aria-label="Open settings"
+              title="Settings"
+            >
+              <Settings className="window-nav-icon" strokeWidth={2.2} />
+            </button>
+            {settings.assistantChatEnabled ? (
+              <aside className={`assistant-overlay assistant-overlay-titlebar ${assistantChatOpen ? 'is-open' : ''}`} aria-label="Tutor companion">
+                {!assistantChatOpen ? (
+                  <div className="assistant-chat-controls">
+                    <button
+                      type="button"
+                      className="window-nav-button assistant-chat-toggle-titlebar"
+                      onClick={() => {
+                        setAssistantChatOpen((open) => !open)
+                        setAssistantChatError(null)
+                      }}
+                      disabled={!isTutorChatUnlocked}
+                      aria-expanded={assistantChatOpen}
+                      aria-controls="assistant-chat-panel"
+                      aria-label={isTutorChatUnlocked ? 'Open tutor chat' : 'Tutor chat locked'}
+                      title={isTutorChatUnlocked ? 'Open tutor chat' : 'Unlock Conversation Mode first'}
+                    >
+                      <MessageCircle className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : null}
+
+                {assistantChatOpen && isTutorChatUnlocked ? (
+                  <section id="assistant-chat-panel" className="assistant-chat-panel" aria-label="Tutor chat panel">
+                    <header className="assistant-chat-header">
+                      <div className="assistant-chat-identity">
+                        <span className="assistant-chat-avatar" aria-hidden="true">
+                          <MessageCircle size={18} strokeWidth={2.2} />
+                          <span className="assistant-chat-presence" />
+                        </span>
+                        <span className="assistant-chat-identity-text">
+                          <span className="assistant-chat-title">Study Coach</span>
+                          <span className="assistant-chat-subtitle">
+                            {assistantChatLoading ? 'Typing…' : 'Online · here to help'}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="assistant-chat-header-actions">
+                        <button
+                          type="button"
+                          className="assistant-chat-clear"
+                          onClick={() => void clearAssistantChat()}
+                          disabled={assistantChatMessages.length <= 0 || assistantChatLoading}
+                          aria-label="Clear chat history"
+                          title="Clear chat"
+                        >
+                          <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="assistant-chat-close"
+                          onClick={closeAssistantChat}
+                          aria-label="Close tutor chat"
+                        >
+                          <X size={14} strokeWidth={2.2} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </header>
+
+                    <div className="assistant-chat-log" role="log" aria-live="polite" ref={assistantChatLogRef}>
+                      {assistantChatMessages.length <= 0 && !assistantChatLoading ? (
+                        <p className="assistant-chat-empty">Start a chat when you want strategy help or encouragement.</p>
+                      ) : (
+                        <>
+                          {assistantChatMessages.map((turn, index) => (
+                            <article key={`${turn.created_at_utc}-${index}`} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
+                              <div className="assistant-chat-turn-meta">
+                                <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
+                              </div>
+                              <p>{turn.content}</p>
+                            </article>
+                          ))}
+                          {assistantChatLoading ? (
+                            <article className="assistant-chat-turn assistant-chat-turn-assistant assistant-chat-turn-typing" aria-label="Coach is typing">
+                              <div className="assistant-chat-turn-meta">
+                                <span className="assistant-chat-turn-role">Coach</span>
+                              </div>
+                              <p className="assistant-chat-typing" aria-hidden="true">
+                                <span className="assistant-chat-typing-dot" />
+                                <span className="assistant-chat-typing-dot" />
+                                <span className="assistant-chat-typing-dot" />
+                              </p>
+                            </article>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+
+                    {assistantChatError ? (
+                      <p className="assistant-chat-error">{assistantChatError}</p>
+                    ) : null}
+
+                    <footer className="assistant-chat-composer">
+                      <div className="assistant-chat-input-wrap">
+                        <textarea
+                          value={assistantChatInput}
+                          onChange={(event) => setAssistantChatInput(event.currentTarget.value)}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Enter' || event.shiftKey) {
+                              return
+                            }
+                            event.preventDefault()
+                            if (assistantChatLoading || assistantChatInput.trim().length === 0) {
+                              return
+                            }
+                            void sendAssistantChat()
+                          }}
+                          placeholder="Ask your coach for help with your current weak area..."
+                          rows={2}
+                          disabled={assistantChatLoading}
+                        />
+                        <button
+                          type="button"
+                          className="assistant-chat-send"
+                          onClick={() => void sendAssistantChat()}
+                          disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
+                          aria-label="Send tutor chat message"
+                          title="Send"
+                        >
+                          <SendHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </footer>
+                  </section>
+                ) : null}
+              </aside>
+            ) : null}
           </div>
         </div>
-        {xpProgress ? (
-          <div
-            className="titlebar-xp"
-            title={`Level ${xpProgress.level} — ${xpProgress.xp_for_current_level - xpProgress.xp_to_next_level} / ${xpProgress.xp_for_current_level} XP`}
-            aria-label={`Level ${xpProgress.level}`}
+        <div className="titlebar-progress-cluster">
+          <button
+            type="button"
+            className="titlebar-streak-chip"
+            onClick={jumpToOverview}
+            title="Open study overview"
+            aria-label={`${streak.current_days} day streak`}
           >
-            <span className="titlebar-xp-badge" aria-hidden="true">{xpProgress.level}</span>
-            <div
-              className="titlebar-xp-track"
-              role="progressbar"
-              aria-valuenow={xpProgress.xp_for_current_level > 0 ? Math.round(((xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) / xpProgress.xp_for_current_level) * 100) : 0}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
+            <Flame className="titlebar-streak-icon" strokeWidth={2.1} aria-hidden="true" />
+            <span>{streak.current_days}d streak</span>
+          </button>
+
+          {xpProgress ? (
+            <div className="titlebar-xp" ref={xpDetailsRef}>
+              <button
+                type="button"
+                className="titlebar-xp-button"
+                title={`Level ${xpProgress.level} — ${xpInLevel} / ${xpLevelCap} XP`}
+                aria-label={`Level ${xpProgress.level}. ${xpPercent}% to next level.`}
+                aria-expanded={xpDetailsOpen}
+                aria-controls="titlebar-xp-details"
+                onClick={() => setXpDetailsOpen((open) => !open)}
+              >
+                <span className="titlebar-xp-badge" aria-hidden="true">{xpProgress.level}</span>
+                <div
+                  className="titlebar-xp-track"
+                  role="progressbar"
+                  aria-valuenow={xpPercent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className="titlebar-xp-fill"
+                    style={{ '--xp-pct': `${xpPercent}%` } as CSSProperties}
+                  />
+                </div>
+                <span className="titlebar-xp-percent">{xpPercent}%</span>
+              </button>
               <div
-                className="titlebar-xp-fill"
-                style={{ '--xp-pct': `${xpProgress.xp_for_current_level > 0 ? Math.round(((xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) / xpProgress.xp_for_current_level) * 100) : 0}%` } as CSSProperties}
-              />
+                id="titlebar-xp-details"
+                className={`titlebar-xp-details ${xpDetailsOpen ? 'is-open' : ''}`}
+                role="dialog"
+                aria-label="XP details"
+              >
+                <p className="titlebar-xp-details-title">Level {xpProgress.level}</p>
+                <p className="titlebar-xp-details-row">Progress: {xpInLevel} / {xpLevelCap} XP</p>
+                <p className="titlebar-xp-details-row">To next level: {Math.max(0, xpProgress.xp_to_next_level)} XP</p>
+                <p className="titlebar-xp-details-row">Completion: {xpPercent}%</p>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
         <div className="window-controls" role="group" aria-label="Window actions">
           <button type="button" className="window-control-button" onClick={minimizeWindow} aria-label="Minimize window">
             <Minus className="window-control-icon" strokeWidth={2.2} />
@@ -4977,12 +5189,11 @@ function App() {
           navDirection={view === 'home' ? navDirection : 'forward'}
           studyPlan={studyPlan}
           homeStudyPlanExpanded={homeStudyPlanExpanded}
-          statsStrip={{ streak: streak.current_days, masteryPct: totals.masteryRate, dueCount: totals.remainingDue }}
           tutorBanner={tutorReactions[0] ? {
             dedupKey: tutorReactions[0].dedup_key,
-            headline: tutorReactions[0].headline,
-            body: tutorReactions[0].body,
-            cta: tutorReactions[0].cta,
+            headline: normalizeTrackTerms(tutorReactions[0].headline),
+            body: normalizeTrackTerms(tutorReactions[0].body),
+            cta: normalizeTrackTerms(tutorReactions[0].cta),
             messageType: tutorReactions[0].message_type,
           } : null}
           recommendations={recommendations.map((r) => ({
@@ -5009,11 +5220,6 @@ function App() {
             setActiveScript(script)
             setView('script_hub')
           }}
-          onGoOverview={() => {
-            setNavDirection('forward')
-            setView('overview')
-          }}
-          onOpenSettings={() => setShowSettings(true)}
           onToggleStudyPlan={() => setHomeStudyPlanExpanded((expanded) => !expanded)}
           onJumpToSetup={jumpToScriptHubSetup}
         />
@@ -5661,7 +5867,7 @@ function App() {
                     <p className="settings-section-label">Tutor Companion</p>
                     {!unlockedFeatureIds.has('tutor_chat') && (
                       <p className="settings-help" style={{ marginBottom: 8, color: 'var(--tone-amber)' }}>
-                        🔒 Tutor Chat unlocks after mastering Grammar N5 and unlocking Conversation Mode.
+                        🔒 Tutor Chat unlocks after mastering Conversational (Grammar N5).
                       </p>
                     )}
                     <div className="settings-animation-grid" role="group" aria-label="Tutor companion controls">
@@ -5848,130 +6054,7 @@ function App() {
         </div>
       ) : null}
 
-      <aside className={`assistant-overlay ${assistantChatOpen ? 'is-open' : ''}`} aria-live="polite" aria-label="Tutor companion">
-        {settings.assistantChatEnabled && !assistantChatOpen ? (
-          <div className="assistant-chat-controls">
-            <button
-              type="button"
-              className="assistant-chat-toggle"
-              onClick={() => {
-                setAssistantChatOpen((open) => !open)
-                setAssistantChatError(null)
-              }}
-              aria-expanded={assistantChatOpen}
-              aria-controls="assistant-chat-panel"
-              title="Open tutor chat"
-            >
-              <MessageCircle className="assistant-chat-toggle-icon" strokeWidth={2.1} aria-hidden="true" />
-              Chat
-            </button>
-          </div>
-        ) : null}
-
-        {settings.assistantChatEnabled && assistantChatOpen ? (
-          <section id="assistant-chat-panel" className="assistant-chat-panel" aria-label="Tutor chat panel">
-            <header className="assistant-chat-header">
-              <div className="assistant-chat-identity">
-                <span className="assistant-chat-avatar" aria-hidden="true">
-                  <MessageCircle size={18} strokeWidth={2.2} />
-                  <span className="assistant-chat-presence" />
-                </span>
-                <span className="assistant-chat-identity-text">
-                  <span className="assistant-chat-title">Study Coach</span>
-                  <span className="assistant-chat-subtitle">
-                    {assistantChatLoading ? 'Typing…' : 'Online · here to help'}
-                  </span>
-                </span>
-              </div>
-              <div className="assistant-chat-header-actions">
-                <button
-                  type="button"
-                  className="assistant-chat-clear"
-                  onClick={() => void clearAssistantChat()}
-                  disabled={assistantChatMessages.length <= 0 || assistantChatLoading}
-                  aria-label="Clear chat history"
-                  title="Clear chat"
-                >
-                  <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className="assistant-chat-close"
-                  onClick={closeAssistantChat}
-                  aria-label="Close tutor chat"
-                >
-                  <X size={14} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-              </div>
-            </header>
-
-            <div className="assistant-chat-log" role="log" aria-live="polite" ref={assistantChatLogRef}>
-              {assistantChatMessages.length <= 0 && !assistantChatLoading ? (
-                <p className="assistant-chat-empty">Start a chat when you want strategy help or encouragement.</p>
-              ) : (
-                <>
-                  {assistantChatMessages.map((turn, index) => (
-                    <article key={`${turn.created_at_utc}-${index}`} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
-                      <div className="assistant-chat-turn-meta">
-                        <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
-                      </div>
-                      <p>{turn.content}</p>
-                    </article>
-                  ))}
-                  {assistantChatLoading ? (
-                    <article className="assistant-chat-turn assistant-chat-turn-assistant assistant-chat-turn-typing" aria-label="Coach is typing">
-                      <div className="assistant-chat-turn-meta">
-                        <span className="assistant-chat-turn-role">Coach</span>
-                      </div>
-                      <p className="assistant-chat-typing" aria-hidden="true">
-                        <span className="assistant-chat-typing-dot" />
-                        <span className="assistant-chat-typing-dot" />
-                        <span className="assistant-chat-typing-dot" />
-                      </p>
-                    </article>
-                  ) : null}
-                </>
-              )}
-            </div>
-
-            {assistantChatError ? (
-              <p className="assistant-chat-error">{assistantChatError}</p>
-            ) : null}
-
-            <footer className="assistant-chat-composer">
-              <div className="assistant-chat-input-wrap">
-                <textarea
-                  value={assistantChatInput}
-                  onChange={(event) => setAssistantChatInput(event.currentTarget.value)}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter' || event.shiftKey) {
-                      return
-                    }
-                    event.preventDefault()
-                    if (assistantChatLoading || assistantChatInput.trim().length === 0) {
-                      return
-                    }
-                    void sendAssistantChat()
-                  }}
-                  placeholder="Ask your coach for help with your current weak area..."
-                  rows={2}
-                  disabled={assistantChatLoading}
-                />
-                <button
-                  type="button"
-                  className="assistant-chat-send"
-                  onClick={() => void sendAssistantChat()}
-                  disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
-                  aria-label="Send tutor chat message"
-                  title="Send"
-                >
-                  <SendHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-              </div>
-            </footer>
-          </section>
-        ) : null}
-
+      <aside className="assistant-toast-anchor" aria-live="polite" aria-label="Tutor updates">
         {settings.assistantToastLimit > 0 && activeAssistantToast ? (
           <div className="assistant-toast-stack" role="status" aria-label="Tutor updates">
             <article key={activeAssistantToast.id} className={`assistant-toast assistant-toast-${activeAssistantToast.priority}`}>

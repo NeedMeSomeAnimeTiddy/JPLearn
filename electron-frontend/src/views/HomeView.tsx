@@ -6,14 +6,15 @@ import {
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { BarChart3, CalendarDays, Flame, Lock, Target } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
 
-interface StatsStrip {
-  streak: number
-  masteryPct: number
-  dueCount: number
+const LOCK_HINTS: Partial<Record<ScriptKey, string>> = {
+  katakana: 'Raise Hiragana to 35% mastery.',
+  kanji_n5: 'Raise Hiragana to 70% and Katakana to 45%.',
+  vocab_n5: 'Raise Hiragana to 70% and Katakana to 55%.',
+  grammar_patterns: 'Raise Words (Vocabulary N5) to 45% mastery.',
 }
 
 interface TutorBannerData {
@@ -36,12 +37,9 @@ interface HomeViewProps {
   navDirection: NavDirection
   studyPlan: StudyPlanSnapshot
   homeStudyPlanExpanded: boolean
-  statsStrip?: StatsStrip
   tutorBanner?: TutorBannerData | null
   recommendations?: RecommendationData[]
   onSelectScript: (script: ScriptKey) => void
-  onGoOverview: () => void
-  onOpenSettings: () => void
   onToggleStudyPlan: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
   onDismissTutorBanner?: (dedupKey: string) => void
@@ -52,12 +50,9 @@ export function HomeView({
   navDirection,
   studyPlan,
   homeStudyPlanExpanded,
-  statsStrip,
   tutorBanner,
   recommendations,
   onSelectScript,
-  onGoOverview,
-  onOpenSettings,
   onToggleStudyPlan,
   onJumpToSetup,
   onDismissTutorBanner,
@@ -87,6 +82,7 @@ export function HomeView({
             const DifficultyIcon = difficulty.icon
             const coverageRow = studyPlan.coverageRows.find((r) => r.key === script)
             const isLocked = coverageRow ? !coverageRow.unlocked : false
+            const lockHint = LOCK_HINTS[script] ?? 'Keep progressing your earlier tracks.'
 
             return (
               <button
@@ -94,7 +90,8 @@ export function HomeView({
                 type="button"
                 className={`menu-card${isLocked ? ' is-locked' : ''}`}
                 aria-keyshortcuts={isLocked ? undefined : String(index + 1)}
-                aria-label={isLocked ? `${SCRIPT_LABELS[script]} — locked` : undefined}
+                aria-label={isLocked ? `${SCRIPT_LABELS[script]} — locked. ${lockHint}` : undefined}
+                title={isLocked ? lockHint : undefined}
                 disabled={isLocked}
                 onClick={() => onSelectScript(script)}
               >
@@ -113,35 +110,12 @@ export function HomeView({
                   <span className="menu-card-lock-overlay" aria-hidden="true">
                     <Lock className="menu-card-lock-icon" strokeWidth={2.1} />
                     <span className="menu-card-lock-label">Locked</span>
+                    <span className="menu-card-lock-hint">{lockHint}</span>
                   </span>
                 )}
               </button>
             )
           })}
-        </div>
-
-        <div className="home-actions">
-          <button
-            type="button"
-            className="home-settings-button"
-            aria-keyshortcuts="6"
-            onClick={onGoOverview}
-            aria-label="Open study overview"
-            title="Study Overview (6)"
-          >
-            <BarChart3 aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-            Study Overview
-          </button>
-
-          <button
-            type="button"
-            className="home-settings-button"
-            onClick={onOpenSettings}
-            aria-label="Open settings"
-            title="Settings (Ctrl+,)"
-          >
-            Settings
-          </button>
         </div>
 
         {studyPlan.coverageRows.length > 0 ? (
@@ -220,40 +194,6 @@ export function HomeView({
               </div>
             </div>
           </section>
-        ) : null}
-
-        {statsStrip ? (
-          <div className="home-stats-strip" aria-label="Quick stats">
-            <button
-              type="button"
-              className="home-stats-chip home-stats-chip-streak"
-              onClick={onGoOverview}
-              title="Open study overview"
-            >
-              <Flame aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
-              <span>{statsStrip.streak}d streak</span>
-            </button>
-            <button
-              type="button"
-              className="home-stats-chip home-stats-chip-mastery"
-              onClick={onGoOverview}
-              title="Open study overview"
-            >
-              <Target aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
-              <span>{statsStrip.masteryPct}% mastered</span>
-            </button>
-            {statsStrip.dueCount > 0 ? (
-              <button
-                type="button"
-                className="home-stats-chip home-stats-chip-due"
-                onClick={onGoOverview}
-                title="Open study overview"
-              >
-                <CalendarDays aria-hidden="true" className="home-stats-icon" strokeWidth={2.2} />
-                <span>{statsStrip.dueCount} due</span>
-              </button>
-            ) : null}
-          </div>
         ) : null}
 
         {recommendations && recommendations.length > 0 && onStartRecommendation ? (

@@ -130,6 +130,7 @@ export function ScriptHubView({
     toggleConfidence,
   } = useSession()
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
+  const activeBlock = blockProgressWithMastery.find((block) => block.index === activeBlockIndex)
 
   return (
     <div className={isSheet ? 'script-hub-sheet-content' : `view-shell view-${navDirection}`}>
@@ -330,12 +331,12 @@ export function ScriptHubView({
         </div>
 
         {/* Minigame selector – shown below block path once a block is active */}
-        {!gameLoading && (blockProgressWithMastery.length === 0 || blockProgressWithMastery[activeBlockIndex]?.unlocked) ? (
+        {!gameLoading && (blockProgressWithMastery.length === 0 || activeBlock?.unlocked) ? (
           <>
             <div className="panel-head block-minigame-head">
               <h3>
                 {blockProgressWithMastery.length > 0
-                  ? `Choose a minigame — ${blockProgressWithMastery[activeBlockIndex]?.name ?? ''} (${activeBlockCards.length} cards)`
+                  ? `Choose a minigame — ${activeBlock?.name ?? ''} (${activeBlockCards.length} cards)`
                   : activeScript === 'kanji_n5' || activeScript === 'vocab_n5'
                     ? `Choose a minigame — ${activeSectionName ?? 'JLPT Level'} (${activeBlockCards.length} cards)`
                     : 'Choose a minigame'}
