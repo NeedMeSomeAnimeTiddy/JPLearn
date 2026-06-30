@@ -1,4 +1,3 @@
-import type { RefObject } from 'react'
 import {
   Activity,
   ArrowLeft,
@@ -9,7 +8,7 @@ import {
   Trophy,
   Volume2,
 } from 'lucide-react'
-import type { MinigameKey, NavDirection, RoundOption, RoundState, ScriptKey, SessionRunReport } from '../types'
+import type { MinigameKey, NavDirection, RoundOption, ScriptKey } from '../types'
 import {
   CONFIDENCE_LEVEL_LABELS,
   CONFIDENCE_SCORES,
@@ -20,6 +19,7 @@ import {
   formatFeedbackAnswerLabel,
 } from '../constants'
 import { getStrokeOrderCandidates, sanitizeRomajiInput } from '../utils'
+import { useSession } from '../context/SessionContext'
 
 // Minimal card shape needed for stroke-order candidate lookup.
 type BasicCard = { id: number; character: string; romaji: string }
@@ -29,42 +29,13 @@ interface MinigameViewProps {
   activeScript: ScriptKey
   activeGame: MinigameKey
   activeSectionName: string | null
-  sessionScore: number
-  sessionRounds: number
-  sessionPoints: number
-  sessionTargetItems: number
-  blockSessionComplete: boolean
-  sessionActive: boolean
-  sessionRunReport: SessionRunReport | null
-  sessionStartPending: boolean
-  sessionSummaryLoading: boolean
   gameLoading: boolean
   gameError: string | null
   activeRunCardsLength: number
-  livesEnabled: boolean
-  livesRemaining: number
-  roundState: RoundState | null
-  roundFeedback: string | null
-  roundFeedbackTone: 'success' | 'error' | null
-  roundFeedbackAnswer: string | null
-  roundFeedbackPoints: number | null
-  isRoundResolving: boolean
-  roundInput: string
-  voiceBusy: boolean
-  voiceUnavailable: boolean
   voiceEnabled: boolean
-  confidenceCaptureEnabled: boolean
-  roundConfidenceScore: number
   activeBlockCards: BasicCard[]
-  answerInputRef: RefObject<HTMLInputElement | null>
-  // callbacks
   onBack: () => void
   onOpenSettings: () => void
-  onStartSession: (game?: MinigameKey) => void
-  onSubmitAnswer: (answer: string) => void
-  onSetRoundInput: (value: string) => void
-  onSetRoundConfidence: (score: number) => void
-  onPlayAudio: (text: string) => void
 }
 
 export function MinigameView({
@@ -72,42 +43,44 @@ export function MinigameView({
   activeScript,
   activeGame,
   activeSectionName,
-  sessionScore,
-  sessionRounds,
-  sessionPoints,
-  sessionTargetItems,
-  blockSessionComplete,
-  sessionActive,
-  sessionRunReport,
-  sessionStartPending,
-  sessionSummaryLoading,
   gameLoading,
   gameError,
   activeRunCardsLength,
-  livesEnabled,
-  livesRemaining,
-  roundState,
-  roundFeedback,
-  roundFeedbackTone,
-  roundFeedbackAnswer,
-  roundFeedbackPoints,
-  isRoundResolving,
-  roundInput,
-  voiceBusy,
-  voiceUnavailable,
   voiceEnabled,
-  confidenceCaptureEnabled,
-  roundConfidenceScore,
   activeBlockCards,
-  answerInputRef,
   onBack,
   onOpenSettings,
-  onStartSession,
-  onSubmitAnswer,
-  onSetRoundInput,
-  onSetRoundConfidence,
-  onPlayAudio,
 }: MinigameViewProps) {
+  const {
+    sessionActive,
+    roundState,
+    roundInput,
+    roundFeedback,
+    roundFeedbackTone,
+    roundFeedbackAnswer,
+    roundFeedbackPoints,
+    isRoundResolving,
+    sessionScore,
+    sessionRounds,
+    sessionPoints,
+    sessionTargetItems,
+    blockSessionComplete,
+    sessionRunReport,
+    sessionStartPending,
+    sessionSummaryLoading,
+    livesEnabled,
+    livesRemaining,
+    confidenceCaptureEnabled,
+    roundConfidenceScore,
+    voiceBusy,
+    voiceUnavailable,
+    answerInputRef,
+    startSession,
+    submitAnswer,
+    setRoundInput,
+    setRoundConfidence,
+    playAudio,
+  } = useSession()
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
 
   return (
@@ -185,7 +158,7 @@ export function MinigameView({
               >
                 <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
               </button>
-              <button type="button" onClick={() => onStartSession()}>
+              <button type="button" onClick={() => startSession()}>
                 Play Again
               </button>
             </div>
@@ -284,7 +257,7 @@ export function MinigameView({
             <div className="game-actions">
               <button
                 type="button"
-                onClick={() => onStartSession()}
+                onClick={() => startSession()}
                 disabled={gameLoading || activeRunCardsLength === 0 || sessionSummaryLoading || sessionStartPending}
               >
                 {sessionRunReport ? 'Play Again' : 'Play'}
@@ -309,7 +282,7 @@ export function MinigameView({
           <div className="game-actions">
             <button
               type="button"
-              onClick={() => onStartSession()}
+              onClick={() => startSession()}
               disabled={gameLoading || activeRunCardsLength === 0 || sessionSummaryLoading || sessionStartPending}
             >
               Restart Challenge
@@ -384,7 +357,7 @@ export function MinigameView({
                     <button
                       type="button"
                       className="game-speak-button"
-                      onClick={() => onPlayAudio(roundState.audioText)}
+                      onClick={() => playAudio(roundState.audioText)}
                       disabled={voiceBusy}
                       aria-label="Play target words"
                       title={voiceUnavailable ? 'Voice playback unavailable' : 'Play target words'}
@@ -403,7 +376,7 @@ export function MinigameView({
                     <button
                       type="button"
                       className="game-speak-button"
-                      onClick={() => onPlayAudio(roundState.exampleSentenceAudioText!)}
+                      onClick={() => playAudio(roundState.exampleSentenceAudioText!)}
                       disabled={voiceBusy}
                       aria-label="Play example sentence"
                       title={voiceUnavailable ? 'Voice playback unavailable' : 'Play example sentence'}
@@ -431,13 +404,13 @@ export function MinigameView({
                   <input
                     ref={answerInputRef}
                     value={roundInput}
-                    onChange={(event) => onSetRoundInput(sanitizeRomajiInput(event.target.value))}
+                      onChange={(event) => setRoundInput(sanitizeRomajiInput(event.target.value))}
                     onKeyDown={(event) => {
                       if (event.key !== 'Enter') return
                       event.preventDefault()
                       const candidates = getStrokeOrderCandidates(activeBlockCards, roundInput)
                       if (candidates.length === 1) {
-                        onSubmitAnswer(candidates[0].character)
+                        submitAnswer(candidates[0].character)
                       }
                     }}
                     placeholder="Type romaji reading"
@@ -454,7 +427,7 @@ export function MinigameView({
                           type="button"
                           className="option-button option-button-character"
                           disabled={isRoundResolving}
-                          onClick={() => onSubmitAnswer(candidate.character)}
+                          onClick={() => submitAnswer(candidate.character)}
                         >
                           <span className="option-button-main" lang="ja">
                             {candidate.character}
@@ -475,14 +448,14 @@ export function MinigameView({
                 className="game-input-row"
                 onSubmit={(event) => {
                   event.preventDefault()
-                  onSubmitAnswer(roundInput)
+                  submitAnswer(roundInput)
                 }}
               >
                 <input
                   ref={answerInputRef}
                   value={roundInput}
                   onChange={(event) =>
-                    onSetRoundInput(
+                    setRoundInput(
                       roundState.mode === 'romaji_sprint'
                         ? sanitizeRomajiInput(event.target.value)
                         : event.target.value,
@@ -506,7 +479,7 @@ export function MinigameView({
                       roundState.mode === 'character_match' ? 'option-button-character' : ''
                     }`}
                     disabled={isRoundResolving}
-                    onClick={() => onSubmitAnswer(option.label)}
+                    onClick={() => submitAnswer(option.label)}
                   >
                     {option.label}
                   </button>
@@ -532,7 +505,7 @@ export function MinigameView({
                       className={`confidence-chip confidence-chip-round ${
                         roundConfidenceScore === score ? 'is-active' : ''
                       }`}
-                      onClick={() => onSetRoundConfidence(score)}
+                      onClick={() => setRoundConfidence(score)}
                       aria-pressed={roundConfidenceScore === score}
                       aria-label={`Confidence ${CONFIDENCE_LEVEL_LABELS[score]}`}
                       title={`Confidence: ${CONFIDENCE_LEVEL_LABELS[score]}`}

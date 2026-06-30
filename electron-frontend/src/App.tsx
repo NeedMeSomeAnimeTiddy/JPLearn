@@ -5,6 +5,7 @@ import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
 import { OverviewView } from './views/OverviewView'
+import { SessionProvider } from './context/SessionContext'
 import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CalendarDays, Copy, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Trophy, Volume2, X } from 'lucide-react'
 import './App.css'
 
@@ -4849,6 +4850,48 @@ function App() {
       ) : null}
 
       <div className="app-shell-scroll">
+      <SessionProvider value={{
+        sessionActive,
+        roundState,
+        roundInput,
+        roundFeedback,
+        roundFeedbackTone,
+        roundFeedbackAnswer,
+        roundFeedbackPoints,
+        isRoundResolving,
+        sessionScore,
+        sessionRounds,
+        sessionPoints,
+        sessionTargetItems,
+        blockSessionComplete,
+        sessionRunReport,
+        sessionStartPending,
+        sessionSummaryLoading,
+        sessionGoalError,
+        lastSessionSummary,
+        livesEnabled,
+        livesRemaining,
+        leechFocusEnabled,
+        confidenceCaptureEnabled,
+        roundConfidenceScore,
+        activeSessionLengthPreset,
+        voiceBusy,
+        voiceUnavailable,
+        answerInputRef,
+        startSession: (game) => { void startSession(game) },
+        submitAnswer,
+        continueLastSession,
+        setRoundInput,
+        setRoundConfidence: setRoundConfidenceScore,
+        setSessionLength: setSessionTargetItems,
+        toggleLives: () => {
+          setLivesEnabled((previous) => !previous)
+          setLivesRemaining(DEFAULT_LIVES)
+        },
+        toggleLeechFocus: () => setLeechFocusEnabled((previous) => !previous),
+        toggleConfidence: () => setConfidenceCaptureEnabled((previous) => !previous),
+        playAudio: (text) => { void playQuestionAudio(text) },
+      }}>
       {view === 'home' ? (
         <HomeView
           navDirection={navDirection}
@@ -4879,7 +4922,6 @@ function App() {
           gameError={gameError}
           blockProgressWithMastery={blockProgressWithMastery}
           activeBlockCards={activeBlockCards}
-          activeRunCardsLength={activeRunCards.length}
           kanjiLevelProgress={kanjiLevelProgress}
           vocabLevelProgress={vocabLevelProgress}
           activeKanjiLevel={activeKanjiLevel}
@@ -4888,16 +4930,6 @@ function App() {
           learningPathTrackRows={learningPathTrackRows}
           leechCardsLength={leechCards.length}
           minigameStats={minigameStats}
-          sessionTargetItems={sessionTargetItems}
-          livesEnabled={livesEnabled}
-          leechFocusEnabled={leechFocusEnabled}
-          confidenceCaptureEnabled={confidenceCaptureEnabled}
-          sessionSummaryLoading={sessionSummaryLoading}
-          sessionGoalError={sessionGoalError}
-          lastSessionSummary={lastSessionSummary}
-          sessionRunReport={sessionRunReport}
-          sessionStartPending={sessionStartPending}
-          activeSessionLengthPreset={activeSessionLengthPreset}
           availableMinigames={availableMinigames}
           activeScriptStats={activeScriptStats}
           activeSectionName={activeSectionName}
@@ -4967,14 +4999,6 @@ function App() {
             resetRoundCycle()
             void startSession(game)
           }}
-          onSetSessionLength={setSessionTargetItems}
-          onToggleLives={() => {
-            setLivesEnabled((previous) => !previous)
-            setLivesRemaining(DEFAULT_LIVES)
-          }}
-          onToggleLeechFocus={() => setLeechFocusEnabled((previous) => !previous)}
-          onToggleConfidence={() => setConfidenceCaptureEnabled((previous) => !previous)}
-          onContinueSession={continueLastSession}
         />
       ) : null}
 
@@ -4984,44 +5008,16 @@ function App() {
           activeScript={activeScript}
           activeGame={activeGame}
           activeSectionName={activeSectionName}
-          sessionScore={sessionScore}
-          sessionRounds={sessionRounds}
-          sessionPoints={sessionPoints}
-          sessionTargetItems={sessionTargetItems}
-          blockSessionComplete={blockSessionComplete}
-          sessionActive={sessionActive}
-          sessionRunReport={sessionRunReport}
-          sessionStartPending={sessionStartPending}
-          sessionSummaryLoading={sessionSummaryLoading}
           gameLoading={gameLoading}
           gameError={gameError}
           activeRunCardsLength={activeRunCards.length}
-          livesEnabled={livesEnabled}
-          livesRemaining={livesRemaining}
-          roundState={roundState}
-          roundFeedback={roundFeedback}
-          roundFeedbackTone={roundFeedbackTone}
-          roundFeedbackAnswer={roundFeedbackAnswer}
-          roundFeedbackPoints={roundFeedbackPoints}
-          isRoundResolving={isRoundResolving}
-          roundInput={roundInput}
-          voiceBusy={voiceBusy}
-          voiceUnavailable={voiceUnavailable}
           voiceEnabled={settings.voiceEnabled}
-          confidenceCaptureEnabled={confidenceCaptureEnabled}
-          roundConfidenceScore={roundConfidenceScore}
           activeBlockCards={activeBlockCards}
-          answerInputRef={answerInputRef}
           onBack={() => {
             setNavDirection('back')
             setView('script_hub')
           }}
           onOpenSettings={() => setShowSettings(true)}
-          onStartSession={(game) => { void startSession(game) }}
-          onSubmitAnswer={submitAnswer}
-          onSetRoundInput={setRoundInput}
-          onSetRoundConfidence={setRoundConfidenceScore}
-          onPlayAudio={(text) => { void playQuestionAudio(text) }}
         />
       ) : null}
 
@@ -5072,6 +5068,8 @@ function App() {
           onSetSelectedChar={setSelectedChar}
         />
       ) : null}
+
+      </SessionProvider>
 
       {showExpertisePrompt ? (
         <div className="modal-backdrop expertise-backdrop" role="presentation">

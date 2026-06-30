@@ -16,7 +16,6 @@ import type {
   MinigameStatsByScript,
   NavDirection,
   ScriptKey,
-  SessionRunReport,
   StudyPlanCoverageRow,
 } from '../types'
 import {
@@ -30,6 +29,7 @@ import {
   SESSION_LENGTH_PRESETS,
 } from '../constants'
 import { MinigameIcon } from '../components/MinigameIcon'
+import { useSession } from '../context/SessionContext'
 
 interface BlockInfo {
   index: number
@@ -45,15 +45,6 @@ interface BasicCard {
   is_leech: boolean
 }
 
-interface LastSessionSummary {
-  goal_met: boolean
-  completed_items: number
-  target_items: number
-  accuracy: number
-  reviewed: number
-  correct: number
-}
-
 interface ScriptHubViewProps {
   navDirection: NavDirection
   activeScript: ScriptKey
@@ -63,7 +54,6 @@ interface ScriptHubViewProps {
   gameError: string | null
   blockProgressWithMastery: BlockInfo[]
   activeBlockCards: BasicCard[]
-  activeRunCardsLength: number
   kanjiLevelProgress: JlptLevelProgress[]
   vocabLevelProgress: JlptLevelProgress[]
   activeKanjiLevel: JlptLevel
@@ -72,20 +62,10 @@ interface ScriptHubViewProps {
   learningPathTrackRows: StudyPlanCoverageRow[]
   leechCardsLength: number
   minigameStats: MinigameStatsByScript
-  sessionTargetItems: number
-  livesEnabled: boolean
-  leechFocusEnabled: boolean
-  confidenceCaptureEnabled: boolean
-  sessionSummaryLoading: boolean
-  sessionGoalError: string | null
-  lastSessionSummary: LastSessionSummary | null
-  sessionRunReport: SessionRunReport | null
-  sessionStartPending: boolean
-  activeSessionLengthPreset: { key: string; label: string; items: number } | null
   availableMinigames: MinigameKey[]
   activeScriptStats: { bestStreak: number }
   activeSectionName: string | null
-  // callbacks
+  // callbacks (navigation / deck selection only)
   onBack: () => void
   onOpenSettings: () => void
   onSelectBlock: (index: number) => void
@@ -94,11 +74,6 @@ interface ScriptHubViewProps {
   onToggleLearningPath: () => void
   onSelectGame: (game: MinigameKey) => void
   onPlayGame: (game: MinigameKey) => void
-  onSetSessionLength: (items: number) => void
-  onToggleLives: () => void
-  onToggleLeechFocus: () => void
-  onToggleConfidence: () => void
-  onContinueSession: () => void
 }
 
 // Suppress unused-import warnings for constants included per spec
@@ -124,15 +99,6 @@ export function ScriptHubView({
   learningPathTrackRows,
   leechCardsLength,
   minigameStats,
-  livesEnabled,
-  leechFocusEnabled,
-  confidenceCaptureEnabled,
-  sessionSummaryLoading,
-  sessionGoalError,
-  lastSessionSummary,
-  sessionRunReport,
-  sessionStartPending,
-  activeSessionLengthPreset,
   availableMinigames,
   activeScriptStats,
   activeSectionName,
@@ -144,12 +110,23 @@ export function ScriptHubView({
   onToggleLearningPath,
   onSelectGame,
   onPlayGame,
-  onSetSessionLength,
-  onToggleLives,
-  onToggleLeechFocus,
-  onToggleConfidence,
-  onContinueSession,
 }: ScriptHubViewProps) {
+  const {
+    sessionRunReport,
+    sessionStartPending,
+    sessionSummaryLoading,
+    sessionGoalError,
+    lastSessionSummary,
+    livesEnabled,
+    leechFocusEnabled,
+    confidenceCaptureEnabled,
+    activeSessionLengthPreset,
+    continueLastSession,
+    setSessionLength,
+    toggleLives,
+    toggleLeechFocus,
+    toggleConfidence,
+  } = useSession()
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
 
   return (
@@ -376,7 +353,7 @@ export function ScriptHubView({
                       aria-pressed={isActive}
                       aria-label={`Set ${preset.label.toLowerCase()} session length (${preset.items} items)`}
                       title={`${preset.label} length (${preset.items} items)`}
-                      onClick={() => onSetSessionLength(preset.items)}
+                      onClick={() => setSessionLength(preset.items)}
                     >
                       <span className="setup-option-icon" aria-hidden="true">
                         <Icon className="toggle-icon" strokeWidth={2.2} />
@@ -397,7 +374,7 @@ export function ScriptHubView({
                   aria-pressed={livesEnabled}
                   aria-label={`Toggle lives mode (${DEFAULT_LIVES} lives per run)`}
                   title={`Lives mode (${DEFAULT_LIVES} lives): ${livesEnabled ? 'On' : 'Off'}`}
-                  onClick={onToggleLives}
+                  onClick={toggleLives}
                 >
                   <span className="setup-option-icon" aria-hidden="true">
                     <Heart className="toggle-icon" strokeWidth={2.1} />
@@ -413,7 +390,7 @@ export function ScriptHubView({
                   aria-pressed={leechFocusEnabled}
                   aria-label="Toggle focused review mode (leech cards first)"
                   title={`Focused review mode (leech first): ${leechFocusEnabled ? 'On' : 'Off'}`}
-                  onClick={onToggleLeechFocus}
+                  onClick={toggleLeechFocus}
                 >
                   <span className="setup-option-icon" aria-hidden="true">
                     <AlertTriangle className="toggle-icon" strokeWidth={2.1} />
@@ -429,7 +406,7 @@ export function ScriptHubView({
                   aria-pressed={confidenceCaptureEnabled}
                   aria-label="Toggle answer confidence capture"
                   title={`Confidence capture: ${confidenceCaptureEnabled ? 'On' : 'Off'}`}
-                  onClick={onToggleConfidence}
+                  onClick={toggleConfidence}
                 >
                   <span className="setup-option-icon" aria-hidden="true">
                     <Target className="toggle-icon" strokeWidth={2.1} />
@@ -464,7 +441,7 @@ export function ScriptHubView({
                   <button
                     type="button"
                     className="session-summary-continue"
-                    onClick={onContinueSession}
+                    onClick={continueLastSession}
                     disabled={!sessionRunReport || sessionStartPending}
                   >
                     Continue
