@@ -55,4 +55,5 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getJLPTExamHistory: (level, mode) => ipcRenderer.invoke('jlpt:get-exam-history', level, mode),
   getLearningPathStatus: () => ipcRenderer.invoke('learning-path:get-status'),
   setLearningPath: (pathId) => ipcRenderer.invoke('learning-path:set', pathId),
+  completeOnboarding: (payload) => ipcRenderer.invoke('learning-path:complete-onboarding', payload),
 })

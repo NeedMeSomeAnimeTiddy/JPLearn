@@ -1416,7 +1416,6 @@ const SETTINGS_STORAGE_KEY = 'jplearn-desktop-settings-v1'
 const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
 const SUMMARY_SNAPSHOT_STORAGE_KEY = 'jplearn-desktop-summary-snapshot-v1'
 const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
-const EXPERTISE_STORAGE_KEY = 'jplearn-first-startup-expertise-v1'
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
 // Curated VOICEVOX voices offered to the user. `id` is the engine speaker id.
@@ -1442,33 +1441,6 @@ const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
   jlpt_n2_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
   jlpt_n1_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
 }
-
-// All slugs pre-completed at each level (includes N4+ slugs not in ScriptKey)
-const EXPERTISE_LEVEL_TO_DISPLAY_SLUGS: Record<ExpertiseLevel, string[]> = {
-  total_beginner:       [],
-  know_hiragana:        ['hiragana'],
-  know_kana:            ['hiragana', 'katakana'],
-  jlpt_n5_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-  jlpt_n4_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'kanji_n4', 'vocab_n4'],
-  jlpt_n3_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'kanji_n4', 'vocab_n4', 'kanji_n3', 'vocab_n3'],
-  jlpt_n2_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'kanji_n4', 'vocab_n4', 'kanji_n3', 'vocab_n3', 'kanji_n2', 'vocab_n2'],
-  jlpt_n1_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'kanji_n4', 'vocab_n4', 'kanji_n3', 'vocab_n3', 'kanji_n2', 'vocab_n2', 'kanji_n1', 'vocab_n1'],
-}
-
-const PREREQ_ITEMS: Array<{ key: string; label: string; description: string }> = [
-  { key: 'hiragana',  label: 'Hiragana',        description: 'The 46 basic phonetic characters used in everyday Japanese' },
-  { key: 'katakana',  label: 'Katakana',        description: 'The phonetic script for loanwords and foreign names' },
-  { key: 'kanji_n5',  label: 'N5 Kanji',        description: 'The ~100 basic Chinese-origin characters at the JLPT N5 level' },
-  { key: 'vocab_n5',  label: 'N5 Vocabulary',   description: 'The ~800 essential words tested at the JLPT N5 level' },
-  { key: 'kanji_n4',  label: 'N4 Kanji',        description: 'Intermediate characters — ~300 kanji at the JLPT N4 level' },
-  { key: 'vocab_n4',  label: 'N4 Vocabulary',   description: '~1,500 words required for everyday conversation at N4' },
-  { key: 'kanji_n3',  label: 'N3 Kanji',        description: '~650 kanji bridging beginner and intermediate Japanese' },
-  { key: 'vocab_n3',  label: 'N3 Vocabulary',   description: '~3,700 words at the mid-level JLPT N3 threshold' },
-  { key: 'kanji_n2',  label: 'N2 Kanji',        description: '~1,000 kanji required for upper-intermediate proficiency' },
-  { key: 'vocab_n2',  label: 'N2 Vocabulary',   description: '~6,000 words covering advanced reading and comprehension' },
-  { key: 'kanji_n1',  label: 'N1 Kanji',        description: '~2,000 kanji — the full set expected at JLPT N1' },
-  { key: 'vocab_n1',  label: 'N1 Vocabulary',   description: '~10,000 words for near-native Japanese proficiency' },
-]
 
 function deriveExpertiseLevelFromChecked(checked: Set<string>): ExpertiseLevel {
   if (checked.has('kanji_n1') || checked.has('vocab_n1')) return 'jlpt_n1_foundation'
@@ -2645,11 +2617,6 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('theme')
   const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
-  const [showExpertisePrompt, setShowExpertisePrompt] = useState<boolean>(false)
-  const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1)
-  const [checkedScripts, setCheckedScripts] = useState<Set<string>>(new Set())
-  const [applyingExpertise, setApplyingExpertise] = useState<boolean>(false)
-  const [expertiseError, setExpertiseError] = useState<string | null>(null)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
   const [collapsedThemeSections, setCollapsedThemeSections] = useState<Partial<Record<string, boolean>>>({})
   const [customThemeActionMessage, setCustomThemeActionMessage] = useState<string | null>(null)
@@ -3376,10 +3343,7 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    if (window.localStorage.getItem(EXPERTISE_STORAGE_KEY) === 'done') return
-    setShowExpertisePrompt(true)
-  }, [])
+  // Onboarding is now gated entirely by learningPathStatus.onboarding_complete from the backend.
 
   useEffect(() => {
     const onWindowStateChanged = window.jplearnDesktop.onWindowStateChanged
@@ -5115,13 +5079,6 @@ function App() {
       const target = event.target as HTMLElement
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
 
-      if (showExpertisePrompt) {
-        if (event.key === 'Escape') {
-          event.preventDefault()
-        }
-        return
-      }
-
       if ((event.ctrlKey || event.metaKey) && event.key === ',') {
         event.preventDefault()
         if (showSettings) {
@@ -5216,7 +5173,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [loadSummary, selectedChar, shortcutMenuOpen, showExpertisePrompt, showOverview, showSettings, view])
+  }, [loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -5451,14 +5408,9 @@ function App() {
       window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(emptyScores))
       window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(emptyStats))
       window.localStorage.removeItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
-      window.localStorage.removeItem(EXPERTISE_STORAGE_KEY)
       setCardScores(emptyScores)
       setScriptStats(emptyStats)
       setMinigameStats(defaultMinigameStatsByScript())
-      setShowExpertisePrompt(true)
-      setOnboardingStep(1)
-      setExpertiseError(null)
-      setCheckedScripts(new Set())
       setResetConfirmStep(0)
       refreshDeckProgressAfterSeedChange()
       await loadSummary()
@@ -5487,13 +5439,15 @@ function App() {
     void window.jplearnDesktop.closeWindow()
   }, [])
 
-  const applyExpertiseSelection = useCallback(async () => {
-    const level = deriveExpertiseLevelFromChecked(checkedScripts)
-    setApplyingExpertise(true)
-    setExpertiseError(null)
+  // Handles completion of the onboarding form: seeds deck expertise, persists answers, sets path.
+  const handleOnboardingComplete = useCallback(async (
+    pathId: string | null,
+    checkedItems: Set<string>,
+    answers: { goal?: string; dailyMinutes?: number; targetLevel?: string },
+  ) => {
+    const level = deriveExpertiseLevelFromChecked(checkedItems)
     try {
       await window.jplearnDesktop.applyExpertiseLevel(level)
-
       if (level === 'total_beginner') {
         setCardScores({ hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} })
       } else {
@@ -5507,53 +5461,29 @@ function App() {
             vocab_n5: { ...previous.vocab_n5 },
             grammar_patterns: { ...previous.grammar_patterns },
           }
-
           targetScripts.forEach((scriptKey, index) => {
             const deck = payloads[index]
             const seeded = { ...next[scriptKey] }
-            deck.cards.forEach((card) => {
-              seeded[card.id] = CARD_MASTERY_MAX
-            })
+            deck.cards.forEach((card) => { seeded[card.id] = CARD_MASTERY_MAX })
             next[scriptKey] = seeded
           })
-
           return next
         })
       }
-
-      window.localStorage.setItem(EXPERTISE_STORAGE_KEY, 'done')
-      setShowExpertisePrompt(false)
       refreshDeckProgressAfterSeedChange()
-      await loadSummary()
-    } catch (err) {
-      setExpertiseError(err instanceof Error ? err.message : 'Could not apply expertise profile.')
-    } finally {
-      setApplyingExpertise(false)
+    } catch {
+      // Expertise seeding is best-effort; proceed to mark onboarding complete.
     }
-  }, [getDeckCardsDeduped, loadSummary, refreshDeckProgressAfterSeedChange, checkedScripts])
 
-  const goToNextOnboardingStep = useCallback(() => {
-    setExpertiseError(null)
-    setOnboardingStep((prev) => {
-      if (prev === 1) return 2
-      return 3
-    })
-  }, [])
-
-  const goToPreviousOnboardingStep = useCallback(() => {
-    setExpertiseError(null)
-    setOnboardingStep((prev) => {
-      if (prev === 3) return 2
-      return 1
-    })
-  }, [])
-
-  const skipOnboarding = useCallback(() => {
-    window.localStorage.setItem(EXPERTISE_STORAGE_KEY, 'done')
-    setShowExpertisePrompt(false)
-    setExpertiseError(null)
-    setOnboardingStep(1)
-  }, [])
+    if (pathId) {
+      const result = await window.jplearnDesktop.setLearningPath?.(pathId).catch(() => undefined)
+      if (result) setLearningPathStatus(result as LearningPathStatus)
+    } else {
+      const result = await window.jplearnDesktop.completeOnboarding?.(answers).catch(() => undefined)
+      if (result) setLearningPathStatus(result as LearningPathStatus)
+    }
+    await loadSummary()
+  }, [getDeckCardsDeduped, loadSummary, refreshDeckProgressAfterSeedChange])
 
   const resolvedBackgroundUrls = useMemo(() => {
     const next: Partial<Record<BackgroundStyle, string>> = {}
@@ -6142,14 +6072,20 @@ function App() {
       {view === 'home' && !loading && learningPathStatus && !learningPathStatus.onboarding_complete ? (
         <OnboardingView
           navDirection={navDirection}
-          onSelectPath={(pathId) => {
-            void window.jplearnDesktop.setLearningPath?.(pathId).then((result) => {
-              if (result) setLearningPathStatus(result as LearningPathStatus)
-            }).catch(() => undefined)
+          voiceOptions={VOICE_OPTIONS}
+          voiceEnabled={settings.voiceEnabled}
+          voiceSpeaker={settings.voiceSpeaker}
+          voiceBusy={voiceBusy}
+          onVoiceToggle={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
+          onVoiceSelect={(id) => {
+            setSettings((prev) => ({ ...prev, voiceSpeaker: id }))
+            void playQuestionAudio(VOICE_SAMPLE_LINE, id)
           }}
-          onSkip={() => {
-            // Mark onboarding done without setting a path
-            setLearningPathStatus((prev) => prev ? { ...prev, onboarding_complete: true } : prev)
+          onSelectPath={(pathId, checkedItems, answers) => {
+            void handleOnboardingComplete(pathId, checkedItems, answers)
+          }}
+          onSkip={(checkedItems, answers) => {
+            void handleOnboardingComplete(null, checkedItems, answers)
           }}
         />
       ) : view === 'home' ? (
@@ -6436,183 +6372,6 @@ function App() {
       ) : null}
 
       </SessionProvider>
-
-      {showExpertisePrompt ? (
-        <div className="modal-backdrop expertise-backdrop" role="presentation">
-          <div
-            className="modal-panel settings-panel expertise-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="expertise-title"
-            aria-describedby="expertise-subtitle"
-          >
-            <div className="settings-modal-header">
-              <div>
-                <h2 id="expertise-title" className="settings-modal-title">
-                  {onboardingStep === 1 ? 'Choose a voice' : null}
-                  {onboardingStep === 2 ? 'What have you already mastered?' : null}
-                  {onboardingStep === 3 ? 'Confirm your starting point' : null}
-                </h2>
-                <p id="expertise-subtitle" className="settings-modal-subtitle">
-                  {onboardingStep === 1 ? 'Hear prompts read aloud. Tap a voice to sample it.' : null}
-                  {onboardingStep === 2 ? 'Check everything you already know. Leave the rest unchecked.' : null}
-                  {onboardingStep === 3 ? 'You can change this later by resetting study progress in settings.' : null}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="onboarding-btn onboarding-btn-ghost onboarding-skip"
-                onClick={skipOnboarding}
-                disabled={applyingExpertise}
-              >
-                Skip setup
-              </button>
-            </div>
-
-            <div className="onboarding-progress" aria-label="Onboarding progress">
-              <span className={`onboarding-dot ${onboardingStep >= 1 ? 'is-active' : ''}`}>1</span>
-              <span className={`onboarding-dot ${onboardingStep >= 2 ? 'is-active' : ''}`}>2</span>
-              <span className={`onboarding-dot ${onboardingStep >= 3 ? 'is-active' : ''}`}>3</span>
-            </div>
-
-            <div className="onboarding-step-body">
-              {onboardingStep === 1 ? (
-                <div className="onboarding-step">
-                  <p className="onboarding-callout">
-                    Read prompts aloud during games?
-                  </p>
-                  <button
-                    type="button"
-                    className={`onboarding-btn ${settings.voiceEnabled ? 'onboarding-btn-secondary' : 'onboarding-btn-primary'}`}
-                    onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
-                    aria-pressed={settings.voiceEnabled}
-                    disabled={applyingExpertise}
-                  >
-                    {settings.voiceEnabled ? 'Disable voice' : 'Enable voice'}
-                  </button>
-                  {settings.voiceEnabled ? (
-                    <div className="onboarding-voice-grid" role="radiogroup" aria-label="Choose a voice">
-                      {VOICE_OPTIONS.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          className={`onboarding-voice-option ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
-                          onClick={() => {
-                            setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
-                            void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
-                          }}
-                          aria-pressed={settings.voiceSpeaker === option.id}
-                          disabled={applyingExpertise || voiceBusy}
-                        >
-                          <span className="expertise-option-title">{option.name}</span>
-                          <span className="expertise-option-description">{option.jp}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  <p className="settings-help">
-                    Voice is <strong>{settings.voiceEnabled ? 'on' : 'off'}</strong>. Tap a voice to hear a sample. You can change this later in Settings.
-                  </p>
-                </div>
-              ) : null}
-
-              {onboardingStep === 2 ? (
-                <div className="onboarding-step">
-                  <p className="settings-help">
-                    Tick everything you can already do confidently. We will skip those decks so you start where it counts.
-                  </p>
-                  <div className="onboarding-prereq-list" role="group" aria-label="Prior knowledge checklist">
-                    {PREREQ_ITEMS.map((item) => {
-                      const isChecked = checkedScripts.has(item.key)
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          className={`onboarding-prereq-item${isChecked ? ' is-checked' : ''}`}
-                          onClick={() => setCheckedScripts((prev) => {
-                            const next = new Set(prev)
-                            if (next.has(item.key)) next.delete(item.key)
-                            else next.add(item.key)
-                            return next
-                          })}
-                          aria-pressed={isChecked}
-                          disabled={applyingExpertise}
-                        >
-                          <span className="onboarding-prereq-check" aria-hidden="true" />
-                          <span className="onboarding-prereq-text">
-                            <span className="onboarding-prereq-title">{item.label}</span>
-                            <span className="onboarding-prereq-desc">{item.description}</span>
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : null}
-
-              {onboardingStep === 3 ? (() => {
-                const level = deriveExpertiseLevelFromChecked(checkedScripts)
-                const willComplete = EXPERTISE_LEVEL_TO_DISPLAY_SLUGS[level]
-                return (
-                  <div className="onboarding-step onboarding-summary">
-                    <p className="settings-help">
-                      If this looks right, press <strong>Start learning</strong> to apply it now.
-                    </p>
-                    <div className="onboarding-prereq-list" aria-label="What will be pre-completed">
-                      {PREREQ_ITEMS.map((item) => {
-                        const done = willComplete.includes(item.key)
-                        return (
-                          <div key={item.key} className={`onboarding-prereq-item is-summary${done ? ' is-checked' : ' is-skipped'}`}>
-                            <span className="onboarding-prereq-check" aria-hidden="true" />
-                            <span className="onboarding-prereq-text">
-                              <span className="onboarding-prereq-title">{item.label}</span>
-                              <span className="onboarding-prereq-desc">{done ? 'Will be marked complete' : 'You will study this from the start'}</span>
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })() : null}
-
-              {expertiseError ? <p className="expertise-error">{expertiseError}</p> : null}
-            </div>
-
-            <div className="expertise-actions">
-              {onboardingStep > 1 ? (
-                <button
-                  type="button"
-                  className="onboarding-btn onboarding-btn-secondary"
-                  onClick={goToPreviousOnboardingStep}
-                  disabled={applyingExpertise}
-                >
-                  Back
-                </button>
-              ) : null}
-              {onboardingStep < 3 ? (
-                <button
-                  type="button"
-                  className="onboarding-btn onboarding-btn-primary"
-                  onClick={goToNextOnboardingStep}
-                  disabled={applyingExpertise}
-                >
-                  Continue
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="onboarding-btn onboarding-btn-primary"
-                  onClick={() => void applyExpertiseSelection()}
-                  disabled={applyingExpertise}
-                >
-                  {applyingExpertise ? 'Applying...' : 'Start learning'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {showSettings ? (
         <div

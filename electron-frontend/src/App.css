@@ -8036,6 +8036,339 @@ html[data-reduced-motion='true'] *::after {
 }
 .onboarding-skip-link:hover { color: var(--text-main); }
 
+/* ── Welcoming Onboarding Page ──────────────────────────────────── */
+
+.onb-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 0 32px;
+  animation: enterUp 420ms ease both;
+}
+
+/* Hero section */
+.onb-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px 32px;
+  gap: 14px;
+  max-width: 560px;
+  width: 100%;
+}
+
+.onb-hero-badge {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: color-mix(in oklab, var(--accent) 90%, var(--text-main));
+  background: color-mix(in oklab, var(--accent) 12%, var(--card-bg-top));
+  border: 1.5px solid color-mix(in oklab, var(--accent) 32%, var(--card-border));
+  border-radius: 14px;
+  padding: 6px 18px;
+  display: inline-block;
+  line-height: 1.2;
+}
+
+.onb-hero-title {
+  font-size: 2.1rem;
+  font-weight: 900;
+  color: var(--text-main);
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.onb-hero-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-soft);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Body: scrollable column of sections */
+.onb-body {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  width: 100%;
+  max-width: 560px;
+  padding: 0 20px;
+}
+
+/* Each question section */
+.onb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.onb-section-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.onb-section-hint {
+  font-size: 0.84rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Learning goal grid */
+.onb-goal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.onb-goal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border-radius: 12px;
+  border: 1.5px solid var(--card-border);
+  background: color-mix(in oklab, var(--card-bg-top) 80%, var(--bg-main));
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+  text-align: center;
+}
+.onb-goal-card:hover {
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--card-border));
+  background: color-mix(in oklab, var(--accent) 5%, var(--card-bg-top));
+  transform: translateY(-1px);
+}
+.onb-goal-card.is-selected {
+  border-color: color-mix(in oklab, var(--accent) 70%, var(--card-border));
+  background: color-mix(in oklab, var(--accent) 12%, var(--card-bg-top));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 22%, transparent) inset;
+}
+
+.onb-goal-emoji {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.onb-goal-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+/* Daily time grid */
+.onb-time-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.onb-time-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 6px;
+  border-radius: 10px;
+  border: 1.5px solid var(--card-border);
+  background: color-mix(in oklab, var(--card-bg-top) 80%, var(--bg-main));
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.onb-time-card:hover {
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--card-border));
+  transform: translateY(-1px);
+}
+.onb-time-card.is-selected {
+  border-color: color-mix(in oklab, var(--accent) 70%, var(--card-border));
+  background: color-mix(in oklab, var(--accent) 12%, var(--card-bg-top));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 22%, transparent) inset;
+}
+
+.onb-time-value {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.onb-time-note {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+/* Target level chips */
+.onb-level-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.onb-level-chip {
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--card-border);
+  background: color-mix(in oklab, var(--card-bg-top) 80%, var(--bg-main));
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.onb-level-chip:hover {
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--card-border));
+}
+.onb-level-chip.is-selected {
+  border-color: color-mix(in oklab, var(--accent) 70%, var(--card-border));
+  background: color-mix(in oklab, var(--accent) 14%, var(--card-bg-top));
+  color: color-mix(in oklab, var(--accent) 80%, var(--text-main));
+}
+
+/* Prior knowledge checklist */
+.onb-check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.onb-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--card-border);
+  background: color-mix(in oklab, var(--card-bg-top) 70%, var(--bg-main));
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.onb-check-item:hover {
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--card-border));
+}
+.onb-check-item.is-checked {
+  border-color: color-mix(in oklab, var(--tone-teal) 54%, var(--card-border));
+  background: color-mix(in oklab, var(--tone-teal) 8%, var(--card-bg-top));
+}
+
+.onb-check-box {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--panel-border);
+  background: var(--card-bg-top);
+  position: relative;
+  transition: border-color 130ms ease, background 130ms ease;
+}
+.onb-check-item.is-checked .onb-check-box {
+  background: color-mix(in oklab, var(--tone-teal) 70%, var(--card-bg-top));
+  border-color: color-mix(in oklab, var(--tone-teal) 80%, var(--card-border));
+}
+.onb-check-item.is-checked .onb-check-box::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 5px;
+  height: 9px;
+  border: 2px solid white;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+
+.onb-check-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.onb-check-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.onb-check-desc {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+/* Voice section */
+.onb-voice-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--card-border);
+  background: color-mix(in oklab, var(--card-bg-top) 80%, var(--bg-main));
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+  align-self: flex-start;
+}
+.onb-voice-toggle.is-on {
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--card-border));
+  color: color-mix(in oklab, var(--accent) 80%, var(--text-main));
+  background: color-mix(in oklab, var(--accent) 10%, var(--card-bg-top));
+}
+
+.onb-voice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.onb-voice-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--card-border);
+  background: color-mix(in oklab, var(--card-bg-top) 80%, var(--bg-main));
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.onb-voice-card:hover { transform: translateY(-1px); border-color: color-mix(in oklab, var(--accent) 30%, var(--card-border)); }
+.onb-voice-card.is-active {
+  border-color: color-mix(in oklab, var(--accent) 60%, var(--card-border));
+  background: color-mix(in oklab, var(--accent) 10%, var(--card-bg-top));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 20%, transparent) inset;
+}
+
+.onb-voice-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.onb-voice-jp {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.onb-path-section {
+  padding-top: 8px;
+}
+
+@media (max-width: 480px) {
+  .onb-hero-title { font-size: 1.6rem; }
+  .onb-time-grid { grid-template-columns: repeat(2, 1fr); }
+  .onb-goal-grid { grid-template-columns: 1fr 1fr; }
+}
+
 /* ── Readiness Warning Modal ────────────────────────────────────── */
 .readiness-warning-modal {
   padding: 24px 22px;

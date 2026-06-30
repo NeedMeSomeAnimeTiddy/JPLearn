@@ -43,6 +43,7 @@ describe('preload contract', () => {
       "toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize')",
       "isWindowMaximized: () => ipcRenderer.invoke('window:is-maximized')",
       "closeWindow: () => ipcRenderer.invoke('window:close')",
+      "completeOnboarding: (payload) => ipcRenderer.invoke('learning-path:complete-onboarding', payload)",
     ]
 
     for (const mapping of expectedMappings) {

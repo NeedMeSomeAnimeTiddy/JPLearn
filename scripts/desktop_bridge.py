@@ -648,7 +648,25 @@ def build_overview_character_mastery() -> dict[str, object]:
 
 def reset_progress() -> dict[str, object]:
     reset_study_db()
+    set_setting("onboarding_complete", "0")
     return {"ok": True}
+
+
+def complete_onboarding_handler(
+    goal: str | None = None,
+    daily_minutes: str | None = None,
+    target_level: str | None = None,
+) -> dict[str, object]:
+    """Mark onboarding complete and persist optional preference answers."""
+    init_study_db()
+    if goal:
+        set_setting("onboarding_goal", goal)
+    if daily_minutes:
+        set_setting("onboarding_daily_minutes", daily_minutes)
+    if target_level:
+        set_setting("onboarding_target_level", target_level)
+    set_setting("onboarding_complete", "1")
+    return build_learning_path_status_payload()
 
 
 # ---------------------------------------------------------------------------
@@ -1699,6 +1717,15 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         try:
             return 0, set_learning_path_handler(argv[1])
         except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "complete-onboarding":
+        try:
+            goal = argv[1] if len(argv) > 1 and argv[1].strip() else None
+            daily_minutes = argv[2] if len(argv) > 2 and argv[2].strip() else None
+            target_level = argv[3] if len(argv) > 3 and argv[3].strip() else None
+            return 0, complete_onboarding_handler(goal, daily_minutes, target_level)
+        except Exception as exc:
             return 2, {"error": str(exc)}
 
     return 2, {"error": f"Unknown command: {command}"}

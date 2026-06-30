@@ -640,6 +640,21 @@ function registerIpcHandlers(options) {
       throw new Error(`Failed to set learning path: ${detail}`)
     }
   })
+
+  options.ipcMain.handle('learning-path:complete-onboarding', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const goal = typeof payload?.goal === 'string' ? payload.goal.slice(0, 32) : ''
+    const dailyMinutes = typeof payload?.dailyMinutes === 'number' ? String(payload.dailyMinutes) : ''
+    const targetLevel = typeof payload?.targetLevel === 'string' ? payload.targetLevel.slice(0, 8) : ''
+    try {
+      const response = await options.runPythonBridgeWithArgs(['complete-onboarding', goal, dailyMinutes, targetLevel])
+      clearBridgeReadCaches()
+      return response
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to complete onboarding: ${detail}`)
+    }
+  })
 }
 
 module.exports = {

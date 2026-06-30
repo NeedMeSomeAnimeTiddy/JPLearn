@@ -47,6 +47,7 @@ describe('ipc main contract', () => {
       'window:close',
       'ui:set-startup-theme',
       'ui:startup-ready',
+      'learning-path:complete-onboarding',
     ]
 
     for (const channel of expectedChannels) {
@@ -90,6 +91,7 @@ describe('ipc main contract', () => {
       'window:close',
       'ui:set-startup-theme',
       'ui:startup-ready',
+      'learning-path:complete-onboarding',
     ]
 
     for (const channel of guardedChannels) {

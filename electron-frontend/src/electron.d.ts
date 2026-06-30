@@ -393,6 +393,13 @@ interface DesktopApi {
   getJLPTExamHistory?: (level?: JLPTLevel | '', mode?: JLPTExamMode | '') => Promise<JLPTExamHistoryPayload>
   getLearningPathStatus?: () => Promise<LearningPathStatusPayload>
   setLearningPath?: (pathId: string) => Promise<LearningPathStatusPayload>
+  completeOnboarding?: (payload: OnboardingCompletionPayload) => Promise<LearningPathStatusPayload>
+}
+
+interface OnboardingCompletionPayload {
+  goal?: string
+  dailyMinutes?: number
+  targetLevel?: string
 }
 
 interface VoiceStatus {
