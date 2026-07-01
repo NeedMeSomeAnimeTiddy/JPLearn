@@ -4,12 +4,20 @@ const path = require('node:path')
 const http = require('node:http')
 const net = require('node:net')
 
+let JishoAPI = null
+try {
+  JishoAPI = require('unofficial-jisho-api')
+} catch {
+  JishoAPI = null
+}
+
 const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
 const DEFAULT_LLAMACPP_TIMEOUT_MS = 90000
 const DEFAULT_MAX_CONTEXT_CHARS = 1800
 const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 420
 const DEFAULT_MAX_PROMPT_CHARS = 3200
+const DEFAULT_DICTIONARY_HTTP_TIMEOUT_MS = 4500
 const DEFAULT_MODEL_DIRECTORY = path.resolve(__dirname, '..', '..', 'models', 'llama')
 const DEFAULT_TUTOR_INSTRUCTIONS_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'instructions.txt')
 const DEFAULT_TUTOR_GRAMMAR_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'conversation.gbnf')
@@ -30,8 +38,6 @@ const DEFAULT_TUTOR_SYSTEM_PROMPT = [
   '- For translation requests: give only the Japanese translation, an optional short reading or gloss in parentheses, and stop there. Do not add a grammar lecture unless the user asks for one.',
   '- For translation requests, never invent a term or guess regional variants. If uncertain, say you are unsure and ask for context rather than fabricating.',
   '- For single-word translations, prefer standard dictionary forms in kana/kanji. Do not output unrelated common words as translations.',
-  '- For slang, rude, or profane phrase translations requested for language learning, still provide the translation. You may add a brief caution label like "rude" or "very offensive".',
-  '- Do not refuse ordinary translation requests just because wording is impolite. Refuse only requests that clearly ask for real-world harm, threats, or instructions to abuse someone.',
   '- If the user made a mistake, correct it kindly and briefly, then continue the conversation.',
   '- If the user asks about grammar, vocabulary, pronunciation, or translation, be precise and practical, still within 1 to 3 sentences.',
   '- If you are uncertain, say so clearly instead of guessing.',
@@ -260,6 +266,143 @@ function buildLowSignalRecoveryReply(message) {
     return 'I glitched on that response. Ask again with the exact phrase and I will translate it to Japanese in one line.'
   }
   return 'I glitched on that response. Please ask again in one short sentence.'
+}
+
+function normalizeAsciiToken(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function detectTranslationIntent(message) {
+  const text = String(message || '').trim()
+  if (!text) {
+    return false
+  }
+  return /\b(translate|translation|in japanese|japanese for|how do you say|say .* in japanese)\b/i.test(text)
+}
+
+function extractEnglishTranslationTarget(message) {
+  const text = String(message || '').trim()
+  if (!text) {
+    return ''
+  }
+
+  const quoted = text.match(/"([^"]{1,60})"|'([^']{1,60})'/)
+  if (quoted) {
+    return normalizeAsciiToken(quoted[1] || quoted[2] || '')
+  }
+
+  const patterns = [
+    /japanese\s+for\s+([a-zA-Z\s-]{1,60})/i,
+    /translate\s+([a-zA-Z\s-]{1,60})\s+to\s+japanese/i,
+    /how\s+do\s+you\s+say\s+([a-zA-Z\s-]{1,60})\s+in\s+japanese/i,
+    /([a-zA-Z\s-]{1,60})\s+in\s+japanese/i,
+  ]
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match && match[1]) {
+      return normalizeAsciiToken(match[1])
+    }
+  }
+  return ''
+}
+
+function extractTranslationTarget(message) {
+  if (!detectTranslationIntent(message)) {
+    return null
+  }
+  return extractEnglishTranslationTarget(message) || null
+}
+
+function normalizeDictionaryEntry(rawEntry) {
+  if (!rawEntry || typeof rawEntry !== 'object') {
+    return null
+  }
+  const japanese = typeof rawEntry.japanese === 'string' ? rawEntry.japanese.trim() : ''
+  const reading = typeof rawEntry.reading === 'string' ? rawEntry.reading.trim() : ''
+  const gloss = typeof rawEntry.gloss === 'string' ? rawEntry.gloss.trim() : ''
+  if (!japanese) {
+    return null
+  }
+  return {
+    japanese,
+    reading,
+    gloss,
+  }
+}
+
+function parseJishoEntry(rawResult) {
+  if (!rawResult || typeof rawResult !== 'object') {
+    return null
+  }
+  const jp = Array.isArray(rawResult.japanese) ? rawResult.japanese[0] : null
+  const japaneseWord = jp && typeof jp.word === 'string' ? jp.word.trim() : ''
+  const japaneseReading = jp && typeof jp.reading === 'string' ? jp.reading.trim() : ''
+  const primary = japaneseWord || japaneseReading
+  if (!primary) {
+    return null
+  }
+  const firstSense = Array.isArray(rawResult.senses) ? rawResult.senses[0] : null
+  const defs = firstSense && Array.isArray(firstSense.english_definitions)
+    ? firstSense.english_definitions.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
+    : []
+  return normalizeDictionaryEntry({
+    japanese: primary,
+    reading: japaneseReading,
+    gloss: defs[0] || '',
+  })
+}
+
+function formatDictionaryTranslation(entry) {
+  if (!entry) {
+    return ''
+  }
+  const reading = entry.reading && entry.reading !== entry.japanese
+    ? ` (${entry.reading})`
+    : ''
+  return `${entry.japanese}${reading}`
+}
+
+function createDictionaryResolver(options = {}) {
+  const onlineTimeoutMs = Number.isFinite(options.onlineTimeoutMs)
+    ? Math.max(1000, Math.floor(options.onlineTimeoutMs))
+    : DEFAULT_DICTIONARY_HTTP_TIMEOUT_MS
+  const jishoClient = typeof options.jishoClient === 'object' && options.jishoClient
+    ? options.jishoClient
+    : (JishoAPI ? new JishoAPI() : null)
+
+  return async (target) => {
+    const key = normalizeAsciiToken(target)
+    if (!key) {
+      return null
+    }
+
+    try {
+      if (!jishoClient || typeof jishoClient.searchForPhrase !== 'function') {
+        return null
+      }
+      const payload = await Promise.race([
+        jishoClient.searchForPhrase(key),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('dictionary lookup timed out')), onlineTimeoutMs)
+        }),
+      ])
+      const first = payload && Array.isArray(payload.data) ? payload.data[0] : null
+      const parsed = parseJishoEntry(first)
+      if (!parsed) {
+        return null
+      }
+      return {
+        ...parsed,
+        source: 'jisho-online',
+      }
+    } catch {
+      return null
+    }
+  }
 }
 
 function findFreePort() {
@@ -589,6 +732,11 @@ function createTutorChatRuntime(options = {}) {
     ? Math.max(24, Math.floor(options.maxOutputTokens))
     : 140
 
+  const resolveDictionaryEntry = createDictionaryResolver({
+    onlineTimeoutMs: options.translationDictionaryTimeoutMs,
+    jishoClient: options.translationJishoClient,
+  })
+
   const adapterRegistry = options.adapterRegistry || createAdapterRegistry()
   if (!adapterRegistry.has('llama.cpp')) {
     adapterRegistry.register('llama.cpp', () => createLlamaServerAdapter(llamaCppConfig))
@@ -672,6 +820,22 @@ function createTutorChatRuntime(options = {}) {
       }
 
       const trimmedMessage = clipText(message, maxMessageChars)
+      const translationTarget = extractTranslationTarget(trimmedMessage)
+      if (translationTarget) {
+        const dictionaryHit = await resolveDictionaryEntry(translationTarget)
+        if (dictionaryHit) {
+          const dictionaryText = formatDictionaryTranslation(dictionaryHit)
+          return {
+            ok: true,
+            text: clipText(dictionaryText, maxOutputChars),
+            provider: 'unofficial-jisho-api',
+            model: String(dictionaryHit.source || 'dictionary'),
+            coldStart: false,
+            elapsedMs: 0,
+          }
+        }
+      }
+
       const boundedContext = {}
       for (const [key, value] of Object.entries(context || {})) {
         if (typeof value !== 'string') {

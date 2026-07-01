@@ -116,8 +116,73 @@ describe('llm runtime', () => {
     const response = await runtime.sendMessage('help with kanji', { focus_area: 'kanji_n5' })
     expect(response.ok).toBe(true)
     expect(response.provider).toBe('scripted-fallback')
-    expect(response.text).toMatch(/coach note/i)
+    expect(response.text).toMatch(/let's keep momentum/i)
     expect(response.text.length).toBeLessThanOrEqual(700)
+  })
+
+  it('uses unofficial-jisho-api translation before adapter inference', async () => {
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      translationJishoClient: {
+        async searchForPhrase() {
+          return {
+            data: [
+              {
+                japanese: [{ word: 'トイレ', reading: 'といれ' }],
+                senses: [{ english_definitions: ['bathroom'] }],
+              },
+            ],
+          }
+        },
+      },
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer() {
+          throw new Error('infer should not be called for dictionary hit')
+        },
+      }),
+    })
+
+    const response = await runtime.sendMessage('How do you say "bathroom" in Japanese?')
+    expect(response.ok).toBe(true)
+    expect(response.provider).toBe('unofficial-jisho-api')
+    expect(response.text).toBe('トイレ (といれ)')
+  })
+
+  it('falls back to adapter inference when dictionary has no match', async () => {
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer() {
+          return {
+            text: '文脈を教えてください。',
+            provider: 'stub',
+            model: 'stub-model',
+          }
+        },
+      }),
+      translationJishoClient: {
+        async searchForPhrase() {
+          return { data: [] }
+        },
+      },
+    })
+
+    const response = await runtime.sendMessage('Translate "launch sequence" to Japanese.')
+    expect(response.ok).toBe(true)
+    expect(response.provider).toBe('stub')
+    expect(response.text).toContain('文脈を教えてください')
   })
 
   it('treats code 130 runtime text as cancellation instead of surfacing raw errors', async () => {
