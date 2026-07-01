@@ -12,6 +12,19 @@ const {
   isAllowedRendererUrl,
 } = require('./ipc_security.cjs')
 
+async function reloadLocalFontsForContents(webContents) {
+  if (!webContents || webContents.isDestroyed()) {
+    return { ok: false }
+  }
+  const fontsDir = path.join(process.env.JPLEARN_DOCUMENTS_DIR || '', 'fonts')
+  const fontCSS = loadFontCSS(fontsDir)
+  if (!fontCSS) {
+    return { ok: false }
+  }
+  await webContents.insertCSS(fontCSS)
+  return { ok: true }
+}
+
 const SQUIRREL_EVENTS = new Set([
   '--squirrel-install',
   '--squirrel-updated',
@@ -1183,6 +1196,7 @@ registerIpcHandlers({
   repoRoot,
   refreshTutorChatRuntime: refreshTutorRuntimeAfterSetup,
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
+  reloadLocalFontsForContents,
 })
 
 async function preloadTutorChatStartupData() {

@@ -318,6 +318,7 @@ interface DesktopApi {
     deferredLoadsQueuedAtMs?: number
   }) => Promise<{ ok: boolean }>
   setStartupTheme: (theme: string) => Promise<{ ok: boolean; theme: string }>
+    reloadLocalFonts?: () => Promise<{ ok: boolean }>
   recordGameResult: (payload: {
     slug: DeckSlug
     cardId: number
@@ -403,7 +404,7 @@ interface DesktopApi {
   downloadModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ alreadyInstalled?: boolean }>
   setActiveTutorModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   uninstallTutorModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
-  downloadLlama?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  downloadLlama?: (backend?: 'cuda' | 'hip' | 'vulkan' | 'cpu') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   downloadVoicevox?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   completeSetup?: () => Promise<{ ok: boolean }>
   skipSetup?: () => Promise<{ ok: boolean }>
@@ -435,6 +436,7 @@ interface SetupSystemInfo {
   models: SetupModelOption[]
   llamaCppInstalled: boolean
   gpuAdapters?: string[]
+  gpuVramGb?: number | null
   llamaCppBackend?: 'cuda' | 'hip' | 'vulkan' | 'cpu'
   llamaCppBackendLabel?: string
   voicevoxInstalled: boolean

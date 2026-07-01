@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { ChevronDown, RefreshCw } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,6 +20,7 @@ interface SystemInfo {
   models: ModelOption[]
   llamaCppInstalled: boolean
   gpuAdapters?: string[]
+  gpuVramGb?: number | null
   llamaCppBackend?: 'cuda' | 'hip' | 'vulkan' | 'cpu'
   llamaCppBackendLabel?: string
   voicevoxInstalled: boolean
@@ -46,7 +47,23 @@ interface Props {
   onComplete: () => void
 }
 
+interface CompactDropdownOption {
+  value: string
+  label: string
+  meta?: string
+  badge?: string
+  badgeTone?: 'recommended' | 'soft'
+}
+
 type ModelTier = 'low' | 'high' | 'ultra' | 'skip'
+type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
+
+const LLAMA_BACKEND_OPTIONS: Array<{ key: LlamaBackend; label: string; description: string }> = [
+  { key: 'cuda', label: 'NVIDIA GPU', description: 'Uses CUDA. Usually the fastest option for NVIDIA graphics cards.' },
+  { key: 'hip', label: 'AMD GPU', description: 'Uses ROCm/HIP. Choose this for AMD graphics cards when GPU acceleration is available.' },
+  { key: 'vulkan', label: 'Intel / Vulkan', description: 'Uses Vulkan. A good fallback for Intel graphics and other systems with Vulkan support.' },
+  { key: 'cpu', label: 'CPU Only', description: 'No GPU acceleration. Best for maximum compatibility and the safest fallback.' },
+]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -78,6 +95,7 @@ export function SetupWizard({ onComplete }: Props) {
   const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null)
   const [systemInfoLoading, setSystemInfoLoading] = useState(false)
   const [selectedTier, setSelectedTier] = useState<ModelTier | null>(null)
+  const [selectedLlamaBackend, setSelectedLlamaBackend] = useState<LlamaBackend>('cpu')
   const [installVoicevox, setInstallVoicevox] = useState(true)
   const [modelProgress, setModelProgress] = useState(0)
   const [llamaProgress, setLlamaProgress] = useState(0)
@@ -120,6 +138,7 @@ export function SetupWizard({ onComplete }: Props) {
         }
         return info.recommendedTier
       })
+      setSelectedLlamaBackend(info.llamaCppBackend ?? 'cpu')
       if (info.voicevoxInstalled) setInstallVoicevox(false)
       if (info.fontsInstalled) setInstallFonts(false)
     } catch {
@@ -136,6 +155,7 @@ export function SetupWizard({ onComplete }: Props) {
         isPackaged: false,
       })
       setSelectedTier('low')
+      setSelectedLlamaBackend('cpu')
     } finally {
       setSystemInfoLoading(false)
     }
@@ -207,8 +227,9 @@ export function SetupWizard({ onComplete }: Props) {
         if (task) downloadTasks.push(task)
       }
       if (selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled) {
-        appendProgressLog('Starting llama.cpp runtime download…')
-        const task = api.downloadLlama?.()
+        const backendLabel = LLAMA_BACKEND_OPTIONS.find((option) => option.key === selectedLlamaBackend)?.label ?? selectedLlamaBackend
+        appendProgressLog(`Starting llama.cpp runtime download (${backendLabel})…`)
+        const task = api.downloadLlama?.(selectedLlamaBackend)
         if (task) downloadTasks.push(task)
       }
       if (installVoicevox) {
@@ -229,6 +250,9 @@ export function SetupWizard({ onComplete }: Props) {
           throw failure.reason instanceof Error ? failure.reason : new Error(String(failure.reason))
         }
       }
+      if (installFonts && !sysInfo?.fontsInstalled) {
+        await api.reloadLocalFonts?.().catch(() => undefined)
+      }
       appendProgressLog('Creating shortcuts…')
       await api.createShortcuts?.({ desktop: createDesktop, startMenu: createStartMenu })
       await api.completeSetup?.()
@@ -239,7 +263,7 @@ export function SetupWizard({ onComplete }: Props) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, installVoicevox, installFonts, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, createDesktop, createStartMenu, appendProgressLog])
+  }, [selectedTier, selectedLlamaBackend, installVoicevox, installFonts, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -273,6 +297,37 @@ export function SetupWizard({ onComplete }: Props) {
   // ── Page renders ───────────────────────────────────────────────────────────
 
   type Page = 1 | 2 | 3 | 4 | 5 | 6 | 7
+  const tutorModelOptions: CompactDropdownOption[] = [
+    ...(sysInfo?.models.map((model) => ({
+      value: model.tier,
+      label: model.label,
+      meta: `${formatSize(model.sizeMb)} • ${formatDurationMinutes(model.estimatedDownloadMinutes)}${model.installed ? ' • Installed' : ''}`,
+      badge: model.tier === sysInfo?.recommendedTier
+        ? 'Recommended'
+        : (model.tier === 'ultra' && (sysInfo?.gpuVramGb ?? 0) >= 8 ? 'VRAM Ready' : undefined),
+      badgeTone: model.tier === sysInfo?.recommendedTier
+        ? ('recommended' as const)
+        : (model.tier === 'ultra' && (sysInfo?.gpuVramGb ?? 0) >= 8 ? ('soft' as const) : undefined),
+    })) ?? []),
+    {
+      value: 'skip',
+      label: "Skip tutor install",
+      meta: 'Install later from settings or scripts',
+    },
+  ]
+  const selectedModel = sysInfo?.models.find((model) => model.tier === selectedTier)
+  const selectedModelDescription = selectedTier === 'skip'
+    ? 'You can install the tutor later if you change your mind.'
+    : selectedModel?.description
+  const selectedModelWarning = selectedTier === 'ultra'
+    ? 'Large download. Expect a longer setup time on slower connections.'
+    : null
+  const llamaBackendOptions: CompactDropdownOption[] = LLAMA_BACKEND_OPTIONS.map((option) => ({
+    value: option.key,
+    label: option.label,
+  }))
+  const selectedBackendDescription = LLAMA_BACKEND_OPTIONS.find((option) => option.key === selectedLlamaBackend)?.description
+
   const pages: Record<Page, ReactNode> = {
     1: (
       <PageLayout
@@ -309,7 +364,6 @@ export function SetupWizard({ onComplete }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <InfoRow label="RAM" value={`${sysInfo.totalRamGb.toFixed(1)} GB`} />
             <InfoRow label="GPU" value={sysInfo.gpuAdapters && sysInfo.gpuAdapters.length > 0 ? sysInfo.gpuAdapters.join(', ') : 'Not detected'} />
-            <InfoRow label="llama.cpp type" value={sysInfo.llamaCppBackendLabel ?? 'CPU'} highlight />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)' }}>
               <span style={{ opacity: 0.7 }}>Network</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -339,11 +393,6 @@ export function SetupWizard({ onComplete }: Props) {
                 </button>
               </span>
             </div>
-            <InfoRow
-              label="Recommended model"
-              value={sysInfo.models.find(m => m.tier === sysInfo.recommendedTier)?.label ?? '—'}
-              highlight
-            />
           </div>
         )}
       </PageLayout>
@@ -361,28 +410,45 @@ export function SetupWizard({ onComplete }: Props) {
           JPLearn includes an AI tutor you can chat with about Japanese grammar, vocabulary, and
           pronunciation — running privately on your device, no internet required once set up.
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {sysInfo?.models.map(m => (
-            <RadioOption
-              key={m.tier}
-              label={`${m.label}  (${formatSize(m.sizeMb)})  •  ${formatDurationMinutes(m.estimatedDownloadMinutes)}`}
-              sublabel={m.installed ? '✓ Already installed' : m.description}
-              checked={selectedTier === m.tier}
-              onChange={() => setSelectedTier(m.tier)}
-              warning={m.tier === 'ultra' ? '⚠ Large download. May take 15–30 min on slower connections.' : undefined}
-            />
-          ))}
-          <RadioOption
-            label="Skip — I don't want the AI tutor"
-            sublabel="You can install it later by running: python scripts/get_gguf_model.py"
-            checked={selectedTier === 'skip'}
-            onChange={() => setSelectedTier('skip')}
-          />
-        </div>
-        {selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled && (
-          <p style={{ opacity: 0.55, fontSize: '0.85rem', marginTop: '1rem', lineHeight: 1.4 }}>
-            The llama.cpp runtime will be installed automatically for this model.
+        <CompactDropdown
+          ariaLabel="Tutor model"
+          options={tutorModelOptions}
+          value={selectedTier ?? 'skip'}
+          onChange={(value) => setSelectedTier(value as ModelTier)}
+        />
+        {sysInfo?.gpuVramGb && sysInfo.gpuVramGb >= 8 ? (
+          <p style={{ opacity: 0.55, fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
+            Ultra is marked as VRAM Ready because this system reports {sysInfo.gpuVramGb.toFixed(1)} GB of GPU memory.
           </p>
+        ) : null}
+        {selectedModelDescription ? (
+          <p style={{ opacity: 0.65, fontSize: '0.84rem', lineHeight: 1.45, margin: '0.6rem 0 0' }}>
+            {selectedModelDescription}
+          </p>
+        ) : null}
+        {selectedModelWarning ? (
+          <p style={{ color: '#ffc107', fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
+            {selectedModelWarning}
+          </p>
+        ) : null}
+        {selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled && (
+          <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            <p style={{ fontSize: '0.92rem', fontWeight: 600, margin: 0 }}>
+              llama.cpp runtime type
+            </p>
+            <CompactDropdown
+              ariaLabel="llama.cpp runtime type"
+              options={llamaBackendOptions}
+              value={selectedLlamaBackend}
+              onChange={(value) => setSelectedLlamaBackend(value as LlamaBackend)}
+            />
+            <p style={{ opacity: 0.65, fontSize: '0.84rem', lineHeight: 1.45, margin: 0 }}>
+              {selectedBackendDescription}
+            </p>
+            <p style={{ opacity: 0.55, fontSize: '0.82rem', lineHeight: 1.4, margin: 0 }}>
+              Defaulted to the detected best match for this device: {sysInfo?.llamaCppBackendLabel ?? 'CPU'}.
+            </p>
+          </div>
         )}
       </PageLayout>
     ),
@@ -452,7 +518,7 @@ export function SetupWizard({ onComplete }: Props) {
             <SummaryRow label="AI Tutor model" detail={`${modelInfo.label} — ${formatSize(modelInfo.sizeMb)}`} />
           )}
           {needsLlama && (
-            <SummaryRow label="llama.cpp runtime" detail={`Local tutor server binary (${sysInfo?.llamaCppBackendLabel ?? 'CPU'})`} />
+            <SummaryRow label="llama.cpp runtime" detail={`Local tutor server binary (${LLAMA_BACKEND_OPTIONS.find((option) => option.key === selectedLlamaBackend)?.label ?? selectedLlamaBackend})`} />
           )}
           {needsVoice && (
             <SummaryRow label="Japanese voice (VOICEVOX)" detail="~1 GB" />
@@ -630,21 +696,6 @@ function PageLayout({
   )
 }
 
-function RadioOption({ label, sublabel, checked, onChange, warning }: {
-  label: string; sublabel?: string; checked: boolean; onChange: () => void; warning?: string
-}) {
-  return (
-    <label style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', cursor: 'pointer', padding: '0.65rem 0.75rem', borderRadius: '8px', background: checked ? 'rgba(255,255,255,0.06)' : 'transparent', border: `1px solid ${checked ? 'rgba(255,255,255,0.18)' : 'transparent'}`, transition: 'background 0.15s' }}>
-      <input type="radio" checked={checked} onChange={onChange} style={{ marginTop: '0.15rem', accentColor: 'var(--accent, #7eb8ea)', flexShrink: 0 }} />
-      <div>
-        <div style={{ fontWeight: 500 }}>{label}</div>
-        {sublabel && <div style={{ fontSize: '0.82rem', opacity: 0.6, marginTop: '0.15rem' }}>{sublabel}</div>}
-        {warning && checked && <div style={{ fontSize: '0.82rem', color: '#ffc107', marginTop: '0.25rem' }}>{warning}</div>}
-      </div>
-    </label>
-  )
-}
-
 function CheckboxOption({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', cursor: 'pointer', padding: '0.65rem 0.75rem', borderRadius: '8px', background: checked ? 'rgba(255,255,255,0.06)' : 'transparent', border: `1px solid ${checked ? 'rgba(255,255,255,0.18)' : 'transparent'}` }}>
@@ -669,6 +720,184 @@ function SummaryRow({ label, detail }: { label: string; detail: string }) {
       <span>{label}</span>
       <span style={{ opacity: 0.65, fontSize: '0.9rem' }}>{detail}</span>
     </div>
+  )
+}
+
+function CompactDropdown({
+  ariaLabel,
+  options,
+  value,
+  onChange,
+}: {
+  ariaLabel: string
+  options: CompactDropdownOption[]
+  value: string
+  onChange: (value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const selected = options.find((option) => option.value === value) ?? options[0] ?? null
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    function handlePointerDown(event: MouseEvent): void {
+      const target = event.target as Node
+      if (rootRef.current?.contains(target)) {
+        return
+      }
+      setOpen(false)
+    }
+
+    function handleEscape(event: KeyboardEvent): void {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown)
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
+
+  return (
+    <div
+      ref={rootRef}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.5rem',
+        padding: '0.75rem',
+        borderRadius: '8px',
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        position: 'relative',
+      }}
+    >
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        style={{
+          width: '100%',
+          borderRadius: '8px',
+          border: '1px solid rgba(255,255,255,0.16)',
+          background: 'rgba(255,255,255,0.06)',
+          color: 'inherit',
+          padding: '0.7rem 0.8rem',
+          fontSize: '0.92rem',
+          fontWeight: 600,
+          outline: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: '0.45rem', minWidth: 0 }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected?.label ?? 'Choose an option'}</span>
+          {selected?.badge ? (
+            <DropdownBadge tone={selected.badgeTone}>{selected.badge}</DropdownBadge>
+          ) : null}
+          {selected?.meta ? (
+            <span style={{ opacity: 0.58, fontSize: '0.8rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {selected.meta}
+            </span>
+          ) : null}
+        </span>
+        <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" style={{ opacity: 0.72, flexShrink: 0 }} />
+      </button>
+      {open ? (
+        <div
+          role="listbox"
+          aria-label={ariaLabel}
+          style={{
+            position: 'absolute',
+            left: '0.75rem',
+            right: '0.75rem',
+            top: 'calc(100% - 0.15rem)',
+            zIndex: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.25rem',
+            padding: '0.4rem',
+            borderRadius: '10px',
+            background: 'rgba(18, 27, 37, 0.98)',
+            border: '1px solid rgba(255,255,255,0.14)',
+            boxShadow: '0 18px 38px rgba(0,0,0,0.34)',
+            backdropFilter: 'blur(10px)',
+          }}
+        >
+          {options.map((option) => {
+            const isActive = option.value === value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isActive}
+                onClick={() => {
+                  onChange(option.value)
+                  setOpen(false)
+                }}
+                style={{
+                  borderRadius: '8px',
+                  border: isActive ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
+                  background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  color: 'inherit',
+                  textAlign: 'left',
+                  padding: '0.58rem 0.68rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  gap: '0.75rem',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{option.label}</span>
+                  {option.badge ? <DropdownBadge tone={option.badgeTone}>{option.badge}</DropdownBadge> : null}
+                </span>
+                {option.meta ? (
+                  <span style={{ fontSize: '0.76rem', opacity: 0.6, whiteSpace: 'nowrap' }}>{option.meta}</span>
+                ) : null}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function DropdownBadge({ children, tone = 'recommended' }: { children: React.ReactNode; tone?: 'recommended' | 'soft' }) {
+  const isSoft = tone === 'soft'
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '0.12rem 0.42rem',
+        borderRadius: '999px',
+        fontSize: '0.68rem',
+        fontWeight: 700,
+        letterSpacing: '0.02em',
+        color: isSoft ? '#f5ddb8' : '#0b1620',
+        background: isSoft ? 'rgba(242, 181, 111, 0.16)' : 'var(--accent, #7eb8ea)',
+        border: isSoft ? '1px solid rgba(242, 181, 111, 0.24)' : '1px solid rgba(255,255,255,0.1)',
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </span>
   )
 }
 

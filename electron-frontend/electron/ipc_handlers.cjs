@@ -492,6 +492,14 @@ function registerIpcHandlers(options) {
     return { ok: true }
   })
 
+  options.ipcMain.handle('ui:reload-local-fonts', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    if (typeof options.reloadLocalFontsForContents !== 'function') {
+      return { ok: false }
+    }
+    return await options.reloadLocalFontsForContents(event.sender)
+  })
+
   // ---- Progression, features, XP, recommendations, tutor ----
 
   options.ipcMain.handle('progression:get-state', async (event) => {
@@ -745,10 +753,13 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:download-llama', async (event) => {
+    options.ipcMain.handle('setup:download-llama', async (event, backend) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
+      const safeBackend = typeof backend === 'string' && ['cuda', 'hip', 'vulkan', 'cpu'].includes(backend)
+        ? backend
+        : undefined
       try {
-        return await setupRuntime.downloadLlamaCpp(event.sender, options.repoRoot)
+        return await setupRuntime.downloadLlamaCpp(event.sender, options.repoRoot, safeBackend)
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`llama.cpp download failed: ${detail}`)

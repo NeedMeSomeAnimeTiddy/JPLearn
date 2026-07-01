@@ -42,38 +42,38 @@
   --tone-amber: #f2b56f;
   --tone-rose: #ee8f87;
 
-  --display-font: 'M PLUS Rounded 1c', 'Trebuchet MS', 'Segoe UI', sans-serif;
-  --sans: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --display-font: 'Kiwi Maru', 'Segoe UI', sans-serif;
+  --sans: 'Kiwi Maru', 'Segoe UI', sans-serif;
   --mono: 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
-  --button-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+  --button-font: 'Kaisei Decol', 'Kiwi Maru', 'Segoe UI', sans-serif;
   --heading-font: var(--display-font);
   --body-font: var(--sans);
 
   font-family: var(--sans);
 }
 
-html[data-app-font='zen_kaku'] {
-  --display-font: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --sans: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --button-font: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --heading-font: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --body-font: 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+html[data-app-font='kiwi_maru'] {
+  --display-font: 'Kiwi Maru', 'Segoe UI', sans-serif;
+  --sans: 'Kiwi Maru', 'Segoe UI', sans-serif;
+  --button-font: 'Kiwi Maru', 'Segoe UI', sans-serif;
+  --heading-font: 'Kiwi Maru', 'Segoe UI', sans-serif;
+  --body-font: 'Kiwi Maru', 'Segoe UI', sans-serif;
 }
 
-html[data-app-font='mplus_rounded'] {
-  --display-font: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
-  --sans: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
-  --button-font: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
-  --heading-font: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
-  --body-font: 'M PLUS Rounded 1c', 'Segoe UI', sans-serif;
+html[data-app-font='bizin_gothic'] {
+  --display-font: 'BIZ UDPGothic', 'Yu Gothic UI', 'Segoe UI', sans-serif;
+  --sans: 'BIZ UDPGothic', 'Yu Gothic UI', 'Segoe UI', sans-serif;
+  --button-font: 'BIZ UDPGothic', 'Yu Gothic UI', 'Segoe UI', sans-serif;
+  --heading-font: 'BIZ UDPGothic', 'Yu Gothic UI', 'Segoe UI', sans-serif;
+  --body-font: 'BIZ UDPGothic', 'Yu Gothic UI', 'Segoe UI', sans-serif;
 }
 
-html[data-app-font='klee_one'] {
-  --display-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --sans: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --button-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --heading-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --body-font: 'Klee One', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+html[data-app-font='kaisei_decol'] {
+  --display-font: 'Kaisei Decol', 'Kiwi Maru', 'Segoe UI', serif;
+  --sans: 'Kaisei Decol', 'Kiwi Maru', 'Segoe UI', serif;
+  --button-font: 'Kaisei Decol', 'Kiwi Maru', 'Segoe UI', serif;
+  --heading-font: 'Kaisei Decol', 'Kiwi Maru', 'Segoe UI', serif;
+  --body-font: 'Kaisei Decol', 'Kiwi Maru', 'Segoe UI', serif;
 }
 
 html[data-app-font='noto_sans_jp'] {
@@ -100,12 +100,12 @@ html[data-app-font='zen_old_mincho'] {
   --body-font: 'Zen Old Mincho', 'Shippori Mincho', 'Yu Mincho', serif;
 }
 
-html[data-app-font='dotgothic16'] {
-  --display-font: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --sans: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --button-font: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --heading-font: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
-  --body-font: 'DotGothic16', 'Zen Kaku Gothic New', 'Segoe UI', sans-serif;
+html[data-app-font='reggae_one'] {
+  --display-font: 'Reggae One', 'Kiwi Maru', 'Segoe UI', cursive;
+  --sans: 'Reggae One', 'Kiwi Maru', 'Segoe UI', cursive;
+  --button-font: 'Reggae One', 'Kiwi Maru', 'Segoe UI', cursive;
+  --heading-font: 'Reggae One', 'Kiwi Maru', 'Segoe UI', cursive;
+  --body-font: 'Reggae One', 'Kiwi Maru', 'Segoe UI', cursive;
 }
 
 html[data-app-font='system_ui'] {

@@ -117,13 +117,13 @@ type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type AppFontPreset =
-  | 'zen_kaku'
-  | 'mplus_rounded'
-  | 'klee_one'
+  | 'kiwi_maru'
+  | 'bizin_gothic'
+  | 'kaisei_decol'
   | 'noto_sans_jp'
   | 'shippori_mincho'
   | 'zen_old_mincho'
-  | 'dotgothic16'
+  | 'reggae_one'
   | 'system_ui'
 type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
 type BackgroundStyle =
@@ -1294,25 +1294,25 @@ const FONT_SIZE_LABEL: Record<FontSize, string> = {
 }
 
 const APP_FONT_OPTIONS: Array<{ key: AppFontPreset; label: string }> = [
-  { key: 'zen_kaku', label: 'Zen Kaku Gothic' },
-  { key: 'mplus_rounded', label: 'M PLUS Rounded' },
-  { key: 'klee_one', label: 'Klee One' },
+  { key: 'kiwi_maru', label: 'Kiwi Maru' },
+  { key: 'bizin_gothic', label: 'BIZ UDPGothic' },
+  { key: 'kaisei_decol', label: 'Kaisei Decol' },
   { key: 'noto_sans_jp', label: 'Noto Sans JP' },
   { key: 'shippori_mincho', label: 'Shippori Mincho' },
   { key: 'zen_old_mincho', label: 'Zen Old Mincho' },
-  { key: 'dotgothic16', label: 'DotGothic16' },
+  { key: 'reggae_one', label: 'Reggae One' },
   { key: 'system_ui', label: 'System UI' },
 ]
 
 function isAppFontPreset(value: unknown): value is AppFontPreset {
   return (
-    value === 'zen_kaku'
-    || value === 'mplus_rounded'
-    || value === 'klee_one'
+    value === 'kiwi_maru'
+    || value === 'bizin_gothic'
+    || value === 'kaisei_decol'
     || value === 'noto_sans_jp'
     || value === 'shippori_mincho'
     || value === 'zen_old_mincho'
-    || value === 'dotgothic16'
+    || value === 'reggae_one'
     || value === 'system_ui'
   )
 }
@@ -1620,7 +1620,7 @@ function defaultSettings(): AppSettings {
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     fontSize: 'medium',
-    appFont: 'zen_kaku',
+    appFont: 'kiwi_maru',
     themeMode: 'dark',
     theme: 'harbor_mist',
     themeScope: 'preset',
@@ -2613,6 +2613,8 @@ function App() {
     recommendedTier: 'low' | 'high'
     activeModelTier?: 'low' | 'high' | 'ultra' | null
     llamaCppInstalled: boolean
+    voicevoxInstalled: boolean
+    fontsInstalled: boolean
     llamaCppEstimatedDownloadMinutes?: number | null
   } | null>(null)
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'high' | 'ultra' | null>(null)
@@ -2844,12 +2846,18 @@ function App() {
         recommendedTier: setupInfo.recommendedTier,
         activeModelTier: setupInfo.activeModelTier ?? null,
         llamaCppInstalled: setupInfo.llamaCppInstalled,
+        voicevoxInstalled: setupInfo.voicevoxInstalled,
+        fontsInstalled: setupInfo.fontsInstalled,
         llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
       })
     } catch {
       // Best effort only.
     }
   }, [])
+
+  useEffect(() => {
+    void refreshTutorInstallInfo()
+  }, [refreshTutorInstallInfo])
 
   useEffect(() => {
     if (!showSettings || activeSettingsTab !== 'tutor') {
@@ -2943,6 +2951,10 @@ function App() {
     const nextSize = FONT_SIZE_ORDER[nextIndex]
     setSettings((prev) => ({ ...prev, fontSize: nextSize }))
   }, [settings.fontSize])
+
+  const reloadLocalFonts = useCallback(() => {
+    void window.jplearnDesktop.reloadLocalFonts?.().catch(() => undefined)
+  }, [])
 
   const availableThemes = useMemo(
     () => THEME_OPTIONS.filter((theme) => theme.mode === settings.themeMode),
@@ -5886,9 +5898,31 @@ function App() {
     return () => window.removeEventListener('mousedown', handlePointerDown)
   }, [streakDetailsOpen])
 
+  const handleSetupWizardComplete = useCallback(() => {
+    setShowWizard(false)
+    const getPath = window.jplearnDesktop.getLearningPathStatus
+    if (getPath) {
+      void getPath().then((path) => {
+        if (path) {
+          setLearningPathStatus(path as LearningPathStatus)
+        }
+      }).catch(() => undefined)
+    }
+    void loadSummary()
+    void refreshTutorInstallInfo()
+  }, [loadSummary, refreshTutorInstallInfo])
+
+  const hasInstalledTutorModel = Boolean(
+    tutorInstallInfo?.llamaCppInstalled
+      && (tutorInstallInfo?.models ?? []).some((model) => model.installed),
+  )
+  const showOnboardingChatbotSection = tutorInstallInfo ? hasInstalledTutorModel : true
+  const showOnboardingVoiceSection = tutorInstallInfo ? tutorInstallInfo.voicevoxInstalled : true
+  const showOnboardingFontSection = tutorInstallInfo ? tutorInstallInfo.fontsInstalled : true
+
   // Show setup wizard on first run (all hooks above must run unconditionally)
   if (showWizard === true) {
-    return <SetupWizard onComplete={() => setShowWizard(false)} />
+    return <SetupWizard onComplete={handleSetupWizardComplete} />
   }
   if (showWizard === null) {
     // Brief check in progress — render nothing to avoid flash
@@ -6374,6 +6408,12 @@ function App() {
       {view === 'home' && !loading && learningPathStatus && !learningPathStatus.onboarding_complete ? (
         <OnboardingView
           navDirection={navDirection}
+          showChatbotSection={showOnboardingChatbotSection}
+          assistantChatEnabled={settings.assistantChatEnabled}
+          onAssistantChatToggle={() => {
+            setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))
+          }}
+          showVoiceSection={showOnboardingVoiceSection}
           voiceOptions={VOICE_OPTIONS}
           voiceEnabled={settings.voiceEnabled}
           voiceSpeaker={settings.voiceSpeaker}
@@ -6382,6 +6422,20 @@ function App() {
           onVoiceSelect={(id) => {
             setSettings((prev) => ({ ...prev, voiceSpeaker: id }))
             void playQuestionAudio(VOICE_SAMPLE_LINE, id)
+          }}
+          showFontSection={showOnboardingFontSection}
+          appFont={settings.appFont}
+          fontOptions={APP_FONT_OPTIONS}
+          onAppFontSelect={(key) => {
+            if (!isAppFontPreset(key)) {
+              return
+            }
+            setSettings((prev) => ({ ...prev, appFont: key }))
+          }}
+          fontSize={settings.fontSize}
+          fontSizeOptions={FONT_SIZE_ORDER.map((size) => ({ key: size, label: FONT_SIZE_LABEL[size] }))}
+          onFontSizeSelect={(key) => {
+            setSettings((prev) => ({ ...prev, fontSize: key }))
           }}
           onSelectPath={(pathId, checkedItems, answers) => {
             void handleOnboardingComplete(pathId, checkedItems, answers)
@@ -7162,6 +7216,19 @@ function App() {
                         </button>
                       ))}
                     </div>
+                    <button
+                      type="button"
+                      className="settings-icon-entry settings-icon-entry-button"
+                      onClick={reloadLocalFonts}
+                      aria-label="Reload local font files"
+                      title="Reload local fonts"
+                      style={{ marginTop: 12 }}
+                    >
+                      <span className="settings-mode-icon-button" aria-hidden="true">
+                        <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" />
+                      </span>
+                      <span className="settings-icon-entry-label">Reload Local Fonts</span>
+                    </button>
                     <p className="settings-help">Applies to interface text across the app.</p>
                   </div>
                 </div>

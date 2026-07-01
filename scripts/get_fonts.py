@@ -23,19 +23,21 @@ from pathlib import Path
 
 # Exact fonts and weights used by the app — mirrors the imports in main.tsx
 FONTS: list[tuple[str, list[int]]] = [
-    ("zen-kaku-gothic-new", [400, 500, 700, 900]),
-    ("m-plus-rounded-1c", [500, 700, 800]),
-    ("klee-one", [600]),
+    ("kiwi-maru", [400, 500]),
+    ("biz-udpgothic", [400, 700]),
+    ("kaisei-decol", [400, 500, 700]),
     ("noto-sans-jp", [400, 500, 700]),
     ("shippori-mincho", [400, 700]),
     ("zen-old-mincho", [400, 700]),
-    ("dotgothic16", [400]),
+    ("reggae-one", [400]),
     ("ibm-plex-mono", [400, 500]),
 ]
 
 NPM_REGISTRY_BASE = "https://registry.npmjs.org/@fontsource"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 READY_MARKER = ".fonts-ready"
+MANIFEST_FILENAME = ".fonts-manifest.json"
+FONT_BUNDLE_VERSION = 2
 
 
 def resolve_target_dir() -> Path:
@@ -151,7 +153,9 @@ def main() -> int:
     target_dir = resolve_target_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
     marker_path = target_dir / READY_MARKER
+    manifest_path = target_dir / MANIFEST_FILENAME
     marker_path.unlink(missing_ok=True)
+    manifest_path.unlink(missing_ok=True)
     print(f"Fonts directory: {target_dir}\n")
 
     total_families = len(FONTS)
@@ -165,6 +169,19 @@ def main() -> int:
 
     print(f"\nDone. Fonts saved to {target_dir}")
     marker_path.write_text("ok\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "version": FONT_BUNDLE_VERSION,
+                "families": [
+                    {"name": family, "weights": weights}
+                    for family, weights in FONTS
+                ],
+            },
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
     print("Restart JPLearn to load the downloaded fonts.")
     return 0
 

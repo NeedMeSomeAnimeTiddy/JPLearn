@@ -44,6 +44,20 @@ const MODELS = {
 const RAM_THRESHOLD_GB = 16
 const SENTINEL_NAME = '.setup-done'
 const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
+const FONT_READY_MARKER = '.fonts-ready'
+const FONT_MANIFEST_FILENAME = '.fonts-manifest.json'
+const FONT_BUNDLE_VERSION = 2
+const EXPECTED_FONT_FAMILIES = [
+  'kiwi-maru',
+  'biz-udpgothic',
+  'kaisei-decol',
+  'noto-sans-jp',
+  'shippori-mincho',
+  'zen-old-mincho',
+  'reggae-one',
+  'ibm-plex-mono',
+]
+const EXPECTED_FONT_WEIGHT_COUNT = 17
 const LLAMA_CPP_SIZE_MB = 250
 const VOICEVOX_SIZE_MB = 1000
 const FONTS_SIZE_MB = 100
@@ -72,6 +86,38 @@ function getJPLearnDir() {
     docs = path.join(os.homedir(), 'Documents')
   }
   return path.join(docs, 'JPLearn')
+}
+
+function getFontInstallState(base) {
+  const fontsDir = path.join(base, 'fonts')
+  const markerPath = path.join(fontsDir, FONT_READY_MARKER)
+  const manifestPath = path.join(fontsDir, FONT_MANIFEST_FILENAME)
+
+  if (!fs.existsSync(fontsDir) || !fs.existsSync(markerPath) || !fs.existsSync(manifestPath)) {
+    return { installed: false, isCurrent: false }
+  }
+
+  try {
+    const raw = fs.readFileSync(manifestPath, 'utf8')
+    const manifest = JSON.parse(raw)
+    const manifestVersion = typeof manifest?.version === 'number' ? manifest.version : null
+    const families = Array.isArray(manifest?.families) ? manifest.families : []
+    const familyNames = families
+      .map((entry) => (entry && typeof entry.name === 'string' ? entry.name : null))
+      .filter(Boolean)
+    const weightCount = families.reduce((sum, entry) => (
+      sum + (Array.isArray(entry?.weights) ? entry.weights.length : 0)
+    ), 0)
+    const hasAllFamilies = EXPECTED_FONT_FAMILIES.every((family) => familyNames.includes(family))
+    const directoriesPresent = EXPECTED_FONT_FAMILIES.every((family) => fs.existsSync(path.join(fontsDir, family)))
+    const isCurrent = manifestVersion === FONT_BUNDLE_VERSION
+      && hasAllFamilies
+      && directoriesPresent
+      && weightCount === EXPECTED_FONT_WEIGHT_COUNT
+    return { installed: isCurrent, isCurrent }
+  } catch {
+    return { installed: false, isCurrent: false }
+  }
 }
 
 function ensureJPLearnDirs() {
@@ -175,6 +221,33 @@ function detectGpuNames() {
   }
 }
 
+function detectGpuVramGb() {
+  if (process.platform !== 'win32') {
+    return null
+  }
+  try {
+    const result = spawnSync(
+      'powershell',
+      ['-NoProfile', '-Command', '(Get-CimInstance Win32_VideoController).AdapterRAM'],
+      { encoding: 'utf8', windowsHide: true, timeout: 10000 },
+    )
+    if (result.status !== 0 || !result.stdout) {
+      return null
+    }
+    const values = result.stdout
+      .split(/\r?\n/)
+      .map((line) => Number(line.trim()))
+      .filter((value) => Number.isFinite(value) && value > 0)
+    if (values.length <= 0) {
+      return null
+    }
+    const maxBytes = Math.max(...values)
+    return Math.round((maxBytes / (1024 ** 3)) * 10) / 10
+  } catch {
+    return null
+  }
+}
+
 function hasNvidiaDriver() {
   if (process.platform !== 'win32') {
     return false
@@ -219,16 +292,15 @@ async function getSystemInfo() {
   const voicevoxInstalled = fs.existsSync(path.join(base, 'voicevox', 'run.exe'))
   const llamaCppInstalled = fs.existsSync(path.join(llamaCppDir, 'llama-server.exe'))
   const gpuAdapters = detectGpuNames()
+  const gpuVramGb = detectGpuVramGb()
   const llamaCppBackend = detectLlamaBackend(gpuAdapters)
   const networkMbpsRaw = await measureNetworkMbps()
   const networkMbps = typeof networkMbpsRaw === 'number' && Number.isFinite(networkMbpsRaw)
     ? Math.round(networkMbpsRaw * 10) / 10
     : null
 
-  const fontsDir = path.join(base, 'fonts')
-  const fontsInstalled = fs.existsSync(fontsDir) && (() => {
-    try { return fs.readdirSync(fontsDir).some((f) => fs.statSync(path.join(fontsDir, f)).isDirectory()) } catch { return false }
-  })()
+  const fontInstallState = getFontInstallState(base)
+  const fontsInstalled = fontInstallState.installed
 
   let isPackaged = false
   try { isPackaged = require('electron').app.isPackaged } catch { /* dev mode */ }
@@ -250,6 +322,7 @@ async function getSystemInfo() {
     models,
     llamaCppInstalled,
     gpuAdapters,
+    gpuVramGb,
     llamaCppBackend,
     llamaCppBackendLabel: LLAMA_BACKEND_LABELS[llamaCppBackend] || LLAMA_BACKEND_LABELS.cpu,
     voicevoxInstalled,
@@ -463,10 +536,13 @@ function downloadModel(tier, sender) {
   return downloadWithProgress(url, destPath, onProgress)
 }
 
-function downloadLlamaCpp(sender, scriptRoot) {
+function downloadLlamaCpp(sender, scriptRoot, requestedBackend) {
   const base = ensureJPLearnDirs()
   const llamaDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
-  const llamaBackend = detectLlamaBackend(detectGpuNames())
+  const detectedBackend = detectLlamaBackend(detectGpuNames())
+  const llamaBackend = ['cuda', 'hip', 'vulkan', 'cpu'].includes(requestedBackend)
+    ? requestedBackend
+    : detectedBackend
 
   if (fs.existsSync(path.join(llamaDir, 'llama-server.exe'))) {
     return Promise.resolve({ alreadyInstalled: true })
@@ -571,6 +647,11 @@ function downloadVoicevox(sender, scriptRoot) {
 function downloadFonts(sender, scriptRoot) {
   const base = ensureJPLearnDirs()
   const scriptPath = path.join(scriptRoot, 'scripts', 'get_fonts.py')
+  const fontInstallState = getFontInstallState(base)
+
+  if (fontInstallState.isCurrent) {
+    return Promise.resolve({ alreadyInstalled: true })
+  }
 
   const pythonCmd = (() => {
     const resourcesPath = (process.resourcesPath || '').trim()
@@ -584,12 +665,13 @@ function downloadFonts(sender, scriptRoot) {
   })()
 
   return new Promise((resolve, reject) => {
-    const child = spawn(pythonCmd, [scriptPath], {
+    const args = fontInstallState.installed ? [scriptPath] : [scriptPath, '--force']
+    const child = spawn(pythonCmd, args, {
       env: { ...process.env, JPLEARN_DOCUMENTS_DIR: base },
       windowsHide: true,
     })
 
-    const TOTAL_WEIGHTS = 18
+    const TOTAL_WEIGHTS = EXPECTED_FONT_WEIGHT_COUNT
     let completedWeights = 0
     let currentWeightPct = 0
 

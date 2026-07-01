@@ -61,12 +61,23 @@ interface VoiceOption {
 
 interface OnboardingViewProps {
   navDirection: NavDirection
+  showChatbotSection: boolean
+  assistantChatEnabled: boolean
+  onAssistantChatToggle: () => void
+  showVoiceSection: boolean
   voiceOptions: VoiceOption[]
   voiceEnabled: boolean
   voiceSpeaker: number
   voiceBusy: boolean
   onVoiceToggle: () => void
   onVoiceSelect: (id: number) => void
+  showFontSection: boolean
+  appFont: string
+  fontOptions: Array<{ key: string; label: string }>
+  onAppFontSelect: (key: string) => void
+  fontSize: 'small' | 'medium' | 'large'
+  fontSizeOptions: Array<{ key: 'small' | 'medium' | 'large'; label: string }>
+  onFontSizeSelect: (key: 'small' | 'medium' | 'large') => void
   onSelectPath: (pathId: string, checkedItems: Set<string>, answers: OnboardingAnswers) => void
   onSkip: (checkedItems: Set<string>, answers: OnboardingAnswers) => void
 }
@@ -75,12 +86,23 @@ interface OnboardingViewProps {
 
 export function OnboardingView({
   navDirection,
+  showChatbotSection,
+  assistantChatEnabled,
+  onAssistantChatToggle,
+  showVoiceSection,
   voiceOptions,
   voiceEnabled,
   voiceSpeaker,
   voiceBusy,
   onVoiceToggle,
   onVoiceSelect,
+  showFontSection,
+  appFont,
+  fontOptions,
+  onAppFontSelect,
+  fontSize,
+  fontSizeOptions,
+  onFontSizeSelect,
   onSelectPath,
   onSkip,
 }: OnboardingViewProps) {
@@ -233,44 +255,107 @@ export function OnboardingView({
             </div>
           </section>
 
-          {/* ── Voice ─────────────────────────────────────────────────── */}
-          <section className="onb-section" aria-labelledby="onb-voice-label">
-            <h2 id="onb-voice-label" className="onb-section-title">
-              Would you like prompts read aloud?
-            </h2>
-            <p className="onb-section-hint">
-              A Japanese voice will read study prompts during games. Tap a voice to hear a sample.
-            </p>
-            <button
-              type="button"
-              className={`onb-voice-toggle${voiceEnabled ? ' is-on' : ''}`}
-              aria-pressed={voiceEnabled}
-              onClick={onVoiceToggle}
-              disabled={submitting}
-            >
-              {voiceEnabled
-                ? <><Volume2 size={15} strokeWidth={2.2} aria-hidden="true" /> Voice on</>
-                : <><VolumeX size={15} strokeWidth={2.2} aria-hidden="true" /> Voice off</>
-              }
-            </button>
-            {voiceEnabled && (
-              <div className="onb-voice-grid" role="radiogroup" aria-label="Choose a reading voice">
-                {voiceOptions.map((opt) => (
+          {showChatbotSection ? (
+            <section className="onb-section" aria-labelledby="onb-chatbot-label">
+              <h2 id="onb-chatbot-label" className="onb-section-title">
+                Would you like the study coach chat?
+              </h2>
+              <p className="onb-section-hint">
+                Enable an in-app coach that can answer study questions and suggest next steps.
+              </p>
+              <button
+                type="button"
+                className={`onb-voice-toggle${assistantChatEnabled ? ' is-on' : ''}`}
+                aria-pressed={assistantChatEnabled}
+                onClick={onAssistantChatToggle}
+                disabled={submitting}
+              >
+                {assistantChatEnabled ? 'Coach chat on' : 'Coach chat off'}
+              </button>
+            </section>
+          ) : null}
+
+          {showVoiceSection ? (
+            <section className="onb-section" aria-labelledby="onb-voice-label">
+              <h2 id="onb-voice-label" className="onb-section-title">
+                Would you like prompts read aloud?
+              </h2>
+              <p className="onb-section-hint">
+                A Japanese voice will read study prompts during games. Tap a voice to hear a sample.
+              </p>
+              <button
+                type="button"
+                className={`onb-voice-toggle${voiceEnabled ? ' is-on' : ''}`}
+                aria-pressed={voiceEnabled}
+                onClick={onVoiceToggle}
+                disabled={submitting}
+              >
+                {voiceEnabled
+                  ? <><Volume2 size={15} strokeWidth={2.2} aria-hidden="true" /> Voice on</>
+                  : <><VolumeX size={15} strokeWidth={2.2} aria-hidden="true" /> Voice off</>
+                }
+              </button>
+              {voiceEnabled && (
+                <div className="onb-voice-grid" role="radiogroup" aria-label="Choose a reading voice">
+                  {voiceOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      className={`onb-voice-card${voiceSpeaker === opt.id ? ' is-active' : ''}`}
+                      aria-pressed={voiceSpeaker === opt.id}
+                      onClick={() => onVoiceSelect(opt.id)}
+                      disabled={submitting || voiceBusy}
+                    >
+                      <span className="onb-voice-name">{opt.name}</span>
+                      <span className="onb-voice-jp">{opt.jp}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : null}
+
+          {showFontSection ? (
+            <section className="onb-section" aria-labelledby="onb-font-label">
+              <h2 id="onb-font-label" className="onb-section-title">
+                Pick a study font
+              </h2>
+              <p className="onb-section-hint">
+                Choose the reading style that feels best now. You can change this later in settings.
+              </p>
+              <div className="onb-level-grid" role="radiogroup" aria-label="App font">
+                {fontOptions.map((font) => (
                   <button
-                    key={opt.id}
+                    key={font.key}
                     type="button"
-                    className={`onb-voice-card${voiceSpeaker === opt.id ? ' is-active' : ''}`}
-                    aria-pressed={voiceSpeaker === opt.id}
-                    onClick={() => onVoiceSelect(opt.id)}
-                    disabled={submitting || voiceBusy}
+                    className={`onb-level-chip${appFont === font.key ? ' is-selected' : ''}`}
+                    aria-pressed={appFont === font.key}
+                    onClick={() => onAppFontSelect(font.key)}
+                    disabled={submitting}
                   >
-                    <span className="onb-voice-name">{opt.name}</span>
-                    <span className="onb-voice-jp">{opt.jp}</span>
+                    {font.label}
                   </button>
                 ))}
               </div>
-            )}
-          </section>
+              <p className="onb-section-hint" style={{ marginTop: '0.9rem' }}>
+                Choose a comfortable font size for menus and study screens.
+              </p>
+              <div className="onb-level-grid" role="radiogroup" aria-label="App font size">
+                {fontSizeOptions.map((size) => (
+                  <button
+                    key={size.key}
+                    type="button"
+                    className={`onb-level-chip${fontSize === size.key ? ' is-selected' : ''}`}
+                    aria-pressed={fontSize === size.key}
+                    onClick={() => onFontSizeSelect(size.key)}
+                    disabled={submitting}
+                  >
+                    {size.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {/* ── Path card + CTA ───────────────────────────────────────── */}
           <section className="onb-section onb-path-section" aria-labelledby="onb-path-label">
