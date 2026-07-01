@@ -12,6 +12,31 @@ const {
   isAllowedRendererUrl,
 } = require('./ipc_security.cjs')
 
+const SQUIRREL_EVENTS = new Set([
+  '--squirrel-install',
+  '--squirrel-updated',
+  '--squirrel-uninstall',
+  '--squirrel-obsolete',
+])
+
+function findSquirrelEventArg(argv) {
+  for (const arg of argv || []) {
+    if (SQUIRREL_EVENTS.has(arg)) return arg
+  }
+  return null
+}
+
+function appendUninstallHookLog(message) {
+  if (process.platform !== 'win32') return
+  try {
+    const logPath = path.join(os.tmpdir(), 'jplearn-uninstall-hook.log')
+    const line = `[${new Date().toISOString()}] ${message}\n`
+    fs.appendFileSync(logPath, line, 'utf8')
+  } catch {
+    // Best effort only.
+  }
+}
+
 function getUninstallCleanupScriptPath() {
   const resourcesPath = (typeof process !== 'undefined' && process.resourcesPath) || ''
   const candidates = [
@@ -34,6 +59,7 @@ function launchUninstallCleanupHelper() {
 
   const scriptPath = getUninstallCleanupScriptPath()
   if (!scriptPath) {
+    appendUninstallHookLog('cleanup-helper: uninstall_cleanup.ps1 not found')
     return
   }
 
@@ -49,31 +75,125 @@ function launchUninstallCleanupHelper() {
   ]
 
   try {
+    appendUninstallHookLog(`cleanup-helper: launching powershell for ${scriptPath}`)
     const child = spawn('powershell.exe', args, {
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
     })
     child.unref()
+    appendUninstallHookLog('cleanup-helper: launch dispatched')
   } catch {
+    appendUninstallHookLog('cleanup-helper: launch failed')
+    // Best effort only: uninstall flow must never block Squirrel.
+  }
+}
+
+function getSquirrelInstallRoot() {
+  try {
+    // process.execPath: ...\AppData\Local\jplearn\app-<version>\JPLearn.exe
+    // Install root is one level above app-<version>.
+    return path.resolve(path.dirname(process.execPath), '..')
+  } catch {
+    return null
+  }
+}
+
+function runSquirrelUpdate(args) {
+  const installRoot = getSquirrelInstallRoot()
+  if (!installRoot) {
+    return false
+  }
+
+  const updateExe = path.join(installRoot, 'Update.exe')
+  if (!fs.existsSync(updateExe)) {
+    appendUninstallHookLog(`squirrel-update: missing Update.exe at ${updateExe}`)
+    return false
+  }
+
+  try {
+    appendUninstallHookLog(`squirrel-update: launching ${updateExe} ${args.join(' ')}`)
+    const child = spawn(updateExe, args, {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    child.unref()
+    appendUninstallHookLog('squirrel-update: launch dispatched')
+    return true
+  } catch {
+    appendUninstallHookLog('squirrel-update: launch failed')
+    return false
+  }
+}
+
+function launchSquirrelRootCleanupHelper() {
+  if (process.platform !== 'win32') {
+    return
+  }
+
+  const installRoot = getSquirrelInstallRoot()
+  if (!installRoot) {
+    appendUninstallHookLog('root-cleanup: install root not resolved')
+    return
+  }
+
+  const escapedRoot = installRoot.replace(/'/g, "''")
+  const command = [
+    `$root = '${escapedRoot}'`,
+    'for ($i = 0; $i -lt 120; $i++) {',
+    '  if (-not (Test-Path -LiteralPath $root)) { exit 0 }',
+    '  try {',
+    '    Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction Stop',
+    '  } catch {',
+    '    # Best effort; Squirrel can still hold files briefly.',
+    '  }',
+    '  if (-not (Test-Path -LiteralPath $root)) { exit 0 }',
+    '  Start-Sleep -Milliseconds 500',
+    '}',
+    'exit 0',
+  ].join('; ')
+
+  const encoded = Buffer.from(command, 'utf16le').toString('base64')
+  try {
+    appendUninstallHookLog(`root-cleanup: launching for ${installRoot}`)
+    const child = spawn('powershell.exe', [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-WindowStyle',
+      'Hidden',
+      '-EncodedCommand',
+      encoded,
+    ], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    child.unref()
+    appendUninstallHookLog('root-cleanup: launch dispatched')
+  } catch {
+    appendUninstallHookLog('root-cleanup: launch failed')
     // Best effort only: uninstall flow must never block Squirrel.
   }
 }
 
 // ── Squirrel.Windows lifecycle events ────────────────────────────────────────
 // Squirrel re-launches the app with a special arg for install/update/uninstall.
-const _squirrelArg = process.argv[1]
-if (
-  _squirrelArg === '--squirrel-install' ||
-  _squirrelArg === '--squirrel-updated' ||
-  _squirrelArg === '--squirrel-uninstall' ||
-  _squirrelArg === '--squirrel-obsolete'
-) {
+const _squirrelArg = findSquirrelEventArg(process.argv)
+if (_squirrelArg) {
+  appendUninstallHookLog(`squirrel-event: ${_squirrelArg}; argv=${JSON.stringify(process.argv)}`)
+  const exeName = path.basename(process.execPath)
+  if (_squirrelArg === '--squirrel-install' || _squirrelArg === '--squirrel-updated') {
+    runSquirrelUpdate(['--createShortcut', exeName])
+  }
   if (_squirrelArg === '--squirrel-uninstall') {
+    runSquirrelUpdate(['--removeShortcut', exeName])
     launchUninstallCleanupHelper()
+    launchSquirrelRootCleanupHelper()
   }
   // Clean quit — Squirrel will handle shortcuts/registry
-  app.quit()
+  app.exit(0)
 }
 
 // ── Documents\JPLearn\ base path ─────────────────────────────────────────────
