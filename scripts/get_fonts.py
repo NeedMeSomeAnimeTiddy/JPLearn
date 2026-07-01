@@ -96,7 +96,7 @@ def download_font(family: str, weight: int, target_dir: Path, force: bool) -> No
         done += 1
         report(done, total)
 
-    sys.stdout.write(f"\r  {total} woff2 files — {family}/{weight}.css\n")
+    sys.stdout.write(f"\r  {total} woff2 files - {family}/{weight}.css\n")
 
 
 def main() -> int:

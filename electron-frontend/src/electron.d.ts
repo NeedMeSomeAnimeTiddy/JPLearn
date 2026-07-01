@@ -439,6 +439,8 @@ interface SetupProgressEvent {
   mb: number | null
   totalMb: number | null
   etaSec: number | null
+  filesDone?: number | null
+  filesTotal?: number | null
 }
 
 interface VoiceStatus {

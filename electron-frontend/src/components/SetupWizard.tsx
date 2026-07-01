@@ -27,6 +27,8 @@ interface ProgressEvent {
   mb: number | null
   totalMb: number | null
   etaSec: number | null
+  filesDone?: number | null
+  filesTotal?: number | null
 }
 
 interface Props {
@@ -63,6 +65,7 @@ export function SetupWizard({ onComplete }: Props) {
   const [modelEta, setModelEta] = useState<number | null>(null)
   const [installFonts, setInstallFonts] = useState(true)
   const [fontsProgress, setFontsProgress] = useState(0)
+  const [fontsFiles, setFontsFiles] = useState<{ done: number; total: number } | null>(null)
   const [createDesktop, setCreateDesktop] = useState(true)
   const [createStartMenu, setCreateStartMenu] = useState(true)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -99,6 +102,9 @@ export function SetupWizard({ onComplete }: Props) {
         if (evt.totalMb !== null) setVoicevoxMb(evt.totalMb)
       } else if (evt.id === 'fonts') {
         setFontsProgress(evt.percent)
+        if (evt.filesDone !== null && evt.filesDone !== undefined && evt.filesTotal !== null && evt.filesTotal !== undefined) {
+          setFontsFiles({ done: evt.filesDone, total: evt.filesTotal })
+        }
       }
     })
     unsubRef.current = unsub
@@ -350,7 +356,14 @@ export function SetupWizard({ onComplete }: Props) {
           />
         )}
         {installFonts && !sysInfo?.fontsInstalled && (
-          <ProgressBar value={fontsProgress} label="Japanese fonts" />
+          <>
+            <ProgressBar value={fontsProgress} label="Japanese fonts" />
+            {fontsFiles && fontsProgress > 0 && fontsProgress < 100 && (
+              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-0.5rem', marginBottom: '0.75rem' }}>
+                Downloading files {fontsFiles.done}/{fontsFiles.total}
+              </p>
+            )}
+          </>
         )}
         {downloadError && (
           <p style={{ color: '#ff7b7b', marginTop: '1rem', lineHeight: 1.5 }}>

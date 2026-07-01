@@ -300,19 +300,37 @@ function downloadFonts(sender, scriptRoot) {
       windowsHide: true,
     })
 
-    const TOTAL_FAMILIES = 8
-    let completed = 0
+    const TOTAL_WEIGHTS = 18
+    let completedWeights = 0
+    let currentWeightPct = 0
+
+    const emitFontProgress = () => {
+      const overall = ((completedWeights + currentWeightPct / 100) / TOTAL_WEIGHTS) * 100
+      const pct = Math.max(0, Math.min(99, Math.round(overall)))
+      if (sender && !sender.isDestroyed()) {
+        sender.send('setup:download-progress', {
+          id: 'fonts',
+          percent: pct,
+          mb: null,
+          totalMb: 100,
+          etaSec: null,
+        })
+      }
+    }
 
     child.stdout.on('data', (chunk) => {
       const text = chunk.toString()
-      // Each completed weight prints "N woff2 files — family/weight.css"
-      const matches = (text.match(/woff2 files —/g) || []).length
-      if (matches > 0) {
-        completed += matches
-        const pct = Math.min(99, Math.round((completed / (TOTAL_FAMILIES * 2.5)) * 100))
-        if (sender && !sender.isDestroyed()) {
-          sender.send('setup:download-progress', { id: 'fonts', percent: pct, mb: null, totalMb: 100, etaSec: null })
-        }
+      const currentMatch = text.match(/(\d{1,3})%\s*\(\d+\/\d+\s+files\)/)
+      if (currentMatch) {
+        currentWeightPct = Math.max(0, Math.min(100, parseInt(currentMatch[1], 10)))
+        emitFontProgress()
+      }
+
+      const completedMatches = text.match(/woff2 files\s*[\u2013\u2014-]/g)
+      if (completedMatches && completedMatches.length > 0) {
+        completedWeights += completedMatches.length
+        currentWeightPct = 0
+        emitFontProgress()
       }
     })
 
@@ -380,3 +398,6 @@ function createSetupRuntime() {
 }
 
 module.exports = { createSetupRuntime }
+
+
+
