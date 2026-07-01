@@ -258,6 +258,34 @@ describe('Minigame menu', () => {
     expect(screen.queryByText(/Session Report/i)).toBeNull()
   })
 
+  it('exits the minigame and shows onboarding after resetting data from settings', async () => {
+    const resetStudyDb = vi.fn(async () => ({ ok: true }))
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      resetStudyDb,
+    }
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+
+    fireEvent.click(screen.getByRole('button', { name: /open shortcuts/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /all maps/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /hiragana map/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /meaning match/i }))
+
+    await screen.findByRole('heading', { name: /Meaning Match/i })
+
+    const settingsButtons = screen.getAllByRole('button', { name: /open settings/i })
+    fireEvent.click(settingsButtons[settingsButtons.length - 1])
+    fireEvent.click(await screen.findByRole('tab', { name: /data/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /reset all progress/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /i understand/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /yes, delete everything/i }))
+
+    await waitFor(() => expect(resetStudyDb).toHaveBeenCalledTimes(1))
+    expect(await screen.findByRole('heading', { name: /Welcome to JPLearn/i })).toBeTruthy()
+  })
+
   it('supports typed recall and forwards confidence score to record payload', async () => {
     const recordGameResult = vi.fn(async (_payload: { minigame: string; confidenceScore?: number }) => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
     window.jplearnDesktop = {

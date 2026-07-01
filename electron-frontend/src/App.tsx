@@ -6097,6 +6097,40 @@ function App() {
       setCardScores(emptyScores)
       setScriptStats(emptyStats)
       setMinigameStats(defaultMinigameStatsByScript())
+      setSessionActive(false)
+      setRoundState(null)
+      setRoundInput('')
+      setRoundFeedback(null)
+      setRoundFeedbackTone(null)
+      setRoundFeedbackPoints(null)
+      setRoundFeedbackAnswer(null)
+      setIsRoundResolving(false)
+      setSessionStartPending(false)
+      setSessionSummaryLoading(false)
+      setSessionGoalError(null)
+      setLastSessionSummary(null)
+      setSessionRunReport(null)
+      setActiveSessionId(null)
+      setGameError(null)
+      setLivesRemaining(DEFAULT_LIVES)
+      resetRoundCycle()
+      setShowSettings(false)
+      setShowOverview(false)
+      setShortcutMenuOpen(false)
+      setLearningPathStatus((prev) => {
+        if (prev) {
+          return { ...prev, onboarding_complete: false }
+        }
+        return {
+          path_id: null,
+          path_name: null,
+          onboarding_complete: false,
+          suggested_next: null,
+          steps: [],
+        }
+      })
+      setNavDirection('back')
+      setView('home')
       setResetConfirmStep(0)
       refreshDeckProgressAfterSeedChange()
       await loadSummary()
@@ -6105,7 +6139,7 @@ function App() {
     } finally {
       setResettingDb(false)
     }
-  }, [loadSummary, refreshDeckProgressAfterSeedChange])
+  }, [loadSummary, refreshDeckProgressAfterSeedChange, resetRoundCycle])
 
   const minimizeWindow = useCallback(() => {
     void window.jplearnDesktop.minimizeWindow()
