@@ -12,6 +12,7 @@ const http = require('node:http')
 const os = require('node:os')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
+const NetworkSpeed = require('network-speed')
 
 // ── Model catalogue ──────────────────────────────────────────────────────────
 
@@ -41,6 +42,14 @@ const MODELS = {
 
 const RAM_THRESHOLD_GB = 16
 const SENTINEL_NAME = '.setup-done'
+const VOICEVOX_SIZE_MB = 1000
+const FONTS_SIZE_MB = 100
+const SPEED_TEST_TIMEOUT_MS = 12000
+const SPEED_TEST_TARGETS = [
+  { url: 'https://proof.ovh.net/files/10Mb.dat', bytes: 10485760 },
+  { url: 'https://proof.ovh.net/files/100Mb.dat', bytes: 20971520 },
+]
+const networkSpeed = new NetworkSpeed()
 
 // ── Path helpers ─────────────────────────────────────────────────────────────
 
@@ -66,12 +75,74 @@ function ensureJPLearnDirs() {
 
 // ── System info ──────────────────────────────────────────────────────────────
 
-function getSystemInfo() {
+function withTimeout(promise, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs)
+    promise
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
+function coerceMbps(result) {
+  if (!result || typeof result !== 'object') {
+    return null
+  }
+  const candidates = [result.mbs, result.mbps, result.mb]
+  for (const value of candidates) {
+    const numeric = typeof value === 'number' ? value : Number(value)
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric
+    }
+  }
+  return null
+}
+
+async function measureNetworkMbps() {
+  for (const target of SPEED_TEST_TARGETS) {
+    try {
+      const result = await withTimeout(
+        networkSpeed.checkDownloadSpeed(target.url, target.bytes),
+        SPEED_TEST_TIMEOUT_MS,
+      )
+      const mbps = coerceMbps(result)
+      if (mbps && Number.isFinite(mbps)) {
+        return mbps
+      }
+    } catch {
+      // Try next endpoint.
+    }
+  }
+  return null
+}
+
+function estimateDownloadMinutes(sizeMb, networkMbps) {
+  if (!networkMbps || !Number.isFinite(networkMbps) || networkMbps <= 0) {
+    return null
+  }
+  const minutes = (sizeMb * 8) / (networkMbps * 60)
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return null
+  }
+  return Math.max(1, Math.round(minutes))
+}
+
+async function getSystemInfo() {
   const base = ensureJPLearnDirs()
   const totalRamGb = os.totalmem() / (1024 ** 3)
   const recommendedTier = totalRamGb >= RAM_THRESHOLD_GB ? 'high' : 'low'
   const modelsDir = path.join(base, 'models')
   const voicevoxInstalled = fs.existsSync(path.join(base, 'voicevox', 'run.exe'))
+  const networkMbpsRaw = await measureNetworkMbps()
+  const networkMbps = typeof networkMbpsRaw === 'number' && Number.isFinite(networkMbpsRaw)
+    ? Math.round(networkMbpsRaw * 10) / 10
+    : null
 
   const fontsDir = path.join(base, 'fonts')
   const fontsInstalled = fs.existsSync(fontsDir) && (() => {
@@ -88,6 +159,7 @@ function getSystemInfo() {
     label: m.label,
     description: m.description,
     installed: fs.existsSync(path.join(modelsDir, m.filename)),
+    estimatedDownloadMinutes: estimateDownloadMinutes(m.sizeMb, networkMbps),
   }))
 
   return {
@@ -97,9 +169,11 @@ function getSystemInfo() {
     voicevoxInstalled,
     fontsInstalled,
     isPackaged,
+    networkMbps,
+    voicevoxEstimatedDownloadMinutes: estimateDownloadMinutes(VOICEVOX_SIZE_MB, networkMbps),
+    fontsEstimatedDownloadMinutes: estimateDownloadMinutes(FONTS_SIZE_MB, networkMbps),
   }
 }
-
 function isFirstRun() {
   const sentinel = path.join(getJPLearnDir(), 'models', SENTINEL_NAME)
   return !fs.existsSync(sentinel)
