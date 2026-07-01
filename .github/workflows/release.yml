@@ -62,7 +62,7 @@ jobs:
           $asset = $release.assets | Where-Object {
               $_.name -match 'cpython-3\.11\.' -and
               $_.name -match 'x86_64-pc-windows-msvc' -and
-              $_.name -match 'install_only' -and
+              $_.name -match 'install_only_stripped' -and
               $_.name.EndsWith('.tar.gz')
           } | Select-Object -First 1
 
@@ -87,6 +87,21 @@ jobs:
 
           Write-Host "Installing runtime packages into bundle..."
           & $pythonExe -m pip install psutil --quiet
+
+          Write-Host "Trimming Python test suite to reduce installer size..."
+          $toRemove = @(
+            "python-bundle\python\Lib\test",
+            "python-bundle\python\Lib\unittest\test",
+            "python-bundle\python\Lib\email\test",
+            "python-bundle\python\Lib\tkinter"
+          )
+          foreach ($dir in $toRemove) {
+            if (Test-Path $dir) {
+              Remove-Item -Recurse -Force $dir
+              Write-Host "  removed: $dir"
+            }
+          }
+
           Write-Host "Python bundle ready: $(& $pythonExe --version)"
 
       - name: Build Windows installer
