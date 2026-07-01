@@ -5680,6 +5680,30 @@ button {
   margin-top: 10px;
 }
 
+.game-dictionary-note {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 34%, var(--card-border));
+  background: color-mix(in oklab, var(--tone-ocean) 10%, transparent);
+}
+
+.game-dictionary-note-title {
+  margin: 0;
+  color: var(--tone-ocean);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.game-dictionary-note-copy {
+  margin: 4px 0 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .game-hint-toggle {
   margin-top: 8px;
   padding: 4px 10px;

@@ -176,6 +176,96 @@ _DICTIONARY_RESULT_LIMIT = 20
 # rest of the dictionary (rare/obscure entries, foreign-greeting loanwords,
 # etc.) and append those below the common results.
 _DICTIONARY_COMMON_FALLBACK_THRESHOLD = 5
+_DICTIONARY_JAPANESE_RE = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]")
+
+
+def _dictionary_has_supported_schema(conn: sqlite3.Connection) -> bool:
+    table_names = {
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')")
+    }
+    return "dictionary_entries" in table_names and "dictionary_fts" in table_names
+
+
+def _search_dictionary_rows(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
+    if _DICTIONARY_JAPANESE_RE.search(normalized_query):
+        return _search_dictionary_japanese(conn, normalized_query)
+    return _search_dictionary_english(conn, normalized_query)
+
+
+def _dictionary_results_from_rows(rows: list[tuple]) -> list[dict[str, object]]:
+    return [
+        {
+            "id": int(row[0]),
+            "character": row[1],
+            "romaji": row[2],
+            "meaning": row[3],
+            "tags": ["offline_dictionary"],
+            "example_sentence": None,
+        }
+        for row in rows
+    ]
+
+
+def _split_dictionary_glosses(gloss_text: str) -> list[str]:
+    return [part.strip() for part in gloss_text.split(";") if part.strip()]
+
+
+def _should_enrich_card_from_dictionary(tags: list[str]) -> bool:
+    normalized_tags = {tag.strip().lower() for tag in tags}
+    return "hiragana" not in normalized_tags and "katakana" not in normalized_tags
+
+
+def _select_dictionary_row(rows: list[tuple], character: str, meaning: str) -> tuple | None:
+    normalized_character = _normalize_dictionary_query(character)
+    normalized_meaning = _normalize_dictionary_query(meaning)
+
+    def _score(row: tuple) -> tuple[int, int, int]:
+        row_character = _normalize_dictionary_query(str(row[1]))
+        row_gloss = _normalize_dictionary_query(str(row[3]))
+        exact_character = 1 if row_character == normalized_character else 0
+        meaning_match = 1 if normalized_meaning and normalized_meaning in row_gloss else 0
+        starts_with_character = 1 if row_character.startswith(normalized_character) else 0
+        return (exact_character, meaning_match, starts_with_character)
+
+    ranked_rows = sorted(
+        rows,
+        key=lambda row: (_score(row), -len(str(row[1]))),
+        reverse=True,
+    )
+    return ranked_rows[0] if ranked_rows else None
+
+
+def _lookup_card_dictionary_summary(
+    conn: sqlite3.Connection | None,
+    *,
+    character: str,
+    meaning: str,
+    tags: list[str],
+) -> DictionaryCardSummary | None:
+    if conn is None or not _should_enrich_card_from_dictionary(tags):
+        return None
+
+    normalized_character = _normalize_dictionary_query(character)
+    if not normalized_character or not _DICTIONARY_JAPANESE_RE.search(normalized_character):
+        return None
+
+    rows = _search_dictionary_japanese(conn, normalized_character)
+    match = _select_dictionary_row(rows, character, meaning)
+    if match is None:
+        return None
+
+    glosses = _split_dictionary_glosses(str(match[3]))
+    if not glosses:
+        return None
+
+    return DictionaryCardSummary(
+        character=str(match[1]),
+        reading=str(match[2]),
+        primary_gloss=glosses[0],
+        glosses=glosses,
+        source="offline_dictionary",
+    )
 
 
 def _search_dictionary_japanese(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
@@ -249,33 +339,16 @@ def build_dictionary_search_payload(query: str) -> dict[str, object]:
 
     conn = sqlite3.connect(db_path)
     try:
-        table_names = {
-            row[0]
-            for row in conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')")
-        }
-        if "dictionary_entries" not in table_names or "dictionary_fts" not in table_names:
+        if not _dictionary_has_supported_schema(conn):
             # Older index build (pre-FTS5 schema) - treat as not installed so the
             # UI prompts a re-download instead of hitting a SQL error.
             raise FileNotFoundError("Offline dictionary index is outdated; please re-download it")
 
-        if is_japanese_query:
-            fetched_rows = _search_dictionary_japanese(conn, normalized_query)
-        else:
-            fetched_rows = _search_dictionary_english(conn, normalized_query)
+        fetched_rows = _search_dictionary_rows(conn, normalized_query)
     finally:
         conn.close()
 
-    results = [
-        {
-            "id": int(row[0]),
-            "character": row[1],
-            "romaji": row[2],
-            "meaning": row[3],
-            "tags": ["offline_dictionary"],
-            "example_sentence": None,
-        }
-        for row in fetched_rows
-    ]
+    results = _dictionary_results_from_rows(fetched_rows)
     return {
         "query": normalized_query,
         "source": "offline_dictionary",
@@ -436,6 +509,15 @@ class StudyStreak:
 
 
 @dataclass(frozen=True)
+class DictionaryCardSummary:
+    character: str
+    reading: str
+    primary_gloss: str
+    glosses: list[str]
+    source: str
+
+
+@dataclass(frozen=True)
 class GameCard:
     id: int
     character: str
@@ -443,6 +525,7 @@ class GameCard:
     meaning: str
     tags: list[str]
     example_sentence: str | None
+    dictionary_summary: DictionaryCardSummary | None
     is_leech: bool
     curriculum_stage: int
     meaning_distractor_ids: list[int]
@@ -661,21 +744,41 @@ def build_deck_cards(slug: str) -> dict[str, object]:
     deck = factory()
     active_leech_ids = load_active_leech_card_ids(deck.name)
     curriculum_stages = load_curriculum_stages(deck.name, "context_cloze", [card.id for card in deck.cards])
-    cards = [
-        GameCard(
-            id=card.id,
-            character=card.character,
-            romaji=card.romaji,
-            meaning=card.meaning,
-            tags=card.tags,
-            example_sentence=card.example_sentence,
-            is_leech=card.id in active_leech_ids,
-            curriculum_stage=curriculum_stages.get(card.id, 1),
-            meaning_distractor_ids=rank_distractor_ids(deck.cards, card, mode="meaning")[:8],
-            character_distractor_ids=rank_distractor_ids(deck.cards, card, mode="character")[:8],
-        )
-        for card in deck.cards
-    ]
+    dictionary_conn: sqlite3.Connection | None = None
+    db_path = _dictionary_db_path()
+    if db_path is not None:
+        candidate_conn = sqlite3.connect(db_path)
+        if _dictionary_has_supported_schema(candidate_conn):
+            dictionary_conn = candidate_conn
+        else:
+            candidate_conn.close()
+
+    try:
+        cards = [
+            GameCard(
+                id=card.id,
+                character=card.character,
+                romaji=card.romaji,
+                meaning=card.meaning,
+                tags=card.tags,
+                example_sentence=card.example_sentence,
+                dictionary_summary=_lookup_card_dictionary_summary(
+                    dictionary_conn,
+                    character=card.character,
+                    meaning=card.meaning,
+                    tags=card.tags,
+                ),
+                is_leech=card.id in active_leech_ids,
+                curriculum_stage=curriculum_stages.get(card.id, 1),
+                meaning_distractor_ids=rank_distractor_ids(deck.cards, card, mode="meaning")[:8],
+                character_distractor_ids=rank_distractor_ids(deck.cards, card, mode="character")[:8],
+            )
+            for card in deck.cards
+        ]
+    finally:
+        if dictionary_conn is not None:
+            dictionary_conn.close()
+
     return {
         "slug": slug,
         "name": deck.name,

@@ -34,27 +34,27 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 const baseCards = [
-  { id: 0, character: 'あ', romaji: 'a', meaning: 'a', tags: ['hiragana'], example_sentence: 'あさです。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [1, 2, 3], character_distractor_ids: [1, 2, 3] },
-  { id: 1, character: 'い', romaji: 'i', meaning: 'i', tags: ['hiragana'], example_sentence: 'いまです。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 2, 3], character_distractor_ids: [0, 2, 3] },
-  { id: 2, character: 'う', romaji: 'u', meaning: 'u', tags: ['hiragana'], example_sentence: 'うみです。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 3], character_distractor_ids: [0, 1, 3] },
-  { id: 3, character: 'え', romaji: 'e', meaning: 'e', tags: ['hiragana'], example_sentence: 'えきです。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 2], character_distractor_ids: [0, 1, 2] },
+  { id: 0, character: 'あ', romaji: 'a', meaning: 'a', tags: ['hiragana'], example_sentence: 'あさです。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [1, 2, 3], character_distractor_ids: [1, 2, 3] },
+  { id: 1, character: 'い', romaji: 'i', meaning: 'i', tags: ['hiragana'], example_sentence: 'いまです。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 2, 3], character_distractor_ids: [0, 2, 3] },
+  { id: 2, character: 'う', romaji: 'u', meaning: 'u', tags: ['hiragana'], example_sentence: 'うみです。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 3], character_distractor_ids: [0, 1, 3] },
+  { id: 3, character: 'え', romaji: 'e', meaning: 'e', tags: ['hiragana'], example_sentence: 'えきです。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 2], character_distractor_ids: [0, 1, 2] },
 ]
 
 const kanjiStudyPlanCards = [
-  { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
-  { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
+  { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', dictionary_summary: { character: '日', reading: 'にち', primary_gloss: 'day', glosses: ['day', 'sun'], source: 'offline_dictionary' }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
+  { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
 ]
 
 const vocabStudyPlanCards = [
-  { id: 20, character: '予定', romaji: 'yotei', meaning: 'schedule', tags: ['vocab', 'n5'], example_sentence: '予定 を たてます。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [21], character_distractor_ids: [21] },
-  { id: 21, character: '計画', romaji: 'keikaku', meaning: 'plan', tags: ['vocab', 'n5'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [20], character_distractor_ids: [20] },
+  { id: 20, character: '予定', romaji: 'yotei', meaning: 'schedule', tags: ['vocab', 'n5'], example_sentence: '予定 を たてます。', dictionary_summary: { character: '予定', reading: 'よてい', primary_gloss: 'schedule', glosses: ['schedule', 'plan'], source: 'offline_dictionary' }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [21], character_distractor_ids: [21] },
+  { id: 21, character: '計画', romaji: 'keikaku', meaning: 'plan', tags: ['vocab', 'n5'], example_sentence: null, dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [20], character_distractor_ids: [20] },
 ]
 
 const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
 
 const kanjiStrokeCards = [
-  { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
-  { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
+  { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', dictionary_summary: { character: '日', reading: 'にち', primary_gloss: 'day', glosses: ['day', 'sun'], source: 'offline_dictionary' }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
+  { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
 ]
 
 const baseDesktopApi = {
@@ -111,6 +111,11 @@ const baseDesktopApi = {
     blocks: { hiragana: [], katakana: [] },
     category_blocks: { vocab_n5: [], grammar_patterns: [] },
     kanji_cards: [],
+  }),
+  searchDictionary: async (query: string) => ({
+    query,
+    source: 'offline_dictionary' as const,
+    results: [],
   }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
@@ -328,10 +333,10 @@ describe('Minigame menu', () => {
 
   it('plays both target words and example sentence in conversational rounds', async () => {
     const conversationalCards = [
-      { id: 30, character: 'です', romaji: 'desu', meaning: 'to be', tags: ['grammar_patterns'], example_sentence: 'これは ほん です。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [31, 32, 33], character_distractor_ids: [31, 32, 33] },
-      { id: 31, character: 'ます', romaji: 'masu', meaning: 'polite verb ending', tags: ['grammar_patterns'], example_sentence: 'べんきょう します。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 32, 33], character_distractor_ids: [30, 32, 33] },
-      { id: 32, character: 'から', romaji: 'kara', meaning: 'because', tags: ['grammar_patterns'], example_sentence: 'あめ です から。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 33], character_distractor_ids: [30, 31, 33] },
-      { id: 33, character: 'けど', romaji: 'kedo', meaning: 'but', tags: ['grammar_patterns'], example_sentence: 'いきたい けど、いけません。', is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 32], character_distractor_ids: [30, 31, 32] },
+      { id: 30, character: 'です', romaji: 'desu', meaning: 'to be', tags: ['grammar_patterns'], example_sentence: 'これは ほん です。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [31, 32, 33], character_distractor_ids: [31, 32, 33] },
+      { id: 31, character: 'ます', romaji: 'masu', meaning: 'polite verb ending', tags: ['grammar_patterns'], example_sentence: 'べんきょう します。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 32, 33], character_distractor_ids: [30, 32, 33] },
+      { id: 32, character: 'から', romaji: 'kara', meaning: 'because', tags: ['grammar_patterns'], example_sentence: 'あめ です から。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 33], character_distractor_ids: [30, 31, 33] },
+      { id: 33, character: 'けど', romaji: 'kedo', meaning: 'but', tags: ['grammar_patterns'], example_sentence: 'いきたい けど、いけません。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 32], character_distractor_ids: [30, 31, 32] },
     ]
     const speakText = vi.fn(async (_payload: string | { text: string; speaker?: number; speed?: number }) => ({
       ok: true,
@@ -435,6 +440,72 @@ describe('Minigame menu', () => {
     fireEvent.click(within((matchTiles[0].closest('.game-tile') ?? matchTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
     expect(await screen.findByText(/Think about how this kanji looks/i)).toBeTruthy()
+  })
+
+  it('renders mode-specific dictionary help and seeds dictionary lookup from the active card', async () => {
+    const searchDictionary = vi.fn(async (query: string) => ({
+      query,
+      source: 'offline_dictionary' as const,
+      results: [
+        {
+          id: 900,
+          character: '日',
+          romaji: 'にち',
+          meaning: 'day',
+          tags: ['offline_dictionary'],
+          example_sentence: null,
+        },
+      ],
+    }))
+
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      searchDictionary,
+      getDeckCards: async (slug: string) => (
+        slug.includes('kanji')
+          ? { slug, name: 'Kanji Deck', cards: kanjiStudyPlanCards }
+          : { slug: slug as any, name: 'Deck', cards: baseCards }
+      ),
+      getStudyQueue: async (slug: string) => (
+        slug.includes('kanji')
+          ? {
+            ok: true,
+            queue: {
+              slug,
+              card_ids: [kanjiStudyPlanCards[0].id],
+              indices: [0],
+            },
+          }
+          : {
+            ok: true,
+            queue: {
+              slug,
+              card_ids: baseCards.map((card) => card.id),
+              indices: baseCards.map((_, index) => index),
+            },
+          }
+      ),
+    }
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    clickTopMenuCard('Kanji')
+
+    const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
+    fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    fireEvent.click(await screen.findByRole('button', { name: /show hint/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /show more hint/i }))
+
+    expect(await screen.findByText(/Dictionary recall/i)).toBeTruthy()
+    expect(screen.getByText(/日 \(にち\) is commonly translated as day, sun\./i)).toBeTruthy()
+
+    const dictionaryButtons = screen.getAllByRole('button', { name: /open dictionary/i })
+    fireEvent.click(dictionaryButtons[dictionaryButtons.length - 1])
+
+    const searchInput = await screen.findByRole('searchbox', { name: /dictionary search/i }) as HTMLInputElement
+    expect(searchInput.value).toBe('日')
+    await waitFor(() => expect(searchDictionary).toHaveBeenCalledWith('日'))
   })
 
   it('renders a stroke-order writing drill for kanji rounds', async () => {

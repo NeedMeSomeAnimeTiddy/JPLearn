@@ -1,15 +1,53 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any, cast
 
 from data import database
+from domain.decks import ALL_DECKS
 from scripts import desktop_bridge
 
 
 def _use_temp_db(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "jplearn-bridge-test.db")
+
+
+def _build_dictionary_db(path: Path, *, japanese: str, reading: str, gloss: str) -> None:
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE dictionary_entries (
+              entry_id INTEGER PRIMARY KEY,
+              source_id TEXT NOT NULL,
+              japanese TEXT NOT NULL,
+              reading TEXT NOT NULL,
+              gloss TEXT NOT NULL,
+              is_common INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE VIRTUAL TABLE dictionary_fts USING fts5(
+              gloss,
+              content='dictionary_entries',
+              content_rowid='entry_id'
+            );
+            """
+        )
+        cursor = conn.execute(
+            """
+            INSERT INTO dictionary_entries (source_id, japanese, reading, gloss, is_common)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            ("test-entry", japanese, reading, gloss, 1),
+        )
+        conn.execute(
+            "INSERT INTO dictionary_fts (rowid, gloss) VALUES (?, ?)",
+            (cursor.lastrowid, gloss),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def test_record_game_result_persists_review_event(tmp_path: Path, monkeypatch) -> None:
@@ -169,6 +207,36 @@ def test_build_deck_cards_includes_curriculum_stage(tmp_path: Path, monkeypatch)
     first_card = next(card for card in cards if card["id"] == 0)
     assert first_card["curriculum_stage"] == 3
     assert first_card["example_sentence"]
+    assert first_card["dictionary_summary"] is None
+
+
+def test_build_deck_cards_includes_dictionary_summary_when_available(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    target_card = ALL_DECKS["kanji_n5"]().cards[0]
+    dictionary_db_path = tmp_path / "dictionary.sqlite"
+    _build_dictionary_db(
+        dictionary_db_path,
+        japanese=target_card.character,
+        reading="にち",
+        gloss=f"{target_card.meaning}; calendar day; sun marker",
+    )
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (dictionary_db_path,),
+    )
+
+    payload = desktop_bridge.build_deck_cards("kanji_n5")
+    cards = cast(list[dict[str, object]], payload["cards"])
+    enriched_card = next(card for card in cards if card["character"] == target_card.character)
+    dictionary_summary = cast(dict[str, object], enriched_card["dictionary_summary"])
+
+    assert dictionary_summary["character"] == target_card.character
+    assert dictionary_summary["reading"] == "にち"
+    assert dictionary_summary["primary_gloss"] == target_card.meaning
+    assert dictionary_summary["glosses"] == [target_card.meaning, "calendar day", "sun marker"]
+    assert dictionary_summary["source"] == "offline_dictionary"
 
 
 def test_build_block_progress_includes_new_phase_one_decks(tmp_path: Path, monkeypatch) -> None:

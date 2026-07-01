@@ -15,6 +15,7 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
 import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
+import type { RoundDictionaryNote } from './types'
 
 type StudySummaryPayload = Awaited<
   ReturnType<typeof window.jplearnDesktop.getStudySummary>
@@ -696,6 +697,8 @@ interface RoundState {
   chapterNumber: 1 | 2 | 3 | null
   chapterLabel: string | null
   hintText: string | null
+  dictionarySeedQuery: string | null
+  dictionaryNote: RoundDictionaryNote | null
   promptLabel: string
   focusText: string
   answer: string
@@ -2078,6 +2081,65 @@ function buildStoryChapter(script: ScriptKey, stage: 1 | 2 | 3, seed: number, ca
     line: applyCardTemplate(chapter.lines[Math.abs(seed) % chapter.lines.length], card),
   }
 }
+
+function buildRoundDictionaryNote(card: ScriptDeck['cards'][number], mode: PlayableMinigame): RoundDictionaryNote | null {
+  const summary = card.dictionary_summary
+  if (!summary) return null
+
+  const secondaryGlosses = summary.glosses.filter((gloss) => gloss !== summary.primary_gloss).slice(0, 2)
+  const glossList = [summary.primary_gloss, ...secondaryGlosses]
+  let title = 'Dictionary note'
+  let copy = `${summary.character} (${summary.reading}) is commonly glossed as ${summary.primary_gloss}.`
+
+  if (mode === 'romaji_sprint') {
+    title = 'Reading clue'
+    copy = `${summary.character} is read ${summary.reading} in the dictionary.`
+  } else if (mode === 'typed_recall') {
+    title = 'Dictionary recall'
+    copy = secondaryGlosses.length > 0
+      ? `${summary.character} (${summary.reading}) is commonly translated as ${glossList.join(', ')}.`
+      : `${summary.character} (${summary.reading}) is commonly translated as ${summary.primary_gloss}.`
+  } else if (mode === 'stroke_order') {
+    title = 'Writing clue'
+    copy = `${summary.character} is read ${summary.reading} and is usually glossed as ${summary.primary_gloss}.`
+  } else if (mode === 'meaning_match') {
+    title = 'Dictionary sense'
+    copy = secondaryGlosses.length > 0
+      ? `${summary.character} is read ${summary.reading} and can carry senses like ${glossList.join(', ')}.`
+      : `${summary.character} is read ${summary.reading} and often points to ${summary.primary_gloss}.`
+  } else if (mode === 'character_match') {
+    title = 'Meaning clue'
+    copy = secondaryGlosses.length > 0
+      ? `Look for the character read ${summary.reading} with meanings like ${glossList.join(', ')}.`
+      : `Look for the character read ${summary.reading} that matches ${summary.primary_gloss}.`
+  } else if (mode === 'context_cloze') {
+    title = 'Context clue'
+    copy = secondaryGlosses.length > 0
+      ? `${summary.character} (${summary.reading}) fits sentence meanings like ${glossList.join(', ')}.`
+      : `${summary.character} (${summary.reading}) fits this kind of sentence as ${summary.primary_gloss}.`
+  } else if (mode === 'narrative_story') {
+    title = 'Reading note'
+    copy = secondaryGlosses.length > 0
+      ? `In passages, ${summary.character} is read ${summary.reading} and can suggest ${glossList.join(', ')}.`
+      : `In passages, ${summary.character} is read ${summary.reading} and usually suggests ${summary.primary_gloss}.`
+  } else if (mode === 'listening_audio_first' || mode === 'listening_prompt_first') {
+    title = 'Listening clue'
+    copy = secondaryGlosses.length > 0
+      ? `The audio term is ${summary.character}, read ${summary.reading}, with senses like ${glossList.join(', ')}.`
+      : `The audio term is ${summary.character}, read ${summary.reading}, and usually means ${summary.primary_gloss}.`
+  }
+
+  return {
+    title,
+    copy,
+    character: summary.character,
+    reading: summary.reading,
+    primaryGloss: summary.primary_gloss,
+    secondaryGlosses,
+    source: summary.source,
+  }
+}
+
 
 function narrativePriorityCards(cards: ScriptDeck['cards']): ScriptDeck['cards'] {
   const stage3 = cards.filter((card) => normalizeCurriculumStage(card.curriculum_stage) === 3)
@@ -4916,6 +4978,8 @@ function App() {
       const exampleSentenceHint = card.example_sentence
         ? `Example: ${card.example_sentence}`
         : null
+      const dictionaryNote = buildRoundDictionaryNote(card, minigame)
+      const dictionarySeedQuery = card.character || card.romaji || null
 
       if (minigame === 'romaji_sprint') {
         const promptLabel = surprisePrompt
@@ -4931,6 +4995,8 @@ function App() {
           chapterNumber: null,
           chapterLabel: null,
           hintText: exampleSentenceHint,
+          dictionarySeedQuery,
+          dictionaryNote,
           promptLabel,
           focusText: card.character,
           answer: card.romaji,
@@ -4952,6 +5018,8 @@ function App() {
           chapterNumber: null,
           chapterLabel: null,
           hintText: exampleSentenceHint ?? `Think about what ${card.character} means.`,
+          dictionarySeedQuery,
+          dictionaryNote,
           promptLabel,
           focusText: card.character,
           answer: card.meaning,
@@ -4973,6 +5041,8 @@ function App() {
           chapterNumber: null,
           chapterLabel: null,
           hintText: 'Type the reading, then select the matching kanji from the options.',
+          dictionarySeedQuery,
+          dictionaryNote,
           promptLabel,
           focusText: card.meaning,
           answer: card.character,
@@ -5041,6 +5111,8 @@ function App() {
           hintText: activeScript === 'kanji_n5'
             ? 'Think about how this kanji looks — its structure can help you recall it.'
             : exampleSentenceHint,
+          dictionarySeedQuery,
+          dictionaryNote,
           promptLabel: surprisePrompt
             ? surpriseLabel
             : 'What does this character mean?',
@@ -5071,6 +5143,8 @@ function App() {
           chapterNumber: null,
           chapterLabel: null,
           hintText: exampleSentenceHint ?? `The word is ${card.character} (${card.romaji}).`,
+          dictionarySeedQuery,
+          dictionaryNote,
           promptLabel: surprisePrompt
             ? surpriseLabel
             : 'Fill in the blank.',
@@ -5105,6 +5179,8 @@ function App() {
           hintText: readingPassage.length > 0
             ? `The sentence uses ${card.character} — choose its meaning.`
             : exampleSentenceHint ?? `This scene features ${card.character} — read as "${card.romaji}".`,
+          dictionarySeedQuery,
+          dictionaryNote,
           promptLabel: surprisePrompt
             ? surpriseLabel
             : readingPassage.length > 0
@@ -5135,6 +5211,8 @@ function App() {
           chapterNumber: null,
           chapterLabel: null,
           hintText: `The character is ${card.character} (${card.romaji}).`,
+          dictionarySeedQuery,
+          dictionaryNote,
           promptLabel: surprisePrompt ? surpriseLabel : 'Listen and choose the meaning.',
           focusText: card.character,
           answer: card.meaning,
@@ -5161,6 +5239,8 @@ function App() {
           chapterNumber: null,
           chapterLabel: null,
           hintText: exampleSentenceHint ?? `Hear ${card.character} and choose its meaning.`,
+          dictionarySeedQuery,
+          dictionaryNote,
           promptLabel: surprisePrompt ? surpriseLabel : 'Hear the pronunciation and choose the meaning.',
           focusText: card.character,
           answer: card.meaning,
@@ -5189,6 +5269,8 @@ function App() {
         hintText: activeScript === 'kanji_n5'
           ? 'Think about how this kanji looks — its structure can help you recall it.'
           : exampleSentenceHint,
+        dictionarySeedQuery,
+        dictionaryNote,
         promptLabel: surprisePrompt
           ? surpriseLabel
           : 'Which character matches this meaning?',

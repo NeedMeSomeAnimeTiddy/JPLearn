@@ -124,6 +124,16 @@ export interface RoundOption {
   label: string
 }
 
+export interface RoundDictionaryNote {
+  title: string
+  copy: string
+  character: string
+  reading: string
+  primaryGloss: string
+  secondaryGlosses: string[]
+  source: string
+}
+
 export interface RoundState {
   cardId: number
   mode: PlayableMinigame
@@ -134,6 +144,8 @@ export interface RoundState {
   chapterNumber: 1 | 2 | 3 | null
   chapterLabel: string | null
   hintText: string | null
+  dictionarySeedQuery: string | null
+  dictionaryNote: RoundDictionaryNote | null
   promptLabel: string
   focusText: string
   answer: string

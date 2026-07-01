@@ -91,6 +91,16 @@ export function MinigameView({
   } = useSession()
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
 
+  function renderDictionaryNote() {
+    if (!roundState?.dictionaryNote) return null
+    return (
+      <div className="game-dictionary-note" aria-live="polite">
+        <p className="game-dictionary-note-title">{roundState.dictionaryNote.title}</p>
+        <p className="game-dictionary-note-copy">{roundState.dictionaryNote.copy}</p>
+      </div>
+    )
+  }
+
   // ── Phase 7: Progressive hint ladder ────────────────────────────────────────
   // 0 = no hint shown, 1 = prompt type label, 2 = hintText, 3 = full answer giveaway
   const [hintStep, setHintStep] = useState<0 | 1 | 2 | 3>(0)
@@ -225,7 +235,7 @@ export function MinigameView({
           <button
             type="button"
             className="topbar-settings-button"
-            onClick={() => onOpenDictionary(roundState?.focusText ?? roundState?.answer ?? '')}
+            onClick={() => onOpenDictionary(roundState?.dictionarySeedQuery ?? roundState?.audioText ?? roundState?.answer ?? '')}
             aria-label="Open dictionary"
             title="Dictionary"
           >
@@ -533,9 +543,14 @@ export function MinigameView({
                   roundState.mode !== 'listening_audio_first'
 
                 if (alwaysShowHint) {
-                  return roundState.hintText ? (
-                    <p className="game-hint-text">{roundState.hintText}</p>
-                  ) : null
+                  return (
+                    <>
+                      {roundState.hintText ? (
+                        <p className="game-hint-text">{roundState.hintText}</p>
+                      ) : null}
+                      {renderDictionaryNote()}
+                    </>
+                  )
                 }
 
                 if (isRoundResolving) return null
@@ -564,6 +579,7 @@ export function MinigameView({
                         {roundState.hintText}
                       </p>
                     ) : null}
+                    {hintStep >= 2 ? renderDictionaryNote() : null}
                     {hintStep >= 3 ? (
                       <p className="game-hint-text game-hint-answer">
                         Answer: {formatExpectedAnswer(roundState.answer)}

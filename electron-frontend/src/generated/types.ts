@@ -18,6 +18,14 @@ export interface StudyStreak {
   best_days: number
 }
 
+export interface DictionaryCardSummary {
+  character: string
+  reading: string
+  primary_gloss: string
+  glosses: string[]
+  source: string
+}
+
 export interface GameCard {
   id: number
   character: string
@@ -25,6 +33,7 @@ export interface GameCard {
   meaning: string
   tags: string[]
   example_sentence: string | null
+  dictionary_summary: DictionaryCardSummary | null
   is_leech: boolean
   curriculum_stage: number
   meaning_distractor_ids: number[]
