@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, screen } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -12,14 +12,66 @@ const {
   isAllowedRendererUrl,
 } = require('./ipc_security.cjs')
 
+function getUninstallCleanupScriptPath() {
+  const resourcesPath = (typeof process !== 'undefined' && process.resourcesPath) || ''
+  const candidates = [
+    resourcesPath ? path.join(resourcesPath, 'scripts', 'uninstall_cleanup.ps1') : '',
+    path.join(__dirname, '..', '..', 'scripts', 'uninstall_cleanup.ps1'),
+  ].filter(Boolean)
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate
+    }
+  }
+  return null
+}
+
+function launchUninstallCleanupHelper() {
+  if (process.platform !== 'win32') {
+    return
+  }
+
+  const scriptPath = getUninstallCleanupScriptPath()
+  if (!scriptPath) {
+    return
+  }
+
+  const docsDir = process.env.JPLEARN_DOCUMENTS_DIR || path.join(os.homedir(), 'Documents', 'JPLearn')
+  const args = [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    scriptPath,
+    '-JPLearnDir',
+    docsDir,
+  ]
+
+  try {
+    const child = spawn('powershell.exe', args, {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    child.unref()
+  } catch {
+    // Best effort only: uninstall flow must never block Squirrel.
+  }
+}
+
 // ── Squirrel.Windows lifecycle events ────────────────────────────────────────
 // Squirrel re-launches the app with a special arg for install/update/uninstall.
 const _squirrelArg = process.argv[1]
 if (
   _squirrelArg === '--squirrel-install' ||
   _squirrelArg === '--squirrel-updated' ||
+  _squirrelArg === '--squirrel-uninstall' ||
   _squirrelArg === '--squirrel-obsolete'
 ) {
+  if (_squirrelArg === '--squirrel-uninstall') {
+    launchUninstallCleanupHelper()
+  }
   // Clean quit — Squirrel will handle shortcuts/registry
   app.quit()
 }
@@ -1576,24 +1628,6 @@ async function createWindowWithSplash() {
 }
 
 app.whenReady().then(() => {
-  // Handle --squirrel-uninstall: show info dialog then quit.
-  // Runs here (after app.ready) because dialog.showMessageBoxSync requires it.
-  if (process.argv[1] === '--squirrel-uninstall') {
-    const jpLearnDir = process.env.JPLEARN_DOCUMENTS_DIR || ''
-    const hasUserData = jpLearnDir && fs.existsSync(jpLearnDir)
-    if (hasUserData) {
-      dialog.showMessageBoxSync({
-        type: 'information',
-        title: 'Uninstalling JPLearn',
-        message: 'Your progress and downloads are safe.',
-        detail: `Your study progress, AI models, and voice engine are saved in:\n\n${jpLearnDir}\n\nThese files will NOT be deleted. If you reinstall JPLearn, everything will be detected automatically.`,
-        buttons: ['OK'],
-      })
-    }
-    app.quit()
-    return
-  }
-
   // Ensure Documents\JPLearn\ subdirectories exist on every launch
   try { localSetupRuntime.ensureJPLearnDirs() } catch { /* non-fatal */ }
 
