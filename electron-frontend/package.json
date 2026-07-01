@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "lucide-react": "^1.21.0",
+    "network-speed": "^2.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
