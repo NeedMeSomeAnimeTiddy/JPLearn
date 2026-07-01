@@ -410,6 +410,7 @@ interface DesktopApi {
   skipSetup?: () => Promise<{ ok: boolean }>
   onSetupProgress?: (listener: (evt: SetupProgressEvent) => void) => () => void
   downloadFonts?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  downloadDictionary?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   createShortcuts?: (opts: { desktop?: boolean; startMenu?: boolean }) => Promise<{ ok: boolean }>
 }
 
@@ -441,15 +442,17 @@ interface SetupSystemInfo {
   llamaCppBackendLabel?: string
   voicevoxInstalled: boolean
   fontsInstalled: boolean
+  dictionaryInstalled: boolean
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
   voicevoxEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
+  dictionaryEstimatedDownloadMinutes?: number | null
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'llama' | 'voicevox' | 'fonts'
+  id: 'model' | 'llama' | 'voicevox' | 'fonts' | 'dictionary'
   percent: number
   mb: number | null
   totalMb: number | null

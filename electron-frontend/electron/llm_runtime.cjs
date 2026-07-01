@@ -4,6 +4,13 @@ const path = require('node:path')
 const http = require('node:http')
 const net = require('node:net')
 
+let NodeSqliteDatabaseSync = null
+try {
+  ;({ DatabaseSync: NodeSqliteDatabaseSync } = require('node:sqlite'))
+} catch {
+  NodeSqliteDatabaseSync = null
+}
+
 let JishoAPI = null
 try {
   JishoAPI = require('unofficial-jisho-api')
@@ -18,6 +25,33 @@ const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 420
 const DEFAULT_MAX_PROMPT_CHARS = 3200
 const DEFAULT_DICTIONARY_HTTP_TIMEOUT_MS = 4500
+const DEFAULT_OFFLINE_DICTIONARY_FULL_PATH = path.resolve(
+  __dirname,
+  '..',
+  '..',
+  'data',
+  'external_sources',
+  'offline_dictionary',
+  'jmdict-eng-3.6.2.json',
+)
+const DEFAULT_OFFLINE_DICTIONARY_COMMON_PATH = path.resolve(
+  __dirname,
+  '..',
+  '..',
+  'data',
+  'external_sources',
+  'offline_dictionary',
+  'jmdict-eng-common-3.6.2.json',
+)
+const DEFAULT_OFFLINE_DICTIONARY_SQLITE_PATH = path.resolve(
+  __dirname,
+  '..',
+  '..',
+  'data',
+  'external_sources',
+  'offline_dictionary',
+  'jmdict_lookup.sqlite',
+)
 const DEFAULT_MODEL_DIRECTORY = path.resolve(__dirname, '..', '..', 'models', 'llama')
 const DEFAULT_TUTOR_INSTRUCTIONS_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'instructions.txt')
 const DEFAULT_TUTOR_GRAMMAR_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'conversation.gbnf')
@@ -366,6 +400,219 @@ function formatDictionaryTranslation(entry) {
   return `${entry.japanese}${reading}`
 }
 
+function extractFirstJmdictGloss(rawEntry) {
+  if (!rawEntry || typeof rawEntry !== 'object') {
+    return ''
+  }
+  const senses = Array.isArray(rawEntry.sense)
+    ? rawEntry.sense
+    : (Array.isArray(rawEntry.senses) ? rawEntry.senses : [])
+  for (const sense of senses) {
+    if (!sense || typeof sense !== 'object') {
+      continue
+    }
+    const glosses = Array.isArray(sense.gloss) ? sense.gloss : []
+    for (const gloss of glosses) {
+      if (typeof gloss === 'string' && gloss.trim()) {
+        return gloss.trim()
+      }
+      if (gloss && typeof gloss === 'object' && typeof gloss.text === 'string' && gloss.text.trim()) {
+        return gloss.text.trim()
+      }
+    }
+  }
+  return ''
+}
+
+function extractAllJmdictGlosses(rawEntry) {
+  if (!rawEntry || typeof rawEntry !== 'object') {
+    return []
+  }
+  const senses = Array.isArray(rawEntry.sense)
+    ? rawEntry.sense
+    : (Array.isArray(rawEntry.senses) ? rawEntry.senses : [])
+  const glosses = []
+  for (const sense of senses) {
+    if (!sense || typeof sense !== 'object') {
+      continue
+    }
+    const entries = Array.isArray(sense.gloss) ? sense.gloss : []
+    for (const entry of entries) {
+      if (typeof entry === 'string' && entry.trim()) {
+        glosses.push(entry.trim())
+      } else if (entry && typeof entry === 'object' && typeof entry.text === 'string' && entry.text.trim()) {
+        glosses.push(entry.text.trim())
+      }
+    }
+  }
+  return glosses
+}
+
+function parseJmdictWordEntry(rawEntry) {
+  if (!rawEntry || typeof rawEntry !== 'object') {
+    return null
+  }
+
+  const kanji = Array.isArray(rawEntry.kanji) ? rawEntry.kanji : []
+  const kana = Array.isArray(rawEntry.kana) ? rawEntry.kana : []
+
+  const preferredKanji = kanji.find((item) => item && item.common && typeof item.text === 'string' && item.text.trim())
+    || kanji.find((item) => item && typeof item.text === 'string' && item.text.trim())
+    || null
+  const preferredKana = kana.find((item) => item && item.common && typeof item.text === 'string' && item.text.trim())
+    || kana.find((item) => item && typeof item.text === 'string' && item.text.trim())
+    || null
+
+  const japanese = preferredKanji && preferredKanji.text
+    ? preferredKanji.text.trim()
+    : (preferredKana && preferredKana.text ? preferredKana.text.trim() : '')
+  const reading = preferredKana && preferredKana.text ? preferredKana.text.trim() : ''
+  const gloss = extractFirstJmdictGloss(rawEntry)
+
+  return normalizeDictionaryEntry({ japanese, reading, gloss })
+}
+
+function resolveOfflineDictionaryPath(configuredPath) {
+  const preferred = typeof configuredPath === 'string' ? configuredPath.trim() : ''
+  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
+  const candidates = [
+    preferred,
+    docsDir ? path.join(docsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-3.6.2.json') : '',
+    docsDir ? path.join(docsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-common-3.6.2.json') : '',
+    resourcesPath ? path.join(resourcesPath, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-3.6.2.json') : '',
+    resourcesPath ? path.join(resourcesPath, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-common-3.6.2.json') : '',
+    DEFAULT_OFFLINE_DICTIONARY_FULL_PATH,
+    DEFAULT_OFFLINE_DICTIONARY_COMMON_PATH,
+  ]
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || ''
+}
+
+function resolveOfflineDictionarySqlitePath(configuredPath) {
+  const preferred = typeof configuredPath === 'string' ? configuredPath.trim() : ''
+  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
+  const candidates = [
+    preferred,
+    docsDir ? path.join(docsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite') : '',
+    resourcesPath ? path.join(resourcesPath, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite') : '',
+    DEFAULT_OFFLINE_DICTIONARY_SQLITE_PATH,
+  ]
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || ''
+}
+
+function createOfflineDictionaryLookup(options = {}) {
+  const filePath = resolveOfflineDictionaryPath(options.offlineDictionaryPath)
+  const sqlitePath = resolveOfflineDictionarySqlitePath(options.offlineDictionarySqlitePath)
+  const inlineEntries = Array.isArray(options.offlineEntries) ? options.offlineEntries : null
+  let index = null
+  let sqliteDb = null
+  let sqliteStatement = null
+
+  function buildIndex(entries) {
+    const byGloss = new Map()
+    for (const rawEntry of entries) {
+      const normalized = parseJmdictWordEntry(rawEntry)
+      if (!normalized) {
+        continue
+      }
+      const glosses = extractAllJmdictGlosses(rawEntry)
+      for (const gloss of glosses) {
+        const exactKey = normalizeAsciiToken(gloss)
+        if (exactKey && !byGloss.has(exactKey)) {
+          byGloss.set(exactKey, normalized)
+        }
+        const words = exactKey.split(' ').filter(Boolean)
+        for (const word of words) {
+          if (word.length < 3) {
+            continue
+          }
+          if (!byGloss.has(word)) {
+            byGloss.set(word, normalized)
+          }
+        }
+      }
+    }
+    return byGloss
+  }
+
+  function ensureIndex() {
+    if (index) {
+      return index
+    }
+    try {
+      const rawEntries = inlineEntries
+        || (() => {
+          if (!filePath) {
+            return []
+          }
+          const payload = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+          return Array.isArray(payload.words) ? payload.words : []
+        })()
+      index = buildIndex(rawEntries)
+    } catch {
+      index = new Map()
+    }
+    return index
+  }
+
+  function lookupFromSqlite(key) {
+    if (inlineEntries || !sqlitePath || !NodeSqliteDatabaseSync) {
+      return null
+    }
+    try {
+      if (!sqliteDb) {
+        sqliteDb = new NodeSqliteDatabaseSync(sqlitePath, { readOnly: true })
+      }
+      if (!sqliteStatement) {
+        sqliteStatement = sqliteDb.prepare(
+          'SELECT japanese, reading, gloss FROM dictionary_lookup WHERE lookup_key = ? LIMIT 1',
+        )
+      }
+      const row = sqliteStatement.get(key)
+      if (!row) {
+        return null
+      }
+      const normalized = normalizeDictionaryEntry({
+        japanese: typeof row.japanese === 'string' ? row.japanese : '',
+        reading: typeof row.reading === 'string' ? row.reading : '',
+        gloss: typeof row.gloss === 'string' ? row.gloss : '',
+      })
+      if (!normalized) {
+        return null
+      }
+      return {
+        ...normalized,
+        source: 'jmdict-offline-sqlite',
+      }
+    } catch {
+      return null
+    }
+  }
+
+  return (target) => {
+    const key = normalizeAsciiToken(target)
+    if (!key) {
+      return null
+    }
+
+    const sqliteHit = lookupFromSqlite(key)
+    if (sqliteHit) {
+      return sqliteHit
+    }
+
+    const table = ensureIndex()
+    const hit = table.get(key)
+    if (!hit) {
+      return null
+    }
+    return {
+      ...hit,
+      source: 'jmdict-offline',
+    }
+  }
+}
+
 function createDictionaryResolver(options = {}) {
   const onlineTimeoutMs = Number.isFinite(options.onlineTimeoutMs)
     ? Math.max(1000, Math.floor(options.onlineTimeoutMs))
@@ -373,6 +620,11 @@ function createDictionaryResolver(options = {}) {
   const jishoClient = typeof options.jishoClient === 'object' && options.jishoClient
     ? options.jishoClient
     : (JishoAPI ? new JishoAPI() : null)
+  const resolveOfflineEntry = createOfflineDictionaryLookup({
+    offlineDictionaryPath: options.offlineDictionaryPath,
+    offlineDictionarySqlitePath: options.offlineDictionarySqlitePath,
+    offlineEntries: options.offlineEntries,
+  })
 
   return async (target) => {
     const key = normalizeAsciiToken(target)
@@ -381,27 +633,32 @@ function createDictionaryResolver(options = {}) {
     }
 
     try {
-      if (!jishoClient || typeof jishoClient.searchForPhrase !== 'function') {
-        return null
-      }
-      const payload = await Promise.race([
-        jishoClient.searchForPhrase(key),
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('dictionary lookup timed out')), onlineTimeoutMs)
-        }),
-      ])
-      const first = payload && Array.isArray(payload.data) ? payload.data[0] : null
-      const parsed = parseJishoEntry(first)
-      if (!parsed) {
-        return null
-      }
-      return {
-        ...parsed,
-        source: 'jisho-online',
+      if (jishoClient && typeof jishoClient.searchForPhrase === 'function') {
+        const payload = await Promise.race([
+          jishoClient.searchForPhrase(key),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('dictionary lookup timed out')), onlineTimeoutMs)
+          }),
+        ])
+        const first = payload && Array.isArray(payload.data) ? payload.data[0] : null
+        const parsed = parseJishoEntry(first)
+        if (parsed) {
+          return {
+            ...parsed,
+            source: 'jisho-online',
+          }
+        }
       }
     } catch {
-      return null
+      // Ignore online lookup failures and continue to offline fallback.
     }
+
+    const offline = resolveOfflineEntry(key)
+    if (offline) {
+      return offline
+    }
+
+    return null
   }
 }
 
@@ -735,6 +992,8 @@ function createTutorChatRuntime(options = {}) {
   const resolveDictionaryEntry = createDictionaryResolver({
     onlineTimeoutMs: options.translationDictionaryTimeoutMs,
     jishoClient: options.translationJishoClient,
+    offlineDictionaryPath: options.translationOfflineDictionaryPath,
+    offlineEntries: options.translationOfflineEntries,
   })
 
   const adapterRegistry = options.adapterRegistry || createAdapterRegistry()
@@ -825,11 +1084,15 @@ function createTutorChatRuntime(options = {}) {
         const dictionaryHit = await resolveDictionaryEntry(translationTarget)
         if (dictionaryHit) {
           const dictionaryText = formatDictionaryTranslation(dictionaryHit)
+          const dictionarySource = String(dictionaryHit.source || 'dictionary')
+          const dictionaryProvider = dictionarySource === 'jisho-online'
+            ? 'unofficial-jisho-api'
+            : 'offline-jmdict'
           return {
             ok: true,
             text: clipText(dictionaryText, maxOutputChars),
-            provider: 'unofficial-jisho-api',
-            model: String(dictionaryHit.source || 'dictionary'),
+            provider: dictionaryProvider,
+            model: dictionarySource,
             coldStart: false,
             elapsedMs: 0,
           }

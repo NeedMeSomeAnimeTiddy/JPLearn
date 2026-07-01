@@ -2701,12 +2701,16 @@ function App() {
     gpuVramGb?: number | null
     voicevoxInstalled: boolean
     fontsInstalled: boolean
+    dictionaryInstalled: boolean
     llamaCppEstimatedDownloadMinutes?: number | null
+    dictionaryEstimatedDownloadMinutes?: number | null
   } | null>(null)
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'high' | 'ultra' | null>(null)
   const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
   const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'high' | 'ultra' | null>(null)
   const [tutorModelsExpanded, setTutorModelsExpanded] = useState(false)
+  const [dictionaryDownloading, setDictionaryDownloading] = useState(false)
+  const [dictionaryProgress, setDictionaryProgress] = useState<number>(0)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
   const [roundFeedbackTone, setRoundFeedbackTone] = useState<FeedbackTone>(null)
   const [roundFeedbackPoints, setRoundFeedbackPoints] = useState<number | null>(null)
@@ -3093,7 +3097,9 @@ function App() {
         gpuVramGb: setupInfo.gpuVramGb ?? null,
         voicevoxInstalled: setupInfo.voicevoxInstalled,
         fontsInstalled: setupInfo.fontsInstalled,
+        dictionaryInstalled: setupInfo.dictionaryInstalled,
         llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
+        dictionaryEstimatedDownloadMinutes: setupInfo.dictionaryEstimatedDownloadMinutes ?? null,
       })
     } catch {
       // Best effort only.
@@ -3117,6 +3123,10 @@ function App() {
       return
     }
     const unsubscribe = onSetupProgress((evt) => {
+      if (evt.id === 'dictionary') {
+        setDictionaryProgress(evt.percent)
+        return
+      }
       if (evt.id !== 'model') {
         return
       }
@@ -3168,6 +3178,22 @@ function App() {
       setTutorModelActionTier(null)
     }
   }, [refreshTutorInstallInfo, tutorModelActionTier])
+
+  const downloadOfflineDictionary = useCallback(async () => {
+    const downloadDictionary = window.jplearnDesktop.downloadDictionary
+    if (!downloadDictionary || dictionaryDownloading) {
+      return
+    }
+    setDictionaryDownloading(true)
+    setDictionaryProgress(0)
+    try {
+      await downloadDictionary()
+      await refreshTutorInstallInfo()
+    } finally {
+      setDictionaryDownloading(false)
+      setDictionaryProgress(0)
+    }
+  }, [dictionaryDownloading, refreshTutorInstallInfo])
 
   // Warm the voice engine in the background once voice is enabled so the first
   // spoken prompt doesn't pay the engine cold-start cost.
@@ -7782,6 +7808,50 @@ function App() {
                       </div>
                       <p className="settings-help" style={{ marginTop: '0.75rem' }}>
                         Select the circle icon to switch the Tutor to that model. Changes apply automatically without restarting the app.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+                ) : null}
+
+                {activeSettingsTab === 'tutor' ? (
+                <div className="settings-theme-card" style={{ marginTop: '1rem' }}>
+                  <div className="settings-theme-custom-head">
+                    <p className="settings-section-label" style={{ margin: 0 }}>Offline Dictionary</p>
+                  </div>
+                  <p className="settings-help" style={{ marginTop: '0.35rem' }}>
+                    Lets Tutor chat translate Japanese↔English words without an internet connection.
+                    Downloaded from the open-source jmdict-simplified project (~30 MB).
+                  </p>
+                  <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <span className="settings-help">
+                      {tutorInstallInfo?.dictionaryInstalled ? 'Installed' : `Not installed • ${formatMinutes(tutorInstallInfo?.dictionaryEstimatedDownloadMinutes)}`}
+                    </span>
+                    <button
+                      type="button"
+                      className="settings-card-icon-button"
+                      onClick={() => { void downloadOfflineDictionary() }}
+                      disabled={dictionaryDownloading || tutorInstallInfo?.dictionaryInstalled}
+                      aria-label={tutorInstallInfo?.dictionaryInstalled ? 'Offline dictionary installed' : 'Download offline dictionary'}
+                      title={tutorInstallInfo?.dictionaryInstalled ? 'Offline dictionary installed' : 'Download offline dictionary'}
+                    >
+                      {dictionaryDownloading
+                        ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                        : tutorInstallInfo?.dictionaryInstalled
+                          ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                          : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
+                    </button>
+                  </div>
+                  {dictionaryDownloading ? (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <div className="settings-progress-track">
+                        <div
+                          className="settings-progress-fill"
+                          style={{ width: `${Math.min(100, Math.max(0, dictionaryProgress))}%` }}
+                        />
+                      </div>
+                      <p className="settings-help" style={{ marginTop: '0.3rem' }}>
+                        Downloading… {Math.round(dictionaryProgress)}%
                       </p>
                     </div>
                   ) : null}

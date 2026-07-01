@@ -61,6 +61,7 @@ const EXPECTED_FONT_WEIGHT_COUNT = 17
 const LLAMA_CPP_SIZE_MB = 250
 const VOICEVOX_SIZE_MB = 1000
 const FONTS_SIZE_MB = 100
+const DICTIONARY_SIZE_MB = 30
 const SPEED_TEST_TIMEOUT_MS = 12000
 const SPEED_TEST_TARGETS = [
   { url: 'https://proof.ovh.net/files/10Mb.dat', bytes: 10485760 },
@@ -126,6 +127,14 @@ function ensureJPLearnDirs() {
     fs.mkdirSync(path.join(base, sub), { recursive: true })
   }
   return base
+}
+
+function getOfflineDictionarySqlitePath(base) {
+  return path.join(base, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite')
+}
+
+function isOfflineDictionaryInstalled(base) {
+  return fs.existsSync(getOfflineDictionarySqlitePath(base))
 }
 
 function resolvePythonCommand(scriptRoot) {
@@ -301,6 +310,7 @@ async function getSystemInfo() {
 
   const fontInstallState = getFontInstallState(base)
   const fontsInstalled = fontInstallState.installed
+  const dictionaryInstalled = isOfflineDictionaryInstalled(base)
 
   let isPackaged = false
   try { isPackaged = require('electron').app.isPackaged } catch { /* dev mode */ }
@@ -327,11 +337,13 @@ async function getSystemInfo() {
     llamaCppBackendLabel: LLAMA_BACKEND_LABELS[llamaCppBackend] || LLAMA_BACKEND_LABELS.cpu,
     voicevoxInstalled,
     fontsInstalled,
+    dictionaryInstalled,
     isPackaged,
     networkMbps,
     llamaCppEstimatedDownloadMinutes: estimateDownloadMinutes(LLAMA_CPP_SIZE_MB, networkMbps),
     voicevoxEstimatedDownloadMinutes: estimateDownloadMinutes(VOICEVOX_SIZE_MB, networkMbps),
     fontsEstimatedDownloadMinutes: estimateDownloadMinutes(FONTS_SIZE_MB, networkMbps),
+    dictionaryEstimatedDownloadMinutes: estimateDownloadMinutes(DICTIONARY_SIZE_MB, networkMbps),
   }
 }
 function isFirstRun() {
@@ -643,6 +655,71 @@ function downloadVoicevox(sender, scriptRoot) {
   })
 }
 
+function downloadDictionary(sender, scriptRoot) {
+  const base = ensureJPLearnDirs()
+
+  if (isOfflineDictionaryInstalled(base)) {
+    return Promise.resolve({ alreadyInstalled: true })
+  }
+
+  const scriptPath = path.join(scriptRoot, 'scripts', 'get_offline_dictionary.py')
+  const pythonCmd = resolvePythonCommand(scriptRoot)
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonCmd, [scriptPath], {
+      env: { ...process.env, JPLEARN_DOCUMENTS_DIR: base },
+      windowsHide: true,
+    })
+
+    // 5 dictionary downloads + 1 SQLite build phase.
+    const TOTAL_PHASES = 6
+    let currentPhase = 0
+    let currentPhasePct = 0
+
+    const emitProgress = () => {
+      const overall = ((currentPhase + currentPhasePct / 100) / TOTAL_PHASES) * 100
+      const pct = Math.max(0, Math.min(99, Math.round(overall)))
+      if (sender && !sender.isDestroyed()) {
+        sender.send('setup:download-progress', {
+          id: 'dictionary',
+          percent: pct,
+          mb: null,
+          totalMb: null,
+          etaSec: null,
+        })
+      }
+    }
+
+    child.stdout.on('data', (chunk) => {
+      const text = chunk.toString()
+      const phaseMatch = text.match(/PHASE (\d+)\/(\d+):/)
+      if (phaseMatch) {
+        currentPhase = Math.max(0, parseInt(phaseMatch[1], 10) - 1)
+        currentPhasePct = 0
+        emitProgress()
+      }
+      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*\((\d+) MB\)/i)
+      if (pctMatch) {
+        currentPhasePct = Math.max(0, Math.min(100, parseInt(pctMatch[1], 10)))
+        emitProgress()
+      }
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        if (sender && !sender.isDestroyed()) {
+          sender.send('setup:download-progress', { id: 'dictionary', percent: 100, mb: null, totalMb: null, etaSec: null })
+        }
+        resolve({ ok: true })
+      } else {
+        reject(new Error(`get_offline_dictionary.py exited with code ${code}`))
+      }
+    })
+
+    child.on('error', reject)
+  })
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 function downloadFonts(sender, scriptRoot) {
   const base = ensureJPLearnDirs()
@@ -765,6 +842,7 @@ function createSetupRuntime() {
     downloadLlamaCpp,
     downloadVoicevox,
     downloadFonts,
+    downloadDictionary,
     createShortcuts,
     setActiveModelTier,
     uninstallModel,

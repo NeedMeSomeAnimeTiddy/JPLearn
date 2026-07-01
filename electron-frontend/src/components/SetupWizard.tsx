@@ -25,15 +25,17 @@ interface SystemInfo {
   llamaCppBackendLabel?: string
   voicevoxInstalled: boolean
   fontsInstalled: boolean
+  dictionaryInstalled: boolean
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
   voicevoxEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
+  dictionaryEstimatedDownloadMinutes?: number | null
 }
 
 interface ProgressEvent {
-  id: 'model' | 'llama' | 'voicevox' | 'fonts'
+  id: 'model' | 'llama' | 'voicevox' | 'fonts' | 'dictionary'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -157,6 +159,8 @@ export function SetupWizard({ onComplete }: Props) {
   const [fontsProgress, setFontsProgress] = useState(0)
   const [fontsFiles, setFontsFiles] = useState<{ done: number; total: number } | null>(null)
   const [fontsMb, setFontsMb] = useState<{ done: number; total: number } | null>(null)
+  const [installDictionary, setInstallDictionary] = useState(true)
+  const [dictionaryProgress, setDictionaryProgress] = useState(0)
   const [createDesktop, setCreateDesktop] = useState(true)
   const [createStartMenu, setCreateStartMenu] = useState(true)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -190,6 +194,7 @@ export function SetupWizard({ onComplete }: Props) {
       setSelectedLlamaBackend(info.llamaCppBackend ?? 'cpu')
       if (info.voicevoxInstalled) setInstallVoicevox(false)
       if (info.fontsInstalled) setInstallFonts(false)
+      if (info.dictionaryInstalled) setInstallDictionary(false)
     } catch {
       setSysInfo((prev) => prev ?? {
         totalRamGb: 0,
@@ -201,6 +206,7 @@ export function SetupWizard({ onComplete }: Props) {
         llamaCppBackendLabel: 'CPU',
         voicevoxInstalled: false,
         fontsInstalled: false,
+        dictionaryInstalled: false,
         isPackaged: false,
       })
       setSelectedTier('low')
@@ -251,6 +257,8 @@ export function SetupWizard({ onComplete }: Props) {
         if (evt.filesDone !== null && evt.filesDone !== undefined && evt.filesTotal !== null && evt.filesTotal !== undefined) {
           setFontsFiles({ done: evt.filesDone, total: evt.filesTotal })
         }
+      } else if (evt.id === 'dictionary') {
+        setDictionaryProgress(evt.percent)
       }
       if (evt.logMessage) {
         appendProgressLog(evt.logMessage)
@@ -291,6 +299,11 @@ export function SetupWizard({ onComplete }: Props) {
         const task = api.downloadFonts?.()
         if (task) downloadTasks.push(task)
       }
+      if (installDictionary && !sysInfo?.dictionaryInstalled) {
+        appendProgressLog('Starting offline dictionary download…')
+        const task = api.downloadDictionary?.()
+        if (task) downloadTasks.push(task)
+      }
 
       if (downloadTasks.length > 0) {
         const results = await Promise.allSettled(downloadTasks)
@@ -312,7 +325,7 @@ export function SetupWizard({ onComplete }: Props) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, selectedLlamaBackend, installVoicevox, installFonts, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, createDesktop, createStartMenu, appendProgressLog])
+  }, [selectedTier, selectedLlamaBackend, installVoicevox, installFonts, installDictionary, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, sysInfo?.dictionaryInstalled, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -554,6 +567,24 @@ export function SetupWizard({ onComplete }: Props) {
             />
           )}
         </div>
+
+        {/* ── Offline Dictionary ── */}
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Offline Dictionary (optional)</p>
+          <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
+            Lets the Tutor chat look up Japanese↔English word translations without an internet
+            connection. Downloaded from the open-source jmdict-simplified project.
+          </p>
+          {sysInfo?.dictionaryInstalled ? (
+            <p style={{ color: 'var(--accent, #7eb8ea)', fontSize: '0.9rem' }}>✓ Offline dictionary is already installed.</p>
+          ) : (
+            <CheckboxOption
+              label={`Download offline dictionary (~30 MB)  •  ${formatDurationMinutes(sysInfo?.dictionaryEstimatedDownloadMinutes)}`}
+              checked={installDictionary}
+              onChange={setInstallDictionary}
+            />
+          )}
+        </div>
       </PageLayout>
     ),
 
@@ -562,6 +593,7 @@ export function SetupWizard({ onComplete }: Props) {
       const needsLlama = selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled
       const needsVoice = installVoicevox && !sysInfo?.voicevoxInstalled
       const needsFonts = installFonts && !sysInfo?.fontsInstalled
+      const needsDictionary = installDictionary && !sysInfo?.dictionaryInstalled
       const modelInfo = sysInfo?.models.find(m => m.tier === selectedTier)
       return (
         <PageLayout
@@ -569,7 +601,7 @@ export function SetupWizard({ onComplete }: Props) {
           subtitle="Review what will be downloaded, then click Start Setup."
           onNext={startDownloads}
           onBack={() => setPage(4)}
-          nextLabel={needsModel || needsLlama || needsVoice || needsFonts ? 'Start Setup' : 'Finish'}
+          nextLabel={needsModel || needsLlama || needsVoice || needsFonts || needsDictionary ? 'Start Setup' : 'Finish'}
         >
           {needsModel && modelInfo && (
             <SummaryRow label="AI Tutor model" detail={`${modelInfo.label} — ${formatSize(modelInfo.sizeMb)}`} />
@@ -583,7 +615,10 @@ export function SetupWizard({ onComplete }: Props) {
           {needsFonts && (
             <SummaryRow label="Japanese fonts" detail="~100 MB" />
           )}
-          {!needsModel && !needsVoice && !needsFonts && (
+          {needsDictionary && (
+            <SummaryRow label="Offline dictionary" detail="~30 MB" />
+          )}
+          {!needsModel && !needsVoice && !needsFonts && !needsDictionary && (
             <p style={{ opacity: 0.7 }}>Nothing to download — all selected components are already installed.</p>
           )}
           {sysInfo?.isPackaged && (
@@ -642,6 +677,9 @@ export function SetupWizard({ onComplete }: Props) {
               </p>
             )}
           </>
+        )}
+        {installDictionary && !sysInfo?.dictionaryInstalled && (
+          <ProgressBar value={dictionaryProgress} label="Offline dictionary" />
         )}
         {downloadError && (
           <p style={{ color: '#ff7b7b', marginTop: '1rem', lineHeight: 1.5 }}>

@@ -226,6 +226,10 @@ models/llama/*.bin
 data/app.db
 data/jplearn.db
 
+# Local offline dictionary payloads (downloaded on demand)
+data/external_sources/offline_dictionary/*.json
+data/external_sources/offline_dictionary/*.sqlite
+
 # Ruff stuff:
 .ruff_cache/
 

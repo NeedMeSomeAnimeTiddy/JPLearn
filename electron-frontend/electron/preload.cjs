@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
     return () => ipcRenderer.removeListener('setup:download-progress', handler)
   },
   downloadFonts: () => ipcRenderer.invoke('setup:download-fonts'),
+  downloadDictionary: () => ipcRenderer.invoke('setup:download-dictionary'),
   createShortcuts: (opts) => ipcRenderer.invoke('setup:create-shortcuts', opts),
   getStudySummary: () => ipcRenderer.invoke('study:get-summary'),
   getBlockProgress: (slug) => ipcRenderer.invoke('study:get-block-progress', slug),

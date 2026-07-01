@@ -786,6 +786,20 @@ function registerIpcHandlers(options) {
       }
     })
 
+    options.ipcMain.handle('setup:download-dictionary', async (event) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      try {
+        const result = await setupRuntime.downloadDictionary(event.sender, options.repoRoot)
+        if (!result?.alreadyInstalled && typeof options.refreshTutorChatRuntime === 'function') {
+          await options.refreshTutorChatRuntime()
+        }
+        return result
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Dictionary download failed: ${detail}`)
+      }
+    })
+
     options.ipcMain.handle('setup:create-shortcuts', (event, opts) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       const safeOpts = opts && typeof opts === 'object' ? opts : {}

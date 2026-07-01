@@ -22,6 +22,7 @@ module.exports = {
         const toRemove = [
           path.join(resourcesDir, "data", "voicevox"),
           path.join(resourcesDir, "data", "piper"),
+          path.join(resourcesDir, "data", "external_sources", "offline_dictionary"),
         ]
         for (const dir of toRemove) {
           if (fs.existsSync(dir)) {

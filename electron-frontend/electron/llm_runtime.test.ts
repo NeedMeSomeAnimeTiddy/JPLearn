@@ -185,6 +185,101 @@ describe('llm runtime', () => {
     expect(response.text).toContain('文脈を教えてください')
   })
 
+  it('uses offline JMdict translation when online dictionary is unavailable', async () => {
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      translationJishoClient: {
+        async searchForPhrase() {
+          throw new Error('network unreachable')
+        },
+      },
+      translationOfflineEntries: [
+        {
+          id: 'offline-test-1',
+          kanji: [{ common: true, text: 'お手洗い', tags: [] }],
+          kana: [{ common: true, text: 'おてあらい', tags: [], appliesToKanji: ['*'] }],
+          sense: [{ gloss: [{ lang: 'eng', text: 'bathroom' }] }],
+        },
+      ],
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer() {
+          throw new Error('infer should not be called for offline dictionary hit')
+        },
+      }),
+    })
+
+    const response = await runtime.sendMessage('How do you say "bathroom" in Japanese?')
+    expect(response.ok).toBe(true)
+    expect(response.provider).toBe('offline-jmdict')
+    expect(response.model).toBe('jmdict-offline')
+    expect(response.text).toBe('お手洗い (おてあらい)')
+  })
+
+  it('uses offline JMdict SQLite lookup when available', async () => {
+    const fs = require('node:fs')
+    const os = require('node:os')
+    const path = require('node:path')
+    let DatabaseSync = null
+    try {
+      ;({ DatabaseSync } = require('node:sqlite'))
+    } catch {
+      DatabaseSync = null
+    }
+
+    if (!DatabaseSync) {
+      return
+    }
+
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jplearn-dict-'))
+    const sqlitePath = path.join(tmpRoot, 'jmdict_lookup.sqlite')
+
+    try {
+      const db = new DatabaseSync(sqlitePath)
+      db.exec(
+        [
+          'CREATE TABLE dictionary_lookup (lookup_key TEXT PRIMARY KEY, japanese TEXT NOT NULL, reading TEXT NOT NULL, gloss TEXT NOT NULL, entry_id TEXT);',
+          "INSERT INTO dictionary_lookup (lookup_key, japanese, reading, gloss, entry_id) VALUES ('bathroom', 'お手洗い', 'おてあらい', 'bathroom', 'sqlite-test-1');",
+        ].join('\n'),
+      )
+      db.close()
+
+      const runtime = createTutorChatRuntime({
+        provider: 'stub',
+        translationJishoClient: {
+          async searchForPhrase() {
+            throw new Error('network unreachable')
+          },
+        },
+        translationOfflineDictionarySqlitePath: sqlitePath,
+        adapterFactory: () => ({
+          async load() {
+            return undefined
+          },
+          async unload() {
+            return undefined
+          },
+          async infer() {
+            throw new Error('infer should not be called for sqlite dictionary hit')
+          },
+        }),
+      })
+
+      const response = await runtime.sendMessage('How do you say "bathroom" in Japanese?')
+      expect(response.ok).toBe(true)
+      expect(response.provider).toBe('offline-jmdict')
+      expect(response.model).toBe('jmdict-offline-sqlite')
+      expect(response.text).toBe('お手洗い (おてあらい)')
+    } finally {
+      fs.rmSync(tmpRoot, { recursive: true, force: true })
+    }
+  })
+
   it('treats code 130 runtime text as cancellation instead of surfacing raw errors', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
