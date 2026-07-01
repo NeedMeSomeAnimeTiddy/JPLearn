@@ -7,6 +7,7 @@ const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
 const { createVoiceRuntime } = require('./voice_runtime.cjs')
 const { createSetupRuntime } = require('./setup_runtime.cjs')
+const { loadFontCSS } = require('./font_loader.cjs')
 const {
   isAllowedRendererUrl,
 } = require('./ipc_security.cjs')
@@ -1314,7 +1315,20 @@ function loadMainWindow(win) {
   })
 
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
-}
+
+  // Inject locally downloaded fonts (Documents\JPLearn\fonts\) if available.
+  // Falls back to system fonts silently — no user action needed.
+  win.webContents.on('did-finish-load', () => {
+    const fontsDir = path.join(process.env.JPLEARN_DOCUMENTS_DIR || '', 'fonts')
+    try {
+      const fontCSS = loadFontCSS(fontsDir)
+      if (fontCSS) {
+        win.webContents.insertCSS(fontCSS).catch(() => {})
+      }
+    } catch {
+      // Non-fatal: app works with system fonts as fallback
+    }
+  })
 
 async function runStudyJourneySmokeIfEnabled() {
   if (process.env.JPLEARN_SMOKE_JOURNEY !== '1') {

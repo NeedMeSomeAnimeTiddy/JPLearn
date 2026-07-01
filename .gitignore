@@ -214,6 +214,10 @@ tools/llama.cpp/
 # Bundled python-build-standalone (created by CI release workflow; not committed)
 python-bundle/
 
+# User-downloaded fonts (stored in Documents\JPLearn\fonts\ in packaged app)
+# For local dev: python scripts/get_fonts.py
+fonts/
+
 # Local llama.cpp model artifacts
 models/llama/*.gguf
 models/llama/*.bin

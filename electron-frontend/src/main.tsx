@@ -1,23 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import '@fontsource/zen-kaku-gothic-new/400.css'
-import '@fontsource/zen-kaku-gothic-new/500.css'
-import '@fontsource/zen-kaku-gothic-new/700.css'
-import '@fontsource/zen-kaku-gothic-new/900.css'
-import '@fontsource/m-plus-rounded-1c/500.css'
-import '@fontsource/m-plus-rounded-1c/700.css'
-import '@fontsource/m-plus-rounded-1c/800.css'
-import '@fontsource/klee-one/600.css'
-import '@fontsource/noto-sans-jp/400.css'
-import '@fontsource/noto-sans-jp/500.css'
-import '@fontsource/noto-sans-jp/700.css'
-import '@fontsource/shippori-mincho/400.css'
-import '@fontsource/shippori-mincho/700.css'
-import '@fontsource/zen-old-mincho/400.css'
-import '@fontsource/zen-old-mincho/700.css'
-import '@fontsource/dotgothic16/400.css'
-import '@fontsource/ibm-plex-mono/400.css'
-import '@fontsource/ibm-plex-mono/500.css'
+// Fonts are NOT bundled — download them with: python scripts/get_fonts.py
+// The app loads them dynamically from Documents\JPLearn\fonts\ at startup.
+// Without them the app falls back to system fonts (e.g. Yu Gothic on Windows).
 import './index.css'
 import App from './App.tsx'
 
