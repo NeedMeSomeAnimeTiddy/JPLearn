@@ -37,6 +37,7 @@ export interface SessionContextValue {
   roundFeedbackAnswer: string | null
   roundFeedbackPoints: number | null
   isRoundResolving: boolean
+  feedbackAdvanceMs: number
 
   // Session metrics
   sessionScore: number

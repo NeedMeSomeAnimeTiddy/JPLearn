@@ -8,9 +8,27 @@ interface RoundFeedbackProps {
   answerLabel: string
   livesEnabled: boolean
   mode: PlayableMinigame
+  autoAdvanceMs?: number
+  autoAdvanceLabel?: string
+  actionLabel?: string
+  actionTitle?: string
+  onAction?: () => void
 }
 
-export function RoundFeedback({ feedback, tone, points, answer, answerLabel, livesEnabled, mode }: RoundFeedbackProps) {
+export function RoundFeedback({
+  feedback,
+  tone,
+  points,
+  answer,
+  answerLabel,
+  livesEnabled,
+  mode,
+  autoAdvanceMs,
+  autoAdvanceLabel,
+  actionLabel,
+  actionTitle,
+  onAction,
+}: RoundFeedbackProps) {
   return (
     <div
       className={`round-feedback ${
@@ -37,6 +55,30 @@ export function RoundFeedback({ feedback, tone, points, answer, answerLabel, liv
       ) : null}
       {mode === 'narrative_story' ? (
         <p className="round-feedback-note">Story progress updates chapter access based on stage transitions.</p>
+      ) : null}
+      {autoAdvanceMs ? (
+        <div className="round-feedback-advance" aria-live="polite">
+          <div className="round-feedback-advance-copy">
+            <span>{autoAdvanceLabel ?? 'Advancing automatically...'}</span>
+            {onAction ? (
+              <button
+                type="button"
+                className="round-feedback-skip"
+                onClick={onAction}
+                aria-label={actionTitle ?? actionLabel ?? 'Continue now'}
+                title={actionTitle ?? actionLabel ?? 'Continue now'}
+              >
+                {actionLabel ?? 'Continue now'}
+              </button>
+            ) : null}
+          </div>
+          <div className="round-feedback-advance-track" aria-hidden="true">
+            <span
+              className="round-feedback-advance-fill"
+              style={{ animationDuration: `${autoAdvanceMs}ms` }}
+            />
+          </div>
+        </div>
       ) : null}
     </div>
   )

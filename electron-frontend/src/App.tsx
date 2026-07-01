@@ -6844,6 +6844,7 @@ function App() {
         roundFeedbackAnswer,
         roundFeedbackPoints,
         isRoundResolving,
+        feedbackAdvanceMs: FEEDBACK_REVEAL_MS,
         sessionScore,
         sessionRounds,
         sessionPoints,
