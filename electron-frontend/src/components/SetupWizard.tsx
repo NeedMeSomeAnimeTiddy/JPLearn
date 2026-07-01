@@ -10,6 +10,7 @@ interface ModelOption {
   label: string
   description: string
   installed: boolean
+  estimatedDownloadMinutes?: number | null
 }
 
 interface SystemInfo {
@@ -19,6 +20,9 @@ interface SystemInfo {
   voicevoxInstalled: boolean
   fontsInstalled: boolean
   isPackaged: boolean
+  networkMbps?: number | null
+  voicevoxEstimatedDownloadMinutes?: number | null
+  fontsEstimatedDownloadMinutes?: number | null
 }
 
 interface ProgressEvent {
@@ -29,6 +33,7 @@ interface ProgressEvent {
   etaSec: number | null
   filesDone?: number | null
   filesTotal?: number | null
+  logMessage?: string
 }
 
 interface Props {
@@ -51,6 +56,15 @@ function formatSize(mb: number): string {
   return `${mb} MB`
 }
 
+function formatDurationMinutes(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined || minutes <= 0) return 'est. unavailable'
+  if (minutes < 60) return `~${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rem = minutes % 60
+  if (rem === 0) return `~${hours} h`
+  return `~${hours} h ${rem} min`
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function SetupWizard({ onComplete }: Props) {
@@ -70,7 +84,18 @@ export function SetupWizard({ onComplete }: Props) {
   const [createStartMenu, setCreateStartMenu] = useState(true)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [downloadDone, setDownloadDone] = useState(false)
+  const [progressLogs, setProgressLogs] = useState<string[]>([])
   const unsubRef = useRef<(() => void) | null>(null)
+
+  const appendProgressLog = useCallback((message: string) => {
+    const trimmed = message.trim()
+    if (!trimmed) return
+    setProgressLogs((prev) => {
+      const timestamp = new Date().toLocaleTimeString()
+      const next = [...prev, `[${timestamp}] ${trimmed}`]
+      return next.slice(-120)
+    })
+  }, [])
 
   // Fetch system info when we land on page 2
   useEffect(() => {
@@ -106,34 +131,45 @@ export function SetupWizard({ onComplete }: Props) {
           setFontsFiles({ done: evt.filesDone, total: evt.filesTotal })
         }
       }
+      if (evt.logMessage) {
+        appendProgressLog(evt.logMessage)
+      }
     })
     unsubRef.current = unsub
     return () => unsub()
-  }, [])
+  }, [appendProgressLog])
 
   const startDownloads = useCallback(async () => {
     setDownloadError(null)
+    setProgressLogs([])
+    appendProgressLog('Starting setup tasks…')
     setPage(6)
 
     const api = window.jplearnDesktop
     try {
       if (selectedTier && selectedTier !== 'skip') {
+        appendProgressLog(`Queueing model download (${selectedTier})…`)
         await api.downloadModel?.(selectedTier)
       }
       if (installVoicevox) {
+        appendProgressLog('Queueing VOICEVOX download…')
         await api.downloadVoicevox?.()
       }
       if (installFonts && !sysInfo?.fontsInstalled) {
+        appendProgressLog('Queueing fonts download…')
         await api.downloadFonts?.()
       }
+      appendProgressLog('Creating shortcuts…')
       await api.createShortcuts?.({ desktop: createDesktop, startMenu: createStartMenu })
       await api.completeSetup?.()
+      appendProgressLog('Setup complete.')
       setDownloadDone(true)
       setPage(7)
     } catch (err) {
+      appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, installVoicevox])
+  }, [selectedTier, installVoicevox, installFonts, sysInfo?.fontsInstalled, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -203,6 +239,10 @@ export function SetupWizard({ onComplete }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <InfoRow label="RAM" value={`${sysInfo.totalRamGb.toFixed(1)} GB`} />
             <InfoRow
+              label="Network"
+              value={sysInfo.networkMbps ? `${sysInfo.networkMbps.toFixed(1)} Mbps` : 'Speed test unavailable'}
+            />
+            <InfoRow
               label="Recommended model"
               value={sysInfo.models.find(m => m.tier === sysInfo.recommendedTier)?.label ?? '—'}
               highlight
@@ -228,7 +268,7 @@ export function SetupWizard({ onComplete }: Props) {
           {sysInfo?.models.map(m => (
             <RadioOption
               key={m.tier}
-              label={`${m.label}  (${formatSize(m.sizeMb)})`}
+              label={`${m.label}  (${formatSize(m.sizeMb)})  •  ${formatDurationMinutes(m.estimatedDownloadMinutes)}`}
               sublabel={m.installed ? '✓ Already installed' : m.description}
               checked={selectedTier === m.tier}
               onChange={() => setSelectedTier(m.tier)}
@@ -261,7 +301,7 @@ export function SetupWizard({ onComplete }: Props) {
           <p style={{ color: 'var(--accent, #7eb8ea)' }}>✓ VOICEVOX is already installed.</p>
         ) : (
           <CheckboxOption
-            label="Install Japanese voice synthesis (~1 GB)"
+            label={`Install Japanese voice synthesis (~1 GB)  •  ${formatDurationMinutes(sysInfo?.voicevoxEstimatedDownloadMinutes)}`}
             checked={installVoicevox}
             onChange={setInstallVoicevox}
           />
@@ -283,7 +323,7 @@ export function SetupWizard({ onComplete }: Props) {
             <p style={{ color: 'var(--accent, #7eb8ea)', fontSize: '0.9rem' }}>✓ Fonts are already installed.</p>
           ) : (
             <CheckboxOption
-              label="Download Japanese fonts (~100 MB)"
+              label={`Download Japanese fonts (~100 MB)  •  ${formatDurationMinutes(sysInfo?.fontsEstimatedDownloadMinutes)}`}
               checked={installFonts}
               onChange={setInstallFonts}
             />
@@ -378,6 +418,21 @@ export function SetupWizard({ onComplete }: Props) {
             </button>
           </p>
         )}
+
+        <div style={{ marginTop: '0.75rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
+          <div style={{ padding: '0.55rem 0.7rem', fontSize: '0.82rem', fontWeight: 600, opacity: 0.85, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            Activity Log
+          </div>
+          <div style={{ maxHeight: '150px', overflowY: 'auto', padding: '0.55rem 0.7rem', fontSize: '0.78rem', lineHeight: 1.5, opacity: 0.85, fontFamily: 'var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace)' }}>
+            {progressLogs.length === 0 ? (
+              <div style={{ opacity: 0.6 }}>Waiting for download activity…</div>
+            ) : (
+              progressLogs.map((line, idx) => (
+                <div key={`${idx}-${line}`}>{line}</div>
+              ))
+            )}
+          </div>
+        </div>
       </PageLayout>
     ),
 

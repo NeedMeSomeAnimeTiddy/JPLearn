@@ -1,8 +1,8 @@
-"""Download font files from fontsource CDN to Documents\\JPLearn\\fonts\\.
+"""Download JPLearn fonts to Documents\\JPLearn\\fonts\\.
 
-JPLearn's Japanese fonts are too large to bundle in the installer (~88 MB).
-This script downloads only the woff2 files for the exact font families and
-weights the app uses. Once downloaded, the app loads them automatically.
+To keep installer size small, fonts are downloaded on demand during setup.
+This script downloads a small number of @fontsource package archives (one per
+family), then extracts only the exact CSS + woff2 files JPLearn uses.
 
 Usage:
     python scripts/get_fonts.py           # download all fonts
@@ -12,9 +12,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import io
+import json
 import os
 import re
 import sys
+import tarfile
 import urllib.request
 from pathlib import Path
 
@@ -30,8 +33,9 @@ FONTS: list[tuple[str, list[int]]] = [
     ("ibm-plex-mono", [400, 500]),
 ]
 
-CDN_BASE = "https://cdn.jsdelivr.net/npm/@fontsource"
+NPM_REGISTRY_BASE = "https://registry.npmjs.org/@fontsource"
 REPO_ROOT = Path(__file__).resolve().parent.parent
+READY_MARKER = ".fonts-ready"
 
 
 def resolve_target_dir() -> Path:
@@ -48,6 +52,20 @@ def fetch(url: str) -> bytes:
         return resp.read()
 
 
+def fetch_json(url: str) -> dict:
+    return json.loads(fetch(url).decode("utf-8"))
+
+
+def get_tarball_url_and_version(family: str) -> tuple[str, str]:
+    meta = fetch_json(f"{NPM_REGISTRY_BASE}/{family}/latest")
+    dist = meta.get("dist") or {}
+    tarball = dist.get("tarball")
+    version = str(meta.get("version") or "latest")
+    if not isinstance(tarball, str) or not tarball:
+        raise RuntimeError(f"No tarball URL for @fontsource/{family}")
+    return tarball, version
+
+
 def report(done: int, total: int) -> None:
     if total > 0:
         pct = done * 100 // total
@@ -55,7 +73,13 @@ def report(done: int, total: int) -> None:
         sys.stdout.flush()
 
 
-def download_font(family: str, weight: int, target_dir: Path, force: bool) -> None:
+def extract_font_from_package(
+    tar: tarfile.TarFile,
+    family: str,
+    weight: int,
+    target_dir: Path,
+    force: bool,
+) -> None:
     family_dir = target_dir / family
     files_dir = family_dir / "files"
     css_path = family_dir / f"{weight}.css"
@@ -66,12 +90,14 @@ def download_font(family: str, weight: int, target_dir: Path, force: bool) -> No
     family_dir.mkdir(parents=True, exist_ok=True)
     files_dir.mkdir(exist_ok=True)
 
-    # Fetch and save the CSS file
-    css_url = f"{CDN_BASE}/{family}/{weight}.css"
     try:
-        css = fetch(css_url).decode("utf-8")
+        css_member = tar.getmember(f"package/{weight}.css")
+        css_bytes = tar.extractfile(css_member)
+        if css_bytes is None:
+            raise RuntimeError("missing css payload")
+        css = css_bytes.read().decode("utf-8")
     except Exception as exc:
-        print(f"  WARNING: failed to fetch CSS for {family}/{weight}: {exc}", file=sys.stderr)
+        print(f"  WARNING: failed to load CSS for {family}/{weight}: {exc}", file=sys.stderr)
         return
 
     css_path.write_text(css, encoding="utf-8")
@@ -90,13 +116,31 @@ def download_font(family: str, weight: int, target_dir: Path, force: bool) -> No
         dest = files_dir / filename
         if not dest.exists() or force:
             try:
-                dest.write_bytes(fetch(f"{CDN_BASE}/{family}/files/{filename}"))
+                member = tar.getmember(f"package/files/{filename}")
+                payload = tar.extractfile(member)
+                if payload is None:
+                    raise RuntimeError(f"archive member missing: {filename}")
+                dest.write_bytes(payload.read())
             except Exception as exc:
-                print(f"\n  WARNING: failed to fetch {filename}: {exc}", file=sys.stderr)
+                print(f"\n  WARNING: failed to extract {filename}: {exc}", file=sys.stderr)
         done += 1
         report(done, total)
 
     sys.stdout.write(f"\r  {total} woff2 files - {family}/{weight}.css\n")
+
+
+def download_family_package(
+    family: str,
+    weights: list[int],
+    target_dir: Path,
+    force: bool,
+) -> None:
+    tarball_url, version = get_tarball_url_and_version(family)
+    print(f"  Package: @fontsource/{family}@{version}")
+    package_bytes = fetch(tarball_url)
+    with tarfile.open(fileobj=io.BytesIO(package_bytes), mode="r:gz") as tar:
+        for weight in weights:
+            extract_font_from_package(tar, family, weight, target_dir, force)
 
 
 def main() -> int:
@@ -106,15 +150,21 @@ def main() -> int:
 
     target_dir = resolve_target_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
+    marker_path = target_dir / READY_MARKER
+    marker_path.unlink(missing_ok=True)
     print(f"Fonts directory: {target_dir}\n")
 
     total_families = len(FONTS)
     for i, (family, weights) in enumerate(FONTS, 1):
         print(f"[{i}/{total_families}] {family}")
-        for weight in weights:
-            download_font(family, weight, target_dir, args.force)
+        try:
+            download_family_package(family, weights, target_dir, args.force)
+        except Exception as exc:
+            print(f"  ERROR: failed to install {family}: {exc}", file=sys.stderr)
+            return 1
 
     print(f"\nDone. Fonts saved to {target_dir}")
+    marker_path.write_text("ok\n", encoding="utf-8")
     print("Restart JPLearn to load the downloaded fonts.")
     return 0
 

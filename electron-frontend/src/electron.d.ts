@@ -422,6 +422,7 @@ interface SetupModelOption {
   label: string
   description: string
   installed: boolean
+  estimatedDownloadMinutes?: number | null
 }
 
 interface SetupSystemInfo {
@@ -431,6 +432,9 @@ interface SetupSystemInfo {
   voicevoxInstalled: boolean
   fontsInstalled: boolean
   isPackaged: boolean
+  networkMbps?: number | null
+  voicevoxEstimatedDownloadMinutes?: number | null
+  fontsEstimatedDownloadMinutes?: number | null
 }
 
 interface SetupProgressEvent {
@@ -441,6 +445,7 @@ interface SetupProgressEvent {
   etaSec: number | null
   filesDone?: number | null
   filesTotal?: number | null
+  logMessage?: string
 }
 
 interface VoiceStatus {

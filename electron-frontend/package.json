@@ -27,14 +27,6 @@
     "make:win": "npm run build && electron-forge make --platform=win32"
   },
   "dependencies": {
-    "@fontsource/dotgothic16": "^5.2.8",
-    "@fontsource/ibm-plex-mono": "^5.2.7",
-    "@fontsource/klee-one": "^5.2.8",
-    "@fontsource/m-plus-rounded-1c": "^5.2.10",
-    "@fontsource/noto-sans-jp": "^5.2.9",
-    "@fontsource/shippori-mincho": "^5.2.8",
-    "@fontsource/zen-kaku-gothic-new": "^5.2.7",
-    "@fontsource/zen-old-mincho": "^5.2.8",
     "lucide-react": "^1.21.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
