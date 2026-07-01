@@ -67,21 +67,27 @@ jobs:
             Write-Error "Installer not found in out/make/squirrel.windows/x64/"
             exit 1
           }
-          gh release create "${{ github.ref_name }}" `
-            "$($installer.FullName)" `
-            --title "JPLearn ${{ github.ref_name }}" `
-            --notes "## JPLearn ${{ github.ref_name }}
+          $notes = @"
+## JPLearn ${{ github.ref_name }}
 
 **Requirements:** Python 3.11+ must be installed on your system.
 
 ### Installation
-1. Download and run \`$($installer.Name)\`
-2. If Windows shows a SmartScreen warning, click **More info → Run anyway** (the app is unsigned)
+1. Download and run ``$($installer.Name)``
+2. If Windows shows a SmartScreen warning, click **More info -> Run anyway** (the app is unsigned)
 3. On first launch, a setup wizard will offer to download the AI tutor model and Japanese voice engine
 
 ### Optional components (downloaded by wizard or manually)
-- **AI Tutor:** \`python scripts/get_gguf_model.py\`
-- **Japanese Voice:** \`python scripts/get_voicevox.py\`
+- **AI Tutor:** ``python scripts/get_gguf_model.py``
+- **Japanese Voice:** ``python scripts/get_voicevox.py``
 
 ### Building from source
-See the [README](README.md) for full build instructions."
+See the [README](README.md) for full build instructions.
+"@
+          $notesFile = New-TemporaryFile
+          $notes | Set-Content -Path $notesFile.FullName -Encoding UTF8
+          gh release create "${{ github.ref_name }}" `
+            "$($installer.FullName)" `
+            --title "JPLearn ${{ github.ref_name }}" `
+            --notes-file "$($notesFile.FullName)"
+          Remove-Item $notesFile.FullName -ErrorAction SilentlyContinue
