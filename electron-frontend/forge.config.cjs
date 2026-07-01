@@ -1,29 +1,32 @@
-const fs = require('node:fs')
-const path = require('node:path')
+const fs = require("node:fs")
+const path = require("node:path")
+
+const extraResourceCandidates = ["../scripts", "../data", "../domain", "../python-bundle"]
+const extraResource = extraResourceCandidates.filter((relativePath) => {
+  const absolutePath = path.resolve(__dirname, relativePath)
+  return fs.existsSync(absolutePath)
+})
 
 module.exports = {
   packagerConfig: {
     asar: true,
-    // Path without extension — Forge appends .ico on Windows, .icns on macOS.
-    // Place your icon at electron-frontend/assets/icon.ico before running make.
-    icon: './assets/icon',
-    extraResource: ['../scripts', '../data', '../domain', '../python-bundle'],
+    // Path without extension - Forge appends .ico on Windows, .icns on macOS.
+    icon: "./assets/icon",
+    extraResource,
   },
   hooks: {
-    // Remove large runtime-only directories from the bundled extraResources so
-    // they never accidentally inflate the installer size.
-    // voicevox (~1 GB) is downloaded at first-run by the setup wizard, not bundled.
+    // Remove large runtime-only directories from bundled extraResources.
     postPackage: async (_config, packageResult) => {
       for (const outputPath of packageResult.outputPaths) {
-        const resourcesDir = path.join(outputPath, 'resources')
+        const resourcesDir = path.join(outputPath, "resources")
         const toRemove = [
-          path.join(resourcesDir, 'data', 'voicevox'),
-          path.join(resourcesDir, 'data', 'piper'),
+          path.join(resourcesDir, "data", "voicevox"),
+          path.join(resourcesDir, "data", "piper"),
         ]
         for (const dir of toRemove) {
           if (fs.existsSync(dir)) {
             fs.rmSync(dir, { recursive: true, force: true })
-            console.log(`[forge hook] removed: ${dir}`)
+            console.log("[forge hook] removed: " + dir)
           }
         }
       }
@@ -32,18 +35,16 @@ module.exports = {
   rebuildConfig: {},
   makers: [
     {
-      name: '@electron-forge/maker-squirrel',
+      name: "@electron-forge/maker-squirrel",
       config: {
-        name: 'jplearn',
-        // Custom installer filename
-        setupExe: 'JPLearn-Installer.exe',
-        // Installer window icon — requires electron-frontend/assets/icon.ico
-        setupIcon: './assets/icon.ico',
+        name: "jplearn",
+        setupExe: "JPLearn-Installer.exe",
+        setupIcon: "./assets/icon.ico",
       },
     },
     {
-      name: '@electron-forge/maker-zip',
-      platforms: ['win32'],
+      name: "@electron-forge/maker-zip",
+      platforms: ["win32"],
     },
   ],
 }
