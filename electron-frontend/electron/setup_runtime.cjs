@@ -19,23 +19,23 @@ const NetworkSpeed = require('network-speed')
 
 const MODELS = {
   low: {
-    filename: 'Qwen3.5-2B-Q4_K_M.gguf',
-    repo: 'unsloth/Qwen3.5-2B-GGUF',
-    sizeMb: 1400,
-    label: 'Low-end (2B)',
+    filename: 'qwen2.5-1.5b-instruct-q8_0.gguf',
+    repo: 'Qwen/Qwen2.5-1.5B-Instruct-GGUF',
+    sizeMb: 1890,
+    label: 'Low-end (1.5B)',
     description: 'Fast on any hardware. Good for everyday questions.',
   },
   high: {
-    filename: 'Qwen3.5-4B-Q4_K_M.gguf',
-    repo: 'unsloth/Qwen3.5-4B-GGUF',
-    sizeMb: 2600,
-    label: 'High-end (4B)',
+    filename: 'qwen2.5-3b-instruct-q8_0.gguf',
+    repo: 'Qwen/Qwen2.5-3B-Instruct-GGUF',
+    sizeMb: 3620,
+    label: 'High-end (3B)',
     description: 'Stronger Japanese understanding. Recommended for most users.',
   },
   ultra: {
-    filename: 'Qwen3.5-9B-Q4_K_M.gguf',
+    filename: 'Qwen3.5-9B-Q6_K.gguf',
     repo: 'unsloth/Qwen3.5-9B-GGUF',
-    sizeMb: 5500,
+    sizeMb: 7460,
     label: 'Ultra (9B)',
     description: 'Most capable. Better for complex grammar and nuanced questions.',
   },

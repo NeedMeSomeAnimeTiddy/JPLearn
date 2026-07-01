@@ -52,7 +52,7 @@ interface CompactDropdownOption {
   label: string
   meta?: string
   badge?: string
-  badgeTone?: 'recommended' | 'soft'
+  badgeTone?: 'recommended' | 'soft' | 'warning'
 }
 
 type ModelTier = 'low' | 'high' | 'ultra' | 'skip'
@@ -86,6 +86,55 @@ function formatDurationMinutes(minutes: number | null | undefined): string {
   const rem = minutes % 60
   if (rem === 0) return `~${hours} h`
   return `~${hours} h ${rem} min`
+}
+
+function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'high' | 'ultra') {
+  const totalRamGb = systemInfo?.totalRamGb ?? 0
+  const gpuVramGb = systemInfo?.gpuVramGb ?? 0
+
+  if (tier === 'low') {
+    return {
+      badge: 'OK on this PC',
+      tone: 'soft' as const,
+      message: 'This tier should run comfortably on this system.',
+      isOk: true,
+    }
+  }
+
+  if (tier === 'high') {
+    if (totalRamGb >= 16) {
+      return {
+        badge: 'OK on this PC',
+        tone: 'soft' as const,
+        message: 'This tier matches the detected system RAM well.',
+        isOk: true,
+      }
+    }
+    return {
+      badge: 'May be too heavy',
+      tone: 'warning' as const,
+      message: 'This tier may be too demanding for this system. 16 GB RAM is recommended.',
+      isOk: false,
+    }
+  }
+
+  if (gpuVramGb >= 12 || totalRamGb >= 24) {
+    return {
+      badge: 'OK on this PC',
+      tone: 'soft' as const,
+      message: gpuVramGb >= 12
+        ? 'This tier should fit this system well.'
+        : 'This tier should run on this system, but it may lean more on system RAM than GPU VRAM.',
+      isOk: true,
+    }
+  }
+
+  return {
+    badge: 'May be too heavy',
+    tone: 'warning' as const,
+    message: 'This tier may be too demanding for this system. 12 GB GPU VRAM or about 24 GB RAM is recommended.',
+    isOk: false,
+  }
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -298,17 +347,16 @@ export function SetupWizard({ onComplete }: Props) {
 
   type Page = 1 | 2 | 3 | 4 | 5 | 6 | 7
   const tutorModelOptions: CompactDropdownOption[] = [
-    ...(sysInfo?.models.map((model) => ({
-      value: model.tier,
-      label: model.label,
-      meta: `${formatSize(model.sizeMb)} • ${formatDurationMinutes(model.estimatedDownloadMinutes)}${model.installed ? ' • Installed' : ''}`,
-      badge: model.tier === sysInfo?.recommendedTier
-        ? 'Recommended'
-        : (model.tier === 'ultra' && (sysInfo?.gpuVramGb ?? 0) >= 8 ? 'VRAM Ready' : undefined),
-      badgeTone: model.tier === sysInfo?.recommendedTier
-        ? ('recommended' as const)
-        : (model.tier === 'ultra' && (sysInfo?.gpuVramGb ?? 0) >= 8 ? ('soft' as const) : undefined),
-    })) ?? []),
+    ...(sysInfo?.models.map((model) => {
+      const hardwareFit = getModelHardwareFit(sysInfo, model.tier)
+      return {
+        value: model.tier,
+        label: model.label,
+        meta: `${formatSize(model.sizeMb)} • ${formatDurationMinutes(model.estimatedDownloadMinutes)}${model.installed ? ' • Installed' : ''}`,
+        badge: model.tier === sysInfo?.recommendedTier ? 'Recommended' : hardwareFit.badge,
+        badgeTone: model.tier === sysInfo?.recommendedTier ? ('recommended' as const) : hardwareFit.tone,
+      }
+    }) ?? []),
     {
       value: 'skip',
       label: "Skip tutor install",
@@ -316,12 +364,16 @@ export function SetupWizard({ onComplete }: Props) {
     },
   ]
   const selectedModel = sysInfo?.models.find((model) => model.tier === selectedTier)
+  const selectedModelHardwareFit = selectedTier && selectedTier !== 'skip'
+    ? getModelHardwareFit(sysInfo ?? null, selectedTier)
+    : null
   const selectedModelDescription = selectedTier === 'skip'
     ? 'You can install the tutor later if you change your mind.'
     : selectedModel?.description
-  const selectedModelWarning = selectedTier === 'ultra'
-    ? 'Large download. Expect a longer setup time on slower connections.'
-    : null
+  const selectedModelWarning = [
+    selectedModelHardwareFit && !selectedModelHardwareFit.isOk ? selectedModelHardwareFit.message : null,
+    selectedTier === 'ultra' ? 'Large download. Expect a longer setup time on slower connections.' : null,
+  ].filter(Boolean).join(' ')
   const llamaBackendOptions: CompactDropdownOption[] = LLAMA_BACKEND_OPTIONS.map((option) => ({
     value: option.key,
     label: option.label,
@@ -416,9 +468,14 @@ export function SetupWizard({ onComplete }: Props) {
           value={selectedTier ?? 'skip'}
           onChange={(value) => setSelectedTier(value as ModelTier)}
         />
-        {sysInfo?.gpuVramGb && sysInfo.gpuVramGb >= 8 ? (
+        {sysInfo?.gpuVramGb && sysInfo.gpuVramGb >= 12 ? (
           <p style={{ opacity: 0.55, fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
             Ultra is marked as VRAM Ready because this system reports {sysInfo.gpuVramGb.toFixed(1)} GB of GPU memory.
+          </p>
+        ) : null}
+        {selectedModelHardwareFit && selectedModelHardwareFit.isOk && selectedTier !== 'skip' ? (
+          <p style={{ color: 'rgba(242, 181, 111, 0.92)', fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
+            {selectedModelHardwareFit.message}
           </p>
         ) : null}
         {selectedModelDescription ? (
@@ -878,8 +935,9 @@ function CompactDropdown({
   )
 }
 
-function DropdownBadge({ children, tone = 'recommended' }: { children: React.ReactNode; tone?: 'recommended' | 'soft' }) {
+function DropdownBadge({ children, tone = 'recommended' }: { children: React.ReactNode; tone?: 'recommended' | 'soft' | 'warning' }) {
   const isSoft = tone === 'soft'
+  const isWarning = tone === 'warning'
   return (
     <span
       style={{
@@ -890,9 +948,9 @@ function DropdownBadge({ children, tone = 'recommended' }: { children: React.Rea
         fontSize: '0.68rem',
         fontWeight: 700,
         letterSpacing: '0.02em',
-        color: isSoft ? '#f5ddb8' : '#0b1620',
-        background: isSoft ? 'rgba(242, 181, 111, 0.16)' : 'var(--accent, #7eb8ea)',
-        border: isSoft ? '1px solid rgba(242, 181, 111, 0.24)' : '1px solid rgba(255,255,255,0.1)',
+        color: isWarning ? '#ffd4cc' : isSoft ? '#f5ddb8' : '#0b1620',
+        background: isWarning ? 'rgba(199, 77, 57, 0.18)' : isSoft ? 'rgba(242, 181, 111, 0.16)' : 'var(--accent, #7eb8ea)',
+        border: isWarning ? '1px solid rgba(199, 77, 57, 0.3)' : isSoft ? '1px solid rgba(242, 181, 111, 0.24)' : '1px solid rgba(255,255,255,0.1)',
         flexShrink: 0,
       }}
     >

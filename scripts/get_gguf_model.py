@@ -1,9 +1,9 @@
 """Download the appropriate GGUF chat model based on available system RAM.
 
 Three tiers are available:
-    low   Qwen3.5-2B-Q4_K_M.gguf  (~1.4 GB)  RAM < 16 GB  (auto-default)
-    high  Qwen3.5-4B-Q4_K_M.gguf  (~2.6 GB)  RAM >= 16 GB (auto-default)
-    ultra Qwen3.5-9B-Q4_K_M.gguf  (~5.5 GB)  explicit choice only
+    low   qwen2.5-1.5b-instruct-q8_0.gguf  (~1.9 GB)  RAM < 16 GB  (auto-default)
+    high  qwen2.5-3b-instruct-q8_0.gguf    (~3.6 GB)  RAM >= 16 GB (auto-default)
+    ultra Qwen3.5-9B-Q6_K.gguf             (~7.5 GB)  explicit choice only
 
 The selected file is saved to Documents\\JPLearn\\models\\ when run from the
 installed app, or to models/llama/ when run directly from the repository.
@@ -32,22 +32,22 @@ RAM_THRESHOLD_GB = 16.0
 
 MODELS: dict[str, dict] = {
     "low": {
-        "filename": "Qwen3.5-2B-Q4_K_M.gguf",
-        "repo": "unsloth/Qwen3.5-2B-GGUF",
-        "size_gb": 1.4,
-        "label": "Low-end  (~1.4 GB)",
+        "filename": "qwen2.5-1.5b-instruct-q8_0.gguf",
+        "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+        "size_gb": 1.9,
+        "label": "Low-end  (~1.9 GB)",
     },
     "high": {
-        "filename": "Qwen3.5-4B-Q4_K_M.gguf",
-        "repo": "unsloth/Qwen3.5-4B-GGUF",
-        "size_gb": 2.6,
-        "label": "High-end (~2.6 GB)",
+        "filename": "qwen2.5-3b-instruct-q8_0.gguf",
+        "repo": "Qwen/Qwen2.5-3B-Instruct-GGUF",
+        "size_gb": 3.6,
+        "label": "High-end (~3.6 GB)",
     },
     "ultra": {
-        "filename": "Qwen3.5-9B-Q4_K_M.gguf",
+        "filename": "Qwen3.5-9B-Q6_K.gguf",
         "repo": "unsloth/Qwen3.5-9B-GGUF",
-        "size_gb": 5.5,
-        "label": "Ultra    (~5.5 GB)",
+        "size_gb": 7.5,
+        "label": "Ultra    (~7.5 GB)",
     },
 }
 
@@ -163,7 +163,7 @@ def main() -> int:
         return 0
 
     if tier == "ultra":
-        print("\n⚠  Ultra model is ~5.5 GB. On a slow connection this may take 15–30 minutes.")
+        print("\n⚠  Ultra model is ~7.5 GB. On a slow connection this may take 15–30 minutes.")
 
     print(f"\nDownloading from:\n  {hf_url}\n")
     tmp_path = target_dir / (filename + ".tmp")

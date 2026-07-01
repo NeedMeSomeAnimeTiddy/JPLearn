@@ -28,6 +28,8 @@ const DEFAULT_TUTOR_SYSTEM_PROMPT = [
   'How to teach:',
   '- Answer the actual question first, then add only the smallest useful explanation or example.',
   '- For translation requests: give only the Japanese translation, an optional short reading or gloss in parentheses, and stop there. Do not add a grammar lecture unless the user asks for one.',
+  '- For translation requests, never invent a term or guess regional variants. If uncertain, say you are unsure and ask for context rather than fabricating.',
+  '- For single-word translations, prefer standard dictionary forms in kana/kanji. Do not output unrelated common words as translations.',
   '- For slang, rude, or profane phrase translations requested for language learning, still provide the translation. You may add a brief caution label like "rude" or "very offensive".',
   '- Do not refuse ordinary translation requests just because wording is impolite. Refuse only requests that clearly ask for real-world harm, threats, or instructions to abuse someone.',
   '- If the user made a mistake, correct it kindly and briefly, then continue the conversation.',
@@ -122,6 +124,8 @@ function resolveTutorGrammarPath() {
     : ''
   const envDisable = typeof process.env.JPLEARN_TUTOR_DISABLE_GRAMMAR === 'string'
     && ['1', 'true', 'yes', 'on'].includes(process.env.JPLEARN_TUTOR_DISABLE_GRAMMAR.trim().toLowerCase())
+  const envUseDefault = typeof process.env.JPLEARN_TUTOR_USE_DEFAULT_GRAMMAR === 'string'
+    && ['1', 'true', 'yes', 'on'].includes(process.env.JPLEARN_TUTOR_USE_DEFAULT_GRAMMAR.trim().toLowerCase())
 
   if (envDisable) {
     return ''
@@ -137,7 +141,12 @@ function resolveTutorGrammarPath() {
     return fs.existsSync(explicitPath) ? explicitPath : ''
   }
 
-  return fs.existsSync(DEFAULT_TUTOR_GRAMMAR_PATH) ? DEFAULT_TUTOR_GRAMMAR_PATH : ''
+  // Keep grammar opt-in by default. Overly strict grammars can force low-signal
+  // outputs or inference errors for normal chat prompts.
+  if (envUseDefault && fs.existsSync(DEFAULT_TUTOR_GRAMMAR_PATH)) {
+    return DEFAULT_TUTOR_GRAMMAR_PATH
+  }
+  return ''
 }
 
 class InferenceAbortError extends Error {
@@ -237,12 +246,20 @@ function buildScriptedFallbackResponse(message, context = {}, detail = '') {
     : 'today\'s weakest area'
   const messageHint = clipText(message, 120)
   void detail
-  void messageHint
+  const promptLead = messageHint ? `About "${messageHint}": ` : ''
   return {
-    text: `Coach note: let's keep momentum on ${focus}. Start one focused round, then re-check your confidence on the items that felt shaky.`,
+    text: `${promptLead}let's keep momentum on ${focus}. Start one focused round, then re-check confidence on the items that felt shaky.`,
     provider: 'scripted-fallback',
     model: 'deterministic-scripted',
   }
+}
+
+function buildLowSignalRecoveryReply(message) {
+  const normalized = String(message || '').trim().toLowerCase()
+  if (/how do you say|in japanese|translate|translation|japanese/i.test(normalized)) {
+    return 'I glitched on that response. Ask again with the exact phrase and I will translate it to Japanese in one line.'
+  }
+  return 'I glitched on that response. Please ask again in one short sentence.'
 }
 
 function findFreePort() {
@@ -304,6 +321,20 @@ function normalizeMojibakePunctuation(rawText) {
     .replace(/â€¦/g, '...')
     .replace(/Â\s/g, ' ')
     .replace(/Â([,.;:!?])/g, '$1')
+}
+
+function isLowSignalAssistantReply(rawText) {
+  const normalized = String(rawText || '').trim()
+  if (!normalized) {
+    return true
+  }
+  const withoutPunctuation = normalized
+    .replace(/[^\p{L}\p{N}\u3040-\u30ff\u3400-\u9fff]+/gu, '')
+    .trim()
+  if (withoutPunctuation.length < 2) {
+    return true
+  }
+  return !/[\p{L}\p{N}\u3040-\u30ff\u3400-\u9fff]/u.test(withoutPunctuation)
 }
 
 function createLlamaServerAdapter(config = {}) {
@@ -477,12 +508,13 @@ function createStubAdapter() {
       return undefined
     },
     async infer(message, context = {}) {
-      void message
+      const messageHint = clipText(message, 110)
       const focus = typeof context.focus_area === 'string' && context.focus_area.trim().length > 0
         ? context.focus_area.trim()
         : 'today\'s weakest area'
+      const lead = messageHint ? `About "${messageHint}": ` : ''
       return {
-        text: `Let's keep your momentum going on ${focus}. Try one short, focused round and notice which items feel shaky, then we can work through those together.`,
+        text: `${lead}let's keep your momentum going on ${focus}. Try one short, focused round and notice which items feel shaky, then we can work through those together.`,
         provider: 'stub',
         model: 'llama.cpp-pending',
       }
@@ -656,30 +688,41 @@ function createTutorChatRuntime(options = {}) {
       activeInferenceController = new AbortController()
       isInferenceActive = true
       try {
-        const inference = await adapter.infer(trimmedMessage, boundedContext, {
-          signal: activeInferenceController.signal,
-          maxContextChars,
-          maxPromptChars,
-          maxOutputTokens,
-        })
+        let inference = null
+        let cleanedText = ''
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          inference = await adapter.infer(trimmedMessage, boundedContext, {
+            signal: activeInferenceController.signal,
+            maxContextChars,
+            maxPromptChars,
+            maxOutputTokens,
+          })
+          cleanedText = normalizeMojibakePunctuation(String(inference.text || ''))
+          if (!isLowSignalAssistantReply(cleanedText)) {
+            break
+          }
+          if (attempt >= 1) {
+            cleanedText = buildLowSignalRecoveryReply(trimmedMessage)
+            break
+          }
+        }
         const elapsedMs = Date.now() - startedAt
         if (activeProvider !== 'stub-fallback') {
           lastError = null
         }
-        if (typeof inference.provider === 'string') {
+        if (inference && typeof inference.provider === 'string') {
           if (!(activeProvider === 'stub-fallback' && inference.provider === 'stub')) {
             activeProvider = inference.provider
           }
         }
-        if (typeof inference.model === 'string') {
+        if (inference && typeof inference.model === 'string') {
           activeModel = inference.model
         }
-        const cleanedText = normalizeMojibakePunctuation(String(inference.text || ''))
         return {
           ok: true,
           text: clipText(cleanedText, maxOutputChars),
-          provider: String(inference.provider || 'unknown'),
-          model: String(inference.model || 'unknown'),
+          provider: String((inference && inference.provider) || 'unknown'),
+          model: String((inference && inference.model) || 'unknown'),
           coldStart,
           elapsedMs,
         }

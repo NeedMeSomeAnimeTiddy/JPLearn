@@ -12,7 +12,7 @@ import { JLPTPrepView } from './views/JLPTPrepView'
 import { OnboardingView } from './views/OnboardingView'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, RotateCcw, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, RotateCcw, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -223,6 +223,7 @@ const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
   { value: 1, label: 'On' },
 ]
+const JAPANESE_CHAR_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/
 const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
   { key: 'theme', label: 'Theme', icon: Sun },
   { key: 'background', label: 'Background', icon: House },
@@ -667,9 +668,16 @@ interface AppSettings {
   backgroundBlur: number
   assistantToastLimit: 0 | 1
   assistantChatEnabled: boolean
+  assistantChatAudioEnabled: boolean
+  englishSpeechVoiceName: string | null
   showKeyboardPrompts: boolean
   voiceEnabled: boolean
   voiceSpeaker: number
+}
+
+interface SpeechSegment {
+  text: string
+  language: 'ja' | 'en'
 }
 
 interface RoundOption {
@@ -1483,6 +1491,47 @@ const VOICE_OPTIONS: Array<{ id: number; name: string; jp: string }> = [
   { id: 13, name: 'Ryusei', jp: '青山龍星' },
 ]
 const VOICE_OPTION_IDS = new Set<number>(VOICE_OPTIONS.map((option) => option.id))
+const ENGLISH_VOICE_PREFERENCE_HINTS = [
+  'aria',
+  'jenny',
+  'guy',
+  'davis',
+  'zira',
+  'sara',
+  'mark',
+] as const
+
+interface BrowserVoiceOption {
+  name: string
+  lang: string
+}
+
+function getEnglishBrowserVoiceOptions(): BrowserVoiceOption[] {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return []
+  }
+  const voices = window.speechSynthesis.getVoices()
+  return voices
+    .filter((voice) => String(voice.lang || '').toLowerCase().startsWith('en'))
+    .map((voice) => ({
+      name: voice.name,
+      lang: voice.lang,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function resolvePreferredEnglishVoiceName(available: BrowserVoiceOption[], preferredName: string | null): string | null {
+  if (preferredName && available.some((voice) => voice.name === preferredName)) {
+    return preferredName
+  }
+  for (const hint of ENGLISH_VOICE_PREFERENCE_HINTS) {
+    const match = available.find((voice) => voice.name.toLowerCase().includes(hint))
+    if (match) {
+      return match.name
+    }
+  }
+  return available[0]?.name ?? null
+}
 
 const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
   total_beginner:       [],
@@ -1631,10 +1680,35 @@ function defaultSettings(): AppSettings {
     backgroundBlur: BACKGROUND_BLUR_DEFAULT,
     assistantToastLimit: ASSISTANT_MAX_TOASTS,
     assistantChatEnabled: true,
+    assistantChatAudioEnabled: true,
+    englishSpeechVoiceName: null,
     showKeyboardPrompts: false,
     voiceEnabled: true,
     voiceSpeaker: 13,
   }
+}
+
+function splitSpeechSegments(text: string): SpeechSegment[] {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (!normalized) {
+    return []
+  }
+  const sentenceMatches = normalized.match(/[^.!?。！？\n]+[.!?。！？\n]*/g) ?? [normalized]
+  const segments: SpeechSegment[] = []
+  for (const sentence of sentenceMatches) {
+    const trimmed = sentence.trim()
+    if (!trimmed) {
+      continue
+    }
+    const language: SpeechSegment['language'] = JAPANESE_CHAR_REGEX.test(trimmed) ? 'ja' : 'en'
+    const previous = segments[segments.length - 1]
+    if (previous && previous.language === language) {
+      previous.text = `${previous.text} ${trimmed}`.trim()
+      continue
+    }
+    segments.push({ text: trimmed, language })
+  }
+  return segments
 }
 
 function isAssistantToastLimit(value: unknown): value is 0 | 1 {
@@ -1759,6 +1833,14 @@ function loadSettings(): AppSettings {
         typeof parsed.assistantChatEnabled === 'boolean'
           ? parsed.assistantChatEnabled
           : defaults.assistantChatEnabled,
+      assistantChatAudioEnabled:
+        typeof parsed.assistantChatAudioEnabled === 'boolean'
+          ? parsed.assistantChatAudioEnabled
+          : defaults.assistantChatAudioEnabled,
+      englishSpeechVoiceName:
+        typeof parsed.englishSpeechVoiceName === 'string' && parsed.englishSpeechVoiceName.trim().length > 0
+          ? parsed.englishSpeechVoiceName
+          : defaults.englishSpeechVoiceName,
       showKeyboardPrompts:
         typeof parsed.showKeyboardPrompts === 'boolean'
           ? parsed.showKeyboardPrompts
@@ -2583,6 +2665,8 @@ function App() {
   const [assistantChatMessages, setAssistantChatMessages] = useState<AssistantChatTurn[]>([])
   const [assistantChatLoading, setAssistantChatLoading] = useState(false)
   const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
+  const [assistantSpeakingTurnKey, setAssistantSpeakingTurnKey] = useState<string | null>(null)
+  const [englishBrowserVoices, setEnglishBrowserVoices] = useState<BrowserVoiceOption[]>(() => getEnglishBrowserVoiceOptions())
   const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
   const [, setAssistantChatWarmup] = useState(false)
   const [, setAssistantChatFallbackNote] = useState<string | null>(null)
@@ -2601,6 +2685,7 @@ function App() {
   const [voiceBusy, setVoiceBusy] = useState<boolean>(false)
   const [voiceUnavailable, setVoiceUnavailable] = useState<boolean>(false)
   const [tutorInstallInfo, setTutorInstallInfo] = useState<{
+    totalRamGb: number
     models: Array<{
       tier: 'low' | 'high' | 'ultra'
       filename: string
@@ -2613,6 +2698,7 @@ function App() {
     recommendedTier: 'low' | 'high'
     activeModelTier?: 'low' | 'high' | 'ultra' | null
     llamaCppInstalled: boolean
+    gpuVramGb?: number | null
     voicevoxInstalled: boolean
     fontsInstalled: boolean
     llamaCppEstimatedDownloadMinutes?: number | null
@@ -2742,6 +2828,7 @@ function App() {
   const assistantChatHistoryHydratedRef = useRef(false)
   const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
   const assistantChatClearTokenRef = useRef(0)
+  const assistantSpeechRunIdRef = useRef(0)
   const xpDetailsRef = useRef<HTMLDivElement | null>(null)
   const streakDetailsRef = useRef<HTMLDivElement | null>(null)
   const localToastIdRef = useRef(-1)
@@ -2817,6 +2904,118 @@ function App() {
     }
   }, [voiceBusy, settings.voiceSpeaker])
 
+  const cancelAssistantSpeech = useCallback(() => {
+    assistantSpeechRunIdRef.current += 1
+    setAssistantSpeakingTurnKey(null)
+    if (voiceAudioRef.current) {
+      voiceAudioRef.current.pause()
+      voiceAudioRef.current = null
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+    }
+  }, [])
+
+  const playBrowserSpeech = useCallback(async (
+    text: string,
+    language: 'ja' | 'en',
+    runId: number,
+  ): Promise<void> => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+      return
+    }
+    await new Promise<void>((resolve) => {
+      if (assistantSpeechRunIdRef.current !== runId) {
+        resolve()
+        return
+      }
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = language === 'ja' ? 'ja-JP' : 'en-US'
+      utterance.rate = language === 'ja' ? 0.96 : 0.98
+      if (language === 'en') {
+        const availableVoices = getEnglishBrowserVoiceOptions()
+        const preferredEnglishVoiceName = resolvePreferredEnglishVoiceName(availableVoices, settings.englishSpeechVoiceName)
+        const selectedVoice = preferredEnglishVoiceName
+          ? window.speechSynthesis.getVoices().find((voice) => voice.name === preferredEnglishVoiceName)
+          : undefined
+        if (selectedVoice) {
+          utterance.voice = selectedVoice
+          utterance.lang = selectedVoice.lang || 'en-US'
+        }
+      }
+      utterance.onend = () => resolve()
+      utterance.onerror = () => resolve()
+      window.speechSynthesis.speak(utterance)
+    })
+  }, [settings.englishSpeechVoiceName])
+
+  const playVoiceRuntimeAudio = useCallback(async (
+    text: string,
+    runId: number,
+  ): Promise<boolean> => {
+    const speak = window.jplearnDesktop.speakText
+    if (!speak) {
+      return false
+    }
+    try {
+      const result = await speak({ text, speaker: settings.voiceSpeaker })
+      if (!result?.audioBase64 || assistantSpeechRunIdRef.current !== runId) {
+        return false
+      }
+      await new Promise<void>((resolve, reject) => {
+        const audio = new Audio(`data:audio/wav;base64,${result.audioBase64}`)
+        if (voiceAudioRef.current) {
+          voiceAudioRef.current.pause()
+        }
+        voiceAudioRef.current = audio
+        audio.onended = () => resolve()
+        audio.onerror = () => reject(new Error('Unable to play voice runtime audio.'))
+        void audio.play().catch(reject)
+      })
+      return true
+    } catch {
+      return false
+    }
+  }, [settings.voiceSpeaker])
+
+  const speakAssistantReply = useCallback(async (text: string, turnKey?: string): Promise<void> => {
+    if (!settings.assistantChatAudioEnabled) {
+      return
+    }
+    const segments = splitSpeechSegments(text)
+    if (segments.length <= 0) {
+      return
+    }
+
+    const runId = assistantSpeechRunIdRef.current + 1
+    assistantSpeechRunIdRef.current = runId
+    setAssistantSpeakingTurnKey(turnKey ?? null)
+
+    try {
+      for (const segment of segments) {
+        if (assistantSpeechRunIdRef.current !== runId) {
+          return
+        }
+        if (segment.language === 'ja') {
+          const playedByRuntime = await playVoiceRuntimeAudio(segment.text, runId)
+          if (!playedByRuntime) {
+            await playBrowserSpeech(segment.text, 'ja', runId)
+          }
+          continue
+        }
+        await playBrowserSpeech(segment.text, 'en', runId)
+      }
+    } finally {
+      if (assistantSpeechRunIdRef.current === runId) {
+        setAssistantSpeakingTurnKey(null)
+      }
+    }
+  }, [playBrowserSpeech, playVoiceRuntimeAudio, settings.assistantChatAudioEnabled])
+
+  const replayAssistantTurn = useCallback((content: string, turnKey: string) => {
+    void speakAssistantReply(content, turnKey)
+  }, [speakAssistantReply])
+
   const formatModelSize = useCallback((sizeMb: number) => {
     if (!Number.isFinite(sizeMb)) {
       return '—'
@@ -2834,6 +3033,50 @@ function App() {
     return `${minutes} min`
   }, [])
 
+  const getTutorModelHardwareFit = useCallback((tier: 'low' | 'high' | 'ultra') => {
+    const totalRamGb = tutorInstallInfo?.totalRamGb ?? 0
+    const gpuVramGb = tutorInstallInfo?.gpuVramGb ?? 0
+
+    if (tier === 'low') {
+      return {
+        badge: 'OK on this PC',
+        detail: 'This tier should run comfortably on this system.',
+        isOk: true,
+      }
+    }
+
+    if (tier === 'high') {
+      if (totalRamGb >= 16) {
+        return {
+          badge: 'OK on this PC',
+          detail: 'This tier matches the detected system RAM well.',
+          isOk: true,
+        }
+      }
+      return {
+        badge: 'May be too heavy',
+        detail: 'This tier may be too demanding for this system. 16 GB RAM is recommended.',
+        isOk: false,
+      }
+    }
+
+    if (gpuVramGb >= 12 || totalRamGb >= 24) {
+      return {
+        badge: 'OK on this PC',
+        detail: gpuVramGb >= 12
+          ? 'This tier should fit this system well.'
+          : 'This tier should run on this system, but it may lean more on system RAM than GPU VRAM.',
+        isOk: true,
+      }
+    }
+
+    return {
+      badge: 'May be too heavy',
+      detail: 'This tier may be too demanding for this system. 12 GB GPU VRAM or about 24 GB RAM is recommended.',
+      isOk: false,
+    }
+  }, [tutorInstallInfo?.gpuVramGb, tutorInstallInfo?.totalRamGb])
+
   const refreshTutorInstallInfo = useCallback(async () => {
     const getSetupSystemInfo = window.jplearnDesktop.getSetupSystemInfo
     if (!getSetupSystemInfo) {
@@ -2842,10 +3085,12 @@ function App() {
     try {
       const setupInfo = await getSetupSystemInfo()
       setTutorInstallInfo({
+        totalRamGb: setupInfo.totalRamGb,
         models: setupInfo.models ?? [],
         recommendedTier: setupInfo.recommendedTier,
         activeModelTier: setupInfo.activeModelTier ?? null,
         llamaCppInstalled: setupInfo.llamaCppInstalled,
+        gpuVramGb: setupInfo.gpuVramGb ?? null,
         voicevoxInstalled: setupInfo.voicevoxInstalled,
         fontsInstalled: setupInfo.fontsInstalled,
         llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
@@ -4051,6 +4296,26 @@ function App() {
   }, [hydrateAssistantChatFromPreloaded, hydrateAssistantChatFromRuntime, refreshAssistantChatHistory, settings.assistantChatEnabled])
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      return
+    }
+    const refreshVoices = () => {
+      setEnglishBrowserVoices(getEnglishBrowserVoiceOptions())
+    }
+
+    refreshVoices()
+    window.speechSynthesis.addEventListener('voiceschanged', refreshVoices)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', refreshVoices)
+  }, [])
+
+  useEffect(() => {
+    if (settings.assistantChatAudioEnabled && assistantChatOpen) {
+      return
+    }
+    cancelAssistantSpeech()
+  }, [assistantChatOpen, cancelAssistantSpeech, settings.assistantChatAudioEnabled])
+
+  useEffect(() => {
     if (!settings.assistantChatEnabled || !assistantChatOpen) {
       return
     }
@@ -4106,11 +4371,12 @@ function App() {
   }, [preloadAssistantChatRuntime, settings.assistantChatEnabled])
 
   const closeAssistantChat = useCallback(() => {
+    cancelAssistantSpeech()
     setAssistantChatOpen(false)
     setAssistantChatError(null)
     setAssistantChatWarmup(false)
     setAssistantChatFallbackNote(null)
-  }, [])
+  }, [cancelAssistantSpeech])
 
   const clearAssistantChat = useCallback(async () => {
     // Invalidate any in-flight history reads so a slow background fetch can't
@@ -4185,6 +4451,9 @@ function App() {
       }
       await refreshAssistantChatStatus()
       await refreshAssistantChatHistory()
+      if (response.text) {
+        void speakAssistantReply(response.text)
+      }
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : 'Unable to send assistant chat message.'
       if (/llama\.cpp exited with code 130/i.test(detail) || /inference cancelled/i.test(detail)) {
@@ -4196,7 +4465,7 @@ function App() {
       setAssistantChatWarmup(false)
       setAssistantChatLoading(false)
     }
-  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled])
+  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
 
   useEffect(() => {
     let cancelled = false
@@ -5855,6 +6124,10 @@ function App() {
   const canTitlebarBack = viewHistoryIndexRef.current > 0
   const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
   const activeAssistantToast = assistantToasts[0] ?? null
+  const effectiveEnglishVoiceName = resolvePreferredEnglishVoiceName(englishBrowserVoices, settings.englishSpeechVoiceName)
+  const effectiveEnglishVoiceLabel = effectiveEnglishVoiceName
+    ? (englishBrowserVoices.find((voice) => voice.name === effectiveEnglishVoiceName)?.name ?? effectiveEnglishVoiceName)
+    : 'System default'
   const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
   const xpLevelCap = xpProgress?.xp_for_current_level ?? 0
   const xpPercent = xpLevelCap > 0 ? Math.round((xpInLevel / xpLevelCap) * 100) : 0
@@ -6146,6 +6419,28 @@ function App() {
                       <div className="assistant-chat-header-actions">
                         <button
                           type="button"
+                          className={`assistant-chat-audio-toggle ${settings.assistantChatAudioEnabled ? 'is-on' : 'is-off'}`}
+                          onClick={() => {
+                            if (settings.assistantChatAudioEnabled) {
+                              cancelAssistantSpeech()
+                            }
+                            setSettings((previous) => ({
+                              ...previous,
+                              assistantChatAudioEnabled: !previous.assistantChatAudioEnabled,
+                            }))
+                          }}
+                          aria-label={settings.assistantChatAudioEnabled ? 'Turn coach audio off' : 'Turn coach audio on'}
+                          aria-pressed={settings.assistantChatAudioEnabled}
+                          title={settings.assistantChatAudioEnabled ? 'Coach audio on' : 'Coach audio off'}
+                        >
+                          {settings.assistantChatAudioEnabled ? (
+                            <Volume2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                          ) : (
+                            <VolumeX size={14} strokeWidth={2.2} aria-hidden="true" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
                           className="assistant-chat-clear"
                           onClick={() => void clearAssistantChat()}
                           disabled={assistantChatMessages.length <= 0 || assistantChatLoading}
@@ -6170,14 +6465,40 @@ function App() {
                         <p className="assistant-chat-empty">Start a chat when you want strategy help or encouragement.</p>
                       ) : (
                         <>
-                          {assistantChatMessages.map((turn, index) => (
-                            <article key={`${turn.created_at_utc}-${index}`} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
-                              <div className="assistant-chat-turn-meta">
-                                <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
-                              </div>
-                              <p>{turn.content}</p>
-                            </article>
-                          ))}
+                          {assistantChatMessages.map((turn, index) => {
+                            const turnKey = `${turn.created_at_utc}-${index}`
+                            const isReplaySpeaking = assistantSpeakingTurnKey === turnKey
+                            return (
+                              <article key={turnKey} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
+                                <div className="assistant-chat-turn-meta">
+                                  <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
+                                  {turn.role === 'assistant' ? (
+                                    <button
+                                      type="button"
+                                      className={`assistant-chat-turn-replay ${isReplaySpeaking ? 'is-speaking' : ''}`}
+                                      onClick={() => {
+                                        if (isReplaySpeaking) {
+                                          cancelAssistantSpeech()
+                                          return
+                                        }
+                                        replayAssistantTurn(turn.content, turnKey)
+                                      }}
+                                      disabled={!settings.assistantChatAudioEnabled}
+                                      aria-label={settings.assistantChatAudioEnabled
+                                        ? (isReplaySpeaking ? 'Stop coach message audio' : 'Replay coach message audio')
+                                        : 'Enable chat audio to replay this message'}
+                                      title={settings.assistantChatAudioEnabled
+                                        ? (isReplaySpeaking ? 'Stop audio' : 'Replay audio')
+                                        : 'Enable chat audio to replay'}
+                                    >
+                                      <Volume2 size={12} strokeWidth={2.2} aria-hidden="true" />
+                                    </button>
+                                  ) : null}
+                                </div>
+                                <p>{turn.content}</p>
+                              </article>
+                            )
+                          })}
                           {assistantChatLoading ? (
                             <article className="assistant-chat-turn assistant-chat-turn-assistant assistant-chat-turn-typing" aria-label="Coach is typing">
                               <div className="assistant-chat-turn-meta">
@@ -7363,9 +7684,11 @@ function App() {
                           const isDownloadingThis = tutorDownloadingTier === model.tier
                           const isActioningThis = tutorModelActionTier === model.tier
                           const isActiveTier = tutorInstallInfo?.activeModelTier === model.tier
+                          const hardwareFit = getTutorModelHardwareFit(model.tier)
                           const badges = [
                             model.tier === tutorInstallInfo?.recommendedTier ? 'Recommended' : null,
                             isActiveTier ? 'Active' : null,
+                            hardwareFit.badge,
                           ].filter(Boolean).join(' · ')
                           return (
                           <div
@@ -7388,6 +7711,9 @@ function App() {
                                 </p>
                                 <p className="settings-help" style={{ marginTop: '0.2rem' }}>
                                   {model.installed ? 'Installed' : model.description}
+                                </p>
+                                <p className="settings-help" style={{ marginTop: '0.2rem', color: hardwareFit.isOk ? 'rgba(242, 181, 111, 0.92)' : '#ffb3a7' }}>
+                                  {hardwareFit.detail}
                                 </p>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
@@ -7515,6 +7841,31 @@ function App() {
                         : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
                       {voiceUnavailable ? ' (Voice engine unavailable right now.)' : ''}
                     </p>
+                    <div style={{ marginTop: '0.85rem' }}>
+                      <p className="settings-small-label" style={{ marginBottom: '0.4rem' }}>English Chat Voice</p>
+                      <select
+                        className="settings-theme-select"
+                        value={settings.englishSpeechVoiceName ?? ''}
+                        onChange={(event) => {
+                          const selected = event.currentTarget.value.trim()
+                          setSettings((previous) => ({
+                            ...previous,
+                            englishSpeechVoiceName: selected.length > 0 ? selected : null,
+                          }))
+                        }}
+                        aria-label="Select English voice for tutor chat playback"
+                      >
+                        <option value="">Auto ({effectiveEnglishVoiceLabel})</option>
+                        {englishBrowserVoices.map((voice) => (
+                          <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
+                            {`${voice.name} (${voice.lang})`}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="settings-help" style={{ marginTop: '0.45rem' }}>
+                        Tutor chat uses VOICEVOX for Japanese. English uses this browser voice.
+                      </p>
+                    </div>
                   </div>
                 </div>
                 ) : null}
