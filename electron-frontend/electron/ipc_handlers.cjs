@@ -786,6 +786,8 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:complete', async (event) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
+      await options.runPythonBridgeWithArgs(['mark-onboarding-pending'])
+      clearBridgeReadCaches()
       setupRuntime.writeSentinel()
       if (typeof options.refreshTutorChatRuntime === 'function') {
         await options.refreshTutorChatRuntime()
@@ -793,8 +795,10 @@ function registerIpcHandlers(options) {
       return { ok: true }
     })
 
-    options.ipcMain.handle('setup:skip', (event) => {
+    options.ipcMain.handle('setup:skip', async (event) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
+      await options.runPythonBridgeWithArgs(['mark-onboarding-pending'])
+      clearBridgeReadCaches()
       setupRuntime.writeSentinel()
       return { ok: true }
     })

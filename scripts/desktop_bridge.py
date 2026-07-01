@@ -670,6 +670,13 @@ def complete_onboarding_handler(
     return build_learning_path_status_payload()
 
 
+def mark_onboarding_pending_handler() -> dict[str, object]:
+    """Mark onboarding as pending while preserving all existing study data."""
+    init_study_db()
+    set_setting("onboarding_complete", "0")
+    return build_learning_path_status_payload()
+
+
 # ---------------------------------------------------------------------------
 # Node → deck slug mapping for recommendations
 # ---------------------------------------------------------------------------
@@ -1726,6 +1733,12 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             daily_minutes = argv[2] if len(argv) > 2 and argv[2].strip() else None
             target_level = argv[3] if len(argv) > 3 and argv[3].strip() else None
             return 0, complete_onboarding_handler(goal, daily_minutes, target_level)
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "mark-onboarding-pending":
+        try:
+            return 0, mark_onboarding_pending_handler()
         except Exception as exc:
             return 2, {"error": str(exc)}
 
