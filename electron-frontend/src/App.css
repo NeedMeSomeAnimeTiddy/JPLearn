@@ -4109,8 +4109,8 @@ button {
 /* ── Study Overview popup panel ──────────────────────────────────────────── */
 
 .overview-popup-panel {
-  width: min(92vw, 860px);
-  max-height: min(78dvh, 680px);
+  width: min(90vw, 900px);
+  max-height: min(84dvh, 720px);
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
@@ -6733,6 +6733,14 @@ button {
   animation: fadeIn 180ms ease both;
 }
 
+.modal-backdrop.overview-backdrop,
+.modal-backdrop.settings-backdrop,
+.modal-backdrop.assistant-backdrop {
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 48px;
+}
+
 .modal-panel {
   background: linear-gradient(145deg, var(--panel-bg), var(--panel-bg-alt));
   border: 1px solid var(--panel-border);
@@ -6745,6 +6753,19 @@ button {
 
 .settings-panel {
   padding: 14px 16px 16px;
+}
+
+.assistant-chat-window {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: min(90vw, 900px);
+  max-width: min(90vw, 900px);
+  min-height: min(460px, calc(100vh - 140px));
+  max-height: min(84dvh, 720px);
+  resize: none;
+  border-radius: 20px;
+  transform-origin: center top;
 }
 
 .settings-sheet {
@@ -8107,6 +8128,13 @@ button {
     align-items: center;
   }
 
+  .modal-backdrop.overview-backdrop,
+  .modal-backdrop.settings-backdrop,
+  .modal-backdrop.assistant-backdrop {
+    align-items: flex-start;
+    padding-top: 44px;
+  }
+
   .settings-sheet {
     width: min(98vw, calc(100dvh - 12px));
     max-width: min(98vw, calc(100dvh - 12px));
@@ -8121,6 +8149,13 @@ button {
 
   .settings-panel {
     padding: 10px 14px 14px;
+  }
+
+  .assistant-chat-window {
+    width: min(98vw, 720px);
+    max-width: min(98vw, 720px);
+    min-height: min(420px, calc(100vh - 112px));
+    max-height: calc(100vh - 112px);
   }
 
   .settings-shortcuts {

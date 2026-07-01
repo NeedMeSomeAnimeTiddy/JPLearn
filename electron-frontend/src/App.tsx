@@ -5758,6 +5758,8 @@ function App() {
         if (showSettings) {
           setShowSettings(false)
         } else {
+          setDictionaryOpen(false)
+          setAssistantChatOpen(false)
           setShowOverview(false)
           setShowSettings(true)
         }
@@ -5778,6 +5780,11 @@ function App() {
 
         if (showSettings) {
           setShowSettings(false)
+          return
+        }
+
+        if (assistantChatOpen) {
+          closeAssistantChat()
           return
         }
 
@@ -5805,9 +5812,10 @@ function App() {
         }
       }
 
-      if (showSettings || isInput) return
+      if (showSettings || assistantChatOpen || isInput) return
 
       if (event.key === '6') {
+        setDictionaryOpen(false)
         setShowOverview(true)
         setShowSettings(false)
         void loadSummary()
@@ -5847,7 +5855,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
+  }, [assistantChatOpen, closeAssistantChat, loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -5998,8 +6006,10 @@ function App() {
   }, [closeShortcutMenu, goHome])
 
   const jumpToOverview = useCallback(() => {
+    setDictionaryOpen(false)
     setShowOverview(true)
     setShowSettings(false)
+    setAssistantChatOpen(false)
     void loadSummary()
     closeShortcutMenu()
   }, [closeShortcutMenu, loadSummary])
@@ -6068,8 +6078,10 @@ function App() {
   }, [closeShortcutMenu, resetRoundCycle, resolveScriptMinigame])
 
   const openSettingsFromMenu = useCallback(() => {
+    setDictionaryOpen(false)
     setShowSettings(true)
     setShowOverview(false)
+    setAssistantChatOpen(false)
     closeShortcutMenu()
   }, [closeShortcutMenu])
 
@@ -6568,178 +6580,25 @@ function App() {
               <Settings className="window-nav-icon" strokeWidth={2.2} />
             </button>
             {settings.assistantChatEnabled ? (
-              <aside className={`assistant-overlay assistant-overlay-titlebar ${assistantChatOpen ? 'is-open' : ''}`} aria-label="Tutor companion">
-                {!assistantChatOpen ? (
-                  <div className="assistant-chat-controls">
-                    <button
-                      type="button"
-                      className="window-nav-button assistant-chat-toggle-titlebar"
-                      onClick={() => {
-                        setAssistantChatOpen((open) => !open)
-                        setAssistantChatError(null)
-                      }}
-                      aria-expanded={assistantChatOpen}
-                      aria-controls="assistant-chat-panel"
-                      aria-label="Open tutor chat"
-                      title="Open tutor chat"
-                    >
-                      <MessageCircle className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
-                    </button>
-                  </div>
-                ) : null}
-
-                {assistantChatOpen ? (
-                  <section id="assistant-chat-panel" className="assistant-chat-panel" aria-label="Tutor chat panel">
-                    <header className="assistant-chat-header">
-                      <div className="assistant-chat-identity">
-                        <span className="assistant-chat-avatar" aria-hidden="true">
-                          <MessageCircle size={18} strokeWidth={2.2} />
-                          <span className="assistant-chat-presence" />
-                        </span>
-                        <span className="assistant-chat-identity-text">
-                          <span className="assistant-chat-title">Study Coach</span>
-                          <span className="assistant-chat-subtitle">
-                            {assistantChatLoading ? 'Typing…' : 'Online · here to help'}
-                          </span>
-                        </span>
-                      </div>
-                      <div className="assistant-chat-header-actions">
-                        <button
-                          type="button"
-                          className={`assistant-chat-audio-toggle ${settings.assistantChatAudioEnabled ? 'is-on' : 'is-off'}`}
-                          onClick={() => {
-                            if (settings.assistantChatAudioEnabled) {
-                              cancelAssistantSpeech()
-                            }
-                            setSettings((previous) => ({
-                              ...previous,
-                              assistantChatAudioEnabled: !previous.assistantChatAudioEnabled,
-                            }))
-                          }}
-                          aria-label={settings.assistantChatAudioEnabled ? 'Turn coach audio off' : 'Turn coach audio on'}
-                          aria-pressed={settings.assistantChatAudioEnabled}
-                          title={settings.assistantChatAudioEnabled ? 'Coach audio on' : 'Coach audio off'}
-                        >
-                          {settings.assistantChatAudioEnabled ? (
-                            <Volume2 size={14} strokeWidth={2.2} aria-hidden="true" />
-                          ) : (
-                            <VolumeX size={14} strokeWidth={2.2} aria-hidden="true" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          className="assistant-chat-clear"
-                          onClick={() => void clearAssistantChat()}
-                          disabled={assistantChatMessages.length <= 0 || assistantChatLoading}
-                          aria-label="Clear chat history"
-                          title="Clear chat"
-                        >
-                          <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          className="assistant-chat-close"
-                          onClick={closeAssistantChat}
-                          aria-label="Close tutor chat"
-                        >
-                          <X size={14} strokeWidth={2.2} aria-hidden="true" />
-                        </button>
-                      </div>
-                    </header>
-
-                    <div className="assistant-chat-log" role="log" aria-live="polite" ref={assistantChatLogRef}>
-                      {assistantChatMessages.length <= 0 && !assistantChatLoading ? (
-                        <p className="assistant-chat-empty">Start a chat when you want strategy help or encouragement.</p>
-                      ) : (
-                        <>
-                          {assistantChatMessages.map((turn, index) => {
-                            const turnKey = `${turn.created_at_utc}-${index}`
-                            const isReplaySpeaking = assistantSpeakingTurnKey === turnKey
-                            return (
-                              <article key={turnKey} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
-                                <div className="assistant-chat-turn-meta">
-                                  <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
-                                  {turn.role === 'assistant' ? (
-                                    <button
-                                      type="button"
-                                      className={`assistant-chat-turn-replay ${isReplaySpeaking ? 'is-speaking' : ''}`}
-                                      onClick={() => {
-                                        if (isReplaySpeaking) {
-                                          cancelAssistantSpeech()
-                                          return
-                                        }
-                                        replayAssistantTurn(turn.content, turnKey)
-                                      }}
-                                      disabled={!settings.assistantChatAudioEnabled}
-                                      aria-label={settings.assistantChatAudioEnabled
-                                        ? (isReplaySpeaking ? 'Stop coach message audio' : 'Replay coach message audio')
-                                        : 'Enable chat audio to replay this message'}
-                                      title={settings.assistantChatAudioEnabled
-                                        ? (isReplaySpeaking ? 'Stop audio' : 'Replay audio')
-                                        : 'Enable chat audio to replay'}
-                                    >
-                                      <Volume2 size={12} strokeWidth={2.2} aria-hidden="true" />
-                                    </button>
-                                  ) : null}
-                                </div>
-                                <p>{turn.content}</p>
-                              </article>
-                            )
-                          })}
-                          {assistantChatLoading ? (
-                            <article className="assistant-chat-turn assistant-chat-turn-assistant assistant-chat-turn-typing" aria-label="Coach is typing">
-                              <div className="assistant-chat-turn-meta">
-                                <span className="assistant-chat-turn-role">Coach</span>
-                              </div>
-                              <p className="assistant-chat-typing" aria-hidden="true">
-                                <span className="assistant-chat-typing-dot" />
-                                <span className="assistant-chat-typing-dot" />
-                                <span className="assistant-chat-typing-dot" />
-                              </p>
-                            </article>
-                          ) : null}
-                        </>
-                      )}
-                    </div>
-
-                    {assistantChatError ? (
-                      <p className="assistant-chat-error">{assistantChatError}</p>
-                    ) : null}
-
-                    <footer className="assistant-chat-composer">
-                      <div className="assistant-chat-input-wrap">
-                        <textarea
-                          value={assistantChatInput}
-                          onChange={(event) => setAssistantChatInput(event.currentTarget.value)}
-                          onKeyDown={(event) => {
-                            if (event.key !== 'Enter' || event.shiftKey) {
-                              return
-                            }
-                            event.preventDefault()
-                            if (assistantChatLoading || assistantChatInput.trim().length === 0) {
-                              return
-                            }
-                            void sendAssistantChat()
-                          }}
-                          placeholder="Ask your coach for help with your current weak area..."
-                          rows={2}
-                          disabled={assistantChatLoading}
-                        />
-                        <button
-                          type="button"
-                          className="assistant-chat-send"
-                          onClick={() => void sendAssistantChat()}
-                          disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
-                          aria-label="Send tutor chat message"
-                          title="Send"
-                        >
-                          <SendHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
-                        </button>
-                      </div>
-                    </footer>
-                  </section>
-                ) : null}
-              </aside>
+              <button
+                type="button"
+                className="window-nav-button"
+                onClick={() => {
+                  setDictionaryOpen(false)
+                  setShowOverview(false)
+                  setShowSettings(false)
+                  setShortcutMenuOpen(false)
+                  setActiveShortcutFlyout(null)
+                  setAssistantChatOpen((open) => !open)
+                  setAssistantChatError(null)
+                }}
+                aria-expanded={assistantChatOpen}
+                aria-controls="assistant-chat-panel"
+                aria-label={assistantChatOpen ? 'Close tutor chat' : 'Open tutor chat'}
+                title={assistantChatOpen ? 'Close tutor chat' : 'Open tutor chat'}
+              >
+                <MessageCircle className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
+              </button>
             ) : null}
           </div>
         </div>
@@ -7069,7 +6928,7 @@ function App() {
           activeSectionName={activeSectionName}
           onBack={goHome}
           onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
-          onOpenSettings={() => { setShowOverview(false); setShowSettings(true) }}
+          onOpenSettings={openSettingsFromMenu}
           onSelectBlock={(index) => {
             setActiveBlockIndex(index)
             setSessionActive(false)
@@ -7178,7 +7037,7 @@ function App() {
             setView('script_hub')
           }}
           onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
-          onOpenSettings={() => { setShowOverview(false); setShowSettings(true) }}
+          onOpenSettings={openSettingsFromMenu}
         />
       ) : null}
 
@@ -7194,7 +7053,7 @@ function App() {
       {/* Study Overview popup — accessible on top of any view */}
       {showOverview ? (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop overview-backdrop"
           role="presentation"
           onClick={() => setShowOverview(false)}
         >
@@ -7252,7 +7111,7 @@ function App() {
 
       {showSettings ? (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop settings-backdrop"
           role="presentation"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowSettings(false)
@@ -8222,6 +8081,173 @@ function App() {
               </div>
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {assistantChatOpen ? (
+        <div
+          className="modal-backdrop assistant-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeAssistantChat()
+          }}
+        >
+          <section
+            id="assistant-chat-panel"
+            className="assistant-chat-panel assistant-chat-window"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Tutor chat panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="assistant-chat-header">
+              <div className="assistant-chat-identity">
+                <span className="assistant-chat-avatar" aria-hidden="true">
+                  <MessageCircle size={18} strokeWidth={2.2} />
+                  <span className="assistant-chat-presence" />
+                </span>
+                <span className="assistant-chat-identity-text">
+                  <span className="assistant-chat-title">Study Coach</span>
+                  <span className="assistant-chat-subtitle">
+                    {assistantChatLoading ? 'Typing…' : 'Online · here to help'}
+                  </span>
+                </span>
+              </div>
+              <div className="assistant-chat-header-actions">
+                <button
+                  type="button"
+                  className={`assistant-chat-audio-toggle ${settings.assistantChatAudioEnabled ? 'is-on' : 'is-off'}`}
+                  onClick={() => {
+                    if (settings.assistantChatAudioEnabled) {
+                      cancelAssistantSpeech()
+                    }
+                    setSettings((previous) => ({
+                      ...previous,
+                      assistantChatAudioEnabled: !previous.assistantChatAudioEnabled,
+                    }))
+                  }}
+                  aria-label={settings.assistantChatAudioEnabled ? 'Turn coach audio off' : 'Turn coach audio on'}
+                  aria-pressed={settings.assistantChatAudioEnabled}
+                  title={settings.assistantChatAudioEnabled ? 'Coach audio on' : 'Coach audio off'}
+                >
+                  {settings.assistantChatAudioEnabled ? (
+                    <Volume2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                  ) : (
+                    <VolumeX size={14} strokeWidth={2.2} aria-hidden="true" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="assistant-chat-clear"
+                  onClick={() => void clearAssistantChat()}
+                  disabled={assistantChatMessages.length <= 0 || assistantChatLoading}
+                  aria-label="Clear chat history"
+                  title="Clear chat"
+                >
+                  <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="assistant-chat-close"
+                  onClick={closeAssistantChat}
+                  aria-label="Close tutor chat"
+                >
+                  <X size={14} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+              </div>
+            </header>
+
+            <div className="assistant-chat-log" role="log" aria-live="polite" ref={assistantChatLogRef}>
+              {assistantChatMessages.length <= 0 && !assistantChatLoading ? (
+                <p className="assistant-chat-empty">Start a chat when you want strategy help or encouragement.</p>
+              ) : (
+                <>
+                  {assistantChatMessages.map((turn, index) => {
+                    const turnKey = `${turn.created_at_utc}-${index}`
+                    const isReplaySpeaking = assistantSpeakingTurnKey === turnKey
+                    return (
+                      <article key={turnKey} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
+                        <div className="assistant-chat-turn-meta">
+                          <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
+                          {turn.role === 'assistant' ? (
+                            <button
+                              type="button"
+                              className={`assistant-chat-turn-replay ${isReplaySpeaking ? 'is-speaking' : ''}`}
+                              onClick={() => {
+                                if (isReplaySpeaking) {
+                                  cancelAssistantSpeech()
+                                  return
+                                }
+                                replayAssistantTurn(turn.content, turnKey)
+                              }}
+                              disabled={!settings.assistantChatAudioEnabled}
+                              aria-label={settings.assistantChatAudioEnabled
+                                ? (isReplaySpeaking ? 'Stop coach message audio' : 'Replay coach message audio')
+                                : 'Enable chat audio to replay this message'}
+                              title={settings.assistantChatAudioEnabled
+                                ? (isReplaySpeaking ? 'Stop audio' : 'Replay audio')
+                                : 'Enable chat audio to replay'}
+                            >
+                              <Volume2 size={12} strokeWidth={2.2} aria-hidden="true" />
+                            </button>
+                          ) : null}
+                        </div>
+                        <p>{turn.content}</p>
+                      </article>
+                    )
+                  })}
+                  {assistantChatLoading ? (
+                    <article className="assistant-chat-turn assistant-chat-turn-assistant assistant-chat-turn-typing" aria-label="Coach is typing">
+                      <div className="assistant-chat-turn-meta">
+                        <span className="assistant-chat-turn-role">Coach</span>
+                      </div>
+                      <p className="assistant-chat-typing" aria-hidden="true">
+                        <span className="assistant-chat-typing-dot" />
+                        <span className="assistant-chat-typing-dot" />
+                        <span className="assistant-chat-typing-dot" />
+                      </p>
+                    </article>
+                  ) : null}
+                </>
+              )}
+            </div>
+
+            {assistantChatError ? (
+              <p className="assistant-chat-error">{assistantChatError}</p>
+            ) : null}
+
+            <footer className="assistant-chat-composer">
+              <div className="assistant-chat-input-wrap">
+                <textarea
+                  value={assistantChatInput}
+                  onChange={(event) => setAssistantChatInput(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' || event.shiftKey) {
+                      return
+                    }
+                    event.preventDefault()
+                    if (assistantChatLoading || assistantChatInput.trim().length === 0) {
+                      return
+                    }
+                    void sendAssistantChat()
+                  }}
+                  placeholder="Ask your coach for help with your current weak area..."
+                  rows={2}
+                  disabled={assistantChatLoading}
+                />
+                <button
+                  type="button"
+                  className="assistant-chat-send"
+                  onClick={() => void sendAssistantChat()}
+                  disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
+                  aria-label="Send tutor chat message"
+                  title="Send"
+                >
+                  <SendHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+              </div>
+            </footer>
+          </section>
         </div>
       ) : null}
 
