@@ -557,6 +557,17 @@ function resolvePythonCommand(projectRoot) {
     return explicit
   }
 
+  // 1. python-build-standalone bundled with the packaged installer
+  //    Located at resources/python-bundle/python/python.exe in the packaged app.
+  const resourcesPath = (typeof process !== 'undefined' && process.resourcesPath) || ''
+  if (resourcesPath) {
+    const bundled = path.join(resourcesPath, 'python-bundle', 'python', 'python.exe')
+    if (fs.existsSync(bundled)) {
+      return bundled
+    }
+  }
+
+  // 2. .venv in the project root (dev)
   const candidates = process.platform === 'win32'
     ? [path.join(projectRoot, '.venv', 'Scripts', 'python.exe')]
     : [path.join(projectRoot, '.venv', 'bin', 'python3'), path.join(projectRoot, '.venv', 'bin', 'python')]
@@ -567,6 +578,7 @@ function resolvePythonCommand(projectRoot) {
     }
   }
 
+  // 3. System Python on PATH
   return 'python'
 }
 

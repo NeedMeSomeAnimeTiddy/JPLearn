@@ -211,6 +211,9 @@ data/voicevox/
 # Local llama.cpp binaries and build output
 tools/llama.cpp/
 
+# Bundled python-build-standalone (created by CI release workflow; not committed)
+python-bundle/
+
 # Local llama.cpp model artifacts
 models/llama/*.gguf
 models/llama/*.bin

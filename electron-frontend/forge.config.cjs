@@ -4,7 +4,7 @@ module.exports = {
     // Path without extension — Forge appends .ico on Windows, .icns on macOS.
     // Place your icon at electron-frontend/assets/icon.ico before running make.
     icon: './assets/icon',
-    extraResource: ['../scripts', '../data', '../domain'],
+    extraResource: ['../scripts', '../data', '../domain', '../python-bundle'],
   },
   rebuildConfig: {},
   makers: [
