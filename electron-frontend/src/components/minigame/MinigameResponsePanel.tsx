@@ -46,53 +46,6 @@ export function MinigameResponsePanel({
 }: MinigameResponsePanelProps) {
   return (
     <div className="minigame-response-column">
-      <section className="minigame-response-card" aria-label="Answer challenge">
-        <div className="minigame-response-head">
-          <div className="minigame-response-head-copy">
-            <span className="minigame-response-kicker">Answer</span>
-            <strong className="minigame-response-title">{title}</strong>
-          </div>
-          <span className="minigame-response-status">{isRoundResolving ? 'Resolving…' : 'Your move'}</span>
-        </div>
-
-        <p className="minigame-response-copy">{copy}</p>
-
-        {children}
-
-        {confidenceCaptureEnabled ? (
-          <section
-            className="confidence-controls confidence-controls-round"
-            aria-label="Confidence score controls"
-          >
-            <p className="interleave-controls-title">Confidence for this answer</p>
-            <div
-              className="confidence-chip-row confidence-chip-row-round"
-              role="group"
-              aria-label="Select confidence score for this answer"
-            >
-              {CONFIDENCE_SCORES.map((score) => (
-                <button
-                  key={`round-confidence-${score}`}
-                  type="button"
-                  className={`confidence-chip confidence-chip-round ${
-                    roundConfidenceScore === score ? 'is-active' : ''
-                  }`}
-                  onClick={() => onSetRoundConfidence(score)}
-                  aria-pressed={roundConfidenceScore === score}
-                  aria-label={`Confidence ${CONFIDENCE_LEVEL_LABELS[score]}`}
-                  title={`Confidence: ${CONFIDENCE_LEVEL_LABELS[score]}`}
-                  disabled={isRoundResolving}
-                >
-                  <span className="confidence-chip-label">
-                    {CONFIDENCE_LEVEL_LABELS[score]}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
-      </section>
-
       {feedback ? (
         <div className="minigame-feedback-wrap">
           <RoundFeedback
@@ -110,7 +63,54 @@ export function MinigameResponsePanel({
             actionTitle={showKeyboardPrompts ? 'Continue immediately (Enter)' : 'Continue immediately'}
           />
         </div>
-      ) : null}
+      ) : (
+        <section className="minigame-response-card" aria-label="Answer challenge">
+          <div className="minigame-response-head">
+            <div className="minigame-response-head-copy">
+              <span className="minigame-response-kicker">Answer</span>
+              <strong className="minigame-response-title">{title}</strong>
+            </div>
+            <span className="minigame-response-status">{isRoundResolving ? 'Resolving…' : 'Your move'}</span>
+          </div>
+
+          <p className="minigame-response-copy">{copy}</p>
+
+          {children}
+
+          {confidenceCaptureEnabled ? (
+            <section
+              className="confidence-controls confidence-controls-round"
+              aria-label="Confidence score controls"
+            >
+              <p className="interleave-controls-title">Confidence for this answer</p>
+              <div
+                className="confidence-chip-row confidence-chip-row-round"
+                role="group"
+                aria-label="Select confidence score for this answer"
+              >
+                {CONFIDENCE_SCORES.map((score) => (
+                  <button
+                    key={`round-confidence-${score}`}
+                    type="button"
+                    className={`confidence-chip confidence-chip-round ${
+                      roundConfidenceScore === score ? 'is-active' : ''
+                    }`}
+                    onClick={() => onSetRoundConfidence(score)}
+                    aria-pressed={roundConfidenceScore === score}
+                    aria-label={`Confidence ${CONFIDENCE_LEVEL_LABELS[score]}`}
+                    title={`Confidence: ${CONFIDENCE_LEVEL_LABELS[score]}`}
+                    disabled={isRoundResolving}
+                  >
+                    <span className="confidence-chip-label">
+                      {CONFIDENCE_LEVEL_LABELS[score]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </section>
+      )}
     </div>
   )
 }

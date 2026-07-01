@@ -9,7 +9,6 @@ interface MinigameHudProps {
   title: string
   sessionRounds: number
   sessionTargetItems: number
-  sessionStatusCopy: string
   sessionScore: number
   sessionPoints: number
   dictionarySeed: string
@@ -32,7 +31,6 @@ export function MinigameHud({
   title,
   sessionRounds,
   sessionTargetItems,
-  sessionStatusCopy,
   sessionScore,
   sessionPoints,
   dictionarySeed,
@@ -48,8 +46,6 @@ export function MinigameHud({
   onOpenDictionary,
   onOpenSettings,
 }: MinigameHudProps) {
-  const progressValue = sessionTargetItems > 0 ? Math.min(sessionRounds / sessionTargetItems, 1) : 0
-
   return (
     <header className="topbar panel-glass minigame-hud">
       <button
@@ -67,19 +63,6 @@ export function MinigameHud({
           {activeSectionName ? ` · ${activeSectionName}` : ' Run'}
         </span>
         <h1>{title}</h1>
-      </div>
-      <div className="minigame-progress-cluster" aria-label="Session progress overview">
-        <div
-          className="minigame-progress-track"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={sessionTargetItems}
-          aria-valuenow={Math.min(sessionRounds, sessionTargetItems)}
-          aria-valuetext={`${sessionRounds} of ${sessionTargetItems} challenges, ${sessionStatusCopy}`}
-          title={`${sessionRounds}/${sessionTargetItems} · ${sessionStatusCopy}`}
-        >
-          <div className="minigame-progress-track-fill" style={{ width: `${progressValue * 100}%` }} />
-        </div>
       </div>
       <div className="topbar-end">
         {sessionActive ? (
@@ -110,19 +93,21 @@ export function MinigameHud({
           </div>
         ) : null}
         <div className="focus-chip minigame-focus-chip">
+          <span className="minigame-points-chip">
+            <MetricsChip
+              icon={Activity}
+              label="Points"
+              value={sessionPoints}
+              accent="streak"
+              valueKey={`points-${sessionPoints}`}
+            />
+          </span>
           <MetricsChip
             icon={Target}
             label="Correct"
             value={`${sessionScore}/${sessionRounds}`}
             accent="skill"
             valueKey={`correct-${sessionScore}-${sessionRounds}`}
-          />
-          <MetricsChip
-            icon={Activity}
-            label="Points"
-            value={sessionPoints}
-            accent="streak"
-            valueKey={`points-${sessionPoints}`}
           />
           <MetricsChip
             icon={Trophy}

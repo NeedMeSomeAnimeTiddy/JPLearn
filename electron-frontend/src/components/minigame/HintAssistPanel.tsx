@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { DictionaryNoteCard } from './DictionaryNoteCard'
 import type { RoundState } from '../../types'
 
@@ -20,6 +23,7 @@ export function HintAssistPanel({
   onRevealHint,
   onRevealMoreHint,
 }: HintAssistPanelProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
   const alwaysShowHint =
     roundState.mode !== 'romaji_sprint' &&
     roundState.mode !== 'typed_recall' &&
@@ -56,51 +60,45 @@ export function HintAssistPanel({
         ? 'Reveal study clue'
         : 'Reveal answer'
 
+  const showRevealButton = !alwaysShowHint && !isRoundResolving && hintStep < 3
+
+  function togglePanel() {
+    setIsExpanded((value) => !value)
+  }
+
+  function handlePanelKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.target !== event.currentTarget) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      togglePanel()
+    }
+  }
+
+  function handleRevealClick(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    if (!isExpanded) setIsExpanded(true)
+    if (hintStep === 0) onRevealHint()
+    else onRevealMoreHint()
+  }
+
   return (
-    <aside className="minigame-assist-panel" aria-label="Round support and hints">
+    <aside
+      className={`minigame-assist-panel ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
+      aria-label="Round support and hints"
+      role="button"
+      tabIndex={0}
+      aria-expanded={isExpanded}
+      onClick={togglePanel}
+      onKeyDown={handlePanelKeyDown}
+    >
       <div className="minigame-assist-head">
-        <span className="minigame-assist-kicker">Support</span>
-        <span className="minigame-assist-shortcut">
-          {showKeyboardPrompts ? 'H to reveal hints' : 'Hints available'}
-        </span>
-      </div>
-      {alwaysShowHint ? (
-        <>
-          {roundState.hintText ? <p className="game-hint-text">{roundState.hintText}</p> : null}
-        </>
-      ) : (
-        <div className="game-hint-ladder" aria-live="polite">
-          <div className="game-hint-step-list" aria-label="Available hint stages">
-            {hintSteps.map((step) => (
-              <div
-                key={step.key}
-                className={`game-hint-step ${step.revealed ? 'is-revealed' : 'is-waiting'}`}
-              >
-                <span className="game-hint-step-label">{step.label}</span>
-                <span className="game-hint-step-copy">
-                  {step.revealed ? step.description : 'Locked until revealed'}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {hintStep >= 1 ? (
-            <p className="game-hint-text game-hint-type">{roundState.promptLabel}</p>
-          ) : null}
-          {hintStep >= 2 && roundState.hintText ? (
-            <p className="game-hint-text">{roundState.hintText}</p>
-          ) : null}
-          {hintStep >= 3 ? (
-            <p className="game-hint-text game-hint-answer">
-              Answer: {formattedAnswer}
-            </p>
-          ) : null}
-
-          {!isRoundResolving && hintStep < 3 ? (
+        <div className="minigame-assist-head-start">
+          <span className="minigame-assist-kicker">Support</span>
+          {showRevealButton ? (
             <button
               type="button"
-              className="game-hint-toggle"
-              onClick={hintStep === 0 ? onRevealHint : onRevealMoreHint}
+              className="game-hint-toggle minigame-assist-reveal"
+              onClick={handleRevealClick}
               aria-label="Show more hint"
             >
               <span className="game-hint-toggle-label">
@@ -109,8 +107,41 @@ export function HintAssistPanel({
             </button>
           ) : null}
         </div>
-      )}
-      {roundState.dictionaryNote ? <DictionaryNoteCard note={roundState.dictionaryNote} /> : null}
+        <div className="minigame-assist-head-end">
+          <span className="minigame-assist-shortcut">
+            {showKeyboardPrompts ? 'H to reveal hints' : 'Hints available'}
+          </span>
+          <span className="minigame-assist-toggle" aria-hidden="true">
+            <ChevronDown className="inline-button-icon" strokeWidth={2.2} />
+          </span>
+        </div>
+      </div>
+      {isExpanded ? (
+        <>
+          {alwaysShowHint ? (
+            <>
+              {roundState.hintText ? <p className="game-hint-text">{roundState.hintText}</p> : null}
+            </>
+          ) : (
+            <div className="game-hint-ladder" aria-live="polite">
+              <div className="game-hint-step-list" aria-label="Available hint stages">
+                {hintSteps.map((step) => (
+                  <div
+                    key={step.key}
+                    className={`game-hint-step ${step.revealed ? 'is-revealed' : 'is-waiting'}`}
+                  >
+                    <span className="game-hint-step-label">{step.label}</span>
+                    <span className="game-hint-step-copy">
+                      {step.revealed ? step.description : 'Locked until revealed'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {roundState.dictionaryNote ? <DictionaryNoteCard note={roundState.dictionaryNote} /> : null}
+        </>
+      ) : null}
     </aside>
   )
 }

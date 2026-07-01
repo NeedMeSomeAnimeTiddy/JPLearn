@@ -2471,26 +2471,18 @@ button {
   font-size: 0.7rem;
 }
 
-.minigame-progress-cluster {
-  display: grid;
-  gap: 4px;
-  min-width: min(100%, 220px);
+.minigame-points-chip {
+  display: inline-flex;
 }
 
-.minigame-progress-track {
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 26%, var(--chip-border));
-  background: color-mix(in oklab, var(--chip-bg) 86%, transparent);
+.minigame-points-chip .metric-accent-streak {
+  border-color: color-mix(in oklab, var(--tone-amber) 46%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-amber) 16%, var(--chip-bg));
 }
 
-.minigame-progress-track-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--tone-amber), var(--tone-ocean));
-  transition: width 220ms ease;
+.minigame-points-chip .live-value {
+  font-size: 0.86rem;
+  font-weight: 800;
 }
 
 .minigame-hud-live {
@@ -5893,60 +5885,25 @@ button {
   margin: 0 auto;
 }
 
-.minigame-support-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.minigame-stage-rail {
-  display: grid;
-  gap: 12px;
-}
-
-.minigame-stage-rail-card {
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 22%, var(--panel-border));
-  border-radius: 16px;
-  padding: 14px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  display: grid;
-  gap: 8px;
-}
-
-.minigame-stage-rail-label {
-  color: var(--text-soft);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.minigame-stage-rail-value {
-  font-size: 1.12rem;
-  line-height: 1.15;
-}
-
-.minigame-stage-rail-copy {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-
-.minigame-stage-rail-progress {
-  height: 8px;
+.minigame-round-progress {
+  height: 3px;
+  width: 100%;
   border-radius: 999px;
   overflow: hidden;
-  background: color-mix(in oklab, var(--chip-bg) 88%, transparent);
+  background: color-mix(in oklab, var(--chip-bg) 80%, transparent);
 }
 
-.minigame-stage-rail-progress span {
+.minigame-round-progress-fill {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--tone-amber), var(--tone-teal));
+  background: linear-gradient(90deg, var(--tone-amber), var(--tone-ocean));
+  transition: width 220ms ease;
+}
+
+.minigame-support-row {
+  display: grid;
+  gap: 16px;
 }
 
 .minigame-response-column {
@@ -5971,7 +5928,41 @@ button {
   justify-items: center;
 }
 
-.minigame-assist-panel,
+.minigame-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.minigame-prompt-head .game-prompt-label {
+  margin: 0;
+}
+
+.game-speak-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 40%, var(--card-border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tone-ocean) 16%, transparent);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.game-speak-icon-button:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--tone-ocean) 26%, transparent);
+}
+
+.game-speak-icon-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 .minigame-response-card {
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--card-border));
   border-radius: 18px;
@@ -5979,6 +5970,26 @@ button {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.minigame-assist-panel {
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--card-border));
+  border-radius: 18px;
+  padding: 14px 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.minigame-assist-panel:hover {
+  border-color: color-mix(in oklab, var(--tone-ocean) 40%, var(--card-border));
+}
+
+.minigame-assist-panel:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--tone-ocean) 60%, transparent);
+  outline-offset: 2px;
 }
 
 .minigame-assist-head,
@@ -5994,6 +6005,45 @@ button {
 .minigame-response-status {
   color: var(--text-soft);
   font-size: 0.78rem;
+}
+
+.minigame-assist-head-start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.minigame-assist-head-end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.minigame-assist-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--card-border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--chip-bg) 88%, transparent);
+  color: var(--text-soft);
+  transition: transform 200ms ease, color 160ms ease;
+}
+
+.minigame-assist-panel:hover .minigame-assist-toggle {
+  color: var(--text-main);
+}
+
+.minigame-assist-panel.is-collapsed .minigame-assist-toggle {
+  transform: rotate(-90deg);
+}
+
+.minigame-assist-panel.is-collapsed .minigame-assist-head {
+  margin-bottom: 0;
 }
 
 .minigame-response-head-copy {
@@ -6183,6 +6233,11 @@ button {
   cursor: pointer;
   align-self: flex-start;
   transition: border-color 0.1s, color 0.1s;
+}
+
+.minigame-assist-reveal {
+  margin-top: 0;
+  flex-shrink: 0;
 }
 
 .game-hint-toggle:hover {
@@ -8524,7 +8579,6 @@ html[data-motion-style='lively'] .live-value {
     flex-wrap: wrap;
   }
 
-  .minigame-progress-cluster,
   .minigame-focus-chip {
     width: 100%;
   }
@@ -8538,11 +8592,6 @@ html[data-motion-style='lively'] .live-value {
 @media (max-width: 980px) {
   .minigame-hud {
     flex-wrap: wrap;
-  }
-
-  .minigame-progress-cluster {
-    order: 3;
-    width: 100%;
   }
 
   .minigame-challenge-body {

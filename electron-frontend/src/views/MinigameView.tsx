@@ -8,7 +8,6 @@ import { ChoiceAnswerPanel } from '../components/minigame/ChoiceAnswerPanel'
 import { HintAssistPanel } from '../components/minigame/HintAssistPanel'
 import { MinigameHud } from '../components/minigame/MinigameHud'
 import { MinigameResponsePanel } from '../components/minigame/MinigameResponsePanel'
-import { MinigameStageRail } from '../components/minigame/MinigameStageRail'
 import { StrokeOrderAnswerPanel } from '../components/minigame/StrokeOrderAnswerPanel'
 import { TypedAnswerPanel } from '../components/minigame/TypedAnswerPanel'
 import { SessionRunSummary } from '../components/SessionRunSummary'
@@ -93,9 +92,7 @@ export function MinigameView({
     activeGame === 'interleave_mix'
       ? (MINIGAMES.find((game) => game.key === roundState?.mode)?.title ?? 'Mixed Round')
       : (selectedGameMeta?.title ?? 'Minigame')
-  const activeRoundIndex = sessionActive && roundState
-    ? Math.min(sessionRounds + 1, Math.max(1, sessionTargetItems))
-    : Math.min(sessionRounds, Math.max(1, sessionTargetItems))
+  const roundProgressValue = sessionTargetItems > 0 ? Math.min(sessionRounds / sessionTargetItems, 1) : 0
   const remainingRounds = Math.max(sessionTargetItems - sessionRounds, 0)
   const sessionStatusCopy = sessionActive
     ? `${remainingRounds} ${remainingRounds === 1 ? 'challenge' : 'challenges'} left`
@@ -205,7 +202,6 @@ export function MinigameView({
         title={selectedGameMeta?.title ?? 'Minigame'}
         sessionRounds={sessionRounds}
         sessionTargetItems={sessionTargetItems}
-        sessionStatusCopy={sessionStatusCopy}
         sessionScore={sessionScore}
         sessionPoints={sessionPoints}
         dictionarySeed={roundState?.dictionarySeedQuery ?? roundState?.audioText ?? roundState?.answer ?? ''}
@@ -256,31 +252,31 @@ export function MinigameView({
                 onRestart={() => startSession()}
                 onBack={onBack}
               />
-            ) : null}
-
-            <div className="game-actions minigame-state-actions">
-              <button
-                type="button"
-                onClick={() => startSession()}
-                disabled={gameLoading || activeRunCardsLength === 0 || sessionSummaryLoading || sessionStartPending}
-              >
-                {sessionRunReport ? 'Play Again' : 'Play'}
-              </button>
-              <button
-                type="button"
-                className="back-button back-button-icon-only"
-                onClick={onBack}
-                aria-label="Back to map"
-                title="Back to map"
-              >
-                <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-              </button>
-              {gameLoading ? (
-                <span>Loading deck...</span>
-              ) : (
-                <span>{activeRunCardsLength} cards available</span>
-              )}
-            </div>
+            ) : (
+              <div className="game-actions minigame-state-actions">
+                <button
+                  type="button"
+                  onClick={() => startSession()}
+                  disabled={gameLoading || activeRunCardsLength === 0 || sessionSummaryLoading || sessionStartPending}
+                >
+                  {sessionRunReport ? 'Play Again' : 'Play'}
+                </button>
+                <button
+                  type="button"
+                  className="back-button back-button-icon-only"
+                  onClick={onBack}
+                  aria-label="Back to map"
+                  title="Back to map"
+                >
+                  <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                </button>
+                {gameLoading ? (
+                  <span>Loading deck...</span>
+                ) : (
+                  <span>{activeRunCardsLength} cards available</span>
+                )}
+              </div>
+            )}
           </>
         ) : null}
 
@@ -324,6 +320,18 @@ export function MinigameView({
 
             <div className="minigame-challenge-body">
               <div className="minigame-core-column">
+                <div
+                  className="minigame-round-progress"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={sessionTargetItems}
+                  aria-valuenow={Math.min(sessionRounds, sessionTargetItems)}
+                  aria-valuetext={`${sessionRounds} of ${sessionTargetItems} challenges, ${sessionStatusCopy}`}
+                  title={`${sessionRounds}/${sessionTargetItems} · ${sessionStatusCopy}`}
+                >
+                  <div className="minigame-round-progress-fill" style={{ width: `${roundProgressValue * 100}%` }} />
+                </div>
+
                 <ChallengePromptCard
                   roundState={roundState}
                   activeScript={activeScript}
@@ -414,15 +422,6 @@ export function MinigameView({
                   formattedAnswer={formatExpectedAnswer(roundState.answer)}
                   onRevealHint={() => setHintStep(1)}
                   onRevealMoreHint={() => setHintStep((s) => (s < 3 ? (s + 1) as 0 | 1 | 2 | 3 : 3))}
-                />
-
-                <MinigameStageRail
-                  currentRound={activeRoundIndex}
-                  targetRounds={sessionTargetItems}
-                  modeTitle={resolvedGameTitle}
-                  sessionPoints={sessionPoints}
-                  livesEnabled={livesEnabled}
-                  livesRemaining={livesRemaining}
                 />
               </div>
             </div>
