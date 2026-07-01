@@ -1,10 +1,8 @@
 # Optional dependency for fetching the VOICEVOX text-to-speech engine.
 #
 # The app uses the VOICEVOX engine (a local HTTP TTS server) for natural Japanese
-# speech. py7zr is only needed to extract the prebuilt engine archive:
-#   pip install -r requirements-tts.txt
-#   python scripts/get_voicevox.py
+# speech. The get_voicevox.py script downloads and extracts the engine using only
+# Python's built-in zipfile module — no third-party packages are required.
 #
-# The engine is downloaded by get_voicevox.py (not via pip). At runtime the app
-# talks to the engine over HTTP, so no Python TTS packages are required.
-py7zr
+# Usage:
+#   python scripts/get_voicevox.py
