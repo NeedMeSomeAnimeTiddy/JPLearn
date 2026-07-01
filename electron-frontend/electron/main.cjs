@@ -1329,6 +1329,7 @@ function loadMainWindow(win) {
       // Non-fatal: app works with system fonts as fallback
     }
   })
+}
 
 async function runStudyJourneySmokeIfEnabled() {
   if (process.env.JPLEARN_SMOKE_JOURNEY !== '1') {
