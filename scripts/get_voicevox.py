@@ -28,7 +28,9 @@ DEFAULT_URL = (
 URL = os.environ.get("VOICEVOX_VVPP_URL", DEFAULT_URL)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-TARGET_DIR = REPO_ROOT / "data" / "voicevox"
+# VOICEVOX_TARGET_DIR lets the Electron first-run wizard redirect the install
+# path to Documents\JPLearn\voicevox\ instead of the repo-relative default.
+TARGET_DIR = Path(os.environ.get("VOICEVOX_TARGET_DIR") or REPO_ROOT / "data" / "voicevox")
 
 
 def report(done: int, total: int) -> None:

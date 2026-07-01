@@ -397,12 +397,44 @@ interface DesktopApi {
   exportAnalyticsCSV?: (
     type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot',
   ) => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
+  // ─ Setup wizard ────────────────────────────────────────────────────
+  isFirstRun?: () => Promise<boolean>
+  getSetupSystemInfo?: () => Promise<SetupSystemInfo>
+  downloadModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ alreadyInstalled?: boolean }>
+  downloadVoicevox?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  completeSetup?: () => Promise<{ ok: boolean }>
+  skipSetup?: () => Promise<{ ok: boolean }>
+  onSetupProgress?: (listener: (evt: SetupProgressEvent) => void) => () => void
 }
 
 interface OnboardingCompletionPayload {
   goal?: string
   dailyMinutes?: number
   targetLevel?: string
+}
+
+interface SetupModelOption {
+  tier: 'low' | 'high' | 'ultra'
+  filename: string
+  sizeMb: number
+  label: string
+  description: string
+  installed: boolean
+}
+
+interface SetupSystemInfo {
+  totalRamGb: number
+  recommendedTier: 'low' | 'high'
+  models: SetupModelOption[]
+  voicevoxInstalled: boolean
+}
+
+interface SetupProgressEvent {
+  id: 'model' | 'voicevox'
+  percent: number
+  mb: number | null
+  totalMb: number | null
+  etaSec: number | null
 }
 
 interface VoiceStatus {

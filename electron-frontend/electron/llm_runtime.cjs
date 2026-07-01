@@ -37,15 +37,24 @@ function resolveBundledLlamaServerPath() {
 }
 
 function resolveBundledModelPath() {
-  if (!fs.existsSync(DEFAULT_MODEL_DIRECTORY)) {
-    return ''
+  // Check Documents\JPLearn\models\ first (installed app), then the bundled/dev path.
+  const directories = []
+  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  if (docsDir) {
+    directories.push(path.join(docsDir, 'models'))
   }
-  const entries = fs.readdirSync(DEFAULT_MODEL_DIRECTORY, { withFileTypes: true })
-  const models = entries
-    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.gguf'))
-    .map((entry) => path.join(DEFAULT_MODEL_DIRECTORY, entry.name))
-    .sort()
-  return models[0] || ''
+  directories.push(DEFAULT_MODEL_DIRECTORY)
+
+  for (const dir of directories) {
+    if (!fs.existsSync(dir)) continue
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    const models = entries
+      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.gguf'))
+      .map((entry) => path.join(dir, entry.name))
+      .sort()
+    if (models.length > 0) return models[0]
+  }
+  return ''
 }
 
 function resolveTutorSystemPrompt() {

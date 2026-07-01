@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write   # required to create GitHub Releases
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: electron-frontend/package-lock.json
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: electron-frontend
+        run: npm ci
+
+      - name: Run backend tests
+        run: python -m pytest -q
+
+      - name: Frontend lint and build
+        working-directory: electron-frontend
+        run: |
+          npm run lint
+          npm run build
+
+      - name: Build Windows installer
+        working-directory: electron-frontend
+        # JPLEARN_DOCUMENTS_DIR is set to a temp path so the build step
+        # doesn't attempt to read/write the developer's Documents folder.
+        env:
+          JPLEARN_DOCUMENTS_DIR: ${{ runner.temp }}\jplearn-build-data
+        run: npm run make:win
+
+      - name: Create GitHub Release
+        working-directory: electron-frontend
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $installer = Get-ChildItem -Path "out/make/squirrel.windows/x64" -Filter "*Setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $installer) {
+            Write-Error "Installer not found in out/make/squirrel.windows/x64/"
+            exit 1
+          }
+          gh release create "${{ github.ref_name }}" `
+            "$($installer.FullName)" `
+            --title "JPLearn ${{ github.ref_name }}" `
+            --notes "## JPLearn ${{ github.ref_name }}
+
+**Requirements:** Python 3.11+ must be installed on your system.
+
+### Installation
+1. Download and run \`$($installer.Name)\`
+2. If Windows shows a SmartScreen warning, click **More info → Run anyway** (the app is unsigned)
+3. On first launch, a setup wizard will offer to download the AI tutor model and Japanese voice engine
+
+### Optional components (downloaded by wizard or manually)
+- **AI Tutor:** \`python scripts/get_gguf_model.py\`
+- **Japanese Voice:** \`python scripts/get_voicevox.py\`
+
+### Building from source
+See the [README](README.md) for full build instructions."

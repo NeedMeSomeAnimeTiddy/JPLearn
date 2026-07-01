@@ -34,9 +34,17 @@ function preprocessForSpeech(text) {
 function resolveEnginePath(repoRoot) {
   const candidates = [
     (process.env.JPLEARN_VOICEVOX_ENGINE || '').trim(),
+  ]
+  // Documents\JPLearn\voicevox\ — priority path for the installed app
+  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  if (docsDir) {
+    candidates.push(path.join(docsDir, 'voicevox', 'run.exe'))
+    candidates.push(path.join(docsDir, 'voicevox', 'run'))
+  }
+  candidates.push(
     path.join(repoRoot, 'data', 'voicevox', 'run.exe'),
     path.join(repoRoot, 'data', 'voicevox', 'run'),
-  ]
+  )
   try {
     const { app } = require('electron')
     if (app && typeof app.getPath === 'function') {

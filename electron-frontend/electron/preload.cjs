@@ -6,6 +6,18 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
     electron: process.versions.electron,
     node: process.versions.node,
   },
+  // ─ Setup wizard ──────────────────────────────────────────────────────
+  isFirstRun: () => ipcRenderer.invoke('setup:is-first-run'),
+  getSetupSystemInfo: () => ipcRenderer.invoke('setup:system-info'),
+  downloadModel: (tier) => ipcRenderer.invoke('setup:download-model', tier),
+  downloadVoicevox: () => ipcRenderer.invoke('setup:download-voicevox'),
+  completeSetup: () => ipcRenderer.invoke('setup:complete'),
+  skipSetup: () => ipcRenderer.invoke('setup:skip'),
+  onSetupProgress: (listener) => {
+    const handler = (_event, data) => listener(data)
+    ipcRenderer.on('setup:download-progress', handler)
+    return () => ipcRenderer.removeListener('setup:download-progress', handler)
+  },
   getStudySummary: () => ipcRenderer.invoke('study:get-summary'),
   getBlockProgress: (slug) => ipcRenderer.invoke('study:get-block-progress', slug),
   getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),

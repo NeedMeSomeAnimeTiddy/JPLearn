@@ -681,6 +681,54 @@ function registerIpcHandlers(options) {
       throw new Error(`Failed to export analytics CSV: ${detail}`)
     }
   })
+  // ── Setup wizard ────────────────────────────────────────────────────────────────────
+  const setupRuntime = options.setupRuntime
+  if (setupRuntime) {
+    options.ipcMain.handle('setup:is-first-run', (event) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      return setupRuntime.isFirstRun()
+    })
+
+    options.ipcMain.handle('setup:system-info', (event) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      return setupRuntime.getSystemInfo()
+    })
+
+    options.ipcMain.handle('setup:download-model', async (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['low', 'high', 'ultra'].includes(tier)) {
+        throw new Error('Invalid model tier')
+      }
+      try {
+        return await setupRuntime.downloadModel(tier, event.sender)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Model download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:download-voicevox', async (event) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      try {
+        return await setupRuntime.downloadVoicevox(event.sender, options.repoRoot)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`VOICEVOX download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:complete', (event) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      setupRuntime.writeSentinel()
+      return { ok: true }
+    })
+
+    options.ipcMain.handle('setup:skip', (event) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      setupRuntime.writeSentinel()
+      return { ok: true }
+    })
+  }
 }
 
 module.exports = {

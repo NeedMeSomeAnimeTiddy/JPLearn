@@ -48,6 +48,88 @@ npm run build
 npm run start
 ```
 
+## Building from a Fresh Clone
+
+After cloning the repository, run these steps in order.
+
+### 1. Core setup (required)
+
+```bash
+python -m pip install -r requirements.txt
+cd electron-frontend && npm ci
+```
+
+### 2. AI Tutor — llama.cpp binaries (optional)
+
+Downloads the latest prebuilt Windows CPU binaries from the llama.cpp GitHub releases:
+
+```bash
+python scripts/get_llama_cpp.py
+```
+
+### 3. AI Tutor — chat model (optional)
+
+Auto-detects your RAM and downloads the appropriate model:
+
+```bash
+python scripts/get_gguf_model.py          # auto-detect RAM
+python scripts/get_gguf_model.py --tier low    # force small model (~1.4 GB)
+python scripts/get_gguf_model.py --tier high   # force medium model (~2.6 GB)
+python scripts/get_gguf_model.py --tier ultra  # large model (~5.5 GB)
+```
+
+### 4. Japanese voice TTS (optional)
+
+```bash
+pip install -r requirements-tts.txt
+python scripts/get_voicevox.py
+```
+
+### 5. Run
+
+```bash
+cd electron-frontend && npm run dev
+```
+
+When running the **installed app** for the first time, a setup wizard will offer
+steps 2–4 automatically.
+
+## Building the Windows installer
+
+```bash
+cd electron-frontend
+npm run make:win
+# Installer appears at: out/make/squirrel.windows/x64/*Setup.exe
+```
+
+Place `electron-frontend/assets/icon.ico` before building to include a custom app icon.
+
+## GitHub Releases
+
+Push a version tag to trigger the release workflow:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+The GitHub Actions workflow builds the installer and publishes a GitHub Release automatically.
+Requires repo → Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" enabled.
+
+> **Note:** The installer is unsigned. Windows will show a SmartScreen warning on first run —
+> click **More info → Run anyway** to proceed.
+
+## User data
+
+The installed app stores all user data in `Documents\JPLearn\`:
+
+| Folder | Contents |
+|--------|----------|
+| `models\` | GGUF model files |
+| `voicevox\` | Japanese TTS engine |
+| `data\` | SQLite databases (progress, settings) |
+
+These files survive uninstall and are detected automatically on reinstall.
+
 ## Common Developer Commands
 
 ### Validate Python side

@@ -1,6 +1,8 @@
 """SQLite persistence for review states and progress."""
 
 import json
+import os
+import shutil
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -16,7 +18,29 @@ from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState
 from data.text_normalization import normalize_japanese_text, normalize_storage_text
 
-DB_PATH = Path(__file__).parent.parent / "data" / "jplearn.db"
+def _resolve_db_path() -> Path:
+    """Return the database path, migrating from the legacy location if needed.
+
+    When JPLEARN_DOCUMENTS_DIR is set (by the Electron main process for the
+    packaged app), the database lives at {dir}/data/jplearn.db — in the user's
+    Documents\\JPLearn\\ folder so it survives uninstall/reinstall.
+    Falls back to the legacy repo-relative path for development.
+    """
+    docs_dir = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
+    if docs_dir:
+        db_dir = Path(docs_dir) / "data"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        new_path = db_dir / "jplearn.db"
+        # One-time migration: copy existing DB on first launch of updated app
+        if not new_path.exists():
+            legacy = Path(__file__).parent.parent / "data" / "jplearn.db"
+            if legacy.exists():
+                shutil.copy2(str(legacy), str(new_path))
+        return new_path
+    return Path(__file__).parent.parent / "data" / "jplearn.db"
+
+
+DB_PATH = _resolve_db_path()
 SCHEMA_VERSION_TABLE = "schema_version"
 MIGRATION_V1 = 1
 MIGRATION_V2 = 2

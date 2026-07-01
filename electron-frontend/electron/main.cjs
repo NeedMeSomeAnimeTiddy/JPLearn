@@ -1,13 +1,39 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, screen } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
 const { createVoiceRuntime } = require('./voice_runtime.cjs')
+const { createSetupRuntime } = require('./setup_runtime.cjs')
 const {
   isAllowedRendererUrl,
 } = require('./ipc_security.cjs')
+
+// ── Squirrel.Windows lifecycle events ────────────────────────────────────────
+// Squirrel re-launches the app with a special arg for install/update/uninstall.
+const _squirrelArg = process.argv[1]
+if (
+  _squirrelArg === '--squirrel-install' ||
+  _squirrelArg === '--squirrel-updated' ||
+  _squirrelArg === '--squirrel-obsolete'
+) {
+  // Clean quit — Squirrel will handle shortcuts/registry
+  app.quit()
+}
+
+// ── Documents\JPLearn\ base path ─────────────────────────────────────────────
+// Set before creating runtimes so llm_runtime and voice_runtime can read it.
+if (!process.env.JPLEARN_DOCUMENTS_DIR) {
+  let docsBase
+  try {
+    docsBase = app.getPath('documents')
+  } catch {
+    docsBase = path.join(os.homedir(), 'Documents')
+  }
+  process.env.JPLEARN_DOCUMENTS_DIR = path.join(docsBase, 'JPLearn')
+}
 
 const repoRoot = path.join(__dirname, '..', '..')
 const startupReadyResolvers = new Map()
@@ -16,6 +42,7 @@ const windowExpandedStateById = new Map()
 const windowRestoreBoundsById = new Map()
 const localTutorRuntime = createTutorChatRuntime()
 const localVoiceRuntime = createVoiceRuntime({ repoRoot })
+const localSetupRuntime = createSetupRuntime()
 let tutorRuntimePreloadTriggered = false
 let tutorRuntimePreloadPromise = null
 let preloadedAssistantChatHistory = {
@@ -945,6 +972,8 @@ registerIpcHandlers({
   windowRestoreBoundsById,
   localTutorRuntime,
   localVoiceRuntime,
+  setupRuntime: localSetupRuntime,
+  repoRoot,
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
 })
 
@@ -1520,6 +1549,27 @@ async function createWindowWithSplash() {
 }
 
 app.whenReady().then(() => {
+  // Handle --squirrel-uninstall: show info dialog then quit.
+  // Runs here (after app.ready) because dialog.showMessageBoxSync requires it.
+  if (process.argv[1] === '--squirrel-uninstall') {
+    const jpLearnDir = process.env.JPLEARN_DOCUMENTS_DIR || ''
+    const hasUserData = jpLearnDir && fs.existsSync(jpLearnDir)
+    if (hasUserData) {
+      dialog.showMessageBoxSync({
+        type: 'information',
+        title: 'Uninstalling JPLearn',
+        message: 'Your progress and downloads are safe.',
+        detail: `Your study progress, AI models, and voice engine are saved in:\n\n${jpLearnDir}\n\nThese files will NOT be deleted. If you reinstall JPLearn, everything will be detected automatically.`,
+        buttons: ['OK'],
+      })
+    }
+    app.quit()
+    return
+  }
+
+  // Ensure Documents\JPLearn\ subdirectories exist on every launch
+  try { localSetupRuntime.ensureJPLearnDirs() } catch { /* non-fatal */ }
+
   void createWindowWithSplash()
 
   app.on('activate', () => {

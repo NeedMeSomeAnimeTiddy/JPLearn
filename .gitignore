@@ -208,9 +208,16 @@ kokoro-assets/
 data/voice-models/
 data/voicevox/
 
+# Local llama.cpp binaries and build output
+tools/llama.cpp/
+
 # Local llama.cpp model artifacts
 models/llama/*.gguf
 models/llama/*.bin
+
+# Runtime SQLite databases (stored in Documents\JPLearn\data\ in packaged app)
+data/app.db
+data/jplearn.db
 
 # Ruff stuff:
 .ruff_cache/

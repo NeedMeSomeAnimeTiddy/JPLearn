@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import type { ChangeEvent } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { LearningPathStatus, SectionReadiness } from './types'
+import { SetupWizard } from './components/SetupWizard'
 import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
@@ -2553,6 +2554,18 @@ function makeCustomThemeExportPayload(themes: CustomTheme[]): CustomThemeExportP
 }
 
 function App() {
+  // First-run setup wizard check — must be the first hooks so the conditional
+  // return (added near the bottom of App) comes after all other hooks.
+  const [showWizard, setShowWizard] = useState<boolean | null>(null)
+  useEffect(() => {
+    const api = window.jplearnDesktop
+    if (typeof api?.isFirstRun !== 'function') {
+      setShowWizard(false)
+      return
+    }
+    void api.isFirstRun().then((first: boolean) => setShowWizard(first)).catch(() => setShowWizard(false))
+  }, [])
+
   const [view, setView] = useState<AppView>('home')
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
   const [summary, setSummary] = useState<StudySummaryPayload | null>(() => loadSummarySnapshot())
@@ -5752,6 +5765,15 @@ function App() {
     window.addEventListener('mousedown', handlePointerDown)
     return () => window.removeEventListener('mousedown', handlePointerDown)
   }, [streakDetailsOpen])
+
+  // Show setup wizard on first run (all hooks above must run unconditionally)
+  if (showWizard === true) {
+    return <SetupWizard onComplete={() => setShowWizard(false)} />
+  }
+  if (showWizard === null) {
+    // Brief check in progress — render nothing to avoid flash
+    return null
+  }
 
   return (
     <main className="app-shell" data-background-style={settings.backgroundStyle} style={appShellStyle}>
