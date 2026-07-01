@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
+pytest.importorskip("pdfplumber", reason="pdfplumber is a dev-only tool; install with: pip install pdfplumber")
+
 from pathlib import Path
 from types import SimpleNamespace
 
