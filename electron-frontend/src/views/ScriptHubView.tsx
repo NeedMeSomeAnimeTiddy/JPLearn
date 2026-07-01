@@ -5,6 +5,7 @@ import {
   Flame,
   Heart,
   Lock,
+  Search,
   Settings,
   Target,
   Trophy,
@@ -75,6 +76,7 @@ interface ScriptHubViewProps {
   isSheet?: boolean
   // callbacks (navigation / deck selection only)
   onBack: () => void
+  onOpenDictionary: (seedQuery?: string) => void
   onOpenSettings: () => void
   onSelectBlock: (index: number) => void
   onSelectKanjiLevel: (level: JlptLevel) => void
@@ -117,6 +119,7 @@ export function ScriptHubView({
   activeSectionName,
   isSheet = false,
   onBack,
+  onOpenDictionary,
   onOpenSettings,
   onSelectBlock,
   onSelectKanjiLevel: _onSelectKanjiLevel,
@@ -179,6 +182,15 @@ export function ScriptHubView({
               Leeches
             </span>
           </div>
+          <button
+            type="button"
+            className="topbar-settings-button"
+            onClick={() => onOpenDictionary(activeSectionName ?? '')}
+            aria-label="Open dictionary"
+            title="Dictionary"
+          >
+            <Search aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+          </button>
           <button
             type="button"
             className="topbar-settings-button"

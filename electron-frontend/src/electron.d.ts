@@ -19,6 +19,21 @@ interface DesktopVersions {
   node: string
 }
 
+interface DictionaryLookupItem {
+  id: number
+  character: string
+  romaji: string
+  meaning: string
+  tags: string[]
+  example_sentence: string | null
+}
+
+interface DictionaryLookupPayload {
+  query: string
+  source: 'loaded_cards' | 'offline_dictionary'
+  results: DictionaryLookupItem[]
+}
+
 interface StudySummary {
   decks: DeckSummary[]
   streak: {
@@ -398,6 +413,7 @@ interface DesktopApi {
   exportAnalyticsCSV?: (
     type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot',
   ) => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
+  searchDictionary?: (query: string) => Promise<DictionaryLookupPayload>
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>
   getSetupSystemInfo?: () => Promise<SetupSystemInfo>

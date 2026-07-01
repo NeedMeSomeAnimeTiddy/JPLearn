@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getBlockProgress: (slug) => ipcRenderer.invoke('study:get-block-progress', slug),
   getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),
   getStudyQueue: (slug) => ipcRenderer.invoke('study:get-study-queue', slug),
+  searchDictionary: (query) => ipcRenderer.invoke('study:search-dictionary', query),
   getOverviewCharacterMastery: () => ipcRenderer.invoke('study:get-overview-character-mastery'),
   recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload),
   startSessionGoal: (payload) => ipcRenderer.invoke('study:start-session-goal', payload),

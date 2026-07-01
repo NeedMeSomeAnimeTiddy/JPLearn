@@ -127,6 +127,537 @@
   width: min(420px, calc(100vw - 36px));
 }
 
+.dictionary-panel {
+  display: grid;
+  gap: 14px;
+  width: min(90vw, 900px);
+  max-height: min(84dvh, 720px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-border) transparent;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--tone-ocean) 14%, transparent), transparent 46%),
+    linear-gradient(145deg, color-mix(in oklab, var(--panel-bg) 98%, black), color-mix(in oklab, var(--panel-bg-alt) 96%, black));
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  box-shadow: var(--panel-shadow), 0 0 60px -20px rgba(0, 0, 0, 0.9);
+  animation: dictionaryDockIn 200ms ease both;
+}
+
+.modal-backdrop.dictionary-backdrop {
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 48px;
+  background: rgba(21, 17, 14, 0.76);
+}
+
+@keyframes dictionaryDockIn {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dictionary-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid color-mix(in oklab, var(--panel-border) 72%, transparent);
+  background: linear-gradient(180deg, var(--panel-bg) 82%, transparent);
+}
+
+.dictionary-header-copy {
+  min-width: 0;
+}
+
+.dictionary-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.dictionary-kicker-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.dictionary-header h2 {
+  margin: 6px 0 4px;
+  font-size: clamp(22px, 2.4vw, 30px);
+  letter-spacing: -0.02em;
+  font-family: var(--display-font);
+}
+
+.dictionary-header p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  max-width: 58ch;
+}
+
+.dictionary-close-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--button-border);
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.dictionary-close-button:hover {
+  color: var(--text-main);
+  border-color: color-mix(in oklab, var(--tone-ocean) 48%, var(--button-border));
+}
+
+.dictionary-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+}
+
+.dictionary-search-input-wrap {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--button-border);
+  border-radius: 14px;
+  padding: 0 14px;
+  background: color-mix(in oklab, var(--panel-bg) 92%, black);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.dictionary-search-input-wrap:focus-within {
+  border-color: color-mix(in oklab, var(--panel-border) 88%, white 12%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.dictionary-search-icon {
+  width: 16px;
+  height: 16px;
+  color: color-mix(in oklab, var(--tone-ocean) 68%, var(--text-soft));
+  flex-shrink: 0;
+}
+
+.dictionary-search-input-wrap input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  padding: 12px 0;
+}
+
+.dictionary-search-input-wrap input:focus,
+.dictionary-search-input-wrap input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.dictionary-search-input-wrap input::-moz-focus-inner {
+  border: 0;
+}
+
+.dictionary-search-button,
+.dictionary-text-button {
+  border: 1px solid var(--button-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.dictionary-search-button {
+  padding: 11px 16px;
+  min-height: 44px;
+  font-weight: 700;
+}
+
+.dictionary-search-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dictionary-recent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 18px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 60%, transparent);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--panel-bg) 96%, black);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dictionary-recent-row::-webkit-scrollbar {
+  display: none;
+}
+
+.dictionary-recent-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dictionary-recent-label svg {
+  width: 13px;
+  height: 13px;
+}
+
+.dictionary-recent-row .dictionary-history-list {
+  flex-wrap: nowrap;
+}
+
+.dictionary-recent-clear {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.dictionary-voice-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--status-error);
+  background: color-mix(in srgb, var(--status-error) 15%, transparent);
+  color: var(--status-error);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.dictionary-voice-error svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.dictionary-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 18px 18px;
+}
+
+.dictionary-results-pane {
+  min-width: 0;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 70%, transparent);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--panel-bg) 98%, black);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 14px;
+  overflow: auto;
+}
+
+.dictionary-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dictionary-section-title-row h3 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.dictionary-section-title-row span {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+.dictionary-empty-state {
+  padding: 18px 10px;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.dictionary-empty-state p {
+  margin: 0 0 8px;
+}
+
+.dictionary-result-list {
+  display: grid;
+  gap: 12px;
+}
+
+.dictionary-result-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 60%, transparent);
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in oklab, var(--tone-ocean) 12%, transparent), transparent 58%),
+    color-mix(in oklab, var(--panel-bg) 88%, black);
+}
+
+.dictionary-result-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dictionary-result-character {
+  font-size: 1.8rem;
+  line-height: 1;
+  font-weight: 700;
+  font-family: var(--display-font);
+}
+
+.dictionary-result-reading {
+  color: var(--text-soft);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.dictionary-fallback-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 38%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-ocean) 14%, var(--chip-bg));
+  color: color-mix(in oklab, var(--tone-ocean) 72%, var(--text-main));
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 3px 8px;
+}
+
+.dictionary-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--button-border);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-soft);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dictionary-icon-action svg {
+  width: 14px;
+  height: 14px;
+}
+
+.dictionary-icon-action:hover:not(:disabled) {
+  color: var(--text-main);
+  border-color: color-mix(in oklab, var(--tone-ocean) 52%, var(--button-border));
+}
+
+.dictionary-icon-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dictionary-voice-button {
+  color: color-mix(in oklab, var(--tone-ocean) 78%, var(--text-soft));
+}
+
+.dictionary-copy-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.dictionary-copy-trigger.is-open {
+  color: var(--text-main);
+  background: color-mix(in oklab, var(--tone-ocean) 24%, var(--button-bg-top));
+  border-color: color-mix(in oklab, var(--tone-ocean) 55%, var(--button-border));
+}
+
+.dictionary-copy-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 180px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 40%, var(--panel-border));
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--tone-ocean) 30%, transparent), transparent 44%),
+    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 96%, black), color-mix(in oklab, var(--panel-bg-alt) 95%, black));
+  box-shadow:
+    0 18px 34px -20px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+  z-index: 20;
+  animation: dictionaryMenuIn 140ms ease both;
+}
+
+@keyframes dictionaryMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dictionary-copy-menu button {
+  border: none;
+  background: color-mix(in oklab, var(--panel-bg) 72%, transparent);
+  color: var(--text-main);
+  border-radius: 9px;
+  min-height: 32px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+}
+
+.dictionary-copy-menu button svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.dictionary-copy-menu button:hover {
+  background: color-mix(in oklab, var(--tone-ocean) 28%, var(--panel-bg));
+}
+
+.dictionary-copy-menu button.is-copied {
+  color: color-mix(in oklab, var(--tone-ocean) 84%, var(--text-main));
+}
+
+.dictionary-result-meaning {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.dictionary-result-example {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.dictionary-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.dictionary-tag,
+.dictionary-history-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--chip-border);
+  background: var(--chip-bg);
+  color: var(--text-main);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.dictionary-tag {
+  padding: 4px 8px;
+}
+
+.dictionary-result-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-content: start;
+  align-self: start;
+}
+
+.dictionary-history-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dictionary-history-chip {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.dictionary-text-button {
+  padding: 6px 10px;
+  font-size: 0.76rem;
+}
+
+@media (max-width: 720px) {
+  .dictionary-search-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dictionary-search-button {
+    width: 100%;
+  }
+
+  .dictionary-result-card {
+    grid-template-columns: 1fr;
+  }
+
+  .dictionary-result-actions {
+    justify-content: flex-start;
+  }
+}
+
 @keyframes assistantDockIn {
   from {
     opacity: 0;

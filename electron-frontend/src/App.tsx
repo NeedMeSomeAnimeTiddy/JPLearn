@@ -4,6 +4,7 @@ import type { ChangeEvent } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { LearningPathStatus, SectionReadiness } from './types'
 import { SetupWizard } from './components/SetupWizard'
+import { DictionaryPopup } from './components/DictionaryPopup'
 import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
@@ -12,7 +13,7 @@ import { JLPTPrepView } from './views/JLPTPrepView'
 import { OnboardingView } from './views/OnboardingView'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, RotateCcw, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -2803,6 +2804,9 @@ function App() {
     score: number
   }
   const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
+    const [dictionaryOpen, setDictionaryOpen] = useState(false)
+    const [dictionarySeedQuery, setDictionarySeedQuery] = useState('')
+    const [dictionaryOpenSignal, setDictionaryOpenSignal] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('theme')
   const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
@@ -2856,6 +2860,38 @@ function App() {
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const customThemeImportInputRef = useRef<HTMLInputElement | null>(null)
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
+
+  const dictionaryCards = useMemo(() => {
+    const byId = new Map<number, ScriptDeck['cards'][number]>()
+    for (const card of deckCards) {
+      byId.set(card.id, card)
+    }
+    for (const card of overviewKanjiDeck) {
+      if (!byId.has(card.id)) {
+        byId.set(card.id, card as ScriptDeck['cards'][number])
+      }
+    }
+    return Array.from(byId.values())
+  }, [deckCards, overviewKanjiDeck])
+
+  const openDictionary = useCallback((seedQuery = '') => {
+    setShowSettings(false)
+    setShowOverview(false)
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+    setAssistantChatOpen(false)
+    setXpDetailsOpen(false)
+    setStreakDetailsOpen(false)
+    setSelectedChar(null)
+    setDictionarySeedQuery(seedQuery)
+    setDictionaryOpen(true)
+    setDictionaryOpenSignal((previous) => previous + 1)
+  }, [])
+
+  const closeDictionary = useCallback(() => {
+    setDictionaryOpen(false)
+    setDictionarySeedQuery('')
+  }, [])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
   const interleaveSequence = useMemo(
@@ -6400,6 +6436,15 @@ function App() {
             <button
               type="button"
               className="window-nav-button"
+              onClick={() => openDictionary(roundState?.focusText ?? roundState?.answer ?? '')}
+              aria-label="Open dictionary"
+              title="Dictionary"
+            >
+              <Search className="window-nav-icon" strokeWidth={2.2} />
+            </button>
+            <button
+              type="button"
+              className="window-nav-button"
               onClick={openSettingsFromMenu}
               aria-label="Open settings"
               title="Settings"
@@ -6906,6 +6951,7 @@ function App() {
           activeScriptStats={activeScriptStats}
           activeSectionName={activeSectionName}
           onBack={goHome}
+          onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
           onOpenSettings={() => { setShowOverview(false); setShowSettings(true) }}
           onSelectBlock={(index) => {
             setActiveBlockIndex(index)
@@ -7014,6 +7060,7 @@ function App() {
             setNavDirection('back')
             setView('script_hub')
           }}
+          onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
           onOpenSettings={() => { setShowOverview(false); setShowSettings(true) }}
         />
       ) : null}
@@ -7072,6 +7119,17 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      <DictionaryPopup
+        open={dictionaryOpen}
+        openSignal={dictionaryOpenSignal}
+        seedQuery={dictionarySeedQuery}
+        cards={dictionaryCards}
+        onClose={closeDictionary}
+        onPlayAudio={(text) => { void playQuestionAudio(text) }}
+        voiceBusy={voiceBusy}
+        voiceUnavailable={voiceUnavailable}
+      />
 
       </SessionProvider>
 

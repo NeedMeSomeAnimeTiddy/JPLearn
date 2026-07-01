@@ -226,6 +226,17 @@ function validatePositiveLimit(value, fallback) {
   return value
 }
 
+function validateDictionarySearchQuery(value) {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid dictionary search query: ${String(value)}`)
+  }
+  const normalized = value.trim()
+  if (!normalized) {
+    throw new Error('Invalid dictionary search query: value must not be empty')
+  }
+  return normalized
+}
+
 function validateAssistantEventIdsPayload(payload) {
   if (!Array.isArray(payload)) {
     throw new Error('Invalid assistant event ids payload: expected array')
@@ -436,6 +447,7 @@ module.exports = {
   validateSessionId,
   validateOptionalSessionId,
   validatePositiveLimit,
+  validateDictionarySearchQuery,
   validateAssistantEventIdsPayload,
   validateAssistantEventInteractionPayload,
   validateAssistantChatAppendPayload,

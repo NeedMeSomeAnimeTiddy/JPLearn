@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Heart,
   LoaderCircle,
+  Search,
   Settings,
   Target,
   Trophy,
@@ -38,6 +39,7 @@ interface MinigameViewProps {
   showKeyboardPrompts: boolean
   activeBlockCards: BasicCard[]
   onBack: () => void
+  onOpenDictionary: (seedQuery?: string) => void
   onOpenSettings: () => void
 }
 
@@ -53,6 +55,7 @@ export function MinigameView({
   showKeyboardPrompts,
   activeBlockCards,
   onBack,
+  onOpenDictionary,
   onOpenSettings,
 }: MinigameViewProps) {
   const {
@@ -219,6 +222,15 @@ export function MinigameView({
               Goal
             </span>
           </div>
+          <button
+            type="button"
+            className="topbar-settings-button"
+            onClick={() => onOpenDictionary(roundState?.focusText ?? roundState?.answer ?? '')}
+            aria-label="Open dictionary"
+            title="Dictionary"
+          >
+            <Search aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+          </button>
           <button
             type="button"
             className="topbar-settings-button"

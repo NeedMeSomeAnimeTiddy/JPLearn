@@ -20,6 +20,7 @@ const {
   validateJLPTSaveResultPayload,
   validateLearningPathId,
   validateAnalyticsExportType,
+  validateDictionarySearchQuery,
 } = require('./ipc_security.cjs')
 
 function registerIpcHandlers(options) {
@@ -87,6 +88,17 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch study queue: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:search-dictionary', async (event, query) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedQuery = validateDictionarySearchQuery(query)
+    try {
+      return await runPythonBridgeWithArgsRead(['dictionary-search', validatedQuery])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to search dictionary: ${detail}`)
     }
   })
 

@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Build a compact SQLite lookup index from JMdict-simplified JSON."""
+"""Build a compact SQLite lookup index from JMdict-simplified JSON.
+
+The index uses a real SQLite FTS5 virtual table (external-content) over the
+English gloss text, which gives us proper tokenization, prefix queries and
+bm25 relevance ranking instead of a hand-rolled per-token lookup table. See
+https://www.sqlite.org/fts5.html for the reference this design follows.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
-import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -15,16 +20,6 @@ DEFAULT_INPUT_CANDIDATES = [
     Path("data/external_sources/offline_dictionary/jmdict-eng-common-3.6.2.json"),
 ]
 DEFAULT_OUTPUT = Path("data/external_sources/offline_dictionary/jmdict_lookup.sqlite")
-
-NON_ASCII_PATTERN = re.compile(r"[^a-z\s]")
-MULTISPACE_PATTERN = re.compile(r"\s+")
-
-
-def normalize_ascii_token(value: str) -> str:
-    lowered = str(value or "").lower()
-    lowered = NON_ASCII_PATTERN.sub(" ", lowered)
-    lowered = MULTISPACE_PATTERN.sub(" ", lowered).strip()
-    return lowered
 
 
 def first_gloss(entry: dict[str, Any]) -> str:
@@ -66,6 +61,19 @@ def all_glosses(entry: dict[str, Any]) -> list[str]:
                 if isinstance(text, str) and text.strip():
                     results.append(text.strip())
     return results
+
+
+def is_common_entry(entry: dict[str, Any]) -> bool:
+    """An entry is "common" if any of its kanji or kana forms are flagged common by JMdict."""
+    for key in ("kanji", "kana"):
+        items = entry.get(key)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict) and item.get("common"):
+                return True
+    return False
+
 
 
 def preferred_japanese(entry: dict[str, Any]) -> tuple[str, str]:
@@ -161,15 +169,28 @@ def build_lookup_db(input_path: Path, output_path: Path) -> dict[str, int]:
 
         conn.executescript(
             """
-            CREATE TABLE dictionary_lookup (
-              lookup_key TEXT PRIMARY KEY,
+            CREATE TABLE dictionary_entries (
+              entry_id INTEGER PRIMARY KEY,
+              source_id TEXT,
               japanese TEXT NOT NULL,
               reading TEXT NOT NULL,
               gloss TEXT NOT NULL,
-              entry_id TEXT
+              is_common INTEGER NOT NULL DEFAULT 0
             );
 
-            CREATE INDEX idx_dictionary_lookup_japanese ON dictionary_lookup(japanese);
+            CREATE INDEX idx_dictionary_entries_japanese ON dictionary_entries(japanese);
+            CREATE INDEX idx_dictionary_entries_reading ON dictionary_entries(reading);
+            CREATE INDEX idx_dictionary_entries_common ON dictionary_entries(is_common);
+
+            -- External-content FTS5 index over the English gloss text. Porter
+            -- stemming lets "run" match "running"/"runs", and FTS5 gives us
+            -- prefix queries + bm25 relevance ranking for free.
+            CREATE VIRTUAL TABLE dictionary_fts USING fts5(
+              gloss,
+              content='dictionary_entries',
+              content_rowid='entry_id',
+              tokenize='porter unicode61'
+            );
 
             CREATE TABLE dictionary_metadata (
               key TEXT PRIMARY KEY,
@@ -178,7 +199,6 @@ def build_lookup_db(input_path: Path, output_path: Path) -> dict[str, int]:
             """
         )
 
-        lookup_rows_inserted = 0
         entries_used = 0
 
         for raw_entry in words:
@@ -189,39 +209,33 @@ def build_lookup_db(input_path: Path, output_path: Path) -> dict[str, int]:
             if not japanese:
                 continue
 
-            gloss = first_gloss(raw_entry)
-            entry_id = str(raw_entry.get("id", ""))
-            keys_for_entry: set[str] = set()
-            for gloss_text in all_glosses(raw_entry):
-                normalized = normalize_ascii_token(gloss_text)
-                if not normalized:
-                    continue
-                keys_for_entry.add(normalized)
-                for token in normalized.split(" "):
-                    if len(token) >= 3:
-                        keys_for_entry.add(token)
-
-            if not keys_for_entry:
+            glosses = all_glosses(raw_entry)
+            if not glosses:
                 continue
 
+            gloss = "; ".join(dict.fromkeys(glosses))[:240]
+            source_id = str(raw_entry.get("id", ""))
+            common_flag = 1 if is_common_entry(raw_entry) else 0
+
+            cursor = conn.execute(
+                """
+                INSERT INTO dictionary_entries (source_id, japanese, reading, gloss, is_common)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (source_id, japanese, reading, gloss, common_flag),
+            )
+            entry_id = cursor.lastrowid
+            conn.execute(
+                "INSERT INTO dictionary_fts (rowid, gloss) VALUES (?, ?)",
+                (entry_id, gloss),
+            )
             entries_used += 1
-            for key in keys_for_entry:
-                cursor = conn.execute(
-                    """
-                    INSERT OR IGNORE INTO dictionary_lookup (lookup_key, japanese, reading, gloss, entry_id)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (key, japanese, reading, gloss, entry_id),
-                )
-                if cursor.rowcount > 0:
-                    lookup_rows_inserted += 1
 
         metadata = {
             "source": str(input_path.name),
             "word_count": str(len(words)),
             "entries_used": str(entries_used),
-            "lookup_rows": str(lookup_rows_inserted),
-            "schema_version": "1",
+            "schema_version": "2",
         }
         conn.executemany(
             "INSERT INTO dictionary_metadata (key, value) VALUES (?, ?)",
@@ -231,7 +245,7 @@ def build_lookup_db(input_path: Path, output_path: Path) -> dict[str, int]:
         return {
             "word_count": len(words),
             "entries_used": entries_used,
-            "lookup_rows": lookup_rows_inserted,
+            "lookup_rows": entries_used,
         }
     finally:
         conn.close()

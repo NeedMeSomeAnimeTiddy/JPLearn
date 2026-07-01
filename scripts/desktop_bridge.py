@@ -7,10 +7,14 @@ request JSON payloads over a subprocess boundary.
 from __future__ import annotations
 
 import json
+import os
+import re
+import sqlite3
 import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import unicodedata
 from typing import Mapping
 from uuid import uuid4
 
@@ -22,6 +26,17 @@ if hasattr(sys.stderr, "reconfigure"):
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+_docs_dir = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
+OFFLINE_DICTIONARY_DIR = (
+    Path(_docs_dir) / "data" / "external_sources" / "offline_dictionary"
+    if _docs_dir
+    else PROJECT_ROOT / "data" / "external_sources" / "offline_dictionary"
+)
+OFFLINE_DICTIONARY_DB_CANDIDATES = (
+    OFFLINE_DICTIONARY_DIR / "jmdict_lookup.sqlite",
+    PROJECT_ROOT / "data" / "external_sources" / "offline_dictionary" / "jmdict_lookup.sqlite",
+)
 
 from data.study_pipeline import (
     append_assistant_chat_turn,
@@ -126,6 +141,146 @@ from domain.jlpt_sessions import (
     build_weak_area_queue,
     project_mock_score,
 )
+
+
+def _normalize_dictionary_query(value: str) -> str:
+    return unicodedata.normalize("NFKC", value).strip().lower()
+
+
+def _dictionary_db_path() -> Path | None:
+    for candidate in OFFLINE_DICTIONARY_DB_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _dictionary_query_terms(query: str) -> list[str]:
+    normalized = _normalize_dictionary_query(query)
+    if not normalized:
+        return []
+    parts = [part for part in re.split(r"\s+", normalized) if part]
+    return parts or [normalized]
+
+
+def _escape_fts5_term(term: str) -> str:
+    """Escape a term for safe use inside an FTS5 double-quoted string token.
+
+    See https://www.sqlite.org/fts5.html#fts5_strings - embedded double quotes
+    are escaped SQL-style by doubling them.
+    """
+    return term.replace('"', '""')
+
+
+_DICTIONARY_RESULT_LIMIT = 20
+# If the common-word tier returns fewer than this many hits, also search the
+# rest of the dictionary (rare/obscure entries, foreign-greeting loanwords,
+# etc.) and append those below the common results.
+_DICTIONARY_COMMON_FALLBACK_THRESHOLD = 5
+
+
+def _search_dictionary_japanese(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
+    base_sql = (
+        "SELECT entry_id, japanese, reading, gloss "
+        "FROM dictionary_entries "
+        "WHERE (japanese = ? OR japanese LIKE ? OR reading = ? OR reading LIKE ?) AND is_common = ? "
+        "ORDER BY LENGTH(japanese), entry_id "
+        "LIMIT ?"
+    )
+    match_params = [
+        normalized_query,
+        f"{normalized_query}%",
+        normalized_query,
+        f"{normalized_query}%",
+    ]
+
+    rows = conn.execute(base_sql, [*match_params, 1, _DICTIONARY_RESULT_LIMIT]).fetchall()
+
+    if len(rows) < _DICTIONARY_COMMON_FALLBACK_THRESHOLD:
+        seen_ids = {row[0] for row in rows}
+        remaining = _DICTIONARY_RESULT_LIMIT - len(rows)
+        extra_rows = conn.execute(base_sql, [*match_params, 0, remaining]).fetchall()
+        rows.extend(row for row in extra_rows if row[0] not in seen_ids)
+
+    return rows
+
+
+def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
+    # Each word must appear as a prefix somewhere in the gloss, ranked by bm25
+    # relevance within each tier.
+    query_terms = _dictionary_query_terms(normalized_query)
+    match_expr = " AND ".join(f'"{_escape_fts5_term(term)}"*' for term in query_terms)
+
+    base_sql = (
+        "SELECT e.entry_id, e.japanese, e.reading, e.gloss "
+        "FROM dictionary_fts "
+        "JOIN dictionary_entries e ON e.entry_id = dictionary_fts.rowid "
+        "WHERE dictionary_fts MATCH ? AND e.is_common = ? "
+        "ORDER BY bm25(dictionary_fts) "
+        "LIMIT ?"
+    )
+
+    try:
+        rows = conn.execute(base_sql, [match_expr, 1, _DICTIONARY_RESULT_LIMIT]).fetchall()
+    except sqlite3.OperationalError:
+        return []
+
+    if len(rows) < _DICTIONARY_COMMON_FALLBACK_THRESHOLD:
+        seen_ids = {row[0] for row in rows}
+        remaining = _DICTIONARY_RESULT_LIMIT - len(rows)
+        try:
+            extra_rows = conn.execute(base_sql, [match_expr, 0, remaining]).fetchall()
+        except sqlite3.OperationalError:
+            extra_rows = []
+        rows.extend(row for row in extra_rows if row[0] not in seen_ids)
+
+    return rows
+
+
+def build_dictionary_search_payload(query: str) -> dict[str, object]:
+    normalized_query = _normalize_dictionary_query(query)
+    if not normalized_query:
+        raise ValueError("Dictionary query must not be empty")
+
+    db_path = _dictionary_db_path()
+    if db_path is None:
+        raise FileNotFoundError("Offline dictionary index is not installed")
+
+    is_japanese_query = bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", normalized_query))
+
+    conn = sqlite3.connect(db_path)
+    try:
+        table_names = {
+            row[0]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')")
+        }
+        if "dictionary_entries" not in table_names or "dictionary_fts" not in table_names:
+            # Older index build (pre-FTS5 schema) - treat as not installed so the
+            # UI prompts a re-download instead of hitting a SQL error.
+            raise FileNotFoundError("Offline dictionary index is outdated; please re-download it")
+
+        if is_japanese_query:
+            fetched_rows = _search_dictionary_japanese(conn, normalized_query)
+        else:
+            fetched_rows = _search_dictionary_english(conn, normalized_query)
+    finally:
+        conn.close()
+
+    results = [
+        {
+            "id": int(row[0]),
+            "character": row[1],
+            "romaji": row[2],
+            "meaning": row[3],
+            "tags": ["offline_dictionary"],
+            "example_sentence": None,
+        }
+        for row in fetched_rows
+    ]
+    return {
+        "query": normalized_query,
+        "source": "offline_dictionary",
+        "results": results,
+    }
 
 SUMMARY_SCRIPT_TAGS = (
     "hiragana",
@@ -1567,6 +1722,14 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         except ValueError as exc:
             return 2, {"error": str(exc)}
         return 0, payload
+
+    if command == "dictionary-search":
+        if len(argv) < 2:
+            return 2, {"error": "Usage: dictionary-search <query>"}
+        try:
+            return 0, build_dictionary_search_payload(argv[1])
+        except (FileNotFoundError, ValueError) as exc:
+            return 2, {"error": str(exc)}
 
     if command == "assistant-snapshot":
         session_id = argv[1] if len(argv) > 1 and argv[1].strip() else None
