@@ -12,6 +12,8 @@ module.exports = {
       name: '@electron-forge/maker-squirrel',
       config: {
         name: 'jplearn',
+        // Custom installer filename
+        setupExe: 'JPLearn-Installer.exe',
         // Installer window icon — requires electron-frontend/assets/icon.ico
         setupIcon: './assets/icon.ico',
       },

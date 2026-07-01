@@ -101,7 +101,7 @@ jobs:
         id: find_installer
         working-directory: electron-frontend
         run: |
-          $installer = Get-ChildItem -Path "out/make/squirrel.windows/x64" -Filter "*Setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $installer = Get-ChildItem -Path "out/make/squirrel.windows/x64" -Filter "JPLearn-Installer.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $installer) {
             Write-Error "Installer not found in out/make/squirrel.windows/x64/"
             exit 1
