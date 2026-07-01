@@ -12,7 +12,7 @@ import { JLPTPrepView } from './views/JLPTPrepView'
 import { OnboardingView } from './views/OnboardingView'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, Copy, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, RotateCcw, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
 import './App.css'
 
 type StudySummaryPayload = Awaited<
@@ -2600,6 +2600,25 @@ function App() {
   const [roundInput, setRoundInput] = useState<string>('')
   const [voiceBusy, setVoiceBusy] = useState<boolean>(false)
   const [voiceUnavailable, setVoiceUnavailable] = useState<boolean>(false)
+  const [tutorInstallInfo, setTutorInstallInfo] = useState<{
+    models: Array<{
+      tier: 'low' | 'high' | 'ultra'
+      filename: string
+      sizeMb: number
+      label: string
+      description: string
+      installed: boolean
+      estimatedDownloadMinutes?: number | null
+    }>
+    recommendedTier: 'low' | 'high'
+    activeModelTier?: 'low' | 'high' | 'ultra' | null
+    llamaCppInstalled: boolean
+    llamaCppEstimatedDownloadMinutes?: number | null
+  } | null>(null)
+  const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'high' | 'ultra' | null>(null)
+  const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
+  const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'high' | 'ultra' | null>(null)
+  const [tutorModelsExpanded, setTutorModelsExpanded] = useState(false)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
   const [roundFeedbackTone, setRoundFeedbackTone] = useState<FeedbackTone>(null)
   const [roundFeedbackPoints, setRoundFeedbackPoints] = useState<number | null>(null)
@@ -2795,6 +2814,107 @@ function App() {
       setVoiceBusy(false)
     }
   }, [voiceBusy, settings.voiceSpeaker])
+
+  const formatModelSize = useCallback((sizeMb: number) => {
+    if (!Number.isFinite(sizeMb)) {
+      return '—'
+    }
+    if (sizeMb >= 1000) {
+      return `${(sizeMb / 1000).toFixed(1)} GB`
+    }
+    return `${Math.round(sizeMb)} MB`
+  }, [])
+
+  const formatMinutes = useCallback((minutes?: number | null) => {
+    if (!Number.isFinite(minutes ?? Number.NaN) || !minutes || minutes <= 0) {
+      return 'time unknown'
+    }
+    return `${minutes} min`
+  }, [])
+
+  const refreshTutorInstallInfo = useCallback(async () => {
+    const getSetupSystemInfo = window.jplearnDesktop.getSetupSystemInfo
+    if (!getSetupSystemInfo) {
+      return
+    }
+    try {
+      const setupInfo = await getSetupSystemInfo()
+      setTutorInstallInfo({
+        models: setupInfo.models ?? [],
+        recommendedTier: setupInfo.recommendedTier,
+        activeModelTier: setupInfo.activeModelTier ?? null,
+        llamaCppInstalled: setupInfo.llamaCppInstalled,
+        llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
+      })
+    } catch {
+      // Best effort only.
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!showSettings || activeSettingsTab !== 'tutor') {
+      return
+    }
+    void refreshTutorInstallInfo()
+  }, [activeSettingsTab, refreshTutorInstallInfo, showSettings])
+
+  useEffect(() => {
+    const onSetupProgress = window.jplearnDesktop.onSetupProgress
+    if (!onSetupProgress) {
+      return
+    }
+    const unsubscribe = onSetupProgress((evt) => {
+      if (evt.id !== 'model') {
+        return
+      }
+      setTutorDownloadProgress({ percent: evt.percent, mb: evt.mb, totalMb: evt.totalMb })
+    })
+    return unsubscribe
+  }, [])
+
+  const downloadTutorModel = useCallback(async (tier: 'low' | 'high' | 'ultra') => {
+    const downloadModel = window.jplearnDesktop.downloadModel
+    if (!downloadModel || tutorDownloadingTier) {
+      return
+    }
+    setTutorDownloadingTier(tier)
+    setTutorDownloadProgress({ percent: 0, mb: null, totalMb: null })
+    try {
+      await downloadModel(tier)
+      await refreshTutorInstallInfo()
+    } finally {
+      setTutorDownloadingTier(null)
+      setTutorDownloadProgress(null)
+    }
+  }, [refreshTutorInstallInfo, tutorDownloadingTier])
+
+  const selectTutorModel = useCallback(async (tier: 'low' | 'high' | 'ultra') => {
+    const setActiveTutorModel = window.jplearnDesktop.setActiveTutorModel
+    if (!setActiveTutorModel || tutorModelActionTier) {
+      return
+    }
+    setTutorModelActionTier(tier)
+    try {
+      await setActiveTutorModel(tier)
+      await refreshTutorInstallInfo()
+    } finally {
+      setTutorModelActionTier(null)
+    }
+  }, [refreshTutorInstallInfo, tutorModelActionTier])
+
+  const uninstallTutorModel = useCallback(async (tier: 'low' | 'high' | 'ultra') => {
+    const uninstallModel = window.jplearnDesktop.uninstallTutorModel
+    if (!uninstallModel || tutorModelActionTier) {
+      return
+    }
+    setTutorModelActionTier(tier)
+    try {
+      await uninstallModel(tier)
+      await refreshTutorInstallInfo()
+    } finally {
+      setTutorModelActionTier(null)
+    }
+  }, [refreshTutorInstallInfo, tutorModelActionTier])
 
   // Warm the voice engine in the background once voice is enabled so the first
   // spoken prompt doesn't pay the engine cold-start cost.
@@ -7140,6 +7260,138 @@ function App() {
                     </div>
                     <p className="settings-help">Turn Chat with Tutor off to unload the local model runtime. Set toasts to Off to disable popup notifications.</p>
                   </div>
+                </div>
+                ) : null}
+
+                {activeSettingsTab === 'tutor' ? (
+                <div className="settings-theme-card" style={{ marginTop: '1rem' }}>
+                  <div className="settings-theme-custom-head">
+                    <p className="settings-section-label" style={{ margin: 0 }}>Tutor models</p>
+                    <button
+                      type="button"
+                      className="settings-card-icon-button"
+                      onClick={() => setTutorModelsExpanded((expanded) => !expanded)}
+                      aria-label={tutorModelsExpanded ? 'Collapse tutor models' : 'Expand tutor models'}
+                      aria-expanded={tutorModelsExpanded}
+                      title={tutorModelsExpanded ? 'Collapse tutor models' : 'Expand tutor models'}
+                    >
+                      <ChevronDown size={18} strokeWidth={2.25} aria-hidden="true" style={{ transform: tutorModelsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
+                    </button>
+                  </div>
+                  <p className="settings-help" style={{ marginTop: '0.35rem' }}>
+                    Download or reinstall the local model tiers used by the Tutor runtime.
+                  </p>
+                  {tutorModelsExpanded ? (
+                    <div style={{ marginTop: '0.9rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
+                        <span className="settings-help">
+                          {tutorInstallInfo?.llamaCppInstalled ? 'llama.cpp installed' : 'llama.cpp not installed'}
+                        </span>
+                        <span className="settings-help">
+                          Recommended tier: <strong style={{ color: 'var(--text-main)' }}>{tutorInstallInfo?.models.find((model) => model.tier === tutorInstallInfo.recommendedTier)?.label ?? '—'}</strong>
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gap: '0.65rem' }}>
+                        {(tutorInstallInfo?.models ?? []).map((model) => {
+                          const isDownloadingThis = tutorDownloadingTier === model.tier
+                          const isActioningThis = tutorModelActionTier === model.tier
+                          const isActiveTier = tutorInstallInfo?.activeModelTier === model.tier
+                          const badges = [
+                            model.tier === tutorInstallInfo?.recommendedTier ? 'Recommended' : null,
+                            isActiveTier ? 'Active' : null,
+                          ].filter(Boolean).join(' · ')
+                          return (
+                          <div
+                            key={model.tier}
+                            style={{
+                              padding: '0.75rem 0.9rem',
+                              borderRadius: '12px',
+                              background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
+                              border: isActiveTier ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))' : model.tier === tutorInstallInfo?.recommendedTier ? '1px solid color-mix(in oklab, var(--accent) 42%, var(--panel-border))' : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                              <div>
+                                <p style={{ margin: 0, fontWeight: 600 }}>
+                                  {model.label}
+                                  {badges ? ` · ${badges}` : ''}
+                                </p>
+                                <p className="settings-help" style={{ marginTop: '0.25rem' }}>
+                                  {formatModelSize(model.sizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
+                                </p>
+                                <p className="settings-help" style={{ marginTop: '0.2rem' }}>
+                                  {model.installed ? 'Installed' : model.description}
+                                </p>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                {model.installed ? (
+                                  <button
+                                    type="button"
+                                    className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
+                                    onClick={() => { void selectTutorModel(model.tier) }}
+                                    disabled={isActiveTier || tutorModelActionTier !== null || tutorDownloadingTier !== null}
+                                    aria-label={isActiveTier ? `${model.label} is the active Tutor model` : `Use ${model.label} for the Tutor`}
+                                    title={isActiveTier ? 'Currently active' : 'Use this model'}
+                                  >
+                                    {isActiveTier
+                                      ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                                      : <Circle size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="settings-card-icon-button"
+                                  onClick={() => { void downloadTutorModel(model.tier) }}
+                                  disabled={tutorDownloadingTier !== null || tutorModelActionTier !== null}
+                                  aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                                  title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                                >
+                                  {isDownloadingThis
+                                    ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                                    : model.installed
+                                      ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
+                                      : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                </button>
+                                {model.installed ? (
+                                  <button
+                                    type="button"
+                                    className="settings-inline-icon-button"
+                                    onClick={() => { void uninstallTutorModel(model.tier) }}
+                                    disabled={tutorModelActionTier !== null || tutorDownloadingTier !== null}
+                                    aria-label={`Uninstall ${model.label}`}
+                                    title={`Uninstall ${model.label}`}
+                                  >
+                                    {isActioningThis
+                                      ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                                      : <Trash2 size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                            {isDownloadingThis ? (
+                              <div>
+                                <div className="settings-progress-track">
+                                  <div
+                                    className="settings-progress-fill"
+                                    style={{ width: `${Math.min(100, Math.max(0, tutorDownloadProgress?.percent ?? 0))}%` }}
+                                  />
+                                </div>
+                                <p className="settings-help" style={{ marginTop: '0.3rem' }}>
+                                  {tutorDownloadProgress?.mb != null && tutorDownloadProgress?.totalMb != null
+                                    ? `${tutorDownloadProgress.mb.toFixed(0)} / ${tutorDownloadProgress.totalMb.toFixed(0)} MB · ${Math.round(tutorDownloadProgress.percent)}%`
+                                    : `Downloading… ${Math.round(tutorDownloadProgress?.percent ?? 0)}%`}
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
+                          )
+                        })}
+                      </div>
+                      <p className="settings-help" style={{ marginTop: '0.75rem' }}>
+                        Select the circle icon to switch the Tutor to that model. Changes apply automatically without restarting the app.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
                 ) : null}
 

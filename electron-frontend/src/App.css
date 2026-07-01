@@ -6429,6 +6429,63 @@ button {
   margin-top: 8px;
 }
 
+.settings-help {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.settings-card-icon-button {
+  appearance: none;
+  flex-shrink: 0;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--button-border);
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-soft);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.settings-card-icon-button:hover {
+  border-color: color-mix(in oklab, var(--accent) 56%, var(--button-border));
+  color: var(--text-main);
+}
+
+.settings-card-icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-card-icon-button.is-active {
+  color: #5be08b;
+  border-color: color-mix(in oklab, #5be08b 60%, var(--button-border));
+  background: linear-gradient(180deg, color-mix(in oklab, #5be08b 22%, var(--button-bg-top)), color-mix(in oklab, #5be08b 12%, var(--button-bg-bottom)));
+  opacity: 1;
+  cursor: default;
+}
+
+.settings-progress-track {
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--panel-border) 80%, transparent);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.settings-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--accent) 75%, white);
+  transition: width 300ms ease;
+  min-width: 2px;
+}
+
 .settings-custom-theme-list {
   margin-top: 8px;
   display: grid;

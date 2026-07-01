@@ -401,6 +401,9 @@ interface DesktopApi {
   isFirstRun?: () => Promise<boolean>
   getSetupSystemInfo?: () => Promise<SetupSystemInfo>
   downloadModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ alreadyInstalled?: boolean }>
+  setActiveTutorModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
+  uninstallTutorModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
+  downloadLlama?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   downloadVoicevox?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   completeSetup?: () => Promise<{ ok: boolean }>
   skipSetup?: () => Promise<{ ok: boolean }>
@@ -428,17 +431,23 @@ interface SetupModelOption {
 interface SetupSystemInfo {
   totalRamGb: number
   recommendedTier: 'low' | 'high'
+  activeModelTier?: 'low' | 'high' | 'ultra' | null
   models: SetupModelOption[]
+  llamaCppInstalled: boolean
+  gpuAdapters?: string[]
+  llamaCppBackend?: 'cuda' | 'hip' | 'vulkan' | 'cpu'
+  llamaCppBackendLabel?: string
   voicevoxInstalled: boolean
   fontsInstalled: boolean
   isPackaged: boolean
   networkMbps?: number | null
+  llamaCppEstimatedDownloadMinutes?: number | null
   voicevoxEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'voicevox' | 'fonts'
+  id: 'model' | 'llama' | 'voicevox' | 'fonts'
   percent: number
   mb: number | null
   totalMb: number | null

@@ -213,7 +213,7 @@ const startupReadyResolvers = new Map()
 const startupTelemetryByContentsId = new Map()
 const windowExpandedStateById = new Map()
 const windowRestoreBoundsById = new Map()
-const localTutorRuntime = createTutorChatRuntime()
+let localTutorRuntime = createTutorChatRuntime()
 const localVoiceRuntime = createVoiceRuntime({ repoRoot })
 const localSetupRuntime = createSetupRuntime()
 let tutorRuntimePreloadTriggered = false
@@ -260,6 +260,28 @@ const bridgeTelemetry = {
 const STARTUP_BUDGETS_MS = {
   startupReady: 5000,
   firstSummary: 2500,
+}
+
+async function refreshTutorRuntimeAfterSetup() {
+  try {
+    await localTutorRuntime.unload('setup-complete-refresh')
+  } catch {
+    // Best effort only.
+  }
+  localTutorRuntime = createTutorChatRuntime()
+  tutorRuntimePreloadTriggered = false
+  tutorRuntimePreloadPromise = null
+  preloadedAssistantChatHistory = {
+    ok: true,
+    turns: [],
+    runtimeActive: false,
+    source: 'setup-runtime-refresh-started',
+  }
+  try {
+    await preloadTutorChatStartupData()
+  } catch {
+    // If the runtime cannot start, the assistant will fall back later.
+  }
 }
 const FORCED_USER_DATA_DIR = process.env.JPLEARN_USER_DATA_DIR
 const FORCED_SESSION_DATA_DIR = process.env.JPLEARN_SESSION_DATA_DIR
@@ -1159,6 +1181,7 @@ registerIpcHandlers({
   localVoiceRuntime,
   setupRuntime: localSetupRuntime,
   repoRoot,
+  refreshTutorChatRuntime: refreshTutorRuntimeAfterSetup,
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
 })
 

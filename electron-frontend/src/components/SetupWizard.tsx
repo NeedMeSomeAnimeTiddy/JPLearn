@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { RefreshCw } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -17,16 +18,21 @@ interface SystemInfo {
   totalRamGb: number
   recommendedTier: 'low' | 'high'
   models: ModelOption[]
+  llamaCppInstalled: boolean
+  gpuAdapters?: string[]
+  llamaCppBackend?: 'cuda' | 'hip' | 'vulkan' | 'cpu'
+  llamaCppBackendLabel?: string
   voicevoxInstalled: boolean
   fontsInstalled: boolean
   isPackaged: boolean
   networkMbps?: number | null
+  llamaCppEstimatedDownloadMinutes?: number | null
   voicevoxEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
 }
 
 interface ProgressEvent {
-  id: 'model' | 'voicevox' | 'fonts'
+  id: 'model' | 'llama' | 'voicevox' | 'fonts'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -70,16 +76,20 @@ function formatDurationMinutes(minutes: number | null | undefined): string {
 export function SetupWizard({ onComplete }: Props) {
   const [page, setPage] = useState<Page>(1)
   const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null)
+  const [systemInfoLoading, setSystemInfoLoading] = useState(false)
   const [selectedTier, setSelectedTier] = useState<ModelTier | null>(null)
   const [installVoicevox, setInstallVoicevox] = useState(true)
   const [modelProgress, setModelProgress] = useState(0)
+  const [llamaProgress, setLlamaProgress] = useState(0)
   const [voicevoxProgress, setVoicevoxProgress] = useState(0)
   const [modelMb, setModelMb] = useState<{ done: number; total: number } | null>(null)
-  const [voicevoxMb, setVoicevoxMb] = useState<number | null>(null)
+  const [llamaMb, setLlamaMb] = useState<{ done: number; total: number } | null>(null)
+  const [voicevoxMb, setVoicevoxMb] = useState<{ done: number; total: number } | null>(null)
   const [modelEta, setModelEta] = useState<number | null>(null)
   const [installFonts, setInstallFonts] = useState(true)
   const [fontsProgress, setFontsProgress] = useState(0)
   const [fontsFiles, setFontsFiles] = useState<{ done: number; total: number } | null>(null)
+  const [fontsMb, setFontsMb] = useState<{ done: number; total: number } | null>(null)
   const [createDesktop, setCreateDesktop] = useState(true)
   const [createStartMenu, setCreateStartMenu] = useState(true)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -97,19 +107,45 @@ export function SetupWizard({ onComplete }: Props) {
     })
   }, [])
 
+  const refreshSystemInfo = useCallback(async () => {
+    const api = window.jplearnDesktop
+    if (!api?.getSetupSystemInfo) return
+    setSystemInfoLoading(true)
+    try {
+      const info = await api.getSetupSystemInfo()
+      setSysInfo(info)
+      setSelectedTier((prev) => {
+        if (prev && prev !== 'skip' && info.models.some((model) => model.tier === prev)) {
+          return prev
+        }
+        return info.recommendedTier
+      })
+      if (info.voicevoxInstalled) setInstallVoicevox(false)
+      if (info.fontsInstalled) setInstallFonts(false)
+    } catch {
+      setSysInfo((prev) => prev ?? {
+        totalRamGb: 0,
+        recommendedTier: 'low',
+        models: [],
+        llamaCppInstalled: false,
+        gpuAdapters: [],
+        llamaCppBackend: 'cpu',
+        llamaCppBackendLabel: 'CPU',
+        voicevoxInstalled: false,
+        fontsInstalled: false,
+        isPackaged: false,
+      })
+      setSelectedTier('low')
+    } finally {
+      setSystemInfoLoading(false)
+    }
+  }, [])
+
   // Fetch system info when we land on page 2
   useEffect(() => {
     if (page !== 2 || sysInfo) return
-    window.jplearnDesktop.getSetupSystemInfo?.().then((info: SystemInfo) => {
-      setSysInfo(info)
-      setSelectedTier(info.recommendedTier)
-      if (info.voicevoxInstalled) setInstallVoicevox(false)
-      if (info.fontsInstalled) setInstallFonts(false)
-    }).catch(() => {
-      setSysInfo({ totalRamGb: 0, recommendedTier: 'low', models: [], voicevoxInstalled: false, fontsInstalled: false, isPackaged: false })
-      setSelectedTier('low')
-    })
-  }, [page, sysInfo])
+    void refreshSystemInfo()
+  }, [page, refreshSystemInfo, sysInfo])
 
   // Subscribe to download progress events
   useEffect(() => {
@@ -122,11 +158,27 @@ export function SetupWizard({ onComplete }: Props) {
           setModelMb({ done: evt.mb, total: evt.totalMb })
         }
         setModelEta(evt.etaSec)
+      } else if (evt.id === 'llama') {
+        setLlamaProgress(evt.percent)
+        if (evt.mb !== null && evt.totalMb !== null) {
+          setLlamaMb({ done: evt.mb, total: evt.totalMb })
+        }
       } else if (evt.id === 'voicevox') {
         setVoicevoxProgress(evt.percent)
-        if (evt.totalMb !== null) setVoicevoxMb(evt.totalMb)
+        if (evt.totalMb !== null) {
+          setVoicevoxMb({
+            done: Math.max(0, Math.min(evt.totalMb, Math.round((evt.percent / 100) * evt.totalMb))),
+            total: evt.totalMb,
+          })
+        }
       } else if (evt.id === 'fonts') {
         setFontsProgress(evt.percent)
+        if (evt.totalMb !== null) {
+          setFontsMb({
+            done: Math.max(0, Math.min(evt.totalMb, Math.round((evt.percent / 100) * evt.totalMb))),
+            total: evt.totalMb,
+          })
+        }
         if (evt.filesDone !== null && evt.filesDone !== undefined && evt.filesTotal !== null && evt.filesTotal !== undefined) {
           setFontsFiles({ done: evt.filesDone, total: evt.filesTotal })
         }
@@ -147,17 +199,35 @@ export function SetupWizard({ onComplete }: Props) {
 
     const api = window.jplearnDesktop
     try {
+      const downloadTasks: Promise<unknown>[] = []
+
       if (selectedTier && selectedTier !== 'skip') {
-        appendProgressLog(`Queueing model download (${selectedTier})…`)
-        await api.downloadModel?.(selectedTier)
+        appendProgressLog(`Starting model download (${selectedTier})…`)
+        const task = api.downloadModel?.(selectedTier)
+        if (task) downloadTasks.push(task)
+      }
+      if (selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled) {
+        appendProgressLog('Starting llama.cpp runtime download…')
+        const task = api.downloadLlama?.()
+        if (task) downloadTasks.push(task)
       }
       if (installVoicevox) {
-        appendProgressLog('Queueing VOICEVOX download…')
-        await api.downloadVoicevox?.()
+        appendProgressLog('Starting VOICEVOX download…')
+        const task = api.downloadVoicevox?.()
+        if (task) downloadTasks.push(task)
       }
       if (installFonts && !sysInfo?.fontsInstalled) {
-        appendProgressLog('Queueing fonts download…')
-        await api.downloadFonts?.()
+        appendProgressLog('Starting fonts download…')
+        const task = api.downloadFonts?.()
+        if (task) downloadTasks.push(task)
+      }
+
+      if (downloadTasks.length > 0) {
+        const results = await Promise.allSettled(downloadTasks)
+        const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+        if (failure) {
+          throw failure.reason instanceof Error ? failure.reason : new Error(String(failure.reason))
+        }
       }
       appendProgressLog('Creating shortcuts…')
       await api.createShortcuts?.({ desktop: createDesktop, startMenu: createStartMenu })
@@ -169,7 +239,7 @@ export function SetupWizard({ onComplete }: Props) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, installVoicevox, installFonts, sysInfo?.fontsInstalled, createDesktop, createStartMenu, appendProgressLog])
+  }, [selectedTier, installVoicevox, installFonts, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -238,10 +308,37 @@ export function SetupWizard({ onComplete }: Props) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <InfoRow label="RAM" value={`${sysInfo.totalRamGb.toFixed(1)} GB`} />
-            <InfoRow
-              label="Network"
-              value={sysInfo.networkMbps ? `${sysInfo.networkMbps.toFixed(1)} Mbps` : 'Speed test unavailable'}
-            />
+            <InfoRow label="GPU" value={sysInfo.gpuAdapters && sysInfo.gpuAdapters.length > 0 ? sysInfo.gpuAdapters.join(', ') : 'Not detected'} />
+            <InfoRow label="llama.cpp type" value={sysInfo.llamaCppBackendLabel ?? 'CPU'} highlight />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)' }}>
+              <span style={{ opacity: 0.7 }}>Network</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <span style={{ fontWeight: 600, color: 'var(--accent, #7eb8ea)' }}>
+                  {sysInfo.networkMbps ? `${sysInfo.networkMbps.toFixed(1)} Mbps` : 'Speed test unavailable'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { void refreshSystemInfo() }}
+                  disabled={systemInfoLoading}
+                  style={{
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    background: 'rgba(255,255,255,0.06)',
+                    color: 'inherit',
+                    borderRadius: '999px',
+                    width: '2rem',
+                    height: '2rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: systemInfoLoading ? 'wait' : 'pointer',
+                  }}
+                  aria-label="Retest network speed"
+                  title="Retest network speed"
+                >
+                  <RefreshCw size={16} strokeWidth={2.25} aria-hidden="true" style={{ animation: systemInfoLoading ? 'spin 0.9s linear infinite' : 'none' }} />
+                </button>
+              </span>
+            </div>
             <InfoRow
               label="Recommended model"
               value={sysInfo.models.find(m => m.tier === sysInfo.recommendedTier)?.label ?? '—'}
@@ -282,6 +379,11 @@ export function SetupWizard({ onComplete }: Props) {
             onChange={() => setSelectedTier('skip')}
           />
         </div>
+        {selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled && (
+          <p style={{ opacity: 0.55, fontSize: '0.85rem', marginTop: '1rem', lineHeight: 1.4 }}>
+            The llama.cpp runtime will be installed automatically for this model.
+          </p>
+        )}
       </PageLayout>
     ),
 
@@ -334,6 +436,7 @@ export function SetupWizard({ onComplete }: Props) {
 
     5: (() => {
       const needsModel = selectedTier && selectedTier !== 'skip' && !sysInfo?.models.find(m => m.tier === selectedTier)?.installed
+      const needsLlama = selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled
       const needsVoice = installVoicevox && !sysInfo?.voicevoxInstalled
       const needsFonts = installFonts && !sysInfo?.fontsInstalled
       const modelInfo = sysInfo?.models.find(m => m.tier === selectedTier)
@@ -343,10 +446,13 @@ export function SetupWizard({ onComplete }: Props) {
           subtitle="Review what will be downloaded, then click Start Setup."
           onNext={startDownloads}
           onBack={() => setPage(4)}
-          nextLabel={needsModel || needsVoice || needsFonts ? 'Start Setup' : 'Finish'}
+          nextLabel={needsModel || needsLlama || needsVoice || needsFonts ? 'Start Setup' : 'Finish'}
         >
           {needsModel && modelInfo && (
             <SummaryRow label="AI Tutor model" detail={`${modelInfo.label} — ${formatSize(modelInfo.sizeMb)}`} />
+          )}
+          {needsLlama && (
+            <SummaryRow label="llama.cpp runtime" detail={`Local tutor server binary (${sysInfo?.llamaCppBackendLabel ?? 'CPU'})`} />
           )}
           {needsVoice && (
             <SummaryRow label="Japanese voice (VOICEVOX)" detail="~1 GB" />
@@ -378,6 +484,12 @@ export function SetupWizard({ onComplete }: Props) {
       <PageLayout title="Setting up…" subtitle="Please wait while files are downloaded." hideNav>
         {selectedTier && selectedTier !== 'skip' && (
           <>
+            {!sysInfo?.llamaCppInstalled && (
+              <ProgressBar
+                value={llamaProgress}
+                label={`llama.cpp runtime${llamaMb ? ` (${llamaMb.done} / ${llamaMb.total} MB)` : ''}`}
+              />
+            )}
             <ProgressBar
               value={modelProgress}
               label={`AI Tutor model${modelMb ? ` (${modelMb.done} / ${modelMb.total} MB)` : ''}`}
@@ -392,12 +504,15 @@ export function SetupWizard({ onComplete }: Props) {
         {installVoicevox && !sysInfo?.voicevoxInstalled && (
           <ProgressBar
             value={voicevoxProgress}
-            label={`Japanese voice${voicevoxMb ? ` (/ ${voicevoxMb} MB)` : ''}`}
+            label={`Japanese voice${voicevoxMb ? ` (${voicevoxMb.done} / ${voicevoxMb.total} MB)` : ''}`}
           />
         )}
         {installFonts && !sysInfo?.fontsInstalled && (
           <>
-            <ProgressBar value={fontsProgress} label="Japanese fonts" />
+            <ProgressBar
+              value={fontsProgress}
+              label={`Japanese fonts${fontsMb ? ` (${fontsMb.done} / ${fontsMb.total} MB)` : ''}`}
+            />
             {fontsFiles && fontsProgress > 0 && fontsProgress < 100 && (
               <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-0.5rem', marginBottom: '0.75rem' }}>
                 Downloading files {fontsFiles.done}/{fontsFiles.total}

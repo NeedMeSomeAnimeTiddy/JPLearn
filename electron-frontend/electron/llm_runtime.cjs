@@ -8,32 +8,58 @@ const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
 const DEFAULT_LLAMACPP_TIMEOUT_MS = 90000
 const DEFAULT_MAX_CONTEXT_CHARS = 1800
 const DEFAULT_MAX_MESSAGE_CHARS = 600
-const DEFAULT_MAX_OUTPUT_CHARS = 700
+const DEFAULT_MAX_OUTPUT_CHARS = 420
 const DEFAULT_MAX_PROMPT_CHARS = 3200
 const DEFAULT_MODEL_DIRECTORY = path.resolve(__dirname, '..', '..', 'models', 'llama')
 const DEFAULT_TUTOR_INSTRUCTIONS_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'instructions.txt')
+const DEFAULT_TUTOR_GRAMMAR_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'conversation.gbnf')
 const DEFAULT_TUTOR_SYSTEM_PROMPT = [
-  'You are JPLearn Coach, a warm and friendly Japanese tutor and conversation partner.',
-  'Reply directly with your answer only. Do not show reasoning, planning, or system notes.',
+  'You are JPLearn Coach, a warm, encouraging Japanese tutor and conversational partner.',
+  'Reply directly to the user. Do not show reasoning, planning, policy text, or system notes.',
   '',
   'How to talk:',
-  '- Be human and conversational, like a friendly tutor. Keep replies short: 1 to 3 sentences. Never write long essays.',
-  '- Mirror the user\'s language: if they write in Japanese, reply in Japanese; if in English, reply in English. If mixed, follow whichever they used most.',
-  '- When replying in Japanese and a word may be hard, add a tiny gloss in parentheses, e.g. 美味しい (oishii, "tasty"). Do not over-explain.',
+  '- Sound natural and conversational, like a patient coach speaking one-to-one. Keep replies short and focused: 1 to 3 sentences, never more than one short paragraph.',
+  '- Do not use emojis, emoticons, or decorative symbols. Express warmth through words only.',
+  '- Use plain punctuation to avoid mojibake. Prefer ASCII quotes and hyphens over typographic punctuation.',
+  '- Match the user\'s language. If they write in Japanese, reply in Japanese. If they write in English, reply in English. If they mix both, follow the language they used most.',
+  '- If the user is speaking English, stay in English unless they explicitly ask for Japanese translation, pronunciation, or a Japanese example.',
+  '- When replying in Japanese, you may add a tiny gloss for a harder word in parentheses, but do not overload the answer with extra explanation.',
   '',
-  'Helping them learn:',
-  '- If asked a Japanese question (grammar, translation, a word, pronunciation), answer directly and accurately with one short example if helpful.',
-  '- Correct mistakes kindly and briefly, then keep the conversation going.',
-  '- If unsure of the correct Japanese, say so instead of guessing.',
-  '- Do not invent the user\'s progress or personal facts.',
+  'How to teach:',
+  '- Answer the actual question first, then add only the smallest useful explanation or example.',
+  '- For translation requests: give only the Japanese translation, an optional short reading or gloss in parentheses, and stop there. Do not add a grammar lecture unless the user asks for one.',
+  '- For slang, rude, or profane phrase translations requested for language learning, still provide the translation. You may add a brief caution label like "rude" or "very offensive".',
+  '- Do not refuse ordinary translation requests just because wording is impolite. Refuse only requests that clearly ask for real-world harm, threats, or instructions to abuse someone.',
+  '- If the user made a mistake, correct it kindly and briefly, then continue the conversation.',
+  '- If the user asks about grammar, vocabulary, pronunciation, or translation, be precise and practical, still within 1 to 3 sentences.',
+  '- If you are uncertain, say so clearly instead of guessing.',
+  '- Do not invent progress, history, preferences, or other personal facts about the user.',
+  '- When helpful, end with a brief follow-up question to keep the conversation going, but never let it push you past 3 sentences total.',
 ].join('\n')
 
 function resolveBundledLlamaServerPath() {
+  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
   const candidates = [
+    docsDir ? path.join(docsDir, 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-server.exe') : '',
+    resourcesPath ? path.join(resourcesPath, 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-server.exe') : '',
     path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-server.exe'),
     path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'llama-server.exe'),
   ]
-  return candidates.find((candidate) => fs.existsSync(candidate)) || ''
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || ''
+}
+
+function readActiveModelFilename(dir) {
+  try {
+    const raw = fs.readFileSync(path.join(dir, 'active-model.json'), 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.filename === 'string' && parsed.filename) {
+      return parsed.filename
+    }
+  } catch {
+    // No explicit selection recorded; caller falls back to auto-detect.
+  }
+  return null
 }
 
 function resolveBundledModelPath() {
@@ -47,6 +73,19 @@ function resolveBundledModelPath() {
 
   for (const dir of directories) {
     if (!fs.existsSync(dir)) continue
+
+    // Honor an explicit tier selection (Settings > Tutor models) before
+    // falling back to auto-detecting the first .gguf found on disk. Without
+    // this, multiple installed tiers would always resolve to whichever
+    // filename sorts first alphabetically, ignoring the user's choice.
+    const activeFilename = readActiveModelFilename(dir)
+    if (activeFilename) {
+      const activePath = path.join(dir, activeFilename)
+      if (fs.existsSync(activePath)) {
+        return activePath
+      }
+    }
+
     const entries = fs.readdirSync(dir, { withFileTypes: true })
     const models = entries
       .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.gguf'))
@@ -75,6 +114,30 @@ function resolveTutorSystemPrompt() {
     }
   }
   return DEFAULT_TUTOR_SYSTEM_PROMPT
+}
+
+function resolveTutorGrammarPath() {
+  const envValue = typeof process.env.JPLEARN_TUTOR_GRAMMAR_FILE === 'string'
+    ? process.env.JPLEARN_TUTOR_GRAMMAR_FILE.trim()
+    : ''
+  const envDisable = typeof process.env.JPLEARN_TUTOR_DISABLE_GRAMMAR === 'string'
+    && ['1', 'true', 'yes', 'on'].includes(process.env.JPLEARN_TUTOR_DISABLE_GRAMMAR.trim().toLowerCase())
+
+  if (envDisable) {
+    return ''
+  }
+
+  if (envValue) {
+    if (['0', 'false', 'none', 'off', 'disable', 'disabled'].includes(envValue.toLowerCase())) {
+      return ''
+    }
+    const explicitPath = path.isAbsolute(envValue)
+      ? envValue
+      : path.resolve(process.cwd(), envValue)
+    return fs.existsSync(explicitPath) ? explicitPath : ''
+  }
+
+  return fs.existsSync(DEFAULT_TUTOR_GRAMMAR_PATH) ? DEFAULT_TUTOR_GRAMMAR_PATH : ''
 }
 
 class InferenceAbortError extends Error {
@@ -231,6 +294,18 @@ function stripThinkTags(rawText) {
     .trim()
 }
 
+function normalizeMojibakePunctuation(rawText) {
+  // Restrict normalization to known CP1252/UTF-8 mojibake punctuation fragments.
+  // Do not apply broad re-decoding so Japanese text remains intact.
+  return String(rawText || '')
+    .replace(/â€”|â€“/g, '-')
+    .replace(/â€˜|â€™/g, "'")
+    .replace(/â€œ|â€\u009d/g, '"')
+    .replace(/â€¦/g, '...')
+    .replace(/Â\s/g, ' ')
+    .replace(/Â([,.;:!?])/g, '$1')
+}
+
 function createLlamaServerAdapter(config = {}) {
   const executablePath = typeof config.executablePath === 'string' ? config.executablePath.trim() : ''
   const modelPath = typeof config.modelPath === 'string' ? config.modelPath.trim() : ''
@@ -299,6 +374,7 @@ function createLlamaServerAdapter(config = {}) {
 
       const configuredPort = Number(process.env.JPLEARN_LLAMA_SERVER_PORT)
       port = Number.isFinite(configuredPort) && configuredPort > 0 ? configuredPort : await findFreePort()
+      const grammarFilePath = resolveTutorGrammarPath()
 
       const args = [
         '-m', modelPath,
@@ -309,6 +385,9 @@ function createLlamaServerAdapter(config = {}) {
         '--no-webui',
         '--chat-template', 'chatml',
       ]
+      if (grammarFilePath) {
+        args.push('--grammar-file', grammarFilePath)
+      }
       serverProcess = spawn(executablePath, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'ignore'] })
       serverProcess.on('error', () => stopServer())
 
@@ -476,7 +555,7 @@ function createTutorChatRuntime(options = {}) {
     : DEFAULT_MAX_PROMPT_CHARS
   const maxOutputTokens = Number.isFinite(options.maxOutputTokens)
     ? Math.max(24, Math.floor(options.maxOutputTokens))
-    : 180
+    : 140
 
   const adapterRegistry = options.adapterRegistry || createAdapterRegistry()
   if (!adapterRegistry.has('llama.cpp')) {
@@ -595,9 +674,10 @@ function createTutorChatRuntime(options = {}) {
         if (typeof inference.model === 'string') {
           activeModel = inference.model
         }
+        const cleanedText = normalizeMojibakePunctuation(String(inference.text || ''))
         return {
           ok: true,
-          text: clipText(String(inference.text || ''), maxOutputChars),
+          text: clipText(cleanedText, maxOutputChars),
           provider: String(inference.provider || 'unknown'),
           model: String(inference.model || 'unknown'),
           coldStart,
@@ -613,7 +693,7 @@ function createTutorChatRuntime(options = {}) {
         const fallback = buildScriptedFallbackResponse(trimmedMessage, boundedContext, detail)
         return {
           ok: true,
-          text: clipText(fallback.text, maxOutputChars),
+          text: clipText(normalizeMojibakePunctuation(fallback.text), maxOutputChars),
           provider: fallback.provider,
           model: fallback.model,
           coldStart,

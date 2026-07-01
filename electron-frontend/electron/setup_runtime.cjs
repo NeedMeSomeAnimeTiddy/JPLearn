@@ -2,8 +2,9 @@
  * setup_runtime.cjs — first-run setup wizard backend.
  *
  * Provides system detection, model downloads (with redirect handling and .tmp
- * safety), and VOICEVOX installation via the existing get_voicevox.py script.
- * All downloads target Documents\JPLearn\ so they survive uninstall/reinstall.
+ * safety), llama.cpp installation, and VOICEVOX installation via the existing
+ * get_voicevox.py script. All downloads target Documents\JPLearn\ so they
+ * survive uninstall/reinstall.
  */
 
 const fs = require('node:fs')
@@ -11,7 +12,7 @@ const https = require('node:https')
 const http = require('node:http')
 const os = require('node:os')
 const path = require('node:path')
-const { spawn } = require('node:child_process')
+const { spawn, spawnSync } = require('node:child_process')
 const NetworkSpeed = require('network-speed')
 
 // ── Model catalogue ──────────────────────────────────────────────────────────
@@ -42,6 +43,8 @@ const MODELS = {
 
 const RAM_THRESHOLD_GB = 16
 const SENTINEL_NAME = '.setup-done'
+const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
+const LLAMA_CPP_SIZE_MB = 250
 const VOICEVOX_SIZE_MB = 1000
 const FONTS_SIZE_MB = 100
 const SPEED_TEST_TIMEOUT_MS = 12000
@@ -50,6 +53,12 @@ const SPEED_TEST_TARGETS = [
   { url: 'https://proof.ovh.net/files/100Mb.dat', bytes: 20971520 },
 ]
 const networkSpeed = new NetworkSpeed()
+const LLAMA_BACKEND_LABELS = {
+  cuda: 'CUDA (NVIDIA)',
+  hip: 'ROCm/HIP (AMD)',
+  vulkan: 'Vulkan',
+  cpu: 'CPU',
+}
 
 // ── Path helpers ─────────────────────────────────────────────────────────────
 
@@ -67,10 +76,21 @@ function getJPLearnDir() {
 
 function ensureJPLearnDirs() {
   const base = getJPLearnDir()
-  for (const sub of ['models', 'voicevox', 'data', 'fonts']) {
+  for (const sub of ['models', 'voicevox', 'data', 'fonts', 'tools']) {
     fs.mkdirSync(path.join(base, sub), { recursive: true })
   }
   return base
+}
+
+function resolvePythonCommand(scriptRoot) {
+  const resourcesPath = (process.resourcesPath || '').trim()
+  if (resourcesPath) {
+    const bundled = path.join(resourcesPath, 'python-bundle', 'python', 'python.exe')
+    if (fs.existsSync(bundled)) return bundled
+  }
+  const venvWin = path.join(scriptRoot, '.venv', 'Scripts', 'python.exe')
+  if (fs.existsSync(venvWin)) return venvWin
+  return 'python'
 }
 
 // ── System info ──────────────────────────────────────────────────────────────
@@ -133,12 +153,73 @@ function estimateDownloadMinutes(sizeMb, networkMbps) {
   return Math.max(1, Math.round(minutes))
 }
 
+function detectGpuNames() {
+  if (process.platform !== 'win32') {
+    return []
+  }
+  try {
+    const result = spawnSync(
+      'powershell',
+      ['-NoProfile', '-Command', '(Get-CimInstance Win32_VideoController).Name'],
+      { encoding: 'utf8', windowsHide: true, timeout: 10000 },
+    )
+    if (result.status !== 0 || !result.stdout) {
+      return []
+    }
+    return result.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+function hasNvidiaDriver() {
+  if (process.platform !== 'win32') {
+    return false
+  }
+  try {
+    const result = spawnSync('nvidia-smi', ['-L'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 5000,
+    })
+    return result.status === 0
+  } catch {
+    return false
+  }
+}
+
+function detectLlamaBackend(gpuNames) {
+  const forced = String(process.env.JPLEARN_LLAMA_BACKEND || '').trim().toLowerCase()
+  if (forced === 'cuda' || forced === 'hip' || forced === 'vulkan' || forced === 'cpu') {
+    return forced
+  }
+
+  const names = gpuNames.join(' ').toLowerCase()
+  if (names.includes('nvidia') && hasNvidiaDriver()) {
+    return 'cuda'
+  }
+  if (names.includes('amd') || names.includes('radeon')) {
+    return 'hip'
+  }
+  if (names.includes('intel') || names.includes('arc')) {
+    return 'vulkan'
+  }
+  return 'cpu'
+}
+
 async function getSystemInfo() {
   const base = ensureJPLearnDirs()
   const totalRamGb = os.totalmem() / (1024 ** 3)
   const recommendedTier = totalRamGb >= RAM_THRESHOLD_GB ? 'high' : 'low'
   const modelsDir = path.join(base, 'models')
+  const llamaCppDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
   const voicevoxInstalled = fs.existsSync(path.join(base, 'voicevox', 'run.exe'))
+  const llamaCppInstalled = fs.existsSync(path.join(llamaCppDir, 'llama-server.exe'))
+  const gpuAdapters = detectGpuNames()
+  const llamaCppBackend = detectLlamaBackend(gpuAdapters)
   const networkMbpsRaw = await measureNetworkMbps()
   const networkMbps = typeof networkMbpsRaw === 'number' && Number.isFinite(networkMbpsRaw)
     ? Math.round(networkMbpsRaw * 10) / 10
@@ -165,11 +246,17 @@ async function getSystemInfo() {
   return {
     totalRamGb: Math.round(totalRamGb * 10) / 10,
     recommendedTier,
+    activeModelTier: resolveActiveTier(base, modelsDir),
     models,
+    llamaCppInstalled,
+    gpuAdapters,
+    llamaCppBackend,
+    llamaCppBackendLabel: LLAMA_BACKEND_LABELS[llamaCppBackend] || LLAMA_BACKEND_LABELS.cpu,
     voicevoxInstalled,
     fontsInstalled,
     isPackaged,
     networkMbps,
+    llamaCppEstimatedDownloadMinutes: estimateDownloadMinutes(LLAMA_CPP_SIZE_MB, networkMbps),
     voicevoxEstimatedDownloadMinutes: estimateDownloadMinutes(VOICEVOX_SIZE_MB, networkMbps),
     fontsEstimatedDownloadMinutes: estimateDownloadMinutes(FONTS_SIZE_MB, networkMbps),
   }
@@ -177,6 +264,74 @@ async function getSystemInfo() {
 function isFirstRun() {
   const sentinel = path.join(getJPLearnDir(), 'models', SENTINEL_NAME)
   return !fs.existsSync(sentinel)
+}
+
+// ── Active model selection ───────────────────────────────────────────────────
+// The active tier is persisted as the exact filename llm_runtime.cjs should
+// load, so both sides agree without either needing to know the other's tier
+// catalogue. If no selection has been made (or the selected file was removed),
+// callers fall back to the first installed tier in catalogue order.
+
+function getActiveModelStatePath(base) {
+  return path.join(base, 'models', ACTIVE_MODEL_STATE_FILENAME)
+}
+
+function readActiveModelSelection(base) {
+  try {
+    const raw = fs.readFileSync(getActiveModelStatePath(base), 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.filename === 'string' && typeof parsed.tier === 'string') {
+      return parsed
+    }
+  } catch {
+    // No selection yet, or the file is unreadable; caller falls back to auto-detect.
+  }
+  return null
+}
+
+function resolveActiveTier(base, modelsDir) {
+  const selection = readActiveModelSelection(base)
+  if (selection && fs.existsSync(path.join(modelsDir, selection.filename))) {
+    return selection.tier
+  }
+  for (const [tier, model] of Object.entries(MODELS)) {
+    if (fs.existsSync(path.join(modelsDir, model.filename))) {
+      return tier
+    }
+  }
+  return null
+}
+
+function setActiveModelTier(tier) {
+  const model = MODELS[tier]
+  if (!model) throw new Error(`Unknown model tier: ${tier}`)
+  const base = ensureJPLearnDirs()
+  const modelsDir = path.join(base, 'models')
+  if (!fs.existsSync(path.join(modelsDir, model.filename))) {
+    throw new Error(`Model tier "${tier}" is not installed`)
+  }
+  fs.writeFileSync(
+    getActiveModelStatePath(base),
+    JSON.stringify({ tier, filename: model.filename, updatedAtUtc: new Date().toISOString() }, null, 2),
+    'utf8',
+  )
+  return { ok: true, tier }
+}
+
+function uninstallModel(tier) {
+  const model = MODELS[tier]
+  if (!model) throw new Error(`Unknown model tier: ${tier}`)
+  const base = ensureJPLearnDirs()
+  const modelsDir = path.join(base, 'models')
+  const modelPath = path.join(modelsDir, model.filename)
+  if (fs.existsSync(modelPath)) {
+    fs.unlinkSync(modelPath)
+  }
+  const selection = readActiveModelSelection(base)
+  if (selection && selection.filename === model.filename) {
+    try { fs.unlinkSync(getActiveModelStatePath(base)) } catch { /* ignore */ }
+  }
+  return { ok: true, tier }
 }
 
 function writeSentinel() {
@@ -308,6 +463,70 @@ function downloadModel(tier, sender) {
   return downloadWithProgress(url, destPath, onProgress)
 }
 
+function downloadLlamaCpp(sender, scriptRoot) {
+  const base = ensureJPLearnDirs()
+  const llamaDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
+  const llamaBackend = detectLlamaBackend(detectGpuNames())
+
+  if (fs.existsSync(path.join(llamaDir, 'llama-server.exe'))) {
+    return Promise.resolve({ alreadyInstalled: true })
+  }
+
+  const scriptPath = path.join(scriptRoot, 'scripts', 'get_llama_cpp.py')
+  const pythonCmd = resolvePythonCommand(scriptRoot)
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonCmd, [scriptPath], {
+      env: {
+        ...process.env,
+        JPLEARN_DOCUMENTS_DIR: base,
+        JPLEARN_LLAMA_BACKEND: llamaBackend,
+      },
+      windowsHide: true,
+    })
+
+    let totalMb = null
+
+    const emitProgress = (percent, doneMb) => {
+      if (sender && !sender.isDestroyed()) {
+        sender.send('setup:download-progress', {
+          id: 'llama',
+          percent,
+          mb: doneMb,
+          totalMb,
+          etaSec: null,
+        })
+      }
+    }
+
+    child.stdout.on('data', (chunk) => {
+      const text = chunk.toString()
+      const foundMatch = text.match(/Found:[^(]+\((\d+) MB\)/i)
+      if (foundMatch) {
+        totalMb = parseInt(foundMatch[1], 10)
+      }
+
+      const progressMatch = text.match(/downloading:\s*(\d{1,3})%\s*\((\d+) MB\)/i)
+      if (progressMatch) {
+        const percent = Math.max(0, Math.min(100, parseInt(progressMatch[1], 10)))
+        const doneMb = parseInt(progressMatch[2], 10)
+        emitProgress(percent, doneMb)
+      }
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        emitProgress(100, totalMb)
+        resolve({ ok: true })
+      } else {
+        reject(new Error(`get_llama_cpp.py exited with code ${code}`))
+      }
+    })
+
+    child.on('error', reject)
+  })
+}
+
 function downloadVoicevox(sender, scriptRoot) {
   const base = ensureJPLearnDirs()
   const voicevoxDir = path.join(base, 'voicevox')
@@ -317,11 +536,7 @@ function downloadVoicevox(sender, scriptRoot) {
   }
 
   const scriptPath = path.join(scriptRoot, 'scripts', 'get_voicevox.py')
-  const pythonCmd = (() => {
-    const venvWin = path.join(scriptRoot, '.venv', 'Scripts', 'python.exe')
-    if (fs.existsSync(venvWin)) return venvWin
-    return 'python'
-  })()
+  const pythonCmd = resolvePythonCommand(scriptRoot)
 
   return new Promise((resolve, reject) => {
     const child = spawn(pythonCmd, [scriptPath], {
@@ -465,9 +680,12 @@ function createSetupRuntime() {
     writeSentinel,
     ensureJPLearnDirs,
     downloadModel,
+    downloadLlamaCpp,
     downloadVoicevox,
     downloadFonts,
     createShortcuts,
+    setActiveModelTier,
+    uninstallModel,
   }
 }
 

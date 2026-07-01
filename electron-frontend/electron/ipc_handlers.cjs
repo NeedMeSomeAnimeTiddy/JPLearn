@@ -700,10 +700,58 @@ function registerIpcHandlers(options) {
         throw new Error('Invalid model tier')
       }
       try {
-        return await setupRuntime.downloadModel(tier, event.sender)
+        const result = await setupRuntime.downloadModel(tier, event.sender)
+        if (!result?.alreadyInstalled && typeof options.refreshTutorChatRuntime === 'function') {
+          await options.refreshTutorChatRuntime()
+        }
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Model download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:set-active-model', async (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['low', 'high', 'ultra'].includes(tier)) {
+        throw new Error('Invalid model tier')
+      }
+      try {
+        const result = setupRuntime.setActiveModelTier(tier)
+        if (typeof options.refreshTutorChatRuntime === 'function') {
+          await options.refreshTutorChatRuntime()
+        }
+        return result
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to select model: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:uninstall-model', async (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['low', 'high', 'ultra'].includes(tier)) {
+        throw new Error('Invalid model tier')
+      }
+      try {
+        const result = setupRuntime.uninstallModel(tier)
+        if (typeof options.refreshTutorChatRuntime === 'function') {
+          await options.refreshTutorChatRuntime()
+        }
+        return result
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to uninstall model: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:download-llama', async (event) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      try {
+        return await setupRuntime.downloadLlamaCpp(event.sender, options.repoRoot)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`llama.cpp download failed: ${detail}`)
       }
     })
 
@@ -736,9 +784,12 @@ function registerIpcHandlers(options) {
       })
     })
 
-    options.ipcMain.handle('setup:complete', (event) => {
+    options.ipcMain.handle('setup:complete', async (event) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       setupRuntime.writeSentinel()
+      if (typeof options.refreshTutorChatRuntime === 'function') {
+        await options.refreshTutorChatRuntime()
+      }
       return { ok: true }
     })
 
