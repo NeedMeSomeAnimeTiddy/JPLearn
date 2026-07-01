@@ -58,7 +58,7 @@ function getJPLearnDir() {
 
 function ensureJPLearnDirs() {
   const base = getJPLearnDir()
-  for (const sub of ['models', 'voicevox', 'data']) {
+  for (const sub of ['models', 'voicevox', 'data', 'fonts']) {
     fs.mkdirSync(path.join(base, sub), { recursive: true })
   }
   return base
@@ -72,6 +72,14 @@ function getSystemInfo() {
   const recommendedTier = totalRamGb >= RAM_THRESHOLD_GB ? 'high' : 'low'
   const modelsDir = path.join(base, 'models')
   const voicevoxInstalled = fs.existsSync(path.join(base, 'voicevox', 'run.exe'))
+
+  const fontsDir = path.join(base, 'fonts')
+  const fontsInstalled = fs.existsSync(fontsDir) && (() => {
+    try { return fs.readdirSync(fontsDir).some((f) => fs.statSync(path.join(fontsDir, f)).isDirectory()) } catch { return false }
+  })()
+
+  let isPackaged = false
+  try { isPackaged = require('electron').app.isPackaged } catch { /* dev mode */ }
 
   const models = Object.entries(MODELS).map(([tier, m]) => ({
     tier,
@@ -87,6 +95,8 @@ function getSystemInfo() {
     recommendedTier,
     models,
     voicevoxInstalled,
+    fontsInstalled,
+    isPackaged,
   }
 }
 
@@ -269,7 +279,93 @@ function downloadVoicevox(sender, scriptRoot) {
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────
+function downloadFonts(sender, scriptRoot) {
+  const base = ensureJPLearnDirs()
+  const scriptPath = path.join(scriptRoot, 'scripts', 'get_fonts.py')
 
+  const pythonCmd = (() => {
+    const resourcesPath = (process.resourcesPath || '').trim()
+    if (resourcesPath) {
+      const bundled = path.join(resourcesPath, 'python-bundle', 'python', 'python.exe')
+      if (fs.existsSync(bundled)) return bundled
+    }
+    const venvWin = path.join(scriptRoot, '.venv', 'Scripts', 'python.exe')
+    if (fs.existsSync(venvWin)) return venvWin
+    return 'python'
+  })()
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonCmd, [scriptPath], {
+      env: { ...process.env, JPLEARN_DOCUMENTS_DIR: base },
+      windowsHide: true,
+    })
+
+    const TOTAL_FAMILIES = 8
+    let completed = 0
+
+    child.stdout.on('data', (chunk) => {
+      const text = chunk.toString()
+      // Each completed weight prints "N woff2 files — family/weight.css"
+      const matches = (text.match(/woff2 files —/g) || []).length
+      if (matches > 0) {
+        completed += matches
+        const pct = Math.min(99, Math.round((completed / (TOTAL_FAMILIES * 2.5)) * 100))
+        if (sender && !sender.isDestroyed()) {
+          sender.send('setup:download-progress', { id: 'fonts', percent: pct, mb: null, totalMb: 100, etaSec: null })
+        }
+      }
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        if (sender && !sender.isDestroyed()) {
+          sender.send('setup:download-progress', { id: 'fonts', percent: 100, mb: null, totalMb: 100, etaSec: null })
+        }
+        resolve({ ok: true })
+      } else {
+        reject(new Error(`get_fonts.py exited with code ${code}`))
+      }
+    })
+
+    child.on('error', reject)
+  })
+}
+
+function createShortcuts({ desktop, startMenu }) {
+  let electronApp, shell
+  try {
+    const electron = require('electron')
+    electronApp = electron.app
+    shell = electron.shell
+  } catch {
+    return { ok: false, reason: 'electron not available' }
+  }
+
+  if (!electronApp.isPackaged) {
+    return { ok: true, skipped: true }
+  }
+
+  const execPath = process.execPath
+  const shortcutConfig = {
+    target: execPath,
+    description: 'JPLearn — Japanese Learning App',
+    icon: execPath,
+    iconIndex: 0,
+  }
+  const results = {}
+
+  if (desktop) {
+    const dest = path.join(os.homedir(), 'Desktop', 'JPLearn.lnk')
+    try { results.desktop = shell.writeShortcutLink(dest, 'create', shortcutConfig) } catch { results.desktop = false }
+  }
+  if (startMenu) {
+    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
+    const dest = path.join(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'JPLearn.lnk')
+    try { results.startMenu = shell.writeShortcutLink(dest, 'create', shortcutConfig) } catch { results.startMenu = false }
+  }
+
+  return { ok: true, ...results }
+}
 function createSetupRuntime() {
   return {
     getSystemInfo,
@@ -278,6 +374,8 @@ function createSetupRuntime() {
     ensureJPLearnDirs,
     downloadModel,
     downloadVoicevox,
+    downloadFonts,
+    createShortcuts,
   }
 }
 

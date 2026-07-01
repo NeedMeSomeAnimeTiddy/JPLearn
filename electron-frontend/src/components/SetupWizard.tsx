@@ -17,10 +17,12 @@ interface SystemInfo {
   recommendedTier: 'low' | 'high'
   models: ModelOption[]
   voicevoxInstalled: boolean
+  fontsInstalled: boolean
+  isPackaged: boolean
 }
 
 interface ProgressEvent {
-  id: 'model' | 'voicevox'
+  id: 'model' | 'voicevox' | 'fonts'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -59,6 +61,10 @@ export function SetupWizard({ onComplete }: Props) {
   const [modelMb, setModelMb] = useState<{ done: number; total: number } | null>(null)
   const [voicevoxMb, setVoicevoxMb] = useState<number | null>(null)
   const [modelEta, setModelEta] = useState<number | null>(null)
+  const [installFonts, setInstallFonts] = useState(true)
+  const [fontsProgress, setFontsProgress] = useState(0)
+  const [createDesktop, setCreateDesktop] = useState(true)
+  const [createStartMenu, setCreateStartMenu] = useState(true)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const [downloadDone, setDownloadDone] = useState(false)
   const unsubRef = useRef<(() => void) | null>(null)
@@ -70,8 +76,9 @@ export function SetupWizard({ onComplete }: Props) {
       setSysInfo(info)
       setSelectedTier(info.recommendedTier)
       if (info.voicevoxInstalled) setInstallVoicevox(false)
+      if (info.fontsInstalled) setInstallFonts(false)
     }).catch(() => {
-      setSysInfo({ totalRamGb: 0, recommendedTier: 'low', models: [], voicevoxInstalled: false })
+      setSysInfo({ totalRamGb: 0, recommendedTier: 'low', models: [], voicevoxInstalled: false, fontsInstalled: false, isPackaged: false })
       setSelectedTier('low')
     })
   }, [page, sysInfo])
@@ -90,6 +97,8 @@ export function SetupWizard({ onComplete }: Props) {
       } else if (evt.id === 'voicevox') {
         setVoicevoxProgress(evt.percent)
         if (evt.totalMb !== null) setVoicevoxMb(evt.totalMb)
+      } else if (evt.id === 'fonts') {
+        setFontsProgress(evt.percent)
       }
     })
     unsubRef.current = unsub
@@ -108,6 +117,10 @@ export function SetupWizard({ onComplete }: Props) {
       if (installVoicevox) {
         await api.downloadVoicevox?.()
       }
+      if (installFonts && !sysInfo?.fontsInstalled) {
+        await api.downloadFonts?.()
+      }
+      await api.createShortcuts?.({ desktop: createDesktop, startMenu: createStartMenu })
       await api.completeSetup?.()
       setDownloadDone(true)
       setPage(7)
@@ -252,12 +265,31 @@ export function SetupWizard({ onComplete }: Props) {
             Voice playback will be unavailable. Install later: <code>python scripts/get_voicevox.py</code>
           </p>
         )}
+
+        {/* ── Japanese Fonts ── */}
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Japanese Fonts (optional)</p>
+          <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
+            Custom display fonts for a better look. Without them the app uses system fonts
+            (e.g. Yu Gothic on Windows), which work fine.
+          </p>
+          {sysInfo?.fontsInstalled ? (
+            <p style={{ color: 'var(--accent, #7eb8ea)', fontSize: '0.9rem' }}>✓ Fonts are already installed.</p>
+          ) : (
+            <CheckboxOption
+              label="Download Japanese fonts (~100 MB)"
+              checked={installFonts}
+              onChange={setInstallFonts}
+            />
+          )}
+        </div>
       </PageLayout>
     ),
 
     5: (() => {
       const needsModel = selectedTier && selectedTier !== 'skip' && !sysInfo?.models.find(m => m.tier === selectedTier)?.installed
       const needsVoice = installVoicevox && !sysInfo?.voicevoxInstalled
+      const needsFonts = installFonts && !sysInfo?.fontsInstalled
       const modelInfo = sysInfo?.models.find(m => m.tier === selectedTier)
       return (
         <PageLayout
@@ -265,7 +297,7 @@ export function SetupWizard({ onComplete }: Props) {
           subtitle="Review what will be downloaded, then click Start Setup."
           onNext={startDownloads}
           onBack={() => setPage(4)}
-          nextLabel={needsModel || needsVoice ? 'Start Setup' : 'Finish'}
+          nextLabel={needsModel || needsVoice || needsFonts ? 'Start Setup' : 'Finish'}
         >
           {needsModel && modelInfo && (
             <SummaryRow label="AI Tutor model" detail={`${modelInfo.label} — ${formatSize(modelInfo.sizeMb)}`} />
@@ -273,8 +305,20 @@ export function SetupWizard({ onComplete }: Props) {
           {needsVoice && (
             <SummaryRow label="Japanese voice (VOICEVOX)" detail="~1 GB" />
           )}
-          {!needsModel && !needsVoice && (
+          {needsFonts && (
+            <SummaryRow label="Japanese fonts" detail="~100 MB" />
+          )}
+          {!needsModel && !needsVoice && !needsFonts && (
             <p style={{ opacity: 0.7 }}>Nothing to download — all selected components are already installed.</p>
+          )}
+          {sysInfo?.isPackaged && (
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <p style={{ fontWeight: 600, margin: '0 0 0.5rem', fontSize: '0.9rem' }}>Shortcuts</p>
+              <CheckboxOption label="Create desktop shortcut" checked={createDesktop} onChange={setCreateDesktop} />
+              <div style={{ marginTop: '0.4rem' }}>
+                <CheckboxOption label="Add to Start Menu" checked={createStartMenu} onChange={setCreateStartMenu} />
+              </div>
+            </div>
           )}
           <p style={{ opacity: 0.55, fontSize: '0.85rem', marginTop: '1.25rem', lineHeight: 1.5 }}>
             ℹ Your downloads and progress are saved to <strong>Documents\JPLearn\</strong> — they will
@@ -304,6 +348,9 @@ export function SetupWizard({ onComplete }: Props) {
             value={voicevoxProgress}
             label={`Japanese voice${voicevoxMb ? ` (/ ${voicevoxMb} MB)` : ''}`}
           />
+        )}
+        {installFonts && !sysInfo?.fontsInstalled && (
+          <ProgressBar value={fontsProgress} label="Japanese fonts" />
         )}
         {downloadError && (
           <p style={{ color: '#ff7b7b', marginTop: '1rem', lineHeight: 1.5 }}>

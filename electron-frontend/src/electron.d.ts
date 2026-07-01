@@ -405,6 +405,8 @@ interface DesktopApi {
   completeSetup?: () => Promise<{ ok: boolean }>
   skipSetup?: () => Promise<{ ok: boolean }>
   onSetupProgress?: (listener: (evt: SetupProgressEvent) => void) => () => void
+  downloadFonts?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  createShortcuts?: (opts: { desktop?: boolean; startMenu?: boolean }) => Promise<{ ok: boolean }>
 }
 
 interface OnboardingCompletionPayload {
@@ -427,10 +429,12 @@ interface SetupSystemInfo {
   recommendedTier: 'low' | 'high'
   models: SetupModelOption[]
   voicevoxInstalled: boolean
+  fontsInstalled: boolean
+  isPackaged: boolean
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'voicevox'
+  id: 'model' | 'voicevox' | 'fonts'
   percent: number
   mb: number | null
   totalMb: number | null

@@ -717,6 +717,25 @@ function registerIpcHandlers(options) {
       }
     })
 
+    options.ipcMain.handle('setup:download-fonts', async (event) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      try {
+        return await setupRuntime.downloadFonts(event.sender, options.repoRoot)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Font download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:create-shortcuts', (event, opts) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      const safeOpts = opts && typeof opts === 'object' ? opts : {}
+      return setupRuntime.createShortcuts({
+        desktop: Boolean(safeOpts.desktop),
+        startMenu: Boolean(safeOpts.startMenu),
+      })
+    })
+
     options.ipcMain.handle('setup:complete', (event) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       setupRuntime.writeSentinel()

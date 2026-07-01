@@ -2,6 +2,7 @@
   "name": "electron-frontend",
   "private": true,
   "version": "0.1.0-beta",
+  "productName": "JPLearn",
   "description": "JPLearn desktop frontend built with Electron, React, and TypeScript.",
   "author": "Robbie",
   "type": "module",
