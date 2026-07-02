@@ -154,6 +154,29 @@ describe('llm runtime', () => {
     expect(response.text).toBe('トイレ (といれ)')
   })
 
+  it('uses local glossary for profane single-word translation requests', async () => {
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer() {
+          throw new Error('infer should not be called for local glossary hits')
+        },
+      }),
+    })
+
+    const response = await runtime.sendMessage('How do you say "shit" in Japanese?')
+    expect(response.ok).toBe(true)
+    expect(response.provider).toBe('local-translation-glossary')
+    expect(response.model).toBe('builtin-glossary')
+    expect(response.text).toBe('くそ')
+  })
+
   it('falls back to adapter inference when dictionary has no match', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',

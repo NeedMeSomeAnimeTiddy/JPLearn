@@ -56,6 +56,13 @@ const DEFAULT_MODEL_DIRECTORY = path.resolve(__dirname, '..', '..', 'models', 'l
 const DEFAULT_ADAPTER_MANIFEST_FILENAME = 'adapter-manifest.json'
 const DEFAULT_TUTOR_INSTRUCTIONS_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'instructions.txt')
 const DEFAULT_TUTOR_GRAMMAR_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'conversation.gbnf')
+const BUILTIN_TRANSLATION_GLOSSARY = {
+  shit: { japanese: 'くそ', reading: '', gloss: 'shit (rude interjection)', source: 'builtin-glossary' },
+  fuck: { japanese: 'くそ', reading: '', gloss: 'fuck (very rude interjection)', source: 'builtin-glossary' },
+  damn: { japanese: 'ちくしょう', reading: '', gloss: 'damn (rude interjection)', source: 'builtin-glossary' },
+  bitch: { japanese: 'クソ女', reading: 'くそおんな', gloss: 'bitch (very rude insult)', source: 'builtin-glossary' },
+  asshole: { japanese: 'クソ野郎', reading: 'くそやろう', gloss: 'asshole (very rude insult)', source: 'builtin-glossary' },
+}
 const DEFAULT_TUTOR_SYSTEM_PROMPT = [
   'You are JPLearn Coach, a warm, encouraging Japanese tutor and conversational partner.',
   'Reply directly to the user. Do not show reasoning, planning, policy text, or system notes.',
@@ -701,6 +708,18 @@ function formatDictionaryTranslation(entry) {
     ? ` (${entry.reading})`
     : ''
   return `${entry.japanese}${reading}`
+}
+
+function resolveBuiltinTranslationEntry(target) {
+  const key = normalizeAsciiToken(target)
+  if (!key) {
+    return null
+  }
+  const hit = BUILTIN_TRANSLATION_GLOSSARY[key]
+  if (!hit) {
+    return null
+  }
+  return normalizeDictionaryEntry(hit)
 }
 
 function extractFirstJmdictGloss(rawEntry) {
@@ -1436,6 +1455,18 @@ function createTutorChatRuntime(options = {}) {
       const trimmedMessage = clipText(message, maxMessageChars)
       const translationTarget = extractTranslationTarget(trimmedMessage)
       if (translationTarget) {
+        const builtinHit = resolveBuiltinTranslationEntry(translationTarget)
+        if (builtinHit) {
+          return {
+            ok: true,
+            text: clipText(formatDictionaryTranslation(builtinHit), maxOutputChars),
+            provider: 'local-translation-glossary',
+            model: 'builtin-glossary',
+            coldStart: false,
+            elapsedMs: 0,
+          }
+        }
+
         const dictionaryHit = await resolveDictionaryEntry(translationTarget)
         if (dictionaryHit) {
           const dictionaryText = formatDictionaryTranslation(dictionaryHit)
