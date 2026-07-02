@@ -2942,6 +2942,8 @@ function App() {
       tier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
       filename: string
       sizeMb: number
+      embedderSizeMb?: number
+      combinedSizeMb?: number
       label: string
       description: string
       installed: boolean
@@ -3335,6 +3337,18 @@ function App() {
     }
     return `${Math.round(sizeMb)} MB`
   }, [])
+
+  // Chatbot tier cards show combined footprint (chatbot + its hidden, auto-installed
+  // embedder) so the displayed size matches what setup actually downloads.
+  const formatCombinedModelSize = useCallback((sizeMb: number, embedderSizeMb?: number) => {
+    if (!Number.isFinite(sizeMb)) {
+      return '—'
+    }
+    if (!embedderSizeMb || !Number.isFinite(embedderSizeMb) || embedderSizeMb <= 0) {
+      return formatModelSize(sizeMb)
+    }
+    return `${formatModelSize(sizeMb)} + ${formatModelSize(embedderSizeMb)}`
+  }, [formatModelSize])
 
   const formatMinutes = useCallback((minutes?: number | null) => {
     if (!Number.isFinite(minutes ?? Number.NaN) || !minutes || minutes <= 0) {
@@ -8277,7 +8291,7 @@ function App() {
                                 {badges ? ` · ${badges}` : ''}
                               </p>
                               <p className="settings-help" style={{ marginTop: '0.25rem' }}>
-                                {formatModelSize(model.sizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
+                                {formatCombinedModelSize(model.sizeMb, model.embedderSizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
                               </p>
                               <p className="settings-help" style={{ marginTop: '0.2rem' }}>
                                 {model.installed ? 'Installed' : model.description}

@@ -46,6 +46,41 @@ const MODELS = {
     label: 'Ultra (9B)',
     description: 'Most capable. Best with 12+ GB VRAM and 32 GB RAM.',
   },
+  max: {
+    filename: 'gemma-4-12b-it-Q6_K.gguf',
+    repo: 'unsloth/gemma-4-12b-it-GGUF',
+    sizeMb: 9790,
+    label: 'Max (12B)',
+    description: 'Largest and highest-capacity option. Best when hardware is strong.',
+  },
+}
+
+// Local retrieval embedder catalogue. Not exposed as a separate choice in
+// Setup — each chatbot tier below silently installs its mapped embedder in
+// the background (see CHATBOT_TIER_TO_EMBEDDER_TIER and downloadModel()).
+const EMBEDDERS = {
+  e5_small: {
+    repo: 'intfloat/multilingual-e5-small',
+    sizeMb: 470,
+    label: 'Embedder Small',
+  },
+  e5_base: {
+    repo: 'intfloat/multilingual-e5-base',
+    sizeMb: 1090,
+    label: 'Embedder Base',
+  },
+  e5_large: {
+    repo: 'intfloat/multilingual-e5-large',
+    sizeMb: 2240,
+    label: 'Embedder Large',
+  },
+}
+const CHATBOT_TIER_TO_EMBEDDER_TIER = {
+  low: 'e5_small',
+  medium: 'e5_base',
+  high: 'e5_base',
+  ultra: 'e5_large',
+  max: 'e5_large',
 }
 const SENTINEL_NAME = '.setup-done'
 const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
@@ -172,6 +207,82 @@ function getOfflineDictionarySqlitePath(base) {
 
 function isOfflineDictionaryInstalled(base) {
   return fs.existsSync(getOfflineDictionarySqlitePath(base))
+}
+
+// ── Embedder install state (hidden — installed alongside chatbot tiers) ─────
+
+function getEmbedderDir(base, embedderTier) {
+  return path.join(base, 'models', 'embedders', embedderTier)
+}
+
+function isEmbedderInstalled(base, embedderTier) {
+  return fs.existsSync(path.join(getEmbedderDir(base, embedderTier), '.embedder-ready'))
+}
+
+function isEmbedderTierStillNeeded(base, embedderTier, excludeChatbotTier) {
+  const modelsDir = path.join(base, 'models')
+  return Object.entries(MODELS).some(([chatbotTier, model]) => {
+    if (chatbotTier === excludeChatbotTier) return false
+    if (CHATBOT_TIER_TO_EMBEDDER_TIER[chatbotTier] !== embedderTier) return false
+    return fs.existsSync(path.join(modelsDir, model.filename))
+  })
+}
+
+/**
+ * Ensures the embedder mapped to a chatbot tier is installed, downloading it
+ * in the background if needed. Best-effort: failures are logged but do not
+ * fail the caller's chatbot install/select flow.
+ */
+function ensureEmbedderInstalled(embedderTier, sender, scriptRoot) {
+  const embedder = EMBEDDERS[embedderTier]
+  if (!embedder) return Promise.resolve({ ok: false, reason: `Unknown embedder tier: ${embedderTier}` })
+
+  const base = ensureJPLearnDirs()
+  if (isEmbedderInstalled(base, embedderTier)) {
+    return Promise.resolve({ alreadyInstalled: true })
+  }
+
+  const scriptPath = path.join(scriptRoot, 'scripts', 'get_embedder_model.py')
+  const pythonCmd = resolvePythonCommand(scriptRoot)
+
+  return new Promise((resolve) => {
+    const child = spawn(pythonCmd, [scriptPath, '--tier', embedderTier], {
+      env: { ...process.env, JPLEARN_DOCUMENTS_DIR: base },
+      windowsHide: true,
+    })
+
+    let currentPct = 0
+    const emitProgress = () => {
+      if (sender && !sender.isDestroyed()) {
+        sender.send('setup:download-progress', { id: 'embedder', percent: currentPct, mb: null, totalMb: null, etaSec: null })
+      }
+    }
+
+    child.stdout.on('data', (chunk) => {
+      const text = chunk.toString()
+      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*\((\d+) MB\)/i)
+      if (pctMatch) {
+        currentPct = Math.max(0, Math.min(99, parseInt(pctMatch[1], 10)))
+        emitProgress()
+      }
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        currentPct = 100
+        emitProgress()
+        resolve({ ok: true })
+      } else {
+        console.error(`get_embedder_model.py (${embedderTier}) exited with code ${code}`)
+        resolve({ ok: false, reason: `exit code ${code}` })
+      }
+    })
+
+    child.on('error', (err) => {
+      console.error(`get_embedder_model.py (${embedderTier}) failed to start: ${err.message}`)
+      resolve({ ok: false, reason: err.message })
+    })
+  })
 }
 
 function getSpeechModelDir(base, tier) {
@@ -441,15 +552,23 @@ async function getSystemInfo() {
   let isPackaged = false
   try { isPackaged = require('electron').app.isPackaged } catch { /* dev mode */ }
 
-  const models = Object.entries(MODELS).map(([tier, m]) => ({
-    tier,
-    filename: m.filename,
-    sizeMb: m.sizeMb,
-    label: m.label,
-    description: m.description,
-    installed: fs.existsSync(path.join(modelsDir, m.filename)),
-    estimatedDownloadMinutes: estimateDownloadMinutes(m.sizeMb, networkMbps),
-  }))
+  const models = Object.entries(MODELS).map(([tier, m]) => {
+    const embedderTier = CHATBOT_TIER_TO_EMBEDDER_TIER[tier]
+    const embedder = embedderTier ? EMBEDDERS[embedderTier] : null
+    const embedderSizeMb = embedder ? embedder.sizeMb : 0
+    const combinedSizeMb = m.sizeMb + embedderSizeMb
+    return {
+      tier,
+      filename: m.filename,
+      sizeMb: m.sizeMb,
+      embedderSizeMb,
+      combinedSizeMb,
+      label: m.label,
+      description: m.description,
+      installed: fs.existsSync(path.join(modelsDir, m.filename)),
+      estimatedDownloadMinutes: estimateDownloadMinutes(combinedSizeMb, networkMbps),
+    }
+  })
 
   return {
     totalRamGb: Math.round(totalRamGb * 10) / 10,
@@ -545,6 +664,17 @@ function uninstallModel(tier) {
   if (selection && selection.filename === model.filename) {
     try { fs.unlinkSync(getActiveModelStatePath(base)) } catch { /* ignore */ }
   }
+
+  // Clean up the mapped embedder only if no other installed chatbot tier
+  // still depends on it (embedders can be shared across tiers).
+  const embedderTier = CHATBOT_TIER_TO_EMBEDDER_TIER[tier]
+  if (embedderTier && !isEmbedderTierStillNeeded(base, embedderTier, tier)) {
+    const embedderDir = getEmbedderDir(base, embedderTier)
+    if (fs.existsSync(embedderDir)) {
+      try { fs.rmSync(embedderDir, { recursive: true, force: true }) } catch { /* best effort */ }
+    }
+  }
+
   return { ok: true, tier }
 }
 
@@ -637,15 +767,25 @@ function downloadWithProgress(url, destPath, onProgress) {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-function downloadModel(tier, sender) {
+function downloadModel(tier, sender, scriptRoot) {
   const model = MODELS[tier]
   if (!model) return Promise.reject(new Error(`Unknown model tier: ${tier}`))
 
   const base = ensureJPLearnDirs()
   const destPath = path.join(base, 'models', model.filename)
+  const embedderTier = CHATBOT_TIER_TO_EMBEDDER_TIER[tier]
+
+  const ensureEmbedder = async () => {
+    if (!embedderTier || !scriptRoot) return
+    try {
+      await ensureEmbedderInstalled(embedderTier, sender, scriptRoot)
+    } catch (err) {
+      console.error(`Embedder install failed for chatbot tier "${tier}": ${err instanceof Error ? err.message : err}`)
+    }
+  }
 
   if (fs.existsSync(destPath)) {
-    return Promise.resolve({ alreadyInstalled: true })
+    return ensureEmbedder().then(() => ({ alreadyInstalled: true }))
   }
 
   const url = `https://huggingface.co/${model.repo}/resolve/main/${model.filename}`
@@ -674,7 +814,10 @@ function downloadModel(tier, sender) {
     }
   }
 
-  return downloadWithProgress(url, destPath, onProgress)
+  return downloadWithProgress(url, destPath, onProgress).then(async () => {
+    await ensureEmbedder()
+    return { ok: true }
+  })
 }
 
 function downloadLlamaCpp(sender, scriptRoot, requestedBackend) {

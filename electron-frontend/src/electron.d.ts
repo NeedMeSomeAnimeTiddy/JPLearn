@@ -445,6 +445,8 @@ interface SetupModelOption {
   tier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
   filename: string
   sizeMb: number
+  embedderSizeMb?: number
+  combinedSizeMb?: number
   label: string
   description: string
   installed: boolean

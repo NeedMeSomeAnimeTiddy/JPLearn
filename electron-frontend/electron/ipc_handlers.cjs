@@ -752,7 +752,7 @@ function registerIpcHandlers(options) {
         throw new Error('Invalid model tier')
       }
       try {
-        const result = await setupRuntime.downloadModel(tier, event.sender)
+        const result = await setupRuntime.downloadModel(tier, event.sender, options.repoRoot)
         if (!result?.alreadyInstalled && typeof options.refreshTutorChatRuntime === 'function') {
           await options.refreshTutorChatRuntime()
         }
