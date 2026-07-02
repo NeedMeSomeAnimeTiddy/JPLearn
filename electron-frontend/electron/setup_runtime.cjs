@@ -688,78 +688,188 @@ function writeSentinel() {
 
 // ── Download helpers ─────────────────────────────────────────────────────────
 
+// Number of parallel TCP connections used when the server supports Range requests.
+// CDNs (HuggingFace/S3/Cloudflare) throttle individual connections; 8 parallel
+// connections saturates the available bandwidth on fast lines.
+const PARALLEL_CONNECTIONS = 8
+
 /**
- * Download url → destPath, following HTTP redirects.
- * Writes to destPath + '.tmp' first; renames to destPath only on 100% success.
- * Node's https.get does not follow redirects automatically.
+ * Follow all HTTP redirects for url, sending Range: bytes=0-0 on the final hop
+ * to detect range-request support and the total file size in one round trip.
+ */
+function probeUrl(url) {
+  return new Promise((resolve, reject) => {
+    function follow(redirectUrl, hops) {
+      if (hops > 8) { reject(new Error('Too many redirects')); return }
+      const mod = redirectUrl.startsWith('https') ? https : http
+      const req = mod.get(redirectUrl, {
+        headers: { 'User-Agent': 'JPLearn/1.0', 'Range': 'bytes=0-0' },
+      }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume()
+          follow(res.headers.location, hops + 1)
+          return
+        }
+        res.resume() // drain the 1-byte probe body
+        const supportsRanges = res.statusCode === 206
+        let total = 0
+        if (supportsRanges && res.headers['content-range']) {
+          const m = res.headers['content-range'].match(/\/(\d+)$/)
+          if (m) total = parseInt(m[1], 10)
+        } else {
+          total = parseInt(res.headers['content-length'] || '0', 10)
+        }
+        resolve({ finalUrl: redirectUrl, total, supportsRanges })
+      })
+      req.on('error', reject)
+    }
+    follow(url, 0)
+  })
+}
+
+/**
+ * Download a single byte range [start, end] from finalUrl to partPath.
+ * Calls onBytes(n) for each received chunk for aggregate progress tracking.
+ */
+function downloadRange(finalUrl, start, end, partPath, onBytes) {
+  return new Promise((resolve, reject) => {
+    const mod = finalUrl.startsWith('https') ? https : http
+    const out = fs.createWriteStream(partPath)
+    const req = mod.get(finalUrl, {
+      headers: { 'User-Agent': 'JPLearn/1.0', 'Range': `bytes=${start}-${end}` },
+    }, (res) => {
+      if (res.statusCode !== 206 && res.statusCode !== 200) {
+        out.destroy()
+        try { fs.unlinkSync(partPath) } catch { /* ignore */ }
+        reject(new Error(`HTTP ${res.statusCode} for range ${start}-${end}`))
+        return
+      }
+      res.on('data', (chunk) => onBytes(chunk.length))
+      res.pipe(out)
+      out.on('finish', resolve)
+      const cleanup = (err) => {
+        out.destroy()
+        try { fs.unlinkSync(partPath) } catch { /* ignore */ }
+        reject(err)
+      }
+      out.on('error', cleanup)
+      res.on('error', cleanup)
+    })
+    req.on('error', (err) => {
+      out.destroy()
+      try { fs.unlinkSync(partPath) } catch { /* ignore */ }
+      reject(err)
+    })
+  })
+}
+
+/**
+ * Stream-assemble ordered part files into tmpPath, then atomically rename to destPath.
+ * Each part file is deleted immediately after its bytes are written.
+ */
+function assembleParts(parts, tmpPath, destPath) {
+  return new Promise((resolve, reject) => {
+    const out = fs.createWriteStream(tmpPath)
+    let i = 0
+
+    const writeNext = () => {
+      if (i >= parts.length) { out.end(); return }
+      const { partPath } = parts[i++]
+      const src = fs.createReadStream(partPath)
+      src.pipe(out, { end: false })
+      src.on('end', () => { try { fs.unlinkSync(partPath) } catch { /* ignore */ } writeNext() })
+      src.on('error', (err) => { out.destroy(); reject(err) })
+    }
+
+    out.on('finish', () => {
+      try { fs.renameSync(tmpPath, destPath); resolve() }
+      catch (err) { try { fs.unlinkSync(tmpPath) } catch { /* ignore */ } reject(err) }
+    })
+    out.on('error', reject)
+    writeNext()
+  })
+}
+
+/**
+ * Single-connection fallback for servers that do not support Range requests.
+ */
+function singleConnectionDownload(finalUrl, tmpPath, knownTotal, onProgress) {
+  return new Promise((resolve, reject) => {
+    const mod = finalUrl.startsWith('https') ? https : http
+    const req = mod.get(finalUrl, { headers: { 'User-Agent': 'JPLearn/1.0' } }, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode} downloading ${finalUrl}`))
+        return
+      }
+      const total = knownTotal || parseInt(res.headers['content-length'] || '0', 10)
+      let done = 0
+      let lastReportedPct = -1
+      const out = fs.createWriteStream(tmpPath)
+      res.on('data', (chunk) => {
+        done += chunk.length
+        if (total > 0 && onProgress) {
+          const pct = Math.round((done / total) * 100)
+          if (pct !== lastReportedPct) { lastReportedPct = pct; onProgress(done, total) }
+        }
+      })
+      res.pipe(out)
+      out.on('finish', resolve)
+      const cleanup = (err) => { try { fs.unlinkSync(tmpPath) } catch { /* ignore */ } reject(err) }
+      out.on('error', cleanup)
+      res.on('error', cleanup)
+    })
+    req.on('error', (err) => { try { fs.unlinkSync(tmpPath) } catch { /* ignore */ } reject(err) })
+  })
+}
+
+/**
+ * Download url → destPath using parallel Range requests for maximum throughput.
+ * Probes the final CDN URL first; falls back to a single connection if the server
+ * does not support Range headers. Writes .tmp and .partN files during download;
+ * atomically renames to destPath only on full success.
  */
 function downloadWithProgress(url, destPath, onProgress) {
   const tmpPath = `${destPath}.tmp`
 
   return new Promise((resolve, reject) => {
-    // Remove any leftover partial file from a previous attempt
     try { fs.unlinkSync(tmpPath) } catch { /* ignore */ }
 
-    function follow(redirectUrl, hops) {
-      if (hops > 8) {
-        reject(new Error('Too many redirects'))
+    probeUrl(url).then(({ finalUrl, total, supportsRanges }) => {
+      if (!supportsRanges || total === 0) {
+        singleConnectionDownload(finalUrl, tmpPath, total, onProgress)
+          .then(() => { fs.renameSync(tmpPath, destPath); resolve() })
+          .catch(reject)
         return
       }
-      const mod = redirectUrl.startsWith('https') ? https : http
-      const req = mod.get(redirectUrl, { headers: { 'User-Agent': 'JPLearn/1.0' } }, (res) => {
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          req.destroy()
-          follow(res.headers.location, hops + 1)
-          return
+
+      const chunkSize = Math.ceil(total / PARALLEL_CONNECTIONS)
+      const parts = Array.from({ length: PARALLEL_CONNECTIONS }, (_, i) => ({
+        start: i * chunkSize,
+        end: Math.min((i + 1) * chunkSize - 1, total - 1),
+        partPath: `${destPath}.part${i}`,
+      }))
+      parts.forEach(({ partPath }) => { try { fs.unlinkSync(partPath) } catch { /* ignore */ } })
+
+      let done = 0
+      let lastReportedPct = -1
+      const onBytes = (n) => {
+        done += n
+        if (total > 0 && onProgress) {
+          const pct = Math.round((done / total) * 100)
+          if (pct !== lastReportedPct) { lastReportedPct = pct; onProgress(done, total) }
         }
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode} downloading ${redirectUrl}`))
-          return
-        }
-        const total = parseInt(res.headers['content-length'] || '0', 10)
-        let done = 0
-        let lastReportedPct = -1
+      }
 
-        const out = fs.createWriteStream(tmpPath)
-
-        res.on('data', (chunk) => {
-          done += chunk.length
-          if (total > 0 && onProgress) {
-            const pct = Math.round((done / total) * 100)
-            // Throttle to avoid flooding the IPC channel
-            if (pct !== lastReportedPct) {
-              lastReportedPct = pct
-              onProgress(done, total)
-            }
-          }
-        })
-
-        res.pipe(out)
-
-        out.on('finish', () => {
-          try {
-            fs.renameSync(tmpPath, destPath)
-            resolve()
-          } catch (err) {
-            try { fs.unlinkSync(tmpPath) } catch { /* ignore */ }
-            reject(err)
-          }
-        })
-
-        const cleanup = (err) => {
+      Promise.all(parts.map(({ start, end, partPath }) =>
+        downloadRange(finalUrl, start, end, partPath, onBytes)
+      ))
+        .then(() => assembleParts(parts, tmpPath, destPath).then(resolve).catch(reject))
+        .catch((err) => {
+          parts.forEach(({ partPath }) => { try { fs.unlinkSync(partPath) } catch { /* ignore */ } })
           try { fs.unlinkSync(tmpPath) } catch { /* ignore */ }
           reject(err)
-        }
-        out.on('error', cleanup)
-        res.on('error', cleanup)
-      })
-      req.on('error', (err) => {
-        try { fs.unlinkSync(tmpPath) } catch { /* ignore */ }
-        reject(err)
-      })
-    }
-
-    follow(url, 0)
+        })
+    }).catch(reject)
   })
 }
 

@@ -34,10 +34,12 @@ TARGET_DIR = TARGET_ROOT / "tools" / "llama.cpp" / "build" / "bin" / "Release"
 API_URL = "https://api.github.com/repos/ggerganov/llama.cpp/releases/latest"
 
 
-def report(done: int, total: int) -> None:
-    if total > 0:
-        pct = done * 100 // total
-        sys.stdout.write(f"\rdownloading: {pct:3d}%  ({done // (1024 * 1024)} MB)")
+def report(done: int, total: int, offset: int = 0, grand_total: int = 0) -> None:
+    effective_total = grand_total if grand_total > 0 else total
+    effective_done = done + offset
+    if effective_total > 0:
+        pct = effective_done * 100 // effective_total
+        sys.stdout.write(f"\rdownloading: {pct:3d}%  ({effective_done // (1024 * 1024)} MB)")
         sys.stdout.flush()
 
 
@@ -140,7 +142,7 @@ def find_cudart_asset(assets: list[dict], cuda_asset_name: str) -> dict | None:
     return None
 
 
-def download(url: str, destination: Path) -> None:
+def download(url: str, destination: Path, offset: int = 0, grand_total: int = 0) -> None:
     req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
     with urllib.request.urlopen(req) as response:
         total = int(response.headers.get("Content-Length") or 0)
@@ -152,7 +154,7 @@ def download(url: str, destination: Path) -> None:
                     break
                 handle.write(chunk)
                 done += len(chunk)
-                report(done, total)
+                report(done, total, offset, grand_total)
     sys.stdout.write("\n")
 
 
@@ -196,9 +198,17 @@ def main() -> int:
         return 1
 
     name: str = asset["name"]
-    size_mb = asset["size"] // (1024 * 1024)
     url: str = asset["browser_download_url"]
-    print(f"Found: {name}  ({size_mb} MB)  release {tag}")
+
+    # Resolve the CUDA runtime asset now so we can compute the grand total
+    # before any downloading begins, giving the progress display a stable total.
+    cudart_asset = find_cudart_asset(assets, name) if backend == "cuda" else None
+    if backend == "cuda" and cudart_asset is None:
+        print("Warning: no matching CUDA runtime DLL package found; llama-server.exe may fail to start.", file=sys.stderr)
+
+    grand_total_bytes = asset["size"] + (cudart_asset["size"] if cudart_asset else 0)
+    grand_total_mb = grand_total_bytes // (1024 * 1024)
+    print(f"Found: {name}  ({grand_total_mb} MB)  release {tag}")
 
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
     zip_path = TARGET_DIR / name
@@ -206,7 +216,7 @@ def main() -> int:
     if not zip_path.exists():
         print(f"Downloading to {zip_path} ...")
         try:
-            download(url, zip_path)
+            download(url, zip_path, offset=0, grand_total=grand_total_bytes)
         except Exception as exc:
             zip_path.unlink(missing_ok=True)
             print(f"\nDownload failed: {exc}", file=sys.stderr)
@@ -221,29 +231,24 @@ def main() -> int:
         print(f"Extraction failed: {exc}", file=sys.stderr)
         return 1
 
-    if backend == "cuda":
-        cudart_asset = find_cudart_asset(assets, name)
-        if cudart_asset is None:
-            print("Warning: no matching CUDA runtime DLL package found; llama-server.exe may fail to start.", file=sys.stderr)
-        else:
-            cudart_name = cudart_asset["name"]
-            cudart_url = cudart_asset["browser_download_url"]
-            cudart_zip_path = TARGET_DIR / cudart_name
-            print(f"Found CUDA runtime package: {cudart_name}")
-            if not cudart_zip_path.exists():
-                print(f"Downloading to {cudart_zip_path} ...")
-                try:
-                    download(cudart_url, cudart_zip_path)
-                except Exception as exc:
-                    cudart_zip_path.unlink(missing_ok=True)
-                    print(f"\nCUDA runtime download failed: {exc}", file=sys.stderr)
-                    return 1
-            print(f"Extracting CUDA runtime to {TARGET_DIR} ...")
+    if cudart_asset is not None:
+        cudart_name = cudart_asset["name"]
+        cudart_url = cudart_asset["browser_download_url"]
+        cudart_zip_path = TARGET_DIR / cudart_name
+        print(f"Downloading CUDA runtime package: {cudart_name}")
+        if not cudart_zip_path.exists():
             try:
-                extract_flat(cudart_zip_path, TARGET_DIR)
+                download(cudart_url, cudart_zip_path, offset=asset["size"], grand_total=grand_total_bytes)
             except Exception as exc:
-                print(f"CUDA runtime extraction failed: {exc}", file=sys.stderr)
+                cudart_zip_path.unlink(missing_ok=True)
+                print(f"\nCUDA runtime download failed: {exc}", file=sys.stderr)
                 return 1
+        print(f"Extracting CUDA runtime to {TARGET_DIR} ...")
+        try:
+            extract_flat(cudart_zip_path, TARGET_DIR)
+        except Exception as exc:
+            print(f"CUDA runtime extraction failed: {exc}", file=sys.stderr)
+            return 1
 
     server_exe = TARGET_DIR / "llama-server.exe"
     if server_exe.exists():

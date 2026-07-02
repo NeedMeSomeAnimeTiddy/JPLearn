@@ -470,6 +470,18 @@ export function SetupWizard({ onComplete }: Props) {
   const startDownloads = useCallback(async () => {
     setDownloadError(null)
     setProgressLogs([])
+    setModelProgress(0)
+    setModelMb(null)
+    setModelEta(null)
+    setLlamaProgress(0)
+    setLlamaMb(null)
+    setVoicevoxProgress(0)
+    setVoicevoxMb(null)
+    setFontsProgress(0)
+    setFontsFiles(null)
+    setFontsMb(null)
+    setDictionaryProgress(0)
+    setSpeechProgress(0)
     appendProgressLog('Starting setup tasks…')
     setPage(7)
 
@@ -962,17 +974,16 @@ export function SetupWizard({ onComplete }: Props) {
           <ProgressBar value={speechProgress} label="Speech recognition model" />
         )}
         {downloadError && (
-          <p style={{ color: '#ff7b7b', marginTop: '1rem', lineHeight: 1.5 }}>
-            Download error: {downloadError}
-            <br />
+          <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.35)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+            <span style={{ color: '#ff7b7b', lineHeight: 1.5, fontSize: '0.88rem', minWidth: 0 }}>Download failed: {downloadError}</span>
             <button
               type="button"
-              onClick={() => { setDownloadError(null); void startDownloads() }}
-              style={btnStyle('secondary')}
+              onClick={() => { void startDownloads() }}
+              style={{ ...btnStyle('secondary'), flexShrink: 0 }}
             >
               Retry
             </button>
-          </p>
+          </div>
         )}
 
         <div style={{ marginTop: '0.75rem', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
