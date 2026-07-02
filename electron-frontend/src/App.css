@@ -9176,152 +9176,304 @@ html[data-reduced-motion='true'] *::after {
 
 /* ── Learning Path Panel ────────────────────────────────────────── */
 .learning-path-panel {
-  padding: 9px 12px;
+  padding: 8px 12px 10px;
   border-radius: 14px;
   margin-bottom: 7px;
+  position: relative;
+  overflow: hidden;
+}
+
+.learning-path-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--accent) 9%, transparent), transparent 55%),
+    radial-gradient(90% 90% at 100% 100%, color-mix(in oklab, var(--tone-teal) 7%, transparent), transparent 50%);
 }
 
 .lpp-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+  display: block;
+  align-items: center;
+  margin-bottom: 6px;
+  position: relative;
+  min-height: 30px;
+  padding-right: 2px;
 }
 
 .lpp-title-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  text-align: center;
+  width: max-content;
+  max-width: calc(100% - 78px);
+  line-height: 1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.lpp-title-group .hero-kicker {
+  margin: 0;
+  line-height: 1;
+}
+
+.lpp-title-group .lpp-path-name {
+  margin-top: 1px;
 }
 
 .lpp-path-name {
-  font-size: 0.96rem;
+  font-size: 0.92rem;
   font-weight: 800;
-  color: var(--text-main);
-}
-
-.lpp-change-btn {
-  font-size: 0.74rem;
-  color: var(--text-soft);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: color 140ms ease;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.lpp-change-btn:hover { color: var(--text-main); }
-
-.lpp-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.lpp-step {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 8px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  transition: background 140ms ease;
-}
-
-.lpp-step--done {
-  opacity: 0.56;
-}
-
-.lpp-step--active {
-  background: color-mix(in oklab, var(--accent) 10%, var(--panel-bg));
-  border-color: color-mix(in oklab, var(--accent) 32%, var(--panel-border));
-}
-
-.lpp-step-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1px solid var(--panel-border);
-  color: var(--text-soft);
-  flex-shrink: 0;
-}
-
-.lpp-step--active .lpp-step-icon {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: color-mix(in oklab, var(--accent) 14%, transparent);
-}
-
-.lpp-step--done .lpp-step-icon {
-  border-color: color-mix(in oklab, var(--tone-teal) 45%, var(--panel-border));
-  color: color-mix(in oklab, var(--tone-teal) 65%, var(--text-soft));
-  background: color-mix(in oklab, var(--tone-teal) 10%, transparent);
-}
-
-.lpp-step-content {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-
-.lpp-step-label {
-  font-size: 0.82rem;
-  font-weight: 600;
   color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.lpp-step--done .lpp-step-label {
-  color: var(--text-soft);
+.lpp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
-.lpp-step-pct {
-  font-size: 0.78rem;
-  color: var(--text-soft);
-  font-variant-numeric: tabular-nums;
+.lpp-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
 }
 
 .lpp-continue-btn {
-  flex-shrink: 0;
-  padding: 3px 10px;
-  font-size: 0.76rem;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 18%, transparent) inset;
 }
 
-.lpp-step-badge {
-  flex-shrink: 0;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.lpp-change-btn {
   color: var(--text-soft);
-  border: 1px solid color-mix(in oklab, var(--panel-border) 70%, transparent);
+  background: color-mix(in oklab, var(--panel-bg) 82%, transparent);
+  border: 1px solid color-mix(in oklab, var(--panel-border) 72%, transparent);
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+.lpp-change-btn:hover {
+  color: var(--text-main);
+  background: color-mix(in oklab, var(--panel-bg) 72%, var(--accent) 8%);
+}
+
+.lpp-change-btn svg,
+.lpp-continue-btn svg {
+  display: block;
+}
+
+/* Horizontal stepper track */
+.lpp-track {
+  list-style: none;
+  margin: 0;
+  padding: 2px 4px 0;
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+}
+
+.lpp-stop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+/* Connector line between stops */
+.lpp-stop + .lpp-stop::before {
+  content: '';
+  position: absolute;
+  top: 19px;
+  right: calc(50% + 22px);
+  left: calc(-50% + 22px);
+  height: 2px;
   border-radius: 999px;
-  padding: 2px 7px;
+  background: color-mix(in oklab, var(--panel-border) 80%, transparent);
 }
 
-.lpp-step-badge--challenging {
-  color: color-mix(in oklab, var(--tone-amber) 72%, var(--text-soft));
-  border-color: color-mix(in oklab, var(--tone-amber) 38%, var(--panel-border));
+/* Filled connector once the previous step is complete */
+.lpp-stop + .lpp-stop--reached::before {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--tone-teal) 62%, var(--panel-border)),
+    color-mix(in oklab, var(--accent) 55%, var(--panel-border))
+  );
 }
 
-.lpp-step-badge--advanced {
-  color: color-mix(in oklab, var(--tone-rose) 65%, var(--text-soft));
-  border-color: color-mix(in oklab, var(--tone-rose) 35%, var(--panel-border));
+.lpp-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 50%;
+}
+
+button.lpp-node { cursor: pointer; }
+
+/* Mastery ring: conic progress around the glyph */
+.lpp-node-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding: 3px;
+  background:
+    conic-gradient(
+      color-mix(in oklab, var(--accent) 78%, var(--tone-teal))
+        var(--lpp-pct, 0%),
+      color-mix(in oklab, var(--panel-border) 85%, transparent) 0
+    );
+  transition: transform 160ms ease;
+}
+
+.lpp-node-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--panel-bg) 92%, var(--accent));
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1;
+}
+
+/* Done state: solid teal fill with check badge */
+.lpp-stop--done .lpp-node-ring {
+  background: color-mix(in oklab, var(--tone-teal) 55%, var(--panel-border));
+}
+
+.lpp-stop--done .lpp-node-glyph {
+  background: color-mix(in oklab, var(--tone-teal) 16%, var(--panel-bg));
+  color: color-mix(in oklab, var(--tone-teal) 70%, var(--text-main));
+}
+
+.lpp-node-check {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--tone-teal) 72%, var(--panel-bg));
+  color: var(--panel-bg);
+  border: 2px solid var(--panel-bg);
+}
+
+/* Active state: glow + pulse */
+.lpp-stop--active .lpp-node-ring {
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent),
+    0 0 14px color-mix(in oklab, var(--accent) 30%, transparent);
+  animation: lppPulse 2.4s ease-in-out infinite;
+}
+
+.lpp-stop--active .lpp-node-glyph {
+  background: color-mix(in oklab, var(--accent) 14%, var(--panel-bg));
+}
+
+button.lpp-node:hover .lpp-node-ring {
+  transform: scale(1.08);
+}
+
+@keyframes lppPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent),
+      0 0 14px color-mix(in oklab, var(--accent) 30%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px color-mix(in oklab, var(--accent) 14%, transparent),
+      0 0 20px color-mix(in oklab, var(--accent) 40%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lpp-stop--active .lpp-node-ring { animation: none; }
+}
+
+/* Future states: dimmed */
+.lpp-stop--recommended .lpp-node-ring,
+.lpp-stop--challenging .lpp-node-ring,
+.lpp-stop--advanced .lpp-node-ring {
+  opacity: 0.62;
+}
+
+.lpp-stop--challenging .lpp-node-glyph {
+  color: color-mix(in oklab, var(--tone-amber) 55%, var(--text-soft));
+}
+
+.lpp-stop--advanced .lpp-node-glyph {
+  color: color-mix(in oklab, var(--tone-rose) 50%, var(--text-soft));
+}
+
+.lpp-stop-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-main);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lpp-stop--done .lpp-stop-label,
+.lpp-stop--recommended .lpp-stop-label,
+.lpp-stop--challenging .lpp-stop-label,
+.lpp-stop--advanced .lpp-stop-label {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.lpp-stop--active .lpp-stop-label {
+  color: var(--accent);
+}
+
+.lpp-stop-pct {
+  font-size: 0.62rem;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.lpp-stop--done .lpp-stop-pct {
+  color: color-mix(in oklab, var(--tone-teal) 60%, var(--text-soft));
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
 }
 
 /* ── Onboarding View ────────────────────────────────────────────── */
