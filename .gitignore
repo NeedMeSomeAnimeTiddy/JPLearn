@@ -229,6 +229,7 @@ fonts/
 
 # Local voice asset dumps (user-managed; too large for git)
 voices/**
+voices/**/**
 !voices/.gitkeep
 
 # Local llama.cpp model artifacts

@@ -10,16 +10,42 @@ function sanitizeSpeechText(text) {
   return typeof text === 'string' ? text.replace(/〜/g, '').trim() : ''
 }
 
+function hasOpenVoiceCheckpoints(baseDir) {
+  if (!baseDir) return false
+  return fs.existsSync(path.join(baseDir, 'checkpoints_v2', 'converter', 'checkpoint.pth'))
+    && fs.existsSync(path.join(baseDir, 'checkpoints_v2', 'converter', 'config.json'))
+}
+
+function hasOpenVoiceVoices(baseDir) {
+  if (!baseDir) return false
+  const voiceRoot = path.join(baseDir, 'voices')
+  return loadVoiceProfiles(voiceRoot).length > 0
+}
+
+function pickFirst(candidates, predicate) {
+  for (const candidate of candidates) {
+    if (candidate && predicate(candidate)) {
+      return candidate
+    }
+  }
+  return ''
+}
+
 function resolveOpenVoicePaths(repoRoot) {
   const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
   const installedDir = docsDir ? path.join(docsDir, 'openvoice') : ''
-  const baseDir = installedDir && fs.existsSync(installedDir)
-    ? installedDir
-    : path.join(repoRoot, 'data', 'openvoice')
+  const bundledDir = path.join(repoRoot, 'data', 'openvoice')
+  const candidates = [installedDir, bundledDir].filter(Boolean)
+
+  const voiceBaseDir = pickFirst(candidates, hasOpenVoiceVoices) || candidates[0] || bundledDir
+  const checkpointBaseDir = pickFirst(candidates, hasOpenVoiceCheckpoints) || candidates[0] || bundledDir
+  const baseDir = pickFirst(candidates, (dir) => hasOpenVoiceVoices(dir) && hasOpenVoiceCheckpoints(dir))
+    || checkpointBaseDir
+
   return {
     baseDir,
-    voiceRoot: path.join(baseDir, 'voices'),
-    checkpointRoot: path.join(baseDir, 'checkpoints_v2'),
+    voiceRoot: path.join(voiceBaseDir, 'voices'),
+    checkpointRoot: path.join(checkpointBaseDir, 'checkpoints_v2'),
     scriptPath: path.join(repoRoot, 'scripts', 'openvoice_speak.py'),
     pythonPath: (process.env.OPENVOICE_PYTHON || process.env.JPLEARN_PYTHON || 'python').trim(),
   }

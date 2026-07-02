@@ -8,7 +8,10 @@
 	"baseLanguage": "ja",
 	"description": "Neutral Japanese female reference voice for OpenVoice cloning.",
 	"targetTotalDurationSeconds": 60,
-	"targetClipDurationSeconds": [10, 20],
+	"targetClipDurationSeconds": [
+		10,
+		20
+	],
 	"clipFormat": "wav",
 	"pcmFormat": "pcm_s16le",
 	"channels": 1,
@@ -29,17 +32,3971 @@
 	],
 	"referenceClips": [
 		{
-			"file": "female_aya_ref_01_jp.wav",
+			"file": "aya_ref_jp (1).wav",
 			"language": "ja",
 			"role": "default",
-			"notes": "Primary Japanese reference clip."
+			"notes": "Auto-indexed from folder contents."
 		},
 		{
-			"file": "female_aya_ref_02_en.wav",
+			"file": "aya_ref_jp (10).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (100).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (101).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (102).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (103).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (104).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (105).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (106).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (107).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (108).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (109).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (11).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (110).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (111).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (112).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (113).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (114).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (115).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (116).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (117).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (118).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (119).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (12).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (120).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (121).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (122).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (123).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (124).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (125).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (126).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (127).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (128).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (129).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (13).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (130).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (131).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (132).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (133).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (134).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (135).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (136).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (137).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (138).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (139).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (14).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (140).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (141).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (142).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (143).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (144).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (145).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (146).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (147).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (148).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (149).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (15).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (150).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (151).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (152).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (153).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (154).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (155).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (156).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (157).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (158).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (159).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (16).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (160).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (161).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (162).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (163).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (164).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (165).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (166).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (167).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (168).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (169).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (17).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (170).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (171).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (172).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (173).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (174).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (175).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (176).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (177).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (178).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (179).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (18).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (180).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (181).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (182).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (183).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (184).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (185).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (186).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (187).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (188).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (189).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (19).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (190).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (191).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (192).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (193).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (194).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (195).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (196).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (197).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (198).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (199).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (2).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (20).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (200).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (201).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (202).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (203).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (204).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (205).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (206).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (207).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (208).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (209).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (21).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (210).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (211).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (212).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (213).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (214).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (215).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (216).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (217).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (218).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (219).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (22).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (220).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (221).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (222).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (223).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (224).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (225).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (226).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (227).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (228).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (229).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (23).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (230).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (231).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (232).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (233).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (234).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (235).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (236).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (237).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (238).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (239).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (24).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (240).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (241).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (242).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (243).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (244).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (245).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (246).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (247).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (248).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (249).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (25).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (250).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (251).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (252).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (253).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (254).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (255).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (256).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (257).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (258).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (259).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (26).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (260).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (261).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (262).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (263).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (264).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (265).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (266).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (267).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (268).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (269).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (27).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (270).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (271).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (272).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (273).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (274).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (275).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (276).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (277).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (278).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (279).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (28).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (280).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (281).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (282).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (29).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (3).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (30).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (31).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (32).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (33).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (34).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (35).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (36).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (37).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (38).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (39).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (4).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (40).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (41).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (42).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (43).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (44).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (45).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (46).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (47).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (48).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (49).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (5).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (50).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (51).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (52).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (53).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (54).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (55).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (56).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (57).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (58).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (59).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (6).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (60).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (61).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (62).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (63).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (64).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (65).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (66).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (67).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (68).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (69).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (7).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (70).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (71).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (72).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (73).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (74).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (75).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (76).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (77).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (78).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (79).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (8).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (80).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (81).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (82).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (83).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (84).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (85).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (86).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (87).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (88).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (89).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (9).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (90).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (91).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (92).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (93).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (94).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (95).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (96).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (97).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (98).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_jp (99).wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (1).wav",
 			"language": "en",
 			"role": "alternate",
-			"notes": "English reference clip for bilingual embedding balance."
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (10).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (100).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (101).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (102).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (103).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (104).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (105).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (106).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (107).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (108).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (109).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (11).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (110).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (111).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (112).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (113).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (114).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (115).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (116).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (117).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (118).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (119).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (12).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (120).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (121).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (122).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (123).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (124).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (125).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (126).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (127).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (128).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (129).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (13).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (130).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (131).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (132).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (133).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (134).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (135).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (136).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (137).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (138).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (139).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (14).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (140).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (141).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (142).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (143).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (144).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (145).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (146).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (147).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (148).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (149).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (15).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (150).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (151).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (152).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (153).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (154).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (155).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (156).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (157).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (158).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (159).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (16).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (160).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (161).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (162).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (163).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (164).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (165).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (166).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (167).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (168).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (169).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (17).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (170).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (171).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (172).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (173).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (174).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (175).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (176).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (177).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (178).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (179).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (18).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (180).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (181).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (182).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (183).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (184).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (185).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (186).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (187).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (188).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (189).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (19).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (190).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (191).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (192).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (193).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (194).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (195).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (196).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (197).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (198).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (199).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (2).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (20).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (200).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (201).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (202).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (203).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (204).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (205).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (206).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (207).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (208).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (209).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (21).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (210).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (211).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (212).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (213).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (214).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (215).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (216).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (217).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (218).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (219).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (22).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (220).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (221).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (222).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (223).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (224).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (225).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (226).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (227).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (228).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (229).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (23).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (230).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (231).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (232).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (233).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (234).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (235).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (236).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (237).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (238).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (239).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (24).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (240).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (241).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (242).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (243).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (244).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (245).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (246).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (247).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (248).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (249).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (25).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (250).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (251).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (252).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (253).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (254).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (255).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (256).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (257).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (258).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (259).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (26).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (260).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (261).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (262).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (263).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (264).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (265).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (266).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (267).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (268).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (269).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (27).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (270).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (271).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (272).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (273).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (274).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (275).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (276).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (277).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (278).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (279).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (28).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (280).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (281).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (282).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (283).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (284).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (285).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (286).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (287).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (288).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (289).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (29).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (290).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (291).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (292).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (293).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (294).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (295).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (296).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (297).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (298).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (299).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (3).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (30).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (300).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (301).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (302).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (303).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (304).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (305).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (306).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (307).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (308).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (309).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (31).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (310).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (311).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (312).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (313).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (314).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (315).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (316).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (317).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (318).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (319).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (32).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (320).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (321).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (322).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (323).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (324).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (325).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (326).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (327).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (328).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (329).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (33).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (330).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (331).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (332).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (333).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (334).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (335).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (336).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (337).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (338).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (339).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (34).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (340).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (341).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (342).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (343).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (344).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (345).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (346).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (347).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (348).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (349).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (35).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (350).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (351).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (352).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (353).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (354).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (355).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (356).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (357).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (358).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (359).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (36).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (360).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (361).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (362).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (363).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (364).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (365).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (366).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (367).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (368).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (369).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (37).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (370).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (371).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (372).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (373).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (374).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (375).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (376).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (377).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (378).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (379).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (38).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (39).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (4).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (40).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (41).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (42).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (43).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (44).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (45).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (46).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (47).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (48).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (49).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (5).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (50).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (51).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (52).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (53).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (54).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (55).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (56).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (57).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (58).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (59).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (6).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (60).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (61).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (62).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (63).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (64).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (65).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (66).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (67).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (68).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (69).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (7).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (70).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (71).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (72).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (73).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (74).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (75).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (76).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (77).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (78).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (79).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (8).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (80).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (81).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (82).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (83).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (84).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (85).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (86).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (87).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (88).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (89).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (9).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (90).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (91).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (92).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (93).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (94).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (95).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (96).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (97).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (98).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
+		},
+		{
+			"file": "aya_ref_en (99).wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "Auto-indexed from folder contents."
 		}
 	],
-	"defaultReferenceClip": "female_aya_ref_01_jp.wav"
+	"defaultReferenceClip": "aya_ref_jp (1).wav"
 }
