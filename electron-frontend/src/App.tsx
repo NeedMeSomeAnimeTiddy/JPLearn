@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ChangeEvent } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { LearningPathStatus, SectionReadiness } from './types'
 import { SetupWizard } from './components/SetupWizard'
@@ -232,6 +233,66 @@ interface CustomThemeExportPayload {
   themes: CustomTheme[]
 }
 type SettingsTabKey = 'theme' | 'background' | 'font_size' | 'animations' | 'tutor' | 'voice' | 'shortcuts' | 'data'
+
+interface SettingsCollapsibleSectionProps {
+  id: string
+  title: string
+  description?: string
+  meta?: ReactNode
+  collapsed: boolean
+  onToggle: () => void
+  className?: string
+  actions?: ReactNode
+  children: ReactNode
+}
+
+function SettingsCollapsibleSection({
+  id,
+  title,
+  description,
+  meta,
+  collapsed,
+  onToggle,
+  className,
+  actions,
+  children,
+}: SettingsCollapsibleSectionProps) {
+  const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onToggle()
+    }
+  }, [onToggle])
+
+  return (
+    <section className={`settings-collapsible-card${className ? ` ${className}` : ''}`}>
+      <div
+        className="settings-collapsible-head"
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
+        aria-controls={`${id}-body`}
+        onClick={onToggle}
+        onKeyDown={handleKeyDown}
+      >
+        <div className="settings-collapsible-copy">
+          <p className="settings-collapsible-title">{title}</p>
+          {description ? <p className="settings-collapsible-description">{description}</p> : null}
+          {meta ? <p className="settings-collapsible-meta">{meta}</p> : null}
+        </div>
+        <div className="settings-collapsible-actions">
+          {actions ? <div className="settings-collapsible-action-group">{actions}</div> : null}
+          <span className={`settings-collapsible-chevron${collapsed ? '' : ' is-open'}`} aria-hidden="true">
+            <ChevronDown size={18} strokeWidth={2.25} aria-hidden="true" />
+          </span>
+        </div>
+      </div>
+      <div id={`${id}-body`} className={`settings-collapsible-body${collapsed ? '' : ' is-open'}`}>
+        {!collapsed ? children : null}
+      </div>
+    </section>
+  )
+}
 
 const FEEDBACK_REVEAL_MS = 2100
 const ASSISTANT_EVENT_POLL_MS = 15000
@@ -2891,7 +2952,6 @@ function App() {
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'high' | 'ultra' | null>(null)
   const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
   const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'high' | 'ultra' | null>(null)
-  const [tutorModelsExpanded, setTutorModelsExpanded] = useState(false)
   const [dictionaryDownloading, setDictionaryDownloading] = useState(false)
   const [dictionaryProgress, setDictionaryProgress] = useState<number>(0)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
@@ -2994,7 +3054,7 @@ function App() {
   const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
   const [streakDetailsOpen, setStreakDetailsOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
-  const [collapsedThemeSections, setCollapsedThemeSections] = useState<Partial<Record<string, boolean>>>({})
+  const [collapsedSettingsSections, setCollapsedSettingsSections] = useState<Partial<Record<string, boolean>>>({})
   const [customThemeActionMessage, setCustomThemeActionMessage] = useState<string | null>(null)
   const [themePaletteCache, setThemePaletteCache] = useState<Partial<Record<ThemeKey, ThemePalette>>>({})
   const [backgroundPreviewUrls, setBackgroundPreviewUrls] = useState<Partial<Record<BackgroundStyle, string>>>({})
@@ -3813,7 +3873,7 @@ function App() {
   }, [])
 
   const toggleThemeSectionCollapsed = useCallback((sectionId: string) => {
-    setCollapsedThemeSections((prev) => ({
+    setCollapsedSettingsSections((prev) => ({
       ...prev,
       [sectionId]: !prev[sectionId],
     }))
@@ -7509,7 +7569,7 @@ function App() {
 
                         {THEME_SECTION_DEFINITIONS.map((section) => {
                           const modeOverrides = activeCustomTheme.overridesByMode[settings.themeMode]
-                          const isCollapsed = Boolean(collapsedThemeSections[section.id])
+                          const isCollapsed = Boolean(collapsedSettingsSections[section.id])
                           const overrideCount = section.keys.reduce(
                             (count, key) => count + (modeOverrides[key] ? 1 : 0),
                             0,
@@ -7764,7 +7824,7 @@ function App() {
                   aria-labelledby="settings-tab-animations"
                 >
                   <div className="settings-control-content">
-                    <p className="settings-section-label">Animations</p>
+                    <p className="settings-section-label">Motion Style</p>
                     <div className="settings-animation-grid" role="radiogroup" aria-label="Animation style">
                       {MOTION_STYLE_OPTIONS.map((motionStyle) => (
                         <button
@@ -7788,9 +7848,12 @@ function App() {
                           <span className="settings-icon-entry-label">{MOTION_STYLE_LABEL[motionStyle.key]}</span>
                         </button>
                       ))}
+                    </div>
+                    <div className="settings-theme-card settings-collapsible-card-inline" style={{ marginTop: 10 }}>
+                      <p className="settings-section-label" style={{ marginBottom: 8 }}>Reduce Motion</p>
                       <button
                         type="button"
-                        className={`settings-icon-entry settings-theme-entry ${settings.reducedMotion ? 'is-active' : ''}`}
+                        className={`settings-toggle settings-reduced-motion-toggle ${settings.reducedMotion ? 'is-active' : ''}`}
                         onClick={() => setSettings((prev) => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
                         aria-label={settings.reducedMotion ? 'Reduce motion enabled. Activate to disable.' : 'Reduce motion disabled. Activate to enable.'}
                         aria-pressed={settings.reducedMotion}
@@ -7799,7 +7862,10 @@ function App() {
                         <span className={`settings-mode-icon-button ${settings.reducedMotion ? 'is-enabled' : ''}`} aria-hidden="true">
                           <Activity size={18} strokeWidth={2.25} aria-hidden="true" />
                         </span>
-                        <span className="settings-icon-entry-label">Reduce Motion</span>
+                        <span className="settings-toggle-copy">
+                          <span className="settings-icon-entry-label">Reduce Motion</span>
+                          <span className="settings-note">Minimize movement across the interface.</span>
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -7853,159 +7919,144 @@ function App() {
                 ) : null}
 
                 {activeSettingsTab === 'tutor' ? (
-                <div className="settings-theme-card" style={{ marginTop: '1rem' }}>
-                  <div className="settings-theme-custom-head">
-                    <p className="settings-section-label" style={{ margin: 0 }}>Tutor models</p>
-                    <button
-                      type="button"
-                      className="settings-card-icon-button"
-                      onClick={() => setTutorModelsExpanded((expanded) => !expanded)}
-                      aria-label={tutorModelsExpanded ? 'Collapse tutor models' : 'Expand tutor models'}
-                      aria-expanded={tutorModelsExpanded}
-                      title={tutorModelsExpanded ? 'Collapse tutor models' : 'Expand tutor models'}
-                    >
-                      <ChevronDown size={18} strokeWidth={2.25} aria-hidden="true" style={{ transform: tutorModelsExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }} />
-                    </button>
-                  </div>
-                  <p className="settings-help" style={{ marginTop: '0.35rem' }}>
-                    Download or reinstall the local model tiers used by the Tutor runtime.
-                  </p>
-                  {tutorModelsExpanded ? (
-                    <div style={{ marginTop: '0.9rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
-                        <span className="settings-help">
-                          {tutorInstallInfo?.llamaCppInstalled ? 'llama.cpp installed' : 'llama.cpp not installed'}
-                        </span>
-                        <span className="settings-help">
-                          Recommended tier: <strong style={{ color: 'var(--text-main)' }}>{tutorInstallInfo?.models.find((model) => model.tier === tutorInstallInfo.recommendedTier)?.label ?? '—'}</strong>
-                        </span>
-                      </div>
-                      <div style={{ display: 'grid', gap: '0.65rem' }}>
-                        {(tutorInstallInfo?.models ?? []).map((model) => {
-                          const isDownloadingThis = tutorDownloadingTier === model.tier
-                          const isActioningThis = tutorModelActionTier === model.tier
-                          const isActiveTier = tutorInstallInfo?.activeModelTier === model.tier
-                          const hardwareFit = getTutorModelHardwareFit(model.tier)
-                          const badges = [
-                            model.tier === tutorInstallInfo?.recommendedTier ? 'Recommended' : null,
-                            isActiveTier ? 'Active' : null,
-                            hardwareFit.badge,
-                          ].filter(Boolean).join(' · ')
-                          return (
-                          <div
-                            key={model.tier}
-                            style={{
-                              padding: '0.75rem 0.9rem',
-                              borderRadius: '12px',
-                              background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
-                              border: isActiveTier ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))' : model.tier === tutorInstallInfo?.recommendedTier ? '1px solid color-mix(in oklab, var(--accent) 42%, var(--panel-border))' : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                              <div>
-                                <p style={{ margin: 0, fontWeight: 600 }}>
-                                  {model.label}
-                                  {badges ? ` · ${badges}` : ''}
-                                </p>
-                                <p className="settings-help" style={{ marginTop: '0.25rem' }}>
-                                  {formatModelSize(model.sizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
-                                </p>
-                                <p className="settings-help" style={{ marginTop: '0.2rem' }}>
-                                  {model.installed ? 'Installed' : model.description}
-                                </p>
-                                <p className="settings-help" style={{ marginTop: '0.2rem', color: hardwareFit.isOk ? 'rgba(242, 181, 111, 0.92)' : '#ffb3a7' }}>
-                                  {hardwareFit.detail}
-                                </p>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                {model.installed ? (
-                                  <button
-                                    type="button"
-                                    className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
-                                    onClick={() => { void selectTutorModel(model.tier) }}
-                                    disabled={isActiveTier || tutorModelActionTier !== null || tutorDownloadingTier !== null}
-                                    aria-label={isActiveTier ? `${model.label} is the active Tutor model` : `Use ${model.label} for the Tutor`}
-                                    title={isActiveTier ? 'Currently active' : 'Use this model'}
-                                  >
-                                    {isActiveTier
-                                      ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                                      : <Circle size={18} strokeWidth={2.25} aria-hidden="true" />}
-                                  </button>
-                                ) : null}
+                <SettingsCollapsibleSection
+                  id="tutor-models"
+                  title="Tutor models"
+                  description="Download or reinstall the local model tiers used by the Tutor runtime."
+                  meta={(
+                    <>
+                      {tutorInstallInfo?.llamaCppInstalled ? 'llama.cpp installed' : 'llama.cpp not installed'}
+                      {' '}· Recommended tier: <strong style={{ color: 'var(--text-main)' }}>{tutorInstallInfo?.models.find((model) => model.tier === tutorInstallInfo.recommendedTier)?.label ?? '—'}</strong>
+                    </>
+                  )}
+                  collapsed={Boolean(collapsedSettingsSections['tutor-models'])}
+                  onToggle={() => toggleThemeSectionCollapsed('tutor-models')}
+                  className="settings-theme-card"
+                >
+                  <div style={{ display: 'grid', gap: '0.65rem' }}>
+                    {(tutorInstallInfo?.models ?? []).map((model) => {
+                      const isDownloadingThis = tutorDownloadingTier === model.tier
+                      const isActioningThis = tutorModelActionTier === model.tier
+                      const isActiveTier = tutorInstallInfo?.activeModelTier === model.tier
+                      const hardwareFit = getTutorModelHardwareFit(model.tier)
+                      const badges = [
+                        model.tier === tutorInstallInfo?.recommendedTier ? 'Recommended' : null,
+                        isActiveTier ? 'Active' : null,
+                        hardwareFit.badge,
+                      ].filter(Boolean).join(' · ')
+
+                      return (
+                        <div
+                          key={model.tier}
+                          style={{
+                            padding: '0.75rem 0.9rem',
+                            borderRadius: '12px',
+                            background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
+                            border: isActiveTier
+                              ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
+                              : model.tier === tutorInstallInfo?.recommendedTier
+                                ? '1px solid color-mix(in oklab, var(--accent) 42%, var(--panel-border))'
+                                : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <div>
+                              <p style={{ margin: 0, fontWeight: 600 }}>
+                                {model.label}
+                                {badges ? ` · ${badges}` : ''}
+                              </p>
+                              <p className="settings-help" style={{ marginTop: '0.25rem' }}>
+                                {formatModelSize(model.sizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
+                              </p>
+                              <p className="settings-help" style={{ marginTop: '0.2rem' }}>
+                                {model.installed ? 'Installed' : model.description}
+                              </p>
+                              <p className="settings-help" style={{ marginTop: '0.2rem', color: hardwareFit.isOk ? 'rgba(242, 181, 111, 0.92)' : '#ffb3a7' }}>
+                                {hardwareFit.detail}
+                              </p>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                              {model.installed ? (
                                 <button
                                   type="button"
-                                  className="settings-card-icon-button"
-                                  onClick={() => { void downloadTutorModel(model.tier) }}
-                                  disabled={tutorDownloadingTier !== null || tutorModelActionTier !== null}
-                                  aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
-                                  title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                                  className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
+                                  onClick={() => { void selectTutorModel(model.tier) }}
+                                  disabled={isActiveTier || tutorModelActionTier !== null || tutorDownloadingTier !== null}
+                                  aria-label={isActiveTier ? `${model.label} is the active Tutor model` : `Use ${model.label} for the Tutor`}
+                                  title={isActiveTier ? 'Currently active' : 'Use this model'}
                                 >
-                                  {isDownloadingThis
-                                    ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
-                                    : model.installed
-                                      ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
-                                      : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                  {isActiveTier ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" /> : <Circle size={18} strokeWidth={2.25} aria-hidden="true" />}
                                 </button>
-                                {model.installed ? (
-                                  <button
-                                    type="button"
-                                    className="settings-inline-icon-button"
-                                    onClick={() => { void uninstallTutorModel(model.tier) }}
-                                    disabled={tutorModelActionTier !== null || tutorDownloadingTier !== null}
-                                    aria-label={`Uninstall ${model.label}`}
-                                    title={`Uninstall ${model.label}`}
-                                  >
-                                    {isActioningThis
-                                      ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
-                                      : <Trash2 size={18} strokeWidth={2.25} aria-hidden="true" />}
-                                  </button>
-                                ) : null}
-                              </div>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="settings-card-icon-button"
+                                onClick={() => { void downloadTutorModel(model.tier) }}
+                                disabled={tutorDownloadingTier !== null || tutorModelActionTier !== null}
+                                aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                                title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                              >
+                                {isDownloadingThis
+                                  ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                                  : model.installed
+                                    ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
+                                    : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
+                              </button>
+                              {model.installed ? (
+                                <button
+                                  type="button"
+                                  className="settings-inline-icon-button"
+                                  onClick={() => { void uninstallTutorModel(model.tier) }}
+                                  disabled={tutorModelActionTier !== null || tutorDownloadingTier !== null}
+                                  aria-label={`Uninstall ${model.label}`}
+                                  title={`Uninstall ${model.label}`}
+                                >
+                                  {isActioningThis
+                                    ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                                    : <Trash2 size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                </button>
+                              ) : null}
                             </div>
-                            {isDownloadingThis ? (
-                              <div>
-                                <div className="settings-progress-track">
-                                  <div
-                                    className="settings-progress-fill"
-                                    style={{ width: `${Math.min(100, Math.max(0, tutorDownloadProgress?.percent ?? 0))}%` }}
-                                  />
-                                </div>
-                                <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                  {tutorDownloadProgress?.mb != null && tutorDownloadProgress?.totalMb != null
-                                    ? `${tutorDownloadProgress.mb.toFixed(0)} / ${tutorDownloadProgress.totalMb.toFixed(0)} MB · ${Math.round(tutorDownloadProgress.percent)}%`
-                                    : `Downloading… ${Math.round(tutorDownloadProgress?.percent ?? 0)}%`}
-                                </p>
-                              </div>
-                            ) : null}
                           </div>
-                          )
-                        })}
-                      </div>
-                      <p className="settings-help" style={{ marginTop: '0.75rem' }}>
-                        Select the circle icon to switch the Tutor to that model. Changes apply automatically without restarting the app.
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
+                          {isDownloadingThis ? (
+                            <div>
+                              <div className="settings-progress-track">
+                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, tutorDownloadProgress?.percent ?? 0))}%` }} />
+                              </div>
+                              <p className="settings-help" style={{ marginTop: '0.3rem' }}>
+                                {tutorDownloadProgress?.mb != null && tutorDownloadProgress?.totalMb != null
+                                  ? `${tutorDownloadProgress.mb.toFixed(0)} / ${tutorDownloadProgress.totalMb.toFixed(0)} MB · ${Math.round(tutorDownloadProgress.percent)}%`
+                                  : `Downloading… ${Math.round(tutorDownloadProgress?.percent ?? 0)}%`}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="settings-help" style={{ marginTop: '0.75rem' }}>
+                    Select the circle icon to switch the Tutor to that model. Changes apply automatically without restarting the app.
+                  </p>
+                </SettingsCollapsibleSection>
                 ) : null}
 
                 {activeSettingsTab === 'tutor' ? (
-                <div className="settings-theme-card" style={{ marginTop: '1rem' }}>
-                  <div className="settings-theme-custom-head">
-                    <p className="settings-section-label" style={{ margin: 0 }}>Offline Dictionary</p>
-                  </div>
-                  <p className="settings-help" style={{ marginTop: '0.35rem' }}>
-                    Lets Tutor chat translate Japanese↔English words without an internet connection.
-                    Downloaded from the open-source jmdict-simplified project (~30 MB).
-                  </p>
-                  <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <span className="settings-help">
-                      {tutorInstallInfo?.dictionaryInstalled ? 'Installed' : `Not installed • ${formatMinutes(tutorInstallInfo?.dictionaryEstimatedDownloadMinutes)}`}
-                    </span>
+                <SettingsCollapsibleSection
+                  id="offline-dictionary"
+                  title="Offline Dictionary"
+                  description="Lets Tutor chat translate Japanese↔English words without an internet connection. Downloaded from the open-source jmdict-simplified project (~30 MB)."
+                  meta={tutorInstallInfo?.dictionaryInstalled ? 'Installed' : `Not installed • ${formatMinutes(tutorInstallInfo?.dictionaryEstimatedDownloadMinutes)}`}
+                  collapsed={Boolean(collapsedSettingsSections['offline-dictionary'])}
+                  onToggle={() => toggleThemeSectionCollapsed('offline-dictionary')}
+                  className="settings-theme-card"
+                  actions={(
                     <button
                       type="button"
                       className="settings-card-icon-button"
-                      onClick={() => { void downloadOfflineDictionary() }}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void downloadOfflineDictionary()
+                      }}
                       disabled={dictionaryDownloading || tutorInstallInfo?.dictionaryInstalled}
                       aria-label={tutorInstallInfo?.dictionaryInstalled ? 'Offline dictionary installed' : 'Download offline dictionary'}
                       title={tutorInstallInfo?.dictionaryInstalled ? 'Offline dictionary installed' : 'Download offline dictionary'}
@@ -8016,7 +8067,8 @@ function App() {
                           ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" />
                           : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
                     </button>
-                  </div>
+                  )}
+                >
                   {dictionaryDownloading ? (
                     <div style={{ marginTop: '0.5rem' }}>
                       <div className="settings-progress-track">
@@ -8030,7 +8082,7 @@ function App() {
                       </p>
                     </div>
                   ) : null}
-                </div>
+                </SettingsCollapsibleSection>
                 ) : null}
 
                 {activeSettingsTab === 'voice' ? (
@@ -8086,8 +8138,15 @@ function App() {
                         : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
                       {voiceUnavailable ? ' (Voice engine unavailable right now.)' : ''}
                     </p>
-                    <div style={{ marginTop: '0.85rem' }}>
-                      <p className="settings-small-label" style={{ marginBottom: '0.4rem' }}>English Chat Voice</p>
+                    <SettingsCollapsibleSection
+                      id="english-chat-voice"
+                      title="English Chat Voice"
+                      description="Tutor chat uses VOICEVOX for Japanese. English uses this browser voice."
+                      meta={`Auto (${effectiveEnglishVoiceLabel})`}
+                      collapsed={Boolean(collapsedSettingsSections['english-chat-voice'])}
+                      onToggle={() => toggleThemeSectionCollapsed('english-chat-voice')}
+                      className="settings-theme-card"
+                    >
                       <select
                         className="settings-theme-select"
                         value={settings.englishSpeechVoiceName ?? ''}
@@ -8107,10 +8166,7 @@ function App() {
                           </option>
                         ))}
                       </select>
-                      <p className="settings-help" style={{ marginTop: '0.45rem' }}>
-                        Tutor chat uses VOICEVOX for Japanese. English uses this browser voice.
-                      </p>
-                    </div>
+                    </SettingsCollapsibleSection>
                   </div>
                 </div>
                 ) : null}

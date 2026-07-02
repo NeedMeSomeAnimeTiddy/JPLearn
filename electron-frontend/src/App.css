@@ -7274,6 +7274,108 @@ button {
   background: color-mix(in oklab, var(--panel-bg-alt) 58%, transparent);
 }
 
+.settings-collapsible-card {
+  border: 1px solid color-mix(in oklab, var(--panel-border) 86%, transparent);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--panel-bg-alt) 66%, transparent);
+  overflow: clip;
+}
+
+.settings-collapsible-card.settings-theme-card {
+  padding: 0;
+}
+
+.settings-collapsible-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.settings-collapsible-head:hover {
+  background: color-mix(in oklab, var(--panel-bg) 12%, transparent);
+}
+
+.settings-collapsible-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-collapsible-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.settings-collapsible-description,
+.settings-collapsible-meta {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.settings-collapsible-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.settings-collapsible-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-collapsible-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: transform 180ms ease;
+}
+
+.settings-collapsible-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.settings-collapsible-body {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  padding: 0 14px;
+  transition: max-height 280ms ease, opacity 180ms ease, padding-bottom 180ms ease;
+}
+
+.settings-collapsible-body.is-open {
+  max-height: 4000px;
+  opacity: 1;
+  padding-bottom: 14px;
+}
+
+.settings-reduced-motion-toggle {
+  width: 100%;
+  align-items: center;
+}
+
+.settings-reduced-motion-toggle .settings-toggle-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-reduced-motion-toggle .settings-note {
+  margin: 0;
+}
+
 .settings-theme-card + .settings-theme-card {
   margin-top: 10px;
 }
