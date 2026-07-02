@@ -2845,7 +2845,7 @@ function App() {
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
   const [warningModal, setWarningModal] = useState<{
-    sectionId: ScriptKey
+    sectionId: ScriptKey | 'jlpt_prep'
     label: string
     readiness: SectionReadiness
     reason: string
@@ -6555,15 +6555,6 @@ function App() {
             <button
               type="button"
               className="window-nav-button"
-              onClick={() => { setNavDirection('forward'); setView('jlpt_prep') }}
-              aria-label="JLPT Preparation"
-              title="JLPT Prep"
-            >
-              <Languages className="window-nav-icon" strokeWidth={2.2} />
-            </button>
-            <button
-              type="button"
-              className="window-nav-button"
               onClick={() => openDictionary(roundState?.focusText ?? roundState?.answer ?? '')}
               aria-label="Open dictionary"
               title="Dictionary"
@@ -6877,6 +6868,26 @@ function App() {
               setView('script_hub')
             }
           }}
+          onOpenJlptPrep={() => {
+            const sectionId = 'jlpt_prep'
+            const shouldWarn = !warnedSectionsRef.current.has(sectionId)
+            if (shouldWarn) {
+              setWarningModal({
+                sectionId,
+                label: 'JLPT Preparation',
+                readiness: 'advanced',
+                reason: 'JLPT prep combines multiple skills and is most effective once your foundations are in place.',
+              })
+              return
+            }
+
+            setDictionaryOpen(false)
+            setShowOverview(false)
+            setShowSettings(false)
+            setAssistantChatOpen(false)
+            setNavDirection('forward')
+            setView('jlpt_prep')
+          }}
           onToggleStudyPlan={() => setHomeStudyPlanExpanded((expanded) => !expanded)}
           onJumpToSetup={jumpToScriptHubSetup}
         />
@@ -6893,7 +6904,17 @@ function App() {
             const { sectionId } = warningModal
             warnedSectionsRef.current.add(sectionId)
             setWarningModal(null)
+            setDictionaryOpen(false)
+            setShowOverview(false)
+            setShowSettings(false)
+            setAssistantChatOpen(false)
             setNavDirection('forward')
+
+            if (sectionId === 'jlpt_prep') {
+              setView('jlpt_prep')
+              return
+            }
+
             setActiveScript(sectionId)
             setView('script_hub')
           }}

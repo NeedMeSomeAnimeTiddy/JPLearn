@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 import type { LearningPathStatus, MinigameKey, NavDirection, ScriptKey, SectionReadiness, StudyPlanSnapshot } from '../types'
 import {
@@ -6,7 +7,7 @@ import {
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { AlertTriangle, Zap } from 'lucide-react'
+import { AlertTriangle, Languages, Zap } from 'lucide-react'
 import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
 import { LearningPathPanel } from '../components/LearningPathPanel'
@@ -44,6 +45,7 @@ interface HomeViewProps {
   recommendations?: RecommendationData[]
   learningPathStatus?: LearningPathStatus | null
   onSelectScript: (script: ScriptKey) => void
+  onOpenJlptPrep: () => void
   onToggleStudyPlan: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
   onDismissTutorBanner?: (dedupKey: string) => void
@@ -60,6 +62,7 @@ export function HomeView({
   recommendations,
   learningPathStatus,
   onSelectScript,
+  onOpenJlptPrep,
   onToggleStudyPlan,
   onJumpToSetup,
   onDismissTutorBanner,
@@ -67,6 +70,23 @@ export function HomeView({
   onContinuePath,
   onChangePath,
 }: HomeViewProps) {
+  useEffect(() => {
+    // Pre-warm JLPT readiness/history so opening JLPT Prep feels instant.
+    void Promise.allSettled([
+      window.jplearnDesktop.getJLPTReadiness?.(),
+      window.jplearnDesktop.getJLPTExamHistory?.(),
+    ])
+  }, [])
+
+  const jlptCoverageRows = studyPlan.coverageRows.filter((row) => (
+    row.key === 'kanji_n5' || row.key === 'vocab_n5' || row.key === 'grammar_patterns'
+  ))
+  const jlptTrackedCards = jlptCoverageRows.reduce((sum, row) => sum + row.total, 0)
+  const jlptMasteredCardsApprox = jlptCoverageRows.reduce((sum, row) => sum + (row.mastery * row.total), 0)
+  const jlptPrepProgressPct = jlptTrackedCards > 0
+    ? Math.round((jlptMasteredCardsApprox / jlptTrackedCards) * 100)
+    : 0
+
   // Build a readiness lookup from the learning path steps
   const readinessBySection: Partial<Record<string, SectionReadiness>> = {}
   if (learningPathStatus?.steps) {
@@ -150,6 +170,42 @@ export function HomeView({
               </button>
             )
           })}
+
+          <button
+            type="button"
+            className="menu-card menu-card--advanced"
+            aria-label="Open JLPT preparation"
+            onClick={onOpenJlptPrep}
+          >
+            <span className="menu-card-readiness-badge badge-advanced" aria-hidden="true">
+              <AlertTriangle size={10} strokeWidth={2.2} aria-hidden="true" />
+              Advanced
+            </span>
+            <span className="menu-script-glyph" aria-hidden="true" lang="ja">級</span>
+            <div className="menu-card-header-row">
+              <strong>JLPT Prep</strong>
+              <span
+                className="menu-card-difficulty menu-card-difficulty-5"
+                aria-label="Difficulty: Exam"
+                title="Difficulty: Exam"
+              >
+                <Languages className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
+                <span>N5-N1</span>
+              </span>
+            </div>
+            <p>Timed exam sets, projected score tracking, and weak-area drills.</p>
+            <div className="menu-card-footer-row">
+              <span className="menu-card-mastery-pct" aria-label={`${jlptPrepProgressPct}% JLPT prep progress`}>
+                {jlptPrepProgressPct}%
+              </span>
+            </div>
+            <div className="menu-card-progress-track" aria-hidden="true">
+              <div
+                className="menu-card-progress-fill"
+                style={{ width: `${jlptPrepProgressPct}%` }}
+              />
+            </div>
+          </button>
         </div>
 
         {studyPlan.coverageRows.length > 0 ? (
