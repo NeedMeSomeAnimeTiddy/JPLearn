@@ -783,7 +783,7 @@ const SCRIPT_LABELS: Record<ScriptKey, string> = {
   katakana: 'Katakana',
   kanji_n5: 'Kanji',
   vocab_n5: 'Vocabulary',
-  grammar_patterns: 'Conversational',
+  grammar_patterns: 'Grammar',
 }
 
 const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }> = [
@@ -2614,7 +2614,7 @@ function buildRoundCoachToast(
 function normalizeTrackTerms(text: string): string {
   return text
     .replace(/Vocabulary\s*N5/gi, 'Vocabulary (N5)')
-    .replace(/Grammar\s*N5/gi, 'Conversational (Grammar N5)')
+    .replace(/Grammar\s*N5/gi, 'Grammar (N5)')
 }
 
 function inferScriptFromFocusArea(focusArea: string | null): ScriptKey | null {

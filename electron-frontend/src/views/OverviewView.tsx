@@ -411,7 +411,7 @@ export function OverviewView({
 
             {([
               ['vocab_n5', 'Vocabulary'],
-              ['grammar_patterns', 'Conversational'],
+              ['grammar_patterns', 'Grammar'],
             ] as const).map(([script, label]) => {
               const blocks = overviewCategoryBlocks[script]
               if (!blocks || blocks.length === 0) return null

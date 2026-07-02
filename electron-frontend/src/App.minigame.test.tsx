@@ -346,12 +346,12 @@ describe('Minigame menu', () => {
     expect(screen.queryByRole('button', { name: /back to map/i })).toBeNull()
   })
 
-  it('removes romaji sprint for conversational track', async () => {
+  it('removes romaji sprint for grammar track', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Conversational')
+    clickTopMenuCard('Grammar')
 
     expect((await screen.findAllByText(/Context Cloze/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Narrative Story/i)).length).toBeGreaterThan(0)
@@ -359,7 +359,7 @@ describe('Minigame menu', () => {
     expect(screen.queryByText(/Romaji Sprint/i)).toBeNull()
   })
 
-  it('plays both target words and example sentence in conversational rounds', async () => {
+  it('plays both target words and example sentence in grammar rounds', async () => {
     const conversationalCards = [
       { id: 30, character: 'です', romaji: 'desu', meaning: 'to be', tags: ['grammar_patterns'], example_sentence: 'これは ほん です。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [31, 32, 33], character_distractor_ids: [31, 32, 33] },
       { id: 31, character: 'ます', romaji: 'masu', meaning: 'polite verb ending', tags: ['grammar_patterns'], example_sentence: 'べんきょう します。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 32, 33], character_distractor_ids: [30, 32, 33] },
@@ -378,7 +378,7 @@ describe('Minigame menu', () => {
       speakText,
       getDeckCards: async (slug: string) => (
         slug === 'grammar_patterns'
-          ? { slug, name: 'Conversational Deck', cards: conversationalCards }
+          ? { slug, name: 'Grammar Deck', cards: conversationalCards }
           : { slug: slug as any, name: 'Deck', cards: baseCards }
       ),
       getStudyQueue: async (slug: string) => (
@@ -404,7 +404,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Conversational')
+    clickTopMenuCard('Grammar')
 
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
     fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))

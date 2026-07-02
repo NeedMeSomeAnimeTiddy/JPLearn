@@ -47,7 +47,7 @@ export const SCRIPT_LABELS: Record<ScriptKey, string> = {
   katakana: 'Katakana',
   kanji_n5: 'Kanji',
   vocab_n5: 'Vocabulary',
-  grammar_patterns: 'Conversational',
+  grammar_patterns: 'Grammar',
 }
 
 export const TIMELINE_SCRIPT_LABELS: Record<string, string> = {
@@ -55,7 +55,7 @@ export const TIMELINE_SCRIPT_LABELS: Record<string, string> = {
   katakana: 'Katakana',
   kanji_n5: 'Kanji',
   vocab_n5: 'Vocabulary',
-  grammar_patterns: 'Conversational',
+  grammar_patterns: 'Grammar',
   unknown: 'General',
 }
 
@@ -64,7 +64,7 @@ export const SCRIPT_MENU_LINES: Record<ScriptKey, string> = {
   katakana: 'Train sharp symbols for names and loanwords.',
   kanji_n5: 'Build meaning recall one character at a time.',
   vocab_n5: 'Learn everyday words grouped by topic.',
-  grammar_patterns: 'Practice conversational patterns and sentence flow.',
+  grammar_patterns: 'Practice grammar patterns and sentence flow.',
 }
 
 export const SCRIPT_DIFFICULTY_META: Record<

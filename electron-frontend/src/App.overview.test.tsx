@@ -174,7 +174,7 @@ describe('Overview activity panel', () => {
     expect((await screen.findAllByText(/38/)).length).toBeGreaterThan(0)
   })
 
-  it('shows vocabulary and conversational sections in character mastery', async () => {
+  it('shows vocabulary and grammar sections in character mastery', async () => {
     window.jplearnDesktop = {
       ...baseDesktopApi,
       getStudySummary: async () => ({

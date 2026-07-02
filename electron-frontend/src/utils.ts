@@ -26,7 +26,7 @@ export function formatTimelineScriptTag(tag: string): string {
     katakana: 'Katakana',
     kanji_n5: 'Kanji',
     vocab_n5: 'Vocabulary',
-    grammar_patterns: 'Conversational',
+    grammar_patterns: 'Grammar',
     unknown: 'General',
   }
   const normalized = tag.trim().toLowerCase()
