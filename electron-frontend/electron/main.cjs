@@ -1169,9 +1169,60 @@ function getSafeRestoreBounds(win) {
   return { x, y, width, height }
 }
 
+function isWindowBoundsFillingWorkArea(win) {
+  // Transparent frameless windows on Windows do not report isMaximized()
+  // reliably, so fall back to comparing bounds against the work area.
+  const bounds = win.getBounds()
+  const workArea = screen.getDisplayMatching(bounds).workArea
+  return (
+    bounds.x <= workArea.x &&
+    bounds.y <= workArea.y &&
+    bounds.x + bounds.width >= workArea.x + workArea.width - 2 &&
+    bounds.y + bounds.height >= workArea.y + workArea.height - 2
+  )
+}
+
 function isWindowExpanded(win) {
   const isSnapped = typeof win.isSnapped === 'function' ? win.isSnapped() : false
-  return win.isMaximized() || win.isFullScreen() || isSnapped
+  return win.isMaximized() || win.isFullScreen() || isSnapped || isWindowBoundsFillingWorkArea(win)
+}
+
+function isWindowBoundsFillingDisplay(win) {
+  // Transparent frameless windows on Windows cannot use real OS fullscreen
+  // (isFullScreen()/setFullScreen are unreliable), so fullscreen is emulated
+  // with bounds that cover the entire display, including the taskbar area.
+  const bounds = win.getBounds()
+  const display = screen.getDisplayMatching(bounds).bounds
+  return (
+    bounds.x <= display.x &&
+    bounds.y <= display.y &&
+    bounds.x + bounds.width >= display.x + display.width - 1 &&
+    bounds.y + bounds.height >= display.y + display.height - 1
+  )
+}
+
+function toggleWindowFullscreen(win) {
+  if (win.isFullScreen()) {
+    win.setFullScreen(false)
+    return
+  }
+
+  if (isWindowBoundsFillingDisplay(win)) {
+    const restoreBounds = windowRestoreBoundsById.get(win.id) || getSafeRestoreBounds(win)
+    if (win.isMaximized()) {
+      win.unmaximize()
+    }
+    win.setBounds(restoreBounds)
+    return
+  }
+
+  if (!isWindowExpanded(win)) {
+    windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
+  }
+  if (win.isMaximized()) {
+    win.unmaximize()
+  }
+  win.setBounds(screen.getDisplayMatching(win.getBounds()).bounds)
 }
 
 registerIpcHandlers({
@@ -1272,7 +1323,7 @@ function createWindow() {
     show: false,
     autoHideMenuBar: true,
     transparent: true,
-    fullscreenable: false,
+    fullscreenable: true,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -1285,6 +1336,18 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     console.warn('Blocked window.open request', { url })
     return { action: 'deny' }
+  })
+
+  win.webContents.on('before-input-event', (event, input) => {
+    const isF11 = input.type === 'keyDown' && input.key === 'F11'
+    const isAltEnter = input.type === 'keyDown' && input.key === 'Enter' && input.alt
+
+    if (!isF11 && !isAltEnter) {
+      return
+    }
+
+    event.preventDefault()
+    toggleWindowFullscreen(win)
   })
 
   const pushWindowState = () => {
@@ -1303,13 +1366,17 @@ function createWindow() {
   win.on('leave-full-screen', pushWindowState)
   win.on('move', () => {
     if (win.isNormal()) {
-      windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
+      if (!isWindowExpanded(win)) {
+        windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
+      }
       pushWindowState()
     }
   })
   win.on('resize', () => {
     if (win.isNormal()) {
-      windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
+      if (!isWindowExpanded(win)) {
+        windowRestoreBoundsById.set(win.id, getSafeRestoreBounds(win))
+      }
       pushWindowState()
     }
   })
