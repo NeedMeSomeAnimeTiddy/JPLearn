@@ -5,7 +5,7 @@ import { ChevronDown, RefreshCw } from 'lucide-react'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ModelOption {
-  tier: 'low' | 'medium' | 'high' | 'ultra'
+  tier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
   filename: string
   sizeMb: number
   label: string
@@ -16,7 +16,7 @@ interface ModelOption {
 
 interface SystemInfo {
   totalRamGb: number
-  recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
+  recommendedTier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
   models: ModelOption[]
   llamaCppInstalled: boolean
   gpuAdapters?: string[]
@@ -69,7 +69,7 @@ interface CompactDropdownOption {
   badgeTone?: 'recommended' | 'soft' | 'warning'
 }
 
-type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'skip'
+type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'max' | 'skip'
 type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra' | 'skip'
 type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
 
@@ -103,137 +103,222 @@ function formatDurationMinutes(minutes: number | null | undefined): string {
   return `~${hours} h ${rem} min`
 }
 
-function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'medium' | 'high' | 'ultra') {
+function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') {
   const totalRamGb = systemInfo?.totalRamGb ?? 0
   const gpuVramGb = systemInfo?.gpuVramGb ?? 0
+  const makeFit = (
+    badge: string,
+    message: string,
+    isOk: boolean,
+    tone: 'soft' | 'warning' = isOk ? 'soft' : 'warning',
+  ) => ({ badge, tone, message, isOk })
 
   if (tier === 'low') {
-    if (totalRamGb >= 8) {
-      return {
-        badge: 'OK on this PC',
-        tone: 'soft' as const,
-        message: 'Target tier: 8 GB RAM laptop, no dedicated GPU required.',
-        isOk: true,
-      }
+    if (totalRamGb >= 8 || gpuVramGb >= 4) {
+      return makeFit(
+        'Recommended fit',
+        'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
+        true,
+      )
     }
-    return {
-      badge: 'May be too heavy',
-      tone: 'warning' as const,
-      message: 'This tier targets at least 8 GB RAM.',
-      isOk: false,
+    if (totalRamGb >= 6 || gpuVramGb >= 4) {
+      return makeFit(
+        'Comfortable fit',
+        'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
+        true,
+      )
     }
+    if (totalRamGb >= 2 || gpuVramGb >= 1) {
+      return makeFit(
+        'Minimum fit',
+        'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
+        true,
+        'warning',
+      )
+    }
+    return makeFit(
+      'Too heavy',
+      'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
+      false,
+    )
   }
 
   if (tier === 'medium') {
-    if (totalRamGb >= 16) {
-      return {
-        badge: 'OK on this PC',
-        tone: 'soft' as const,
-        message: 'Target tier: 16 GB RAM desktop/laptop.',
-        isOk: true,
-      }
+    if (totalRamGb >= 10 || gpuVramGb >= 6) {
+      return makeFit(
+        'Recommended fit',
+        'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
+        true,
+      )
     }
-    return {
-      badge: 'May be too heavy',
-      tone: 'warning' as const,
-      message: 'This tier targets 16 GB RAM.',
-      isOk: false,
+    if (totalRamGb >= 8 || gpuVramGb >= 4) {
+      return makeFit(
+        'Comfortable fit',
+        'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
+        true,
+      )
     }
+    if (totalRamGb >= 4 || gpuVramGb >= 2) {
+      return makeFit(
+        'Minimum fit',
+        'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
+        true,
+        'warning',
+      )
+    }
+    return makeFit(
+      'Too heavy',
+      'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
+      false,
+    )
   }
 
   if (tier === 'high') {
-    if (gpuVramGb >= 8 && totalRamGb >= 16) {
-      return {
-        badge: 'OK on this PC',
-        tone: 'soft' as const,
-        message: 'Target tier: 8 GB VRAM GPU + 16 GB RAM.',
-        isOk: true,
-      }
+    if (totalRamGb >= 12 || gpuVramGb >= 8) {
+      return makeFit(
+        'Recommended fit',
+        'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
+        true,
+      )
     }
-    return {
-      badge: 'May be too heavy',
-      tone: 'warning' as const,
-      message: 'This tier targets 8 GB VRAM GPU + 16 GB RAM.',
-      isOk: false,
+    if (totalRamGb >= 8 || gpuVramGb >= 6) {
+      return makeFit(
+        'Comfortable fit',
+        'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
+        true,
+      )
     }
+    if (totalRamGb >= 3 || gpuVramGb >= 4) {
+      return makeFit(
+        'Minimum fit',
+        'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
+        true,
+        'warning',
+      )
+    }
+    return makeFit(
+      'Too heavy',
+      'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
+      false,
+    )
   }
 
-  if (gpuVramGb >= 12 && totalRamGb >= 32) {
-    return {
-      badge: 'OK on this PC',
-      tone: 'soft' as const,
-      message: 'Target tier: 12+ GB VRAM GPU + 32 GB RAM.',
-      isOk: true,
+  if (tier === 'ultra') {
+    if (totalRamGb >= 16 || gpuVramGb >= 16) {
+      return makeFit(
+        'Recommended fit',
+        'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+        true,
+      )
     }
+    if (totalRamGb >= 14 || gpuVramGb >= 12) {
+      return makeFit(
+        'Comfortable fit',
+        'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+        true,
+      )
+    }
+    if (totalRamGb >= 6 || gpuVramGb >= 8) {
+      return makeFit(
+        'Minimum fit',
+        'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+        true,
+        'warning',
+      )
+    }
+    return makeFit(
+      'Too heavy',
+      'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+      false,
+    )
   }
 
-  return {
-    badge: 'May be too heavy',
-    tone: 'warning' as const,
-    message: 'This tier targets 12+ GB VRAM GPU + 32 GB RAM.',
-    isOk: false,
+  if (totalRamGb >= 24 || gpuVramGb >= 24) {
+    return makeFit(
+      'Recommended fit',
+      'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
+      true,
+    )
   }
+
+  if (totalRamGb >= 16 || gpuVramGb >= 16) {
+    return makeFit(
+      'Comfortable fit',
+      'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
+      true,
+    )
+  }
+
+  if (totalRamGb >= 8 || gpuVramGb >= 11) {
+    return makeFit(
+      'Minimum fit',
+      'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
+      true,
+      'warning',
+    )
+  }
+
+  return makeFit(
+    'Too heavy',
+    'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
+    false,
+  )
 }
 
 function getSpeechHardwareFit(systemInfo: SystemInfo | null, tier: 'fast' | 'balanced' | 'high' | 'ultra') {
   const totalRamGb = systemInfo?.totalRamGb ?? 0
   const gpuVramGb = systemInfo?.gpuVramGb ?? 0
+  const makeFit = (
+    badge: string,
+    message: string,
+    isOk: boolean,
+    tone: 'soft' | 'warning' = isOk ? 'soft' : 'warning',
+  ) => ({ badge, tone, message, isOk })
 
   if (tier === 'fast') {
-    return {
-      badge: 'Most compatible',
-      tone: 'soft' as const,
-      message: 'Best on lower-spec systems and for the quickest response.',
-      isOk: true,
+    if (totalRamGb >= 6 || gpuVramGb >= 2) {
+      return makeFit('Recommended fit', 'Best on lower-spec systems and for the quickest response.', true)
     }
+    if (totalRamGb >= 4 || gpuVramGb >= 1) {
+      return makeFit('Comfortable fit', 'Best on lower-spec systems and for the quickest response.', true)
+    }
+    return makeFit('Minimum fit', 'Best on lower-spec systems and for the quickest response.', true, 'warning')
   }
   if (tier === 'balanced') {
-    if (totalRamGb >= 10) {
-      return {
-        badge: 'Good fit',
-        tone: 'soft' as const,
-        message: 'Good balance of speed and accuracy for most PCs.',
-        isOk: true,
-      }
+    if (totalRamGb >= 12 || gpuVramGb >= 4) {
+      return makeFit('Recommended fit', 'Good balance of speed and accuracy for most PCs.', true)
     }
-    return {
-      badge: 'May be heavy',
-      tone: 'warning' as const,
-      message: 'Works best with about 10 GB RAM or more.',
-      isOk: false,
+    if (totalRamGb >= 10 || gpuVramGb >= 2) {
+      return makeFit('Comfortable fit', 'Good balance of speed and accuracy for most PCs.', true)
     }
+    if (totalRamGb >= 6) {
+      return makeFit('Minimum fit', 'Good balance of speed and accuracy for most PCs.', true, 'warning')
+    }
+    return makeFit('Too heavy', 'Works best with about 10 GB RAM or more.', false)
   }
   if (tier === 'high') {
+    if (totalRamGb >= 24 || gpuVramGb >= 12) {
+      return makeFit('Recommended fit', 'Strong quality with lower latency than Ultra on capable hardware.', true)
+    }
     if (totalRamGb >= 16 || gpuVramGb >= 8) {
-      return {
-        badge: 'High-end fit',
-        tone: 'soft' as const,
-        message: 'Strong quality with lower latency than Ultra on capable hardware.',
-        isOk: true,
-      }
+      return makeFit('Comfortable fit', 'Strong quality with lower latency than Ultra on capable hardware.', true)
     }
-    return {
-      badge: 'May be heavy',
-      tone: 'warning' as const,
-      message: 'Best with around 16 GB RAM or 8 GB GPU VRAM.',
-      isOk: false,
+    if (totalRamGb >= 8 || gpuVramGb >= 4) {
+      return makeFit('Minimum fit', 'Strong quality with lower latency than Ultra on capable hardware.', true, 'warning')
     }
+    return makeFit('Too heavy', 'Best with around 16 GB RAM or 8 GB GPU VRAM.', false)
   }
 
+  if (totalRamGb >= 32 || gpuVramGb >= 16) {
+    return makeFit('Recommended fit', 'Best recognition quality when your system can handle a heavier model.', true)
+  }
   if (totalRamGb >= 24 || gpuVramGb >= 12) {
-    return {
-      badge: 'Top quality fit',
-      tone: 'soft' as const,
-      message: 'Best recognition quality when your system can handle a heavier model.',
-      isOk: true,
-    }
+    return makeFit('Comfortable fit', 'Best recognition quality when your system can handle a heavier model.', true)
   }
-  return {
-    badge: 'Heavy tier',
-    tone: 'warning' as const,
-    message: 'Best with around 24 GB RAM or 12 GB GPU VRAM.',
-    isOk: false,
+  if (totalRamGb >= 12 || gpuVramGb >= 8) {
+    return makeFit('Minimum fit', 'Best recognition quality when your system can handle a heavier model.', true, 'warning')
   }
+  return makeFit('Too heavy', 'Best with around 24 GB RAM or 12 GB GPU VRAM.', false)
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -1239,3 +1324,5 @@ function btnStyle(variant: 'primary' | 'secondary' | 'ghost', disabled = false):
   if (variant === 'secondary') return { ...base, background: 'rgba(255,255,255,0.1)', color: '#e8f0fa' }
   return { ...base, background: 'transparent', color: 'rgba(255,255,255,0.5)', padding: '0.5rem 0.75rem' }
 }
+
+

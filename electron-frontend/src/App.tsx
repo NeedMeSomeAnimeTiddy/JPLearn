@@ -2938,7 +2938,7 @@ function App() {
   const [tutorInstallInfo, setTutorInstallInfo] = useState<{
     totalRamGb: number
     models: Array<{
-      tier: 'low' | 'medium' | 'high' | 'ultra'
+      tier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
       filename: string
       sizeMb: number
       label: string
@@ -2946,8 +2946,8 @@ function App() {
       installed: boolean
       estimatedDownloadMinutes?: number | null
     }>
-    recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
-    activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
+    recommendedTier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
+    activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | 'max' | null
     llamaCppInstalled: boolean
     gpuVramGb?: number | null
     voicevoxInstalled: boolean
@@ -2966,9 +2966,9 @@ function App() {
     recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
     activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
   } | null>(null)
-  const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
+  const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | 'max' | null>(null)
   const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
-  const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
+  const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'medium' | 'high' | 'ultra' | 'max' | null>(null)
   const [dictionaryDownloading, setDictionaryDownloading] = useState(false)
   const [dictionaryProgress, setDictionaryProgress] = useState<number>(0)
   const [speechDownloadingTier, setSpeechDownloadingTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
@@ -3342,68 +3342,224 @@ function App() {
     return `${minutes} min`
   }, [])
 
-  const getTutorModelHardwareFit = useCallback((tier: 'low' | 'medium' | 'high' | 'ultra') => {
+  const getTutorModelHardwareFit = useCallback((tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => {
     const totalRamGb = tutorInstallInfo?.totalRamGb ?? 0
     const gpuVramGb = tutorInstallInfo?.gpuVramGb ?? 0
+    const makeFit = (
+      badge: string,
+      detail: string,
+      isOk: boolean,
+      tone: 'soft' | 'warning' = isOk ? 'soft' : 'warning',
+    ) => ({ badge, detail, isOk, tone })
 
     if (tier === 'low') {
-      if (totalRamGb >= 8) {
-        return {
-          badge: 'OK on this PC',
-          detail: 'Target tier: 8 GB RAM laptop, no dedicated GPU required.',
-          isOk: true,
-        }
+      if (totalRamGb >= 8 || gpuVramGb >= 4) {
+        return makeFit(
+          'Recommended fit',
+          'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
+          true,
+        )
       }
-      return {
-        badge: 'May be too heavy',
-        detail: 'This tier targets at least 8 GB RAM.',
-        isOk: false,
+      if (totalRamGb >= 6 || gpuVramGb >= 4) {
+        return makeFit(
+          'Comfortable fit',
+          'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
+          true,
+        )
       }
+      if (totalRamGb >= 2 || gpuVramGb >= 1) {
+        return makeFit(
+          'Minimum fit',
+          'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
+          true,
+          'warning',
+        )
+      }
+      return makeFit(
+        'Too heavy',
+        'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
+        false,
+      )
     }
 
     if (tier === 'medium') {
-      if (totalRamGb >= 16) {
-        return {
-          badge: 'OK on this PC',
-          detail: 'Target tier: 16 GB RAM desktop/laptop.',
-          isOk: true,
-        }
+      if (totalRamGb >= 10 || gpuVramGb >= 6) {
+        return makeFit(
+          'Recommended fit',
+          'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
+          true,
+        )
       }
-      return {
-        badge: 'May be too heavy',
-        detail: 'This tier targets 16 GB RAM.',
-        isOk: false,
+      if (totalRamGb >= 8 || gpuVramGb >= 4) {
+        return makeFit(
+          'Comfortable fit',
+          'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
+          true,
+        )
       }
+      if (totalRamGb >= 4 || gpuVramGb >= 2) {
+        return makeFit(
+          'Minimum fit',
+          'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
+          true,
+          'warning',
+        )
+      }
+      return makeFit(
+        'Too heavy',
+        'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
+        false,
+      )
     }
 
     if (tier === 'high') {
-      if (gpuVramGb >= 8 && totalRamGb >= 16) {
-        return {
-          badge: 'OK on this PC',
-          detail: 'Target tier: 8 GB VRAM GPU + 16 GB RAM.',
-          isOk: true,
-        }
+      if (totalRamGb >= 12 || gpuVramGb >= 8) {
+        return makeFit(
+          'Recommended fit',
+          'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
+          true,
+        )
       }
-      return {
-        badge: 'May be too heavy',
-        detail: 'This tier targets 8 GB VRAM GPU + 16 GB RAM.',
-        isOk: false,
+      if (totalRamGb >= 8 || gpuVramGb >= 6) {
+        return makeFit(
+          'Comfortable fit',
+          'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
+          true,
+        )
       }
+      if (totalRamGb >= 3 || gpuVramGb >= 4) {
+        return makeFit(
+          'Minimum fit',
+          'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
+          true,
+          'warning',
+        )
+      }
+      return makeFit(
+        'Too heavy',
+        'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
+        false,
+      )
     }
 
-    if (gpuVramGb >= 12 && totalRamGb >= 32) {
-      return {
-        badge: 'OK on this PC',
-        detail: 'Target tier: 12+ GB VRAM GPU + 32 GB RAM.',
-        isOk: true,
+    if (tier === 'ultra') {
+      if (totalRamGb >= 16 || gpuVramGb >= 16) {
+        return makeFit(
+          'Recommended fit',
+          'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+          true,
+        )
       }
+      if (totalRamGb >= 14 || gpuVramGb >= 12) {
+        return makeFit(
+          'Comfortable fit',
+          'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+          true,
+        )
+      }
+      if (totalRamGb >= 6 || gpuVramGb >= 8) {
+        return makeFit(
+          'Minimum fit',
+          'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+          true,
+          'warning',
+        )
+      }
+      return makeFit(
+        'Too heavy',
+        'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+        false,
+      )
     }
 
-    return {
-      badge: 'May be too heavy',
-      detail: 'This tier targets 12+ GB VRAM GPU + 32 GB RAM.',
-      isOk: false,
+    if (totalRamGb >= 24 || gpuVramGb >= 24) {
+      return makeFit(
+        'Recommended fit',
+        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
+        true,
+      )
     }
+
+    if (totalRamGb >= 16 || gpuVramGb >= 16) {
+      return makeFit(
+        'Comfortable fit',
+        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
+        true,
+      )
+    }
+
+    if (totalRamGb >= 8 || gpuVramGb >= 11) {
+      return makeFit(
+        'Minimum fit',
+        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
+        true,
+        'warning',
+      )
+    }
+
+    return makeFit(
+      'Too heavy',
+      'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
+      false,
+    )
+  }, [tutorInstallInfo?.gpuVramGb, tutorInstallInfo?.totalRamGb])
+
+  const getSpeechModelHardwareFit = useCallback((tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
+    const totalRamGb = tutorInstallInfo?.totalRamGb ?? 0
+    const gpuVramGb = tutorInstallInfo?.gpuVramGb ?? 0
+    const makeFit = (
+      badge: string,
+      detail: string,
+      isOk: boolean,
+      tone: 'soft' | 'warning' = isOk ? 'soft' : 'warning',
+    ) => ({ badge, detail, isOk, tone })
+
+    if (tier === 'fast') {
+      if (totalRamGb >= 6 || gpuVramGb >= 2) {
+        return makeFit('Recommended fit', 'Fastest option. Comfortable on most systems.', true)
+      }
+      if (totalRamGb >= 4 || gpuVramGb >= 1) {
+        return makeFit('Comfortable fit', 'Fastest option. Comfortable on most systems.', true)
+      }
+      return makeFit('Minimum fit', 'Fastest option. Comfortable on most systems.', true, 'warning')
+    }
+
+    if (tier === 'balanced') {
+      if (totalRamGb >= 12 || gpuVramGb >= 4) {
+        return makeFit('Recommended fit', 'Good balance of speed and recognition quality.', true)
+      }
+      if (totalRamGb >= 10 || gpuVramGb >= 2) {
+        return makeFit('Comfortable fit', 'Good balance of speed and recognition quality.', true)
+      }
+      if (totalRamGb >= 6) {
+        return makeFit('Minimum fit', 'Good balance of speed and recognition quality.', true, 'warning')
+      }
+      return makeFit('Too heavy', 'Works best with around 10 GB RAM or more.', false)
+    }
+
+    if (tier === 'high') {
+      if (totalRamGb >= 24 || gpuVramGb >= 12) {
+        return makeFit('Recommended fit', 'Strong quality with lower latency than Ultra.', true)
+      }
+      if (totalRamGb >= 16 || gpuVramGb >= 8) {
+        return makeFit('Comfortable fit', 'Strong quality with lower latency than Ultra.', true)
+      }
+      if (totalRamGb >= 8 || gpuVramGb >= 4) {
+        return makeFit('Minimum fit', 'Strong quality with lower latency than Ultra.', true, 'warning')
+      }
+      return makeFit('Too heavy', 'Best with around 16 GB RAM or 8 GB GPU VRAM.', false)
+    }
+
+    if (totalRamGb >= 32 || gpuVramGb >= 16) {
+      return makeFit('Recommended fit', 'Highest recognition quality; heaviest tier.', true)
+    }
+    if (totalRamGb >= 24 || gpuVramGb >= 12) {
+      return makeFit('Comfortable fit', 'Highest recognition quality; heaviest tier.', true)
+    }
+    if (totalRamGb >= 12 || gpuVramGb >= 8) {
+      return makeFit('Minimum fit', 'Highest recognition quality; heaviest tier.', true, 'warning')
+    }
+    return makeFit('Too heavy', 'Best with around 24 GB RAM or 12 GB GPU VRAM.', false)
   }, [tutorInstallInfo?.gpuVramGb, tutorInstallInfo?.totalRamGb])
 
   const refreshTutorInstallInfo = useCallback(async () => {
@@ -3467,7 +3623,7 @@ function App() {
     return unsubscribe
   }, [])
 
-  const downloadTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
+  const downloadTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => {
     const downloadModel = window.jplearnDesktop.downloadModel
     if (!downloadModel || tutorDownloadingTier) {
       return
@@ -3483,7 +3639,7 @@ function App() {
     }
   }, [refreshTutorInstallInfo, tutorDownloadingTier])
 
-  const selectTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
+  const selectTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => {
     const setActiveTutorModel = window.jplearnDesktop.setActiveTutorModel
     if (!setActiveTutorModel || tutorModelActionTier) {
       return
@@ -3497,7 +3653,7 @@ function App() {
     }
   }, [refreshTutorInstallInfo, tutorModelActionTier])
 
-  const uninstallTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
+  const uninstallTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => {
     const uninstallModel = window.jplearnDesktop.uninstallTutorModel
     if (!uninstallModel || tutorModelActionTier) {
       return
@@ -8250,6 +8406,7 @@ function App() {
                       const isDownloadingThis = speechDownloadingTier === model.tier
                       const isActioningThis = speechModelActionTier === model.tier
                       const isActiveTier = tutorInstallInfo?.activeSpeechModelTier === model.tier
+                      const speechHardwareFit = getSpeechModelHardwareFit(model.tier)
 
                       return (
                         <div
@@ -8274,6 +8431,17 @@ function App() {
                               </p>
                               <p className="settings-help" style={{ marginTop: '0.2rem' }}>
                                 {model.installed ? 'Installed' : model.description}
+                              </p>
+                              <p
+                                className="settings-help"
+                                style={{
+                                  marginTop: '0.2rem',
+                                  color: speechHardwareFit.tone === 'warning'
+                                    ? 'rgba(242, 181, 111, 0.92)'
+                                    : 'var(--text-soft)',
+                                }}
+                              >
+                                {speechHardwareFit.badge} · {speechHardwareFit.detail}
                               </p>
                               {tutorInstallInfo?.recommendedSpeechTier === model.tier ? (
                                 <p className="settings-help" style={{ marginTop: '0.2rem', color: 'var(--accent, #7eb8ea)' }}>
@@ -8784,4 +8952,6 @@ function App() {
 }
 
 export default App
+
+
 

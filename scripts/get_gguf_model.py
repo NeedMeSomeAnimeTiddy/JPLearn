@@ -1,18 +1,22 @@
 """Download the appropriate GGUF chat model based on available system RAM.
 
-Three tiers are available:
-    low   qwen2.5-1.5b-instruct-q8_0.gguf  (~1.9 GB)  RAM < 16 GB  (auto-default)
-    high  qwen2.5-3b-instruct-q8_0.gguf    (~3.6 GB)  RAM >= 16 GB (auto-default)
-    ultra Qwen3.5-9B-Q6_K.gguf             (~7.5 GB)  explicit choice only
+Five tiers are available:
+    low    Qwen3.5-0.8B-Q6_K.gguf   (~639 MB)   smallest / most compatible
+    medium Qwen3.5-2B-Q6_K.gguf     (~1.6 GB)   balanced starter tier
+    high   Qwen3.5-4B-Q6_K.gguf     (~3.5 GB)   stronger reasoning, still light
+    ultra  Qwen3.5-9B-Q6_K.gguf     (~7.5 GB)   large, high quality
+    max    gemma-4-12b-it-Q6_K.gguf (~9.8 GB)   biggest / best quality
 
 The selected file is saved to Documents\\JPLearn\\models\\ when run from the
 installed app, or to models/llama/ when run directly from the repository.
 
 Usage:
     python scripts/get_gguf_model.py              # auto-detect RAM, choose tier
-    python scripts/get_gguf_model.py --tier low   # force low-end model
-    python scripts/get_gguf_model.py --tier high  # force high-end model
-    python scripts/get_gguf_model.py --tier ultra # force ultra model (large!)
+    python scripts/get_gguf_model.py --tier low     # force low-end model
+    python scripts/get_gguf_model.py --tier medium  # force medium model
+    python scripts/get_gguf_model.py --tier high    # force high-end model
+    python scripts/get_gguf_model.py --tier ultra   # force ultra model
+    python scripts/get_gguf_model.py --tier max     # force max model (largest)
 
 Override download target:
     set JPLEARN_DOCUMENTS_DIR=C:\\path\\to\\dir
@@ -28,26 +32,44 @@ import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-RAM_THRESHOLD_GB = 16.0
+RAM_THRESHOLDS_GB = {
+    "low": 6.0,
+    "medium": 8.0,
+    "high": 12.0,
+    "ultra": 24.0,
+    "max": 32.0,
+}
 
 MODELS: dict[str, dict] = {
     "low": {
-        "filename": "qwen2.5-1.5b-instruct-q8_0.gguf",
-        "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
-        "size_gb": 1.9,
-        "label": "Low-end  (~1.9 GB)",
+        "filename": "Qwen3.5-0.8B-Q6_K.gguf",
+        "repo": "unsloth/Qwen3.5-0.8B-GGUF",
+        "size_gb": 0.639,
+        "label": "Low     (~639 MB)",
+    },
+    "medium": {
+        "filename": "Qwen3.5-2B-Q6_K.gguf",
+        "repo": "unsloth/Qwen3.5-2B-GGUF",
+        "size_gb": 1.57,
+        "label": "Medium  (~1.6 GB)",
     },
     "high": {
-        "filename": "qwen2.5-3b-instruct-q8_0.gguf",
-        "repo": "Qwen/Qwen2.5-3B-Instruct-GGUF",
-        "size_gb": 3.6,
-        "label": "High-end (~3.6 GB)",
+        "filename": "Qwen3.5-4B-Q6_K.gguf",
+        "repo": "unsloth/Qwen3.5-4B-GGUF",
+        "size_gb": 3.53,
+        "label": "High    (~3.5 GB)",
     },
     "ultra": {
         "filename": "Qwen3.5-9B-Q6_K.gguf",
         "repo": "unsloth/Qwen3.5-9B-GGUF",
-        "size_gb": 7.5,
-        "label": "Ultra    (~7.5 GB)",
+        "size_gb": 7.46,
+        "label": "Ultra   (~7.5 GB)",
+    },
+    "max": {
+        "filename": "gemma-4-12b-it-Q6_K.gguf",
+        "repo": "unsloth/gemma-4-12b-it-GGUF",
+        "size_gb": 9.79,
+        "label": "Max    (~9.8 GB)",
     },
 }
 
@@ -88,7 +110,15 @@ def get_total_ram_gb() -> float:
 
 
 def auto_tier(ram_gb: float) -> str:
-    return "high" if ram_gb >= RAM_THRESHOLD_GB else "low"
+    if ram_gb >= RAM_THRESHOLDS_GB["max"]:
+        return "max"
+    if ram_gb >= RAM_THRESHOLDS_GB["ultra"]:
+        return "ultra"
+    if ram_gb >= RAM_THRESHOLDS_GB["high"]:
+        return "high"
+    if ram_gb >= RAM_THRESHOLDS_GB["medium"]:
+        return "medium"
+    return "low"
 
 
 def report(done: int, total: int) -> None:
@@ -127,7 +157,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Download a GGUF model for JPLearn.")
     parser.add_argument(
         "--tier",
-        choices=["low", "high", "ultra"],
+        choices=["low", "medium", "high", "ultra", "max"],
         default=None,
         help="Force a specific model tier instead of auto-detecting from RAM.",
     )
@@ -142,7 +172,7 @@ def main() -> int:
     else:
         tier = auto_tier(ram_gb)
         if ram_gb > 0:
-            reason = f"detected {ram_gb:.1f} GB RAM (threshold: {RAM_THRESHOLD_GB} GB)"
+            reason = f"detected {ram_gb:.1f} GB RAM"
         else:
             reason = "RAM detection failed — defaulting to low-end"
 

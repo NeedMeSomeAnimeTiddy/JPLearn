@@ -92,6 +92,11 @@ const SPEECH_MODELS = {
     description: 'Highest recognition quality. Best when you prioritize accuracy over speed.',
     sizeMb: 3100,
   },
+  max: {
+    label: 'Max (12B, ~9.8 GB)',
+    description: 'Largest and highest-capacity option. Best when hardware is strong.',
+    sizeMb: 9790,
+  },
 }
 const ACTIVE_SPEECH_MODEL_STATE_FILENAME = 'active-speech-model.json'
 const SPEED_TEST_TIMEOUT_MS = 12000
@@ -307,9 +312,10 @@ function estimateDownloadMinutes(sizeMb, networkMbps) {
 }
 
 function recommendTutorTier(totalRamGb, gpuVramGb) {
-  if (gpuVramGb >= 12 && totalRamGb >= 32) return 'ultra'
-  if (gpuVramGb >= 8 && totalRamGb >= 16) return 'high'
-  if (totalRamGb >= 16) return 'medium'
+  if (gpuVramGb >= 16 || totalRamGb >= 16) return 'max'
+  if (gpuVramGb >= 12 || totalRamGb >= 14) return 'ultra'
+  if (gpuVramGb >= 6 || totalRamGb >= 8) return 'high'
+  if (gpuVramGb >= 4 || totalRamGb >= 6) return 'medium'
   return 'low'
 }
 
