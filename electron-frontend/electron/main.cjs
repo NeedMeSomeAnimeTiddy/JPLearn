@@ -1873,6 +1873,8 @@ async function createWindowWithSplash() {
 app.whenReady().then(() => {
   // Ensure Documents\JPLearn\ subdirectories exist on every launch
   try { localSetupRuntime.ensureJPLearnDirs() } catch { /* non-fatal */ }
+  // If bundled voice profiles are present, seed missing voices into Documents once.
+  try { localSetupRuntime.seedBundledOpenVoiceVoices() } catch { /* non-fatal */ }
 
   void createWindowWithSplash()
 

@@ -10,42 +10,33 @@ function sanitizeSpeechText(text) {
   return typeof text === 'string' ? text.replace(/〜/g, '').trim() : ''
 }
 
-function hasOpenVoiceCheckpoints(baseDir) {
-  if (!baseDir) return false
-  return fs.existsSync(path.join(baseDir, 'checkpoints_v2', 'converter', 'checkpoint.pth'))
-    && fs.existsSync(path.join(baseDir, 'checkpoints_v2', 'converter', 'config.json'))
-}
-
-function hasOpenVoiceVoices(baseDir) {
-  if (!baseDir) return false
-  const voiceRoot = path.join(baseDir, 'voices')
-  return loadVoiceProfiles(voiceRoot).length > 0
-}
-
-function pickFirst(candidates, predicate) {
-  for (const candidate of candidates) {
-    if (candidate && predicate(candidate)) {
-      return candidate
-    }
+function hasVoiceProfiles(voiceRoot) {
+  if (!fs.existsSync(voiceRoot)) {
+    return false
   }
-  return ''
+  const entries = fs.readdirSync(voiceRoot, { withFileTypes: true })
+  return entries.some((entry) => entry.isDirectory() && fs.existsSync(path.join(voiceRoot, entry.name, 'manifest.json')))
+}
+
+function hasOpenVoiceAssets(baseDir) {
+  const checkpointRoot = path.join(baseDir, 'checkpoints_v2')
+  const voiceRoot = path.join(baseDir, 'voices')
+  const converterCheckpoint = path.join(checkpointRoot, 'converter', 'checkpoint.pth')
+  const converterConfig = path.join(checkpointRoot, 'converter', 'config.json')
+  return fs.existsSync(converterCheckpoint) && fs.existsSync(converterConfig) && hasVoiceProfiles(voiceRoot)
 }
 
 function resolveOpenVoicePaths(repoRoot) {
   const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
   const installedDir = docsDir ? path.join(docsDir, 'openvoice') : ''
   const bundledDir = path.join(repoRoot, 'data', 'openvoice')
-  const candidates = [installedDir, bundledDir].filter(Boolean)
-
-  const voiceBaseDir = pickFirst(candidates, hasOpenVoiceVoices) || candidates[0] || bundledDir
-  const checkpointBaseDir = pickFirst(candidates, hasOpenVoiceCheckpoints) || candidates[0] || bundledDir
-  const baseDir = pickFirst(candidates, (dir) => hasOpenVoiceVoices(dir) && hasOpenVoiceCheckpoints(dir))
-    || checkpointBaseDir
-
+  const baseDir = installedDir && hasOpenVoiceAssets(installedDir)
+    ? installedDir
+    : bundledDir
   return {
     baseDir,
-    voiceRoot: path.join(voiceBaseDir, 'voices'),
-    checkpointRoot: path.join(checkpointBaseDir, 'checkpoints_v2'),
+    voiceRoot: path.join(baseDir, 'voices'),
+    checkpointRoot: path.join(baseDir, 'checkpoints_v2'),
     scriptPath: path.join(repoRoot, 'scripts', 'openvoice_speak.py'),
     pythonPath: (process.env.OPENVOICE_PYTHON || process.env.JPLEARN_PYTHON || 'python').trim(),
   }
@@ -149,11 +140,10 @@ function createOpenVoiceRuntime(options = {}) {
     ? options.repoRoot.trim()
     : path.resolve(__dirname, '..', '..')
   const maxTextChars = Number.isFinite(options.maxTextChars) ? Math.max(1, Math.floor(options.maxTextChars)) : DEFAULT_MAX_TEXT_CHARS
-  const paths = resolveOpenVoicePaths(repoRoot)
-  const voiceProfiles = loadVoiceProfiles(paths.voiceRoot)
   let lastError = null
 
-  function pickModelName(profile) {
+  function pickModelName(voiceProfiles) {
+    const profile = voiceProfiles[0]
     if (!profile) {
       return 'openvoice:unavailable'
     }
@@ -165,6 +155,8 @@ function createOpenVoiceRuntime(options = {}) {
   }
 
   async function synthesize(text, speaker, speed) {
+    const paths = resolveOpenVoicePaths(repoRoot)
+    const voiceProfiles = loadVoiceProfiles(paths.voiceRoot)
     const profile = resolveVoiceProfile(voiceProfiles, speaker)
     if (!profile) {
       throw new Error('No OpenVoice voice profiles are configured')
@@ -219,12 +211,14 @@ function createOpenVoiceRuntime(options = {}) {
   const runtime = {
     getStatus() {
       const ready = getReadyState()
+      const paths = resolveOpenVoicePaths(repoRoot)
+      const voiceProfiles = loadVoiceProfiles(paths.voiceRoot)
       return {
         available: ready && lastError == null,
         modelReady: ready,
         downloading: false,
         downloadProgress: 0,
-        modelName: pickModelName(voiceProfiles[0]),
+        modelName: pickModelName(voiceProfiles),
         lastError,
       }
     },

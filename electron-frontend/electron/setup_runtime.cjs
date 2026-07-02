@@ -201,6 +201,50 @@ function ensureJPLearnDirs() {
   return base
 }
 
+function hasVoiceManifests(voiceRoot) {
+  if (!fs.existsSync(voiceRoot)) {
+    return false
+  }
+  const entries = fs.readdirSync(voiceRoot, { withFileTypes: true })
+  return entries.some((entry) => entry.isDirectory() && fs.existsSync(path.join(voiceRoot, entry.name, 'manifest.json')))
+}
+
+function hasOpenVoiceAssets(baseDir) {
+  const converterCheckpoint = path.join(baseDir, 'checkpoints_v2', 'converter', 'checkpoint.pth')
+  const converterConfig = path.join(baseDir, 'checkpoints_v2', 'converter', 'config.json')
+  const voiceRoot = path.join(baseDir, 'voices')
+  return fs.existsSync(converterCheckpoint) && fs.existsSync(converterConfig) && hasVoiceManifests(voiceRoot)
+}
+
+function seedBundledOpenVoiceVoices(scriptRootArg = null) {
+  const base = ensureJPLearnDirs()
+  const scriptRoot = scriptRootArg || resolveScriptRoot()
+  const sourceRoot = path.join(scriptRoot, 'data', 'openvoice', 'voices')
+  const targetRoot = path.join(base, 'openvoice', 'voices')
+
+  if (!fs.existsSync(sourceRoot)) {
+    return { ok: false, reason: 'no-bundled-voices' }
+  }
+
+  fs.mkdirSync(targetRoot, { recursive: true })
+
+  const entries = fs.readdirSync(sourceRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+
+  let copied = 0
+  for (const entry of entries) {
+    const from = path.join(sourceRoot, entry.name)
+    const to = path.join(targetRoot, entry.name)
+    if (fs.existsSync(to)) {
+      continue
+    }
+    fs.cpSync(from, to, { recursive: true, force: false })
+    copied += 1
+  }
+
+  return { ok: true, copied, total: entries.length }
+}
+
 function getOfflineDictionarySqlitePath(base) {
   return path.join(base, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite')
 }
@@ -364,60 +408,6 @@ function resolvePythonCommand(scriptRoot) {
 
 function resolveScriptRoot() {
   return path.join(__dirname, '..', '..')
-}
-
-function resolveBundledOpenVoiceVoiceRoot(scriptRoot) {
-  const candidates = [
-    path.join(scriptRoot, 'data', 'openvoice', 'voices'),
-    (process.resourcesPath || '').trim() ? path.join(process.resourcesPath, 'data', 'openvoice', 'voices') : '',
-    path.join(__dirname, '..', '..', 'data', 'openvoice', 'voices'),
-  ].filter(Boolean)
-
-  for (const candidate of candidates) {
-    if (!fs.existsSync(candidate)) continue
-    try {
-      const entries = fs.readdirSync(candidate, { withFileTypes: true })
-      const hasManifest = entries.some((entry) => (
-        entry.isDirectory() && fs.existsSync(path.join(candidate, entry.name, 'manifest.json'))
-      ))
-      if (hasManifest) {
-        return candidate
-      }
-    } catch {
-      // Try next candidate.
-    }
-  }
-
-  return ''
-}
-
-function seedBundledOpenVoiceVoices(base, scriptRoot) {
-  const sourceRoot = resolveBundledOpenVoiceVoiceRoot(scriptRoot)
-  if (!sourceRoot) {
-    return { ok: false, copied: 0, reason: 'bundled voices not found' }
-  }
-
-  const targetRoot = path.join(base, 'openvoice', 'voices')
-  fs.mkdirSync(targetRoot, { recursive: true })
-
-  let copied = 0
-  const entries = fs.readdirSync(sourceRoot, { withFileTypes: true })
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue
-    const sourceDir = path.join(sourceRoot, entry.name)
-    const sourceManifest = path.join(sourceDir, 'manifest.json')
-    if (!fs.existsSync(sourceManifest)) continue
-
-    const targetDir = path.join(targetRoot, entry.name)
-    if (fs.existsSync(path.join(targetDir, 'manifest.json'))) {
-      continue
-    }
-
-    fs.cpSync(sourceDir, targetDir, { recursive: true })
-    copied += 1
-  }
-
-  return { ok: true, copied, sourceRoot, targetRoot }
 }
 
 const OPENVOICE_DEPS_PROBE = [
@@ -599,12 +589,13 @@ async function getSystemInfo() {
   const base = ensureJPLearnDirs()
   const scriptRoot = resolveScriptRoot()
   const pythonCmd = resolvePythonCommand(scriptRoot)
-  const openVoiceCheckpointsInstalled = fs.existsSync(path.join(base, 'openvoice', 'checkpoints_v2', 'converter', 'checkpoint.pth'))
+  const bundledOpenVoiceBase = path.join(scriptRoot, 'data', 'openvoice')
   const openVoiceDependenciesInstalled = areOpenVoiceDependenciesInstalled(pythonCmd)
   const totalRamGb = os.totalmem() / (1024 ** 3)
   const modelsDir = path.join(base, 'models')
   const llamaCppDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
-  const openVoiceInstalled = openVoiceCheckpointsInstalled && openVoiceDependenciesInstalled
+  const openVoiceInstalled = (hasOpenVoiceAssets(path.join(base, 'openvoice')) || hasOpenVoiceAssets(bundledOpenVoiceBase))
+    && openVoiceDependenciesInstalled
   const llamaCppInstalled = fs.existsSync(path.join(llamaCppDir, 'llama-server.exe'))
   const gpuAdapters = detectGpuNames()
   const gpuVramGb = detectGpuVramGb()
@@ -1098,17 +1089,6 @@ function downloadOpenVoice(sender, scriptRoot) {
 
   const dependenciesInstalled = () => areOpenVoiceDependenciesInstalled(pythonCmd)
 
-  const seedVoices = () => {
-    const result = seedBundledOpenVoiceVoices(base, scriptRoot)
-    if (!result.ok) {
-      return Promise.resolve(result)
-    }
-    if (result.copied > 0) {
-      emitProgress(36, `Seeded ${result.copied} bundled OpenVoice voice profile(s).`)
-    }
-    return Promise.resolve(result)
-  }
-
   const installDependencies = () => {
     if (dependenciesInstalled()) {
       emitProgress(100, 'OpenVoice Python dependencies already installed.')
@@ -1176,7 +1156,7 @@ function downloadOpenVoice(sender, scriptRoot) {
     fs.existsSync(path.join(openvoiceDir, 'checkpoints_v2', 'converter', 'checkpoint.pth'))
     && dependenciesInstalled()
   ) {
-    return seedVoices().then(() => ({ alreadyInstalled: true }))
+    return Promise.resolve({ alreadyInstalled: true })
   }
 
   const checkpointsInstalled = fs.existsSync(path.join(openvoiceDir, 'checkpoints_v2', 'converter', 'checkpoint.pth'))
@@ -1219,7 +1199,6 @@ function downloadOpenVoice(sender, scriptRoot) {
   }
 
   return downloadCheckpoints()
-    .then(() => seedVoices())
     .then(() => installDependencies())
     .then(() => ({ ok: true }))
 }
@@ -1468,6 +1447,7 @@ function createSetupRuntime() {
     isFirstRun,
     writeSentinel,
     ensureJPLearnDirs,
+    seedBundledOpenVoiceVoices,
     downloadModel,
     downloadLlamaCpp,
     downloadOpenVoice,

@@ -228,9 +228,9 @@ python-bundle/
 fonts/
 
 # Local voice asset dumps (user-managed; too large for git)
-voices/**
-voices/**/**
-!voices/.gitkeep
+data/openvoice/voices/**
+data/openvoice/samples/**
+!data/openvoice/voices/.gitkeep
 
 # Local llama.cpp model artifacts
 models/llama/*.gguf
