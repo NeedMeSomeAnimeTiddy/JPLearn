@@ -28,3 +28,4 @@ inflect==7.0.0
 wavmark==0.0.3
 num2words==0.5.12
 setuptools==68.2.2
+nltk==3.9.1

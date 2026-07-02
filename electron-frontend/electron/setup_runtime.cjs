@@ -368,8 +368,9 @@ function resolveScriptRoot() {
 
 const OPENVOICE_DEPS_PROBE = [
   'import importlib.util',
-  "mods=['openvoice','melo','torch','torchaudio','librosa','soundfile','transformers','langid','MeCab']",
+  "mods=['openvoice','melo','torch','torchaudio','librosa','soundfile','transformers','langid','MeCab','nltk']",
   'missing=[m for m in mods if importlib.util.find_spec(m) is None]',
+  "import nltk; nltk.data.find('taggers/averaged_perceptron_tagger_eng/')",
   'raise SystemExit(1 if missing else 0)',
 ].join(';')
 
@@ -1082,6 +1083,28 @@ function downloadOpenVoice(sender, scriptRoot) {
 
       child.on('error', reject)
     })
+      .then(() => {
+        emitProgress(90, 'Installing required NLTK data for English mixed-language speech…')
+        return new Promise((resolve, reject) => {
+          const nltkInstallCode = [
+            'import nltk',
+            "nltk.download('averaged_perceptron_tagger_eng', quiet=True, raise_on_error=True)",
+          ].join(';')
+          const child = spawn(pythonCmd, ['-c', nltkInstallCode], {
+            windowsHide: true,
+          })
+
+          child.on('close', (code) => {
+            if (code === 0) {
+              resolve({ ok: true })
+            } else {
+              reject(new Error(`OpenVoice NLTK data install failed (python exited with code ${code})`))
+            }
+          })
+
+          child.on('error', reject)
+        })
+      })
   }
 
   if (
