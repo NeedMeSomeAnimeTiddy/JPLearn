@@ -6,6 +6,7 @@ import sys
 from dataclasses import dataclass
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Literal
 
 from data.text_normalization import normalize_japanese_text, normalize_storage_text
 
@@ -23,6 +24,7 @@ DEFAULT_KANJI_N2_CSV = ROOT / "data" / "external_sources" / "kanji_n2.csv"
 DEFAULT_KANJI_N1_CSV = ROOT / "data" / "external_sources" / "kanji_n1.csv"
 OUTPUT_MODULE = ROOT / "domain" / "external_deck_data.py"
 EXPECTED_HEADERS = ("character", "romaji", "meaning")
+ConflictPolicy = Literal["error", "keep-first", "keep-last"]
 
 
 @dataclass(frozen=True)
@@ -122,6 +124,58 @@ def _build_cross_list_report(sheets: list[CsvSheet]) -> tuple[int, list[str]]:
     return cross_list_duplicates, conflicts
 
 
+def _resolve_cross_list_conflicts(
+    sheets: list[CsvSheet],
+    policy: ConflictPolicy,
+) -> list[CsvSheet]:
+    if policy == "error":
+        return sheets
+
+    if policy == "keep-first":
+        seen: set[tuple[str, str]] = set()
+        resolved: list[CsvSheet] = []
+        for sheet in sheets:
+            kept_rows: list[tuple[str, str, str]] = []
+            for character, romaji, meaning in sheet.rows:
+                key = (character, romaji)
+                if key in seen:
+                    continue
+                seen.add(key)
+                kept_rows.append((character, romaji, meaning))
+            resolved.append(
+                CsvSheet(
+                    name=sheet.name,
+                    source_path=sheet.source_path,
+                    rows=kept_rows,
+                    duplicates_removed=sheet.duplicates_removed,
+                )
+            )
+        return resolved
+
+    # keep-last: retain the last occurrence across input sheet order.
+    winner_by_key: dict[tuple[str, str], tuple[str, str, str, str]] = {}
+    for sheet in sheets:
+        for character, romaji, meaning in sheet.rows:
+            winner_by_key[(character, romaji)] = (character, romaji, meaning, sheet.name)
+
+    resolved_last: list[CsvSheet] = []
+    for sheet in sheets:
+        kept_rows = [
+            (character, romaji, meaning)
+            for character, romaji, meaning in sheet.rows
+            if winner_by_key.get((character, romaji), (None, None, None, None))[3] == sheet.name
+        ]
+        resolved_last.append(
+            CsvSheet(
+                name=sheet.name,
+                source_path=sheet.source_path,
+                rows=kept_rows,
+                duplicates_removed=sheet.duplicates_removed,
+            )
+        )
+    return resolved_last
+
+
 def _format_rows(name: str, rows: list[tuple[str, str, str]]) -> str:
     lines = [f"{name}: list[tuple[str, str, str]] = ["]
     for character, romaji, meaning in rows:
@@ -153,9 +207,7 @@ def _render_module(
     kanji_n3_source: Path,
     kanji_n2_source: Path,
     kanji_n1_source: Path,
-    sentence_examples_rows: list[tuple[str, str, str]] | None,
     conjugation_training_rows: list[tuple[str, str, str]] | None,
-    sentence_examples_source: Path | None,
     conjugation_training_source: Path | None,
     duplicates_removed_within_lists: int,
     duplicates_across_lists: int,
@@ -179,8 +231,6 @@ def _render_module(
         f"# Generated from: {_display_source_path(kanji_n1_source)}",
         "",
     ]
-    if sentence_examples_source is not None:
-        header.append(f"# Generated from: {_display_source_path(sentence_examples_source)}")
     if conjugation_training_source is not None:
         header.append(f"# Generated from: {_display_source_path(conjugation_training_source)}")
     body = [
@@ -207,11 +257,6 @@ def _render_module(
         _format_rows("KANJI_N1_EXTERNAL_DATA", kanji_n1_rows),
         "",
     ]
-    if sentence_examples_rows is not None:
-        body.extend([
-            _format_rows("SENTENCE_EXAMPLES_EXTERNAL_DATA", sentence_examples_rows),
-            "",
-        ])
     if conjugation_training_rows is not None:
         body.extend([
             _format_rows("CONJUGATION_TRAINING_EXTERNAL_DATA", conjugation_training_rows),
@@ -233,8 +278,8 @@ def generate_external_deck_module(
     kanji_n3_csv: Path = DEFAULT_KANJI_N3_CSV,
     kanji_n2_csv: Path = DEFAULT_KANJI_N2_CSV,
     kanji_n1_csv: Path = DEFAULT_KANJI_N1_CSV,
-    sentence_examples_csv: Path | None = None,
     conjugation_training_csv: Path | None = None,
+    conflict_policy: ConflictPolicy = "error",
 ) -> tuple[int, int, int, int, int, int, int, int, int, int, int]:
     words_n5_sheet = _read_csv(words_n5_csv, "words_n5")
     words_n4_sheet = _read_csv(words_n4_csv, "words_n4")
@@ -247,7 +292,6 @@ def generate_external_deck_module(
     kanji_n3_sheet = _read_csv(kanji_n3_csv, "kanji_n3")
     kanji_n2_sheet = _read_csv(kanji_n2_csv, "kanji_n2")
     kanji_n1_sheet = _read_csv(kanji_n1_csv, "kanji_n1")
-    sentence_examples_sheet = _read_csv(sentence_examples_csv, "sentence_examples") if sentence_examples_csv else None
     conjugation_training_sheet = _read_csv(conjugation_training_csv, "conjugation_training") if conjugation_training_csv else None
 
     sheets = [
@@ -263,13 +307,14 @@ def generate_external_deck_module(
         kanji_n2_sheet,
         kanji_n1_sheet,
     ]
-    if sentence_examples_sheet is not None:
-        sheets.append(sentence_examples_sheet)
     if conjugation_training_sheet is not None:
         sheets.append(conjugation_training_sheet)
+
+    sheets = _resolve_cross_list_conflicts(sheets, conflict_policy)
+
     duplicates_removed_within_lists = sum(sheet.duplicates_removed for sheet in sheets)
     duplicates_across_lists, conflicts = _build_cross_list_report(sheets)
-    if conflicts:
+    if conflict_policy == "error" and conflicts:
         sample_lines = "\n".join(conflicts[:8])
         remaining = len(conflicts) - 8
         suffix = "" if remaining <= 0 else f"\n... and {remaining} more conflict(s)"
@@ -278,17 +323,19 @@ def generate_external_deck_module(
             f"{sample_lines}{suffix}"
         )
 
-    words_n5_rows = words_n5_sheet.rows
-    words_n4_rows = words_n4_sheet.rows
-    words_n3_rows = words_n3_sheet.rows
-    words_n2_rows = words_n2_sheet.rows
-    words_n1_rows = words_n1_sheet.rows
-    conversational_rows = conversational_sheet.rows
-    kanji_n5_rows = kanji_n5_sheet.rows
-    kanji_n4_rows = kanji_n4_sheet.rows
-    kanji_n3_rows = kanji_n3_sheet.rows
-    kanji_n2_rows = kanji_n2_sheet.rows
-    kanji_n1_rows = kanji_n1_sheet.rows
+    rows_by_name = {sheet.name: sheet.rows for sheet in sheets}
+    words_n5_rows = rows_by_name["words_n5"]
+    words_n4_rows = rows_by_name["words_n4"]
+    words_n3_rows = rows_by_name["words_n3"]
+    words_n2_rows = rows_by_name["words_n2"]
+    words_n1_rows = rows_by_name["words_n1"]
+    conversational_rows = rows_by_name["conversational"]
+    kanji_n5_rows = rows_by_name["kanji_n5"]
+    kanji_n4_rows = rows_by_name["kanji_n4"]
+    kanji_n3_rows = rows_by_name["kanji_n3"]
+    kanji_n2_rows = rows_by_name["kanji_n2"]
+    kanji_n1_rows = rows_by_name["kanji_n1"]
+    conjugation_training_rows = rows_by_name.get("conjugation_training")
 
     if len(words_n5_rows) < 80:
         raise ValueError("Words N5 source must contain at least 80 rows")
@@ -312,8 +359,6 @@ def generate_external_deck_module(
         raise ValueError("Kanji N2 source must contain at least 20 rows")
     if len(kanji_n1_rows) < 20:
         raise ValueError("Kanji N1 source must contain at least 20 rows")
-    if sentence_examples_sheet is not None and len(sentence_examples_sheet.rows) < 40:
-        raise ValueError("Sentence examples source must contain at least 40 rows")
     if conjugation_training_sheet is not None and len(conjugation_training_sheet.rows) < 20:
         raise ValueError("Conjugation training source must contain at least 20 rows")
 
@@ -340,9 +385,7 @@ def generate_external_deck_module(
         kanji_n3_csv,
         kanji_n2_csv,
         kanji_n1_csv,
-        sentence_examples_sheet.rows if sentence_examples_sheet is not None else None,
-        conjugation_training_sheet.rows if conjugation_training_sheet is not None else None,
-        sentence_examples_csv,
+        conjugation_training_rows,
         conjugation_training_csv,
         duplicates_removed_within_lists,
         duplicates_across_lists,
@@ -440,6 +483,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=OUTPUT_MODULE,
         help="Output Python module path",
     )
+    parser.add_argument(
+        "--conflict-policy",
+        choices=["error", "keep-first", "keep-last"],
+        default="error",
+        help="How to handle cross-list (character,romaji) meaning conflicts.",
+    )
     return parser
 
 
@@ -473,6 +522,7 @@ def main() -> int:
             kanji_n2_csv=args.kanji_n2_csv,
             kanji_n1_csv=args.kanji_n1_csv,
             output_module=args.output,
+            conflict_policy=args.conflict_policy,
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)

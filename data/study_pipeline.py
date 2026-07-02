@@ -480,6 +480,15 @@ def load_today_progress(
     return database.load_today_progress(deck_name, card_ids, on_date=on_date)
 
 
+def load_deck_summary_counts(
+    deck_name: str,
+    card_ids: list[int],
+    on_date: date | None = None,
+) -> tuple[int, int, int]:
+    """Return ``(mastered_count, due_today, completed_today)`` for summary screens."""
+    return database.load_deck_summary_counts(deck_name, card_ids, on_date=on_date)
+
+
 def load_streak_state() -> StreakState:
     """Return persisted daily streak information."""
     return database.load_streak_state()

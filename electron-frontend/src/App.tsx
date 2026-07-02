@@ -111,7 +111,7 @@ type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgres
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
 type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
 type OverviewCategoryBlocks = OverviewCharacterMasteryPayload['category_blocks']
-type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
+type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns' | 'sentence_examples'
 type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' | 'food_drink' | 'school_study' | 'places' | 'transport' | 'adjectives' | 'verbs' | 'nouns'
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
 type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
@@ -566,6 +566,48 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Audio Anchor: connect the written form to spoken usage.',
     ],
   },
+  sentence_examples: {
+    romaji_sprint: [
+      'Sentence Read: commit to the reading flow before typing.',
+      'Phrase Rhythm: keep sentence cadence while you answer.',
+    ],
+    meaning_match: [
+      'Sentence Meaning: choose the translation that fits best.',
+      'Context Precision: pick the meaning that matches full context.',
+    ],
+    character_match: [
+      'Sentence Form: choose the Japanese line that matches the meaning.',
+      'Expression Recall: select the most natural sentence form.',
+    ],
+    stroke_order: [
+      'Stroke Trace: picture the write order before you answer.',
+      'Form First: rebuild the symbol one part at a time.',
+    ],
+    typed_recall: [
+      'Sentence Recall: type the meaning from memory in your own words.',
+      'Full-Line Recall: capture the sentence intent clearly.',
+    ],
+    speech_recall: [
+      'Voice Recall: say the sentence meaning clearly and naturally.',
+      'Spoken Intent: speak the core meaning in one go.',
+    ],
+    context_cloze: [
+      'Sentence Cloze: use surrounding context to fill the missing part.',
+      'Flow Completion: choose what makes the line sound natural.',
+    ],
+    narrative_story: [
+      'Scene Sentence: pick the line that fits the moment.',
+      'Story Context: complete the exchange with natural phrasing.',
+    ],
+    listening_audio_first: [
+      'Sentence Audio: hear the sentence and choose its meaning.',
+      'Ear-First Context: decode the line by sound before selecting.',
+    ],
+    listening_prompt_first: [
+      'Read + Listen: reinforce sentence form with pronunciation.',
+      'Audio Anchor: connect sentence text to spoken rhythm.',
+    ],
+  },
 }
 const TAG_PROMPT_PACKS: Record<string, string[]> = {
   hiragana: [
@@ -654,6 +696,20 @@ const CLOZE_TEMPLATES: Record<ScriptKey, Record<number, string[]>> = {
     3: [
       'In nuanced dialogue, {character} still conveys ___.',
       'The most natural reading of {character} here is ___.',
+    ],
+  },
+  sentence_examples: {
+    1: [
+      'The sentence {character} most naturally means ___.',
+      'For {character} ({romaji}), the best meaning is ___.',
+    ],
+    2: [
+      'From context, {character} expresses ___.',
+      'In this exchange, {character} is best read as ___.',
+    ],
+    3: [
+      'In nuanced context, {character} still conveys ___.',
+      'Under pressure, the most natural meaning of {character} is ___.',
     ],
   },
 }
@@ -771,6 +827,29 @@ const STORY_CHAPTERS: Record<ScriptKey, Record<1 | 2 | 3, { title: string; lines
       lines: [
         'In natural dialogue, {character} conveys ___ in this scene.',
         'In the final exchange, {character} carries the meaning ___.',
+      ],
+    },
+  },
+  sentence_examples: {
+    1: {
+      title: 'Chapter 1: Daily Exchange',
+      lines: [
+        'A casual line is missing one idea; {character} means ___.',
+        'In this daily scene, {character} is best read as ___.',
+      ],
+    },
+    2: {
+      title: 'Chapter 2: Practical Situation',
+      lines: [
+        'Context clues point to one meaning for {character}: ___.',
+        'This practical sentence sounds natural only if {character} means ___.',
+      ],
+    },
+    3: {
+      title: 'Chapter 3: Nuanced Conversation',
+      lines: [
+        'In a nuanced exchange, {character} conveys ___.',
+        'The strongest interpretation of {character} in this scene is ___.',
       ],
     },
   },
@@ -897,7 +976,7 @@ type StatsByScript = Record<ScriptKey, ScriptStats>
 type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
 type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'deckSnapshot'
 
-const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns'] as const
+const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples'] as const
 
 const SCRIPT_LABELS: Record<ScriptKey, string> = {
   hiragana: 'Hiragana',
@@ -905,6 +984,7 @@ const SCRIPT_LABELS: Record<ScriptKey, string> = {
   kanji_n5: 'Kanji',
   vocab_n5: 'Vocabulary',
   grammar_patterns: 'Grammar',
+  sentence_examples: 'Sentences',
 }
 
 const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }> = [
@@ -971,6 +1051,7 @@ const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
   kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  sentence_examples: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
 }
 
 const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>> = {
@@ -979,6 +1060,7 @@ const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>>
   kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match'],
   vocab_n5: ['meaning_match', 'character_match', 'context_cloze'],
   grammar_patterns: ['meaning_match', 'character_match', 'context_cloze'],
+  sentence_examples: ['meaning_match', 'character_match', 'context_cloze'],
 }
 
 const SECTION_META: Record<ScriptKey, { glyph: string }> = {
@@ -987,6 +1069,7 @@ const SECTION_META: Record<ScriptKey, { glyph: string }> = {
   kanji_n5: { glyph: '漢' },
   vocab_n5: { glyph: '語' },
   grammar_patterns: { glyph: '話' },
+  sentence_examples: { glyph: '文' },
 }
 
 const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
@@ -1807,6 +1890,7 @@ function defaultStatsByScript(): StatsByScript {
     kanji_n5: { ...EMPTY_SCRIPT_STATS },
     vocab_n5: { ...EMPTY_SCRIPT_STATS },
     grammar_patterns: { ...EMPTY_SCRIPT_STATS },
+    sentence_examples: { ...EMPTY_SCRIPT_STATS },
   }
 }
 
@@ -1877,6 +1961,19 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
+    sentence_examples: {
+      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
+      meaning_match: { ...EMPTY_MINIGAME_STATS },
+      character_match: { ...EMPTY_MINIGAME_STATS },
+      stroke_order: { ...EMPTY_MINIGAME_STATS },
+      typed_recall: { ...EMPTY_MINIGAME_STATS },
+      speech_recall: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
+      narrative_story: { ...EMPTY_MINIGAME_STATS },
+      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
+      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
+      interleave_mix: { ...EMPTY_MINIGAME_STATS },
+    },
   }
 }
 
@@ -1892,6 +1989,7 @@ function loadSavedStats(): StatsByScript {
       kanji_n5: { ...EMPTY_SCRIPT_STATS, ...(parsed.kanji_n5 ?? {}) },
       vocab_n5: { ...EMPTY_SCRIPT_STATS, ...(parsed.vocab_n5 ?? {}) },
       grammar_patterns: { ...EMPTY_SCRIPT_STATS, ...(parsed.grammar_patterns ?? {}) },
+      sentence_examples: { ...EMPTY_SCRIPT_STATS, ...(parsed.sentence_examples ?? {}) },
     }
   } catch {
     return defaultStatsByScript()
@@ -2117,7 +2215,7 @@ type CardScores = Record<ScriptKey, Record<number, number>>
 function loadCardScores(): CardScores {
   try {
     const raw = window.localStorage.getItem(CARD_SCORES_STORAGE_KEY)
-    if (!raw) return { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} }
+    if (!raw) return { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} }
     const parsed = JSON.parse(raw) as Partial<CardScores>
     return {
       hiragana: parsed.hiragana ?? {},
@@ -2125,9 +2223,10 @@ function loadCardScores(): CardScores {
       kanji_n5: parsed.kanji_n5 ?? {},
       vocab_n5: parsed.vocab_n5 ?? {},
       grammar_patterns: parsed.grammar_patterns ?? {},
+      sentence_examples: parsed.sentence_examples ?? {},
     }
   } catch {
-    return { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} }
+    return { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} }
   }
 }
 
@@ -2474,6 +2573,7 @@ function getStudyPlanTargetMastery(script: ScriptKey): number {
   if (script === 'katakana') return 0.85
   if (script === 'kanji_n5') return 0.72
   if (script === 'vocab_n5') return 0.72
+  if (script === 'sentence_examples') return 0.68
   return 0.68
 }
 
@@ -2515,6 +2615,7 @@ function buildStudyPlan(
   const hiragana = aggregateDeckMastery(decks, (slug) => slug === 'hiragana')
   const katakana = aggregateDeckMastery(decks, (slug) => slug === 'katakana')
   const grammar = aggregateDeckMastery(decks, (slug) => slug === 'grammar_patterns')
+  const sentences = aggregateDeckMastery(decks, (slug) => slug === 'sentence_examples')
 
   const kanjiFromDecks = aggregateDeckMastery(decks, (slug) => slug.startsWith('kanji_'))
   const vocabFromDecks = aggregateDeckMastery(decks, (slug) => slug.startsWith('vocab_'))
@@ -2528,6 +2629,7 @@ function buildStudyPlan(
   const kanjiReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.45
   const vocabReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.55
   const grammarReady = vocab.mastery >= 0.45
+  const sentencesReady = grammar.mastery >= 0.45
 
   const coverageRows: StudyPlanCoverageRow[] = [
     {
@@ -2569,6 +2671,14 @@ function buildStudyPlan(
       total: grammar.total,
       unlocked: grammarReady,
       difficulty: 4,
+    },
+    {
+      key: 'sentence_examples',
+      label: SCRIPT_LABELS.sentence_examples,
+      mastery: sentences.mastery,
+      total: sentences.total,
+      unlocked: sentencesReady,
+      difficulty: 5,
     },
   ]
 
@@ -5582,7 +5692,7 @@ function App() {
         }
       }
 
-      if (cards.length < 4) return null
+      if (cards.length < 2) return null
 
       const cardsById = new Map(cards.map((entry) => [entry.id, entry]))
 
@@ -5872,7 +5982,9 @@ function App() {
     const block = blockProgress.find((entry) => entry.index === activeBlockIndex)
     if (!block) return deckCards
     const idSet = new Set(block.card_ids)
-    return deckCards.filter((c) => idSet.has(c.id))
+    const matchingCards = deckCards.filter((c) => idSet.has(c.id))
+    // Fallback to full deck when block metadata does not map to loaded card IDs.
+    return matchingCards.length > 0 ? matchingCards : deckCards
   }, [deckCards, blockProgress, activeBlockIndex])
 
   const activeSessionLengthPreset = useMemo(
@@ -6402,6 +6514,11 @@ function App() {
           setActiveScript('grammar_patterns')
           setView('script_hub')
         }
+        if (event.key === '7') {
+          setNavDirection('forward')
+          setActiveScript('sentence_examples')
+          setView('script_hub')
+        }
       }
     }
 
@@ -6647,13 +6764,14 @@ function App() {
     setError(null)
     try {
       await window.jplearnDesktop.resetStudyDb()
-      const emptyScores: CardScores = { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} }
+      const emptyScores: CardScores = { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} }
       const emptyStats: StatsByScript = {
         hiragana: { ...EMPTY_SCRIPT_STATS },
         katakana: { ...EMPTY_SCRIPT_STATS },
         kanji_n5: { ...EMPTY_SCRIPT_STATS },
         vocab_n5: { ...EMPTY_SCRIPT_STATS },
         grammar_patterns: { ...EMPTY_SCRIPT_STATS },
+        sentence_examples: { ...EMPTY_SCRIPT_STATS },
       }
       window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(emptyScores))
       window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(emptyStats))
@@ -6733,7 +6851,7 @@ function App() {
     try {
       await window.jplearnDesktop.applyExpertiseLevel(level)
       if (level === 'total_beginner') {
-        setCardScores({ hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {} })
+        setCardScores({ hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} })
       } else {
         const targetScripts = EXPERTISE_LEVEL_TO_SCRIPT_KEYS[level]
         const payloads = await Promise.all(targetScripts.map((slug) => getDeckCardsDeduped(slug)))
@@ -6744,6 +6862,7 @@ function App() {
             kanji_n5: { ...previous.kanji_n5 },
             vocab_n5: { ...previous.vocab_n5 },
             grammar_patterns: { ...previous.grammar_patterns },
+            sentence_examples: { ...previous.sentence_examples },
           }
           targetScripts.forEach((scriptKey, index) => {
             const deck = payloads[index]
@@ -7409,7 +7528,7 @@ function App() {
             if (needsWarning) {
               const LABELS: Record<ScriptKey, string> = {
                 hiragana: 'Hiragana', katakana: 'Katakana', kanji_n5: 'Kanji (N5)',
-                vocab_n5: 'N5 Vocabulary', grammar_patterns: 'N5 Grammar',
+                vocab_n5: 'N5 Vocabulary', grammar_patterns: 'N5 Grammar', sentence_examples: 'Sentences',
               }
               setWarningModal({
                 sectionId: script,

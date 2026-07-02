@@ -58,6 +58,7 @@ MIGRATION_V8 = 8
 MIGRATION_V9 = 9
 MIGRATION_V10 = 10
 LATEST_SCHEMA_VERSION = 10
+_SQLITE_IN_CHUNK_SIZE = 900
 
 StageDistribution: TypeAlias = dict[int, int]
 
@@ -98,6 +99,70 @@ def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _iter_chunks(values: list[int], size: int) -> list[list[int]]:
+    return [values[i : i + size] for i in range(0, len(values), size)]
+
+
+def load_deck_summary_counts(
+    deck_name: str,
+    card_ids: list[int],
+    on_date: date | None = None,
+) -> tuple[int, int, int]:
+    """Return (mastered_count, due_today, completed_today) for selected deck cards.
+
+    This avoids materializing default ReviewState objects for every card when
+    large decks are summarized.
+    """
+    if not card_ids:
+        return (0, 0, 0)
+
+    normalized_deck_name = _normalize_deck_name(deck_name)
+    target_day = on_date or date.today()
+    target_day_iso = target_day.isoformat()
+
+    mastered_count = 0
+    persisted_total = 0
+    persisted_due = 0
+    completed_ids: set[int] = set()
+
+    with _connect() as conn:
+        for card_id_chunk in _iter_chunks(card_ids, _SQLITE_IN_CHUNK_SIZE):
+            placeholders = ",".join("?" * len(card_id_chunk))
+            summary_row = conn.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS persisted_total,
+                    SUM(CASE WHEN repetitions >= 3 AND interval >= 21 THEN 1 ELSE 0 END) AS mastered_total,
+                    SUM(CASE WHEN next_review <= ? THEN 1 ELSE 0 END) AS due_total
+                FROM review_states
+                WHERE deck=? AND card_id IN ({placeholders})
+                """,
+                [target_day_iso, normalized_deck_name, *card_id_chunk],
+            ).fetchone()
+
+            persisted_total += int(summary_row["persisted_total"] or 0)
+            mastered_count += int(summary_row["mastered_total"] or 0)
+            persisted_due += int(summary_row["due_total"] or 0)
+
+            completion_rows = conn.execute(
+                f"""
+                SELECT DISTINCT card_id
+                FROM review_events
+                WHERE deck=? AND reviewed_on=? AND card_id IN ({placeholders})
+                """,
+                [normalized_deck_name, target_day_iso, *card_id_chunk],
+            ).fetchall()
+            for row in completion_rows:
+                completed_ids.add(int(row[0]))
+
+    # Missing review_states rows are default cards due immediately.
+    missing_total = max(0, len(card_ids) - persisted_total)
+    due_remaining = persisted_due + missing_total
+    completed_today = len(completed_ids)
+    due_today = due_remaining + completed_today
+    return mastered_count, due_today, completed_today
 
 
 def _ensure_schema_version_table(conn: sqlite3.Connection) -> None:
@@ -615,11 +680,15 @@ def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
 
     normalized_deck_name = _normalize_deck_name(deck_name)
     with _connect() as conn:
-        placeholders = ",".join("?" * len(card_ids))
-        rows = conn.execute(
-            f"SELECT * FROM review_states WHERE deck=? AND card_id IN ({placeholders})",
-            [normalized_deck_name, *card_ids],
-        ).fetchall()
+        rows: list[sqlite3.Row] = []
+        for card_id_chunk in _iter_chunks(card_ids, _SQLITE_IN_CHUNK_SIZE):
+            placeholders = ",".join("?" * len(card_id_chunk))
+            rows.extend(
+                conn.execute(
+                    f"SELECT * FROM review_states WHERE deck=? AND card_id IN ({placeholders})",
+                    [normalized_deck_name, *card_id_chunk],
+                ).fetchall()
+            )
 
     states = {
         row["card_id"]: ReviewState(
@@ -845,16 +914,20 @@ def load_curriculum_stages(deck_name: str, mode: str, card_ids: list[int]) -> di
     if not normalized_mode:
         raise ValueError("mode must not be empty")
 
-    placeholders = ",".join("?" * len(card_ids))
     with _connect() as conn:
-        rows = conn.execute(
-            f"""
-            SELECT card_id, stage
-            FROM curriculum_stages
-            WHERE deck=? AND mode=? AND card_id IN ({placeholders})
-            """,
-            [normalized_deck_name, normalized_mode, *card_ids],
-        ).fetchall()
+        rows: list[sqlite3.Row] = []
+        for card_id_chunk in _iter_chunks(card_ids, _SQLITE_IN_CHUNK_SIZE):
+            placeholders = ",".join("?" * len(card_id_chunk))
+            rows.extend(
+                conn.execute(
+                    f"""
+                    SELECT card_id, stage
+                    FROM curriculum_stages
+                    WHERE deck=? AND mode=? AND card_id IN ({placeholders})
+                    """,
+                    [normalized_deck_name, normalized_mode, *card_id_chunk],
+                ).fetchall()
+            )
 
     stages = {int(row["card_id"]): max(1, min(3, int(row["stage"]))) for row in rows}
     for cid in card_ids:
@@ -1031,26 +1104,11 @@ def load_today_progress(
     deck_name: str, card_ids: list[int], on_date: date | None = None
 ) -> tuple[int, int]:
     """Return (due_today, completed_today) for the selected deck cards."""
-    if not card_ids:
-        return (0, 0)
-
-    normalized_deck_name = _normalize_deck_name(deck_name)
-    target_day = on_date or date.today()
-    states = load_states(normalized_deck_name, card_ids)
-    due_remaining = sum(1 for state in states.values() if state.next_review <= target_day)
-
-    placeholders = ",".join("?" * len(card_ids))
-    with _connect() as conn:
-        completed_today = conn.execute(
-            f"""
-            SELECT COUNT(DISTINCT card_id)
-            FROM review_events
-            WHERE deck=? AND reviewed_on=? AND card_id IN ({placeholders})
-            """,
-            [normalized_deck_name, target_day.isoformat(), *card_ids],
-        ).fetchone()[0]
-
-    due_today = due_remaining + completed_today
+    _, due_today, completed_today = load_deck_summary_counts(
+        deck_name,
+        card_ids,
+        on_date=on_date,
+    )
     return due_today, completed_today
 
 

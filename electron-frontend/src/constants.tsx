@@ -41,6 +41,7 @@ export const ALL_SCRIPT_KEYS = [
   'kanji_n5',
   'vocab_n5',
   'grammar_patterns',
+  'sentence_examples',
 ] as const
 
 export const SCRIPT_LABELS: Record<ScriptKey, string> = {
@@ -49,6 +50,7 @@ export const SCRIPT_LABELS: Record<ScriptKey, string> = {
   kanji_n5: 'Kanji',
   vocab_n5: 'Vocabulary',
   grammar_patterns: 'Grammar',
+  sentence_examples: 'Sentences',
 }
 
 export const TIMELINE_SCRIPT_LABELS: Record<string, string> = {
@@ -57,6 +59,7 @@ export const TIMELINE_SCRIPT_LABELS: Record<string, string> = {
   kanji_n5: 'Kanji',
   vocab_n5: 'Vocabulary',
   grammar_patterns: 'Grammar',
+  sentence_examples: 'Sentences',
   unknown: 'General',
 }
 
@@ -66,6 +69,7 @@ export const SCRIPT_MENU_LINES: Record<ScriptKey, string> = {
   kanji_n5: 'Build meaning recall one character at a time.',
   vocab_n5: 'Learn everyday words grouped by topic.',
   grammar_patterns: 'Practice grammar patterns and sentence flow.',
+  sentence_examples: 'Train full Japanese sentences with context-first recall.',
 }
 
 export const SCRIPT_DIFFICULTY_META: Record<
@@ -77,6 +81,7 @@ export const SCRIPT_DIFFICULTY_META: Record<
   kanji_n5: { label: 'Medium', tier: 3, icon: Target },
   vocab_n5: { label: 'Hard', tier: 4, icon: Flame },
   grammar_patterns: { label: 'Expert', tier: 5, icon: Trophy },
+  sentence_examples: { label: 'Expert+', tier: 5, icon: History },
 }
 
 export const SECTION_META: Record<ScriptKey, { glyph: string }> = {
@@ -85,6 +90,7 @@ export const SECTION_META: Record<ScriptKey, { glyph: string }> = {
   kanji_n5: { glyph: '漢' },
   vocab_n5: { glyph: '語' },
   grammar_patterns: { glyph: '話' },
+  sentence_examples: { glyph: '文' },
 }
 
 // ── Minigame metadata ────────────────────────────────────────────────────────
@@ -173,6 +179,17 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'interleave_mix',
   ],
   grammar_patterns: [
+    'meaning_match',
+    'character_match',
+    'typed_recall',
+    'speech_recall',
+    'context_cloze',
+    'narrative_story',
+    'listening_audio_first',
+    'listening_prompt_first',
+    'interleave_mix',
+  ],
+  sentence_examples: [
     'meaning_match',
     'character_match',
     'typed_recall',
@@ -380,6 +397,7 @@ export const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<InterleaveWeightKe
   kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match'],
   vocab_n5: ['meaning_match', 'character_match', 'context_cloze'],
   grammar_patterns: ['meaning_match', 'character_match', 'context_cloze'],
+  sentence_examples: ['meaning_match', 'character_match', 'context_cloze'],
 }
 
 // ── Round display helpers ────────────────────────────────────────────────────

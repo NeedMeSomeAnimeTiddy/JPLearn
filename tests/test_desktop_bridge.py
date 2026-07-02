@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from data import database
+from domain.cards import Card, Deck
 from domain.decks import ALL_DECKS
 from scripts import desktop_bridge
 
@@ -237,6 +238,59 @@ def test_build_deck_cards_includes_dictionary_summary_when_available(tmp_path: P
     assert dictionary_summary["primary_gloss"] == target_card.meaning
     assert dictionary_summary["glosses"] == [target_card.meaning, "calendar day", "sun marker"]
     assert dictionary_summary["source"] == "offline_dictionary"
+
+
+def test_build_deck_cards_sentence_examples_prefers_csv_runtime_source(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    csv_path = tmp_path / "sentence_examples.csv"
+    csv_path.write_text(
+        "character,romaji,meaning\n"
+        "おはよう。,ohayou.,Good morning.\n"
+        "今日はいい天気です。,kyou wa ii tenki desu.,The weather is nice today.\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(desktop_bridge, "SENTENCE_EXAMPLES_CSV_CANDIDATES", (csv_path,))
+    monkeypatch.setattr(desktop_bridge, "_SENTENCE_EXAMPLES_ROWS_CACHE", None)
+
+    payload = desktop_bridge.build_deck_cards("sentence_examples")
+    cards = cast(list[dict[str, object]], payload["cards"])
+
+    assert payload["name"] == "Sentence Examples"
+    assert len(cards) == 2
+    assert cards[0]["character"] == "おはよう。"
+    assert cards[0]["meaning"] == "Good morning."
+    assert cards[0]["example_sentence"] == "おはよう。"
+
+
+def test_build_deck_cards_sentence_examples_falls_back_when_csv_unavailable(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    fallback_deck = Deck(
+        name="Sentence Examples",
+        cards=[
+            Card(
+                id=0,
+                character="Fallback sentence",
+                romaji="fallback sentence",
+                meaning="fallback",
+                tags=["sentence"],
+                example_sentence="Fallback sentence",
+            )
+        ],
+    )
+
+    monkeypatch.setattr(desktop_bridge, "SENTENCE_EXAMPLES_CSV_CANDIDATES", (tmp_path / "missing.csv",))
+    monkeypatch.setattr(desktop_bridge, "_SENTENCE_EXAMPLES_ROWS_CACHE", None)
+    monkeypatch.setattr(desktop_bridge, "_SENTENCE_EXAMPLES_FALLBACK_FACTORY", lambda: fallback_deck)
+
+    payload = desktop_bridge.build_deck_cards("sentence_examples")
+    cards = cast(list[dict[str, object]], payload["cards"])
+
+    assert len(cards) == 1
+    assert cards[0]["character"] == "Fallback sentence"
+    assert cards[0]["meaning"] == "fallback"
 
 
 def test_build_block_progress_includes_new_phase_one_decks(tmp_path: Path, monkeypatch) -> None:

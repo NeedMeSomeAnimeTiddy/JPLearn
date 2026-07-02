@@ -56,6 +56,46 @@ def test_load_today_progress_counts_unique_completed_cards(tmp_path: Path, monke
     assert completed_today == 1
 
 
+def test_large_card_id_lists_are_chunked_for_sqlite_queries(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    today = date.today()
+    card_ids = list(range(1, 2501))
+
+    # Persist sparse rows so loaders must query and also create defaults.
+    for cid in (1, 1000, 2000, 2500):
+        database.save_state(
+            "Sentence Examples",
+            ReviewState(card_id=cid, repetitions=1, interval=3, next_review=today),
+        )
+
+    for cid, stage in ((1, 1), (1000, 2), (2000, 3), (2500, 2)):
+        database.save_curriculum_stage("Sentence Examples", cid, "context_cloze", stage)
+
+    database.log_review("Sentence Examples", 1000, 4, reviewed_on=today)
+
+    states = database.load_states("Sentence Examples", card_ids)
+    assert len(states) == len(card_ids)
+    assert states[1000].repetitions == 1
+
+    stages = database.load_curriculum_stages("Sentence Examples", "context_cloze", card_ids)
+    assert len(stages) == len(card_ids)
+    assert stages[1000] == 2
+    assert stages[1500] == 1
+
+    due_today, completed_today = database.load_today_progress("Sentence Examples", card_ids, on_date=today)
+    assert completed_today == 1
+    assert due_today >= completed_today
+
+    mastered_count, summary_due_today, summary_completed_today = database.load_deck_summary_counts(
+        "Sentence Examples",
+        card_ids,
+        on_date=today,
+    )
+    assert mastered_count == 0
+    assert summary_due_today == due_today
+    assert summary_completed_today == completed_today
+
+
 def test_streak_state_defaults_when_missing(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
     streak = database.load_streak_state()

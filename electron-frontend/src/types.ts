@@ -21,6 +21,7 @@ export type ScriptKey =
   | 'kanji_n5'
   | 'vocab_n5'
   | 'grammar_patterns'
+  | 'sentence_examples'
 
 export type JlptLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
 

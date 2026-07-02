@@ -19,23 +19,23 @@ const NetworkSpeed = require('network-speed')
 
 const MODELS = {
   low: {
-    filename: 'qwen2.5-1.5b-instruct-q8_0.gguf',
-    repo: 'Qwen/Qwen2.5-1.5B-Instruct-GGUF',
-    sizeMb: 1890,
+    filename: 'Qwen3.5-0.8B-Q6_K.gguf',
+    repo: 'unsloth/Qwen3.5-0.8B-GGUF',
+    sizeMb: 639,
     label: 'Low (0.8B)',
     description: 'Fast on any hardware. Good for everyday questions.',
   },
   medium: {
-    filename: 'qwen2.5-3b-instruct-q8_0.gguf',
-    repo: 'Qwen/Qwen2.5-3B-Instruct-GGUF',
-    sizeMb: 3620,
+    filename: 'Qwen3.5-2B-Q6_K.gguf',
+    repo: 'unsloth/Qwen3.5-2B-GGUF',
+    sizeMb: 1570,
     label: 'Medium (2B)',
     description: 'Better Japanese understanding while staying responsive on 16 GB systems.',
   },
   high: {
-    filename: 'Yi-1.5-6B-Chat-Q6_K.gguf',
-    repo: 'bartowski/Yi-1.5-6B-Chat-GGUF',
-    sizeMb: 4970,
+    filename: 'Qwen3.5-4B-Q6_K.gguf',
+    repo: 'unsloth/Qwen3.5-4B-GGUF',
+    sizeMb: 3530,
     label: 'High (4B)',
     description: 'Stronger reasoning and nuance. Best with 8 GB VRAM and 16 GB RAM.',
   },
@@ -805,18 +805,26 @@ function probeUrl(url) {
   })
 }
 
+function tryGetFileSize(filePath) {
+  try {
+    return fs.statSync(filePath).size
+  } catch {
+    return 0
+  }
+}
+
 /**
  * Download a single byte range [start, end] from finalUrl to partPath.
  * Calls onBytes(n) for each received chunk for aggregate progress tracking.
  */
-function downloadRange(finalUrl, start, end, partPath, onBytes) {
+function downloadRange(finalUrl, start, end, partPath, onBytes, append = false) {
   return new Promise((resolve, reject) => {
     const mod = finalUrl.startsWith('https') ? https : http
-    const out = fs.createWriteStream(partPath)
+    const out = fs.createWriteStream(partPath, { flags: append ? 'a' : 'w' })
     const req = mod.get(finalUrl, {
       headers: { 'User-Agent': 'JPLearn/1.0', 'Range': `bytes=${start}-${end}` },
     }, (res) => {
-      if (res.statusCode !== 206 && res.statusCode !== 200) {
+      if (res.statusCode !== 206) {
         out.destroy()
         try { fs.unlinkSync(partPath) } catch { /* ignore */ }
         reject(new Error(`HTTP ${res.statusCode} for range ${start}-${end}`))
@@ -827,7 +835,6 @@ function downloadRange(finalUrl, start, end, partPath, onBytes) {
       out.on('finish', resolve)
       const cleanup = (err) => {
         out.destroy()
-        try { fs.unlinkSync(partPath) } catch { /* ignore */ }
         reject(err)
       }
       out.on('error', cleanup)
@@ -835,7 +842,6 @@ function downloadRange(finalUrl, start, end, partPath, onBytes) {
     })
     req.on('error', (err) => {
       out.destroy()
-      try { fs.unlinkSync(partPath) } catch { /* ignore */ }
       reject(err)
     })
   })
@@ -873,30 +879,83 @@ function assembleParts(parts, tmpPath, destPath) {
  */
 function singleConnectionDownload(finalUrl, tmpPath, knownTotal, onProgress) {
   return new Promise((resolve, reject) => {
-    const mod = finalUrl.startsWith('https') ? https : http
-    const req = mod.get(finalUrl, { headers: { 'User-Agent': 'JPLearn/1.0' } }, (res) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode} downloading ${finalUrl}`))
+    let existing = tryGetFileSize(tmpPath)
+    if (knownTotal > 0 && existing > knownTotal) {
+      try { fs.unlinkSync(tmpPath) } catch { /* ignore */ }
+      existing = 0
+    }
+
+    if (knownTotal > 0 && existing === knownTotal) {
+      if (onProgress) onProgress(knownTotal, knownTotal)
+      resolve()
+      return
+    }
+
+    const requestWithRedirects = (urlToGet, hops) => {
+      if (hops > 8) {
+        reject(new Error('Too many redirects downloading model'))
         return
       }
-      const total = knownTotal || parseInt(res.headers['content-length'] || '0', 10)
-      let done = 0
-      let lastReportedPct = -1
-      const out = fs.createWriteStream(tmpPath)
-      res.on('data', (chunk) => {
-        done += chunk.length
-        if (total > 0 && onProgress) {
-          const pct = Math.round((done / total) * 100)
-          if (pct !== lastReportedPct) { lastReportedPct = pct; onProgress(done, total) }
+
+      const headers = { 'User-Agent': 'JPLearn/1.0' }
+      if (existing > 0) {
+        headers.Range = `bytes=${existing}-`
+      }
+
+      const mod = urlToGet.startsWith('https') ? https : http
+      const req = mod.get(urlToGet, { headers }, (res) => {
+        const status = res.statusCode || 0
+        const isRedirect = status >= 300 && status < 400 && !!res.headers.location
+        if (isRedirect) {
+          const nextUrl = new URL(res.headers.location, urlToGet).toString()
+          res.resume()
+          requestWithRedirects(nextUrl, hops + 1)
+          return
         }
+
+        const resIsFull = status === 200
+        const resIsRange = status === 206
+        if (!resIsFull && !resIsRange) {
+          reject(new Error(`HTTP ${status} downloading ${urlToGet}`))
+          return
+        }
+
+        let total = knownTotal || 0
+        if (resIsRange && res.headers['content-range']) {
+          const m = res.headers['content-range'].match(/\/(\d+)$/)
+          if (m) total = parseInt(m[1], 10)
+        }
+        if (total === 0) {
+          const contentLen = parseInt(res.headers['content-length'] || '0', 10)
+          total = resIsRange ? existing + contentLen : contentLen
+        }
+
+        const shouldAppend = resIsRange && existing > 0
+        if (!shouldAppend && existing > 0) {
+          try { fs.unlinkSync(tmpPath) } catch { /* ignore */ }
+          existing = 0
+        }
+
+        let done = existing
+        let lastReportedPct = -1
+        const out = fs.createWriteStream(tmpPath, { flags: shouldAppend ? 'a' : 'w' })
+        res.on('data', (chunk) => {
+          done += chunk.length
+          if (total > 0 && onProgress) {
+            const pct = Math.round((done / total) * 100)
+            if (pct !== lastReportedPct) { lastReportedPct = pct; onProgress(done, total) }
+          }
+        })
+        res.pipe(out)
+        out.on('finish', resolve)
+        const cleanup = (err) => { reject(err) }
+        out.on('error', cleanup)
+        res.on('error', cleanup)
       })
-      res.pipe(out)
-      out.on('finish', resolve)
-      const cleanup = (err) => { try { fs.unlinkSync(tmpPath) } catch { /* ignore */ } reject(err) }
-      out.on('error', cleanup)
-      res.on('error', cleanup)
-    })
-    req.on('error', (err) => { try { fs.unlinkSync(tmpPath) } catch { /* ignore */ } reject(err) })
+      req.on('error', reject)
+    }
+
+    requestWithRedirects(finalUrl, 0)
   })
 }
 
@@ -910,8 +969,6 @@ function downloadWithProgress(url, destPath, onProgress) {
   const tmpPath = `${destPath}.tmp`
 
   return new Promise((resolve, reject) => {
-    try { fs.unlinkSync(tmpPath) } catch { /* ignore */ }
-
     probeUrl(url).then(({ finalUrl, total, supportsRanges }) => {
       if (!supportsRanges || total === 0) {
         singleConnectionDownload(finalUrl, tmpPath, total, onProgress)
@@ -926,7 +983,6 @@ function downloadWithProgress(url, destPath, onProgress) {
         end: Math.min((i + 1) * chunkSize - 1, total - 1),
         partPath: `${destPath}.part${i}`,
       }))
-      parts.forEach(({ partPath }) => { try { fs.unlinkSync(partPath) } catch { /* ignore */ } })
 
       let done = 0
       let lastReportedPct = -1
@@ -938,14 +994,54 @@ function downloadWithProgress(url, destPath, onProgress) {
         }
       }
 
-      Promise.all(parts.map(({ start, end, partPath }) =>
-        downloadRange(finalUrl, start, end, partPath, onBytes)
-      ))
+      const downloads = []
+      for (const part of parts) {
+        const expectedSize = part.end - part.start + 1
+        let existingSize = tryGetFileSize(part.partPath)
+
+        if (existingSize < 0) existingSize = 0
+        if (existingSize > expectedSize) {
+          try { fs.unlinkSync(part.partPath) } catch { /* ignore */ }
+          existingSize = 0
+        }
+
+        if (existingSize === expectedSize) {
+          done += existingSize
+          continue
+        }
+
+        done += existingSize
+        downloads.push(downloadRange(
+          finalUrl,
+          part.start + existingSize,
+          part.end,
+          part.partPath,
+          onBytes,
+          existingSize > 0,
+        ))
+      }
+
+      if (total > 0 && onProgress) {
+        const pct = Math.round((done / total) * 100)
+        if (pct !== lastReportedPct) { lastReportedPct = pct; onProgress(done, total) }
+      }
+
+      Promise.all(downloads)
         .then(() => assembleParts(parts, tmpPath, destPath).then(resolve).catch(reject))
         .catch((err) => {
-          parts.forEach(({ partPath }) => { try { fs.unlinkSync(partPath) } catch { /* ignore */ } })
-          try { fs.unlinkSync(tmpPath) } catch { /* ignore */ }
-          reject(err)
+          const message = err instanceof Error ? err.message : String(err)
+          const shouldFallbackToSingle = /HTTP\s+403\s+for\s+range/i.test(message)
+
+          if (!shouldFallbackToSingle) {
+            reject(err)
+            return
+          }
+
+          // Some CDN edges reject individual ranged chunk requests mid-download.
+          // Retry once with a resumable single stream against the canonical URL.
+          singleConnectionDownload(url, tmpPath, total, onProgress)
+            .then(() => { fs.renameSync(tmpPath, destPath); resolve() })
+            .catch(reject)
         })
     }).catch(reject)
   })

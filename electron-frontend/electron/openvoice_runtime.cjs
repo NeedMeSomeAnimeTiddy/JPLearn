@@ -5,6 +5,12 @@ const { spawn } = require('node:child_process')
 
 const DEFAULT_MAX_TEXT_CHARS = 400
 const DEFAULT_SPEED = 1.0
+const DEFAULT_REQUEST_TIMEOUT_MS = 120000
+const DEFAULT_QUALITY_MODE = (process.env.JPLEARN_OPENVOICE_QUALITY_MODE || 'fast').trim() || 'fast'
+const DEFAULT_POSTPROCESS_MODE = (process.env.JPLEARN_OPENVOICE_POSTPROCESS || 'off').trim() || 'off'
+const DEFAULT_CACHE_ENTRIES = Number.isFinite(Number(process.env.JPLEARN_OPENVOICE_CACHE_ENTRIES))
+  ? Math.max(0, Math.floor(Number(process.env.JPLEARN_OPENVOICE_CACHE_ENTRIES)))
+  : 24
 
 function sanitizeSpeechText(text) {
   return typeof text === 'string' ? text.replace(/〜/g, '').trim() : ''
@@ -41,6 +47,7 @@ function resolveOpenVoicePaths(repoRoot) {
     voiceRoot: path.join(baseDir, 'voices'),
     checkpointRoot: path.join(baseDir, 'checkpoints_v2'),
     scriptPath: path.join(repoRoot, 'scripts', 'openvoice_speak.py'),
+    serverScriptPath: path.join(repoRoot, 'scripts', 'openvoice_speech_server.py'),
     pythonPath: (process.env.OPENVOICE_PYTHON || process.env.JPLEARN_PYTHON || 'python').trim(),
   }
 }
@@ -105,45 +112,68 @@ function resolveVoiceProfile(voiceProfiles, speaker) {
   return voiceProfiles[0]
 }
 
-function runOpenVoiceScript(pythonPath, scriptPath, args, extraEnv = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(pythonPath, [scriptPath, ...args], {
-      cwd: path.dirname(scriptPath),
-      env: {
-        ...process.env,
-        PYTHONUTF8: '1',
-        ...extraEnv,
-      },
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-
-    let stdout = ''
-    let stderr = ''
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString('utf8')
-    })
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString('utf8')
-    })
-    child.on('error', reject)
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr })
-        return
-      }
-      const message = stderr.trim() || stdout.trim() || `OpenVoice exited with code ${code}`
-      reject(new Error(message))
-    })
-  })
-}
-
 function createOpenVoiceRuntime(options = {}) {
   const repoRoot = typeof options.repoRoot === 'string' && options.repoRoot.trim()
     ? options.repoRoot.trim()
     : path.resolve(__dirname, '..', '..')
   const maxTextChars = Number.isFinite(options.maxTextChars) ? Math.max(1, Math.floor(options.maxTextChars)) : DEFAULT_MAX_TEXT_CHARS
+  const qualityMode = typeof options.qualityMode === 'string' && options.qualityMode.trim()
+    ? options.qualityMode.trim()
+    : DEFAULT_QUALITY_MODE
+  const postprocessMode = typeof options.postprocessMode === 'string' && options.postprocessMode.trim()
+    ? options.postprocessMode.trim()
+    : DEFAULT_POSTPROCESS_MODE
+  const cacheLimit = Number.isFinite(options.cacheEntries)
+    ? Math.max(0, Math.floor(options.cacheEntries))
+    : DEFAULT_CACHE_ENTRIES
+  const requestTimeoutMs = Number.isFinite(options.requestTimeoutMs)
+    ? Math.max(10000, Math.floor(options.requestTimeoutMs))
+    : DEFAULT_REQUEST_TIMEOUT_MS
+  const audioCache = new Map()
+  let child = null
+  let startPromise = null
+  let stdoutBuffer = ''
+  let nextRequestId = 1
+  const pending = new Map()
   let lastError = null
+
+  function getCacheKey(text, voiceId, speed) {
+    return JSON.stringify({
+      text,
+      voiceId,
+      speed: Number.isFinite(speed) ? Number(speed.toFixed(3)) : DEFAULT_SPEED,
+      qualityMode,
+      postprocessMode,
+    })
+  }
+
+  function getCachedAudio(cacheKey) {
+    if (!audioCache.has(cacheKey)) {
+      return null
+    }
+    const value = audioCache.get(cacheKey)
+    // Move to end for simple LRU behavior.
+    audioCache.delete(cacheKey)
+    audioCache.set(cacheKey, value)
+    return value
+  }
+
+  function setCachedAudio(cacheKey, payload) {
+    if (cacheLimit <= 0) {
+      return
+    }
+    if (audioCache.has(cacheKey)) {
+      audioCache.delete(cacheKey)
+    }
+    audioCache.set(cacheKey, payload)
+    while (audioCache.size > cacheLimit) {
+      const oldestKey = audioCache.keys().next().value
+      if (oldestKey == null) {
+        break
+      }
+      audioCache.delete(oldestKey)
+    }
+  }
 
   function pickModelName(voiceProfiles) {
     const profile = voiceProfiles[0]
@@ -155,6 +185,108 @@ function createOpenVoiceRuntime(options = {}) {
 
   function getReadyState() {
     return isOpenVoiceInstalled(repoRoot)
+  }
+
+  function stopServer() {
+    if (child) {
+      try { child.kill() } catch { /* ignore */ }
+      child = null
+    }
+    for (const entry of pending.values()) {
+      clearTimeout(entry.timer)
+      entry.reject(new Error('OpenVoice process exited unexpectedly'))
+    }
+    pending.clear()
+  }
+
+  function handleStdoutData(chunk) {
+    stdoutBuffer += chunk.toString('utf8')
+    let newlineIndex = stdoutBuffer.indexOf('\n')
+    while (newlineIndex >= 0) {
+      const line = stdoutBuffer.slice(0, newlineIndex).trim()
+      stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1)
+      newlineIndex = stdoutBuffer.indexOf('\n')
+      if (!line) continue
+
+      let parsed
+      try {
+        parsed = JSON.parse(line)
+      } catch {
+        continue
+      }
+
+      const entry = pending.get(parsed.id)
+      if (!entry) continue
+      pending.delete(parsed.id)
+      clearTimeout(entry.timer)
+      if (parsed.error) {
+        entry.reject(new Error(parsed.error))
+      } else {
+        entry.resolve(parsed)
+      }
+    }
+  }
+
+  async function ensureStarted() {
+    if (child) return
+    if (startPromise) return startPromise
+
+    startPromise = new Promise((resolve, reject) => {
+      const paths = resolveOpenVoicePaths(repoRoot)
+      if (!fs.existsSync(paths.serverScriptPath)) {
+        reject(new Error(`OpenVoice server script is missing: ${paths.serverScriptPath}`))
+        return
+      }
+
+      const proc = spawn(paths.pythonPath, [paths.serverScriptPath, '--repo-root', repoRoot], {
+        cwd: path.dirname(paths.serverScriptPath),
+        env: {
+          ...process.env,
+          PYTHONUTF8: '1',
+          OPENVOICE_CHECKPOINT_DIR: paths.checkpointRoot,
+          OPENVOICE_VOICE_ROOT: paths.voiceRoot,
+        },
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+
+      proc.stdout.on('data', handleStdoutData)
+      proc.stderr.on('data', (chunk) => {
+        const text = chunk.toString('utf8').trim()
+        if (text) lastError = text
+      })
+      proc.on('error', (error) => {
+        lastError = error instanceof Error ? error.message : String(error)
+        child = null
+      })
+      proc.on('close', () => {
+        stopServer()
+      })
+
+      child = proc
+      resolve()
+    }).finally(() => {
+      startPromise = null
+    })
+
+    return startPromise
+  }
+
+  async function requestServer(payload) {
+    await ensureStarted()
+    if (!child) {
+      throw new Error(lastError || 'OpenVoice process is not running')
+    }
+
+    const id = nextRequestId++
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pending.delete(id)
+        reject(new Error('OpenVoice request timed out'))
+      }, requestTimeoutMs)
+      pending.set(id, { resolve, reject, timer })
+      child.stdin.write(`${JSON.stringify({ id, ...payload })}\n`)
+    })
   }
 
   async function synthesize(text, speaker, speed) {
@@ -173,41 +305,41 @@ function createOpenVoiceRuntime(options = {}) {
       throw new Error('Speak text must not be empty')
     }
     const boundedText = normalized.length <= maxTextChars ? normalized : normalized.slice(0, maxTextChars)
-
-    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jplearn-openvoice-'))
-    const outputPath = path.join(outputDir, 'output.wav')
-
-    try {
-      await runOpenVoiceScript(paths.pythonPath, paths.scriptPath, [
-        '--repo-root', repoRoot,
-        '--voice-id', profile.voiceId || path.basename(profile.voiceDir),
-        '--text', boundedText,
-        '--output', outputPath,
-        '--speed', String(Number.isFinite(speed) ? Math.min(2, Math.max(0.5, speed)) : DEFAULT_SPEED),
-      ], {
-        OPENVOICE_CHECKPOINT_DIR: paths.checkpointRoot,
-        OPENVOICE_VOICE_ROOT: paths.voiceRoot,
-      })
-
-      const wav = fs.readFileSync(outputPath)
-      if (!wav || wav.length < 44) {
-        throw new Error('OpenVoice returned empty audio')
-      }
-
+    const voiceId = profile.voiceId || path.basename(profile.voiceDir)
+    const cacheKey = getCacheKey(boundedText, voiceId, speed)
+    const cached = getCachedAudio(cacheKey)
+    if (cached) {
       lastError = null
       return {
+        ...cached,
         ok: true,
-        format: 'wav',
-        sampleRate: 24000,
-        voiceId: profile.voiceId || path.basename(profile.voiceDir),
-        audioBase64: wav.toString('base64'),
       }
-    } finally {
-      try {
-        fs.rmSync(outputDir, { recursive: true, force: true })
-      } catch {
-        // Best-effort cleanup.
-      }
+    }
+
+    const response = await requestServer({
+      type: 'synthesize',
+      text: boundedText,
+      voiceId,
+      speed: Number.isFinite(speed) ? Math.min(2, Math.max(0.5, speed)) : DEFAULT_SPEED,
+      qualityMode,
+      postprocessMode,
+    })
+
+    if (typeof response.audioBase64 !== 'string' || response.audioBase64.length === 0) {
+      throw new Error('OpenVoice returned empty audio')
+    }
+
+    const payload = {
+      format: 'wav',
+      sampleRate: Number.isFinite(response.sampleRate) ? response.sampleRate : 24000,
+      voiceId: response.voiceId || voiceId,
+      audioBase64: response.audioBase64,
+    }
+    setCachedAudio(cacheKey, payload)
+    lastError = null
+    return {
+      ok: true,
+      ...payload,
     }
   }
 
@@ -218,7 +350,7 @@ function createOpenVoiceRuntime(options = {}) {
       const voiceProfiles = loadVoiceProfiles(paths.voiceRoot)
       return {
         available: ready && lastError == null,
-        modelReady: ready,
+        modelReady: ready && child != null,
         downloading: false,
         downloadProgress: 0,
         modelName: pickModelName(voiceProfiles),
@@ -237,7 +369,15 @@ function createOpenVoiceRuntime(options = {}) {
 
     async preload(speaker) {
       try {
-        await synthesize('Hello', speaker, DEFAULT_SPEED)
+        const paths = resolveOpenVoicePaths(repoRoot)
+        const voiceProfiles = loadVoiceProfiles(paths.voiceRoot)
+        const profile = resolveVoiceProfile(voiceProfiles, speaker)
+        await requestServer({
+          type: 'preload',
+          voiceId: profile ? (profile.voiceId || path.basename(profile.voiceDir)) : null,
+          qualityMode,
+          postprocessMode,
+        })
         return { ok: true, ready: true }
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error)
@@ -246,6 +386,8 @@ function createOpenVoiceRuntime(options = {}) {
     },
 
     async unload() {
+      audioCache.clear()
+      stopServer()
       return { ok: true }
     },
   }

@@ -115,7 +115,7 @@ export function HomeView({
         )}
 
         <div className="menu-grid">
-          {(['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns'] as const).map((script, index) => {
+          {(['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples'] as const).map((script, index) => {
             const glyph = SECTION_META[script].glyph
             const difficulty = SCRIPT_DIFFICULTY_META[script]
             const DifficultyIcon = difficulty.icon

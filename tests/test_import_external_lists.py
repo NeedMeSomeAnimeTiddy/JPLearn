@@ -26,12 +26,10 @@ def _kanji_sources(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path]:
     return kanji_n5_csv, kanji_n4_csv, kanji_n3_csv, kanji_n2_csv, kanji_n1_csv
 
 
-def _phase1_sources(tmp_path: Path) -> tuple[Path, Path]:
-    sentence_examples_csv = tmp_path / "sentence_examples.csv"
+def _phase1_sources(tmp_path: Path) -> Path:
     conjugation_training_csv = tmp_path / "conjugation_training.csv"
-    _write_source(sentence_examples_csv, 40, "例文")
     _write_source(conjugation_training_csv, 20, "活用")
-    return sentence_examples_csv, conjugation_training_csv
+    return conjugation_training_csv
 
 
 def test_generate_external_deck_module_from_csv_sources(tmp_path: Path) -> None:
@@ -42,7 +40,7 @@ def test_generate_external_deck_module_from_csv_sources(tmp_path: Path) -> None:
     words_n1_csv = tmp_path / "words_n1.csv"
     conversational_csv = tmp_path / "conversational.csv"
     kanji_n5_csv, kanji_n4_csv, kanji_n3_csv, kanji_n2_csv, kanji_n1_csv = _kanji_sources(tmp_path)
-    sentence_examples_csv, conjugation_training_csv = _phase1_sources(tmp_path)
+    conjugation_training_csv = _phase1_sources(tmp_path)
     output_py = tmp_path / "external_deck_data.py"
 
     _write_source(words_n5_csv, 80, "単語N5")
@@ -76,7 +74,6 @@ def test_generate_external_deck_module_from_csv_sources(tmp_path: Path) -> None:
         kanji_n3_csv=kanji_n3_csv,
         kanji_n2_csv=kanji_n2_csv,
         kanji_n1_csv=kanji_n1_csv,
-        sentence_examples_csv=sentence_examples_csv,
         conjugation_training_csv=conjugation_training_csv,
         output_module=output_py,
     )
@@ -104,7 +101,7 @@ def test_generate_external_deck_module_from_csv_sources(tmp_path: Path) -> None:
     assert "KANJI_N3_EXTERNAL_DATA" in content
     assert "KANJI_N2_EXTERNAL_DATA" in content
     assert "KANJI_N1_EXTERNAL_DATA" in content
-    assert "SENTENCE_EXAMPLES_EXTERNAL_DATA" in content
+    assert "SENTENCE_EXAMPLES_EXTERNAL_DATA" not in content
     assert "CONJUGATION_TRAINING_EXTERNAL_DATA" in content
 
 
@@ -382,8 +379,8 @@ def test_generate_external_deck_module_reports_cross_list_conflicts(tmp_path: Pa
     kanji_n5_csv, kanji_n4_csv, kanji_n3_csv, kanji_n2_csv, kanji_n1_csv = _kanji_sources(tmp_path)
     output_py = tmp_path / "external_deck_data.py"
 
-    _write_source(words_n5_csv, 80, "単語N5")
-    _write_source(words_n4_csv, 80, "単語N4")
+    _write_source(words_n5_csv, 81, "単語N5")
+    _write_source(words_n4_csv, 81, "単語N4")
     _write_source(words_n3_csv, 80, "単語N3")
     _write_source(words_n2_csv, 80, "単語N2")
     _write_source(words_n1_csv, 80, "単語N1")
@@ -420,3 +417,95 @@ def test_generate_external_deck_module_reports_cross_list_conflicts(tmp_path: Pa
         assert "words_n4" in message
     else:
         raise AssertionError("Expected ValueError for conflicting cross-list meanings")
+
+
+def test_generate_external_deck_module_keep_first_resolves_conflicts(tmp_path: Path) -> None:
+    words_n5_csv = tmp_path / "words_n5.csv"
+    words_n4_csv = tmp_path / "words_n4.csv"
+    words_n3_csv = tmp_path / "words_n3.csv"
+    words_n2_csv = tmp_path / "words_n2.csv"
+    words_n1_csv = tmp_path / "words_n1.csv"
+    conversational_csv = tmp_path / "conversational.csv"
+    kanji_n5_csv, kanji_n4_csv, kanji_n3_csv, kanji_n2_csv, kanji_n1_csv = _kanji_sources(tmp_path)
+    output_py = tmp_path / "external_deck_data.py"
+
+    _write_source(words_n5_csv, 81, "単語N5")
+    _write_source(words_n4_csv, 81, "単語N4")
+    _write_source(words_n3_csv, 80, "単語N3")
+    _write_source(words_n2_csv, 80, "単語N2")
+    _write_source(words_n1_csv, 80, "単語N1")
+    _write_source(conversational_csv, 40, "会話")
+
+    words_n5_lines = words_n5_csv.read_text(encoding="utf-8").splitlines()
+    words_n5_lines[1] = "共通,kyoutsuu,first meaning"
+    words_n5_csv.write_text("\n".join(words_n5_lines), encoding="utf-8")
+
+    words_n4_lines = words_n4_csv.read_text(encoding="utf-8").splitlines()
+    words_n4_lines[1] = "共通,kyoutsuu,last meaning"
+    words_n4_csv.write_text("\n".join(words_n4_lines), encoding="utf-8")
+
+    import_external_lists.generate_external_deck_module(
+        words_n5_csv=words_n5_csv,
+        words_n4_csv=words_n4_csv,
+        words_n3_csv=words_n3_csv,
+        words_n2_csv=words_n2_csv,
+        words_n1_csv=words_n1_csv,
+        conversational_csv=conversational_csv,
+        kanji_n5_csv=kanji_n5_csv,
+        kanji_n4_csv=kanji_n4_csv,
+        kanji_n3_csv=kanji_n3_csv,
+        kanji_n2_csv=kanji_n2_csv,
+        kanji_n1_csv=kanji_n1_csv,
+        output_module=output_py,
+        conflict_policy="keep-first",
+    )
+
+    content = output_py.read_text(encoding="utf-8")
+    assert "('共通', 'kyoutsuu', 'first meaning')" in content
+    assert "('共通', 'kyoutsuu', 'last meaning')" not in content
+
+
+def test_generate_external_deck_module_keep_last_resolves_conflicts(tmp_path: Path) -> None:
+    words_n5_csv = tmp_path / "words_n5.csv"
+    words_n4_csv = tmp_path / "words_n4.csv"
+    words_n3_csv = tmp_path / "words_n3.csv"
+    words_n2_csv = tmp_path / "words_n2.csv"
+    words_n1_csv = tmp_path / "words_n1.csv"
+    conversational_csv = tmp_path / "conversational.csv"
+    kanji_n5_csv, kanji_n4_csv, kanji_n3_csv, kanji_n2_csv, kanji_n1_csv = _kanji_sources(tmp_path)
+    output_py = tmp_path / "external_deck_data.py"
+
+    _write_source(words_n5_csv, 81, "単語N5")
+    _write_source(words_n4_csv, 81, "単語N4")
+    _write_source(words_n3_csv, 80, "単語N3")
+    _write_source(words_n2_csv, 80, "単語N2")
+    _write_source(words_n1_csv, 80, "単語N1")
+    _write_source(conversational_csv, 40, "会話")
+
+    words_n5_lines = words_n5_csv.read_text(encoding="utf-8").splitlines()
+    words_n5_lines[1] = "共通,kyoutsuu,first meaning"
+    words_n5_csv.write_text("\n".join(words_n5_lines), encoding="utf-8")
+
+    words_n4_lines = words_n4_csv.read_text(encoding="utf-8").splitlines()
+    words_n4_lines[1] = "共通,kyoutsuu,last meaning"
+    words_n4_csv.write_text("\n".join(words_n4_lines), encoding="utf-8")
+
+    import_external_lists.generate_external_deck_module(
+        words_n5_csv=words_n5_csv,
+        words_n4_csv=words_n4_csv,
+        words_n3_csv=words_n3_csv,
+        words_n2_csv=words_n2_csv,
+        words_n1_csv=words_n1_csv,
+        conversational_csv=conversational_csv,
+        kanji_n5_csv=kanji_n5_csv,
+        kanji_n4_csv=kanji_n4_csv,
+        kanji_n3_csv=kanji_n3_csv,
+        kanji_n2_csv=kanji_n2_csv,
+        kanji_n1_csv=kanji_n1_csv,
+        output_module=output_py,
+        conflict_policy="keep-last",
+    )
+
+    content = output_py.read_text(encoding="utf-8")
+    assert "('共通', 'kyoutsuu', 'first meaning')" not in content
+    assert "('共通', 'kyoutsuu', 'last meaning')" in content

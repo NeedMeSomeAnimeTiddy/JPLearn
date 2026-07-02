@@ -11,11 +11,12 @@ import os
 import re
 import sqlite3
 import sys
+import csv
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 import unicodedata
-from typing import Mapping
+from typing import Callable, Mapping
 from uuid import uuid4
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -58,6 +59,7 @@ from data.study_pipeline import (
     load_item_history,
     load_mistake_breakdown,
     load_curriculum_stages,
+    load_deck_summary_counts,
     load_review_states,
     load_streak_state,
     load_today_progress,
@@ -74,6 +76,7 @@ from domain.blocks import (
     compute_unlocked_count,
     unlock_threshold_for_slug,
 )
+from domain.cards import Card, Deck
 from domain.distractors import rank_distractor_ids
 from domain.decks import ALL_DECKS
 from domain.scheduler import ReviewState, update
@@ -145,6 +148,82 @@ from domain.jlpt_sessions import (
     build_weak_area_queue,
     project_mock_score,
 )
+
+SENTENCE_EXAMPLES_CSV_CANDIDATES = (
+    Path(_assets_dir) / "data" / "external_sources" / "sentence_examples.csv"
+    if _assets_dir
+    else Path(_docs_dir) / "data" / "external_sources" / "sentence_examples.csv"
+    if _docs_dir
+    else PROJECT_ROOT / "data" / "external_sources" / "sentence_examples.csv",
+    PROJECT_ROOT / "data" / "external_sources" / "sentence_examples.csv",
+)
+_SENTENCE_EXAMPLES_ROWS_CACHE: list[tuple[str, str, str]] | None = None
+_SENTENCE_EXAMPLES_TAGS = ["sentence", "example", "grammar"]
+_SENTENCE_EXAMPLES_FALLBACK_FACTORY: Callable[[], Deck] | None = ALL_DECKS.get("sentence_examples")
+
+
+def _load_sentence_examples_rows() -> list[tuple[str, str, str]]:
+    """Load sentence examples from CSV once and cache parsed rows."""
+    global _SENTENCE_EXAMPLES_ROWS_CACHE
+    if _SENTENCE_EXAMPLES_ROWS_CACHE is not None:
+        return _SENTENCE_EXAMPLES_ROWS_CACHE
+
+    for candidate in SENTENCE_EXAMPLES_CSV_CANDIDATES:
+        if not candidate.exists():
+            continue
+        try:
+            rows: list[tuple[str, str, str]] = []
+            with candidate.open("r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.reader(handle)
+                for index, raw in enumerate(reader):
+                    if len(raw) < 3:
+                        continue
+                    character = raw[0].strip()
+                    reading = raw[1].strip()
+                    meaning = raw[2].strip()
+                    if not character or not meaning:
+                        continue
+                    if (
+                        index == 0
+                        and character.lower() in {"character", "japanese", "text", "sentence"}
+                        and reading.lower() in {"romaji", "reading", "kana", "romanization"}
+                    ):
+                        continue
+                    rows.append((character, reading, meaning))
+            if rows:
+                _SENTENCE_EXAMPLES_ROWS_CACHE = rows
+                return rows
+        except (OSError, csv.Error):
+            continue
+
+    _SENTENCE_EXAMPLES_ROWS_CACHE = []
+    return _SENTENCE_EXAMPLES_ROWS_CACHE
+
+
+def _sentence_examples_deck_factory() -> Deck:
+    rows = _load_sentence_examples_rows()
+    if rows:
+        cards = [
+            Card(
+                id=index,
+                character=character,
+                romaji=reading,
+                meaning=meaning,
+                tags=list(_SENTENCE_EXAMPLES_TAGS),
+                # Surface the full Japanese sentence as contextual hint text.
+                example_sentence=character,
+            )
+            for index, (character, reading, meaning) in enumerate(rows)
+        ]
+        return Deck(name="Sentence Examples", cards=cards)
+
+    if _SENTENCE_EXAMPLES_FALLBACK_FACTORY is not None:
+        return _SENTENCE_EXAMPLES_FALLBACK_FACTORY()
+
+    return Deck(name="Sentence Examples", cards=[])
+
+
+ALL_DECKS["sentence_examples"] = _sentence_examples_deck_factory
 
 
 def _normalize_dictionary_query(value: str) -> str:
@@ -686,8 +765,7 @@ def build_summary() -> dict[str, object]:
     for slug, factory in ALL_DECKS.items():
         deck = factory()
         card_ids = [card.id for card in deck.cards]
-        states = load_review_states(deck.name, card_ids)
-        due_today, completed_today = load_today_progress(deck.name, card_ids)
+        mastered_count, due_today, completed_today = load_deck_summary_counts(deck.name, card_ids)
         for card in deck.cards:
             prompt_text = card.character
             prompt_lookup[(_normalize_deck_key(deck.name), card.id)] = prompt_text
@@ -698,7 +776,7 @@ def build_summary() -> dict[str, object]:
                 slug=slug,
                 name=deck.name,
                 total=len(deck.cards),
-                mastered=_mastered_count(states),
+                mastered=mastered_count,
                 due_today=due_today,
                 completed_today=completed_today,
             )
