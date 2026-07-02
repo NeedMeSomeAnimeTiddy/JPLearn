@@ -27,9 +27,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+_assets_dir = os.environ.get("JPLEARN_ASSETS_DIR", "").strip() or os.environ.get("JPLEARN_USER_DATA_DIR", "").strip()
 _docs_dir = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
 OFFLINE_DICTIONARY_DIR = (
-    Path(_docs_dir) / "data" / "external_sources" / "offline_dictionary"
+    Path(_assets_dir) / "data" / "external_sources" / "offline_dictionary"
+    if _assets_dir
+    else Path(_docs_dir) / "data" / "external_sources" / "offline_dictionary"
     if _docs_dir
     else PROJECT_ROOT / "data" / "external_sources" / "offline_dictionary"
 )

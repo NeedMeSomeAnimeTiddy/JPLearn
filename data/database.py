@@ -23,7 +23,7 @@ def _resolve_db_path() -> Path:
 
     When JPLEARN_DOCUMENTS_DIR is set (by the Electron main process for the
     packaged app), the database lives at {dir}/data/jplearn.db — in the user's
-    Documents\\JPLearn\\ folder so it survives uninstall/reinstall.
+    Documents folder so it survives uninstall/reinstall.
     Falls back to the legacy repo-relative path for development.
     """
     docs_dir = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
@@ -33,9 +33,14 @@ def _resolve_db_path() -> Path:
         new_path = db_dir / "jplearn.db"
         # One-time migration: copy existing DB on first launch of updated app
         if not new_path.exists():
-            legacy = Path(__file__).parent.parent / "data" / "jplearn.db"
-            if legacy.exists():
-                shutil.copy2(str(legacy), str(new_path))
+            legacy_candidates = [
+                Path.home() / "Documents" / "JPLearn" / "data" / "jplearn.db",
+                Path(__file__).parent.parent / "data" / "jplearn.db",
+            ]
+            for legacy in legacy_candidates:
+                if legacy.exists() and legacy != new_path:
+                    shutil.copy2(str(legacy), str(new_path))
+                    break
         return new_path
     return Path(__file__).parent.parent / "data" / "jplearn.db"
 

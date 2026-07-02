@@ -31,12 +31,16 @@ function preprocessForSpeech(text) {
     .trim()
 }
 
+function resolveAssetsBaseDir() {
+  return (process.env.JPLEARN_ASSETS_DIR || process.env.JPLEARN_USER_DATA_DIR || process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+}
+
 function resolveEnginePath(repoRoot) {
   const candidates = [
     (process.env.JPLEARN_VOICEVOX_ENGINE || '').trim(),
   ]
-  // Documents\JPLearn\voicevox\ — priority path for the installed app
-  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  // Installed assets path — priority path for the configured app data root.
+  const docsDir = resolveAssetsBaseDir()
   if (docsDir) {
     candidates.push(path.join(docsDir, 'voicevox', 'run.exe'))
     candidates.push(path.join(docsDir, 'voicevox', 'run'))

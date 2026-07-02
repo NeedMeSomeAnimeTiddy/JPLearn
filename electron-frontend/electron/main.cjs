@@ -18,7 +18,10 @@ async function reloadLocalFontsForContents(webContents) {
   if (!webContents || webContents.isDestroyed()) {
     return { ok: false }
   }
-  const fontsDir = path.join(process.env.JPLEARN_DOCUMENTS_DIR || '', 'fonts')
+  const fontsDir = path.join(
+    process.env.JPLEARN_ASSETS_DIR || process.env.JPLEARN_USER_DATA_DIR || process.env.JPLEARN_DOCUMENTS_DIR || '',
+    'fonts',
+  )
   const fontCSS = loadFontCSS(fontsDir)
   if (!fontCSS) {
     return { ok: false }
@@ -78,7 +81,7 @@ function launchUninstallCleanupHelper() {
     return
   }
 
-  const docsDir = process.env.JPLEARN_DOCUMENTS_DIR || path.join(os.homedir(), 'Documents', 'JPLearn')
+  const docsDir = process.env.JPLEARN_DOCUMENTS_DIR || path.join(os.homedir(), 'Documents', 'JPLearn Progress')
   const args = [
     '-NoProfile',
     '-ExecutionPolicy',
@@ -211,16 +214,46 @@ if (_squirrelArg) {
   app.exit(0)
 }
 
-// ── Documents\JPLearn\ base path ─────────────────────────────────────────────
-// Set before creating runtimes so llm_runtime and voice_runtime can read it.
-if (!process.env.JPLEARN_DOCUMENTS_DIR) {
+function resolveProgressDocumentsDir() {
+  const explicit = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  if (explicit) {
+    return explicit
+  }
   let docsBase
   try {
     docsBase = app.getPath('documents')
   } catch {
     docsBase = path.join(os.homedir(), 'Documents')
   }
-  process.env.JPLEARN_DOCUMENTS_DIR = path.join(docsBase, 'JPLearn')
+  return path.join(docsBase, 'JPLearn Progress')
+}
+
+function resolveAssetsDataDir() {
+  const explicit = (process.env.JPLEARN_ASSETS_DIR || process.env.JPLEARN_USER_DATA_DIR || '').trim()
+  if (explicit) {
+    return explicit
+  }
+  if (process.platform === 'win32') {
+    const localAppData = (process.env.LOCALAPPDATA || '').trim()
+    if (localAppData) {
+      return path.join(localAppData, 'JPLearn Assets')
+    }
+  }
+  let appDataBase
+  try {
+    appDataBase = app.getPath('appData')
+  } catch {
+    appDataBase = path.join(os.homedir(), '.local', 'share')
+  }
+  return path.join(appDataBase, 'JPLearn Assets')
+}
+
+// Set before creating runtimes so storage-dependent modules resolve consistent paths.
+if (!process.env.JPLEARN_DOCUMENTS_DIR) {
+  process.env.JPLEARN_DOCUMENTS_DIR = resolveProgressDocumentsDir()
+}
+if (!process.env.JPLEARN_ASSETS_DIR) {
+  process.env.JPLEARN_ASSETS_DIR = resolveAssetsDataDir()
 }
 
 const repoRoot = path.join(__dirname, '..', '..')
@@ -1611,10 +1644,13 @@ function loadMainWindow(win) {
 
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
 
-  // Inject locally downloaded fonts (Documents\JPLearn\fonts\) if available.
+  // Inject locally downloaded fonts from the assets store if available.
   // Falls back to system fonts silently — no user action needed.
   win.webContents.on('did-finish-load', () => {
-    const fontsDir = path.join(process.env.JPLEARN_DOCUMENTS_DIR || '', 'fonts')
+    const fontsDir = path.join(
+      process.env.JPLEARN_ASSETS_DIR || process.env.JPLEARN_USER_DATA_DIR || process.env.JPLEARN_DOCUMENTS_DIR || '',
+      'fonts',
+    )
     try {
       const fontCSS = loadFontCSS(fontsDir)
       if (fontCSS) {

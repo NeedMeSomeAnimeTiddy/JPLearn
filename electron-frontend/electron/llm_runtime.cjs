@@ -145,13 +145,17 @@ function normalizePromptAdapterId(rawValue) {
     .replace(/[^a-z0-9_]/g, '')
 }
 
+function resolveAssetsBaseDir() {
+  return (process.env.JPLEARN_ASSETS_DIR || process.env.JPLEARN_USER_DATA_DIR || process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+}
+
 function resolveAdapterManifestPath(configuredPath) {
   const preferred = typeof configuredPath === 'string' ? configuredPath.trim() : ''
-  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const assetsDir = resolveAssetsBaseDir()
   const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
   const candidates = [
     preferred,
-    docsDir ? path.join(docsDir, 'models', DEFAULT_ADAPTER_MANIFEST_FILENAME) : '',
+    assetsDir ? path.join(assetsDir, 'models', DEFAULT_ADAPTER_MANIFEST_FILENAME) : '',
     resourcesPath ? path.join(resourcesPath, 'models', DEFAULT_ADAPTER_MANIFEST_FILENAME) : '',
     path.join(DEFAULT_MODEL_DIRECTORY, DEFAULT_ADAPTER_MANIFEST_FILENAME),
   ]
@@ -276,10 +280,10 @@ function createPromptAdapterManifestReader(options = {}) {
 }
 
 function resolveBundledLlamaServerPath() {
-  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const assetsDir = resolveAssetsBaseDir()
   const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
   const candidates = [
-    docsDir ? path.join(docsDir, 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-server.exe') : '',
+    assetsDir ? path.join(assetsDir, 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-server.exe') : '',
     resourcesPath ? path.join(resourcesPath, 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-server.exe') : '',
     path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-server.exe'),
     path.resolve(__dirname, '..', '..', 'tools', 'llama.cpp', 'build', 'bin', 'llama-server.exe'),
@@ -314,11 +318,11 @@ function readActiveModelTier(dir) {
 }
 
 function resolveBundledModelPath() {
-  // Check Documents\JPLearn\models\ first (installed app), then the bundled/dev path.
+  // Check the installed assets model directory first, then the bundled/dev path.
   const directories = []
-  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
-  if (docsDir) {
-    directories.push(path.join(docsDir, 'models'))
+  const assetsDir = resolveAssetsBaseDir()
+  if (assetsDir) {
+    directories.push(path.join(assetsDir, 'models'))
   }
   directories.push(DEFAULT_MODEL_DIRECTORY)
 
@@ -773,12 +777,12 @@ function parseJmdictWordEntry(rawEntry) {
 
 function resolveOfflineDictionaryPath(configuredPath) {
   const preferred = typeof configuredPath === 'string' ? configuredPath.trim() : ''
-  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const assetsDir = resolveAssetsBaseDir()
   const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
   const candidates = [
     preferred,
-    docsDir ? path.join(docsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-3.6.2.json') : '',
-    docsDir ? path.join(docsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-common-3.6.2.json') : '',
+    assetsDir ? path.join(assetsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-3.6.2.json') : '',
+    assetsDir ? path.join(assetsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-common-3.6.2.json') : '',
     resourcesPath ? path.join(resourcesPath, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-3.6.2.json') : '',
     resourcesPath ? path.join(resourcesPath, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-common-3.6.2.json') : '',
     DEFAULT_OFFLINE_DICTIONARY_FULL_PATH,
@@ -789,11 +793,11 @@ function resolveOfflineDictionaryPath(configuredPath) {
 
 function resolveOfflineDictionarySqlitePath(configuredPath) {
   const preferred = typeof configuredPath === 'string' ? configuredPath.trim() : ''
-  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const assetsDir = resolveAssetsBaseDir()
   const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
   const candidates = [
     preferred,
-    docsDir ? path.join(docsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite') : '',
+    assetsDir ? path.join(assetsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite') : '',
     resourcesPath ? path.join(resourcesPath, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite') : '',
     DEFAULT_OFFLINE_DICTIONARY_SQLITE_PATH,
   ]
@@ -1279,7 +1283,7 @@ function createTutorChatRuntime(options = {}) {
 
   const discoveredLlamaServerPath = resolveBundledLlamaServerPath()
   const discoveredModelPath = resolveBundledModelPath()
-  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const docsDir = resolveAssetsBaseDir()
   const modelStateBases = [
     docsDir ? path.join(docsDir, 'models') : '',
     path.resolve(__dirname, '..', '..', 'models'),

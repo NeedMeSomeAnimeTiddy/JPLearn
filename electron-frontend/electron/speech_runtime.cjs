@@ -15,6 +15,10 @@ const { spawn } = require('node:child_process')
 const REQUEST_TIMEOUT_MS = 20000
 const SPEECH_TIERS = ['fast', 'balanced', 'high', 'ultra']
 
+function resolveAssetsBaseDir() {
+  return (process.env.JPLEARN_ASSETS_DIR || process.env.JPLEARN_USER_DATA_DIR || process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+}
+
 function readActiveSpeechTier(docsBase) {
   try {
     const raw = fs.readFileSync(path.join(docsBase, 'whisper', 'active-speech-model.json'), 'utf8')
@@ -29,7 +33,7 @@ function readActiveSpeechTier(docsBase) {
 // Maps to the model directory layout written by scripts/get_whisper_model.py
 // and electron/setup_runtime.cjs: Documents\JPLearn\whisper\<tier>\model.bin.
 function resolveModelDir(repoRoot) {
-  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const docsDir = resolveAssetsBaseDir()
   const candidates = []
 
   if (docsDir) {

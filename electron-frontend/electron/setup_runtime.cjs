@@ -3,8 +3,8 @@
  *
  * Provides system detection, model downloads (with redirect handling and .tmp
  * safety), llama.cpp installation, and OpenVoice installation via the
- * get_openvoice.py script. All downloads target Documents\JPLearn\ so they
- * survive uninstall/reinstall.
+ * get_openvoice.py script. Large downloads target the assets data directory
+ * so they stay writable without elevation.
  */
 
 const fs = require('node:fs')
@@ -150,15 +150,23 @@ const LLAMA_BACKEND_LABELS = {
 // ── Path helpers ─────────────────────────────────────────────────────────────
 
 function getJPLearnDir() {
-  const explicit = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const explicit = (process.env.JPLEARN_ASSETS_DIR || process.env.JPLEARN_USER_DATA_DIR || '').trim()
   if (explicit) return explicit
-  let docs
-  try {
-    docs = require('electron').app.getPath('documents')
-  } catch {
-    docs = path.join(os.homedir(), 'Documents')
+  const legacyDocs = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  if (legacyDocs) return legacyDocs
+  if (process.platform === 'win32') {
+    const localAppData = (process.env.LOCALAPPDATA || '').trim()
+    if (localAppData) {
+      return path.join(localAppData, 'JPLearn Assets')
+    }
   }
-  return path.join(docs, 'JPLearn')
+  let appData
+  try {
+    appData = require('electron').app.getPath('appData')
+  } catch {
+    appData = path.join(os.homedir(), '.local', 'share')
+  }
+  return path.join(appData, 'JPLearn Assets')
 }
 
 function getFontInstallState(base) {
@@ -291,7 +299,7 @@ function ensureEmbedderInstalled(embedderTier, sender, scriptRoot) {
 
   return new Promise((resolve) => {
     const child = spawn(pythonCmd, [scriptPath, '--tier', embedderTier], {
-      env: { ...process.env, JPLEARN_DOCUMENTS_DIR: base },
+      env: { ...process.env, JPLEARN_ASSETS_DIR: base, JPLEARN_DOCUMENTS_DIR: base },
       windowsHide: true,
     })
 
@@ -589,12 +597,11 @@ async function getSystemInfo() {
   const base = ensureJPLearnDirs()
   const scriptRoot = resolveScriptRoot()
   const pythonCmd = resolvePythonCommand(scriptRoot)
-  const bundledOpenVoiceBase = path.join(scriptRoot, 'data', 'openvoice')
   const openVoiceDependenciesInstalled = areOpenVoiceDependenciesInstalled(pythonCmd)
   const totalRamGb = os.totalmem() / (1024 ** 3)
   const modelsDir = path.join(base, 'models')
   const llamaCppDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
-  const openVoiceInstalled = (hasOpenVoiceAssets(path.join(base, 'openvoice')) || hasOpenVoiceAssets(bundledOpenVoiceBase))
+  const openVoiceInstalled = hasOpenVoiceAssets(path.join(base, 'openvoice'))
     && openVoiceDependenciesInstalled
   const llamaCppInstalled = fs.existsSync(path.join(llamaCppDir, 'llama-server.exe'))
   const gpuAdapters = detectGpuNames()
@@ -1018,6 +1025,7 @@ function downloadLlamaCpp(sender, scriptRoot, requestedBackend) {
     const child = spawn(pythonCmd, [scriptPath], {
       env: {
         ...process.env,
+        JPLEARN_ASSETS_DIR: base,
         JPLEARN_DOCUMENTS_DIR: base,
         JPLEARN_LLAMA_BACKEND: llamaBackend,
       },
@@ -1171,7 +1179,12 @@ function downloadOpenVoice(sender, scriptRoot) {
 
     return new Promise((resolve, reject) => {
       const child = spawn(pythonCmd, [scriptPath], {
-        env: { ...process.env, OPENVOICE_TARGET_DIR: openvoiceCheckpointDir },
+        env: {
+          ...process.env,
+          JPLEARN_ASSETS_DIR: base,
+          JPLEARN_DOCUMENTS_DIR: base,
+          OPENVOICE_TARGET_DIR: openvoiceCheckpointDir,
+        },
         windowsHide: true,
       })
 
@@ -1215,7 +1228,7 @@ function downloadDictionary(sender, scriptRoot) {
 
   return new Promise((resolve, reject) => {
     const child = spawn(pythonCmd, [scriptPath], {
-      env: { ...process.env, JPLEARN_DOCUMENTS_DIR: base },
+      env: { ...process.env, JPLEARN_ASSETS_DIR: base, JPLEARN_DOCUMENTS_DIR: base },
       windowsHide: true,
     })
 
@@ -1282,7 +1295,7 @@ function downloadSpeechModel(tier, sender, scriptRoot) {
 
   return new Promise((resolve, reject) => {
     const child = spawn(pythonCmd, [scriptPath, '--tier', tier], {
-      env: { ...process.env, JPLEARN_DOCUMENTS_DIR: base },
+      env: { ...process.env, JPLEARN_ASSETS_DIR: base, JPLEARN_DOCUMENTS_DIR: base },
       windowsHide: true,
     })
 
@@ -1353,7 +1366,7 @@ function downloadFonts(sender, scriptRoot) {
   return new Promise((resolve, reject) => {
     const args = fontInstallState.installed ? [scriptPath] : [scriptPath, '--force']
     const child = spawn(pythonCmd, args, {
-      env: { ...process.env, JPLEARN_DOCUMENTS_DIR: base },
+      env: { ...process.env, JPLEARN_ASSETS_DIR: base, JPLEARN_DOCUMENTS_DIR: base },
       windowsHide: true,
     })
 

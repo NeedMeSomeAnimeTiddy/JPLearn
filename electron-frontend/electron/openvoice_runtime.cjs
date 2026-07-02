@@ -10,29 +10,32 @@ function sanitizeSpeechText(text) {
   return typeof text === 'string' ? text.replace(/〜/g, '').trim() : ''
 }
 
-function hasVoiceProfiles(voiceRoot) {
-  if (!fs.existsSync(voiceRoot)) {
-    return false
+function getJPLearnInstallDir() {
+  const explicit = (process.env.JPLEARN_ASSETS_DIR || process.env.JPLEARN_USER_DATA_DIR || '').trim()
+  if (explicit) {
+    return explicit
   }
-  const entries = fs.readdirSync(voiceRoot, { withFileTypes: true })
-  return entries.some((entry) => entry.isDirectory() && fs.existsSync(path.join(voiceRoot, entry.name, 'manifest.json')))
-}
-
-function hasOpenVoiceAssets(baseDir) {
-  const checkpointRoot = path.join(baseDir, 'checkpoints_v2')
-  const voiceRoot = path.join(baseDir, 'voices')
-  const converterCheckpoint = path.join(checkpointRoot, 'converter', 'checkpoint.pth')
-  const converterConfig = path.join(checkpointRoot, 'converter', 'config.json')
-  return fs.existsSync(converterCheckpoint) && fs.existsSync(converterConfig) && hasVoiceProfiles(voiceRoot)
+  const legacyDocs = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  if (legacyDocs) {
+    return legacyDocs
+  }
+  if (process.platform === 'win32') {
+    const localAppData = (process.env.LOCALAPPDATA || '').trim()
+    if (localAppData) {
+      return path.join(localAppData, 'JPLearn Assets')
+    }
+  }
+  let appData
+  try {
+    appData = require('electron').app.getPath('appData')
+  } catch {
+    appData = path.join(os.homedir(), '.local', 'share')
+  }
+  return path.join(appData, 'JPLearn Assets')
 }
 
 function resolveOpenVoicePaths(repoRoot) {
-  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
-  const installedDir = docsDir ? path.join(docsDir, 'openvoice') : ''
-  const bundledDir = path.join(repoRoot, 'data', 'openvoice')
-  const baseDir = installedDir && hasOpenVoiceAssets(installedDir)
-    ? installedDir
-    : bundledDir
+  const baseDir = path.join(getJPLearnInstallDir(), 'openvoice')
   return {
     baseDir,
     voiceRoot: path.join(baseDir, 'voices'),
