@@ -203,7 +203,7 @@ function getFontInstallState(base) {
 
 function ensureJPLearnDirs() {
   const base = getJPLearnDir()
-  for (const sub of ['models', 'voicevox', 'openvoice', 'data', 'fonts', 'tools', 'whisper']) {
+  for (const sub of ['models', 'openvoice', 'data', 'fonts', 'tools', 'whisper']) {
     fs.mkdirSync(path.join(base, sub), { recursive: true })
   }
   return base

@@ -47,7 +47,7 @@ interface SpeechModelOption {
 }
 
 interface ProgressEvent {
-  id: 'model' | 'llama' | 'openvoice' | 'voicevox' | 'fonts' | 'dictionary' | 'speech'
+  id: 'model' | 'llama' | 'openvoice' | 'fonts' | 'dictionary' | 'speech'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -435,7 +435,7 @@ export function SetupWizard({ onComplete }: Props) {
         if (evt.mb !== null && evt.totalMb !== null) {
           setLlamaMb({ done: evt.mb, total: evt.totalMb })
         }
-      } else if (evt.id === 'openvoice' || evt.id === 'voicevox') {
+      } else if (evt.id === 'openvoice') {
         setOpenVoiceProgress(evt.percent)
         if (evt.totalMb !== null) {
           setOpenVoiceMb({

@@ -57,7 +57,7 @@ function createRegisteredHandlers(overrides = {}) {
       cancelActiveInference: vi.fn(async () => ({ ok: true, cancelled: false, reason: 'renderer-cancel' })),
     },
     localVoiceRuntime: {
-      getStatus: vi.fn(() => ({ available: false, modelReady: false, downloading: false, downloadProgress: 0, modelName: 'voicevox:13', lastError: null })),
+      getStatus: vi.fn(() => ({ available: false, modelReady: false, downloading: false, downloadProgress: 0, modelName: 'openvoice:unavailable', lastError: null })),
       speak: vi.fn(async () => ({ ok: true, format: 'wav', sampleRate: 24000, voiceId: 13, audioBase64: '' })),
       preload: vi.fn(async () => ({ ok: true, ready: true })),
       unload: vi.fn(async () => ({ ok: true })),

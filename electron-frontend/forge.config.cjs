@@ -20,7 +20,6 @@ module.exports = {
       for (const outputPath of packageResult.outputPaths) {
         const resourcesDir = path.join(outputPath, "resources")
         const toRemove = [
-          path.join(resourcesDir, "data", "voicevox"),
           path.join(resourcesDir, "data", "piper"),
           path.join(resourcesDir, "data", "external_sources", "offline_dictionary"),
         ]

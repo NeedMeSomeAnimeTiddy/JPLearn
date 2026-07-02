@@ -44,8 +44,8 @@ Add-Type -AssemblyName System.Drawing
 
 $options = @(
   @{
-    Label = 'Keep VOICEVOX files (~1 GB)'
-    Path = Join-Path $targetDir 'voicevox'
+    Label = 'Keep OpenVoice files (~2.4 GB)'
+    Path = Join-Path $targetDir 'openvoice'
   },
   @{
     Label = 'Keep AI model files (GGUF)'

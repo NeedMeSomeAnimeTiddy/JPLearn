@@ -2040,6 +2040,54 @@ function splitSpeechSegments(text: string): SpeechSegment[] {
   if (!normalized) {
     return []
   }
+  const splitSentenceByLanguage = (sentence: string): SpeechSegment[] => {
+    const tokens = sentence.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fffー々〆ヵヶ]+|[A-Za-z0-9][A-Za-z0-9'’-]*|[^A-Za-z0-9\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+/g) ?? [sentence]
+    const classifyToken = (token: string): 'ja' | 'en' | 'neutral' => {
+      if (JAPANESE_CHAR_REGEX.test(token)) {
+        return 'ja'
+      }
+      if (/[A-Za-z0-9]/.test(token)) {
+        return 'en'
+      }
+      return 'neutral'
+    }
+
+    const classified = tokens.map((token) => ({ token, kind: classifyToken(token) }))
+    const sentenceSegments: SpeechSegment[] = []
+
+    const findNextConcreteLanguage = (startIndex: number): SpeechSegment['language'] | null => {
+      for (let index = startIndex; index < classified.length; index += 1) {
+        const kind = classified[index].kind
+        if (kind !== 'neutral') {
+          return kind
+        }
+      }
+      return null
+    }
+
+    for (let index = 0; index < classified.length; index += 1) {
+      const entry = classified[index]
+      let language: SpeechSegment['language']
+      if (entry.kind === 'neutral') {
+        const previousLanguage = sentenceSegments[sentenceSegments.length - 1]?.language
+        language = previousLanguage ?? findNextConcreteLanguage(index + 1) ?? 'en'
+      } else {
+        language = entry.kind
+      }
+
+      const previous = sentenceSegments[sentenceSegments.length - 1]
+      if (previous && previous.language === language) {
+        previous.text += entry.token
+        continue
+      }
+      sentenceSegments.push({ text: entry.token, language })
+    }
+
+    return sentenceSegments
+      .map((segment) => ({ ...segment, text: segment.text.trim() }))
+      .filter((segment) => segment.text.length > 0)
+  }
+
   const sentenceMatches = normalized.match(/[^.!?。！？\n]+[.!?。！？\n]*/g) ?? [normalized]
   const segments: SpeechSegment[] = []
   for (const sentence of sentenceMatches) {
@@ -2047,13 +2095,15 @@ function splitSpeechSegments(text: string): SpeechSegment[] {
     if (!trimmed) {
       continue
     }
-    const language: SpeechSegment['language'] = JAPANESE_CHAR_REGEX.test(trimmed) ? 'ja' : 'en'
-    const previous = segments[segments.length - 1]
-    if (previous && previous.language === language) {
-      previous.text = `${previous.text} ${trimmed}`.trim()
-      continue
+    const sentenceSegments = splitSentenceByLanguage(trimmed)
+    for (const sentenceSegment of sentenceSegments) {
+      const previous = segments[segments.length - 1]
+      if (previous && previous.language === sentenceSegment.language) {
+        previous.text = `${previous.text} ${sentenceSegment.text}`.trim()
+        continue
+      }
+      segments.push(sentenceSegment)
     }
-    segments.push({ text: trimmed, language })
   }
   return segments
 }

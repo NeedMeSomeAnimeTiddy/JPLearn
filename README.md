@@ -82,7 +82,7 @@ python scripts/get_gguf_model.py --tier ultra  # large model (~5.5 GB)
 
 ```bash
 pip install -r requirements-tts.txt
-python scripts/get_voicevox.py
+python scripts/get_openvoice.py
 ```
 
 ### 5. Run
@@ -125,7 +125,7 @@ The installed app stores all user data in `Documents\JPLearn\`:
 | Folder | Contents |
 |--------|----------|
 | `models\` | GGUF model files |
-| `voicevox\` | Japanese TTS engine |
+| `openvoice\` | Japanese TTS engine assets and voices |
 | `data\` | SQLite databases (progress, settings) |
 
 These files survive uninstall and are detected automatically on reinstall.

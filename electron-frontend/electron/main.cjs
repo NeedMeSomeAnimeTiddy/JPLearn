@@ -5,7 +5,6 @@ const os = require('node:os')
 const path = require('node:path')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
-const { createVoiceRuntime } = require('./voice_runtime.cjs')
 const { createOpenVoiceRuntime, isOpenVoiceInstalled } = require('./openvoice_runtime.cjs')
 const { createSetupRuntime } = require('./setup_runtime.cjs')
 const { createSpeechRuntime } = require('./speech_runtime.cjs')
@@ -264,17 +263,10 @@ const windowRestoreBoundsById = new Map()
 let localTutorRuntime = createTutorChatRuntime()
 
 function createSelectedVoiceRuntime() {
-  const requestedBackend = (process.env.JPLEARN_TTS_BACKEND || '').trim().toLowerCase()
-  if (requestedBackend === 'openvoice') {
-    return createOpenVoiceRuntime({ repoRoot })
+  if (!isOpenVoiceInstalled(repoRoot)) {
+    console.warn('OpenVoice is not fully installed; audio:speak will remain unavailable until setup completes.')
   }
-  if (requestedBackend === 'voicevox') {
-    return createVoiceRuntime({ repoRoot })
-  }
-  if (isOpenVoiceInstalled(repoRoot)) {
-    return createOpenVoiceRuntime({ repoRoot })
-  }
-  return createVoiceRuntime({ repoRoot })
+  return createOpenVoiceRuntime({ repoRoot })
 }
 
 const localVoiceRuntime = createSelectedVoiceRuntime()
