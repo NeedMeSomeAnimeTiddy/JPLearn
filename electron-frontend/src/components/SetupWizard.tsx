@@ -5,7 +5,7 @@ import { ChevronDown, RefreshCw } from 'lucide-react'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ModelOption {
-  tier: 'low' | 'high' | 'ultra'
+  tier: 'low' | 'medium' | 'high' | 'ultra'
   filename: string
   sizeMb: number
   label: string
@@ -16,7 +16,7 @@ interface ModelOption {
 
 interface SystemInfo {
   totalRamGb: number
-  recommendedTier: 'low' | 'high'
+  recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
   models: ModelOption[]
   llamaCppInstalled: boolean
   gpuAdapters?: string[]
@@ -26,6 +26,9 @@ interface SystemInfo {
   voicevoxInstalled: boolean
   fontsInstalled: boolean
   dictionaryInstalled: boolean
+  speechModels: SpeechModelOption[]
+  recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
+  activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
@@ -34,8 +37,17 @@ interface SystemInfo {
   dictionaryEstimatedDownloadMinutes?: number | null
 }
 
+interface SpeechModelOption {
+  tier: 'fast' | 'balanced' | 'high' | 'ultra'
+  label: string
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
 interface ProgressEvent {
-  id: 'model' | 'llama' | 'voicevox' | 'fonts' | 'dictionary'
+  id: 'model' | 'llama' | 'voicevox' | 'fonts' | 'dictionary' | 'speech'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -57,7 +69,8 @@ interface CompactDropdownOption {
   badgeTone?: 'recommended' | 'soft' | 'warning'
 }
 
-type ModelTier = 'low' | 'high' | 'ultra' | 'skip'
+type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'skip'
+type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra' | 'skip'
 type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
 
 const LLAMA_BACKEND_OPTIONS: Array<{ key: LlamaBackend; label: string; description: string }> = [
@@ -90,43 +103,66 @@ function formatDurationMinutes(minutes: number | null | undefined): string {
   return `~${hours} h ${rem} min`
 }
 
-function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'high' | 'ultra') {
+function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'medium' | 'high' | 'ultra') {
   const totalRamGb = systemInfo?.totalRamGb ?? 0
   const gpuVramGb = systemInfo?.gpuVramGb ?? 0
 
   if (tier === 'low') {
-    return {
-      badge: 'OK on this PC',
-      tone: 'soft' as const,
-      message: 'This tier should run comfortably on this system.',
-      isOk: true,
-    }
-  }
-
-  if (tier === 'high') {
-    if (totalRamGb >= 16) {
+    if (totalRamGb >= 8) {
       return {
         badge: 'OK on this PC',
         tone: 'soft' as const,
-        message: 'This tier matches the detected system RAM well.',
+        message: 'Target tier: 8 GB RAM laptop, no dedicated GPU required.',
         isOk: true,
       }
     }
     return {
       badge: 'May be too heavy',
       tone: 'warning' as const,
-      message: 'This tier may be too demanding for this system. 16 GB RAM is recommended.',
+      message: 'This tier targets at least 8 GB RAM.',
       isOk: false,
     }
   }
 
-  if (gpuVramGb >= 12 || totalRamGb >= 24) {
+  if (tier === 'medium') {
+    if (totalRamGb >= 16) {
+      return {
+        badge: 'OK on this PC',
+        tone: 'soft' as const,
+        message: 'Target tier: 16 GB RAM desktop/laptop.',
+        isOk: true,
+      }
+    }
+    return {
+      badge: 'May be too heavy',
+      tone: 'warning' as const,
+      message: 'This tier targets 16 GB RAM.',
+      isOk: false,
+    }
+  }
+
+  if (tier === 'high') {
+    if (gpuVramGb >= 8 && totalRamGb >= 16) {
+      return {
+        badge: 'OK on this PC',
+        tone: 'soft' as const,
+        message: 'Target tier: 8 GB VRAM GPU + 16 GB RAM.',
+        isOk: true,
+      }
+    }
+    return {
+      badge: 'May be too heavy',
+      tone: 'warning' as const,
+      message: 'This tier targets 8 GB VRAM GPU + 16 GB RAM.',
+      isOk: false,
+    }
+  }
+
+  if (gpuVramGb >= 12 && totalRamGb >= 32) {
     return {
       badge: 'OK on this PC',
       tone: 'soft' as const,
-      message: gpuVramGb >= 12
-        ? 'This tier should fit this system well.'
-        : 'This tier should run on this system, but it may lean more on system RAM than GPU VRAM.',
+      message: 'Target tier: 12+ GB VRAM GPU + 32 GB RAM.',
       isOk: true,
     }
   }
@@ -134,7 +170,68 @@ function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'high'
   return {
     badge: 'May be too heavy',
     tone: 'warning' as const,
-    message: 'This tier may be too demanding for this system. 12 GB GPU VRAM or about 24 GB RAM is recommended.',
+    message: 'This tier targets 12+ GB VRAM GPU + 32 GB RAM.',
+    isOk: false,
+  }
+}
+
+function getSpeechHardwareFit(systemInfo: SystemInfo | null, tier: 'fast' | 'balanced' | 'high' | 'ultra') {
+  const totalRamGb = systemInfo?.totalRamGb ?? 0
+  const gpuVramGb = systemInfo?.gpuVramGb ?? 0
+
+  if (tier === 'fast') {
+    return {
+      badge: 'Most compatible',
+      tone: 'soft' as const,
+      message: 'Best on lower-spec systems and for the quickest response.',
+      isOk: true,
+    }
+  }
+  if (tier === 'balanced') {
+    if (totalRamGb >= 10) {
+      return {
+        badge: 'Good fit',
+        tone: 'soft' as const,
+        message: 'Good balance of speed and accuracy for most PCs.',
+        isOk: true,
+      }
+    }
+    return {
+      badge: 'May be heavy',
+      tone: 'warning' as const,
+      message: 'Works best with about 10 GB RAM or more.',
+      isOk: false,
+    }
+  }
+  if (tier === 'high') {
+    if (totalRamGb >= 16 || gpuVramGb >= 8) {
+      return {
+        badge: 'High-end fit',
+        tone: 'soft' as const,
+        message: 'Strong quality with lower latency than Ultra on capable hardware.',
+        isOk: true,
+      }
+    }
+    return {
+      badge: 'May be heavy',
+      tone: 'warning' as const,
+      message: 'Best with around 16 GB RAM or 8 GB GPU VRAM.',
+      isOk: false,
+    }
+  }
+
+  if (totalRamGb >= 24 || gpuVramGb >= 12) {
+    return {
+      badge: 'Top quality fit',
+      tone: 'soft' as const,
+      message: 'Best recognition quality when your system can handle a heavier model.',
+      isOk: true,
+    }
+  }
+  return {
+    badge: 'Heavy tier',
+    tone: 'warning' as const,
+    message: 'Best with around 24 GB RAM or 12 GB GPU VRAM.',
     isOk: false,
   }
 }
@@ -161,6 +258,8 @@ export function SetupWizard({ onComplete }: Props) {
   const [fontsMb, setFontsMb] = useState<{ done: number; total: number } | null>(null)
   const [installDictionary, setInstallDictionary] = useState(true)
   const [dictionaryProgress, setDictionaryProgress] = useState(0)
+  const [selectedSpeechTier, setSelectedSpeechTier] = useState<SpeechTier>('fast')
+  const [speechProgress, setSpeechProgress] = useState(0)
   const [createDesktop, setCreateDesktop] = useState(true)
   const [createStartMenu, setCreateStartMenu] = useState(true)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -195,6 +294,12 @@ export function SetupWizard({ onComplete }: Props) {
       if (info.voicevoxInstalled) setInstallVoicevox(false)
       if (info.fontsInstalled) setInstallFonts(false)
       if (info.dictionaryInstalled) setInstallDictionary(false)
+      setSelectedSpeechTier((prev) => {
+        if (prev !== 'skip' && info.speechModels?.some((model) => model.tier === prev)) {
+          return prev
+        }
+        return info.activeSpeechModelTier ?? info.recommendedSpeechTier ?? 'fast'
+      })
     } catch {
       setSysInfo((prev) => prev ?? {
         totalRamGb: 0,
@@ -207,6 +312,9 @@ export function SetupWizard({ onComplete }: Props) {
         voicevoxInstalled: false,
         fontsInstalled: false,
         dictionaryInstalled: false,
+        speechModels: [],
+        recommendedSpeechTier: 'fast',
+        activeSpeechModelTier: null,
         isPackaged: false,
       })
       setSelectedTier('low')
@@ -259,6 +367,8 @@ export function SetupWizard({ onComplete }: Props) {
         }
       } else if (evt.id === 'dictionary') {
         setDictionaryProgress(evt.percent)
+      } else if (evt.id === 'speech') {
+        setSpeechProgress(evt.percent)
       }
       if (evt.logMessage) {
         appendProgressLog(evt.logMessage)
@@ -304,6 +414,11 @@ export function SetupWizard({ onComplete }: Props) {
         const task = api.downloadDictionary?.()
         if (task) downloadTasks.push(task)
       }
+      if (selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find((model) => model.tier === selectedSpeechTier)?.installed) {
+        appendProgressLog(`Starting speech recognition model download (${selectedSpeechTier})…`)
+        const task = api.downloadSpeechModel?.(selectedSpeechTier)
+        if (task) downloadTasks.push(task)
+      }
 
       if (downloadTasks.length > 0) {
         const results = await Promise.allSettled(downloadTasks)
@@ -325,7 +440,7 @@ export function SetupWizard({ onComplete }: Props) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, selectedLlamaBackend, installVoicevox, installFonts, installDictionary, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, sysInfo?.dictionaryInstalled, createDesktop, createStartMenu, appendProgressLog])
+  }, [selectedTier, selectedLlamaBackend, installVoicevox, installFonts, installDictionary, selectedSpeechTier, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, sysInfo?.dictionaryInstalled, sysInfo?.speechModels, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -392,6 +507,36 @@ export function SetupWizard({ onComplete }: Props) {
     label: option.label,
   }))
   const selectedBackendDescription = LLAMA_BACKEND_OPTIONS.find((option) => option.key === selectedLlamaBackend)?.description
+  const speechModelOptions: CompactDropdownOption[] = [
+    ...(sysInfo?.speechModels.map((model) => ({
+      value: model.tier,
+      label: model.label,
+      meta: `${formatSize(model.sizeMb)} • ${formatDurationMinutes(model.estimatedDownloadMinutes)}${model.installed ? ' • Installed' : ''}`,
+      badge: model.tier === sysInfo?.recommendedSpeechTier
+        ? 'Recommended'
+        : getSpeechHardwareFit(sysInfo ?? null, model.tier).badge,
+      badgeTone: model.tier === sysInfo?.recommendedSpeechTier
+        ? ('recommended' as const)
+        : getSpeechHardwareFit(sysInfo ?? null, model.tier).tone,
+    })) ?? []),
+    {
+      value: 'skip',
+      label: 'Skip speech recognition install',
+      meta: 'Install later from settings',
+    },
+  ]
+  const selectedSpeechModel = sysInfo?.speechModels.find((model) => model.tier === selectedSpeechTier)
+  const selectedSpeechModelHardwareFit = selectedSpeechTier !== 'skip'
+    ? getSpeechHardwareFit(sysInfo ?? null, selectedSpeechTier)
+    : null
+  const selectedSpeechTierDescription = selectedSpeechTier === 'skip'
+    ? 'You can enable speech-based answers later from Settings.'
+    : selectedSpeechModel?.description
+  const selectedSpeechTierWarning = selectedSpeechTier === 'ultra'
+    ? 'Large download and slower transcription speed, but highest recognition quality.'
+    : (selectedSpeechModelHardwareFit && !selectedSpeechModelHardwareFit.isOk
+      ? selectedSpeechModelHardwareFit.message
+      : null)
 
   const pages: Record<Page, ReactNode> = {
     1: (
@@ -585,6 +730,37 @@ export function SetupWizard({ onComplete }: Props) {
             />
           )}
         </div>
+
+        {/* ── Speech Recognition ── */}
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Speech Recognition (optional)</p>
+          <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
+            Lets you answer minigame questions by speaking into your microphone. Runs entirely on
+            your device using a local offline speech model — no internet connection needed once
+            installed.
+          </p>
+          <CompactDropdown
+            ariaLabel="Speech recognition model"
+            options={speechModelOptions}
+            value={selectedSpeechTier}
+            onChange={(value) => setSelectedSpeechTier(value as SpeechTier)}
+          />
+          {selectedSpeechTierDescription ? (
+            <p style={{ opacity: 0.65, fontSize: '0.84rem', lineHeight: 1.45, margin: '0.6rem 0 0' }}>
+              {selectedSpeechTierDescription}
+            </p>
+          ) : null}
+          {selectedSpeechModelHardwareFit && selectedSpeechModelHardwareFit.isOk ? (
+            <p style={{ color: 'rgba(242, 181, 111, 0.92)', fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
+              {selectedSpeechModelHardwareFit.message}
+            </p>
+          ) : null}
+          {selectedSpeechTierWarning ? (
+            <p style={{ color: '#ffc107', fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
+              {selectedSpeechTierWarning}
+            </p>
+          ) : null}
+        </div>
       </PageLayout>
     ),
 
@@ -594,14 +770,16 @@ export function SetupWizard({ onComplete }: Props) {
       const needsVoice = installVoicevox && !sysInfo?.voicevoxInstalled
       const needsFonts = installFonts && !sysInfo?.fontsInstalled
       const needsDictionary = installDictionary && !sysInfo?.dictionaryInstalled
+      const needsSpeech = selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find(m => m.tier === selectedSpeechTier)?.installed
       const modelInfo = sysInfo?.models.find(m => m.tier === selectedTier)
+      const speechModelInfo = sysInfo?.speechModels.find(m => m.tier === selectedSpeechTier)
       return (
         <PageLayout
           title="Ready to download"
           subtitle="Review what will be downloaded, then click Start Setup."
           onNext={startDownloads}
           onBack={() => setPage(4)}
-          nextLabel={needsModel || needsLlama || needsVoice || needsFonts || needsDictionary ? 'Start Setup' : 'Finish'}
+          nextLabel={needsModel || needsLlama || needsVoice || needsFonts || needsDictionary || needsSpeech ? 'Start Setup' : 'Finish'}
         >
           {needsModel && modelInfo && (
             <SummaryRow label="AI Tutor model" detail={`${modelInfo.label} — ${formatSize(modelInfo.sizeMb)}`} />
@@ -618,7 +796,10 @@ export function SetupWizard({ onComplete }: Props) {
           {needsDictionary && (
             <SummaryRow label="Offline dictionary" detail="~30 MB" />
           )}
-          {!needsModel && !needsVoice && !needsFonts && !needsDictionary && (
+          {needsSpeech && speechModelInfo && (
+            <SummaryRow label="Speech recognition model" detail={`${speechModelInfo.label} — ${formatSize(speechModelInfo.sizeMb)}`} />
+          )}
+          {!needsModel && !needsVoice && !needsFonts && !needsDictionary && !needsSpeech && (
             <p style={{ opacity: 0.7 }}>Nothing to download — all selected components are already installed.</p>
           )}
           {sysInfo?.isPackaged && (
@@ -680,6 +861,9 @@ export function SetupWizard({ onComplete }: Props) {
         )}
         {installDictionary && !sysInfo?.dictionaryInstalled && (
           <ProgressBar value={dictionaryProgress} label="Offline dictionary" />
+        )}
+        {selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find((model) => model.tier === selectedSpeechTier)?.installed && (
+          <ProgressBar value={speechProgress} label="Speech recognition model" />
         )}
         {downloadError && (
           <p style={{ color: '#ff7b7b', marginTop: '1rem', lineHeight: 1.5 }}>

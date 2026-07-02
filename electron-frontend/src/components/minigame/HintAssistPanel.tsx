@@ -29,6 +29,7 @@ export function HintAssistPanel({
   const alwaysShowHint =
     roundState.mode !== 'romaji_sprint' &&
     roundState.mode !== 'typed_recall' &&
+    roundState.mode !== 'speech_recall' &&
     roundState.mode !== 'listening_audio_first'
 
   const hintSteps = [

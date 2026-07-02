@@ -386,6 +386,46 @@ function validateSpeakPayload(payload) {
   return result
 }
 
+const VALID_SPEECH_MIME_TYPES = new Set(['audio/webm', 'audio/ogg', 'audio/wav', 'audio/wave', 'audio/x-wav'])
+const SPEECH_MIME_EXTENSIONS = {
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'audio/wave': 'wav',
+  'audio/x-wav': 'wav',
+}
+// Base64 length cap (~6 MB decoded). Generous for a short spoken answer clip
+// while bounding memory/disk use per transcription request.
+const MAX_SPEECH_AUDIO_BASE64_LENGTH = 8 * 1024 * 1024
+const VALID_SPEECH_LANGUAGES = new Set(['ja', 'en'])
+
+function validateTranscribeSpeechPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid speech transcription payload: expected object')
+  }
+  const { audioBase64, mimeType, language } = payload
+
+  if (typeof audioBase64 !== 'string' || !audioBase64) {
+    throw new Error('Invalid speech transcription payload: missing audio data')
+  }
+  if (audioBase64.length > MAX_SPEECH_AUDIO_BASE64_LENGTH) {
+    throw new Error('Invalid speech transcription payload: audio data too large')
+  }
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(audioBase64)) {
+    throw new Error('Invalid speech transcription payload: audio data is not valid base64')
+  }
+  if (typeof mimeType !== 'string' || !VALID_SPEECH_MIME_TYPES.has(mimeType)) {
+    throw new Error(`Invalid speech transcription payload: unsupported mime type ${String(mimeType)}`)
+  }
+  const safeLanguage = typeof language === 'string' && VALID_SPEECH_LANGUAGES.has(language) ? language : 'ja'
+
+  return {
+    audioBase64,
+    extension: SPEECH_MIME_EXTENSIONS[mimeType],
+    language: safeLanguage,
+  }
+}
+
 const VALID_JLPT_LEVELS = new Set(['n5', 'n4', 'n3', 'n2', 'n1'])
 const VALID_JLPT_MODES = new Set(['mock_exam', 'diagnostic', 'adaptive_review', 'weak_area_drill'])
 
@@ -455,6 +495,7 @@ module.exports = {
   validateStartupThemeInput,
   validateRecordGameResultPayload,
   validateSpeakPayload,
+  validateTranscribeSpeechPayload,
   validateJLPTLevel,
   validateJLPTMode,
   validateOptionalJLPTLevel,

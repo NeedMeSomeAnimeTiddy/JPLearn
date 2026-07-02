@@ -14,7 +14,9 @@ import { JLPTPrepView } from './views/JLPTPrepView'
 import { OnboardingView } from './views/OnboardingView'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { assessTypedAnswer } from './lib/answerAssessment'
+import type { TypedAnswerState } from './lib/answerAssessment'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
 import type { RoundDictionaryNote } from './types'
 
@@ -112,7 +114,7 @@ type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' |
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
 type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'context_cloze' | 'narrative_story' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'context_cloze' | 'narrative_story' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
@@ -359,6 +361,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Typed Recall: write the meaning from memory with clean spelling.',
       'No options this round: recall first, then type confidently.',
     ],
+    speech_recall: [
+      'Voice Recall: speak the meaning aloud, then let the mic catch every syllable.',
+      'Say It Clean: trust the sound before you speak.',
+    ],
     context_cloze: [
       'Context Ladder: use sentence clues before touching options.',
       'Meaning Lens: infer the blank, then verify carefully.',
@@ -396,6 +402,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
     typed_recall: [
       'Typed Recall: write the exact meaning from memory.',
       'No hints mode: type what the prompt means in one shot.',
+    ],
+    speech_recall: [
+      'Voice Recall: speak the exact meaning, trusting the borrowed sound.',
+      'Say It Clean: commit to the term you would use in conversation.',
     ],
     context_cloze: [
       'Loanword Context: let the sentence guide the missing term.',
@@ -435,6 +445,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Concept Recall: type the meaning directly without choices.',
       'Kanji Memory: commit one meaning and type it exactly.',
     ],
+    speech_recall: [
+      'Voice Recall: say the meaning aloud, clearly and confidently.',
+      'Spoken Kanji: commit to one meaning and speak it out loud.',
+    ],
     context_cloze: [
       'Semantic Context: use nearby clues to fill the blank.',
       'N5 Sentence Drill: infer first, then commit to one meaning.',
@@ -473,6 +487,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
       'Meaning Recall: type the word meaning from memory.',
       'Precision Recall: type the best English gloss directly.',
     ],
+    speech_recall: [
+      'Voice Recall: speak the word meaning from memory.',
+      'Spoken Precision: say the best English gloss aloud.',
+    ],
     context_cloze: [
       'Usage Context: use sentence context to place the right word.',
       'Meaning-in-Use: infer from surrounding clues first.',
@@ -510,6 +528,10 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
     typed_recall: [
       'Pattern Recall: type the intended meaning in your own words.',
       'Grammar Recall: type what this expression conveys.',
+    ],
+    speech_recall: [
+      'Voice Recall: say the intended meaning in your own words.',
+      'Spoken Pattern: say aloud what this expression conveys.',
     ],
     context_cloze: [
       'Sentence Pattern: complete the line with the right structure.',
@@ -895,6 +917,11 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
     description: 'Type the meaning directly with near-miss tolerance.',
   },
   {
+    key: 'speech_recall',
+    title: 'Speech Recall',
+    description: 'Say the meaning aloud — transcribed and graded offline.',
+  },
+  {
     key: 'context_cloze',
     title: 'Context Cloze',
     description: 'Fill sentence blanks using context clues and i+1 progression.',
@@ -924,9 +951,9 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
 const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
   hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
   katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
-  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
 }
 
 const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>> = {
@@ -951,6 +978,7 @@ const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   character_match: Languages,
   stroke_order: Keyboard,
   typed_recall: Keyboard,
+  speech_recall: Mic,
   context_cloze: BookText,
   narrative_story: History,
   listening_audio_first: Volume2,
@@ -1776,6 +1804,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
+      speech_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -1788,6 +1817,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
+      speech_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -1800,6 +1830,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
+      speech_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -1812,6 +1843,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
+      speech_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -1824,6 +1856,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
+      speech_recall: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -2125,64 +2158,6 @@ function normalizeText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-function normalizeTypedText(value: string): string {
-  return value
-    .normalize('NFKC')
-    .toLowerCase()
-    .trim()
-    .replace(/[^\p{L}\p{N}]+/gu, '')
-}
-
-function isTransposition(left: string, right: string): boolean {
-  if (left.length !== right.length) return false
-  const diffs: number[] = []
-  for (let index = 0; index < left.length; index += 1) {
-    if (left[index] !== right[index]) diffs.push(index)
-  }
-  if (diffs.length !== 2) return false
-  const [i, j] = diffs
-  return left[i] === right[j] && left[j] === right[i]
-}
-
-function levenshteinDistance(left: string, right: string): number {
-  if (left === right) return 0
-  if (!left) return right.length
-  if (!right) return left.length
-
-  let previousRow: number[] = Array.from({ length: right.length + 1 }, (_, index) => index)
-  for (let i = 1; i <= left.length; i += 1) {
-    const currentRow: number[] = [i]
-    for (let j = 1; j <= right.length; j += 1) {
-      const substitutionCost = left[i - 1] === right[j - 1] ? 0 : 1
-      currentRow[j] = Math.min(
-        previousRow[j] + 1,
-        currentRow[j - 1] + 1,
-        previousRow[j - 1] + substitutionCost,
-      )
-    }
-    previousRow = currentRow
-  }
-  return previousRow[right.length]
-}
-
-type TypedAnswerState = 'exact' | 'near_miss' | 'incorrect'
-
-function assessTypedAnswer(expected: string, given: string): TypedAnswerState {
-  const normalizedExpected = normalizeTypedText(expected)
-  const normalizedGiven = normalizeTypedText(given)
-  if (!normalizedExpected || !normalizedGiven) return 'incorrect'
-  if (normalizedExpected === normalizedGiven) return 'exact'
-
-  const distance = levenshteinDistance(normalizedExpected, normalizedGiven)
-  const minLength = Math.min(normalizedExpected.length, normalizedGiven.length)
-  const nearMiss =
-    distance <= 1 ||
-    isTransposition(normalizedExpected, normalizedGiven) ||
-    (distance === 2 && minLength >= 6)
-
-  return nearMiss ? 'near_miss' : 'incorrect'
-}
-
 function chooseUniqueIndices(length: number, count: number, exclude: number): number[] {
   const picks = new Set<number>()
   while (picks.size < Math.min(count, Math.max(0, length - 1))) {
@@ -2283,6 +2258,11 @@ function buildRoundDictionaryNote(card: ScriptDeck['cards'][number], mode: Playa
     copy = secondaryGlosses.length > 0
       ? `${summary.character} (${summary.reading}) is commonly translated as ${glossList.join(', ')}.`
       : `${summary.character} (${summary.reading}) is commonly translated as ${summary.primary_gloss}.`
+  } else if (mode === 'speech_recall') {
+    title = 'Dictionary recall'
+    copy = secondaryGlosses.length > 0
+      ? `${summary.character} (${summary.reading}) is commonly translated as ${glossList.join(', ')}. Say it aloud clearly.`
+      : `${summary.character} (${summary.reading}) is commonly translated as ${summary.primary_gloss}. Say it aloud clearly.`
   } else if (mode === 'stroke_order') {
     title = 'Writing clue'
     copy = `${summary.character} is read ${summary.reading} and is usually glossed as ${summary.primary_gloss}.`
@@ -2679,6 +2659,7 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'character_match') return 'Character Match'
   if (mode === 'stroke_order') return 'Stroke Order'
   if (mode === 'typed_recall') return 'Typed Recall'
+  if (mode === 'speech_recall') return 'Speech Recall'
   if (mode === 'context_cloze') return 'Context Cloze'
   if (mode === 'listening_audio_first') return 'Listening: Audio First'
   if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
@@ -2706,6 +2687,7 @@ function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'character_match') return 'You are building pattern memory one step at a time.'
   if (mode === 'stroke_order') return 'Nice attempt. Visual memory gets stronger with reps.'
   if (mode === 'typed_recall') return 'Great effort. Keep the next answer short and clear.'
+  if (mode === 'speech_recall') return 'Great effort. Speak the next answer clearly and confidently.'
   if (mode === 'context_cloze') return 'Good try. Let the sentence mood guide your choice.'
   if (mode === 'listening_audio_first') return 'Keep listening. Audio recognition builds over time.'
   if (mode === 'listening_prompt_first') return 'Connect the sound to the character. It gets natural.'
@@ -2747,6 +2729,21 @@ function buildRoundCoachToast(
       messageKey: 'coach.round_near_miss',
       title: 'Nice save',
       body: 'That was close and you handled it well.',
+      targetMode: null,
+      focusArea: null,
+      actionType: null,
+      actionLabel: 'Got it',
+    }
+  }
+
+  if (payload.mode === 'speech_recall' && payload.typedAssessment === 'near_miss') {
+    return {
+      id,
+      priority: 'coaching',
+      eventType: 'round_feedback',
+      messageKey: 'coach.round_near_miss',
+      title: 'Nice save',
+      body: 'Close call on the transcript, but that counts.',
       targetMode: null,
       focusArea: null,
       actionType: null,
@@ -2941,7 +2938,7 @@ function App() {
   const [tutorInstallInfo, setTutorInstallInfo] = useState<{
     totalRamGb: number
     models: Array<{
-      tier: 'low' | 'high' | 'ultra'
+      tier: 'low' | 'medium' | 'high' | 'ultra'
       filename: string
       sizeMb: number
       label: string
@@ -2949,8 +2946,8 @@ function App() {
       installed: boolean
       estimatedDownloadMinutes?: number | null
     }>
-    recommendedTier: 'low' | 'high'
-    activeModelTier?: 'low' | 'high' | 'ultra' | null
+    recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
+    activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
     llamaCppInstalled: boolean
     gpuVramGb?: number | null
     voicevoxInstalled: boolean
@@ -2958,12 +2955,25 @@ function App() {
     dictionaryInstalled: boolean
     llamaCppEstimatedDownloadMinutes?: number | null
     dictionaryEstimatedDownloadMinutes?: number | null
+    speechModels: Array<{
+      tier: 'fast' | 'balanced' | 'high' | 'ultra'
+      label: string
+      description: string
+      sizeMb: number
+      installed: boolean
+      estimatedDownloadMinutes?: number | null
+    }>
+    recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
+    activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
   } | null>(null)
-  const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'high' | 'ultra' | null>(null)
+  const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
   const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
-  const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'high' | 'ultra' | null>(null)
+  const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
   const [dictionaryDownloading, setDictionaryDownloading] = useState(false)
   const [dictionaryProgress, setDictionaryProgress] = useState<number>(0)
+  const [speechDownloadingTier, setSpeechDownloadingTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
+  const [speechDownloadProgress, setSpeechDownloadProgress] = useState<number>(0)
+  const [speechModelActionTier, setSpeechModelActionTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
   const [roundFeedbackTone, setRoundFeedbackTone] = useState<FeedbackTone>(null)
   const [roundFeedbackPoints, setRoundFeedbackPoints] = useState<number | null>(null)
@@ -3332,46 +3342,66 @@ function App() {
     return `${minutes} min`
   }, [])
 
-  const getTutorModelHardwareFit = useCallback((tier: 'low' | 'high' | 'ultra') => {
+  const getTutorModelHardwareFit = useCallback((tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const totalRamGb = tutorInstallInfo?.totalRamGb ?? 0
     const gpuVramGb = tutorInstallInfo?.gpuVramGb ?? 0
 
     if (tier === 'low') {
-      return {
-        badge: 'OK on this PC',
-        detail: 'This tier should run comfortably on this system.',
-        isOk: true,
-      }
-    }
-
-    if (tier === 'high') {
-      if (totalRamGb >= 16) {
+      if (totalRamGb >= 8) {
         return {
           badge: 'OK on this PC',
-          detail: 'This tier matches the detected system RAM well.',
+          detail: 'Target tier: 8 GB RAM laptop, no dedicated GPU required.',
           isOk: true,
         }
       }
       return {
         badge: 'May be too heavy',
-        detail: 'This tier may be too demanding for this system. 16 GB RAM is recommended.',
+        detail: 'This tier targets at least 8 GB RAM.',
         isOk: false,
       }
     }
 
-    if (gpuVramGb >= 12 || totalRamGb >= 24) {
+    if (tier === 'medium') {
+      if (totalRamGb >= 16) {
+        return {
+          badge: 'OK on this PC',
+          detail: 'Target tier: 16 GB RAM desktop/laptop.',
+          isOk: true,
+        }
+      }
+      return {
+        badge: 'May be too heavy',
+        detail: 'This tier targets 16 GB RAM.',
+        isOk: false,
+      }
+    }
+
+    if (tier === 'high') {
+      if (gpuVramGb >= 8 && totalRamGb >= 16) {
+        return {
+          badge: 'OK on this PC',
+          detail: 'Target tier: 8 GB VRAM GPU + 16 GB RAM.',
+          isOk: true,
+        }
+      }
+      return {
+        badge: 'May be too heavy',
+        detail: 'This tier targets 8 GB VRAM GPU + 16 GB RAM.',
+        isOk: false,
+      }
+    }
+
+    if (gpuVramGb >= 12 && totalRamGb >= 32) {
       return {
         badge: 'OK on this PC',
-        detail: gpuVramGb >= 12
-          ? 'This tier should fit this system well.'
-          : 'This tier should run on this system, but it may lean more on system RAM than GPU VRAM.',
+        detail: 'Target tier: 12+ GB VRAM GPU + 32 GB RAM.',
         isOk: true,
       }
     }
 
     return {
       badge: 'May be too heavy',
-      detail: 'This tier may be too demanding for this system. 12 GB GPU VRAM or about 24 GB RAM is recommended.',
+      detail: 'This tier targets 12+ GB VRAM GPU + 32 GB RAM.',
       isOk: false,
     }
   }, [tutorInstallInfo?.gpuVramGb, tutorInstallInfo?.totalRamGb])
@@ -3395,6 +3425,9 @@ function App() {
         dictionaryInstalled: setupInfo.dictionaryInstalled,
         llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
         dictionaryEstimatedDownloadMinutes: setupInfo.dictionaryEstimatedDownloadMinutes ?? null,
+        speechModels: setupInfo.speechModels ?? [],
+        recommendedSpeechTier: setupInfo.recommendedSpeechTier,
+        activeSpeechModelTier: setupInfo.activeSpeechModelTier ?? null,
       })
     } catch {
       // Best effort only.
@@ -3422,6 +3455,10 @@ function App() {
         setDictionaryProgress(evt.percent)
         return
       }
+      if (evt.id === 'speech') {
+        setSpeechDownloadProgress(evt.percent)
+        return
+      }
       if (evt.id !== 'model') {
         return
       }
@@ -3430,7 +3467,7 @@ function App() {
     return unsubscribe
   }, [])
 
-  const downloadTutorModel = useCallback(async (tier: 'low' | 'high' | 'ultra') => {
+  const downloadTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const downloadModel = window.jplearnDesktop.downloadModel
     if (!downloadModel || tutorDownloadingTier) {
       return
@@ -3446,7 +3483,7 @@ function App() {
     }
   }, [refreshTutorInstallInfo, tutorDownloadingTier])
 
-  const selectTutorModel = useCallback(async (tier: 'low' | 'high' | 'ultra') => {
+  const selectTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const setActiveTutorModel = window.jplearnDesktop.setActiveTutorModel
     if (!setActiveTutorModel || tutorModelActionTier) {
       return
@@ -3460,7 +3497,7 @@ function App() {
     }
   }, [refreshTutorInstallInfo, tutorModelActionTier])
 
-  const uninstallTutorModel = useCallback(async (tier: 'low' | 'high' | 'ultra') => {
+  const uninstallTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const uninstallModel = window.jplearnDesktop.uninstallTutorModel
     if (!uninstallModel || tutorModelActionTier) {
       return
@@ -3489,6 +3526,50 @@ function App() {
       setDictionaryProgress(0)
     }
   }, [dictionaryDownloading, refreshTutorInstallInfo])
+
+  const downloadSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
+    const downloadModel = window.jplearnDesktop.downloadSpeechModel
+    if (!downloadModel || speechDownloadingTier) {
+      return
+    }
+    setSpeechDownloadingTier(tier)
+    setSpeechDownloadProgress(0)
+    try {
+      await downloadModel(tier)
+      await refreshTutorInstallInfo()
+    } finally {
+      setSpeechDownloadingTier(null)
+      setSpeechDownloadProgress(0)
+    }
+  }, [refreshTutorInstallInfo, speechDownloadingTier])
+
+  const selectSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
+    const setActiveSpeechModel = window.jplearnDesktop.setActiveSpeechModel
+    if (!setActiveSpeechModel || speechModelActionTier) {
+      return
+    }
+    setSpeechModelActionTier(tier)
+    try {
+      await setActiveSpeechModel(tier)
+      await refreshTutorInstallInfo()
+    } finally {
+      setSpeechModelActionTier(null)
+    }
+  }, [refreshTutorInstallInfo, speechModelActionTier])
+
+  const uninstallSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
+    const uninstallModel = window.jplearnDesktop.uninstallSpeechModel
+    if (!uninstallModel || speechModelActionTier) {
+      return
+    }
+    setSpeechModelActionTier(tier)
+    try {
+      await uninstallModel(tier)
+      await refreshTutorInstallInfo()
+    } finally {
+      setSpeechModelActionTier(null)
+    }
+  }, [refreshTutorInstallInfo, speechModelActionTier])
 
   // Warm the voice engine in the background once voice is enabled so the first
   // spoken prompt doesn't pay the engine cold-start cost.
@@ -5229,6 +5310,29 @@ function App() {
         }
       }
 
+      if (minigame === 'speech_recall') {
+        const promptLabel = surprisePrompt
+          ? surpriseLabel
+          : 'What does this mean? Say your answer aloud.'
+        return {
+          cardId: card.id,
+          mode: minigame,
+          audioText: card.character,
+          exampleSentenceAudioText,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: exampleSentenceHint ?? `Think about what ${card.character} means.`,
+          dictionarySeedQuery,
+          dictionaryNote,
+          promptLabel,
+          focusText: card.character,
+          answer: card.meaning,
+          options: [],
+        }
+      }
+
       if (minigame === 'stroke_order') {
         const promptLabel = surprisePrompt
           ? surpriseLabel
@@ -5760,7 +5864,7 @@ function App() {
       const targetRounds = Math.max(1, Math.floor(sessionTargetItems))
 
       const typedAssessment =
-        roundState.mode === 'typed_recall'
+        roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall'
           ? assessTypedAnswer(roundState.answer, answer)
           : null
       const isCorrect =
@@ -5820,7 +5924,7 @@ function App() {
       if (isCorrect) {
         setSessionScore((value) => value + 1)
         setSessionPoints((value) => value + awardedPoints)
-        if (roundState.mode === 'typed_recall' && typedAssessment === 'near_miss') {
+        if ((roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall') && typedAssessment === 'near_miss') {
           setRoundFeedback(`Close enough — we’ll count it! ${pointsCopy}${comboCopy}.`)
         } else if (roundState.mode === 'narrative_story') {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
@@ -8128,6 +8232,116 @@ function App() {
                       </p>
                     </div>
                   ) : null}
+                </SettingsCollapsibleSection>
+                ) : null}
+
+                {activeSettingsTab === 'tutor' ? (
+                <SettingsCollapsibleSection
+                  id="speech-recognition"
+                  title="Speech Recognition"
+                  description="Local offline speech-to-text used to answer minigame questions by speaking. Runs entirely on your device."
+                  meta={(tutorInstallInfo?.speechModels ?? []).some((model) => model.installed) ? 'Installed' : 'Not installed'}
+                  collapsed={Boolean(collapsedSettingsSections['speech-recognition'])}
+                  onToggle={() => toggleThemeSectionCollapsed('speech-recognition')}
+                  className="settings-theme-card"
+                >
+                  <div style={{ display: 'grid', gap: '0.65rem' }}>
+                    {(tutorInstallInfo?.speechModels ?? []).map((model) => {
+                      const isDownloadingThis = speechDownloadingTier === model.tier
+                      const isActioningThis = speechModelActionTier === model.tier
+                      const isActiveTier = tutorInstallInfo?.activeSpeechModelTier === model.tier
+
+                      return (
+                        <div
+                          key={model.tier}
+                          style={{
+                            padding: '0.75rem 0.9rem',
+                            borderRadius: '12px',
+                            background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
+                            border: isActiveTier
+                              ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
+                              : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <div>
+                              <p style={{ margin: 0, fontWeight: 600 }}>
+                                {model.label}
+                                {isActiveTier ? ' · Active' : ''}
+                              </p>
+                              <p className="settings-help" style={{ marginTop: '0.25rem' }}>
+                                {formatModelSize(model.sizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
+                              </p>
+                              <p className="settings-help" style={{ marginTop: '0.2rem' }}>
+                                {model.installed ? 'Installed' : model.description}
+                              </p>
+                              {tutorInstallInfo?.recommendedSpeechTier === model.tier ? (
+                                <p className="settings-help" style={{ marginTop: '0.2rem', color: 'var(--accent, #7eb8ea)' }}>
+                                  Recommended for this hardware
+                                </p>
+                              ) : null}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                              {model.installed ? (
+                                <button
+                                  type="button"
+                                  className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
+                                  onClick={() => { void selectSpeechModel(model.tier) }}
+                                  disabled={isActiveTier || speechModelActionTier !== null || speechDownloadingTier !== null}
+                                  aria-label={isActiveTier ? `${model.label} is the active speech model` : `Use ${model.label} for speech recognition`}
+                                  title={isActiveTier ? 'Currently active' : 'Use this model'}
+                                >
+                                  {isActiveTier ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" /> : <Circle size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="settings-card-icon-button"
+                                onClick={() => { void downloadSpeechModel(model.tier) }}
+                                disabled={speechDownloadingTier !== null || speechModelActionTier !== null}
+                                aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                                title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                              >
+                                {isDownloadingThis
+                                  ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                                  : model.installed
+                                    ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
+                                    : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
+                              </button>
+                              {model.installed ? (
+                                <button
+                                  type="button"
+                                  className="settings-inline-icon-button"
+                                  onClick={() => { void uninstallSpeechModel(model.tier) }}
+                                  disabled={speechModelActionTier !== null || speechDownloadingTier !== null}
+                                  aria-label={`Uninstall ${model.label}`}
+                                  title={`Uninstall ${model.label}`}
+                                >
+                                  {isActioningThis
+                                    ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                                    : <Trash2 size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                          {isDownloadingThis ? (
+                            <div>
+                              <div className="settings-progress-track">
+                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, speechDownloadProgress))}%` }} />
+                              </div>
+                              <p className="settings-help" style={{ marginTop: '0.3rem' }}>
+                                Downloading… {Math.round(speechDownloadProgress)}%
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="settings-help" style={{ marginTop: '0.75rem' }}>
+                    Select the circle icon to switch the active speech recognition model. If no model is
+                    installed, speech-answer minigame rounds fall back to typed answers.
+                  </p>
                 </SettingsCollapsibleSection>
                 ) : null}
 

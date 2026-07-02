@@ -417,9 +417,9 @@ interface DesktopApi {
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>
   getSetupSystemInfo?: () => Promise<SetupSystemInfo>
-  downloadModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ alreadyInstalled?: boolean }>
-  setActiveTutorModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
-  uninstallTutorModel?: (tier: 'low' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
+  downloadModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ alreadyInstalled?: boolean }>
+  setActiveTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
+  uninstallTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   downloadLlama?: (backend?: 'cuda' | 'hip' | 'vulkan' | 'cpu') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   downloadVoicevox?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   completeSetup?: () => Promise<{ ok: boolean }>
@@ -427,6 +427,11 @@ interface DesktopApi {
   onSetupProgress?: (listener: (evt: SetupProgressEvent) => void) => () => void
   downloadFonts?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   downloadDictionary?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  downloadSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  setActiveSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
+  uninstallSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
+  transcribeSpeech?: (payload: SpeechTranscribePayload) => Promise<SpeechTranscriptionResult>
+  getSpeechStatus?: () => Promise<SpeechRuntimeStatus>
   createShortcuts?: (opts: { desktop?: boolean; startMenu?: boolean }) => Promise<{ ok: boolean }>
 }
 
@@ -437,7 +442,7 @@ interface OnboardingCompletionPayload {
 }
 
 interface SetupModelOption {
-  tier: 'low' | 'high' | 'ultra'
+  tier: 'low' | 'medium' | 'high' | 'ultra'
   filename: string
   sizeMb: number
   label: string
@@ -446,10 +451,38 @@ interface SetupModelOption {
   estimatedDownloadMinutes?: number | null
 }
 
+interface SetupSpeechModelOption {
+  tier: 'fast' | 'balanced' | 'high' | 'ultra'
+  label: string
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
+interface SpeechTranscribePayload {
+  audioBase64: string
+  mimeType: 'audio/webm' | 'audio/ogg' | 'audio/wav' | 'audio/wave' | 'audio/x-wav'
+  language?: 'ja' | 'en'
+}
+
+interface SpeechTranscriptionResult {
+  text: string
+  confidence: number
+  durationMs: number | null
+  languageProbability?: number | null
+}
+
+interface SpeechRuntimeStatus {
+  available: boolean
+  running: boolean
+  lastError: string | null
+}
+
 interface SetupSystemInfo {
   totalRamGb: number
-  recommendedTier: 'low' | 'high'
-  activeModelTier?: 'low' | 'high' | 'ultra' | null
+  recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
+  activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
   models: SetupModelOption[]
   llamaCppInstalled: boolean
   gpuAdapters?: string[]
@@ -459,6 +492,9 @@ interface SetupSystemInfo {
   voicevoxInstalled: boolean
   fontsInstalled: boolean
   dictionaryInstalled: boolean
+  speechModels: SetupSpeechModelOption[]
+  recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
+  activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
@@ -468,7 +504,7 @@ interface SetupSystemInfo {
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'llama' | 'voicevox' | 'fonts' | 'dictionary'
+  id: 'model' | 'llama' | 'voicevox' | 'fonts' | 'dictionary' | 'speech'
   percent: number
   mb: number | null
   totalMb: number | null

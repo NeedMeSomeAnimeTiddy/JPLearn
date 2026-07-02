@@ -13,6 +13,7 @@ const {
   validateRecordGameResultPayload,
   validateExpertiseLevelInput,
   validateSpeakPayload,
+  validateTranscribeSpeechPayload,
   validateJLPTLevel,
   validateJLPTMode,
   validateOptionalJLPTLevel,
@@ -428,6 +429,37 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('audio:speech-status', (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const speechRuntime = options.speechRuntime
+    return speechRuntime
+      ? speechRuntime.getStatus()
+      : { available: false, running: false, lastError: 'Speech recognition runtime is not available' }
+  })
+
+  options.ipcMain.handle('audio:transcribe', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validated = validateTranscribeSpeechPayload(payload)
+    const speechRuntime = options.speechRuntime
+    if (!speechRuntime) {
+      throw new Error('Speech recognition runtime is not available')
+    }
+    const fs = require('fs')
+    const os = require('os')
+    const path = require('path')
+    const crypto = require('crypto')
+    const tempPath = path.join(os.tmpdir(), `jplearn-speech-${crypto.randomUUID()}.${validated.extension}`)
+    try {
+      fs.writeFileSync(tempPath, Buffer.from(validated.audioBase64, 'base64'))
+      return await speechRuntime.transcribe(tempPath, { language: validated.language })
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Speech transcription failed: ${detail}`)
+    } finally {
+      try { fs.unlinkSync(tempPath) } catch { /* ignore */ }
+    }
+  })
+
   options.ipcMain.handle('window:minimize', (event) => {
     const win = assertTrustedIpcSender(event, trustedSenderOptions())
     if (win) win.minimize()
@@ -716,7 +748,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:download-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['low', 'high', 'ultra'].includes(tier)) {
+      if (typeof tier !== 'string' || !['low', 'medium', 'high', 'ultra'].includes(tier)) {
         throw new Error('Invalid model tier')
       }
       try {
@@ -733,7 +765,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:set-active-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['low', 'high', 'ultra'].includes(tier)) {
+      if (typeof tier !== 'string' || !['low', 'medium', 'high', 'ultra'].includes(tier)) {
         throw new Error('Invalid model tier')
       }
       try {
@@ -750,7 +782,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:uninstall-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['low', 'high', 'ultra'].includes(tier)) {
+      if (typeof tier !== 'string' || !['low', 'medium', 'high', 'ultra'].includes(tier)) {
         throw new Error('Invalid model tier')
       }
       try {
@@ -809,6 +841,45 @@ function registerIpcHandlers(options) {
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Dictionary download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:download-speech-model', async (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
+        throw new Error('Invalid speech model tier')
+      }
+      try {
+        return await setupRuntime.downloadSpeechModel(tier, event.sender, options.repoRoot)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Speech model download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:set-active-speech-model', (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
+        throw new Error('Invalid speech model tier')
+      }
+      try {
+        return setupRuntime.setActiveSpeechModelTier(tier)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to select speech model: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:uninstall-speech-model', (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
+        throw new Error('Invalid speech model tier')
+      }
+      try {
+        return setupRuntime.uninstallSpeechModel(tier)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to uninstall speech model: ${detail}`)
       }
     })
 

@@ -14,6 +14,7 @@ import { MinigameHud } from '../components/minigame/MinigameHud'
 import { MinigameResponsePanel } from '../components/minigame/MinigameResponsePanel'
 import { StrokeOrderAnswerPanel } from '../components/minigame/StrokeOrderAnswerPanel'
 import { TypedAnswerPanel } from '../components/minigame/TypedAnswerPanel'
+import { SpeechAnswerPanel } from '../components/minigame/SpeechAnswerPanel'
 import { SessionRunSummary } from '../components/SessionRunSummary'
 import type { MinigameKey, NavDirection, ScriptKey } from '../types'
 import {
@@ -116,6 +117,7 @@ export function MinigameView({
   // 0 = no hint shown, 1 = prompt type label, 2 = hintText, 3 = full answer giveaway
   const [hintStep, setHintStep] = useState<0 | 1 | 2 | 3>(0)
   const [activeChoiceIndex, setActiveChoiceIndex] = useState(0)
+  const [speechFallbackToTyped, setSpeechFallbackToTyped] = useState(false)
   const [hintRevealCount, setHintRevealCount] = useState(0)
   const [focusModeEnabled, setFocusModeEnabled] = useState(false)
   const [pointsGainPulse, setPointsGainPulse] = useState(false)
@@ -194,6 +196,7 @@ export function MinigameView({
 
   useEffect(() => {
     setActiveChoiceIndex(0)
+    setSpeechFallbackToTyped(false)
   }, [roundState?.cardId, roundState?.mode])
 
   // ── Phase 6 + 7: Keyboard shortcuts ─────────────────────────────────────────
@@ -212,6 +215,7 @@ export function MinigameView({
     const isTyped =
       activeRound.mode === 'romaji_sprint' ||
       activeRound.mode === 'typed_recall' ||
+      activeRound.mode === 'speech_recall' ||
       activeRound.mode === 'stroke_order'
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -497,7 +501,9 @@ export function MinigameView({
                         ? 'Type the reading'
                         : roundState.mode === 'typed_recall'
                           ? 'Type the meaning'
-                          : 'Choose the best answer'
+                          : roundState.mode === 'speech_recall'
+                            ? 'Speak the meaning'
+                            : 'Choose the best answer'
                   }
                   copy={
                     roundState.mode === 'stroke_order'
@@ -506,7 +512,11 @@ export function MinigameView({
                         ? 'Submit as soon as the reading is clear in your head.'
                         : roundState.mode === 'typed_recall'
                           ? 'Short, direct answers work best.'
-                          : 'Commit to one answer and keep the run moving.'
+                          : roundState.mode === 'speech_recall'
+                            ? speechFallbackToTyped
+                              ? 'Short, direct answers work best.'
+                              : 'Tap the mic and say your answer clearly.'
+                            : 'Commit to one answer and keep the run moving.'
                   }
                   confidenceCaptureEnabled={confidenceCaptureEnabled}
                   roundConfidenceScore={roundConfidenceScore}
@@ -533,7 +543,14 @@ export function MinigameView({
                         onInputChange={setRoundInput}
                         onSelect={submitAnswer}
                       />
-                    ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' ? (
+                    ) : roundState.mode === 'speech_recall' && !speechFallbackToTyped ? (
+                      <SpeechAnswerPanel
+                        expectedAnswer={roundState.answer}
+                        disabled={isRoundResolving}
+                        onResult={({ transcript }) => submitAnswer(transcript)}
+                        onFallbackToTyped={() => setSpeechFallbackToTyped(true)}
+                      />
+                    ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' ? (
                       <TypedAnswerPanel
                         answerInputRef={answerInputRef}
                         value={roundInput}

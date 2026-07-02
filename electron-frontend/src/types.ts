@@ -6,6 +6,7 @@ export type MinigameKey =
   | 'character_match'
   | 'stroke_order'
   | 'typed_recall'
+  | 'speech_recall'
   | 'context_cloze'
   | 'narrative_story'
   | 'listening_audio_first'

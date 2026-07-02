@@ -7,6 +7,7 @@ const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
 const { createVoiceRuntime } = require('./voice_runtime.cjs')
 const { createSetupRuntime } = require('./setup_runtime.cjs')
+const { createSpeechRuntime } = require('./speech_runtime.cjs')
 const { loadFontCSS } = require('./font_loader.cjs')
 const {
   isAllowedRendererUrl,
@@ -229,6 +230,7 @@ const windowRestoreBoundsById = new Map()
 let localTutorRuntime = createTutorChatRuntime()
 const localVoiceRuntime = createVoiceRuntime({ repoRoot })
 const localSetupRuntime = createSetupRuntime()
+const localSpeechRuntime = createSpeechRuntime({ repoRoot })
 let tutorRuntimePreloadTriggered = false
 let tutorRuntimePreloadPromise = null
 let preloadedAssistantChatHistory = {
@@ -1243,6 +1245,7 @@ registerIpcHandlers({
   windowRestoreBoundsById,
   localTutorRuntime,
   localVoiceRuntime,
+  speechRuntime: localSpeechRuntime,
   setupRuntime: localSetupRuntime,
   repoRoot,
   refreshTutorChatRuntime: refreshTutorRuntimeAfterSetup,

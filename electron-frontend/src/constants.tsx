@@ -11,6 +11,7 @@ import {
   Keyboard,
   Languages,
   ListChecks,
+  Mic,
   Minus,
   Plus,
   Shuffle,
@@ -115,6 +116,11 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
     description: 'Type the meaning directly with near-miss tolerance.',
   },
   {
+    key: 'speech_recall',
+    title: 'Speech Recall',
+    description: 'Say the meaning aloud — transcribed and graded offline.',
+  },
+  {
     key: 'context_cloze',
     title: 'Context Cloze',
     description: 'Fill sentence blanks using context clues and i+1 progression.',
@@ -150,6 +156,7 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'character_match',
     'stroke_order',
     'typed_recall',
+    'speech_recall',
     'listening_audio_first',
     'listening_prompt_first',
     'interleave_mix',
@@ -158,6 +165,7 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'meaning_match',
     'character_match',
     'typed_recall',
+    'speech_recall',
     'context_cloze',
     'narrative_story',
     'listening_audio_first',
@@ -168,6 +176,7 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'meaning_match',
     'character_match',
     'typed_recall',
+    'speech_recall',
     'context_cloze',
     'narrative_story',
     'listening_audio_first',
@@ -182,6 +191,7 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   character_match: Languages,
   stroke_order: Keyboard,
   typed_recall: Keyboard,
+  speech_recall: Mic,
   context_cloze: BookText,
   narrative_story: History,
   listening_audio_first: Volume2,
@@ -380,6 +390,7 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'character_match') return 'Character Match'
   if (mode === 'stroke_order') return 'Stroke Order'
   if (mode === 'typed_recall') return 'Typed Recall'
+  if (mode === 'speech_recall') return 'Speech Recall'
   if (mode === 'context_cloze') return 'Context Cloze'
   if (mode === 'listening_audio_first') return 'Listening: Audio First'
   if (mode === 'listening_prompt_first') return 'Listening: Prompt First'

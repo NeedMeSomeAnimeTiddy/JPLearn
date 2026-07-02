@@ -22,26 +22,31 @@ const MODELS = {
     filename: 'qwen2.5-1.5b-instruct-q8_0.gguf',
     repo: 'Qwen/Qwen2.5-1.5B-Instruct-GGUF',
     sizeMb: 1890,
-    label: 'Low-end (1.5B)',
+    label: 'Low (1.5B)',
     description: 'Fast on any hardware. Good for everyday questions.',
   },
-  high: {
+  medium: {
     filename: 'qwen2.5-3b-instruct-q8_0.gguf',
     repo: 'Qwen/Qwen2.5-3B-Instruct-GGUF',
     sizeMb: 3620,
-    label: 'High-end (3B)',
-    description: 'Stronger Japanese understanding. Recommended for most users.',
+    label: 'Medium (3B)',
+    description: 'Better Japanese understanding while staying responsive on 16 GB systems.',
+  },
+  high: {
+    filename: 'Yi-1.5-6B-Chat-Q6_K.gguf',
+    repo: 'bartowski/Yi-1.5-6B-Chat-GGUF',
+    sizeMb: 4970,
+    label: 'High (6B)',
+    description: 'Stronger reasoning and nuance. Best with 8 GB VRAM and 16 GB RAM.',
   },
   ultra: {
     filename: 'Qwen3.5-9B-Q6_K.gguf',
     repo: 'unsloth/Qwen3.5-9B-GGUF',
     sizeMb: 7460,
     label: 'Ultra (9B)',
-    description: 'Most capable. Better for complex grammar and nuanced questions.',
+    description: 'Most capable. Best with 12+ GB VRAM and 32 GB RAM.',
   },
 }
-
-const RAM_THRESHOLD_GB = 16
 const SENTINEL_NAME = '.setup-done'
 const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
 const FONT_READY_MARKER = '.fonts-ready'
@@ -62,6 +67,33 @@ const LLAMA_CPP_SIZE_MB = 250
 const VOICEVOX_SIZE_MB = 1000
 const FONTS_SIZE_MB = 100
 const DICTIONARY_SIZE_MB = 30
+
+// Offline Japanese speech recognition (faster-whisper). Used by the speech-
+// answer minigame mode. Downloaded via scripts/get_whisper_model.py, which
+// fetches the CTranslate2 model files for the selected tier.
+const SPEECH_MODELS = {
+  fast: {
+    label: 'Fast (small, ~500 MB)',
+    description: 'Fastest startup and lowest resource use. Best for older laptops or quick rounds.',
+    sizeMb: 500,
+  },
+  balanced: {
+    label: 'Balanced (medium, ~1.5 GB)',
+    description: 'Good all-around pick: better accuracy than Fast while still responsive.',
+    sizeMb: 1530,
+  },
+  high: {
+    label: 'High (distil-large-v3, ~1.9 GB)',
+    description: 'Near-Ultra quality with lower latency than Ultra. Great for higher-end PCs.',
+    sizeMb: 1900,
+  },
+  ultra: {
+    label: 'Ultra (large-v3, ~3.1 GB)',
+    description: 'Highest recognition quality. Best when you prioritize accuracy over speed.',
+    sizeMb: 3100,
+  },
+}
+const ACTIVE_SPEECH_MODEL_STATE_FILENAME = 'active-speech-model.json'
 const SPEED_TEST_TIMEOUT_MS = 12000
 const SPEED_TEST_TARGETS = [
   { url: 'https://proof.ovh.net/files/10Mb.dat', bytes: 10485760 },
@@ -123,7 +155,7 @@ function getFontInstallState(base) {
 
 function ensureJPLearnDirs() {
   const base = getJPLearnDir()
-  for (const sub of ['models', 'voicevox', 'data', 'fonts', 'tools']) {
+  for (const sub of ['models', 'voicevox', 'data', 'fonts', 'tools', 'whisper']) {
     fs.mkdirSync(path.join(base, sub), { recursive: true })
   }
   return base
@@ -135,6 +167,72 @@ function getOfflineDictionarySqlitePath(base) {
 
 function isOfflineDictionaryInstalled(base) {
   return fs.existsSync(getOfflineDictionarySqlitePath(base))
+}
+
+function getSpeechModelDir(base, tier) {
+  return path.join(base, 'whisper', tier)
+}
+
+function isSpeechModelInstalled(base, tier) {
+  return fs.existsSync(path.join(getSpeechModelDir(base, tier), 'model.bin'))
+}
+
+function getActiveSpeechModelStatePath(base) {
+  return path.join(base, 'whisper', ACTIVE_SPEECH_MODEL_STATE_FILENAME)
+}
+
+function readActiveSpeechModelSelection(base) {
+  try {
+    const raw = fs.readFileSync(getActiveSpeechModelStatePath(base), 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.tier === 'string') {
+      return parsed
+    }
+  } catch {
+    // No selection yet, or the file is unreadable; caller falls back to auto-detect.
+  }
+  return null
+}
+
+function resolveActiveSpeechTier(base) {
+  const selection = readActiveSpeechModelSelection(base)
+  if (selection && isSpeechModelInstalled(base, selection.tier)) {
+    return selection.tier
+  }
+  for (const tier of Object.keys(SPEECH_MODELS)) {
+    if (isSpeechModelInstalled(base, tier)) {
+      return tier
+    }
+  }
+  return null
+}
+
+function setActiveSpeechModelTier(tier) {
+  if (!SPEECH_MODELS[tier]) throw new Error(`Unknown speech model tier: ${tier}`)
+  const base = ensureJPLearnDirs()
+  if (!isSpeechModelInstalled(base, tier)) {
+    throw new Error(`Speech model tier "${tier}" is not installed`)
+  }
+  fs.writeFileSync(
+    getActiveSpeechModelStatePath(base),
+    JSON.stringify({ tier, updatedAtUtc: new Date().toISOString() }, null, 2),
+    'utf8',
+  )
+  return { ok: true, tier }
+}
+
+function uninstallSpeechModel(tier) {
+  if (!SPEECH_MODELS[tier]) throw new Error(`Unknown speech model tier: ${tier}`)
+  const base = ensureJPLearnDirs()
+  const dir = getSpeechModelDir(base, tier)
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+  const selection = readActiveSpeechModelSelection(base)
+  if (selection && selection.tier === tier) {
+    try { fs.unlinkSync(getActiveSpeechModelStatePath(base)) } catch { /* ignore */ }
+  }
+  return { ok: true, tier }
 }
 
 function resolvePythonCommand(scriptRoot) {
@@ -206,6 +304,20 @@ function estimateDownloadMinutes(sizeMb, networkMbps) {
     return null
   }
   return Math.max(1, Math.round(minutes))
+}
+
+function recommendTutorTier(totalRamGb, gpuVramGb) {
+  if (gpuVramGb >= 12 && totalRamGb >= 32) return 'ultra'
+  if (gpuVramGb >= 8 && totalRamGb >= 16) return 'high'
+  if (totalRamGb >= 16) return 'medium'
+  return 'low'
+}
+
+function recommendSpeechTier(totalRamGb, gpuVramGb) {
+  if (gpuVramGb >= 12 || totalRamGb >= 24) return 'ultra'
+  if (gpuVramGb >= 8 || totalRamGb >= 16) return 'high'
+  if (totalRamGb >= 10) return 'balanced'
+  return 'fast'
 }
 
 function detectGpuNames() {
@@ -295,13 +407,13 @@ function detectLlamaBackend(gpuNames) {
 async function getSystemInfo() {
   const base = ensureJPLearnDirs()
   const totalRamGb = os.totalmem() / (1024 ** 3)
-  const recommendedTier = totalRamGb >= RAM_THRESHOLD_GB ? 'high' : 'low'
   const modelsDir = path.join(base, 'models')
   const llamaCppDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
   const voicevoxInstalled = fs.existsSync(path.join(base, 'voicevox', 'run.exe'))
   const llamaCppInstalled = fs.existsSync(path.join(llamaCppDir, 'llama-server.exe'))
   const gpuAdapters = detectGpuNames()
   const gpuVramGb = detectGpuVramGb()
+  const recommendedTier = recommendTutorTier(totalRamGb, gpuVramGb || 0)
   const llamaCppBackend = detectLlamaBackend(gpuAdapters)
   const networkMbpsRaw = await measureNetworkMbps()
   const networkMbps = typeof networkMbpsRaw === 'number' && Number.isFinite(networkMbpsRaw)
@@ -311,6 +423,14 @@ async function getSystemInfo() {
   const fontInstallState = getFontInstallState(base)
   const fontsInstalled = fontInstallState.installed
   const dictionaryInstalled = isOfflineDictionaryInstalled(base)
+  const speechModels = Object.entries(SPEECH_MODELS).map(([tier, m]) => ({
+    tier,
+    label: m.label,
+    description: m.description,
+    sizeMb: m.sizeMb,
+    installed: isSpeechModelInstalled(base, tier),
+    estimatedDownloadMinutes: estimateDownloadMinutes(m.sizeMb, networkMbps),
+  }))
 
   let isPackaged = false
   try { isPackaged = require('electron').app.isPackaged } catch { /* dev mode */ }
@@ -338,6 +458,9 @@ async function getSystemInfo() {
     voicevoxInstalled,
     fontsInstalled,
     dictionaryInstalled,
+    speechModels,
+    recommendedSpeechTier: recommendSpeechTier(totalRamGb, gpuVramGb || 0),
+    activeSpeechModelTier: resolveActiveSpeechTier(base),
     isPackaged,
     networkMbps,
     llamaCppEstimatedDownloadMinutes: estimateDownloadMinutes(LLAMA_CPP_SIZE_MB, networkMbps),
@@ -720,6 +843,67 @@ function downloadDictionary(sender, scriptRoot) {
   })
 }
 
+function downloadSpeechModel(tier, sender, scriptRoot) {
+  if (!SPEECH_MODELS[tier]) return Promise.reject(new Error(`Unknown speech model tier: ${tier}`))
+
+  const base = ensureJPLearnDirs()
+
+  if (isSpeechModelInstalled(base, tier)) {
+    return Promise.resolve({ alreadyInstalled: true })
+  }
+
+  const scriptPath = path.join(scriptRoot, 'scripts', 'get_whisper_model.py')
+  const pythonCmd = resolvePythonCommand(scriptRoot)
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonCmd, [scriptPath, '--tier', tier], {
+      env: { ...process.env, JPLEARN_DOCUMENTS_DIR: base },
+      windowsHide: true,
+    })
+
+    // 4 files per tier: model.bin, config.json, tokenizer.json, vocabulary.txt.
+    const TOTAL_PHASES = 4
+    let currentPhase = 0
+    let currentPhasePct = 0
+
+    const emitProgress = () => {
+      const overall = ((currentPhase + currentPhasePct / 100) / TOTAL_PHASES) * 100
+      const pct = Math.max(0, Math.min(99, Math.round(overall)))
+      if (sender && !sender.isDestroyed()) {
+        sender.send('setup:download-progress', { id: 'speech', percent: pct, mb: null, totalMb: null, etaSec: null })
+      }
+    }
+
+    child.stdout.on('data', (chunk) => {
+      const text = chunk.toString()
+      const phaseMatch = text.match(/PHASE (\d+)\/(\d+):/)
+      if (phaseMatch) {
+        currentPhase = Math.max(0, parseInt(phaseMatch[1], 10) - 1)
+        currentPhasePct = 0
+        emitProgress()
+      }
+      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*\((\d+) MB\)/i)
+      if (pctMatch) {
+        currentPhasePct = Math.max(0, Math.min(100, parseInt(pctMatch[1], 10)))
+        emitProgress()
+      }
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        if (sender && !sender.isDestroyed()) {
+          sender.send('setup:download-progress', { id: 'speech', percent: 100, mb: null, totalMb: null, etaSec: null })
+        }
+        resolve({ ok: true })
+      } else {
+        reject(new Error(`get_whisper_model.py exited with code ${code}`))
+      }
+    })
+
+    child.on('error', reject)
+  })
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 function downloadFonts(sender, scriptRoot) {
   const base = ensureJPLearnDirs()
@@ -843,9 +1027,12 @@ function createSetupRuntime() {
     downloadVoicevox,
     downloadFonts,
     downloadDictionary,
+    downloadSpeechModel,
     createShortcuts,
     setActiveModelTier,
     uninstallModel,
+    setActiveSpeechModelTier,
+    uninstallSpeechModel,
   }
 }
 

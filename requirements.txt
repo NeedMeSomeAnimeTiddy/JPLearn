@@ -1,4 +1,8 @@
 psutil
 pytest
+# Optional: offline Japanese speech-to-text for the speech-answer minigame mode.
+# Heavy dependency (ctranslate2 + onnxruntime); only required if the user
+# installs a speech recognition model from Setup or Settings.
+faster-whisper
 # Python GUI dependencies were removed.
 # Frontend is now Electron + React + TypeScript in electron-frontend/.
