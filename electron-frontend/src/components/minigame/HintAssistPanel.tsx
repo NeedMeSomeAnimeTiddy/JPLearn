@@ -8,6 +8,7 @@ interface HintAssistPanelProps {
   roundState: RoundState
   isRoundResolving: boolean
   hintStep: 0 | 1 | 2 | 3
+  hintRevealCount: number
   showKeyboardPrompts: boolean
   formattedAnswer: string
   onRevealHint: () => void
@@ -18,6 +19,7 @@ export function HintAssistPanel({
   roundState,
   isRoundResolving,
   hintStep,
+  hintRevealCount,
   showKeyboardPrompts,
   formattedAnswer,
   onRevealHint,
@@ -61,6 +63,7 @@ export function HintAssistPanel({
         : 'Reveal answer'
 
   const showRevealButton = !alwaysShowHint && !isRoundResolving && hintStep < 3
+  const hintStageLabel = hintStep === 0 ? 'Stage 0/3' : `Stage ${hintStep}/3`
 
   function togglePanel() {
     setIsExpanded((value) => !value)
@@ -102,15 +105,16 @@ export function HintAssistPanel({
               aria-label="Show more hint"
             >
               <span className="game-hint-toggle-label">
-                {showKeyboardPrompts ? `${nextStepCopy} (H)` : nextStepCopy}
+                {showKeyboardPrompts ? `${nextStepCopy} (Space)` : nextStepCopy}
               </span>
             </button>
           ) : null}
         </div>
         <div className="minigame-assist-head-end">
           <span className="minigame-assist-shortcut">
-            {showKeyboardPrompts ? 'H to reveal hints' : 'Hints available'}
+            {showKeyboardPrompts ? 'Space to reveal hints' : 'Hints available'}
           </span>
+          <span className="minigame-assist-stage">{hintStageLabel} · Used {hintRevealCount}</span>
           <span className="minigame-assist-toggle" aria-hidden="true">
             <ChevronDown className="inline-button-icon" strokeWidth={2.2} />
           </span>

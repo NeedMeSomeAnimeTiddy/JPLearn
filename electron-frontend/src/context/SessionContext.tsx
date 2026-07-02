@@ -25,6 +25,8 @@ interface SessionLengthPreset {
   items: number
 }
 
+export type RoundPerformanceLabel = 'PERFECT' | 'GOOD' | 'SLOW' | 'MISS'
+
 // ── Context shape ─────────────────────────────────────────────────────────────
 
 export interface SessionContextValue {
@@ -36,6 +38,7 @@ export interface SessionContextValue {
   roundFeedbackTone: FeedbackTone
   roundFeedbackAnswer: string | null
   roundFeedbackPoints: number | null
+  roundPerformanceLabel: RoundPerformanceLabel | null
   isRoundResolving: boolean
   feedbackAdvanceMs: number
 
@@ -43,8 +46,14 @@ export interface SessionContextValue {
   sessionScore: number
   sessionRounds: number
   sessionPoints: number
+  sessionStreak: number
+  sessionBestStreak: number
   sessionTargetItems: number
   blockSessionComplete: boolean
+
+  // Round reward metadata (UI only)
+  roundComboBonus: number
+  roundMilestoneStreak: number | null
 
   // Session flow
   sessionRunReport: SessionRunReport | null

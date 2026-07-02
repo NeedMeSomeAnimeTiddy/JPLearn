@@ -7,6 +7,7 @@ interface ChallengePromptCardProps {
   voiceEnabled: boolean
   voiceBusy: boolean
   voiceUnavailable: boolean
+  showKeyboardPrompts: boolean
   showRevealText: boolean
   onPlayAudio: (text: string) => void
 }
@@ -17,6 +18,7 @@ export function ChallengePromptCard({
   voiceEnabled,
   voiceBusy,
   voiceUnavailable,
+  showKeyboardPrompts,
   showRevealText,
   onPlayAudio,
 }: ChallengePromptCardProps) {
@@ -34,7 +36,7 @@ export function ChallengePromptCard({
             onClick={() => onPlayAudio(roundState.audioText)}
             disabled={voiceBusy}
             aria-label="Play target words"
-            title={voiceUnavailable ? 'Voice playback unavailable' : 'Play target words'}
+            title={voiceUnavailable ? 'Voice playback unavailable' : showKeyboardPrompts ? 'Play target words (P)' : 'Play target words'}
           >
             <Volume2 size={18} aria-hidden="true" />
           </button>
@@ -48,7 +50,7 @@ export function ChallengePromptCard({
             onClick={() => onPlayAudio(roundState.audioText)}
             disabled={voiceBusy || !voiceEnabled}
             aria-label="Play audio prompt"
-            title={voiceUnavailable ? 'Voice playback unavailable' : 'Replay audio'}
+            title={voiceUnavailable ? 'Voice playback unavailable' : showKeyboardPrompts ? 'Replay audio (P)' : 'Replay audio'}
           >
             <Volume2 size={28} aria-hidden="true" />
             <span>

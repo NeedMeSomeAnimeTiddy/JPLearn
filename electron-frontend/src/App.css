@@ -2473,6 +2473,7 @@ button {
 
 .minigame-points-chip {
   display: inline-flex;
+  position: relative;
 }
 
 .minigame-points-chip .metric-accent-streak {
@@ -2483,6 +2484,31 @@ button {
 .minigame-points-chip .live-value {
   font-size: 0.86rem;
   font-weight: 800;
+}
+
+.minigame-points-chip.is-gaining {
+  animation: minigamePointsPulse 360ms var(--motion-ease);
+}
+
+.minigame-points-gain {
+  position: absolute;
+  right: -2px;
+  top: -10px;
+  border: 1px solid color-mix(in oklab, #75d48f 46%, var(--chip-border));
+  border-radius: 999px;
+  background: color-mix(in oklab, #75d48f 20%, var(--chip-bg));
+  color: #86dfa0;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  animation: minigamePointsGainFloat 700ms var(--motion-ease);
+  pointer-events: none;
+}
+
+.minigame-focus-chip .metric-accent-warning {
+  border-color: color-mix(in oklab, var(--tone-amber) 42%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-amber) 16%, var(--chip-bg));
 }
 
 .minigame-hud-live {
@@ -2622,6 +2648,29 @@ button {
   transform: translateY(-1px);
   border-color: color-mix(in oklab, var(--tone-ocean) 52%, var(--button-border));
   color: var(--text-main);
+}
+
+.topbar-settings-button.is-active {
+  border-color: color-mix(in oklab, var(--tone-ocean) 58%, var(--button-border));
+  color: color-mix(in oklab, var(--tone-ocean) 82%, white);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--button-bg-top) 74%, var(--tone-ocean)),
+    color-mix(in oklab, var(--button-bg-bottom) 84%, var(--tone-ocean))
+  );
+}
+
+.minigame-focus-toggle {
+  width: auto;
+  padding: 0 10px;
+  gap: 6px;
+}
+
+.minigame-focus-toggle-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .game-panel,
@@ -5657,7 +5706,10 @@ button {
 
 .round-feedback-points,
 .round-feedback-life,
-.round-feedback-points-rule {
+.round-feedback-points-rule,
+.round-feedback-combo,
+.round-feedback-performance,
+.round-feedback-milestone {
   border: 1px solid var(--chip-border);
   border-radius: 999px;
   padding: 4px 10px;
@@ -5685,6 +5737,84 @@ button {
 .round-feedback-points-rule {
   background: color-mix(in oklab, var(--tone-ocean) 24%, transparent);
   color: color-mix(in oklab, var(--text-main) 86%, var(--tone-ocean));
+}
+
+.round-feedback-combo {
+  background: color-mix(in oklab, var(--tone-amber) 24%, transparent);
+  color: color-mix(in oklab, var(--tone-amber) 80%, white);
+}
+
+.round-feedback-performance-perfect {
+  border-color: color-mix(in oklab, #75d48f 58%, var(--chip-border));
+  background: color-mix(in oklab, #75d48f 30%, transparent);
+  color: color-mix(in oklab, #75d48f 78%, white);
+}
+
+.round-feedback-performance-good {
+  border-color: color-mix(in oklab, var(--tone-ocean) 58%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-ocean) 28%, transparent);
+  color: color-mix(in oklab, var(--tone-ocean) 78%, white);
+}
+
+.round-feedback-performance-slow {
+  border-color: color-mix(in oklab, var(--tone-amber) 58%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-amber) 30%, transparent);
+  color: color-mix(in oklab, var(--tone-amber) 78%, white);
+}
+
+.round-feedback-performance-miss {
+  border-color: color-mix(in oklab, #ff8a8a 58%, var(--chip-border));
+  background: color-mix(in oklab, #ff8a8a 30%, transparent);
+  color: color-mix(in oklab, #ff8a8a 80%, white);
+}
+
+.round-feedback-milestone {
+  border-color: color-mix(in oklab, var(--tone-ocean) 56%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-ocean) 28%, transparent);
+  color: color-mix(in oklab, var(--tone-ocean) 74%, white);
+  animation: minigameMilestoneFlash 420ms var(--motion-ease);
+}
+
+@keyframes minigamePointsPulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.035);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes minigamePointsGainFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(1.02);
+  }
+}
+
+@keyframes minigameMilestoneFlash {
+  0% {
+    transform: scale(0.96);
+    filter: saturate(0.9);
+  }
+  45% {
+    transform: scale(1.03);
+    filter: saturate(1.12);
+  }
+  100% {
+    transform: scale(1);
+    filter: saturate(1);
+  }
 }
 
 .round-feedback-answer {
@@ -5916,9 +6046,61 @@ button {
   transition: width 220ms ease;
 }
 
+.minigame-progress-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.minigame-progress-count,
+.minigame-progress-remaining {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  flex-shrink: 0;
+}
+
+.minigame-progress-pips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.minigame-progress-pip {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--chip-border) 88%, transparent);
+  background: color-mix(in oklab, var(--chip-bg) 86%, transparent);
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.minigame-progress-pip.is-reached {
+  border-color: color-mix(in oklab, var(--tone-ocean) 60%, var(--chip-border));
+  background: color-mix(in oklab, var(--tone-ocean) 72%, white);
+}
+
 .minigame-support-row {
   display: grid;
   gap: 16px;
+}
+
+.minigame-shell.minigame-focus-mode .minigame-focus-optional,
+.minigame-shell.minigame-focus-mode .minigame-support-row {
+  display: none;
+}
+
+.minigame-shell.minigame-focus-mode .minigame-challenge {
+  padding: 18px 20px;
+}
+
+.minigame-shell.minigame-focus-mode .minigame-core-column {
+  max-width: 760px;
 }
 
 .minigame-response-column {
@@ -6022,6 +6204,13 @@ button {
   font-size: 0.78rem;
 }
 
+.minigame-assist-stage {
+  color: color-mix(in oklab, var(--text-soft) 86%, var(--tone-ocean));
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .minigame-assist-head-start {
   display: flex;
   align-items: center;
@@ -6077,6 +6266,25 @@ button {
   color: var(--text-soft);
   font-size: 0.86rem;
   line-height: 1.5;
+}
+
+.minigame-shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.minigame-shortcut-chip {
+  border: 1px solid color-mix(in oklab, var(--chip-border) 94%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  background: color-mix(in oklab, var(--chip-bg) 88%, transparent);
 }
 
 .game-prompt-label {
@@ -6497,6 +6705,14 @@ button {
   font-size: 1rem;
   font-weight: 600;
   position: relative;
+}
+
+.option-button[data-active='true']:not(:disabled) {
+  border-color: color-mix(in oklab, var(--tone-ocean) 44%, var(--button-border));
+  transform: translateY(-1px);
+  box-shadow:
+    0 12px 18px -18px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .option-key-hint {

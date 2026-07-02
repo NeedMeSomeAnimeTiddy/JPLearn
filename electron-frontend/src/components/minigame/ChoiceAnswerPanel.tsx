@@ -5,6 +5,8 @@ interface ChoiceAnswerPanelProps {
   disabled: boolean
   characterMode: boolean
   showKeyboardPrompts: boolean
+  activeIndex: number
+  onActiveIndexChange: (index: number) => void
   onSelect: (label: string) => void
 }
 
@@ -13,6 +15,8 @@ export function ChoiceAnswerPanel({
   disabled,
   characterMode,
   showKeyboardPrompts,
+  activeIndex,
+  onActiveIndexChange,
   onSelect,
 }: ChoiceAnswerPanelProps) {
   return (
@@ -23,7 +27,13 @@ export function ChoiceAnswerPanel({
           type="button"
           className={`option-button ${characterMode ? 'option-button-character' : ''}`}
           disabled={disabled}
-          onClick={() => onSelect(option.label)}
+          data-active={index === activeIndex}
+          onFocus={() => onActiveIndexChange(index)}
+          onMouseEnter={() => onActiveIndexChange(index)}
+          onClick={() => {
+            onActiveIndexChange(index)
+            onSelect(option.label)
+          }}
         >
           {showKeyboardPrompts ? <span className="option-key-hint" aria-hidden="true">[{index + 1}]</span> : null}
           {option.label}

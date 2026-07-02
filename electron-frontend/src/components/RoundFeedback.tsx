@@ -1,9 +1,12 @@
 import type { PlayableMinigame } from '../types'
+import type { RoundPerformanceLabel } from '../context/SessionContext'
 
 interface RoundFeedbackProps {
   feedback: string
   tone: 'success' | 'error' | null
-  points: number | null
+  performanceLabel: RoundPerformanceLabel | null
+  comboBonus: number
+  milestoneStreak: number | null
   answer: string | null
   answerLabel: string
   livesEnabled: boolean
@@ -18,7 +21,9 @@ interface RoundFeedbackProps {
 export function RoundFeedback({
   feedback,
   tone,
-  points,
+  performanceLabel,
+  comboBonus,
+  milestoneStreak,
   answer,
   answerLabel,
   livesEnabled,
@@ -41,11 +46,14 @@ export function RoundFeedback({
     >
       <p className="round-feedback-message">{feedback}</p>
       <div className="round-feedback-meta">
-        <span className="round-feedback-points">
-          {points !== null ? `+${points} pts` : '+0 pts'}
-        </span>
-        <span className="round-feedback-points-rule">Combo at streaks 3/6/9</span>
-        {tone === 'error' && livesEnabled ? <span className="round-feedback-life">-1 life</span> : null}
+        {performanceLabel ? (
+          <span className={`round-feedback-performance round-feedback-performance-${performanceLabel.toLowerCase()}`}>
+            {performanceLabel}
+          </span>
+        ) : null}
+        {comboBonus > 0 ? <span className="round-feedback-combo">+{comboBonus} combo</span> : null}
+        {milestoneStreak ? <span className="round-feedback-milestone">Streak ×{milestoneStreak}</span> : null}
+        {tone === 'error' && livesEnabled ? <span className="round-feedback-life">−1 life</span> : null}
       </div>
       {answer ? (
         <div className="round-feedback-answer">

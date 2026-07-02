@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { CONFIDENCE_LEVEL_LABELS, CONFIDENCE_SCORES } from '../../constants'
 import { RoundFeedback } from '../RoundFeedback'
 import type { PlayableMinigame } from '../../types'
+import type { RoundPerformanceLabel } from '../../context/SessionContext'
 
 interface MinigameResponsePanelProps {
   isRoundResolving: boolean
@@ -13,7 +14,9 @@ interface MinigameResponsePanelProps {
   onSetRoundConfidence: (score: number) => void
   feedback: string | null
   feedbackTone: 'success' | 'error' | null
-  feedbackPoints: number | null
+  feedbackPerformanceLabel: RoundPerformanceLabel | null
+  feedbackComboBonus: number
+  feedbackMilestoneStreak: number | null
   feedbackAnswer: string | null
   feedbackAnswerLabel: string
   livesEnabled: boolean
@@ -34,7 +37,9 @@ export function MinigameResponsePanel({
   onSetRoundConfidence,
   feedback,
   feedbackTone,
-  feedbackPoints,
+  feedbackPerformanceLabel,
+  feedbackComboBonus,
+  feedbackMilestoneStreak,
   feedbackAnswer,
   feedbackAnswerLabel,
   livesEnabled,
@@ -44,6 +49,21 @@ export function MinigameResponsePanel({
   onSkipFeedback,
   children,
 }: MinigameResponsePanelProps) {
+  const isChoiceMode =
+    mode === 'meaning_match' ||
+    mode === 'character_match' ||
+    mode === 'context_cloze' ||
+    mode === 'narrative_story' ||
+    mode === 'listening_audio_first' ||
+    mode === 'listening_prompt_first'
+
+  const shortcutHints = showKeyboardPrompts
+    ? [
+      ...(isChoiceMode ? ['1–4: pick', 'Enter ↵: submit'] : ['Enter ↵: submit']),
+      'Space: hint',
+    ]
+    : []
+
   return (
     <div className="minigame-response-column">
       {feedback ? (
@@ -51,7 +71,9 @@ export function MinigameResponsePanel({
           <RoundFeedback
             feedback={feedback}
             tone={feedbackTone}
-            points={feedbackPoints}
+            performanceLabel={feedbackPerformanceLabel}
+            comboBonus={feedbackComboBonus}
+            milestoneStreak={feedbackMilestoneStreak}
             answer={feedbackAnswer}
             answerLabel={feedbackAnswerLabel}
             livesEnabled={livesEnabled}
@@ -76,6 +98,14 @@ export function MinigameResponsePanel({
           <p className="minigame-response-copy">{copy}</p>
 
           {children}
+
+          {shortcutHints.length > 0 ? (
+            <div className="minigame-shortcut-row" aria-label="Keyboard shortcuts">
+              {shortcutHints.map((hint) => (
+                <span key={hint} className="minigame-shortcut-chip">{hint}</span>
+              ))}
+            </div>
+          ) : null}
 
           {confidenceCaptureEnabled ? (
             <section

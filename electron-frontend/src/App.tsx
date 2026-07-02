@@ -295,6 +295,9 @@ function SettingsCollapsibleSection({
 }
 
 const FEEDBACK_REVEAL_MS = 2100
+const FEEDBACK_REVEAL_SUCCESS_MS = 500
+const PERFORMANCE_PERFECT_MS = 700
+const PERFORMANCE_GOOD_MS = 2200
 const ASSISTANT_EVENT_POLL_MS = 15000
 const ASSISTANT_TOAST_TTL_MS = 3800
 const ROUND_QUEUE_TIMEOUT_MS = 1200
@@ -2622,6 +2625,13 @@ function calculateAwardedPoints(streakAfterCorrect: number): number {
   return 1 + comboBonus
 }
 
+function classifyRoundPerformance(isCorrect: boolean, responseMs: number): 'PERFECT' | 'GOOD' | 'SLOW' | 'MISS' {
+  if (!isCorrect) return 'MISS'
+  if (responseMs <= PERFORMANCE_PERFECT_MS) return 'PERFECT'
+  if (responseMs <= PERFORMANCE_GOOD_MS) return 'GOOD'
+  return 'SLOW'
+}
+
 function formatAssistantEventTitle(event: AssistantEventPayload): string {
   if (event.event_type === 'session_goal_met') return 'You did it'
   if (event.event_type === 'streak_milestone') return 'Streak glow'
@@ -2958,10 +2968,16 @@ function App() {
   const [roundFeedbackTone, setRoundFeedbackTone] = useState<FeedbackTone>(null)
   const [roundFeedbackPoints, setRoundFeedbackPoints] = useState<number | null>(null)
   const [roundFeedbackAnswer, setRoundFeedbackAnswer] = useState<string | null>(null)
+  const [roundPerformanceLabel, setRoundPerformanceLabel] = useState<'PERFECT' | 'GOOD' | 'SLOW' | 'MISS' | null>(null)
   const [isRoundResolving, setIsRoundResolving] = useState<boolean>(false)
+  const [feedbackAdvanceMs, setFeedbackAdvanceMs] = useState<number>(FEEDBACK_REVEAL_MS)
   const [sessionScore, setSessionScore] = useState<number>(0)
   const [sessionRounds, setSessionRounds] = useState<number>(0)
   const [sessionPoints, setSessionPoints] = useState<number>(0)
+  const [sessionStreak, setSessionStreak] = useState<number>(0)
+  const [sessionBestStreak, setSessionBestStreak] = useState<number>(0)
+  const [roundComboBonus, setRoundComboBonus] = useState<number>(0)
+  const [roundMilestoneStreak, setRoundMilestoneStreak] = useState<number | null>(null)
   const [sessionTargetItems, setSessionTargetItems] = useState<number>(DEFAULT_SESSION_LENGTH_PRESET.items)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [lastSessionSummary, setLastSessionSummary] = useState<SessionSummaryPayload | null>(null)
@@ -3069,6 +3085,7 @@ function App() {
   const voicePreloadTriggeredRef = useRef<boolean>(false)
   const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
+  const roundPresentedAtRef = useRef<number>(0)
   const scriptLoadRequestIdRef = useRef<number>(0)
   const lastLoadedScriptRef = useRef<ScriptKey>('hiragana')
   const startupBootMarkRef = useRef<number>(performance.now())
@@ -4127,7 +4144,7 @@ function App() {
       !sessionActive ||
       !roundState ||
       isRoundResolving ||
-      (roundState.mode !== 'romaji_sprint' && roundState.mode !== 'typed_recall')
+      (roundState.mode !== 'romaji_sprint' && roundState.mode !== 'typed_recall' && roundState.mode !== 'stroke_order')
     ) {
       return
     }
@@ -4918,6 +4935,11 @@ function App() {
     setSessionScore(0)
     setSessionRounds(0)
     setSessionPoints(0)
+    setSessionStreak(0)
+    setSessionBestStreak(0)
+    setRoundComboBonus(0)
+    setRoundMilestoneStreak(null)
+    setRoundPerformanceLabel(null)
     setSessionConfidenceCount(0)
     setSessionConfidenceTotal(0)
     setLivesRemaining(DEFAULT_LIVES)
@@ -5579,11 +5601,13 @@ function App() {
 
       setSessionActive(true)
       setRoundState(nextRound)
+      roundPresentedAtRef.current = performance.now()
       setRoundInput('')
       setRoundFeedback(null)
       setRoundFeedbackTone(null)
       setRoundFeedbackPoints(null)
       setRoundFeedbackAnswer(null)
+      setRoundPerformanceLabel(null)
       setIsRoundResolving(false)
       setGameError(null)
       setRoundConfidenceScore(3)
@@ -5716,11 +5740,15 @@ function App() {
     }
 
     setRoundState(candidate)
+    roundPresentedAtRef.current = performance.now()
     setRoundInput('')
     setRoundFeedback(null)
     setRoundFeedbackTone(null)
     setRoundFeedbackPoints(null)
     setRoundFeedbackAnswer(null)
+    setRoundPerformanceLabel(null)
+      setRoundComboBonus(0)
+      setRoundMilestoneStreak(null)
   }, [activeBlockCards, activeGame, buildRound, hydrateRoundCycle, leechFocusEnabled, nextCardIndex, nextRoundMode])
 
   const submitAnswer = useCallback(
@@ -5739,10 +5767,16 @@ function App() {
         typedAssessment !== null
           ? typedAssessment !== 'incorrect'
           : normalizeText(answer) === normalizeText(roundState.answer)
+      const responseMs =
+        roundPresentedAtRef.current > 0
+          ? Math.max(0, performance.now() - roundPresentedAtRef.current)
+          : PERFORMANCE_GOOD_MS
+      const performanceLabel = classifyRoundPerformance(isCorrect, responseMs)
       const previousScript = scriptStats[activeScript]
       const nextStreak = isCorrect ? previousScript.currentStreak + 1 : 0
       const awardedPoints = isCorrect ? calculateAwardedPoints(nextStreak) : 0
       const comboBonus = Math.max(0, awardedPoints - 1)
+      const isMilestone = nextStreak === 3 || nextStreak === 6 || nextStreak === 9
       const pointsCopy = `+${awardedPoints} ${awardedPoints === 1 ? 'point' : 'points'}`
       const comboCopy = comboBonus > 0 ? ` (streak bonus +${comboBonus})` : ''
       let nextLives = livesRemaining
@@ -5778,6 +5812,11 @@ function App() {
       })
 
       setSessionRounds((value) => value + 1)
+      setSessionStreak(nextStreak)
+      setSessionBestStreak((value) => Math.max(value, nextStreak))
+      setRoundComboBonus(comboBonus)
+      setRoundMilestoneStreak(isMilestone ? nextStreak : null)
+      setRoundPerformanceLabel(performanceLabel)
       if (isCorrect) {
         setSessionScore((value) => value + 1)
         setSessionPoints((value) => value + awardedPoints)
@@ -5833,6 +5872,9 @@ function App() {
           }
         })
       }
+
+      const nextFeedbackAdvanceMs = isCorrect ? FEEDBACK_REVEAL_SUCCESS_MS : FEEDBACK_REVEAL_MS
+      setFeedbackAdvanceMs(nextFeedbackAdvanceMs)
 
       const confidenceForAnswer = confidenceCaptureEnabled ? roundConfidenceScore : undefined
 
@@ -5923,7 +5965,7 @@ function App() {
         setIsRoundResolving(false)
       }
       feedbackAdvanceRef.current = advanceFeedback
-      feedbackTimerRef.current = window.setTimeout(advanceFeedback, FEEDBACK_REVEAL_MS)
+      feedbackTimerRef.current = window.setTimeout(advanceFeedback, nextFeedbackAdvanceMs)
     },
     [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionRounds, sessionTargetItems],
   )
@@ -6907,13 +6949,18 @@ function App() {
         roundFeedbackTone,
         roundFeedbackAnswer,
         roundFeedbackPoints,
+        roundPerformanceLabel,
         isRoundResolving,
-        feedbackAdvanceMs: FEEDBACK_REVEAL_MS,
+        feedbackAdvanceMs,
         sessionScore,
         sessionRounds,
         sessionPoints,
+        sessionStreak,
+        sessionBestStreak,
         sessionTargetItems,
         blockSessionComplete,
+        roundComboBonus,
+        roundMilestoneStreak,
         sessionRunReport,
         sessionStartPending,
         sessionSummaryLoading,

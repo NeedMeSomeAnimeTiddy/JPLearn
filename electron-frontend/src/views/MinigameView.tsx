@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
   LoaderCircle,
@@ -62,14 +62,17 @@ export function MinigameView({
     roundFeedback,
     roundFeedbackTone,
     roundFeedbackAnswer,
-    roundFeedbackPoints,
+    roundPerformanceLabel,
     isRoundResolving,
     feedbackAdvanceMs,
     sessionScore,
     sessionRounds,
     sessionPoints,
+    sessionStreak,
     sessionTargetItems,
     blockSessionComplete,
+    roundComboBonus,
+    roundMilestoneStreak,
     sessionRunReport,
     sessionStartPending,
     sessionSummaryLoading,
@@ -105,15 +108,69 @@ export function MinigameView({
       : sessionRounds >= sessionTargetItems
         ? 'Wrapping up this run...'
         : 'Advancing automatically...'
+  const progressCheckpoints = [25, 50, 75, 100]
+  const completedCount = Math.min(sessionRounds, sessionTargetItems)
 
   // ── Phase 7: Progressive hint ladder ────────────────────────────────────────
   // 0 = no hint shown, 1 = prompt type label, 2 = hintText, 3 = full answer giveaway
   const [hintStep, setHintStep] = useState<0 | 1 | 2 | 3>(0)
+  const [activeChoiceIndex, setActiveChoiceIndex] = useState(0)
+  const [hintRevealCount, setHintRevealCount] = useState(0)
+  const [focusModeEnabled, setFocusModeEnabled] = useState(false)
+  const previousSessionActiveRef = useRef(false)
+
+  const toggleFocusMode = useCallback(() => {
+    const next = !focusModeEnabled
+    setFocusModeEnabled(next)
+
+    if (next) {
+      if (!document.fullscreenElement) {
+        void document.documentElement.requestFullscreen().catch(() => undefined)
+      }
+      return
+    }
+
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined)
+    }
+  }, [focusModeEnabled])
+
+  const advanceHintStep = useCallback(() => {
+    setHintStep((current) => {
+      if (current >= 3) return current
+      setHintRevealCount((value) => value + 1)
+      return (current + 1) as 0 | 1 | 2 | 3
+    })
+  }, [])
 
   // Reset hint when a new round starts.
   useEffect(() => {
     setHintStep(0)
   }, [roundState?.cardId])
+
+  useEffect(() => {
+    const previouslyActive = previousSessionActiveRef.current
+    previousSessionActiveRef.current = sessionActive
+
+    if (sessionActive && !previouslyActive) {
+      setHintRevealCount(0)
+    }
+  }, [sessionActive])
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      if (!document.fullscreenElement) {
+        setFocusModeEnabled(false)
+      }
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  useEffect(() => {
+    setActiveChoiceIndex(0)
+  }, [roundState?.cardId, roundState?.mode])
 
   // ── Phase 6 + 7: Keyboard shortcuts ─────────────────────────────────────────
   useEffect(() => {
@@ -145,18 +202,51 @@ export function MinigameView({
         return
       }
 
-      // H: increment hint step (only while waiting for answer, not during feedback)
-      if ((event.key === 'h' || event.key === 'H') && !isRoundResolving && !isInputFocused) {
+      // F: toggle distraction-free focus mode + fullscreen
+      if ((event.key === 'f' || event.key === 'F') && !isInputFocused) {
         event.preventDefault()
-        setHintStep((s) => (s < 3 ? ((s + 1) as 0 | 1 | 2 | 3) : 3))
+        toggleFocusMode()
         return
       }
 
-      // Space: replay audio (only when not typing)
-      if (event.key === ' ' && voiceEnabled && activeRound.audioText && !isInputFocused) {
+      // Space/H: increment hint step (only while waiting for answer, not during feedback)
+      if ((event.key === ' ' || event.key === 'h' || event.key === 'H') && !isRoundResolving && !isInputFocused) {
+        event.preventDefault()
+        advanceHintStep()
+        return
+      }
+
+      // P: replay audio prompt (only when not typing)
+      if ((event.key === 'p' || event.key === 'P') && voiceEnabled && activeRound.audioText && !isInputFocused) {
         event.preventDefault()
         playAudio(activeRound.audioText)
         return
+      }
+
+      if (isMultipleChoice && !isRoundResolving && !isInputFocused && !isTyped) {
+        if (activeRound.options.length === 0) return
+
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+          event.preventDefault()
+          setActiveChoiceIndex((current) => (current + 1) % activeRound.options.length)
+          return
+        }
+
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+          event.preventDefault()
+          setActiveChoiceIndex((current) => {
+            if (current <= 0) return activeRound.options.length - 1
+            return current - 1
+          })
+          return
+        }
+
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          const selected = activeRound.options[activeChoiceIndex]
+          if (selected) submitAnswer(selected.label)
+          return
+        }
       }
 
       // 1-4: select MC option (only for multiple-choice modes, not while resolving, not in input)
@@ -164,6 +254,7 @@ export function MinigameView({
         const index = parseInt(event.key, 10) - 1
         if (index >= 0 && index < activeRound.options.length) {
           event.preventDefault()
+          setActiveChoiceIndex(index)
           submitAnswer(activeRound.options[index].label)
         }
       }
@@ -178,8 +269,11 @@ export function MinigameView({
     roundFeedback,
     voiceEnabled,
     skipFeedback,
+    toggleFocusMode,
+    advanceHintStep,
     playAudio,
     submitAnswer,
+    activeChoiceIndex,
   ])
 
   // Auto-play audio when a listening round starts.
@@ -195,7 +289,7 @@ export function MinigameView({
   }, [roundState?.cardId, roundState?.mode])
 
   return (
-    <div className={`view-shell view-${navDirection} minigame-shell`}>
+    <div className={`view-shell view-${navDirection} minigame-shell ${focusModeEnabled ? 'minigame-focus-mode' : ''}`}>
       <MinigameHud
         activeScript={activeScript}
         activeSectionName={activeSectionName}
@@ -204,6 +298,8 @@ export function MinigameView({
         sessionTargetItems={sessionTargetItems}
         sessionScore={sessionScore}
         sessionPoints={sessionPoints}
+        sessionStreak={sessionStreak}
+        focusModeEnabled={focusModeEnabled}
         dictionarySeed={roundState?.dictionarySeedQuery ?? roundState?.audioText ?? roundState?.answer ?? ''}
         sessionActive={sessionActive}
         activeRunCardsLength={activeRunCardsLength}
@@ -216,6 +312,7 @@ export function MinigameView({
         onBack={onBack}
         onOpenDictionary={onOpenDictionary}
         onOpenSettings={onOpenSettings}
+        onToggleFocusMode={toggleFocusMode}
       />
 
       <section className="panel-glass game-panel minigame-stage-panel">
@@ -307,7 +404,7 @@ export function MinigameView({
                 <span>{SCRIPT_LABELS[activeScript]}</span>
                 <strong>{resolvedGameTitle}</strong>
               </div>
-              <div className="minigame-challenge-badges">
+              <div className="minigame-challenge-badges minigame-focus-optional">
                 {roundState.chapterLabel ? (
                   <span className="chapter-pill">
                     {roundState.chapterNumber ? `Chapter ${roundState.chapterNumber}` : 'Chapter'} · {roundState.chapterLabel}
@@ -331,6 +428,24 @@ export function MinigameView({
                 >
                   <div className="minigame-round-progress-fill" style={{ width: `${roundProgressValue * 100}%` }} />
                 </div>
+                <div className="minigame-progress-footer" aria-live="polite">
+                  <span className="minigame-progress-count">{completedCount}/{sessionTargetItems}</span>
+                  <div className="minigame-progress-pips" aria-label="Session completion checkpoints">
+                    {progressCheckpoints.map((checkpoint) => {
+                      const checkpointRounds = Math.max(1, Math.ceil((sessionTargetItems * checkpoint) / 100))
+                      const reached = completedCount >= checkpointRounds
+
+                      return (
+                        <span
+                          key={`pip-${checkpoint}`}
+                          className={`minigame-progress-pip ${reached ? 'is-reached' : ''}`}
+                          aria-label={`${checkpoint}% ${reached ? 'reached' : 'pending'}`}
+                        />
+                      )
+                    })}
+                  </div>
+                  <span className="minigame-progress-remaining">{sessionStatusCopy}</span>
+                </div>
 
                 <ChallengePromptCard
                   roundState={roundState}
@@ -338,6 +453,7 @@ export function MinigameView({
                   voiceEnabled={voiceEnabled}
                   voiceBusy={voiceBusy}
                   voiceUnavailable={voiceUnavailable}
+                  showKeyboardPrompts={showKeyboardPrompts}
                   showRevealText={roundFeedback !== null}
                   onPlayAudio={playAudio}
                 />
@@ -368,7 +484,9 @@ export function MinigameView({
                   onSetRoundConfidence={setRoundConfidence}
                   feedback={roundFeedback}
                   feedbackTone={roundFeedbackTone}
-                  feedbackPoints={roundFeedbackPoints}
+                  feedbackPerformanceLabel={roundPerformanceLabel}
+                  feedbackComboBonus={roundComboBonus}
+                  feedbackMilestoneStreak={roundMilestoneStreak}
                   feedbackAnswer={roundFeedbackAnswer}
                   feedbackAnswerLabel={formatFeedbackAnswerLabel(roundState.mode)}
                   livesEnabled={livesEnabled}
@@ -407,6 +525,8 @@ export function MinigameView({
                         disabled={isRoundResolving}
                         characterMode={roundState.mode === 'character_match'}
                         showKeyboardPrompts={showKeyboardPrompts}
+                        activeIndex={activeChoiceIndex}
+                        onActiveIndexChange={setActiveChoiceIndex}
                         onSelect={submitAnswer}
                       />
                     )}
@@ -418,10 +538,16 @@ export function MinigameView({
                   roundState={roundState}
                   isRoundResolving={isRoundResolving}
                   hintStep={hintStep}
+                  hintRevealCount={hintRevealCount}
                   showKeyboardPrompts={showKeyboardPrompts}
                   formattedAnswer={formatExpectedAnswer(roundState.answer)}
-                  onRevealHint={() => setHintStep(1)}
-                  onRevealMoreHint={() => setHintStep((s) => (s < 3 ? (s + 1) as 0 | 1 | 2 | 3 : 3))}
+                  onRevealHint={() => {
+                    if (hintStep < 1) {
+                      setHintRevealCount((value) => value + 1)
+                    }
+                    setHintStep(1)
+                  }}
+                  onRevealMoreHint={advanceHintStep}
                 />
               </div>
             </div>
