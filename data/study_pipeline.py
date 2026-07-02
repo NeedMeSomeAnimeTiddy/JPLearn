@@ -20,6 +20,8 @@ from domain.streaks import StreakState, apply_study_day
 
 PHASE3_CONTEXT_FACT_LIMIT = 4
 PHASE3_CONTEXT_SUMMARY_LIMIT = 2
+MEMORY_GRAPH_FACT_LIMIT = 6
+MEMORY_GRAPH_SUMMARY_LIMIT = 3
 
 
 def _format_strengths(activity_week: ActivitySummary, streak: StreakState) -> str:
@@ -255,6 +257,106 @@ def _format_memory_rollup_v2(user_message: str | None = None, embed_fn=None) -> 
     right = " | ".join(summary_fragments[:2]) if summary_fragments else "no chat summaries"
     embedder_tag = "onnx-e5" if embed_fn else "hashed-trigram-v1"
     return f"facts[{left}] summaries[{right}] (embedder={embedder_tag})"
+
+
+def _load_assistant_chat_context_inputs(session_id: str | None = None) -> dict[str, object]:
+    """Load shared context inputs once for chat context assembly."""
+    profile = database.load_assistant_profile()
+    state = database.load_latest_assistant_state()
+    streak = database.load_streak_state()
+    activity_week = database.load_activity_summary(7)
+    mistakes = database.load_mistake_breakdown(limit=3)
+    leech_count = database.load_active_leech_count()
+    item_history = load_item_history(limit_items=4, events_per_item=3)
+    session_summary = database.load_session_summary(session_id) if session_id else None
+    return {
+        "profile": profile,
+        "state": state,
+        "streak": streak,
+        "activity_week": activity_week,
+        "mistakes": mistakes,
+        "leech_count": leech_count,
+        "item_history": item_history,
+        "session_summary": session_summary,
+    }
+
+
+def _format_unified_memory_graph(
+    selected_facts: list[dict[str, str | int | None]],
+    selected_summaries: list[dict[str, str | int]],
+    context_inputs: dict[str, object],
+) -> str:
+    """Compose a compact learner memory graph from profile, signals, and memory hits.
+
+    The graph is serialized as deterministic fragments so local LLM context
+    receives one stable, compact memory representation across app surfaces.
+    """
+    profile = context_inputs["profile"]
+    activity_week = context_inputs["activity_week"]
+    streak = context_inputs["streak"]
+    mistakes = context_inputs["mistakes"]
+    leech_count = context_inputs["leech_count"]
+    session_summary = context_inputs["session_summary"]
+
+    fact_map = {
+        str(fact["fact_key"]): str(fact["fact_value"])
+        for fact in selected_facts
+    }
+
+    weakest_bucket = "none"
+    if mistakes:
+        weakest_bucket = str(mistakes[0].key)
+    elif fact_map.get("study.weakest_bucket"):
+        weakest_bucket = fact_map["study.weakest_bucket"]
+
+    focus_area = fact_map.get("coach.focus_area", fact_map.get("coach.commitment.focus_area", "general"))
+    commitment_action = fact_map.get("coach.commitment.action", "none")
+    commitment_mode = fact_map.get("coach.commitment.target_mode", "none")
+
+    summary_fragments = []
+    for summary in selected_summaries[:MEMORY_GRAPH_SUMMARY_LIMIT]:
+        summary_fragments.append(
+            f"{summary.get('focus_tags', 'general')}:{summary.get('latest_user_intent', '')}"
+        )
+
+    memory_hits = [
+        f"{fact['fact_key']}={fact['fact_value']}"
+        for fact in selected_facts[:MEMORY_GRAPH_FACT_LIMIT]
+    ]
+
+    profile_node = (
+        f"style={profile.get('persona_style', 'coach')},"
+        f"backend={profile.get('llm_backend', 'llama.cpp')},"
+        f"cadence={profile.get('popup_cadence', 'high')}"
+    )
+    performance_node = (
+        f"acc7d={activity_week.accuracy},"
+        f"reviewed7d={activity_week.reviewed},"
+        f"streak={streak.current_streak_days}"
+    )
+    focus_node = (
+        f"focus={focus_area},"
+        f"weakest={weakest_bucket},"
+        f"leech={leech_count}"
+    )
+    commitment_node = f"action={commitment_action},mode={commitment_mode}"
+    goal_node = (
+        "none"
+        if session_summary is None
+        else f"{session_summary.completed_items}/{session_summary.target_items}@{session_summary.accuracy}%"
+    )
+    summary_node = " | ".join(summary_fragments) if summary_fragments else "none"
+    memory_node = " | ".join(memory_hits) if memory_hits else "none"
+
+    return (
+        f"profile[{''.join(profile_node)}] "
+        f"performance[{''.join(performance_node)}] "
+        f"focus[{''.join(focus_node)}] "
+        f"commitments[{commitment_node}] "
+        f"goal[{goal_node}] "
+        f"summaries[{summary_node}] "
+        f"facts[{memory_node}]"
+    )
 
 
 def init_study_db() -> None:
@@ -615,16 +717,16 @@ def clear_assistant_chat() -> int:
 
 
 
-def _assemble_assistant_chat_context_base(session_id: str | None = None) -> dict[str, str]:
+def _assemble_assistant_chat_context_base(context_inputs: dict[str, object]) -> dict[str, str]:
     """Build the memory-independent portion of chat context (shared by v1/v2)."""
-    profile = database.load_assistant_profile()
-    state = database.load_latest_assistant_state()
-    streak = database.load_streak_state()
-    activity_week = database.load_activity_summary(7)
-    mistakes = database.load_mistake_breakdown(limit=3)
-    leech_count = database.load_active_leech_count()
-    item_history = load_item_history(limit_items=4, events_per_item=3)
-    session_summary = database.load_session_summary(session_id) if session_id else None
+    profile = context_inputs["profile"]
+    state = context_inputs["state"]
+    streak = context_inputs["streak"]
+    activity_week = context_inputs["activity_week"]
+    mistakes = context_inputs["mistakes"]
+    leech_count = context_inputs["leech_count"]
+    item_history = context_inputs["item_history"]
+    session_summary = context_inputs["session_summary"]
 
     emotional_state = (
         f"mood={state.mood}, momentum={state.momentum}, confidence={state.confidence_level}, focus={state.focus_area}"
@@ -645,8 +747,16 @@ def _assemble_assistant_chat_context_base(session_id: str | None = None) -> dict
 
 def assemble_assistant_chat_context(session_id: str | None = None, user_message: str | None = None) -> dict[str, str]:
     """Build deterministic, compact chat context from assistant memory tiers."""
-    context = _assemble_assistant_chat_context_base(session_id)
+    context_inputs = _load_assistant_chat_context_inputs(session_id)
+    context = _assemble_assistant_chat_context_base(context_inputs)
     context["memory"] = _format_memory_rollup(user_message=user_message)
+
+    query_terms = _extract_query_terms(user_message)
+    facts = database.load_assistant_memory_facts(limit=28)
+    summaries = database.load_recent_assistant_chat_summaries(limit=10)
+    selected_facts = _select_relevant_facts(facts, query_terms, MEMORY_GRAPH_FACT_LIMIT)
+    selected_summaries = _select_relevant_summaries(summaries, query_terms, MEMORY_GRAPH_SUMMARY_LIMIT)
+    context["memory_graph"] = _format_unified_memory_graph(selected_facts, selected_summaries, context_inputs)
     return context
 
 
@@ -663,6 +773,30 @@ def assemble_assistant_chat_context_v2_with_embeddings(
     real ONNX-based encoder from scripts/embedder_runtime.py); otherwise the
     pure, dependency-free fallback embedder is used.
     """
-    context = _assemble_assistant_chat_context_base(session_id)
+    context_inputs = _load_assistant_chat_context_inputs(session_id)
+    context = _assemble_assistant_chat_context_base(context_inputs)
     context["memory"] = _format_memory_rollup_v2(user_message=user_message, embed_fn=embed_fn)
+
+    encode = embed_fn or embed_text
+    facts = database.load_assistant_memory_facts(limit=28)
+    summaries = database.load_recent_assistant_chat_summaries(limit=10)
+    if user_message and user_message.strip():
+        query_vector = encode(user_message)
+        selected_facts = _select_relevant_facts_by_embedding(
+            facts,
+            query_vector,
+            MEMORY_GRAPH_FACT_LIMIT,
+            encode,
+        )
+        selected_summaries = _select_relevant_summaries_by_embedding(
+            summaries,
+            query_vector,
+            MEMORY_GRAPH_SUMMARY_LIMIT,
+            encode,
+        )
+    else:
+        selected_facts = facts[:MEMORY_GRAPH_FACT_LIMIT]
+        selected_summaries = summaries[:MEMORY_GRAPH_SUMMARY_LIMIT]
+
+    context["memory_graph"] = _format_unified_memory_graph(selected_facts, selected_summaries, context_inputs)
     return context

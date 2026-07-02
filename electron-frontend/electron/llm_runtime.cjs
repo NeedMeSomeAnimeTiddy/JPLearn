@@ -472,7 +472,7 @@ function sanitizeContextText(context = {}, options = {}) {
     pairs.push(line)
     consumedChars += line.length
   }
-  return pairs.slice(0, 8).join('\n')
+  return pairs.slice(0, 10).join('\n')
 }
 
 function extractCliResponseText(rawOutput) {

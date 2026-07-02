@@ -434,10 +434,13 @@ def test_assistant_chat_context_assembler_exposes_required_context_tiers(tmp_pat
         "recent_activity",
         "commitments",
         "memory",
+        "memory_graph",
     }
     assert expected_keys.issubset(context.keys())
     assert "style=coach" in context["persona"]
     assert context["memory"]
+    assert "profile[" in context["memory_graph"]
+    assert "facts[" in context["memory_graph"]
 
 
 def test_assistant_chat_context_prefers_relevant_memory_for_user_message(tmp_path: Path, monkeypatch) -> None:
@@ -449,6 +452,20 @@ def test_assistant_chat_context_prefers_relevant_memory_for_user_message(tmp_pat
 
     context = study_pipeline.assemble_assistant_chat_context(user_message="help me with kanji")
     assert "kanji" in context["memory"].lower()
+    assert "kanji" in context["memory_graph"].lower()
+
+
+def test_assistant_chat_context_v2_exposes_unified_memory_graph(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    database.upsert_assistant_memory_fact("study.focus.kanji", "kanji confusion in compounds", source="test")
+    database.upsert_assistant_memory_fact("study.focus.grammar", "grammar tense slips", source="test")
+    study_pipeline.load_assistant_snapshot()
+
+    context = study_pipeline.assemble_assistant_chat_context_v2_with_embeddings(user_message="help me with kanji")
+    assert "memory_graph" in context
+    assert "profile[" in context["memory_graph"]
+    assert "kanji" in context["memory_graph"].lower()
 
 
 def test_prune_assistant_memory_facts_keeps_recent_entries_only(tmp_path: Path, monkeypatch) -> None:

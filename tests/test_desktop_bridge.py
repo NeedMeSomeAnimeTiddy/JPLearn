@@ -476,6 +476,7 @@ def test_get_assistant_chat_context_returns_compact_context(tmp_path: Path, monk
     assert "persona" in context
     assert "emotional_state" in context
     assert "memory" in context
+    assert "memory_graph" in context
 
 
 def test_record_game_result_contract_shape(tmp_path: Path, monkeypatch) -> None:
