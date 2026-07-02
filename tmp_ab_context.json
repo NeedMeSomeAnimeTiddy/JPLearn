@@ -1,0 +1,24 @@
+{
+  "temp_docs": "C:\\Users\\Robbie\\AppData\\Local\\Temp\\jplearn-ab-juqi7rul",
+  "prompt": "Keep grammar cards as a short warm-up, but the real issue is understanding fast gate updates and platform announcements on crowded trains; I want the chat to help me focus on that instead.",
+  "keyword_context": {
+    "persona": "style=coach, backend=llama.cpp",
+    "emotional_state": "mood=coach_neutral, momentum=0, confidence=50, focus=general",
+    "goals": "No active session goal context in memory.",
+    "strengths": "Early momentum in progress; preserve daily study cadence.",
+    "weaknesses": "No acute weak area detected in current window.",
+    "recent_activity": "7d reviewed=0, accuracy=0%, active_days=0; trends=no recent item trend snapshots",
+    "commitments": "Run noisy-platform shadowing before class。:mode:station announcements and gate changes",
+    "memory": "facts[coach.study.note=Grammar cards stay as a short warm-up only。 | coach.issue=Crowded train audio is the main blocker。 | coach.preference.topic=weather forecast listening | coach.goal=Short daily commute practice。] summaries[focus=grammar;intent=Keep grammar cards as a short warm-up。 | focus=general;intent=I need speaking practice for crowded station announcements and gate changes。]"
+  },
+  "embed_context": {
+    "persona": "style=coach, backend=llama.cpp",
+    "emotional_state": "mood=coach_neutral, momentum=0, confidence=50, focus=general",
+    "goals": "No active session goal context in memory.",
+    "strengths": "Early momentum in progress; preserve daily study cadence.",
+    "weaknesses": "No acute weak area detected in current window.",
+    "recent_activity": "7d reviewed=0, accuracy=0%, active_days=0; trends=no recent item trend snapshots",
+    "commitments": "Run noisy-platform shadowing before class。:mode:station announcements and gate changes",
+    "memory": "facts[coach.study.note=Grammar cards stay as a short warm-up only。 | coach.issue=Crowded train audio is the main blocker。 | coach.commitment.focus_area=station announcements and gate changes | coach.commitment.action=Run noisy-platform shadowing before class。] summaries[focus=grammar;intent=Keep grammar cards as a short warm-up。 | focus=general;intent=I need speaking practice for crowded station announcements and gate changes。] (embedder=onnx-e5)"
+  }
+}

@@ -104,6 +104,19 @@ function readActiveModelFilename(dir) {
   return null
 }
 
+function readActiveModelTier(dir) {
+  try {
+    const raw = fs.readFileSync(path.join(dir, 'active-model.json'), 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.tier === 'string' && parsed.tier) {
+      return parsed.tier
+    }
+  } catch {
+    // No explicit selection recorded; caller falls back to compatibility heuristics.
+  }
+  return null
+}
+
 function resolveBundledModelPath() {
   // Check Documents\JPLearn\models\ first (installed app), then the bundled/dev path.
   const directories = []
@@ -185,6 +198,27 @@ function resolveTutorGrammarPath() {
   // outputs or inference errors for normal chat prompts.
   if (envUseDefault && fs.existsSync(DEFAULT_TUTOR_GRAMMAR_PATH)) {
     return DEFAULT_TUTOR_GRAMMAR_PATH
+  }
+  return ''
+}
+
+function detectPromptTuningProfile({ activeTier, modelPath }) {
+  if (typeof activeTier === 'string' && activeTier.trim().toLowerCase() === 'medium') {
+    return 'medium'
+  }
+
+  // Compatibility fallback for older installs or direct CLI runs that have no
+  // active-model.json tier selection yet.
+  const filename = path.basename(typeof modelPath === 'string' ? modelPath : '').toLowerCase()
+  if (filename.includes('qwen3.5-2b') || (filename.includes('2b') && filename.includes('q6_k'))) {
+    return 'medium'
+  }
+  return 'default'
+}
+
+function resolveContextPriorityNote(profile) {
+  if (profile === 'medium') {
+    return 'When current context is provided, treat it as the primary source for concrete details and prefer it over generic tutoring.'
   }
   return ''
 }
@@ -740,6 +774,9 @@ function isLowSignalAssistantReply(rawText) {
 function createLlamaServerAdapter(config = {}) {
   const executablePath = typeof config.executablePath === 'string' ? config.executablePath.trim() : ''
   const modelPath = typeof config.modelPath === 'string' ? config.modelPath.trim() : ''
+  const promptTuningProfile = typeof config.promptTuningProfile === 'string'
+    ? config.promptTuningProfile.trim().toLowerCase()
+    : 'default'
   const requestTimeoutMs = Number.isFinite(config.timeoutMs)
     ? Math.max(5000, Math.floor(config.timeoutMs))
     : DEFAULT_LLAMACPP_TIMEOUT_MS
@@ -838,8 +875,14 @@ function createLlamaServerAdapter(config = {}) {
     async infer(message, context = {}, runtimeOptions = {}) {
       const contextText = sanitizeContextText(context, runtimeOptions)
       const systemPrompt = resolveTutorSystemPrompt()
+      const contextPriorityNote = resolveContextPriorityNote(promptTuningProfile)
       const composedSystemPrompt = contextText
-        ? `${systemPrompt}\n\nCurrent context:\n${contextText}`
+        ? [
+            systemPrompt,
+            contextPriorityNote,
+            'Current context:',
+            contextText,
+          ].filter(Boolean).join('\n\n')
         : systemPrompt
       const boundedSystemPrompt = clipText(composedSystemPrompt, runtimeOptions.maxPromptChars || DEFAULT_MAX_PROMPT_CHARS)
       const boundedMessage = clipText(message, DEFAULT_MAX_MESSAGE_CHARS)
@@ -948,6 +991,15 @@ function createTutorChatRuntime(options = {}) {
 
   const discoveredLlamaServerPath = resolveBundledLlamaServerPath()
   const discoveredModelPath = resolveBundledModelPath()
+  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const modelStateBases = [
+    docsDir ? path.join(docsDir, 'models') : '',
+    path.resolve(__dirname, '..', '..', 'models'),
+  ]
+  const activeModelTier = modelStateBases
+    .map((base) => (base && fs.existsSync(base) ? readActiveModelTier(base) : null))
+    .find((tier) => typeof tier === 'string' && tier.trim())
+    || null
   const configuredProvider = normalizeProviderName(
     options.provider
     || process.env.JPLEARN_TUTOR_PROVIDER
@@ -969,6 +1021,11 @@ function createTutorChatRuntime(options = {}) {
       || preferExistingPath(process.env.JPLEARN_LLAMA_SERVER_PATH, discoveredLlamaServerPath),
     modelPath: options.llamaModelPath
       || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, discoveredModelPath),
+    promptTuningProfile: detectPromptTuningProfile({
+      activeTier: activeModelTier,
+      modelPath: options.llamaModelPath
+        || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, discoveredModelPath),
+    }),
     timeoutMs: options.llamaTimeoutMs,
     startupTimeoutMs: options.llamaServerStartupTimeoutMs,
   }
