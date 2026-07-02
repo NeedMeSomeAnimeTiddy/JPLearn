@@ -103,6 +103,8 @@ interface AssistantChatRuntimeStatus {
   configuredProvider?: string
   activeProvider?: string
   activeModel?: string
+  activePromptAdapter?: string
+  adapterManifestPath?: string | null
   lastError?: string | null
 }
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
@@ -121,6 +123,7 @@ type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_m
 type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
+type AssistantChatAdapterMode = 'auto' | 'default' | 'translation' | 'grammar' | 'study_plan'
 type AppFontPreset =
   | 'kiwi_maru'
   | 'bizin_gothic'
@@ -310,6 +313,19 @@ const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
   { value: 1, label: 'On' },
 ]
+const ASSISTANT_CHAT_ADAPTER_OPTIONS: Array<{ value: AssistantChatAdapterMode; label: string; note: string }> = [
+  { value: 'auto', label: 'Auto (intent-based)', note: 'Automatically picks Translation, Grammar, or Study Plan mode.' },
+  { value: 'default', label: 'Default coach', note: 'Balanced general tutoring.' },
+  { value: 'translation', label: 'Translation first', note: 'Short, literal translation behavior.' },
+  { value: 'grammar', label: 'Grammar coach', note: 'Correction-forward answers with short explanations.' },
+  { value: 'study_plan', label: 'Study planner', note: 'Prioritized next-step study plans.' },
+]
+const ASSISTANT_CHAT_ACTIVE_MODE_LABEL: Record<string, string> = {
+  default: 'Default',
+  translation: 'Translation',
+  grammar: 'Grammar',
+  study_plan: 'Study Plan',
+}
 const JAPANESE_CHAR_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/
 const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
   { key: 'theme', label: 'Theme', icon: Sun },
@@ -776,6 +792,7 @@ interface AppSettings {
   assistantToastLimit: 0 | 1
   assistantChatEnabled: boolean
   assistantChatAudioEnabled: boolean
+  assistantChatAdapter: AssistantChatAdapterMode
   englishSpeechVoiceName: string | null
   showKeyboardPrompts: boolean
   voiceEnabled: boolean
@@ -1903,6 +1920,7 @@ function defaultSettings(): AppSettings {
     assistantToastLimit: ASSISTANT_MAX_TOASTS,
     assistantChatEnabled: true,
     assistantChatAudioEnabled: true,
+    assistantChatAdapter: 'auto',
     englishSpeechVoiceName: null,
     showKeyboardPrompts: false,
     voiceEnabled: true,
@@ -1935,6 +1953,22 @@ function splitSpeechSegments(text: string): SpeechSegment[] {
 
 function isAssistantToastLimit(value: unknown): value is 0 | 1 {
   return value === 0 || value === 1
+}
+
+function isAssistantChatAdapterMode(value: unknown): value is AssistantChatAdapterMode {
+  return value === 'auto'
+    || value === 'default'
+    || value === 'translation'
+    || value === 'grammar'
+    || value === 'study_plan'
+}
+
+function formatAssistantChatAdapterLabel(value: string | null | undefined): string {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized) {
+    return 'Default'
+  }
+  return ASSISTANT_CHAT_ACTIVE_MODE_LABEL[normalized] ?? 'Default'
 }
 
 function isBackgroundStyle(value: unknown): value is BackgroundStyle {
@@ -2059,6 +2093,9 @@ function loadSettings(): AppSettings {
         typeof parsed.assistantChatAudioEnabled === 'boolean'
           ? parsed.assistantChatAudioEnabled
           : defaults.assistantChatAudioEnabled,
+      assistantChatAdapter: isAssistantChatAdapterMode(parsed.assistantChatAdapter)
+        ? parsed.assistantChatAdapter
+        : defaults.assistantChatAdapter,
       englishSpeechVoiceName:
         typeof parsed.englishSpeechVoiceName === 'string' && parsed.englishSpeechVoiceName.trim().length > 0
           ? parsed.englishSpeechVoiceName
@@ -4357,6 +4394,16 @@ function App() {
     return PETAL_STREAM.slice(0, count)
   }, [settings.motionStyle, settings.reducedMotion])
 
+  const activeAssistantChatModeLabel = useMemo(() => {
+    if (assistantChatStatus?.activePromptAdapter) {
+      return formatAssistantChatAdapterLabel(assistantChatStatus.activePromptAdapter)
+    }
+    if (settings.assistantChatAdapter === 'auto') {
+      return 'Auto'
+    }
+    return formatAssistantChatAdapterLabel(settings.assistantChatAdapter)
+  }, [assistantChatStatus?.activePromptAdapter, settings.assistantChatAdapter])
+
   const showPetalLayer = activePetalStream.length > 0 && !(view === 'minigame' && sessionActive)
 
   useEffect(() => {
@@ -5019,6 +5066,7 @@ function App() {
         message,
         context: {
           session_id: activeSessionId ?? '',
+          assistant_adapter: settings.assistantChatAdapter,
         },
       })
       if (response.provider === 'scripted-fallback' || response.provider === 'stub-fallback') {
@@ -5042,7 +5090,7 @@ function App() {
       setAssistantChatWarmup(false)
       setAssistantChatLoading(false)
     }
-  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
+  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatAdapter, settings.assistantChatEnabled, speakAssistantReply])
 
   useEffect(() => {
     let cancelled = false
@@ -8238,6 +8286,31 @@ function App() {
                         </button>
                       ))}
                     </div>
+                    <div className="settings-theme-card settings-collapsible-card-inline" style={{ marginTop: 10 }}>
+                      <p className="settings-section-label" style={{ marginBottom: 8 }}>Chat adapter mode</p>
+                      <label className="settings-help" htmlFor="assistant-chat-adapter-select" style={{ display: 'block', marginBottom: 6 }}>
+                        Choose how the local model is tuned for assistant chat replies.
+                      </label>
+                      <select
+                        id="assistant-chat-adapter-select"
+                        className="settings-select"
+                        value={settings.assistantChatAdapter}
+                        onChange={(event) => {
+                          const nextValue = event.currentTarget.value
+                          if (!isAssistantChatAdapterMode(nextValue)) {
+                            return
+                          }
+                          setSettings((prev) => ({ ...prev, assistantChatAdapter: nextValue }))
+                        }}
+                      >
+                        {ASSISTANT_CHAT_ADAPTER_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <p className="settings-help" style={{ marginTop: 6 }}>
+                        {ASSISTANT_CHAT_ADAPTER_OPTIONS.find((option) => option.value === settings.assistantChatAdapter)?.note ?? 'Balanced general tutoring.'}
+                      </p>
+                    </div>
                     <p className="settings-help">Turn Chat with Tutor off to unload the local model runtime. Set toasts to Off to disable popup notifications.</p>
                   </div>
                 </div>
@@ -8756,6 +8829,9 @@ function App() {
                     {assistantChatLoading ? 'Typing…' : 'Online · here to help'}
                   </span>
                 </span>
+                <span className="assistant-chat-mode-badge" title={`Active coach mode: ${activeAssistantChatModeLabel}`}>
+                  Mode: {activeAssistantChatModeLabel}
+                </span>
               </div>
               <div className="assistant-chat-header-actions">
                 <button
@@ -8813,6 +8889,9 @@ function App() {
                       <article key={turnKey} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
                         <div className="assistant-chat-turn-meta">
                           <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
+                          {turn.role === 'assistant' ? (
+                            <span className="assistant-chat-turn-mode">{activeAssistantChatModeLabel}</span>
+                          ) : null}
                           {turn.role === 'assistant' ? (
                             <button
                               type="button"

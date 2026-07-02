@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "notes": "Starter adapter manifest for JPLearn local tutor runtime. Add entries or tweak values to tune behavior.",
+  "adapters": [
+    {
+      "id": "translation",
+      "label": "Translation First",
+      "description": "Compact direct translations. Keep uncertainty explicit.",
+      "intents": ["translation"],
+      "systemNote": "Translation mode:\n- Prioritize direct translation output.\n- Keep output compact and literal where possible.\n- If context is missing, ask one brief clarification question instead of guessing.",
+      "temperature": 0.3,
+      "top_p": 0.85,
+      "top_k": 30,
+      "repeat_penalty": 1.08,
+      "maxOutputTokens": 120
+    },
+    {
+      "id": "grammar",
+      "label": "Grammar Coach",
+      "description": "Correction-first grammar guidance with one practical example.",
+      "intents": ["grammar"],
+      "systemNote": "Grammar coaching mode:\n- Correct errors briefly and explain only the key grammar point.\n- Provide one improved example when useful.",
+      "temperature": 0.4,
+      "top_p": 0.9,
+      "top_k": 30,
+      "repeat_penalty": 1.1,
+      "maxOutputTokens": 180
+    },
+    {
+      "id": "study_plan",
+      "label": "Study Planner",
+      "description": "Prioritized next-step plans using weak areas and short timeboxes.",
+      "intents": ["study_plan"],
+      "systemNote": "Study planning mode:\n- Return a compact, prioritized plan with 2 to 4 concrete steps.\n- Favor weak-area drills and immediate next actions over theory.",
+      "temperature": 0.45,
+      "top_p": 0.9,
+      "top_k": 40,
+      "repeat_penalty": 1.1,
+      "maxOutputTokens": 220
+    }
+  ]
+}

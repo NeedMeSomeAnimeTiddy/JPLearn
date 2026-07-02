@@ -53,6 +53,7 @@ const DEFAULT_OFFLINE_DICTIONARY_SQLITE_PATH = path.resolve(
   'jmdict_lookup.sqlite',
 )
 const DEFAULT_MODEL_DIRECTORY = path.resolve(__dirname, '..', '..', 'models', 'llama')
+const DEFAULT_ADAPTER_MANIFEST_FILENAME = 'adapter-manifest.json'
 const DEFAULT_TUTOR_INSTRUCTIONS_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'instructions.txt')
 const DEFAULT_TUTOR_GRAMMAR_PATH = path.join(DEFAULT_MODEL_DIRECTORY, 'conversation.gbnf')
 const DEFAULT_TUTOR_SYSTEM_PROMPT = [
@@ -78,6 +79,201 @@ const DEFAULT_TUTOR_SYSTEM_PROMPT = [
   '- Do not invent progress, history, preferences, or other personal facts about the user.',
   '- When helpful, end with a brief follow-up question to keep the conversation going, but never let it push you past 3 sentences total.',
 ].join('\n')
+
+const BUILTIN_PROMPT_ADAPTERS = {
+  default: {
+    id: 'default',
+    label: 'Default Coach',
+    intents: ['default'],
+    systemNote: '',
+  },
+  translation: {
+    id: 'translation',
+    label: 'Translation First',
+    intents: ['translation'],
+    systemNote: [
+      'Translation mode:',
+      '- Prioritize direct translation output.',
+      '- Keep output compact and literal where possible.',
+      '- If context is missing, ask one brief clarification question instead of guessing.',
+    ].join('\n'),
+    temperature: 0.3,
+    top_p: 0.85,
+    top_k: 30,
+    repeat_penalty: 1.08,
+    maxOutputTokens: 120,
+  },
+  grammar: {
+    id: 'grammar',
+    label: 'Grammar Coach',
+    intents: ['grammar'],
+    systemNote: [
+      'Grammar coaching mode:',
+      '- Correct errors briefly and explain only the key grammar point.',
+      '- Provide one improved example when useful.',
+    ].join('\n'),
+    temperature: 0.4,
+    top_p: 0.9,
+    top_k: 30,
+    repeat_penalty: 1.1,
+    maxOutputTokens: 180,
+  },
+  study_plan: {
+    id: 'study_plan',
+    label: 'Study Planner',
+    intents: ['study_plan'],
+    systemNote: [
+      'Study planning mode:',
+      '- Return a compact, prioritized plan with 2 to 4 concrete steps.',
+      '- Favor weak-area drills and immediate next actions over theory.',
+    ].join('\n'),
+    temperature: 0.45,
+    top_p: 0.9,
+    top_k: 40,
+    repeat_penalty: 1.1,
+    maxOutputTokens: 220,
+  },
+}
+
+function normalizePromptAdapterId(rawValue) {
+  const value = String(rawValue || '').trim().toLowerCase()
+  if (!value) {
+    return ''
+  }
+  return value
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+}
+
+function resolveAdapterManifestPath(configuredPath) {
+  const preferred = typeof configuredPath === 'string' ? configuredPath.trim() : ''
+  const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
+  const candidates = [
+    preferred,
+    docsDir ? path.join(docsDir, 'models', DEFAULT_ADAPTER_MANIFEST_FILENAME) : '',
+    resourcesPath ? path.join(resourcesPath, 'models', DEFAULT_ADAPTER_MANIFEST_FILENAME) : '',
+    path.join(DEFAULT_MODEL_DIRECTORY, DEFAULT_ADAPTER_MANIFEST_FILENAME),
+  ]
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || ''
+}
+
+function normalizePromptAdapterConfig(rawAdapter) {
+  if (!rawAdapter || typeof rawAdapter !== 'object') {
+    return null
+  }
+  const id = normalizePromptAdapterId(rawAdapter.id)
+  if (!id) {
+    return null
+  }
+  const label = typeof rawAdapter.label === 'string' && rawAdapter.label.trim()
+    ? rawAdapter.label.trim()
+    : id
+  const intents = Array.isArray(rawAdapter.intents)
+    ? rawAdapter.intents
+      .map((intent) => normalizePromptAdapterId(intent))
+      .filter(Boolean)
+    : []
+  const systemNote = typeof rawAdapter.systemNote === 'string' ? rawAdapter.systemNote.trim() : ''
+
+  const numericField = (name, min, max) => {
+    const value = rawAdapter[name]
+    if (!Number.isFinite(value)) {
+      return undefined
+    }
+    return Math.max(min, Math.min(max, Number(value)))
+  }
+
+  return {
+    id,
+    label,
+    intents,
+    systemNote,
+    temperature: numericField('temperature', 0, 2),
+    top_p: numericField('top_p', 0.05, 1),
+    top_k: numericField('top_k', 1, 256),
+    repeat_penalty: numericField('repeat_penalty', 1, 2),
+    maxOutputTokens: numericField('maxOutputTokens', 24, 1024),
+  }
+}
+
+function createPromptAdapterManifestReader(options = {}) {
+  const configuredPath = options.adapterManifestPath
+  let cachedPath = ''
+  let cachedMtimeMs = 0
+  let cachedAdapters = { ...BUILTIN_PROMPT_ADAPTERS }
+
+  function readFromDisk() {
+    const manifestPath = resolveAdapterManifestPath(configuredPath)
+    if (!manifestPath) {
+      cachedPath = ''
+      cachedMtimeMs = 0
+      cachedAdapters = { ...BUILTIN_PROMPT_ADAPTERS }
+      return {
+        manifestPath: '',
+        adapters: cachedAdapters,
+      }
+    }
+
+    let stat
+    try {
+      stat = fs.statSync(manifestPath)
+    } catch {
+      return {
+        manifestPath: cachedPath,
+        adapters: cachedAdapters,
+      }
+    }
+
+    if (manifestPath === cachedPath && cachedMtimeMs === stat.mtimeMs) {
+      return {
+        manifestPath: cachedPath,
+        adapters: cachedAdapters,
+      }
+    }
+
+    let parsed
+    try {
+      parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    } catch {
+      cachedPath = manifestPath
+      cachedMtimeMs = stat.mtimeMs
+      cachedAdapters = { ...BUILTIN_PROMPT_ADAPTERS }
+      return {
+        manifestPath: cachedPath,
+        adapters: cachedAdapters,
+      }
+    }
+
+    const merged = { ...BUILTIN_PROMPT_ADAPTERS }
+    const rawAdapters = Array.isArray(parsed && parsed.adapters) ? parsed.adapters : []
+    for (const rawAdapter of rawAdapters) {
+      const normalized = normalizePromptAdapterConfig(rawAdapter)
+      if (!normalized) {
+        continue
+      }
+      const inherited = merged[normalized.id] || {}
+      merged[normalized.id] = {
+        ...inherited,
+        ...normalized,
+      }
+    }
+
+    cachedPath = manifestPath
+    cachedMtimeMs = stat.mtimeMs
+    cachedAdapters = merged
+    return {
+      manifestPath: cachedPath,
+      adapters: cachedAdapters,
+    }
+  }
+
+  return {
+    getAdapters() {
+      return readFromDisk()
+    },
+  }
+}
 
 function resolveBundledLlamaServerPath() {
   const docsDir = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
@@ -336,6 +532,28 @@ function buildLowSignalRecoveryReply(message) {
   return 'I glitched on that response. Please ask again in one short sentence.'
 }
 
+function isLowConfidenceAssistantReply(rawText) {
+  const text = String(rawText || '').trim()
+  if (!text) {
+    return false
+  }
+  return /(i am not sure|i'm not sure|not sure|unsure|i do not know|i don't know|cannot tell|can't tell|need more context|insufficient context|it depends)/i.test(text)
+}
+
+function buildClarifyingQuestionForIntent(message) {
+  const text = String(message || '')
+  if (detectTranslationIntent(text)) {
+    return 'I might need a little context for that translation. Can you share the exact phrase and where you want to use it?'
+  }
+  if (detectGrammarIntent(text)) {
+    return 'I can give a precise correction if I see the full sentence. Can you share the exact Japanese sentence you want checked?'
+  }
+  if (detectStudyPlanIntent(text)) {
+    return 'I can tailor this better with one detail: do you want a 10-minute, 20-minute, or 30-minute plan?'
+  }
+  return 'I might be missing context. Can you share one more detail so I can answer precisely?'
+}
+
 function normalizeAsciiToken(value) {
   return String(value || '')
     .toLowerCase()
@@ -350,6 +568,53 @@ function detectTranslationIntent(message) {
     return false
   }
   return /\b(translate|translation|in japanese|japanese for|how do you say|say .* in japanese)\b/i.test(text)
+}
+
+function detectGrammarIntent(message) {
+  const text = String(message || '').trim()
+  if (!text) {
+    return false
+  }
+  return /(grammar|particle|conjugat|tense|polite|casual|is this sentence|correct this|fix this japanese|natural japanese)/i.test(text)
+}
+
+function detectStudyPlanIntent(message) {
+  const text = String(message || '').trim()
+  if (!text) {
+    return false
+  }
+  return /(study plan|what should i study|next step|next steps|practice next|daily plan|review plan|focus area)/i.test(text)
+}
+
+function detectPromptAdapterIntent(message) {
+  if (detectTranslationIntent(message)) {
+    return 'translation'
+  }
+  if (detectGrammarIntent(message)) {
+    return 'grammar'
+  }
+  if (detectStudyPlanIntent(message)) {
+    return 'study_plan'
+  }
+  return 'default'
+}
+
+function resolvePromptAdapterSelection(message, context, adapters) {
+  const requestedRaw = context && typeof context.assistant_adapter === 'string'
+    ? context.assistant_adapter
+    : ''
+  const requested = normalizePromptAdapterId(requestedRaw)
+  const explicitRequested = requested && requested !== 'auto'
+  if (explicitRequested && adapters[requested]) {
+    return adapters[requested]
+  }
+
+  const intent = detectPromptAdapterIntent(message)
+  if (adapters[intent]) {
+    return adapters[intent]
+  }
+
+  return adapters.default || BUILTIN_PROMPT_ADAPTERS.default
 }
 
 function extractEnglishTranslationTarget(message) {
@@ -884,11 +1149,34 @@ function createLlamaServerAdapter(config = {}) {
             contextText,
           ].filter(Boolean).join('\n\n')
         : systemPrompt
-      const boundedSystemPrompt = clipText(composedSystemPrompt, runtimeOptions.maxPromptChars || DEFAULT_MAX_PROMPT_CHARS)
+      const promptAdapter = runtimeOptions.promptAdapter && typeof runtimeOptions.promptAdapter === 'object'
+        ? runtimeOptions.promptAdapter
+        : null
+      const adaptedSystemPrompt = promptAdapter && typeof promptAdapter.systemNote === 'string' && promptAdapter.systemNote.trim()
+        ? [composedSystemPrompt, 'Adapter instructions:', promptAdapter.systemNote.trim()].join('\n\n')
+        : composedSystemPrompt
+      const boundedSystemPrompt = clipText(adaptedSystemPrompt, runtimeOptions.maxPromptChars || DEFAULT_MAX_PROMPT_CHARS)
       const boundedMessage = clipText(message, DEFAULT_MAX_MESSAGE_CHARS)
-      const maxOutputTokens = Number.isFinite(runtimeOptions.maxOutputTokens)
-        ? Math.max(24, Math.floor(runtimeOptions.maxOutputTokens))
+      const adapterMaxTokens = Number.isFinite(promptAdapter && promptAdapter.maxOutputTokens)
+        ? Math.max(24, Math.floor(promptAdapter.maxOutputTokens))
+        : null
+      const maxOutputTokens = Number.isFinite(adapterMaxTokens)
+        ? adapterMaxTokens
+        : Number.isFinite(runtimeOptions.maxOutputTokens)
+          ? Math.max(24, Math.floor(runtimeOptions.maxOutputTokens))
         : 256
+      const temperature = Number.isFinite(promptAdapter && promptAdapter.temperature)
+        ? Math.max(0, Math.min(2, Number(promptAdapter.temperature)))
+        : 0.6
+      const topP = Number.isFinite(promptAdapter && promptAdapter.top_p)
+        ? Math.max(0.05, Math.min(1, Number(promptAdapter.top_p)))
+        : 0.9
+      const topK = Number.isFinite(promptAdapter && promptAdapter.top_k)
+        ? Math.max(1, Math.min(256, Math.floor(promptAdapter.top_k)))
+        : 20
+      const repeatPenalty = Number.isFinite(promptAdapter && promptAdapter.repeat_penalty)
+        ? Math.max(1, Math.min(2, Number(promptAdapter.repeat_penalty)))
+        : 1.1
 
       if (!serverProcess || serverProcess.exitCode !== null) {
         throw new Error('llama-server is not running')
@@ -899,10 +1187,10 @@ function createLlamaServerAdapter(config = {}) {
           { role: 'system', content: boundedSystemPrompt },
           { role: 'user', content: boundedMessage },
         ],
-        temperature: 0.6,
-        top_p: 0.9,
-        top_k: 20,
-        repeat_penalty: 1.1,
+        temperature,
+        top_p: topP,
+        top_k: topK,
+        repeat_penalty: repeatPenalty,
         max_tokens: maxOutputTokens,
         cache_prompt: true,
         stream: false,
@@ -1045,11 +1333,15 @@ function createTutorChatRuntime(options = {}) {
   const maxOutputTokens = Number.isFinite(options.maxOutputTokens)
     ? Math.max(24, Math.floor(options.maxOutputTokens))
     : 140
+  const promptAdapterManifest = createPromptAdapterManifestReader({
+    adapterManifestPath: options.adapterManifestPath || process.env.JPLEARN_TUTOR_ADAPTER_MANIFEST_PATH,
+  })
 
   const resolveDictionaryEntry = createDictionaryResolver({
     onlineTimeoutMs: options.translationDictionaryTimeoutMs,
     jishoClient: options.translationJishoClient,
     offlineDictionaryPath: options.translationOfflineDictionaryPath,
+    offlineDictionarySqlitePath: options.translationOfflineDictionarySqlitePath,
     offlineEntries: options.translationOfflineEntries,
   })
 
@@ -1081,6 +1373,8 @@ function createTutorChatRuntime(options = {}) {
   let unloadTimer = null
   let activeInferenceController = null
   let isInferenceActive = false
+  let activePromptAdapterId = 'default'
+  let loadedAdapterManifestPath = ''
 
   function clearUnloadTimer() {
     if (unloadTimer) {
@@ -1164,6 +1458,13 @@ function createTutorChatRuntime(options = {}) {
         boundedContext[key] = clipText(value, 280)
       }
 
+      const adapterState = promptAdapterManifest.getAdapters()
+      loadedAdapterManifestPath = adapterState.manifestPath
+      const selectedPromptAdapter = resolvePromptAdapterSelection(trimmedMessage, boundedContext, adapterState.adapters)
+      activePromptAdapterId = selectedPromptAdapter && selectedPromptAdapter.id
+        ? selectedPromptAdapter.id
+        : 'default'
+
       const coldStart = await ensureLoaded()
       lastUsedAtUtc = new Date().toISOString()
       scheduleInactivityUnload()
@@ -1180,8 +1481,13 @@ function createTutorChatRuntime(options = {}) {
             maxContextChars,
             maxPromptChars,
             maxOutputTokens,
+            promptAdapter: selectedPromptAdapter,
           })
           cleanedText = normalizeMojibakePunctuation(String(inference.text || ''))
+          if (isLowConfidenceAssistantReply(cleanedText)) {
+            cleanedText = buildClarifyingQuestionForIntent(trimmedMessage)
+            break
+          }
           if (!isLowSignalAssistantReply(cleanedText)) {
             break
           }
@@ -1207,6 +1513,7 @@ function createTutorChatRuntime(options = {}) {
           text: clipText(cleanedText, maxOutputChars),
           provider: String((inference && inference.provider) || 'unknown'),
           model: String((inference && inference.model) || 'unknown'),
+          adapter: activePromptAdapterId,
           coldStart,
           elapsedMs,
         }
@@ -1246,6 +1553,8 @@ function createTutorChatRuntime(options = {}) {
         maxMessageChars,
         maxOutputChars,
         maxOutputTokens,
+        activePromptAdapter: activePromptAdapterId,
+        adapterManifestPath: loadedAdapterManifestPath || null,
         inferenceActive: isInferenceActive,
       }
     },
@@ -1294,6 +1603,7 @@ function createTutorChatRuntime(options = {}) {
       activeInferenceController = null
       activeProvider = configuredProvider
       activeModel = configuredProvider === 'llama.cpp' ? llamaCppConfig.modelPath || 'unknown' : 'stub'
+      activePromptAdapterId = 'default'
       return {
         ok: true,
         reason,

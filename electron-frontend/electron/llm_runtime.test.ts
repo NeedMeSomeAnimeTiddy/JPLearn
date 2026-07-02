@@ -276,7 +276,11 @@ describe('llm runtime', () => {
       expect(response.model).toBe('jmdict-offline-sqlite')
       expect(response.text).toBe('お手洗い (おてあらい)')
     } finally {
-      fs.rmSync(tmpRoot, { recursive: true, force: true })
+      try {
+        fs.rmSync(tmpRoot, { recursive: true, force: true })
+      } catch {
+        // Windows can hold a read lock briefly for SQLite handles in CI/dev.
+      }
     }
   })
 
@@ -369,6 +373,71 @@ describe('llm runtime', () => {
     expect(cancelPayload.ok).toBe(true)
     expect(cancelPayload.cancelled).toBe(true)
     await expect(pending).resolves.toMatchObject({ ok: true, provider: 'scripted-fallback' })
+  })
+
+  it('auto-selects translation adapter by intent', async () => {
+    const seen = {
+      adapterId: '',
+    }
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      translationJishoClient: {
+        async searchForPhrase() {
+          return { data: [] }
+        },
+      },
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer(_message, _context, runtimeOptions) {
+          seen.adapterId = String(runtimeOptions.promptAdapter?.id || '')
+          return {
+            text: 'stub translation result',
+            provider: 'stub',
+            model: 'stub-model',
+          }
+        },
+      }),
+    })
+
+    const response = await runtime.sendMessage('Can you translate this in Japanese?')
+    expect(response.ok).toBe(true)
+    expect(response.adapter).toBe('translation')
+    expect(seen.adapterId).toBe('translation')
+  })
+
+  it('honors explicit assistant adapter override from context', async () => {
+    const seen = {
+      adapterId: '',
+    }
+    const runtime = createTutorChatRuntime({
+      provider: 'stub',
+      adapterFactory: () => ({
+        async load() {
+          return undefined
+        },
+        async unload() {
+          return undefined
+        },
+        async infer(_message, _context, runtimeOptions) {
+          seen.adapterId = String(runtimeOptions.promptAdapter?.id || '')
+          return {
+            text: 'stub grammar result',
+            provider: 'stub',
+            model: 'stub-model',
+          }
+        },
+      }),
+    })
+
+    const response = await runtime.sendMessage('hello coach', { assistant_adapter: 'grammar' })
+    expect(response.ok).toBe(true)
+    expect(response.adapter).toBe('grammar')
+    expect(seen.adapterId).toBe('grammar')
   })
 })
 

@@ -308,6 +308,8 @@ interface AssistantChatRuntimeStatus {
   configuredProvider?: string
   activeProvider?: string
   activeModel?: string
+  activePromptAdapter?: string
+  adapterManifestPath?: string | null
   lastError?: string | null
 }
 
@@ -316,6 +318,7 @@ interface AssistantChatRuntimeResponse {
   text: string
   provider: string
   model: string
+  adapter?: string
   coldStart: boolean
   elapsedMs: number
 }
