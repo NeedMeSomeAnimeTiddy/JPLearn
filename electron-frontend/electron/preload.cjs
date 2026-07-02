@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   setActiveTutorModel: (tier) => ipcRenderer.invoke('setup:set-active-model', tier),
   uninstallTutorModel: (tier) => ipcRenderer.invoke('setup:uninstall-model', tier),
   downloadLlama: (backend) => ipcRenderer.invoke('setup:download-llama', backend),
-  downloadVoicevox: () => ipcRenderer.invoke('setup:download-voicevox'),
+  downloadOpenVoice: () => ipcRenderer.invoke('setup:download-openvoice'),
   completeSetup: () => ipcRenderer.invoke('setup:complete'),
   skipSetup: () => ipcRenderer.invoke('setup:skip'),
   onSetupProgress: (listener) => {

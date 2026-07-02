@@ -275,7 +275,6 @@ function SettingsCollapsibleSection({
         className="settings-collapsible-head"
         role="button"
         tabIndex={0}
-        aria-expanded={!collapsed}
         aria-controls={`${id}-body`}
         onClick={onToggle}
         onKeyDown={handleKeyDown}
@@ -796,7 +795,7 @@ interface AppSettings {
   englishSpeechVoiceName: string | null
   showKeyboardPrompts: boolean
   voiceEnabled: boolean
-  voiceSpeaker: number
+  voiceSpeaker: string
 }
 
 interface SpeechSegment {
@@ -1713,18 +1712,15 @@ const SUMMARY_SNAPSHOT_STORAGE_KEY = 'jplearn-desktop-summary-snapshot-v1'
 const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
-// Curated VOICEVOX voices offered to the user. `id` is the engine speaker id.
+// Curated OpenVoice voices offered to the user. `id` matches a voice folder.
 const VOICE_SAMPLE_LINE = 'こんにちは。いっしょにがんばりましょう。'
-const VOICE_OPTIONS: Array<{ id: number; name: string; jp: string }> = [
-  { id: 16, name: 'Sora', jp: '九州そら' },
-  { id: 20, name: 'Mochiko', jp: 'もち子さん' },
-  { id: 8, name: 'Tsumugi', jp: '春日部つむぎ' },
-  { id: 29, name: 'No.7', jp: 'No.7' },
-  { id: 61, name: 'Usagi', jp: '中国うさぎ' },
-  { id: 11, name: 'Takehiro', jp: '玄野武宏' },
-  { id: 13, name: 'Ryusei', jp: '青山龍星' },
+const VOICE_OPTIONS: Array<{ id: string; name: string; jp: string; search: string }> = [
+  { id: 'male_kenji', name: 'Kenji', jp: 'male_kenji', search: 'neutral Japanese male' },
+  { id: 'male_haru', name: 'Haru', jp: 'male_haru', search: 'warm Japanese male' },
+  { id: 'female_aya', name: 'Aya', jp: 'female_aya', search: 'neutral Japanese female' },
+  { id: 'female_mina', name: 'Mina', jp: 'female_mina', search: 'bright Japanese female' },
 ]
-const VOICE_OPTION_IDS = new Set<number>(VOICE_OPTIONS.map((option) => option.id))
+const VOICE_OPTION_IDS = new Set<string>(VOICE_OPTIONS.map((option) => option.id))
 const ENGLISH_VOICE_PREFERENCE_HINTS = [
   'aria',
   'jenny',
@@ -1924,7 +1920,7 @@ function defaultSettings(): AppSettings {
     englishSpeechVoiceName: null,
     showKeyboardPrompts: false,
     voiceEnabled: true,
-    voiceSpeaker: 13,
+    voiceSpeaker: 'male_kenji',
   }
 }
 
@@ -2107,7 +2103,7 @@ function loadSettings(): AppSettings {
       voiceEnabled:
         typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
       voiceSpeaker:
-        typeof parsed.voiceSpeaker === 'number' && VOICE_OPTION_IDS.has(parsed.voiceSpeaker)
+        typeof parsed.voiceSpeaker === 'string' && VOICE_OPTION_IDS.has(parsed.voiceSpeaker)
           ? parsed.voiceSpeaker
           : defaults.voiceSpeaker,
     }
@@ -2990,7 +2986,7 @@ function App() {
     activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | 'max' | null
     llamaCppInstalled: boolean
     gpuVramGb?: number | null
-    voicevoxInstalled: boolean
+    openVoiceInstalled: boolean
     fontsInstalled: boolean
     dictionaryInstalled: boolean
     llamaCppEstimatedDownloadMinutes?: number | null
@@ -3225,7 +3221,7 @@ function App() {
     interleaveCursorRef.current = 0
   }, [])
 
-  const playQuestionAudio = useCallback(async (text: string, speaker?: number) => {
+  const playQuestionAudio = useCallback(async (text: string, speaker?: string) => {
     const spoken = typeof text === 'string' ? text.trim() : ''
     if (!spoken || voiceBusy) {
       return
@@ -3629,7 +3625,7 @@ function App() {
         activeModelTier: setupInfo.activeModelTier ?? null,
         llamaCppInstalled: setupInfo.llamaCppInstalled,
         gpuVramGb: setupInfo.gpuVramGb ?? null,
-        voicevoxInstalled: setupInfo.voicevoxInstalled,
+        openVoiceInstalled: setupInfo.openVoiceInstalled,
         fontsInstalled: setupInfo.fontsInstalled,
         dictionaryInstalled: setupInfo.dictionaryInstalled,
         llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
@@ -6936,7 +6932,7 @@ function App() {
       && (tutorInstallInfo?.models ?? []).some((model) => model.installed),
   )
   const showOnboardingChatbotSection = tutorInstallInfo ? hasInstalledTutorModel : true
-  const showOnboardingVoiceSection = tutorInstallInfo ? tutorInstallInfo.voicevoxInstalled : true
+  const showOnboardingVoiceSection = tutorInstallInfo ? tutorInstallInfo.openVoiceInstalled : true
   const showOnboardingFontSection = tutorInstallInfo ? tutorInstallInfo.fontsInstalled : true
 
   // Show setup wizard on first run (all hooks above must run unconditionally)
@@ -7339,7 +7335,7 @@ function App() {
           voiceSpeaker={settings.voiceSpeaker}
           voiceBusy={voiceBusy}
           onVoiceToggle={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
-          onVoiceSelect={(id) => {
+            onVoiceSelect={(id) => {
             setSettings((prev) => ({ ...prev, voiceSpeaker: id }))
             void playQuestionAudio(VOICE_SAMPLE_LINE, id)
           }}
@@ -8668,9 +8664,9 @@ function App() {
                                   void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
                                 }}
                                 disabled={voiceBusy}
-                                aria-label={`Use voice ${option.name} (${option.jp}) and hear a sample`}
+                                aria-label={`Use voice ${option.name} (${option.search}) and hear a sample`}
                                 aria-pressed={settings.voiceSpeaker === option.id}
-                                title={`${option.name} · ${option.jp} — click to hear a sample`}
+                                title={`${option.name} · ${option.search} — click to hear a sample`}
                               >
                                 <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
                                   <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
@@ -8703,7 +8699,7 @@ function App() {
                         <SettingsCollapsibleSection
                           id="english-chat-voice"
                           title="English Chat Voice"
-                          description="Tutor chat uses VOICEVOX for Japanese. English uses this browser voice."
+                          description="Tutor chat uses OpenVoice V2 for Japanese and the browser voice for English."
                           meta={`Auto (${effectiveEnglishVoiceLabel})`}
                           collapsed={Boolean(collapsedSettingsSections['english-chat-voice'])}
                           onToggle={() => toggleThemeSectionCollapsed('english-chat-voice')}

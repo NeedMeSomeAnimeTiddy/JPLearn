@@ -1,0 +1,51 @@
+{
+	"schemaVersion": 1,
+	"voiceId": "female_mina",
+	"displayName": "Mina",
+	"gender": "female",
+	"language": "ja",
+	"accent": "tokyo",
+	"baseLanguage": "ja",
+	"description": "Bright Japanese female reference voice for OpenVoice cloning.",
+	"targetTotalDurationSeconds": 60,
+	"targetClipDurationSeconds": [10, 20],
+	"clipFormat": "wav",
+	"pcmFormat": "pcm_s16le",
+	"channels": 1,
+	"sampleRateHz": 44100,
+	"qualityRequirements": {
+		"singleSpeakerOnly": true,
+		"noMusic": true,
+		"noReverb": true,
+		"noClipping": true,
+		"clearPronunciation": true
+	},
+	"searchTerms": [
+		"japanese female voice",
+		"mina",
+		"bright",
+		"clear narration",
+		"friendly"
+	],
+	"referenceClips": [
+		{
+			"file": "female_mina_ref_01_jp.wav",
+			"language": "ja",
+			"role": "default",
+			"notes": "Primary Japanese reference clip."
+		},
+		{
+			"file": "female_mina_ref_02_jp.wav",
+			"language": "ja",
+			"role": "alternate",
+			"notes": "Secondary Japanese clip for stable timbre averaging."
+		},
+		{
+			"file": "female_mina_ref_03_en.wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "English clip to improve cross-language consistency."
+		}
+	],
+	"defaultReferenceClip": "female_mina_ref_01_jp.wav"
+}

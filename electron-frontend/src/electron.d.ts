@@ -391,9 +391,9 @@ interface DesktopApi {
   }) => Promise<AssistantChatRuntimeResponse>
   unloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string }>
   cancelAssistantChatInference?: () => Promise<{ ok: boolean; cancelled: boolean; reason: string }>
-  speakText?: (payload: string | { text: string; speaker?: number; speed?: number }) => Promise<VoiceSpeakResponse>
+  speakText?: (payload: string | { text: string; speaker?: string | number; speed?: number }) => Promise<VoiceSpeakResponse>
   getVoiceStatus?: () => Promise<VoiceStatus>
-  preloadVoice?: (speaker?: number) => Promise<{ ok: boolean; ready: boolean }>
+  preloadVoice?: (speaker?: string | number) => Promise<{ ok: boolean; ready: boolean }>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>
@@ -424,7 +424,7 @@ interface DesktopApi {
   setActiveTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => Promise<{ ok: boolean; tier: string }>
   uninstallTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => Promise<{ ok: boolean; tier: string }>
   downloadLlama?: (backend?: 'cuda' | 'hip' | 'vulkan' | 'cpu') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
-  downloadVoicevox?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  downloadOpenVoice?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   completeSetup?: () => Promise<{ ok: boolean }>
   skipSetup?: () => Promise<{ ok: boolean }>
   onSetupProgress?: (listener: (evt: SetupProgressEvent) => void) => () => void
@@ -494,7 +494,7 @@ interface SetupSystemInfo {
   gpuVramGb?: number | null
   llamaCppBackend?: 'cuda' | 'hip' | 'vulkan' | 'cpu'
   llamaCppBackendLabel?: string
-  voicevoxInstalled: boolean
+  openVoiceInstalled: boolean
   fontsInstalled: boolean
   dictionaryInstalled: boolean
   speechModels: SetupSpeechModelOption[]
@@ -503,13 +503,13 @@ interface SetupSystemInfo {
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
-  voicevoxEstimatedDownloadMinutes?: number | null
+  openVoiceEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
   dictionaryEstimatedDownloadMinutes?: number | null
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'llama' | 'voicevox' | 'fonts' | 'dictionary' | 'speech'
+  id: 'model' | 'llama' | 'openvoice' | 'fonts' | 'dictionary' | 'speech'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -532,7 +532,7 @@ interface VoiceSpeakResponse {
   ok: boolean
   format: 'wav'
   sampleRate: number
-  voiceId: number
+  voiceId: string
   audioBase64: string
 }
 

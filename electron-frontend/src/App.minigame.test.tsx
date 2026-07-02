@@ -366,11 +366,11 @@ describe('Minigame menu', () => {
       { id: 32, character: 'から', romaji: 'kara', meaning: 'because', tags: ['grammar_patterns'], example_sentence: 'あめ です から。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 33], character_distractor_ids: [30, 31, 33] },
       { id: 33, character: 'けど', romaji: 'kedo', meaning: 'but', tags: ['grammar_patterns'], example_sentence: 'いきたい けど、いけません。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 32], character_distractor_ids: [30, 31, 32] },
     ]
-    const speakText = vi.fn(async (_payload: string | { text: string; speaker?: number; speed?: number }) => ({
+    const speakText = vi.fn(async (_payload: string | { text: string; speaker?: string | number; speed?: number }) => ({
       ok: true,
       format: 'wav' as const,
       sampleRate: 24000,
-      voiceId: 13,
+      voiceId: 'male_kenji',
       audioBase64: '',
     }))
     window.jplearnDesktop = {
@@ -415,7 +415,7 @@ describe('Minigame menu', () => {
     await waitFor(() => expect(speakText).toHaveBeenCalledTimes(2))
     const expectedWords = new Set(conversationalCards.map((card) => card.character))
     const expectedSentences = new Set(conversationalCards.map((card) => card.example_sentence))
-    const calls = speakText.mock.calls as Array<[string | { text: string; speaker?: number; speed?: number }]>
+    const calls = speakText.mock.calls as Array<[string | { text: string; speaker?: string | number; speed?: number }]>
     const firstPayload = calls[0][0]
     const secondPayload = calls[1][0]
     const firstText = typeof firstPayload === 'string' ? firstPayload : firstPayload.text

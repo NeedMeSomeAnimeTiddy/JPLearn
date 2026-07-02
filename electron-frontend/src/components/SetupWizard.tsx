@@ -23,7 +23,7 @@ interface SystemInfo {
   gpuVramGb?: number | null
   llamaCppBackend?: 'cuda' | 'hip' | 'vulkan' | 'cpu'
   llamaCppBackendLabel?: string
-  voicevoxInstalled: boolean
+  openVoiceInstalled: boolean
   fontsInstalled: boolean
   dictionaryInstalled: boolean
   speechModels: SpeechModelOption[]
@@ -32,7 +32,7 @@ interface SystemInfo {
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
-  voicevoxEstimatedDownloadMinutes?: number | null
+  openVoiceEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
   dictionaryEstimatedDownloadMinutes?: number | null
 }
@@ -47,7 +47,7 @@ interface SpeechModelOption {
 }
 
 interface ProgressEvent {
-  id: 'model' | 'llama' | 'voicevox' | 'fonts' | 'dictionary' | 'speech'
+  id: 'model' | 'llama' | 'openvoice' | 'voicevox' | 'fonts' | 'dictionary' | 'speech'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -333,13 +333,13 @@ export function SetupWizard({ onComplete }: Props) {
   const [systemInfoLoading, setSystemInfoLoading] = useState(false)
   const [selectedTier, setSelectedTier] = useState<ModelTier | null>(null)
   const [selectedLlamaBackend, setSelectedLlamaBackend] = useState<LlamaBackend>('cpu')
-  const [installVoicevox, setInstallVoicevox] = useState(true)
+  const [installOpenVoice, setInstallOpenVoice] = useState(true)
   const [modelProgress, setModelProgress] = useState(0)
   const [llamaProgress, setLlamaProgress] = useState(0)
-  const [voicevoxProgress, setVoicevoxProgress] = useState(0)
+  const [openVoiceProgress, setOpenVoiceProgress] = useState(0)
   const [modelMb, setModelMb] = useState<{ done: number; total: number } | null>(null)
   const [llamaMb, setLlamaMb] = useState<{ done: number; total: number } | null>(null)
-  const [voicevoxMb, setVoicevoxMb] = useState<{ done: number; total: number } | null>(null)
+  const [openVoiceMb, setOpenVoiceMb] = useState<{ done: number; total: number } | null>(null)
   const [modelEta, setModelEta] = useState<number | null>(null)
   const [installFonts, setInstallFonts] = useState(true)
   const [fontsProgress, setFontsProgress] = useState(0)
@@ -380,7 +380,7 @@ export function SetupWizard({ onComplete }: Props) {
         return info.recommendedTier
       })
       setSelectedLlamaBackend(info.llamaCppBackend ?? 'cpu')
-      if (info.voicevoxInstalled) setInstallVoicevox(false)
+      if (info.openVoiceInstalled) setInstallOpenVoice(false)
       if (info.fontsInstalled) setInstallFonts(false)
       if (info.dictionaryInstalled) setInstallDictionary(false)
       setSelectedSpeechTier((prev) => {
@@ -398,7 +398,7 @@ export function SetupWizard({ onComplete }: Props) {
         gpuAdapters: [],
         llamaCppBackend: 'cpu',
         llamaCppBackendLabel: 'CPU',
-        voicevoxInstalled: false,
+        openVoiceInstalled: false,
         fontsInstalled: false,
         dictionaryInstalled: false,
         speechModels: [],
@@ -435,10 +435,10 @@ export function SetupWizard({ onComplete }: Props) {
         if (evt.mb !== null && evt.totalMb !== null) {
           setLlamaMb({ done: evt.mb, total: evt.totalMb })
         }
-      } else if (evt.id === 'voicevox') {
-        setVoicevoxProgress(evt.percent)
+      } else if (evt.id === 'openvoice' || evt.id === 'voicevox') {
+        setOpenVoiceProgress(evt.percent)
         if (evt.totalMb !== null) {
-          setVoicevoxMb({
+          setOpenVoiceMb({
             done: Math.max(0, Math.min(evt.totalMb, Math.round((evt.percent / 100) * evt.totalMb))),
             total: evt.totalMb,
           })
@@ -475,8 +475,8 @@ export function SetupWizard({ onComplete }: Props) {
     setModelEta(null)
     setLlamaProgress(0)
     setLlamaMb(null)
-    setVoicevoxProgress(0)
-    setVoicevoxMb(null)
+    setOpenVoiceProgress(0)
+    setOpenVoiceMb(null)
     setFontsProgress(0)
     setFontsFiles(null)
     setFontsMb(null)
@@ -500,9 +500,9 @@ export function SetupWizard({ onComplete }: Props) {
         const task = api.downloadLlama?.(selectedLlamaBackend)
         if (task) downloadTasks.push(task)
       }
-      if (installVoicevox) {
-        appendProgressLog('Starting VOICEVOX download…')
-        const task = api.downloadVoicevox?.()
+      if (installOpenVoice) {
+        appendProgressLog('Starting OpenVoice download…')
+        const task = api.downloadOpenVoice?.()
         if (task) downloadTasks.push(task)
       }
       if (installFonts && !sysInfo?.fontsInstalled) {
@@ -541,7 +541,7 @@ export function SetupWizard({ onComplete }: Props) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, selectedLlamaBackend, installVoicevox, installFonts, installDictionary, selectedSpeechTier, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, sysInfo?.dictionaryInstalled, sysInfo?.speechModels, createDesktop, createStartMenu, appendProgressLog])
+  }, [selectedTier, selectedLlamaBackend, installOpenVoice, installFonts, installDictionary, selectedSpeechTier, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, sysInfo?.dictionaryInstalled, sysInfo?.speechModels, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -771,28 +771,32 @@ export function SetupWizard({ onComplete }: Props) {
 
     4: (
       <PageLayout
-        title="Japanese Voice (optional)"
+        title="OpenVoice Voice Packs (optional)"
         subtitle="Install voice synthesis and optional speech recognition."
         onNext={() => setPage(5)}
         onBack={() => setPage(3)}
         nextLabel="Continue"
       >
         <p style={{ opacity: 0.75, lineHeight: 1.6, marginBottom: '1rem' }}>
-          VOICEVOX is a local text-to-speech engine that powers the voice button in study sessions —
+          OpenVoice V2 is the local text-to-speech stack that powers the voice button in study sessions —
           useful for hearing correct readings of new words. It runs entirely on your device.
         </p>
-        {sysInfo?.voicevoxInstalled ? (
-          <p style={{ color: 'var(--accent, #7eb8ea)' }}>✓ VOICEVOX is already installed.</p>
+        <p style={{ opacity: 0.62, lineHeight: 1.55, marginTop: '-0.2rem', marginBottom: '1rem', fontSize: '0.86rem' }}>
+          Setup installs OpenVoice checkpoints and required Python dependencies. Depending on your machine,
+          first voice playback may still fetch additional Melo language assets if they are not already cached.
+        </p>
+        {sysInfo?.openVoiceInstalled ? (
+          <p style={{ color: 'var(--accent, #7eb8ea)' }}>✓ OpenVoice assets are already installed.</p>
         ) : (
           <CheckboxOption
-            label={`Install Japanese voice synthesis (~1 GB)  •  ${formatDurationMinutes(sysInfo?.voicevoxEstimatedDownloadMinutes)}`}
-            checked={installVoicevox}
-            onChange={setInstallVoicevox}
+            label={`Install OpenVoice voice synthesis (~2.4 GB)  •  ${formatDurationMinutes(sysInfo?.openVoiceEstimatedDownloadMinutes)}`}
+            checked={installOpenVoice}
+            onChange={setInstallOpenVoice}
           />
         )}
-        {!installVoicevox && !sysInfo?.voicevoxInstalled && (
+        {!installOpenVoice && !sysInfo?.openVoiceInstalled && (
           <p style={{ opacity: 0.55, fontSize: '0.85rem', marginTop: '0.75rem' }}>
-            Voice playback will be unavailable. Install later: <code>python scripts/get_voicevox.py</code>
+            Voice playback will be unavailable. Install later: <code>python -m pip install -r requirements-tts.txt</code> then <code>python scripts/get_openvoice.py</code>
           </p>
         )}
 
@@ -875,7 +879,7 @@ export function SetupWizard({ onComplete }: Props) {
     6: (() => {
       const needsModel = selectedTier && selectedTier !== 'skip' && !sysInfo?.models.find(m => m.tier === selectedTier)?.installed
       const needsLlama = selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled
-      const needsVoice = installVoicevox && !sysInfo?.voicevoxInstalled
+      const needsVoice = installOpenVoice && !sysInfo?.openVoiceInstalled
       const needsFonts = installFonts && !sysInfo?.fontsInstalled
       const needsDictionary = installDictionary && !sysInfo?.dictionaryInstalled
       const needsSpeech = selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find(m => m.tier === selectedSpeechTier)?.installed
@@ -896,7 +900,7 @@ export function SetupWizard({ onComplete }: Props) {
             <SummaryRow label="llama.cpp runtime" detail={`Local tutor server binary (${LLAMA_BACKEND_OPTIONS.find((option) => option.key === selectedLlamaBackend)?.label ?? selectedLlamaBackend})`} />
           )}
           {needsVoice && (
-            <SummaryRow label="Japanese voice (VOICEVOX)" detail="~1 GB" />
+            <SummaryRow label="OpenVoice runtime + voice packs" detail="~2.4 GB (deps + checkpoints)" />
           )}
           {needsFonts && (
             <SummaryRow label="Japanese fonts" detail="~100 MB" />
@@ -948,10 +952,10 @@ export function SetupWizard({ onComplete }: Props) {
             )}
           </>
         )}
-        {installVoicevox && !sysInfo?.voicevoxInstalled && (
+        {installOpenVoice && !sysInfo?.openVoiceInstalled && (
           <ProgressBar
-            value={voicevoxProgress}
-            label={`Japanese voice${voicevoxMb ? ` (${voicevoxMb.done} / ${voicevoxMb.total} MB)` : ''}`}
+            value={openVoiceProgress}
+            label={`OpenVoice voice packs${openVoiceMb ? ` (${openVoiceMb.done} / ${openVoiceMb.total} MB)` : ''}`}
           />
         )}
         {installFonts && !sysInfo?.fontsInstalled && (

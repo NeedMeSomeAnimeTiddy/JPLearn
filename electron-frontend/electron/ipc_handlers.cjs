@@ -822,13 +822,13 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:download-voicevox', async (event) => {
+    options.ipcMain.handle('setup:download-openvoice', async (event) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       try {
-        return await setupRuntime.downloadVoicevox(event.sender, options.repoRoot)
+        return await setupRuntime.downloadOpenVoice(event.sender, options.repoRoot)
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
-        throw new Error(`VOICEVOX download failed: ${detail}`)
+        throw new Error(`OpenVoice download failed: ${detail}`)
       }
     })
 

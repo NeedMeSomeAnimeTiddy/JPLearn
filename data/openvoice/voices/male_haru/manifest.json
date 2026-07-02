@@ -1,0 +1,45 @@
+{
+	"schemaVersion": 1,
+	"voiceId": "male_haru",
+	"displayName": "Haru",
+	"gender": "male",
+	"language": "ja",
+	"accent": "tokyo",
+	"baseLanguage": "ja",
+	"description": "Friendly Japanese male reference voice for OpenVoice cloning.",
+	"targetTotalDurationSeconds": 60,
+	"targetClipDurationSeconds": [10, 20],
+	"clipFormat": "wav",
+	"pcmFormat": "pcm_s16le",
+	"channels": 1,
+	"sampleRateHz": 44100,
+	"qualityRequirements": {
+		"singleSpeakerOnly": true,
+		"noMusic": true,
+		"noReverb": true,
+		"noClipping": true,
+		"clearPronunciation": true
+	},
+	"searchTerms": [
+		"japanese male voice",
+		"haru",
+		"warm",
+		"friendly narration",
+		"clear speech"
+	],
+	"referenceClips": [
+		{
+			"file": "male_haru_ref_01_jp.wav",
+			"language": "ja",
+			"role": "default",
+			"notes": "Primary Japanese reference clip."
+		},
+		{
+			"file": "male_haru_ref_02_en.wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "English reference clip for bilingual embedding balance."
+		}
+	],
+	"defaultReferenceClip": "male_haru_ref_01_jp.wav"
+}

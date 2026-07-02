@@ -208,6 +208,15 @@ kokoro-assets/
 data/voice-models/
 data/voicevox/
 
+# OpenVoice runtime artifacts (downloaded locally)
+# Keep profile_cache tracked so pre-cloned voice embeddings can be bundled.
+data/openvoice/checkpoints_v2/**
+!data/openvoice/checkpoints_v2/profile_cache/
+!data/openvoice/checkpoints_v2/profile_cache/**
+
+# Local smoke-test and temporary synthesis outputs
+tmp/
+
 # Local llama.cpp binaries and build output
 tools/llama.cpp/
 

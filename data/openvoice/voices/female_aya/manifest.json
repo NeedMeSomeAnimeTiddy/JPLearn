@@ -1,0 +1,45 @@
+{
+	"schemaVersion": 1,
+	"voiceId": "female_aya",
+	"displayName": "Aya",
+	"gender": "female",
+	"language": "ja",
+	"accent": "tokyo",
+	"baseLanguage": "ja",
+	"description": "Neutral Japanese female reference voice for OpenVoice cloning.",
+	"targetTotalDurationSeconds": 60,
+	"targetClipDurationSeconds": [10, 20],
+	"clipFormat": "wav",
+	"pcmFormat": "pcm_s16le",
+	"channels": 1,
+	"sampleRateHz": 44100,
+	"qualityRequirements": {
+		"singleSpeakerOnly": true,
+		"noMusic": true,
+		"noReverb": true,
+		"noClipping": true,
+		"clearPronunciation": true
+	},
+	"searchTerms": [
+		"japanese female voice",
+		"aya",
+		"neutral",
+		"clear narration",
+		"tokyo accent"
+	],
+	"referenceClips": [
+		{
+			"file": "female_aya_ref_01_jp.wav",
+			"language": "ja",
+			"role": "default",
+			"notes": "Primary Japanese reference clip."
+		},
+		{
+			"file": "female_aya_ref_02_en.wav",
+			"language": "en",
+			"role": "alternate",
+			"notes": "English reference clip for bilingual embedding balance."
+		}
+	],
+	"defaultReferenceClip": "female_aya_ref_01_jp.wav"
+}

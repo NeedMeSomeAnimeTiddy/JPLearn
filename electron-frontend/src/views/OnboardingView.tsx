@@ -54,7 +54,7 @@ export interface OnboardingAnswers {
 }
 
 interface VoiceOption {
-  id: number
+  id: string
   name: string
   jp: string
 }
@@ -67,10 +67,10 @@ interface OnboardingViewProps {
   showVoiceSection: boolean
   voiceOptions: VoiceOption[]
   voiceEnabled: boolean
-  voiceSpeaker: number
+  voiceSpeaker: string
   voiceBusy: boolean
   onVoiceToggle: () => void
-  onVoiceSelect: (id: number) => void
+  onVoiceSelect: (id: string) => void
   showFontSection: boolean
   appFont: string
   fontOptions: Array<{ key: string; label: string }>

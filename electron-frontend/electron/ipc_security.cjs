@@ -370,10 +370,17 @@ function validateSpeakPayload(payload) {
   const result = { text: text.slice(0, 400) }
 
   if (rawSpeaker != null) {
-    if (!Number.isInteger(rawSpeaker) || rawSpeaker < 0 || rawSpeaker > 100000) {
+    if (typeof rawSpeaker === 'string') {
+      const normalizedSpeaker = rawSpeaker.trim()
+      if (!normalizedSpeaker) {
+        throw new Error('Invalid speaker value: value must not be empty')
+      }
+      result.speaker = normalizedSpeaker
+    } else if (Number.isInteger(rawSpeaker) && rawSpeaker >= 0 && rawSpeaker <= 100000) {
+      result.speaker = rawSpeaker
+    } else {
       throw new Error(`Invalid speaker value: ${String(rawSpeaker)}`)
     }
-    result.speaker = rawSpeaker
   }
 
   if (rawSpeed != null) {
