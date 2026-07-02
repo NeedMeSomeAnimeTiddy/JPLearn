@@ -186,6 +186,24 @@ type ThemeVariableKey =
   | '--card-bg-top'
   | '--card-bg-bottom'
   | '--track-bg'
+  | '--xp-shell-border'
+  | '--xp-shell-bg'
+  | '--xp-badge-bg'
+  | '--xp-badge-text'
+  | '--xp-badge-ring'
+  | '--xp-badge-glow'
+  | '--xp-track-bg'
+  | '--xp-fill-start'
+  | '--xp-fill-end'
+  | '--xp-label'
+  | '--streak-shell-border'
+  | '--streak-shell-bg'
+  | '--streak-shell-text'
+  | '--streak-icon'
+  | '--streak-popover-border'
+  | '--streak-popover-glow'
+  | '--streak-popover-title'
+  | '--streak-divider'
   | '--status-error'
   | '--tone-teal'
   | '--tone-ocean'
@@ -988,6 +1006,24 @@ const THEME_VARIABLE_KEYS: ThemeVariableKey[] = [
   '--card-bg-top',
   '--card-bg-bottom',
   '--track-bg',
+  '--xp-shell-border',
+  '--xp-shell-bg',
+  '--xp-badge-bg',
+  '--xp-badge-text',
+  '--xp-badge-ring',
+  '--xp-badge-glow',
+  '--xp-track-bg',
+  '--xp-fill-start',
+  '--xp-fill-end',
+  '--xp-label',
+  '--streak-shell-border',
+  '--streak-shell-bg',
+  '--streak-shell-text',
+  '--streak-icon',
+  '--streak-popover-border',
+  '--streak-popover-glow',
+  '--streak-popover-title',
+  '--streak-divider',
   '--status-error',
   '--tone-teal',
   '--tone-ocean',
@@ -1025,6 +1061,18 @@ const THEME_SECTION_DEFINITIONS: ThemeSection[] = [
     label: 'Buttons and Cards',
     description: 'Button and card gradient colors plus error feedback color.',
     keys: ['--button-bg-top', '--button-bg-bottom', '--card-bg-top', '--card-bg-bottom', '--status-error'],
+  },
+  {
+    id: 'xp',
+    label: 'XP Bar',
+    description: 'Colors used by the home and titlebar XP indicators.',
+    keys: ['--xp-shell-border', '--xp-shell-bg', '--xp-badge-bg', '--xp-badge-text', '--xp-badge-ring', '--xp-badge-glow', '--xp-track-bg', '--xp-fill-start', '--xp-fill-end', '--xp-label'],
+  },
+  {
+    id: 'streak',
+    label: 'Streak Chip',
+    description: 'Colors used by the titlebar streak chip and its details popover.',
+    keys: ['--streak-shell-border', '--streak-shell-bg', '--streak-shell-text', '--streak-icon', '--streak-popover-border', '--streak-popover-glow', '--streak-popover-title', '--streak-divider'],
   },
   {
     id: 'tones',
@@ -1135,6 +1183,78 @@ const THEME_VARIABLE_DISPLAY: Record<ThemeVariableKey, { label: string; descript
   '--track-bg': {
     label: 'Track Background',
     description: 'Background for progress and slider tracks.',
+  },
+  '--xp-shell-border': {
+    label: 'XP Shell Border',
+    description: 'Border color around XP bar shells.',
+  },
+  '--xp-shell-bg': {
+    label: 'XP Shell Background',
+    description: 'Background behind the XP bar shell.',
+  },
+  '--xp-badge-bg': {
+    label: 'XP Badge Background',
+    description: 'Background color of the circular XP level badge.',
+  },
+  '--xp-badge-text': {
+    label: 'XP Badge Text',
+    description: 'Text color shown inside the XP level badge.',
+  },
+  '--xp-badge-ring': {
+    label: 'XP Badge Ring',
+    description: 'Ring color around the XP level badge for emphasis.',
+  },
+  '--xp-badge-glow': {
+    label: 'XP Badge Glow',
+    description: 'Glow color behind the XP level badge.',
+  },
+  '--xp-track-bg': {
+    label: 'XP Track Background',
+    description: 'Background color of the XP progress track.',
+  },
+  '--xp-fill-start': {
+    label: 'XP Fill Gradient Start',
+    description: 'Starting color of the XP fill gradient.',
+  },
+  '--xp-fill-end': {
+    label: 'XP Fill Gradient End',
+    description: 'Ending color of the XP fill gradient.',
+  },
+  '--xp-label': {
+    label: 'XP Label Text',
+    description: 'Text color used by XP percentage and value labels.',
+  },
+  '--streak-shell-border': {
+    label: 'Streak Chip Border',
+    description: 'Border color around the streak chip button.',
+  },
+  '--streak-shell-bg': {
+    label: 'Streak Chip Background',
+    description: 'Background color of the streak chip button.',
+  },
+  '--streak-shell-text': {
+    label: 'Streak Chip Text',
+    description: 'Text color of the streak chip value.',
+  },
+  '--streak-icon': {
+    label: 'Streak Icon Color',
+    description: 'Color used by the streak flame icon.',
+  },
+  '--streak-popover-border': {
+    label: 'Streak Popover Border',
+    description: 'Border color around the streak details popover.',
+  },
+  '--streak-popover-glow': {
+    label: 'Streak Popover Glow',
+    description: 'Glow color used in the streak details popover background.',
+  },
+  '--streak-popover-title': {
+    label: 'Streak Popover Title',
+    description: 'Title color in the streak details popover.',
+  },
+  '--streak-divider': {
+    label: 'Streak Divider',
+    description: 'Divider color for streak popover helper text.',
   },
   '--status-error': {
     label: 'Error Color',
@@ -6605,7 +6725,7 @@ function App() {
               aria-controls="titlebar-streak-details"
             >
               <Flame className="titlebar-streak-icon" strokeWidth={2.1} aria-hidden="true" />
-              <span>{streak.current_days}d streak</span>
+              <span className="titlebar-streak-value">{streak.current_days}</span>
             </button>
             <div
               id="titlebar-streak-details"

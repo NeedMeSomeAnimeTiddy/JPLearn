@@ -35,6 +35,25 @@
   --card-bg-bottom: rgba(31, 50, 64, 0.86);
 
   --track-bg: rgba(201, 224, 236, 0.18);
+  --xp-shell-border: color-mix(in oklab, var(--accent) 34%, var(--panel-border));
+  --xp-shell-bg: color-mix(in oklab, var(--accent-soft) 14%, var(--panel-bg));
+  --xp-badge-bg: color-mix(in oklab, var(--accent) 72%, var(--tone-ocean));
+  --xp-badge-text: #ffffff;
+  --xp-badge-ring: color-mix(in oklab, var(--accent-soft) 70%, white);
+  --xp-badge-glow: color-mix(in oklab, var(--accent) 58%, transparent);
+  --xp-track-bg: color-mix(in oklab, var(--accent-soft) 22%, var(--panel-bg));
+  --xp-fill-start: color-mix(in oklab, var(--accent-soft) 82%, white);
+  --xp-fill-end: color-mix(in oklab, var(--accent) 74%, var(--tone-ocean));
+  --xp-label: color-mix(in oklab, var(--accent) 72%, var(--text-main));
+
+  --streak-shell-border: color-mix(in oklab, var(--accent) 28%, var(--button-border));
+  --streak-shell-bg: color-mix(in oklab, var(--accent-soft) 12%, var(--panel-bg));
+  --streak-shell-text: color-mix(in oklab, var(--accent) 78%, var(--text-main));
+  --streak-icon: color-mix(in oklab, var(--accent-soft) 86%, white);
+  --streak-popover-border: color-mix(in oklab, var(--accent) 32%, var(--panel-border));
+  --streak-popover-glow: color-mix(in oklab, var(--accent-soft) 26%, transparent);
+  --streak-popover-title: color-mix(in oklab, var(--accent) 82%, var(--text-main));
+  --streak-divider: color-mix(in oklab, var(--accent) 20%, var(--panel-border));
   --status-error: #ff9e9e;
 
   --tone-teal: #5bc8b3;
