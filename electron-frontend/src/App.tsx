@@ -3452,14 +3452,10 @@ function App() {
         if (assistantSpeechRunIdRef.current !== runId) {
           return
         }
-        if (segment.language === 'ja') {
-          const playedByRuntime = await playVoiceRuntimeAudio(segment.text, runId)
-          if (!playedByRuntime) {
-            await playBrowserSpeech(segment.text, 'ja', runId)
-          }
-          continue
+        const playedByRuntime = await playVoiceRuntimeAudio(segment.text, runId)
+        if (!playedByRuntime) {
+          await playBrowserSpeech(segment.text, segment.language, runId)
         }
-        await playBrowserSpeech(segment.text, 'en', runId)
       }
     } finally {
       if (assistantSpeechRunIdRef.current === runId) {

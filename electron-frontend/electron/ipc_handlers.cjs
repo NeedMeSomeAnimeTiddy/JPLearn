@@ -418,7 +418,13 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('audio:preload', async (event, speaker) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    const requestedSpeaker = Number.isInteger(speaker) && speaker >= 0 && speaker <= 100000 ? speaker : undefined
+    let requestedSpeaker
+    if (typeof speaker === 'string') {
+      const normalized = speaker.trim()
+      requestedSpeaker = normalized || undefined
+    } else if (Number.isInteger(speaker) && speaker >= 0 && speaker <= 100000) {
+      requestedSpeaker = speaker
+    }
     try {
       return await options.localVoiceRuntime.preload(requestedSpeaker)
     } catch (error) {
