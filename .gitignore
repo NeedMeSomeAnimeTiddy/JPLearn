@@ -227,6 +227,10 @@ python-bundle/
 # For local dev: python scripts/get_fonts.py
 fonts/
 
+# Local voice asset dumps (user-managed; too large for git)
+voices/**
+!voices/.gitkeep
+
 # Local llama.cpp model artifacts
 models/llama/*.gguf
 models/llama/*.bin
