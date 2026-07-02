@@ -1,6 +1,6 @@
 # JPLearn Roadmap
 
-Updated: 2026-06-27
+Updated: 2026-07-02
 
 This document tracks delivery status and planned improvements.
 
@@ -57,6 +57,10 @@ This document tracks delivery status and planned improvements.
 - [x] (Medium) Add progress analytics export
   - Export review history, accuracy trends, and mastery snapshots to CSV
   - Useful for external study tracking and self-audit
+- [ ] (High) Add session resume and per-mode defaults
+  - Restore the last deck, study mode, and prompt settings after restart
+  - Remember audio, hint, lives, and confidence preferences per mode
+  - Reduce setup friction for short daily study sessions
 
 ## Data Quality and Content Operations
 
@@ -77,9 +81,24 @@ This document tracks delivery status and planned improvements.
 - [x] (Medium) Defer non-critical renderer work until after first meaningful paint
 - [x] (Medium) Add packaged smoke tests in CI (`npm run build`, package, launch check)
 - [x] (Medium) Add restrictive CSP baseline for packaged renderer
-- [ ] (Medium) Decompose App.tsx monolith into scene-level components
-  - Extract StudyScene, OverviewScene, SettingsScene, and OnboardingScene
-  - Enables targeted component tests and reduces cognitive load per file
+
+## UX, Delight, and Quality of Life
+
+- [ ] (High) Add a quick resume entry point for the last study session
+  - Open the most recent deck and mode from the home screen with one click
+  - Offer a "resume" action that restores the previous round state when possible
+- [ ] (Medium) Add streak celebrations and milestone rewards
+  - Show lightweight burst animations, badges, or toast moments for long streaks
+  - Keep effects tasteful and easy to disable for distraction-free study
+- [ ] (Medium) Add one-tap retry for missed items from the session summary
+  - Requeue wrong answers and near-misses into a short recovery run
+  - Make it easier to fix weak spots immediately after a session ends
+- [ ] (Medium) Add a shortcut cheat sheet and command palette for study actions
+  - Surface the most common keys and actions without leaving the study flow
+  - Make keyboard-driven navigation easier to discover for new users
+- [ ] (Low) Add quick dictionary lookup from answer reveals and summaries
+  - Let users jump from a missed item to a lookup without losing session context
+  - Support faster review of unfamiliar words and kanji
 
 ## Quality, Tooling, and Developer Experience
 
@@ -89,8 +108,6 @@ This document tracks delivery status and planned improvements.
 - [x] (Medium) Add performance regression tests for large datasets
   - Validate queue build, deck summary, and history aggregation with 10k+ items
   - Establish baseline thresholds to catch regressions before they ship
-- [ ] (Low) Add contributor architecture diagrams and a "how data flows" reference doc
-- [ ] (Low) Clean up empty domain/models.py or consolidate shared model definitions
 
 ## Deferred Product Additions
 
