@@ -1138,6 +1138,7 @@
   display: flex;
   align-items: flex-end;
   gap: 6px;
+  position: relative;
   flex: 1;
   min-width: 0;
   border-radius: 18px;
@@ -1162,11 +1163,23 @@
   border: none;
   background: transparent;
   color: var(--text-main);
-  padding: 7px 0;
+  padding: 7px 44px 7px 0;
   font-family: var(--body-font);
   font-size: 0.78rem;
   line-height: 1.4;
   scrollbar-width: none;
+}
+
+.assistant-chat-limit {
+  position: absolute;
+  right: 44px;
+  bottom: 8px;
+  font-size: 0.64rem;
+  line-height: 1;
+  color: var(--text-main);
+  opacity: 0.42;
+  pointer-events: none;
+  user-select: none;
 }
 
 .assistant-chat-composer textarea::-webkit-scrollbar {

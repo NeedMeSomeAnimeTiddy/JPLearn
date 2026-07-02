@@ -302,6 +302,7 @@ const PERFORMANCE_PERFECT_MS = 700
 const PERFORMANCE_GOOD_MS = 2200
 const ASSISTANT_EVENT_POLL_MS = 15000
 const ASSISTANT_TOAST_TTL_MS = 3800
+const ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT = 600
 const ROUND_QUEUE_TIMEOUT_MS = 1200
 const STUDY_QUEUE_CACHE_TTL_MS = 45000
 const ASSISTANT_MAX_TOASTS = 1
@@ -4981,6 +4982,10 @@ function App() {
     if (!message) {
       return
     }
+    if (message.length > ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT) {
+      setAssistantChatError(`User chat is limited to ${ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT} characters.`)
+      return
+    }
 
     // Optimistically render the user's message immediately, then show a typing
     // indicator while the model responds (refreshAssistantChatHistory replaces
@@ -8845,7 +8850,12 @@ function App() {
               <div className="assistant-chat-input-wrap">
                 <textarea
                   value={assistantChatInput}
-                  onChange={(event) => setAssistantChatInput(event.currentTarget.value)}
+                  onChange={(event) => {
+                    setAssistantChatInput(event.currentTarget.value)
+                    if (assistantChatError?.startsWith('User chat is limited to')) {
+                      setAssistantChatError(null)
+                    }
+                  }}
                   onKeyDown={(event) => {
                     if (event.key !== 'Enter' || event.shiftKey) {
                       return
@@ -8858,8 +8868,12 @@ function App() {
                   }}
                   placeholder="Ask your coach for help with your current weak area..."
                   rows={2}
+                  maxLength={ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT}
                   disabled={assistantChatLoading}
                 />
+                <span className="assistant-chat-limit" aria-hidden="true">
+                  {assistantChatInput.length}/{ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT}
+                </span>
                 <button
                   type="button"
                   className="assistant-chat-send"
