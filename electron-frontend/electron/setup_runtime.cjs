@@ -118,7 +118,7 @@ const SPEECH_MODELS = {
   balanced: {
     label: 'Balanced (medium, ~1.5 GB)',
     description: 'Good all-around pick: better accuracy than Fast while still responsive.',
-    sizeMb: 1530,
+    sizeMb: 1500,
   },
   high: {
     label: 'High (distil-large-v3, ~1.9 GB)',
@@ -129,11 +129,6 @@ const SPEECH_MODELS = {
     label: 'Ultra (large-v3, ~3.1 GB)',
     description: 'Highest recognition quality. Best when you prioritize accuracy over speed.',
     sizeMb: 3100,
-  },
-  max: {
-    label: 'Max (12B, ~9.8 GB)',
-    description: 'Largest and highest-capacity option. Best when hardware is strong.',
-    sizeMb: 9790,
   },
 }
 const ACTIVE_SPEECH_MODEL_STATE_FILENAME = 'active-speech-model.json'
@@ -315,7 +310,7 @@ function readActiveSpeechModelSelection(base) {
 
 function resolveActiveSpeechTier(base) {
   const selection = readActiveSpeechModelSelection(base)
-  if (selection && isSpeechModelInstalled(base, selection.tier)) {
+  if (selection && SPEECH_MODELS[selection.tier] && isSpeechModelInstalled(base, selection.tier)) {
     return selection.tier
   }
   for (const tier of Object.keys(SPEECH_MODELS)) {

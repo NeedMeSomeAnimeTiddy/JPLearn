@@ -3117,6 +3117,7 @@ function App() {
     const [dictionaryOpenSignal, setDictionaryOpenSignal] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('theme')
+  const [voiceSettingsStep, setVoiceSettingsStep] = useState<1 | 2>(1)
   const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
   const [streakDetailsOpen, setStreakDetailsOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
@@ -4184,6 +4185,12 @@ function App() {
       [sectionId]: !prev[sectionId],
     }))
   }, [])
+
+  useEffect(() => {
+    if (activeSettingsTab === 'voice') {
+      setVoiceSettingsStep(1)
+    }
+  }, [activeSettingsTab])
 
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setSettings((prev) => {
@@ -8614,79 +8621,125 @@ function App() {
                 >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Voice</p>
-                    <div className="settings-animation-grid" role="group" aria-label="Voice controls">
+                    <div className="settings-voice-stepper" role="tablist" aria-label="Voice setup steps">
                       <button
                         type="button"
-                        className={`settings-icon-entry settings-theme-entry ${settings.voiceEnabled ? 'is-active' : ''}`}
-                        onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
-                        aria-label={settings.voiceEnabled ? 'Spoken prompts enabled. Activate to disable.' : 'Spoken prompts disabled. Activate to enable.'}
-                        aria-pressed={settings.voiceEnabled}
-                        title={settings.voiceEnabled ? 'Spoken prompts enabled' : 'Spoken prompts disabled'}
+                        className={`settings-voice-step-button ${voiceSettingsStep === 1 ? 'is-active' : ''}`}
+                        onClick={() => setVoiceSettingsStep(1)}
+                        aria-pressed={voiceSettingsStep === 1}
                       >
-                        <span className={`settings-mode-icon-button ${settings.voiceEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
-                          <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                        </span>
-                        <span className="settings-icon-entry-label">{settings.voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
+                        1. Japanese Prompt Voice
                       </button>
+                      <button
+                        type="button"
+                        className={`settings-voice-step-button ${voiceSettingsStep === 2 ? 'is-active' : ''}`}
+                        onClick={() => setVoiceSettingsStep(2)}
+                        aria-pressed={voiceSettingsStep === 2}
+                      >
+                        2. English Chat Voice
+                      </button>
+                    </div>
 
-                      {settings.voiceEnabled
-                        ? VOICE_OPTIONS.map((option) => (
+                    {voiceSettingsStep === 1 ? (
+                      <div className="settings-voice-step-content" role="group" aria-label="Step 1: Japanese prompt voice">
+                        <div className="settings-animation-grid" role="group" aria-label="Japanese voice controls">
                           <button
-                            key={option.id}
                             type="button"
-                            className={`settings-icon-entry settings-theme-entry ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
-                            onClick={() => {
-                              setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
-                              void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
-                            }}
-                            disabled={voiceBusy}
-                            aria-label={`Use voice ${option.name} (${option.jp}) and hear a sample`}
-                            aria-pressed={settings.voiceSpeaker === option.id}
-                            title={`${option.name} · ${option.jp} — click to hear a sample`}
+                            className={`settings-icon-entry settings-theme-entry ${settings.voiceEnabled ? 'is-active' : ''}`}
+                            onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
+                            aria-label={settings.voiceEnabled ? 'Spoken prompts enabled. Activate to disable.' : 'Spoken prompts disabled. Activate to enable.'}
+                            aria-pressed={settings.voiceEnabled}
+                            title={settings.voiceEnabled ? 'Spoken prompts enabled' : 'Spoken prompts disabled'}
                           >
-                            <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
+                            <span className={`settings-mode-icon-button ${settings.voiceEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
                               <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
                             </span>
-                            <span className="settings-icon-entry-label">{option.name}</span>
+                            <span className="settings-icon-entry-label">{settings.voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
                           </button>
-                        ))
-                        : null}
-                    </div>
-                    <p className="settings-help">
-                      {settings.voiceEnabled
-                        ? 'Click a voice to hear a sample. The speaker button in games reads the prompt aloud.'
-                        : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
-                      {voiceUnavailable ? ' (Voice engine unavailable right now.)' : ''}
-                    </p>
-                    <SettingsCollapsibleSection
-                      id="english-chat-voice"
-                      title="English Chat Voice"
-                      description="Tutor chat uses VOICEVOX for Japanese. English uses this browser voice."
-                      meta={`Auto (${effectiveEnglishVoiceLabel})`}
-                      collapsed={Boolean(collapsedSettingsSections['english-chat-voice'])}
-                      onToggle={() => toggleThemeSectionCollapsed('english-chat-voice')}
-                      className="settings-theme-card"
-                    >
-                      <select
-                        className="settings-theme-select"
-                        value={settings.englishSpeechVoiceName ?? ''}
-                        onChange={(event) => {
-                          const selected = event.currentTarget.value.trim()
-                          setSettings((previous) => ({
-                            ...previous,
-                            englishSpeechVoiceName: selected.length > 0 ? selected : null,
-                          }))
-                        }}
-                        aria-label="Select English voice for tutor chat playback"
-                      >
-                        <option value="">Auto ({effectiveEnglishVoiceLabel})</option>
-                        {englishBrowserVoices.map((voice) => (
-                          <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
-                            {`${voice.name} (${voice.lang})`}
-                          </option>
-                        ))}
-                      </select>
-                    </SettingsCollapsibleSection>
+
+                          {settings.voiceEnabled
+                            ? VOICE_OPTIONS.map((option) => (
+                              <button
+                                key={option.id}
+                                type="button"
+                                className={`settings-icon-entry settings-theme-entry ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
+                                onClick={() => {
+                                  setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
+                                  void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
+                                }}
+                                disabled={voiceBusy}
+                                aria-label={`Use voice ${option.name} (${option.jp}) and hear a sample`}
+                                aria-pressed={settings.voiceSpeaker === option.id}
+                                title={`${option.name} · ${option.jp} — click to hear a sample`}
+                              >
+                                <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
+                                  <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                                </span>
+                                <span className="settings-icon-entry-label">{option.name}</span>
+                              </button>
+                            ))
+                            : null}
+                        </div>
+                        <p className="settings-help">
+                          {settings.voiceEnabled
+                            ? 'Click a voice to hear a sample. The speaker button in games reads the prompt aloud.'
+                            : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
+                          {voiceUnavailable ? ' (Voice engine unavailable right now.)' : ''}
+                        </p>
+                        <div className="settings-voice-step-actions">
+                          <button
+                            type="button"
+                            className="settings-inline-button"
+                            onClick={() => setVoiceSettingsStep(2)}
+                          >
+                            Continue to Step 2
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {voiceSettingsStep === 2 ? (
+                      <div className="settings-voice-step-content" role="group" aria-label="Step 2: English chat voice">
+                        <SettingsCollapsibleSection
+                          id="english-chat-voice"
+                          title="English Chat Voice"
+                          description="Tutor chat uses VOICEVOX for Japanese. English uses this browser voice."
+                          meta={`Auto (${effectiveEnglishVoiceLabel})`}
+                          collapsed={Boolean(collapsedSettingsSections['english-chat-voice'])}
+                          onToggle={() => toggleThemeSectionCollapsed('english-chat-voice')}
+                          className="settings-theme-card"
+                        >
+                          <select
+                            className="settings-theme-select"
+                            value={settings.englishSpeechVoiceName ?? ''}
+                            onChange={(event) => {
+                              const selected = event.currentTarget.value.trim()
+                              setSettings((previous) => ({
+                                ...previous,
+                                englishSpeechVoiceName: selected.length > 0 ? selected : null,
+                              }))
+                            }}
+                            aria-label="Select English voice for tutor chat playback"
+                          >
+                            <option value="">Auto ({effectiveEnglishVoiceLabel})</option>
+                            {englishBrowserVoices.map((voice) => (
+                              <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
+                                {`${voice.name} (${voice.lang})`}
+                              </option>
+                            ))}
+                          </select>
+                        </SettingsCollapsibleSection>
+                        <div className="settings-voice-step-actions">
+                          <button
+                            type="button"
+                            className="settings-inline-button"
+                            onClick={() => setVoiceSettingsStep(1)}
+                          >
+                            Back to Step 1
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 ) : null}

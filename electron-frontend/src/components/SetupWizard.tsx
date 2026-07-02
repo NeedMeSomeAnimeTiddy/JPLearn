@@ -69,6 +69,10 @@ interface CompactDropdownOption {
   badgeTone?: 'recommended' | 'soft' | 'warning'
 }
 
+type AppRegionStyle = React.CSSProperties & {
+  WebkitAppRegion?: 'drag' | 'no-drag'
+}
+
 type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'max' | 'skip'
 type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra' | 'skip'
 type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
@@ -467,7 +471,7 @@ export function SetupWizard({ onComplete }: Props) {
     setDownloadError(null)
     setProgressLogs([])
     appendProgressLog('Starting setup tasks…')
-    setPage(6)
+    setPage(7)
 
     const api = window.jplearnDesktop
     try {
@@ -520,7 +524,7 @@ export function SetupWizard({ onComplete }: Props) {
       await api.completeSetup?.()
       appendProgressLog('Setup complete.')
       setDownloadDone(true)
-      setPage(7)
+      setPage(8)
     } catch (err) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
@@ -558,7 +562,7 @@ export function SetupWizard({ onComplete }: Props) {
 
   // ── Page renders ───────────────────────────────────────────────────────────
 
-  type Page = 1 | 2 | 3 | 4 | 5 | 6 | 7
+  type Page = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   const tutorModelOptions: CompactDropdownOption[] = [
     ...(sysInfo?.models.map((model) => {
       const hardwareFit = getModelHardwareFit(sysInfo, model.tier)
@@ -756,7 +760,7 @@ export function SetupWizard({ onComplete }: Props) {
     4: (
       <PageLayout
         title="Japanese Voice (optional)"
-        subtitle="Hear vocabulary and kanji read aloud with natural pronunciation."
+        subtitle="Install voice synthesis and optional speech recognition."
         onNext={() => setPage(5)}
         onBack={() => setPage(3)}
         nextLabel="Continue"
@@ -780,43 +784,6 @@ export function SetupWizard({ onComplete }: Props) {
           </p>
         )}
 
-        {/* ── Japanese Fonts ── */}
-        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Japanese Fonts (optional)</p>
-          <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
-            Custom display fonts for a better look. Without them the app uses system fonts
-            (e.g. Yu Gothic on Windows), which work fine.
-          </p>
-          {sysInfo?.fontsInstalled ? (
-            <p style={{ color: 'var(--accent, #7eb8ea)', fontSize: '0.9rem' }}>✓ Fonts are already installed.</p>
-          ) : (
-            <CheckboxOption
-              label={`Download Japanese fonts (~100 MB)  •  ${formatDurationMinutes(sysInfo?.fontsEstimatedDownloadMinutes)}`}
-              checked={installFonts}
-              onChange={setInstallFonts}
-            />
-          )}
-        </div>
-
-        {/* ── Offline Dictionary ── */}
-        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Offline Dictionary (optional)</p>
-          <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
-            Lets the Tutor chat look up Japanese↔English word translations without an internet
-            connection. Downloaded from the open-source jmdict-simplified project.
-          </p>
-          {sysInfo?.dictionaryInstalled ? (
-            <p style={{ color: 'var(--accent, #7eb8ea)', fontSize: '0.9rem' }}>✓ Offline dictionary is already installed.</p>
-          ) : (
-            <CheckboxOption
-              label={`Download offline dictionary (~30 MB)  •  ${formatDurationMinutes(sysInfo?.dictionaryEstimatedDownloadMinutes)}`}
-              checked={installDictionary}
-              onChange={setInstallDictionary}
-            />
-          )}
-        </div>
-
-        {/* ── Speech Recognition ── */}
         <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Speech Recognition (optional)</p>
           <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
@@ -849,7 +816,51 @@ export function SetupWizard({ onComplete }: Props) {
       </PageLayout>
     ),
 
-    5: (() => {
+    5: (
+      <PageLayout
+        title="Reading Assets (optional)"
+        subtitle="Install optional Japanese fonts and offline dictionary data."
+        onNext={() => setPage(6)}
+        onBack={() => setPage(4)}
+        nextLabel="Continue"
+      >
+        <div>
+          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Japanese Fonts (optional)</p>
+          <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
+            Custom display fonts for a better look. Without them the app uses system fonts
+            (e.g. Yu Gothic on Windows), which work fine.
+          </p>
+          {sysInfo?.fontsInstalled ? (
+            <p style={{ color: 'var(--accent, #7eb8ea)', fontSize: '0.9rem' }}>✓ Fonts are already installed.</p>
+          ) : (
+            <CheckboxOption
+              label={`Download Japanese fonts (~100 MB)  •  ${formatDurationMinutes(sysInfo?.fontsEstimatedDownloadMinutes)}`}
+              checked={installFonts}
+              onChange={setInstallFonts}
+            />
+          )}
+        </div>
+
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Offline Dictionary (optional)</p>
+          <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
+            Lets the Tutor chat look up Japanese↔English word translations without an internet
+            connection. Downloaded from the open-source jmdict-simplified project.
+          </p>
+          {sysInfo?.dictionaryInstalled ? (
+            <p style={{ color: 'var(--accent, #7eb8ea)', fontSize: '0.9rem' }}>✓ Offline dictionary is already installed.</p>
+          ) : (
+            <CheckboxOption
+              label={`Download offline dictionary (~30 MB)  •  ${formatDurationMinutes(sysInfo?.dictionaryEstimatedDownloadMinutes)}`}
+              checked={installDictionary}
+              onChange={setInstallDictionary}
+            />
+          )}
+        </div>
+      </PageLayout>
+    ),
+
+    6: (() => {
       const needsModel = selectedTier && selectedTier !== 'skip' && !sysInfo?.models.find(m => m.tier === selectedTier)?.installed
       const needsLlama = selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled
       const needsVoice = installVoicevox && !sysInfo?.voicevoxInstalled
@@ -863,7 +874,7 @@ export function SetupWizard({ onComplete }: Props) {
           title="Ready to download"
           subtitle="Review what will be downloaded, then click Start Setup."
           onNext={startDownloads}
-          onBack={() => setPage(4)}
+          onBack={() => setPage(5)}
           nextLabel={needsModel || needsLlama || needsVoice || needsFonts || needsDictionary || needsSpeech ? 'Start Setup' : 'Finish'}
         >
           {needsModel && modelInfo && (
@@ -904,7 +915,7 @@ export function SetupWizard({ onComplete }: Props) {
       )
     })(),
 
-    6: (
+    7: (
       <PageLayout title="Setting up…" subtitle="Please wait while files are downloaded." hideNav>
         {selectedTier && selectedTier !== 'skip' && (
           <>
@@ -981,7 +992,7 @@ export function SetupWizard({ onComplete }: Props) {
       </PageLayout>
     ),
 
-    7: (
+    8: (
       <PageLayout
         title="Setup complete"
         subtitle="Everything is ready. Enjoy learning Japanese!"
@@ -1000,8 +1011,17 @@ export function SetupWizard({ onComplete }: Props) {
   return (
     <div style={overlayStyle}>
       <div style={cardStyle}>
-        <StepDots total={7} current={page} />
-        {pages[page]}
+        <div style={dragBarStyle} aria-label="Move setup window">
+          <span style={dragBarTitleStyle}>JPLearn Setup</span>
+        </div>
+        <div style={stepDotsRowStyle}>
+          <StepDots total={8} current={page} />
+        </div>
+        <div className="setup-wizard-scroll-area" style={cardViewportStyle}>
+          <div style={cardBodyStyle}>
+            {pages[page]}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -1290,23 +1310,71 @@ function StepDots({ total, current }: { total: number; current: number }) {
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  background: 'rgba(10, 14, 20, 0.97)',
+  display: 'block',
+  background: 'transparent',
   zIndex: 9999,
 }
 
 const cardStyle: React.CSSProperties = {
-  width: '100%',
-  maxWidth: '520px',
-  padding: '2rem',
-  borderRadius: '14px',
-  background: 'rgba(25, 35, 48, 0.98)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+  width: '100vw',
+  height: '100vh',
+  borderRadius: 0,
+  background: 'rgba(25, 35, 48, 0.86)',
+  border: 'none',
+  boxShadow: 'none',
   color: '#e8f0fa',
   fontFamily: 'inherit',
+  overflow: 'hidden',
+  display: 'flex',
+  flexDirection: 'column',
+  backdropFilter: 'blur(4px)',
+}
+
+const dragBarStyle: AppRegionStyle = {
+  height: '34px',
+  display: 'flex',
+  alignItems: 'center',
+  padding: '0 0.9rem',
+  borderBottom: '1px solid rgba(255,255,255,0.08)',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04))',
+  WebkitAppRegion: 'drag',
+}
+
+const dragBarTitleStyle: React.CSSProperties = {
+  fontSize: '0.76rem',
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  opacity: 0.68,
+  fontWeight: 700,
+  userSelect: 'none',
+  pointerEvents: 'none',
+}
+
+const cardViewportStyle: AppRegionStyle = {
+  flex: 1,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflowY: 'auto',
+  overflowX: 'hidden',
+  padding: '0.4rem 1.25rem 1.4rem',
+  WebkitAppRegion: 'no-drag',
+}
+
+const stepDotsRowStyle: AppRegionStyle = {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: '0.75rem 1.25rem 0.2rem',
+  WebkitAppRegion: 'no-drag',
+}
+
+const cardBodyStyle: AppRegionStyle = {
+  padding: '2rem',
+  width: '100%',
+  maxWidth: '760px',
+  margin: 0,
+  WebkitAppRegion: 'no-drag',
 }
 
 function btnStyle(variant: 'primary' | 'secondary' | 'ghost', disabled = false): React.CSSProperties {

@@ -8335,6 +8335,51 @@ button {
   font-weight: 700;
 }
 
+.settings-voice-stepper {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.settings-voice-step-button {
+  appearance: none;
+  width: 100%;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 88%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--panel-bg-alt) 70%, transparent);
+  color: var(--text-soft);
+  padding: 8px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.settings-voice-step-button:hover {
+  border-color: color-mix(in oklab, var(--accent) 56%, var(--panel-border));
+  color: var(--text-main);
+}
+
+.settings-voice-step-button.is-active {
+  color: var(--text-main);
+  border-color: color-mix(in oklab, var(--accent) 62%, var(--panel-border));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 20%, transparent);
+  background: color-mix(in oklab, var(--accent) 14%, var(--panel-bg-alt));
+}
+
+.settings-voice-step-content {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-voice-step-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .settings-button-group {
   display: flex;
   gap: 8px;
@@ -8560,6 +8605,19 @@ button {
   .settings-animation-grid {
     grid-template-columns: 1fr;
   }
+
+  .settings-voice-stepper {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-voice-step-actions {
+    justify-content: stretch;
+  }
+
+  .settings-voice-step-actions .settings-inline-button {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .settings-shortcuts span {
@@ -8585,6 +8643,16 @@ button {
 .settings-reset-button:hover {
   border-color: color-mix(in oklab, var(--tone-rose) 50%, var(--button-border));
   color: color-mix(in oklab, var(--tone-rose) 80%, var(--text-main));
+}
+
+.setup-wizard-scroll-area {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.setup-wizard-scroll-area::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .settings-reset-confirm {
