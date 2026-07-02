@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Activity,
   ArrowLeft,
+  Flame,
   LoaderCircle,
+  Target,
+  Trophy,
 } from 'lucide-react'
 import { ChallengePromptCard } from '../components/minigame/ChallengePromptCard'
 import { ChoiceAnswerPanel } from '../components/minigame/ChoiceAnswerPanel'
@@ -14,7 +18,6 @@ import { SessionRunSummary } from '../components/SessionRunSummary'
 import type { MinigameKey, NavDirection, ScriptKey } from '../types'
 import {
   MINIGAMES,
-  SCRIPT_LABELS,
   formatExpectedAnswer,
   formatFeedbackAnswerLabel,
 } from '../constants'
@@ -108,8 +111,6 @@ export function MinigameView({
       : sessionRounds >= sessionTargetItems
         ? 'Wrapping up this run...'
         : 'Advancing automatically...'
-  const progressCheckpoints = [25, 50, 75, 100]
-  const completedCount = Math.min(sessionRounds, sessionTargetItems)
 
   // ── Phase 7: Progressive hint ladder ────────────────────────────────────────
   // 0 = no hint shown, 1 = prompt type label, 2 = hintText, 3 = full answer giveaway
@@ -117,6 +118,9 @@ export function MinigameView({
   const [activeChoiceIndex, setActiveChoiceIndex] = useState(0)
   const [hintRevealCount, setHintRevealCount] = useState(0)
   const [focusModeEnabled, setFocusModeEnabled] = useState(false)
+  const [pointsGainPulse, setPointsGainPulse] = useState(false)
+  const [pointsGainAmount, setPointsGainAmount] = useState<number | null>(null)
+  const previousPointsRef = useRef(sessionPoints)
   const previousSessionActiveRef = useRef(false)
 
   const toggleFocusMode = useCallback(() => {
@@ -147,6 +151,26 @@ export function MinigameView({
   useEffect(() => {
     setHintStep(0)
   }, [roundState?.cardId])
+
+  // Brief pulse + floating "+N" label whenever points increase.
+  useEffect(() => {
+    if (sessionPoints <= previousPointsRef.current) {
+      previousPointsRef.current = sessionPoints
+      return
+    }
+
+    const gained = sessionPoints - previousPointsRef.current
+    previousPointsRef.current = sessionPoints
+    setPointsGainAmount(gained)
+    setPointsGainPulse(true)
+
+    const timeoutHandle = window.setTimeout(() => {
+      setPointsGainPulse(false)
+      setPointsGainAmount(null)
+    }, 700)
+
+    return () => window.clearTimeout(timeoutHandle)
+  }, [sessionPoints])
 
   useEffect(() => {
     const previouslyActive = previousSessionActiveRef.current
@@ -293,12 +317,7 @@ export function MinigameView({
       <MinigameHud
         activeScript={activeScript}
         activeSectionName={activeSectionName}
-        title={selectedGameMeta?.title ?? 'Minigame'}
-        sessionRounds={sessionRounds}
-        sessionTargetItems={sessionTargetItems}
-        sessionScore={sessionScore}
-        sessionPoints={sessionPoints}
-        sessionStreak={sessionStreak}
+        title={resolvedGameTitle}
         focusModeEnabled={focusModeEnabled}
         dictionarySeed={roundState?.dictionarySeedQuery ?? roundState?.audioText ?? roundState?.answer ?? ''}
         sessionActive={sessionActive}
@@ -399,21 +418,18 @@ export function MinigameView({
             }`}
             key={`round-${sessionRounds}-${roundState.focusText}-${roundState.answer}`}
           >
-            <div className="game-round-head minigame-challenge-head">
-              <div className="minigame-challenge-titles">
-                <span>{SCRIPT_LABELS[activeScript]}</span>
-                <strong>{resolvedGameTitle}</strong>
+            {roundState.chapterLabel || roundState.surprisePrompt ? (
+              <div className="game-round-head minigame-challenge-head">
+                <div className="minigame-challenge-badges minigame-focus-optional">
+                  {roundState.chapterLabel ? (
+                    <span className="chapter-pill">
+                      {roundState.chapterNumber ? `Chapter ${roundState.chapterNumber}` : 'Chapter'} · {roundState.chapterLabel}
+                    </span>
+                  ) : null}
+                  {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
+                </div>
               </div>
-              <div className="minigame-challenge-badges minigame-focus-optional">
-                {roundState.chapterLabel ? (
-                  <span className="chapter-pill">
-                    {roundState.chapterNumber ? `Chapter ${roundState.chapterNumber}` : 'Chapter'} · {roundState.chapterLabel}
-                  </span>
-                ) : null}
-                <span className="stage-pill">Stage {roundState.curriculumStage}</span>
-                {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
-              </div>
-            </div>
+            ) : null}
 
             <div className="minigame-challenge-body">
               <div className="minigame-core-column">
@@ -428,23 +444,36 @@ export function MinigameView({
                 >
                   <div className="minigame-round-progress-fill" style={{ width: `${roundProgressValue * 100}%` }} />
                 </div>
-                <div className="minigame-progress-footer" aria-live="polite">
-                  <span className="minigame-progress-count">{completedCount}/{sessionTargetItems}</span>
-                  <div className="minigame-progress-pips" aria-label="Session completion checkpoints">
-                    {progressCheckpoints.map((checkpoint) => {
-                      const checkpointRounds = Math.max(1, Math.ceil((sessionTargetItems * checkpoint) / 100))
-                      const reached = completedCount >= checkpointRounds
-
-                      return (
-                        <span
-                          key={`pip-${checkpoint}`}
-                          className={`minigame-progress-pip ${reached ? 'is-reached' : ''}`}
-                          aria-label={`${checkpoint}% ${reached ? 'reached' : 'pending'}`}
-                        />
-                      )
-                    })}
-                  </div>
-                  <span className="minigame-progress-remaining">{sessionStatusCopy}</span>
+                <div className="minigame-stats-row" aria-live="polite">
+                  <span className={`minigame-stat-inline ${pointsGainPulse ? 'is-gaining' : ''}`} aria-label={`Points ${sessionPoints}`}>
+                    <span className="minigame-stat-heading">
+                      <Activity className="minigame-stat-icon" aria-hidden="true" strokeWidth={2.2} />
+                      <strong className="minigame-stat-label">Points</strong>
+                    </span>
+                    <strong className="minigame-stat-badge">{sessionPoints}</strong>
+                    {pointsGainAmount ? <span className="minigame-stat-gain">+{pointsGainAmount}</span> : null}
+                  </span>
+                  <span className="minigame-stat-inline" aria-label={`Streak ${sessionStreak}`}>
+                    <span className="minigame-stat-heading">
+                      <Flame className="minigame-stat-icon" aria-hidden="true" strokeWidth={2.2} />
+                      <strong className="minigame-stat-label">Streak</strong>
+                    </span>
+                    <strong className="minigame-stat-badge">{sessionStreak}</strong>
+                  </span>
+                  <span className="minigame-stat-inline" aria-label={`Current ${sessionScore} of ${sessionRounds}`}>
+                    <span className="minigame-stat-heading">
+                      <Target className="minigame-stat-icon" aria-hidden="true" strokeWidth={2.2} />
+                      <strong className="minigame-stat-label">Current</strong>
+                    </span>
+                    <strong className="minigame-stat-badge">{sessionScore}/{sessionRounds}</strong>
+                  </span>
+                  <span className="minigame-stat-inline" aria-label={`Goal ${sessionRounds} of ${sessionTargetItems}`}>
+                    <span className="minigame-stat-heading">
+                      <Trophy className="minigame-stat-icon" aria-hidden="true" strokeWidth={2.2} />
+                      <strong className="minigame-stat-label">Goal</strong>
+                    </span>
+                    <strong className="minigame-stat-badge">{sessionRounds}/{sessionTargetItems}</strong>
+                  </span>
                 </div>
 
                 <ChallengePromptCard

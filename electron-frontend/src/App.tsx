@@ -7175,7 +7175,6 @@ function App() {
           activeScriptStats={activeScriptStats}
           activeSectionName={activeSectionName}
           onBack={goHome}
-          onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
           onOpenSettings={openSettingsFromMenu}
           onSelectBlock={(index) => {
             setActiveBlockIndex(index)
@@ -8553,6 +8552,13 @@ function App() {
                   </button>
                 </div>
               ) : null}
+              <div className="assistant-toast-advance-track" aria-hidden="true">
+                <span
+                  key={activeAssistantToast.id}
+                  className="assistant-toast-advance-fill"
+                  style={{ animationDuration: `${ASSISTANT_TOAST_TTL_MS}ms` }}
+                />
+              </div>
             </article>
           </div>
         ) : null}

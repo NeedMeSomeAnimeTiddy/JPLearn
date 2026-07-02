@@ -1275,22 +1275,6 @@
   animation: assistantToastLifecycle 3800ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.assistant-toast::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--tone-streak) 68%, white 32%),
-    color-mix(in oklab, var(--tone-ocean) 68%, white 32%)
-  );
-  transform-origin: left center;
-  animation: assistantToastTimer 3800ms linear both;
-}
-
 .assistant-toast::after {
   content: '';
   position: absolute;
@@ -1365,6 +1349,26 @@
   border-color: color-mix(in oklab, var(--panel-border) 70%, white);
 }
 
+.assistant-toast-advance-track {
+  margin-top: 9px;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--chip-bg) 82%, transparent);
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--chip-border));
+}
+
+.assistant-toast-advance-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--tone-amber), var(--tone-ocean));
+  animation-name: feedbackAdvanceCountdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
 .assistant-toast-info {
   border-color: color-mix(in oklab, var(--tone-ocean) 45%, var(--panel-border));
 }
@@ -1400,16 +1404,6 @@
   100% {
     opacity: 0;
     transform: translateY(6px) scale(0.985);
-  }
-}
-
-@keyframes assistantToastTimer {
-  from {
-    transform: scaleX(1);
-  }
-
-  to {
-    transform: scaleX(0);
   }
 }
 
@@ -2471,77 +2465,10 @@ button {
   font-size: 0.7rem;
 }
 
-.minigame-points-chip {
-  display: inline-flex;
-  position: relative;
-}
-
-.minigame-points-chip .metric-accent-streak {
-  border-color: color-mix(in oklab, var(--tone-amber) 46%, var(--chip-border));
-  background: color-mix(in oklab, var(--tone-amber) 16%, var(--chip-bg));
-}
-
-.minigame-points-chip .live-value {
-  font-size: 0.86rem;
-  font-weight: 800;
-}
-
-.minigame-points-chip.is-gaining {
-  animation: minigamePointsPulse 360ms var(--motion-ease);
-}
-
-.minigame-points-gain {
-  position: absolute;
-  right: -2px;
-  top: -10px;
-  border: 1px solid color-mix(in oklab, #75d48f 46%, var(--chip-border));
-  border-radius: 999px;
-  background: color-mix(in oklab, #75d48f 20%, var(--chip-bg));
-  color: #86dfa0;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  padding: 1px 6px;
-  animation: minigamePointsGainFloat 700ms var(--motion-ease);
-  pointer-events: none;
-}
-
-.minigame-focus-chip .metric-accent-warning {
-  border-color: color-mix(in oklab, var(--tone-amber) 42%, var(--chip-border));
-  background: color-mix(in oklab, var(--tone-amber) 16%, var(--chip-bg));
-}
-
-.minigame-hud-live {
+.minigame-hud-start {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-right: 4px;
-  border-right: 1px solid color-mix(in oklab, var(--tone-ocean) 22%, var(--chip-border));
-}
-
-.minigame-hud-restart {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--button-border);
-  border-radius: 10px;
-  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
-  color: var(--text-soft);
-  width: 36px;
-  height: 36px;
-  cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease, color 160ms ease;
-}
-
-.minigame-hud-restart:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: color-mix(in oklab, var(--tone-ocean) 52%, var(--button-border));
-  color: var(--text-main);
-}
-
-.minigame-hud-restart:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .minigame-lives-inline {
@@ -5579,17 +5506,6 @@ button {
   color: color-mix(in oklab, var(--text-main) 86%, var(--tone-amber));
 }
 
-.stage-pill {
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 42%, var(--chip-border));
-  background: color-mix(in oklab, var(--tone-ocean) 24%, var(--chip-bg));
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: color-mix(in oklab, var(--text-main) 88%, var(--tone-ocean));
-}
-
 .chapter-pill {
   border: 1px solid color-mix(in oklab, var(--tone-teal) 46%, var(--chip-border));
   background: color-mix(in oklab, var(--tone-teal) 22%, var(--chip-bg));
@@ -5999,17 +5915,6 @@ button {
   gap: 12px;
 }
 
-.minigame-challenge-titles {
-  display: grid;
-  gap: 4px;
-}
-
-.minigame-challenge-titles strong {
-  color: var(--text-main);
-  font-size: 1.08rem;
-  line-height: 1.1;
-}
-
 .minigame-challenge-badges {
   display: flex;
   flex-wrap: wrap;
@@ -6019,7 +5924,7 @@ button {
 
 .minigame-challenge-body {
   display: grid;
-  gap: 22px;
+  gap: 18px;
 }
 
 .minigame-core-column {
@@ -6046,43 +5951,84 @@ button {
   transition: width 220ms ease;
 }
 
-.minigame-progress-footer {
+.minigame-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.minigame-stat-inline {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 5px;
+  position: relative;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in oklab, var(--chip-border) 78%, transparent);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--chip-bg) 94%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-.minigame-progress-count,
-.minigame-progress-remaining {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-soft);
-  flex-shrink: 0;
+.minigame-stat-inline.is-gaining {
+  animation: minigamePointsPulse 360ms var(--motion-ease);
 }
 
-.minigame-progress-pips {
-  display: flex;
+.minigame-stat-heading {
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  min-width: 0;
 }
 
-.minigame-progress-pip {
-  display: block;
-  width: 7px;
-  height: 7px;
+.minigame-stat-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: color-mix(in oklab, var(--accent) 70%, var(--text-soft));
+}
+
+.minigame-stat-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: color-mix(in oklab, var(--text-main) 86%, var(--text-soft));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.minigame-stat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 22px;
+  padding: 1px 8px;
   border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--chip-border) 88%, transparent);
-  background: color-mix(in oklab, var(--chip-bg) 86%, transparent);
-  transition: background 200ms ease, border-color 200ms ease;
+  border: 1px solid color-mix(in oklab, var(--chip-border) 84%, transparent);
+  background: color-mix(in oklab, var(--chip-bg) 82%, white 5%);
+  color: var(--text-main);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
-.minigame-progress-pip.is-reached {
-  border-color: color-mix(in oklab, var(--tone-ocean) 60%, var(--chip-border));
-  background: color-mix(in oklab, var(--tone-ocean) 72%, white);
+.minigame-stat-gain {
+  position: absolute;
+  right: -6px;
+  top: -12px;
+  border: 1px solid color-mix(in oklab, #75d48f 46%, var(--chip-border));
+  border-radius: 999px;
+  background: color-mix(in oklab, #75d48f 20%, var(--chip-bg));
+  color: #86dfa0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  animation: minigamePointsGainFloat 700ms var(--motion-ease);
+  pointer-events: none;
 }
 
 .minigame-support-row {
@@ -8905,6 +8851,31 @@ html[data-motion-style='lively'] .live-value {
     grid-template-columns: 1fr;
   }
 
+  .minigame-stats-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .minigame-stat-inline {
+    gap: 6px;
+    padding: 6px 7px;
+  }
+
+  .minigame-stat-heading {
+    gap: 5px;
+  }
+
+  .minigame-stat-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.07em;
+  }
+
+  .minigame-stat-badge {
+    min-height: 20px;
+    padding: 1px 7px;
+    font-size: 0.7rem;
+  }
+
   .minigame-challenge-body {
     grid-template-columns: 1fr;
   }
@@ -10296,6 +10267,24 @@ button.lpp-node:hover .lpp-node-ring {
   .onb-hero-title { font-size: 1.6rem; }
   .onb-time-grid { grid-template-columns: repeat(2, 1fr); }
   .onb-goal-grid { grid-template-columns: 1fr 1fr; }
+
+  .minigame-stats-row {
+    gap: 5px;
+  }
+
+  .minigame-stat-inline {
+    padding: 5px 6px;
+  }
+
+  .minigame-stat-label {
+    font-size: 0.55rem;
+  }
+
+  .minigame-stat-badge {
+    min-height: 18px;
+    padding: 1px 6px;
+    font-size: 0.66rem;
+  }
 }
 
 /* ── Readiness Warning Modal ────────────────────────────────────── */
