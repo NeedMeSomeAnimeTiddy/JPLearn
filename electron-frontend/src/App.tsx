@@ -141,6 +141,7 @@ type BackgroundStyle =
   | 'temple_reflection'
   | 'garden_bridge'
   | 'autumn_pond'
+  | 'custom_upload'
 type FeedbackTone = 'success' | 'error' | null
 type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation'
 type ThemeKey =
@@ -867,6 +868,8 @@ interface AppSettings {
   motionStyle: AnimationStyle
   backgroundStyle: BackgroundStyle
   backgroundBlur: number
+  customBackgroundDataUrl: string | null
+  customBackgroundName: string | null
   assistantToastLimit: 0 | 1
   assistantChatEnabled: boolean
   assistantChatAudioEnabled: boolean
@@ -1656,6 +1659,9 @@ const MOTION_STYLE_LABEL: Record<AnimationStyle, string> = {
 const BACKGROUND_BLUR_MIN = 0
 const BACKGROUND_BLUR_MAX = 12
 const BACKGROUND_BLUR_DEFAULT = 4
+const CUSTOM_BACKGROUND_MAX_BYTES = 15 * 1024 * 1024
+const CUSTOM_BACKGROUND_MAX_EDGE = 2200
+const CUSTOM_BACKGROUND_MAX_DATA_URL_LENGTH = 6_500_000
 
 const BACKGROUND_OPTIONS: Array<{
   key: BackgroundStyle
@@ -1697,6 +1703,11 @@ const BACKGROUND_OPTIONS: Array<{
     label: 'Autumn Pond',
     note: 'Warm maple tones and morning light rays.',
     imagePath: 'backgrounds/lake.jpg',
+  },
+  {
+    key: 'custom_upload',
+    label: 'Custom Image',
+    note: 'Use your own image from device storage.',
   },
 ]
 
@@ -2011,6 +2022,8 @@ function defaultSettings(): AppSettings {
     motionStyle: 'glide',
     backgroundStyle: 'classic_scene',
     backgroundBlur: BACKGROUND_BLUR_DEFAULT,
+    customBackgroundDataUrl: null,
+    customBackgroundName: null,
     assistantToastLimit: ASSISTANT_MAX_TOASTS,
     assistantChatEnabled: true,
     assistantChatAudioEnabled: true,
@@ -2072,7 +2085,8 @@ function isBackgroundStyle(value: unknown): value is BackgroundStyle {
     value === 'torii_gate' ||
     value === 'temple_reflection' ||
     value === 'garden_bridge' ||
-    value === 'autumn_pond'
+    value === 'autumn_pond' ||
+    value === 'custom_upload'
   )
 }
 
@@ -2127,6 +2141,60 @@ function createBackgroundPreviewDataUrl(source: HTMLImageElement, width: number,
   }
 }
 
+function normalizeCustomBackgroundDataUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  if (!normalized.startsWith('data:image/')) return null
+  if (normalized.length > CUSTOM_BACKGROUND_MAX_DATA_URL_LENGTH) return null
+  return normalized
+}
+
+async function optimizeBackgroundFileToDataUrl(file: File): Promise<string> {
+  const objectUrl = URL.createObjectURL(file)
+  const image = new Image()
+  image.decoding = 'async'
+  image.src = objectUrl
+
+  try {
+    try {
+      await image.decode()
+    } catch {
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve()
+        image.onerror = () => reject(new Error('Unable to decode image file.'))
+      })
+    }
+
+    const sourceWidth = image.naturalWidth || image.width
+    const sourceHeight = image.naturalHeight || image.height
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+      throw new Error('Invalid image dimensions.')
+    }
+
+    const scale = Math.min(1, CUSTOM_BACKGROUND_MAX_EDGE / Math.max(sourceWidth, sourceHeight))
+    const width = Math.max(1, Math.round(sourceWidth * scale))
+    const height = Math.max(1, Math.round(sourceHeight * scale))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    if (!context) {
+      throw new Error('Canvas context unavailable.')
+    }
+
+    context.drawImage(image, 0, 0, width, height)
+
+    try {
+      return canvas.toDataURL('image/webp', 0.8)
+    } catch {
+      return canvas.toDataURL('image/jpeg', 0.86)
+    }
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
 function loadSettings(): AppSettings {
   try {
     const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
@@ -2165,6 +2233,15 @@ function loadSettings(): AppSettings {
       }
     }
 
+    const normalizedCustomBackgroundDataUrl = normalizeCustomBackgroundDataUrl(parsed.customBackgroundDataUrl)
+    const normalizedCustomBackgroundName = typeof parsed.customBackgroundName === 'string' && parsed.customBackgroundName.trim()
+      ? parsed.customBackgroundName.trim().slice(0, 120)
+      : null
+    const normalizedBackgroundStyle = isBackgroundStyle(parsed.backgroundStyle) ? parsed.backgroundStyle : defaults.backgroundStyle
+    const resolvedBackgroundStyle = normalizedBackgroundStyle === 'custom_upload' && !normalizedCustomBackgroundDataUrl
+      ? defaults.backgroundStyle
+      : normalizedBackgroundStyle
+
     return {
       ...defaults,
       ...parsed,
@@ -2174,8 +2251,10 @@ function loadSettings(): AppSettings {
       themeScope: normalizedThemeScope,
       activeCustomThemeId: normalizedActiveCustomThemeId,
       customThemes,
-      backgroundStyle: isBackgroundStyle(parsed.backgroundStyle) ? parsed.backgroundStyle : defaults.backgroundStyle,
+      backgroundStyle: resolvedBackgroundStyle,
       backgroundBlur: typeof parsed.backgroundBlur === 'number' ? clampBackgroundBlur(parsed.backgroundBlur) : defaults.backgroundBlur,
+      customBackgroundDataUrl: normalizedCustomBackgroundDataUrl,
+      customBackgroundName: normalizedCustomBackgroundName,
       assistantToastLimit: isAssistantToastLimit(parsed.assistantToastLimit)
         ? parsed.assistantToastLimit
         : defaults.assistantToastLimit,
@@ -3229,6 +3308,7 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
   const [collapsedSettingsSections, setCollapsedSettingsSections] = useState<Partial<Record<string, boolean>>>({})
   const [customThemeActionMessage, setCustomThemeActionMessage] = useState<string | null>(null)
+  const [customBackgroundActionMessage, setCustomBackgroundActionMessage] = useState<string | null>(null)
   const [themePaletteCache, setThemePaletteCache] = useState<Partial<Record<ThemeKey, ThemePalette>>>({})
   const [backgroundPreviewUrls, setBackgroundPreviewUrls] = useState<Partial<Record<BackgroundStyle, string>>>({})
   const [showOverview, setShowOverview] = useState(false)
@@ -3275,6 +3355,7 @@ function App() {
   const backgroundImageCacheRef = useRef<Partial<Record<BackgroundStyle, HTMLImageElement>>>({})
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const customThemeImportInputRef = useRef<HTMLInputElement | null>(null)
+  const customBackgroundImportInputRef = useRef<HTMLInputElement | null>(null)
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
   const dictionaryCards = useMemo(() => {
@@ -4206,6 +4287,53 @@ function App() {
     reader.readAsText(file)
     event.currentTarget.value = ''
   }, [importCustomThemesPayload])
+
+  const openCustomBackgroundPicker = useCallback(() => {
+    customBackgroundImportInputRef.current?.click()
+  }, [])
+
+  const clearCustomBackground = useCallback(() => {
+    setSettings((previous) => ({
+      ...previous,
+      customBackgroundDataUrl: null,
+      customBackgroundName: null,
+      backgroundStyle: previous.backgroundStyle === 'custom_upload' ? 'classic_scene' : previous.backgroundStyle,
+    }))
+    setCustomBackgroundActionMessage('Custom background removed.')
+  }, [])
+
+  const handleCustomBackgroundFileImport = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) {
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setCustomBackgroundActionMessage('Please choose an image file.')
+      return
+    }
+    if (file.size > CUSTOM_BACKGROUND_MAX_BYTES) {
+      setCustomBackgroundActionMessage('Image is too large. Choose a file under 15 MB.')
+      return
+    }
+
+    try {
+      const dataUrl = await optimizeBackgroundFileToDataUrl(file)
+      if (dataUrl.length > CUSTOM_BACKGROUND_MAX_DATA_URL_LENGTH) {
+        setCustomBackgroundActionMessage('Image is still too large after compression. Choose a smaller image.')
+        return
+      }
+      setSettings((previous) => ({
+        ...previous,
+        backgroundStyle: 'custom_upload',
+        customBackgroundDataUrl: dataUrl,
+        customBackgroundName: file.name,
+      }))
+      setCustomBackgroundActionMessage(`Custom background set: ${file.name}`)
+    } catch {
+      setCustomBackgroundActionMessage('Could not process selected image.')
+    }
+  }, [])
 
   const updateCustomThemeBase = useCallback((id: string, mode: ThemeMode, baseTheme: ThemeKey) => {
     setSettings((prev) => {
@@ -6948,9 +7076,11 @@ function App() {
 
   const selectedBackgroundOption =
     BACKGROUND_OPTIONS.find((option) => option.key === settings.backgroundStyle) ?? BACKGROUND_OPTIONS[0]
-  const selectedBackgroundUrl = selectedBackgroundOption.imagePath
-    ? resolvedBackgroundUrls[selectedBackgroundOption.key]
-    : undefined
+  const selectedBackgroundUrl = selectedBackgroundOption.key === 'custom_upload'
+    ? settings.customBackgroundDataUrl ?? undefined
+    : (selectedBackgroundOption.imagePath
+      ? resolvedBackgroundUrls[selectedBackgroundOption.key]
+      : undefined)
   const appShellStyle = {
     '--background-image': selectedBackgroundUrl ? `url("${selectedBackgroundUrl}")` : 'none',
     '--background-blur': `${clampBackgroundBlur(settings.backgroundBlur)}px`,
@@ -8185,24 +8315,34 @@ function App() {
                     <div className="settings-background-grid" role="radiogroup" aria-label="Background selection">
                       {BACKGROUND_OPTIONS.map((background) => {
                         const isActive = settings.backgroundStyle === background.key
+                        const customPreview = background.key === 'custom_upload' ? settings.customBackgroundDataUrl : null
+                        const previewSrc = customPreview ?? backgroundPreviewUrls[background.key] ?? resolvedBackgroundUrls[background.key]
+                        const hasPreview = Boolean(previewSrc)
                         return (
                           <button
                             key={background.key}
                             type="button"
                             className={`settings-icon-entry settings-background-entry ${isActive ? 'is-active' : ''}`}
-                            onClick={() => setSettings((prev) => ({ ...prev, backgroundStyle: background.key }))}
+                            onClick={() => {
+                              if (background.key === 'custom_upload' && !settings.customBackgroundDataUrl) {
+                                openCustomBackgroundPicker()
+                                setCustomBackgroundActionMessage('Pick an image to enable custom background.')
+                                return
+                              }
+                              setSettings((prev) => ({ ...prev, backgroundStyle: background.key }))
+                            }}
                             aria-label={`Use ${background.label} background`}
                             aria-pressed={isActive}
                             title={background.label}
                           >
                             <span
-                              className={`settings-background-preview ${background.imagePath ? 'is-photo' : 'is-classic'}`}
+                              className={`settings-background-preview ${hasPreview ? 'is-photo' : 'is-classic'}`}
                               aria-hidden="true"
                             >
-                              {background.imagePath ? (
+                              {previewSrc ? (
                                 <img
                                   className="settings-background-preview-image"
-                                  src={backgroundPreviewUrls[background.key] ?? resolvedBackgroundUrls[background.key]}
+                                  src={previewSrc}
                                   alt=""
                                   loading="eager"
                                   decoding="async"
@@ -8217,6 +8357,34 @@ function App() {
                         )
                       })}
                     </div>
+
+                    <div className="settings-inline-action-group" style={{ marginTop: 10 }}>
+                      <button
+                        type="button"
+                        className="settings-inline-button"
+                        onClick={openCustomBackgroundPicker}
+                      >
+                        Choose Image
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-inline-button"
+                        onClick={clearCustomBackground}
+                        disabled={!settings.customBackgroundDataUrl}
+                      >
+                        Remove Custom
+                      </button>
+                    </div>
+                    <input
+                      ref={customBackgroundImportInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp"
+                      className="settings-hidden-file-input"
+                      onChange={(event) => { void handleCustomBackgroundFileImport(event) }}
+                    />
+                    {customBackgroundActionMessage ? (
+                      <p className="settings-help settings-help-inline">{customBackgroundActionMessage}</p>
+                    ) : null}
 
                     <div className="settings-background-slider">
                       <div className="settings-background-slider-head">
@@ -8238,7 +8406,7 @@ function App() {
                         disabled={settings.backgroundStyle === 'classic_scene'}
                       />
                       <p className="settings-help">
-                        Applies to photo backgrounds. Choose No Background to restore the simpler pre-drawing background.
+                        Applies to image backgrounds, including your custom upload. Choose No Background to restore the simpler pre-drawing background.
                       </p>
                     </div>
                   </div>
