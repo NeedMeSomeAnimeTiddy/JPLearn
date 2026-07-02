@@ -41,6 +41,7 @@ OFFLINE_DICTIONARY_DB_CANDIDATES = (
 from data.study_pipeline import (
     append_assistant_chat_turn,
     assemble_assistant_chat_context,
+    assemble_assistant_chat_context_v2_with_embeddings,
     clear_assistant_chat,
     consume_assistant_events,
     init_study_db,
@@ -1600,6 +1601,57 @@ def get_assistant_chat_context(session_id: str | None = None, user_message: str 
     }
 
 
+def get_assistant_chat_context_v2(session_id: str | None = None, user_message: str | None = None) -> dict[str, object]:
+    init_study_db()
+    embed_fn = _resolve_real_embed_fn()
+    return {
+        "ok": True,
+        "context": assemble_assistant_chat_context_v2_with_embeddings(
+            session_id=session_id, user_message=user_message, embed_fn=embed_fn
+        ),
+    }
+
+
+def _read_active_chatbot_tier() -> str | None:
+    """Read the tutor tier selected via Setup/Settings (see setup_runtime.cjs
+    setActiveModelTier), if any. Returns None in dev/test environments where
+    no Electron-managed model selection exists yet.
+    """
+    docs_dir = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
+    base = Path(docs_dir) if docs_dir else PROJECT_ROOT
+    state_path = base / "models" / "active-model.json"
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    tier = payload.get("tier") if isinstance(payload, dict) else None
+    return tier if isinstance(tier, str) else None
+
+
+def _resolve_real_embed_fn():
+    """Best-effort: use the real ONNX embedder mapped to the active chatbot
+    tier if onnxruntime/tokenizers and the model files are installed;
+    otherwise return None so callers fall back to the dependency-free hashed
+    embedder in domain.retrieval.
+    """
+    try:
+        import embedder_runtime
+    except ImportError:
+        return None
+
+    active_tier = _read_active_chatbot_tier()
+    if not active_tier:
+        return None
+    embedder_tier = embedder_runtime.resolve_embedder_tier_for_chatbot_tier(active_tier)
+    if not embedder_tier or not embedder_runtime.is_available(embedder_tier):
+        return None
+
+    def _embed(text: str) -> list[float]:
+        return embedder_runtime.encode_text(text, embedder_tier)
+
+    return _embed
+
+
 # ---------------------------------------------------------------------------
 # JLPT preparation commands
 # ---------------------------------------------------------------------------
@@ -1899,6 +1951,11 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
         user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
         return 0, get_assistant_chat_context(session_id=session_id, user_message=user_message)
+
+    if command == "assistant-chat-context-v2":
+        session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
+        user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
+        return 0, get_assistant_chat_context_v2(session_id=session_id, user_message=user_message)
 
     if command == "progression":
         return 0, build_progression_status()

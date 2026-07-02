@@ -58,20 +58,23 @@ const MODELS = {
 // Local retrieval embedder catalogue. Not exposed as a separate choice in
 // Setup — each chatbot tier below silently installs its mapped embedder in
 // the background (see CHATBOT_TIER_TO_EMBEDDER_TIER and downloadModel()).
+// Sizes reflect the quantized ONNX weights (Xenova mirrors) + tokenizer
+// files fetched by scripts/get_embedder_model.py, not the raw PyTorch
+// checkpoints (which are 3-4x larger).
 const EMBEDDERS = {
   e5_small: {
-    repo: 'intfloat/multilingual-e5-small',
-    sizeMb: 470,
+    repo: 'Xenova/multilingual-e5-small',
+    sizeMb: 140,
     label: 'Embedder Small',
   },
   e5_base: {
-    repo: 'intfloat/multilingual-e5-base',
-    sizeMb: 1090,
+    repo: 'Xenova/multilingual-e5-base',
+    sizeMb: 300,
     label: 'Embedder Base',
   },
   e5_large: {
-    repo: 'intfloat/multilingual-e5-large',
-    sizeMb: 2240,
+    repo: 'Xenova/multilingual-e5-large',
+    sizeMb: 585,
     label: 'Embedder Large',
   },
 }

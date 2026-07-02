@@ -4,5 +4,12 @@ pytest
 # Heavy dependency (ctranslate2 + onnxruntime); only required if the user
 # installs a speech recognition model from Setup or Settings.
 faster-whisper
+# Optional: local ONNX-based sentence embedder for assistant chat retrieval
+# (scripts/embedder_runtime.py). Lightweight (~15-20 MB) compared to
+# torch/transformers; only required if the mapped embedder model (see
+# scripts/get_embedder_model.py) has been installed. Falls back to the
+# dependency-free hashed embedder in domain/retrieval.py if not installed.
+onnxruntime
+tokenizers
 # Python GUI dependencies were removed.
 # Frontend is now Electron + React + TypeScript in electron-frontend/.

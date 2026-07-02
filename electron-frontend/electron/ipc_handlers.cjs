@@ -346,11 +346,23 @@ function registerIpcHandlers(options) {
           typeof validatedPayload.context?.session_id === 'string'
             ? validatedPayload.context.session_id.trim()
             : ''
-        const contextResponse = await options.runPythonBridgeWithArgs([
-          'assistant-chat-context',
-          requestedSessionId,
-          validatedPayload.message,
-        ])
+        // Prefer the embedding-aware context (ranks assistant memory facts/
+        // summaries by similarity to the message); fall back to the plain
+        // keyword-matched context if the v2 path errors for any reason.
+        let contextResponse
+        try {
+          contextResponse = await options.runPythonBridgeWithArgs([
+            'assistant-chat-context-v2',
+            requestedSessionId,
+            validatedPayload.message,
+          ])
+        } catch {
+          contextResponse = await options.runPythonBridgeWithArgs([
+            'assistant-chat-context',
+            requestedSessionId,
+            validatedPayload.message,
+          ])
+        }
         if (contextResponse && contextResponse.ok && contextResponse.context && typeof contextResponse.context === 'object') {
           assembledContext = contextResponse.context
         }

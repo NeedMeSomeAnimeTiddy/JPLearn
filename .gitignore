@@ -222,6 +222,9 @@ fonts/
 models/llama/*.gguf
 models/llama/*.bin
 
+# Local embedder artifacts (downloaded on demand; too large for git)
+models/embedders/
+
 # Runtime SQLite databases (stored in Documents\JPLearn\data\ in packaged app)
 data/app.db
 data/jplearn.db

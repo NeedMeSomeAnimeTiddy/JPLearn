@@ -13,6 +13,7 @@ from domain.assistant import compute_assistant_state, evaluate_assistant_events
 from domain.curriculum import next_stage
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
 from domain.mistakes import MistakeBreakdownRow
+from domain.retrieval import embed_text, rank_by_similarity
 from domain.scheduler import ReviewState, update
 from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState, apply_study_day
@@ -173,6 +174,87 @@ def _format_memory_rollup(user_message: str | None = None) -> str:
     left = " | ".join(fact_fragments[:4]) if fact_fragments else "no semantic facts"
     right = " | ".join(summary_fragments[:2]) if summary_fragments else "no chat summaries"
     return f"facts[{left}] summaries[{right}]"
+
+
+def _select_relevant_facts_by_embedding(
+    facts: list[dict[str, str | int | None]],
+    query_vector: list[float],
+    max_items: int,
+    embed_fn=embed_text,
+) -> list[dict[str, str | int | None]]:
+    if max_items <= 0 or not facts:
+        return []
+    candidates = [
+        (str(index), embed_fn(f"{fact['fact_key']} {fact['fact_value']}"))
+        for index, fact in enumerate(facts)
+    ]
+    ranked = rank_by_similarity(query_vector, candidates, top_k=max_items)
+    return [facts[int(item.key)] for item in ranked]
+
+
+def _select_relevant_summaries_by_embedding(
+    summaries: list[dict[str, str | int]],
+    query_vector: list[float],
+    max_items: int,
+    embed_fn=embed_text,
+) -> list[dict[str, str | int]]:
+    if max_items <= 0 or not summaries:
+        return []
+    candidates = [
+        (
+            str(index),
+            embed_fn(
+                f"{summary.get('focus_tags', '')} {summary.get('latest_user_intent', '')} "
+                f"{summary.get('latest_coach_reply', '')}"
+            ),
+        )
+        for index, summary in enumerate(summaries)
+    ]
+    ranked = rank_by_similarity(query_vector, candidates, top_k=max_items)
+    return [summaries[int(item.key)] for item in ranked]
+
+
+def _format_memory_rollup_v2(user_message: str | None = None, embed_fn=None) -> str:
+    """Like ``_format_memory_rollup``, but ranks facts/summaries by embedding
+    similarity to ``user_message`` instead of substring keyword overlap.
+
+    ``embed_fn`` defaults to the pure, dependency-free fallback embedder in
+    ``domain.retrieval``. Callers (see scripts/desktop_bridge.py) may inject a
+    real ONNX-based embedder (scripts/embedder_runtime.py) when available.
+    """
+    encode = embed_fn or embed_text
+    facts = database.load_assistant_memory_facts(limit=24)
+    summaries = database.load_recent_assistant_chat_summaries(limit=8)
+
+    if user_message and user_message.strip():
+        query_vector = encode(user_message)
+        selected_facts = _select_relevant_facts_by_embedding(facts, query_vector, PHASE3_CONTEXT_FACT_LIMIT, encode)
+        selected_summaries = _select_relevant_summaries_by_embedding(
+            summaries,
+            query_vector,
+            PHASE3_CONTEXT_SUMMARY_LIMIT,
+            encode,
+        )
+    else:
+        selected_facts = facts[:PHASE3_CONTEXT_FACT_LIMIT]
+        selected_summaries = summaries[:PHASE3_CONTEXT_SUMMARY_LIMIT]
+
+    fact_fragments = [
+        f"{fact['fact_key']}={fact['fact_value']}"
+        for fact in selected_facts
+    ]
+    summary_fragments = [
+        (
+            f"focus={summary.get('focus_tags', 'general')};"
+            f"intent={summary.get('latest_user_intent', '')}"
+        )
+        for summary in selected_summaries
+    ]
+
+    left = " | ".join(fact_fragments[:4]) if fact_fragments else "no semantic facts"
+    right = " | ".join(summary_fragments[:2]) if summary_fragments else "no chat summaries"
+    embedder_tag = "onnx-e5" if embed_fn else "hashed-trigram-v1"
+    return f"facts[{left}] summaries[{right}] (embedder={embedder_tag})"
 
 
 def init_study_db() -> None:
@@ -533,8 +615,8 @@ def clear_assistant_chat() -> int:
 
 
 
-def assemble_assistant_chat_context(session_id: str | None = None, user_message: str | None = None) -> dict[str, str]:
-    """Build deterministic, compact chat context from assistant memory tiers."""
+def _assemble_assistant_chat_context_base(session_id: str | None = None) -> dict[str, str]:
+    """Build the memory-independent portion of chat context (shared by v1/v2)."""
     profile = database.load_assistant_profile()
     state = database.load_latest_assistant_state()
     streak = database.load_streak_state()
@@ -558,5 +640,29 @@ def assemble_assistant_chat_context(session_id: str | None = None, user_message:
         "weaknesses": _format_weaknesses(mistakes, leech_count),
         "recent_activity": _format_recent_activity(activity_week, item_history),
         "commitments": _format_commitments(),
-        "memory": _format_memory_rollup(user_message=user_message),
     }
+
+
+def assemble_assistant_chat_context(session_id: str | None = None, user_message: str | None = None) -> dict[str, str]:
+    """Build deterministic, compact chat context from assistant memory tiers."""
+    context = _assemble_assistant_chat_context_base(session_id)
+    context["memory"] = _format_memory_rollup(user_message=user_message)
+    return context
+
+
+def assemble_assistant_chat_context_v2_with_embeddings(
+    session_id: str | None = None,
+    user_message: str | None = None,
+    embed_fn=None,
+) -> dict[str, str]:
+    """Like ``assemble_assistant_chat_context``, but ranks memory facts and
+    summaries by embedding similarity to ``user_message`` (see
+    ``domain.retrieval``) instead of substring keyword overlap only.
+
+    ``embed_fn``, if provided, is a ``str -> list[float]`` callable (e.g. a
+    real ONNX-based encoder from scripts/embedder_runtime.py); otherwise the
+    pure, dependency-free fallback embedder is used.
+    """
+    context = _assemble_assistant_chat_context_base(session_id)
+    context["memory"] = _format_memory_rollup_v2(user_message=user_message, embed_fn=embed_fn)
+    return context
