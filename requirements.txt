@@ -1,5 +1,9 @@
 psutil
 pytest
+# Required: Japanese morphological tokenization (word/POS segmentation) used
+# by data/text_normalization.py::tokenize_japanese and downstream parsing.
+fugashi
+unidic-lite
 # Optional: offline Japanese speech-to-text for the speech-answer minigame mode.
 # Heavy dependency (ctranslate2 + onnxruntime); only required if the user
 # installs a speech recognition model from Setup or Settings.

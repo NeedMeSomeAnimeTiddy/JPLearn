@@ -66,7 +66,8 @@ def export_progress_snapshot() -> dict[str, Any]:
             dict(row)
             for row in conn.execute(
                 """
-                SELECT deck, card_id, ease_factor, interval, repetitions, next_review
+                SELECT deck, card_id, ease_factor, interval, repetitions, next_review,
+                       stability, difficulty, last_review
                 FROM review_states
                 ORDER BY deck ASC, card_id ASC
                 """
@@ -163,13 +164,19 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
 
         conn.executemany(
             """
-            INSERT INTO review_states (deck, card_id, ease_factor, interval, repetitions, next_review)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO review_states (
+                deck, card_id, ease_factor, interval, repetitions, next_review,
+                stability, difficulty, last_review
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(deck, card_id) DO UPDATE SET
                 ease_factor=excluded.ease_factor,
                 interval=excluded.interval,
                 repetitions=excluded.repetitions,
-                next_review=excluded.next_review
+                next_review=excluded.next_review,
+                stability=excluded.stability,
+                difficulty=excluded.difficulty,
+                last_review=excluded.last_review
             """,
             [
                 (
@@ -179,6 +186,13 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
                     int(row["interval"]),
                     int(row["repetitions"]),
                     normalize_storage_text(str(row["next_review"])),
+                    float(row.get("stability", 0.0) or 0.0),
+                    float(row.get("difficulty", 0.0) or 0.0),
+                    (
+                        normalize_storage_text(str(row["last_review"]))
+                        if row.get("last_review")
+                        else None
+                    ),
                 )
                 for row in review_states
             ],

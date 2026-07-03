@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from data.text_normalization import tokenize_japanese
 
 
 @dataclass(frozen=True)
@@ -14,20 +19,17 @@ class Token:
 
 
 def naive_split(text: str) -> List[str]:
-    """
-    Placeholder segmentation.
-    Replace later with MeCab / Sudachi / fugashi.
-    """
-    return [t for t in text.replace("。", " ").split() if t]
+    """Segment text into surface-form tokens using Fugashi/MeCab."""
+    return [token.surface for token in tokenize_japanese(text)]
 
 
 def transform(text: str) -> dict:
-    tokens = naive_split(text)
+    tokens = tokenize_japanese(text)
 
     return {
         "raw": text,
         "tokens": [
-            {"surface": t, "reading": None, "lemma": None}
+            {"surface": t.surface, "reading": None, "lemma": t.lemma}
             for t in tokens
         ],
         "unit_type": "sentence",

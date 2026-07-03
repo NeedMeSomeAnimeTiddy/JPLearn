@@ -1420,11 +1420,17 @@ def dismiss_tutor_reaction_key(dedup_key: str) -> dict[str, object]:
 
 
 def _mastered_seed_state(card_id: int) -> ReviewState:
+    from datetime import date as _date
+    from datetime import timedelta as _timedelta
+
     state = ReviewState(card_id=card_id)
     # The app treats mastered as repetitions >= 3 and interval >= 21.
-    # Four successful reviews reaches interval >= 21 with current scheduler settings.
+    # FSRS only grows stability when time has actually elapsed since the last
+    # review, so backdate last_review to simulate reviewing on the due date
+    # each time; four successful reviews reaches interval >= 21 this way.
     for _ in range(4):
         state = update(state, quality=4)
+        state.last_review = _date.today() - _timedelta(days=state.interval)
     return state
 
 

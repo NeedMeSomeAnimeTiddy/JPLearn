@@ -9,6 +9,8 @@ const { createOpenVoiceRuntime, isOpenVoiceInstalled } = require('./openvoice_ru
 const { createSetupRuntime } = require('./setup_runtime.cjs')
 const { createSpeechRuntime } = require('./speech_runtime.cjs')
 const { loadFontCSS } = require('./font_loader.cjs')
+const { initAutoUpdater } = require('./updater.cjs')
+const { getConfigValue } = require('./config_store.cjs')
 const {
   isAllowedRendererUrl,
 } = require('./ipc_security.cjs')
@@ -1898,11 +1900,18 @@ async function createWindowWithSplash() {
   return win
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Ensure Documents\JPLearn\ subdirectories exist on every launch
   try { localSetupRuntime.ensureJPLearnDirs() } catch { /* non-fatal */ }
   // If bundled voice profiles are present, seed missing voices into Documents once.
   try { localSetupRuntime.seedBundledOpenVoiceVoices() } catch { /* non-fatal */ }
+  // Auto-update check (GitHub Releases); safe no-op in dev, unconfigured, or user-disabled.
+  try {
+    const autoUpdateEnabled = await getConfigValue('autoUpdateEnabled')
+    if (autoUpdateEnabled) {
+      initAutoUpdater({ isPackaged: app.isPackaged })
+    }
+  } catch { /* non-fatal */ }
 
   void createWindowWithSplash()
 

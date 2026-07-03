@@ -337,6 +337,8 @@ interface DesktopApi {
     deferredLoadsQueuedAtMs?: number
   }) => Promise<{ ok: boolean }>
   setStartupTheme: (theme: string) => Promise<{ ok: boolean; theme: string }>
+  getConfigValue?: (key: 'autoUpdateEnabled') => Promise<{ ok: boolean; key: string; value: boolean }>
+  setConfigValue?: (key: 'autoUpdateEnabled', value: boolean) => Promise<{ ok: boolean; key: string; value: boolean }>
     reloadLocalFonts?: () => Promise<{ ok: boolean }>
   recordGameResult: (payload: {
     slug: DeckSlug

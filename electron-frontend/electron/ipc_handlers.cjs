@@ -22,7 +22,10 @@ const {
   validateLearningPathId,
   validateAnalyticsExportType,
   validateDictionarySearchQuery,
+  validateConfigKey,
+  validateConfigSetPayload,
 } = require('./ipc_security.cjs')
+const { getConfigValue, setConfigValue } = require('./config_store.cjs')
 
 function registerIpcHandlers(options) {
   const trustedSenderOptions = () => ({
@@ -929,6 +932,20 @@ function registerIpcHandlers(options) {
       return { ok: true }
     })
   }
+
+  options.ipcMain.handle('config:get', async (event, key) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedKey = validateConfigKey(key)
+    const value = await getConfigValue(validatedKey)
+    return { ok: true, key: validatedKey, value }
+  })
+
+  options.ipcMain.handle('config:set', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const { key, value } = validateConfigSetPayload(payload)
+    await setConfigValue(key, value)
+    return { ok: true, key, value }
+  })
 }
 
 module.exports = {

@@ -510,6 +510,8 @@ module.exports = {
   validateJLPTSaveResultPayload,
   validateLearningPathId,
   validateAnalyticsExportType,
+  validateConfigKey,
+  validateConfigSetPayload,
 }
 
 const VALID_LEARNING_PATH_IDS = new Set(['complete_beginner'])
@@ -528,4 +530,24 @@ function validateAnalyticsExportType(type) {
     throw new Error(`Invalid analytics export type: ${String(type)}`)
   }
   return type
+}
+
+const VALID_CONFIG_KEYS = new Set(['autoUpdateEnabled'])
+
+function validateConfigKey(key) {
+  if (typeof key !== 'string' || !VALID_CONFIG_KEYS.has(key)) {
+    throw new Error(`Invalid config key: ${String(key)}`)
+  }
+  return key
+}
+
+function validateConfigSetPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid config set payload')
+  }
+  const key = validateConfigKey(payload.key)
+  if (typeof payload.value !== 'boolean') {
+    throw new Error(`Invalid config value for key: ${key}`)
+  }
+  return { key, value: payload.value }
 }

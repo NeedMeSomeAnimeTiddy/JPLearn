@@ -57,7 +57,8 @@ MIGRATION_V7 = 7
 MIGRATION_V8 = 8
 MIGRATION_V9 = 9
 MIGRATION_V10 = 10
-LATEST_SCHEMA_VERSION = 10
+MIGRATION_V11 = 11
+LATEST_SCHEMA_VERSION = 11
 _SQLITE_IN_CHUNK_SIZE = 900
 
 StageDistribution: TypeAlias = dict[int, int]
@@ -487,6 +488,31 @@ def _migration_0010(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0011(conn: sqlite3.Connection) -> None:
+    """Add FSRS state columns to review_states (stability/difficulty/last_review)."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS review_states (
+            deck        TEXT    NOT NULL,
+            card_id     INTEGER NOT NULL,
+            ease_factor REAL    NOT NULL DEFAULT 2.5,
+            interval    INTEGER NOT NULL DEFAULT 1,
+            repetitions INTEGER NOT NULL DEFAULT 0,
+            next_review TEXT    NOT NULL,
+            PRIMARY KEY (deck, card_id)
+        )
+    """)
+    existing_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(review_states)").fetchall()
+    }
+    if "stability" not in existing_columns:
+        conn.execute("ALTER TABLE review_states ADD COLUMN stability REAL NOT NULL DEFAULT 0.0")
+    if "difficulty" not in existing_columns:
+        conn.execute("ALTER TABLE review_states ADD COLUMN difficulty REAL NOT NULL DEFAULT 0.0")
+    if "last_review" not in existing_columns:
+        conn.execute("ALTER TABLE review_states ADD COLUMN last_review TEXT")
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -498,6 +524,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V8: _migration_0008,
     MIGRATION_V9: _migration_0009,
     MIGRATION_V10: _migration_0010,
+    MIGRATION_V11: _migration_0011,
 }
 
 
@@ -697,6 +724,9 @@ def load_states(deck_name: str, card_ids: list[int]) -> dict[int, ReviewState]:
             interval=row["interval"],
             repetitions=row["repetitions"],
             next_review=date.fromisoformat(row["next_review"]),
+            stability=row["stability"],
+            difficulty=row["difficulty"],
+            last_review=date.fromisoformat(row["last_review"]) if row["last_review"] else None,
         )
         for row in rows
     }
@@ -713,13 +743,19 @@ def save_state(deck_name: str, state: ReviewState) -> None:
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO review_states (deck, card_id, ease_factor, interval, repetitions, next_review)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO review_states (
+                deck, card_id, ease_factor, interval, repetitions, next_review,
+                stability, difficulty, last_review
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(deck, card_id) DO UPDATE SET
                 ease_factor=excluded.ease_factor,
                 interval=excluded.interval,
                 repetitions=excluded.repetitions,
-                next_review=excluded.next_review
+                next_review=excluded.next_review,
+                stability=excluded.stability,
+                difficulty=excluded.difficulty,
+                last_review=excluded.last_review
             """,
             (
                 normalized_deck_name,
@@ -728,6 +764,9 @@ def save_state(deck_name: str, state: ReviewState) -> None:
                 state.interval,
                 state.repetitions,
                 state.next_review.isoformat(),
+                state.stability,
+                state.difficulty,
+                state.last_review.isoformat() if state.last_review else None,
             ),
         )
 
