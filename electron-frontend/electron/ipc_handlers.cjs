@@ -804,7 +804,12 @@ function registerIpcHandlers(options) {
       }
       try {
         const result = await runWithTransientRetry(() => setupRuntime.downloadModel(tier, event.sender, options.repoRoot))
-        if (!result?.alreadyInstalled && typeof options.refreshTutorChatRuntime === 'function') {
+        const shouldRefreshRuntime = Boolean(
+          !result?.alreadyInstalled
+          || result?.llamaCppDownloaded
+          || result?.selectedAsActive,
+        )
+        if (shouldRefreshRuntime && typeof options.refreshTutorChatRuntime === 'function') {
           await options.refreshTutorChatRuntime()
         }
         return result

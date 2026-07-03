@@ -124,7 +124,6 @@ type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_m
 type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
-type AssistantChatAdapterMode = 'auto' | 'default' | 'translation' | 'grammar' | 'study_plan'
 type AppFontPreset =
   | 'kiwi_maru'
   | 'bizin_gothic'
@@ -317,19 +316,6 @@ const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
   { value: 1, label: 'On' },
 ]
-const ASSISTANT_CHAT_ADAPTER_OPTIONS: Array<{ value: AssistantChatAdapterMode; label: string; note: string }> = [
-  { value: 'auto', label: 'Auto (intent-based)', note: 'Automatically picks Translation, Grammar, or Study Plan mode.' },
-  { value: 'default', label: 'Default coach', note: 'Balanced general tutoring.' },
-  { value: 'translation', label: 'Translation first', note: 'Short, literal translation behavior.' },
-  { value: 'grammar', label: 'Grammar coach', note: 'Correction-forward answers with short explanations.' },
-  { value: 'study_plan', label: 'Study planner', note: 'Prioritized next-step study plans.' },
-]
-const ASSISTANT_CHAT_ACTIVE_MODE_LABEL: Record<string, string> = {
-  default: 'Default',
-  translation: 'Translation',
-  grammar: 'Grammar',
-  study_plan: 'Study Plan',
-}
 const JAPANESE_CHAR_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/
 const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
   { key: 'theme', label: 'Theme', icon: Sun },
@@ -877,7 +863,6 @@ interface AppSettings {
   assistantToastLimit: 0 | 1
   assistantChatEnabled: boolean
   assistantChatAudioEnabled: boolean
-  assistantChatAdapter: AssistantChatAdapterMode
   showKeyboardPrompts: boolean
   voiceEnabled: boolean
   voiceSpeaker: string
@@ -2002,7 +1987,6 @@ function defaultSettings(): AppSettings {
     assistantToastLimit: ASSISTANT_MAX_TOASTS,
     assistantChatEnabled: true,
     assistantChatAudioEnabled: true,
-    assistantChatAdapter: 'auto',
     showKeyboardPrompts: false,
     voiceEnabled: true,
     voiceSpeaker: DEFAULT_VOICE_SPEAKER,
@@ -2084,22 +2068,6 @@ function splitSpeechSegments(text: string): SpeechSegment[] {
 
 function isAssistantToastLimit(value: unknown): value is 0 | 1 {
   return value === 0 || value === 1
-}
-
-function isAssistantChatAdapterMode(value: unknown): value is AssistantChatAdapterMode {
-  return value === 'auto'
-    || value === 'default'
-    || value === 'translation'
-    || value === 'grammar'
-    || value === 'study_plan'
-}
-
-function formatAssistantChatAdapterLabel(value: string | null | undefined): string {
-  const normalized = String(value || '').trim().toLowerCase()
-  if (!normalized) {
-    return 'Default'
-  }
-  return ASSISTANT_CHAT_ACTIVE_MODE_LABEL[normalized] ?? 'Default'
 }
 
 function isBackgroundStyle(value: unknown): value is BackgroundStyle {
@@ -2349,9 +2317,6 @@ function loadSettings(): AppSettings {
         typeof parsed.assistantChatAudioEnabled === 'boolean'
           ? parsed.assistantChatAudioEnabled
           : defaults.assistantChatAudioEnabled,
-      assistantChatAdapter: isAssistantChatAdapterMode(parsed.assistantChatAdapter)
-        ? parsed.assistantChatAdapter
-        : defaults.assistantChatAdapter,
       showKeyboardPrompts:
         typeof parsed.showKeyboardPrompts === 'boolean'
           ? parsed.showKeyboardPrompts
@@ -3661,12 +3626,29 @@ function App() {
   const getTutorModelHardwareFit = useCallback((tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const totalRamGb = tutorInstallInfo?.totalRamGb ?? 0
     const gpuVramGb = tutorInstallInfo?.gpuVramGb ?? 0
+    const minRequirements: Record<'low' | 'medium' | 'high' | 'ultra', { ram: number; vram: number }> = {
+      low: { ram: 2, vram: 1 },
+      medium: { ram: 4, vram: 2 },
+      high: { ram: 3, vram: 4 },
+      ultra: { ram: 8, vram: 11 },
+    }
     const makeFit = (
       badge: string,
       detail: string,
       isOk: boolean,
       tone: 'soft' | 'warning' = isOk ? 'soft' : 'warning',
     ) => ({ badge, detail, isOk, tone })
+
+    const mins = minRequirements[tier]
+    const ramOnlyFit = totalRamGb >= mins.ram && gpuVramGb < mins.vram
+    if (ramOnlyFit) {
+      return makeFit(
+        'Usable (slower)',
+        `This tier can still run because your RAM meets the minimum (${mins.ram} GB), but GPU VRAM is below the ${mins.vram} GB target. Expect slower performance.`,
+        true,
+        'warning',
+      )
+    }
 
     if (tier === 'low') {
       if (totalRamGb >= 8 || gpuVramGb >= 4) {
@@ -4741,16 +4723,6 @@ function App() {
     return PETAL_STREAM.slice(0, count)
   }, [settings.motionStyle, settings.reducedMotion])
 
-  const activeAssistantChatModeLabel = useMemo(() => {
-    if (assistantChatStatus?.activePromptAdapter) {
-      return formatAssistantChatAdapterLabel(assistantChatStatus.activePromptAdapter)
-    }
-    if (settings.assistantChatAdapter === 'auto') {
-      return 'Auto'
-    }
-    return formatAssistantChatAdapterLabel(settings.assistantChatAdapter)
-  }, [assistantChatStatus?.activePromptAdapter, settings.assistantChatAdapter])
-
   const showPetalLayer = activePetalStream.length > 0 && !(view === 'minigame' && sessionActive)
 
   useEffect(() => {
@@ -5389,7 +5361,6 @@ function App() {
         message,
         context: {
           session_id: activeSessionId ?? '',
-          assistant_adapter: settings.assistantChatAdapter,
         },
       })
       if (response.provider === 'scripted-fallback' || response.provider === 'stub-fallback') {
@@ -5413,7 +5384,7 @@ function App() {
       setAssistantChatWarmup(false)
       setAssistantChatLoading(false)
     }
-  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatAdapter, settings.assistantChatEnabled, speakAssistantReply])
+  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
 
   useEffect(() => {
     let cancelled = false
@@ -8738,31 +8709,6 @@ function App() {
                         </button>
                       ))}
                     </div>
-                    <div className="settings-theme-card settings-collapsible-card-inline" style={{ marginTop: 10 }}>
-                      <p className="settings-section-label" style={{ marginBottom: 8 }}>Chat adapter mode</p>
-                      <label className="settings-help" htmlFor="assistant-chat-adapter-select" style={{ display: 'block', marginBottom: 6 }}>
-                        Choose how the local model is tuned for assistant chat replies.
-                      </label>
-                      <select
-                        id="assistant-chat-adapter-select"
-                        className="settings-select"
-                        value={settings.assistantChatAdapter}
-                        onChange={(event) => {
-                          const nextValue = event.currentTarget.value
-                          if (!isAssistantChatAdapterMode(nextValue)) {
-                            return
-                          }
-                          setSettings((prev) => ({ ...prev, assistantChatAdapter: nextValue }))
-                        }}
-                      >
-                        {ASSISTANT_CHAT_ADAPTER_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <p className="settings-help" style={{ marginTop: 6 }}>
-                        {ASSISTANT_CHAT_ADAPTER_OPTIONS.find((option) => option.value === settings.assistantChatAdapter)?.note ?? 'Balanced general tutoring.'}
-                      </p>
-                    </div>
                     <p className="settings-help">Turn Chat with Tutor off to unload the local model runtime. Set toasts to Off to disable popup notifications.</p>
                   </div>
                 </div>
@@ -8789,8 +8735,10 @@ function App() {
                       const isActioningThis = tutorModelActionTier === model.tier
                       const isActiveTier = tutorInstallInfo?.activeModelTier === model.tier
                       const hardwareFit = getTutorModelHardwareFit(model.tier)
+                      const showRecommendedBadge = model.tier === tutorInstallInfo?.recommendedTier
+                        && hardwareFit.badge === 'Recommended fit'
                       const badges = [
-                        model.tier === tutorInstallInfo?.recommendedTier ? 'Recommended' : null,
+                        showRecommendedBadge ? 'Recommended' : null,
                         isActiveTier ? 'Active' : null,
                         hardwareFit.badge,
                       ].filter(Boolean).join(' · ')
@@ -8804,7 +8752,7 @@ function App() {
                             background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
                             border: isActiveTier
                               ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
-                              : model.tier === tutorInstallInfo?.recommendedTier
+                              : showRecommendedBadge
                                 ? '1px solid color-mix(in oklab, var(--accent) 42%, var(--panel-border))'
                                 : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
                           }}
@@ -9334,9 +9282,6 @@ function App() {
                     {assistantChatLoading ? 'Typing…' : 'Online · here to help'}
                   </span>
                 </span>
-                <span className="assistant-chat-mode-badge" title={`Active coach mode: ${activeAssistantChatModeLabel}`}>
-                  Mode: {activeAssistantChatModeLabel}
-                </span>
               </div>
               <div className="assistant-chat-header-actions">
                 <button
@@ -9394,9 +9339,6 @@ function App() {
                       <article key={turnKey} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
                         <div className="assistant-chat-turn-meta">
                           <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
-                          {turn.role === 'assistant' ? (
-                            <span className="assistant-chat-turn-mode">{activeAssistantChatModeLabel}</span>
-                          ) : null}
                           {turn.role === 'assistant' ? (
                             <button
                               type="button"

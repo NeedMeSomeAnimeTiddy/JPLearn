@@ -1368,8 +1368,10 @@ function downloadModel(tier, sender, scriptRoot) {
   if (!model) return Promise.reject(new Error(`Unknown model tier: ${tier}`))
 
   const base = ensureJPLearnDirs()
+  const modelsDir = path.join(base, 'models')
   const destPath = path.join(base, 'models', model.filename)
   const embedderTier = CHATBOT_TIER_TO_EMBEDDER_TIER[tier]
+  const hadActiveTier = resolveActiveTier(base, modelsDir)
 
   const ensureEmbedder = async () => {
     if (!embedderTier || !scriptRoot) return
@@ -1380,8 +1382,28 @@ function downloadModel(tier, sender, scriptRoot) {
     }
   }
 
+  const ensureLlamaCpp = async () => {
+    if (!scriptRoot) {
+      return false
+    }
+    const result = await downloadLlamaCpp(sender, scriptRoot)
+    return !result?.alreadyInstalled
+  }
+
+  const ensureActiveSelection = () => {
+    if (hadActiveTier) {
+      return false
+    }
+    setActiveModelTier(tier)
+    return true
+  }
+
   if (fs.existsSync(destPath)) {
-    return ensureEmbedder().then(() => ({ alreadyInstalled: true }))
+    return ensureLlamaCpp().then(async (llamaCppDownloaded) => {
+      await ensureEmbedder()
+      const selectedAsActive = ensureActiveSelection()
+      return { alreadyInstalled: true, llamaCppDownloaded, selectedAsActive }
+    })
   }
 
   const url = `https://huggingface.co/${model.repo}/resolve/main/${model.filename}`
@@ -1410,10 +1432,11 @@ function downloadModel(tier, sender, scriptRoot) {
     }
   }
 
-  return downloadWithProgress(url, destPath, onProgress).then(async () => {
+  return ensureLlamaCpp().then((llamaCppDownloaded) => downloadWithProgress(url, destPath, onProgress).then(async () => {
     await ensureEmbedder()
-    return { ok: true }
-  })
+    const selectedAsActive = ensureActiveSelection()
+    return { ok: true, llamaCppDownloaded, selectedAsActive }
+  }))
 }
 
 // Marks the optional voice setup step as completed. Voice synthesis itself is
