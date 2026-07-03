@@ -74,6 +74,7 @@ describe('ipc_security', () => {
 
   it('validates deck slug and startup theme types', () => {
     expect(validateDeckSlug('hiragana')).toBe('hiragana')
+    expect(validateDeckSlug('sentence_examples')).toBe('sentence_examples')
     expect(() => validateDeckSlug('unknown_deck')).toThrow(/invalid deck slug/i)
 
     expect(validateStartupThemeInput('harbor_mist')).toBe('harbor_mist')

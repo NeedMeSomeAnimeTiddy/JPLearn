@@ -52,6 +52,7 @@ const VALID_DECK_SLUGS = new Set([
   'vocab_nouns',
   // Grammar / Conversational
   'grammar_patterns',
+  'sentence_examples',
 ])
 
 function isAllowedRendererUrl(rawUrl, isDev) {
