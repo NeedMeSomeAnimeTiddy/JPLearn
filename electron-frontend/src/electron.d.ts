@@ -430,9 +430,9 @@ interface DesktopApi {
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>
   getSetupSystemInfo?: () => Promise<SetupSystemInfo>
-  downloadModel?: (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => Promise<{ alreadyInstalled?: boolean }>
-  setActiveTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => Promise<{ ok: boolean; tier: string }>
-  uninstallTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => Promise<{ ok: boolean; tier: string }>
+  downloadModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ alreadyInstalled?: boolean }>
+  setActiveTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
+  uninstallTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   downloadLlama?: (backend?: 'cuda' | 'hip' | 'vulkan' | 'cpu') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   downloadQwentts?: (tier?: '0.6b') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   setActiveQwenttsTier?: (tier: '0.6b') => Promise<{ ok: boolean; tier: string }>
@@ -457,7 +457,7 @@ interface OnboardingCompletionPayload {
 }
 
 interface SetupModelOption {
-  tier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
+  tier: 'low' | 'medium' | 'high' | 'ultra'
   filename: string
   sizeMb: number
   embedderSizeMb?: number
@@ -509,8 +509,8 @@ interface SpeechRuntimeStatus {
 
 interface SetupSystemInfo {
   totalRamGb: number
-  recommendedTier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
-  activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | 'max' | null
+  recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
+  activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
   models: SetupModelOption[]
   llamaCppInstalled: boolean
   gpuAdapters?: string[]

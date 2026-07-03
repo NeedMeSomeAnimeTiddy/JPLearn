@@ -817,7 +817,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:download-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['low', 'medium', 'high', 'ultra', 'max'].includes(tier)) {
+      if (typeof tier !== 'string' || !['low', 'medium', 'high', 'ultra'].includes(tier)) {
         throw new Error('Invalid model tier')
       }
       try {
@@ -834,7 +834,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:set-active-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['low', 'medium', 'high', 'ultra', 'max'].includes(tier)) {
+      if (typeof tier !== 'string' || !['low', 'medium', 'high', 'ultra'].includes(tier)) {
         throw new Error('Invalid model tier')
       }
       try {
@@ -851,7 +851,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:uninstall-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['low', 'medium', 'high', 'ultra', 'max'].includes(tier)) {
+      if (typeof tier !== 'string' || !['low', 'medium', 'high', 'ultra'].includes(tier)) {
         throw new Error('Invalid model tier')
       }
       try {

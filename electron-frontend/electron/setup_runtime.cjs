@@ -19,39 +19,32 @@ const NetworkSpeed = require('network-speed')
 
 const MODELS = {
   low: {
-    filename: 'Qwen3.5-0.8B-Q6_K.gguf',
-    repo: 'unsloth/Qwen3.5-0.8B-GGUF',
-    sizeMb: 639,
-    label: 'Low (0.8B)',
-    description: 'Fast on any hardware. Good for everyday questions.',
+    filename: 'shisa-v2.1-lfm2-1.2b.Q4_K_M.gguf',
+    repo: 'mradermacher/shisa-v2.1-lfm2-1.2b-GGUF',
+    sizeMb: 980,
+    label: 'Low (1.2B Shisa)',
+    description: 'Fastest option for Japanese practice and everyday coaching.',
   },
   medium: {
-    filename: 'Qwen3.5-2B-Q6_K.gguf',
-    repo: 'unsloth/Qwen3.5-2B-GGUF',
-    sizeMb: 1570,
-    label: 'Medium (2B)',
-    description: 'Better Japanese understanding while staying responsive on 16 GB systems.',
+    filename: 'Llama-3.2-3B-Instruct-UD-Q4_K_XL.gguf',
+    repo: 'dahara1/shisa-v2.1-llama3.2-3b-UD-japanese-imatrix',
+    sizeMb: 2150,
+    label: 'Medium (3B Shisa)',
+    description: 'Balanced Japanese quality and speed for most 16 GB systems.',
   },
   high: {
-    filename: 'Qwen3.5-4B-Q6_K.gguf',
-    repo: 'unsloth/Qwen3.5-4B-GGUF',
-    sizeMb: 3530,
-    label: 'High (4B)',
-    description: 'Stronger reasoning and nuance. Best with 8 GB VRAM and 16 GB RAM.',
+    filename: 'shisa-v2.1-qwen3-8B-UD-Q4_K_XL.gguf',
+    repo: 'dahara1/shisa-v2.1-qwen3-8b-UD-japanese-imatrix',
+    sizeMb: 5200,
+    label: 'High (8B Shisa)',
+    description: 'Stronger Japanese nuance and reasoning. Best with 8 GB VRAM and 16 GB RAM.',
   },
   ultra: {
-    filename: 'Qwen3.5-9B-Q6_K.gguf',
-    repo: 'unsloth/Qwen3.5-9B-GGUF',
-    sizeMb: 7460,
-    label: 'Ultra (9B)',
-    description: 'Most capable. Best with 12+ GB VRAM and 32 GB RAM.',
-  },
-  max: {
-    filename: 'gemma-4-12b-it-Q6_K.gguf',
-    repo: 'unsloth/gemma-4-12b-it-GGUF',
-    sizeMb: 9790,
-    label: 'Max (12B)',
-    description: 'Largest and highest-capacity option. Best when hardware is strong.',
+    filename: 'shisa-v2.1-unphi4-14b.Q4_K_M.gguf',
+    repo: 'mradermacher/shisa-v2.1-unphi4-14b-GGUF',
+    sizeMb: 9100,
+    label: 'Ultra (14B Shisa)',
+    description: 'Most capable Japanese tier. Best with 12+ GB VRAM and 24+ GB RAM.',
   },
 }
 
@@ -83,7 +76,6 @@ const CHATBOT_TIER_TO_EMBEDDER_TIER = {
   medium: 'e5_base',
   high: 'e5_base',
   ultra: 'e5_large',
-  max: 'e5_large',
 }
 
 // qwentts.cpp Japanese voice model catalogue. Two GGUFs are required
@@ -635,7 +627,6 @@ function estimateDownloadMinutes(sizeMb, networkMbps) {
 }
 
 function recommendTutorTier(totalRamGb, gpuVramGb) {
-  if (gpuVramGb >= 16 || totalRamGb >= 16) return 'max'
   if (gpuVramGb >= 12 || totalRamGb >= 14) return 'ultra'
   if (gpuVramGb >= 6 || totalRamGb >= 8) return 'high'
   if (gpuVramGb >= 4 || totalRamGb >= 6) return 'medium'
@@ -856,7 +847,7 @@ function readActiveModelSelection(base) {
 
 function resolveActiveTier(base, modelsDir) {
   const selection = readActiveModelSelection(base)
-  if (selection && fs.existsSync(path.join(modelsDir, selection.filename))) {
+  if (selection && MODELS[selection.tier] && fs.existsSync(path.join(modelsDir, selection.filename))) {
     return selection.tier
   }
   for (const [tier, model] of Object.entries(MODELS)) {

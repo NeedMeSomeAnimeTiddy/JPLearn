@@ -3183,7 +3183,7 @@ function App() {
   const [tutorInstallInfo, setTutorInstallInfo] = useState<{
     totalRamGb: number
     models: Array<{
-      tier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
+      tier: 'low' | 'medium' | 'high' | 'ultra'
       filename: string
       sizeMb: number
       embedderSizeMb?: number
@@ -3193,8 +3193,8 @@ function App() {
       installed: boolean
       estimatedDownloadMinutes?: number | null
     }>
-    recommendedTier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
-    activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | 'max' | null
+    recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
+    activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
     llamaCppInstalled: boolean
     gpuVramGb?: number | null
     qwenttsInstalled: boolean
@@ -3214,9 +3214,9 @@ function App() {
     activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
   } | null>(null)
   const [voiceOptions, setVoiceOptions] = useState<VoiceOptionEntry[]>([])
-  const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | 'max' | null>(null)
+  const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
   const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
-  const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'medium' | 'high' | 'ultra' | 'max' | null>(null)
+  const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
   const [dictionaryDownloading, setDictionaryDownloading] = useState(false)
   const [dictionaryProgress, setDictionaryProgress] = useState<number>(0)
   const [speechDownloadingTier, setSpeechDownloadingTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
@@ -3576,7 +3576,7 @@ function App() {
     return `${minutes} min`
   }, [])
 
-  const getTutorModelHardwareFit = useCallback((tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => {
+  const getTutorModelHardwareFit = useCallback((tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const totalRamGb = tutorInstallInfo?.totalRamGb ?? 0
     const gpuVramGb = tutorInstallInfo?.gpuVramGb ?? 0
     const makeFit = (
@@ -3677,65 +3677,36 @@ function App() {
     }
 
     if (tier === 'ultra') {
-      if (totalRamGb >= 16 || gpuVramGb >= 16) {
+      if (totalRamGb >= 24 || gpuVramGb >= 24) {
         return makeFit(
           'Recommended fit',
-          'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+          'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
           true,
         )
       }
-      if (totalRamGb >= 14 || gpuVramGb >= 12) {
+      if (totalRamGb >= 16 || gpuVramGb >= 16) {
         return makeFit(
           'Comfortable fit',
-          'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+          'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
           true,
         )
       }
-      if (totalRamGb >= 6 || gpuVramGb >= 8) {
+      if (totalRamGb >= 8 || gpuVramGb >= 11) {
         return makeFit(
           'Minimum fit',
-          'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+          'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
           true,
           'warning',
         )
       }
       return makeFit(
         'Too heavy',
-        'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
         false,
       )
     }
 
-    if (totalRamGb >= 24 || gpuVramGb >= 24) {
-      return makeFit(
-        'Recommended fit',
-        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-        true,
-      )
-    }
-
-    if (totalRamGb >= 16 || gpuVramGb >= 16) {
-      return makeFit(
-        'Comfortable fit',
-        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-        true,
-      )
-    }
-
-    if (totalRamGb >= 8 || gpuVramGb >= 11) {
-      return makeFit(
-        'Minimum fit',
-        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-        true,
-        'warning',
-      )
-    }
-
-    return makeFit(
-      'Too heavy',
-      'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-      false,
-    )
+    return makeFit('Unsupported tier', 'Unable to evaluate this model tier on this system.', false)
   }, [tutorInstallInfo?.gpuVramGb, tutorInstallInfo?.totalRamGb])
 
   const getSpeechModelHardwareFit = useCallback((tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
@@ -3879,7 +3850,7 @@ function App() {
     return unsubscribe
   }, [])
 
-  const downloadTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => {
+  const downloadTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const downloadModel = window.jplearnDesktop.downloadModel
     if (!downloadModel || tutorDownloadingTier) {
       return
@@ -3895,7 +3866,7 @@ function App() {
     }
   }, [refreshTutorInstallInfo, tutorDownloadingTier])
 
-  const selectTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => {
+  const selectTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const setActiveTutorModel = window.jplearnDesktop.setActiveTutorModel
     if (!setActiveTutorModel || tutorModelActionTier) {
       return
@@ -3909,7 +3880,7 @@ function App() {
     }
   }, [refreshTutorInstallInfo, tutorModelActionTier])
 
-  const uninstallTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => {
+  const uninstallTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const uninstallModel = window.jplearnDesktop.uninstallTutorModel
     if (!uninstallModel || tutorModelActionTier) {
       return

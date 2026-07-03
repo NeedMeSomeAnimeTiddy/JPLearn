@@ -5,7 +5,7 @@ import { ChevronDown, RefreshCw } from 'lucide-react'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ModelOption {
-  tier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
+  tier: 'low' | 'medium' | 'high' | 'ultra'
   filename: string
   sizeMb: number
   label: string
@@ -16,7 +16,7 @@ interface ModelOption {
 
 interface SystemInfo {
   totalRamGb: number
-  recommendedTier: 'low' | 'medium' | 'high' | 'ultra' | 'max'
+  recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
   models: ModelOption[]
   llamaCppInstalled: boolean
   gpuAdapters?: string[]
@@ -86,7 +86,7 @@ type AppRegionStyle = React.CSSProperties & {
   WebkitAppRegion?: 'drag' | 'no-drag'
 }
 
-type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'max' | 'skip'
+type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'skip'
 type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra' | 'skip'
 type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
 type QwenttsTier = '0.6b' | 'skip'
@@ -123,15 +123,14 @@ function formatDurationMinutes(minutes: number | null | undefined): string {
   return `~${hours} h ${rem} min`
 }
 
-function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') {
+function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'medium' | 'high' | 'ultra') {
   const totalRamGb = systemInfo?.totalRamGb ?? 0
   const gpuVramGb = systemInfo?.gpuVramGb ?? 0
-  const minRequirements: Record<'low' | 'medium' | 'high' | 'ultra' | 'max', { ram: number; vram: number }> = {
+  const minRequirements: Record<'low' | 'medium' | 'high' | 'ultra', { ram: number; vram: number }> = {
     low: { ram: 2, vram: 1 },
     medium: { ram: 4, vram: 2 },
     high: { ram: 3, vram: 4 },
-    ultra: { ram: 6, vram: 8 },
-    max: { ram: 8, vram: 11 },
+    ultra: { ram: 8, vram: 11 },
   }
   const makeFit = (
     badge: string,
@@ -242,65 +241,36 @@ function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'mediu
   }
 
   if (tier === 'ultra') {
-    if (totalRamGb >= 16 || gpuVramGb >= 16) {
+    if (totalRamGb >= 24 || gpuVramGb >= 24) {
       return makeFit(
         'Recommended fit',
-        'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
         true,
       )
     }
-    if (totalRamGb >= 14 || gpuVramGb >= 12) {
+    if (totalRamGb >= 16 || gpuVramGb >= 16) {
       return makeFit(
         'Comfortable fit',
-        'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
         true,
       )
     }
-    if (totalRamGb >= 6 || gpuVramGb >= 8) {
+    if (totalRamGb >= 8 || gpuVramGb >= 11) {
       return makeFit(
         'Minimum fit',
-        'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
         true,
         'warning',
       )
     }
     return makeFit(
       'Too heavy',
-      'Minimum: about 6 GB RAM and 8 GB VRAM. Comfortable on 14 GB RAM or 12 GB VRAM. Recommended on 16+ GB RAM or 16 GB VRAM.',
+      'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
       false,
     )
   }
 
-  if (totalRamGb >= 24 || gpuVramGb >= 24) {
-    return makeFit(
-      'Recommended fit',
-      'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-      true,
-    )
-  }
-
-  if (totalRamGb >= 16 || gpuVramGb >= 16) {
-    return makeFit(
-      'Comfortable fit',
-      'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-      true,
-    )
-  }
-
-  if (totalRamGb >= 8 || gpuVramGb >= 11) {
-    return makeFit(
-      'Minimum fit',
-      'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-      true,
-      'warning',
-    )
-  }
-
-  return makeFit(
-    'Too heavy',
-    'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-    false,
-  )
+  return makeFit('Unsupported tier', 'Unable to evaluate this tier on the current setup screen.', false)
 }
 
 function getSpeechHardwareFit(systemInfo: SystemInfo | null, tier: 'fast' | 'balanced' | 'high' | 'ultra') {
