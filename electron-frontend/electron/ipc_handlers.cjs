@@ -879,52 +879,52 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:download-qwentts', async (event, tier) => {
+    options.ipcMain.handle('setup:download-voice-engine', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       const safeTier = typeof tier === 'string' && ['0.6b'].includes(tier) ? tier : '0.6b'
       try {
-        const result = await runWithTransientRetry(() => setupRuntime.downloadQwentts(safeTier, event.sender, options.repoRoot))
+        const result = await runWithTransientRetry(() => setupRuntime.downloadVoiceEngine(safeTier, event.sender, options.repoRoot))
         if (!result?.alreadyInstalled && typeof options.refreshVoiceRuntime === 'function') {
           await options.refreshVoiceRuntime()
         }
         return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
-        throw new Error(`qwentts download failed: ${detail}`)
+        throw new Error(`voice engine download failed: ${detail}`)
       }
     })
 
-    options.ipcMain.handle('setup:set-active-qwentts-tier', async (event, tier) => {
+    options.ipcMain.handle('setup:set-active-voice-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       if (typeof tier !== 'string' || !['0.6b'].includes(tier)) {
-        throw new Error('Invalid qwentts tier')
+        throw new Error('Invalid voice model tier')
       }
       try {
-        const result = setupRuntime.setActiveQwenttsTier(tier)
+        const result = setupRuntime.setActiveVoiceModel(tier)
         if (typeof options.refreshVoiceRuntime === 'function') {
           await options.refreshVoiceRuntime()
         }
         return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
-        throw new Error(`Failed to select qwentts voice model: ${detail}`)
+        throw new Error(`Failed to select voice model: ${detail}`)
       }
     })
 
-    options.ipcMain.handle('setup:uninstall-qwentts-tier', async (event, tier) => {
+    options.ipcMain.handle('setup:uninstall-voice-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       if (typeof tier !== 'string' || !['0.6b'].includes(tier)) {
-        throw new Error('Invalid qwentts tier')
+        throw new Error('Invalid voice model tier')
       }
       try {
-        const result = setupRuntime.uninstallQwenttsTier(tier)
+        const result = setupRuntime.uninstallVoiceModel(tier)
         if (typeof options.refreshVoiceRuntime === 'function') {
           await options.refreshVoiceRuntime()
         }
         return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
-        throw new Error(`Failed to uninstall qwentts voice model: ${detail}`)
+        throw new Error(`Failed to uninstall voice model: ${detail}`)
       }
     })
 

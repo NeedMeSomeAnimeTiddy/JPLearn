@@ -1817,11 +1817,17 @@ const SUMMARY_SNAPSHOT_STORAGE_KEY = 'jplearn-desktop-summary-snapshot-v1'
 const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
-// Japanese voice options are loaded dynamically from the installed qwentts
-// preset speaker bank (see qwentts_runtime.cjs's listVoices() / audio:list-voices
-// IPC channel) instead of a hardcoded list, since the curated speaker set is
-// built from user-provided reference clips (scripts/build_qwentts_preset_bank.py)
-// rather than shipped as fixed named speakers.
+const FIXED_JAPANESE_VOICE_OPTIONS: VoiceOptionEntry[] = [
+  { id: 'zundamon_normal', name: 'Zundamon', jp: 'ずんだもん', search: 'zundamon normal' },
+  { id: 'shikoku_metan_normal', name: 'Shikoku Metan', jp: '四国めたん', search: 'shikoku metan normal' },
+  { id: 'kasukabe_tsumugi_normal', name: 'Kasukabe Tsumugi', jp: '春日部つむぎ', search: 'kasukabe tsumugi normal' },
+  { id: 'namine_ritsu_normal', name: 'Namine Ritsu', jp: '波音リツ', search: 'namine ritsu normal' },
+  { id: 'genno_takehiro_normal', name: 'Genno Takehiro', jp: '玄野武宏', search: 'genno takehiro normal' },
+  { id: 'shirakami_kotaro_normal', name: 'Shirakami Kotaro', jp: '白上虎太郎', search: 'shirakami kotaro normal' },
+  { id: 'meimei_himari_normal', name: 'Meimei Himari', jp: '冥鳴ひまり', search: 'meimei himari normal' },
+  { id: 'kyushu_sora_normal', name: 'Kyushu Sora', jp: '九州そら', search: 'kyushu sora normal' },
+]
+const DEFAULT_VOICE_SPEAKER = FIXED_JAPANESE_VOICE_OPTIONS[0].id
 const VOICE_SAMPLE_LINE = 'こんにちは。いっしょにがんばりましょう。'
 type VoiceOptionEntry = { id: string; name: string; jp: string; search: string }
 
@@ -1998,7 +2004,7 @@ function defaultSettings(): AppSettings {
     assistantChatAdapter: 'auto',
     showKeyboardPrompts: false,
     voiceEnabled: true,
-    voiceSpeaker: 'male_kenji',
+    voiceSpeaker: DEFAULT_VOICE_SPEAKER,
     mixedLanguageStitchingEnabled: true,
   }
 }
@@ -2294,11 +2300,8 @@ function loadSettings(): AppSettings {
       voiceEnabled:
         typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
       voiceSpeaker:
-        // Preset speaker IDs are loaded dynamically at runtime (see voiceOptions
-        // state), not known synchronously at settings-parse time, so only
-        // validate shape here. An unknown/stale speaker ID just falls through
-        // to the runtime's default-voice behavior on next playback.
-        typeof parsed.voiceSpeaker === 'string' && parsed.voiceSpeaker.trim().length > 0
+        typeof parsed.voiceSpeaker === 'string'
+          && FIXED_JAPANESE_VOICE_OPTIONS.some((option) => option.id === parsed.voiceSpeaker)
           ? parsed.voiceSpeaker
           : defaults.voiceSpeaker,
       mixedLanguageStitchingEnabled:
@@ -3197,7 +3200,7 @@ function App() {
     activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
     llamaCppInstalled: boolean
     gpuVramGb?: number | null
-    qwenttsInstalled: boolean
+    voiceInstalled: boolean
     fontsInstalled: boolean
     dictionaryInstalled: boolean
     llamaCppEstimatedDownloadMinutes?: number | null
@@ -3213,7 +3216,7 @@ function App() {
     recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
     activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
   } | null>(null)
-  const [voiceOptions, setVoiceOptions] = useState<VoiceOptionEntry[]>([])
+  const [voiceOptions] = useState<VoiceOptionEntry[]>(FIXED_JAPANESE_VOICE_OPTIONS)
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
   const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
   const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
@@ -3781,7 +3784,7 @@ function App() {
         activeModelTier: setupInfo.activeModelTier ?? null,
         llamaCppInstalled: setupInfo.llamaCppInstalled,
         gpuVramGb: setupInfo.gpuVramGb ?? null,
-        qwenttsInstalled: setupInfo.qwenttsInstalled,
+        voiceInstalled: setupInfo.voiceInstalled ?? false,
         fontsInstalled: setupInfo.fontsInstalled,
         dictionaryInstalled: setupInfo.dictionaryInstalled,
         llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
@@ -3798,28 +3801,6 @@ function App() {
   useEffect(() => {
     void refreshTutorInstallInfo()
   }, [refreshTutorInstallInfo])
-
-  const refreshVoiceOptions = useCallback(async () => {
-    const listVoices = window.jplearnDesktop.listVoices
-    if (!listVoices) {
-      return
-    }
-    try {
-      const presets = await listVoices()
-      setVoiceOptions(presets.map((preset) => ({
-        id: preset.voiceId,
-        name: preset.displayName,
-        jp: preset.voiceId,
-        search: preset.description || preset.searchTerms.join(' ') || preset.displayName,
-      })))
-    } catch {
-      // Best effort only; leave whatever list was previously loaded.
-    }
-  }, [])
-
-  useEffect(() => {
-    void refreshVoiceOptions()
-  }, [refreshVoiceOptions])
 
   useEffect(() => {
     if (!showSettings || activeSettingsTab !== 'tutor') {
@@ -7127,7 +7108,7 @@ function App() {
       && (tutorInstallInfo?.models ?? []).some((model) => model.installed),
   )
   const showOnboardingChatbotSection = tutorInstallInfo ? hasInstalledTutorModel : true
-  const showOnboardingVoiceSection = tutorInstallInfo ? tutorInstallInfo.qwenttsInstalled : true
+  const showOnboardingVoiceSection = tutorInstallInfo ? tutorInstallInfo.voiceInstalled : true
   const showOnboardingFontSection = tutorInstallInfo ? tutorInstallInfo.fontsInstalled : true
 
   // Show setup wizard on first run (all hooks above must run unconditionally)
@@ -8900,7 +8881,7 @@ function App() {
                         onClick={() => setVoiceSettingsStep(2)}
                         aria-pressed={voiceSettingsStep === 2}
                       >
-                        2. English Chat Voice
+                        2. Conversation Voice
                       </button>
                     </div>
 
@@ -8963,12 +8944,12 @@ function App() {
                     ) : null}
 
                     {voiceSettingsStep === 2 ? (
-                      <div className="settings-voice-step-content" role="group" aria-label="Step 2: English chat voice">
+                      <div className="settings-voice-step-content" role="group" aria-label="Step 2: Conversation voice">
                         <SettingsCollapsibleSection
                           id="english-chat-voice"
-                          title="English Chat Voice"
-                          description="Tutor chat now uses the local QwenTTS voice runtime for both Japanese and English speech."
-                          meta="Local QwenTTS"
+                          title="Conversation Voice"
+                          description="Conversation playback stays in Japanese mode."
+                          meta="Japanese Only"
                           collapsed={Boolean(collapsedSettingsSections['english-chat-voice'])}
                           onToggle={() => toggleThemeSectionCollapsed('english-chat-voice')}
                           className="settings-theme-card"

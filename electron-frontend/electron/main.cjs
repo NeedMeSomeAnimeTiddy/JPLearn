@@ -5,7 +5,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
-const { createQwenttsRuntime, isQwenttsInstalled } = require('./qwentts_runtime.cjs')
+const { createVoiceRuntime, isVoiceRuntimeInstalled } = require('./voice_runtime.cjs')
 const { createSetupRuntime } = require('./setup_runtime.cjs')
 const { createSpeechRuntime } = require('./speech_runtime.cjs')
 const { loadFontCSS } = require('./font_loader.cjs')
@@ -265,10 +265,10 @@ const windowRestoreBoundsById = new Map()
 let localTutorRuntime = createTutorChatRuntime()
 
 function createSelectedVoiceRuntime() {
-  if (!isQwenttsInstalled(repoRoot)) {
-    console.warn('qwentts is not fully installed; audio:speak will remain unavailable until setup completes.')
+  if (!isVoiceRuntimeInstalled(repoRoot)) {
+    console.warn('voice engine is not fully installed; audio:speak will remain unavailable until setup completes.')
   }
-  return createQwenttsRuntime({ repoRoot })
+  return createVoiceRuntime({ repoRoot })
 }
 
 const localVoiceRuntime = createSelectedVoiceRuntime()
@@ -342,7 +342,7 @@ async function refreshTutorRuntimeAfterSetup() {
   }
 }
 
-// qwentts_runtime.cjs re-resolves talker/tokenizer paths fresh on every
+// voice runtime re-resolves model paths fresh on every
 // restart (no cached state across calls the way the tutor runtime has), so
 // refreshing after a new voice model download/selection only needs to stop
 // any currently running server -- the next speak()/preload() call spawns a
@@ -1921,8 +1921,10 @@ async function createWindowWithSplash() {
 app.whenReady().then(async () => {
   // Ensure Documents\JPLearn\ subdirectories exist on every launch
   try { localSetupRuntime.ensureJPLearnDirs() } catch { /* non-fatal */ }
-  // If bundled preset speakers are present, seed missing ones into Documents once.
-  try { localSetupRuntime.seedBundledQwenttsPresetSpeakers() } catch { /* non-fatal */ }
+  // If bundled voice profiles are present, seed missing ones into Documents once.
+  try {
+    localSetupRuntime.seedBundledVoiceProfiles()
+  } catch { /* non-fatal */ }
   // Auto-update check (GitHub Releases); safe no-op in dev, unconfigured, or user-disabled.
   try {
     const autoUpdateEnabled = await getConfigValue('autoUpdateEnabled')

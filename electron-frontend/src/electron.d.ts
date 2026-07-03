@@ -434,9 +434,9 @@ interface DesktopApi {
   setActiveTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   uninstallTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   downloadLlama?: (backend?: 'cuda' | 'hip' | 'vulkan' | 'cpu') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
-  downloadQwentts?: (tier?: '0.6b') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
-  setActiveQwenttsTier?: (tier: '0.6b') => Promise<{ ok: boolean; tier: string }>
-  uninstallQwenttsTier?: (tier: '0.6b') => Promise<{ ok: boolean; tier: string }>
+  downloadVoiceEngine?: (tier?: '0.6b') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  setActiveVoiceModel?: (tier: '0.6b') => Promise<{ ok: boolean; tier: string }>
+  uninstallVoiceModel?: (tier: '0.6b') => Promise<{ ok: boolean; tier: string }>
   completeSetup?: () => Promise<{ ok: boolean }>
   skipSetup?: () => Promise<{ ok: boolean }>
   onSetupProgress?: (listener: (evt: SetupProgressEvent) => void) => () => void
@@ -477,7 +477,7 @@ interface SetupSpeechModelOption {
   estimatedDownloadMinutes?: number | null
 }
 
-interface SetupQwenttsModelOption {
+interface SetupVoiceModelOption {
   tier: '0.6b'
   filename: string
   sizeMb: number
@@ -491,7 +491,7 @@ interface SetupQwenttsModelOption {
 interface SpeechTranscribePayload {
   audioBase64: string
   mimeType: 'audio/webm' | 'audio/ogg' | 'audio/wav' | 'audio/wave' | 'audio/x-wav'
-  language?: 'ja' | 'en'
+  language?: 'ja'
 }
 
 interface SpeechTranscriptionResult {
@@ -527,14 +527,14 @@ interface SetupSystemInfo {
   llamaCppEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
   dictionaryEstimatedDownloadMinutes?: number | null
-  qwenttsInstalled: boolean
-  qwenttsModels: SetupQwenttsModelOption[]
-  qwenttsDefaultTier: '0.6b'
-  activeQwenttsTier?: '0.6b' | null
+  voiceInstalled?: boolean
+  voiceModels?: SetupVoiceModelOption[]
+  voiceDefaultModel?: '0.6b'
+  activeVoiceModel?: '0.6b' | null
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'llama' | 'qwentts' | 'fonts' | 'dictionary' | 'speech'
+  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech'
   percent: number
   mb: number | null
   totalMb: number | null

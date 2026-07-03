@@ -13,7 +13,7 @@ interface SpeechAnswerResult {
 interface SpeechAnswerPanelProps {
   expectedAnswer: string
   disabled?: boolean
-  language?: 'ja' | 'en'
+  language?: 'ja'
   maxDurationMs?: number
   onResult: (result: SpeechAnswerResult) => void
   onFallbackToTyped?: () => void

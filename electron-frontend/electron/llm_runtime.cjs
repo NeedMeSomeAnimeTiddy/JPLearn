@@ -71,9 +71,8 @@ const DEFAULT_TUTOR_SYSTEM_PROMPT = [
   '- Sound natural and conversational, like a patient coach speaking one-to-one. Keep replies short and focused: 1 to 3 sentences, never more than one short paragraph.',
   '- Do not use emojis, emoticons, or decorative symbols. Express warmth through words only.',
   '- Use plain punctuation to avoid mojibake. Prefer ASCII quotes and hyphens over typographic punctuation.',
-  '- Match the user\'s language. If they write in Japanese, reply in Japanese. If they write in English, reply in English. If they mix both, follow the language they used most.',
-  '- If the user is speaking English, stay in English unless they explicitly ask for Japanese translation, pronunciation, or a Japanese example.',
-  '- When replying in Japanese, you may add a tiny gloss for a harder word in parentheses, but do not overload the answer with extra explanation.',
+  '- Always reply in Japanese only, even if the user writes in English.',
+  '- Keep Japanese natural and learner-friendly. If needed, include a short kana reading in parentheses.',
   '',
   'How to teach:',
   '- Answer the actual question first, then add only the smallest useful explanation or example.',
@@ -527,23 +526,23 @@ function extractCliResponseText(rawOutput) {
 function buildScriptedFallbackResponse(message, context = {}, detail = '') {
   const focus = typeof context.focus_area === 'string' && context.focus_area.trim().length > 0
     ? context.focus_area.trim()
-    : 'today\'s weakest area'
-  const messageHint = clipText(message, 120)
+    : 'にがてなポイント'
+  const messageHint = clipText(message, 70)
   void detail
-  const promptLead = messageHint ? `About "${messageHint}": ` : ''
+  const promptLead = messageHint ? `「${messageHint}」について、` : ''
   return {
-    text: `${promptLead}let's keep momentum on ${focus}. Start one focused round, then re-check confidence on the items that felt shaky.`,
+    text: `${promptLead}${focus}を1ラウンドだけ集中して練習しましょう。終わったら不安な項目をもう一度確認しましょう。`,
     provider: 'scripted-fallback',
     model: 'deterministic-scripted',
   }
 }
 
 function buildLowSignalRecoveryReply(message) {
-  const normalized = String(message || '').trim().toLowerCase()
-  if (/how do you say|in japanese|translate|translation|japanese/i.test(normalized)) {
-    return 'I glitched on that response. Ask again with the exact phrase and I will translate it to Japanese in one line.'
+  const normalized = String(message || '').trim()
+  if (detectTranslationIntent(normalized)) {
+    return '返答が不安定でした。翻訳したい語句をそのまま送ってください。1行で日本語訳を返します。'
   }
-  return 'I glitched on that response. Please ask again in one short sentence.'
+  return '返答が不安定でした。短い文でもう一度日本語で送ってください。'
 }
 
 function isLowConfidenceAssistantReply(rawText) {
@@ -557,15 +556,33 @@ function isLowConfidenceAssistantReply(rawText) {
 function buildClarifyingQuestionForIntent(message) {
   const text = String(message || '')
   if (detectTranslationIntent(text)) {
-    return 'I might need a little context for that translation. Can you share the exact phrase and where you want to use it?'
+    return '翻訳の精度を上げるため、正確な語句と使う場面を教えてください。'
   }
   if (detectGrammarIntent(text)) {
-    return 'I can give a precise correction if I see the full sentence. Can you share the exact Japanese sentence you want checked?'
+    return '正確に直すため、確認したい日本語の全文を送ってください。'
   }
   if (detectStudyPlanIntent(text)) {
-    return 'I can tailor this better with one detail: do you want a 10-minute, 20-minute, or 30-minute plan?'
+    return '学習計画を調整します。10分・20分・30分のどれにしますか。'
   }
-  return 'I might be missing context. Can you share one more detail so I can answer precisely?'
+  return '文脈が少し足りません。もう1つだけ情報をください。'
+}
+
+function hasJapaneseCharacters(text) {
+  return /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}々〆ヵヶ]/u.test(String(text || ''))
+}
+
+function enforceJapaneseOnlyReply(replyText, sourceMessage) {
+  const text = String(replyText || '').trim()
+  if (!text) {
+    return 'すみません。もう一度日本語で送ってください。'
+  }
+  if (hasJapaneseCharacters(text)) {
+    return text
+  }
+  if (detectTranslationIntent(sourceMessage)) {
+    return '日本語訳で答えます。翻訳したい語句をそのまま送ってください。'
+  }
+  return 'すみません。日本語で答えます。短くもう一度送ってください。'
 }
 
 function normalizeAsciiToken(value) {
@@ -1583,6 +1600,7 @@ function createTutorChatRuntime(options = {}) {
           }
         }
         const elapsedMs = Date.now() - startedAt
+        cleanedText = enforceJapaneseOnlyReply(cleanedText, trimmedMessage)
         if (activeProvider !== 'stub-fallback') {
           lastError = null
         }
@@ -1613,7 +1631,7 @@ function createTutorChatRuntime(options = {}) {
         const fallback = buildScriptedFallbackResponse(trimmedMessage, boundedContext, detail)
         return {
           ok: true,
-          text: clipText(normalizeMojibakePunctuation(fallback.text), maxOutputChars),
+          text: clipText(enforceJapaneseOnlyReply(normalizeMojibakePunctuation(fallback.text), trimmedMessage), maxOutputChars),
           provider: fallback.provider,
           model: fallback.model,
           coldStart,

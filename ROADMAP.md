@@ -81,13 +81,13 @@ This document tracks delivery status and planned improvements.
 - [x] (Medium) Defer non-critical renderer work until after first meaningful paint
 - [x] (Medium) Add packaged smoke tests in CI (`npm run build`, package, launch check)
 - [x] (Medium) Add restrictive CSP baseline for packaged renderer
-- [ ] (Low) Add streaming playback for local Japanese voice synthesis (qwentts.cpp)
-  - Current voice runtime returns one-shot WAV audio per utterance; qwentts.cpp's
-    `tts-server.exe` also supports `response_format: "pcm"` chunked streaming for
-    lower perceived first-audio latency on longer utterances
+- [ ] (Low) Add lower-latency playback path for local Japanese voice synthesis (VOICEVOX)
+  - Current voice runtime returns one-shot WAV audio per utterance; investigate
+    chunk-friendly playback strategies to reduce perceived first-audio latency on
+    longer utterances
   - Requires new IPC chunk-event plumbing (start call + streamed chunk events +
     done event, similar in shape to the existing `setup:download-progress`
-    pattern), a streaming variant in `qwentts_runtime.cjs`, and client-side
+    pattern), a streaming-aware voice runtime path, and client-side
     Web Audio API buffer scheduling to play chunks back-to-back without gaps
   - Deferred: JPLearn's typical utterances are short (single words/sentences),
     so the perceived-latency win is likely modest versus the implementation

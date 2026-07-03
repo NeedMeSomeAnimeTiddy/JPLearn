@@ -80,19 +80,13 @@ python scripts/get_gguf_model.py --tier ultra  # large model (~5.5 GB)
 
 ### 4. Japanese voice TTS (optional)
 
-Build the qwentts.cpp runtime once (Windows, requires Visual Studio 2022 with the
-C++ workload):
+JPLearn now uses VOICEVOX for local Japanese speech playback.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/build_qwentts_cpp.ps1
-```
+1. Install and run VOICEVOX locally (default endpoint: `127.0.0.1:50021`).
+2. Open JPLearn and select one of the built-in Japanese voices in Settings.
 
-Then install a voice model via the app's Setup Wizard, or download one directly
-from https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF into
-`Documents\JPLearn\tts\models\` (both a `qwen-talker-*.gguf` and the shared
-`qwen-tokenizer-12hz-*.gguf` are required). Curated preset speakers are built
-from reference clips with `python scripts/build_qwentts_preset_bank.py`
-(see `data/tts/speaker_intake/README.md`).
+Advanced note: the previous custom voice-model builder pipeline has been
+retired and is no longer part of normal setup or runtime.
 
 ### 5. Run
 

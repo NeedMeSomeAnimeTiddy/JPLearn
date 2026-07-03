@@ -214,16 +214,6 @@ tmp/
 # Local llama.cpp binaries and build output
 tools/llama.cpp/
 
-# Local qwentts.cpp clone/patch/build output (see scripts/build_qwentts_cpp.ps1
-# and patches/qwentts-cpp/); the tracked patch is the source of truth, not
-# this directory.
-tools/qwentts.cpp/
-
-# Staged qwentts.cpp runtime files for packaging (tts-server.exe + ggml*.dll,
-# copied from tools/qwentts.cpp/build/Release/ by scripts/build_qwentts_cpp.ps1).
-# Bundled into the installer via electron-frontend/forge.config.cjs extraResource.
-/qwentts/
-
 # Bundled python-build-standalone (created by CI release workflow; not committed)
 python-bundle/
 
@@ -241,10 +231,6 @@ models/embedders/
 # Runtime SQLite databases (stored in Documents\JPLearn\data\ in packaged app)
 data/app.db
 data/jplearn.db
-
-# Speaker intake raw clip files are local-only; keep scaffold files tracked.
-data/tts/speaker_intake/**/clips/*
-!data/tts/speaker_intake/**/clips/.gitkeep
 
 # Local offline dictionary payloads (downloaded on demand)
 data/external_sources/offline_dictionary/*.json

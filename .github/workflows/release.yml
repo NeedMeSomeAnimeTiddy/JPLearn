@@ -142,7 +142,7 @@ jobs:
 
             ### Optional components (downloaded by wizard or manually)
             - **AI Tutor:** `python scripts/get_gguf_model.py`
-            - **Japanese Voice:** `python scripts/get_voicevox.py`
+            - **Japanese Voice:** Installed from the in-app setup wizard (optional component)
 
             ### Building from source
             See the [README](README.md) for full build instructions.

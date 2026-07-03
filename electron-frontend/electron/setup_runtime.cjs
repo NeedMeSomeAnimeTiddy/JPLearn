@@ -2,7 +2,7 @@
  * setup_runtime.cjs — first-run setup wizard backend.
  *
  * Provides system detection, model downloads (with redirect handling and .tmp
- * safety), llama.cpp installation, and qwentts.cpp voice model installation.
+ * safety), llama.cpp installation, and Japanese voice model installation.
  * Large downloads target the assets data directory so they stay writable
  * without elevation.
  */
@@ -78,37 +78,26 @@ const CHATBOT_TIER_TO_EMBEDDER_TIER = {
   ultra: 'e5_large',
 }
 
-// qwentts.cpp Japanese voice model catalogue. Two GGUFs are required
-// together for any synthesis: a per-tier talker (voice/personality-bearing
-// weights) and a single shared tokenizer/codec (same for every tier).
-// Filenames and sizes verified against https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF.
-// Q8_0 is the shipping quant (qwentts.cpp has no Q6 variant; BF16/F32/Q8_0/
-// Q4_K_M are the only options -- Q8_0 chosen for quality, see
-// patches/qwentts-cpp/0001-speaker-bank.patch for the runtime this targets).
-const QWENTTS_MODELS = {
+// Japanese voice setup profile.
+// The active runtime uses VOICEVOX (local HTTP engine). We keep a tiny
+// marker-based setup state so first-run onboarding can track whether the user
+// has completed the optional voice step.
+const VOICE_MODELS = {
   '0.6b': {
-    talkerFilename: 'qwen-talker-0.6b-base-Q8_0.gguf',
-    talkerRepo: 'Serveurperso/Qwen3-TTS-GGUF',
-    talkerSizeMb: 993,
-    label: 'Standard (0.6B)',
-    description: 'Default. Fast Japanese voice cloning with the curated preset speaker bank.',
+    talkerFilename: 'voice-model-0.6b.marker',
+    talkerRepo: 'local',
+    talkerSizeMb: 0,
+    label: 'VOICEVOX Local Engine',
+    description: 'Use a locally running VOICEVOX engine (default: 127.0.0.1:50021).',
   },
 }
-const QWENTTS_TOKENIZER = {
-  filename: 'qwen-tokenizer-12hz-Q8_0.gguf',
-  repo: 'Serveurperso/Qwen3-TTS-GGUF',
-  sizeMb: 291,
+const VOICE_TOKENIZER = {
+  filename: 'voice-engine-shared.marker',
+  repo: 'local',
+  sizeMb: 0,
 }
-const QWENTTS_DEFAULT_TIER = '0.6b'
-const ACTIVE_QWENTTS_TIER_STATE_FILENAME = 'active-qwentts-tier.json'
-const DEPRECATED_QWENTTS_TALKER_FILENAMES = [
-  'qwen-talker-1.7b-base-Q8_0.gguf',
-]
-const DEPRECATED_QWENTTS_BANK_DIRS = [
-  'preset_bank_1.7b',
-  'preset_bank_jp_1.7b',
-  'preset_bank_en_1.7b',
-]
+const VOICE_DEFAULT_TIER = '0.6b'
+const ACTIVE_VOICE_MODEL_STATE_FILENAME = 'active-voice-model.json'
 const SENTINEL_NAME = '.setup-done'
 const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
 const FONT_READY_MARKER = '.fonts-ready'
@@ -230,124 +219,48 @@ function ensureJPLearnDirs() {
   return base
 }
 
-// ── qwentts (Japanese TTS) install state ─────────────────────────────────────
+// ── Voice model install state ─────────────────────────────────────────────────
 
-function getQwenttsDir(base) {
+function getVoiceDir(base) {
   return path.join(base, 'tts')
 }
 
-function getQwenttsModelsDir(base) {
-  return path.join(getQwenttsDir(base), 'models')
+function getVoiceModelsDir(base) {
+  return path.join(getVoiceDir(base), 'models')
 }
 
-function getQwenttsPresetBankDir(base) {
-  return path.join(getQwenttsDir(base), 'preset_bank')
-}
-
-function getQwenttsPresetBankDirForProfile(base, profile) {
-  if (profile === 'jp') {
-    return path.join(getQwenttsDir(base), 'preset_bank_jp')
-  }
-  if (profile === 'en') {
-    return path.join(getQwenttsDir(base), 'preset_bank_en')
-  }
-  return getQwenttsPresetBankDir(base)
-}
-
-function isQwenttsTalkerInstalled(base, tier) {
-  const model = QWENTTS_MODELS[tier]
+function isVoiceTalkerInstalled(base, tier) {
+  const model = VOICE_MODELS[tier]
   if (!model) return false
-  return fs.existsSync(path.join(getQwenttsModelsDir(base), model.talkerFilename))
+  return fs.existsSync(path.join(getVoiceModelsDir(base), model.talkerFilename))
 }
 
-function isQwenttsTokenizerInstalled(base) {
-  return fs.existsSync(path.join(getQwenttsModelsDir(base), QWENTTS_TOKENIZER.filename))
+function isVoiceTokenizerInstalled(base) {
+  return fs.existsSync(path.join(getVoiceModelsDir(base), VOICE_TOKENIZER.filename))
 }
 
-function hasAnyQwenttsTalkerInstalled(base) {
-  return Object.keys(QWENTTS_MODELS).some((tier) => isQwenttsTalkerInstalled(base, tier))
+function hasAnyVoiceTalkerInstalled(base) {
+  return Object.keys(VOICE_MODELS).some((tier) => isVoiceTalkerInstalled(base, tier))
 }
 
-// Copies any curated preset speakers bundled in the repo (data/tts/preset_bank/)
-// into the installed assets directory. Called once at every app launch (see
-// main.cjs) plus after a fresh model download, so newly bundled presets in a
-// future app update get picked up without requiring a full reinstall.
-// A no-op (returns {ok:false, reason:'no-bundled-presets'}) until real curated
-// speakers exist under data/tts/preset_bank/ (see scripts/build_qwentts_preset_bank.py).
-function seedBundledQwenttsPresetSpeakers(scriptRootArg = null) {
-  const base = ensureJPLearnDirs()
-  const scriptRoot = scriptRootArg || resolveScriptRoot()
-  const bankProfiles = [
-    { key: 'main', sourceDir: 'preset_bank' },
-    { key: 'jp', sourceDir: 'preset_bank_jp' },
-    { key: 'en', sourceDir: 'preset_bank_en' },
-    { key: 'main', sourceDir: 'preset_bank_0.6b' },
-    { key: 'jp', sourceDir: 'preset_bank_jp_0.6b' },
-    { key: 'en', sourceDir: 'preset_bank_en_0.6b' },
-  ]
-
-  if (!bankProfiles.some((profile) => fs.existsSync(path.join(scriptRoot, 'data', 'tts', profile.sourceDir)))) {
-    return { ok: false, reason: 'no-bundled-presets' }
-  }
-
-  let copied = 0
-  let total = 0
-  for (const profile of bankProfiles) {
-    const sourceRoot = path.join(scriptRoot, 'data', 'tts', profile.sourceDir)
-    if (!fs.existsSync(sourceRoot)) {
-      continue
-    }
-    const targetRoot = getQwenttsPresetBankDirForProfile(base, profile.key)
-    fs.mkdirSync(targetRoot, { recursive: true })
-
-    const entries = fs.readdirSync(sourceRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-    total += entries.length
-
-    for (const entry of entries) {
-      const from = path.join(sourceRoot, entry.name)
-      const to = path.join(targetRoot, entry.name)
-      if (fs.existsSync(to)) {
-        continue
-      }
-      fs.cpSync(from, to, { recursive: true, force: false })
-      copied += 1
-    }
-  }
-
-  return { ok: true, copied, total }
+// The active voice runtime does not require bundled local speaker banks.
+// Keep this entry point for compatibility with existing startup/setup wiring.
+function seedBundledVoicePresetSpeakers(scriptRootArg = null) {
+  void scriptRootArg
+  return { ok: true, skipped: true, reason: 'voice-runtime-does-not-use-preset-banks' }
 }
 
-function getActiveQwenttsTierStatePath(base) {
-  return path.join(getQwenttsDir(base), ACTIVE_QWENTTS_TIER_STATE_FILENAME)
+function getActiveVoiceModelStatePath(base) {
+  return path.join(getVoiceDir(base), ACTIVE_VOICE_MODEL_STATE_FILENAME)
 }
 
-function pruneDeprecatedQwenttsAssets(base) {
-  const modelsDir = getQwenttsModelsDir(base)
-  for (const filename of DEPRECATED_QWENTTS_TALKER_FILENAMES) {
-    const modelPath = path.join(modelsDir, filename)
-    if (fs.existsSync(modelPath)) {
-      try { fs.unlinkSync(modelPath) } catch { /* best effort */ }
-    }
-  }
-
-  const qwenttsDir = getQwenttsDir(base)
-  for (const dirname of DEPRECATED_QWENTTS_BANK_DIRS) {
-    const bankPath = path.join(qwenttsDir, dirname)
-    if (fs.existsSync(bankPath)) {
-      try { fs.rmSync(bankPath, { recursive: true, force: true }) } catch { /* best effort */ }
-    }
-  }
-
-  const selection = readActiveQwenttsTierSelection(base)
-  if (selection && selection.tier !== QWENTTS_DEFAULT_TIER) {
-    try { fs.unlinkSync(getActiveQwenttsTierStatePath(base)) } catch { /* best effort */ }
-  }
+function pruneDeprecatedVoiceAssets(base) {
+  void base
 }
 
-function readActiveQwenttsTierSelection(base) {
+function readActiveVoiceModelSelection(base) {
   try {
-    const raw = fs.readFileSync(getActiveQwenttsTierStatePath(base), 'utf8')
+    const raw = fs.readFileSync(getActiveVoiceModelStatePath(base), 'utf8')
     const parsed = JSON.parse(raw)
     if (parsed && typeof parsed.tier === 'string' && typeof parsed.talkerFilename === 'string') {
       return parsed
@@ -358,45 +271,47 @@ function readActiveQwenttsTierSelection(base) {
   return null
 }
 
-function resolveActiveQwenttsTier(base) {
-  const selection = readActiveQwenttsTierSelection(base)
-  if (selection && QWENTTS_MODELS[selection.tier] && isQwenttsTalkerInstalled(base, selection.tier)) {
+function resolveActiveVoiceModel(base) {
+  const selection = readActiveVoiceModelSelection(base)
+  if (selection && VOICE_MODELS[selection.tier] && isVoiceTalkerInstalled(base, selection.tier)) {
     return selection.tier
   }
-  for (const tier of Object.keys(QWENTTS_MODELS)) {
-    if (isQwenttsTalkerInstalled(base, tier)) {
+  for (const tier of Object.keys(VOICE_MODELS)) {
+    if (isVoiceTalkerInstalled(base, tier)) {
       return tier
     }
   }
   return null
 }
 
-function setActiveQwenttsTier(tier) {
-  const model = QWENTTS_MODELS[tier]
-  if (!model) throw new Error(`Unknown qwentts tier: ${tier}`)
+function setActiveVoiceModelSelection(tier) {
+  const model = VOICE_MODELS[tier]
+  if (!model) throw new Error(`Unknown voice model tier: ${tier}`)
   const base = ensureJPLearnDirs()
-  if (!isQwenttsTalkerInstalled(base, tier)) {
-    throw new Error(`qwentts tier "${tier}" is not installed`)
-  }
+  fs.mkdirSync(getVoiceModelsDir(base), { recursive: true })
   fs.writeFileSync(
-    getActiveQwenttsTierStatePath(base),
+    getActiveVoiceModelStatePath(base),
     JSON.stringify({ tier, talkerFilename: model.talkerFilename, updatedAtUtc: new Date().toISOString() }, null, 2),
     'utf8',
   )
   return { ok: true, tier }
 }
 
-function uninstallQwenttsTier(tier) {
-  const model = QWENTTS_MODELS[tier]
-  if (!model) throw new Error(`Unknown qwentts tier: ${tier}`)
+function uninstallVoiceModelTier(tier) {
+  const model = VOICE_MODELS[tier]
+  if (!model) throw new Error(`Unknown voice model tier: ${tier}`)
   const base = ensureJPLearnDirs()
-  const modelPath = path.join(getQwenttsModelsDir(base), model.talkerFilename)
+  const modelPath = path.join(getVoiceModelsDir(base), model.talkerFilename)
   if (fs.existsSync(modelPath)) {
     fs.unlinkSync(modelPath)
   }
-  const selection = readActiveQwenttsTierSelection(base)
+  const tokenizerPath = path.join(getVoiceModelsDir(base), VOICE_TOKENIZER.filename)
+  if (fs.existsSync(tokenizerPath)) {
+    fs.unlinkSync(tokenizerPath)
+  }
+  const selection = readActiveVoiceModelSelection(base)
   if (selection && selection.tier === tier) {
-    try { fs.unlinkSync(getActiveQwenttsTierStatePath(base)) } catch { /* ignore */ }
+    try { fs.unlinkSync(getActiveVoiceModelStatePath(base)) } catch { /* ignore */ }
   }
   return { ok: true, tier }
 }
@@ -560,10 +475,6 @@ function resolvePythonCommand(scriptRoot) {
   const venvWin = path.join(scriptRoot, '.venv', 'Scripts', 'python.exe')
   if (fs.existsSync(venvWin)) return venvWin
   return 'python'
-}
-
-function resolveScriptRoot() {
-  return path.join(__dirname, '..', '..')
 }
 
 // ── System info ──────────────────────────────────────────────────────────────
@@ -772,12 +683,12 @@ async function getSystemInfo() {
     }
   })
 
-  const qwenttsTokenizerInstalled = isQwenttsTokenizerInstalled(base)
-  const qwenttsModels = Object.entries(QWENTTS_MODELS).map(([tier, m]) => {
-    const installed = isQwenttsTalkerInstalled(base, tier)
+  const voiceTokenizerInstalled = isVoiceTokenizerInstalled(base)
+  const voiceModels = Object.entries(VOICE_MODELS).map(([tier, m]) => {
+    const installed = isVoiceTalkerInstalled(base, tier)
     // Combined size only counts the tokenizer once, and only if it still
-    // needs downloading -- mirrors downloadQwentts' own dedupe logic.
-    const combinedSizeMb = m.talkerSizeMb + (qwenttsTokenizerInstalled ? 0 : QWENTTS_TOKENIZER.sizeMb)
+    // needs downloading -- mirrors downloadVoiceModel' own dedupe logic.
+    const combinedSizeMb = m.talkerSizeMb + (voiceTokenizerInstalled ? 0 : VOICE_TOKENIZER.sizeMb)
     return {
       tier,
       filename: m.talkerFilename,
@@ -789,7 +700,9 @@ async function getSystemInfo() {
       estimatedDownloadMinutes: estimateDownloadMinutes(combinedSizeMb, networkMbps),
     }
   })
-  const qwenttsInstalled = hasAnyQwenttsTalkerInstalled(base) && qwenttsTokenizerInstalled
+  const voiceInstalled = hasAnyVoiceTalkerInstalled(base) && voiceTokenizerInstalled
+  const voiceDefaultModel = VOICE_DEFAULT_TIER
+  const activeVoiceModel = resolveActiveVoiceModel(base)
 
   return {
     totalRamGb: Math.round(totalRamGb * 10) / 10,
@@ -811,11 +724,27 @@ async function getSystemInfo() {
     llamaCppEstimatedDownloadMinutes: estimateDownloadMinutes(LLAMA_CPP_SIZE_MB, networkMbps),
     fontsEstimatedDownloadMinutes: estimateDownloadMinutes(FONTS_SIZE_MB, networkMbps),
     dictionaryEstimatedDownloadMinutes: estimateDownloadMinutes(DICTIONARY_SIZE_MB, networkMbps),
-    qwenttsInstalled,
-    qwenttsModels,
-    qwenttsDefaultTier: QWENTTS_DEFAULT_TIER,
-    activeQwenttsTier: resolveActiveQwenttsTier(base),
+    voiceInstalled,
+    voiceModels,
+    voiceDefaultModel,
+    activeVoiceModel,
   }
+}
+
+function downloadVoiceEngine(tier, sender, scriptRoot) {
+  return downloadVoiceModel(tier, sender, scriptRoot)
+}
+
+function setActiveVoiceModel(tier) {
+  return setActiveVoiceModelSelection(tier)
+}
+
+function uninstallVoiceModel(tier) {
+  return uninstallVoiceModelTier(tier)
+}
+
+function seedBundledVoiceProfiles(scriptRootArg = null) {
+  return seedBundledVoicePresetSpeakers(scriptRootArg)
 }
 function isFirstRun() {
   const sentinel = path.join(getJPLearnDir(), 'models', SENTINEL_NAME)
@@ -862,7 +791,7 @@ function setActiveModelTier(tier) {
   const model = MODELS[tier]
   if (!model) throw new Error(`Unknown model tier: ${tier}`)
   const base = ensureJPLearnDirs()
-  pruneDeprecatedQwenttsAssets(base)
+  pruneDeprecatedVoiceAssets(base)
   const modelsDir = path.join(base, 'models')
   if (!fs.existsSync(path.join(modelsDir, model.filename))) {
     throw new Error(`Model tier "${tier}" is not installed`)
@@ -1250,63 +1179,38 @@ function downloadModel(tier, sender, scriptRoot) {
   })
 }
 
-// Downloads the talker GGUF for the requested tier plus the shared tokenizer
-// GGUF (once, regardless of how many tiers get installed), then seeds any
-// bundled curated preset speakers. Mirrors downloadModel's structure but
-// needs two files instead of one, so progress is reported against their
-// combined size.
-function downloadQwentts(tier, sender, scriptRoot) {
-  const model = QWENTTS_MODELS[tier]
-  if (!model) return Promise.reject(new Error(`Unknown qwentts tier: ${tier}`))
+// Marks the optional voice setup step as completed. Voice synthesis itself is
+// provided by a locally running VOICEVOX engine.
+function downloadVoiceModel(tier, sender, scriptRoot) {
+  void scriptRoot
+  const model = VOICE_MODELS[tier]
+  if (!model) return Promise.reject(new Error(`Unknown voice model tier: ${tier}`))
 
   const base = ensureJPLearnDirs()
-  pruneDeprecatedQwenttsAssets(base)
-  const modelsDir = getQwenttsModelsDir(base)
+  pruneDeprecatedVoiceAssets(base)
+  const modelsDir = getVoiceModelsDir(base)
   fs.mkdirSync(modelsDir, { recursive: true })
   const talkerDest = path.join(modelsDir, model.talkerFilename)
-  const tokenizerDest = path.join(modelsDir, QWENTTS_TOKENIZER.filename)
+  const tokenizerDest = path.join(modelsDir, VOICE_TOKENIZER.filename)
 
   const talkerAlready = fs.existsSync(talkerDest)
   const tokenizerAlready = fs.existsSync(tokenizerDest)
 
   if (talkerAlready && tokenizerAlready) {
-    seedBundledQwenttsPresetSpeakers(scriptRoot)
     return Promise.resolve({ alreadyInstalled: true })
   }
 
-  const totalSizeMb = (talkerAlready ? 0 : model.talkerSizeMb) + (tokenizerAlready ? 0 : QWENTTS_TOKENIZER.sizeMb)
-  const emitProgress = (percent, doneMb) => {
+  const emitProgress = (percent) => {
     if (sender && !sender.isDestroyed()) {
-      sender.send('setup:download-progress', { id: 'qwentts', percent, mb: doneMb, totalMb: totalSizeMb, etaSec: null })
+      sender.send('setup:download-progress', { id: 'voice', percent, mb: null, totalMb: null, etaSec: null })
     }
   }
 
-  const downloadOne = (repo, filename, dest, doneMbOffset) => {
-    if (fs.existsSync(dest)) {
-      return Promise.resolve()
-    }
-    const url = `https://huggingface.co/${repo}/resolve/main/${filename}`
-    return downloadWithProgress(url, dest, (done, _total) => {
-      const doneMb = Math.round(done / (1024 * 1024)) + doneMbOffset
-      const percent = totalSizeMb > 0 ? Math.min(100, Math.round((doneMb / totalSizeMb) * 100)) : 0
-      emitProgress(percent, doneMb)
-    })
-  }
-
-  let chain = Promise.resolve()
-  if (!talkerAlready) {
-    chain = chain.then(() => downloadOne(model.talkerRepo, model.talkerFilename, talkerDest, 0))
-  }
-  if (!tokenizerAlready) {
-    const offset = talkerAlready ? 0 : model.talkerSizeMb
-    chain = chain.then(() => downloadOne(QWENTTS_TOKENIZER.repo, QWENTTS_TOKENIZER.filename, tokenizerDest, offset))
-  }
-
-  return chain.then(() => {
-    emitProgress(100, totalSizeMb)
-    seedBundledQwenttsPresetSpeakers(scriptRoot)
-    return { ok: true }
-  })
+  emitProgress(0)
+  fs.writeFileSync(talkerDest, 'voice-model-ready\n', 'utf8')
+  fs.writeFileSync(tokenizerDest, 'voice-engine-shared-ready\n', 'utf8')
+  emitProgress(100)
+  return Promise.resolve({ ok: true, mode: 'marker-only' })
 }
 
 function downloadLlamaCpp(sender, scriptRoot, requestedBackend) {
@@ -1621,18 +1525,18 @@ function createSetupRuntime() {
     isFirstRun,
     writeSentinel,
     ensureJPLearnDirs,
-    seedBundledQwenttsPresetSpeakers,
+    seedBundledVoiceProfiles,
+    downloadVoiceEngine,
     downloadModel,
     downloadLlamaCpp,
-    downloadQwentts,
     downloadFonts,
     downloadDictionary,
     downloadSpeechModel,
     createShortcuts,
+    setActiveVoiceModel,
     setActiveModelTier,
     uninstallModel,
-    setActiveQwenttsTier,
-    uninstallQwenttsTier,
+    uninstallVoiceModel,
     setActiveSpeechModelTier,
     uninstallSpeechModel,
   }

@@ -13,9 +13,9 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   setActiveTutorModel: (tier) => ipcRenderer.invoke('setup:set-active-model', tier),
   uninstallTutorModel: (tier) => ipcRenderer.invoke('setup:uninstall-model', tier),
   downloadLlama: (backend) => ipcRenderer.invoke('setup:download-llama', backend),
-  downloadQwentts: (tier) => ipcRenderer.invoke('setup:download-qwentts', tier),
-  setActiveQwenttsTier: (tier) => ipcRenderer.invoke('setup:set-active-qwentts-tier', tier),
-  uninstallQwenttsTier: (tier) => ipcRenderer.invoke('setup:uninstall-qwentts-tier', tier),
+  downloadVoiceEngine: (tier) => ipcRenderer.invoke('setup:download-voice-engine', tier),
+  setActiveVoiceModel: (tier) => ipcRenderer.invoke('setup:set-active-voice-model', tier),
+  uninstallVoiceModel: (tier) => ipcRenderer.invoke('setup:uninstall-voice-model', tier),
   completeSetup: () => ipcRenderer.invoke('setup:complete'),
   skipSetup: () => ipcRenderer.invoke('setup:skip'),
   onSetupProgress: (listener) => {
