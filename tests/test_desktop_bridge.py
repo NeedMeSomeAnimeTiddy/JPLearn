@@ -51,6 +51,43 @@ def _build_dictionary_db(path: Path, *, japanese: str, reading: str, gloss: str)
         conn.close()
 
 
+def _build_dictionary_db_many(path: Path, rows: list[tuple[str, str, str, int]]) -> None:
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE dictionary_entries (
+              entry_id INTEGER PRIMARY KEY,
+              source_id TEXT NOT NULL,
+              japanese TEXT NOT NULL,
+              reading TEXT NOT NULL,
+              gloss TEXT NOT NULL,
+              is_common INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE VIRTUAL TABLE dictionary_fts USING fts5(
+              gloss,
+              content='dictionary_entries',
+              content_rowid='entry_id'
+            );
+            """
+        )
+        for index, (japanese, reading, gloss, is_common) in enumerate(rows, start=1):
+            cursor = conn.execute(
+                """
+                INSERT INTO dictionary_entries (source_id, japanese, reading, gloss, is_common)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (f"test-entry-{index}", japanese, reading, gloss, is_common),
+            )
+            conn.execute(
+                "INSERT INTO dictionary_fts (rowid, gloss) VALUES (?, ?)",
+                (cursor.lastrowid, gloss),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def test_record_game_result_persists_review_event(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
@@ -238,6 +275,30 @@ def test_build_deck_cards_includes_dictionary_summary_when_available(tmp_path: P
     assert dictionary_summary["primary_gloss"] == target_card.meaning
     assert dictionary_summary["glosses"] == [target_card.meaning, "calendar day", "sun marker"]
     assert dictionary_summary["source"] == "offline_dictionary"
+
+
+def test_dictionary_hello_prefers_konnichiwa_over_katakana_hello(tmp_path: Path, monkeypatch) -> None:
+    dictionary_db_path = tmp_path / "dictionary.sqlite"
+    _build_dictionary_db_many(
+        dictionary_db_path,
+        rows=[
+            ("ハロー", "はろー", "hello", 1),
+            ("今日は", "こんにちは", "greetings; hello; good afternoon", 1),
+            ("もしもし", "もしもし", "hello (e.g. on phone)", 1),
+        ],
+    )
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (dictionary_db_path,),
+    )
+
+    payload = desktop_bridge.build_dictionary_search_payload("hello")
+    results = cast(list[dict[str, object]], payload["results"])
+
+    assert len(results) > 0
+    assert results[0]["character"] == "今日は"
+    assert any(result["character"] == "ハロー" for result in results)
 
 
 def test_build_deck_cards_sentence_examples_prefers_csv_runtime_source(tmp_path: Path, monkeypatch) -> None:

@@ -940,11 +940,19 @@ async function getSystemInfo() {
     || voiceEngineReachable
   const voiceDefaultModel = VOICE_DEFAULT_TIER
   const activeVoiceModel = resolveActiveVoiceModel(base)
+  const activeModelTier = resolveActiveTier(base, modelsDir)
+  const activeEmbedderTier = activeModelTier ? CHATBOT_TIER_TO_EMBEDDER_TIER[activeModelTier] || null : null
+  const activeEmbedderInstalled = activeEmbedderTier ? isEmbedderInstalled(base, activeEmbedderTier) : false
+  const activeEmbedder = activeEmbedderTier ? EMBEDDERS[activeEmbedderTier] || null : null
 
   return {
     totalRamGb: Math.round(totalRamGb * 10) / 10,
     recommendedTier,
-    activeModelTier: resolveActiveTier(base, modelsDir),
+    activeModelTier,
+    activeEmbedderTier,
+    activeEmbedderLabel: activeEmbedder ? activeEmbedder.label : null,
+    activeEmbedderInstalled,
+    activeEmbedderEnabled: Boolean(activeModelTier && activeEmbedderInstalled),
     models,
     llamaCppInstalled,
     gpuAdapters,

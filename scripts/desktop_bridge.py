@@ -260,6 +260,14 @@ _DICTIONARY_RESULT_LIMIT = 20
 # etc.) and append those below the common results.
 _DICTIONARY_COMMON_FALLBACK_THRESHOLD = 5
 _DICTIONARY_JAPANESE_RE = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]")
+_DICTIONARY_KATAKANA_ONLY_RE = re.compile(r"^[\u30a0-\u30ffー・\s]+$")
+_DICTIONARY_GREETINGS_QUERY_BOOST = {
+    "hello",
+    "hi",
+    "good day",
+    "good afternoon",
+    "greetings",
+}
 
 
 def _dictionary_has_supported_schema(conn: sqlite3.Connection) -> bool:
@@ -379,12 +387,14 @@ def _search_dictionary_japanese(conn: sqlite3.Connection, normalized_query: str)
 
 def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
     # Each word must appear as a prefix somewhere in the gloss, ranked by bm25
-    # relevance within each tier.
+    # within each tier first, then re-ranked with learner-friendly heuristics.
     query_terms = _dictionary_query_terms(normalized_query)
     match_expr = " AND ".join(f'"{_escape_fts5_term(term)}"*' for term in query_terms)
 
+    candidate_limit = max(_DICTIONARY_RESULT_LIMIT * 4, 40)
+
     base_sql = (
-        "SELECT e.entry_id, e.japanese, e.reading, e.gloss "
+        "SELECT e.entry_id, e.japanese, e.reading, e.gloss, bm25(dictionary_fts) AS score "
         "FROM dictionary_fts "
         "JOIN dictionary_entries e ON e.entry_id = dictionary_fts.rowid "
         "WHERE dictionary_fts MATCH ? AND e.is_common = ? "
@@ -393,20 +403,58 @@ def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) 
     )
 
     try:
-        rows = conn.execute(base_sql, [match_expr, 1, _DICTIONARY_RESULT_LIMIT]).fetchall()
+        rows = conn.execute(base_sql, [match_expr, 1, candidate_limit]).fetchall()
     except sqlite3.OperationalError:
         return []
 
     if len(rows) < _DICTIONARY_COMMON_FALLBACK_THRESHOLD:
         seen_ids = {row[0] for row in rows}
-        remaining = _DICTIONARY_RESULT_LIMIT - len(rows)
+        remaining = candidate_limit - len(rows)
         try:
             extra_rows = conn.execute(base_sql, [match_expr, 0, remaining]).fetchall()
         except sqlite3.OperationalError:
             extra_rows = []
         rows.extend(row for row in extra_rows if row[0] not in seen_ids)
 
-    return rows
+    def _rank_row(row: tuple) -> tuple:
+        japanese = str(row[1])
+        reading = str(row[2])
+        gloss_text = str(row[3])
+        bm25_score = float(row[4]) if len(row) > 4 and row[4] is not None else 0.0
+
+        glosses = [_normalize_dictionary_query(part) for part in _split_dictionary_glosses(gloss_text)]
+        exact_gloss_match = 1 if normalized_query in glosses else 0
+        prefix_gloss_match = 1 if any(gloss.startswith(normalized_query) for gloss in glosses) else 0
+        whole_word_hits = sum(
+            1
+            for term in query_terms
+            if re.search(rf"\\b{re.escape(term)}\\b", _normalize_dictionary_query(gloss_text))
+        )
+
+        has_native_script = 1 if re.search(r"[\u3040-\u309f\u4e00-\u9fff]", japanese) else 0
+        katakana_only = 1 if _DICTIONARY_KATAKANA_ONLY_RE.fullmatch(japanese or "") else 0
+        native_script_bonus = has_native_script - katakana_only
+
+        greetings_bonus = 0
+        if normalized_query in _DICTIONARY_GREETINGS_QUERY_BOOST:
+            if "こんにちは" in japanese or reading.startswith("こんにち"):
+                greetings_bonus = 2
+
+        # Sort by strongest lexical match first, then native-script preference,
+        # then FTS relevance and stable deterministic tie-breakers.
+        return (
+            greetings_bonus,
+            exact_gloss_match,
+            prefix_gloss_match,
+            whole_word_hits,
+            native_script_bonus,
+            -bm25_score,
+            -len(japanese),
+            -int(row[0]),
+        )
+
+    ranked_rows = sorted(rows, key=_rank_row, reverse=True)
+    return [tuple(row[:4]) for row in ranked_rows[:_DICTIONARY_RESULT_LIMIT]]
 
 
 def build_dictionary_search_payload(query: str) -> dict[str, object]:

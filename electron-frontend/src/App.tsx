@@ -3232,6 +3232,10 @@ function App() {
     }>
     recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
     activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
+    activeEmbedderTier?: 'e5_small' | 'e5_base' | 'e5_large' | null
+    activeEmbedderLabel?: string | null
+    activeEmbedderInstalled?: boolean
+    activeEmbedderEnabled?: boolean
     llamaCppInstalled: boolean
     gpuVramGb?: number | null
     voiceInstalled: boolean
@@ -3843,6 +3847,10 @@ function App() {
         models: setupInfo.models ?? [],
         recommendedTier: setupInfo.recommendedTier,
         activeModelTier: setupInfo.activeModelTier ?? null,
+        activeEmbedderTier: setupInfo.activeEmbedderTier ?? null,
+        activeEmbedderLabel: setupInfo.activeEmbedderLabel ?? null,
+        activeEmbedderInstalled: setupInfo.activeEmbedderInstalled ?? false,
+        activeEmbedderEnabled: setupInfo.activeEmbedderEnabled ?? false,
         llamaCppInstalled: setupInfo.llamaCppInstalled,
         gpuVramGb: setupInfo.gpuVramGb ?? null,
         voiceInstalled: setupInfo.voiceInstalled ?? false,
@@ -8833,6 +8841,18 @@ function App() {
                     })}
                   </div>
                   <p className="settings-help" style={{ marginTop: '0.75rem' }}>
+                    {(() => {
+                      const embedderLabel = tutorInstallInfo?.activeEmbedderLabel
+                        ?? (tutorInstallInfo?.activeEmbedderTier ? tutorInstallInfo.activeEmbedderTier.replace('_', '-').toUpperCase() : null)
+                      if (!embedderLabel) {
+                        return 'Embedder: none active yet. Select a Tutor model to enable retrieval embeddings.'
+                      }
+                      const installState = tutorInstallInfo?.activeEmbedderInstalled ? 'installed' : 'not installed'
+                      const enabledState = tutorInstallInfo?.activeEmbedderEnabled ? 'enabled' : 'disabled'
+                      return `Embedder: ${embedderLabel} · ${installState} · ${enabledState}`
+                    })()}
+                  </p>
+                  <p className="settings-help" style={{ marginTop: '0.45rem' }}>
                     Select the circle icon to switch the Tutor to that model. Changes apply automatically without restarting the app.
                   </p>
                 </SettingsCollapsibleSection>

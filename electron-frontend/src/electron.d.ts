@@ -510,6 +510,10 @@ interface SetupSystemInfo {
   totalRamGb: number
   recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
   activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
+  activeEmbedderTier?: 'e5_small' | 'e5_base' | 'e5_large' | null
+  activeEmbedderLabel?: string | null
+  activeEmbedderInstalled?: boolean
+  activeEmbedderEnabled?: boolean
   models: SetupModelOption[]
   llamaCppInstalled: boolean
   gpuAdapters?: string[]
