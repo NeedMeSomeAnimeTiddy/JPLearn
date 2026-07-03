@@ -336,6 +336,7 @@ interface DesktopApi {
     firstSummaryMs?: number | null
     deferredLoadsQueuedAtMs?: number
   }) => Promise<{ ok: boolean }>
+  openInspectElement?: () => Promise<{ ok: boolean }>
   setStartupTheme: (theme: string) => Promise<{ ok: boolean; theme: string }>
   getConfigValue?: (key: 'autoUpdateEnabled') => Promise<{ ok: boolean; key: string; value: boolean }>
   setConfigValue?: (key: 'autoUpdateEnabled', value: boolean) => Promise<{ ok: boolean; key: string; value: boolean }>

@@ -39,6 +39,7 @@ describe('preload contract', () => {
       "cancelAssistantChatInference: () => ipcRenderer.invoke('assistant-chat:cancel')",
       "resetStudyDb: () => ipcRenderer.invoke('study:reset-db')",
       "notifyStartupReady: (payload) => ipcRenderer.invoke('ui:startup-ready', payload)",
+      "openInspectElement: () => ipcRenderer.invoke('ui:inspect-element')",
       "setStartupTheme: (theme) => ipcRenderer.invoke('ui:set-startup-theme', theme)",
         "reloadLocalFonts: () => ipcRenderer.invoke('ui:reload-local-fonts')",
       "minimizeWindow: () => ipcRenderer.invoke('window:minimize')",

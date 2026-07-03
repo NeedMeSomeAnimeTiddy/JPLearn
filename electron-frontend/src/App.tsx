@@ -16,7 +16,7 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
 import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
 import type { RoundDictionaryNote } from './types'
 
@@ -118,7 +118,7 @@ type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_la
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'context_cloze' | 'narrative_story' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
-type ShortcutSubmenuKey = 'all_maps' | ScriptKey
+type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
 type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
 type NavDirection = 'forward' | 'back'
@@ -308,6 +308,7 @@ const ASSISTANT_TOAST_TTL_MS = 3800
 const ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT = 600
 const ROUND_QUEUE_TIMEOUT_MS = 1200
 const STUDY_QUEUE_CACHE_TTL_MS = 45000
+const DECK_LOAD_TIMEOUT_MS = 15000
 const ASSISTANT_MAX_TOASTS = 1
 const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
@@ -4513,7 +4514,12 @@ function App() {
     const inFlight = deckCardsInFlightRef.current.get(slug)
     if (inFlight) return inFlight
 
-    const request = window.jplearnDesktop.getDeckCards(slug).finally(() => {
+    const request = Promise.race<ScriptDeck>([
+      window.jplearnDesktop.getDeckCards(slug),
+      new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error(`Loading deck cards timed out for ${slug}`)), DECK_LOAD_TIMEOUT_MS)
+      }),
+    ]).finally(() => {
       if (deckCardsInFlightRef.current.get(slug) === request) {
         deckCardsInFlightRef.current.delete(slug)
       }
@@ -4530,7 +4536,12 @@ function App() {
     const inFlight = blockProgressInFlightRef.current.get(slug)
     if (inFlight) return inFlight
 
-    const request = window.jplearnDesktop.getBlockProgress(slug).finally(() => {
+    const request = Promise.race<BlockProgressPayload>([
+      window.jplearnDesktop.getBlockProgress(slug),
+      new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error(`Loading block progress timed out for ${slug}`)), DECK_LOAD_TIMEOUT_MS)
+      }),
+    ]).finally(() => {
       if (blockProgressInFlightRef.current.get(slug) === request) {
         blockProgressInFlightRef.current.delete(slug)
       }
@@ -4856,17 +4867,6 @@ function App() {
         deferredLoadsQueuedAtMs,
       })
       .catch(() => undefined)
-  }, [])
-
-  const scheduleDeferredStartupTask = useCallback((task: () => void, delayMs: number) => {
-    if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(
-        () => task(),
-        { timeout: Math.max(500, delayMs + 500) },
-      )
-      return
-    }
-    window.setTimeout(task, delayMs)
   }, [])
 
   const trackAssistantToastInteraction = useCallback(
@@ -5385,13 +5385,11 @@ function App() {
     async function preloadStartupDeckData(): Promise<void> {
       const startupKanjiCategory: KanjiCategory = 'numbers_time'
       const startupVocabCategory: VocabCategory = 'greetings'
-      const startupScripts: ScriptKey[] = ['hiragana', 'katakana', 'grammar_patterns']
-      const startupQueueSlugs: DeckSlugInput[] = [
-        ...startupScripts,
-        KANJI_CATEGORY_TO_DECK_SLUG[startupKanjiCategory],
-        VOCAB_CATEGORY_TO_DECK_SLUG[startupVocabCategory],
-      ]
-      let deferredLoadsQueuedAtMs: number | undefined
+      const startupScripts: ScriptKey[] = ['hiragana', 'katakana']
+      const deferredLoadsQueuedAtMs = Math.round(performance.now() - startupBootMarkRef.current)
+
+      // Signal startup-ready as soon as core UI mounts; keep deck warmups fully backgrounded.
+      notifyStartupReady(deferredLoadsQueuedAtMs)
 
       const preloadScript = async (script: ScriptKey): Promise<void> => {
         if (scriptDeckCacheRef.current[script] && scriptBlockCacheRef.current[script]) {
@@ -5461,40 +5459,9 @@ function App() {
           ...startupScripts.map((script) => preloadScript(script)),
           preloadKanjiCategory(startupKanjiCategory, true),
           preloadVocabCategory(startupVocabCategory, true),
-          ...startupQueueSlugs.map((slug) => getStudyQueueDeduped(slug, { preferCache: false }).catch(() => undefined)),
         ])
-
-        if (cancelled) return
-
-        deferredLoadsQueuedAtMs = Math.round(performance.now() - startupBootMarkRef.current)
-
-        const deferredKanjiCats = KANJI_CATEGORY_ORDER.filter((c) => c !== startupKanjiCategory)
-        const deferredVocabCats = VOCAB_CATEGORY_ORDER.filter((c) => c !== startupVocabCategory)
-
-        deferredKanjiCats.forEach((cat, index) => {
-          const delayMs = 150 * (index + 1)
-          scheduleDeferredStartupTask(() => {
-            void preloadKanjiCategory(cat, true).catch(() => undefined)
-          }, delayMs)
-          scheduleDeferredStartupTask(() => {
-            void getStudyQueueDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat], { preferCache: false }).catch(() => undefined)
-          }, delayMs + 30)
-        })
-        deferredVocabCats.forEach((cat, index) => {
-          const delayMs = 150 * (index + 1) + 75
-          scheduleDeferredStartupTask(() => {
-            void preloadVocabCategory(cat, true).catch(() => undefined)
-          }, delayMs)
-          scheduleDeferredStartupTask(() => {
-            void getStudyQueueDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat], { preferCache: false }).catch(() => undefined)
-          }, delayMs + 30)
-        })
       } catch {
         // Allow startup to continue even if preloading fails on some decks.
-      } finally {
-        if (!cancelled) {
-          notifyStartupReady(deferredLoadsQueuedAtMs)
-        }
       }
     }
 
@@ -5503,7 +5470,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [getBlockProgressDeduped, getDeckCardsDeduped, getStudyQueueDeduped, notifyStartupReady, scheduleDeferredStartupTask])
+  }, [getBlockProgressDeduped, getDeckCardsDeduped, notifyStartupReady])
 
   const loadScriptCards = useCallback(async (
     script: ScriptKey,
@@ -6933,6 +6900,16 @@ function App() {
     closeShortcutMenu()
   }, [closeShortcutMenu, loadSummary])
 
+  const inspectElementFromMenu = useCallback(async () => {
+    try {
+      await window.jplearnDesktop.openInspectElement?.()
+    } catch {
+      // Devtools action is best effort in development contexts.
+    } finally {
+      closeShortcutMenu()
+    }
+  }, [closeShortcutMenu])
+
   const resetStudyDb = useCallback(async () => {
     setResettingDb(true)
     setError(null)
@@ -7289,17 +7266,21 @@ function App() {
                       role="menuitem"
                       className="titlebar-shortcut-item titlebar-shortcut-parent"
                       aria-haspopup="true"
-                      aria-expanded={activeShortcutFlyout !== null}
+                      aria-expanded={activeShortcutFlyout !== null && activeShortcutFlyout !== 'dev_tools'}
                       onClick={() => {
-                        setActiveShortcutFlyout((current) => (current === null ? 'all_maps' : null))
+                        setActiveShortcutFlyout((current) => (
+                          current === null || current === 'dev_tools'
+                            ? 'all_maps'
+                            : null
+                        ))
                       }}
                     >
                       <ListChecks className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
                       All Maps
-                      <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout !== null ? '▾' : '▸'}</span>
+                      <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout !== null && activeShortcutFlyout !== 'dev_tools' ? '▾' : '▸'}</span>
                     </button>
 
-                    {activeShortcutFlyout !== null ? (
+                    {activeShortcutFlyout !== null && activeShortcutFlyout !== 'dev_tools' ? (
                       <div className="titlebar-shortcut-righttree" role="group" aria-label="Maps and minigames">
                         {ALL_SCRIPT_KEYS.map((script) => {
                           const isScriptExpanded = activeShortcutFlyout === script
@@ -7367,6 +7348,37 @@ function App() {
                     <Activity className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
                     Refresh Data
                   </button>
+
+                  <div className="titlebar-shortcut-tree-anchor">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="titlebar-shortcut-item titlebar-shortcut-parent"
+                      aria-haspopup="true"
+                      aria-expanded={activeShortcutFlyout === 'dev_tools'}
+                      onClick={() => {
+                        setActiveShortcutFlyout((current) => (current === 'dev_tools' ? null : 'dev_tools'))
+                      }}
+                    >
+                      <Code2 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                      Developer Tools
+                      <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout === 'dev_tools' ? '▾' : '▸'}</span>
+                    </button>
+
+                    {activeShortcutFlyout === 'dev_tools' ? (
+                      <div className="titlebar-shortcut-righttree" role="group" aria-label="Developer tools">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                          onClick={() => { void inspectElementFromMenu() }}
+                        >
+                          <span className="titlebar-shortcut-glyph" aria-hidden="true">&lt;/&gt;</span>
+                          Inspect Element
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>

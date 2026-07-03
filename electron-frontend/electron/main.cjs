@@ -1813,6 +1813,10 @@ async function createWindowWithSplash() {
 
   updateSplashStatus(splash, 'Loading study data...', 'Decks, stats, and progress are syncing...', 70)
 
+  // Prime summary cache while splash is visible so the first renderer summary
+  // read can reuse in-flight or cached bridge payload.
+  void runPythonBridgeCached('summary').catch(() => undefined)
+
   const rendererStartupPromise = Promise.all([
     windowReadyPromise,
     Promise.race([

@@ -57,6 +57,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getSpeechStatus: () => ipcRenderer.invoke('audio:speech-status'),
   resetStudyDb: () => ipcRenderer.invoke('study:reset-db'),
   notifyStartupReady: (payload) => ipcRenderer.invoke('ui:startup-ready', payload),
+  openInspectElement: () => ipcRenderer.invoke('ui:inspect-element'),
   setStartupTheme: (theme) => ipcRenderer.invoke('ui:set-startup-theme', theme),
   getConfigValue: (key) => ipcRenderer.invoke('config:get', key),
   setConfigValue: (key, value) => ipcRenderer.invoke('config:set', { key, value }),

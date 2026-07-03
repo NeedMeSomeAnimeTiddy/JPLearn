@@ -699,6 +699,35 @@ class TutorReactionPayload:
     cta: str
 
 
+HEAVY_DECK_ENRICHMENT_CARD_THRESHOLD = 800
+
+
+def _lightweight_distractor_ids(
+    card_ids: list[int],
+    id_to_index: dict[int, int],
+    target_id: int,
+    *,
+    limit: int,
+) -> list[int]:
+    """Return deterministic nearby ids in O(limit) for large-deck payloads."""
+    total = len(card_ids)
+    if total <= 1 or limit <= 0:
+        return []
+
+    start_index = id_to_index.get(target_id)
+    if start_index is None:
+        return []
+
+    distractors: list[int] = []
+    step = 1
+    while len(distractors) < limit and step < total:
+        candidate_id = card_ids[(start_index + step) % total]
+        if candidate_id != target_id:
+            distractors.append(candidate_id)
+        step += 1
+    return distractors
+
+
 def _normalize_deck_key(value: str) -> str:
     return value.strip().lower().replace("_", " ")
 
@@ -825,15 +854,21 @@ def build_deck_cards(slug: str) -> dict[str, object]:
 
     deck = factory()
     active_leech_ids = load_active_leech_card_ids(deck.name)
-    curriculum_stages = load_curriculum_stages(deck.name, "context_cloze", [card.id for card in deck.cards])
+    card_ids = [card.id for card in deck.cards]
+    curriculum_stages = load_curriculum_stages(deck.name, "context_cloze", card_ids)
+    use_lightweight_enrichment = (
+        slug == "sentence_examples" or len(deck.cards) > HEAVY_DECK_ENRICHMENT_CARD_THRESHOLD
+    )
+    id_to_index = {card_id: index for index, card_id in enumerate(card_ids)}
     dictionary_conn: sqlite3.Connection | None = None
-    db_path = _dictionary_db_path()
-    if db_path is not None:
-        candidate_conn = sqlite3.connect(db_path)
-        if _dictionary_has_supported_schema(candidate_conn):
-            dictionary_conn = candidate_conn
-        else:
-            candidate_conn.close()
+    if not use_lightweight_enrichment:
+        db_path = _dictionary_db_path()
+        if db_path is not None:
+            candidate_conn = sqlite3.connect(db_path)
+            if _dictionary_has_supported_schema(candidate_conn):
+                dictionary_conn = candidate_conn
+            else:
+                candidate_conn.close()
 
     try:
         cards = [
@@ -844,16 +879,28 @@ def build_deck_cards(slug: str) -> dict[str, object]:
                 meaning=card.meaning,
                 tags=card.tags,
                 example_sentence=card.example_sentence,
-                dictionary_summary=_lookup_card_dictionary_summary(
-                    dictionary_conn,
-                    character=card.character,
-                    meaning=card.meaning,
-                    tags=card.tags,
+                dictionary_summary=(
+                    None
+                    if use_lightweight_enrichment
+                    else _lookup_card_dictionary_summary(
+                        dictionary_conn,
+                        character=card.character,
+                        meaning=card.meaning,
+                        tags=card.tags,
+                    )
                 ),
                 is_leech=card.id in active_leech_ids,
                 curriculum_stage=curriculum_stages.get(card.id, 1),
-                meaning_distractor_ids=rank_distractor_ids(deck.cards, card, mode="meaning")[:8],
-                character_distractor_ids=rank_distractor_ids(deck.cards, card, mode="character")[:8],
+                meaning_distractor_ids=(
+                    _lightweight_distractor_ids(card_ids, id_to_index, card.id, limit=8)
+                    if use_lightweight_enrichment
+                    else rank_distractor_ids(deck.cards, card, mode="meaning")[:8]
+                ),
+                character_distractor_ids=(
+                    _lightweight_distractor_ids(card_ids, id_to_index, card.id, limit=8)
+                    if use_lightweight_enrichment
+                    else rank_distractor_ids(deck.cards, card, mode="character")[:8]
+                ),
             )
             for card in deck.cards
         ]

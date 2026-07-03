@@ -557,6 +557,28 @@ function registerIpcHandlers(options) {
     return { ok: true }
   })
 
+  options.ipcMain.handle('ui:inspect-element', (event) => {
+    const win = assertTrustedIpcSender(event, trustedSenderOptions())
+    if (!win || win.isDestroyed()) {
+      return { ok: false }
+    }
+
+    const contents = win.webContents
+    if (!contents.isDevToolsOpened()) {
+      contents.openDevTools({ mode: 'detach', activate: true })
+    }
+
+    const devtools = contents.devToolsWebContents
+    if (devtools && typeof devtools.sendInputEvent === 'function') {
+      devtools.focus()
+      const inspectModifiers = process.platform === 'darwin' ? ['meta', 'alt'] : ['control', 'shift']
+      devtools.sendInputEvent({ type: 'keyDown', keyCode: 'C', modifiers: inspectModifiers })
+      devtools.sendInputEvent({ type: 'keyUp', keyCode: 'C', modifiers: inspectModifiers })
+    }
+
+    return { ok: true }
+  })
+
   options.ipcMain.handle('ui:reload-local-fonts', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     if (typeof options.reloadLocalFontsForContents !== 'function') {
