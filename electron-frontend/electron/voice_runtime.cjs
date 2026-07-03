@@ -1,5 +1,6 @@
 const http = require('node:http')
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 
@@ -28,12 +29,39 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function getJPLearnDir() {
+  const explicit = (process.env.JPLEARN_ASSETS_DIR || process.env.JPLEARN_USER_DATA_DIR || '').trim()
+  if (explicit) return explicit
+  const legacyDocs = (process.env.JPLEARN_DOCUMENTS_DIR || '').trim()
+  if (legacyDocs) return legacyDocs
+  if (process.platform === 'win32') {
+    const localAppData = (process.env.LOCALAPPDATA || '').trim()
+    if (localAppData) {
+      return path.join(localAppData, 'JPLearn Assets')
+    }
+  }
+  let appData
+  try {
+    appData = require('electron').app.getPath('appData')
+  } catch {
+    appData = path.join(os.homedir(), '.local', 'share')
+  }
+  return path.join(appData, 'JPLearn Assets')
+}
+
 function getVoicevoxExecutableCandidates() {
   const candidates = []
   const explicit = (process.env.JPLEARN_VOICEVOX_EXECUTABLE || '').trim()
   if (explicit) {
     candidates.push(explicit)
   }
+
+  const base = getJPLearnDir()
+  const assetsInstallDir = path.join(base, 'tools', 'voicevox')
+  candidates.push(path.join(assetsInstallDir, 'VOICEVOX.exe'))
+  candidates.push(path.join(assetsInstallDir, 'vv-engine', 'run.exe'))
+  candidates.push(path.join(assetsInstallDir, 'VOICEVOX', 'VOICEVOX.exe'))
+  candidates.push(path.join(assetsInstallDir, 'VOICEVOX', 'vv-engine', 'run.exe'))
 
   const localAppData = (process.env.LOCALAPPDATA || '').trim()
   const programFiles = (process.env.ProgramFiles || '').trim()
@@ -50,6 +78,24 @@ function getVoicevoxExecutableCandidates() {
   if (programFilesX86) {
     candidates.push(path.join(programFilesX86, 'VOICEVOX', 'VOICEVOX.exe'))
     candidates.push(path.join(programFilesX86, 'VOICEVOX Engine', 'run.exe'))
+  }
+
+  // winget portable installs can live under LocalAppData\Microsoft\WinGet\Packages.
+  if (localAppData) {
+    const wingetPackagesDir = path.join(localAppData, 'Microsoft', 'WinGet', 'Packages')
+    try {
+      if (fs.existsSync(wingetPackagesDir)) {
+        const packageDirs = fs.readdirSync(wingetPackagesDir, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory() && entry.name.startsWith('HiroshibaKazuyuki.VOICEVOX'))
+          .map((entry) => path.join(wingetPackagesDir, entry.name))
+        for (const packageDir of packageDirs) {
+          candidates.push(path.join(packageDir, 'VOICEVOX', 'VOICEVOX.exe'))
+          candidates.push(path.join(packageDir, 'VOICEVOX', 'vv-engine', 'run.exe'))
+        }
+      }
+    } catch {
+      // Best-effort path discovery only.
+    }
   }
 
   return [...new Set(candidates)]

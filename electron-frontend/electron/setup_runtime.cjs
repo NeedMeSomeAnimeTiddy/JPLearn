@@ -86,7 +86,8 @@ const VOICE_MODELS = {
   '0.6b': {
     talkerFilename: 'voice-model-0.6b.marker',
     talkerRepo: 'local',
-    talkerSizeMb: 0,
+    // Approximate installer footprint for ETA only.
+    talkerSizeMb: 1200,
     label: 'VOICEVOX Local Engine',
     description: 'Use a locally running VOICEVOX engine (default: 127.0.0.1:50021).',
   },
@@ -99,10 +100,6 @@ const VOICE_TOKENIZER = {
 const VOICE_DEFAULT_TIER = '0.6b'
 const VOICEVOX_HOST = (process.env.JPLEARN_VOICEVOX_HOST || '127.0.0.1').trim()
 const VOICEVOX_PORT = Number(process.env.JPLEARN_VOICEVOX_PORT || 50021)
-const VOICEVOX_WINGET_IDS = [
-  'HiroshibaKazuyuki.VOICEVOX',
-  'HiroshibaKazuyuki.VOICEVOX.CPU',
-]
 const ACTIVE_VOICE_MODEL_STATE_FILENAME = 'active-voice-model.json'
 const SENTINEL_NAME = '.setup-done'
 const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
@@ -123,6 +120,8 @@ const EXPECTED_FONT_WEIGHT_COUNT = 17
 const LLAMA_CPP_SIZE_MB = 250
 const FONTS_SIZE_MB = 100
 const DICTIONARY_SIZE_MB = 30
+const VOICEVOX_PORTABLE_RELEASE = '0.25.2'
+const VOICEVOX_PORTABLE_DOWNLOAD_URL = `https://github.com/VOICEVOX/voicevox/releases/download/${VOICEVOX_PORTABLE_RELEASE}/voicevox-windows-cpu-${VOICEVOX_PORTABLE_RELEASE}.zip`
 
 // Offline Japanese speech recognition (faster-whisper). Used by the speech-
 // answer minigame mode. Downloaded via scripts/get_whisper_model.py, which
@@ -235,6 +234,24 @@ function getVoiceModelsDir(base) {
   return path.join(getVoiceDir(base), 'models')
 }
 
+function getVoicevoxAssetsInstallDir(base) {
+  return path.join(base, 'tools', 'voicevox')
+}
+
+function getVoicevoxAssetsExecutableCandidates(base) {
+  const installDir = getVoicevoxAssetsInstallDir(base)
+  return [
+    path.join(installDir, 'VOICEVOX.exe'),
+    path.join(installDir, 'vv-engine', 'run.exe'),
+    path.join(installDir, 'VOICEVOX', 'VOICEVOX.exe'),
+    path.join(installDir, 'VOICEVOX', 'vv-engine', 'run.exe'),
+  ]
+}
+
+function isVoicevoxInstalledInAssets(base) {
+  return getVoicevoxAssetsExecutableCandidates(base).some((candidate) => fs.existsSync(candidate))
+}
+
 function isVoiceTalkerInstalled(base, tier) {
   const model = VOICE_MODELS[tier]
   if (!model) return false
@@ -251,6 +268,9 @@ function getVoicevoxExecutableCandidates() {
   if (explicit) {
     candidates.push(explicit)
   }
+
+  const base = getJPLearnDir()
+  candidates.push(...getVoicevoxAssetsExecutableCandidates(base))
 
   const localAppData = (process.env.LOCALAPPDATA || '').trim()
   const programFiles = (process.env.ProgramFiles || '').trim()
@@ -269,72 +289,147 @@ function getVoicevoxExecutableCandidates() {
     candidates.push(path.join(programFilesX86, 'VOICEVOX Engine', 'run.exe'))
   }
 
+  // winget portable installs can live under LocalAppData\Microsoft\WinGet\Packages.
+  if (localAppData) {
+    const wingetPackagesDir = path.join(localAppData, 'Microsoft', 'WinGet', 'Packages')
+    try {
+      if (fs.existsSync(wingetPackagesDir)) {
+        const packageDirs = fs.readdirSync(wingetPackagesDir, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory() && entry.name.startsWith('HiroshibaKazuyuki.VOICEVOX'))
+          .map((entry) => path.join(wingetPackagesDir, entry.name))
+        for (const packageDir of packageDirs) {
+          candidates.push(path.join(packageDir, 'VOICEVOX', 'VOICEVOX.exe'))
+          candidates.push(path.join(packageDir, 'VOICEVOX', 'vv-engine', 'run.exe'))
+        }
+      }
+    } catch {
+      // Best-effort path discovery only.
+    }
+  }
+
   return [...new Set(candidates)]
+}
+
+function resolvePortableExtractRoot(extractDir) {
+  const direct = path.join(extractDir, 'VOICEVOX.exe')
+  if (fs.existsSync(direct)) {
+    return extractDir
+  }
+  const nested = path.join(extractDir, 'VOICEVOX', 'VOICEVOX.exe')
+  if (fs.existsSync(nested)) {
+    return path.join(extractDir, 'VOICEVOX')
+  }
+  const entries = fs.readdirSync(extractDir, { withFileTypes: true }).filter((entry) => entry.isDirectory())
+  for (const entry of entries) {
+    const dir = path.join(extractDir, entry.name)
+    if (fs.existsSync(path.join(dir, 'VOICEVOX.exe'))) {
+      return dir
+    }
+    if (fs.existsSync(path.join(dir, 'VOICEVOX', 'VOICEVOX.exe'))) {
+      return path.join(dir, 'VOICEVOX')
+    }
+  }
+  return null
+}
+
+function expandZipArchive(zipPath, destinationDir) {
+  return new Promise((resolve, reject) => {
+    const command = `Expand-Archive -Path '${zipPath.replace(/'/g, "''")}' -DestinationPath '${destinationDir.replace(/'/g, "''")}' -Force`
+    const child = spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      windowsHide: true,
+    })
+    let output = ''
+    child.stdout.on('data', (chunk) => {
+      output += chunk.toString()
+      if (output.length > 2000) output = output.slice(-2000)
+    })
+    child.stderr.on('data', (chunk) => {
+      output += chunk.toString()
+      if (output.length > 2000) output = output.slice(-2000)
+    })
+    child.on('error', (error) => reject(new Error(`Failed to start archive extraction: ${error.message}`)))
+    child.on('close', (code) => {
+      if (Number(code || 0) === 0) {
+        resolve()
+      } else {
+        reject(new Error(`Expand-Archive exited with code ${code}${output ? `: ${output.trim()}` : ''}`))
+      }
+    })
+  })
+}
+
+function installVoicevoxPortableToAssets(base, sender) {
+  const installDir = getVoicevoxAssetsInstallDir(base)
+  fs.mkdirSync(installDir, { recursive: true })
+
+  const zipPath = path.join(installDir, `voicevox-windows-cpu-${VOICEVOX_PORTABLE_RELEASE}.zip`)
+  const extractDir = path.join(installDir, '_extract')
+  const targetDir = path.join(installDir, 'VOICEVOX')
+
+  let lastEtaSec = null
+  let lastDone = 0
+  let lastTime = Date.now()
+
+  const emit = (percent, mb = null, totalMb = null, etaSec = null) => {
+    if (sender && !sender.isDestroyed()) {
+      sender.send('setup:download-progress', {
+        id: 'voice',
+        percent,
+        mb,
+        totalMb,
+        etaSec,
+      })
+    }
+  }
+
+  emit(0)
+
+  return downloadWithProgress(VOICEVOX_PORTABLE_DOWNLOAD_URL, zipPath, (done, total) => {
+    const now = Date.now()
+    const elapsed = (now - lastTime) / 1000
+    if (elapsed > 0) {
+      const bytesPerSec = (done - lastDone) / elapsed
+      lastDone = done
+      lastTime = now
+      if (bytesPerSec > 0) {
+        lastEtaSec = Math.round((total - done) / bytesPerSec)
+      }
+    }
+    const rawPercent = Math.round((done / total) * 100)
+    const mappedPercent = Math.max(1, Math.min(92, rawPercent))
+    emit(mappedPercent, Math.round(done / (1024 * 1024)), Math.round(total / (1024 * 1024)), lastEtaSec)
+  }).then(async () => {
+    emit(94)
+    fs.rmSync(extractDir, { recursive: true, force: true })
+    fs.mkdirSync(extractDir, { recursive: true })
+
+    await expandZipArchive(zipPath, extractDir)
+    emit(97)
+
+    const extractedRoot = resolvePortableExtractRoot(extractDir)
+    if (!extractedRoot) {
+      throw new Error('VOICEVOX archive extracted, but executable was not found')
+    }
+
+    fs.rmSync(targetDir, { recursive: true, force: true })
+    fs.mkdirSync(path.dirname(targetDir), { recursive: true })
+    fs.cpSync(extractedRoot, targetDir, { recursive: true, force: true })
+
+    fs.rmSync(extractDir, { recursive: true, force: true })
+    try { fs.unlinkSync(zipPath) } catch { /* ignore */ }
+
+    const installedExe = path.join(targetDir, 'VOICEVOX.exe')
+    if (!fs.existsSync(installedExe)) {
+      throw new Error('VOICEVOX install completed, but executable validation failed')
+    }
+
+    emit(100)
+    return { ok: true, mode: 'assets-portable', installDir: targetDir }
+  })
 }
 
 function resolveInstalledVoicevoxExecutable() {
   return getVoicevoxExecutableCandidates().find((candidate) => fs.existsSync(candidate)) || null
-}
-
-function isVoicevoxWingetPackageInstalled() {
-  for (const packageId of VOICEVOX_WINGET_IDS) {
-    try {
-      const result = spawnSync(
-        'winget',
-        ['list', '--id', packageId, '-e', '--accept-source-agreements'],
-        { windowsHide: true, encoding: 'utf8' },
-      )
-      if (result.status === 0 && typeof result.stdout === 'string' && result.stdout.includes(packageId)) {
-        return true
-      }
-    } catch {
-      // Best effort check only.
-    }
-  }
-  return false
-}
-
-function installVoicevoxViaWinget(packageId) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      'winget',
-      [
-        'install',
-        '--id',
-        packageId,
-        '-e',
-        '--scope',
-        'user',
-        '--accept-package-agreements',
-        '--accept-source-agreements',
-        '--silent',
-        '--disable-interactivity',
-      ],
-      { windowsHide: true },
-    )
-
-    let output = ''
-    child.stdout.on('data', (chunk) => {
-      output += chunk.toString()
-      if (output.length > 2000) {
-        output = output.slice(-2000)
-      }
-    })
-    child.stderr.on('data', (chunk) => {
-      output += chunk.toString()
-      if (output.length > 2000) {
-        output = output.slice(-2000)
-      }
-    })
-
-    child.on('close', (code) => {
-      resolve({ code: Number(code || 0), output: output.trim() })
-    })
-
-    child.on('error', (error) => {
-      reject(new Error(`Failed to start winget install: ${error.message}`))
-    })
-  })
 }
 
 function ensureVoiceSetupMarkers(base, tier) {
@@ -1331,7 +1426,7 @@ function downloadVoiceModel(tier, sender, scriptRoot) {
   const base = ensureJPLearnDirs()
   pruneDeprecatedVoiceAssets(base)
 
-  const voicevoxAlreadyInstalled = Boolean(resolveInstalledVoicevoxExecutable()) || isVoicevoxWingetPackageInstalled()
+  const voicevoxAlreadyInstalled = isVoicevoxInstalledInAssets(base)
   if (voicevoxAlreadyInstalled) {
     ensureVoiceSetupMarkers(base, tier)
     return Promise.resolve({ alreadyInstalled: true })
@@ -1346,40 +1441,10 @@ function downloadVoiceModel(tier, sender, scriptRoot) {
   emitProgress(0)
 
   return (async () => {
-    let lastCode = 0
-    let lastOutput = ''
-    for (let index = 0; index < VOICEVOX_WINGET_IDS.length; index += 1) {
-      const packageId = VOICEVOX_WINGET_IDS[index]
-      emitProgress(25 + index * 30)
-      const result = await installVoicevoxViaWinget(packageId)
-      lastCode = result.code
-      lastOutput = result.output
-      if (result.code === 0) {
-        ensureVoiceSetupMarkers(base, tier)
-        emitProgress(100)
-        return { ok: true, mode: 'winget-install', packageId }
-      }
-      // 0x8A150014: package not found with current source/catalog.
-      if (result.code === 2316632084) {
-        continue
-      }
-      // If winget reports a non-zero code but the package is now installed,
-      // still treat setup as successful.
-      if (Boolean(resolveInstalledVoicevoxExecutable()) || isVoicevoxWingetPackageInstalled()) {
-        ensureVoiceSetupMarkers(base, tier)
-        emitProgress(100)
-        return { ok: true, mode: 'winget-install-detected', packageId }
-      }
-    }
-
-    if (Boolean(resolveInstalledVoicevoxExecutable()) || isVoicevoxWingetPackageInstalled()) {
-      ensureVoiceSetupMarkers(base, tier)
-      emitProgress(100)
-      return { ok: true, mode: 'winget-install-detected' }
-    }
-
-    const detail = lastOutput ? `: ${lastOutput}` : ''
-    throw new Error(`winget install failed (code ${lastCode})${detail}`)
+    const portableResult = await installVoicevoxPortableToAssets(base, sender)
+    ensureVoiceSetupMarkers(base, tier)
+    emitProgress(100)
+    return portableResult
   })()
 }
 
