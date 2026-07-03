@@ -19,30 +19,11 @@ import unicodedata
 from typing import Callable, Mapping
 from uuid import uuid4
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8")
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-_assets_dir = os.environ.get("JPLEARN_ASSETS_DIR", "").strip() or os.environ.get("JPLEARN_USER_DATA_DIR", "").strip()
-_docs_dir = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
-OFFLINE_DICTIONARY_DIR = (
-    Path(_assets_dir) / "data" / "external_sources" / "offline_dictionary"
-    if _assets_dir
-    else Path(_docs_dir) / "data" / "external_sources" / "offline_dictionary"
-    if _docs_dir
-    else PROJECT_ROOT / "data" / "external_sources" / "offline_dictionary"
-)
-OFFLINE_DICTIONARY_DB_CANDIDATES = (
-    OFFLINE_DICTIONARY_DIR / "jmdict_lookup.sqlite",
-    PROJECT_ROOT / "data" / "external_sources" / "offline_dictionary" / "jmdict_lookup.sqlite",
-)
-
-from data.study_pipeline import (
+from data.study_pipeline import (  # noqa: E402
     append_assistant_chat_turn,
     assemble_assistant_chat_context,
     assemble_assistant_chat_context_v2_with_embeddings,
@@ -62,51 +43,50 @@ from data.study_pipeline import (
     load_deck_summary_counts,
     load_review_states,
     load_streak_state,
-    load_today_progress,
     reset_study_db,
     review_minigame_result,
     save_session_goal,
     load_session_summary,
     track_assistant_event_interaction,
 )
-from data.database import save_state
-from domain.blocks import (
+from data.database import save_state  # noqa: E402
+from domain.blocks import (  # noqa: E402
     blocks_for_slug,
     compute_block_mastery,
     compute_unlocked_count,
     unlock_threshold_for_slug,
 )
-from domain.cards import Card, Deck
-from domain.distractors import rank_distractor_ids
-from domain.decks import ALL_DECKS
-from domain.scheduler import ReviewState, update
-from domain.queue_builder import build_study_queue
-from domain.decks import (
+from domain.cards import Card, Deck  # noqa: E402
+from domain.distractors import rank_distractor_ids  # noqa: E402
+from domain.decks import ALL_DECKS  # noqa: E402
+from domain.scheduler import ReviewState, update  # noqa: E402
+from domain.queue_builder import build_study_queue  # noqa: E402
+from domain.decks import (  # noqa: E402
     VOCAB_N1_EXTERNAL_DATA,
     VOCAB_N2_EXTERNAL_DATA,
     VOCAB_N3_EXTERNAL_DATA,
     VOCAB_N4_EXTERNAL_DATA,
     VOCAB_N5_EXTERNAL_DATA,
 )
-from domain.progression import NodeProgressionState, ProgressionState
-from domain.progression_curriculum import JPLEARN_GRAPH
-from domain.progression_service import (
+from domain.progression import NodeProgressionState, ProgressionState  # noqa: E402
+from domain.progression_curriculum import JPLEARN_GRAPH  # noqa: E402
+from domain.progression_service import (  # noqa: E402
     build_initial_state,
     reachable_nodes,
 )
-from domain.feature_catalog import JPLEARN_FEATURES
-from domain.feature_service import build_feature_state, evaluate_features
-from domain.features import FeatureState
-from domain.xp import DEFAULT_CURVE, XP_CORRECT_ANSWER, UserProgress, XPEvent
-from domain.level_service import (
+from domain.feature_catalog import JPLEARN_FEATURES  # noqa: E402
+from domain.feature_service import evaluate_features  # noqa: E402
+from domain.features import FeatureState  # noqa: E402
+from domain.xp import DEFAULT_CURVE, XP_CORRECT_ANSWER, UserProgress, XPEvent  # noqa: E402
+from domain.level_service import (  # noqa: E402
     apply_xp,
     compute_level as compute_xp_level,
     xp_for_level_up,
     xp_to_next_level as xp_left,
 )
-from domain.recommendation import CategoryMetrics, StudySnapshot
-from domain.recommendation_service import generate_recommendations
-from domain.tutor_service import (
+from domain.recommendation import CategoryMetrics, StudySnapshot  # noqa: E402
+from domain.recommendation_service import generate_recommendations  # noqa: E402
+from domain.tutor_service import (  # noqa: E402
     active_reactions,
     from_feature_event,
     from_level_event,
@@ -114,7 +94,7 @@ from domain.tutor_service import (
     from_recommendation,
     generate_reactions,
 )
-from data.database import (
+from data.database import (  # noqa: E402
     load_feature_unlocks,
     load_tutor_seen_keys,
     load_user_progression,
@@ -122,31 +102,47 @@ from data.database import (
     save_feature_unlock,
     save_tutor_seen_key,
     save_user_xp,
-    upsert_progression_node,
 )
-from data.jlpt_repository import (
+from data.jlpt_repository import (  # noqa: E402
     load_card_accuracy_map,
     load_jlpt_exam_history,
     save_jlpt_exam_result,
 )
-from data import deck_portability
-from data.settings_repository import get_setting, set_setting
-from domain.readiness import (
+from data import deck_portability  # noqa: E402
+from data.settings_repository import get_setting, set_setting  # noqa: E402
+from domain.readiness import (  # noqa: E402
     LEARNING_PATHS,
     build_learning_path_status,
 )
-from domain.jlpt_readiness import (
+from domain.jlpt_readiness import (  # noqa: E402
     JLPT_LEVEL_SPECS,
     LEVEL_ORDER,
     compute_readiness_report,
 )
-from domain.jlpt_sessions import (
-    JLPTExamMode,
+from domain.jlpt_sessions import (  # noqa: E402
     build_adaptive_review_queue,
     build_diagnostic_queue,
     build_mock_exam_queue,
     build_weak_area_queue,
-    project_mock_score,
+)
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
+_assets_dir = os.environ.get("JPLEARN_ASSETS_DIR", "").strip() or os.environ.get("JPLEARN_USER_DATA_DIR", "").strip()
+_docs_dir = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
+OFFLINE_DICTIONARY_DIR = (
+    Path(_assets_dir) / "data" / "external_sources" / "offline_dictionary"
+    if _assets_dir
+    else Path(_docs_dir) / "data" / "external_sources" / "offline_dictionary"
+    if _docs_dir
+    else PROJECT_ROOT / "data" / "external_sources" / "offline_dictionary"
+)
+OFFLINE_DICTIONARY_DB_CANDIDATES = (
+    OFFLINE_DICTIONARY_DIR / "jmdict_lookup.sqlite",
+    PROJECT_ROOT / "data" / "external_sources" / "offline_dictionary" / "jmdict_lookup.sqlite",
 )
 
 SENTENCE_EXAMPLES_CSV_CANDIDATES = (
@@ -241,7 +237,12 @@ def _dictionary_query_terms(query: str) -> list[str]:
     normalized = _normalize_dictionary_query(query)
     if not normalized:
         return []
-    parts = [part for part in re.split(r"\s+", normalized) if part]
+    if _DICTIONARY_JAPANESE_RE.search(normalized):
+        parts = [part for part in re.split(r"\s+", normalized) if part]
+    else:
+        # English queries benefit from word-token extraction so punctuation
+        # like "hello!" still matches the intended gloss term "hello".
+        parts = re.findall(r"[a-z0-9']+", normalized)
     return parts or [normalized]
 
 
@@ -254,7 +255,7 @@ def _escape_fts5_term(term: str) -> str:
     return term.replace('"', '""')
 
 
-_DICTIONARY_RESULT_LIMIT = 20
+_DICTIONARY_RESULT_LIMIT = 120
 # If the common-word tier returns fewer than this many hits, also search the
 # rest of the dictionary (rare/obscure entries, foreign-greeting loanwords,
 # etc.) and append those below the common results.
@@ -465,8 +466,6 @@ def build_dictionary_search_payload(query: str) -> dict[str, object]:
     db_path = _dictionary_db_path()
     if db_path is None:
         raise FileNotFoundError("Offline dictionary index is not installed")
-
-    is_japanese_query = bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", normalized_query))
 
     conn = sqlite3.connect(db_path)
     try:
@@ -1353,7 +1352,6 @@ def _build_category_metrics_for_node(node_id: str) -> CategoryMetrics:
     # 7-day accuracy from review events
     from data.database import _connect, init_db
     init_db()
-    import sqlite3
     with _connect() as conn:
         row = conn.execute(
             """
@@ -1474,7 +1472,6 @@ def build_tutor_reactions_payload() -> dict[str, object]:
     # Top recommendation as a tutor event
     recs_payload = build_recommendations_payload()
     for r in recs_payload.get("recommendations", [])[:1]:
-        rec_obj = generate_recommendations.__module__  # just to get the type
         # Reconstruct StudyRecommendation from payload dict
         from domain.recommendation import StudyRecommendation as SR
         sr = SR(

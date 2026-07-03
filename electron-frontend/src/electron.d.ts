@@ -444,6 +444,9 @@ interface DesktopApi {
   downloadSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   setActiveSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   uninstallSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
+  downloadOcrModel?: (tier: 'standard') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  setActiveOcrModel?: (tier: 'standard') => Promise<{ ok: boolean; tier: string }>
+  uninstallOcrModel?: (tier: 'standard') => Promise<{ ok: boolean; tier: string }>
   transcribeSpeech?: (payload: SpeechTranscribePayload) => Promise<SpeechTranscriptionResult>
   getSpeechStatus?: () => Promise<SpeechRuntimeStatus>
   createShortcuts?: (opts: { desktop?: boolean; startMenu?: boolean }) => Promise<{ ok: boolean }>
@@ -487,6 +490,15 @@ interface SetupVoiceModelOption {
   estimatedDownloadMinutes?: number | null
 }
 
+interface SetupOcrModelOption {
+  tier: 'standard'
+  label: string
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
 interface SpeechTranscribePayload {
   audioBase64: string
   mimeType: 'audio/webm' | 'audio/ogg' | 'audio/wav' | 'audio/wave' | 'audio/x-wav'
@@ -525,6 +537,10 @@ interface SetupSystemInfo {
   speechModels: SetupSpeechModelOption[]
   recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
   activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
+  ocrModels?: SetupOcrModelOption[]
+  recommendedOcrTier?: 'standard'
+  activeOcrModelTier?: 'standard' | null
+  ocrInstalled?: boolean
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
@@ -537,7 +553,7 @@ interface SetupSystemInfo {
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech'
+  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr'
   percent: number
   mb: number | null
   totalMb: number | null

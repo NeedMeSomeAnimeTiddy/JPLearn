@@ -3264,6 +3264,17 @@ function App() {
     }>
     recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
     activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
+    ocrModels?: Array<{
+      tier: 'standard'
+      label: string
+      description: string
+      sizeMb: number
+      installed: boolean
+      estimatedDownloadMinutes?: number | null
+    }>
+    recommendedOcrTier?: 'standard'
+    activeOcrModelTier?: 'standard' | null
+    ocrInstalled?: boolean
   } | null>(null)
   const [voiceOptions] = useState<VoiceOptionEntry[]>(FIXED_JAPANESE_VOICE_OPTIONS)
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
@@ -3274,6 +3285,9 @@ function App() {
   const [speechDownloadingTier, setSpeechDownloadingTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
   const [speechDownloadProgress, setSpeechDownloadProgress] = useState<number>(0)
   const [speechModelActionTier, setSpeechModelActionTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
+  const [ocrDownloadingTier, setOcrDownloadingTier] = useState<'standard' | null>(null)
+  const [ocrDownloadProgress, setOcrDownloadProgress] = useState<number>(0)
+  const [ocrModelActionTier, setOcrModelActionTier] = useState<'standard' | null>(null)
   const [voiceEngineDownloadingTier, setVoiceEngineDownloadingTier] = useState<'0.6b' | null>(null)
   const [voiceEngineDownloadProgress, setVoiceEngineDownloadProgress] = useState<number>(0)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
@@ -3863,6 +3877,10 @@ function App() {
         speechModels: setupInfo.speechModels ?? [],
         recommendedSpeechTier: setupInfo.recommendedSpeechTier,
         activeSpeechModelTier: setupInfo.activeSpeechModelTier ?? null,
+        ocrModels: setupInfo.ocrModels ?? [],
+        recommendedOcrTier: setupInfo.recommendedOcrTier,
+        activeOcrModelTier: setupInfo.activeOcrModelTier ?? null,
+        ocrInstalled: setupInfo.ocrInstalled ?? false,
       })
     } catch {
       // Best effort only.
@@ -3924,6 +3942,10 @@ function App() {
       }
       if (evt.id === 'speech') {
         setSpeechDownloadProgress(evt.percent)
+        return
+      }
+      if (evt.id === 'ocr') {
+        setOcrDownloadProgress(evt.percent)
         return
       }
       if (evt.id !== 'model') {
@@ -4037,6 +4059,50 @@ function App() {
       setSpeechModelActionTier(null)
     }
   }, [refreshTutorInstallInfo, speechModelActionTier])
+
+  const downloadOcrModel = useCallback(async (tier: 'standard') => {
+    const downloadModel = window.jplearnDesktop.downloadOcrModel
+    if (!downloadModel || ocrDownloadingTier) {
+      return
+    }
+    setOcrDownloadingTier(tier)
+    setOcrDownloadProgress(0)
+    try {
+      await downloadModel(tier)
+      await refreshTutorInstallInfo()
+    } finally {
+      setOcrDownloadingTier(null)
+      setOcrDownloadProgress(0)
+    }
+  }, [ocrDownloadingTier, refreshTutorInstallInfo])
+
+  const selectOcrModel = useCallback(async (tier: 'standard') => {
+    const setActiveOcrModel = window.jplearnDesktop.setActiveOcrModel
+    if (!setActiveOcrModel || ocrModelActionTier) {
+      return
+    }
+    setOcrModelActionTier(tier)
+    try {
+      await setActiveOcrModel(tier)
+      await refreshTutorInstallInfo()
+    } finally {
+      setOcrModelActionTier(null)
+    }
+  }, [ocrModelActionTier, refreshTutorInstallInfo])
+
+  const uninstallOcrModel = useCallback(async (tier: 'standard') => {
+    const uninstallModel = window.jplearnDesktop.uninstallOcrModel
+    if (!uninstallModel || ocrModelActionTier) {
+      return
+    }
+    setOcrModelActionTier(tier)
+    try {
+      await uninstallModel(tier)
+      await refreshTutorInstallInfo()
+    } finally {
+      setOcrModelActionTier(null)
+    }
+  }, [ocrModelActionTier, refreshTutorInstallInfo])
 
   const downloadVoiceEngineModel = useCallback(async (tier: '0.6b') => {
     const downloadVoiceEngine = window.jplearnDesktop.downloadVoiceEngine
@@ -8900,6 +8966,115 @@ function App() {
                       </p>
                     </div>
                   ) : null}
+                </SettingsCollapsibleSection>
+                ) : null}
+
+                {activeSettingsTab === 'tutor' ? (
+                <SettingsCollapsibleSection
+                  id="image-ocr"
+                  title="Image OCR"
+                  description="Install PaddleOCR Japanese assets so Tutor chat can read text from imported images offline."
+                  meta={(tutorInstallInfo?.ocrModels ?? []).some((model) => model.installed) ? 'Installed' : 'Not installed'}
+                  collapsed={Boolean(collapsedSettingsSections['image-ocr'])}
+                  onToggle={() => toggleThemeSectionCollapsed('image-ocr')}
+                  className="settings-theme-card"
+                >
+                  <div style={{ display: 'grid', gap: '0.65rem' }}>
+                    {(tutorInstallInfo?.ocrModels ?? []).map((model) => {
+                      const isDownloadingThis = ocrDownloadingTier === model.tier
+                      const isActioningThis = ocrModelActionTier === model.tier
+                      const isActiveTier = tutorInstallInfo?.activeOcrModelTier === model.tier
+
+                      return (
+                        <div
+                          key={model.tier}
+                          style={{
+                            padding: '0.75rem 0.9rem',
+                            borderRadius: '12px',
+                            background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
+                            border: isActiveTier
+                              ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
+                              : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <div>
+                              <p style={{ margin: 0, fontWeight: 600 }}>
+                                {model.label}
+                                {isActiveTier ? ' · Active' : ''}
+                              </p>
+                              <p className="settings-help" style={{ marginTop: '0.25rem' }}>
+                                {formatModelSize(model.sizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
+                              </p>
+                              <p className="settings-help" style={{ marginTop: '0.2rem' }}>
+                                {model.installed ? 'Installed' : model.description}
+                              </p>
+                              {tutorInstallInfo?.recommendedOcrTier === model.tier ? (
+                                <p className="settings-help" style={{ marginTop: '0.2rem', color: 'var(--accent, #7eb8ea)' }}>
+                                  Recommended default OCR package
+                                </p>
+                              ) : null}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                              {model.installed ? (
+                                <button
+                                  type="button"
+                                  className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
+                                  onClick={() => { void selectOcrModel(model.tier) }}
+                                  disabled={isActiveTier || ocrModelActionTier !== null || ocrDownloadingTier !== null}
+                                  aria-label={isActiveTier ? `${model.label} is the active OCR model` : `Use ${model.label} for image OCR`}
+                                  title={isActiveTier ? 'Currently active' : 'Use this model'}
+                                >
+                                  {isActiveTier ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" /> : <Circle size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="settings-card-icon-button"
+                                onClick={() => { void downloadOcrModel(model.tier) }}
+                                disabled={ocrDownloadingTier !== null || ocrModelActionTier !== null}
+                                aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                                title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                              >
+                                {isDownloadingThis
+                                  ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                                  : model.installed
+                                    ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
+                                    : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
+                              </button>
+                              {model.installed ? (
+                                <button
+                                  type="button"
+                                  className="settings-inline-icon-button"
+                                  onClick={() => { void uninstallOcrModel(model.tier) }}
+                                  disabled={ocrModelActionTier !== null || ocrDownloadingTier !== null}
+                                  aria-label={`Uninstall ${model.label}`}
+                                  title={`Uninstall ${model.label}`}
+                                >
+                                  {isActioningThis
+                                    ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                                    : <Trash2 size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                          {isDownloadingThis ? (
+                            <div>
+                              <div className="settings-progress-track">
+                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, ocrDownloadProgress))}%` }} />
+                              </div>
+                              <p className="settings-help" style={{ marginTop: '0.3rem' }}>
+                                Downloading… {Math.round(ocrDownloadProgress)}%
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="settings-help" style={{ marginTop: '0.75rem' }}>
+                    Select the circle icon to choose the active OCR package used by Tutor chat image text extraction.
+                  </p>
                 </SettingsCollapsibleSection>
                 ) : null}
 

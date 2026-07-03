@@ -32,7 +32,8 @@ type DictionaryLookupPayload = Awaited<ReturnType<NonNullable<typeof window.jple
 
 const HISTORY_STORAGE_KEY = 'jplearn-dictionary-history-v1'
 const MAX_HISTORY = 8
-const MAX_RESULTS = 12
+const INITIAL_VISIBLE_RESULTS = 12
+const RESULTS_PAGE_SIZE = 12
 
 function normalizeQuery(value: string): string {
   return value.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ')
@@ -128,7 +129,6 @@ function dedupeResults(results: DictionaryResult[]): DictionaryResult[] {
     if (seen.has(key)) continue
     seen.add(key)
     deduped.push(result)
-    if (deduped.length >= MAX_RESULTS) break
   }
   return deduped
 }
@@ -169,12 +169,14 @@ async function copyText(value: string): Promise<void> {
 
 export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, onPlayAudio, voiceBusy, voiceUnavailable }: DictionaryPopupProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const resultsPaneRef = useRef<HTMLElement | null>(null)
   const searchRequestIdRef = useRef(0)
   const [query, setQuery] = useState('')
   const [history, setHistory] = useState<string[]>(() => loadHistory())
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [remoteResults, setRemoteResults] = useState<DictionaryResult[]>([])
   const [searchStatus, setSearchStatus] = useState<'idle' | 'searching' | 'ready' | 'unavailable' | 'error'>('idle')
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_RESULTS)
   const [openCopyMenu, setOpenCopyMenu] = useState<string | null>(null)
   const openCopyMenuRef = useRef<string | null>(null)
   const [playFailedFor, setPlayFailedFor] = useState<string | null>(null)
@@ -196,11 +198,16 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
       setCopiedKey(null)
       setRemoteResults([])
       setSearchStatus('idle')
+      setVisibleCount(INITIAL_VISIBLE_RESULTS)
       setOpenCopyMenu(null)
       setPlayFailedFor(null)
       pendingPlayCharacterRef.current = null
     }
   }, [open])
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_RESULTS)
+  }, [query])
 
   useEffect(() => {
     const wasBusy = wasVoiceBusyRef.current
@@ -310,6 +317,16 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
     return dedupeResults(mergedResults)
   }, [cards, query, remoteResults])
 
+  const visibleResults = useMemo(
+    () => results.slice(0, visibleCount),
+    [results, visibleCount],
+  )
+  const hasMoreResults = visibleResults.length < results.length
+
+  const loadMoreResults = () => {
+    setVisibleCount((previous) => Math.min(results.length, previous + RESULTS_PAGE_SIZE))
+  }
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextHistory = updateHistory(history, query)
@@ -410,7 +427,20 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
         ) : null}
 
         <div className="dictionary-body">
-          <section className="dictionary-results-pane">
+          <section
+            ref={resultsPaneRef}
+            className="dictionary-results-pane"
+            onScroll={(event) => {
+              if (!hasMoreResults) {
+                return
+              }
+              const target = event.currentTarget
+              const remaining = target.scrollHeight - target.scrollTop - target.clientHeight
+              if (remaining <= 120) {
+                loadMoreResults()
+              }
+            }}
+          >
             <div className="dictionary-section-title-row">
               <h3>Results</h3>
               <span>
@@ -427,7 +457,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
               </div>
             ) : results.length > 0 ? (
               <div className="dictionary-result-list">
-                {results.map((result) => {
+                {visibleResults.map((result) => {
                   const copyPrefix = `${result.id}-${result.character}`
                   const visibleTags = (result.tags ?? []).filter((tag) => tag !== 'offline_dictionary')
                   const isCopyMenuOpen = openCopyMenu === copyPrefix
@@ -518,6 +548,11 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                     </article>
                   )
                 })}
+                {hasMoreResults ? (
+                  <div className="dictionary-empty-state" style={{ paddingTop: 4 }}>
+                    <p>Scroll for more results…</p>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="dictionary-empty-state">

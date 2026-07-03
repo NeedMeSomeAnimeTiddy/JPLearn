@@ -28,6 +28,10 @@ interface SystemInfo {
   speechModels: SpeechModelOption[]
   recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
   activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
+  ocrModels?: OcrModelOption[]
+  recommendedOcrTier?: 'standard'
+  activeOcrModelTier?: 'standard' | null
+  ocrInstalled?: boolean
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
@@ -48,6 +52,15 @@ interface SpeechModelOption {
   estimatedDownloadMinutes?: number | null
 }
 
+interface OcrModelOption {
+  tier: 'standard'
+  label: string
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
 interface VoiceModelOption {
   tier: '0.6b'
   filename: string
@@ -60,7 +73,7 @@ interface VoiceModelOption {
 }
 
 interface ProgressEvent {
-  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech'
+  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -88,6 +101,7 @@ type AppRegionStyle = React.CSSProperties & {
 
 type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'skip'
 type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra' | 'skip'
+type OcrTier = 'standard' | 'skip'
 type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
 type VoiceTier = '0.6b' | 'skip'
 type SetupMode = 'advanced' | 'simple'
@@ -354,6 +368,8 @@ export function SetupWizard({ onComplete }: Props) {
   const [dictionaryProgress, setDictionaryProgress] = useState(0)
   const [selectedSpeechTier, setSelectedSpeechTier] = useState<SpeechTier>('fast')
   const [speechProgress, setSpeechProgress] = useState(0)
+  const [selectedOcrTier, setSelectedOcrTier] = useState<OcrTier>('skip')
+  const [ocrProgress, setOcrProgress] = useState(0)
   const [createDesktop, setCreateDesktop] = useState(true)
   const [createStartMenu, setCreateStartMenu] = useState(true)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -402,6 +418,12 @@ export function SetupWizard({ onComplete }: Props) {
         }
         return info.activeSpeechModelTier ?? info.recommendedSpeechTier ?? 'fast'
       })
+      setSelectedOcrTier((prev) => {
+        if (prev !== 'skip' && info.ocrModels?.some((model) => model.tier === prev)) {
+          return prev
+        }
+        return info.activeOcrModelTier ?? 'skip'
+      })
     } catch {
       setSysInfo((prev) => prev ?? {
         totalRamGb: 0,
@@ -416,6 +438,10 @@ export function SetupWizard({ onComplete }: Props) {
         speechModels: [],
         recommendedSpeechTier: 'fast',
         activeSpeechModelTier: null,
+        ocrModels: [],
+        recommendedOcrTier: 'standard',
+        activeOcrModelTier: null,
+        ocrInstalled: false,
         isPackaged: false,
         voiceInstalled: false,
         voiceModels: [],
@@ -435,6 +461,7 @@ export function SetupWizard({ onComplete }: Props) {
     setInstallFonts(false)
     setInstallDictionary(true)
     setSelectedSpeechTier('fast')
+    setSelectedOcrTier('skip')
   }, [])
 
   // Fetch system info once we enter the setup flow beyond mode selection.
@@ -479,6 +506,8 @@ export function SetupWizard({ onComplete }: Props) {
         setDictionaryProgress(evt.percent)
       } else if (evt.id === 'speech') {
         setSpeechProgress(evt.percent)
+      } else if (evt.id === 'ocr') {
+        setOcrProgress(evt.percent)
       }
       if (evt.logMessage) {
         appendProgressLog(evt.logMessage)
@@ -509,6 +538,7 @@ export function SetupWizard({ onComplete }: Props) {
     const needsFonts = installFonts && !effectiveSysInfo?.fontsInstalled
     const needsDictionary = installDictionary && !effectiveSysInfo?.dictionaryInstalled
     const needsSpeech = selectedSpeechTier !== 'skip' && !effectiveSysInfo?.speechModels.find((m) => m.tier === selectedSpeechTier)?.installed
+    const needsOcr = selectedOcrTier !== 'skip' && !effectiveSysInfo?.ocrModels?.find((m) => m.tier === selectedOcrTier)?.installed
 
     setDownloadError(null)
     setProgressLogs([])
@@ -524,6 +554,7 @@ export function SetupWizard({ onComplete }: Props) {
     setFontsMb(null)
     setDictionaryProgress(needsDictionary ? 0 : 100)
     setSpeechProgress(needsSpeech ? 0 : 100)
+    setOcrProgress(needsOcr ? 0 : 100)
     appendProgressLog('Starting setup tasks…')
     setPage(8)
 
@@ -609,6 +640,19 @@ export function SetupWizard({ onComplete }: Props) {
           })
         }
       }
+      if (needsOcr) {
+        appendProgressLog(`Starting OCR model download (${selectedOcrTier})…`)
+        const task = api.downloadOcrModel?.(selectedOcrTier)
+        if (task) {
+          downloadTasks.push({
+            name: 'ocr',
+            promise: task.then((result) => {
+              setOcrProgress(100)
+              return result
+            }),
+          })
+        }
+      }
 
       if (downloadTasks.length > 0) {
         const results = await Promise.allSettled(downloadTasks.map((task) => task.promise))
@@ -630,7 +674,7 @@ export function SetupWizard({ onComplete }: Props) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, selectedLlamaBackend, selectedVoiceTier, installFonts, installDictionary, selectedSpeechTier, sysInfo, createDesktop, createStartMenu, appendProgressLog])
+  }, [selectedTier, selectedLlamaBackend, selectedVoiceTier, installFonts, installDictionary, selectedSpeechTier, selectedOcrTier, sysInfo, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -726,6 +770,25 @@ export function SetupWizard({ onComplete }: Props) {
     : (selectedSpeechModelHardwareFit && !selectedSpeechModelHardwareFit.isOk
       ? selectedSpeechModelHardwareFit.message
       : null)
+
+  const ocrModelOptions: CompactDropdownOption[] = [
+    ...(sysInfo?.ocrModels?.map((model) => ({
+      value: model.tier,
+      label: model.label,
+      meta: `${formatSize(model.sizeMb)} • ${formatDurationMinutes(model.estimatedDownloadMinutes)}${model.installed ? ' • Installed' : ''}`,
+      badge: model.tier === sysInfo?.recommendedOcrTier ? 'Recommended' : undefined,
+      badgeTone: model.tier === sysInfo?.recommendedOcrTier ? ('recommended' as const) : undefined,
+    })) ?? []),
+    {
+      value: 'skip',
+      label: 'Skip OCR install',
+      meta: 'Install later from settings',
+    },
+  ]
+  const selectedOcrModel = sysInfo?.ocrModels?.find((model) => model.tier === selectedOcrTier)
+  const selectedOcrTierDescription = selectedOcrTier === 'skip'
+    ? 'You can install OCR later from Settings to read text from images in Tutor chat.'
+    : selectedOcrModel?.description
 
   const availableVoiceModels = sysInfo?.voiceModels ?? []
   const defaultVoiceModel = sysInfo?.voiceDefaultModel
@@ -999,7 +1062,7 @@ export function SetupWizard({ onComplete }: Props) {
     6: (
       <PageLayout
         title="Reading Assets (optional)"
-        subtitle="Install optional Japanese fonts and offline dictionary data."
+        subtitle="Install optional fonts, offline dictionary, and OCR assets."
         onNext={() => setPage(7)}
         onBack={() => setPage(5)}
         nextLabel="Continue"
@@ -1037,6 +1100,24 @@ export function SetupWizard({ onComplete }: Props) {
             />
           )}
         </div>
+
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Image OCR (optional)</p>
+          <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
+            Installs PaddleOCR Japanese assets so Tutor chat can read Japanese text from imported images offline.
+          </p>
+          <CompactDropdown
+            ariaLabel="OCR model"
+            options={ocrModelOptions}
+            value={selectedOcrTier}
+            onChange={(value) => setSelectedOcrTier(value as OcrTier)}
+          />
+          {selectedOcrTierDescription ? (
+            <p style={{ opacity: 0.65, fontSize: '0.84rem', lineHeight: 1.45, margin: '0.6rem 0 0' }}>
+              {selectedOcrTierDescription}
+            </p>
+          ) : null}
+        </div>
       </PageLayout>
     ),
 
@@ -1048,16 +1129,18 @@ export function SetupWizard({ onComplete }: Props) {
       const needsFonts = installFonts && !sysInfo?.fontsInstalled
       const needsDictionary = installDictionary && !sysInfo?.dictionaryInstalled
       const needsSpeech = selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find(m => m.tier === selectedSpeechTier)?.installed
+      const needsOcr = selectedOcrTier !== 'skip' && !sysInfo?.ocrModels?.find(m => m.tier === selectedOcrTier)?.installed
       const modelInfo = sysInfo?.models.find(m => m.tier === selectedTier)
       const speechModelInfo = sysInfo?.speechModels.find(m => m.tier === selectedSpeechTier)
       const voiceModelInfo = availableVoiceModels.find(m => m.tier === selectedVoiceTier)
+      const ocrModelInfo = sysInfo?.ocrModels?.find(m => m.tier === selectedOcrTier)
       return (
         <PageLayout
           title="Ready to download"
           subtitle="Review what will be downloaded, then click Start Setup."
           onNext={startDownloads}
           onBack={() => setPage(setupMode === 'simple' ? 2 : 6)}
-          nextLabel={needsModel || needsLlama || needsVoice || needsFonts || needsDictionary || needsSpeech ? 'Start Setup' : 'Finish'}
+          nextLabel={needsModel || needsLlama || needsVoice || needsFonts || needsDictionary || needsSpeech || needsOcr ? 'Start Setup' : 'Finish'}
         >
           {needsModel && modelInfo && (
             <SummaryRow label="AI Tutor model" detail={`${modelInfo.label} — ${formatSize(modelInfo.sizeMb)}`} />
@@ -1077,7 +1160,10 @@ export function SetupWizard({ onComplete }: Props) {
           {needsSpeech && speechModelInfo && (
             <SummaryRow label="Speech recognition model" detail={`${speechModelInfo.label} — ${formatSize(speechModelInfo.sizeMb)}`} />
           )}
-          {!needsModel && !needsVoice && !needsFonts && !needsDictionary && !needsSpeech && (
+          {needsOcr && ocrModelInfo && (
+            <SummaryRow label="Image OCR model" detail={`${ocrModelInfo.label} — ${formatSize(ocrModelInfo.sizeMb)}`} />
+          )}
+          {!needsModel && !needsVoice && !needsFonts && !needsDictionary && !needsSpeech && !needsOcr && (
             <p style={{ opacity: 0.7 }}>Nothing to download — all selected components are already installed.</p>
           )}
           {sysInfo?.isPackaged && (
@@ -1142,6 +1228,9 @@ export function SetupWizard({ onComplete }: Props) {
         )}
         {selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find((model) => model.tier === selectedSpeechTier)?.installed && (
           <ProgressBar value={speechProgress} label="Speech recognition model" />
+        )}
+        {selectedOcrTier !== 'skip' && !sysInfo?.ocrModels?.find((model) => model.tier === selectedOcrTier)?.installed && (
+          <ProgressBar value={ocrProgress} label="Image OCR model" />
         )}
         {downloadError && (
           <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.35)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>

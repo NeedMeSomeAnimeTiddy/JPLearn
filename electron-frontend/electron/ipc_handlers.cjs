@@ -978,6 +978,45 @@ function registerIpcHandlers(options) {
       }
     })
 
+    options.ipcMain.handle('setup:download-ocr-model', async (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['standard'].includes(tier)) {
+        throw new Error('Invalid OCR model tier')
+      }
+      try {
+        return await setupRuntime.downloadOcrModel(tier, event.sender, options.repoRoot)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`OCR model download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:set-active-ocr-model', (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['standard'].includes(tier)) {
+        throw new Error('Invalid OCR model tier')
+      }
+      try {
+        return setupRuntime.setActiveOcrModelTier(tier)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to select OCR model: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:uninstall-ocr-model', (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['standard'].includes(tier)) {
+        throw new Error('Invalid OCR model tier')
+      }
+      try {
+        return setupRuntime.uninstallOcrModel(tier)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to uninstall OCR model: ${detail}`)
+      }
+    })
+
     options.ipcMain.handle('setup:create-shortcuts', (event, opts) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       const safeOpts = opts && typeof opts === 'object' ? opts : {}

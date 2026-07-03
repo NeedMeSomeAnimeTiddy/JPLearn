@@ -149,6 +149,14 @@ const SPEECH_MODELS = {
   },
 }
 const ACTIVE_SPEECH_MODEL_STATE_FILENAME = 'active-speech-model.json'
+const OCR_MODELS = {
+  standard: {
+    label: 'Standard (PaddleOCR Japanese, ~220 MB)',
+    description: 'Offline Japanese image text recognition for tutor chat image uploads.',
+    sizeMb: 220,
+  },
+}
+const ACTIVE_OCR_MODEL_STATE_FILENAME = 'active-ocr-model.json'
 const SPEED_TEST_TIMEOUT_MS = 12000
 const SPEED_TEST_TARGETS = [
   { url: 'https://proof.ovh.net/files/10Mb.dat', bytes: 10485760 },
@@ -218,7 +226,7 @@ function getFontInstallState(base) {
 
 function ensureJPLearnDirs() {
   const base = getJPLearnDir()
-  for (const sub of ['models', 'tts', 'data', 'fonts', 'tools', 'whisper']) {
+  for (const sub of ['models', 'tts', 'data', 'fonts', 'tools', 'whisper', 'ocr']) {
     fs.mkdirSync(path.join(base, sub), { recursive: true })
   }
   return base
@@ -699,6 +707,76 @@ function uninstallSpeechModel(tier) {
   return { ok: true, tier }
 }
 
+function getOcrModelDir(base, tier) {
+  return path.join(base, 'ocr', tier)
+}
+
+function getOcrReadyMarkerPath(base, tier) {
+  return path.join(getOcrModelDir(base, tier), 'model.ready')
+}
+
+function isOcrModelInstalled(base, tier) {
+  return fs.existsSync(getOcrReadyMarkerPath(base, tier))
+}
+
+function getActiveOcrModelStatePath(base) {
+  return path.join(base, 'ocr', ACTIVE_OCR_MODEL_STATE_FILENAME)
+}
+
+function readActiveOcrModelSelection(base) {
+  try {
+    const raw = fs.readFileSync(getActiveOcrModelStatePath(base), 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.tier === 'string') {
+      return parsed
+    }
+  } catch {
+    // No selection yet, or the file is unreadable; caller falls back to auto-detect.
+  }
+  return null
+}
+
+function resolveActiveOcrTier(base) {
+  const selection = readActiveOcrModelSelection(base)
+  if (selection && OCR_MODELS[selection.tier] && isOcrModelInstalled(base, selection.tier)) {
+    return selection.tier
+  }
+  for (const tier of Object.keys(OCR_MODELS)) {
+    if (isOcrModelInstalled(base, tier)) {
+      return tier
+    }
+  }
+  return null
+}
+
+function setActiveOcrModelTier(tier) {
+  if (!OCR_MODELS[tier]) throw new Error(`Unknown OCR model tier: ${tier}`)
+  const base = ensureJPLearnDirs()
+  if (!isOcrModelInstalled(base, tier)) {
+    throw new Error(`OCR model tier "${tier}" is not installed`)
+  }
+  fs.writeFileSync(
+    getActiveOcrModelStatePath(base),
+    JSON.stringify({ tier, updatedAtUtc: new Date().toISOString() }, null, 2),
+    'utf8',
+  )
+  return { ok: true, tier }
+}
+
+function uninstallOcrModel(tier) {
+  if (!OCR_MODELS[tier]) throw new Error(`Unknown OCR model tier: ${tier}`)
+  const base = ensureJPLearnDirs()
+  const dir = getOcrModelDir(base, tier)
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+  const selection = readActiveOcrModelSelection(base)
+  if (selection && selection.tier === tier) {
+    try { fs.unlinkSync(getActiveOcrModelStatePath(base)) } catch { /* ignore */ }
+  }
+  return { ok: true, tier }
+}
+
 function resolvePythonCommand(scriptRoot) {
   const resourcesPath = (process.resourcesPath || '').trim()
   if (resourcesPath) {
@@ -894,6 +972,14 @@ async function getSystemInfo() {
     installed: isSpeechModelInstalled(base, tier),
     estimatedDownloadMinutes: estimateDownloadMinutes(m.sizeMb, networkMbps),
   }))
+  const ocrModels = Object.entries(OCR_MODELS).map(([tier, m]) => ({
+    tier,
+    label: m.label,
+    description: m.description,
+    sizeMb: m.sizeMb,
+    installed: isOcrModelInstalled(base, tier),
+    estimatedDownloadMinutes: estimateDownloadMinutes(m.sizeMb, networkMbps),
+  }))
 
   let isPackaged = false
   try { isPackaged = require('electron').app.isPackaged } catch { /* dev mode */ }
@@ -964,6 +1050,10 @@ async function getSystemInfo() {
     speechModels,
     recommendedSpeechTier: recommendSpeechTier(totalRamGb, gpuVramGb || 0),
     activeSpeechModelTier: resolveActiveSpeechTier(base),
+    ocrModels,
+    recommendedOcrTier: 'standard',
+    activeOcrModelTier: resolveActiveOcrTier(base),
+    ocrInstalled: ocrModels.some((model) => model.installed),
     isPackaged,
     networkMbps,
     llamaCppEstimatedDownloadMinutes: estimateDownloadMinutes(LLAMA_CPP_SIZE_MB, networkMbps),
@@ -1673,6 +1763,85 @@ function downloadSpeechModel(tier, sender, scriptRoot) {
   })
 }
 
+function downloadOcrModel(tier, sender, scriptRoot) {
+  if (!OCR_MODELS[tier]) return Promise.reject(new Error(`Unknown OCR model tier: ${tier}`))
+
+  const base = ensureJPLearnDirs()
+
+  if (isOcrModelInstalled(base, tier)) {
+    return Promise.resolve({ alreadyInstalled: true })
+  }
+
+  const scriptPath = path.join(scriptRoot, 'scripts', 'get_paddleocr_model.py')
+  const pythonCmd = resolvePythonCommand(scriptRoot)
+  const modelDir = getOcrModelDir(base, tier)
+  fs.mkdirSync(modelDir, { recursive: true })
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonCmd, [scriptPath, '--tier', tier, '--dest', modelDir], {
+      env: {
+        ...process.env,
+        JPLEARN_ASSETS_DIR: base,
+        JPLEARN_DOCUMENTS_DIR: base,
+      },
+      windowsHide: true,
+    })
+
+    const TOTAL_PHASES = 3
+    let currentPhase = 0
+    let currentPhasePct = 0
+
+    const emitProgress = () => {
+      const overall = ((currentPhase + currentPhasePct / 100) / TOTAL_PHASES) * 100
+      const pct = Math.max(0, Math.min(99, Math.round(overall)))
+      if (sender && !sender.isDestroyed()) {
+        sender.send('setup:download-progress', { id: 'ocr', percent: pct, mb: null, totalMb: null, etaSec: null })
+      }
+    }
+
+    child.stdout.on('data', (chunk) => {
+      const text = chunk.toString()
+      const phaseMatch = text.match(/PHASE (\d+)\/(\d+):/)
+      if (phaseMatch) {
+        currentPhase = Math.max(0, parseInt(phaseMatch[1], 10) - 1)
+        currentPhasePct = 0
+        emitProgress()
+      }
+      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*\((\d+) MB\)/i)
+      if (pctMatch) {
+        currentPhasePct = Math.max(0, Math.min(100, parseInt(pctMatch[1], 10)))
+        emitProgress()
+      }
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        try {
+          fs.writeFileSync(getOcrReadyMarkerPath(base, tier), new Date().toISOString(), 'utf8')
+        } catch {
+          reject(new Error('OCR model finished but ready marker could not be written'))
+          return
+        }
+        try {
+          if (!resolveActiveOcrTier(base)) {
+            setActiveOcrModelTier(tier)
+          }
+        } catch {
+          // Best effort; download still succeeded.
+        }
+        if (sender && !sender.isDestroyed()) {
+          sender.send('setup:download-progress', { id: 'ocr', percent: 100, mb: null, totalMb: null, etaSec: null })
+        }
+        resolve({ ok: true })
+      } else {
+        reject(new Error(`get_paddleocr_model.py exited with code ${code}`))
+      }
+    })
+
+    child.on('error', reject)
+  })
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 function downloadFonts(sender, scriptRoot) {
   const base = ensureJPLearnDirs()
@@ -1798,6 +1967,7 @@ function createSetupRuntime() {
     downloadFonts,
     downloadDictionary,
     downloadSpeechModel,
+    downloadOcrModel,
     createShortcuts,
     setActiveVoiceModel,
     setActiveModelTier,
@@ -1805,6 +1975,8 @@ function createSetupRuntime() {
     uninstallVoiceModel,
     setActiveSpeechModelTier,
     uninstallSpeechModel,
+    setActiveOcrModelTier,
+    uninstallOcrModel,
   }
 }
 
