@@ -97,6 +97,8 @@ const VOICE_TOKENIZER = {
   sizeMb: 0,
 }
 const VOICE_DEFAULT_TIER = '0.6b'
+const VOICEVOX_HOST = (process.env.JPLEARN_VOICEVOX_HOST || '127.0.0.1').trim()
+const VOICEVOX_PORT = Number(process.env.JPLEARN_VOICEVOX_PORT || 50021)
 const ACTIVE_VOICE_MODEL_STATE_FILENAME = 'active-voice-model.json'
 const SENTINEL_NAME = '.setup-done'
 const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
@@ -237,6 +239,77 @@ function isVoiceTalkerInstalled(base, tier) {
 
 function isVoiceTokenizerInstalled(base) {
   return fs.existsSync(path.join(getVoiceModelsDir(base), VOICE_TOKENIZER.filename))
+}
+
+function getVoicevoxExecutableCandidates() {
+  const candidates = []
+  const explicit = (process.env.JPLEARN_VOICEVOX_EXECUTABLE || '').trim()
+  if (explicit) {
+    candidates.push(explicit)
+  }
+
+  const localAppData = (process.env.LOCALAPPDATA || '').trim()
+  const programFiles = (process.env.ProgramFiles || '').trim()
+  const programFilesX86 = (process.env['ProgramFiles(x86)'] || '').trim()
+
+  if (localAppData) {
+    candidates.push(path.join(localAppData, 'Programs', 'VOICEVOX', 'VOICEVOX.exe'))
+    candidates.push(path.join(localAppData, 'Programs', 'VOICEVOX Engine', 'run.exe'))
+  }
+  if (programFiles) {
+    candidates.push(path.join(programFiles, 'VOICEVOX', 'VOICEVOX.exe'))
+    candidates.push(path.join(programFiles, 'VOICEVOX Engine', 'run.exe'))
+  }
+  if (programFilesX86) {
+    candidates.push(path.join(programFilesX86, 'VOICEVOX', 'VOICEVOX.exe'))
+    candidates.push(path.join(programFilesX86, 'VOICEVOX Engine', 'run.exe'))
+  }
+
+  return [...new Set(candidates)]
+}
+
+function resolveInstalledVoicevoxExecutable() {
+  return getVoicevoxExecutableCandidates().find((candidate) => fs.existsSync(candidate)) || null
+}
+
+function ensureVoiceSetupMarkers(base, tier) {
+  const model = VOICE_MODELS[tier]
+  if (!model) {
+    return
+  }
+  const modelsDir = getVoiceModelsDir(base)
+  fs.mkdirSync(modelsDir, { recursive: true })
+  const talkerDest = path.join(modelsDir, model.talkerFilename)
+  const tokenizerDest = path.join(modelsDir, VOICE_TOKENIZER.filename)
+  if (!fs.existsSync(talkerDest)) {
+    fs.writeFileSync(talkerDest, 'voice-model-ready\n', 'utf8')
+  }
+  if (!fs.existsSync(tokenizerDest)) {
+    fs.writeFileSync(tokenizerDest, 'voice-engine-shared-ready\n', 'utf8')
+  }
+}
+
+function probeVoicevoxReachable(timeoutMs = 1200) {
+  return new Promise((resolve) => {
+    const request = http.request(
+      {
+        host: VOICEVOX_HOST,
+        port: VOICEVOX_PORT,
+        method: 'GET',
+        path: '/version',
+      },
+      (response) => {
+        const status = response.statusCode || 0
+        resolve(status >= 200 && status < 300)
+      },
+    )
+    request.setTimeout(timeoutMs, () => {
+      request.destroy()
+      resolve(false)
+    })
+    request.on('error', () => resolve(false))
+    request.end()
+  })
 }
 
 function hasAnyVoiceTalkerInstalled(base) {
@@ -684,8 +757,10 @@ async function getSystemInfo() {
   })
 
   const voiceTokenizerInstalled = isVoiceTokenizerInstalled(base)
+  const voicevoxInstalled = Boolean(resolveInstalledVoicevoxExecutable())
+  const voiceEngineReachable = await probeVoicevoxReachable()
   const voiceModels = Object.entries(VOICE_MODELS).map(([tier, m]) => {
-    const installed = isVoiceTalkerInstalled(base, tier)
+    const installed = isVoiceTalkerInstalled(base, tier) || voicevoxInstalled || voiceEngineReachable
     // Combined size only counts the tokenizer once, and only if it still
     // needs downloading -- mirrors downloadVoiceModel' own dedupe logic.
     const combinedSizeMb = m.talkerSizeMb + (voiceTokenizerInstalled ? 0 : VOICE_TOKENIZER.sizeMb)
@@ -700,7 +775,9 @@ async function getSystemInfo() {
       estimatedDownloadMinutes: estimateDownloadMinutes(combinedSizeMb, networkMbps),
     }
   })
-  const voiceInstalled = hasAnyVoiceTalkerInstalled(base) && voiceTokenizerInstalled
+  const voiceInstalled = (hasAnyVoiceTalkerInstalled(base) && voiceTokenizerInstalled)
+    || voicevoxInstalled
+    || voiceEngineReachable
   const voiceDefaultModel = VOICE_DEFAULT_TIER
   const activeVoiceModel = resolveActiveVoiceModel(base)
 
@@ -1188,15 +1265,10 @@ function downloadVoiceModel(tier, sender, scriptRoot) {
 
   const base = ensureJPLearnDirs()
   pruneDeprecatedVoiceAssets(base)
-  const modelsDir = getVoiceModelsDir(base)
-  fs.mkdirSync(modelsDir, { recursive: true })
-  const talkerDest = path.join(modelsDir, model.talkerFilename)
-  const tokenizerDest = path.join(modelsDir, VOICE_TOKENIZER.filename)
 
-  const talkerAlready = fs.existsSync(talkerDest)
-  const tokenizerAlready = fs.existsSync(tokenizerDest)
-
-  if (talkerAlready && tokenizerAlready) {
+  const voicevoxAlreadyInstalled = Boolean(resolveInstalledVoicevoxExecutable())
+  if (voicevoxAlreadyInstalled) {
+    ensureVoiceSetupMarkers(base, tier)
     return Promise.resolve({ alreadyInstalled: true })
   }
 
@@ -1207,10 +1279,45 @@ function downloadVoiceModel(tier, sender, scriptRoot) {
   }
 
   emitProgress(0)
-  fs.writeFileSync(talkerDest, 'voice-model-ready\n', 'utf8')
-  fs.writeFileSync(tokenizerDest, 'voice-engine-shared-ready\n', 'utf8')
-  emitProgress(100)
-  return Promise.resolve({ ok: true, mode: 'marker-only' })
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      'winget',
+      [
+        'install',
+        '--id',
+        'VOICEVOX.VOICEVOX',
+        '-e',
+        '--accept-package-agreements',
+        '--accept-source-agreements',
+        '--silent',
+        '--disable-interactivity',
+      ],
+      { windowsHide: true },
+    )
+
+    emitProgress(35)
+    child.stdout.on('data', () => {
+      emitProgress(65)
+    })
+    child.stderr.on('data', () => {
+      emitProgress(75)
+    })
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`winget install exited with code ${code}`))
+        return
+      }
+      ensureVoiceSetupMarkers(base, tier)
+      emitProgress(100)
+      resolve({ ok: true, mode: 'winget-install' })
+    })
+
+    child.on('error', (error) => {
+      reject(new Error(`Failed to start winget install: ${error.message}`))
+    })
+  })
 }
 
 function downloadLlamaCpp(sender, scriptRoot, requestedBackend) {

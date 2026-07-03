@@ -1,4 +1,7 @@
 const http = require('node:http')
+const fs = require('node:fs')
+const path = require('node:path')
+const { spawn } = require('node:child_process')
 
 const DEFAULT_MAX_TEXT_CHARS = 400
 const DEFAULT_REQUEST_TIMEOUT_MS = 30000
@@ -6,6 +9,7 @@ const DEFAULT_SAMPLE_RATE = 24000
 
 const VOICEVOX_HOST = (process.env.JPLEARN_VOICEVOX_HOST || '127.0.0.1').trim()
 const VOICEVOX_PORT = Number(process.env.JPLEARN_VOICEVOX_PORT || 50021)
+const VOICEVOX_AUTOSTART_ENABLED = String(process.env.JPLEARN_VOICEVOX_AUTOSTART || '1').trim() !== '0'
 
 const VOICE_CATALOG = [
   { voiceId: 'zundamon_normal', displayName: 'Zundamon', description: 'ずんだもん (ノーマル)', gender: 'neutral', searchTerms: ['zundamon', 'ずんだもん', 'normal'], speaker: 3 },
@@ -19,6 +23,60 @@ const VOICE_CATALOG = [
 ]
 
 const VOICE_BY_ID = new Map(VOICE_CATALOG.map((voice) => [voice.voiceId, voice]))
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function getVoicevoxExecutableCandidates() {
+  const candidates = []
+  const explicit = (process.env.JPLEARN_VOICEVOX_EXECUTABLE || '').trim()
+  if (explicit) {
+    candidates.push(explicit)
+  }
+
+  const localAppData = (process.env.LOCALAPPDATA || '').trim()
+  const programFiles = (process.env.ProgramFiles || '').trim()
+  const programFilesX86 = (process.env['ProgramFiles(x86)'] || '').trim()
+
+  if (localAppData) {
+    candidates.push(path.join(localAppData, 'Programs', 'VOICEVOX', 'VOICEVOX.exe'))
+    candidates.push(path.join(localAppData, 'Programs', 'VOICEVOX Engine', 'run.exe'))
+  }
+  if (programFiles) {
+    candidates.push(path.join(programFiles, 'VOICEVOX', 'VOICEVOX.exe'))
+    candidates.push(path.join(programFiles, 'VOICEVOX Engine', 'run.exe'))
+  }
+  if (programFilesX86) {
+    candidates.push(path.join(programFilesX86, 'VOICEVOX', 'VOICEVOX.exe'))
+    candidates.push(path.join(programFilesX86, 'VOICEVOX Engine', 'run.exe'))
+  }
+
+  return [...new Set(candidates)]
+}
+
+function resolveVoicevoxExecutable() {
+  return getVoicevoxExecutableCandidates().find((candidate) => fs.existsSync(candidate)) || null
+}
+
+function launchVoicevoxProcess() {
+  const executablePath = resolveVoicevoxExecutable()
+  if (!executablePath) {
+    return false
+  }
+
+  try {
+    const child = spawn(executablePath, [], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    child.unref()
+    return true
+  } catch {
+    return false
+  }
+}
 
 function sanitizeSpeechText(text) {
   return typeof text === 'string' ? text.trim().slice(0, DEFAULT_MAX_TEXT_CHARS) : ''
@@ -141,6 +199,30 @@ async function checkVoicevoxAvailable() {
   }
 }
 
+async function ensureVoicevoxAvailable() {
+  if (await checkVoicevoxAvailable()) {
+    return true
+  }
+
+  if (!VOICEVOX_AUTOSTART_ENABLED) {
+    return false
+  }
+
+  const started = launchVoicevoxProcess()
+  if (!started) {
+    return false
+  }
+
+  const deadline = Date.now() + 12000
+  while (Date.now() < deadline) {
+    await sleep(400)
+    if (await checkVoicevoxAvailable()) {
+      return true
+    }
+  }
+  return false
+}
+
 function createVoiceRuntime() {
   let lastError = null
   let available = false
@@ -158,7 +240,7 @@ function createVoiceRuntime() {
     },
 
     async preload() {
-      available = await checkVoicevoxAvailable()
+      available = await ensureVoicevoxAvailable()
       if (!available) {
         lastError = `VOICEVOX engine is unavailable at ${VOICEVOX_HOST}:${VOICEVOX_PORT}`
         return { ok: false, ready: false }
@@ -192,6 +274,9 @@ function createVoiceRuntime() {
       const speakerId = selectedVoice.speaker
 
       try {
+        if (!(await ensureVoicevoxAvailable())) {
+          throw new Error(`VOICEVOX engine is unavailable at ${VOICEVOX_HOST}:${VOICEVOX_PORT}`)
+        }
         const audioQueryPath = `/audio_query?speaker=${speakerId}&text=${encodeURIComponent(safeText)}`
         const query = await requestJson('POST', audioQueryPath, null)
         query.speedScale = speed

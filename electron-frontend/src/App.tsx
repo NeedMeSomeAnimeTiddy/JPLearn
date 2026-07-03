@@ -3201,6 +3201,17 @@ function App() {
     llamaCppInstalled: boolean
     gpuVramGb?: number | null
     voiceInstalled: boolean
+    voiceModels: Array<{
+      tier: '0.6b'
+      filename: string
+      sizeMb: number
+      combinedSizeMb: number
+      label: string
+      description: string
+      installed: boolean
+      estimatedDownloadMinutes?: number | null
+    }>
+    activeVoiceModel?: '0.6b' | null
     fontsInstalled: boolean
     dictionaryInstalled: boolean
     llamaCppEstimatedDownloadMinutes?: number | null
@@ -3225,6 +3236,8 @@ function App() {
   const [speechDownloadingTier, setSpeechDownloadingTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
   const [speechDownloadProgress, setSpeechDownloadProgress] = useState<number>(0)
   const [speechModelActionTier, setSpeechModelActionTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
+  const [voiceEngineDownloadingTier, setVoiceEngineDownloadingTier] = useState<'0.6b' | null>(null)
+  const [voiceEngineDownloadProgress, setVoiceEngineDownloadProgress] = useState<number>(0)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
   const [roundFeedbackTone, setRoundFeedbackTone] = useState<FeedbackTone>(null)
   const [roundFeedbackPoints, setRoundFeedbackPoints] = useState<number | null>(null)
@@ -3328,7 +3341,6 @@ function App() {
     const [dictionaryOpenSignal, setDictionaryOpenSignal] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('theme')
-  const [voiceSettingsStep, setVoiceSettingsStep] = useState<1 | 2>(1)
   const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
   const [streakDetailsOpen, setStreakDetailsOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
@@ -3785,6 +3797,8 @@ function App() {
         llamaCppInstalled: setupInfo.llamaCppInstalled,
         gpuVramGb: setupInfo.gpuVramGb ?? null,
         voiceInstalled: setupInfo.voiceInstalled ?? false,
+        voiceModels: setupInfo.voiceModels ?? [],
+        activeVoiceModel: setupInfo.activeVoiceModel ?? null,
         fontsInstalled: setupInfo.fontsInstalled,
         dictionaryInstalled: setupInfo.dictionaryInstalled,
         llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
@@ -3817,6 +3831,10 @@ function App() {
     const unsubscribe = onSetupProgress((evt) => {
       if (evt.id === 'dictionary') {
         setDictionaryProgress(evt.percent)
+        return
+      }
+      if (evt.id === 'voice') {
+        setVoiceEngineDownloadProgress(evt.percent)
         return
       }
       if (evt.id === 'speech') {
@@ -3934,6 +3952,26 @@ function App() {
       setSpeechModelActionTier(null)
     }
   }, [refreshTutorInstallInfo, speechModelActionTier])
+
+  const downloadVoiceEngineModel = useCallback(async (tier: '0.6b') => {
+    const downloadVoiceEngine = window.jplearnDesktop.downloadVoiceEngine
+    if (!downloadVoiceEngine || voiceEngineDownloadingTier) {
+      return
+    }
+    setVoiceEngineDownloadingTier(tier)
+    setVoiceEngineDownloadProgress(0)
+    try {
+      await downloadVoiceEngine(tier)
+      await refreshTutorInstallInfo()
+      const preloadVoice = window.jplearnDesktop.preloadVoice
+      if (preloadVoice) {
+        await preloadVoice(settings.voiceSpeaker)
+      }
+    } finally {
+      setVoiceEngineDownloadingTier(null)
+      setVoiceEngineDownloadProgress(0)
+    }
+  }, [refreshTutorInstallInfo, settings.voiceSpeaker, voiceEngineDownloadingTier])
 
   // Warm the voice engine in the background once voice is enabled so the first
   // spoken prompt doesn't pay the engine cold-start cost.
@@ -4387,12 +4425,6 @@ function App() {
       [sectionId]: !prev[sectionId],
     }))
   }, [])
-
-  useEffect(() => {
-    if (activeSettingsTab === 'voice') {
-      setVoiceSettingsStep(1)
-    }
-  }, [activeSettingsTab])
 
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setSettings((prev) => {
@@ -8888,138 +8920,154 @@ function App() {
                 >
                   <div className="settings-control-content">
                     <p className="settings-section-label">Voice</p>
-                    <div className="settings-voice-stepper" role="tablist" aria-label="Voice setup steps">
+                    <div className="settings-animation-grid" role="group" aria-label="Japanese voice controls">
                       <button
                         type="button"
-                        className={`settings-voice-step-button ${voiceSettingsStep === 1 ? 'is-active' : ''}`}
-                        onClick={() => setVoiceSettingsStep(1)}
-                        aria-pressed={voiceSettingsStep === 1}
+                        className={`settings-icon-entry settings-theme-entry ${settings.voiceEnabled ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
+                        aria-label={settings.voiceEnabled ? 'Spoken prompts enabled. Activate to disable.' : 'Spoken prompts disabled. Activate to enable.'}
+                        aria-pressed={settings.voiceEnabled}
+                        title={settings.voiceEnabled ? 'Spoken prompts enabled' : 'Spoken prompts disabled'}
                       >
-                        1. Japanese Prompt Voice
+                        <span className={`settings-mode-icon-button ${settings.voiceEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+                          <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                        </span>
+                        <span className="settings-icon-entry-label">{settings.voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
                       </button>
+
+                      {settings.voiceEnabled
+                        ? voiceOptions.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className={`settings-icon-entry settings-theme-entry ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
+                            onClick={() => {
+                              setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
+                              void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
+                            }}
+                            disabled={voiceBusy}
+                            aria-label={`Use voice ${option.name} (${option.search}) and hear a sample`}
+                            aria-pressed={settings.voiceSpeaker === option.id}
+                            title={`${option.name} · ${option.search} — click to hear a sample`}
+                          >
+                            <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
+                              <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                            </span>
+                            <span className="settings-icon-entry-label">{option.name}</span>
+                          </button>
+                        ))
+                        : null}
+
                       <button
                         type="button"
-                        className={`settings-voice-step-button ${voiceSettingsStep === 2 ? 'is-active' : ''}`}
-                        onClick={() => setVoiceSettingsStep(2)}
-                        aria-pressed={voiceSettingsStep === 2}
+                        className={`settings-icon-entry settings-theme-entry ${settings.mixedLanguageStitchingEnabled ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({
+                          ...prev,
+                          mixedLanguageStitchingEnabled: !prev.mixedLanguageStitchingEnabled,
+                        }))}
+                        aria-label={settings.mixedLanguageStitchingEnabled
+                          ? 'Mixed-language stitching enabled. Activate to disable.'
+                          : 'Mixed-language stitching disabled. Activate to enable.'}
+                        aria-pressed={settings.mixedLanguageStitchingEnabled}
+                        title={settings.mixedLanguageStitchingEnabled
+                          ? 'Mixed-language stitching enabled'
+                          : 'Mixed-language stitching disabled'}
                       >
-                        2. Conversation Voice
+                        <span className={`settings-mode-icon-button ${settings.mixedLanguageStitchingEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+                          <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                        </span>
+                        <span className="settings-icon-entry-label">
+                          {settings.mixedLanguageStitchingEnabled ? 'Mixed Stitching On' : 'Mixed Stitching Off'}
+                        </span>
                       </button>
                     </div>
 
-                    {voiceSettingsStep === 1 ? (
-                      <div className="settings-voice-step-content" role="group" aria-label="Step 1: Japanese prompt voice">
-                        <div className="settings-animation-grid" role="group" aria-label="Japanese voice controls">
-                          <button
-                            type="button"
-                            className={`settings-icon-entry settings-theme-entry ${settings.voiceEnabled ? 'is-active' : ''}`}
-                            onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
-                            aria-label={settings.voiceEnabled ? 'Spoken prompts enabled. Activate to disable.' : 'Spoken prompts disabled. Activate to enable.'}
-                            aria-pressed={settings.voiceEnabled}
-                            title={settings.voiceEnabled ? 'Spoken prompts enabled' : 'Spoken prompts disabled'}
-                          >
-                            <span className={`settings-mode-icon-button ${settings.voiceEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
-                              <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                            </span>
-                            <span className="settings-icon-entry-label">{settings.voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
-                          </button>
+                    <p className="settings-help" style={{ marginTop: '0.65rem' }}>
+                      {settings.voiceEnabled
+                        ? 'Click a voice to hear a sample. The speaker button in games reads prompts aloud.'
+                        : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
+                      {voiceUnavailable ? ' (Voice runtime unavailable right now.)' : ''}
+                    </p>
+                    <p className="settings-help">
+                      Synthesis debug: {lastVoiceSynthesis
+                        ? `${lastVoiceSynthesis.mode}, ${lastVoiceSynthesis.profile}, ${Math.max(0, Math.round(lastVoiceSynthesis.elapsedMs))}ms`
+                        : 'No playback yet.'}
+                    </p>
 
-                          {settings.voiceEnabled
-                            ? voiceOptions.map((option) => (
-                              <button
-                                key={option.id}
-                                type="button"
-                                className={`settings-icon-entry settings-theme-entry ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
-                                onClick={() => {
-                                  setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
-                                  void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
-                                }}
-                                disabled={voiceBusy}
-                                aria-label={`Use voice ${option.name} (${option.search}) and hear a sample`}
-                                aria-pressed={settings.voiceSpeaker === option.id}
-                                title={`${option.name} · ${option.search} — click to hear a sample`}
-                              >
-                                <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
-                                  <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                                </span>
-                                <span className="settings-icon-entry-label">{option.name}</span>
-                              </button>
-                            ))
-                            : null}
-                        </div>
-                        <p className="settings-help">
-                          {settings.voiceEnabled
-                            ? 'Click a voice to hear a sample. The speaker button in games reads the prompt aloud.'
-                            : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
-                          {voiceUnavailable ? ' (Voice engine unavailable right now.)' : ''}
-                        </p>
-                        <div className="settings-voice-step-actions">
-                          <button
-                            type="button"
-                            className="settings-inline-button"
-                            onClick={() => setVoiceSettingsStep(2)}
-                          >
-                            Continue to Step 2
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
+                    <SettingsCollapsibleSection
+                      id="voicevox-runtime"
+                      title="VOICEVOX Runtime"
+                      description="Install VOICEVOX from Settings and use it for local Japanese speech playback."
+                      meta={tutorInstallInfo?.voiceInstalled ? 'Already installed' : 'Not installed'}
+                      collapsed={Boolean(collapsedSettingsSections['voicevox-runtime'])}
+                      onToggle={() => toggleThemeSectionCollapsed('voicevox-runtime')}
+                      className="settings-theme-card"
+                    >
+                      <div style={{ display: 'grid', gap: '0.65rem' }}>
+                        {(tutorInstallInfo?.voiceModels ?? []).map((model) => {
+                          const isDownloadingThis = voiceEngineDownloadingTier === model.tier
+                          const isActiveTier = tutorInstallInfo?.activeVoiceModel === model.tier
 
-                    {voiceSettingsStep === 2 ? (
-                      <div className="settings-voice-step-content" role="group" aria-label="Step 2: Conversation voice">
-                        <SettingsCollapsibleSection
-                          id="english-chat-voice"
-                          title="Conversation Voice"
-                          description="Conversation playback stays in Japanese mode."
-                          meta="Japanese Only"
-                          collapsed={Boolean(collapsedSettingsSections['english-chat-voice'])}
-                          onToggle={() => toggleThemeSectionCollapsed('english-chat-voice')}
-                          className="settings-theme-card"
-                        >
-                          <div className="settings-animation-grid" role="group" aria-label="Mixed language synthesis strategy">
-                            <button
-                              type="button"
-                              className={`settings-icon-entry settings-theme-entry ${settings.mixedLanguageStitchingEnabled ? 'is-active' : ''}`}
-                              onClick={() => setSettings((prev) => ({
-                                ...prev,
-                                mixedLanguageStitchingEnabled: !prev.mixedLanguageStitchingEnabled,
-                              }))}
-                              aria-label={settings.mixedLanguageStitchingEnabled
-                                ? 'Mixed-language stitching enabled. Activate to disable.'
-                                : 'Mixed-language stitching disabled. Activate to enable.'}
-                              aria-pressed={settings.mixedLanguageStitchingEnabled}
-                              title={settings.mixedLanguageStitchingEnabled
-                                ? 'Mixed-language stitching enabled'
-                                : 'Mixed-language stitching disabled'}
+                          return (
+                            <div
+                              key={model.tier}
+                              style={{
+                                padding: '0.75rem 0.9rem',
+                                borderRadius: '12px',
+                                background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
+                                border: isActiveTier
+                                  ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
+                                  : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
+                              }}
                             >
-                              <span className={`settings-mode-icon-button ${settings.mixedLanguageStitchingEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
-                                <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                              </span>
-                              <span className="settings-icon-entry-label">
-                                {settings.mixedLanguageStitchingEnabled ? 'Mixed Stitching On' : 'Mixed Stitching Off'}
-                              </span>
-                            </button>
-                          </div>
-                          <p className="settings-help">
-                            English playback uses the same selected local speaker from Step 1.
-                          </p>
-                          <p className="settings-help">
-                            Synthesis debug: {lastVoiceSynthesis
-                              ? `${lastVoiceSynthesis.mode}, ${lastVoiceSynthesis.profile}, ${Math.max(0, Math.round(lastVoiceSynthesis.elapsedMs))}ms`
-                              : 'No playback yet.'}
-                          </p>
-                        </SettingsCollapsibleSection>
-                        <div className="settings-voice-step-actions">
-                          <button
-                            type="button"
-                            className="settings-inline-button"
-                            onClick={() => setVoiceSettingsStep(1)}
-                          >
-                            Back to Step 1
-                          </button>
-                        </div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                <div>
+                                  <p style={{ margin: 0, fontWeight: 600 }}>
+                                    {model.label}
+                                    {isActiveTier ? ' · Active' : ''}
+                                  </p>
+                                  <p className="settings-help" style={{ marginTop: '0.25rem' }}>
+                                    {model.installed ? 'Installed' : model.description}
+                                  </p>
+                                  <p className="settings-help" style={{ marginTop: '0.2rem' }}>
+                                    {formatMinutes(model.estimatedDownloadMinutes)}
+                                  </p>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    className="settings-card-icon-button"
+                                    onClick={() => { void downloadVoiceEngineModel(model.tier) }}
+                                    disabled={voiceEngineDownloadingTier !== null}
+                                    aria-label={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}
+                                    title={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}
+                                  >
+                                    {isDownloadingThis
+                                      ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                                      : model.installed
+                                        ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
+                                        : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
+                                  </button>
+                                </div>
+                              </div>
+                              {isDownloadingThis ? (
+                                <div>
+                                  <div className="settings-progress-track">
+                                    <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, voiceEngineDownloadProgress))}%` }} />
+                                  </div>
+                                  <p className="settings-help" style={{ marginTop: '0.3rem' }}>
+                                    Installing… {Math.round(voiceEngineDownloadProgress)}%
+                                  </p>
+                                </div>
+                              ) : null}
+                            </div>
+                          )
+                        })}
                       </div>
-                    ) : null}
+                      <p className="settings-help" style={{ marginTop: '0.75rem' }}>
+                        Installing from this section will also warm up the voice runtime so playback can start immediately.
+                      </p>
+                    </SettingsCollapsibleSection>
                   </div>
                 </div>
                 ) : null}
