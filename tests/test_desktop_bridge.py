@@ -301,6 +301,34 @@ def test_dictionary_hello_prefers_konnichiwa_over_katakana_hello(tmp_path: Path,
     assert any(result["character"] == "ハロー" for result in results)
 
 
+def test_dictionary_semantic_rerank_can_change_lexical_order(tmp_path: Path, monkeypatch) -> None:
+    dictionary_db_path = tmp_path / "dictionary.sqlite"
+    _build_dictionary_db_many(
+        dictionary_db_path,
+        rows=[
+            ("語彙A", "ごいA", "hello", 1),
+            ("語彙B", "ごいB", "hello there", 1),
+        ],
+    )
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (dictionary_db_path,),
+    )
+
+    def fake_semantic_embedder(query: str, candidates: list[str]) -> list[float]:
+        assert query == "hello"
+        return [0.1 if candidate == "hello" else 0.9 for candidate in candidates]
+
+    monkeypatch.setattr(desktop_bridge, "_resolve_dictionary_semantic_embedder", lambda: fake_semantic_embedder)
+
+    payload = desktop_bridge.build_dictionary_search_payload("hello")
+    results = cast(list[dict[str, object]], payload["results"])
+
+    assert len(results) >= 2
+    assert results[0]["character"] == "語彙B"
+
+
 def test_build_deck_cards_sentence_examples_prefers_csv_runtime_source(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

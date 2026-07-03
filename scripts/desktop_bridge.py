@@ -262,6 +262,7 @@ _DICTIONARY_RESULT_LIMIT = 120
 _DICTIONARY_COMMON_FALLBACK_THRESHOLD = 5
 _DICTIONARY_JAPANESE_RE = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]")
 _DICTIONARY_KATAKANA_ONLY_RE = re.compile(r"^[\u30a0-\u30ffー・\s]+$")
+_DICTIONARY_SEMANTIC_RERANK_LIMIT = 80
 _DICTIONARY_GREETINGS_QUERY_BOOST = {
     "hello",
     "hi",
@@ -417,6 +418,20 @@ def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) 
             extra_rows = []
         rows.extend(row for row in extra_rows if row[0] not in seen_ids)
 
+    semantic_scores_by_id: dict[int, float] = {}
+    semantic_embed = _resolve_dictionary_semantic_embedder()
+    if semantic_embed and rows:
+        semantic_candidates = rows[: min(len(rows), _DICTIONARY_SEMANTIC_RERANK_LIMIT)]
+        semantic_texts = [str(row[3]) for row in semantic_candidates]
+        try:
+            semantic_scores = semantic_embed(normalized_query, semantic_texts)
+            for row, score in zip(semantic_candidates, semantic_scores):
+                semantic_scores_by_id[int(row[0])] = float(score)
+        except Exception:
+            # Semantic scoring is an optional ranking enhancement; lexical
+            # ranking remains authoritative when embedder inference fails.
+            semantic_scores_by_id = {}
+
     def _rank_row(row: tuple) -> tuple:
         japanese = str(row[1])
         reading = str(row[2])
@@ -441,10 +456,13 @@ def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) 
             if "こんにちは" in japanese or reading.startswith("こんにち"):
                 greetings_bonus = 2
 
+        semantic_score = semantic_scores_by_id.get(int(row[0]), -1.0)
+
         # Sort by strongest lexical match first, then native-script preference,
         # then FTS relevance and stable deterministic tie-breakers.
         return (
             greetings_bonus,
+            semantic_score,
             exact_gloss_match,
             prefix_gloss_match,
             whole_word_hits,
@@ -1829,6 +1847,47 @@ def _resolve_real_embed_fn():
         return embedder_runtime.encode_text(text, embedder_tier)
 
     return _embed
+
+
+def _resolve_dictionary_semantic_embedder() -> Callable[[str, list[str]], list[float]] | None:
+    """Resolve semantic scorer for dictionary reranking.
+
+    Prefers the installed ONNX embedder mapped to the active chatbot tier.
+    Falls back to the deterministic hashed embedder so semantic reranking still
+    works in development/test environments without optional ML dependencies.
+    """
+
+    from domain.retrieval import cosine_similarity, embed_text
+
+    try:
+        import embedder_runtime
+    except ImportError:
+        embedder_runtime = None
+
+    active_tier = _read_active_chatbot_tier()
+    embedder_tier = (
+        embedder_runtime.resolve_embedder_tier_for_chatbot_tier(active_tier)
+        if embedder_runtime and active_tier
+        else None
+    )
+
+    if embedder_runtime and embedder_tier and embedder_runtime.is_available(embedder_tier):
+        def _score_with_real_embedder(query: str, candidates: list[str]) -> list[float]:
+            if not candidates:
+                return []
+            query_vector = embedder_runtime.encode_text(query, embedder_tier, is_query=True)
+            candidate_vectors = embedder_runtime.encode_texts(candidates, embedder_tier, is_query=False)
+            return [cosine_similarity(query_vector, vector) for vector in candidate_vectors]
+
+        return _score_with_real_embedder
+
+    def _score_with_hashed_embedder(query: str, candidates: list[str]) -> list[float]:
+        if not candidates:
+            return []
+        query_vector = embed_text(query)
+        return [cosine_similarity(query_vector, embed_text(candidate)) for candidate in candidates]
+
+    return _score_with_hashed_embedder
 
 
 # ---------------------------------------------------------------------------
