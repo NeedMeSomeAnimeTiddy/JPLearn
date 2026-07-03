@@ -29,8 +29,10 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hf_download import download_file as _download_file  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -74,18 +76,7 @@ def report(done: int, total: int) -> None:
 
 def download_file(url: str, dest: Path) -> None:
     tmp = dest.with_name(dest.name + ".tmp")
-    req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
-    with urllib.request.urlopen(req) as response:
-        total = int(response.headers.get("Content-Length", "0"))
-        done = 0
-        with open(tmp, "wb") as out:
-            while True:
-                chunk = response.read(1024 * 256)
-                if not chunk:
-                    break
-                out.write(chunk)
-                done += len(chunk)
-                report(done, total)
+    _download_file(url, tmp, report=report)
     print()
     tmp.replace(dest)
 

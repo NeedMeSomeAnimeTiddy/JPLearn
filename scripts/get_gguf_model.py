@@ -28,8 +28,10 @@ import argparse
 import os
 import subprocess
 import sys
-import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hf_download import download_file  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RAM_THRESHOLDS_GB = {
@@ -134,21 +136,12 @@ def download(url: str, tmp_path: Path, final_path: Path) -> None:
     """Download url to tmp_path, then rename to final_path on success.
 
     Writes to a .tmp file first so a cancelled or failed download never leaves
-    a corrupt .gguf that the runtime might try to load.
+    a corrupt .gguf that the runtime might try to load. Uses several
+    concurrent range-request connections (falling back to a single stream
+    when unsupported) since HuggingFace's per-connection throughput is often
+    far below the link's actual bandwidth.
     """
-    req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
-    # urllib.request.urlopen follows HTTP redirects automatically (HuggingFace → CDN).
-    with urllib.request.urlopen(req) as response:
-        total = int(response.headers.get("Content-Length") or 0)
-        done = 0
-        with open(tmp_path, "wb") as handle:
-            while True:
-                chunk = response.read(1024 * 256)
-                if not chunk:
-                    break
-                handle.write(chunk)
-                done += len(chunk)
-                report(done, total)
+    download_file(url, tmp_path, report=report)
     sys.stdout.write("\n")
     tmp_path.rename(final_path)
 

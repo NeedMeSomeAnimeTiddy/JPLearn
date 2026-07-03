@@ -45,8 +45,10 @@ import argparse
 import os
 import sys
 import urllib.error
-import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hf_download import download_file as _download_file  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -99,19 +101,8 @@ def download_file(url: str, dest: Path) -> bool:
     """Download url to dest. Returns False (without raising) on HTTP 404."""
     tmp = dest.with_name(dest.name + ".tmp")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
     try:
-        with urllib.request.urlopen(req) as response:
-            total = int(response.headers.get("Content-Length", "0"))
-            done = 0
-            with open(tmp, "wb") as out:
-                while True:
-                    chunk = response.read(1024 * 256)
-                    if not chunk:
-                        break
-                    out.write(chunk)
-                    done += len(chunk)
-                    report(done, total)
+        _download_file(url, tmp, report=report)
         print()
         tmp.replace(dest)
         return True
