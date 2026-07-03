@@ -110,12 +110,30 @@ function formatDurationMinutes(minutes: number | null | undefined): string {
 function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') {
   const totalRamGb = systemInfo?.totalRamGb ?? 0
   const gpuVramGb = systemInfo?.gpuVramGb ?? 0
+  const minRequirements: Record<'low' | 'medium' | 'high' | 'ultra' | 'max', { ram: number; vram: number }> = {
+    low: { ram: 2, vram: 1 },
+    medium: { ram: 4, vram: 2 },
+    high: { ram: 3, vram: 4 },
+    ultra: { ram: 6, vram: 8 },
+    max: { ram: 8, vram: 11 },
+  }
   const makeFit = (
     badge: string,
     message: string,
     isOk: boolean,
     tone: 'soft' | 'warning' = isOk ? 'soft' : 'warning',
   ) => ({ badge, tone, message, isOk })
+
+  const mins = minRequirements[tier]
+  const ramOnlyFit = totalRamGb >= mins.ram && gpuVramGb < mins.vram
+  if (ramOnlyFit) {
+    return makeFit(
+      'Usable (slower)',
+      `This tier can still run because your RAM meets the minimum (${mins.ram} GB), but GPU VRAM is below the ${mins.vram} GB target. Expect slower performance.`,
+      true,
+      'warning',
+    )
+  }
 
   if (tier === 'low') {
     if (totalRamGb >= 8 || gpuVramGb >= 4) {
