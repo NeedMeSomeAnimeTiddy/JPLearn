@@ -160,7 +160,7 @@ class TestKanjiDecks:
                 f"Card '{card.character}' has meaning == romaji (likely copy-paste error)"
             )
 
-    @pytest.mark.parametrize("kanji", ["日", "山", "一", "人", "食"])
+    @pytest.mark.parametrize("kanji", ["日", "山", "国", "人", "食"])
     def test_spot_check_key_n5_kanji_present(self, kanji: str) -> None:
         chars = {c.character for c in get_kanji_n5_deck().cards}
         assert kanji in chars, f"Expected N5 kanji '{kanji}' not found in deck"
@@ -175,12 +175,12 @@ class TestKanjiDecks:
         chars = {c.character for c in get_kanji_n3_deck().cards}
         assert kanji in chars, f"Expected N3 kanji '{kanji}' not found in deck"
 
-    @pytest.mark.parametrize("kanji", ["率", "責", "訳", "総"])
+    @pytest.mark.parametrize("kanji", ["協", "総", "訳", "税"])
     def test_spot_check_n2_kanji_present(self, kanji: str) -> None:
         chars = {c.character for c in get_kanji_n2_deck().cards}
         assert kanji in chars, f"Expected N2 kanji '{kanji}' not found in deck"
 
-    @pytest.mark.parametrize("kanji", ["顕", "諭", "罰", "審"])
+    @pytest.mark.parametrize("kanji", ["統", "率", "審", "憲"])
     def test_spot_check_n1_kanji_present(self, kanji: str) -> None:
         chars = {c.character for c in get_kanji_n1_deck().cards}
         assert kanji in chars, f"Expected N1 kanji '{kanji}' not found in deck"

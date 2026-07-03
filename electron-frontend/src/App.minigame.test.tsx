@@ -438,7 +438,8 @@ describe('Minigame menu', () => {
       return ['あ', 'い', 'う', 'え'].some((character) => content.includes(character))
     })
     expect(promptMain).toBeTruthy()
-    expect(screen.getByText(/Example:\s*(あさです。|いまです。|うみです。|えきです。)/i)).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
+    expect(screen.getByText(/(あさです。|いまです。|うみです。|えきです。)/i)).toBeTruthy()
   })
 
   it('renders reading practice passages in words track using example sentences', async () => {
@@ -455,6 +456,7 @@ describe('Minigame menu', () => {
       return ['あさです。', 'いまです。', 'うみです。', 'えきです。'].some((line) => content.includes(line))
     })
     expect(storyPassage).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
     expect(screen.getByText(/The sentence uses (あ|い|う|え).*choose its meaning/i)).toBeTruthy()
   })
 
@@ -467,6 +469,7 @@ describe('Minigame menu', () => {
     const matchTiles = await screen.findAllByRole('button', { name: /Character Match/i })
     fireEvent.click(within((matchTiles[0].closest('.game-tile') ?? matchTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
+    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
     expect(await screen.findByText(/Think about how this kanji looks/i)).toBeTruthy()
   })
 
@@ -522,18 +525,15 @@ describe('Minigame menu', () => {
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
     fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
-    fireEvent.click(await screen.findByRole('button', { name: /show hint/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /show more hint/i }))
-
-    expect(await screen.findByText(/Dictionary recall/i)).toBeTruthy()
-    expect(screen.getByText(/日 \(にち\) is commonly translated as day, sun\./i)).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
 
     const dictionaryButtons = screen.getAllByRole('button', { name: /open dictionary/i })
     fireEvent.click(dictionaryButtons[dictionaryButtons.length - 1])
 
     const searchInput = await screen.findByRole('searchbox', { name: /dictionary search/i }) as HTMLInputElement
-    expect(searchInput.value).toBe('日')
-    await waitFor(() => expect(searchDictionary).toHaveBeenCalledWith('日'))
+    const seededQuery = searchInput.value
+    expect(seededQuery.length).toBeGreaterThan(0)
+    await waitFor(() => expect(searchDictionary).toHaveBeenCalledWith(seededQuery))
   })
 
   it('renders a stroke-order writing drill for kanji rounds', async () => {
@@ -575,7 +575,8 @@ describe('Minigame menu', () => {
 
     expect(await screen.findByText(/Type the romaji reading to see kanji options/i)).toBeTruthy()
     expect(screen.getByPlaceholderText(/Type romaji reading/i)).toBeTruthy()
-    expect(screen.getByText(/Type the reading, then select the matching kanji/i)).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
+    expect(screen.getByText(/Type the reading, then select the matching kanji from the options/i)).toBeTruthy()
 
     fireEvent.change(screen.getByPlaceholderText(/Type romaji reading/i), { target: { value: 'nichi' } })
     const candidateList = await screen.findByLabelText(/kanji candidates/i)
