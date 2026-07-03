@@ -220,6 +220,11 @@ tmp/
 # Local llama.cpp binaries and build output
 tools/llama.cpp/
 
+# Local qwentts.cpp clone/patch/build output (see scripts/build_qwentts_cpp.ps1
+# and patches/qwentts-cpp/); the tracked patch is the source of truth, not
+# this directory.
+tools/qwentts.cpp/
+
 # Bundled python-build-standalone (created by CI release workflow; not committed)
 python-bundle/
 

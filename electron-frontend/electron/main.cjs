@@ -5,7 +5,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
-const { createOpenVoiceRuntime, isOpenVoiceInstalled } = require('./openvoice_runtime.cjs')
+const { createQwenttsRuntime, isQwenttsInstalled } = require('./qwentts_runtime.cjs')
 const { createSetupRuntime } = require('./setup_runtime.cjs')
 const { createSpeechRuntime } = require('./speech_runtime.cjs')
 const { loadFontCSS } = require('./font_loader.cjs')
@@ -265,10 +265,10 @@ const windowRestoreBoundsById = new Map()
 let localTutorRuntime = createTutorChatRuntime()
 
 function createSelectedVoiceRuntime() {
-  if (!isOpenVoiceInstalled(repoRoot)) {
-    console.warn('OpenVoice is not fully installed; audio:speak will remain unavailable until setup completes.')
+  if (!isQwenttsInstalled(repoRoot)) {
+    console.warn('qwentts is not fully installed; audio:speak will remain unavailable until setup completes.')
   }
-  return createOpenVoiceRuntime({ repoRoot })
+  return createQwenttsRuntime({ repoRoot })
 }
 
 const localVoiceRuntime = createSelectedVoiceRuntime()
