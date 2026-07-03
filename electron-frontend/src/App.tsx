@@ -875,7 +875,6 @@ interface AppSettings {
   assistantChatEnabled: boolean
   assistantChatAudioEnabled: boolean
   assistantChatAdapter: AssistantChatAdapterMode
-  englishSpeechVoiceName: string | null
   showKeyboardPrompts: boolean
   voiceEnabled: boolean
   voiceSpeaker: string
@@ -1814,47 +1813,6 @@ const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a c
 // rather than shipped as fixed named speakers.
 const VOICE_SAMPLE_LINE = 'こんにちは。いっしょにがんばりましょう。'
 type VoiceOptionEntry = { id: string; name: string; jp: string; search: string }
-const ENGLISH_VOICE_PREFERENCE_HINTS = [
-  'aria',
-  'jenny',
-  'guy',
-  'davis',
-  'zira',
-  'sara',
-  'mark',
-] as const
-
-interface BrowserVoiceOption {
-  name: string
-  lang: string
-}
-
-function getEnglishBrowserVoiceOptions(): BrowserVoiceOption[] {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return []
-  }
-  const voices = window.speechSynthesis.getVoices()
-  return voices
-    .filter((voice) => String(voice.lang || '').toLowerCase().startsWith('en'))
-    .map((voice) => ({
-      name: voice.name,
-      lang: voice.lang,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name))
-}
-
-function resolvePreferredEnglishVoiceName(available: BrowserVoiceOption[], preferredName: string | null): string | null {
-  if (preferredName && available.some((voice) => voice.name === preferredName)) {
-    return preferredName
-  }
-  for (const hint of ENGLISH_VOICE_PREFERENCE_HINTS) {
-    const match = available.find((voice) => voice.name.toLowerCase().includes(hint))
-    if (match) {
-      return match.name
-    }
-  }
-  return available[0]?.name ?? null
-}
 
 const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
   total_beginner:       [],
@@ -2027,7 +1985,6 @@ function defaultSettings(): AppSettings {
     assistantChatEnabled: true,
     assistantChatAudioEnabled: true,
     assistantChatAdapter: 'auto',
-    englishSpeechVoiceName: null,
     showKeyboardPrompts: false,
     voiceEnabled: true,
     voiceSpeaker: 'male_kenji',
@@ -2318,10 +2275,6 @@ function loadSettings(): AppSettings {
       assistantChatAdapter: isAssistantChatAdapterMode(parsed.assistantChatAdapter)
         ? parsed.assistantChatAdapter
         : defaults.assistantChatAdapter,
-      englishSpeechVoiceName:
-        typeof parsed.englishSpeechVoiceName === 'string' && parsed.englishSpeechVoiceName.trim().length > 0
-          ? parsed.englishSpeechVoiceName
-          : defaults.englishSpeechVoiceName,
       showKeyboardPrompts:
         typeof parsed.showKeyboardPrompts === 'boolean'
           ? parsed.showKeyboardPrompts
@@ -3193,7 +3146,6 @@ function App() {
   const [assistantChatLoading, setAssistantChatLoading] = useState(false)
   const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
   const [assistantSpeakingTurnKey, setAssistantSpeakingTurnKey] = useState<string | null>(null)
-  const [englishBrowserVoices, setEnglishBrowserVoices] = useState<BrowserVoiceOption[]>(() => getEnglishBrowserVoiceOptions())
   const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
   const [, setAssistantChatWarmup] = useState(false)
   const [, setAssistantChatFallbackNote] = useState<string | null>(null)
@@ -3502,43 +3454,7 @@ function App() {
       voiceAudioRef.current.pause()
       voiceAudioRef.current = null
     }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-    }
   }, [])
-
-  const playBrowserSpeech = useCallback(async (
-    text: string,
-    language: 'ja' | 'en',
-    runId: number,
-  ): Promise<void> => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
-      return
-    }
-    await new Promise<void>((resolve) => {
-      if (assistantSpeechRunIdRef.current !== runId) {
-        resolve()
-        return
-      }
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.lang = language === 'ja' ? 'ja-JP' : 'en-US'
-      utterance.rate = language === 'ja' ? 0.96 : 0.98
-      if (language === 'en') {
-        const availableVoices = getEnglishBrowserVoiceOptions()
-        const preferredEnglishVoiceName = resolvePreferredEnglishVoiceName(availableVoices, settings.englishSpeechVoiceName)
-        const selectedVoice = preferredEnglishVoiceName
-          ? window.speechSynthesis.getVoices().find((voice) => voice.name === preferredEnglishVoiceName)
-          : undefined
-        if (selectedVoice) {
-          utterance.voice = selectedVoice
-          utterance.lang = selectedVoice.lang || 'en-US'
-        }
-      }
-      utterance.onend = () => resolve()
-      utterance.onerror = () => resolve()
-      window.speechSynthesis.speak(utterance)
-    })
-  }, [settings.englishSpeechVoiceName])
 
   const playVoiceRuntimeAudio = useCallback(async (
     text: string,
@@ -3589,7 +3505,8 @@ function App() {
         }
         const playedByRuntime = await playVoiceRuntimeAudio(segment.text, runId)
         if (!playedByRuntime) {
-          await playBrowserSpeech(segment.text, segment.language, runId)
+          setVoiceUnavailable(true)
+          return
         }
       }
     } finally {
@@ -3597,7 +3514,7 @@ function App() {
         setAssistantSpeakingTurnKey(null)
       }
     }
-  }, [playBrowserSpeech, playVoiceRuntimeAudio, settings.assistantChatAudioEnabled])
+  }, [playVoiceRuntimeAudio, settings.assistantChatAudioEnabled])
 
   const replayAssistantTurn = useCallback((content: string, turnKey: string) => {
     void speakAssistantReply(content, turnKey)
@@ -5226,19 +5143,6 @@ function App() {
       window.clearInterval(startupHydrationPollHandle)
     }
   }, [hydrateAssistantChatFromPreloaded, hydrateAssistantChatFromRuntime, refreshAssistantChatHistory, settings.assistantChatEnabled])
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      return
-    }
-    const refreshVoices = () => {
-      setEnglishBrowserVoices(getEnglishBrowserVoiceOptions())
-    }
-
-    refreshVoices()
-    window.speechSynthesis.addEventListener('voiceschanged', refreshVoices)
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', refreshVoices)
-  }, [])
 
   useEffect(() => {
     if (settings.assistantChatAudioEnabled && assistantChatOpen) {
@@ -7163,10 +7067,6 @@ function App() {
   const canTitlebarBack = viewHistoryIndexRef.current > 0
   const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
   const activeAssistantToast = assistantToasts[0] ?? null
-  const effectiveEnglishVoiceName = resolvePreferredEnglishVoiceName(englishBrowserVoices, settings.englishSpeechVoiceName)
-  const effectiveEnglishVoiceLabel = effectiveEnglishVoiceName
-    ? (englishBrowserVoices.find((voice) => voice.name === effectiveEnglishVoiceName)?.name ?? effectiveEnglishVoiceName)
-    : 'System default'
   const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
   const xpLevelCap = xpProgress?.xp_for_current_level ?? 0
   const xpPercent = xpLevelCap > 0 ? Math.round((xpInLevel / xpLevelCap) * 100) : 0
@@ -9069,31 +8969,16 @@ function App() {
                         <SettingsCollapsibleSection
                           id="english-chat-voice"
                           title="English Chat Voice"
-                          description="Tutor chat uses the local Japanese voice model for Japanese and the browser voice for English."
-                          meta={`Auto (${effectiveEnglishVoiceLabel})`}
+                          description="Tutor chat now uses the local QwenTTS voice runtime for both Japanese and English speech."
+                          meta="Local QwenTTS"
                           collapsed={Boolean(collapsedSettingsSections['english-chat-voice'])}
                           onToggle={() => toggleThemeSectionCollapsed('english-chat-voice')}
                           className="settings-theme-card"
                         >
-                          <select
-                            className="settings-theme-select"
-                            value={settings.englishSpeechVoiceName ?? ''}
-                            onChange={(event) => {
-                              const selected = event.currentTarget.value.trim()
-                              setSettings((previous) => ({
-                                ...previous,
-                                englishSpeechVoiceName: selected.length > 0 ? selected : null,
-                              }))
-                            }}
-                            aria-label="Select English voice for tutor chat playback"
-                          >
-                            <option value="">Auto ({effectiveEnglishVoiceLabel})</option>
-                            {englishBrowserVoices.map((voice) => (
-                              <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
-                                {`${voice.name} (${voice.lang})`}
-                              </option>
-                            ))}
-                          </select>
+                          <p className="settings-help">
+                            English playback follows the selected local speaker from Step 1. If speech fails,
+                            confirm the QwenTTS model and speaker bank are installed.
+                          </p>
                         </SettingsCollapsibleSection>
                         <div className="settings-voice-step-actions">
                           <button
