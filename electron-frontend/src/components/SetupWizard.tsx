@@ -35,6 +35,10 @@ interface SystemInfo {
   openVoiceEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
   dictionaryEstimatedDownloadMinutes?: number | null
+  qwenttsInstalled: boolean
+  qwenttsModels: QwenttsModelOption[]
+  qwenttsDefaultTier: '0.6b' | '1.7b'
+  activeQwenttsTier?: '0.6b' | '1.7b' | null
 }
 
 interface SpeechModelOption {
@@ -46,8 +50,19 @@ interface SpeechModelOption {
   estimatedDownloadMinutes?: number | null
 }
 
+interface QwenttsModelOption {
+  tier: '0.6b' | '1.7b'
+  filename: string
+  sizeMb: number
+  combinedSizeMb: number
+  label: string
+  description: string
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
 interface ProgressEvent {
-  id: 'model' | 'llama' | 'openvoice' | 'fonts' | 'dictionary' | 'speech'
+  id: 'model' | 'llama' | 'openvoice' | 'qwentts' | 'fonts' | 'dictionary' | 'speech'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -76,6 +91,7 @@ type AppRegionStyle = React.CSSProperties & {
 type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'max' | 'skip'
 type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra' | 'skip'
 type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
+type QwenttsTier = '0.6b' | '1.7b' | 'skip'
 
 const LLAMA_BACKEND_OPTIONS: Array<{ key: LlamaBackend; label: string; description: string }> = [
   { key: 'cuda', label: 'NVIDIA GPU', description: 'Uses CUDA. Usually the fastest option for NVIDIA graphics cards.' },
@@ -351,13 +367,13 @@ export function SetupWizard({ onComplete }: Props) {
   const [systemInfoLoading, setSystemInfoLoading] = useState(false)
   const [selectedTier, setSelectedTier] = useState<ModelTier | null>(null)
   const [selectedLlamaBackend, setSelectedLlamaBackend] = useState<LlamaBackend>('cpu')
-  const [installOpenVoice, setInstallOpenVoice] = useState(true)
+  const [selectedQwenttsTier, setSelectedQwenttsTier] = useState<QwenttsTier>('0.6b')
   const [modelProgress, setModelProgress] = useState(0)
   const [llamaProgress, setLlamaProgress] = useState(0)
-  const [openVoiceProgress, setOpenVoiceProgress] = useState(0)
+  const [qwenttsProgress, setQwenttsProgress] = useState(0)
   const [modelMb, setModelMb] = useState<{ done: number; total: number } | null>(null)
   const [llamaMb, setLlamaMb] = useState<{ done: number; total: number } | null>(null)
-  const [openVoiceMb, setOpenVoiceMb] = useState<{ done: number; total: number } | null>(null)
+  const [qwenttsMb, setQwenttsMb] = useState<{ done: number; total: number } | null>(null)
   const [modelEta, setModelEta] = useState<number | null>(null)
   const [installFonts, setInstallFonts] = useState(true)
   const [fontsProgress, setFontsProgress] = useState(0)
@@ -398,9 +414,14 @@ export function SetupWizard({ onComplete }: Props) {
         return info.recommendedTier
       })
       setSelectedLlamaBackend(info.llamaCppBackend ?? 'cpu')
-      if (info.openVoiceInstalled) setInstallOpenVoice(false)
       if (info.fontsInstalled) setInstallFonts(false)
       if (info.dictionaryInstalled) setInstallDictionary(false)
+      setSelectedQwenttsTier((prev) => {
+        if (prev !== 'skip' && info.qwenttsModels?.some((model) => model.tier === prev)) {
+          return prev
+        }
+        return info.activeQwenttsTier ?? info.qwenttsDefaultTier ?? '0.6b'
+      })
       setSelectedSpeechTier((prev) => {
         if (prev !== 'skip' && info.speechModels?.some((model) => model.tier === prev)) {
           return prev
@@ -423,6 +444,10 @@ export function SetupWizard({ onComplete }: Props) {
         recommendedSpeechTier: 'fast',
         activeSpeechModelTier: null,
         isPackaged: false,
+        qwenttsInstalled: false,
+        qwenttsModels: [],
+        qwenttsDefaultTier: '0.6b',
+        activeQwenttsTier: null,
       })
       setSelectedTier('low')
       setSelectedLlamaBackend('cpu')
@@ -453,13 +478,10 @@ export function SetupWizard({ onComplete }: Props) {
         if (evt.mb !== null && evt.totalMb !== null) {
           setLlamaMb({ done: evt.mb, total: evt.totalMb })
         }
-      } else if (evt.id === 'openvoice') {
-        setOpenVoiceProgress(evt.percent)
-        if (evt.totalMb !== null) {
-          setOpenVoiceMb({
-            done: Math.max(0, Math.min(evt.totalMb, Math.round((evt.percent / 100) * evt.totalMb))),
-            total: evt.totalMb,
-          })
+      } else if (evt.id === 'qwentts') {
+        setQwenttsProgress(evt.percent)
+        if (evt.mb !== null && evt.totalMb !== null) {
+          setQwenttsMb({ done: evt.mb, total: evt.totalMb })
         }
       } else if (evt.id === 'fonts') {
         setFontsProgress(evt.percent)
@@ -493,8 +515,8 @@ export function SetupWizard({ onComplete }: Props) {
     setModelEta(null)
     setLlamaProgress(0)
     setLlamaMb(null)
-    setOpenVoiceProgress(0)
-    setOpenVoiceMb(null)
+    setQwenttsProgress(0)
+    setQwenttsMb(null)
     setFontsProgress(0)
     setFontsFiles(null)
     setFontsMb(null)
@@ -518,9 +540,9 @@ export function SetupWizard({ onComplete }: Props) {
         const task = api.downloadLlama?.(selectedLlamaBackend)
         if (task) downloadTasks.push(task)
       }
-      if (installOpenVoice) {
-        appendProgressLog('Starting OpenVoice download…')
-        const task = api.downloadOpenVoice?.()
+      if (selectedQwenttsTier !== 'skip' && !sysInfo?.qwenttsModels.find((model) => model.tier === selectedQwenttsTier)?.installed) {
+        appendProgressLog(`Starting Japanese voice model download (${selectedQwenttsTier})…`)
+        const task = api.downloadQwentts?.(selectedQwenttsTier)
         if (task) downloadTasks.push(task)
       }
       if (installFonts && !sysInfo?.fontsInstalled) {
@@ -559,7 +581,7 @@ export function SetupWizard({ onComplete }: Props) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, selectedLlamaBackend, installOpenVoice, installFonts, installDictionary, selectedSpeechTier, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, sysInfo?.dictionaryInstalled, sysInfo?.speechModels, createDesktop, createStartMenu, appendProgressLog])
+  }, [selectedTier, selectedLlamaBackend, selectedQwenttsTier, installFonts, installDictionary, selectedSpeechTier, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, sysInfo?.dictionaryInstalled, sysInfo?.speechModels, sysInfo?.qwenttsModels, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -656,6 +678,25 @@ export function SetupWizard({ onComplete }: Props) {
     : (selectedSpeechModelHardwareFit && !selectedSpeechModelHardwareFit.isOk
       ? selectedSpeechModelHardwareFit.message
       : null)
+
+  const qwenttsModelOptions: CompactDropdownOption[] = [
+    ...(sysInfo?.qwenttsModels.map((model) => ({
+      value: model.tier,
+      label: model.label,
+      meta: `${formatSize(model.combinedSizeMb)} • ${formatDurationMinutes(model.estimatedDownloadMinutes)}${model.installed ? ' • Installed' : ''}`,
+      badge: model.tier === sysInfo?.qwenttsDefaultTier ? 'Recommended' : undefined,
+      badgeTone: model.tier === sysInfo?.qwenttsDefaultTier ? ('recommended' as const) : undefined,
+    })) ?? []),
+    {
+      value: 'skip',
+      label: 'Skip Japanese voice install',
+      meta: 'Install later from settings',
+    },
+  ]
+  const selectedQwenttsModel = sysInfo?.qwenttsModels.find((model) => model.tier === selectedQwenttsTier)
+  const selectedQwenttsTierDescription = selectedQwenttsTier === 'skip'
+    ? 'Voice playback will be unavailable until you install a Japanese voice model later from Settings.'
+    : selectedQwenttsModel?.description
 
   const pages: Record<Page, ReactNode> = {
     1: (
@@ -789,33 +830,32 @@ export function SetupWizard({ onComplete }: Props) {
 
     4: (
       <PageLayout
-        title="OpenVoice Voice Packs (optional)"
+        title="Japanese Voice (optional)"
         subtitle="Install voice synthesis and optional speech recognition."
         onNext={() => setPage(5)}
         onBack={() => setPage(3)}
         nextLabel="Continue"
       >
         <p style={{ opacity: 0.75, lineHeight: 1.6, marginBottom: '1rem' }}>
-          OpenVoice V2 is the local text-to-speech stack that powers the voice button in study sessions —
-          useful for hearing correct readings of new words. It runs entirely on your device.
+          JPLearn's local Japanese text-to-speech runs entirely on your device using a curated bank of
+          preset voices — useful for hearing correct readings of new words during study sessions.
         </p>
-        <p style={{ opacity: 0.62, lineHeight: 1.55, marginTop: '-0.2rem', marginBottom: '1rem', fontSize: '0.86rem' }}>
-          Setup installs OpenVoice checkpoints and required Python dependencies. Depending on your machine,
-          first voice playback may still fetch additional Melo language assets if they are not already cached.
-        </p>
-        {sysInfo?.openVoiceInstalled ? (
-          <p style={{ color: 'var(--accent, #7eb8ea)' }}>✓ OpenVoice assets are already installed.</p>
+        {sysInfo?.qwenttsInstalled ? (
+          <p style={{ color: 'var(--accent, #7eb8ea)' }}>✓ A Japanese voice model is already installed.</p>
         ) : (
-          <CheckboxOption
-            label={`Install OpenVoice voice synthesis (~2.4 GB)  •  ${formatDurationMinutes(sysInfo?.openVoiceEstimatedDownloadMinutes)}`}
-            checked={installOpenVoice}
-            onChange={setInstallOpenVoice}
-          />
-        )}
-        {!installOpenVoice && !sysInfo?.openVoiceInstalled && (
-          <p style={{ opacity: 0.55, fontSize: '0.85rem', marginTop: '0.75rem' }}>
-            Voice playback will be unavailable. Install later: <code>python -m pip install -r requirements-tts.txt</code> then <code>python scripts/get_openvoice.py</code>
-          </p>
+          <>
+            <CompactDropdown
+              ariaLabel="Japanese voice model"
+              options={qwenttsModelOptions}
+              value={selectedQwenttsTier}
+              onChange={(value) => setSelectedQwenttsTier(value as QwenttsTier)}
+            />
+            {selectedQwenttsTierDescription ? (
+              <p style={{ opacity: 0.65, fontSize: '0.84rem', lineHeight: 1.45, margin: '0.6rem 0 0' }}>
+                {selectedQwenttsTierDescription}
+              </p>
+            ) : null}
+          </>
         )}
 
         <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
@@ -897,12 +937,13 @@ export function SetupWizard({ onComplete }: Props) {
     6: (() => {
       const needsModel = selectedTier && selectedTier !== 'skip' && !sysInfo?.models.find(m => m.tier === selectedTier)?.installed
       const needsLlama = selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled
-      const needsVoice = installOpenVoice && !sysInfo?.openVoiceInstalled
+      const needsVoice = selectedQwenttsTier !== 'skip' && !sysInfo?.qwenttsModels.find(m => m.tier === selectedQwenttsTier)?.installed
       const needsFonts = installFonts && !sysInfo?.fontsInstalled
       const needsDictionary = installDictionary && !sysInfo?.dictionaryInstalled
       const needsSpeech = selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find(m => m.tier === selectedSpeechTier)?.installed
       const modelInfo = sysInfo?.models.find(m => m.tier === selectedTier)
       const speechModelInfo = sysInfo?.speechModels.find(m => m.tier === selectedSpeechTier)
+      const qwenttsModelInfo = sysInfo?.qwenttsModels.find(m => m.tier === selectedQwenttsTier)
       return (
         <PageLayout
           title="Ready to download"
@@ -918,7 +959,7 @@ export function SetupWizard({ onComplete }: Props) {
             <SummaryRow label="llama.cpp runtime" detail={`Local tutor server binary (${LLAMA_BACKEND_OPTIONS.find((option) => option.key === selectedLlamaBackend)?.label ?? selectedLlamaBackend})`} />
           )}
           {needsVoice && (
-            <SummaryRow label="OpenVoice runtime + voice packs" detail="~2.4 GB (deps + checkpoints)" />
+            <SummaryRow label="Japanese voice model" detail={qwenttsModelInfo ? `${qwenttsModelInfo.label} — ${formatSize(qwenttsModelInfo.combinedSizeMb)}` : 'Japanese voice model'} />
           )}
           {needsFonts && (
             <SummaryRow label="Japanese fonts" detail="~100 MB" />
@@ -970,10 +1011,10 @@ export function SetupWizard({ onComplete }: Props) {
             )}
           </>
         )}
-        {installOpenVoice && !sysInfo?.openVoiceInstalled && (
+        {selectedQwenttsTier !== 'skip' && !sysInfo?.qwenttsModels.find(m => m.tier === selectedQwenttsTier)?.installed && (
           <ProgressBar
-            value={openVoiceProgress}
-            label={`OpenVoice voice packs${openVoiceMb ? ` (${openVoiceMb.done} / ${openVoiceMb.total} MB)` : ''}`}
+            value={qwenttsProgress}
+            label={`Japanese voice model${qwenttsMb ? ` (${qwenttsMb.done} / ${qwenttsMb.total} MB)` : ''}`}
           />
         )}
         {installFonts && !sysInfo?.fontsInstalled && (

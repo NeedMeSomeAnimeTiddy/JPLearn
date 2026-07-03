@@ -13,7 +13,9 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   setActiveTutorModel: (tier) => ipcRenderer.invoke('setup:set-active-model', tier),
   uninstallTutorModel: (tier) => ipcRenderer.invoke('setup:uninstall-model', tier),
   downloadLlama: (backend) => ipcRenderer.invoke('setup:download-llama', backend),
-  downloadOpenVoice: () => ipcRenderer.invoke('setup:download-openvoice'),
+  downloadQwentts: (tier) => ipcRenderer.invoke('setup:download-qwentts', tier),
+  setActiveQwenttsTier: (tier) => ipcRenderer.invoke('setup:set-active-qwentts-tier', tier),
+  uninstallQwenttsTier: (tier) => ipcRenderer.invoke('setup:uninstall-qwentts-tier', tier),
   completeSetup: () => ipcRenderer.invoke('setup:complete'),
   skipSetup: () => ipcRenderer.invoke('setup:skip'),
   onSetupProgress: (listener) => {
@@ -52,6 +54,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   cancelAssistantChatInference: () => ipcRenderer.invoke('assistant-chat:cancel'),
   speakText: (payload) => ipcRenderer.invoke('audio:speak', payload),
   getVoiceStatus: () => ipcRenderer.invoke('audio:voice-status'),
+  listVoices: () => ipcRenderer.invoke('audio:list-voices'),
   preloadVoice: (speaker) => ipcRenderer.invoke('audio:preload', speaker),
   transcribeSpeech: (payload) => ipcRenderer.invoke('audio:transcribe', payload),
   getSpeechStatus: () => ipcRenderer.invoke('audio:speech-status'),

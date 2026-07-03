@@ -80,10 +80,19 @@ python scripts/get_gguf_model.py --tier ultra  # large model (~5.5 GB)
 
 ### 4. Japanese voice TTS (optional)
 
-```bash
-pip install -r requirements-tts.txt
-python scripts/get_openvoice.py
+Build the qwentts.cpp runtime once (Windows, requires Visual Studio 2022 with the
+C++ workload):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build_qwentts_cpp.ps1
 ```
+
+Then install a voice model via the app's Setup Wizard, or download one directly
+from https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF into
+`Documents\JPLearn\tts\models\` (both a `qwen-talker-*.gguf` and the shared
+`qwen-tokenizer-12hz-*.gguf` are required). Curated preset speakers are built
+from reference clips with `python scripts/build_qwentts_preset_bank.py`
+(see `data/tts/speaker_intake/README.md`).
 
 ### 5. Run
 
@@ -125,7 +134,7 @@ The installed app stores all user data in `Documents\JPLearn\`:
 | Folder | Contents |
 |--------|----------|
 | `models\` | GGUF model files |
-| `openvoice\` | Japanese TTS engine assets and voices |
+| `tts\` | Japanese voice models and curated preset speaker bank |
 | `data\` | SQLite databases (progress, settings) |
 
 These files survive uninstall and are detected automatically on reinstall.

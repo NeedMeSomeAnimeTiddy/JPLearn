@@ -85,6 +85,37 @@ const CHATBOT_TIER_TO_EMBEDDER_TIER = {
   ultra: 'e5_large',
   max: 'e5_large',
 }
+
+// qwentts.cpp Japanese voice model catalogue. Two GGUFs are required
+// together for any synthesis: a per-tier talker (voice/personality-bearing
+// weights) and a single shared tokenizer/codec (same for every tier).
+// Filenames and sizes verified against https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF.
+// Q8_0 is the shipping quant (qwentts.cpp has no Q6 variant; BF16/F32/Q8_0/
+// Q4_K_M are the only options -- Q8_0 chosen for quality, see
+// patches/qwentts-cpp/0001-speaker-bank.patch for the runtime this targets).
+const QWENTTS_MODELS = {
+  '0.6b': {
+    talkerFilename: 'qwen-talker-0.6b-base-Q8_0.gguf',
+    talkerRepo: 'Serveurperso/Qwen3-TTS-GGUF',
+    talkerSizeMb: 993,
+    label: 'Standard (0.6B)',
+    description: 'Default. Fast Japanese voice cloning with the curated preset speaker bank.',
+  },
+  '1.7b': {
+    talkerFilename: 'qwen-talker-1.7b-base-Q8_0.gguf',
+    talkerRepo: 'Serveurperso/Qwen3-TTS-GGUF',
+    talkerSizeMb: 2080,
+    label: 'High Quality (1.7B)',
+    description: 'Optional. Stronger voice quality; slower and heavier on RAM.',
+  },
+}
+const QWENTTS_TOKENIZER = {
+  filename: 'qwen-tokenizer-12hz-Q8_0.gguf',
+  repo: 'Serveurperso/Qwen3-TTS-GGUF',
+  sizeMb: 291,
+}
+const QWENTTS_DEFAULT_TIER = '0.6b'
+const ACTIVE_QWENTTS_TIER_STATE_FILENAME = 'active-qwentts-tier.json'
 const SENTINEL_NAME = '.setup-done'
 const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
 const FONT_READY_MARKER = '.fonts-ready'
@@ -203,7 +234,7 @@ function getFontInstallState(base) {
 
 function ensureJPLearnDirs() {
   const base = getJPLearnDir()
-  for (const sub of ['models', 'openvoice', 'data', 'fonts', 'tools', 'whisper']) {
+  for (const sub of ['models', 'openvoice', 'tts', 'data', 'fonts', 'tools', 'whisper']) {
     fs.mkdirSync(path.join(base, sub), { recursive: true })
   }
   return base
@@ -251,6 +282,127 @@ function seedBundledOpenVoiceVoices(scriptRootArg = null) {
   }
 
   return { ok: true, copied, total: entries.length }
+}
+
+// ── qwentts (Japanese TTS) install state ─────────────────────────────────────
+
+function getQwenttsDir(base) {
+  return path.join(base, 'tts')
+}
+
+function getQwenttsModelsDir(base) {
+  return path.join(getQwenttsDir(base), 'models')
+}
+
+function getQwenttsPresetBankDir(base) {
+  return path.join(getQwenttsDir(base), 'preset_bank')
+}
+
+function isQwenttsTalkerInstalled(base, tier) {
+  const model = QWENTTS_MODELS[tier]
+  if (!model) return false
+  return fs.existsSync(path.join(getQwenttsModelsDir(base), model.talkerFilename))
+}
+
+function isQwenttsTokenizerInstalled(base) {
+  return fs.existsSync(path.join(getQwenttsModelsDir(base), QWENTTS_TOKENIZER.filename))
+}
+
+function hasAnyQwenttsTalkerInstalled(base) {
+  return Object.keys(QWENTTS_MODELS).some((tier) => isQwenttsTalkerInstalled(base, tier))
+}
+
+// Copies any curated preset speakers bundled in the repo (data/tts/preset_bank/)
+// into the installed assets directory, mirroring seedBundledOpenVoiceVoices.
+// A no-op (returns {ok:false, reason:'no-bundled-presets'}) until Phase 3's
+// curated speakers exist under data/tts/preset_bank/.
+function seedBundledQwenttsPresetSpeakers(scriptRootArg = null) {
+  const base = ensureJPLearnDirs()
+  const scriptRoot = scriptRootArg || resolveScriptRoot()
+  const sourceRoot = path.join(scriptRoot, 'data', 'tts', 'preset_bank')
+  const targetRoot = getQwenttsPresetBankDir(base)
+
+  if (!fs.existsSync(sourceRoot)) {
+    return { ok: false, reason: 'no-bundled-presets' }
+  }
+
+  fs.mkdirSync(targetRoot, { recursive: true })
+
+  const entries = fs.readdirSync(sourceRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+
+  let copied = 0
+  for (const entry of entries) {
+    const from = path.join(sourceRoot, entry.name)
+    const to = path.join(targetRoot, entry.name)
+    if (fs.existsSync(to)) {
+      continue
+    }
+    fs.cpSync(from, to, { recursive: true, force: false })
+    copied += 1
+  }
+
+  return { ok: true, copied, total: entries.length }
+}
+
+function getActiveQwenttsTierStatePath(base) {
+  return path.join(getQwenttsDir(base), ACTIVE_QWENTTS_TIER_STATE_FILENAME)
+}
+
+function readActiveQwenttsTierSelection(base) {
+  try {
+    const raw = fs.readFileSync(getActiveQwenttsTierStatePath(base), 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.tier === 'string' && typeof parsed.talkerFilename === 'string') {
+      return parsed
+    }
+  } catch {
+    // No selection yet, or the file is unreadable; caller falls back to auto-detect.
+  }
+  return null
+}
+
+function resolveActiveQwenttsTier(base) {
+  const selection = readActiveQwenttsTierSelection(base)
+  if (selection && QWENTTS_MODELS[selection.tier] && isQwenttsTalkerInstalled(base, selection.tier)) {
+    return selection.tier
+  }
+  for (const tier of Object.keys(QWENTTS_MODELS)) {
+    if (isQwenttsTalkerInstalled(base, tier)) {
+      return tier
+    }
+  }
+  return null
+}
+
+function setActiveQwenttsTier(tier) {
+  const model = QWENTTS_MODELS[tier]
+  if (!model) throw new Error(`Unknown qwentts tier: ${tier}`)
+  const base = ensureJPLearnDirs()
+  if (!isQwenttsTalkerInstalled(base, tier)) {
+    throw new Error(`qwentts tier "${tier}" is not installed`)
+  }
+  fs.writeFileSync(
+    getActiveQwenttsTierStatePath(base),
+    JSON.stringify({ tier, talkerFilename: model.talkerFilename, updatedAtUtc: new Date().toISOString() }, null, 2),
+    'utf8',
+  )
+  return { ok: true, tier }
+}
+
+function uninstallQwenttsTier(tier) {
+  const model = QWENTTS_MODELS[tier]
+  if (!model) throw new Error(`Unknown qwentts tier: ${tier}`)
+  const base = ensureJPLearnDirs()
+  const modelPath = path.join(getQwenttsModelsDir(base), model.talkerFilename)
+  if (fs.existsSync(modelPath)) {
+    fs.unlinkSync(modelPath)
+  }
+  const selection = readActiveQwenttsTierSelection(base)
+  if (selection && selection.tier === tier) {
+    try { fs.unlinkSync(getActiveQwenttsTierStatePath(base)) } catch { /* ignore */ }
+  }
+  return { ok: true, tier }
 }
 
 function getOfflineDictionarySqlitePath(base) {
@@ -646,6 +798,25 @@ async function getSystemInfo() {
     }
   })
 
+  const qwenttsTokenizerInstalled = isQwenttsTokenizerInstalled(base)
+  const qwenttsModels = Object.entries(QWENTTS_MODELS).map(([tier, m]) => {
+    const installed = isQwenttsTalkerInstalled(base, tier)
+    // Combined size only counts the tokenizer once, and only if it still
+    // needs downloading -- mirrors downloadQwentts' own dedupe logic.
+    const combinedSizeMb = m.talkerSizeMb + (qwenttsTokenizerInstalled ? 0 : QWENTTS_TOKENIZER.sizeMb)
+    return {
+      tier,
+      filename: m.talkerFilename,
+      sizeMb: m.talkerSizeMb,
+      combinedSizeMb,
+      label: m.label,
+      description: m.description,
+      installed,
+      estimatedDownloadMinutes: estimateDownloadMinutes(combinedSizeMb, networkMbps),
+    }
+  })
+  const qwenttsInstalled = hasAnyQwenttsTalkerInstalled(base) && qwenttsTokenizerInstalled
+
   return {
     totalRamGb: Math.round(totalRamGb * 10) / 10,
     recommendedTier,
@@ -668,6 +839,10 @@ async function getSystemInfo() {
     openVoiceEstimatedDownloadMinutes: estimateDownloadMinutes(OPENVOICE_SIZE_MB, networkMbps),
     fontsEstimatedDownloadMinutes: estimateDownloadMinutes(FONTS_SIZE_MB, networkMbps),
     dictionaryEstimatedDownloadMinutes: estimateDownloadMinutes(DICTIONARY_SIZE_MB, networkMbps),
+    qwenttsInstalled,
+    qwenttsModels,
+    qwenttsDefaultTier: QWENTTS_DEFAULT_TIER,
+    activeQwenttsTier: resolveActiveQwenttsTier(base),
   }
 }
 function isFirstRun() {
@@ -1098,6 +1273,64 @@ function downloadModel(tier, sender, scriptRoot) {
 
   return downloadWithProgress(url, destPath, onProgress).then(async () => {
     await ensureEmbedder()
+    return { ok: true }
+  })
+}
+
+// Downloads the talker GGUF for the requested tier plus the shared tokenizer
+// GGUF (once, regardless of how many tiers get installed), then seeds any
+// bundled curated preset speakers. Mirrors downloadModel's structure but
+// needs two files instead of one, so progress is reported against their
+// combined size.
+function downloadQwentts(tier, sender, scriptRoot) {
+  const model = QWENTTS_MODELS[tier]
+  if (!model) return Promise.reject(new Error(`Unknown qwentts tier: ${tier}`))
+
+  const base = ensureJPLearnDirs()
+  const modelsDir = getQwenttsModelsDir(base)
+  fs.mkdirSync(modelsDir, { recursive: true })
+  const talkerDest = path.join(modelsDir, model.talkerFilename)
+  const tokenizerDest = path.join(modelsDir, QWENTTS_TOKENIZER.filename)
+
+  const talkerAlready = fs.existsSync(talkerDest)
+  const tokenizerAlready = fs.existsSync(tokenizerDest)
+
+  if (talkerAlready && tokenizerAlready) {
+    seedBundledQwenttsPresetSpeakers(scriptRoot)
+    return Promise.resolve({ alreadyInstalled: true })
+  }
+
+  const totalSizeMb = (talkerAlready ? 0 : model.talkerSizeMb) + (tokenizerAlready ? 0 : QWENTTS_TOKENIZER.sizeMb)
+  const emitProgress = (percent, doneMb) => {
+    if (sender && !sender.isDestroyed()) {
+      sender.send('setup:download-progress', { id: 'qwentts', percent, mb: doneMb, totalMb: totalSizeMb, etaSec: null })
+    }
+  }
+
+  const downloadOne = (repo, filename, dest, doneMbOffset) => {
+    if (fs.existsSync(dest)) {
+      return Promise.resolve()
+    }
+    const url = `https://huggingface.co/${repo}/resolve/main/${filename}`
+    return downloadWithProgress(url, dest, (done, _total) => {
+      const doneMb = Math.round(done / (1024 * 1024)) + doneMbOffset
+      const percent = totalSizeMb > 0 ? Math.min(100, Math.round((doneMb / totalSizeMb) * 100)) : 0
+      emitProgress(percent, doneMb)
+    })
+  }
+
+  let chain = Promise.resolve()
+  if (!talkerAlready) {
+    chain = chain.then(() => downloadOne(model.talkerRepo, model.talkerFilename, talkerDest, 0))
+  }
+  if (!tokenizerAlready) {
+    const offset = talkerAlready ? 0 : model.talkerSizeMb
+    chain = chain.then(() => downloadOne(QWENTTS_TOKENIZER.repo, QWENTTS_TOKENIZER.filename, tokenizerDest, offset))
+  }
+
+  return chain.then(() => {
+    emitProgress(100, totalSizeMb)
+    seedBundledQwenttsPresetSpeakers(scriptRoot)
     return { ok: true }
   })
 }
@@ -1560,12 +1793,15 @@ function createSetupRuntime() {
     downloadModel,
     downloadLlamaCpp,
     downloadOpenVoice,
+    downloadQwentts,
     downloadFonts,
     downloadDictionary,
     downloadSpeechModel,
     createShortcuts,
     setActiveModelTier,
     uninstallModel,
+    setActiveQwenttsTier,
+    uninstallQwenttsTier,
     setActiveSpeechModelTier,
     uninstallSpeechModel,
   }

@@ -419,6 +419,15 @@ function registerIpcHandlers(options) {
     return options.localVoiceRuntime.getStatus()
   })
 
+  options.ipcMain.handle('audio:list-voices', (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return options.localVoiceRuntime.listVoices?.() ?? []
+    } catch {
+      return []
+    }
+  })
+
   options.ipcMain.handle('audio:preload', async (event, speaker) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     let requestedSpeaker
@@ -853,13 +862,52 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:download-openvoice', async (event) => {
+    options.ipcMain.handle('setup:download-qwentts', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
+      const safeTier = typeof tier === 'string' && ['0.6b', '1.7b'].includes(tier) ? tier : '0.6b'
       try {
-        return await setupRuntime.downloadOpenVoice(event.sender, options.repoRoot)
+        const result = await setupRuntime.downloadQwentts(safeTier, event.sender, options.repoRoot)
+        if (!result?.alreadyInstalled && typeof options.refreshVoiceRuntime === 'function') {
+          await options.refreshVoiceRuntime()
+        }
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
-        throw new Error(`OpenVoice download failed: ${detail}`)
+        throw new Error(`qwentts download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:set-active-qwentts-tier', async (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['0.6b', '1.7b'].includes(tier)) {
+        throw new Error('Invalid qwentts tier')
+      }
+      try {
+        const result = setupRuntime.setActiveQwenttsTier(tier)
+        if (typeof options.refreshVoiceRuntime === 'function') {
+          await options.refreshVoiceRuntime()
+        }
+        return result
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to select qwentts voice model: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:uninstall-qwentts-tier', async (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['0.6b', '1.7b'].includes(tier)) {
+        throw new Error('Invalid qwentts tier')
+      }
+      try {
+        const result = setupRuntime.uninstallQwenttsTier(tier)
+        if (typeof options.refreshVoiceRuntime === 'function') {
+          await options.refreshVoiceRuntime()
+        }
+        return result
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to uninstall qwentts voice model: ${detail}`)
       }
     })
 

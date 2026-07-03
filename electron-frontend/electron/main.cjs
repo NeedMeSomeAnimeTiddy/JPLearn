@@ -341,6 +341,19 @@ async function refreshTutorRuntimeAfterSetup() {
     // If the runtime cannot start, the assistant will fall back later.
   }
 }
+
+// qwentts_runtime.cjs re-resolves talker/tokenizer paths fresh on every
+// restart (no cached state across calls the way the tutor runtime has), so
+// refreshing after a new voice model download/selection only needs to stop
+// any currently running server -- the next speak()/preload() call spawns a
+// fresh process against the newly selected model.
+async function refreshVoiceRuntimeAfterSetup() {
+  try {
+    await localVoiceRuntime.unload()
+  } catch {
+    // Best effort only.
+  }
+}
 const FORCED_USER_DATA_DIR = process.env.JPLEARN_USER_DATA_DIR
 const FORCED_SESSION_DATA_DIR = process.env.JPLEARN_SESSION_DATA_DIR
 const DEFAULT_STARTUP_THEME = 'harbor_mist'
@@ -1292,6 +1305,7 @@ registerIpcHandlers({
   setupRuntime: localSetupRuntime,
   repoRoot,
   refreshTutorChatRuntime: refreshTutorRuntimeAfterSetup,
+  refreshVoiceRuntime: refreshVoiceRuntimeAfterSetup,
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
   reloadLocalFontsForContents,
 })

@@ -1807,15 +1807,13 @@ const SUMMARY_SNAPSHOT_STORAGE_KEY = 'jplearn-desktop-summary-snapshot-v1'
 const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
-// Curated OpenVoice voices offered to the user. `id` matches a voice folder.
+// Japanese voice options are loaded dynamically from the installed qwentts
+// preset speaker bank (see qwentts_runtime.cjs's listVoices() / audio:list-voices
+// IPC channel) instead of a hardcoded list, since the curated speaker set is
+// built from user-provided reference clips (scripts/build_qwentts_preset_bank.py)
+// rather than shipped as fixed named speakers.
 const VOICE_SAMPLE_LINE = 'こんにちは。いっしょにがんばりましょう。'
-const VOICE_OPTIONS: Array<{ id: string; name: string; jp: string; search: string }> = [
-  { id: 'male_kenji', name: 'Kenji', jp: 'male_kenji', search: 'neutral Japanese male' },
-  { id: 'male_haru', name: 'Haru', jp: 'male_haru', search: 'warm Japanese male' },
-  { id: 'female_aya', name: 'Aya', jp: 'female_aya', search: 'neutral Japanese female' },
-  { id: 'female_mina', name: 'Mina', jp: 'female_mina', search: 'bright Japanese female' },
-]
-const VOICE_OPTION_IDS = new Set<string>(VOICE_OPTIONS.map((option) => option.id))
+type VoiceOptionEntry = { id: string; name: string; jp: string; search: string }
 const ENGLISH_VOICE_PREFERENCE_HINTS = [
   'aria',
   'jenny',
@@ -2331,7 +2329,11 @@ function loadSettings(): AppSettings {
       voiceEnabled:
         typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
       voiceSpeaker:
-        typeof parsed.voiceSpeaker === 'string' && VOICE_OPTION_IDS.has(parsed.voiceSpeaker)
+        // Preset speaker IDs are loaded dynamically at runtime (see voiceOptions
+        // state), not known synchronously at settings-parse time, so only
+        // validate shape here. An unknown/stale speaker ID just falls through
+        // to the runtime's default-voice behavior on next playback.
+        typeof parsed.voiceSpeaker === 'string' && parsed.voiceSpeaker.trim().length > 0
           ? parsed.voiceSpeaker
           : defaults.voiceSpeaker,
     }
@@ -3227,6 +3229,7 @@ function App() {
     llamaCppInstalled: boolean
     gpuVramGb?: number | null
     openVoiceInstalled: boolean
+    qwenttsInstalled: boolean
     fontsInstalled: boolean
     dictionaryInstalled: boolean
     llamaCppEstimatedDownloadMinutes?: number | null
@@ -3242,6 +3245,7 @@ function App() {
     recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
     activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
   } | null>(null)
+  const [voiceOptions, setVoiceOptions] = useState<VoiceOptionEntry[]>([])
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | 'max' | null>(null)
   const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
   const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'medium' | 'high' | 'ultra' | 'max' | null>(null)
@@ -3864,6 +3868,7 @@ function App() {
         llamaCppInstalled: setupInfo.llamaCppInstalled,
         gpuVramGb: setupInfo.gpuVramGb ?? null,
         openVoiceInstalled: setupInfo.openVoiceInstalled,
+        qwenttsInstalled: setupInfo.qwenttsInstalled,
         fontsInstalled: setupInfo.fontsInstalled,
         dictionaryInstalled: setupInfo.dictionaryInstalled,
         llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
@@ -3880,6 +3885,28 @@ function App() {
   useEffect(() => {
     void refreshTutorInstallInfo()
   }, [refreshTutorInstallInfo])
+
+  const refreshVoiceOptions = useCallback(async () => {
+    const listVoices = window.jplearnDesktop.listVoices
+    if (!listVoices) {
+      return
+    }
+    try {
+      const presets = await listVoices()
+      setVoiceOptions(presets.map((preset) => ({
+        id: preset.voiceId,
+        name: preset.displayName,
+        jp: preset.voiceId,
+        search: preset.description || preset.searchTerms.join(' ') || preset.displayName,
+      })))
+    } catch {
+      // Best effort only; leave whatever list was previously loaded.
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshVoiceOptions()
+  }, [refreshVoiceOptions])
 
   useEffect(() => {
     if (!showSettings || activeSettingsTab !== 'tutor') {
@@ -7204,7 +7231,7 @@ function App() {
       && (tutorInstallInfo?.models ?? []).some((model) => model.installed),
   )
   const showOnboardingChatbotSection = tutorInstallInfo ? hasInstalledTutorModel : true
-  const showOnboardingVoiceSection = tutorInstallInfo ? tutorInstallInfo.openVoiceInstalled : true
+  const showOnboardingVoiceSection = tutorInstallInfo ? tutorInstallInfo.qwenttsInstalled : true
   const showOnboardingFontSection = tutorInstallInfo ? tutorInstallInfo.fontsInstalled : true
 
   // Show setup wizard on first run (all hooks above must run unconditionally)
@@ -7637,7 +7664,7 @@ function App() {
             setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))
           }}
           showVoiceSection={showOnboardingVoiceSection}
-          voiceOptions={VOICE_OPTIONS}
+          voiceOptions={voiceOptions}
           voiceEnabled={settings.voiceEnabled}
           voiceSpeaker={settings.voiceSpeaker}
           voiceBusy={voiceBusy}
@@ -8999,7 +9026,7 @@ function App() {
                           </button>
 
                           {settings.voiceEnabled
-                            ? VOICE_OPTIONS.map((option) => (
+                            ? voiceOptions.map((option) => (
                               <button
                                 key={option.id}
                                 type="button"

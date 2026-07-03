@@ -89,11 +89,33 @@ function findFirstMatch(dir, pattern) {
   return entries.length ? path.join(dir, entries[0]) : null
 }
 
+// setup_runtime.cjs persists the user's selected tier as the exact talker
+// filename to load (tts/active-qwentts-tier.json), the same pattern used for
+// the tutor LLM's active-model.json. Reading it here means installing a
+// second tier (e.g. upgrading 0.6b -> 1.7b) doesn't silently keep loading
+// whichever talker file happens to sort first alphabetically.
+function readActiveQwenttsTalkerFilename(baseDir) {
+  try {
+    const raw = fs.readFileSync(path.join(baseDir, 'active-qwentts-tier.json'), 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.talkerFilename === 'string' && parsed.talkerFilename.trim()) {
+      return parsed.talkerFilename.trim()
+    }
+  } catch {
+    // No selection persisted yet, or unreadable; caller falls back to auto-detect.
+  }
+  return null
+}
+
 function resolveQwenttsModelPaths(baseDir) {
   const modelsDir = path.join(baseDir, 'models')
+  const activeTalkerFilename = readActiveQwenttsTalkerFilename(baseDir)
+  const activeTalkerPath = activeTalkerFilename ? path.join(modelsDir, activeTalkerFilename) : null
   return {
     modelsDir,
-    talkerPath: findFirstMatch(modelsDir, /^qwen-talker-.*\.gguf$/i),
+    talkerPath: activeTalkerPath && fs.existsSync(activeTalkerPath)
+      ? activeTalkerPath
+      : findFirstMatch(modelsDir, /^qwen-talker-.*\.gguf$/i),
     tokenizerPath: findFirstMatch(modelsDir, /^qwen-tokenizer-.*\.gguf$/i),
   }
 }
@@ -114,6 +136,39 @@ function loadPresetSpeakerNames(baseDir) {
     .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(presetRoot, entry.name, 'spk.bin')))
     .map((entry) => entry.name)
     .sort()
+}
+
+// Enriched version of loadPresetSpeakerNames for renderer display: reads each
+// preset's preset.json (written by scripts/build_qwentts_preset_bank.py) for a
+// display name/description, falling back to the folder name if preset.json is
+// missing or unreadable.
+function loadPresetSpeakers(baseDir) {
+  const presetRoot = resolvePresetBankDir(baseDir)
+  if (!fs.existsSync(presetRoot)) {
+    return []
+  }
+  return fs.readdirSync(presetRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(presetRoot, entry.name, 'spk.bin')))
+    .map((entry) => {
+      let metadata = {}
+      try {
+        metadata = JSON.parse(fs.readFileSync(path.join(presetRoot, entry.name, 'preset.json'), 'utf8'))
+      } catch {
+        // No preset.json (or unreadable); fall back to folder name only.
+      }
+      return {
+        voiceId: entry.name,
+        displayName: typeof metadata.displayName === 'string' && metadata.displayName.trim()
+          ? metadata.displayName.trim()
+          : entry.name,
+        description: typeof metadata.description === 'string' ? metadata.description : '',
+        gender: typeof metadata.gender === 'string' ? metadata.gender : undefined,
+        searchTerms: Array.isArray(metadata.searchTerms)
+          ? metadata.searchTerms.filter((term) => typeof term === 'string')
+          : [],
+      }
+    })
+    .sort((a, b) => a.voiceId.localeCompare(b.voiceId))
 }
 
 function isQwenttsInstalled(repoRoot) {
@@ -376,6 +431,10 @@ function createQwenttsRuntime(options = {}) {
       stopServer()
       return { ok: true }
     },
+
+    listVoices() {
+      return loadPresetSpeakers(resolveQwenttsBaseDir())
+    },
   }
 }
 
@@ -383,4 +442,5 @@ module.exports = {
   createQwenttsRuntime,
   isQwenttsInstalled,
   loadPresetSpeakerNames,
+  loadPresetSpeakers,
 }

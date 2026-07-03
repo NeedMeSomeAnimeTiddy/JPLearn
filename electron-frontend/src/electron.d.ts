@@ -397,6 +397,7 @@ interface DesktopApi {
   cancelAssistantChatInference?: () => Promise<{ ok: boolean; cancelled: boolean; reason: string }>
   speakText?: (payload: string | { text: string; speaker?: string | number; speed?: number }) => Promise<VoiceSpeakResponse>
   getVoiceStatus?: () => Promise<VoiceStatus>
+  listVoices?: () => Promise<VoiceOption[]>
   preloadVoice?: (speaker?: string | number) => Promise<{ ok: boolean; ready: boolean }>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
@@ -428,7 +429,9 @@ interface DesktopApi {
   setActiveTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => Promise<{ ok: boolean; tier: string }>
   uninstallTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => Promise<{ ok: boolean; tier: string }>
   downloadLlama?: (backend?: 'cuda' | 'hip' | 'vulkan' | 'cpu') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
-  downloadOpenVoice?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  downloadQwentts?: (tier?: '0.6b' | '1.7b') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  setActiveQwenttsTier?: (tier: '0.6b' | '1.7b') => Promise<{ ok: boolean; tier: string }>
+  uninstallQwenttsTier?: (tier: '0.6b' | '1.7b') => Promise<{ ok: boolean; tier: string }>
   completeSetup?: () => Promise<{ ok: boolean }>
   skipSetup?: () => Promise<{ ok: boolean }>
   onSetupProgress?: (listener: (evt: SetupProgressEvent) => void) => () => void
@@ -465,6 +468,17 @@ interface SetupSpeechModelOption {
   label: string
   description: string
   sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
+interface SetupQwenttsModelOption {
+  tier: '0.6b' | '1.7b'
+  filename: string
+  sizeMb: number
+  combinedSizeMb: number
+  label: string
+  description: string
   installed: boolean
   estimatedDownloadMinutes?: number | null
 }
@@ -510,10 +524,14 @@ interface SetupSystemInfo {
   openVoiceEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
   dictionaryEstimatedDownloadMinutes?: number | null
+  qwenttsInstalled: boolean
+  qwenttsModels: SetupQwenttsModelOption[]
+  qwenttsDefaultTier: '0.6b' | '1.7b'
+  activeQwenttsTier?: '0.6b' | '1.7b' | null
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'llama' | 'openvoice' | 'fonts' | 'dictionary' | 'speech'
+  id: 'model' | 'llama' | 'openvoice' | 'qwentts' | 'fonts' | 'dictionary' | 'speech'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -538,6 +556,14 @@ interface VoiceSpeakResponse {
   sampleRate: number
   voiceId: string
   audioBase64: string
+}
+
+interface VoiceOption {
+  voiceId: string
+  displayName: string
+  description: string
+  gender?: string
+  searchTerms: string[]
 }
 
 // ---- JLPT preparation types ----
