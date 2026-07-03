@@ -1061,8 +1061,8 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
 ]
 
 const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],

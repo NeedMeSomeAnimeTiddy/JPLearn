@@ -99,7 +99,7 @@ export function SpeechAnswerPanel({
       <div className="speech-answer-status" aria-live="polite">
         {state === 'idle' && !processingError ? <span>Tap the mic and say the answer aloud.</span> : null}
         {state === 'requesting-permission' ? <span>Requesting microphone access…</span> : null}
-        {isRecording ? <span>Listening… auto-stop in {remainingSec}s</span> : null}
+        {isRecording ? <span>Listening… auto-submit when you stop speaking (max {remainingSec}s)</span> : null}
         {state === 'processing' ? <span>Transcribing…</span> : null}
         {state === 'error' && errorReason === 'permission' ? (
           <span>

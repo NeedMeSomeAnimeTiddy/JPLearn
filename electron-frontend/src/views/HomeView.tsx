@@ -132,39 +132,42 @@ export function HomeView({
                 aria-keyshortcuts={String(index + 1)}
                 onClick={() => onSelectScript(script)}
               >
-                {badgeMeta && (
-                  <span className={`menu-card-readiness-badge ${badgeMeta.className}`} aria-hidden="true">
-                    {isNeedsWarning && <AlertTriangle size={10} strokeWidth={2.2} aria-hidden="true" />}
-                    {readiness === 'suggested_next' && <Zap size={10} strokeWidth={2.2} aria-hidden="true" />}
-                    {badgeMeta.label}
-                  </span>
-                )}
                 <span className="menu-script-glyph" aria-hidden="true" lang="ja">{glyph}</span>
                 <div className="menu-card-header-row">
                   <strong>{SCRIPT_LABELS[script]}</strong>
-                  <span
-                    className={`menu-card-difficulty menu-card-difficulty-${difficulty.tier}`}
-                    aria-label={`Difficulty: ${difficulty.label}`}
-                    title={`Difficulty: ${difficulty.label}`}
-                  >
-                    <DifficultyIcon className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
-                    <span>{difficulty.label}</span>
+                  <span className="menu-card-meta-badges">
+                    {badgeMeta && (
+                      <span className={`menu-card-readiness-badge ${badgeMeta.className}`} aria-hidden="true">
+                        {isNeedsWarning && <AlertTriangle size={10} strokeWidth={2.2} aria-hidden="true" />}
+                        {readiness === 'suggested_next' && <Zap size={10} strokeWidth={2.2} aria-hidden="true" />}
+                        {badgeMeta.label}
+                      </span>
+                    )}
+                    <span
+                      className={`menu-card-difficulty menu-card-difficulty-${difficulty.tier}`}
+                      aria-label={`Difficulty: ${difficulty.label}`}
+                      title={`Difficulty: ${difficulty.label}`}
+                    >
+                      <DifficultyIcon className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
+                      <span>{difficulty.label}</span>
+                    </span>
                   </span>
                 </div>
                 <p>{SCRIPT_MENU_LINES[script]}</p>
-                <div className="menu-card-footer-row">
-                  {coverageRow && coverageRow.total > 0 ? (
-                    <span className="menu-card-mastery-pct" aria-label={`${Math.round(coverageRow.mastery * 100)}% mastered`}>
-                      {Math.round(coverageRow.mastery * 100)}%
-                    </span>
-                  ) : null}
-                </div>
                 {coverageRow && coverageRow.total > 0 ? (
-                  <div className="menu-card-progress-track" aria-hidden="true">
-                    <div
-                      className="menu-card-progress-fill"
-                      style={{ width: `${Math.round(coverageRow.mastery * 100)}%` }}
-                    />
+                  <div className="menu-card-footer-row">
+                    <div className="menu-card-progress-row">
+                      <span className="menu-card-progress-label">Mastery</span>
+                      <span className="menu-card-mastery-pct" aria-label={`${Math.round(coverageRow.mastery * 100)}% mastered`}>
+                        {Math.round(coverageRow.mastery * 100)}%
+                      </span>
+                    </div>
+                    <div className="menu-card-progress-track" aria-hidden="true">
+                      <div
+                        className="menu-card-progress-fill"
+                        style={{ width: `${Math.round(coverageRow.mastery * 100)}%` }}
+                      />
+                    </div>
                   </div>
                 ) : null}
               </button>
@@ -177,33 +180,38 @@ export function HomeView({
             aria-label="Open JLPT preparation"
             onClick={onOpenJlptPrep}
           >
-            <span className="menu-card-readiness-badge badge-advanced" aria-hidden="true">
-              <AlertTriangle size={10} strokeWidth={2.2} aria-hidden="true" />
-              Advanced
-            </span>
             <span className="menu-script-glyph" aria-hidden="true" lang="ja">級</span>
             <div className="menu-card-header-row">
               <strong>JLPT Prep</strong>
-              <span
-                className="menu-card-difficulty menu-card-difficulty-5"
-                aria-label="Difficulty: Exam"
-                title="Difficulty: Exam"
-              >
-                <Languages className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
-                <span>N5-N1</span>
+              <span className="menu-card-meta-badges">
+                <span className="menu-card-readiness-badge badge-advanced" aria-hidden="true">
+                  <AlertTriangle size={10} strokeWidth={2.2} aria-hidden="true" />
+                  Advanced
+                </span>
+                <span
+                  className="menu-card-difficulty menu-card-difficulty-5"
+                  aria-label="Difficulty: Exam"
+                  title="Difficulty: Exam"
+                >
+                  <Languages className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
+                  <span>N5-N1</span>
+                </span>
               </span>
             </div>
             <p>Timed exam sets, projected score tracking, and weak-area drills.</p>
             <div className="menu-card-footer-row">
-              <span className="menu-card-mastery-pct" aria-label={`${jlptPrepProgressPct}% JLPT prep progress`}>
-                {jlptPrepProgressPct}%
-              </span>
-            </div>
-            <div className="menu-card-progress-track" aria-hidden="true">
-              <div
-                className="menu-card-progress-fill"
-                style={{ width: `${jlptPrepProgressPct}%` }}
-              />
+              <div className="menu-card-progress-row">
+                <span className="menu-card-progress-label">Prep</span>
+                <span className="menu-card-mastery-pct" aria-label={`${jlptPrepProgressPct}% JLPT prep progress`}>
+                  {jlptPrepProgressPct}%
+                </span>
+              </div>
+              <div className="menu-card-progress-track" aria-hidden="true">
+                <div
+                  className="menu-card-progress-fill"
+                  style={{ width: `${jlptPrepProgressPct}%` }}
+                />
+              </div>
             </div>
           </button>
         </div>

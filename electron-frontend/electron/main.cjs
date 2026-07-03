@@ -328,10 +328,7 @@ const STARTUP_PRELOAD_DECK_SLUGS = [
   'kanji_numbers_time',
   'vocab_greetings',
 ]
-const STARTUP_PRELOAD_BLOCK_ONLY_SLUGS = [
-  'grammar_patterns',
-  'sentence_examples',
-]
+const STARTUP_PRELOAD_BLOCK_ONLY_SLUGS = []
 
 async function refreshTutorRuntimeAfterSetup() {
   try {

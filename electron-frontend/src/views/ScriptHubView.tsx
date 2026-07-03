@@ -92,6 +92,24 @@ void CONFIDENCE_LEVEL_LABELS
 void CONFIDENCE_SCORES
 void DEFAULT_SESSION_LENGTH_PRESET
 void JLPT_LEVEL_LABELS
+
+const MINIGAME_DIFFICULTY: Record<MinigameKey, {
+  level: 'easy' | 'medium' | 'hard'
+  label: 'Easy' | 'Medium' | 'Hard'
+}> = {
+  romaji_sprint: { level: 'easy', label: 'Easy' },
+  meaning_match: { level: 'easy', label: 'Easy' },
+  character_match: { level: 'easy', label: 'Easy' },
+  stroke_order: { level: 'medium', label: 'Medium' },
+  typed_recall: { level: 'medium', label: 'Medium' },
+  speech_recall: { level: 'hard', label: 'Hard' },
+  context_cloze: { level: 'hard', label: 'Hard' },
+  narrative_story: { level: 'hard', label: 'Hard' },
+  listening_audio_first: { level: 'medium', label: 'Medium' },
+  listening_prompt_first: { level: 'medium', label: 'Medium' },
+  interleave_mix: { level: 'hard', label: 'Hard' },
+}
+
 export function ScriptHubView({
   navDirection,
   activeScript,
@@ -501,6 +519,7 @@ export function ScriptHubView({
                 const game = MINIGAMES.find((entry) => entry.key === gameKey)
                 if (!game) return null
                 const gameStats = minigameStats[activeScript][game.key]
+                const difficulty = MINIGAME_DIFFICULTY[game.key]
                 const lockReason = minigameLockReasons[game.key] ?? null
                 const minigameLocked = Boolean(lockReason)
                 const accuracy =
@@ -530,12 +549,6 @@ export function ScriptHubView({
                     aria-label={minigameLocked ? `${game.title}, locked. ${lockReason}` : undefined}
                     style={{ animationDelay: `${120 + index * 70}ms` }}
                   >
-                    {minigameLocked ? (
-                      <span className="game-tile-lock-badge" aria-hidden="true">
-                        <Lock className="game-tile-lock-icon" strokeWidth={2} />
-                        Locked
-                      </span>
-                    ) : null}
                     <div className={`game-tile-main ${minigameLocked ? 'is-blurred' : ''}`}>
                       <div className="game-tile-head">
                         <span className="game-icon" aria-hidden="true">
@@ -543,6 +556,16 @@ export function ScriptHubView({
                         </span>
                         <div className="game-tile-copy">
                           <strong className="game-tile-title">{game.title}</strong>
+                          <span className={`game-tile-difficulty-badge is-${difficulty.level}`} title={`Difficulty: ${difficulty.label}`}>
+                            {difficulty.level === 'hard' ? (
+                              <AlertTriangle className="game-tile-difficulty-icon" strokeWidth={2.1} aria-hidden="true" />
+                            ) : difficulty.level === 'medium' ? (
+                              <Flame className="game-tile-difficulty-icon" strokeWidth={2.1} aria-hidden="true" />
+                            ) : (
+                              <Target className="game-tile-difficulty-icon" strokeWidth={2.1} aria-hidden="true" />
+                            )}
+                            <span className="game-tile-difficulty-label">{difficulty.label}</span>
+                          </span>
                           <p className="game-tile-description">{game.description}</p>
                         </div>
                       </div>
@@ -583,9 +606,12 @@ export function ScriptHubView({
                       </button>
                     </div>
                     {lockReason ? (
-                      <div className="game-tile-lock-reason">
-                        <p className="game-tile-lock-title">{game.title}</p>
-                        <p className="game-tile-lock-copy">{lockReason}</p>
+                      <div className="game-tile-lock-overlay" aria-hidden="true">
+                        <div className="game-tile-lock-overlay-card">
+                          <Lock className="game-tile-lock-icon" strokeWidth={2} />
+                          <p className="game-tile-lock-title">{game.title}</p>
+                          <p className="game-tile-lock-copy">{lockReason}</p>
+                        </div>
                       </div>
                     ) : null}
                   </article>

@@ -74,7 +74,6 @@ export function MinigameView({
     sessionPoints,
     sessionStreak,
     sessionTargetItems,
-    blockSessionComplete,
     roundComboBonus,
     roundMilestoneStreak,
     sessionRunReport,
@@ -339,31 +338,7 @@ export function MinigameView({
       />
 
       <section className="panel-glass game-panel minigame-stage-panel">
-        {blockSessionComplete && sessionActive ? (
-          <article className="block-complete-banner panel-glass minigame-state-card" role="status">
-            <span className="block-complete-icon" aria-hidden="true">🎉</span>
-            <h2 className="block-complete-title">Block complete!</h2>
-            <p className="block-complete-copy">
-              You answered every card in{' '}
-              <strong>{activeSectionName ?? 'this section'}</strong>{' '}
-              correctly. Head back to the map to continue your path.
-            </p>
-            <div className="game-actions">
-              <button
-                type="button"
-                className="back-button back-button-icon-only"
-                onClick={onBack}
-                aria-label="Back to map"
-                title="Back to map"
-              >
-                <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-              </button>
-              <button type="button" onClick={() => startSession()}>
-                Play Again
-              </button>
-            </div>
-          </article>
-        ) : !sessionActive ? (
+        {!sessionActive ? (
           <>
             {sessionRunReport && !sessionStartPending ? (
               <SessionRunSummary
