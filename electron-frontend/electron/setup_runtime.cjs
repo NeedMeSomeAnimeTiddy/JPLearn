@@ -1790,6 +1790,7 @@ function downloadOcrModel(tier, sender, scriptRoot) {
     const TOTAL_PHASES = 3
     let currentPhase = 0
     let currentPhasePct = 0
+    let stderrBuffer = ''
 
     const emitProgress = () => {
       const overall = ((currentPhase + currentPhasePct / 100) / TOTAL_PHASES) * 100
@@ -1814,6 +1815,10 @@ function downloadOcrModel(tier, sender, scriptRoot) {
       }
     })
 
+    child.stderr.on('data', (chunk) => {
+      stderrBuffer += chunk.toString()
+    })
+
     child.on('close', (code) => {
       if (code === 0) {
         try {
@@ -1834,7 +1839,10 @@ function downloadOcrModel(tier, sender, scriptRoot) {
         }
         resolve({ ok: true })
       } else {
-        reject(new Error(`get_paddleocr_model.py exited with code ${code}`))
+        const detail = stderrBuffer.trim()
+        reject(new Error(
+          `get_paddleocr_model.py exited with code ${code}${detail ? `: ${detail}` : ''}`,
+        ))
       }
     })
 

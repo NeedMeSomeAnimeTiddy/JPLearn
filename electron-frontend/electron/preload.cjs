@@ -53,6 +53,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getAssistantChatRuntimeStatus: () => ipcRenderer.invoke('assistant-chat:status'),
   preloadAssistantChatRuntime: () => ipcRenderer.invoke('assistant-chat:preload'),
   sendAssistantChatMessage: (payload) => ipcRenderer.invoke('assistant-chat:send-message', payload),
+  extractAssistantChatImageText: (payload) => ipcRenderer.invoke('assistant-chat:extract-image-text', payload),
   unloadAssistantChatRuntime: () => ipcRenderer.invoke('assistant-chat:unload'),
   cancelAssistantChatInference: () => ipcRenderer.invoke('assistant-chat:cancel'),
   speakText: (payload) => ipcRenderer.invoke('audio:speak', payload),

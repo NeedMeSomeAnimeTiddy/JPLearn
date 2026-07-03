@@ -7,6 +7,7 @@ request JSON payloads over a subprocess boundary.
 from __future__ import annotations
 
 import json
+import importlib
 import os
 import re
 import sqlite3
@@ -143,6 +144,14 @@ OFFLINE_DICTIONARY_DIR = (
 OFFLINE_DICTIONARY_DB_CANDIDATES = (
     OFFLINE_DICTIONARY_DIR / "jmdict_lookup.sqlite",
     PROJECT_ROOT / "data" / "external_sources" / "offline_dictionary" / "jmdict_lookup.sqlite",
+)
+OCR_MODEL_DIR_CANDIDATES = (
+    Path(_assets_dir) / "ocr" / "standard"
+    if _assets_dir
+    else Path(_docs_dir) / "ocr" / "standard"
+    if _docs_dir
+    else PROJECT_ROOT / "data" / "ocr" / "standard",
+    PROJECT_ROOT / "data" / "ocr" / "standard",
 )
 
 SENTENCE_EXAMPLES_CSV_CANDIDATES = (
@@ -501,6 +510,94 @@ def build_dictionary_search_payload(query: str) -> dict[str, object]:
         "query": normalized_query,
         "source": "offline_dictionary",
         "results": results,
+    }
+
+
+def _resolve_ocr_model_root() -> Path | None:
+    for candidate in OCR_MODEL_DIR_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _resolve_infer_dir(model_root: Path, phase: str) -> Path | None:
+    phase_root = model_root / phase
+    if not phase_root.exists():
+        return None
+
+    if any(path.suffix == ".pdmodel" for path in phase_root.glob("*.pdmodel")):
+        return phase_root
+
+    for child in phase_root.iterdir():
+        if not child.is_dir():
+            continue
+        if any(path.suffix == ".pdmodel" for path in child.glob("*.pdmodel")):
+            return child
+    return None
+
+
+def extract_assistant_chat_ocr_payload(image_path_raw: str, min_confidence: float = 0.30) -> dict[str, object]:
+    image_path = Path(image_path_raw).expanduser().resolve()
+    if not image_path.exists() or not image_path.is_file():
+        raise ValueError(f"Image file does not exist: {image_path}")
+
+    model_root = _resolve_ocr_model_root()
+    if model_root is None:
+        raise FileNotFoundError("PaddleOCR model is not installed. Install it from Settings > Tutor > Image OCR.")
+
+    det_model_dir = _resolve_infer_dir(model_root, "det")
+    rec_model_dir = _resolve_infer_dir(model_root, "rec")
+    cls_model_dir = _resolve_infer_dir(model_root, "cls")
+    if det_model_dir is None or rec_model_dir is None or cls_model_dir is None:
+        raise FileNotFoundError("PaddleOCR model files are incomplete. Reinstall the Image OCR package.")
+
+    try:
+        paddleocr_module = importlib.import_module("paddleocr")
+        PaddleOCR = getattr(paddleocr_module, "PaddleOCR")
+    except Exception as exc:  # pragma: no cover - environment-dependent
+        raise RuntimeError(
+            "PaddleOCR runtime is unavailable in this environment. Install Python package 'paddleocr'."
+        ) from exc
+
+    engine = PaddleOCR(
+        use_angle_cls=True,
+        lang="japan",
+        show_log=False,
+        det_model_dir=str(det_model_dir),
+        rec_model_dir=str(rec_model_dir),
+        cls_model_dir=str(cls_model_dir),
+    )
+
+    raw_result = engine.ocr(str(image_path), cls=True)
+    lines: list[dict[str, object]] = []
+    extracted_lines: list[str] = []
+
+    for block in raw_result or []:
+        if not isinstance(block, list):
+            continue
+        for entry in block:
+            if not isinstance(entry, list) or len(entry) < 2:
+                continue
+            line_meta = entry[1]
+            if not isinstance(line_meta, (list, tuple)) or len(line_meta) < 2:
+                continue
+            text = str(line_meta[0] or "").strip()
+            try:
+                confidence = float(line_meta[1])
+            except (TypeError, ValueError):
+                confidence = 0.0
+            if not text:
+                continue
+            lines.append({"text": text, "confidence": round(confidence, 4)})
+            if confidence >= min_confidence:
+                extracted_lines.append(text)
+
+    extracted_text = "\n".join(extracted_lines).strip()
+    return {
+        "ok": True,
+        "text": extracted_text,
+        "lineCount": len(extracted_lines),
+        "lines": lines,
     }
 
 SUMMARY_SCRIPT_TAGS = (
@@ -2194,6 +2291,22 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
         user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
         return 0, get_assistant_chat_context_v2(session_id=session_id, user_message=user_message)
+
+    if command == "assistant-chat-ocr":
+        if len(argv) < 2:
+            return 2, {"error": "Usage: assistant-chat-ocr <image_path> [min_confidence]"}
+        min_confidence = 0.30
+        if len(argv) > 2:
+            try:
+                min_confidence = float(argv[2])
+            except ValueError:
+                return 2, {"error": "min_confidence must be a number between 0 and 1"}
+            if min_confidence < 0 or min_confidence > 1:
+                return 2, {"error": "min_confidence must be between 0 and 1"}
+        try:
+            return 0, extract_assistant_chat_ocr_payload(argv[1], min_confidence=min_confidence)
+        except (FileNotFoundError, RuntimeError, ValueError) as exc:
+            return 2, {"error": str(exc)}
 
     if command == "progression":
         return 0, build_progression_status()

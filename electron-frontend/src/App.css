@@ -1156,6 +1156,36 @@
   color: color-mix(in oklab, var(--tone-danger) 76%, var(--text-main));
 }
 
+.assistant-chat-ocr-summary {
+  margin: 0 10px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 48%, var(--panel-border));
+  background: color-mix(in oklab, var(--panel-bg) 84%, var(--tone-ocean) 16%);
+  font-size: 0.71rem;
+  line-height: 1.35;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.assistant-chat-ocr-summary-clear {
+  flex-shrink: 0;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 68%, white 32%);
+  background: color-mix(in oklab, var(--panel-bg) 96%, black);
+  color: var(--text-main);
+  border-radius: 999px;
+  font-size: 0.66rem;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.assistant-chat-ocr-summary-clear:hover {
+  border-color: color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
+}
+
 .assistant-chat-composer {
   display: flex;
   align-items: center;
@@ -1193,7 +1223,7 @@
   border: none;
   background: transparent;
   color: var(--text-main);
-  padding: 7px 44px 7px 0;
+  padding: 7px 84px 7px 0;
   font-family: var(--body-font);
   font-size: 0.78rem;
   line-height: 1.4;
@@ -1202,7 +1232,7 @@
 
 .assistant-chat-limit {
   position: absolute;
-  right: 44px;
+  right: 82px;
   bottom: 8px;
   font-size: 0.64rem;
   line-height: 1;
@@ -1243,6 +1273,31 @@
 }
 
 .assistant-chat-send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.assistant-chat-upload {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 78%, white 22%);
+  background: color-mix(in oklab, var(--panel-bg) 95%, black);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.assistant-chat-upload:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--tone-ocean) 64%, var(--panel-border));
+  background: color-mix(in oklab, var(--panel-bg) 76%, var(--tone-ocean) 24%);
+}
+
+.assistant-chat-upload:disabled {
   opacity: 0.5;
   cursor: default;
 }

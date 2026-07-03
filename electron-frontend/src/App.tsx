@@ -16,7 +16,7 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
 import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, History, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
 import type { RoundDictionaryNote } from './types'
 
@@ -306,6 +306,10 @@ const PERFORMANCE_GOOD_MS = 2200
 const ASSISTANT_EVENT_POLL_MS = 15000
 const ASSISTANT_TOAST_TTL_MS = 3800
 const ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT = 600
+const ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB = 30
+const ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_BYTES = ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB * 1024 * 1024
+const ASSISTANT_CHAT_IMAGE_MAX_DIMENSION = 2200
+const ASSISTANT_CHAT_IMAGE_JPEG_QUALITY = 0.62
 const ROUND_QUEUE_TIMEOUT_MS = 1200
 const STUDY_QUEUE_CACHE_TTL_MS = 45000
 const DECK_LOAD_TIMEOUT_MS = 15000
@@ -600,6 +604,82 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, strin
     ],
   },
 }
+
+async function fileToDataUrl(file: File): Promise<string> {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      if (!result) {
+        reject(new Error('Failed to read image file.'))
+        return
+      }
+      resolve(result)
+    }
+    reader.onerror = () => reject(new Error('Failed to read image file.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function loadImageElement(dataUrl: string): Promise<HTMLImageElement> {
+  return await new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('Unsupported image format.'))
+    image.src = dataUrl
+  })
+}
+
+function parseDataUrl(dataUrl: string): { mimeType: string; base64: string } {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (!match) {
+    throw new Error('Invalid image data. Please try another file.')
+  }
+  return {
+    mimeType: match[1].toLowerCase(),
+    base64: match[2],
+  }
+}
+
+async function prepareAssistantChatImagePayload(file: File): Promise<{
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp'
+  imageBase64: string
+}> {
+  const originalDataUrl = await fileToDataUrl(file)
+  const originalParsed = parseDataUrl(originalDataUrl)
+  const acceptedMime = new Set(['image/png', 'image/jpeg', 'image/webp'])
+
+  const sourceImage = await loadImageElement(originalDataUrl)
+  const maxSide = Math.max(sourceImage.width, sourceImage.height, 1)
+  const scale = Math.min(1, ASSISTANT_CHAT_IMAGE_MAX_DIMENSION / maxSide)
+  const targetWidth = Math.max(1, Math.round(sourceImage.width * scale))
+  const targetHeight = Math.max(1, Math.round(sourceImage.height * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = targetWidth
+  canvas.height = targetHeight
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Image processing is unavailable in this environment.')
+  }
+  context.drawImage(sourceImage, 0, 0, targetWidth, targetHeight)
+
+  const compressedDataUrl = canvas.toDataURL('image/jpeg', ASSISTANT_CHAT_IMAGE_JPEG_QUALITY)
+  const compressedParsed = parseDataUrl(compressedDataUrl)
+
+  const useOriginal = acceptedMime.has(originalParsed.mimeType) && originalParsed.base64.length <= compressedParsed.base64.length
+  if (useOriginal) {
+    return {
+      mimeType: originalParsed.mimeType as 'image/png' | 'image/jpeg' | 'image/webp',
+      imageBase64: originalParsed.base64,
+    }
+  }
+
+  return {
+    mimeType: 'image/jpeg',
+    imageBase64: compressedParsed.base64,
+  }
+}
 const TAG_PROMPT_PACKS: Record<string, string[]> = {
   hiragana: [
     'Foundations First: this kana appears everywhere.',
@@ -863,6 +943,7 @@ interface AppSettings {
   assistantToastLimit: 0 | 1
   assistantChatEnabled: boolean
   assistantChatAudioEnabled: boolean
+  assistantChatOcrMinConfidence: number
   showKeyboardPrompts: boolean
   voiceEnabled: boolean
   voiceSpeaker: string
@@ -1987,6 +2068,7 @@ function defaultSettings(): AppSettings {
     assistantToastLimit: ASSISTANT_MAX_TOASTS,
     assistantChatEnabled: true,
     assistantChatAudioEnabled: true,
+    assistantChatOcrMinConfidence: 0.3,
     showKeyboardPrompts: false,
     voiceEnabled: true,
     voiceSpeaker: DEFAULT_VOICE_SPEAKER,
@@ -2084,6 +2166,13 @@ function isBackgroundStyle(value: unknown): value is BackgroundStyle {
 
 function clampBackgroundBlur(value: number): number {
   return Math.max(BACKGROUND_BLUR_MIN, Math.min(BACKGROUND_BLUR_MAX, Math.round(value)))
+}
+
+function clampAssistantChatOcrMinConfidence(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0.3
+  }
+  return Math.max(0, Math.min(1, Math.round(value * 100) / 100))
 }
 
 function resolveBackgroundImageUrl(imagePath: string): string {
@@ -2317,6 +2406,10 @@ function loadSettings(): AppSettings {
         typeof parsed.assistantChatAudioEnabled === 'boolean'
           ? parsed.assistantChatAudioEnabled
           : defaults.assistantChatAudioEnabled,
+      assistantChatOcrMinConfidence:
+        typeof parsed.assistantChatOcrMinConfidence === 'number'
+          ? clampAssistantChatOcrMinConfidence(parsed.assistantChatOcrMinConfidence)
+          : defaults.assistantChatOcrMinConfidence,
       showKeyboardPrompts:
         typeof parsed.showKeyboardPrompts === 'boolean'
           ? parsed.showKeyboardPrompts
@@ -3196,6 +3289,8 @@ function App() {
   const [assistantChatMessages, setAssistantChatMessages] = useState<AssistantChatTurn[]>([])
   const [assistantChatLoading, setAssistantChatLoading] = useState(false)
   const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
+  const [assistantChatImageBusy, setAssistantChatImageBusy] = useState(false)
+  const [assistantChatLastOcrSummary, setAssistantChatLastOcrSummary] = useState<{ fileName: string; lineCount: number } | null>(null)
   const [assistantSpeakingTurnKey, setAssistantSpeakingTurnKey] = useState<string | null>(null)
   const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
   const [, setAssistantChatWarmup] = useState(false)
@@ -3421,6 +3516,7 @@ function App() {
   const assistantChatPreloadTriggeredRef = useRef(false)
   const assistantChatHistoryHydratedRef = useRef(false)
   const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
+  const assistantChatImageInputRef = useRef<HTMLInputElement | null>(null)
   const assistantChatClearTokenRef = useRef(0)
   const assistantSpeechRunIdRef = useRef(0)
   const xpDetailsRef = useRef<HTMLDivElement | null>(null)
@@ -5396,7 +5492,7 @@ function App() {
     log.scrollTop = log.scrollHeight
   }, [assistantChatOpen, assistantChatMessages, assistantChatLoading])
 
-  const sendAssistantChat = useCallback(async () => {
+  const sendAssistantChat = useCallback(async (forcedMessage?: string) => {
     if (!settings.assistantChatEnabled) {
       setAssistantChatError('Chatbot is disabled in settings.')
       return
@@ -5408,7 +5504,7 @@ function App() {
       return
     }
 
-    const message = assistantChatInput.trim()
+    const message = (forcedMessage ?? assistantChatInput).trim()
     if (!message) {
       return
     }
@@ -5427,6 +5523,7 @@ function App() {
     }
     setAssistantChatMessages((previous) => [...previous, optimisticTurn])
     setAssistantChatInput('')
+    setAssistantChatLastOcrSummary(null)
     setAssistantChatLoading(true)
     setAssistantChatError(null)
     setAssistantChatWarmup(!assistantChatStatus?.loaded)
@@ -5459,6 +5556,71 @@ function App() {
       setAssistantChatLoading(false)
     }
   }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
+
+  const handleAssistantChatImageSelected = useCallback(async (file: File) => {
+    if (!settings.assistantChatEnabled) {
+      setAssistantChatError('Chatbot is disabled in settings.')
+      return
+    }
+    if (file.size > ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_BYTES) {
+      setAssistantChatError(`Image uploads are limited to ${ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB} MB.`)
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setAssistantChatError('Please choose a PNG, JPEG, or WEBP image.')
+      return
+    }
+
+    const extractAssistantChatImageText = window.jplearnDesktop.extractAssistantChatImageText
+    if (!extractAssistantChatImageText) {
+      setAssistantChatError('Image OCR is unavailable in this build.')
+      return
+    }
+    if (!tutorInstallInfo?.ocrInstalled) {
+      setAssistantChatError('Image OCR is not installed. Install it in Settings > Tutor > Image OCR.')
+      return
+    }
+
+    setAssistantChatImageBusy(true)
+    setAssistantChatError(null)
+    try {
+      const payload = await prepareAssistantChatImagePayload(file)
+      const ocrResponse = await extractAssistantChatImageText({
+        ...payload,
+        minConfidence: settings.assistantChatOcrMinConfidence,
+      })
+      const extractedText = typeof ocrResponse?.text === 'string' ? ocrResponse.text.trim() : ''
+      if (!extractedText) {
+        setAssistantChatError('No readable text was found in that image.')
+        return
+      }
+
+      const prompt = [
+        'Please translate this Japanese text to English and provide a short vocabulary breakdown.',
+        'OCR text:',
+        extractedText,
+      ].join('\n\n')
+      setAssistantChatInput((previous) => {
+        const trimmed = previous.trim()
+        return trimmed ? `${trimmed}\n\n${prompt}` : prompt
+      })
+      const lineCount = Number.isFinite(ocrResponse?.lineCount)
+        ? Math.max(0, Math.trunc(ocrResponse.lineCount))
+        : extractedText.split(/\n+/).filter(Boolean).length
+      setAssistantChatLastOcrSummary({
+        fileName: file.name,
+        lineCount,
+      })
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : 'Unable to process image OCR.'
+      setAssistantChatError(detail)
+    } finally {
+      setAssistantChatImageBusy(false)
+      if (assistantChatImageInputRef.current) {
+        assistantChatImageInputRef.current.value = ''
+      }
+    }
+  }, [settings.assistantChatEnabled, settings.assistantChatOcrMinConfidence, tutorInstallInfo?.ocrInstalled])
 
   useEffect(() => {
     let cancelled = false
@@ -9075,6 +9237,30 @@ function App() {
                   <p className="settings-help" style={{ marginTop: '0.75rem' }}>
                     Select the circle icon to choose the active OCR package used by Tutor chat image text extraction.
                   </p>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <label className="settings-help" htmlFor="assistant-chat-ocr-confidence-slider" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                      OCR confidence filter: {Math.round(settings.assistantChatOcrMinConfidence * 100)}%
+                    </label>
+                    <input
+                      id="assistant-chat-ocr-confidence-slider"
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={settings.assistantChatOcrMinConfidence}
+                      onChange={(event) => {
+                        const value = Number(event.currentTarget.value)
+                        setSettings((prev) => ({
+                          ...prev,
+                          assistantChatOcrMinConfidence: clampAssistantChatOcrMinConfidence(value),
+                        }))
+                      }}
+                      aria-label="OCR confidence filter"
+                    />
+                    <p className="settings-help" style={{ marginTop: '0.3rem' }}>
+                      Higher values ignore uncertain OCR lines; lower values capture more text with more noise.
+                    </p>
+                  </div>
                 </SettingsCollapsibleSection>
                 ) : null}
 
@@ -9581,6 +9767,19 @@ function App() {
               <p className="assistant-chat-error">{assistantChatError}</p>
             ) : null}
 
+            {assistantChatLastOcrSummary ? (
+              <p className="assistant-chat-ocr-summary" role="status" aria-live="polite">
+                OCR imported from "{assistantChatLastOcrSummary.fileName}" ({assistantChatLastOcrSummary.lineCount} line{assistantChatLastOcrSummary.lineCount === 1 ? '' : 's'}). Review and send when ready.
+                <button
+                  type="button"
+                  className="assistant-chat-ocr-summary-clear"
+                  onClick={() => setAssistantChatLastOcrSummary(null)}
+                >
+                  Dismiss
+                </button>
+              </p>
+            ) : null}
+
             <footer className="assistant-chat-composer">
               <div className="assistant-chat-input-wrap">
                 <textarea
@@ -9596,7 +9795,7 @@ function App() {
                       return
                     }
                     event.preventDefault()
-                    if (assistantChatLoading || assistantChatInput.trim().length === 0) {
+                    if (assistantChatLoading || assistantChatImageBusy || assistantChatInput.trim().length === 0) {
                       return
                     }
                     void sendAssistantChat()
@@ -9611,9 +9810,32 @@ function App() {
                 </span>
                 <button
                   type="button"
+                  className="assistant-chat-upload"
+                  onClick={() => assistantChatImageInputRef.current?.click()}
+                  disabled={assistantChatLoading || assistantChatImageBusy}
+                  aria-label="Upload image for OCR"
+                  title={`Upload image (max ${ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB} MB)`}
+                >
+                  <ImagePlus size={16} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+                <input
+                  ref={assistantChatImageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0]
+                    if (!file) {
+                      return
+                    }
+                    void handleAssistantChatImageSelected(file)
+                  }}
+                />
+                <button
+                  type="button"
                   className="assistant-chat-send"
                   onClick={() => void sendAssistantChat()}
-                  disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
+                  disabled={assistantChatLoading || assistantChatImageBusy || assistantChatInput.trim().length === 0}
                   aria-label="Send tutor chat message"
                   title="Send"
                 >

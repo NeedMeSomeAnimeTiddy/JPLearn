@@ -324,6 +324,22 @@ interface AssistantChatRuntimeResponse {
   elapsedMs: number
 }
 
+interface AssistantChatImageOcrPayload {
+  imageBase64: string
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp'
+  minConfidence?: number
+}
+
+interface AssistantChatImageOcrResponse {
+  ok: boolean
+  text: string
+  lineCount: number
+  lines: Array<{
+    text: string
+    confidence: number
+  }>
+}
+
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
@@ -393,6 +409,7 @@ interface DesktopApi {
     message: string
     context?: Record<string, string>
   }) => Promise<AssistantChatRuntimeResponse>
+  extractAssistantChatImageText?: (payload: AssistantChatImageOcrPayload) => Promise<AssistantChatImageOcrResponse>
   unloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string }>
   cancelAssistantChatInference?: () => Promise<{ ok: boolean; cancelled: boolean; reason: string }>
   speakText?: (payload: string | {

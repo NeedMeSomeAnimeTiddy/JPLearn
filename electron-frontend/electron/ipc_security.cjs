@@ -305,6 +305,42 @@ function validateAssistantChatRuntimePayload(payload) {
   }
 }
 
+const VALID_ASSISTANT_CHAT_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
+const MAX_ASSISTANT_CHAT_IMAGE_BASE64_LENGTH = 44 * 1024 * 1024
+
+function validateAssistantChatImagePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid assistant chat image payload: expected object')
+  }
+  const imageBase64 = typeof payload.imageBase64 === 'string' ? payload.imageBase64.trim() : ''
+  if (!imageBase64) {
+    throw new Error('Invalid assistant chat image payload: missing image data')
+  }
+  if (imageBase64.length > MAX_ASSISTANT_CHAT_IMAGE_BASE64_LENGTH) {
+    throw new Error('Invalid assistant chat image payload: image data too large')
+  }
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)) {
+    throw new Error('Invalid assistant chat image payload: image data is not valid base64')
+  }
+  const mimeType = typeof payload.mimeType === 'string' ? payload.mimeType.trim().toLowerCase() : ''
+  if (!VALID_ASSISTANT_CHAT_IMAGE_MIME_TYPES.has(mimeType)) {
+    throw new Error(`Invalid assistant chat image payload: unsupported mime type ${String(payload.mimeType)}`)
+  }
+  let minConfidence = 0.3
+  if (payload.minConfidence != null) {
+    const parsed = Number(payload.minConfidence)
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+      throw new Error('Invalid assistant chat image payload: minConfidence must be between 0 and 1')
+    }
+    minConfidence = parsed
+  }
+  return {
+    imageBase64,
+    mimeType,
+    minConfidence,
+  }
+}
+
 function validateAssistantEventInteractionPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Invalid assistant event interaction payload: expected object')
@@ -500,6 +536,7 @@ module.exports = {
   validateAssistantEventInteractionPayload,
   validateAssistantChatAppendPayload,
   validateAssistantChatRuntimePayload,
+  validateAssistantChatImagePayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
   validateSpeakPayload,

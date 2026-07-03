@@ -9,6 +9,7 @@ const {
   validateAssistantEventInteractionPayload,
   validateAssistantChatAppendPayload,
   validateAssistantChatRuntimePayload,
+  validateAssistantChatImagePayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
   validateExpertiseLevelInput,
@@ -390,6 +391,43 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to send assistant chat message: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('assistant-chat:extract-image-text', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateAssistantChatImagePayload(payload)
+    const fs = require('node:fs')
+    const os = require('node:os')
+    const path = require('node:path')
+
+    const extensionByMime = {
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/webp': 'webp',
+    }
+    const extension = extensionByMime[validatedPayload.mimeType] || 'img'
+    const tempFile = path.join(
+      os.tmpdir(),
+      `jplearn-chat-ocr-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`,
+    )
+
+    try {
+      fs.writeFileSync(tempFile, Buffer.from(validatedPayload.imageBase64, 'base64'))
+      return await options.runPythonBridgeWithArgs([
+        'assistant-chat-ocr',
+        tempFile,
+        String(validatedPayload.minConfidence),
+      ])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to extract image text: ${detail}`)
+    } finally {
+      try {
+        fs.unlinkSync(tempFile)
+      } catch {
+        // Best-effort temp cleanup.
+      }
     }
   })
 
