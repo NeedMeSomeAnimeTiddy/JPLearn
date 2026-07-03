@@ -1,0 +1,54 @@
+{
+  "presets": [
+    {
+      "speakerId": "female_aya",
+      "displayName": "Aya",
+      "gender": "female",
+      "language": "ja",
+      "description": "Neutral Japanese female voice, clear narration style.",
+      "searchTerms": [
+        "neutral",
+        "female",
+        "clear narration"
+      ],
+      "referenceRole": "default_en",
+      "embeddingLanguage": "en",
+      "hasIclCodes": true,
+      "sourceClip": "aya_en.wav",
+      "speakerEmbeddingClipCount": 1,
+      "englishEmbeddingClipCount": 0,
+      "excludedByRole": [],
+      "englishCappedClips": [],
+      "skippedEmbeddingClips": [],
+      "unlistedSkippedClips": [],
+      "embeddingWeights": {
+        "aya_en.wav": 3.0
+      }
+    },
+    {
+      "speakerId": "male_kenji",
+      "displayName": "Kenji",
+      "gender": "male",
+      "language": "ja",
+      "description": "Neutral Japanese male voice, clear narration style.",
+      "searchTerms": [
+        "neutral",
+        "male",
+        "clear narration"
+      ],
+      "referenceRole": "default_en",
+      "embeddingLanguage": "en",
+      "hasIclCodes": true,
+      "sourceClip": "kenji_en.wav",
+      "speakerEmbeddingClipCount": 1,
+      "englishEmbeddingClipCount": 0,
+      "excludedByRole": [],
+      "englishCappedClips": [],
+      "skippedEmbeddingClips": [],
+      "unlistedSkippedClips": [],
+      "embeddingWeights": {
+        "kenji_en.wav": 3.0
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "speakerId": "female_aya",
+  "displayName": "Aya",
+  "gender": "female",
+  "language": "ja",
+  "description": "Neutral Japanese female voice, clear narration style.",
+  "searchTerms": [
+    "neutral",
+    "female",
+    "clear narration"
+  ],
+  "referenceRole": "default",
+  "embeddingLanguage": "all",
+  "hasIclCodes": true,
+  "sourceClip": "aya_jp.wav",
+  "speakerEmbeddingClipCount": 2,
+  "englishEmbeddingClipCount": 0,
+  "excludedByRole": [],
+  "englishCappedClips": [],
+  "skippedEmbeddingClips": [],
+  "unlistedSkippedClips": [],
+  "embeddingWeights": {
+    "aya_jp.wav": 3.0,
+    "aya_en.wav": 1.0499999999999998
+  }
+}

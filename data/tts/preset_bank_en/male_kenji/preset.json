@@ -1,0 +1,25 @@
+{
+  "speakerId": "male_kenji",
+  "displayName": "Kenji",
+  "gender": "male",
+  "language": "ja",
+  "description": "Neutral Japanese male voice, clear narration style.",
+  "searchTerms": [
+    "neutral",
+    "male",
+    "clear narration"
+  ],
+  "referenceRole": "default_en",
+  "embeddingLanguage": "en",
+  "hasIclCodes": true,
+  "sourceClip": "kenji_en.wav",
+  "speakerEmbeddingClipCount": 1,
+  "englishEmbeddingClipCount": 0,
+  "excludedByRole": [],
+  "englishCappedClips": [],
+  "skippedEmbeddingClips": [],
+  "unlistedSkippedClips": [],
+  "embeddingWeights": {
+    "kenji_en.wav": 3.0
+  }
+}

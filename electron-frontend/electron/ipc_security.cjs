@@ -350,12 +350,14 @@ function validateSpeakPayload(payload) {
   let rawText
   let rawSpeaker
   let rawSpeed
+  let rawMixedLanguageStitchingEnabled
   if (typeof payload === 'string') {
     rawText = payload
   } else if (payload && typeof payload === 'object') {
     rawText = payload.text
     rawSpeaker = payload.speaker
     rawSpeed = payload.speed
+    rawMixedLanguageStitchingEnabled = payload.mixedLanguageStitchingEnabled
   } else {
     throw new Error('Invalid speak payload: expected string or object')
   }
@@ -389,6 +391,13 @@ function validateSpeakPayload(payload) {
       throw new Error(`Invalid speed value: ${String(rawSpeed)}`)
     }
     result.speed = rawSpeed
+  }
+
+  if (rawMixedLanguageStitchingEnabled != null) {
+    if (typeof rawMixedLanguageStitchingEnabled !== 'boolean') {
+      throw new Error(`Invalid mixedLanguageStitchingEnabled value: ${String(rawMixedLanguageStitchingEnabled)}`)
+    }
+    result.mixedLanguageStitchingEnabled = rawMixedLanguageStitchingEnabled
   }
 
   return result

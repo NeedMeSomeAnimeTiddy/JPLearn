@@ -35,8 +35,8 @@ interface SystemInfo {
   dictionaryEstimatedDownloadMinutes?: number | null
   qwenttsInstalled: boolean
   qwenttsModels: QwenttsModelOption[]
-  qwenttsDefaultTier: '0.6b' | '1.7b'
-  activeQwenttsTier?: '0.6b' | '1.7b' | null
+  qwenttsDefaultTier: '0.6b'
+  activeQwenttsTier?: '0.6b' | null
 }
 
 interface SpeechModelOption {
@@ -49,7 +49,7 @@ interface SpeechModelOption {
 }
 
 interface QwenttsModelOption {
-  tier: '0.6b' | '1.7b'
+  tier: '0.6b'
   filename: string
   sizeMb: number
   combinedSizeMb: number
@@ -89,7 +89,9 @@ type AppRegionStyle = React.CSSProperties & {
 type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'max' | 'skip'
 type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra' | 'skip'
 type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
-type QwenttsTier = '0.6b' | '1.7b' | 'skip'
+type QwenttsTier = '0.6b' | 'skip'
+type SetupMode = 'advanced' | 'simple'
+type Page = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
 
 const LLAMA_BACKEND_OPTIONS: Array<{ key: LlamaBackend; label: string; description: string }> = [
   { key: 'cuda', label: 'NVIDIA GPU', description: 'Uses CUDA. Usually the fastest option for NVIDIA graphics cards.' },
@@ -361,6 +363,7 @@ function getSpeechHardwareFit(systemInfo: SystemInfo | null, tier: 'fast' | 'bal
 
 export function SetupWizard({ onComplete }: Props) {
   const [page, setPage] = useState<Page>(1)
+  const [setupMode, setSetupMode] = useState<SetupMode>('advanced')
   const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null)
   const [systemInfoLoading, setSystemInfoLoading] = useState(false)
   const [selectedTier, setSelectedTier] = useState<ModelTier | null>(null)
@@ -453,9 +456,17 @@ export function SetupWizard({ onComplete }: Props) {
     }
   }, [])
 
-  // Fetch system info when we land on page 2
+  const applySimpleSetupDefaults = useCallback(() => {
+    setSelectedTier('skip')
+    setSelectedQwenttsTier('skip')
+    setInstallFonts(false)
+    setInstallDictionary(true)
+    setSelectedSpeechTier('fast')
+  }, [])
+
+  // Fetch system info once we enter the setup flow beyond mode selection.
   useEffect(() => {
-    if (page !== 2 || sysInfo) return
+    if (page < 3 || sysInfo) return
     void refreshSystemInfo()
   }, [page, refreshSystemInfo, sysInfo])
 
@@ -505,67 +516,134 @@ export function SetupWizard({ onComplete }: Props) {
   }, [appendProgressLog])
 
   const startDownloads = useCallback(async () => {
+    const api = window.jplearnDesktop
+
+    let effectiveSysInfo = sysInfo
+    if (api?.getSetupSystemInfo) {
+      try {
+        const latestInfo = await api.getSetupSystemInfo()
+        setSysInfo(latestInfo)
+        effectiveSysInfo = latestInfo
+      } catch {
+        // Keep the most recent known system snapshot.
+      }
+    }
+
+    const needsModel = selectedTier && selectedTier !== 'skip' && !effectiveSysInfo?.models.find((m) => m.tier === selectedTier)?.installed
+    const needsLlama = selectedTier && selectedTier !== 'skip' && !effectiveSysInfo?.llamaCppInstalled
+    const needsVoice = selectedQwenttsTier !== 'skip' && !effectiveSysInfo?.qwenttsModels.find((m) => m.tier === selectedQwenttsTier)?.installed
+    const needsFonts = installFonts && !effectiveSysInfo?.fontsInstalled
+    const needsDictionary = installDictionary && !effectiveSysInfo?.dictionaryInstalled
+    const needsSpeech = selectedSpeechTier !== 'skip' && !effectiveSysInfo?.speechModels.find((m) => m.tier === selectedSpeechTier)?.installed
+
     setDownloadError(null)
     setProgressLogs([])
-    setModelProgress(0)
+    setModelProgress(needsModel ? 0 : 100)
     setModelMb(null)
     setModelEta(null)
-    setLlamaProgress(0)
+    setLlamaProgress(needsLlama ? 0 : 100)
     setLlamaMb(null)
-    setQwenttsProgress(0)
+    setQwenttsProgress(needsVoice ? 0 : 100)
     setQwenttsMb(null)
-    setFontsProgress(0)
+    setFontsProgress(needsFonts ? 0 : 100)
     setFontsFiles(null)
     setFontsMb(null)
-    setDictionaryProgress(0)
-    setSpeechProgress(0)
+    setDictionaryProgress(needsDictionary ? 0 : 100)
+    setSpeechProgress(needsSpeech ? 0 : 100)
     appendProgressLog('Starting setup tasks…')
-    setPage(7)
+    setPage(8)
 
-    const api = window.jplearnDesktop
     try {
-      const downloadTasks: Promise<unknown>[] = []
+      const downloadTasks: Array<{ name: string; promise: Promise<unknown> }> = []
 
-      if (selectedTier && selectedTier !== 'skip') {
+      if (needsModel && selectedTier) {
         appendProgressLog(`Starting model download (${selectedTier})…`)
         const task = api.downloadModel?.(selectedTier)
-        if (task) downloadTasks.push(task)
+        if (task) {
+          downloadTasks.push({
+            name: 'model',
+            promise: task.then((result) => {
+              setModelProgress(100)
+              return result
+            }),
+          })
+        }
       }
-      if (selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled) {
+      if (needsLlama && selectedTier) {
         const backendLabel = LLAMA_BACKEND_OPTIONS.find((option) => option.key === selectedLlamaBackend)?.label ?? selectedLlamaBackend
         appendProgressLog(`Starting llama.cpp runtime download (${backendLabel})…`)
         const task = api.downloadLlama?.(selectedLlamaBackend)
-        if (task) downloadTasks.push(task)
+        if (task) {
+          downloadTasks.push({
+            name: 'llama',
+            promise: task.then((result) => {
+              setLlamaProgress(100)
+              return result
+            }),
+          })
+        }
       }
-      if (selectedQwenttsTier !== 'skip' && !sysInfo?.qwenttsModels.find((model) => model.tier === selectedQwenttsTier)?.installed) {
+      if (needsVoice) {
         appendProgressLog(`Starting Japanese voice model download (${selectedQwenttsTier})…`)
         const task = api.downloadQwentts?.(selectedQwenttsTier)
-        if (task) downloadTasks.push(task)
+        if (task) {
+          downloadTasks.push({
+            name: 'qwentts',
+            promise: task.then((result) => {
+              setQwenttsProgress(100)
+              return result
+            }),
+          })
+        }
       }
-      if (installFonts && !sysInfo?.fontsInstalled) {
+      if (needsFonts) {
         appendProgressLog('Starting fonts download…')
         const task = api.downloadFonts?.()
-        if (task) downloadTasks.push(task)
+        if (task) {
+          downloadTasks.push({
+            name: 'fonts',
+            promise: task.then((result) => {
+              setFontsProgress(100)
+              return result
+            }),
+          })
+        }
       }
-      if (installDictionary && !sysInfo?.dictionaryInstalled) {
+      if (needsDictionary) {
         appendProgressLog('Starting offline dictionary download…')
         const task = api.downloadDictionary?.()
-        if (task) downloadTasks.push(task)
+        if (task) {
+          downloadTasks.push({
+            name: 'dictionary',
+            promise: task.then((result) => {
+              setDictionaryProgress(100)
+              return result
+            }),
+          })
+        }
       }
-      if (selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find((model) => model.tier === selectedSpeechTier)?.installed) {
+      if (needsSpeech) {
         appendProgressLog(`Starting speech recognition model download (${selectedSpeechTier})…`)
         const task = api.downloadSpeechModel?.(selectedSpeechTier)
-        if (task) downloadTasks.push(task)
+        if (task) {
+          downloadTasks.push({
+            name: 'speech',
+            promise: task.then((result) => {
+              setSpeechProgress(100)
+              return result
+            }),
+          })
+        }
       }
 
       if (downloadTasks.length > 0) {
-        const results = await Promise.allSettled(downloadTasks)
+        const results = await Promise.allSettled(downloadTasks.map((task) => task.promise))
         const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
         if (failure) {
           throw failure.reason instanceof Error ? failure.reason : new Error(String(failure.reason))
         }
       }
-      if (installFonts && !sysInfo?.fontsInstalled) {
+      if (needsFonts) {
         await api.reloadLocalFonts?.().catch(() => undefined)
       }
       appendProgressLog('Creating shortcuts…')
@@ -573,12 +651,12 @@ export function SetupWizard({ onComplete }: Props) {
       await api.completeSetup?.()
       appendProgressLog('Setup complete.')
       setDownloadDone(true)
-      setPage(8)
+      setPage(9)
     } catch (err) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, selectedLlamaBackend, selectedQwenttsTier, installFonts, installDictionary, selectedSpeechTier, sysInfo?.llamaCppInstalled, sysInfo?.fontsInstalled, sysInfo?.dictionaryInstalled, sysInfo?.speechModels, sysInfo?.qwenttsModels, createDesktop, createStartMenu, appendProgressLog])
+  }, [selectedTier, selectedLlamaBackend, selectedQwenttsTier, installFonts, installDictionary, selectedSpeechTier, sysInfo, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -611,7 +689,6 @@ export function SetupWizard({ onComplete }: Props) {
 
   // ── Page renders ───────────────────────────────────────────────────────────
 
-  type Page = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   const tutorModelOptions: CompactDropdownOption[] = [
     ...(sysInfo?.models.map((model) => {
       const hardwareFit = getModelHardwareFit(sysInfo, model.tier)
@@ -718,10 +795,66 @@ export function SetupWizard({ onComplete }: Props) {
 
     2: (
       <PageLayout
+        title="Setup style"
+        subtitle="Choose a quick setup or configure everything in detail."
+        onNext={() => {
+          if (setupMode === 'simple') {
+            applySimpleSetupDefaults()
+            setPage(7)
+            return
+          }
+          setPage(3)
+        }}
+        onBack={() => setPage(1)}
+        nextLabel={setupMode === 'simple' ? 'Continue (Simple)' : 'Continue (Advanced)'}
+      >
+        <div style={{ display: 'grid', gap: '0.8rem' }}>
+          <button
+            type="button"
+            onClick={() => setSetupMode('simple')}
+            style={{
+              textAlign: 'left',
+              padding: '0.9rem',
+              borderRadius: '10px',
+              border: setupMode === 'simple' ? '1px solid var(--accent, #7eb8ea)' : '1px solid rgba(255,255,255,0.14)',
+              background: setupMode === 'simple' ? 'rgba(126,184,234,0.14)' : 'rgba(255,255,255,0.05)',
+              color: 'inherit',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: '0.35rem' }}>Simple setup</div>
+            <div style={{ opacity: 0.75, fontSize: '0.9rem', lineHeight: 1.45 }}>
+              Downloads only offline dictionary + fastest speech recognition model.
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSetupMode('advanced')}
+            style={{
+              textAlign: 'left',
+              padding: '0.9rem',
+              borderRadius: '10px',
+              border: setupMode === 'advanced' ? '1px solid var(--accent, #7eb8ea)' : '1px solid rgba(255,255,255,0.14)',
+              background: setupMode === 'advanced' ? 'rgba(126,184,234,0.14)' : 'rgba(255,255,255,0.05)',
+              color: 'inherit',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: '0.35rem' }}>Advanced setup</div>
+            <div style={{ opacity: 0.75, fontSize: '0.9rem', lineHeight: 1.45 }}>
+              Choose tutor model, voice model, speech tier, fonts, dictionary, and shortcuts.
+            </div>
+          </button>
+        </div>
+      </PageLayout>
+    ),
+
+    3: (
+      <PageLayout
         title="System Check"
         subtitle="Checking your hardware to recommend the best settings."
-        onNext={() => setPage(3)}
-        onBack={() => setPage(1)}
+        onNext={() => setPage(4)}
+        onBack={() => setPage(2)}
         nextLabel="Continue"
         nextDisabled={!sysInfo}
       >
@@ -765,12 +898,12 @@ export function SetupWizard({ onComplete }: Props) {
       </PageLayout>
     ),
 
-    3: (
+    4: (
       <PageLayout
         title="AI Tutor (optional)"
         subtitle="Select a model or skip — you can always add one later."
-        onNext={() => setPage(4)}
-        onBack={() => setPage(2)}
+        onNext={() => setPage(5)}
+        onBack={() => setPage(3)}
         nextLabel="Continue"
       >
         <p style={{ opacity: 0.75, lineHeight: 1.6, marginBottom: '1rem' }}>
@@ -825,12 +958,12 @@ export function SetupWizard({ onComplete }: Props) {
       </PageLayout>
     ),
 
-    4: (
+    5: (
       <PageLayout
         title="Japanese Voice (optional)"
         subtitle="Install voice synthesis and optional speech recognition."
-        onNext={() => setPage(5)}
-        onBack={() => setPage(3)}
+        onNext={() => setPage(6)}
+        onBack={() => setPage(4)}
         nextLabel="Continue"
       >
         <p style={{ opacity: 0.75, lineHeight: 1.6, marginBottom: '1rem' }}>
@@ -887,12 +1020,12 @@ export function SetupWizard({ onComplete }: Props) {
       </PageLayout>
     ),
 
-    5: (
+    6: (
       <PageLayout
         title="Reading Assets (optional)"
         subtitle="Install optional Japanese fonts and offline dictionary data."
-        onNext={() => setPage(6)}
-        onBack={() => setPage(4)}
+        onNext={() => setPage(7)}
+        onBack={() => setPage(5)}
         nextLabel="Continue"
       >
         <div>
@@ -931,7 +1064,7 @@ export function SetupWizard({ onComplete }: Props) {
       </PageLayout>
     ),
 
-    6: (() => {
+    7: (() => {
       const needsModel = selectedTier && selectedTier !== 'skip' && !sysInfo?.models.find(m => m.tier === selectedTier)?.installed
       const needsLlama = selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled
       const needsVoice = selectedQwenttsTier !== 'skip' && !sysInfo?.qwenttsModels.find(m => m.tier === selectedQwenttsTier)?.installed
@@ -946,7 +1079,7 @@ export function SetupWizard({ onComplete }: Props) {
           title="Ready to download"
           subtitle="Review what will be downloaded, then click Start Setup."
           onNext={startDownloads}
-          onBack={() => setPage(5)}
+          onBack={() => setPage(setupMode === 'simple' ? 2 : 6)}
           nextLabel={needsModel || needsLlama || needsVoice || needsFonts || needsDictionary || needsSpeech ? 'Start Setup' : 'Finish'}
         >
           {needsModel && modelInfo && (
@@ -987,7 +1120,7 @@ export function SetupWizard({ onComplete }: Props) {
       )
     })(),
 
-    7: (
+    8: (
       <PageLayout title="Setting up…" subtitle="Please wait while files are downloaded." hideNav>
         {selectedTier && selectedTier !== 'skip' && (
           <>
@@ -1063,7 +1196,7 @@ export function SetupWizard({ onComplete }: Props) {
       </PageLayout>
     ),
 
-    8: (
+    9: (
       <PageLayout
         title="Setup complete"
         subtitle="Everything is ready. Enjoy learning Japanese!"
@@ -1086,7 +1219,7 @@ export function SetupWizard({ onComplete }: Props) {
           <span style={dragBarTitleStyle}>JPLearn Setup</span>
         </div>
         <div style={stepDotsRowStyle}>
-          <StepDots total={8} current={page} />
+          <StepDots total={9} current={page} />
         </div>
         <div className="setup-wizard-scroll-area" style={cardViewportStyle}>
           <div style={cardBodyStyle}>

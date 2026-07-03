@@ -878,6 +878,17 @@ interface AppSettings {
   showKeyboardPrompts: boolean
   voiceEnabled: boolean
   voiceSpeaker: string
+  mixedLanguageStitchingEnabled: boolean
+}
+
+interface VoiceSynthesisMeta {
+  mode: 'single' | 'mixed_stitched'
+  profile: 'main' | 'jp' | 'en'
+  mixedStitchingEnabled: boolean
+  mixedSegmentCount: number
+  streamingAttempted: boolean
+  streamingFallbackUsed: boolean
+  elapsedMs: number
 }
 
 interface SpeechSegment {
@@ -1988,6 +1999,7 @@ function defaultSettings(): AppSettings {
     showKeyboardPrompts: false,
     voiceEnabled: true,
     voiceSpeaker: 'male_kenji',
+    mixedLanguageStitchingEnabled: true,
   }
 }
 
@@ -2289,6 +2301,10 @@ function loadSettings(): AppSettings {
         typeof parsed.voiceSpeaker === 'string' && parsed.voiceSpeaker.trim().length > 0
           ? parsed.voiceSpeaker
           : defaults.voiceSpeaker,
+      mixedLanguageStitchingEnabled:
+        typeof parsed.mixedLanguageStitchingEnabled === 'boolean'
+          ? parsed.mixedLanguageStitchingEnabled
+          : defaults.mixedLanguageStitchingEnabled,
     }
   } catch {
     return defaultSettings()
@@ -3163,6 +3179,7 @@ function App() {
   const [roundInput, setRoundInput] = useState<string>('')
   const [voiceBusy, setVoiceBusy] = useState<boolean>(false)
   const [voiceUnavailable, setVoiceUnavailable] = useState<boolean>(false)
+  const [lastVoiceSynthesis, setLastVoiceSynthesis] = useState<VoiceSynthesisMeta | null>(null)
   const [tutorInstallInfo, setTutorInstallInfo] = useState<{
     totalRamGb: number
     models: Array<{
@@ -3430,8 +3447,13 @@ function App() {
     }
     setVoiceBusy(true)
     try {
-      const result = await speak({ text: spoken, speaker: speaker ?? settings.voiceSpeaker })
+      const result = await speak({
+        text: spoken,
+        speaker: speaker ?? settings.voiceSpeaker,
+        mixedLanguageStitchingEnabled: settings.mixedLanguageStitchingEnabled,
+      })
       if (result?.audioBase64) {
+        setLastVoiceSynthesis((result.synthesis as VoiceSynthesisMeta | undefined) ?? null)
         if (voiceAudioRef.current) {
           voiceAudioRef.current.pause()
         }
@@ -3445,7 +3467,7 @@ function App() {
     } finally {
       setVoiceBusy(false)
     }
-  }, [voiceBusy, settings.voiceSpeaker])
+  }, [voiceBusy, settings.mixedLanguageStitchingEnabled, settings.voiceSpeaker])
 
   const cancelAssistantSpeech = useCallback(() => {
     assistantSpeechRunIdRef.current += 1
@@ -3465,10 +3487,15 @@ function App() {
       return false
     }
     try {
-      const result = await speak({ text, speaker: settings.voiceSpeaker })
+      const result = await speak({
+        text,
+        speaker: settings.voiceSpeaker,
+        mixedLanguageStitchingEnabled: settings.mixedLanguageStitchingEnabled,
+      })
       if (!result?.audioBase64 || assistantSpeechRunIdRef.current !== runId) {
         return false
       }
+      setLastVoiceSynthesis((result.synthesis as VoiceSynthesisMeta | undefined) ?? null)
       await new Promise<void>((resolve, reject) => {
         const audio = new Audio(`data:audio/wav;base64,${result.audioBase64}`)
         if (voiceAudioRef.current) {
@@ -3483,7 +3510,7 @@ function App() {
     } catch {
       return false
     }
-  }, [settings.voiceSpeaker])
+  }, [settings.mixedLanguageStitchingEnabled, settings.voiceSpeaker])
 
   const speakAssistantReply = useCallback(async (text: string, turnKey?: string): Promise<void> => {
     if (!settings.assistantChatAudioEnabled) {
@@ -8975,9 +9002,37 @@ function App() {
                           onToggle={() => toggleThemeSectionCollapsed('english-chat-voice')}
                           className="settings-theme-card"
                         >
+                          <div className="settings-animation-grid" role="group" aria-label="Mixed language synthesis strategy">
+                            <button
+                              type="button"
+                              className={`settings-icon-entry settings-theme-entry ${settings.mixedLanguageStitchingEnabled ? 'is-active' : ''}`}
+                              onClick={() => setSettings((prev) => ({
+                                ...prev,
+                                mixedLanguageStitchingEnabled: !prev.mixedLanguageStitchingEnabled,
+                              }))}
+                              aria-label={settings.mixedLanguageStitchingEnabled
+                                ? 'Mixed-language stitching enabled. Activate to disable.'
+                                : 'Mixed-language stitching disabled. Activate to enable.'}
+                              aria-pressed={settings.mixedLanguageStitchingEnabled}
+                              title={settings.mixedLanguageStitchingEnabled
+                                ? 'Mixed-language stitching enabled'
+                                : 'Mixed-language stitching disabled'}
+                            >
+                              <span className={`settings-mode-icon-button ${settings.mixedLanguageStitchingEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+                                <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                              </span>
+                              <span className="settings-icon-entry-label">
+                                {settings.mixedLanguageStitchingEnabled ? 'Mixed Stitching On' : 'Mixed Stitching Off'}
+                              </span>
+                            </button>
+                          </div>
                           <p className="settings-help">
-                            English playback follows the selected local speaker from Step 1. If speech fails,
-                            confirm the QwenTTS model and speaker bank are installed.
+                            English playback uses the same selected local speaker from Step 1.
+                          </p>
+                          <p className="settings-help">
+                            Synthesis debug: {lastVoiceSynthesis
+                              ? `${lastVoiceSynthesis.mode}, ${lastVoiceSynthesis.profile}, ${Math.max(0, Math.round(lastVoiceSynthesis.elapsedMs))}ms`
+                              : 'No playback yet.'}
                           </p>
                         </SettingsCollapsibleSection>
                         <div className="settings-voice-step-actions">

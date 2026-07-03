@@ -395,7 +395,12 @@ interface DesktopApi {
   }) => Promise<AssistantChatRuntimeResponse>
   unloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string }>
   cancelAssistantChatInference?: () => Promise<{ ok: boolean; cancelled: boolean; reason: string }>
-  speakText?: (payload: string | { text: string; speaker?: string | number; speed?: number }) => Promise<VoiceSpeakResponse>
+  speakText?: (payload: string | {
+    text: string
+    speaker?: string | number
+    speed?: number
+    mixedLanguageStitchingEnabled?: boolean
+  }) => Promise<VoiceSpeakResponse>
   getVoiceStatus?: () => Promise<VoiceStatus>
   listVoices?: () => Promise<VoiceOption[]>
   preloadVoice?: (speaker?: string | number) => Promise<{ ok: boolean; ready: boolean }>
@@ -429,9 +434,9 @@ interface DesktopApi {
   setActiveTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => Promise<{ ok: boolean; tier: string }>
   uninstallTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra' | 'max') => Promise<{ ok: boolean; tier: string }>
   downloadLlama?: (backend?: 'cuda' | 'hip' | 'vulkan' | 'cpu') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
-  downloadQwentts?: (tier?: '0.6b' | '1.7b') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
-  setActiveQwenttsTier?: (tier: '0.6b' | '1.7b') => Promise<{ ok: boolean; tier: string }>
-  uninstallQwenttsTier?: (tier: '0.6b' | '1.7b') => Promise<{ ok: boolean; tier: string }>
+  downloadQwentts?: (tier?: '0.6b') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  setActiveQwenttsTier?: (tier: '0.6b') => Promise<{ ok: boolean; tier: string }>
+  uninstallQwenttsTier?: (tier: '0.6b') => Promise<{ ok: boolean; tier: string }>
   completeSetup?: () => Promise<{ ok: boolean }>
   skipSetup?: () => Promise<{ ok: boolean }>
   onSetupProgress?: (listener: (evt: SetupProgressEvent) => void) => () => void
@@ -473,7 +478,7 @@ interface SetupSpeechModelOption {
 }
 
 interface SetupQwenttsModelOption {
-  tier: '0.6b' | '1.7b'
+  tier: '0.6b'
   filename: string
   sizeMb: number
   combinedSizeMb: number
@@ -524,8 +529,8 @@ interface SetupSystemInfo {
   dictionaryEstimatedDownloadMinutes?: number | null
   qwenttsInstalled: boolean
   qwenttsModels: SetupQwenttsModelOption[]
-  qwenttsDefaultTier: '0.6b' | '1.7b'
-  activeQwenttsTier?: '0.6b' | '1.7b' | null
+  qwenttsDefaultTier: '0.6b'
+  activeQwenttsTier?: '0.6b' | null
 }
 
 interface SetupProgressEvent {
@@ -554,6 +559,15 @@ interface VoiceSpeakResponse {
   sampleRate: number
   voiceId: string
   audioBase64: string
+  synthesis?: {
+    mode: 'single' | 'mixed_stitched'
+    profile: 'main' | 'jp' | 'en'
+    mixedStitchingEnabled: boolean
+    mixedSegmentCount: number
+    streamingAttempted: boolean
+    streamingFallbackUsed: boolean
+    elapsedMs: number
+  }
 }
 
 interface VoiceOption {

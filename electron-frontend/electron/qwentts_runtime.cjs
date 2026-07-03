@@ -34,6 +34,109 @@ const DEFAULT_MAX_TEXT_CHARS = 400
 const DEFAULT_STARTUP_TIMEOUT_MS = 120000
 const DEFAULT_REQUEST_TIMEOUT_MS = 60000
 const HOST = '127.0.0.1'
+const MIXED_STITCH_CROSSFADE_MS = 40
+const PROFILE_MAIN = 'main'
+const PROFILE_JP = 'jp'
+const PROFILE_EN = 'en'
+const TALKER_TIER_PATTERN = /^qwen-talker-(0\.6b)-.*\.gguf$/i
+
+let activeQwenttsServerGuard = null
+let qwenttsServerOwnerCounter = 0
+
+function containsJapaneseScript(text) {
+  return /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}々〆ヵヶ]/u.test(text)
+}
+
+function containsLatinLetters(text) {
+  return /[A-Za-z]/.test(text)
+}
+
+function inferLanguageProfile(text) {
+  const hasJapanese = containsJapaneseScript(text)
+  const hasLatin = containsLatinLetters(text)
+
+  if (hasJapanese && !hasLatin) {
+    return PROFILE_JP
+  }
+  if (hasLatin && !hasJapanese) {
+    return PROFILE_EN
+  }
+  return PROFILE_MAIN
+}
+
+function detectCharLanguage(char) {
+  if (containsJapaneseScript(char)) {
+    return PROFILE_JP
+  }
+  if (containsLatinLetters(char)) {
+    return PROFILE_EN
+  }
+  return null
+}
+
+function normalizeUnknownRuns(runs) {
+  if (!runs.length) {
+    return runs
+  }
+
+  for (let i = 0; i < runs.length; i += 1) {
+    if (runs[i].profile !== 'unknown') {
+      continue
+    }
+
+    let replacement = null
+    for (let j = i - 1; j >= 0; j -= 1) {
+      if (runs[j].profile !== 'unknown') {
+        replacement = runs[j].profile
+        break
+      }
+    }
+    if (!replacement) {
+      for (let j = i + 1; j < runs.length; j += 1) {
+        if (runs[j].profile !== 'unknown') {
+          replacement = runs[j].profile
+          break
+        }
+      }
+    }
+    runs[i].profile = replacement || PROFILE_MAIN
+  }
+
+  const merged = []
+  for (const run of runs) {
+    if (!run.text) {
+      continue
+    }
+    const prev = merged[merged.length - 1]
+    if (prev && prev.profile === run.profile) {
+      prev.text += run.text
+    } else {
+      merged.push({ ...run })
+    }
+  }
+  return merged
+}
+
+function splitMixedLanguageRuns(text) {
+  const runs = []
+  for (const char of text) {
+    const profile = detectCharLanguage(char)
+    if (!runs.length) {
+      runs.push({ profile: profile || 'unknown', text: char })
+      continue
+    }
+    const prev = runs[runs.length - 1]
+    if (!profile || prev.profile === profile) {
+      prev.text += char
+    } else {
+      runs.push({ profile, text: char })
+    }
+  }
+
+  return normalizeUnknownRuns(runs)
+    .map((run) => ({ profile: run.profile, text: run.text.trim() }))
+    .filter((run) => run.text.length > 0 && (run.profile === PROFILE_JP || run.profile === PROFILE_EN))
+}
 
 function sanitizeSpeechText(text) {
   return typeof text === 'string' ? text.replace(/〜/g, '').trim() : ''
@@ -92,7 +195,7 @@ function findFirstMatch(dir, pattern) {
 // setup_runtime.cjs persists the user's selected tier as the exact talker
 // filename to load (tts/active-qwentts-tier.json), the same pattern used for
 // the tutor LLM's active-model.json. Reading it here means installing a
-// second tier (e.g. upgrading 0.6b -> 1.7b) doesn't silently keep loading
+// alternative tier files don't silently keep loading
 // whichever talker file happens to sort first alphabetically.
 function readActiveQwenttsTalkerFilename(baseDir) {
   try {
@@ -107,28 +210,147 @@ function readActiveQwenttsTalkerFilename(baseDir) {
   return null
 }
 
-function resolveQwenttsModelPaths(baseDir) {
+function readActiveQwenttsTier(baseDir) {
+  try {
+    const raw = fs.readFileSync(path.join(baseDir, 'active-qwentts-tier.json'), 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.tier === 'string' && parsed.tier.trim()) {
+      return parsed.tier.trim()
+    }
+  } catch {
+    // No persisted tier selection yet.
+  }
+  return null
+}
+
+function findVoiceCompatibleTalker(modelsDir) {
+  return findFirstMatch(modelsDir, /^qwen-talker-0\.6b-.*\.gguf$/i)
+}
+
+function inferTierFromTalkerFilename(talkerFilename) {
+  if (typeof talkerFilename !== 'string') {
+    return null
+  }
+  const match = TALKER_TIER_PATTERN.exec(talkerFilename.trim())
+  return match ? match[1].toLowerCase() : null
+}
+
+function inferTierFromTalkerPath(talkerPath) {
+  if (typeof talkerPath !== 'string' || !talkerPath.trim()) {
+    return null
+  }
+  return inferTierFromTalkerFilename(path.basename(talkerPath.trim()))
+}
+
+function expectedSpeakerEmbeddingDimForTier(tier) {
+  if (tier === '0.6b') {
+    return 1024
+  }
+  return null
+}
+
+function findSpeakerEmbeddingDimMismatch(presetBankDir, expectedDim) {
+  if (!Number.isInteger(expectedDim) || expectedDim <= 0 || !fs.existsSync(presetBankDir)) {
+    return null
+  }
+  const expectedSize = expectedDim * 4
+  const entries = fs.readdirSync(presetBankDir, { withFileTypes: true }).filter((entry) => entry.isDirectory())
+  for (const entry of entries) {
+    const spkPath = path.join(presetBankDir, entry.name, 'spk.bin')
+    if (!fs.existsSync(spkPath)) {
+      continue
+    }
+    let stat
+    try {
+      stat = fs.statSync(spkPath)
+    } catch {
+      continue
+    }
+    if (!stat.isFile() || stat.size <= 0 || stat.size % 4 !== 0) {
+      continue
+    }
+    if (stat.size !== expectedSize) {
+      return {
+        speakerId: entry.name,
+        actualDim: Math.floor(stat.size / 4),
+        expectedDim,
+      }
+    }
+  }
+  return null
+}
+
+function resolveQwenttsModelPaths(baseDir, preferVoiceCompatibleTalker = false) {
   const modelsDir = path.join(baseDir, 'models')
   const activeTalkerFilename = readActiveQwenttsTalkerFilename(baseDir)
   const activeTalkerPath = activeTalkerFilename ? path.join(modelsDir, activeTalkerFilename) : null
+  const compatibleTalkerPath = findVoiceCompatibleTalker(modelsDir)
+  const autoTalkerPath = findFirstMatch(modelsDir, /^qwen-talker-.*\.gguf$/i)
+
+  let talkerPath = null
+  if (preferVoiceCompatibleTalker && compatibleTalkerPath) {
+    talkerPath = compatibleTalkerPath
+  } else if (activeTalkerPath && fs.existsSync(activeTalkerPath)) {
+    talkerPath = activeTalkerPath
+  } else {
+    talkerPath = autoTalkerPath
+  }
+
   return {
     modelsDir,
-    talkerPath: activeTalkerPath && fs.existsSync(activeTalkerPath)
-      ? activeTalkerPath
-      : findFirstMatch(modelsDir, /^qwen-talker-.*\.gguf$/i),
+    talkerPath,
     tokenizerPath: findFirstMatch(modelsDir, /^qwen-tokenizer-.*\.gguf$/i),
   }
 }
 
-function resolvePresetBankDir(baseDir) {
+function resolvePresetBankDir(baseDir, profile = PROFILE_MAIN, tier = null) {
+  const normalizedTier = typeof tier === 'string' ? tier.trim() : ''
+
+  if (normalizedTier) {
+    if (profile === PROFILE_JP) {
+      return path.join(baseDir, `preset_bank_jp_${normalizedTier}`)
+    }
+    if (profile === PROFILE_EN) {
+      return path.join(baseDir, `preset_bank_en_${normalizedTier}`)
+    }
+    return path.join(baseDir, `preset_bank_${normalizedTier}`)
+  }
+
+  if (profile === PROFILE_JP) {
+    return path.join(baseDir, 'preset_bank_jp')
+  }
+  if (profile === PROFILE_EN) {
+    return path.join(baseDir, 'preset_bank_en')
+  }
   return path.join(baseDir, 'preset_bank')
+}
+
+function resolvePresetBankDirForProfile(baseDir, profile, tierHint = null) {
+  const hintedTier = typeof tierHint === 'string' ? tierHint.trim().toLowerCase() : ''
+  const activeTier = hintedTier || readActiveQwenttsTier(baseDir)
+  const preferredTierRoot = resolvePresetBankDir(baseDir, profile, activeTier)
+  if (fs.existsSync(preferredTierRoot)) {
+    return preferredTierRoot
+  }
+
+  const preferred = resolvePresetBankDir(baseDir, profile)
+  if (fs.existsSync(preferred)) {
+    return preferred
+  }
+
+  const fallbackTierMainRoot = resolvePresetBankDir(baseDir, PROFILE_MAIN, activeTier)
+  if (fs.existsSync(fallbackTierMainRoot)) {
+    return fallbackTierMainRoot
+  }
+
+  return resolvePresetBankDir(baseDir, PROFILE_MAIN)
 }
 
 // Preset folder name is the OAI "voice" name the patched server exposes via
 // --speaker-bank; a folder only counts once its required spk.bin exists
 // (see patches/qwentts-cpp/0001-speaker-bank.patch).
 function loadPresetSpeakerNames(baseDir) {
-  const presetRoot = resolvePresetBankDir(baseDir)
+  const presetRoot = resolvePresetBankDir(baseDir, PROFILE_MAIN)
   if (!fs.existsSync(presetRoot)) {
     return []
   }
@@ -143,7 +365,7 @@ function loadPresetSpeakerNames(baseDir) {
 // display name/description, falling back to the folder name if preset.json is
 // missing or unreadable.
 function loadPresetSpeakers(baseDir) {
-  const presetRoot = resolvePresetBankDir(baseDir)
+  const presetRoot = resolvePresetBankDir(baseDir, PROFILE_MAIN)
   if (!fs.existsSync(presetRoot)) {
     return []
   }
@@ -215,6 +437,152 @@ function httpRequestBinary(requestOptions, payload, timeoutMs) {
   })
 }
 
+function isLikelyWav(body) {
+  if (!Buffer.isBuffer(body) || body.length < 12) {
+    return false
+  }
+  return body.subarray(0, 4).toString('ascii') === 'RIFF' && body.subarray(8, 12).toString('ascii') === 'WAVE'
+}
+
+function decodePcm16MonoWav(buffer) {
+  if (!isLikelyWav(buffer)) {
+    throw new Error('Expected RIFF/WAVE payload')
+  }
+
+  let offset = 12
+  let format = null
+  let sampleRate = 0
+  let channels = 0
+  let bitsPerSample = 0
+  let dataChunk = null
+
+  while (offset + 8 <= buffer.length) {
+    const chunkId = buffer.toString('ascii', offset, offset + 4)
+    const chunkSize = buffer.readUInt32LE(offset + 4)
+    const chunkStart = offset + 8
+    const chunkEnd = chunkStart + chunkSize
+    if (chunkEnd > buffer.length) {
+      break
+    }
+
+    if (chunkId === 'fmt ' && chunkSize >= 16) {
+      format = buffer.readUInt16LE(chunkStart)
+      channels = buffer.readUInt16LE(chunkStart + 2)
+      sampleRate = buffer.readUInt32LE(chunkStart + 4)
+      bitsPerSample = buffer.readUInt16LE(chunkStart + 14)
+    }
+    if (chunkId === 'data') {
+      dataChunk = buffer.subarray(chunkStart, chunkEnd)
+    }
+
+    offset = chunkEnd + (chunkSize % 2)
+  }
+
+  if (format !== 1 || channels !== 1 || bitsPerSample !== 16 || !dataChunk) {
+    throw new Error('Unsupported WAV format (expected PCM16 mono)')
+  }
+
+  const sampleCount = Math.floor(dataChunk.length / 2)
+  const samples = new Array(sampleCount)
+  for (let i = 0; i < sampleCount; i += 1) {
+    samples[i] = dataChunk.readInt16LE(i * 2)
+  }
+
+  return { sampleRate, samples }
+}
+
+function encodePcm16MonoWav(sampleRate, samples) {
+  const dataLength = samples.length * 2
+  const out = Buffer.alloc(44 + dataLength)
+
+  out.write('RIFF', 0, 4, 'ascii')
+  out.writeUInt32LE(36 + dataLength, 4)
+  out.write('WAVE', 8, 4, 'ascii')
+  out.write('fmt ', 12, 4, 'ascii')
+  out.writeUInt32LE(16, 16)
+  out.writeUInt16LE(1, 20)
+  out.writeUInt16LE(1, 22)
+  out.writeUInt32LE(sampleRate, 24)
+  out.writeUInt32LE(sampleRate * 2, 28)
+  out.writeUInt16LE(2, 32)
+  out.writeUInt16LE(16, 34)
+  out.write('data', 36, 4, 'ascii')
+  out.writeUInt32LE(dataLength, 40)
+
+  for (let i = 0; i < samples.length; i += 1) {
+    const value = Math.max(-32768, Math.min(32767, Math.round(samples[i])))
+    out.writeInt16LE(value, 44 + (i * 2))
+  }
+
+  return out
+}
+
+function stitchWavBuffers(buffers, crossfadeMs = MIXED_STITCH_CROSSFADE_MS) {
+  if (!buffers.length) {
+    throw new Error('No WAV buffers to stitch')
+  }
+
+  const decoded = buffers.map((buffer) => decodePcm16MonoWav(buffer))
+  const sampleRate = decoded[0].sampleRate
+  if (decoded.some((item) => item.sampleRate !== sampleRate)) {
+    throw new Error('Cannot stitch WAV buffers with different sample rates')
+  }
+
+  let merged = decoded[0].samples.slice()
+  const crossfadeSamples = Math.max(1, Math.floor((sampleRate * crossfadeMs) / 1000))
+
+  for (let i = 1; i < decoded.length; i += 1) {
+    const next = decoded[i].samples
+    const n = Math.min(crossfadeSamples, merged.length, next.length)
+
+    if (n > 0) {
+      for (let j = 0; j < n; j += 1) {
+        const t = j / n
+        const mixed = ((1 - t) * merged[merged.length - n + j]) + (t * next[j])
+        merged[merged.length - n + j] = mixed
+      }
+      merged = merged.concat(next.slice(n))
+    } else {
+      merged = merged.concat(next)
+    }
+  }
+
+  return encodePcm16MonoWav(sampleRate, merged)
+}
+
+function createServerState() {
+  return {
+    process: null,
+    port: 0,
+    startPromise: null,
+  }
+}
+
+function isTransientSpeechNetworkError(error) {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+  const code = typeof error.code === 'string' ? error.code : ''
+  return code === 'ECONNRESET' || code === 'ECONNREFUSED' || code === 'EPIPE' || code === 'ETIMEDOUT'
+}
+
+function isSpeakerDimMismatchError(error) {
+  const detail = error instanceof Error ? error.message : String(error)
+  return /ref_spk_dim\s+\d+\s+mismatches\s+talker\s+hidden\s+\d+/i.test(detail)
+}
+
+function createSynthesisMeta() {
+  return {
+    mode: 'single',
+    profile: PROFILE_MAIN,
+    mixedStitchingEnabled: true,
+    mixedSegmentCount: 0,
+    streamingAttempted: false,
+    streamingFallbackUsed: false,
+    elapsedMs: 0,
+  }
+}
+
 function createQwenttsRuntime(options = {}) {
   const repoRoot = typeof options.repoRoot === 'string' && options.repoRoot.trim()
     ? options.repoRoot.trim()
@@ -227,28 +595,37 @@ function createQwenttsRuntime(options = {}) {
     ? Math.max(5000, Math.floor(options.requestTimeoutMs))
     : DEFAULT_REQUEST_TIMEOUT_MS
 
-  let serverProcess = null
-  let port = 0
-  let startPromise = null
+  // Keep a single heavy qwentts backend process alive. Spawning one server
+  // per language profile multiplies memory footprint and can exhaust RAM.
+  const serverState = createServerState()
   let lastError = null
   let exitHandlerRegistered = false
+  const ownerId = ++qwenttsServerOwnerCounter
 
-  function stopServer() {
-    if (serverProcess && serverProcess.exitCode === null) {
-      try { serverProcess.kill() } catch { /* ignore */ }
+  function stopServer(state) {
+    if (state.process && state.process.exitCode === null) {
+      try { state.process.kill() } catch { /* ignore */ }
     }
-    serverProcess = null
-    port = 0
+    state.process = null
+    state.port = 0
+    state.startPromise = null
+    if (activeQwenttsServerGuard && activeQwenttsServerGuard.ownerId === ownerId) {
+      activeQwenttsServerGuard = null
+    }
   }
 
-  async function waitForHealth() {
+  function stopAllServers() {
+    stopServer(serverState)
+  }
+
+  async function waitForHealth(state) {
     const deadline = Date.now() + startupTimeoutMs
     while (Date.now() < deadline) {
-      if (serverProcess && serverProcess.exitCode !== null) {
+      if (state.process && state.process.exitCode !== null) {
         throw new Error('qwentts server exited before becoming ready')
       }
       try {
-        const res = await httpRequestBinary({ host: HOST, port, path: '/health', method: 'GET' }, null, 4000)
+        const res = await httpRequestBinary({ host: HOST, port: state.port, path: '/health', method: 'GET' }, null, 4000)
         if (res.status === 200) {
           return
         }
@@ -260,62 +637,90 @@ function createQwenttsRuntime(options = {}) {
     throw new Error('qwentts server did not become healthy in time')
   }
 
-  async function ensureStarted() {
-    if (serverProcess && serverProcess.exitCode === null && port) {
+  async function ensureStarted(_profile = PROFILE_MAIN) {
+    const state = serverState
+    if (state.process && state.process.exitCode === null && state.port) {
       return
     }
-    if (startPromise) {
-      return startPromise
+    if (state.startPromise) {
+      return state.startPromise
     }
 
-    startPromise = (async () => {
+    state.startPromise = (async () => {
       const binaryPath = resolveQwenttsBinaryPath(repoRoot)
       if (!fs.existsSync(binaryPath)) {
         throw new Error(`qwentts server binary not found: ${binaryPath}`)
       }
       const baseDir = resolveQwenttsBaseDir()
-      const { modelsDir, talkerPath, tokenizerPath } = resolveQwenttsModelPaths(baseDir)
+      const { modelsDir, talkerPath, tokenizerPath } = resolveQwenttsModelPaths(baseDir, false)
       if (!talkerPath || !tokenizerPath) {
         throw new Error(`qwentts model files are missing under ${modelsDir}`)
       }
-      const presetBankDir = resolvePresetBankDir(baseDir)
 
-      port = await findFreePort()
-      const args = ['--model', talkerPath, '--codec', tokenizerPath, '--host', HOST, '--port', String(port)]
+      if (
+        activeQwenttsServerGuard
+        && activeQwenttsServerGuard.ownerId !== ownerId
+        && activeQwenttsServerGuard.process
+        && activeQwenttsServerGuard.process.exitCode === null
+      ) {
+        throw new Error('Refusing to spawn a second local qwentts server instance while one is already active')
+      }
+      const talkerTier = inferTierFromTalkerPath(talkerPath) || readActiveQwenttsTier(baseDir)
+      // Always anchor to the main bank for the shared server to avoid
+      // spinning up per-language heavyweight backends.
+      const presetBankDir = resolvePresetBankDirForProfile(baseDir, PROFILE_MAIN, talkerTier)
+
+      const expectedSpkDim = expectedSpeakerEmbeddingDimForTier(talkerTier)
+      const mismatch = findSpeakerEmbeddingDimMismatch(presetBankDir, expectedSpkDim)
+      if (mismatch) {
+        throw new Error(
+          `Preset speaker '${mismatch.speakerId}' is ${mismatch.actualDim}D but talker tier ${talkerTier} requires ${mismatch.expectedDim}D. Rebuild/install tier-matched preset_bank_${talkerTier}.`
+        )
+      }
+
+      state.port = await findFreePort()
+      const args = ['--model', talkerPath, '--codec', tokenizerPath, '--host', HOST, '--port', String(state.port)]
       if (fs.existsSync(presetBankDir)) {
         args.push('--speaker-bank', presetBankDir)
       }
 
       const proc = spawn(binaryPath, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] })
+      activeQwenttsServerGuard = {
+        ownerId,
+        process: proc,
+        talkerPath,
+        tokenizerPath,
+        port: state.port,
+      }
       proc.stderr.on('data', (chunk) => {
         const text = chunk.toString('utf8').trim()
         if (text) lastError = text
       })
       proc.on('error', (error) => {
         lastError = error instanceof Error ? error.message : String(error)
-        stopServer()
+        stopServer(state)
       })
       proc.on('exit', () => {
-        if (serverProcess === proc) {
-          serverProcess = null
-          port = 0
+        if (state.process === proc) {
+          state.process = null
+          state.port = 0
         }
       })
-      serverProcess = proc
+      state.process = proc
 
       if (!exitHandlerRegistered) {
         exitHandlerRegistered = true
-        process.once('exit', stopServer)
+        process.once('exit', stopAllServers)
       }
 
-      await waitForHealth()
+      await waitForHealth(state)
       lastError = null
     })()
 
     try {
-      await startPromise
+      await state.startPromise
     } finally {
-      startPromise = null
+      state.startPromise = null
     }
   }
 
@@ -339,35 +744,54 @@ function createQwenttsRuntime(options = {}) {
     return undefined
   }
 
-  async function synthesize(text, speaker, speed) {
-    if (!isQwenttsInstalled(repoRoot)) {
-      throw new Error('qwentts runtime is not fully installed')
-    }
-    const normalized = sanitizeSpeechText(text)
-    if (!normalized) {
-      throw new Error('Speak text must not be empty')
-    }
-    const boundedText = normalized.length <= maxTextChars ? normalized : normalized.slice(0, maxTextChars)
+  async function requestSpeechWav(text, speaker, speed, _profile, tryStreaming) {
+    const state = serverState
 
-    await ensureStarted()
+    async function postSpeech(payload, allowRecoverRetry = true) {
+      await ensureStarted(_profile)
+      try {
+        return await httpRequestBinary(
+          { host: HOST, port: state.port, path: '/v1/audio/speech', method: 'POST' },
+          payload,
+          requestTimeoutMs,
+        )
+      } catch (error) {
+        if (!allowRecoverRetry || !isTransientSpeechNetworkError(error)) {
+          throw error
+        }
+
+        // Recover from transient socket failures by restarting only the
+        // affected profile server and retrying once.
+        stopServer(state)
+        await ensureStarted(_profile)
+        return await httpRequestBinary(
+          { host: HOST, port: state.port, path: '/v1/audio/speech', method: 'POST' },
+          payload,
+          requestTimeoutMs,
+        )
+      }
+    }
 
     const voice = resolveVoiceName(speaker)
-    const payload = { input: boundedText, response_format: 'wav' }
+    const payload = { input: text, response_format: 'wav' }
     if (voice) {
       payload.voice = voice
     }
-    // qwentts.cpp's tts-server parses "speed" but currently ignores it (no
-    // time-stretch in the ABI; see src/tts-server.h upstream). Sent anyway
-    // for forward API compatibility -- has no audible effect yet.
     if (Number.isFinite(speed)) {
       payload.speed = Math.min(2, Math.max(0.5, speed))
     }
+    if (tryStreaming) {
+      payload.stream = true
+    }
 
-    const response = await httpRequestBinary(
-      { host: HOST, port, path: '/v1/audio/speech', method: 'POST' },
-      payload,
-      requestTimeoutMs,
-    )
+    let response = await postSpeech(payload, true)
+
+    let streamingFallbackUsed = false
+    if (tryStreaming && response.status === 200 && !isLikelyWav(response.body)) {
+      const retryPayload = { ...payload, stream: false }
+      response = await postSpeech(retryPayload, true)
+      streamingFallbackUsed = true
+    }
 
     if (response.status !== 200) {
       let message = `qwentts server returned status ${response.status}`
@@ -384,12 +808,90 @@ function createQwenttsRuntime(options = {}) {
     if (!response.body.length) {
       throw new Error('qwentts server returned empty audio')
     }
+    if (!isLikelyWav(response.body)) {
+      throw new Error('qwentts server returned non-WAV audio payload')
+    }
+
+    return {
+      voice,
+      wav: response.body,
+      streamingFallbackUsed,
+    }
+  }
+
+  async function synthesize(text, speaker, speed, speakOptions = {}) {
+    if (!isQwenttsInstalled(repoRoot)) {
+      throw new Error('qwentts runtime is not fully installed')
+    }
+    const normalized = sanitizeSpeechText(text)
+    if (!normalized) {
+      throw new Error('Speak text must not be empty')
+    }
+    const boundedText = normalized.length <= maxTextChars ? normalized : normalized.slice(0, maxTextChars)
+
+    const startedAt = Date.now()
+    const meta = createSynthesisMeta()
+    const mixedStitchingEnabled = speakOptions.mixedLanguageStitchingEnabled !== false
+    meta.mixedStitchingEnabled = mixedStitchingEnabled
+
+    let voice
+    let wav
+
+    const runSynthesisOnce = async () => {
+      const hasJapanese = containsJapaneseScript(boundedText)
+      const hasLatin = containsLatinLetters(boundedText)
+
+      voice = resolveVoiceName(speaker)
+      wav = undefined
+
+      if (hasJapanese && hasLatin && mixedStitchingEnabled) {
+        const runs = splitMixedLanguageRuns(boundedText)
+        if (runs.length >= 2) {
+          meta.mode = 'mixed_stitched'
+          meta.profile = PROFILE_MAIN
+          meta.mixedSegmentCount = runs.length
+          const parts = []
+          for (const run of runs) {
+            const segment = await requestSpeechWav(run.text, speaker, speed, run.profile, false)
+            voice = voice || segment.voice
+            parts.push(segment.wav)
+          }
+          wav = stitchWavBuffers(parts, MIXED_STITCH_CROSSFADE_MS)
+        }
+      }
+
+      if (!wav) {
+        const profile = inferLanguageProfile(boundedText)
+        const shouldTryStreaming = profile !== PROFILE_MAIN
+        meta.mode = 'single'
+        meta.profile = profile
+        meta.streamingAttempted = shouldTryStreaming
+        const segment = await requestSpeechWav(boundedText, speaker, speed, profile, shouldTryStreaming)
+        voice = voice || segment.voice
+        wav = segment.wav
+        meta.streamingFallbackUsed = Boolean(segment.streamingFallbackUsed)
+      }
+    }
+
+    try {
+      await runSynthesisOnce()
+    } catch (error) {
+      if (!isSpeakerDimMismatchError(error)) {
+        throw error
+      }
+      throw new Error(
+        'Selected QwenTTS talker is incompatible with preset speakers. Expected 0.6b preset embeddings (1024D). Reinstall bundled 0.6b voice assets.'
+      )
+    }
+
+    meta.elapsedMs = Date.now() - startedAt
 
     return {
       format: 'wav',
       sampleRate: 24000,
       voiceId: voice || 'default',
-      audioBase64: response.body.toString('base64'),
+      audioBase64: wav.toString('base64'),
+      synthesis: meta,
     }
   }
 
@@ -398,7 +900,8 @@ function createQwenttsRuntime(options = {}) {
       const installed = isQwenttsInstalled(repoRoot)
       return {
         available: installed && lastError == null,
-        modelReady: installed && serverProcess != null && serverProcess.exitCode === null,
+        modelReady: installed
+          && (serverState.process != null && serverState.process.exitCode === null),
         downloading: false,
         downloadProgress: 0,
         modelName: pickModelName(),
@@ -408,7 +911,7 @@ function createQwenttsRuntime(options = {}) {
 
     async speak(text, speakOptions = {}) {
       try {
-        const result = await synthesize(text, speakOptions.speaker, speakOptions.speed)
+        const result = await synthesize(text, speakOptions.speaker, speakOptions.speed, speakOptions)
         lastError = null
         return { ok: true, ...result }
       } catch (error) {
@@ -419,7 +922,7 @@ function createQwenttsRuntime(options = {}) {
 
     async preload() {
       try {
-        await ensureStarted()
+        await ensureStarted(PROFILE_MAIN)
         return { ok: true, ready: true }
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error)
@@ -428,7 +931,7 @@ function createQwenttsRuntime(options = {}) {
     },
 
     async unload() {
-      stopServer()
+      stopAllServers()
       return { ok: true }
     },
 

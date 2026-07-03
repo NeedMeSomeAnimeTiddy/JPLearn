@@ -142,6 +142,9 @@ const BUILTIN_PROMPT_ADAPTERS = {
   },
 }
 
+let activeLlamaServerGuard = null
+let llamaServerOwnerCounter = 0
+
 function normalizePromptAdapterId(rawValue) {
   const value = String(rawValue || '').trim().toLowerCase()
   if (!value) {
@@ -1072,10 +1075,12 @@ function createLlamaServerAdapter(config = {}) {
     ? Math.max(10000, Math.floor(config.startupTimeoutMs))
     : 120000
   const host = '127.0.0.1'
+  const ownerId = ++llamaServerOwnerCounter
 
   let serverProcess = null
   let port = 0
   let exitHandlerRegistered = false
+  let startPromise = null
 
   function stopServer() {
     if (serverProcess && serverProcess.exitCode === null) {
@@ -1087,6 +1092,9 @@ function createLlamaServerAdapter(config = {}) {
     }
     serverProcess = null
     port = 0
+    if (activeLlamaServerGuard && activeLlamaServerGuard.ownerId === ownerId) {
+      activeLlamaServerGuard = null
+    }
   }
 
   async function waitForHealth() {
@@ -1128,31 +1136,60 @@ function createLlamaServerAdapter(config = {}) {
         return
       }
 
-      const configuredPort = Number(process.env.JPLEARN_LLAMA_SERVER_PORT)
-      port = Number.isFinite(configuredPort) && configuredPort > 0 ? configuredPort : await findFreePort()
-      const grammarFilePath = resolveTutorGrammarPath()
-
-      const args = [
-        '-m', modelPath,
-        '-c', '2048',
-        '-t', '6',
-        '--host', host,
-        '--port', String(port),
-        '--no-webui',
-        '--chat-template', 'chatml',
-      ]
-      if (grammarFilePath) {
-        args.push('--grammar-file', grammarFilePath)
-      }
-      serverProcess = spawn(executablePath, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'ignore'] })
-      serverProcess.on('error', () => stopServer())
-
-      if (!exitHandlerRegistered) {
-        exitHandlerRegistered = true
-        process.once('exit', stopServer)
+      if (
+        activeLlamaServerGuard
+        && activeLlamaServerGuard.ownerId !== ownerId
+        && activeLlamaServerGuard.process
+        && activeLlamaServerGuard.process.exitCode === null
+      ) {
+        throw new Error('Refusing to spawn a second local llama-server instance while one is already active')
       }
 
-      await waitForHealth()
+      if (startPromise) {
+        await startPromise
+        return
+      }
+
+      startPromise = (async () => {
+        const configuredPort = Number(process.env.JPLEARN_LLAMA_SERVER_PORT)
+        port = Number.isFinite(configuredPort) && configuredPort > 0 ? configuredPort : await findFreePort()
+        const grammarFilePath = resolveTutorGrammarPath()
+
+        const args = [
+          '-m', modelPath,
+          '-c', '2048',
+          '-t', '6',
+          '--host', host,
+          '--port', String(port),
+          '--no-webui',
+          '--chat-template', 'chatml',
+        ]
+        if (grammarFilePath) {
+          args.push('--grammar-file', grammarFilePath)
+        }
+        serverProcess = spawn(executablePath, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'ignore'] })
+        activeLlamaServerGuard = {
+          ownerId,
+          process: serverProcess,
+          executablePath,
+          modelPath,
+          port,
+        }
+        serverProcess.on('error', () => stopServer())
+
+        if (!exitHandlerRegistered) {
+          exitHandlerRegistered = true
+          process.once('exit', stopServer)
+        }
+
+        await waitForHealth()
+      })()
+
+      try {
+        await startPromise
+      } finally {
+        startPromise = null
+      }
     },
 
     async unload() {
@@ -1396,6 +1433,7 @@ function createTutorChatRuntime(options = {}) {
   let unloadTimer = null
   let activeInferenceController = null
   let isInferenceActive = false
+  let loadPromise = null
   let activePromptAdapterId = 'default'
   let loadedAdapterManifestPath = ''
 
@@ -1418,29 +1456,42 @@ function createTutorChatRuntime(options = {}) {
       return false
     }
 
-    adapter = adapterFactory()
-    if (!adapter || typeof adapter.load !== 'function') {
-      throw new Error('Tutor chat adapter is invalid or missing load()')
+    if (loadPromise) {
+      await loadPromise
+      return false
     }
 
-    try {
-      await adapter.load()
-      lastError = null
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      if (configuredProvider === 'llama.cpp') {
-        adapter = createStubAdapter()
-        await adapter.load()
-        activeProvider = 'stub-fallback'
-        activeModel = 'llama.cpp-unavailable'
-        lastError = detail
-      } else {
-        throw error
+    loadPromise = (async () => {
+      adapter = adapterFactory()
+      if (!adapter || typeof adapter.load !== 'function') {
+        throw new Error('Tutor chat adapter is invalid or missing load()')
       }
+
+      try {
+        await adapter.load()
+        lastError = null
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        if (configuredProvider === 'llama.cpp') {
+          adapter = createStubAdapter()
+          await adapter.load()
+          activeProvider = 'stub-fallback'
+          activeModel = 'llama.cpp-unavailable'
+          lastError = detail
+        } else {
+          throw error
+        }
+      }
+      loaded = true
+      loadedAtUtc = new Date().toISOString()
+      return true
+    })()
+
+    try {
+      return await loadPromise
+    } finally {
+      loadPromise = null
     }
-    loaded = true
-    loadedAtUtc = new Date().toISOString()
-    return true
   }
 
   const runtime = {

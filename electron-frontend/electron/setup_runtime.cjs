@@ -101,13 +101,6 @@ const QWENTTS_MODELS = {
     label: 'Standard (0.6B)',
     description: 'Default. Fast Japanese voice cloning with the curated preset speaker bank.',
   },
-  '1.7b': {
-    talkerFilename: 'qwen-talker-1.7b-base-Q8_0.gguf',
-    talkerRepo: 'Serveurperso/Qwen3-TTS-GGUF',
-    talkerSizeMb: 2080,
-    label: 'High Quality (1.7B)',
-    description: 'Optional. Stronger voice quality; slower and heavier on RAM.',
-  },
 }
 const QWENTTS_TOKENIZER = {
   filename: 'qwen-tokenizer-12hz-Q8_0.gguf',
@@ -116,6 +109,14 @@ const QWENTTS_TOKENIZER = {
 }
 const QWENTTS_DEFAULT_TIER = '0.6b'
 const ACTIVE_QWENTTS_TIER_STATE_FILENAME = 'active-qwentts-tier.json'
+const DEPRECATED_QWENTTS_TALKER_FILENAMES = [
+  'qwen-talker-1.7b-base-Q8_0.gguf',
+]
+const DEPRECATED_QWENTTS_BANK_DIRS = [
+  'preset_bank_1.7b',
+  'preset_bank_jp_1.7b',
+  'preset_bank_en_1.7b',
+]
 const SENTINEL_NAME = '.setup-done'
 const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
 const FONT_READY_MARKER = '.fonts-ready'
@@ -251,6 +252,16 @@ function getQwenttsPresetBankDir(base) {
   return path.join(getQwenttsDir(base), 'preset_bank')
 }
 
+function getQwenttsPresetBankDirForProfile(base, profile) {
+  if (profile === 'jp') {
+    return path.join(getQwenttsDir(base), 'preset_bank_jp')
+  }
+  if (profile === 'en') {
+    return path.join(getQwenttsDir(base), 'preset_bank_en')
+  }
+  return getQwenttsPresetBankDir(base)
+}
+
 function isQwenttsTalkerInstalled(base, tier) {
   const model = QWENTTS_MODELS[tier]
   if (!model) return false
@@ -274,34 +285,72 @@ function hasAnyQwenttsTalkerInstalled(base) {
 function seedBundledQwenttsPresetSpeakers(scriptRootArg = null) {
   const base = ensureJPLearnDirs()
   const scriptRoot = scriptRootArg || resolveScriptRoot()
-  const sourceRoot = path.join(scriptRoot, 'data', 'tts', 'preset_bank')
-  const targetRoot = getQwenttsPresetBankDir(base)
+  const bankProfiles = [
+    { key: 'main', sourceDir: 'preset_bank' },
+    { key: 'jp', sourceDir: 'preset_bank_jp' },
+    { key: 'en', sourceDir: 'preset_bank_en' },
+    { key: 'main', sourceDir: 'preset_bank_0.6b' },
+    { key: 'jp', sourceDir: 'preset_bank_jp_0.6b' },
+    { key: 'en', sourceDir: 'preset_bank_en_0.6b' },
+  ]
 
-  if (!fs.existsSync(sourceRoot)) {
+  if (!bankProfiles.some((profile) => fs.existsSync(path.join(scriptRoot, 'data', 'tts', profile.sourceDir)))) {
     return { ok: false, reason: 'no-bundled-presets' }
   }
 
-  fs.mkdirSync(targetRoot, { recursive: true })
-
-  const entries = fs.readdirSync(sourceRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-
   let copied = 0
-  for (const entry of entries) {
-    const from = path.join(sourceRoot, entry.name)
-    const to = path.join(targetRoot, entry.name)
-    if (fs.existsSync(to)) {
+  let total = 0
+  for (const profile of bankProfiles) {
+    const sourceRoot = path.join(scriptRoot, 'data', 'tts', profile.sourceDir)
+    if (!fs.existsSync(sourceRoot)) {
       continue
     }
-    fs.cpSync(from, to, { recursive: true, force: false })
-    copied += 1
+    const targetRoot = getQwenttsPresetBankDirForProfile(base, profile.key)
+    fs.mkdirSync(targetRoot, { recursive: true })
+
+    const entries = fs.readdirSync(sourceRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+    total += entries.length
+
+    for (const entry of entries) {
+      const from = path.join(sourceRoot, entry.name)
+      const to = path.join(targetRoot, entry.name)
+      if (fs.existsSync(to)) {
+        continue
+      }
+      fs.cpSync(from, to, { recursive: true, force: false })
+      copied += 1
+    }
   }
 
-  return { ok: true, copied, total: entries.length }
+  return { ok: true, copied, total }
 }
 
 function getActiveQwenttsTierStatePath(base) {
   return path.join(getQwenttsDir(base), ACTIVE_QWENTTS_TIER_STATE_FILENAME)
+}
+
+function pruneDeprecatedQwenttsAssets(base) {
+  const modelsDir = getQwenttsModelsDir(base)
+  for (const filename of DEPRECATED_QWENTTS_TALKER_FILENAMES) {
+    const modelPath = path.join(modelsDir, filename)
+    if (fs.existsSync(modelPath)) {
+      try { fs.unlinkSync(modelPath) } catch { /* best effort */ }
+    }
+  }
+
+  const qwenttsDir = getQwenttsDir(base)
+  for (const dirname of DEPRECATED_QWENTTS_BANK_DIRS) {
+    const bankPath = path.join(qwenttsDir, dirname)
+    if (fs.existsSync(bankPath)) {
+      try { fs.rmSync(bankPath, { recursive: true, force: true }) } catch { /* best effort */ }
+    }
+  }
+
+  const selection = readActiveQwenttsTierSelection(base)
+  if (selection && selection.tier !== QWENTTS_DEFAULT_TIER) {
+    try { fs.unlinkSync(getActiveQwenttsTierStatePath(base)) } catch { /* best effort */ }
+  }
 }
 
 function readActiveQwenttsTierSelection(base) {
@@ -822,6 +871,7 @@ function setActiveModelTier(tier) {
   const model = MODELS[tier]
   if (!model) throw new Error(`Unknown model tier: ${tier}`)
   const base = ensureJPLearnDirs()
+  pruneDeprecatedQwenttsAssets(base)
   const modelsDir = path.join(base, 'models')
   if (!fs.existsSync(path.join(modelsDir, model.filename))) {
     throw new Error(`Model tier "${tier}" is not installed`)
@@ -1219,6 +1269,7 @@ function downloadQwentts(tier, sender, scriptRoot) {
   if (!model) return Promise.reject(new Error(`Unknown qwentts tier: ${tier}`))
 
   const base = ensureJPLearnDirs()
+  pruneDeprecatedQwenttsAssets(base)
   const modelsDir = getQwenttsModelsDir(base)
   fs.mkdirSync(modelsDir, { recursive: true })
   const talkerDest = path.join(modelsDir, model.talkerFilename)

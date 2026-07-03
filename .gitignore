@@ -242,9 +242,16 @@ models/embedders/
 data/app.db
 data/jplearn.db
 
+# Speaker intake raw clip files are local-only; keep scaffold files tracked.
+data/tts/speaker_intake/**/clips/*
+!data/tts/speaker_intake/**/clips/.gitkeep
+
 # Local offline dictionary payloads (downloaded on demand)
 data/external_sources/offline_dictionary/*.json
 data/external_sources/offline_dictionary/*.sqlite
+
+# Local Whisper speech model artifacts (downloaded on demand; too large for git)
+data/whisper/**/model.bin
 
 # Ruff stuff:
 .ruff_cache/

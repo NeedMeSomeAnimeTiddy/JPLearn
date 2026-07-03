@@ -27,6 +27,22 @@ const {
 } = require('./ipc_security.cjs')
 const { getConfigValue, setConfigValue } = require('./config_store.cjs')
 
+function isTransientSetupNetworkError(error) {
+  const detail = error instanceof Error ? error.message : String(error)
+  return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE/i.test(detail)
+}
+
+async function runWithTransientRetry(fn) {
+  try {
+    return await fn()
+  } catch (error) {
+    if (!isTransientSetupNetworkError(error)) {
+      throw error
+    }
+    return await fn()
+  }
+}
+
 function registerIpcHandlers(options) {
   const trustedSenderOptions = () => ({
     isDev: options.isDev,
@@ -452,6 +468,7 @@ function registerIpcHandlers(options) {
       return await options.localVoiceRuntime.speak(validatedPayload.text, {
         speaker: validatedPayload.speaker,
         speed: validatedPayload.speed,
+        mixedLanguageStitchingEnabled: validatedPayload.mixedLanguageStitchingEnabled,
       })
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
@@ -804,7 +821,7 @@ function registerIpcHandlers(options) {
         throw new Error('Invalid model tier')
       }
       try {
-        const result = await setupRuntime.downloadModel(tier, event.sender, options.repoRoot)
+        const result = await runWithTransientRetry(() => setupRuntime.downloadModel(tier, event.sender, options.repoRoot))
         if (!result?.alreadyInstalled && typeof options.refreshTutorChatRuntime === 'function') {
           await options.refreshTutorChatRuntime()
         }
@@ -864,9 +881,9 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:download-qwentts', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      const safeTier = typeof tier === 'string' && ['0.6b', '1.7b'].includes(tier) ? tier : '0.6b'
+      const safeTier = typeof tier === 'string' && ['0.6b'].includes(tier) ? tier : '0.6b'
       try {
-        const result = await setupRuntime.downloadQwentts(safeTier, event.sender, options.repoRoot)
+        const result = await runWithTransientRetry(() => setupRuntime.downloadQwentts(safeTier, event.sender, options.repoRoot))
         if (!result?.alreadyInstalled && typeof options.refreshVoiceRuntime === 'function') {
           await options.refreshVoiceRuntime()
         }
@@ -879,7 +896,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:set-active-qwentts-tier', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['0.6b', '1.7b'].includes(tier)) {
+      if (typeof tier !== 'string' || !['0.6b'].includes(tier)) {
         throw new Error('Invalid qwentts tier')
       }
       try {
@@ -896,7 +913,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:uninstall-qwentts-tier', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['0.6b', '1.7b'].includes(tier)) {
+      if (typeof tier !== 'string' || !['0.6b'].includes(tier)) {
         throw new Error('Invalid qwentts tier')
       }
       try {
