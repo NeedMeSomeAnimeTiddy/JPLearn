@@ -295,7 +295,6 @@ function createVoiceRuntime() {
           synthesis: {
             mode: 'single',
             profile: 'jp',
-            mixedStitchingEnabled: false,
             mixedSegmentCount: 1,
             streamingAttempted: false,
             streamingFallbackUsed: false,

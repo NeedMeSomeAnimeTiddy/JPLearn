@@ -399,7 +399,6 @@ interface DesktopApi {
     text: string
     speaker?: string | number
     speed?: number
-    mixedLanguageStitchingEnabled?: boolean
   }) => Promise<VoiceSpeakResponse>
   getVoiceStatus?: () => Promise<VoiceStatus>
   listVoices?: () => Promise<VoiceOption[]>
@@ -562,7 +561,6 @@ interface VoiceSpeakResponse {
   synthesis?: {
     mode: 'single' | 'mixed_stitched'
     profile: 'main' | 'jp' | 'en'
-    mixedStitchingEnabled: boolean
     mixedSegmentCount: number
     streamingAttempted: boolean
     streamingFallbackUsed: boolean

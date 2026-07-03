@@ -468,7 +468,6 @@ function registerIpcHandlers(options) {
       return await options.localVoiceRuntime.speak(validatedPayload.text, {
         speaker: validatedPayload.speaker,
         speed: validatedPayload.speed,
-        mixedLanguageStitchingEnabled: validatedPayload.mixedLanguageStitchingEnabled,
       })
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)

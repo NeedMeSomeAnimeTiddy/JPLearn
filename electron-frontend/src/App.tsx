@@ -878,13 +878,11 @@ interface AppSettings {
   showKeyboardPrompts: boolean
   voiceEnabled: boolean
   voiceSpeaker: string
-  mixedLanguageStitchingEnabled: boolean
 }
 
 interface VoiceSynthesisMeta {
   mode: 'single' | 'mixed_stitched'
   profile: 'main' | 'jp' | 'en'
-  mixedStitchingEnabled: boolean
   mixedSegmentCount: number
   streamingAttempted: boolean
   streamingFallbackUsed: boolean
@@ -2005,7 +2003,6 @@ function defaultSettings(): AppSettings {
     showKeyboardPrompts: false,
     voiceEnabled: true,
     voiceSpeaker: DEFAULT_VOICE_SPEAKER,
-    mixedLanguageStitchingEnabled: true,
   }
 }
 
@@ -2173,13 +2170,72 @@ function normalizeCustomBackgroundDataUrl(value: unknown): string | null {
   return normalized
 }
 
+function hasSupportedImageExtension(fileName: string): boolean {
+  const normalizedName = fileName.trim().toLowerCase()
+  return normalizedName.endsWith('.png')
+    || normalizedName.endsWith('.jpg')
+    || normalizedName.endsWith('.jpeg')
+    || normalizedName.endsWith('.webp')
+    || normalizedName.endsWith('.avif')
+    || normalizedName.endsWith('.gif')
+    || normalizedName.endsWith('.bmp')
+}
+
+function isSupportedBackgroundImageFile(file: File): boolean {
+  const mimeType = (file.type || '').trim().toLowerCase()
+  if (mimeType.startsWith('image/')) {
+    return true
+  }
+  // Some Windows file pickers provide an empty MIME type for local files.
+  return hasSupportedImageExtension(file.name)
+}
+
 async function optimizeBackgroundFileToDataUrl(file: File): Promise<string> {
-  const objectUrl = URL.createObjectURL(file)
-  const image = new Image()
-  image.decoding = 'async'
-  image.src = objectUrl
+  let bitmap: ImageBitmap | null = null
+  let objectUrl: string | null = null
 
   try {
+    const canvas = document.createElement('canvas')
+    const context = canvas.getContext('2d')
+    if (!context) {
+      throw new Error('Canvas context unavailable.')
+    }
+
+    if (typeof createImageBitmap === 'function') {
+      try {
+        bitmap = await createImageBitmap(file)
+      } catch {
+        bitmap = null
+      }
+    }
+
+    if (bitmap) {
+      const sourceWidth = bitmap.width
+      const sourceHeight = bitmap.height
+      if (sourceWidth <= 0 || sourceHeight <= 0) {
+        throw new Error('Invalid image dimensions.')
+      }
+
+      const scale = Math.min(1, CUSTOM_BACKGROUND_MAX_EDGE / Math.max(sourceWidth, sourceHeight))
+      const width = Math.max(1, Math.round(sourceWidth * scale))
+      const height = Math.max(1, Math.round(sourceHeight * scale))
+
+      canvas.width = width
+      canvas.height = height
+      context.drawImage(bitmap, 0, 0, width, height)
+
+      try {
+        return canvas.toDataURL('image/webp', 0.8)
+      } catch {
+        return canvas.toDataURL('image/jpeg', 0.86)
+      }
+    }
+
+    objectUrl = URL.createObjectURL(file)
+    const image = new Image()
+    image.decoding = 'async'
+    image.src = objectUrl
+
     try {
       await image.decode()
     } catch {
@@ -2199,13 +2255,8 @@ async function optimizeBackgroundFileToDataUrl(file: File): Promise<string> {
     const width = Math.max(1, Math.round(sourceWidth * scale))
     const height = Math.max(1, Math.round(sourceHeight * scale))
 
-    const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
-    const context = canvas.getContext('2d')
-    if (!context) {
-      throw new Error('Canvas context unavailable.')
-    }
 
     context.drawImage(image, 0, 0, width, height)
 
@@ -2215,7 +2266,12 @@ async function optimizeBackgroundFileToDataUrl(file: File): Promise<string> {
       return canvas.toDataURL('image/jpeg', 0.86)
     }
   } finally {
-    URL.revokeObjectURL(objectUrl)
+    if (bitmap) {
+      bitmap.close()
+    }
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl)
+    }
   }
 }
 
@@ -2304,10 +2360,6 @@ function loadSettings(): AppSettings {
           && FIXED_JAPANESE_VOICE_OPTIONS.some((option) => option.id === parsed.voiceSpeaker)
           ? parsed.voiceSpeaker
           : defaults.voiceSpeaker,
-      mixedLanguageStitchingEnabled:
-        typeof parsed.mixedLanguageStitchingEnabled === 'boolean'
-          ? parsed.mixedLanguageStitchingEnabled
-          : defaults.mixedLanguageStitchingEnabled,
     }
   } catch {
     return defaultSettings()
@@ -3465,7 +3517,6 @@ function App() {
       const result = await speak({
         text: spoken,
         speaker: speaker ?? settings.voiceSpeaker,
-        mixedLanguageStitchingEnabled: settings.mixedLanguageStitchingEnabled,
       })
       if (result?.audioBase64) {
         setLastVoiceSynthesis((result.synthesis as VoiceSynthesisMeta | undefined) ?? null)
@@ -3482,7 +3533,7 @@ function App() {
     } finally {
       setVoiceBusy(false)
     }
-  }, [voiceBusy, settings.mixedLanguageStitchingEnabled, settings.voiceSpeaker])
+  }, [voiceBusy, settings.voiceSpeaker])
 
   const cancelAssistantSpeech = useCallback(() => {
     assistantSpeechRunIdRef.current += 1
@@ -3505,7 +3556,6 @@ function App() {
       const result = await speak({
         text,
         speaker: settings.voiceSpeaker,
-        mixedLanguageStitchingEnabled: settings.mixedLanguageStitchingEnabled,
       })
       if (!result?.audioBase64 || assistantSpeechRunIdRef.current !== runId) {
         return false
@@ -3525,7 +3575,7 @@ function App() {
     } catch {
       return false
     }
-  }, [settings.mixedLanguageStitchingEnabled, settings.voiceSpeaker])
+  }, [settings.voiceSpeaker])
 
   const speakAssistantReply = useCallback(async (text: string, turnKey?: string): Promise<void> => {
     if (!settings.assistantChatAudioEnabled) {
@@ -4318,7 +4368,7 @@ function App() {
     if (!file) {
       return
     }
-    if (!file.type.startsWith('image/')) {
+    if (!isSupportedBackgroundImageFile(file)) {
       setCustomBackgroundActionMessage('Please choose an image file.')
       return
     }
@@ -4340,8 +4390,9 @@ function App() {
         customBackgroundName: file.name,
       }))
       setCustomBackgroundActionMessage(`Custom background set: ${file.name}`)
-    } catch {
-      setCustomBackgroundActionMessage('Could not process selected image.')
+    } catch (error) {
+      const detail = error instanceof Error && error.message ? ` (${error.message})` : ''
+      setCustomBackgroundActionMessage(`Could not process selected image${detail}`)
     }
   }, [])
 
@@ -8958,28 +9009,6 @@ function App() {
                         ))
                         : null}
 
-                      <button
-                        type="button"
-                        className={`settings-icon-entry settings-theme-entry ${settings.mixedLanguageStitchingEnabled ? 'is-active' : ''}`}
-                        onClick={() => setSettings((prev) => ({
-                          ...prev,
-                          mixedLanguageStitchingEnabled: !prev.mixedLanguageStitchingEnabled,
-                        }))}
-                        aria-label={settings.mixedLanguageStitchingEnabled
-                          ? 'Mixed-language stitching enabled. Activate to disable.'
-                          : 'Mixed-language stitching disabled. Activate to enable.'}
-                        aria-pressed={settings.mixedLanguageStitchingEnabled}
-                        title={settings.mixedLanguageStitchingEnabled
-                          ? 'Mixed-language stitching enabled'
-                          : 'Mixed-language stitching disabled'}
-                      >
-                        <span className={`settings-mode-icon-button ${settings.mixedLanguageStitchingEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
-                          <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                        </span>
-                        <span className="settings-icon-entry-label">
-                          {settings.mixedLanguageStitchingEnabled ? 'Mixed Stitching On' : 'Mixed Stitching Off'}
-                        </span>
-                      </button>
                     </div>
 
                     <p className="settings-help" style={{ marginTop: '0.65rem' }}>

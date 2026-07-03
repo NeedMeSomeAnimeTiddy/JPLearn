@@ -99,6 +99,10 @@ const VOICE_TOKENIZER = {
 const VOICE_DEFAULT_TIER = '0.6b'
 const VOICEVOX_HOST = (process.env.JPLEARN_VOICEVOX_HOST || '127.0.0.1').trim()
 const VOICEVOX_PORT = Number(process.env.JPLEARN_VOICEVOX_PORT || 50021)
+const VOICEVOX_WINGET_IDS = [
+  'HiroshibaKazuyuki.VOICEVOX',
+  'HiroshibaKazuyuki.VOICEVOX.CPU',
+]
 const ACTIVE_VOICE_MODEL_STATE_FILENAME = 'active-voice-model.json'
 const SENTINEL_NAME = '.setup-done'
 const ACTIVE_MODEL_STATE_FILENAME = 'active-model.json'
@@ -270,6 +274,67 @@ function getVoicevoxExecutableCandidates() {
 
 function resolveInstalledVoicevoxExecutable() {
   return getVoicevoxExecutableCandidates().find((candidate) => fs.existsSync(candidate)) || null
+}
+
+function isVoicevoxWingetPackageInstalled() {
+  for (const packageId of VOICEVOX_WINGET_IDS) {
+    try {
+      const result = spawnSync(
+        'winget',
+        ['list', '--id', packageId, '-e', '--accept-source-agreements'],
+        { windowsHide: true, encoding: 'utf8' },
+      )
+      if (result.status === 0 && typeof result.stdout === 'string' && result.stdout.includes(packageId)) {
+        return true
+      }
+    } catch {
+      // Best effort check only.
+    }
+  }
+  return false
+}
+
+function installVoicevoxViaWinget(packageId) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      'winget',
+      [
+        'install',
+        '--id',
+        packageId,
+        '-e',
+        '--scope',
+        'user',
+        '--accept-package-agreements',
+        '--accept-source-agreements',
+        '--silent',
+        '--disable-interactivity',
+      ],
+      { windowsHide: true },
+    )
+
+    let output = ''
+    child.stdout.on('data', (chunk) => {
+      output += chunk.toString()
+      if (output.length > 2000) {
+        output = output.slice(-2000)
+      }
+    })
+    child.stderr.on('data', (chunk) => {
+      output += chunk.toString()
+      if (output.length > 2000) {
+        output = output.slice(-2000)
+      }
+    })
+
+    child.on('close', (code) => {
+      resolve({ code: Number(code || 0), output: output.trim() })
+    })
+
+    child.on('error', (error) => {
+      reject(new Error(`Failed to start winget install: ${error.message}`))
+    })
+  })
 }
 
 function ensureVoiceSetupMarkers(base, tier) {
@@ -1266,7 +1331,7 @@ function downloadVoiceModel(tier, sender, scriptRoot) {
   const base = ensureJPLearnDirs()
   pruneDeprecatedVoiceAssets(base)
 
-  const voicevoxAlreadyInstalled = Boolean(resolveInstalledVoicevoxExecutable())
+  const voicevoxAlreadyInstalled = Boolean(resolveInstalledVoicevoxExecutable()) || isVoicevoxWingetPackageInstalled()
   if (voicevoxAlreadyInstalled) {
     ensureVoiceSetupMarkers(base, tier)
     return Promise.resolve({ alreadyInstalled: true })
@@ -1280,44 +1345,42 @@ function downloadVoiceModel(tier, sender, scriptRoot) {
 
   emitProgress(0)
 
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      'winget',
-      [
-        'install',
-        '--id',
-        'VOICEVOX.VOICEVOX',
-        '-e',
-        '--accept-package-agreements',
-        '--accept-source-agreements',
-        '--silent',
-        '--disable-interactivity',
-      ],
-      { windowsHide: true },
-    )
-
-    emitProgress(35)
-    child.stdout.on('data', () => {
-      emitProgress(65)
-    })
-    child.stderr.on('data', () => {
-      emitProgress(75)
-    })
-
-    child.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`winget install exited with code ${code}`))
-        return
+  return (async () => {
+    let lastCode = 0
+    let lastOutput = ''
+    for (let index = 0; index < VOICEVOX_WINGET_IDS.length; index += 1) {
+      const packageId = VOICEVOX_WINGET_IDS[index]
+      emitProgress(25 + index * 30)
+      const result = await installVoicevoxViaWinget(packageId)
+      lastCode = result.code
+      lastOutput = result.output
+      if (result.code === 0) {
+        ensureVoiceSetupMarkers(base, tier)
+        emitProgress(100)
+        return { ok: true, mode: 'winget-install', packageId }
       }
+      // 0x8A150014: package not found with current source/catalog.
+      if (result.code === 2316632084) {
+        continue
+      }
+      // If winget reports a non-zero code but the package is now installed,
+      // still treat setup as successful.
+      if (Boolean(resolveInstalledVoicevoxExecutable()) || isVoicevoxWingetPackageInstalled()) {
+        ensureVoiceSetupMarkers(base, tier)
+        emitProgress(100)
+        return { ok: true, mode: 'winget-install-detected', packageId }
+      }
+    }
+
+    if (Boolean(resolveInstalledVoicevoxExecutable()) || isVoicevoxWingetPackageInstalled()) {
       ensureVoiceSetupMarkers(base, tier)
       emitProgress(100)
-      resolve({ ok: true, mode: 'winget-install' })
-    })
+      return { ok: true, mode: 'winget-install-detected' }
+    }
 
-    child.on('error', (error) => {
-      reject(new Error(`Failed to start winget install: ${error.message}`))
-    })
-  })
+    const detail = lastOutput ? `: ${lastOutput}` : ''
+    throw new Error(`winget install failed (code ${lastCode})${detail}`)
+  })()
 }
 
 function downloadLlamaCpp(sender, scriptRoot, requestedBackend) {
