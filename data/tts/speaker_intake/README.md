@@ -1,6 +1,9 @@
 # Japanese Voice Preset Speaker Intake
 
-Add one folder per curated speaker here, then run:
+Four speaker folders are already scaffolded here (`male_kenji`, `male_haru`,
+`female_aya`, `female_mina` — matching the original 4-preset target). Drop
+your reference clip into each speaker's `clips/` folder, fill in
+`transcripts.tsv` and `metadata.json`, then run:
 
 ```bash
 python scripts/build_qwentts_preset_bank.py
@@ -8,7 +11,9 @@ python scripts/build_qwentts_preset_bank.py
 
 This pre-encodes each speaker's reference clip into the format the qwentts.cpp
 runtime (`tts-server.exe --speaker-bank`) and `electron-frontend/electron/qwentts_runtime.cjs`
-expect under `data/tts/preset_bank/`.
+expect under `data/tts/preset_bank/`. Rename the folders or edit `metadata.json`
+freely if you want different speakers, genders, or names than the scaffolded
+defaults — the folder name is what becomes the in-app voice ID.
 
 ## Folder layout
 
@@ -51,9 +56,29 @@ kenji_ref_02.wav	alternate	今日はいい天気ですね。	alternate candidate
   `--talker <path>` / `--codec <path>` explicitly.
 - `tools/qwentts.cpp/build/Release/qwen-codec.exe` must exist (run
   `scripts/build_qwentts_cpp.ps1` first), or pass `--qwen-codec <path>`.
-- Reference clips should be clean, single-speaker, mono audio. qwen-codec
-  resamples internally, but higher quality source audio produces a better
-  speaker embedding.
+
+## Reference clip specs
+
+Each speaker only needs **one** solid reference clip (the `role: default` row
+in `transcripts.tsv`). Extra `alternate` rows are optional, kept only for your
+own comparison — they are not processed.
+
+| | Requirement |
+|---|---|
+| Format | WAV, uncompressed PCM |
+| Channels | Mono (single channel) |
+| Bit depth | 16-bit PCM (`pcm_s16le`) is safest/simplest |
+| Sample rate | 24 kHz or higher (44.1 kHz is a safe default); qwen-codec resamples internally to 24 kHz, so higher source quality helps more than exact rate matching |
+| Duration | Roughly 10-20 seconds of continuous speech is a good target — long enough for a clean speaker embedding, short enough to stay easy to record/transcribe cleanly |
+| Speaker | Single speaker only, no overlapping voices |
+| Content | Natural spoken Japanese at a natural pace — avoid reading in a flat/monotone deadpan; JPLearn's voice is a coach/tutor, so a warm, clear delivery works best |
+| Background | No music, no reverb/echo, no background noise |
+| Audio quality | No clipping/distortion, consistent volume level throughout |
+| Transcript | Must exactly match what is spoken in the clip, character for character (used for the ICL clone path) |
+
+If a clip fails to produce usable ICL codes (`rvq.bin`), the build script falls
+back to speaker-embedding-only ("x-vector") mode automatically — you'll still
+get a working preset, just without the ICL quality boost.
 
 ## Output
 

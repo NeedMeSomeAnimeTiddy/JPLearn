@@ -219,6 +219,11 @@ tools/llama.cpp/
 # this directory.
 tools/qwentts.cpp/
 
+# Staged qwentts.cpp runtime files for packaging (tts-server.exe + ggml*.dll,
+# copied from tools/qwentts.cpp/build/Release/ by scripts/build_qwentts_cpp.ps1).
+# Bundled into the installer via electron-frontend/forge.config.cjs extraResource.
+/qwentts/
+
 # Bundled python-build-standalone (created by CI release workflow; not committed)
 python-bundle/
 

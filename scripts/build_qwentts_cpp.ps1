@@ -147,3 +147,23 @@ Write-Host ""
 Write-Host "Build complete: $releaseDir"
 Write-Host "Redistributable size: $totalMb MB"
 $artifacts | Sort-Object Length -Descending | Format-Table Name, @{N='SizeMB';E={[math]::Round($_.Length/1MB,2)}} -AutoSize
+
+# Stage just the runtime files the packaged app needs (tts-server.exe + its
+# ggml*.dll deps) into a top-level qwentts/ folder. electron-frontend's
+# forge.config.cjs bundles this via extraResource, and its basename ("qwentts")
+# must match exactly what qwentts_runtime.cjs's resolveQwenttsBinaryPath()
+# looks for under process.resourcesPath at runtime. Dev-only CLI tools
+# (qwen-tts.exe, qwen-codec.exe, quantize.exe) are deliberately NOT staged --
+# they're used by scripts/build_qwentts_preset_bank.py at build time, not by
+# the packaged app at runtime.
+$stagingDir = Join-Path $repoRoot "qwentts"
+New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
+$runtimeFiles = @("tts-server.exe", "ggml.dll", "ggml-cpu.dll", "ggml-base.dll")
+foreach ($fileName in $runtimeFiles) {
+  $source = Join-Path $releaseDir $fileName
+  if (-not (Test-Path $source)) {
+    throw "Expected runtime file not found: $source"
+  }
+  Copy-Item -Path $source -Destination (Join-Path $stagingDir $fileName) -Force
+}
+Write-Host "Staged packaging runtime files to: $stagingDir"
