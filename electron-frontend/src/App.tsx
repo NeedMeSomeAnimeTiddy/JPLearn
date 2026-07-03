@@ -2442,6 +2442,18 @@ function normalizeDeckCards(cards: unknown): ScriptDeck['cards'] {
   return Array.isArray(cards) ? cards as ScriptDeck['cards'] : []
 }
 
+const SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT = 1200
+
+function limitRuntimeDeckCards(script: ScriptKey, cards: ScriptDeck['cards']): ScriptDeck['cards'] {
+  if (script !== 'sentence_examples') {
+    return cards
+  }
+  if (cards.length <= SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT) {
+    return cards
+  }
+  return cards.slice(0, SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT)
+}
+
 function normalizeBlockList(blocks: unknown): BlockInfo[] {
   return Array.isArray(blocks) ? blocks as BlockInfo[] : []
 }
@@ -5427,9 +5439,7 @@ function App() {
     }
 
     async function preloadStartupDeckData(): Promise<void> {
-      const startupKanjiCategory: KanjiCategory = 'numbers_time'
-      const startupVocabCategory: VocabCategory = 'greetings'
-      const startupScripts: ScriptKey[] = ['hiragana', 'katakana', 'grammar_patterns', 'sentence_examples']
+      const startupScripts: ScriptKey[] = ['hiragana', 'katakana']
       const deferredLoadsQueuedAtMs = Math.round(performance.now() - startupBootMarkRef.current)
 
       // Signal startup-ready as soon as core UI mounts; keep deck warmups fully backgrounded.
@@ -5443,7 +5453,7 @@ function App() {
         if (!scriptDeckCacheRef.current[script]) {
           const deckPayload = await getDeckCardsDeduped(script)
           if (cancelled) return
-          scriptDeckCacheRef.current[script] = normalizeDeckCards(deckPayload.cards)
+          scriptDeckCacheRef.current[script] = limitRuntimeDeckCards(script, normalizeDeckCards(deckPayload.cards))
         }
 
         if (!scriptBlockCacheRef.current[script]) {
@@ -5456,65 +5466,9 @@ function App() {
         }
       }
 
-      const preloadKanjiCategory = async (cat: KanjiCategory, shouldHydrateState: boolean): Promise<void> => {
-        if (kanjiCategoryDeckCacheRef.current[cat] && kanjiCategoryBlockCacheRef.current[cat]) {
-          return
-        }
-
-        const slug = KANJI_CATEGORY_TO_DECK_SLUG[cat]
-        const [deckPayload, blockPayload] = await Promise.all([
-          getDeckCardsDeduped(slug),
-          getBlockProgressDeduped(slug),
-        ])
-        if (cancelled) return
-
-        const normalizedCards = normalizeDeckCards(deckPayload.cards)
-        const normalizedBlocks = normalizeBlockList(blockPayload.blocks)
-        kanjiCategoryDeckCacheRef.current[cat] = normalizedCards
-        kanjiCategoryBlockCacheRef.current[cat] = normalizedBlocks
-        if (shouldHydrateState) {
-          setKanjiDeckCardsByCategory((previous) => ({
-            ...previous,
-            [cat]: normalizedCards,
-          }))
-        }
-      }
-
-      const preloadVocabCategory = async (cat: VocabCategory, shouldHydrateState: boolean): Promise<void> => {
-        if (vocabCategoryDeckCacheRef.current[cat] && vocabCategoryBlockCacheRef.current[cat]) {
-          return
-        }
-
-        const slug = VOCAB_CATEGORY_TO_DECK_SLUG[cat]
-        const [deckPayload, blockPayload] = await Promise.all([
-          getDeckCardsDeduped(slug),
-          getBlockProgressDeduped(slug),
-        ])
-        if (cancelled) return
-
-        const normalizedCards = normalizeDeckCards(deckPayload.cards)
-        const normalizedBlocks = normalizeBlockList(blockPayload.blocks)
-        vocabCategoryDeckCacheRef.current[cat] = normalizedCards
-        vocabCategoryBlockCacheRef.current[cat] = normalizedBlocks
-        if (shouldHydrateState) {
-          setVocabDeckCardsByCategory((previous) => ({
-            ...previous,
-            [cat]: normalizedCards,
-          }))
-        }
-      }
-
       try {
-        // Prioritize the two visible categories first, then continue with lower
-        // priority script warmups in a cooperative queue.
-        await preloadKanjiCategory(startupKanjiCategory, true)
-        if (cancelled) return
-        await maybeYieldToMain()
-
-        await preloadVocabCategory(startupVocabCategory, true)
-        if (cancelled) return
-        await maybeYieldToMain()
-
+        // Keep post-open warmup lightweight to avoid blocking input shortly
+        // after first paint.
         for (const script of startupScripts) {
           await preloadScript(script)
           if (cancelled) return
@@ -5714,7 +5668,7 @@ function App() {
           if (scriptLoadRequestIdRef.current !== requestId) {
             return
           }
-          resolvedCards = normalizeDeckCards(deckPayload.cards)
+          resolvedCards = limitRuntimeDeckCards(script, normalizeDeckCards(deckPayload.cards))
           scriptDeckCacheRef.current[script] = resolvedCards
         }
 
@@ -6426,9 +6380,33 @@ function App() {
       const targetRounds = Math.max(1, Math.floor(sessionTargetItems))
 
       const typedAssessment =
-        roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall'
+        roundState.mode === 'typed_recall'
           ? assessTypedAnswer(roundState.answer, answer)
-          : null
+          : roundState.mode === 'speech_recall'
+            ? (() => {
+              const candidates = [
+                roundState.answer,
+                roundState.focusText,
+                roundState.dictionaryNote?.reading,
+                roundState.dictionaryNote?.primaryGloss,
+                ...(roundState.dictionaryNote?.secondaryGlosses ?? []),
+              ]
+                .map((value) => (typeof value === 'string' ? value.trim() : ''))
+                .filter((value) => value.length > 0)
+
+              let bestAssessment: TypedAnswerState = 'incorrect'
+              for (const candidate of candidates) {
+                const candidateAssessment = assessTypedAnswer(candidate, answer)
+                if (candidateAssessment === 'exact') {
+                  return 'exact'
+                }
+                if (candidateAssessment === 'near_miss') {
+                  bestAssessment = 'near_miss'
+                }
+              }
+              return bestAssessment
+            })()
+            : null
       const isCorrect =
         typedAssessment !== null
           ? typedAssessment !== 'incorrect'
