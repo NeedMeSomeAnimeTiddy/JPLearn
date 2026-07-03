@@ -208,12 +208,6 @@ kokoro-assets/
 data/voice-models/
 data/voicevox/
 
-# OpenVoice runtime artifacts (downloaded locally)
-# Keep profile_cache tracked so pre-cloned voice embeddings can be bundled.
-data/openvoice/checkpoints_v2/**
-!data/openvoice/checkpoints_v2/profile_cache/
-!data/openvoice/checkpoints_v2/profile_cache/**
-
 # Local smoke-test and temporary synthesis outputs
 tmp/
 
@@ -231,11 +225,6 @@ python-bundle/
 # User-downloaded fonts (stored in Documents\JPLearn\fonts\ in packaged app)
 # For local dev: python scripts/get_fonts.py
 fonts/
-
-# Local voice asset dumps (user-managed; too large for git)
-data/openvoice/voices/**
-data/openvoice/samples/**
-!data/openvoice/voices/.gitkeep
 
 # Local llama.cpp model artifacts
 models/llama/*.gguf

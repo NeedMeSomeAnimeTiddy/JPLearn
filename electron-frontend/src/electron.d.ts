@@ -512,7 +512,6 @@ interface SetupSystemInfo {
   gpuVramGb?: number | null
   llamaCppBackend?: 'cuda' | 'hip' | 'vulkan' | 'cpu'
   llamaCppBackendLabel?: string
-  openVoiceInstalled: boolean
   fontsInstalled: boolean
   dictionaryInstalled: boolean
   speechModels: SetupSpeechModelOption[]
@@ -521,7 +520,6 @@ interface SetupSystemInfo {
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
-  openVoiceEstimatedDownloadMinutes?: number | null
   fontsEstimatedDownloadMinutes?: number | null
   dictionaryEstimatedDownloadMinutes?: number | null
   qwenttsInstalled: boolean
@@ -531,7 +529,7 @@ interface SetupSystemInfo {
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'llama' | 'openvoice' | 'qwentts' | 'fonts' | 'dictionary' | 'speech'
+  id: 'model' | 'llama' | 'qwentts' | 'fonts' | 'dictionary' | 'speech'
   percent: number
   mb: number | null
   totalMb: number | null

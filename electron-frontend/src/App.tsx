@@ -3228,7 +3228,6 @@ function App() {
     activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | 'max' | null
     llamaCppInstalled: boolean
     gpuVramGb?: number | null
-    openVoiceInstalled: boolean
     qwenttsInstalled: boolean
     fontsInstalled: boolean
     dictionaryInstalled: boolean
@@ -3867,7 +3866,6 @@ function App() {
         activeModelTier: setupInfo.activeModelTier ?? null,
         llamaCppInstalled: setupInfo.llamaCppInstalled,
         gpuVramGb: setupInfo.gpuVramGb ?? null,
-        openVoiceInstalled: setupInfo.openVoiceInstalled,
         qwenttsInstalled: setupInfo.qwenttsInstalled,
         fontsInstalled: setupInfo.fontsInstalled,
         dictionaryInstalled: setupInfo.dictionaryInstalled,
@@ -9071,7 +9069,7 @@ function App() {
                         <SettingsCollapsibleSection
                           id="english-chat-voice"
                           title="English Chat Voice"
-                          description="Tutor chat uses OpenVoice V2 for Japanese and the browser voice for English."
+                          description="Tutor chat uses the local Japanese voice model for Japanese and the browser voice for English."
                           meta={`Auto (${effectiveEnglishVoiceLabel})`}
                           collapsed={Boolean(collapsedSettingsSections['english-chat-voice'])}
                           onToggle={() => toggleThemeSectionCollapsed('english-chat-voice')}

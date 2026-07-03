@@ -2,9 +2,9 @@
  * setup_runtime.cjs — first-run setup wizard backend.
  *
  * Provides system detection, model downloads (with redirect handling and .tmp
- * safety), llama.cpp installation, and OpenVoice installation via the
- * get_openvoice.py script. Large downloads target the assets data directory
- * so they stay writable without elevation.
+ * safety), llama.cpp installation, and qwentts.cpp voice model installation.
+ * Large downloads target the assets data directory so they stay writable
+ * without elevation.
  */
 
 const fs = require('node:fs')
@@ -133,9 +133,6 @@ const EXPECTED_FONT_FAMILIES = [
 ]
 const EXPECTED_FONT_WEIGHT_COUNT = 17
 const LLAMA_CPP_SIZE_MB = 250
-// OpenVoice setup now includes checkpoints plus Python dependency installation.
-// This is an on-disk footprint estimate used for setup ETA/status messaging.
-const OPENVOICE_SIZE_MB = 2410
 const FONTS_SIZE_MB = 100
 const DICTIONARY_SIZE_MB = 30
 
@@ -234,54 +231,10 @@ function getFontInstallState(base) {
 
 function ensureJPLearnDirs() {
   const base = getJPLearnDir()
-  for (const sub of ['models', 'openvoice', 'tts', 'data', 'fonts', 'tools', 'whisper']) {
+  for (const sub of ['models', 'tts', 'data', 'fonts', 'tools', 'whisper']) {
     fs.mkdirSync(path.join(base, sub), { recursive: true })
   }
   return base
-}
-
-function hasVoiceManifests(voiceRoot) {
-  if (!fs.existsSync(voiceRoot)) {
-    return false
-  }
-  const entries = fs.readdirSync(voiceRoot, { withFileTypes: true })
-  return entries.some((entry) => entry.isDirectory() && fs.existsSync(path.join(voiceRoot, entry.name, 'manifest.json')))
-}
-
-function hasOpenVoiceAssets(baseDir) {
-  const converterCheckpoint = path.join(baseDir, 'checkpoints_v2', 'converter', 'checkpoint.pth')
-  const converterConfig = path.join(baseDir, 'checkpoints_v2', 'converter', 'config.json')
-  const voiceRoot = path.join(baseDir, 'voices')
-  return fs.existsSync(converterCheckpoint) && fs.existsSync(converterConfig) && hasVoiceManifests(voiceRoot)
-}
-
-function seedBundledOpenVoiceVoices(scriptRootArg = null) {
-  const base = ensureJPLearnDirs()
-  const scriptRoot = scriptRootArg || resolveScriptRoot()
-  const sourceRoot = path.join(scriptRoot, 'data', 'openvoice', 'voices')
-  const targetRoot = path.join(base, 'openvoice', 'voices')
-
-  if (!fs.existsSync(sourceRoot)) {
-    return { ok: false, reason: 'no-bundled-voices' }
-  }
-
-  fs.mkdirSync(targetRoot, { recursive: true })
-
-  const entries = fs.readdirSync(sourceRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-
-  let copied = 0
-  for (const entry of entries) {
-    const from = path.join(sourceRoot, entry.name)
-    const to = path.join(targetRoot, entry.name)
-    if (fs.existsSync(to)) {
-      continue
-    }
-    fs.cpSync(from, to, { recursive: true, force: false })
-    copied += 1
-  }
-
-  return { ok: true, copied, total: entries.length }
 }
 
 // ── qwentts (Japanese TTS) install state ─────────────────────────────────────
@@ -313,9 +266,11 @@ function hasAnyQwenttsTalkerInstalled(base) {
 }
 
 // Copies any curated preset speakers bundled in the repo (data/tts/preset_bank/)
-// into the installed assets directory, mirroring seedBundledOpenVoiceVoices.
-// A no-op (returns {ok:false, reason:'no-bundled-presets'}) until Phase 3's
-// curated speakers exist under data/tts/preset_bank/.
+// into the installed assets directory. Called once at every app launch (see
+// main.cjs) plus after a fresh model download, so newly bundled presets in a
+// future app update get picked up without requiring a full reinstall.
+// A no-op (returns {ok:false, reason:'no-bundled-presets'}) until real curated
+// speakers exist under data/tts/preset_bank/ (see scripts/build_qwentts_preset_bank.py).
 function seedBundledQwenttsPresetSpeakers(scriptRootArg = null) {
   const base = ensureJPLearnDirs()
   const scriptRoot = scriptRootArg || resolveScriptRoot()
@@ -570,22 +525,6 @@ function resolveScriptRoot() {
   return path.join(__dirname, '..', '..')
 }
 
-const OPENVOICE_DEPS_PROBE = [
-  'import importlib.util',
-  "mods=['openvoice','melo','torch','torchaudio','librosa','soundfile','transformers','langid','MeCab','nltk']",
-  'missing=[m for m in mods if importlib.util.find_spec(m) is None]',
-  "import nltk; nltk.data.find('taggers/averaged_perceptron_tagger_eng/')",
-  'raise SystemExit(1 if missing else 0)',
-].join(';')
-
-function areOpenVoiceDependenciesInstalled(pythonCmd) {
-  const probe = spawnSync(pythonCmd, ['-c', OPENVOICE_DEPS_PROBE], {
-    windowsHide: true,
-    stdio: 'ignore',
-  })
-  return probe.status === 0
-}
-
 // ── System info ──────────────────────────────────────────────────────────────
 
 function withTimeout(promise, timeoutMs) {
@@ -747,14 +686,9 @@ function detectLlamaBackend(gpuNames) {
 
 async function getSystemInfo() {
   const base = ensureJPLearnDirs()
-  const scriptRoot = resolveScriptRoot()
-  const pythonCmd = resolvePythonCommand(scriptRoot)
-  const openVoiceDependenciesInstalled = areOpenVoiceDependenciesInstalled(pythonCmd)
   const totalRamGb = os.totalmem() / (1024 ** 3)
   const modelsDir = path.join(base, 'models')
   const llamaCppDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
-  const openVoiceInstalled = hasOpenVoiceAssets(path.join(base, 'openvoice'))
-    && openVoiceDependenciesInstalled
   const llamaCppInstalled = fs.existsSync(path.join(llamaCppDir, 'llama-server.exe'))
   const gpuAdapters = detectGpuNames()
   const gpuVramGb = detectGpuVramGb()
@@ -827,7 +761,6 @@ async function getSystemInfo() {
     gpuVramGb,
     llamaCppBackend,
     llamaCppBackendLabel: LLAMA_BACKEND_LABELS[llamaCppBackend] || LLAMA_BACKEND_LABELS.cpu,
-    openVoiceInstalled,
     fontsInstalled,
     dictionaryInstalled,
     speechModels,
@@ -836,7 +769,6 @@ async function getSystemInfo() {
     isPackaged,
     networkMbps,
     llamaCppEstimatedDownloadMinutes: estimateDownloadMinutes(LLAMA_CPP_SIZE_MB, networkMbps),
-    openVoiceEstimatedDownloadMinutes: estimateDownloadMinutes(OPENVOICE_SIZE_MB, networkMbps),
     fontsEstimatedDownloadMinutes: estimateDownloadMinutes(FONTS_SIZE_MB, networkMbps),
     dictionaryEstimatedDownloadMinutes: estimateDownloadMinutes(DICTIONARY_SIZE_MB, networkMbps),
     qwenttsInstalled,
@@ -1403,148 +1335,6 @@ function downloadLlamaCpp(sender, scriptRoot, requestedBackend) {
   })
 }
 
-function downloadOpenVoice(sender, scriptRoot) {
-  const base = ensureJPLearnDirs()
-  const openvoiceDir = path.join(base, 'openvoice')
-  const openvoiceCheckpointDir = path.join(openvoiceDir, 'checkpoints_v2')
-  const scriptPath = path.join(scriptRoot, 'scripts', 'get_openvoice.py')
-  const requirementsPath = path.join(scriptRoot, 'requirements-tts.txt')
-  const pythonCmd = resolvePythonCommand(scriptRoot)
-
-  const emitProgress = (percent, logMessage = null) => {
-    if (sender && !sender.isDestroyed()) {
-      sender.send('setup:download-progress', {
-        id: 'openvoice',
-        percent,
-        mb: null,
-        totalMb: OPENVOICE_SIZE_MB,
-        etaSec: null,
-        logMessage,
-      })
-    }
-  }
-
-  const dependenciesInstalled = () => areOpenVoiceDependenciesInstalled(pythonCmd)
-
-  const installDependencies = () => {
-    if (dependenciesInstalled()) {
-      emitProgress(100, 'OpenVoice Python dependencies already installed.')
-      return Promise.resolve({ alreadyInstalled: true })
-    }
-    if (!fs.existsSync(requirementsPath)) {
-      return Promise.reject(new Error(`OpenVoice requirements file is missing: ${requirementsPath}`))
-    }
-
-    emitProgress(40, 'Installing OpenVoice Python dependencies…')
-
-    return new Promise((resolve, reject) => {
-      const child = spawn(pythonCmd, ['-m', 'pip', 'install', '-r', requirementsPath], {
-        windowsHide: true,
-      })
-
-      let loggedInstallPhase = false
-      const onOutput = (chunk) => {
-        const text = chunk.toString()
-        if (!loggedInstallPhase && /Collecting|Installing collected packages|Requirement already satisfied/i.test(text)) {
-          loggedInstallPhase = true
-          emitProgress(70, 'Resolving and installing OpenVoice dependency packages…')
-        }
-      }
-
-      child.stdout.on('data', onOutput)
-      child.stderr.on('data', onOutput)
-
-      child.on('close', (code) => {
-        if (code === 0) {
-          emitProgress(100, 'OpenVoice dependencies installed.')
-          resolve({ ok: true })
-        } else {
-          reject(new Error(`OpenVoice dependency install failed (pip exited with code ${code})`))
-        }
-      })
-
-      child.on('error', reject)
-    })
-      .then(() => {
-        emitProgress(90, 'Installing required NLTK data for English mixed-language speech…')
-        return new Promise((resolve, reject) => {
-          const nltkInstallCode = [
-            'import nltk',
-            "nltk.download('averaged_perceptron_tagger_eng', quiet=True, raise_on_error=True)",
-          ].join(';')
-          const child = spawn(pythonCmd, ['-c', nltkInstallCode], {
-            windowsHide: true,
-          })
-
-          child.on('close', (code) => {
-            if (code === 0) {
-              resolve({ ok: true })
-            } else {
-              reject(new Error(`OpenVoice NLTK data install failed (python exited with code ${code})`))
-            }
-          })
-
-          child.on('error', reject)
-        })
-      })
-  }
-
-  if (
-    fs.existsSync(path.join(openvoiceDir, 'checkpoints_v2', 'converter', 'checkpoint.pth'))
-    && dependenciesInstalled()
-  ) {
-    return Promise.resolve({ alreadyInstalled: true })
-  }
-
-  const checkpointsInstalled = fs.existsSync(path.join(openvoiceDir, 'checkpoints_v2', 'converter', 'checkpoint.pth'))
-
-  const downloadCheckpoints = () => {
-    if (checkpointsInstalled) {
-      emitProgress(35, 'OpenVoice checkpoints already installed.')
-      return Promise.resolve({ alreadyInstalled: true })
-    }
-
-    emitProgress(1, 'Downloading OpenVoice checkpoints…')
-
-    return new Promise((resolve, reject) => {
-      const child = spawn(pythonCmd, [scriptPath], {
-        env: {
-          ...process.env,
-          JPLEARN_ASSETS_DIR: base,
-          JPLEARN_DOCUMENTS_DIR: base,
-          OPENVOICE_TARGET_DIR: openvoiceCheckpointDir,
-        },
-        windowsHide: true,
-      })
-
-      child.stdout.on('data', (chunk) => {
-        const text = chunk.toString()
-        const match = text.match(/(\d+)%/)
-        if (match) {
-          const rawPct = parseInt(match[1], 10)
-          const scaledPct = Math.max(1, Math.min(35, Math.round((rawPct / 100) * 35)))
-          emitProgress(scaledPct)
-        }
-      })
-
-      child.on('close', (code) => {
-        if (code === 0) {
-          emitProgress(35, 'OpenVoice checkpoints downloaded.')
-          resolve({ ok: true })
-        } else {
-          reject(new Error(`get_openvoice.py exited with code ${code}`))
-        }
-      })
-
-      child.on('error', reject)
-    })
-  }
-
-  return downloadCheckpoints()
-    .then(() => installDependencies())
-    .then(() => ({ ok: true }))
-}
-
 function downloadDictionary(sender, scriptRoot) {
   const base = ensureJPLearnDirs()
 
@@ -1789,10 +1579,9 @@ function createSetupRuntime() {
     isFirstRun,
     writeSentinel,
     ensureJPLearnDirs,
-    seedBundledOpenVoiceVoices,
+    seedBundledQwenttsPresetSpeakers,
     downloadModel,
     downloadLlamaCpp,
-    downloadOpenVoice,
     downloadQwentts,
     downloadFonts,
     downloadDictionary,
