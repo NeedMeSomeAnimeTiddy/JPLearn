@@ -1,6 +1,14 @@
 import { Volume2 } from 'lucide-react'
 import type { RoundState, ScriptKey } from '../../types'
 
+function promptSizeClass(text: string): string {
+  const length = Array.from(text.trim()).length
+  if (length >= 32) return 'is-size-xs'
+  if (length >= 20) return 'is-size-sm'
+  if (length >= 10) return 'is-size-md'
+  return ''
+}
+
 interface ChallengePromptCardProps {
   roundState: RoundState
   activeScript: ScriptKey
@@ -24,6 +32,15 @@ export function ChallengePromptCard({
 }: ChallengePromptCardProps) {
   const showWordAudioButton =
     roundState.mode !== 'listening_audio_first' && voiceEnabled && Boolean(roundState.audioText)
+  const sizeClass = promptSizeClass(roundState.focusText)
+  const promptClassName = [
+    'game-prompt-main',
+    roundState.mode !== 'character_match' ? 'is-japanese' : '',
+    sizeClass,
+  ].filter(Boolean).join(' ')
+  const revealClassName = ['game-prompt-main', 'is-japanese', 'game-listen-reveal', sizeClass]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div className="game-prompt-focus minigame-prompt-card">
@@ -62,13 +79,13 @@ export function ChallengePromptCard({
             </span>
           </button>
           {showRevealText ? (
-            <p className="game-prompt-main is-japanese game-listen-reveal">
+            <p className={revealClassName}>
               {roundState.focusText}
             </p>
           ) : null}
         </div>
       ) : (
-        <p className={`game-prompt-main ${roundState.mode !== 'character_match' ? 'is-japanese' : ''}`}>
+        <p className={promptClassName}>
           {roundState.focusText}
         </p>
       )}

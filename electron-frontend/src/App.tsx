@@ -5293,7 +5293,7 @@ function App() {
     async function preloadStartupDeckData(): Promise<void> {
       const startupKanjiCategory: KanjiCategory = 'numbers_time'
       const startupVocabCategory: VocabCategory = 'greetings'
-      const startupScripts: ScriptKey[] = ['hiragana', 'katakana']
+      const startupScripts: ScriptKey[] = ['hiragana', 'katakana', 'grammar_patterns', 'sentence_examples']
       const deferredLoadsQueuedAtMs = Math.round(performance.now() - startupBootMarkRef.current)
 
       // Signal startup-ready as soon as core UI mounts; keep deck warmups fully backgrounded.
@@ -5304,14 +5304,20 @@ function App() {
           return
         }
 
-        const [deckPayload, blockPayload] = await Promise.all([
-          getDeckCardsDeduped(script),
-          getBlockProgressDeduped(script),
-        ])
-        if (cancelled) return
+        if (!scriptDeckCacheRef.current[script]) {
+          const deckPayload = await getDeckCardsDeduped(script)
+          if (cancelled) return
+          scriptDeckCacheRef.current[script] = normalizeDeckCards(deckPayload.cards)
+        }
 
-        scriptDeckCacheRef.current[script] = normalizeDeckCards(deckPayload.cards)
-        scriptBlockCacheRef.current[script] = normalizeBlockList(blockPayload.blocks)
+        if (!scriptBlockCacheRef.current[script]) {
+          void getBlockProgressDeduped(script)
+            .then((blockPayload) => {
+              if (cancelled) return
+              scriptBlockCacheRef.current[script] = normalizeBlockList(blockPayload.blocks)
+            })
+            .catch(() => undefined)
+        }
       }
 
       const preloadKanjiCategory = async (cat: KanjiCategory, shouldHydrateState: boolean): Promise<void> => {
@@ -5550,33 +5556,49 @@ function App() {
         let resolvedCards = cachedDeck
         let resolvedBlocks = cachedBlocks
 
-        if (!resolvedCards || !resolvedBlocks) {
-          const [deckPayload, blockPayload] = await Promise.all([
-            getDeckCardsDeduped(script),
-            getBlockProgressDeduped(script),
-          ])
-
+        if (!resolvedCards) {
+          const deckPayload = await getDeckCardsDeduped(script)
           if (scriptLoadRequestIdRef.current !== requestId) {
             return
           }
-
           resolvedCards = normalizeDeckCards(deckPayload.cards)
-          resolvedBlocks = normalizeBlockList(blockPayload.blocks)
           scriptDeckCacheRef.current[script] = resolvedCards
-          scriptBlockCacheRef.current[script] = resolvedBlocks
         }
 
         setDeckCards(resolvedCards ?? [])
-        const blocks = resolvedBlocks ?? []
-        setBlockProgress(blocks)
-        if (blocks.length > 0) {
-          const lastUnlocked = blocks.reduce(
-            (best, b) => (b.unlocked ? b.index : best),
-            0,
-          )
-          setActiveBlockIndex(lastUnlocked)
+
+        if (resolvedBlocks) {
+          const blocks = resolvedBlocks
+          setBlockProgress(blocks)
+          if (blocks.length > 0) {
+            const lastUnlocked = blocks.reduce(
+              (best, b) => (b.unlocked ? b.index : best),
+              0,
+            )
+            setActiveBlockIndex(lastUnlocked)
+          } else {
+            setActiveBlockIndex(0)
+          }
         } else {
+          setBlockProgress([])
           setActiveBlockIndex(0)
+          void getBlockProgressDeduped(script)
+            .then((payload) => {
+              if (scriptLoadRequestIdRef.current !== requestId) {
+                return
+              }
+              const normalizedBlocks = normalizeBlockList(payload.blocks)
+              scriptBlockCacheRef.current[script] = normalizedBlocks
+              setBlockProgress(normalizedBlocks)
+              if (normalizedBlocks.length > 0) {
+                const lastUnlocked = normalizedBlocks.reduce(
+                  (best, b) => (b.unlocked ? b.index : best),
+                  0,
+                )
+                setActiveBlockIndex(lastUnlocked)
+              }
+            })
+            .catch(() => undefined)
         }
       }
 

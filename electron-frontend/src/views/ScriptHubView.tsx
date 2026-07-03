@@ -341,7 +341,7 @@ export function ScriptHubView({
                             : `${cat.label}, ${masteryPct}% mastered`}
                         >
                           <div className="jlpt-level-header">
-                            <strong>{cat.label}</strong>
+                            <strong className="jlpt-level-title">{cat.label}</strong>
                             {!cat.unlocked || unavailable ? (
                               <Lock className="block-lock-icon" strokeWidth={2} aria-hidden="true" />
                             ) : null}
