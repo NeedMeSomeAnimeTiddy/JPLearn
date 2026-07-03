@@ -319,6 +319,19 @@ const STARTUP_BUDGETS_MS = {
   startupReady: 5000,
   firstSummary: 2500,
 }
+const STARTUP_PRELOAD_MAX_WAIT_MS = 25000
+const STARTUP_PRELOAD_PROGRESS_START_PCT = 70
+const STARTUP_PRELOAD_PROGRESS_END_PCT = 90
+const STARTUP_PRELOAD_DECK_SLUGS = [
+  'hiragana',
+  'katakana',
+  'kanji_numbers_time',
+  'vocab_greetings',
+]
+const STARTUP_PRELOAD_BLOCK_ONLY_SLUGS = [
+  'grammar_patterns',
+  'sentence_examples',
+]
 
 async function refreshTutorRuntimeAfterSetup() {
   try {
@@ -1782,10 +1795,134 @@ async function runStudyJourneySmokeIfEnabled() {
   }
 }
 
+async function preloadStartupBridgeData(splash) {
+  updateSplashStatus(splash, 'Loading study data...', 'Preparing your decks and stats...', STARTUP_PRELOAD_PROGRESS_START_PCT)
+
+  const preloadTasks = [
+    {
+      key: 'summary',
+      label: 'Study summary',
+      run: () => runPythonBridgeCached('summary'),
+    },
+    {
+      key: 'overview-character-mastery',
+      label: 'Character mastery',
+      run: () => runPythonBridgeCached('overview-character-mastery'),
+    },
+    {
+      key: 'xp-progress',
+      label: 'XP progress',
+      run: () => runPythonBridgeCached('xp-progress'),
+    },
+    {
+      key: 'recommendations',
+      label: 'Recommendations',
+      run: () => runPythonBridgeCached('recommendations'),
+    },
+    {
+      key: 'tutor-reactions',
+      label: 'Tutor reactions',
+      run: () => runPythonBridgeCached('tutor-reactions'),
+    },
+    {
+      key: 'learning-path-status',
+      label: 'Learning path status',
+      run: () => runPythonBridgeCached('learning-path-status'),
+    },
+    {
+      key: 'assistant-snapshot',
+      label: 'Assistant snapshot',
+      run: () => runPythonBridgeCached('assistant-snapshot'),
+    },
+  ]
+
+  for (const slug of STARTUP_PRELOAD_DECK_SLUGS) {
+    preloadTasks.push({
+      key: `deck-cards:${slug}`,
+      label: `Deck cards: ${slug}`,
+      run: () => runPythonBridgeWithArgsCached(['deck-cards', slug]),
+    })
+    preloadTasks.push({
+      key: `block-progress:${slug}`,
+      label: `Block progress: ${slug}`,
+      run: () => runPythonBridgeWithArgsCached(['block-progress', slug]),
+    })
+  }
+
+  for (const slug of STARTUP_PRELOAD_BLOCK_ONLY_SLUGS) {
+    preloadTasks.push({
+      key: `block-progress:${slug}`,
+      label: `Block progress: ${slug}`,
+      run: () => runPythonBridgeWithArgsCached(['block-progress', slug]),
+    })
+  }
+
+  const taskTimings = []
+  const startedAt = Date.now()
+  const totalTasks = preloadTasks.length
+
+  for (let index = 0; index < totalTasks; index += 1) {
+    const task = preloadTasks[index]
+    const ordinal = index + 1
+    const pctRange = STARTUP_PRELOAD_PROGRESS_END_PCT - STARTUP_PRELOAD_PROGRESS_START_PCT
+    const pct = STARTUP_PRELOAD_PROGRESS_START_PCT + Math.floor((ordinal / totalTasks) * pctRange)
+
+    updateSplashStatus(
+      splash,
+      'Loading study data...',
+      `Loading ${task.label} (${ordinal}/${totalTasks})...`,
+      pct,
+    )
+
+    const taskStartedAt = Date.now()
+    let ok = true
+    let error = null
+
+    try {
+      await task.run()
+    } catch (taskError) {
+      ok = false
+      error = taskError instanceof Error ? taskError.message : String(taskError)
+    }
+
+    const durationMs = Date.now() - taskStartedAt
+    taskTimings.push({
+      key: task.key,
+      label: task.label,
+      durationMs,
+      ok,
+      error,
+    })
+
+    const completionLabel = ok ? 'Loaded' : 'Skipped'
+    updateSplashStatus(
+      splash,
+      'Loading study data...',
+      `${completionLabel} ${task.label} in ${durationMs}ms (${ordinal}/${totalTasks})`,
+      pct,
+    )
+
+    if (Date.now() - startedAt >= STARTUP_PRELOAD_MAX_WAIT_MS) {
+      taskTimings.push({
+        key: 'startup-preload-time-budget',
+        label: 'Startup preload time budget reached',
+        durationMs: Date.now() - startedAt,
+        ok: false,
+        error: `Exceeded ${STARTUP_PRELOAD_MAX_WAIT_MS}ms before completing all preload tasks`,
+      })
+      break
+    }
+  }
+
+  return {
+    totalDurationMs: Date.now() - startedAt,
+    taskTimings,
+  }
+}
+
 async function createWindowWithSplash() {
   const minSplashMs = 1100
   const maxStartupWaitMs = 30000
-  const maxTutorPreloadWaitMs = 15000
   const startupSessionStartedAt = Date.now()
   const startupTheme = readSavedStartupTheme()
   const splash = createSplashWindow(startupTheme)
@@ -1793,13 +1930,6 @@ async function createWindowWithSplash() {
   const webContentsId = win.webContents.id
 
   updateSplashStatus(splash, 'Starting JPLearn...', 'Preparing desktop window...', 8)
-
-  if (!tutorRuntimePreloadTriggered) {
-    tutorRuntimePreloadTriggered = true
-    // Warm the local tutor runtime and prefetch chat history during splash.
-    updateSplashStatus(splash, 'Loading tutor services...', 'Warming local coach runtime...', 28)
-    void preloadTutorChatStartupData().catch(() => undefined)
-  }
 
   startupTelemetryByContentsId.set(webContentsId, {
     main: {
@@ -1825,11 +1955,10 @@ async function createWindowWithSplash() {
     win.once('ready-to-show', resolve)
   })
 
-  updateSplashStatus(splash, 'Loading study data...', 'Decks, stats, and progress are syncing...', 70)
-
-  // Prime summary cache while splash is visible so the first renderer summary
-  // read can reuse in-flight or cached bridge payload.
-  void runPythonBridgeCached('summary').catch(() => undefined)
+  const startupBridgePreloadPromise = preloadStartupBridgeData(splash).catch(() => ({
+    totalDurationMs: null,
+    taskTimings: [],
+  }))
 
   const rendererStartupPromise = Promise.all([
     windowReadyPromise,
@@ -1841,16 +1970,9 @@ async function createWindowWithSplash() {
     updateSplashStatus(splash, 'Finalizing startup...', 'Preparing your first screen...', 92)
   })
 
-  const tutorStartupPromise = Promise.race([
-    preloadTutorChatStartupData(),
-    new Promise((resolve) => setTimeout(resolve, maxTutorPreloadWaitMs)),
-  ]).then(() => {
-    updateSplashStatus(splash, 'Finalizing startup...', 'Almost ready to study.', 96)
-  })
-
-  await Promise.all([
+  const [, preloadTelemetry] = await Promise.all([
     rendererStartupPromise,
-    tutorStartupPromise,
+    startupBridgePreloadPromise,
     new Promise((resolve) => setTimeout(resolve, minSplashMs)),
   ])
 
@@ -1867,9 +1989,16 @@ async function createWindowWithSplash() {
       startupSessionCompletedAt,
       startupSessionMs,
       startupTheme,
+      startupPreloadMs: Number.isFinite(preloadTelemetry?.totalDurationMs)
+        ? preloadTelemetry.totalDurationMs
+        : null,
     },
     renderer: rendererTelemetry,
     bridge: getBridgeTelemetrySnapshot(),
+    preload: {
+      maxWaitMs: STARTUP_PRELOAD_MAX_WAIT_MS,
+      tasks: Array.isArray(preloadTelemetry?.taskTimings) ? preloadTelemetry.taskTimings : [],
+    },
   })
 
   if (rendererTelemetry && typeof rendererTelemetry.startupReadyMs === 'number' && rendererTelemetry.startupReadyMs > STARTUP_BUDGETS_MS.startupReady) {
@@ -1905,6 +2034,11 @@ async function createWindowWithSplash() {
         clearInterval(timer)
       }
     }, fadeInterval)
+
+    if (!tutorRuntimePreloadTriggered) {
+      tutorRuntimePreloadTriggered = true
+      void preloadTutorChatStartupData().catch(() => undefined)
+    }
   }
 
   win.on('closed', () => {

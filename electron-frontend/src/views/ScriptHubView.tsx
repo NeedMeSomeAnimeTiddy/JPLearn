@@ -72,6 +72,7 @@ interface ScriptHubViewProps {
   availableMinigames: MinigameKey[]
   activeScriptStats: { bestStreak: number }
   activeSectionName: string | null
+  minigameLockReasons: Partial<Record<MinigameKey, string>>
   isSheet?: boolean
   // callbacks (navigation / deck selection only)
   onBack: () => void
@@ -115,6 +116,7 @@ export function ScriptHubView({
   availableMinigames,
   activeScriptStats,
   activeSectionName,
+  minigameLockReasons,
   isSheet = false,
   onBack,
   onOpenSettings,
@@ -499,6 +501,8 @@ export function ScriptHubView({
                 const game = MINIGAMES.find((entry) => entry.key === gameKey)
                 if (!game) return null
                 const gameStats = minigameStats[activeScript][game.key]
+                const lockReason = minigameLockReasons[game.key] ?? null
+                const minigameLocked = Boolean(lockReason)
                 const accuracy =
                   gameStats.attempted > 0
                     ? Math.round((gameStats.correct / gameStats.attempted) * 100)
@@ -509,55 +513,81 @@ export function ScriptHubView({
                     key={game.key}
                     role="button"
                     tabIndex={0}
-                    className={`game-tile ${activeGame === game.key ? 'is-active' : ''}`}
-                    onClick={() => onSelectGame(game.key)}
+                    className={`game-tile ${activeGame === game.key ? 'is-active' : ''} ${minigameLocked ? 'is-locked' : ''}`}
+                    onClick={() => {
+                      if (minigameLocked) return
+                      onSelectGame(game.key)
+                    }}
                     onKeyDown={(event) => {
+                      if (minigameLocked) {
+                        return
+                      }
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault()
                         onSelectGame(game.key)
                       }
                     }}
+                    aria-label={minigameLocked ? `${game.title}, locked. ${lockReason}` : undefined}
                     style={{ animationDelay: `${120 + index * 70}ms` }}
                   >
-                    <div className="game-tile-head">
-                      <span className="game-icon" aria-hidden="true">
-                        <MinigameIcon game={game.key} />
+                    {minigameLocked ? (
+                      <span className="game-tile-lock-badge" aria-hidden="true">
+                        <Lock className="game-tile-lock-icon" strokeWidth={2} />
+                        Locked
                       </span>
-                      <div className="game-tile-copy">
-                        <strong className="game-tile-title">{game.title}</strong>
-                        <p className="game-tile-description">{game.description}</p>
+                    ) : null}
+                    <div className={`game-tile-main ${minigameLocked ? 'is-blurred' : ''}`}>
+                      <div className="game-tile-head">
+                        <span className="game-icon" aria-hidden="true">
+                          <MinigameIcon game={game.key} />
+                        </span>
+                        <div className="game-tile-copy">
+                          <strong className="game-tile-title">{game.title}</strong>
+                          <p className="game-tile-description">{game.description}</p>
+                        </div>
                       </div>
+                      <div className="game-tile-stats" aria-label="Minigame stats">
+                        <span className="game-tile-stat" aria-label="Accuracy" title="Accuracy">
+                          <span className="game-tile-stat-label" aria-hidden="true">
+                            <Target className="game-tile-stat-icon" strokeWidth={2.1} />
+                          </span>
+                          <strong>{accuracy}%</strong>
+                        </span>
+                        <span className="game-tile-stat" aria-label="Best streak" title="Best streak">
+                          <span className="game-tile-stat-label" aria-hidden="true">
+                            <Flame className="game-tile-stat-icon" strokeWidth={2.1} />
+                          </span>
+                          <strong>{gameStats.bestStreak}</strong>
+                        </span>
+                        <span className="game-tile-stat" aria-label="Points" title="Points">
+                          <span className="game-tile-stat-label" aria-hidden="true">
+                            <Trophy className="game-tile-stat-icon" strokeWidth={2.1} />
+                          </span>
+                          <strong>{gameStats.points}</strong>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="play-cta-button game-tile-play"
+                        disabled={minigameLocked}
+                        title={minigameLocked ? lockReason ?? 'Locked' : 'Play'}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          if (minigameLocked) {
+                            return
+                          }
+                          onPlayGame(game.key)
+                        }}
+                      >
+                        Play
+                      </button>
                     </div>
-                    <div className="game-tile-stats" aria-label="Minigame stats">
-                      <span className="game-tile-stat" aria-label="Accuracy" title="Accuracy">
-                        <span className="game-tile-stat-label" aria-hidden="true">
-                          <Target className="game-tile-stat-icon" strokeWidth={2.1} />
-                        </span>
-                        <strong>{accuracy}%</strong>
-                      </span>
-                      <span className="game-tile-stat" aria-label="Best streak" title="Best streak">
-                        <span className="game-tile-stat-label" aria-hidden="true">
-                          <Flame className="game-tile-stat-icon" strokeWidth={2.1} />
-                        </span>
-                        <strong>{gameStats.bestStreak}</strong>
-                      </span>
-                      <span className="game-tile-stat" aria-label="Points" title="Points">
-                        <span className="game-tile-stat-label" aria-hidden="true">
-                          <Trophy className="game-tile-stat-icon" strokeWidth={2.1} />
-                        </span>
-                        <strong>{gameStats.points}</strong>
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="play-cta-button game-tile-play"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onPlayGame(game.key)
-                      }}
-                    >
-                      Play
-                    </button>
+                    {lockReason ? (
+                      <div className="game-tile-lock-reason">
+                        <p className="game-tile-lock-title">{game.title}</p>
+                        <p className="game-tile-lock-copy">{lockReason}</p>
+                      </div>
+                    ) : null}
                   </article>
                 )
               })}

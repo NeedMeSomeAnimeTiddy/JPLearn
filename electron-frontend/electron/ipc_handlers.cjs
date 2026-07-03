@@ -44,6 +44,22 @@ async function runWithTransientRetry(fn) {
 }
 
 function registerIpcHandlers(options) {
+  const transientAssistantChatTurns = []
+  const appendTransientAssistantChatTurn = (role, content) => {
+    transientAssistantChatTurns.push({
+      role,
+      content,
+      created_at_utc: new Date().toISOString(),
+    })
+  }
+  const readTransientAssistantChatTurns = (limit) => {
+    const normalizedLimit = validatePositiveLimit(limit, 20)
+    return transientAssistantChatTurns.slice(-normalizedLimit)
+  }
+  const clearTransientAssistantChatTurns = () => {
+    transientAssistantChatTurns.length = 0
+  }
+
   const trustedSenderOptions = () => ({
     isDev: options.isDev,
     getWindowFromSender: options.getWindowFromSender,
@@ -282,26 +298,15 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant:append-chat-turn', async (event, payload) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedPayload = validateAssistantChatAppendPayload(payload)
-    try {
-      return await options.runPythonBridgeWithArgs([
-        'assistant-chat-append',
-        validatedPayload.role,
-        validatedPayload.content,
-      ])
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to append assistant chat turn: ${detail}`)
-    }
+    appendTransientAssistantChatTurn(validatedPayload.role, validatedPayload.content)
+    return { ok: true }
   })
 
   options.ipcMain.handle('assistant:get-chat-history', async (event, limit) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    const validatedLimit = validatePositiveLimit(limit, 20)
-    try {
-      return await options.runPythonBridgeWithArgs(['assistant-chat-history', String(validatedLimit)])
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to fetch assistant chat history: ${detail}`)
+    return {
+      ok: true,
+      turns: readTransientAssistantChatTurns(limit),
     }
   })
 
@@ -320,12 +325,8 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('assistant:clear-chat-history', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    try {
-      return await options.runPythonBridgeWithArgs(['assistant-chat-clear'])
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to clear assistant chat history: ${detail}`)
-    }
+    clearTransientAssistantChatTurns()
+    return { ok: true }
   })
 
   options.ipcMain.handle('assistant-chat:status', (event) => {
@@ -346,17 +347,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:send-message', async (event, payload) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedPayload = validateAssistantChatRuntimePayload(payload)
-
-    try {
-      // Chat transcript persistence is best-effort and isolated from inference lifecycle.
-      await options.runPythonBridgeWithArgs([
-        'assistant-chat-append',
-        'user',
-        validatedPayload.message,
-      ])
-    } catch {
-      // Keep chat runtime responsive even if persistence fails.
-    }
+    appendTransientAssistantChatTurn('user', validatedPayload.message)
 
     try {
       let assembledContext = {}
@@ -394,15 +385,7 @@ function registerIpcHandlers(options) {
         ...validatedPayload.context,
       }
       const response = await options.localTutorRuntime.sendMessage(validatedPayload.message, runtimeContext)
-      try {
-        await options.runPythonBridgeWithArgs([
-          'assistant-chat-append',
-          'assistant',
-          response.text,
-        ])
-      } catch {
-        // Best-effort persistence only.
-      }
+      appendTransientAssistantChatTurn('assistant', response.text)
       return response
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)

@@ -34,6 +34,7 @@ type SessionGoalStartResponse = Awaited<ReturnType<typeof window.jplearnDesktop.
 type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getSessionSummary>>
 type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
 type XPProgress = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getXpProgress>>>
+type VoiceStatusPayload = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getVoiceStatus>>>
 type TutorReactionItem = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getTutorReactions>>>['reactions'][number]
 type RecommendationItem = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getRecommendations>>>['recommendations'][number]
 interface SessionRunReport {
@@ -309,6 +310,8 @@ const ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT = 600
 const ROUND_QUEUE_TIMEOUT_MS = 1200
 const STUDY_QUEUE_CACHE_TTL_MS = 45000
 const DECK_LOAD_TIMEOUT_MS = 15000
+const STARTUP_WARMUP_INITIAL_DELAY_MS = 900
+const STARTUP_WARMUP_YIELD_DEADLINE_MS = 45
 const ASSISTANT_MAX_TOASTS = 1
 const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
@@ -1058,8 +1061,8 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
 ]
 
 const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
@@ -3235,6 +3238,8 @@ function App() {
   const [voiceBusy, setVoiceBusy] = useState<boolean>(false)
   const [voiceUnavailable, setVoiceUnavailable] = useState<boolean>(false)
   const [lastVoiceSynthesis, setLastVoiceSynthesis] = useState<VoiceSynthesisMeta | null>(null)
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatusPayload | null>(null)
+  const [voiceStatusChecked, setVoiceStatusChecked] = useState(false)
   const [tutorInstallInfo, setTutorInstallInfo] = useState<{
     totalRamGb: number
     models: Array<{
@@ -3862,9 +3867,37 @@ function App() {
     }
   }, [])
 
+  const refreshVoiceStatus = useCallback(async (): Promise<VoiceStatusPayload | null> => {
+    const getVoiceStatus = window.jplearnDesktop.getVoiceStatus
+    if (!getVoiceStatus) {
+      setVoiceStatusChecked(true)
+      return null
+    }
+    try {
+      const status = await getVoiceStatus()
+      setVoiceStatus(status)
+      setVoiceStatusChecked(true)
+      return status
+    } catch {
+      setVoiceStatusChecked(true)
+      return null
+    }
+  }, [])
+
   useEffect(() => {
     void refreshTutorInstallInfo()
   }, [refreshTutorInstallInfo])
+
+  useEffect(() => {
+    void refreshVoiceStatus()
+  }, [refreshVoiceStatus])
+
+  useEffect(() => {
+    if (view !== 'script_hub') {
+      return
+    }
+    void refreshVoiceStatus()
+  }, [refreshVoiceStatus, view])
 
   useEffect(() => {
     if (!showSettings || activeSettingsTab !== 'tutor') {
@@ -5372,6 +5405,26 @@ function App() {
 
   useEffect(() => {
     let cancelled = false
+    let warmupStartHandle: number | null = null
+    let lastYieldAt = performance.now()
+
+    const yieldToMain = async () => {
+      if (typeof globalThis.scheduler !== 'undefined' && typeof globalThis.scheduler.yield === 'function') {
+        await globalThis.scheduler.yield()
+        return
+      }
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 0)
+      })
+    }
+
+    const maybeYieldToMain = async () => {
+      if (performance.now() - lastYieldAt < STARTUP_WARMUP_YIELD_DEADLINE_MS) {
+        return
+      }
+      await yieldToMain()
+      lastYieldAt = performance.now()
+    }
 
     async function preloadStartupDeckData(): Promise<void> {
       const startupKanjiCategory: KanjiCategory = 'numbers_time'
@@ -5452,20 +5505,37 @@ function App() {
       }
 
       try {
-        await Promise.all([
-          ...startupScripts.map((script) => preloadScript(script)),
-          preloadKanjiCategory(startupKanjiCategory, true),
-          preloadVocabCategory(startupVocabCategory, true),
-        ])
+        // Prioritize the two visible categories first, then continue with lower
+        // priority script warmups in a cooperative queue.
+        await preloadKanjiCategory(startupKanjiCategory, true)
+        if (cancelled) return
+        await maybeYieldToMain()
+
+        await preloadVocabCategory(startupVocabCategory, true)
+        if (cancelled) return
+        await maybeYieldToMain()
+
+        for (const script of startupScripts) {
+          await preloadScript(script)
+          if (cancelled) return
+          await maybeYieldToMain()
+        }
       } catch {
         // Allow startup to continue even if preloading fails on some decks.
       }
     }
 
-    void preloadStartupDeckData()
+    warmupStartHandle = window.setTimeout(() => {
+      if (!cancelled) {
+        void preloadStartupDeckData()
+      }
+    }, STARTUP_WARMUP_INITIAL_DELAY_MS)
 
     return () => {
       cancelled = true
+      if (warmupStartHandle !== null) {
+        window.clearTimeout(warmupStartHandle)
+      }
     }
   }, [getBlockProgressDeduped, getDeckCardsDeduped, notifyStartupReady])
 
@@ -6746,6 +6816,52 @@ function App() {
     return null
   }, [blockProgressWithMastery, activeBlockIndex, activeScript, kanjiCategoryProgress, activeKanjiCategory, vocabCategoryProgress, activeVocabCategory])
 
+  const speechRecognitionModelEnabled = useMemo(() => {
+    if (!tutorInstallInfo) {
+      return true
+    }
+    const activeTier = tutorInstallInfo.activeSpeechModelTier
+    if (!activeTier) {
+      return false
+    }
+    return tutorInstallInfo.speechModels.some((model) => model.tier === activeTier && model.installed)
+  }, [tutorInstallInfo])
+  const speechRecognitionLockReason = 'Install and enable a speech recognition model in Settings > Voice to use Speech Recall.'
+
+  const voiceRuntimeRunning = useMemo(() => {
+    const hasVoiceStatusApi = typeof window.jplearnDesktop.getVoiceStatus === 'function'
+    if (!hasVoiceStatusApi || !voiceStatusChecked) {
+      return true
+    }
+    if (!voiceStatus) {
+      return false
+    }
+    return voiceStatus.available && voiceStatus.modelReady && !voiceStatus.downloading
+  }, [voiceStatus, voiceStatusChecked])
+
+  const listeningLockReason = useMemo(() => {
+    if (voiceRuntimeRunning) {
+      return null
+    }
+    const detail = voiceStatus?.lastError?.trim()
+    if (detail) {
+      return `VOICEVOX runtime is not running (${detail}). Start it in Settings > Voice.`
+    }
+    return 'VOICEVOX runtime is not running. Start it in Settings > Voice.'
+  }, [voiceRuntimeRunning, voiceStatus?.lastError])
+
+  const minigameLockReasons = useMemo(() => {
+    const reasons: Partial<Record<MinigameKey, string>> = {}
+    if (!speechRecognitionModelEnabled) {
+      reasons.speech_recall = speechRecognitionLockReason
+    }
+    if (listeningLockReason) {
+      reasons.listening_audio_first = listeningLockReason
+      reasons.listening_prompt_first = listeningLockReason
+    }
+    return reasons
+  }, [listeningLockReason, speechRecognitionModelEnabled])
+
   // Block session is complete when every card in the active block has reached max score.
   // sessionRounds > 0 ensures we don't trigger on a pre-mastered block before answering.
   const blockSessionComplete = useMemo(() => {
@@ -7820,6 +7936,7 @@ function App() {
           availableMinigames={availableMinigames}
           activeScriptStats={activeScriptStats}
           activeSectionName={activeSectionName}
+          minigameLockReasons={minigameLockReasons}
           onBack={goHome}
           onOpenSettings={openSettingsFromMenu}
           onSelectBlock={(index) => {
@@ -8840,7 +8957,7 @@ function App() {
                 </SettingsCollapsibleSection>
                 ) : null}
 
-                {activeSettingsTab === 'tutor' ? (
+                {activeSettingsTab === 'voice' ? (
                 <SettingsCollapsibleSection
                   id="speech-recognition"
                   title="Speech Recognition"

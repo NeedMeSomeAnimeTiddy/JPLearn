@@ -360,6 +360,34 @@ function resolveBundledModelPath() {
   return ''
 }
 
+function resolveDownloadedModelPath() {
+  const assetsDir = resolveAssetsBaseDir()
+  if (!assetsDir) {
+    return ''
+  }
+
+  const modelsDir = path.join(assetsDir, 'models')
+  if (!fs.existsSync(modelsDir)) {
+    return ''
+  }
+
+  const activeFilename = readActiveModelFilename(modelsDir)
+  if (activeFilename) {
+    const activePath = path.join(modelsDir, activeFilename)
+    if (fs.existsSync(activePath)) {
+      return activePath
+    }
+  }
+
+  const entries = fs.readdirSync(modelsDir, { withFileTypes: true })
+  const models = entries
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.gguf'))
+    .map((entry) => path.join(modelsDir, entry.name))
+    .sort()
+
+  return models[0] || ''
+}
+
 function resolveTutorSystemPrompt() {
   const envPrompt = typeof process.env.JPLEARN_TUTOR_SYSTEM_PROMPT === 'string'
     ? process.env.JPLEARN_TUTOR_SYSTEM_PROMPT.trim()
@@ -1355,7 +1383,9 @@ function createTutorChatRuntime(options = {}) {
     : DEFAULT_INACTIVITY_UNLOAD_MS
 
   const discoveredLlamaServerPath = resolveBundledLlamaServerPath()
+  const downloadedModelPath = resolveDownloadedModelPath()
   const discoveredModelPath = resolveBundledModelPath()
+  const autoModelPath = downloadedModelPath || ''
   const docsDir = resolveAssetsBaseDir()
   const modelStateBases = [
     docsDir ? path.join(docsDir, 'models') : '',
@@ -1368,7 +1398,7 @@ function createTutorChatRuntime(options = {}) {
   const configuredProvider = normalizeProviderName(
     options.provider
     || process.env.JPLEARN_TUTOR_PROVIDER
-    || (discoveredLlamaServerPath && discoveredModelPath ? 'llama.cpp' : 'stub'),
+    || (discoveredLlamaServerPath && autoModelPath ? 'llama.cpp' : 'stub'),
   )
   // Explicit options are honored as-is. For ambient environment variables we
   // fall back to the discovered on-disk model/server when the configured path
@@ -1385,11 +1415,11 @@ function createTutorChatRuntime(options = {}) {
     executablePath: options.llamaServerPath
       || preferExistingPath(process.env.JPLEARN_LLAMA_SERVER_PATH, discoveredLlamaServerPath),
     modelPath: options.llamaModelPath
-      || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, discoveredModelPath),
+      || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, autoModelPath),
     promptTuningProfile: detectPromptTuningProfile({
       activeTier: activeModelTier,
       modelPath: options.llamaModelPath
-        || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, discoveredModelPath),
+        || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, autoModelPath || discoveredModelPath),
     }),
     timeoutMs: options.llamaTimeoutMs,
     startupTimeoutMs: options.llamaServerStartupTimeoutMs,
