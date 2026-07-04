@@ -10,6 +10,7 @@ const {
   validateSessionId,
   validateAssistantEventInteractionPayload,
   validateStartupThemeInput,
+  validateGrammarMinigameRequest,
   validateRecordGameResultPayload,
   validateSpeakPayload,
 } = require('./ipc_security.cjs')
@@ -135,6 +136,31 @@ describe('ipc_security', () => {
         confidenceScore: 0,
       }),
     ).toThrow(/invalid confidencescore/i)
+  })
+
+  it('validates grammar minigame request payload and rejects malformed values', () => {
+    const valid = validateGrammarMinigameRequest({
+      gameType: 'particle_cloze',
+      sentence: '私は日本語を勉強します',
+      seed: 3,
+    })
+
+    expect(valid.gameType).toBe('particle_cloze')
+    expect(valid.sentence).toBe('私は日本語を勉強します')
+    expect(valid.seed).toBe(3)
+
+    expect(() =>
+      validateGrammarMinigameRequest({
+        gameType: 'unknown_mode',
+      }),
+    ).toThrow(/invalid grammar minigame gametype/i)
+
+    expect(() =>
+      validateGrammarMinigameRequest({
+        gameType: 'imposter',
+        seed: -1,
+      }),
+    ).toThrow(/invalid grammar minigame seed/i)
   })
 
   it('validates session goal payload and session id values', () => {

@@ -204,6 +204,22 @@ interface StudyQueueResponse {
   queue: StudyQueuePayload
 }
 
+type GrammarMinigameType = 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter'
+
+interface GrammarMinigameRequest {
+  gameType: GrammarMinigameType
+  sentence?: string
+  seed?: number
+}
+
+interface GrammarMinigameResponse {
+  ok: boolean
+  game_type: GrammarMinigameType
+  sentence: string
+  seed: number
+  data: Record<string, unknown>
+}
+
 interface BlockInfo {
   index: number
   name: string
@@ -372,6 +388,7 @@ interface DesktopApi {
   getBlockProgress: (slug: DeckSlug) => Promise<BlockProgressPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>
+  getGrammarMinigameData?: (payload: GrammarMinigameRequest) => Promise<GrammarMinigameResponse>
   getOverviewCharacterMastery: () => Promise<OverviewCharacterMasteryPayload>
   notifyStartupReady: (payload?: {
     startupReadyMs?: number

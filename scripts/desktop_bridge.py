@@ -116,6 +116,12 @@ from data.jlpt_repository import (  # noqa: E402
     save_jlpt_exam_result,
 )
 from data import deck_portability  # noqa: E402
+from data.grammar_minigame_generator import (  # noqa: E402
+    generate_assembly_data,
+    generate_imposter_data,
+    generate_particle_cloze_data,
+    generate_vibe_check_data,
+)
 from data.settings_repository import get_setting, set_setting  # noqa: E402
 from domain.readiness import (  # noqa: E402
     LEARNING_PATHS,
@@ -3558,6 +3564,48 @@ def build_study_queue_payload(slug: str) -> dict[str, object]:
     }
 
 
+def build_grammar_minigame_data(
+    game_type: str,
+    sentence: str | None = None,
+    *,
+    seed: int = 0,
+) -> dict[str, object]:
+    """Generate grammar minigame data payloads from sentence examples or input."""
+    normalized_type = game_type.strip().lower()
+    if normalized_type not in {
+        "sentence_assembly",
+        "particle_cloze",
+        "vibe_check",
+        "imposter",
+    }:
+        raise ValueError(f"Unsupported grammar minigame type: {game_type}")
+
+    normalized_sentence = (sentence or "").strip()
+    if not normalized_sentence:
+        rows = _load_sentence_examples_rows()
+        if not rows:
+            raise ValueError("No sentence examples available for grammar minigames")
+        selected = rows[seed % len(rows)]
+        normalized_sentence = selected[0]
+
+    if normalized_type == "sentence_assembly":
+        payload = generate_assembly_data(normalized_sentence, seed=seed)
+    elif normalized_type == "particle_cloze":
+        payload = generate_particle_cloze_data(normalized_sentence, seed=seed)
+    elif normalized_type == "vibe_check":
+        payload = generate_vibe_check_data(normalized_sentence)
+    else:
+        payload = generate_imposter_data(normalized_sentence, seed=seed)
+
+    return {
+        "ok": True,
+        "game_type": normalized_type,
+        "sentence": normalized_sentence,
+        "seed": seed,
+        "data": payload,
+    }
+
+
 def build_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
     init_study_db()
     return {
@@ -3939,6 +3987,20 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             return 2, {"error": "Usage: study-queue <slug>"}
         try:
             payload = build_study_queue_payload(argv[1])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+        return 0, payload
+
+    if command == "grammar-minigame-data":
+        if len(argv) < 2:
+            return 2, {
+                "error": "Usage: grammar-minigame-data <game_type> [sentence] [seed]"
+            }
+        try:
+            game_type = argv[1]
+            sentence = argv[2] if len(argv) > 2 and argv[2].strip() else None
+            seed = int(argv[3]) if len(argv) > 3 and argv[3].strip() else 0
+            payload = build_grammar_minigame_data(game_type, sentence, seed=seed)
         except ValueError as exc:
             return 2, {"error": str(exc)}
         return 0, payload

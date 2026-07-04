@@ -238,6 +238,43 @@ function validateDictionarySearchQuery(value) {
   return normalized
 }
 
+function validateGrammarMinigameRequest(payload) {
+  const allowedGameTypes = new Set(['sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter'])
+
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid grammar minigame request payload: expected object')
+  }
+
+  if (typeof payload.gameType !== 'string' || !allowedGameTypes.has(payload.gameType)) {
+    throw new Error(`Invalid grammar minigame gameType: ${String(payload.gameType)}`)
+  }
+
+  let sentence
+  if (payload.sentence != null) {
+    if (typeof payload.sentence !== 'string') {
+      throw new Error(`Invalid grammar minigame sentence: ${String(payload.sentence)}`)
+    }
+    const normalizedSentence = payload.sentence.trim()
+    if (normalizedSentence.length > 0) {
+      sentence = normalizedSentence
+    }
+  }
+
+  let seed = 0
+  if (payload.seed != null) {
+    if (!Number.isInteger(payload.seed) || payload.seed < 0) {
+      throw new Error(`Invalid grammar minigame seed: ${String(payload.seed)}`)
+    }
+    seed = payload.seed
+  }
+
+  return {
+    gameType: payload.gameType,
+    sentence,
+    seed,
+  }
+}
+
 function validateAssistantEventIdsPayload(payload) {
   if (!Array.isArray(payload)) {
     throw new Error('Invalid assistant event ids payload: expected array')
@@ -532,6 +569,7 @@ module.exports = {
   validateOptionalSessionId,
   validatePositiveLimit,
   validateDictionarySearchQuery,
+  validateGrammarMinigameRequest,
   validateAssistantEventIdsPayload,
   validateAssistantEventInteractionPayload,
   validateAssistantChatAppendPayload,

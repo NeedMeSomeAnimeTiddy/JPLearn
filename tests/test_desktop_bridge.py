@@ -537,6 +537,48 @@ def test_build_summary_contract_shape(tmp_path: Path, monkeypatch) -> None:
     assert {"sentence_examples", "conjugation_training"}.issubset(slugs)
 
 
+def test_build_grammar_minigame_data_uses_csv_when_sentence_missing(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sentence_examples.csv"
+    csv_path.write_text(
+        "character,romaji,meaning\n"
+        "今日はいい天気です。,kyou wa ii tenki desu.,The weather is nice today.\n"
+        "私は日本語を勉強します。,watashi wa nihongo o benkyou shimasu.,I study Japanese.\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(desktop_bridge, "SENTENCE_EXAMPLES_CSV_CANDIDATES", (csv_path,))
+    monkeypatch.setattr(desktop_bridge, "_SENTENCE_EXAMPLES_ROWS_CACHE", None)
+
+    payload = desktop_bridge.build_grammar_minigame_data("particle_cloze", seed=1)
+
+    assert payload["ok"] is True
+    assert payload["game_type"] == "particle_cloze"
+    data = cast(dict[str, Any], payload["data"])
+    assert data["game_type"] == "particle_cloze"
+    assert "___" in data["prompt"]
+
+
+def test_build_grammar_minigame_data_accepts_explicit_sentence() -> None:
+    payload = desktop_bridge.build_grammar_minigame_data(
+        "imposter",
+        "私は学校で日本語を勉強します",
+        seed=0,
+    )
+
+    assert payload["ok"] is True
+    assert payload["sentence"] == "私は学校で日本語を勉強します"
+    data = cast(dict[str, Any], payload["data"])
+    assert data["game_type"] == "imposter"
+    assert data["mutated_sentence"] != data["sentence"]
+
+
+def test_run_command_grammar_minigame_data_rejects_unknown_type() -> None:
+    code, payload = desktop_bridge._run_command(["grammar-minigame-data", "not_a_mode"])
+
+    assert code == 2
+    assert "Unsupported grammar minigame type" in str(payload["error"])
+
+
 def test_apply_expertise_level_n5_foundation_marks_target_decks_mastered(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

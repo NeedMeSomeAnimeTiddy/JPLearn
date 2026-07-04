@@ -18,6 +18,7 @@ describe('preload contract', () => {
       "getBlockProgress: (slug) => ipcRenderer.invoke('study:get-block-progress', slug)",
       "getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug)",
       "getStudyQueue: (slug) => ipcRenderer.invoke('study:get-study-queue', slug)",
+      "getGrammarMinigameData: (payload) => ipcRenderer.invoke('study:get-grammar-minigame-data', payload)",
       "searchDictionary: (query) => ipcRenderer.invoke('study:search-dictionary', query)",
       "getOverviewCharacterMastery: () => ipcRenderer.invoke('study:get-overview-character-mastery')",
       "recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload)",

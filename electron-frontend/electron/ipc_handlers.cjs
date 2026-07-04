@@ -23,6 +23,7 @@ const {
   validateLearningPathId,
   validateAnalyticsExportType,
   validateDictionarySearchQuery,
+  validateGrammarMinigameRequest,
   validateConfigKey,
   validateConfigSetPayload,
 } = require('./ipc_security.cjs')
@@ -136,6 +137,22 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to search dictionary: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:get-grammar-minigame-data', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateGrammarMinigameRequest(payload)
+    try {
+      const args = ['grammar-minigame-data', validatedPayload.gameType]
+      if (typeof validatedPayload.sentence === 'string') {
+        args.push(validatedPayload.sentence)
+      }
+      args.push(String(validatedPayload.seed))
+      return await runPythonBridgeWithArgsRead(args)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch grammar minigame data: ${detail}`)
     }
   })
 

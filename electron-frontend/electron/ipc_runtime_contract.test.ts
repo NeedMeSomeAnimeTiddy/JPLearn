@@ -95,6 +95,20 @@ describe('ipc runtime contract', () => {
     expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
   })
 
+  it('rejects malformed grammar minigame payloads before bridge dispatch', async () => {
+    const { handlers, options } = createRegisteredHandlers()
+    const handler = handlers.get('study:get-grammar-minigame-data')
+
+    await expect(
+      handler(createValidEvent(), {
+        gameType: 'particle_cloze',
+        seed: '3',
+      }),
+    ).rejects.toThrow(/Invalid grammar minigame seed/i)
+
+    expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
+  })
+
   it('rejects untrusted senders before session-start bridge dispatch', async () => {
     const { handlers, options } = createRegisteredHandlers()
     const handler = handlers.get('study:start-session-goal')
