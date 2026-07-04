@@ -105,6 +105,7 @@ const MINIGAME_DIFFICULTY: Record<MinigameKey, {
   speech_recall: { level: 'hard', label: 'Hard' },
   sentence_assembly: { level: 'hard', label: 'Hard' },
   particle_cloze: { level: 'hard', label: 'Hard' },
+  vibe_check: { level: 'hard', label: 'Hard' },
   imposter: { level: 'hard', label: 'Hard' },
   listening_audio_first: { level: 'medium', label: 'Medium' },
   listening_prompt_first: { level: 'medium', label: 'Medium' },

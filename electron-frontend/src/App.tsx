@@ -121,7 +121,7 @@ type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' |
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
 type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'imposter' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
@@ -1115,6 +1115,11 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
     description: 'Fill the missing particle using sentence context and word order cues.',
   },
   {
+    key: 'vibe_check',
+    title: 'Vibe Check',
+    description: 'Read social tone and pick the best context for the sentence register.',
+  },
+  {
     key: 'imposter',
     title: 'Imposter',
     description: 'Find the token with a deliberate grammar error in a sentence.',
@@ -1137,12 +1142,12 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
 ]
 
 const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'particle_cloze', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  sentence_examples: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  sentence_examples: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
 }
 
 const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>> = {
@@ -1172,6 +1177,7 @@ const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   speech_recall: Mic,
   sentence_assembly: Shuffle,
   particle_cloze: BookText,
+  vibe_check: MessageCircle,
   imposter: History,
   listening_audio_first: Volume2,
   listening_prompt_first: Volume2,
@@ -1968,6 +1974,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
@@ -1982,6 +1989,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
@@ -1996,6 +2004,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
@@ -2010,6 +2019,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
@@ -2024,6 +2034,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
@@ -2038,6 +2049,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
@@ -2577,6 +2589,10 @@ function isParticleClozeMode(mode: MinigameKey): mode is 'particle_cloze' {
   return mode === 'particle_cloze'
 }
 
+function isVibeCheckMode(mode: MinigameKey): mode is 'vibe_check' {
+  return mode === 'vibe_check'
+}
+
 function isImposterMode(mode: MinigameKey): mode is 'imposter' {
   return mode === 'imposter'
 }
@@ -2586,7 +2602,7 @@ function isSentenceAssemblyMode(mode: MinigameKey): mode is 'sentence_assembly' 
 }
 
 function isGrammarCurriculumMode(mode: MinigameKey): boolean {
-  return isSentenceAssemblyMode(mode) || isParticleClozeMode(mode) || isImposterMode(mode)
+  return isSentenceAssemblyMode(mode) || isParticleClozeMode(mode) || isVibeCheckMode(mode) || isImposterMode(mode)
 }
 
 function pickSurprisePrompt(
@@ -3100,6 +3116,7 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'speech_recall') return 'Speech Recall'
   if (mode === 'sentence_assembly') return 'Sentence Assembly'
   if (mode === 'particle_cloze') return 'Particle Cloze'
+  if (mode === 'vibe_check') return 'Vibe Check'
   if (mode === 'imposter') return 'Imposter'
   if (mode === 'listening_audio_first') return 'Listening: Audio First'
   if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
@@ -3130,6 +3147,7 @@ function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'speech_recall') return 'Great effort. Speak the next answer clearly and confidently.'
   if (mode === 'sentence_assembly') return 'Good try. Keep the chunk order natural and grammatically smooth.'
   if (mode === 'particle_cloze') return 'Good try. Follow the sentence flow and particle role.'
+  if (mode === 'vibe_check') return 'Good try. Read the sentence ending and tone cues before deciding register.'
   if (mode === 'imposter') return 'Good attempt. Scan for the token that breaks grammar flow.'
   if (mode === 'listening_audio_first') return 'Keep listening. Audio recognition builds over time.'
   if (mode === 'listening_prompt_first') return 'Connect the sound to the character. It gets natural.'
@@ -6173,6 +6191,8 @@ function App() {
       ? 'sentence_assembly'
       : isParticleClozeMode(minigame)
         ? 'particle_cloze'
+        : isVibeCheckMode(minigame)
+          ? 'vibe_check'
         : isImposterMode(minigame)
           ? 'imposter'
           : null
@@ -6270,6 +6290,42 @@ function App() {
         dictionaryNote,
         promptLabel: surprisePrompt ? surpriseLabel : 'Fill in the missing particle.',
         focusText: prompt,
+        answer,
+        options,
+      }
+    }
+
+    if (isVibeCheckMode(minigame)) {
+      const answer = typeof data.correct_label === 'string' ? data.correct_label : ''
+      const rawOptions = Array.isArray(data.options)
+        ? data.options.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        : []
+      if (!answer || rawOptions.length === 0) return null
+
+      const dedupedOptions = Array.from(new Set(rawOptions))
+      if (!dedupedOptions.includes(answer)) {
+        dedupedOptions.unshift(answer)
+      }
+
+      const options = shuffleArray(dedupedOptions.slice(0, 4)).map((label, index) => ({
+        id: `${card.id}-vibe-${index}`,
+        label,
+      }))
+
+      return {
+        cardId: card.id,
+        mode: minigame,
+        audioText: sourceSentence,
+        exampleSentenceAudioText,
+        surprisePrompt,
+        curriculumStage,
+        chapterNumber: null,
+        chapterLabel: null,
+        hintText: exampleSentenceHint ?? 'Look at sentence endings and politeness markers to infer social context.',
+        dictionarySeedQuery,
+        dictionaryNote,
+        promptLabel: surprisePrompt ? surpriseLabel : 'Pick the social register that best fits this sentence.',
+        focusText: sourceSentence,
         answer,
         options,
       }
@@ -6564,6 +6620,43 @@ function App() {
             : 'Fill in the blank.',
           focusText: clozeSentence,
           answer: card.meaning,
+          options,
+        }
+      }
+
+      if (isVibeCheckMode(minigame)) {
+        const sourceSentence = card.example_sentence?.trim() || card.character
+        const options = shuffleArray([
+          { id: `${card.id}-vibe-0`, label: 'Casual / Plain' },
+          { id: `${card.id}-vibe-1`, label: 'Polite' },
+          { id: `${card.id}-vibe-2`, label: 'Formal Request' },
+          { id: `${card.id}-vibe-3`, label: 'Unclear / Context Needed' },
+        ])
+
+        const answer =
+          sourceSentence.includes('ください')
+            ? 'Formal Request'
+            : sourceSentence.includes('です') || sourceSentence.includes('ます')
+              ? 'Polite'
+              : 'Casual / Plain'
+
+        return {
+          cardId: card.id,
+          mode: minigame,
+          audioText: sourceSentence,
+          exampleSentenceAudioText,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: exampleSentenceHint ?? 'Read the sentence ending to judge whether it sounds casual, polite, or request-formal.',
+          dictionarySeedQuery,
+          dictionaryNote,
+          promptLabel: surprisePrompt
+            ? surpriseLabel
+            : 'Which social context best fits this sentence?',
+          focusText: sourceSentence,
+          answer,
           options,
         }
       }

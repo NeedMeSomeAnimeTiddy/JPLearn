@@ -208,6 +208,7 @@ export function MinigameView({
       activeRound.mode === 'meaning_match' ||
       activeRound.mode === 'character_match' ||
       activeRound.mode === 'particle_cloze' ||
+      activeRound.mode === 'vibe_check' ||
       activeRound.mode === 'imposter' ||
       activeRound.mode === 'listening_audio_first' ||
       activeRound.mode === 'listening_prompt_first'
@@ -483,6 +484,8 @@ export function MinigameView({
                             ? 'Speak the meaning'
                             : roundState.mode === 'particle_cloze'
                               ? 'Choose the missing particle'
+                              : roundState.mode === 'vibe_check'
+                                ? 'Read the register vibe'
                               : roundState.mode === 'imposter'
                                 ? 'Spot the grammar imposter'
                             : 'Choose the best answer'
@@ -502,6 +505,8 @@ export function MinigameView({
                               : 'Tap the mic and say your answer clearly.'
                             : roundState.mode === 'particle_cloze'
                               ? 'Use syntax and particle role to choose the best fit.'
+                              : roundState.mode === 'vibe_check'
+                                ? 'Use sentence endings like です, ます, or ください as tone clues.'
                               : roundState.mode === 'imposter'
                                 ? 'Pick the token that introduces the grammar error.'
                             : 'Commit to one answer and keep the run moving.'

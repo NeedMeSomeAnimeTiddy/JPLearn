@@ -11,6 +11,7 @@ import {
   Keyboard,
   Languages,
   ListChecks,
+  MessageCircle,
   Mic,
   Minus,
   Plus,
@@ -137,6 +138,11 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
     description: 'Fill the missing particle using sentence context and word order cues.',
   },
   {
+    key: 'vibe_check',
+    title: 'Vibe Check',
+    description: 'Read social tone and pick the best context for the sentence register.',
+  },
+  {
     key: 'imposter',
     title: 'Imposter',
     description: 'Find the token with a deliberate grammar error in a sentence.',
@@ -159,8 +165,8 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
 ]
 
 export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'interleave_mix'],
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'interleave_mix'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'interleave_mix'],
   kanji_n5: [
     'romaji_sprint',
     'meaning_match',
@@ -168,6 +174,9 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'stroke_order',
     'typed_recall',
     'speech_recall',
+    'sentence_assembly',
+    'particle_cloze',
+    'imposter',
     'listening_audio_first',
     'listening_prompt_first',
     'interleave_mix',
@@ -190,6 +199,7 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'speech_recall',
     'sentence_assembly',
     'particle_cloze',
+    'vibe_check',
     'imposter',
     'listening_audio_first',
     'listening_prompt_first',
@@ -201,7 +211,6 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'typed_recall',
     'speech_recall',
     'sentence_assembly',
-    'particle_cloze',
     'imposter',
     'listening_audio_first',
     'listening_prompt_first',
@@ -218,6 +227,7 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   speech_recall: Mic,
   sentence_assembly: Shuffle,
   particle_cloze: BookText,
+  vibe_check: MessageCircle,
   imposter: History,
   listening_audio_first: Volume2,
   listening_prompt_first: Volume2,
@@ -419,6 +429,7 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'speech_recall') return 'Speech Recall'
   if (mode === 'sentence_assembly') return 'Sentence Assembly'
   if (mode === 'particle_cloze') return 'Particle Cloze'
+  if (mode === 'vibe_check') return 'Vibe Check'
   if (mode === 'imposter') return 'Imposter'
   if (mode === 'listening_audio_first') return 'Listening: Audio First'
   if (mode === 'listening_prompt_first') return 'Listening: Prompt First'

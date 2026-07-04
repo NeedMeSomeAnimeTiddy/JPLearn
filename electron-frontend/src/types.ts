@@ -9,6 +9,7 @@ export type MinigameKey =
   | 'speech_recall'
   | 'sentence_assembly'
   | 'particle_cloze'
+  | 'vibe_check'
   | 'imposter'
   | 'listening_audio_first'
   | 'listening_prompt_first'

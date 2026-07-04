@@ -212,7 +212,7 @@ function buildStudyPlanDesktopApi() {
 }
 
 describe('Minigame menu', () => {
-  it('hides context and narrative games for alphabet tracks', async () => {
+  it('includes grammar gameplay modes for alphabet tracks', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
@@ -222,9 +222,10 @@ describe('Minigame menu', () => {
     expect((await screen.findAllByText(/Romaji Sprint/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Meaning Match/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Character Match/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Sentence Assembly/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Particle Cloze/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Imposter/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Interleave Mix/i)).length).toBeGreaterThan(0)
-    expect(screen.queryByText(/Particle Cloze/i)).toBeNull()
-    expect(screen.queryByText(/Imposter/i)).toBeNull()
   })
 
   it('removes romaji sprint for words track', async () => {

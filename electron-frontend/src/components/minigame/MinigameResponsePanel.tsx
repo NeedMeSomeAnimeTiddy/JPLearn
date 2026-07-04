@@ -53,6 +53,7 @@ export function MinigameResponsePanel({
     mode === 'meaning_match' ||
     mode === 'character_match' ||
     mode === 'particle_cloze' ||
+    mode === 'vibe_check' ||
     mode === 'imposter' ||
     mode === 'listening_audio_first' ||
     mode === 'listening_prompt_first'
