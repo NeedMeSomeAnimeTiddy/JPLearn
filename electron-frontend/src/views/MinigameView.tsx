@@ -12,6 +12,7 @@ import { ChoiceAnswerPanel } from '../components/minigame/ChoiceAnswerPanel'
 import { HintAssistPanel } from '../components/minigame/HintAssistPanel'
 import { MinigameHud } from '../components/minigame/MinigameHud'
 import { MinigameResponsePanel } from '../components/minigame/MinigameResponsePanel'
+import { SentenceAssemblyAnswerPanel } from '../components/minigame/SentenceAssemblyAnswerPanel'
 import { StrokeOrderAnswerPanel } from '../components/minigame/StrokeOrderAnswerPanel'
 import { TypedAnswerPanel } from '../components/minigame/TypedAnswerPanel'
 import { SpeechAnswerPanel } from '../components/minigame/SpeechAnswerPanel'
@@ -206,6 +207,8 @@ export function MinigameView({
     const isMultipleChoice =
       activeRound.mode === 'meaning_match' ||
       activeRound.mode === 'character_match' ||
+      activeRound.mode === 'particle_cloze' ||
+      activeRound.mode === 'imposter' ||
       activeRound.mode === 'context_cloze' ||
       activeRound.mode === 'narrative_story' ||
       activeRound.mode === 'listening_audio_first' ||
@@ -474,10 +477,16 @@ export function MinigameView({
                       ? 'Build the matching kanji'
                       : roundState.mode === 'romaji_sprint'
                         ? 'Type the reading'
+                        : roundState.mode === 'sentence_assembly'
+                          ? 'Assemble the sentence'
                         : roundState.mode === 'typed_recall'
                           ? 'Type the meaning'
                           : roundState.mode === 'speech_recall'
                             ? 'Speak the meaning'
+                            : roundState.mode === 'particle_cloze' || roundState.mode === 'context_cloze'
+                              ? 'Choose the missing particle'
+                              : roundState.mode === 'imposter' || roundState.mode === 'narrative_story'
+                                ? 'Spot the grammar imposter'
                             : 'Choose the best answer'
                   }
                   copy={
@@ -485,12 +494,18 @@ export function MinigameView({
                       ? 'Type the romaji reading to narrow the kanji candidates.'
                       : roundState.mode === 'romaji_sprint'
                         ? 'Submit as soon as the reading is clear in your head.'
+                        : roundState.mode === 'sentence_assembly'
+                          ? 'Drag chunks into natural order, then submit.'
                         : roundState.mode === 'typed_recall'
                           ? 'Short, direct answers work best.'
                           : roundState.mode === 'speech_recall'
                             ? speechFallbackToTyped
                               ? 'Short, direct answers work best.'
                               : 'Tap the mic and say your answer clearly.'
+                            : roundState.mode === 'particle_cloze' || roundState.mode === 'context_cloze'
+                              ? 'Use syntax and particle role to choose the best fit.'
+                              : roundState.mode === 'imposter' || roundState.mode === 'narrative_story'
+                                ? 'Pick the token that introduces the grammar error.'
                             : 'Commit to one answer and keep the run moving.'
                   }
                   confidenceCaptureEnabled={confidenceCaptureEnabled}
@@ -517,6 +532,12 @@ export function MinigameView({
                         disabled={isRoundResolving}
                         onInputChange={setRoundInput}
                         onSelect={submitAnswer}
+                      />
+                    ) : roundState.mode === 'sentence_assembly' ? (
+                      <SentenceAssemblyAnswerPanel
+                        options={roundState.options}
+                        disabled={isRoundResolving}
+                        onSubmit={submitAnswer}
                       />
                     ) : roundState.mode === 'speech_recall' && !speechFallbackToTyped ? (
                       <SpeechAnswerPanel
@@ -561,7 +582,7 @@ export function MinigameView({
                   hintStep={hintStep}
                   hintRevealCount={hintRevealCount}
                   showKeyboardPrompts={showKeyboardPrompts}
-                  formattedAnswer={formatExpectedAnswer(roundState.answer)}
+                  formattedAnswer={roundState.answerDisplay ?? formatExpectedAnswer(roundState.answer)}
                   onRevealHint={() => {
                     if (hintStep < 1) {
                       setHintRevealCount((value) => value + 1)

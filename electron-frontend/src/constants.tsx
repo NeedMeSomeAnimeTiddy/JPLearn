@@ -127,14 +127,19 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
     description: 'Say the meaning aloud — transcribed and graded offline.',
   },
   {
-    key: 'context_cloze',
-    title: 'Context Cloze',
-    description: 'Fill sentence blanks using context clues and i+1 progression.',
+    key: 'sentence_assembly',
+    title: 'Sentence Assembly',
+    description: 'Arrange shuffled sentence chunks into natural Japanese order.',
   },
   {
-    key: 'narrative_story',
-    title: 'Narrative Story',
-    description: 'Play chapter scenes unlocked by your persisted curriculum stage.',
+    key: 'particle_cloze',
+    title: 'Particle Cloze',
+    description: 'Fill the missing particle using sentence context and word order cues.',
+  },
+  {
+    key: 'imposter',
+    title: 'Imposter',
+    description: 'Find the token with a deliberate grammar error in a sentence.',
   },
   {
     key: 'listening_audio_first',
@@ -172,8 +177,8 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'character_match',
     'typed_recall',
     'speech_recall',
-    'context_cloze',
-    'narrative_story',
+    'particle_cloze',
+    'imposter',
     'listening_audio_first',
     'listening_prompt_first',
     'interleave_mix',
@@ -183,8 +188,9 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'character_match',
     'typed_recall',
     'speech_recall',
-    'context_cloze',
-    'narrative_story',
+    'sentence_assembly',
+    'particle_cloze',
+    'imposter',
     'listening_audio_first',
     'listening_prompt_first',
     'interleave_mix',
@@ -194,8 +200,9 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'character_match',
     'typed_recall',
     'speech_recall',
-    'context_cloze',
-    'narrative_story',
+    'sentence_assembly',
+    'particle_cloze',
+    'imposter',
     'listening_audio_first',
     'listening_prompt_first',
     'interleave_mix',
@@ -209,6 +216,9 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   stroke_order: Keyboard,
   typed_recall: Keyboard,
   speech_recall: Mic,
+  sentence_assembly: Shuffle,
+  particle_cloze: BookText,
+  imposter: History,
   context_cloze: BookText,
   narrative_story: History,
   listening_audio_first: Volume2,
@@ -389,15 +399,15 @@ export const KANJI_CATEGORY_TO_DECK_SLUG: Record<KanjiCategory, KanjiCategorySlu
 
 // ── Interleave ───────────────────────────────────────────────────────────────
 
-type InterleaveWeightKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze'
+type InterleaveWeightKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze'
 
 export const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<InterleaveWeightKey>> = {
   hiragana: ['romaji_sprint', 'meaning_match', 'character_match'],
   katakana: ['romaji_sprint', 'meaning_match', 'character_match'],
   kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match'],
-  vocab_n5: ['meaning_match', 'character_match', 'context_cloze'],
-  grammar_patterns: ['meaning_match', 'character_match', 'context_cloze'],
-  sentence_examples: ['meaning_match', 'character_match', 'context_cloze'],
+  vocab_n5: ['meaning_match', 'character_match', 'particle_cloze'],
+  grammar_patterns: ['meaning_match', 'character_match', 'particle_cloze'],
+  sentence_examples: ['meaning_match', 'character_match', 'particle_cloze'],
 }
 
 // ── Round display helpers ────────────────────────────────────────────────────
@@ -409,15 +419,18 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'stroke_order') return 'Stroke Order'
   if (mode === 'typed_recall') return 'Typed Recall'
   if (mode === 'speech_recall') return 'Speech Recall'
-  if (mode === 'context_cloze') return 'Context Cloze'
+  if (mode === 'sentence_assembly') return 'Sentence Assembly'
+  if (mode === 'particle_cloze' || mode === 'context_cloze') return 'Particle Cloze'
+  if (mode === 'imposter' || mode === 'narrative_story') return 'Imposter'
   if (mode === 'listening_audio_first') return 'Listening: Audio First'
   if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
-  return 'Story Mode'
+  return 'Interleave Mix'
 }
 
 export function formatFeedbackAnswerLabel(mode: PlayableMinigame): string {
   if (mode === 'romaji_sprint') return 'The reading'
   if (mode === 'stroke_order' || mode === 'character_match') return 'The character'
+  if (mode === 'sentence_assembly') return 'Correct order'
   return 'The answer'
 }
 

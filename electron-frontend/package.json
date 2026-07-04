@@ -27,6 +27,9 @@
     "make:win": "npm run build && electron-forge make --platform=win32"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "electron-store": "^11.0.2",
     "lucide-react": "^1.21.0",
     "network-speed": "^2.1.1",

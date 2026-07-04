@@ -31,6 +31,9 @@ type OverviewCharacterMasteryPayload = Awaited<
 type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
 type BlockProgressPayload = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>
 type StudyQueueResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getStudyQueue>>
+type GrammarMinigameResponse = Awaited<
+  ReturnType<NonNullable<typeof window.jplearnDesktop.getGrammarMinigameData>>
+>
 type SessionGoalStartResponse = Awaited<ReturnType<typeof window.jplearnDesktop.startSessionGoal>>
 type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getSessionSummary>>
 type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
@@ -118,10 +121,10 @@ type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' |
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
 type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'context_cloze' | 'narrative_story' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'imposter' | 'context_cloze' | 'narrative_story' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools'
-type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'context_cloze', number>
+type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
 type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
@@ -343,7 +346,7 @@ const DEFAULT_INTERLEAVE_WEIGHTS: InterleaveWeights = {
   romaji_sprint: 1,
   meaning_match: 1,
   character_match: 1,
-  context_cloze: 1,
+  particle_cloze: 1,
 }
 const POINT_COMBO_THRESHOLDS = [3, 6, 9] as const
 const SURPRISE_PROMPTS = [
@@ -351,7 +354,7 @@ const SURPRISE_PROMPTS = [
   'Odd Prompt Mode: quick read, clean recall.',
   'Twist Round: stay sharp and answer fast.',
 ] as const
-const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Record<PlayableMinigame, string[]>> = {
+const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigame, string[]>>> = {
   hiragana: {
     romaji_sprint: [
       'Sound Burst: read it aloud, then type it clean.',
@@ -984,6 +987,7 @@ interface RoundState {
   promptLabel: string
   focusText: string
   answer: string
+  answerDisplay?: string | null
   options: RoundOption[]
 }
 
@@ -1101,14 +1105,19 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
     description: 'Say the meaning aloud — transcribed and graded offline.',
   },
   {
-    key: 'context_cloze',
-    title: 'Context Cloze',
-    description: 'Fill sentence blanks using context clues and i+1 progression.',
+    key: 'sentence_assembly',
+    title: 'Sentence Assembly',
+    description: 'Arrange shuffled sentence chunks into natural Japanese order.',
   },
   {
-    key: 'narrative_story',
-    title: 'Narrative Story',
-    description: 'Play chapter scenes unlocked by your persisted curriculum stage.',
+    key: 'particle_cloze',
+    title: 'Particle Cloze',
+    description: 'Fill the missing particle using sentence context and word order cues.',
+  },
+  {
+    key: 'imposter',
+    title: 'Imposter',
+    description: 'Find the token with a deliberate grammar error in a sentence.',
   },
   {
     key: 'listening_audio_first',
@@ -1131,18 +1140,18 @@ const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
   hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
   kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  sentence_examples: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'context_cloze', 'narrative_story', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'particle_cloze', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  sentence_examples: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
 }
 
 const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>> = {
   hiragana: ['romaji_sprint', 'meaning_match', 'character_match'],
   katakana: ['romaji_sprint', 'meaning_match', 'character_match'],
   kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match'],
-  vocab_n5: ['meaning_match', 'character_match', 'context_cloze'],
-  grammar_patterns: ['meaning_match', 'character_match', 'context_cloze'],
-  sentence_examples: ['meaning_match', 'character_match', 'context_cloze'],
+  vocab_n5: ['meaning_match', 'character_match', 'particle_cloze'],
+  grammar_patterns: ['meaning_match', 'character_match', 'particle_cloze'],
+  sentence_examples: ['meaning_match', 'character_match', 'particle_cloze'],
 }
 
 const SECTION_META: Record<ScriptKey, { glyph: string }> = {
@@ -1161,6 +1170,9 @@ const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   stroke_order: Keyboard,
   typed_recall: Keyboard,
   speech_recall: Mic,
+  sentence_assembly: Shuffle,
+  particle_cloze: BookText,
+  imposter: History,
   context_cloze: BookText,
   narrative_story: History,
   listening_audio_first: Volume2,
@@ -1956,6 +1968,9 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
+      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
+      particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      imposter: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -1969,6 +1984,9 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
+      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
+      particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      imposter: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -1982,6 +2000,9 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
+      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
+      particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      imposter: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -1995,6 +2016,9 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
+      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
+      particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      imposter: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -2008,6 +2032,9 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
+      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
+      particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      imposter: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -2021,6 +2048,9 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       stroke_order: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
+      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
+      particle_cloze: { ...EMPTY_MINIGAME_STATS },
+      imposter: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
       narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
@@ -2557,13 +2587,36 @@ function buildInterleaveSequence(
   return sequence.length > 0 ? sequence : allowedModes
 }
 
+function isParticleClozeMode(mode: MinigameKey): mode is 'particle_cloze' | 'context_cloze' {
+  return mode === 'particle_cloze' || mode === 'context_cloze'
+}
+
+function isImposterMode(mode: MinigameKey): mode is 'imposter' | 'narrative_story' {
+  return mode === 'imposter' || mode === 'narrative_story'
+}
+
+function isSentenceAssemblyMode(mode: MinigameKey): mode is 'sentence_assembly' {
+  return mode === 'sentence_assembly'
+}
+
+function isGrammarCurriculumMode(mode: MinigameKey): boolean {
+  return isSentenceAssemblyMode(mode) || isParticleClozeMode(mode) || isImposterMode(mode)
+}
+
+function normalizePromptPackMode(mode: PlayableMinigame): PlayableMinigame {
+  if (mode === 'particle_cloze') return 'context_cloze'
+  if (mode === 'imposter') return 'narrative_story'
+  return mode
+}
+
 function pickSurprisePrompt(
   script: ScriptKey,
   mode: PlayableMinigame,
   tags: string[],
   seed: number,
 ): string {
-  const scriptPool = SCRIPT_MODE_PROMPT_PACKS[script][mode]
+  const normalizedMode = normalizePromptPackMode(mode)
+  const scriptPool = SCRIPT_MODE_PROMPT_PACKS[script][normalizedMode] ?? SCRIPT_MODE_PROMPT_PACKS[script][mode] ?? []
   const tagPool = tags
     .map((tag) => TAG_PROMPT_PACKS[tag.toLowerCase()])
     .filter((pack): pack is string[] => Boolean(pack))
@@ -2591,6 +2644,35 @@ function applyCardTemplate(template: string, card: ScriptDeck['cards'][number]):
     .replaceAll('{meaning}', card.meaning)
 }
 
+function splitSentenceIntoAssemblyChunks(sentence: string): string[] {
+  const chunks: string[] = []
+  let buffer = ''
+  const particleBreaks = new Set(['は', 'が', 'を', 'に', 'で', 'と', 'へ', 'も', 'の'])
+  const punctuationBreaks = new Set(['、', '。', '！', '？'])
+
+  for (const character of sentence) {
+    if (character.trim().length === 0) {
+      if (buffer.trim().length > 0) {
+        chunks.push(buffer.trim())
+        buffer = ''
+      }
+      continue
+    }
+
+    buffer += character
+    if (particleBreaks.has(character) || punctuationBreaks.has(character)) {
+      chunks.push(buffer)
+      buffer = ''
+    }
+  }
+
+  if (buffer.length > 0) {
+    chunks.push(buffer)
+  }
+
+  return chunks.filter((chunk) => chunk.trim().length > 0)
+}
+
 function buildClozeLine(script: ScriptKey, stage: 1 | 2 | 3, seed: number, card: ScriptDeck['cards'][number]): string {
   const templates = CLOZE_TEMPLATES[script][stage]
   return applyCardTemplate(templates[Math.abs(seed) % templates.length], card)
@@ -2616,6 +2698,9 @@ function buildRoundDictionaryNote(card: ScriptDeck['cards'][number], mode: Playa
   if (mode === 'romaji_sprint') {
     title = 'Reading clue'
     copy = `${summary.character} is read ${summary.reading} in the dictionary.`
+  } else if (mode === 'sentence_assembly') {
+    title = 'Assembly clue'
+    copy = `Rebuild the sentence in natural order around ${summary.character} (${summary.reading}).`
   } else if (mode === 'typed_recall') {
     title = 'Dictionary recall'
     copy = secondaryGlosses.length > 0
@@ -2639,12 +2724,12 @@ function buildRoundDictionaryNote(card: ScriptDeck['cards'][number], mode: Playa
     copy = secondaryGlosses.length > 0
       ? `Look for the character read ${summary.reading} with meanings like ${glossList.join(', ')}.`
       : `Look for the character read ${summary.reading} that matches ${summary.primary_gloss}.`
-  } else if (mode === 'context_cloze') {
+  } else if (isParticleClozeMode(mode)) {
     title = 'Context clue'
     copy = secondaryGlosses.length > 0
       ? `${summary.character} (${summary.reading}) fits sentence meanings like ${glossList.join(', ')}.`
       : `${summary.character} (${summary.reading}) fits this kind of sentence as ${summary.primary_gloss}.`
-  } else if (mode === 'narrative_story') {
+  } else if (isImposterMode(mode)) {
     title = 'Reading note'
     copy = secondaryGlosses.length > 0
       ? `In passages, ${summary.character} is read ${summary.reading} and can suggest ${glossList.join(', ')}.`
@@ -2789,13 +2874,13 @@ function getStudyPlanShortcutMinigame(row: StudyPlanCoverageRow, stage: StudyPla
 
   if (row.key === 'vocab_n5') {
     if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
-    if (stage === 'building') return index === 0 ? 'typed_recall' : 'context_cloze'
-    return index === 0 ? 'context_cloze' : 'narrative_story'
+    if (stage === 'building') return index === 0 ? 'typed_recall' : 'particle_cloze'
+    return index === 0 ? 'particle_cloze' : 'imposter'
   }
 
   if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
-  if (stage === 'building') return index === 0 ? 'context_cloze' : 'typed_recall'
-  return index === 0 ? 'narrative_story' : 'context_cloze'
+  if (stage === 'building') return index === 0 ? 'particle_cloze' : 'typed_recall'
+  return index === 0 ? 'imposter' : 'particle_cloze'
 }
 
 function getStudyPlanTargetMastery(script: ScriptKey): number {
@@ -3034,10 +3119,12 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'stroke_order') return 'Stroke Order'
   if (mode === 'typed_recall') return 'Typed Recall'
   if (mode === 'speech_recall') return 'Speech Recall'
-  if (mode === 'context_cloze') return 'Context Cloze'
+  if (mode === 'sentence_assembly') return 'Sentence Assembly'
+  if (mode === 'particle_cloze' || mode === 'context_cloze') return 'Particle Cloze'
+  if (mode === 'imposter' || mode === 'narrative_story') return 'Imposter'
   if (mode === 'listening_audio_first') return 'Listening: Audio First'
   if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
-  return 'Story Mode'
+  return 'Interleave Mix'
 }
 
 function formatExpectedAnswer(rawAnswer: string): string {
@@ -3062,10 +3149,12 @@ function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'stroke_order') return 'Nice attempt. Visual memory gets stronger with reps.'
   if (mode === 'typed_recall') return 'Great effort. Keep the next answer short and clear.'
   if (mode === 'speech_recall') return 'Great effort. Speak the next answer clearly and confidently.'
-  if (mode === 'context_cloze') return 'Good try. Let the sentence mood guide your choice.'
+  if (mode === 'sentence_assembly') return 'Good try. Keep the chunk order natural and grammatically smooth.'
+  if (mode === 'particle_cloze' || mode === 'context_cloze') return 'Good try. Follow the sentence flow and particle role.'
+  if (mode === 'imposter' || mode === 'narrative_story') return 'Good attempt. Scan for the token that breaks grammar flow.'
   if (mode === 'listening_audio_first') return 'Keep listening. Audio recognition builds over time.'
   if (mode === 'listening_prompt_first') return 'Connect the sound to the character. It gets natural.'
-  return 'You are learning the pattern. Keep going.'
+  return 'Good attempt. Keep the next answer short and clear.'
 }
 
 function buildRoundCoachToast(
@@ -3698,7 +3787,12 @@ function App() {
 
   const resolveScriptMinigame = useCallback((script: ScriptKey, minigame: MinigameKey): MinigameKey => {
     const allowedMinigames = SCRIPT_MINIGAMES[script]
-    return allowedMinigames.includes(minigame) ? minigame : allowedMinigames[0]
+    const canonicalMinigame = minigame === 'context_cloze'
+      ? 'particle_cloze'
+      : minigame === 'narrative_story'
+        ? 'imposter'
+        : minigame
+    return allowedMinigames.includes(canonicalMinigame) ? canonicalMinigame : allowedMinigames[0]
   }, [])
 
   const resetRoundCycle = useCallback(() => {
@@ -6070,6 +6164,182 @@ function App() {
     void loadScriptCards(activeScript, activeKanjiCategory, activeVocabCategory)
   }, [activeScript, activeKanjiCategory, activeVocabCategory, loadScriptCards])
 
+  const buildBridgeGrammarRound = useCallback(async (
+    card: ScriptDeck['cards'][number],
+    minigame: PlayableMinigame,
+    options: {
+      curriculumStage: 1 | 2 | 3
+      surprisePrompt: boolean
+      surpriseLabel: string
+      promptSeed: number
+      exampleSentenceAudioText: string | null
+      dictionarySeedQuery: string | null
+      dictionaryNote: RoundDictionaryNote | null
+      exampleSentenceHint: string | null
+    },
+  ): Promise<RoundState | null> => {
+    const {
+      curriculumStage,
+      surprisePrompt,
+      surpriseLabel,
+      promptSeed,
+      exampleSentenceAudioText,
+      dictionarySeedQuery,
+      dictionaryNote,
+      exampleSentenceHint,
+    } = options
+
+    const getGrammarData = window.jplearnDesktop.getGrammarMinigameData
+    if (!getGrammarData) return null
+
+    const sourceSentence = card.example_sentence?.trim() || card.character
+    if (!sourceSentence) return null
+
+    const gameType = isSentenceAssemblyMode(minigame)
+      ? 'sentence_assembly'
+      : isParticleClozeMode(minigame)
+        ? 'particle_cloze'
+        : isImposterMode(minigame)
+          ? 'imposter'
+          : null
+    if (!gameType) return null
+
+    let response: GrammarMinigameResponse
+    try {
+      response = await getGrammarData({
+        gameType,
+        sentence: sourceSentence,
+        seed: promptSeed,
+      })
+    } catch {
+      return null
+    }
+
+    const data = response.data as Record<string, unknown>
+
+    if (isSentenceAssemblyMode(minigame)) {
+      const promptSentence = typeof data.sentence === 'string' ? data.sentence : sourceSentence
+      const shuffledChunks = Array.isArray(data.shuffled_chunks)
+        ? data.shuffled_chunks.filter((entry): entry is { id: string; text: string } => {
+          if (entry === null || typeof entry !== 'object') return false
+          const id = (entry as Record<string, unknown>).id
+          const text = (entry as Record<string, unknown>).text
+          return typeof id === 'string' && id.trim().length > 0 && typeof text === 'string' && text.trim().length > 0
+        })
+        : []
+      const answerOrder = Array.isArray(data.answer_order)
+        ? data.answer_order.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+        : []
+      if (shuffledChunks.length < 2 || answerOrder.length < 2) return null
+
+      const options = shuffledChunks.map((chunk) => ({
+        id: chunk.id,
+        label: chunk.text,
+      }))
+      const chunkLookup = Array.isArray(data.chunks)
+        ? new Map(
+          data.chunks
+            .filter((entry): entry is { id: string; text: string } => {
+              if (entry === null || typeof entry !== 'object') return false
+              const id = (entry as Record<string, unknown>).id
+              const text = (entry as Record<string, unknown>).text
+              return typeof id === 'string' && typeof text === 'string'
+            })
+            .map((chunk) => [chunk.id, chunk.text]),
+        )
+        : new Map(options.map((option) => [option.id, option.label]))
+      const answerDisplay = answerOrder.map((chunkId) => chunkLookup.get(chunkId) ?? '').join('').trim()
+
+      return {
+        cardId: card.id,
+        mode: minigame,
+        audioText: sourceSentence,
+        exampleSentenceAudioText,
+        surprisePrompt,
+        curriculumStage,
+        chapterNumber: null,
+        chapterLabel: null,
+        hintText: exampleSentenceHint ?? 'Arrange chunks to restore a natural sentence flow.',
+        dictionarySeedQuery,
+        dictionaryNote,
+        promptLabel: surprisePrompt ? surpriseLabel : 'Rebuild the sentence in natural order.',
+        focusText: promptSentence,
+        answer: answerOrder.join('|'),
+        answerDisplay: answerDisplay.length > 0 ? answerDisplay : null,
+        options,
+      }
+    }
+
+    if (isParticleClozeMode(minigame)) {
+      const prompt = typeof data.prompt === 'string' ? data.prompt : sourceSentence
+      const answer = typeof data.correct_particle === 'string' ? data.correct_particle : ''
+      const rawOptions = Array.isArray(data.options)
+        ? data.options.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        : []
+      if (!answer || rawOptions.length === 0) return null
+      const options = shuffleArray(Array.from(new Set(rawOptions))).map((label, index) => ({
+        id: `${card.id}-particle-${index}`,
+        label,
+      }))
+
+      return {
+        cardId: card.id,
+        mode: minigame,
+        audioText: sourceSentence,
+        exampleSentenceAudioText,
+        surprisePrompt,
+        curriculumStage,
+        chapterNumber: null,
+        chapterLabel: null,
+        hintText: exampleSentenceHint ?? 'Use sentence flow to pick the correct particle.',
+        dictionarySeedQuery,
+        dictionaryNote,
+        promptLabel: surprisePrompt ? surpriseLabel : 'Fill in the missing particle.',
+        focusText: prompt,
+        answer,
+        options,
+      }
+    }
+
+    if (isImposterMode(minigame)) {
+      const mutatedSentence = typeof data.mutated_sentence === 'string' ? data.mutated_sentence : sourceSentence
+      const answer = typeof data.mutated_token === 'string' ? data.mutated_token : ''
+      const rawTokens = Array.isArray(data.mutated_tokens)
+        ? data.mutated_tokens.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        : []
+      if (!answer || rawTokens.length === 0) return null
+
+      const dedupedOptions = Array.from(new Set(rawTokens)).slice(0, 4)
+      if (!dedupedOptions.includes(answer)) {
+        dedupedOptions.unshift(answer)
+      }
+      const options = shuffleArray(dedupedOptions.slice(0, 4)).map((label, index) => ({
+        id: `${card.id}-imposter-${index}`,
+        label,
+      }))
+
+      return {
+        cardId: card.id,
+        mode: minigame,
+        audioText: sourceSentence,
+        exampleSentenceAudioText,
+        surprisePrompt,
+        curriculumStage,
+        chapterNumber: curriculumStage,
+        chapterLabel: null,
+        hintText: 'Find the grammatically incorrect token in this sentence.',
+        dictionarySeedQuery,
+        dictionaryNote,
+        promptLabel: surprisePrompt ? surpriseLabel : 'Spot the grammatical imposter.',
+        focusText: mutatedSentence,
+        answer,
+        options,
+      }
+    }
+
+    return null
+  }, [])
+
   const buildRound = useCallback(
     (
       cards: ScriptDeck['cards'],
@@ -6085,7 +6355,7 @@ function App() {
       const currentScore = cardScores[activeScript][card.id] ?? 0
       const persistedStage = normalizeCurriculumStage(card.curriculum_stage)
       const scoreStage = curriculumStageFromScore(currentScore)
-      const curriculumStage = (minigame === 'context_cloze' || minigame === 'narrative_story')
+      const curriculumStage = isGrammarCurriculumMode(minigame)
         ? persistedStage
         : scoreStage
       const exampleSentenceAudioText = card.example_sentence?.trim() || null
@@ -6187,6 +6457,39 @@ function App() {
         }
       }
 
+      if (isSentenceAssemblyMode(minigame)) {
+        const sourceSentence = card.example_sentence?.trim() || ''
+        const chunks = splitSentenceIntoAssemblyChunks(sourceSentence)
+        if (chunks.length < 2) return null
+
+        const orderedOptions = chunks.map((chunk, index) => ({
+          id: `${card.id}-assembly-${index}`,
+          label: chunk,
+        }))
+        const options = shuffleArray(orderedOptions)
+
+        return {
+          cardId: card.id,
+          mode: minigame,
+          audioText: sourceSentence,
+          exampleSentenceAudioText,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: exampleSentenceHint ?? 'Place each chunk where the sentence sounds most natural.',
+          dictionarySeedQuery,
+          dictionaryNote,
+          promptLabel: surprisePrompt
+            ? surpriseLabel
+            : 'Arrange the chunks to rebuild the original sentence.',
+          focusText: sourceSentence,
+          answer: orderedOptions.map((option) => option.id).join('|'),
+          answerDisplay: chunks.join(''),
+          options,
+        }
+      }
+
       if (cards.length < 2) return null
 
       const cardsById = new Map(cards.map((entry) => [entry.id, entry]))
@@ -6259,7 +6562,7 @@ function App() {
         }
       }
 
-      if (minigame === 'context_cloze') {
+      if (isParticleClozeMode(minigame)) {
         const rankedMeaningDistractors = pickDistractorsFromPool(card.meaning_distractor_ids, 3)
         const options = shuffleArray([
           { id: `${card.id}-correct`, label: card.meaning },
@@ -6291,7 +6594,7 @@ function App() {
         }
       }
 
-      if (minigame === 'narrative_story') {
+      if (isImposterMode(minigame)) {
         const rankedMeaningDistractors = pickDistractorsFromPool(card.meaning_distractor_ids, 3)
         const options = shuffleArray([
           { id: `${card.id}-correct`, label: card.meaning },
@@ -6419,6 +6722,45 @@ function App() {
     [activeScript, cardScores],
   )
 
+  const buildRoundWithBridge = useCallback(async (
+    cards: ScriptDeck['cards'],
+    minigame: PlayableMinigame,
+    cardIndex: number,
+    surprisePrompt: boolean,
+    promptSeed: number,
+  ): Promise<RoundState | null> => {
+    if (cards.length === 0) return null
+
+    const card = cards[cardIndex]
+    const surpriseLabel = pickSurprisePrompt(activeScript, minigame, card.tags, promptSeed)
+    const currentScore = cardScores[activeScript][card.id] ?? 0
+    const persistedStage = normalizeCurriculumStage(card.curriculum_stage)
+    const scoreStage = curriculumStageFromScore(currentScore)
+    const curriculumStage = isGrammarCurriculumMode(minigame)
+      ? persistedStage
+      : scoreStage
+    const exampleSentenceAudioText = card.example_sentence?.trim() || null
+    const exampleSentenceHint = card.example_sentence
+      ? `Example: ${card.example_sentence}`
+      : null
+    const dictionaryNote = buildRoundDictionaryNote(card, minigame)
+    const dictionarySeedQuery = card.character || card.romaji || null
+
+    const bridgeRound = await buildBridgeGrammarRound(card, minigame, {
+      curriculumStage,
+      surprisePrompt,
+      surpriseLabel,
+      promptSeed,
+      exampleSentenceAudioText,
+      dictionarySeedQuery,
+      dictionaryNote,
+      exampleSentenceHint,
+    })
+    if (bridgeRound) return bridgeRound
+
+    return buildRound(cards, minigame, cardIndex, surprisePrompt, promptSeed)
+  }, [activeScript, buildBridgeGrammarRound, buildRound, cardScores])
+
   const nextRoundMode = useCallback((selectedMode: MinigameKey): { mode: PlayableMinigame; surprisePrompt: boolean; promptSeed: number } => {
     if (selectedMode !== 'interleave_mix') {
       return { mode: selectedMode, surprisePrompt: false, promptSeed: 0 }
@@ -6511,7 +6853,7 @@ function App() {
       const leechPool = activeBlockCards.filter((card) => card.is_leech)
       const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
       const modeSelection = nextRoundMode(selectedGame)
-      const modeCards = modeSelection.mode === 'narrative_story'
+      const modeCards = isImposterMode(modeSelection.mode)
         ? narrativePriorityCards(sourceCards)
         : sourceCards
       const goalTargetItems = Math.max(1, Math.floor(sessionTargetItems))
@@ -6524,7 +6866,7 @@ function App() {
       const index = nextCardIndex(modeCards.length)
       const nextRound = index === null
         ? null
-        : buildRound(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
+        : await buildRoundWithBridge(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
       if (!nextRound) {
         setSessionActive(false)
         setRoundState(null)
@@ -6570,7 +6912,7 @@ function App() {
   }, [
     activeBlockCards,
     activeGame,
-    buildRound,
+    buildRoundWithBridge,
     hydrateRoundCycle,
     leechFocusEnabled,
     nextCardIndex,
@@ -6659,7 +7001,7 @@ function App() {
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
     const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
     const modeSelection = nextRoundMode(activeGame)
-    const modeCards = modeSelection.mode === 'narrative_story'
+    const modeCards = isImposterMode(modeSelection.mode)
       ? narrativePriorityCards(sourceCards)
       : sourceCards
     let index = nextCardIndex(modeCards.length)
@@ -6669,7 +7011,7 @@ function App() {
     }
     const candidate = index === null
       ? null
-      : buildRound(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
+      : await buildRoundWithBridge(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
     if (!candidate) {
       setRoundState(null)
       setSessionActive(false)
@@ -6686,7 +7028,7 @@ function App() {
     setRoundPerformanceLabel(null)
       setRoundComboBonus(0)
       setRoundMilestoneStreak(null)
-  }, [activeBlockCards, activeGame, buildRound, hydrateRoundCycle, leechFocusEnabled, nextCardIndex, nextRoundMode])
+  }, [activeBlockCards, activeGame, buildRoundWithBridge, hydrateRoundCycle, leechFocusEnabled, nextCardIndex, nextRoundMode])
 
   const submitAnswer = useCallback(
     (answer: string) => {
@@ -6788,7 +7130,7 @@ function App() {
         setSessionPoints((value) => value + awardedPoints)
         if ((roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall') && typedAssessment === 'near_miss') {
           setRoundFeedback(`Close enough — we’ll count it! ${pointsCopy}${comboCopy}.`)
-        } else if (roundState.mode === 'narrative_story') {
+        } else if (isImposterMode(roundState.mode)) {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
           setRoundFeedback(`Nice work! ${pointsCopy}${comboCopy}. Stage ${roundState.curriculumStage} → ${nextStage}.`)
         } else {
@@ -6815,7 +7157,7 @@ function App() {
           nextLives = Math.max(0, livesRemaining - 1)
           setLivesRemaining(nextLives)
         }
-        if (roundState.mode === 'narrative_story') {
+        if (isImposterMode(roundState.mode)) {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage - 1)
           setRoundFeedback(`Not quite. Stage ${roundState.curriculumStage} → ${nextStage}.`)
         } else {
@@ -6823,7 +7165,11 @@ function App() {
         }
         setRoundFeedbackTone('error')
         setRoundFeedbackPoints(0)
-        setRoundFeedbackAnswer(formatExpectedAnswer(roundState.answer))
+        setRoundFeedbackAnswer(
+          roundState.answerDisplay && roundState.answerDisplay.trim().length > 0
+            ? roundState.answerDisplay
+            : formatExpectedAnswer(roundState.answer),
+        )
 
         // Wrong answer deducts 1 from the card score (floored at 0).
         const answeredCardId = roundState.cardId
@@ -6858,14 +7204,14 @@ function App() {
         isCorrect,
         minigame: roundState.mode,
         curriculumStage:
-          roundState.mode === 'context_cloze' || roundState.mode === 'narrative_story'
+          isGrammarCurriculumMode(roundState.mode)
             ? roundState.curriculumStage
             : undefined,
         sessionId: activeSessionId ?? undefined,
         confidenceScore: confidenceForAnswer,
       }).then((result) => {
         if (
-          (roundState.mode !== 'context_cloze' && roundState.mode !== 'narrative_story') ||
+          !isGrammarCurriculumMode(roundState.mode) ||
           typeof result.curriculum_stage !== 'number'
         ) {
           return

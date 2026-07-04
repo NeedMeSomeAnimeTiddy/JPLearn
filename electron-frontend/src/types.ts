@@ -7,6 +7,9 @@ export type MinigameKey =
   | 'stroke_order'
   | 'typed_recall'
   | 'speech_recall'
+  | 'sentence_assembly'
+  | 'particle_cloze'
+  | 'imposter'
   | 'context_cloze'
   | 'narrative_story'
   | 'listening_audio_first'
@@ -151,6 +154,7 @@ export interface RoundState {
   promptLabel: string
   focusText: string
   answer: string
+  answerDisplay?: string | null
   options: RoundOption[]
 }
 
