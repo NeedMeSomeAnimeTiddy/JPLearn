@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import json
 import importlib
+import inspect
 import os
 import re
+import urllib.request
 import sqlite3
 import sys
 import csv
+import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -153,6 +156,24 @@ OCR_MODEL_DIR_CANDIDATES = (
     else PROJECT_ROOT / "data" / "ocr" / "standard",
     PROJECT_ROOT / "data" / "ocr" / "standard",
 )
+OCR_PRIMARY_DET_MODEL_NAME = "PP-OCRv6_medium_det"
+OCR_PRIMARY_REC_MODEL_NAME = "PP-OCRv6_medium_rec"
+OCR_PREPROCESS_ENABLED = os.environ.get("JPLEARN_OCR_PREPROCESS", "1").strip().lower() not in {"0", "false", "no", "off"}
+OCR_DET_CANVAS_SIZE = 1024
+OCR_DUAL_PASS_ACCEPT_CONFIDENCE = 0.88
+OCR_LOW_CONFIDENCE_NOISE_THRESHOLD = 0.50
+OCR_RETENTION_GUARD_MIN_RATIO = 0.70
+OCR_BBOX_HORIZONTAL_PADDING_RATIO = 0.03
+
+TRANSLATION_RUNTIME_DIR = (
+    Path(_assets_dir)
+    if _assets_dir
+    else Path(_docs_dir)
+    if _docs_dir
+    else PROJECT_ROOT / "data"
+)
+FASTTEXT_LID_MODEL_PATH = TRANSLATION_RUNTIME_DIR / "translation" / "fasttext" / "lid.176.ftz"
+FASTTEXT_LID_MODEL_URL = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz"
 
 SENTENCE_EXAMPLES_CSV_CANDIDATES = (
     Path(_assets_dir) / "data" / "external_sources" / "sentence_examples.csv"
@@ -525,54 +546,76 @@ def _resolve_infer_dir(model_root: Path, phase: str) -> Path | None:
     if not phase_root.exists():
         return None
 
-    if any(path.suffix == ".pdmodel" for path in phase_root.glob("*.pdmodel")):
+    def _looks_like_infer_dir(directory: Path) -> bool:
+        return (
+            any(path.suffix == ".pdmodel" for path in directory.glob("*.pdmodel"))
+            or any(path.suffix == ".onnx" for path in directory.glob("*.onnx"))
+            or (directory / "inference.yml").exists()
+            or ((directory / "inference.json").exists() and (directory / "inference.pdiparams").exists())
+        )
+
+    if _looks_like_infer_dir(phase_root):
         return phase_root
 
     for child in phase_root.iterdir():
         if not child.is_dir():
             continue
-        if any(path.suffix == ".pdmodel" for path in child.glob("*.pdmodel")):
+        if _looks_like_infer_dir(child):
             return child
     return None
 
 
-def extract_assistant_chat_ocr_payload(image_path_raw: str, min_confidence: float = 0.30) -> dict[str, object]:
-    image_path = Path(image_path_raw).expanduser().resolve()
-    if not image_path.exists() or not image_path.is_file():
-        raise ValueError(f"Image file does not exist: {image_path}")
-
-    model_root = _resolve_ocr_model_root()
-    if model_root is None:
-        raise FileNotFoundError("PaddleOCR model is not installed. Install it from Settings > Tutor > Image OCR.")
-
-    det_model_dir = _resolve_infer_dir(model_root, "det")
-    rec_model_dir = _resolve_infer_dir(model_root, "rec")
-    cls_model_dir = _resolve_infer_dir(model_root, "cls")
-    if det_model_dir is None or rec_model_dir is None or cls_model_dir is None:
-        raise FileNotFoundError("PaddleOCR model files are incomplete. Reinstall the Image OCR package.")
-
+def _is_supported_image_magic(image_path: Path) -> bool:
     try:
-        paddleocr_module = importlib.import_module("paddleocr")
-        PaddleOCR = getattr(paddleocr_module, "PaddleOCR")
-    except Exception as exc:  # pragma: no cover - environment-dependent
-        raise RuntimeError(
-            "PaddleOCR runtime is unavailable in this environment. Install Python package 'paddleocr'."
-        ) from exc
+        header = image_path.read_bytes()[:16]
+    except OSError:
+        return False
 
-    engine = PaddleOCR(
-        use_angle_cls=True,
-        lang="japan",
-        show_log=False,
-        det_model_dir=str(det_model_dir),
-        rec_model_dir=str(rec_model_dir),
-        cls_model_dir=str(cls_model_dir),
+    signatures = (
+        b"\x89PNG\r\n\x1a\n",  # PNG
+        b"\xff\xd8\xff",  # JPEG
+        b"BM",  # BMP
+        b"GIF87a",  # GIF87a
+        b"GIF89a",  # GIF89a
+        b"II*\x00",  # TIFF little-endian
+        b"MM\x00*",  # TIFF big-endian
     )
+    if any(header.startswith(signature) for signature in signatures):
+        return True
+    # WEBP: RIFF....WEBP
+    return len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WEBP"
 
-    raw_result = engine.ocr(str(image_path), cls=True)
+
+def _mean_confidence(lines: list[dict[str, object]]) -> float:
+    confidences: list[float] = []
+    for entry in lines:
+        try:
+            confidence = float(entry.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidences.append(confidence)
+    if not confidences:
+        return 0.0
+    return sum(confidences) / len(confidences)
+
+
+def _parse_ocr_lines(raw_result: object) -> list[dict[str, object]]:
     lines: list[dict[str, object]] = []
-    extracted_lines: list[str] = []
-
     for block in raw_result or []:
+        if hasattr(block, "get"):
+            rec_texts = block.get("rec_texts")
+            rec_scores = block.get("rec_scores")
+            if isinstance(rec_texts, list) and isinstance(rec_scores, list):
+                for text_raw, score_raw in zip(rec_texts, rec_scores):
+                    text = str(text_raw or "").strip()
+                    try:
+                        confidence = float(score_raw)
+                    except (TypeError, ValueError):
+                        confidence = 0.0
+                    if text:
+                        lines.append({"text": text, "confidence": round(confidence, 4)})
+                continue
+
         if not isinstance(block, list):
             continue
         for entry in block:
@@ -586,18 +629,871 @@ def extract_assistant_chat_ocr_payload(image_path_raw: str, min_confidence: floa
                 confidence = float(line_meta[1])
             except (TypeError, ValueError):
                 confidence = 0.0
+            if text:
+                lines.append({"text": text, "confidence": round(confidence, 4)})
+    return lines
+
+
+def _build_ocr_payload_from_lines(lines: list[dict[str, object]], min_confidence: float) -> dict[str, object]:
+    extracted_lines: list[str] = []
+    all_lines: list[str] = []
+
+    for entry in lines:
+        text = str(entry.get("text") or "").strip()
+        if not text:
+            continue
+        try:
+            confidence = float(entry.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        all_lines.append(text)
+        if confidence >= min_confidence:
+            extracted_lines.append(text)
+
+    selected_lines = extracted_lines
+    if lines:
+        selected_lines = []
+        for entry in lines:
+            text = str(entry.get("text") or "").strip()
             if not text:
                 continue
-            lines.append({"text": text, "confidence": round(confidence, 4)})
-            if confidence >= min_confidence:
-                extracted_lines.append(text)
+            try:
+                confidence = float(entry.get("confidence", 0.0))
+            except (TypeError, ValueError):
+                confidence = 0.0
 
-    extracted_text = "\n".join(extracted_lines).strip()
+            # Keep Japanese-script lines even when confidence is low;
+            # OCR confidence underestimates mixed/complex JP glyphs.
+            keep_line = confidence >= min_confidence or _contains_japanese_script(text)
+            if keep_line:
+                selected_lines.append(text)
+
+    if all_lines:
+        retained_ratio = (len(selected_lines) / len(all_lines)) if all_lines else 0.0
+        if not selected_lines or retained_ratio < 0.55:
+            selected_lines = all_lines
+
+    extracted_text = _join_ocr_lines_for_translation(selected_lines)
     return {
         "ok": True,
         "text": extracted_text,
-        "lineCount": len(extracted_lines),
+        "lineCount": len(selected_lines),
         "lines": lines,
+    }
+
+
+def _run_ocr_with_engine(
+    engine: object,
+    image_path: Path,
+    ocr_signature: inspect.Signature,
+    selected_enable_cls: bool,
+    min_confidence: float,
+) -> dict[str, object]:
+    if "cls" in ocr_signature.parameters:
+        raw_result = engine.ocr(str(image_path), cls=selected_enable_cls)
+    else:
+        raw_result = engine.ocr(str(image_path))
+    lines = _parse_ocr_lines(raw_result)
+    return _build_ocr_payload_from_lines(lines, min_confidence=min_confidence)
+
+
+def _preprocess_image_for_ocr(source_path: Path) -> Path | None:
+    try:
+        cv2 = importlib.import_module("cv2")
+        np = importlib.import_module("numpy")
+        image_module = importlib.import_module("PIL.Image")
+        image_ops_module = importlib.import_module("PIL.ImageOps")
+        image_open = getattr(image_module, "open")
+        exif_transpose = getattr(image_ops_module, "exif_transpose")
+        image_fromarray = getattr(image_module, "fromarray")
+    except Exception:
+        return None
+
+    try:
+        with image_open(source_path) as raw_image:
+            image = exif_transpose(raw_image).convert("RGB")
+            rgb = np.asarray(image)
+    except Exception:
+        return None
+
+    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+
+    height, width = gray.shape[:2]
+    longest_side = max(height, width)
+    if longest_side < 1700:
+        scale = min(2.0, 1700.0 / max(1.0, float(longest_side)))
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    normalized = clahe.apply(gray)
+    denoised = cv2.bilateralFilter(normalized, d=5, sigmaColor=35, sigmaSpace=35)
+    sharpened = cv2.addWeighted(denoised, 1.2, cv2.GaussianBlur(denoised, (0, 0), 1.0), -0.2, 0)
+    final_rgb = cv2.cvtColor(sharpened, cv2.COLOR_GRAY2RGB)
+
+    try:
+        tmp = tempfile.NamedTemporaryFile(prefix="jplearn_ocr_", suffix=".png", delete=False)
+        tmp_path = Path(tmp.name)
+        tmp.close()
+        image_fromarray(final_rgb).save(tmp_path, format="PNG")
+        return tmp_path
+    except Exception:
+        return None
+
+
+def _choose_preferred_ocr_payload(primary: dict[str, object], secondary: dict[str, object]) -> dict[str, object]:
+    primary_lines = primary.get("lines") if isinstance(primary.get("lines"), list) else []
+    secondary_lines = secondary.get("lines") if isinstance(secondary.get("lines"), list) else []
+    primary_mean = _mean_confidence(primary_lines)
+    secondary_mean = _mean_confidence(secondary_lines)
+    primary_count = int(primary.get("lineCount", 0) or 0)
+    secondary_count = int(secondary.get("lineCount", 0) or 0)
+
+    if secondary_mean > primary_mean + 0.002:
+        return secondary
+    if secondary_mean >= primary_mean and secondary_count > primary_count:
+        return secondary
+    return primary
+
+
+def _payload_mean_confidence(payload: dict[str, object]) -> float:
+    payload_lines = payload.get("lines") if isinstance(payload.get("lines"), list) else []
+    return _mean_confidence(payload_lines)
+
+
+def _select_best_ocr_payload(candidates: list[tuple[str, dict[str, object]]]) -> dict[str, object]:
+    if not candidates:
+        return {"ok": False, "text": "", "lineCount": 0, "lines": []}
+
+    def _candidate_rank(candidate: tuple[str, dict[str, object]]) -> tuple[float, int]:
+        _name, payload = candidate
+        mean_conf = _payload_mean_confidence(payload)
+        line_count = int(payload.get("lineCount", 0) or 0)
+        return (mean_conf, line_count)
+
+    winner_name, winner_payload = max(candidates, key=_candidate_rank)
+    winner_payload = dict(winner_payload)
+    winner_payload["pipeline"] = winner_name
+    winner_payload["confidenceMean"] = round(_payload_mean_confidence(winner_payload), 4)
+    winner_payload["candidateCount"] = len(candidates)
+    return winner_payload
+
+
+def _order_quad_points(points: object) -> object:
+    np = importlib.import_module("numpy")
+    pts = np.array(points, dtype="float32")
+    if pts.shape != (4, 2):
+        return pts
+    sums = pts.sum(axis=1)
+    diffs = np.diff(pts, axis=1).reshape(-1)
+    ordered = np.zeros((4, 2), dtype="float32")
+    ordered[0] = pts[np.argmin(sums)]
+    ordered[2] = pts[np.argmax(sums)]
+    ordered[1] = pts[np.argmin(diffs)]
+    ordered[3] = pts[np.argmax(diffs)]
+    return ordered
+
+
+def _crop_quad_bgr(image_bgr: object, quad_points: object) -> object | None:
+    cv2 = importlib.import_module("cv2")
+    np = importlib.import_module("numpy")
+    pts = _order_quad_points(quad_points)
+    if getattr(pts, "shape", None) != (4, 2):
+        return None
+
+    width_top = float(np.linalg.norm(pts[1] - pts[0]))
+    width_bottom = float(np.linalg.norm(pts[2] - pts[3]))
+    max_width = int(max(width_top, width_bottom))
+
+    height_right = float(np.linalg.norm(pts[2] - pts[1]))
+    height_left = float(np.linalg.norm(pts[3] - pts[0]))
+    max_height = int(max(height_right, height_left))
+
+    if max_width < 2 or max_height < 2:
+        return None
+
+    dst = np.array(
+        [
+            [0, 0],
+            [max_width - 1, 0],
+            [max_width - 1, max_height - 1],
+            [0, max_height - 1],
+        ],
+        dtype="float32",
+    )
+    transform = cv2.getPerspectiveTransform(pts, dst)
+    return cv2.warpPerspective(image_bgr, transform, (max_width, max_height))
+
+
+def _recognize_crop_text(recognizer: object, crop_bgr: object) -> tuple[str, float]:
+    if crop_bgr is None:
+        return "", 0.0
+    try:
+        result = recognizer.predict(crop_bgr)
+    except Exception:
+        return "", 0.0
+    if not isinstance(result, list) or not result:
+        return "", 0.0
+    first = result[0]
+    if not hasattr(first, "get"):
+        return "", 0.0
+    text = str(first.get("rec_text") or "").strip()
+    try:
+        score = float(first.get("rec_score", 0.0))
+    except (TypeError, ValueError):
+        score = 0.0
+    return text, score
+
+
+def _prepare_ocr_image_variants(source_path: Path) -> tuple[object, object, float] | None:
+    try:
+        cv2 = importlib.import_module("cv2")
+        np = importlib.import_module("numpy")
+        image_module = importlib.import_module("PIL.Image")
+        image_ops_module = importlib.import_module("PIL.ImageOps")
+        image_open = getattr(image_module, "open")
+        exif_transpose = getattr(image_ops_module, "exif_transpose")
+    except Exception:
+        return None
+
+    try:
+        with image_open(source_path) as raw_image:
+            image = exif_transpose(raw_image).convert("RGB")
+            rgb = np.asarray(image)
+    except Exception:
+        return None
+
+    stream_b = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+    stream_b = cv2.bilateralFilter(stream_b, d=5, sigmaColor=35, sigmaSpace=35)
+
+    gray = cv2.cvtColor(stream_b, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    stream_a_gray = cv2.resize(binary, (OCR_DET_CANVAS_SIZE, OCR_DET_CANVAS_SIZE), interpolation=cv2.INTER_AREA)
+    stream_a = cv2.cvtColor(stream_a_gray, cv2.COLOR_GRAY2BGR)
+    return stream_a, stream_b, 1.0
+
+
+def _crop_bbox_with_padding(image_bgr: object, bbox: tuple[float, float, float, float], pad_ratio: float = 0.0) -> object | None:
+    np = importlib.import_module("numpy")
+    x1, y1, x2, y2 = bbox
+    height, width = image_bgr.shape[:2]
+    pad = (x2 - x1) * max(0.0, pad_ratio)
+
+    left = max(0, int(np.floor(x1 - pad)))
+    right = min(width, int(np.ceil(x2 + pad)))
+    top = max(0, int(np.floor(y1)))
+    bottom = min(height, int(np.ceil(y2)))
+    if right - left < 2 or bottom - top < 2:
+        return None
+    return image_bgr[top:bottom, left:right]
+
+
+def _poly_to_bbox(poly: object) -> tuple[float, float, float, float] | None:
+    np = importlib.import_module("numpy")
+    points = np.array(poly, dtype="float32")
+    if points.shape != (4, 2):
+        return None
+    x1 = float(np.min(points[:, 0]))
+    y1 = float(np.min(points[:, 1]))
+    x2 = float(np.max(points[:, 0]))
+    y2 = float(np.max(points[:, 1]))
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return x1, y1, x2, y2
+
+
+def _is_vertical_layout(lines: list[dict[str, object]]) -> bool:
+    if not lines:
+        return False
+    tall = 0
+    for entry in lines:
+        width = float(entry.get("_w", 0.0))
+        height = float(entry.get("_h", 0.0))
+        if height > width:
+            tall += 1
+    return (tall / max(1, len(lines))) > 0.60
+
+
+def _sort_layout_lines(lines: list[dict[str, object]]) -> list[dict[str, object]]:
+    vertical = _is_vertical_layout(lines)
+    if vertical:
+        return sorted(lines, key=lambda row: (-float(row.get("_x", 0.0)), float(row.get("_y", 0.0))))
+    return sorted(lines, key=lambda row: (float(row.get("_y", 0.0)), float(row.get("_x", 0.0))) )
+
+
+def _contains_kana(text: str) -> bool:
+    return bool(re.search(r"[\u3040-\u309f\u30a0-\u30ff]", text))
+
+
+def _fuse_lines_for_translation(lines: list[dict[str, object]]) -> list[str]:
+    if not lines:
+        return []
+
+    vertical = _is_vertical_layout(lines)
+    fused: list[str] = []
+    current = str(lines[0].get("text") or "").strip()
+    prev = lines[0]
+
+    for entry in lines[1:]:
+        text = str(entry.get("text") or "").strip()
+        if not text:
+            continue
+
+        if vertical:
+            gap = float(entry.get("_y1", 0.0)) - float(prev.get("_y2", 0.0))
+            char_unit = max(6.0, float(prev.get("_h", 0.0)) / max(1.0, float(len(str(prev.get("text") or "").strip()))))
+        else:
+            gap = float(entry.get("_x1", 0.0)) - float(prev.get("_x2", 0.0))
+            char_unit = max(6.0, float(prev.get("_w", 0.0)) / max(1.0, float(len(str(prev.get("text") or "").strip()))))
+
+        should_fuse = gap <= (1.5 * char_unit)
+        if should_fuse:
+            current = f"{current}{text}"
+        else:
+            fused.append(current.strip())
+            current = text
+        prev = entry
+
+    if current.strip():
+        fused.append(current.strip())
+    return fused
+
+
+def _extract_dual_pass_ocr_payload(
+    image_path: Path,
+    min_confidence: float,
+    paddleocr_module: object,
+) -> dict[str, object] | None:
+    if not OCR_PREPROCESS_ENABLED:
+        return None
+
+    variants = _prepare_ocr_image_variants(image_path)
+    if variants is None:
+        return None
+    stream_a_bgr, stream_b_bgr, _ = variants
+
+    try:
+        TextDetection = getattr(paddleocr_module, "TextDetection")
+        TextRecognition = getattr(paddleocr_module, "TextRecognition")
+        detector = TextDetection(model_name=OCR_PRIMARY_DET_MODEL_NAME, engine="onnxruntime")
+        recognizer = TextRecognition(model_name=OCR_PRIMARY_REC_MODEL_NAME, engine="onnxruntime")
+    except Exception:
+        return None
+
+    try:
+        det_result = detector.predict(stream_a_bgr)
+    except Exception:
+        return None
+    if not isinstance(det_result, list) or not det_result:
+        return None
+
+    first = det_result[0]
+    if not hasattr(first, "get"):
+        return None
+    dt_polys = first.get("dt_polys")
+    if dt_polys is None:
+        return None
+
+    np = importlib.import_module("numpy")
+    try:
+        polys = np.array(dt_polys, dtype="float32")
+    except Exception:
+        return None
+    if polys.ndim != 3 or polys.shape[1:] != (4, 2):
+        return None
+
+    line_rows: list[dict[str, object]] = []
+    stream_a_h, stream_a_w = stream_a_bgr.shape[:2]
+    stream_b_h, stream_b_w = stream_b_bgr.shape[:2]
+    scale_x = float(stream_b_w) / max(1.0, float(stream_a_w))
+    scale_y = float(stream_b_h) / max(1.0, float(stream_a_h))
+
+    for poly in polys:
+        stream_a_poly = np.array(poly, dtype="float32")
+        stream_b_poly = np.array(poly, dtype="float32")
+        stream_b_poly[:, 0] *= scale_x
+        stream_b_poly[:, 1] *= scale_y
+
+        stream_a_bbox = _poly_to_bbox(stream_a_poly)
+        stream_b_bbox = _poly_to_bbox(stream_b_poly)
+        if stream_a_bbox is None or stream_b_bbox is None:
+            continue
+
+        pass_a_crop = _crop_bbox_with_padding(stream_a_bgr, stream_a_bbox, pad_ratio=OCR_BBOX_HORIZONTAL_PADDING_RATIO)
+        pass_a_text, pass_a_score = _recognize_crop_text(recognizer, pass_a_crop)
+
+        chosen_text = pass_a_text
+        chosen_score = pass_a_score
+        if pass_a_score < OCR_DUAL_PASS_ACCEPT_CONFIDENCE:
+            pass_b_crop = _crop_bbox_with_padding(stream_b_bgr, stream_b_bbox, pad_ratio=OCR_BBOX_HORIZONTAL_PADDING_RATIO)
+            pass_b_text, pass_b_score = _recognize_crop_text(recognizer, pass_b_crop)
+            if pass_b_score > pass_a_score:
+                chosen_text, chosen_score = pass_b_text, pass_b_score
+
+        chosen_text = chosen_text.strip()
+        if not chosen_text:
+            continue
+
+        x1, y1, x2, y2 = stream_b_bbox
+        center_x = (x1 + x2) / 2.0
+        center_y = (y1 + y2) / 2.0
+        line_rows.append(
+            {
+                "text": chosen_text,
+                "confidence": round(float(chosen_score), 4),
+                "_y": center_y,
+                "_x": center_x,
+                "_x1": x1,
+                "_x2": x2,
+                "_y1": y1,
+                "_y2": y2,
+                "_w": x2 - x1,
+                "_h": y2 - y1,
+            }
+        )
+
+    if not line_rows:
+        return None
+
+    ordered_rows = _sort_layout_lines(line_rows)
+    if not ordered_rows:
+        return None
+
+    filtered_rows: list[dict[str, object]] = []
+    for row in ordered_rows:
+        text = str(row.get("text") or "").strip()
+        if not text:
+            continue
+        confidence = float(row.get("confidence", 0.0))
+        has_cjk = _contains_japanese_script(text)
+        has_kana = _contains_kana(text)
+        if has_kana:
+            filtered_rows.append(row)
+            continue
+        if confidence < OCR_LOW_CONFIDENCE_NOISE_THRESHOLD and not has_cjk:
+            continue
+        filtered_rows.append(row)
+
+    if ordered_rows and (len(filtered_rows) / len(ordered_rows)) < OCR_RETENTION_GUARD_MIN_RATIO:
+        filtered_rows = list(ordered_rows)
+
+    selected_rows = [
+        row
+        for row in filtered_rows
+        if float(row.get("confidence", 0.0)) >= min_confidence
+        or _contains_japanese_script(str(row.get("text") or ""))
+    ]
+    if filtered_rows and not selected_rows:
+        selected_rows = list(filtered_rows)
+
+    raw_lines = [
+        {
+            "text": str(row.get("text") or "").strip(),
+            "confidence": round(float(row.get("confidence", 0.0)), 4),
+        }
+        for row in ordered_rows
+        if str(row.get("text") or "").strip()
+    ]
+    final_rows = [
+        {
+            "text": str(row.get("text") or "").strip(),
+            "confidence": round(float(row.get("confidence", 0.0)), 4),
+            "_x1": float(row.get("_x1", 0.0)),
+            "_x2": float(row.get("_x2", 0.0)),
+            "_y1": float(row.get("_y1", 0.0)),
+            "_y2": float(row.get("_y2", 0.0)),
+            "_w": float(row.get("_w", 0.0)),
+            "_h": float(row.get("_h", 0.0)),
+        }
+        for row in selected_rows
+        if str(row.get("text") or "").strip()
+    ]
+
+    fused_blocks = _fuse_lines_for_translation(final_rows)
+    stitched_text = "\n".join(block for block in fused_blocks if block).strip()
+    if not stitched_text:
+        stitched_text = _join_ocr_lines_for_translation([str(row.get("text") or "") for row in final_rows])
+
+    payload = {
+        "ok": True,
+        "text": stitched_text,
+        "lineCount": len(final_rows),
+        "lines": raw_lines,
+    }
+    payload_lines = payload.get("lines") if isinstance(payload.get("lines"), list) else []
+    if payload_lines and _mean_confidence(payload_lines) < 0.75:
+        return None
+    return payload
+
+
+def extract_assistant_chat_ocr_payload(image_path_raw: str, min_confidence: float = 0.30) -> dict[str, object]:
+    image_path = Path(image_path_raw).expanduser().resolve()
+    if not image_path.exists() or not image_path.is_file():
+        raise ValueError(f"Image file does not exist: {image_path}")
+    if not _is_supported_image_magic(image_path):
+        raise ValueError(f"Unsupported or corrupted image format: {image_path.name}")
+
+    model_root = _resolve_ocr_model_root()
+    det_model_dir: Path | None = None
+    rec_model_dir: Path | None = None
+    cls_model_dir: Path | None = None
+    if model_root is not None:
+        det_model_dir = _resolve_infer_dir(model_root, "det")
+        rec_model_dir = _resolve_infer_dir(model_root, "rec")
+        cls_model_dir = _resolve_infer_dir(model_root, "cls")
+
+    try:
+        # PaddleOCR/PaddlePaddle 3.3.x has a known PIR+oneDNN regression on CPU
+        # (ConvertPirAttribute2RuntimeAttribute...). Disable those paths before
+        # importing PaddleOCR to keep inference stable across environments.
+        os.environ.setdefault("FLAGS_enable_pir_api", "0")
+        os.environ.setdefault("FLAGS_use_mkldnn", "0")
+        paddleocr_module = importlib.import_module("paddleocr")
+        PaddleOCR = getattr(paddleocr_module, "PaddleOCR")
+    except Exception as exc:  # pragma: no cover - environment-dependent
+        raise RuntimeError(
+            "PaddleOCR runtime is unavailable in this environment. Install Python package 'paddleocr'."
+        ) from exc
+
+    init_signature = inspect.signature(PaddleOCR.__init__)
+    accepted_params = set(init_signature.parameters.keys())
+    accepts_var_kwargs = any(
+        param.kind == inspect.Parameter.VAR_KEYWORD
+        for param in init_signature.parameters.values()
+    )
+
+    base_kwargs: dict[str, object] = {}
+    if "lang" in accepted_params:
+        base_kwargs["lang"] = "japan"
+    if "show_log" in accepted_params:
+        base_kwargs["show_log"] = False
+    if "enable_mkldnn" in accepted_params or accepts_var_kwargs:
+        base_kwargs["enable_mkldnn"] = False
+    if "engine" in accepted_params or accepts_var_kwargs:
+        base_kwargs["engine"] = "onnxruntime"
+    if "use_doc_orientation_classify" in accepted_params or accepts_var_kwargs:
+        base_kwargs["use_doc_orientation_classify"] = False
+    if "use_doc_unwarping" in accepted_params or accepts_var_kwargs:
+        base_kwargs["use_doc_unwarping"] = False
+
+    init_candidates: list[tuple[dict[str, object], bool]] = []
+
+    supports_legacy_model_dirs = (
+        "det_model_dir" in accepted_params
+        and "rec_model_dir" in accepted_params
+        and "cls_model_dir" in accepted_params
+    )
+    supports_new_model_dirs = (
+        "text_detection_model_dir" in accepted_params
+        and "text_recognition_model_dir" in accepted_params
+    )
+
+    # Main pipeline: use PP-OCRv6 ONNX medium det/rec model names.
+    onnx_kwargs = dict(base_kwargs)
+    onnx_kwargs.pop("lang", None)
+    if "text_detection_model_name" in accepted_params or accepts_var_kwargs:
+        onnx_kwargs["text_detection_model_name"] = OCR_PRIMARY_DET_MODEL_NAME
+    if "text_recognition_model_name" in accepted_params or accepts_var_kwargs:
+        onnx_kwargs["text_recognition_model_name"] = OCR_PRIMARY_REC_MODEL_NAME
+    if "use_textline_orientation" in accepted_params or accepts_var_kwargs:
+        onnx_kwargs["use_textline_orientation"] = False
+    init_candidates.append((onnx_kwargs, False))
+
+    if supports_legacy_model_dirs and det_model_dir is not None and rec_model_dir is not None and cls_model_dir is not None:
+        legacy_kwargs = dict(base_kwargs)
+        legacy_kwargs.pop("lang", None)
+        legacy_kwargs["det_model_dir"] = str(det_model_dir)
+        legacy_kwargs["rec_model_dir"] = str(rec_model_dir)
+        legacy_kwargs["cls_model_dir"] = str(cls_model_dir)
+        enable_cls = False
+        if "use_angle_cls" in accepted_params:
+            legacy_kwargs["use_angle_cls"] = True
+            enable_cls = True
+        init_candidates.append((legacy_kwargs, enable_cls))
+
+    det_has_inference_yaml = bool(det_model_dir and (det_model_dir / "inference.yml").exists())
+    rec_has_inference_yaml = bool(rec_model_dir and (rec_model_dir / "inference.yml").exists())
+    cls_has_inference_yaml = bool(cls_model_dir and (cls_model_dir / "inference.yml").exists())
+    if (
+        supports_new_model_dirs
+        and det_model_dir is not None
+        and rec_model_dir is not None
+        and det_has_inference_yaml
+        and rec_has_inference_yaml
+    ):
+        new_kwargs = dict(base_kwargs)
+        new_kwargs.pop("lang", None)
+        new_kwargs["text_detection_model_dir"] = str(det_model_dir)
+        new_kwargs["text_recognition_model_dir"] = str(rec_model_dir)
+
+        det_name = det_model_dir.name.replace("_infer", "") if det_model_dir.name else ""
+        rec_name = rec_model_dir.name.replace("_infer", "") if rec_model_dir.name else ""
+        if det_name and ("text_detection_model_name" in accepted_params or accepts_var_kwargs):
+            new_kwargs["text_detection_model_name"] = det_name
+        if rec_name and ("text_recognition_model_name" in accepted_params or accepts_var_kwargs):
+            new_kwargs["text_recognition_model_name"] = rec_name
+
+        enable_cls = False
+        if "use_textline_orientation" in accepted_params:
+            if cls_model_dir is not None and cls_has_inference_yaml and "textline_orientation_model_dir" in accepted_params:
+                new_kwargs["use_textline_orientation"] = True
+                new_kwargs["textline_orientation_model_dir"] = str(cls_model_dir)
+                cls_name = cls_model_dir.name.replace("_infer", "") if cls_model_dir.name else ""
+                if cls_name and ("textline_orientation_model_name" in accepted_params or accepts_var_kwargs):
+                    new_kwargs["textline_orientation_model_name"] = cls_name
+                enable_cls = True
+            else:
+                new_kwargs["use_textline_orientation"] = False
+        init_candidates.append((new_kwargs, enable_cls))
+
+    # Final fallback: let PaddleOCR use its own bundled/default model resolution.
+    # This prevents hard-failing when local model files are from an older format.
+    auto_kwargs = dict(base_kwargs)
+    auto_kwargs["lang"] = "japan"
+    enable_cls = False
+    if "use_textline_orientation" in accepted_params:
+        auto_kwargs["use_textline_orientation"] = False
+    elif "use_angle_cls" in accepted_params:
+        auto_kwargs["use_angle_cls"] = False
+    init_candidates.append((auto_kwargs, enable_cls))
+
+    engine = None
+    selected_enable_cls = False
+    init_errors: list[str] = []
+    for kwargs, candidate_enable_cls in init_candidates:
+        try:
+            engine = PaddleOCR(**kwargs)
+            selected_enable_cls = candidate_enable_cls
+            break
+        except Exception as exc:
+            init_errors.append(str(exc))
+
+    if engine is None:
+        details = " | ".join(error for error in init_errors if error)
+        raise RuntimeError(
+            "Unable to initialize PaddleOCR runtime with available model configuration. "
+            f"Details: {details or '(no details)'}"
+        )
+
+    ocr_signature = inspect.signature(engine.ocr)
+    candidates: list[tuple[str, dict[str, object]]] = []
+
+    dual_pass_payload = _extract_dual_pass_ocr_payload(
+        image_path=image_path,
+        min_confidence=min_confidence,
+        paddleocr_module=paddleocr_module,
+    )
+    if dual_pass_payload is not None:
+        candidates.append(("dual_stream_detect_once", dual_pass_payload))
+
+    base_payload = _run_ocr_with_engine(
+        engine,
+        image_path,
+        ocr_signature,
+        selected_enable_cls,
+        min_confidence,
+    )
+    candidates.append(("full_image_original", base_payload))
+
+    if not OCR_PREPROCESS_ENABLED:
+        return _select_best_ocr_payload(candidates)
+
+    preprocessed_path = _preprocess_image_for_ocr(image_path)
+    if preprocessed_path is None:
+        return _select_best_ocr_payload(candidates)
+
+    try:
+        preprocessed_payload = _run_ocr_with_engine(
+            engine,
+            preprocessed_path,
+            ocr_signature,
+            selected_enable_cls,
+            min_confidence,
+        )
+        candidates.append(("full_image_preprocessed", preprocessed_payload))
+    except Exception:
+        return _select_best_ocr_payload(candidates)
+    finally:
+        try:
+            preprocessed_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    return _select_best_ocr_payload(candidates)
+
+
+def _contains_japanese_script(text: str) -> bool:
+    return bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", text))
+
+
+def _contains_latin_letters(text: str) -> bool:
+    return bool(re.search(r"[A-Za-z]", text))
+
+
+def _join_ocr_lines_for_translation(lines: list[str]) -> str:
+    """Reflow OCR line fragments into readable paragraph text for translation."""
+    cleaned = [line.strip() for line in lines if line and line.strip()]
+    if not cleaned:
+        return ""
+
+    deduped: list[str] = []
+    for line in cleaned:
+        if deduped and deduped[-1] == line:
+            continue
+        deduped.append(line)
+
+    # Preserve visual OCR line boundaries to avoid accidental token fusion
+    # that can hurt deterministic JA->EN translation quality.
+    return "\n".join(deduped).strip()
+
+
+def _resolve_argos_translation(source_lang: str, target_lang: str):
+    try:
+        argos_package = importlib.import_module("argostranslate.package")
+        argos_translate = importlib.import_module("argostranslate.translate")
+    except Exception as exc:  # pragma: no cover - environment dependent
+        raise RuntimeError(
+            "Argos Translate runtime is unavailable. Install Python package 'argostranslate'."
+        ) from exc
+
+    def find_translation():
+        installed_languages = argos_translate.get_installed_languages()
+        source = next((lang for lang in installed_languages if lang.code == source_lang), None)
+        target = next((lang for lang in installed_languages if lang.code == target_lang), None)
+        if source is None or target is None:
+            return None
+        return source.get_translation(target)
+
+    translation = find_translation()
+    if translation is not None:
+        return translation
+
+    try:
+        argos_package.update_package_index()
+        available_packages = argos_package.get_available_packages()
+        package = next(
+            (
+                item
+                for item in available_packages
+                if item.from_code == source_lang and item.to_code == target_lang
+            ),
+            None,
+        )
+    except Exception as exc:  # pragma: no cover - network dependent
+        raise RuntimeError(
+            f"Unable to resolve Argos Translate package for {source_lang}->{target_lang}: {exc}"
+        ) from exc
+
+    if package is None:
+        raise RuntimeError(f"No Argos Translate package available for {source_lang}->{target_lang}.")
+
+    try:
+        downloaded_path = package.download()
+        argos_package.install_from_path(downloaded_path)
+    except Exception as exc:  # pragma: no cover - network dependent
+        raise RuntimeError(
+            f"Failed to install Argos Translate package for {source_lang}->{target_lang}: {exc}"
+        ) from exc
+
+    translation = find_translation()
+    if translation is None:
+        raise RuntimeError(f"Argos Translate package install succeeded but translation {source_lang}->{target_lang} is unavailable.")
+    return translation
+
+
+def _ensure_fasttext_lid_model_path() -> Path:
+    if FASTTEXT_LID_MODEL_PATH.exists():
+        return FASTTEXT_LID_MODEL_PATH
+    FASTTEXT_LID_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with urllib.request.urlopen(FASTTEXT_LID_MODEL_URL, timeout=30) as response:
+            data = response.read()
+    except Exception as exc:  # pragma: no cover - network dependent
+        raise RuntimeError(
+            "Unable to download fastText language ID model (lid.176.ftz). "
+            "Check internet connection and retry."
+        ) from exc
+
+    FASTTEXT_LID_MODEL_PATH.write_bytes(data)
+    return FASTTEXT_LID_MODEL_PATH
+
+
+def _detect_language_fasttext(text: str) -> tuple[str, float]:
+    try:
+        fasttext = importlib.import_module("fasttext")
+    except Exception as exc:  # pragma: no cover - environment dependent
+        raise RuntimeError(
+            "fastText runtime is unavailable. Install Python package 'fasttext-wheel' or 'fasttext'."
+        ) from exc
+
+    model_path = _ensure_fasttext_lid_model_path()
+    try:
+        detector = fasttext.load_model(str(model_path))
+        labels, scores = detector.predict(text.replace("\n", " "), k=1)
+    except Exception as exc:  # pragma: no cover - environment dependent
+        raise RuntimeError(f"fastText language detection failed: {exc}") from exc
+
+    label = labels[0] if labels else ""
+    score = float(scores[0]) if scores else 0.0
+    normalized = str(label).replace("__label__", "")
+    if "_" in normalized:
+        normalized = normalized.split("_", 1)[0]
+    return normalized.lower(), score
+
+
+def translate_assistant_chat_ocr_payload(text_raw: str, source_lang: str = "ja", target_lang: str = "en") -> dict[str, object]:
+    text = str(text_raw or "").strip()
+    if not text:
+        raise ValueError("OCR text is empty.")
+
+    source = (source_lang or "ja").strip().lower()
+    target = (target_lang or "en").strip().lower()
+    if source != "ja" or target != "en":
+        raise ValueError("Only ja->en OCR translation is currently supported.")
+
+    translation = _resolve_argos_translation(source, target)
+    translated_text = str(translation.translate(text) or "").strip()
+    if not translated_text:
+        raise RuntimeError("Offline translator returned empty text.")
+
+    detected_lang, detected_confidence = _detect_language_fasttext(translated_text)
+    source_has_japanese_script = _contains_japanese_script(text)
+    has_japanese_script = _contains_japanese_script(translated_text)
+    english_gate_passed = detected_lang == "en" and detected_confidence >= 0.45 and not has_japanese_script
+
+    # Mixed-script OCR snippets (JP + product names/acronyms) can yield low
+    # fastText confidence even when translation output is valid English. Keep a
+    # narrow fallback that still rejects Japanese output and non-JP sources.
+    fallback_gate_passed = (
+        not english_gate_passed
+        and source_has_japanese_script
+        and not has_japanese_script
+        and _contains_latin_letters(translated_text)
+        and len(translated_text) <= 120
+        and translated_text.casefold() != text.casefold()
+    )
+    gate_passed = english_gate_passed or fallback_gate_passed
+
+    if not gate_passed:
+        raise RuntimeError(
+            "Language gate rejected translation output. "
+            f"detected={detected_lang or 'unknown'} confidence={detected_confidence:.3f} "
+            f"containsJapaneseScript={has_japanese_script}"
+        )
+
+    return {
+        "ok": True,
+        "text": translated_text,
+        "languageGate": {
+            "model": "fasttext-lid.176",
+            "detectedLanguage": detected_lang,
+            "confidence": round(detected_confidence, 4),
+            "sourceContainsJapaneseScript": source_has_japanese_script,
+            "containsJapaneseScript": has_japanese_script,
+            "passed": gate_passed,
+            "mode": "strict" if english_gate_passed else "fallback-mixed-ocr",
+            "threshold": 0.45,
+        },
     }
 
 SUMMARY_SCRIPT_TAGS = (
@@ -760,7 +1656,6 @@ class DictionaryCardSummary:
     primary_gloss: str
     glosses: list[str]
     source: str
-
 
 @dataclass(frozen=True)
 class GameCard:
@@ -2306,6 +3201,16 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         try:
             return 0, extract_assistant_chat_ocr_payload(argv[1], min_confidence=min_confidence)
         except (FileNotFoundError, RuntimeError, ValueError) as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "assistant-chat-translate-ocr":
+        if len(argv) < 2:
+            return 2, {"error": "Usage: assistant-chat-translate-ocr <text> [source_lang] [target_lang]"}
+        source_lang = argv[2] if len(argv) > 2 and argv[2].strip() else "ja"
+        target_lang = argv[3] if len(argv) > 3 and argv[3].strip() else "en"
+        try:
+            return 0, translate_assistant_chat_ocr_payload(argv[1], source_lang=source_lang, target_lang=target_lang)
+        except (RuntimeError, ValueError) as exc:
             return 2, {"error": str(exc)}
 
     if command == "progression":

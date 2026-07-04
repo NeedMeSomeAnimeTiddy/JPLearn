@@ -408,12 +408,11 @@ if (FORCED_USER_DATA_DIR) {
 
 const resolvedSessionDataPath = ensureAppPath(
   'sessionData',
-  FORCED_SESSION_DATA_DIR || path.join(app.getPath('temp'), 'jplearn-electron', 'session-data')
+  FORCED_SESSION_DATA_DIR || path.join(app.getPath('userData'), 'session-data')
 )
 const resolvedDiskCachePath = path.join(resolvedSessionDataPath, 'Cache')
 try {
   fs.mkdirSync(resolvedDiskCachePath, { recursive: true })
-  app.commandLine.appendSwitch('disk-cache-dir', resolvedDiskCachePath)
 } catch (error) {
   const detail = error instanceof Error ? error.message : String(error)
   console.warn('Failed to configure disk cache dir:', detail)

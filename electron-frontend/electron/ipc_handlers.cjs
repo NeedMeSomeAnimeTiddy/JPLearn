@@ -431,6 +431,31 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('assistant-chat:translate-ocr-text', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const text = typeof payload?.text === 'string' ? payload.text.trim() : ''
+    if (!text) {
+      throw new Error('OCR text is required for translation.')
+    }
+    if (text.length > 24000) {
+      throw new Error('OCR text exceeds maximum supported length.')
+    }
+    const sourceLang = typeof payload?.sourceLang === 'string' ? payload.sourceLang.trim().toLowerCase() : 'ja'
+    const targetLang = typeof payload?.targetLang === 'string' ? payload.targetLang.trim().toLowerCase() : 'en'
+
+    try {
+      return await options.runPythonBridgeWithArgs([
+        'assistant-chat-translate-ocr',
+        text,
+        sourceLang,
+        targetLang,
+      ])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to translate OCR text: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('assistant-chat:unload', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
@@ -1016,13 +1041,14 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:download-ocr-model', async (event, tier) => {
+    options.ipcMain.handle('setup:download-ocr-model', async (event, tier, downloadOptions) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       if (typeof tier !== 'string' || !['standard'].includes(tier)) {
         throw new Error('Invalid OCR model tier')
       }
+      const force = Boolean(downloadOptions && typeof downloadOptions === 'object' && downloadOptions.force)
       try {
-        return await setupRuntime.downloadOcrModel(tier, event.sender, options.repoRoot)
+        return await setupRuntime.downloadOcrModel(tier, event.sender, options.repoRoot, { force })
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`OCR model download failed: ${detail}`)

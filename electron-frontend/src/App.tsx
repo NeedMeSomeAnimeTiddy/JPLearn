@@ -3259,6 +3259,72 @@ function makeCustomThemeExportPayload(themes: CustomTheme[]): CustomThemeExportP
   }
 }
 
+function sanitizeOcrTranslationText(text: string): string {
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  const leadingBoilerplate = [
+    /^\*{0,2}English Translation\*{0,2}:?\s*$/i,
+    /^English:\s*Here's the translation and explanation:?\s*$/i,
+    /^English:?\s*$/i,
+    /^Here's the translation and explanation:?\s*$/i,
+    /^Translation:?\s*$/i,
+    /^Translated Text:?\s*$/i,
+  ]
+
+  const trailingBoilerplate = [
+    /^notes?:?$/i,
+    /^vocabulary notes?:?$/i,
+    /^explanation:?$/i,
+    /^clarification:?$/i,
+    /^context:?$/i,
+    /^literal translation:?$/i,
+    /^alternative translation:?$/i,
+    /^if you want/i,
+    /^let me know/i,
+  ]
+
+  while (lines.length > 0) {
+    const first = lines[0]?.trim() ?? ''
+    if (!first) {
+      lines.shift()
+      continue
+    }
+    if (leadingBoilerplate.some((pattern) => pattern.test(first))) {
+      lines.shift()
+      continue
+    }
+    break
+  }
+
+  if (lines.length === 0) {
+    return ''
+  }
+
+  lines[0] = (lines[0] ?? '')
+    .replace(/^\*{0,2}English Translation\*{0,2}\s*:?\s*/i, '')
+    .replace(/^English:\s*Here's the translation and explanation:?\s*/i, '')
+    .replace(/^English:\s*/i, '')
+    .replace(/^Here's the translation and explanation:?\s*/i, '')
+
+  const cleanedLines: string[] = []
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed && trailingBoilerplate.some((pattern) => pattern.test(trimmed))) {
+      break
+    }
+    cleanedLines.push(line)
+  }
+
+  return cleanedLines.join('\n').trim()
+}
+
+function containsJapaneseScript(text: string): boolean {
+  return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(text)
+}
+
+function normalizeTranslationWhitespace(text: string): string {
+  return text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 function App() {
   // First-run setup wizard check — must be the first hooks so the conditional
   // return (added near the bottom of App) comes after all other hooks.
@@ -3289,8 +3355,15 @@ function App() {
   const [assistantChatMessages, setAssistantChatMessages] = useState<AssistantChatTurn[]>([])
   const [assistantChatLoading, setAssistantChatLoading] = useState(false)
   const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
-  const [assistantChatImageBusy, setAssistantChatImageBusy] = useState(false)
-  const [assistantChatLastOcrSummary, setAssistantChatLastOcrSummary] = useState<{ fileName: string; lineCount: number } | null>(null)
+  const [ocrWorkbenchOpen, setOcrWorkbenchOpen] = useState(false)
+  const [ocrWorkbenchBusy, setOcrWorkbenchBusy] = useState(false)
+  const [ocrWorkbenchError, setOcrWorkbenchError] = useState<string | null>(null)
+  const [ocrWorkbenchResult, setOcrWorkbenchResult] = useState<{
+    fileName: string
+    lineCount: number
+    japaneseText: string
+    englishText: string
+  } | null>(null)
   const [assistantSpeakingTurnKey, setAssistantSpeakingTurnKey] = useState<string | null>(null)
   const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
   const [, setAssistantChatWarmup] = useState(false)
@@ -3516,7 +3589,7 @@ function App() {
   const assistantChatPreloadTriggeredRef = useRef(false)
   const assistantChatHistoryHydratedRef = useRef(false)
   const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
-  const assistantChatImageInputRef = useRef<HTMLInputElement | null>(null)
+  const ocrWorkbenchImageInputRef = useRef<HTMLInputElement | null>(null)
   const assistantChatClearTokenRef = useRef(0)
   const assistantSpeechRunIdRef = useRef(0)
   const xpDetailsRef = useRef<HTMLDivElement | null>(null)
@@ -3563,6 +3636,7 @@ function App() {
     setShortcutMenuOpen(false)
     setActiveShortcutFlyout(null)
     setAssistantChatOpen(false)
+    setOcrWorkbenchOpen(false)
     setXpDetailsOpen(false)
     setStreakDetailsOpen(false)
     setSelectedChar(null)
@@ -3574,6 +3648,11 @@ function App() {
   const closeDictionary = useCallback(() => {
     setDictionaryOpen(false)
     setDictionarySeedQuery('')
+  }, [])
+
+  const closeOcrWorkbench = useCallback(() => {
+    setOcrWorkbenchOpen(false)
+    setOcrWorkbenchError(null)
   }, [])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
@@ -4156,7 +4235,7 @@ function App() {
     }
   }, [refreshTutorInstallInfo, speechModelActionTier])
 
-  const downloadOcrModel = useCallback(async (tier: 'standard') => {
+  const downloadOcrModel = useCallback(async (tier: 'standard', options?: { force?: boolean }) => {
     const downloadModel = window.jplearnDesktop.downloadOcrModel
     if (!downloadModel || ocrDownloadingTier) {
       return
@@ -4164,7 +4243,7 @@ function App() {
     setOcrDownloadingTier(tier)
     setOcrDownloadProgress(0)
     try {
-      await downloadModel(tier)
+      await downloadModel(tier, options)
       await refreshTutorInstallInfo()
     } finally {
       setOcrDownloadingTier(null)
@@ -5523,7 +5602,6 @@ function App() {
     }
     setAssistantChatMessages((previous) => [...previous, optimisticTurn])
     setAssistantChatInput('')
-    setAssistantChatLastOcrSummary(null)
     setAssistantChatLoading(true)
     setAssistantChatError(null)
     setAssistantChatWarmup(!assistantChatStatus?.loaded)
@@ -5557,32 +5635,33 @@ function App() {
     }
   }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
 
-  const handleAssistantChatImageSelected = useCallback(async (file: File) => {
-    if (!settings.assistantChatEnabled) {
-      setAssistantChatError('Chatbot is disabled in settings.')
-      return
-    }
+  const handleOcrWorkbenchImageSelected = useCallback(async (file: File) => {
     if (file.size > ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_BYTES) {
-      setAssistantChatError(`Image uploads are limited to ${ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB} MB.`)
+      setOcrWorkbenchError(`Image uploads are limited to ${ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB} MB.`)
       return
     }
     if (!file.type.startsWith('image/')) {
-      setAssistantChatError('Please choose a PNG, JPEG, or WEBP image.')
+      setOcrWorkbenchError('Please choose a PNG, JPEG, or WEBP image.')
       return
     }
 
     const extractAssistantChatImageText = window.jplearnDesktop.extractAssistantChatImageText
     if (!extractAssistantChatImageText) {
-      setAssistantChatError('Image OCR is unavailable in this build.')
+      setOcrWorkbenchError('Image Translation is unavailable in this build.')
       return
     }
     if (!tutorInstallInfo?.ocrInstalled) {
-      setAssistantChatError('Image OCR is not installed. Install it in Settings > Tutor > Image OCR.')
+      setOcrWorkbenchError('Image Translation is not installed. Install it in Settings > Tutor > Image Translation.')
+      return
+    }
+    const translateAssistantChatOcrText = window.jplearnDesktop.translateAssistantChatOcrText
+    if (!translateAssistantChatOcrText) {
+      setOcrWorkbenchError('Offline OCR translation runtime is unavailable in this build.')
       return
     }
 
-    setAssistantChatImageBusy(true)
-    setAssistantChatError(null)
+    setOcrWorkbenchBusy(true)
+    setOcrWorkbenchError(null)
     try {
       const payload = await prepareAssistantChatImagePayload(file)
       const ocrResponse = await extractAssistantChatImageText({
@@ -5591,36 +5670,46 @@ function App() {
       })
       const extractedText = typeof ocrResponse?.text === 'string' ? ocrResponse.text.trim() : ''
       if (!extractedText) {
-        setAssistantChatError('No readable text was found in that image.')
+        setOcrWorkbenchError('No readable text was found in that image.')
         return
       }
 
-      const prompt = [
-        'Please translate this Japanese text to English and provide a short vocabulary breakdown.',
-        'OCR text:',
-        extractedText,
-      ].join('\n\n')
-      setAssistantChatInput((previous) => {
-        const trimmed = previous.trim()
-        return trimmed ? `${trimmed}\n\n${prompt}` : prompt
+      const translationResponse = await translateAssistantChatOcrText({
+        text: extractedText,
+        sourceLang: 'ja',
+        targetLang: 'en',
       })
+      const rawEnglishText = (translationResponse?.text ?? '').trim()
+      const finalEnglishText = normalizeTranslationWhitespace(sanitizeOcrTranslationText(rawEnglishText))
+
+      if (!finalEnglishText) {
+        setOcrWorkbenchError('No translation text returned.')
+        return
+      }
+      if (containsJapaneseScript(finalEnglishText)) {
+        setOcrWorkbenchError('Translator returned non-English text. Try again or switch tutor model.')
+        return
+      }
+
       const lineCount = Number.isFinite(ocrResponse?.lineCount)
         ? Math.max(0, Math.trunc(ocrResponse.lineCount))
         : extractedText.split(/\n+/).filter(Boolean).length
-      setAssistantChatLastOcrSummary({
+      setOcrWorkbenchResult({
         fileName: file.name,
         lineCount,
+        japaneseText: extractedText,
+        englishText: finalEnglishText,
       })
     } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : 'Unable to process image OCR.'
-      setAssistantChatError(detail)
+      const detail = error instanceof Error ? error.message : 'Unable to process image translation.'
+      setOcrWorkbenchError(detail)
     } finally {
-      setAssistantChatImageBusy(false)
-      if (assistantChatImageInputRef.current) {
-        assistantChatImageInputRef.current.value = ''
+      setOcrWorkbenchBusy(false)
+      if (ocrWorkbenchImageInputRef.current) {
+        ocrWorkbenchImageInputRef.current.value = ''
       }
     }
-  }, [settings.assistantChatEnabled, settings.assistantChatOcrMinConfidence, tutorInstallInfo?.ocrInstalled])
+  }, [settings.assistantChatOcrMinConfidence, tutorInstallInfo?.ocrInstalled])
 
   useEffect(() => {
     let cancelled = false
@@ -6833,6 +6922,7 @@ function App() {
         } else {
           setDictionaryOpen(false)
           setAssistantChatOpen(false)
+          setOcrWorkbenchOpen(false)
           setShowOverview(false)
           setShowSettings(true)
         }
@@ -6861,6 +6951,11 @@ function App() {
           return
         }
 
+        if (ocrWorkbenchOpen) {
+          closeOcrWorkbench()
+          return
+        }
+
         if (view === 'minigame') {
           setNavDirection('back')
           setView('script_hub')
@@ -6885,12 +6980,13 @@ function App() {
         }
       }
 
-      if (showSettings || assistantChatOpen || isInput) return
+      if (showSettings || assistantChatOpen || ocrWorkbenchOpen || isInput) return
 
       if (event.key === '6') {
         setDictionaryOpen(false)
         setShowOverview(true)
         setShowSettings(false)
+        setOcrWorkbenchOpen(false)
         void loadSummary()
         setShortcutMenuOpen(false)
         setActiveShortcutFlyout(null)
@@ -6933,7 +7029,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [assistantChatOpen, closeAssistantChat, loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
+  }, [assistantChatOpen, closeAssistantChat, closeOcrWorkbench, loadSummary, ocrWorkbenchOpen, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -7117,6 +7213,7 @@ function App() {
     setIsRoundResolving(false)
     resetRoundCycle()
     setShowSettings(false)
+    setOcrWorkbenchOpen(false)
   }, [resetRoundCycle])
 
   const closeShortcutMenu = useCallback(() => {
@@ -7134,6 +7231,7 @@ function App() {
     setShowOverview(true)
     setShowSettings(false)
     setAssistantChatOpen(false)
+    setOcrWorkbenchOpen(false)
     void loadSummary()
     closeShortcutMenu()
   }, [closeShortcutMenu, loadSummary])
@@ -7206,6 +7304,7 @@ function App() {
     setShowSettings(true)
     setShowOverview(false)
     setAssistantChatOpen(false)
+    setOcrWorkbenchOpen(false)
     closeShortcutMenu()
   }, [closeShortcutMenu])
 
@@ -7733,6 +7832,27 @@ function App() {
             <button
               type="button"
               className="window-nav-button"
+              onClick={() => {
+                setDictionaryOpen(false)
+                setShowOverview(false)
+                setShowSettings(false)
+                setShortcutMenuOpen(false)
+                setActiveShortcutFlyout(null)
+                setAssistantChatOpen(false)
+                setAssistantChatError(null)
+                setOcrWorkbenchOpen((open) => !open)
+                setOcrWorkbenchError(null)
+              }}
+              aria-expanded={ocrWorkbenchOpen}
+              aria-controls="ocr-workbench-panel"
+              aria-label={ocrWorkbenchOpen ? 'Close OCR translator' : 'Open OCR translator'}
+              title={ocrWorkbenchOpen ? 'Close OCR translator' : 'Open OCR translator'}
+            >
+              <ImagePlus className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="window-nav-button"
               onClick={openSettingsFromMenu}
               aria-label="Open settings"
               title="Settings"
@@ -7747,6 +7867,7 @@ function App() {
                   setDictionaryOpen(false)
                   setShowOverview(false)
                   setShowSettings(false)
+                  setOcrWorkbenchOpen(false)
                   setShortcutMenuOpen(false)
                   setActiveShortcutFlyout(null)
                   setAssistantChatOpen((open) => !open)
@@ -8059,6 +8180,7 @@ function App() {
             setShowOverview(false)
             setShowSettings(false)
             setAssistantChatOpen(false)
+            setOcrWorkbenchOpen(false)
             setNavDirection('forward')
             setView('jlpt_prep')
           }}
@@ -8082,6 +8204,7 @@ function App() {
             setShowOverview(false)
             setShowSettings(false)
             setAssistantChatOpen(false)
+            setOcrWorkbenchOpen(false)
             setNavDirection('forward')
 
             if (sectionId === 'jlpt_prep') {
@@ -8301,6 +8424,152 @@ function App() {
         voiceBusy={voiceBusy}
         voiceUnavailable={voiceUnavailable}
       />
+
+      {ocrWorkbenchOpen ? (
+        <div
+          className="modal-backdrop assistant-backdrop ocr-workbench-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeOcrWorkbench()
+            }
+          }}
+        >
+          <section
+            id="ocr-workbench-panel"
+            className="assistant-chat-panel assistant-chat-window"
+            role="dialog"
+            aria-modal="true"
+            aria-label="OCR translator panel"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="assistant-chat-header">
+              <div className="assistant-chat-identity">
+                <span className="assistant-chat-avatar" aria-hidden="true">
+                  <ImagePlus size={18} strokeWidth={2.2} />
+                  <span className="assistant-chat-presence" />
+                </span>
+                <span className="assistant-chat-identity-text">
+                  <span className="assistant-chat-title">OCR Translator</span>
+                  <span className="assistant-chat-subtitle">
+                    {ocrWorkbenchBusy ? 'Reading image…' : 'Upload Japanese text image to translate'}
+                  </span>
+                </span>
+              </div>
+              <div className="assistant-chat-header-actions">
+                <button
+                  type="button"
+                  className="assistant-chat-clear"
+                  onClick={() => {
+                    setOcrWorkbenchResult(null)
+                    setOcrWorkbenchError(null)
+                  }}
+                  disabled={ocrWorkbenchBusy || (!ocrWorkbenchResult && !ocrWorkbenchError)}
+                  aria-label="Clear OCR result"
+                  title="Clear"
+                >
+                  <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="assistant-chat-close"
+                  onClick={closeOcrWorkbench}
+                  aria-label="Close OCR translator"
+                >
+                  <X size={14} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+              </div>
+            </header>
+
+            <div className="assistant-chat-log" role="log" aria-live="polite">
+              {!ocrWorkbenchResult ? (
+                <p className="assistant-chat-empty">Select an image to extract Japanese text and get an English translation in one response.</p>
+              ) : (
+                <article className="assistant-chat-turn assistant-chat-turn-assistant ocr-workbench-result-card" style={{ maxWidth: '100%' }}>
+                  <div className="assistant-chat-turn-meta">
+                    <span className="assistant-chat-turn-role">OCR + Tutor</span>
+                  </div>
+                  <div className="ocr-workbench-source-meta">
+                    <span className="ocr-workbench-source-label">Source image</span>
+                    <span className="ocr-workbench-source-value">{ocrWorkbenchResult.fileName}</span>
+                    <span className="ocr-workbench-source-lines">{`${ocrWorkbenchResult.lineCount} line${ocrWorkbenchResult.lineCount === 1 ? '' : 's'}`}</span>
+                  </div>
+                  <div className="ocr-workbench-flow" role="group" aria-label="Japanese to English translation flow">
+                    <section className="ocr-workbench-box ocr-workbench-box-japanese" aria-label="Japanese text">
+                      <h3>Japanese</h3>
+                      <p>{ocrWorkbenchResult.japaneseText}</p>
+                    </section>
+                    <span className="ocr-workbench-flow-arrow" aria-hidden="true">
+                      <ArrowRight size={22} strokeWidth={2.4} />
+                    </span>
+                    <section className="ocr-workbench-box ocr-workbench-box-english" aria-label="English text">
+                      <h3>English</h3>
+                      <p>{ocrWorkbenchResult.englishText}</p>
+                    </section>
+                  </div>
+                </article>
+              )}
+            </div>
+
+            {ocrWorkbenchError ? (
+              <p className="assistant-chat-error">{ocrWorkbenchError}</p>
+            ) : null}
+
+            <footer className="assistant-chat-composer">
+              <div className="assistant-chat-input-wrap ocr-workbench-controls">
+                <button
+                  type="button"
+                  className="assistant-chat-upload ocr-workbench-upload"
+                  onClick={() => ocrWorkbenchImageInputRef.current?.click()}
+                  disabled={ocrWorkbenchBusy}
+                  aria-label="Upload image for OCR"
+                  title={`Upload image (max ${ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB} MB)`}
+                >
+                  {ocrWorkbenchBusy
+                    ? <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" className="spin-icon" />
+                    : <ImagePlus size={16} strokeWidth={2.2} aria-hidden="true" />}
+                  <span>Upload image</span>
+                </button>
+                <label className="ocr-workbench-confidence" htmlFor="ocr-workbench-confidence-slider">
+                  <span className="ocr-workbench-confidence-label">Confidence</span>
+                  <div className="ocr-workbench-confidence-row">
+                    <input
+                      id="ocr-workbench-confidence-slider"
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={settings.assistantChatOcrMinConfidence}
+                      onChange={(event) => {
+                        const value = Number(event.currentTarget.value)
+                        setSettings((prev) => ({
+                          ...prev,
+                          assistantChatOcrMinConfidence: clampAssistantChatOcrMinConfidence(value),
+                        }))
+                      }}
+                      aria-label="OCR confidence filter"
+                    />
+                    <span className="ocr-workbench-confidence-value">{Math.round(settings.assistantChatOcrMinConfidence * 100)}%</span>
+                  </div>
+                </label>
+                <input
+                  ref={ocrWorkbenchImageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0]
+                    if (!file) {
+                      return
+                    }
+                    void handleOcrWorkbenchImageSelected(file)
+                  }}
+                />
+              </div>
+            </footer>
+          </section>
+        </div>
+      ) : null}
 
       </SessionProvider>
 
@@ -9134,8 +9403,8 @@ function App() {
                 {activeSettingsTab === 'tutor' ? (
                 <SettingsCollapsibleSection
                   id="image-ocr"
-                  title="Image OCR"
-                  description="Install PaddleOCR Japanese assets so Tutor chat can read text from imported images offline."
+                  title="Image Translation"
+                  description="Install the offline Image Translation package (PaddleOCR + local JA→EN translation) for imported Japanese text images."
                   meta={(tutorInstallInfo?.ocrModels ?? []).some((model) => model.installed) ? 'Installed' : 'Not installed'}
                   collapsed={Boolean(collapsedSettingsSections['image-ocr'])}
                   onToggle={() => toggleThemeSectionCollapsed('image-ocr')}
@@ -9173,7 +9442,7 @@ function App() {
                               </p>
                               {tutorInstallInfo?.recommendedOcrTier === model.tier ? (
                                 <p className="settings-help" style={{ marginTop: '0.2rem', color: 'var(--accent, #7eb8ea)' }}>
-                                  Recommended default OCR package
+                                  Recommended default Image Translation package
                                 </p>
                               ) : null}
                             </div>
@@ -9184,7 +9453,7 @@ function App() {
                                   className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
                                   onClick={() => { void selectOcrModel(model.tier) }}
                                   disabled={isActiveTier || ocrModelActionTier !== null || ocrDownloadingTier !== null}
-                                  aria-label={isActiveTier ? `${model.label} is the active OCR model` : `Use ${model.label} for image OCR`}
+                                  aria-label={isActiveTier ? `${model.label} is the active Image Translation model` : `Use ${model.label} for image translation`}
                                   title={isActiveTier ? 'Currently active' : 'Use this model'}
                                 >
                                   {isActiveTier ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" /> : <Circle size={18} strokeWidth={2.25} aria-hidden="true" />}
@@ -9193,7 +9462,7 @@ function App() {
                               <button
                                 type="button"
                                 className="settings-card-icon-button"
-                                onClick={() => { void downloadOcrModel(model.tier) }}
+                                onClick={() => { void downloadOcrModel(model.tier, { force: model.installed }) }}
                                 disabled={ocrDownloadingTier !== null || ocrModelActionTier !== null}
                                 aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
                                 title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
@@ -9235,7 +9504,7 @@ function App() {
                     })}
                   </div>
                   <p className="settings-help" style={{ marginTop: '0.75rem' }}>
-                    Select the circle icon to choose the active OCR package used by Tutor chat image text extraction.
+                    Select the circle icon to choose the active Image Translation package used by the OCR Translator.
                   </p>
                   <div style={{ marginTop: '0.75rem' }}>
                     <label className="settings-help" htmlFor="assistant-chat-ocr-confidence-slider" style={{ display: 'block', marginBottom: '0.35rem' }}>
@@ -9767,19 +10036,6 @@ function App() {
               <p className="assistant-chat-error">{assistantChatError}</p>
             ) : null}
 
-            {assistantChatLastOcrSummary ? (
-              <p className="assistant-chat-ocr-summary" role="status" aria-live="polite">
-                OCR imported from "{assistantChatLastOcrSummary.fileName}" ({assistantChatLastOcrSummary.lineCount} line{assistantChatLastOcrSummary.lineCount === 1 ? '' : 's'}). Review and send when ready.
-                <button
-                  type="button"
-                  className="assistant-chat-ocr-summary-clear"
-                  onClick={() => setAssistantChatLastOcrSummary(null)}
-                >
-                  Dismiss
-                </button>
-              </p>
-            ) : null}
-
             <footer className="assistant-chat-composer">
               <div className="assistant-chat-input-wrap">
                 <textarea
@@ -9795,7 +10051,7 @@ function App() {
                       return
                     }
                     event.preventDefault()
-                    if (assistantChatLoading || assistantChatImageBusy || assistantChatInput.trim().length === 0) {
+                    if (assistantChatLoading || assistantChatInput.trim().length === 0) {
                       return
                     }
                     void sendAssistantChat()
@@ -9810,32 +10066,9 @@ function App() {
                 </span>
                 <button
                   type="button"
-                  className="assistant-chat-upload"
-                  onClick={() => assistantChatImageInputRef.current?.click()}
-                  disabled={assistantChatLoading || assistantChatImageBusy}
-                  aria-label="Upload image for OCR"
-                  title={`Upload image (max ${ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB} MB)`}
-                >
-                  <ImagePlus size={16} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-                <input
-                  ref={assistantChatImageInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  style={{ display: 'none' }}
-                  onChange={(event) => {
-                    const file = event.currentTarget.files?.[0]
-                    if (!file) {
-                      return
-                    }
-                    void handleAssistantChatImageSelected(file)
-                  }}
-                />
-                <button
-                  type="button"
                   className="assistant-chat-send"
                   onClick={() => void sendAssistantChat()}
-                  disabled={assistantChatLoading || assistantChatImageBusy || assistantChatInput.trim().length === 0}
+                  disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
                   aria-label="Send tutor chat message"
                   title="Send"
                 >

@@ -340,6 +340,25 @@ interface AssistantChatImageOcrResponse {
   }>
 }
 
+interface AssistantChatOcrTranslationPayload {
+  text: string
+  sourceLang?: 'ja'
+  targetLang?: 'en'
+}
+
+interface AssistantChatOcrTranslationResponse {
+  ok: boolean
+  text: string
+  languageGate: {
+    model: string
+    detectedLanguage: string
+    confidence: number
+    containsJapaneseScript: boolean
+    passed: boolean
+    threshold: number
+  }
+}
+
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
@@ -410,6 +429,7 @@ interface DesktopApi {
     context?: Record<string, string>
   }) => Promise<AssistantChatRuntimeResponse>
   extractAssistantChatImageText?: (payload: AssistantChatImageOcrPayload) => Promise<AssistantChatImageOcrResponse>
+  translateAssistantChatOcrText?: (payload: AssistantChatOcrTranslationPayload) => Promise<AssistantChatOcrTranslationResponse>
   unloadAssistantChatRuntime?: () => Promise<{ ok: boolean; reason: string }>
   cancelAssistantChatInference?: () => Promise<{ ok: boolean; cancelled: boolean; reason: string }>
   speakText?: (payload: string | {
@@ -461,7 +481,7 @@ interface DesktopApi {
   downloadSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   setActiveSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   uninstallSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
-  downloadOcrModel?: (tier: 'standard') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  downloadOcrModel?: (tier: 'standard', options?: { force?: boolean }) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   setActiveOcrModel?: (tier: 'standard') => Promise<{ ok: boolean; tier: string }>
   uninstallOcrModel?: (tier: 'standard') => Promise<{ ok: boolean; tier: string }>
   transcribeSpeech?: (payload: SpeechTranscribePayload) => Promise<SpeechTranscriptionResult>

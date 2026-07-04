@@ -1,9 +1,13 @@
-"""Download PaddleOCR Japanese inference assets for offline OCR.
+"""Prepare PaddleOCR ONNX assets for offline-ish OCR runtime usage.
 
-This script downloads a small set of PaddleOCR inference archives for
-Japanese OCR and extracts them into a local directory. It is designed for
-Setup Wizard / Settings downloads and prints progress in the same format
-parsed by the Electron setup runtime:
+This script warms up the ONNX OCR models used by the desktop bridge:
+
+- Text detection: PP-OCRv6_medium_det
+- Text recognition: PP-OCRv6_medium_rec
+
+PaddleOCR handles model retrieval/caching internally (HF/BOS depending on
+runtime settings). The script keeps setup progress compatible with the
+Electron setup runtime by emitting:
 
 - "PHASE i/N: ..."
 - "downloading: NN%  (MM MB)"
@@ -17,46 +21,20 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import io
-import os
 import sys
-import tarfile
-import time
-import urllib.error
-import urllib.request
+import json
+import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 TOTAL_PHASES = 3
-DOWNLOAD_RETRIES = 3
-DOWNLOAD_TIMEOUT_SECONDS = 45
 
-MODELS: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {
-    "standard": (
-        (
-            "det",
-            (
-                "https://paddleocr.bj.bcebos.com/PP-OCRv3/multilingual/Multilingual_PP-OCRv3_det_infer.tar",
-                "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv3_mobile_det_infer.tar",
-                "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv4_mobile_det_infer.tar",
-            ),
-        ),
-        (
-            "rec",
-            (
-                "https://paddleocr.bj.bcebos.com/PP-OCRv3/multilingual/japan_PP-OCRv3_rec_infer.tar",
-                "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/japan_PP-OCRv3_mobile_rec_infer.tar",
-            ),
-        ),
-        (
-            "cls",
-            (
-                "https://paddleocr.bj.bcebos.com/dygraph_v2.0/ch/ch_ppocr_mobile_v2.0_cls_infer.tar",
-                "https://paddleocr.bj.bcebos.com/PP-OCRv4/chinese/ch_ppocr_mobile_v2.0_cls_infer.tar",
-            ),
-        ),
-    ),
+MODEL_NAMES: dict[str, dict[str, str]] = {
+    "standard": {
+        "det": "PP-OCRv6_medium_det",
+        "rec": "PP-OCRv6_medium_rec",
+    }
 }
 
 
@@ -74,71 +52,60 @@ def resolve_default_dest(tier: str) -> Path:
     return REPO_ROOT / "data" / "ocr" / tier
 
 
-def download_bytes(urls: tuple[str, ...], label: str) -> bytes:
-    candidate_errors: list[str] = []
+def _warmup_onnx_models(tier: str) -> None:
+    try:
+        from paddleocr import TextDetection, TextRecognition  # type: ignore
+    except Exception as exc:  # pragma: no cover - environment dependent
+        raise RuntimeError(
+            "PaddleOCR runtime is unavailable. Install 'paddleocr' and 'onnxruntime'."
+        ) from exc
 
-    for candidate_index, url in enumerate(urls, start=1):
-        req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
-        last_error: Exception | None = None
+    os.environ.setdefault("PADDLE_PDX_MODEL_SOURCE", "BOS")
 
-        for attempt in range(1, DOWNLOAD_RETRIES + 1):
-            try:
-                with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
-                    total = int(response.headers.get("Content-Length") or 0)
-                    done = 0
-                    chunks: list[bytes] = []
-                    while True:
-                        chunk = response.read(1024 * 256)
-                        if not chunk:
-                            break
-                        chunks.append(chunk)
-                        done += len(chunk)
-                        report(done, total)
-                    sys.stdout.write("\n")
-                return b"".join(chunks)
-            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as exc:
-                last_error = exc
-                if attempt >= DOWNLOAD_RETRIES:
-                    break
-                print(
-                    f"Retry {attempt}/{DOWNLOAD_RETRIES - 1} for {label} (url {candidate_index}/{len(urls)}) after error: {exc}",
-                    file=sys.stderr,
-                )
-                time.sleep(min(2 * attempt, 5))
+    model_names = MODEL_NAMES[tier]
 
-        candidate_errors.append(f"url {candidate_index}/{len(urls)}: {last_error}")
+    print("PHASE 1/3: det")
+    report(100, 100)
+    TextDetection(model_name=model_names["det"], engine="onnxruntime")
+    sys.stdout.write("\n")
 
-    joined_errors = "; ".join(candidate_errors)
-    raise RuntimeError(f"Download failed for {label}: {joined_errors}")
+    print("PHASE 2/3: rec")
+    report(100, 100)
+    TextRecognition(model_name=model_names["rec"], engine="onnxruntime")
+    sys.stdout.write("\n")
 
-
-def extract_tar_bytes(payload: bytes, target_dir: Path) -> None:
-    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:*") as archive:
-        archive.extractall(target_dir)
+    print("PHASE 3/3: finalize")
+    report(100, 100)
+    sys.stdout.write("\n")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Download PaddleOCR model assets")
-    parser.add_argument("--tier", choices=sorted(MODELS.keys()), default="standard")
+    parser.add_argument("--tier", choices=sorted(MODEL_NAMES.keys()), default="standard")
     parser.add_argument("--dest", default="", help="Destination directory for OCR assets")
     args = parser.parse_args()
 
     target_dir = Path(args.dest).expanduser().resolve() if args.dest else resolve_default_dest(args.tier)
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    assets = MODELS[args.tier]
-    for index, (label, urls) in enumerate(assets, start=1):
-        print(f"PHASE {index}/{TOTAL_PHASES}: {label}")
-        phase_dir = target_dir / label
-        phase_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            payload = download_bytes(urls, label)
-            extract_tar_bytes(payload, phase_dir)
-        except Exception as exc:
-            print(f"ERROR: phase '{label}' failed: {exc}", file=sys.stderr)
-            return 1
+    try:
+        _warmup_onnx_models(args.tier)
+    except Exception as exc:
+        print(f"ERROR: ONNX OCR warmup failed: {exc}", file=sys.stderr)
+        return 1
 
-    print(f"PaddleOCR '{args.tier}' assets ready at {target_dir}")
+    manifest = {
+        "pipeline": "ppocr-v6-onnx",
+        "text_detection_model_name": MODEL_NAMES[args.tier]["det"],
+        "text_recognition_model_name": MODEL_NAMES[args.tier]["rec"],
+        "engine": "onnxruntime",
+    }
+    (target_dir / "det").mkdir(parents=True, exist_ok=True)
+    (target_dir / "rec").mkdir(parents=True, exist_ok=True)
+    (target_dir / "cls").mkdir(parents=True, exist_ok=True)
+    (target_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    print(f"PaddleOCR ONNX '{args.tier}' assets ready at {target_dir}")
     return 0
 
 

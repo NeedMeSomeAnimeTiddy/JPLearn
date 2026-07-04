@@ -151,11 +151,13 @@ const SPEECH_MODELS = {
 const ACTIVE_SPEECH_MODEL_STATE_FILENAME = 'active-speech-model.json'
 const OCR_MODELS = {
   standard: {
-    label: 'Standard (PaddleOCR Japanese, ~220 MB)',
-    description: 'Offline Japanese image text recognition for tutor chat image uploads.',
+    label: 'Standard (Image Translation, OCR + JA→EN, ~220 MB+)',
+    description: 'Offline image translation package: PaddleOCR Japanese text extraction plus local JA→EN translation runtime.',
     sizeMb: 220,
   },
 }
+const PADDLEOCR_VERSION = '3.7.0'
+const PADDLEPADDLE_VERSION = '3.2.0'
 const ACTIVE_OCR_MODEL_STATE_FILENAME = 'active-ocr-model.json'
 const SPEED_TEST_TIMEOUT_MS = 12000
 const SPEED_TEST_TARGETS = [
@@ -786,6 +788,116 @@ function resolvePythonCommand(scriptRoot) {
   const venvWin = path.join(scriptRoot, '.venv', 'Scripts', 'python.exe')
   if (fs.existsSync(venvWin)) return venvWin
   return 'python'
+}
+
+function runPythonCapture(pythonCmd, args, env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonCmd, args, {
+      env,
+      windowsHide: true,
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+
+    child.on('error', reject)
+    child.on('close', (code) => {
+      resolve({ code: code ?? 1, stdout, stderr })
+    })
+  })
+}
+
+async function ensureOcrPythonRuntime(scriptRoot, base) {
+  const pythonCmd = resolvePythonCommand(scriptRoot)
+  const env = {
+    ...process.env,
+    JPLEARN_ASSETS_DIR: base,
+    JPLEARN_DOCUMENTS_DIR: base,
+    PADDLE_PDX_MODEL_SOURCE: process.env.PADDLE_PDX_MODEL_SOURCE || 'BOS',
+  }
+
+  const ensurePythonImport = async (importName, installCandidates) => {
+    const initialProbe = await runPythonCapture(pythonCmd, ['-c', `import ${importName}`], env)
+    if (initialProbe.code === 0) {
+      return
+    }
+
+    let lastInstallResult = initialProbe
+    for (const candidate of installCandidates) {
+      lastInstallResult = await runPythonCapture(
+        pythonCmd,
+        ['-m', 'pip', 'install', '--disable-pip-version-check', ...candidate],
+        env,
+      )
+      const probeAfterInstall = await runPythonCapture(pythonCmd, ['-c', `import ${importName}`], env)
+      if (lastInstallResult.code === 0 && probeAfterInstall.code === 0) {
+        return
+      }
+    }
+
+    throw new Error(
+      [
+        `Failed to install Python runtime for '${importName}'.`,
+        `Python command: ${pythonCmd}`,
+        `Probe error: ${(initialProbe.stderr || initialProbe.stdout).trim() || '(empty)'}`,
+        `Last install stderr: ${(lastInstallResult.stderr || '').trim() || '(empty)'}`,
+        `Last install stdout: ${(lastInstallResult.stdout || '').trim() || '(empty)'}`,
+      ].join('\n'),
+    )
+  }
+
+  const ensureOcrImport = async () => {
+    const probe = await runPythonCapture(pythonCmd, ['-c', 'import paddleocr'], env)
+    if (probe.code === 0) {
+      return { ok: true, probe }
+    }
+
+    // Keep OCR runtime deterministic across Windows machines.
+    const installPaddle = await runPythonCapture(
+      pythonCmd,
+      ['-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', `paddlepaddle==${PADDLEPADDLE_VERSION}`],
+      env,
+    )
+    const installPaddleOcr = await runPythonCapture(
+      pythonCmd,
+      ['-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', `paddleocr==${PADDLEOCR_VERSION}`],
+      env,
+    )
+    const finalProbe = await runPythonCapture(pythonCmd, ['-c', 'import paddleocr'], env)
+    if (installPaddle.code === 0 && installPaddleOcr.code === 0 && finalProbe.code === 0) {
+      return { ok: true, probe: finalProbe }
+    }
+
+    const parts = [
+      `Python command: ${pythonCmd}`,
+      `Probe error: ${(probe.stderr || probe.stdout).trim() || '(empty)'}`,
+      `Pinned paddlepaddle install stderr: ${installPaddle.stderr.trim() || '(empty)'}`,
+      `Pinned paddlepaddle install stdout: ${installPaddle.stdout.trim() || '(empty)'}`,
+      `Pinned paddleocr install stderr: ${installPaddleOcr.stderr.trim() || '(empty)'}`,
+      `Pinned paddleocr install stdout: ${installPaddleOcr.stdout.trim() || '(empty)'}`,
+      `Final probe error: ${(finalProbe.stderr || finalProbe.stdout).trim() || '(empty)'}`,
+    ]
+    throw new Error(`Failed to install OCR runtime packages.\n${parts.join('\n')}`)
+  }
+
+  const status = await ensureOcrImport()
+  if (status.ok) {
+    await ensurePythonImport('onnxruntime', [['onnxruntime']])
+    await ensurePythonImport('numpy', [['numpy']])
+    await ensurePythonImport('PIL', [['Pillow']])
+    await ensurePythonImport('cv2', [['opencv-python-headless']])
+    await ensurePythonImport('argostranslate', [['argostranslate']])
+    await ensurePythonImport('fasttext', [['fasttext-wheel'], ['fasttext']])
+    return
+  }
 }
 
 // ── System info ──────────────────────────────────────────────────────────────
@@ -1763,18 +1875,43 @@ function downloadSpeechModel(tier, sender, scriptRoot) {
   })
 }
 
-function downloadOcrModel(tier, sender, scriptRoot) {
+async function downloadOcrModel(tier, sender, scriptRoot, options = {}) {
   if (!OCR_MODELS[tier]) return Promise.reject(new Error(`Unknown OCR model tier: ${tier}`))
 
   const base = ensureJPLearnDirs()
+  const force = Boolean(options && options.force)
 
-  if (isOcrModelInstalled(base, tier)) {
+  if (!force && isOcrModelInstalled(base, tier)) {
+    if (sender && !sender.isDestroyed()) {
+      sender.send('setup:download-progress', { id: 'ocr', percent: 100, mb: null, totalMb: null, etaSec: null })
+    }
+    return Promise.resolve({ alreadyInstalled: true })
+  }
+
+  if (sender && !sender.isDestroyed()) {
+    sender.send('setup:download-progress', { id: 'ocr', percent: 4, mb: null, totalMb: null, etaSec: null })
+  }
+
+  await ensureOcrPythonRuntime(scriptRoot, base)
+
+  if (sender && !sender.isDestroyed()) {
+    sender.send('setup:download-progress', { id: 'ocr', percent: 12, mb: null, totalMb: null, etaSec: null })
+  }
+
+  if (!force && isOcrModelInstalled(base, tier)) {
+    if (sender && !sender.isDestroyed()) {
+      sender.send('setup:download-progress', { id: 'ocr', percent: 100, mb: null, totalMb: null, etaSec: null })
+    }
     return Promise.resolve({ alreadyInstalled: true })
   }
 
   const scriptPath = path.join(scriptRoot, 'scripts', 'get_paddleocr_model.py')
   const pythonCmd = resolvePythonCommand(scriptRoot)
   const modelDir = getOcrModelDir(base, tier)
+
+  if (force && fs.existsSync(modelDir)) {
+    fs.rmSync(modelDir, { recursive: true, force: true })
+  }
   fs.mkdirSync(modelDir, { recursive: true })
 
   return new Promise((resolve, reject) => {
@@ -1783,6 +1920,7 @@ function downloadOcrModel(tier, sender, scriptRoot) {
         ...process.env,
         JPLEARN_ASSETS_DIR: base,
         JPLEARN_DOCUMENTS_DIR: base,
+        PADDLE_PDX_MODEL_SOURCE: process.env.PADDLE_PDX_MODEL_SOURCE || 'BOS',
       },
       windowsHide: true,
     })

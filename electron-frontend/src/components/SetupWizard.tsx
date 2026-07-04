@@ -641,7 +641,7 @@ export function SetupWizard({ onComplete }: Props) {
         }
       }
       if (needsOcr) {
-        appendProgressLog(`Starting OCR model download (${selectedOcrTier})…`)
+        appendProgressLog(`Starting Image Translation package download (${selectedOcrTier})…`)
         const task = api.downloadOcrModel?.(selectedOcrTier)
         if (task) {
           downloadTasks.push({
@@ -781,13 +781,13 @@ export function SetupWizard({ onComplete }: Props) {
     })) ?? []),
     {
       value: 'skip',
-      label: 'Skip OCR install',
+      label: 'Skip Image Translation install',
       meta: 'Install later from settings',
     },
   ]
   const selectedOcrModel = sysInfo?.ocrModels?.find((model) => model.tier === selectedOcrTier)
   const selectedOcrTierDescription = selectedOcrTier === 'skip'
-    ? 'You can install OCR later from Settings to read text from images in Tutor chat.'
+    ? 'You can install Image Translation later from Settings to translate text from images offline.'
     : selectedOcrModel?.description
 
   const availableVoiceModels = sysInfo?.voiceModels ?? []
@@ -1102,12 +1102,12 @@ export function SetupWizard({ onComplete }: Props) {
         </div>
 
         <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Image OCR (optional)</p>
+          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Image Translation (optional)</p>
           <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
-            Installs PaddleOCR Japanese assets so Tutor chat can read Japanese text from imported images offline.
+            Installs the Image Translation package: PaddleOCR Japanese extraction + offline JA→EN translation.
           </p>
           <CompactDropdown
-            ariaLabel="OCR model"
+            ariaLabel="Image Translation package"
             options={ocrModelOptions}
             value={selectedOcrTier}
             onChange={(value) => setSelectedOcrTier(value as OcrTier)}
@@ -1161,7 +1161,7 @@ export function SetupWizard({ onComplete }: Props) {
             <SummaryRow label="Speech recognition model" detail={`${speechModelInfo.label} — ${formatSize(speechModelInfo.sizeMb)}`} />
           )}
           {needsOcr && ocrModelInfo && (
-            <SummaryRow label="Image OCR model" detail={`${ocrModelInfo.label} — ${formatSize(ocrModelInfo.sizeMb)}`} />
+            <SummaryRow label="Image Translation package" detail={`${ocrModelInfo.label} — ${formatSize(ocrModelInfo.sizeMb)}`} />
           )}
           {!needsModel && !needsVoice && !needsFonts && !needsDictionary && !needsSpeech && !needsOcr && (
             <p style={{ opacity: 0.7 }}>Nothing to download — all selected components are already installed.</p>
@@ -1230,7 +1230,7 @@ export function SetupWizard({ onComplete }: Props) {
           <ProgressBar value={speechProgress} label="Speech recognition model" />
         )}
         {selectedOcrTier !== 'skip' && !sysInfo?.ocrModels?.find((model) => model.tier === selectedOcrTier)?.installed && (
-          <ProgressBar value={ocrProgress} label="Image OCR model" />
+          <ProgressBar value={ocrProgress} label="Image Translation package" />
         )}
         {downloadError && (
           <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.35)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
