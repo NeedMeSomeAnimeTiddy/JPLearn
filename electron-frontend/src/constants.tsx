@@ -234,6 +234,60 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   interleave_mix: Shuffle,
 }
 
+export type MinigameSkillGroupKey =
+  | 'recognition'
+  | 'recall'
+  | 'listening'
+  | 'challenge'
+  | 'mixed'
+
+export const MINIGAME_SKILL_GROUP_META: Record<
+  MinigameSkillGroupKey,
+  { title: string; helper: string; order: number }
+> = {
+  recognition: {
+    title: 'Recognition',
+    helper: 'Fast pattern spotting and meaning detection.',
+    order: 1,
+  },
+  recall: {
+    title: 'Recall',
+    helper: 'Produce answers from memory with precision.',
+    order: 2,
+  },
+  listening: {
+    title: 'Listening',
+    helper: 'Train audio-first understanding and spoken recall.',
+    order: 3,
+  },
+  challenge: {
+    title: 'Challenge',
+    helper: 'Harder contextual rounds for deeper fluency.',
+    order: 4,
+  },
+  mixed: {
+    title: 'Mixed',
+    helper: 'Blend multiple modes into one focused run.',
+    order: 5,
+  },
+}
+
+export const MINIGAME_SKILL_GROUP: Record<MinigameKey, MinigameSkillGroupKey> = {
+  romaji_sprint: 'recognition',
+  meaning_match: 'recognition',
+  character_match: 'recognition',
+  stroke_order: 'recall',
+  typed_recall: 'recall',
+  speech_recall: 'recall',
+  sentence_assembly: 'challenge',
+  particle_cloze: 'challenge',
+  vibe_check: 'challenge',
+  imposter: 'challenge',
+  listening_audio_first: 'listening',
+  listening_prompt_first: 'listening',
+  interleave_mix: 'mixed',
+}
+
 // ── Session configuration ────────────────────────────────────────────────────
 
 export const DEFAULT_LIVES = 3

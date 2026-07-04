@@ -5069,13 +5069,64 @@ button {
 
 /* ── Minigame grid ──────────────────────────────────────────────── */
 
-.minigame-grid {
+.minigame-lane-stack {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.minigame-lane {
+  border: 1px solid color-mix(in oklab, var(--panel-border) 78%, transparent);
+  border-radius: 14px;
+  padding: 10px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--panel-bg) 74%, transparent),
+    color-mix(in oklab, var(--panel-bg-alt) 76%, transparent)
+  );
+}
+
+.minigame-lane-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.minigame-lane-title {
+  margin: 0;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.minigame-lane-helper {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+}
+
+.minigame-lane-toggle {
+  border: 1px solid color-mix(in oklab, var(--button-border) 74%, var(--tone-ocean));
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  color: var(--text-main);
+  background: color-mix(in oklab, var(--chip-bg) 78%, transparent);
+  cursor: pointer;
+}
+
+.minigame-lane-viewport {
+  overflow: hidden;
+}
+
+.minigame-lane-track {
+  display: flex;
   gap: 12px;
 }
 
 .game-tile {
+  flex: 0 0 clamp(240px, 29vw, 330px);
   text-align: left;
   border: 1px solid color-mix(in oklab, var(--card-border) 86%, var(--tone-ocean));
   border-radius: 12px;
@@ -5163,9 +5214,9 @@ button {
 
 .game-tile-main {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto auto auto;
   align-content: stretch;
-  gap: 10px;
+  gap: 8px;
 }
 
 .game-tile-main.is-blurred {
@@ -5306,6 +5357,150 @@ button {
   letter-spacing: 0;
   line-height: 1.1;
   white-space: nowrap;
+}
+
+.game-launch-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 2px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 70%, var(--button-border));
+  color: color-mix(in oklab, var(--text-main) 94%, var(--tone-ocean));
+  background:
+    radial-gradient(circle at 14% 50%, color-mix(in oklab, var(--tone-ocean) 42%, transparent), transparent 50%),
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--button-bg-top) 86%, var(--tone-ocean)),
+      color-mix(in oklab, var(--button-bg-bottom) 82%, var(--tone-teal))
+    );
+  min-height: calc(44px * var(--ui-scale));
+  padding: 9px 14px;
+  cursor: pointer;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--tone-ocean) 34%, transparent),
+    0 14px 24px -20px color-mix(in oklab, var(--tone-ocean) 76%, transparent);
+  transition: border-color 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.game-launch-pill:hover,
+.game-launch-pill:focus-visible {
+  border-color: color-mix(in oklab, var(--tone-ocean) 84%, var(--button-border));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--tone-ocean) 42%, transparent),
+    0 18px 28px -20px color-mix(in oklab, var(--tone-ocean) 82%, transparent);
+}
+
+.game-launch-pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.game-launch-pill-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--panel-bg) 44%, transparent);
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 58%, transparent);
+}
+
+.game-launch-pill-label {
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(-4px);
+  white-space: nowrap;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  font-weight: 700;
+  transition: max-width 220ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.game-launch-pill:hover .game-launch-pill-label,
+.game-launch-pill:focus-visible .game-launch-pill-label,
+.game-launch-pill:active .game-launch-pill-label {
+  max-width: 96px;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.game-launch-tooltip {
+  z-index: 40;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 82%, transparent);
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  color: var(--text-main);
+  background: color-mix(in oklab, var(--panel-bg-alt) 90%, #0d1218);
+}
+
+.game-launch-tooltip-arrow {
+  fill: color-mix(in oklab, var(--panel-bg-alt) 90%, #0d1218);
+}
+
+.game-tile-subactions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.game-subaction-pill {
+  border: 1px solid color-mix(in oklab, var(--chip-border) 82%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--chip-bg) 82%, transparent);
+  color: var(--text-main);
+  min-height: calc(30px * var(--ui-scale));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.game-subaction-pill:hover,
+.game-subaction-pill:focus-visible,
+.game-subaction-pill.is-active {
+  border-color: color-mix(in oklab, var(--tone-ocean) 62%, var(--chip-border));
+}
+
+.game-subaction-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.game-inline-panel {
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--chip-border) 72%, transparent);
+  background: color-mix(in oklab, var(--chip-bg) 68%, transparent);
+}
+
+.game-inline-panel p {
+  margin: 0;
+  padding: 7px 9px;
+  font-size: 0.74rem;
+  line-height: 1.3;
+  color: var(--text-soft);
+}
+
+.game-inline-panel[data-state='closed'] {
+  max-height: 0;
+  opacity: 0;
+  border-width: 0;
+}
+
+.game-inline-panel[data-state='open'] {
+  max-height: 110px;
+  opacity: 1;
+  transition: max-height 220ms ease, opacity 180ms ease;
 }
 
 .play-cta-button {
@@ -9574,6 +9769,14 @@ html[data-motion-style='lively'] .live-value {
 
   .game-tile-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .game-tile {
+    flex-basis: min(86vw, 300px);
+  }
+
+  .game-tile-subactions {
+    grid-template-columns: 1fr;
   }
 
   .game-tile-stat:last-child {

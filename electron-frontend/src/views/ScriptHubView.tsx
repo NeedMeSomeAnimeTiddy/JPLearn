@@ -1,10 +1,19 @@
-import type { CSSProperties } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import type { CSSProperties, MouseEvent } from 'react'
+import useEmblaCarousel from 'embla-carousel-react'
+import { clsx } from 'clsx'
+import { motion, useReducedMotion } from 'motion/react'
+import * as Tooltip from '@radix-ui/react-tooltip'
+import * as Collapsible from '@radix-ui/react-collapsible'
 import {
   AlertTriangle,
   ArrowLeft,
+  Eye,
   Flame,
   Heart,
+  Info,
   Lock,
+  Play,
   Settings,
   Target,
   Trophy,
@@ -28,6 +37,9 @@ import {
   DEFAULT_SESSION_LENGTH_PRESET,
   JLPT_LEVEL_LABELS,
   MINIGAMES,
+  MINIGAME_SKILL_GROUP,
+  MINIGAME_SKILL_GROUP_META,
+  type MinigameSkillGroupKey,
   SCRIPT_LABELS,
   SESSION_LENGTH_PRESETS,
 } from '../constants'
@@ -112,6 +124,267 @@ const MINIGAME_DIFFICULTY: Record<MinigameKey, {
   interleave_mix: { level: 'hard', label: 'Hard' },
 }
 
+type ExpandedPanelKind = 'preview' | 'details' | null
+
+interface RankedMinigameCard {
+  key: MinigameKey
+  title: string
+  description: string
+  accuracy: number
+  difficulty: (typeof MINIGAME_DIFFICULTY)[MinigameKey]
+  lockReason: string | null
+  minigameLocked: boolean
+  stats: MinigameStatsByScript[ScriptKey][MinigameKey]
+  recommendationScore: number
+}
+
+interface MinigameLane {
+  key: MinigameSkillGroupKey
+  title: string
+  helper: string
+  cards: RankedMinigameCard[]
+}
+
+const LANE_FIRST_FOLD = 4
+
+function buildBalancedRanking(cards: RankedMinigameCard[]): RankedMinigameCard[] {
+  if (cards.length <= 1) {
+    return cards
+  }
+
+  const needsWork = [...cards].sort((left, right) => right.recommendationScore - left.recommendationScore)
+  const momentum = [...cards].sort((left, right) => {
+    const leftMomentum = left.accuracy + left.stats.bestStreak * 4 + Math.min(left.stats.attempted, 12)
+    const rightMomentum = right.accuracy + right.stats.bestStreak * 4 + Math.min(right.stats.attempted, 12)
+    return rightMomentum - leftMomentum
+  })
+
+  const seen = new Set<MinigameKey>()
+  const balanced: RankedMinigameCard[] = []
+
+  for (const card of needsWork) {
+    if (balanced.length >= 2) break
+    if (seen.has(card.key)) continue
+    balanced.push(card)
+    seen.add(card.key)
+  }
+
+  for (const card of momentum) {
+    if (balanced.length >= 4) break
+    if (seen.has(card.key)) continue
+    balanced.push(card)
+    seen.add(card.key)
+  }
+
+  for (const card of cards) {
+    if (seen.has(card.key)) continue
+    balanced.push(card)
+    seen.add(card.key)
+  }
+
+  return balanced
+}
+
+interface MinigameLaneRowProps {
+  lane: MinigameLane
+  activeGame: MinigameKey
+  expanded: boolean
+  expandedPanels: Partial<Record<MinigameKey, ExpandedPanelKind>>
+  onToggleLane: (laneKey: MinigameSkillGroupKey) => void
+  onSetExpandedPanel: (key: MinigameKey, kind: ExpandedPanelKind) => void
+  onSelectGame: (game: MinigameKey) => void
+  onPlayGame: (game: MinigameKey) => void
+}
+
+function MinigameLaneRow({
+  lane,
+  activeGame,
+  expanded,
+  expandedPanels,
+  onToggleLane,
+  onSetExpandedPanel,
+  onSelectGame,
+  onPlayGame,
+}: MinigameLaneRowProps) {
+  const [emblaRef] = useEmblaCarousel({ align: 'start', dragFree: true, containScroll: 'trimSnaps' })
+  const reduceMotion = useReducedMotion()
+  const visibleCards = expanded ? lane.cards : lane.cards.slice(0, LANE_FIRST_FOLD)
+  const hasOverflow = lane.cards.length > LANE_FIRST_FOLD
+
+  return (
+    <section className="minigame-lane" aria-label={`${lane.title} minigames`}>
+      <header className="minigame-lane-head">
+        <div>
+          <h4 className="minigame-lane-title">{lane.title}</h4>
+          <p className="minigame-lane-helper">{lane.helper}</p>
+        </div>
+        {hasOverflow ? (
+          <button type="button" className="minigame-lane-toggle" onClick={() => onToggleLane(lane.key)}>
+            {expanded ? 'Show less' : `Show all (${lane.cards.length})`}
+          </button>
+        ) : null}
+      </header>
+
+      <div className="minigame-lane-viewport" ref={emblaRef}>
+        <div className="minigame-lane-track">
+          {visibleCards.map((card, index) => {
+            const panel = expandedPanels[card.key] ?? null
+            const slideDelay = `${120 + index * 45}ms`
+
+            return (
+              <article
+                key={card.key}
+                className={clsx('game-tile', activeGame === card.key && 'is-active', card.minigameLocked && 'is-locked')}
+                onClick={() => {
+                  if (card.minigameLocked) return
+                  onSelectGame(card.key)
+                }}
+                style={{ animationDelay: slideDelay }}
+              >
+                <div className={clsx('game-tile-main', card.minigameLocked && 'is-blurred')}>
+                  <div className="game-tile-head">
+                    <span className="game-icon" aria-hidden="true">
+                      <MinigameIcon game={card.key} />
+                    </span>
+                    <div className="game-tile-copy">
+                      <strong className="game-tile-title">{card.title}</strong>
+                      <span className={`game-tile-difficulty-badge is-${card.difficulty.level}`} title={`Difficulty: ${card.difficulty.label}`}>
+                        {card.difficulty.level === 'hard' ? (
+                          <AlertTriangle className="game-tile-difficulty-icon" strokeWidth={2.1} aria-hidden="true" />
+                        ) : card.difficulty.level === 'medium' ? (
+                          <Flame className="game-tile-difficulty-icon" strokeWidth={2.1} aria-hidden="true" />
+                        ) : (
+                          <Target className="game-tile-difficulty-icon" strokeWidth={2.1} aria-hidden="true" />
+                        )}
+                        <span className="game-tile-difficulty-label">{card.difficulty.label}</span>
+                      </span>
+                      <p className="game-tile-description">{card.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="game-tile-stats" aria-label="Minigame stats">
+                    <span className="game-tile-stat" aria-label="Accuracy" title="Accuracy">
+                      <span className="game-tile-stat-label" aria-hidden="true">
+                        <Target className="game-tile-stat-icon" strokeWidth={2.1} />
+                      </span>
+                      <strong>{card.accuracy}%</strong>
+                    </span>
+                    <span className="game-tile-stat" aria-label="Best streak" title="Best streak">
+                      <span className="game-tile-stat-label" aria-hidden="true">
+                        <Flame className="game-tile-stat-icon" strokeWidth={2.1} />
+                      </span>
+                      <strong>{card.stats.bestStreak}</strong>
+                    </span>
+                    <span className="game-tile-stat" aria-label="Points" title="Points">
+                      <span className="game-tile-stat-label" aria-hidden="true">
+                        <Trophy className="game-tile-stat-icon" strokeWidth={2.1} />
+                      </span>
+                      <strong>{card.stats.points}</strong>
+                    </span>
+                  </div>
+
+                  <Tooltip.Provider delayDuration={180}>
+                    <Tooltip.Root>
+                      <Tooltip.Trigger asChild>
+                        <motion.button
+                          type="button"
+                          className="game-launch-pill"
+                          disabled={card.minigameLocked}
+                          aria-label={card.minigameLocked ? `${card.title} is locked` : `Launch ${card.title}`}
+                          onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                            event.stopPropagation()
+                            if (card.minigameLocked) {
+                              return
+                            }
+                            onPlayGame(card.key)
+                          }}
+                          whileHover={reduceMotion ? undefined : { scale: 1.015, y: -1 }}
+                          whileTap={reduceMotion ? undefined : { scale: 0.99 }}
+                          transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+                        >
+                          <motion.span
+                            className="game-launch-pill-icon"
+                            animate={reduceMotion
+                              ? undefined
+                              : {
+                                  rotate: [0, -8, 8, 0],
+                                  scale: [1, 1.05, 1],
+                                }}
+                            transition={{ duration: 2.4, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut' }}
+                            aria-hidden="true"
+                          >
+                            <Play size={16} strokeWidth={2.3} />
+                          </motion.span>
+                          <span className="game-launch-pill-label">Launch</span>
+                        </motion.button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Content sideOffset={8} className="game-launch-tooltip">
+                          Launch {card.title}
+                          <Tooltip.Arrow className="game-launch-tooltip-arrow" />
+                        </Tooltip.Content>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
+                  </Tooltip.Provider>
+
+                  <div className="game-tile-subactions" role="group" aria-label={`${card.title} additional actions`}>
+                    <button
+                      type="button"
+                      className={clsx('game-subaction-pill', panel === 'preview' && 'is-active')}
+                      disabled={card.minigameLocked}
+                      onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                        event.stopPropagation()
+                        onSetExpandedPanel(card.key, panel === 'preview' ? null : 'preview')
+                      }}
+                    >
+                      <Eye size={14} aria-hidden="true" /> Preview
+                    </button>
+                    <button
+                      type="button"
+                      className={clsx('game-subaction-pill', panel === 'details' && 'is-active')}
+                      disabled={card.minigameLocked}
+                      onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                        event.stopPropagation()
+                        onSetExpandedPanel(card.key, panel === 'details' ? null : 'details')
+                      }}
+                    >
+                      <Info size={14} aria-hidden="true" /> Details
+                    </button>
+                  </div>
+
+                  <Collapsible.Root open={panel !== null}>
+                    <Collapsible.Content className="game-inline-panel" forceMount>
+                      {panel === 'preview' ? (
+                        <p>
+                          Preview a short sample round of {card.title} before launching.
+                        </p>
+                      ) : panel === 'details' ? (
+                        <p>
+                          {card.title} focuses on {lane.title.toLowerCase()} skills and currently sits in the {card.difficulty.label.toLowerCase()} difficulty tier.
+                        </p>
+                      ) : null}
+                    </Collapsible.Content>
+                  </Collapsible.Root>
+                </div>
+
+                {card.lockReason ? (
+                  <div className="game-tile-lock-overlay" aria-hidden="true">
+                    <div className="game-tile-lock-overlay-card">
+                      <Lock className="game-tile-lock-icon" strokeWidth={2} />
+                      <p className="game-tile-lock-title">{card.title}</p>
+                      <p className="game-tile-lock-copy">{card.lockReason}</p>
+                    </div>
+                  </div>
+                ) : null}
+              </article>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function ScriptHubView({
   navDirection,
   activeScript,
@@ -167,6 +440,75 @@ export function ScriptHubView({
   } = useSession()
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
   const activeBlock = blockProgressWithMastery.find((block) => block.index === activeBlockIndex)
+  const [expandedLanes, setExpandedLanes] = useState<Partial<Record<MinigameSkillGroupKey, boolean>>>({})
+  const [expandedPanels, setExpandedPanels] = useState<Partial<Record<MinigameKey, ExpandedPanelKind>>>({})
+
+  const rankedCards = useMemo(() => {
+    const mapped = availableMinigames
+      .map((gameKey) => {
+        const game = MINIGAMES.find((entry) => entry.key === gameKey)
+        if (!game) {
+          return null
+        }
+        const stats = minigameStats[activeScript][game.key]
+        const accuracy = stats.attempted > 0 ? Math.round((stats.correct / stats.attempted) * 100) : 0
+        const lockReason = minigameLockReasons[game.key] ?? null
+        const unmetNeed = stats.attempted === 0 ? 100 : Math.max(0, 85 - accuracy)
+        const recommendationScore = unmetNeed + Math.max(0, 6 - Math.min(stats.bestStreak, 6))
+
+        return {
+          key: game.key,
+          title: game.title,
+          description: game.description,
+          accuracy,
+          difficulty: MINIGAME_DIFFICULTY[game.key],
+          lockReason,
+          minigameLocked: Boolean(lockReason),
+          stats,
+          recommendationScore,
+        } satisfies RankedMinigameCard
+      })
+      .filter((entry): entry is RankedMinigameCard => entry !== null)
+
+    return buildBalancedRanking(mapped)
+  }, [availableMinigames, minigameStats, activeScript, minigameLockReasons])
+
+  const minigameLanes = useMemo<MinigameLane[]>(() => {
+    const grouped = new Map<MinigameSkillGroupKey, RankedMinigameCard[]>()
+    for (const card of rankedCards) {
+      const groupKey = MINIGAME_SKILL_GROUP[card.key]
+      const existing = grouped.get(groupKey) ?? []
+      existing.push(card)
+      grouped.set(groupKey, existing)
+    }
+
+    return Array.from(grouped.entries())
+      .map(([key, cards]) => ({
+        key,
+        title: MINIGAME_SKILL_GROUP_META[key].title,
+        helper: MINIGAME_SKILL_GROUP_META[key].helper,
+        cards,
+      }))
+      .sort((left, right) => MINIGAME_SKILL_GROUP_META[left.key].order - MINIGAME_SKILL_GROUP_META[right.key].order)
+  }, [rankedCards])
+
+  const toggleLane = useCallback((laneKey: MinigameSkillGroupKey) => {
+    setExpandedLanes((previous) => ({
+      ...previous,
+      [laneKey]: !previous[laneKey],
+    }))
+  }, [])
+
+  const setExpandedPanel = useCallback((key: MinigameKey, kind: ExpandedPanelKind) => {
+    setExpandedPanels((previous) => {
+      if (!kind) {
+        const next = { ...previous }
+        delete next[key]
+        return next
+      }
+      return { ...previous, [key]: kind }
+    })
+  }, [])
 
   return (
     <div className={isSheet ? 'script-hub-sheet-content' : `view-shell view-${navDirection}`}>
@@ -516,109 +858,20 @@ export function ScriptHubView({
               </section>
             ) : null}
 
-            <div className="minigame-grid">
-              {availableMinigames.map((gameKey, index) => {
-                const game = MINIGAMES.find((entry) => entry.key === gameKey)
-                if (!game) return null
-                const gameStats = minigameStats[activeScript][game.key]
-                const difficulty = MINIGAME_DIFFICULTY[game.key]
-                const lockReason = minigameLockReasons[game.key] ?? null
-                const minigameLocked = Boolean(lockReason)
-                const accuracy =
-                  gameStats.attempted > 0
-                    ? Math.round((gameStats.correct / gameStats.attempted) * 100)
-                    : 0
-
-                return (
-                  <article
-                    key={game.key}
-                    role="button"
-                    tabIndex={0}
-                    className={`game-tile ${activeGame === game.key ? 'is-active' : ''} ${minigameLocked ? 'is-locked' : ''}`}
-                    onClick={() => {
-                      if (minigameLocked) return
-                      onSelectGame(game.key)
-                    }}
-                    onKeyDown={(event) => {
-                      if (minigameLocked) {
-                        return
-                      }
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        onSelectGame(game.key)
-                      }
-                    }}
-                    aria-label={minigameLocked ? `${game.title}, locked. ${lockReason}` : undefined}
-                    style={{ animationDelay: `${120 + index * 70}ms` }}
-                  >
-                    <div className={`game-tile-main ${minigameLocked ? 'is-blurred' : ''}`}>
-                      <div className="game-tile-head">
-                        <span className="game-icon" aria-hidden="true">
-                          <MinigameIcon game={game.key} />
-                        </span>
-                        <div className="game-tile-copy">
-                          <strong className="game-tile-title">{game.title}</strong>
-                          <span className={`game-tile-difficulty-badge is-${difficulty.level}`} title={`Difficulty: ${difficulty.label}`}>
-                            {difficulty.level === 'hard' ? (
-                              <AlertTriangle className="game-tile-difficulty-icon" strokeWidth={2.1} aria-hidden="true" />
-                            ) : difficulty.level === 'medium' ? (
-                              <Flame className="game-tile-difficulty-icon" strokeWidth={2.1} aria-hidden="true" />
-                            ) : (
-                              <Target className="game-tile-difficulty-icon" strokeWidth={2.1} aria-hidden="true" />
-                            )}
-                            <span className="game-tile-difficulty-label">{difficulty.label}</span>
-                          </span>
-                          <p className="game-tile-description">{game.description}</p>
-                        </div>
-                      </div>
-                      <div className="game-tile-stats" aria-label="Minigame stats">
-                        <span className="game-tile-stat" aria-label="Accuracy" title="Accuracy">
-                          <span className="game-tile-stat-label" aria-hidden="true">
-                            <Target className="game-tile-stat-icon" strokeWidth={2.1} />
-                          </span>
-                          <strong>{accuracy}%</strong>
-                        </span>
-                        <span className="game-tile-stat" aria-label="Best streak" title="Best streak">
-                          <span className="game-tile-stat-label" aria-hidden="true">
-                            <Flame className="game-tile-stat-icon" strokeWidth={2.1} />
-                          </span>
-                          <strong>{gameStats.bestStreak}</strong>
-                        </span>
-                        <span className="game-tile-stat" aria-label="Points" title="Points">
-                          <span className="game-tile-stat-label" aria-hidden="true">
-                            <Trophy className="game-tile-stat-icon" strokeWidth={2.1} />
-                          </span>
-                          <strong>{gameStats.points}</strong>
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="play-cta-button game-tile-play"
-                        disabled={minigameLocked}
-                        title={minigameLocked ? lockReason ?? 'Locked' : 'Play'}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          if (minigameLocked) {
-                            return
-                          }
-                          onPlayGame(game.key)
-                        }}
-                      >
-                        Play
-                      </button>
-                    </div>
-                    {lockReason ? (
-                      <div className="game-tile-lock-overlay" aria-hidden="true">
-                        <div className="game-tile-lock-overlay-card">
-                          <Lock className="game-tile-lock-icon" strokeWidth={2} />
-                          <p className="game-tile-lock-title">{game.title}</p>
-                          <p className="game-tile-lock-copy">{lockReason}</p>
-                        </div>
-                      </div>
-                    ) : null}
-                  </article>
-                )
-              })}
+            <div className="minigame-lane-stack">
+              {minigameLanes.map((lane) => (
+                <MinigameLaneRow
+                  key={lane.key}
+                  lane={lane}
+                  activeGame={activeGame}
+                  expanded={Boolean(expandedLanes[lane.key])}
+                  expandedPanels={expandedPanels}
+                  onToggleLane={toggleLane}
+                  onSetExpandedPanel={setExpandedPanel}
+                  onSelectGame={onSelectGame}
+                  onPlayGame={onPlayGame}
+                />
+              ))}
             </div>
           </>
         ) : null}
