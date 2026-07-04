@@ -28,6 +28,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import urllib.error
@@ -78,11 +79,19 @@ def _download_backend() -> str:
     return BACKEND_AUTO
 
 
-def _find_hf_cli() -> str | None:
+def _hf_cli_commands() -> list[list[str]]:
+    commands: list[list[str]] = []
     for exe in ("hf", "huggingface-cli"):
         if shutil.which(exe):
-            return exe
-    return None
+            commands.append([exe])
+
+    try:
+        __import__("huggingface_hub.commands.huggingface_cli")
+        commands.append([sys.executable, "-m", "huggingface_hub.commands.huggingface_cli"])
+    except Exception:
+        pass
+
+    return commands
 
 
 def _parse_hf_url(url: str) -> tuple[str, str, str] | None:
@@ -108,29 +117,32 @@ def _parse_hf_url(url: str) -> tuple[str, str, str] | None:
 
 def _download_hf_cli(url: str, dest: Path) -> bool:
     """Try downloading via Hugging Face CLI; return True on success."""
-    cli = _find_hf_cli()
     parsed = _parse_hf_url(url)
-    if not cli or not parsed:
+    commands = _hf_cli_commands()
+    if not parsed or not commands:
         return False
 
     repo_id, revision, file_path = parsed
     expected_dest = dest.parent / file_path
     expected_dest.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = [
-        cli,
-        "download",
-        repo_id,
-        file_path,
-        "--revision",
-        revision,
-        "--local-dir",
-        str(dest.parent),
-    ]
+    for base_cmd in commands:
+        cmd = [
+            *base_cmd,
+            "download",
+            repo_id,
+            file_path,
+            "--revision",
+            revision,
+            "--local-dir",
+            str(dest.parent),
+        ]
 
-    # Keep CLI output visible (progress/errors), then fall back if it fails.
-    result = subprocess.run(cmd, check=False)
-    if result.returncode != 0 or not expected_dest.exists():
+        # Keep CLI output visible (progress/errors), then fall back if it fails.
+        result = subprocess.run(cmd, check=False)
+        if result.returncode == 0 and expected_dest.exists():
+            break
+    else:
         return False
 
     if expected_dest != dest:

@@ -3325,6 +3325,14 @@ function normalizeTranslationWhitespace(text: string): string {
   return text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
+function parseProgressMethod(logMessage: string | null | undefined): string | null {
+  if (!logMessage) return null
+  const match = logMessage.match(/downloading:\s*\d+%\s*\[([^\]]+)\]/i)
+  if (!match) return null
+  const method = match[1]?.trim()
+  return method ? method : null
+}
+
 function App() {
   // First-run setup wizard check — must be the first hooks so the conditional
   // return (added near the bottom of App) comes after all other hooks.
@@ -3479,16 +3487,21 @@ function App() {
   const [voiceOptions] = useState<VoiceOptionEntry[]>(FIXED_JAPANESE_VOICE_OPTIONS)
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
   const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
+  const [tutorDownloadMethod, setTutorDownloadMethod] = useState<string | null>(null)
   const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
   const [dictionaryDownloading, setDictionaryDownloading] = useState(false)
   const [dictionaryProgress, setDictionaryProgress] = useState<number>(0)
+  const [dictionaryDownloadMethod, setDictionaryDownloadMethod] = useState<string | null>(null)
   const [speechDownloadingTier, setSpeechDownloadingTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
   const [speechDownloadProgress, setSpeechDownloadProgress] = useState<number>(0)
+  const [speechDownloadMethod, setSpeechDownloadMethod] = useState<string | null>(null)
   const [speechModelActionTier, setSpeechModelActionTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
   const [translationProfileApplyingTier, setTranslationProfileApplyingTier] = useState<'ocr_argos_small' | 'ocr_pipeline_full' | null>(null)
   const [translationProfileProgress, setTranslationProfileProgress] = useState<number>(0)
+  const [translationProfileMethod, setTranslationProfileMethod] = useState<string | null>(null)
   const [voiceEngineDownloadingTier, setVoiceEngineDownloadingTier] = useState<'0.6b' | null>(null)
   const [voiceEngineDownloadProgress, setVoiceEngineDownloadProgress] = useState<number>(0)
+  const [voiceEngineDownloadMethod, setVoiceEngineDownloadMethod] = useState<string | null>(null)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
   const [roundFeedbackTone, setRoundFeedbackTone] = useState<FeedbackTone>(null)
   const [roundFeedbackPoints, setRoundFeedbackPoints] = useState<number | null>(null)
@@ -4161,33 +4174,41 @@ function App() {
       return
     }
     const unsubscribe = onSetupProgress((evt) => {
+      const method = parseProgressMethod(evt.logMessage)
       if (evt.id === 'dictionary') {
         setDictionaryProgress(evt.percent)
+        if (method) setDictionaryDownloadMethod(method)
         return
       }
       if (evt.id === 'voice') {
         setVoiceEngineDownloadProgress(evt.percent)
+        if (method) setVoiceEngineDownloadMethod(method)
         return
       }
       if (evt.id === 'speech') {
         setSpeechDownloadProgress(evt.percent)
+        if (method) setSpeechDownloadMethod(method)
         return
       }
       if (evt.id === 'ocr') {
         setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+        if (method) setTranslationProfileMethod(method)
         return
       }
       if (evt.id === 'translation') {
         setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+        if (method) setTranslationProfileMethod(method)
         return
       }
       if (evt.id === 'pipeline') {
         setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+        if (method) setTranslationProfileMethod(method)
         return
       }
       if (evt.id !== 'model') {
         return
       }
+      if (method) setTutorDownloadMethod(method)
       setTutorDownloadProgress({ percent: evt.percent, mb: evt.mb, totalMb: evt.totalMb })
     })
     return unsubscribe
@@ -4200,6 +4221,7 @@ function App() {
     }
     setTutorDownloadingTier(tier)
     setTutorDownloadProgress({ percent: 0, mb: null, totalMb: null })
+    setTutorDownloadMethod(null)
     try {
       await downloadModel(tier)
       await refreshTutorInstallInfo()
@@ -4244,6 +4266,7 @@ function App() {
     }
     setDictionaryDownloading(true)
     setDictionaryProgress(0)
+    setDictionaryDownloadMethod(null)
     try {
       await downloadDictionary()
       await refreshTutorInstallInfo()
@@ -4260,6 +4283,7 @@ function App() {
     }
     setSpeechDownloadingTier(tier)
     setSpeechDownloadProgress(0)
+    setSpeechDownloadMethod(null)
     try {
       await downloadModel(tier)
       await refreshTutorInstallInfo()
@@ -4304,6 +4328,7 @@ function App() {
     }
     setTranslationProfileApplyingTier(tier)
     setTranslationProfileProgress(0)
+    setTranslationProfileMethod(null)
     try {
       await applyProfile(tier, { force: true })
       await refreshTutorInstallInfo()
@@ -4320,6 +4345,7 @@ function App() {
     }
     setVoiceEngineDownloadingTier(tier)
     setVoiceEngineDownloadProgress(0)
+    setVoiceEngineDownloadMethod(null)
     try {
       await downloadVoiceEngine(tier)
       await refreshTutorInstallInfo()
@@ -9333,8 +9359,8 @@ function App() {
                               </div>
                               <p className="settings-help" style={{ marginTop: '0.3rem' }}>
                                 {tutorDownloadProgress?.mb != null && tutorDownloadProgress?.totalMb != null
-                                  ? `${tutorDownloadProgress.mb.toFixed(0)} / ${tutorDownloadProgress.totalMb.toFixed(0)} MB · ${Math.round(tutorDownloadProgress.percent)}%`
-                                  : `Downloading… ${Math.round(tutorDownloadProgress?.percent ?? 0)}%`}
+                                  ? `${tutorDownloadProgress.mb.toFixed(0)} / ${tutorDownloadProgress.totalMb.toFixed(0)} MB · ${Math.round(tutorDownloadProgress.percent)}%${tutorDownloadMethod ? ` [${tutorDownloadMethod}]` : ''}`
+                                  : `Downloading… ${Math.round(tutorDownloadProgress?.percent ?? 0)}%${tutorDownloadMethod ? ` [${tutorDownloadMethod}]` : ''}`}
                               </p>
                             </div>
                           ) : null}
@@ -9398,7 +9424,7 @@ function App() {
                         />
                       </div>
                       <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                        Downloading… {Math.round(dictionaryProgress)}%
+                        Downloading… {Math.round(dictionaryProgress)}%{dictionaryDownloadMethod ? ` [${dictionaryDownloadMethod}]` : ''}
                       </p>
                     </div>
                   ) : null}
@@ -9469,7 +9495,7 @@ function App() {
                                 <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, translationProfileProgress))}%` }} />
                               </div>
                               <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                Applying… {Math.round(translationProfileProgress)}%
+                                Applying… {Math.round(translationProfileProgress)}%{translationProfileMethod ? ` [${translationProfileMethod}]` : ''}
                               </p>
                             </div>
                           ) : null}
@@ -9614,7 +9640,7 @@ function App() {
                                 <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, speechDownloadProgress))}%` }} />
                               </div>
                               <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                Downloading… {Math.round(speechDownloadProgress)}%
+                                Downloading… {Math.round(speechDownloadProgress)}%{speechDownloadMethod ? ` [${speechDownloadMethod}]` : ''}
                               </p>
                             </div>
                           ) : null}
@@ -9764,7 +9790,7 @@ function App() {
                                     <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, voiceEngineDownloadProgress))}%` }} />
                                   </div>
                                   <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                    Installing… {Math.round(voiceEngineDownloadProgress)}%
+                                    Installing… {Math.round(voiceEngineDownloadProgress)}%{voiceEngineDownloadMethod ? ` [${voiceEngineDownloadMethod}]` : ''}
                                   </p>
                                 </div>
                               ) : null}

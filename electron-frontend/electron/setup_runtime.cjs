@@ -131,21 +131,29 @@ const SPEECH_MODELS = {
     label: 'Fast (small, ~500 MB)',
     description: 'Fastest startup and lowest resource use. Best for older laptops or quick rounds.',
     sizeMb: 500,
+    repo: 'Systran/faster-whisper-small',
+    files: ['model.bin', 'config.json', 'tokenizer.json', 'vocabulary.txt'],
   },
   balanced: {
     label: 'Balanced (medium, ~1.5 GB)',
     description: 'Good all-around pick: better accuracy than Fast while still responsive.',
     sizeMb: 1500,
+    repo: 'Systran/faster-whisper-medium',
+    files: ['model.bin', 'config.json', 'tokenizer.json', 'vocabulary.txt'],
   },
   high: {
     label: 'High (distil-large-v3, ~1.9 GB)',
     description: 'Near-Ultra quality with lower latency than Ultra. Great for higher-end PCs.',
     sizeMb: 1900,
+    repo: 'distil-whisper/distil-large-v3',
+    files: ['model.bin', 'config.json', 'tokenizer.json', 'vocabulary.txt'],
   },
   ultra: {
     label: 'Ultra (large-v3, ~3.1 GB)',
     description: 'Highest recognition quality. Best when you prioritize accuracy over speed.',
     sizeMb: 3100,
+    repo: 'Systran/faster-whisper-large-v3',
+    files: ['model.bin', 'config.json', 'tokenizer.json', 'vocabulary.txt'],
   },
 }
 const ACTIVE_SPEECH_MODEL_STATE_FILENAME = 'active-speech-model.json'
@@ -215,6 +223,7 @@ const SPEED_TEST_TARGETS = [
   { url: 'https://proof.ovh.net/files/100Mb.dat', bytes: 20971520 },
 ]
 const networkSpeed = new NetworkSpeed()
+const REMOTE_SIZE_CACHE = new Map()
 const LLAMA_BACKEND_LABELS = {
   cuda: 'CUDA (NVIDIA)',
   hip: 'ROCm/HIP (AMD)',
@@ -711,7 +720,12 @@ function ensureEmbedderInstalled(embedderTier, sender, scriptRoot) {
 
   return new Promise((resolve) => {
     const child = spawn(pythonCmd, [scriptPath, '--tier', embedderTier], {
-      env: { ...process.env, JPLEARN_ASSETS_DIR: base, JPLEARN_DOCUMENTS_DIR: base },
+      env: {
+        ...process.env,
+        JPLEARN_ASSETS_DIR: base,
+        JPLEARN_DOCUMENTS_DIR: base,
+        JPLEARN_DOWNLOAD_BACKEND: process.env.JPLEARN_DOWNLOAD_BACKEND || 'auto',
+      },
       windowsHide: true,
     })
 
@@ -724,7 +738,7 @@ function ensureEmbedderInstalled(embedderTier, sender, scriptRoot) {
 
     child.stdout.on('data', (chunk) => {
       const text = chunk.toString()
-      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*\((\d+) MB\)/i)
+      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*(?:\[[^\]]+\])?\s*\((\d+) MB\)/i)
       if (pctMatch) {
         currentPct = Math.max(0, Math.min(99, parseInt(pctMatch[1], 10)))
         emitProgress()
@@ -1349,13 +1363,16 @@ async function getSystemInfo() {
   const fontInstallState = getFontInstallState(base)
   const fontsInstalled = fontInstallState.installed
   const dictionaryInstalled = isOfflineDictionaryInstalled(base)
-  const speechModels = Object.entries(SPEECH_MODELS).map(([tier, m]) => ({
-    tier,
-    label: m.label,
-    description: m.description,
-    sizeMb: m.sizeMb,
-    installed: isSpeechModelInstalled(base, tier),
-    estimatedDownloadMinutes: estimateDownloadMinutes(m.sizeMb, networkMbps),
+  const speechModels = await Promise.all(Object.entries(SPEECH_MODELS).map(async ([tier, m]) => {
+    const exactSizeMb = await getSpeechModelSizeMb(m)
+    return {
+      tier,
+      label: m.label,
+      description: m.description,
+      sizeMb: exactSizeMb,
+      installed: isSpeechModelInstalled(base, tier),
+      estimatedDownloadMinutes: estimateDownloadMinutes(exactSizeMb, networkMbps),
+    }
   }))
   const ocrModels = Object.entries(OCR_MODELS).map(([tier, m]) => ({
     tier,
@@ -1396,15 +1413,16 @@ async function getSystemInfo() {
   let isPackaged = false
   try { isPackaged = require('electron').app.isPackaged } catch { /* dev mode */ }
 
-  const models = Object.entries(MODELS).map(([tier, m]) => {
+  const models = await Promise.all(Object.entries(MODELS).map(async ([tier, m]) => {
+    const exactModelSizeMb = await getTutorModelSizeMb(m)
     const embedderTier = CHATBOT_TIER_TO_EMBEDDER_TIER[tier]
     const embedder = embedderTier ? EMBEDDERS[embedderTier] : null
     const embedderSizeMb = embedder ? embedder.sizeMb : 0
-    const combinedSizeMb = m.sizeMb + embedderSizeMb
+    const combinedSizeMb = exactModelSizeMb + embedderSizeMb
     return {
       tier,
       filename: m.filename,
-      sizeMb: m.sizeMb,
+      sizeMb: exactModelSizeMb,
       embedderSizeMb,
       combinedSizeMb,
       label: m.label,
@@ -1412,7 +1430,7 @@ async function getSystemInfo() {
       installed: fs.existsSync(path.join(modelsDir, m.filename)),
       estimatedDownloadMinutes: estimateDownloadMinutes(combinedSizeMb, networkMbps),
     }
-  })
+  }))
 
   const voiceTokenizerInstalled = isVoiceTokenizerInstalled(base)
   const voicevoxInstalled = Boolean(resolveInstalledVoicevoxExecutable())
@@ -1617,7 +1635,8 @@ function probeUrl(url) {
       }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume()
-          follow(res.headers.location, hops + 1)
+          const nextUrl = new URL(res.headers.location, redirectUrl).toString()
+          follow(nextUrl, hops + 1)
           return
         }
         res.resume() // drain the 1-byte probe body
@@ -1637,12 +1656,247 @@ function probeUrl(url) {
   })
 }
 
+function toHfResolveUrl(repo, filename, revision = 'main') {
+  return `https://huggingface.co/${repo}/resolve/${revision}/${filename}`
+}
+
+async function getCachedUrlSizeBytes(url) {
+  if (REMOTE_SIZE_CACHE.has(url)) {
+    return REMOTE_SIZE_CACHE.get(url)
+  }
+  try {
+    const { total } = await probeUrl(url)
+    const size = total > 0 ? total : null
+    REMOTE_SIZE_CACHE.set(url, size)
+    return size
+  } catch {
+    REMOTE_SIZE_CACHE.set(url, null)
+    return null
+  }
+}
+
+async function getTutorModelSizeMb(model) {
+  const sizeBytes = await getCachedUrlSizeBytes(toHfResolveUrl(model.repo, model.filename))
+  if (!sizeBytes || sizeBytes <= 0) return model.sizeMb
+  return Math.max(1, Math.round(sizeBytes / (1024 * 1024)))
+}
+
+async function getSpeechModelSizeMb(model) {
+  if (!model.repo || !Array.isArray(model.files) || model.files.length === 0) {
+    return model.sizeMb
+  }
+
+  const sizes = await Promise.all(
+    model.files.map((filename) => getCachedUrlSizeBytes(toHfResolveUrl(model.repo, filename))),
+  )
+
+  if (sizes.some((value) => !value || value <= 0)) {
+    return model.sizeMb
+  }
+
+  const totalBytes = sizes.reduce((sum, value) => sum + (value || 0), 0)
+  return Math.max(1, Math.round(totalBytes / (1024 * 1024)))
+}
+
 function tryGetFileSize(filePath) {
   try {
     return fs.statSync(filePath).size
   } catch {
     return 0
   }
+}
+
+function parseHfResolveUrl(url) {
+  try {
+    const parsed = new URL(url)
+    if ((parsed.hostname || '').toLowerCase() !== 'huggingface.co') return null
+    const pathName = (parsed.pathname || '').replace(/^\/+/, '')
+    const marker = '/resolve/'
+    const markerIndex = pathName.indexOf(marker)
+    if (markerIndex <= 0) return null
+    const repoId = pathName.slice(0, markerIndex)
+    const rest = pathName.slice(markerIndex + marker.length)
+    const slash = rest.indexOf('/')
+    if (slash <= 0) return null
+    const revision = rest.slice(0, slash)
+    const filePath = rest.slice(slash + 1)
+    if (!repoId || !revision || !filePath) return null
+    return { repoId, revision, filePath }
+  } catch {
+    return null
+  }
+}
+
+function resolveHfCliCommand(pythonCmd) {
+  const check = (cmd, args) => {
+    try {
+      const result = spawnSync(cmd, args, { windowsHide: true, stdio: 'ignore' })
+      return (result.status ?? 1) === 0
+    } catch {
+      return false
+    }
+  }
+
+  const hasPythonHfModule = () => {
+    if (!pythonCmd) return false
+    return check(pythonCmd, ['-c', 'import huggingface_hub.commands.huggingface_cli'])
+  }
+
+  const ensurePythonHfModule = () => {
+    if (!pythonCmd) return false
+    if (hasPythonHfModule()) return true
+    try {
+      const install = spawnSync(
+        pythonCmd,
+        ['-m', 'pip', 'install', '--disable-pip-version-check', 'huggingface-hub'],
+        { windowsHide: true, stdio: 'ignore' },
+      )
+      if ((install.status ?? 1) !== 0) return false
+    } catch {
+      return false
+    }
+    return hasPythonHfModule()
+  }
+
+  if (check('hf', ['--help'])) return ['hf']
+  if (check('huggingface-cli', ['--help'])) return ['huggingface-cli']
+  if (ensurePythonHfModule()) {
+    return [pythonCmd, '-m', 'huggingface_hub.commands.huggingface_cli']
+  }
+  return null
+}
+
+function downloadWithHfCli(url, destPath, pythonCmd, onProgress, expectedTotalBytes) {
+  const parsed = parseHfResolveUrl(url)
+  const cliCommand = resolveHfCliCommand(pythonCmd)
+  if (!parsed || !cliCommand) {
+    return Promise.resolve({ ok: false, reason: 'HF CLI not available (no hf executable and no python huggingface-hub CLI).' })
+  }
+
+  const outputDir = path.dirname(destPath)
+  const expectedPath = path.join(outputDir, ...parsed.filePath.split('/'))
+  fs.mkdirSync(path.dirname(expectedPath), { recursive: true })
+
+  const executable = cliCommand[0]
+  const baseArgs = cliCommand.slice(1)
+  const args = [
+    ...baseArgs,
+    'download',
+    parsed.repoId,
+    parsed.filePath,
+    '--revision',
+    parsed.revision,
+    '--local-dir',
+    outputDir,
+  ]
+
+  return new Promise((resolve) => {
+    const child = spawn(executable, args, {
+      env: {
+        ...process.env,
+        PYTHONUTF8: process.env.PYTHONUTF8 || '1',
+        PYTHONIOENCODING: process.env.PYTHONIOENCODING || 'utf-8',
+      },
+      windowsHide: true,
+    })
+
+    let stderrTail = ''
+    let stdoutTail = ''
+    let lastPercentFromOutput = -1
+    let lastEmittedPercent = -1
+    const startedAt = Date.now()
+    const appendTail = (prev, chunk) => {
+      const text = `${prev}${chunk.toString()}`
+      const MAX_TAIL = 2000
+      return text.length > MAX_TAIL ? text.slice(-MAX_TAIL) : text
+    }
+
+    const emitProgress = (percent) => {
+      if (!onProgress) return
+      const bounded = Math.max(0, Math.min(100, percent))
+      if (bounded <= lastEmittedPercent) return
+      lastEmittedPercent = bounded
+      const done = Math.round((bounded / 100) * total)
+      onProgress(done, total, 'hf-cli')
+    }
+
+    const emitPercentProgress = (text) => {
+      if (!onProgress) return
+      // Accept both tqdm-like "12%|" and plain "12%" forms.
+      const matches = [...text.matchAll(/(\d{1,3})%/g)]
+      if (matches.length <= 0) return
+      const raw = parseInt(matches[matches.length - 1][1], 10)
+      if (!Number.isFinite(raw)) return
+      const percent = Math.max(0, Math.min(100, raw))
+      if (percent <= lastPercentFromOutput) return
+      lastPercentFromOutput = percent
+      emitProgress(percent)
+    }
+
+    child.stderr.on('data', (chunk) => {
+      stderrTail = appendTail(stderrTail, chunk)
+      emitPercentProgress(chunk.toString())
+    })
+
+    child.stdout.on('data', (chunk) => {
+      stdoutTail = appendTail(stdoutTail, chunk)
+      emitPercentProgress(chunk.toString())
+    })
+
+    const total = Math.max(1, expectedTotalBytes || 1)
+    const poll = setInterval(() => {
+      if (!onProgress) return
+      const size = Math.min(total, tryGetFileSize(expectedPath))
+      const measuredPercent = Math.round((size / total) * 100)
+
+      if (measuredPercent > 0) {
+        emitProgress(measuredPercent)
+        return
+      }
+
+      // Some hf-cli runs don't expose intermediate bytes for --local-dir.
+      // Show smooth, bounded progress instead of a 0% -> 100% jump.
+      const elapsedSec = (Date.now() - startedAt) / 1000
+      const syntheticPercent = Math.min(92, Math.floor(2 + elapsedSec * 7))
+      emitProgress(syntheticPercent)
+    }, 120)
+
+    const finish = (ok, reason = null) => {
+      clearInterval(poll)
+      if (ok) {
+        if (expectedPath !== destPath && fs.existsSync(expectedPath)) {
+          fs.mkdirSync(path.dirname(destPath), { recursive: true })
+          try { fs.unlinkSync(destPath) } catch { /* ignore */ }
+          fs.renameSync(expectedPath, destPath)
+        }
+        if (onProgress) {
+          const finalSize = Math.min(total, tryGetFileSize(destPath))
+          const finalPercent = finalSize > 0 ? Math.round((finalSize / total) * 100) : 100
+          emitProgress(Math.max(finalPercent, 100))
+        }
+      }
+      resolve({ ok, reason })
+    }
+
+    child.on('error', (err) => {
+      const message = err instanceof Error ? err.message : String(err)
+      console.warn(`hf-cli failed to start; falling back to HTTP: ${message}`)
+      finish(false, `hf-cli failed to start: ${message}`)
+    })
+    child.on('close', (code) => {
+      const succeeded = code === 0 && fs.existsSync(expectedPath)
+      if (!succeeded) {
+        const detail = (stderrTail || stdoutTail || '').trim()
+        console.warn(`hf-cli exited with code ${code}; falling back to HTTP${detail ? `\n${detail}` : ''}`)
+        const reason = detail
+          ? `hf-cli exited with code ${code}: ${detail}`
+          : `hf-cli exited with code ${code}`
+        finish(false, reason)
+        return
+      }
+      finish(true, null)
+    })
+  })
 }
 
 /**
@@ -1803,7 +2057,7 @@ function downloadWithProgress(url, destPath, onProgress) {
   return new Promise((resolve, reject) => {
     probeUrl(url).then(({ finalUrl, total, supportsRanges }) => {
       if (!supportsRanges || total === 0) {
-        singleConnectionDownload(finalUrl, tmpPath, total, onProgress)
+        singleConnectionDownload(finalUrl, tmpPath, total, (done, totalBytes) => onProgress(done, totalBytes, 'http'))
           .then(() => { fs.renameSync(tmpPath, destPath); resolve() })
           .catch(reject)
         return
@@ -1822,7 +2076,7 @@ function downloadWithProgress(url, destPath, onProgress) {
         done += n
         if (total > 0 && onProgress) {
           const pct = Math.round((done / total) * 100)
-          if (pct !== lastReportedPct) { lastReportedPct = pct; onProgress(done, total) }
+          if (pct !== lastReportedPct) { lastReportedPct = pct; onProgress(done, total, 'http-range') }
         }
       }
 
@@ -1855,7 +2109,7 @@ function downloadWithProgress(url, destPath, onProgress) {
 
       if (total > 0 && onProgress) {
         const pct = Math.round((done / total) * 100)
-        if (pct !== lastReportedPct) { lastReportedPct = pct; onProgress(done, total) }
+        if (pct !== lastReportedPct) { lastReportedPct = pct; onProgress(done, total, 'http-range') }
       }
 
       Promise.all(downloads)
@@ -1871,7 +2125,7 @@ function downloadWithProgress(url, destPath, onProgress) {
 
           // Some CDN edges reject individual ranged chunk requests mid-download.
           // Retry once with a resumable single stream against the canonical URL.
-          singleConnectionDownload(url, tmpPath, total, onProgress)
+          singleConnectionDownload(url, tmpPath, total, (done, totalBytes) => onProgress(done, totalBytes, 'http'))
             .then(() => { fs.renameSync(tmpPath, destPath); resolve() })
             .catch(reject)
         })
@@ -1931,7 +2185,7 @@ function downloadModel(tier, sender, scriptRoot) {
   let lastDone = 0
   let lastTime = startTime
 
-  const onProgress = (done, total) => {
+  const onProgress = (done, total, method = null) => {
     const now = Date.now()
     const elapsed = (now - lastTime) / 1000
     if (elapsed > 0) {
@@ -1946,15 +2200,44 @@ function downloadModel(tier, sender, scriptRoot) {
     const mb = Math.round(done / (1024 * 1024))
     const totalMb = Math.round(total / (1024 * 1024))
     if (sender && !sender.isDestroyed()) {
-      sender.send('setup:download-progress', { id: 'model', percent, mb, totalMb, etaSec: lastEtaSec })
+      sender.send('setup:download-progress', {
+        id: 'model',
+        percent,
+        mb,
+        totalMb,
+        etaSec: lastEtaSec,
+        logMessage: method ? `downloading: ${percent}% [${method}]` : undefined,
+      })
     }
   }
 
-  return ensureLlamaCpp().then((llamaCppDownloaded) => downloadWithProgress(url, destPath, onProgress).then(async () => {
+  return ensureLlamaCpp().then(async (llamaCppDownloaded) => {
+    const pythonCmd = scriptRoot ? resolvePythonCommand(scriptRoot) : null
+    const exactTotalBytes = await getCachedUrlSizeBytes(url)
+    const expectedTotalBytes = exactTotalBytes && exactTotalBytes > 0
+      ? exactTotalBytes
+      : Math.round((model.sizeMb || 0) * 1024 * 1024)
+
+    const hfResult = await downloadWithHfCli(url, destPath, pythonCmd, onProgress, expectedTotalBytes)
+    if (!hfResult.ok) {
+      if (sender && !sender.isDestroyed()) {
+        const percent = Math.round((lastDone / Math.max(1, expectedTotalBytes || 1)) * 100)
+        sender.send('setup:download-progress', {
+          id: 'model',
+          percent: Math.max(0, Math.min(99, percent)),
+          mb: Math.round(lastDone / (1024 * 1024)),
+          totalMb: expectedTotalBytes > 0 ? Math.round(expectedTotalBytes / (1024 * 1024)) : null,
+          etaSec: lastEtaSec,
+          logMessage: hfResult.reason ? `hf-cli fallback: ${hfResult.reason}` : 'hf-cli fallback: unknown reason',
+        })
+      }
+      await downloadWithProgress(url, destPath, onProgress)
+    }
+
     await ensureEmbedder()
     const selectedAsActive = ensureActiveSelection()
     return { ok: true, llamaCppDownloaded, selectedAsActive }
-  }))
+  })
 }
 
 // Marks the optional voice setup step as completed. Voice synthesis itself is
@@ -2078,6 +2361,8 @@ function downloadDictionary(sender, scriptRoot) {
     let currentPhase = 0
     let currentPhasePct = 0
 
+    let lastMethod = null
+
     const emitProgress = () => {
       const overall = ((currentPhase + currentPhasePct / 100) / TOTAL_PHASES) * 100
       const pct = Math.max(0, Math.min(99, Math.round(overall)))
@@ -2088,6 +2373,7 @@ function downloadDictionary(sender, scriptRoot) {
           mb: null,
           totalMb: null,
           etaSec: null,
+          logMessage: lastMethod ? `downloading: ${pct}% [${lastMethod}]` : undefined,
         })
       }
     }
@@ -2100,9 +2386,10 @@ function downloadDictionary(sender, scriptRoot) {
         currentPhasePct = 0
         emitProgress()
       }
-      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*\((\d+) MB\)/i)
+      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*(?:\[([^\]]+)\])?\s*\((\d+) MB\)/i)
       if (pctMatch) {
         currentPhasePct = Math.max(0, Math.min(100, parseInt(pctMatch[1], 10)))
+        lastMethod = pctMatch[2] ? pctMatch[2].trim() : lastMethod
         emitProgress()
       }
     })
@@ -2136,7 +2423,12 @@ function downloadSpeechModel(tier, sender, scriptRoot) {
 
   return new Promise((resolve, reject) => {
     const child = spawn(pythonCmd, [scriptPath, '--tier', tier], {
-      env: { ...process.env, JPLEARN_ASSETS_DIR: base, JPLEARN_DOCUMENTS_DIR: base },
+      env: {
+        ...process.env,
+        JPLEARN_ASSETS_DIR: base,
+        JPLEARN_DOCUMENTS_DIR: base,
+        JPLEARN_DOWNLOAD_BACKEND: process.env.JPLEARN_DOWNLOAD_BACKEND || 'auto',
+      },
       windowsHide: true,
     })
 
@@ -2145,11 +2437,20 @@ function downloadSpeechModel(tier, sender, scriptRoot) {
     let currentPhase = 0
     let currentPhasePct = 0
 
+    let lastMethod = null
+
     const emitProgress = () => {
       const overall = ((currentPhase + currentPhasePct / 100) / TOTAL_PHASES) * 100
       const pct = Math.max(0, Math.min(99, Math.round(overall)))
       if (sender && !sender.isDestroyed()) {
-        sender.send('setup:download-progress', { id: 'speech', percent: pct, mb: null, totalMb: null, etaSec: null })
+        sender.send('setup:download-progress', {
+          id: 'speech',
+          percent: pct,
+          mb: null,
+          totalMb: null,
+          etaSec: null,
+          logMessage: lastMethod ? `downloading: ${pct}% [${lastMethod}]` : undefined,
+        })
       }
     }
 
@@ -2161,9 +2462,10 @@ function downloadSpeechModel(tier, sender, scriptRoot) {
         currentPhasePct = 0
         emitProgress()
       }
-      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*\((\d+) MB\)/i)
+      const pctMatch = text.match(/downloading:\s*(\d{1,3})%\s*(?:\[([^\]]+)\])?\s*\((\d+) MB\)/i)
       if (pctMatch) {
         currentPhasePct = Math.max(0, Math.min(100, parseInt(pctMatch[1], 10)))
+        lastMethod = pctMatch[2] ? pctMatch[2].trim() : lastMethod
         emitProgress()
       }
     })

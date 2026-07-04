@@ -15,5 +15,8 @@ faster-whisper
 # dependency-free hashed embedder in domain/retrieval.py if not installed.
 onnxruntime
 tokenizers
+# Optional: enables Hugging Face CLI (`hf`) for faster/resumable model downloads
+# in scripts/hf_download.py when available.
+huggingface-hub
 # Python GUI dependencies were removed.
 # Frontend is now Electron + React + TypeScript in electron-frontend/.
