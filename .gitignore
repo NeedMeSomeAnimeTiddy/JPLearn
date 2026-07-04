@@ -239,6 +239,10 @@ data/external_sources/offline_dictionary/*.sqlite
 # Local Whisper speech model artifacts (downloaded on demand; too large for git)
 data/whisper/**/model.bin
 
+# Local translation model artifacts (downloaded on demand; too large for git)
+data/translation/
+data/translation-pipeline/
+
 # Ruff stuff:
 .ruff_cache/
 

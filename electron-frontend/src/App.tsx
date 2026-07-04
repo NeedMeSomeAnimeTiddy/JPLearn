@@ -5741,6 +5741,7 @@ function App() {
         text: extractedText,
         sourceLang: 'ja',
         targetLang: 'en',
+        fastMode: true,
       })
       const rawEnglishText = (translationResponse?.text ?? '').trim()
       const finalEnglishText = normalizeTranslationWhitespace(sanitizeOcrTranslationText(rawEnglishText))

@@ -16,6 +16,7 @@ import sqlite3
 import sys
 import csv
 import tempfile
+from time import perf_counter
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -174,6 +175,9 @@ TRANSLATION_RUNTIME_DIR = (
 )
 FASTTEXT_LID_MODEL_PATH = TRANSLATION_RUNTIME_DIR / "translation" / "fasttext" / "lid.176.ftz"
 FASTTEXT_LID_MODEL_URL = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz"
+OCR_REMOTE_TRANSLATE_URL = os.environ.get("JPLEARN_OCR_REMOTE_TRANSLATE_URL", "").strip()
+OCR_REMOTE_TRANSLATE_TIMEOUT_MS = int(os.environ.get("JPLEARN_OCR_REMOTE_TRANSLATE_TIMEOUT_MS", "7000").strip() or "7000")
+OCR_REMOTE_FALLBACK_ENABLED = os.environ.get("JPLEARN_OCR_REMOTE_FALLBACK", "0").strip().lower() in {"1", "true", "yes", "on"}
 ACTIVE_TRANSLATION_MODEL_STATE_CANDIDATES = (
     Path(_assets_dir) / "translation" / "active-translation-model.json"
     if _assets_dir
@@ -182,7 +186,7 @@ ACTIVE_TRANSLATION_MODEL_STATE_CANDIDATES = (
     else PROJECT_ROOT / "data" / "translation" / "active-translation-model.json",
     PROJECT_ROOT / "data" / "translation" / "active-translation-model.json",
 )
-TRANSLATION_TIER_ORDER = ("argos", "opusmt")
+TRANSLATION_TIER_ORDER = ("opusmt", "argos")
 OPUSMT_MODEL_ID = "onnx-community/opus-mt-ja-en"
 LLMJP_150M_ONNX_MODEL_ID = "onnx-community/llm-jp-3-150m-instruct3-ONNX"
 JP_RERANKER_ONNX_MODEL_ID = "hotchpotch/japanese-reranker-xsmall-v2"
@@ -1347,6 +1351,266 @@ def _contains_latin_letters(text: str) -> bool:
     return bool(re.search(r"[A-Za-z]", text))
 
 
+def _repair_common_mojibake(text: str) -> str:
+    raw = str(text or "")
+    if not raw:
+        return ""
+
+    # Heuristic: OCR text should usually contain Japanese script. If not, and it
+    # contains common UTF-8-as-latin1 artifacts, try recovering original UTF-8.
+    if _contains_japanese_script(raw):
+        return raw
+    if not any(token in raw for token in ("Ò", "Ã", "Â", "Ê")):
+        return raw
+
+    try:
+        repaired = raw.encode("latin-1", errors="ignore").decode("utf-8", errors="ignore")
+    except Exception:
+        return raw
+
+    return repaired if _contains_japanese_script(repaired) else raw
+
+
+def _split_ocr_text_for_translation(text: str, *, max_chars: int, max_lines: int, overlap_lines: int) -> list[str]:
+    lines = [line.strip() for line in str(text or "").splitlines() if line and line.strip()]
+    if not lines:
+        return []
+
+    single = _join_ocr_lines_for_translation(lines)
+    if len(single) <= max_chars and len(lines) <= max_lines:
+        return [single]
+
+    chunks: list[str] = []
+    index = 0
+    last_index = len(lines)
+    overlap = max(0, overlap_lines)
+
+    while index < last_index:
+        end = index
+        total = 0
+        while end < last_index:
+            line_len = len(lines[end]) + 1
+            line_count = end - index + 1
+            if end > index and (total + line_len > max_chars or line_count > max_lines):
+                break
+            total += line_len
+            end += 1
+
+        if end <= index:
+            end = min(index + 1, last_index)
+
+        chunk = _join_ocr_lines_for_translation(lines[index:end])
+        if chunk:
+            chunks.append(chunk)
+
+        if end >= last_index:
+            break
+        index = max(index + 1, end - overlap)
+
+    return chunks or [single]
+
+
+def _translate_text_unit_with_backend(
+    unit: str,
+    *,
+    backend: str,
+    source_lang: str,
+    target_lang: str,
+) -> tuple[str, bool]:
+    if backend == "opusmt":
+        try:
+            return _translate_with_transformers_model(
+                unit,
+                tier="opusmt",
+                model_id=OPUSMT_MODEL_ID,
+                source_lang=source_lang,
+                target_lang=target_lang,
+            ), False
+        except RuntimeError as exc:
+            # Recover from sporadic empty Opus outputs by falling back to Argos.
+            if "returned empty text" in str(exc):
+                return _translate_with_argos(unit, source_lang, target_lang), True
+            raise
+    if backend == "argos":
+        return _translate_with_argos(unit, source_lang, target_lang), False
+    raise ValueError(f"Unsupported translation backend: {backend}")
+
+
+def _split_japanese_sentences(text: str) -> list[str]:
+    compact = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not compact:
+        return []
+
+    rough = re.split(r"(?<=[。！？!?」』])\s+", compact)
+    sentences = [segment.strip() for segment in rough if segment and segment.strip()]
+    return sentences or [compact]
+
+
+def _translate_ocr_text_by_sentence(
+    text: str,
+    *,
+    backend: str,
+    source_lang: str,
+    target_lang: str,
+) -> tuple[str, dict[str, object]]:
+    sentences = _split_japanese_sentences(text)
+    translated_sentences: list[str] = []
+    fallback_sentences = 0
+
+    for sentence in sentences:
+        translated_sentence, used_fallback = _translate_text_unit_with_backend(
+            sentence,
+            backend=backend,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
+        translated_sentences.append(str(translated_sentence or "").strip())
+        if used_fallback:
+            fallback_sentences += 1
+
+    merged = "\n".join(line for line in translated_sentences if line).strip()
+    return merged, {
+        "strategy": "sentence",
+        "sentenceCount": len(sentences),
+        "fallbackSentenceCount": fallback_sentences,
+    }
+
+
+def _translate_ocr_text_with_backend(
+    text: str,
+    *,
+    backend: str,
+    source_lang: str,
+    target_lang: str,
+    chunk_max_chars: int,
+    chunk_max_lines: int,
+    chunk_overlap_lines: int,
+) -> tuple[str, dict[str, object]]:
+    chunks = _split_ocr_text_for_translation(
+        text,
+        max_chars=chunk_max_chars,
+        max_lines=chunk_max_lines,
+        overlap_lines=chunk_overlap_lines,
+    )
+    translated_chunks: list[str] = []
+    fallback_chunks = 0
+    for chunk in chunks:
+        translated_chunk, used_fallback = _translate_text_unit_with_backend(
+            chunk,
+            backend=backend,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
+        if used_fallback:
+            fallback_chunks += 1
+
+        translated_chunks.append(str(translated_chunk or "").strip())
+
+    merged = _dedupe_overlap_lines(translated_chunks)
+    return merged, {
+        "strategy": "chunk",
+        "chunkCount": len(chunks),
+        "chunkMaxChars": chunk_max_chars,
+        "chunkMaxLines": chunk_max_lines,
+        "chunkOverlapLines": chunk_overlap_lines,
+        "fallbackChunkCount": fallback_chunks,
+    }
+
+
+def _translation_quality_score(source_text: str, translated_text: str) -> tuple[float, list[str]]:
+    source = str(source_text or "")
+    translated = str(translated_text or "")
+    if not translated.strip():
+        return 0.0, ["empty-output"]
+
+    score = 1.0
+    flags: list[str] = []
+    source_lines = [line.strip() for line in source.splitlines() if line.strip()]
+    translated_lines = [line.strip() for line in translated.splitlines() if line.strip()]
+    source_compact_len = len(re.sub(r"\s+", "", source))
+    translated_compact_len = len(re.sub(r"\s+", "", translated))
+
+    if _contains_japanese_script(translated):
+        score -= 0.55
+        flags.append("contains-japanese-script")
+    if not _contains_latin_letters(translated):
+        score -= 0.40
+        flags.append("missing-latin-letters")
+
+    if len(source_lines) >= 6 and len(translated_lines) <= max(2, len(source_lines) // 4):
+        score -= 0.35
+        flags.append("line-collapse")
+
+    if source_compact_len >= 120:
+        ratio = translated_compact_len / max(1, source_compact_len)
+        if ratio < 0.25:
+            score -= 0.45
+            flags.append("too-short-vs-source")
+        elif ratio < 0.4:
+            score -= 0.35
+            flags.append("short-vs-source")
+        elif ratio < 0.55:
+            score -= 0.2
+            flags.append("borderline-short-vs-source")
+
+    words = re.findall(r"[A-Za-z']+", translated.casefold())
+    if len(words) >= 16:
+        diversity = len(set(words)) / len(words)
+        if diversity < 0.35:
+            score -= 0.15
+            flags.append("low-lexical-diversity")
+
+    if len(words) >= 20:
+        counts: dict[str, int] = {}
+        for word in words:
+            counts[word] = counts.get(word, 0) + 1
+        max_ratio = max(counts.values()) / max(1, len(words))
+        if max_ratio >= 0.2:
+            score -= 0.3
+            flags.append("dominant-word-repetition")
+
+    if len(words) >= 24:
+        repeated_bigrams = 0
+        seen_bigrams: dict[tuple[str, str], int] = {}
+        for idx in range(len(words) - 1):
+            key = (words[idx], words[idx + 1])
+            seen_bigrams[key] = seen_bigrams.get(key, 0) + 1
+        for value in seen_bigrams.values():
+            if value >= 3:
+                repeated_bigrams += 1
+        if repeated_bigrams >= 2:
+            score -= 0.45
+            flags.append("looped-phrase-repetition")
+
+    if "�" in translated:
+        score -= 0.25
+        flags.append("replacement-char")
+
+    quote_count = translated.count('"') + translated.count("'")
+    if quote_count % 2 == 1:
+        score -= 0.15
+        flags.append("unbalanced-quotes")
+
+    if translated_lines:
+        tail = translated_lines[-1].strip()
+        if tail and not re.search(r'[.!?)"]$', tail):
+            score -= 0.15
+            flags.append("abrupt-ending")
+
+    ui_artifact_count = 0
+    for line in translated_lines:
+        lowered = line.casefold().strip("\"'“”‘’ ")
+        if lowered in {"back", "close", "home", "kindle"}:
+            ui_artifact_count += 1
+        elif "time left in chapter" in lowered:
+            ui_artifact_count += 1
+    if ui_artifact_count:
+        score -= min(0.4, 0.12 * ui_artifact_count)
+        flags.append("ui-artifacts-in-output")
+
+    return max(0.0, min(1.0, score)), flags
+
+
 def _join_ocr_lines_for_translation(lines: list[str]) -> str:
     """Reflow OCR line fragments into readable paragraph text for translation."""
     cleaned = [line.strip() for line in lines if line and line.strip()]
@@ -1362,6 +1626,96 @@ def _join_ocr_lines_for_translation(lines: list[str]) -> str:
     # Preserve visual OCR line boundaries to avoid accidental token fusion
     # that can hurt deterministic JA->EN translation quality.
     return "\n".join(deduped).strip()
+
+
+def _reflow_wrapped_japanese_lines(lines: list[str]) -> list[str]:
+    """Merge hard-wrapped OCR lines into sentence-like units before translation."""
+    cleaned = [line.strip() for line in lines if line and line.strip()]
+    if not cleaned:
+        return []
+
+    merged: list[str] = []
+    strong_end_pattern = re.compile(r"[。！？!?」』）)]$")
+
+    for line in cleaned:
+        if not merged:
+            merged.append(line)
+            continue
+
+        previous = merged[-1]
+        should_join = (
+            _contains_japanese_script(previous)
+            and _contains_japanese_script(line)
+            and not strong_end_pattern.search(previous)
+        )
+
+        if should_join:
+            merged[-1] = previous + line
+        else:
+            merged.append(line)
+
+    return merged
+
+
+def _dedupe_overlap_lines(translated_chunks: list[str]) -> str:
+    merged_lines: list[str] = []
+    seen_recent: list[str] = []
+
+    for chunk in translated_chunks:
+        for raw_line in str(chunk or "").splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            key = line.casefold()
+
+            # Overlap chunking can repeat neighboring lines; keep first occurrence
+            # within a small sliding window while preserving global order.
+            if key in seen_recent:
+                continue
+
+            merged_lines.append(line)
+            seen_recent.append(key)
+            if len(seen_recent) > 8:
+                seen_recent.pop(0)
+
+    return "\n".join(merged_lines).strip()
+
+
+def _collapse_ocr_text_to_single_line(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip()
+
+
+def _is_ocr_ui_noise_line(line: str) -> bool:
+    text = str(line or "").strip()
+    if not text:
+        return True
+    lowered = text.casefold()
+
+    if _contains_japanese_script(text):
+        return False
+
+    if lowered in {"kindle", "home", "close", "back"}:
+        return True
+    if lowered.endswith("mins") and "time left in chapter" in lowered:
+        return True
+    if re.fullmatch(r"\d{1,3}%", lowered):
+        return True
+    if re.fullmatch(r"\d{1,2}:\d{2}", lowered):
+        return True
+
+    return False
+
+
+def _prepare_ocr_text_for_translation(text_raw: str) -> str:
+    repaired = _repair_common_mojibake(text_raw)
+    lines = [line.strip() for line in str(repaired or "").splitlines() if line and line.strip()]
+    if not lines:
+        return ""
+
+    filtered = [line for line in lines if not _is_ocr_ui_noise_line(line)]
+    candidate = _reflow_wrapped_japanese_lines(filtered if filtered else lines)
+    joined = _join_ocr_lines_for_translation(candidate)
+    return _collapse_ocr_text_to_single_line(joined)
 
 
 def _translation_tier_model_dir_candidates(tier: str) -> tuple[Path, ...]:
@@ -1397,7 +1751,36 @@ def _translation_tier_is_installed(tier: str) -> bool:
     for base in _translation_tier_model_dir_candidates(tier):
         if (base / "model.ready").exists():
             return True
+
+        # Allow runtime-installed Hugging Face cache layout (no model.ready marker).
+        if tier == "opusmt":
+            direct_layout = (
+                (base / "onnx" / "encoder_model_int8.onnx").exists()
+                and (base / "onnx" / "decoder_model_merged_int8.onnx").exists()
+            )
+            if direct_layout:
+                return True
+
+            snapshot_encoder = next(
+                base.glob("models--onnx-community--opus-mt-ja-en/snapshots/*/onnx/encoder_model_int8.onnx"),
+                None,
+            )
+            snapshot_decoder = next(
+                base.glob("models--onnx-community--opus-mt-ja-en/snapshots/*/onnx/decoder_model_merged_int8.onnx"),
+                None,
+            )
+            if snapshot_encoder is not None and snapshot_decoder is not None:
+                return True
     return False
+
+
+def _normalize_translation_backend_tier(tier: str) -> str:
+    normalized = str(tier or "").strip().lower()
+    alias_map = {
+        "opusmt_ja_en_onnx": "opusmt",
+        "argos_ja_en": "argos",
+    }
+    return alias_map.get(normalized, normalized)
 
 
 def _pipeline_tier_cache_dir(tier: str) -> Path:
@@ -1422,7 +1805,7 @@ def _resolve_active_translation_backend() -> str:
             payload = json.loads(state_path.read_text(encoding="utf-8"))
         except Exception:
             continue
-        tier = str(payload.get("tier") or "").strip().lower()
+        tier = _normalize_translation_backend_tier(payload.get("tier") or "")
         if tier in TRANSLATION_TIER_ORDER and _translation_tier_is_installed(tier):
             return tier
 
@@ -1581,12 +1964,63 @@ def _translate_with_transformers_model(
         _TRANSFORMERS_TRANSLATOR_CACHE[tier] = (tokenizer, model)
 
     inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-    generate_kwargs: dict[str, object] = {"max_new_tokens": 512}
+    # Some ONNX-exported configs may leave generation fields unset (None).
+    # Provide explicit defaults so `generate()` remains stable across runtimes.
+    generate_kwargs: dict[str, object] = {
+        "max_new_tokens": 512,
+        "num_beams": 1,
+        "num_return_sequences": 1,
+    }
 
     outputs = model.generate(**inputs, **generate_kwargs)
     translated_text = str(tokenizer.batch_decode(outputs, skip_special_tokens=True)[0] or "").strip()
     if not translated_text:
         raise RuntimeError(f"{tier} translation returned empty text.")
+    return translated_text
+
+
+def _translate_with_remote_service(text: str, source_lang: str, target_lang: str) -> str:
+    if not OCR_REMOTE_TRANSLATE_URL:
+        raise RuntimeError("Remote OCR translation URL is not configured.")
+
+    payload = json.dumps(
+        {
+            "q": str(text or ""),
+            "source": source_lang,
+            "target": target_lang,
+            "format": "text",
+        }
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        OCR_REMOTE_TRANSLATE_URL,
+        data=payload,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    timeout_seconds = max(1.0, float(OCR_REMOTE_TRANSLATE_TIMEOUT_MS) / 1000.0)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            body = response.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        raise RuntimeError(f"Remote OCR translation request failed: {exc}") from exc
+
+    try:
+        parsed = json.loads(body)
+    except Exception as exc:
+        raise RuntimeError("Remote OCR translation returned non-JSON response.") from exc
+
+    translated_text = ""
+    if isinstance(parsed, dict):
+        translated_text = str(
+            parsed.get("translatedText")
+            or parsed.get("translation")
+            or parsed.get("text")
+            or ""
+        ).strip()
+
+    if not translated_text:
+        raise RuntimeError("Remote OCR translation returned empty text.")
     return translated_text
 
 
@@ -1785,8 +2219,18 @@ def _apply_optional_pipeline(source_text: str, base_translation: str) -> tuple[s
     }
 
 
-def translate_assistant_chat_ocr_payload(text_raw: str, source_lang: str = "ja", target_lang: str = "en") -> dict[str, object]:
-    text = str(text_raw or "").strip()
+def translate_assistant_chat_ocr_payload(
+    text_raw: str,
+    source_lang: str = "ja",
+    target_lang: str = "en",
+    fast_mode: bool = False,
+) -> dict[str, object]:
+    total_start = perf_counter()
+    timing: dict[str, object] = {}
+
+    preprocess_start = perf_counter()
+    text = _prepare_ocr_text_for_translation(text_raw)
+    timing["preprocessMs"] = round((perf_counter() - preprocess_start) * 1000.0, 2)
     if not text:
         raise ValueError("OCR text is empty.")
 
@@ -1796,16 +2240,44 @@ def translate_assistant_chat_ocr_payload(text_raw: str, source_lang: str = "ja",
         raise ValueError("Only ja->en OCR translation is currently supported.")
 
     configured_backend = os.environ.get("JPLEARN_TRANSLATION_BACKEND", "").strip().lower()
-    backend = configured_backend if configured_backend in TRANSLATION_TIER_ORDER else _resolve_active_translation_backend()
+    if configured_backend in TRANSLATION_TIER_ORDER:
+        backend = configured_backend
+    else:
+        # OCR passages need higher-fidelity translation; prefer OpusMT when
+        # local model assets are present, then fall back to active/default.
+        backend = "opusmt" if _translation_tier_is_installed("opusmt") else _resolve_active_translation_backend()
 
-    if backend == "opusmt":
-        translated_text = _translate_with_transformers_model(
-            text,
-            tier="opusmt",
-            model_id=OPUSMT_MODEL_ID,
-            source_lang=source,
-            target_lang=target,
-        )
+    raw_ocr_text = str(text_raw or "")
+    raw_had_multiple_lines = "\n" in raw_ocr_text
+    # After one-line normalization, only treat as "multiline passage" when the
+    # remaining content is still long enough to justify stricter quality checks.
+    is_multiline_ocr = raw_had_multiple_lines and len(text) >= 180
+    chunk_max_chars = 340 if is_multiline_ocr or len(text) > 220 else 520
+    chunk_max_lines = 6 if is_multiline_ocr else 12
+    chunk_overlap_lines = 1 if "\n" in text else 0
+
+    initial_translation_start = perf_counter()
+    translated_text, translation_meta = _translate_ocr_text_with_backend(
+        text,
+        backend=backend,
+        source_lang=source,
+        target_lang=target,
+        chunk_max_chars=chunk_max_chars,
+        chunk_max_lines=chunk_max_lines,
+        chunk_overlap_lines=chunk_overlap_lines,
+    )
+    timing["initialTranslationMs"] = round((perf_counter() - initial_translation_start) * 1000.0, 2)
+
+    # Keep long or multiline OCR output faithful: rewrite/rerank can over-compress
+    # narrative passages and drift from source meaning.
+    should_apply_pipeline = (
+        backend == "opusmt"
+        and translation_meta.get("chunkCount") == 1
+        and len(text) <= 160
+        and "\n" not in text
+    )
+    pipeline_start = perf_counter()
+    if should_apply_pipeline:
         try:
             translated_text, pipeline_meta = _apply_optional_pipeline(text, translated_text)
         except Exception as exc:
@@ -1815,10 +2287,195 @@ def translate_assistant_chat_ocr_payload(text_raw: str, source_lang: str = "ja",
                 "error": str(exc),
             }
     else:
-        backend = "argos"
-        translated_text = _translate_with_argos(text, source, target)
-        pipeline_meta = {"applied": False, "reason": "backend-not-opusmt"}
+        pipeline_meta = {
+            "applied": False,
+            "reason": "pipeline-skipped-for-faithful-ocr-mode",
+        }
+    timing["pipelineMs"] = round((perf_counter() - pipeline_start) * 1000.0, 2)
 
+    quality_start = perf_counter()
+    quality_score, quality_flags = _translation_quality_score(text, translated_text)
+    timing["qualityScoreMs"] = round((perf_counter() - quality_start) * 1000.0, 2)
+    retries: list[dict[str, object]] = []
+
+    quality_threshold = 0.64 if is_multiline_ocr else 0.48
+    retry_total_start = perf_counter()
+    if quality_score < quality_threshold:
+        retry_specs: list[tuple[str, int, int, str]] = []
+        if is_multiline_ocr or len(text) > 260:
+            retry_specs.append((backend, 240, 2, "smaller-chunks"))
+
+        alternate_backend = "argos" if backend == "opusmt" else "opusmt"
+        if alternate_backend == "argos" or _translation_tier_is_installed("opusmt"):
+            retry_specs.append((alternate_backend, 300 if len(text) > 220 else 520, 1 if "\n" in text else 0, "alternate-backend"))
+
+        best_candidate = {
+            "text": translated_text,
+            "backend": backend,
+            "score": quality_score,
+            "flags": quality_flags,
+            "meta": translation_meta,
+        }
+
+        for retry_backend, retry_max_chars, retry_overlap, retry_reason in retry_specs:
+            retry_start = perf_counter()
+            try:
+                retry_text, retry_meta = _translate_ocr_text_with_backend(
+                    text,
+                    backend=retry_backend,
+                    source_lang=source,
+                    target_lang=target,
+                    chunk_max_chars=retry_max_chars,
+                    chunk_max_lines=5 if is_multiline_ocr else 10,
+                    chunk_overlap_lines=retry_overlap,
+                )
+            except Exception as exc:
+                retries.append({
+                    "reason": retry_reason,
+                    "backend": retry_backend,
+                    "ok": False,
+                    "error": str(exc),
+                    "durationMs": round((perf_counter() - retry_start) * 1000.0, 2),
+                })
+                continue
+
+            retry_score, retry_flags = _translation_quality_score(text, retry_text)
+            retries.append({
+                "reason": retry_reason,
+                "backend": retry_backend,
+                "ok": True,
+                "score": round(retry_score, 4),
+                "flags": retry_flags,
+                "chunking": retry_meta,
+                "durationMs": round((perf_counter() - retry_start) * 1000.0, 2),
+            })
+
+            if retry_score > float(best_candidate["score"]):
+                best_candidate = {
+                    "text": retry_text,
+                    "backend": retry_backend,
+                    "score": retry_score,
+                    "flags": retry_flags,
+                    "meta": retry_meta,
+                }
+
+        if not fast_mode:
+            sentence_retry_backends: list[tuple[str, str]] = [(backend, "sentence-split")]
+            alt_for_sentence = "argos" if backend == "opusmt" else "opusmt"
+            if alt_for_sentence == "argos" or _translation_tier_is_installed("opusmt"):
+                sentence_retry_backends.append((alt_for_sentence, "sentence-split-alternate-backend"))
+
+            for sentence_backend, sentence_reason in sentence_retry_backends:
+                sentence_start = perf_counter()
+                try:
+                    sentence_text, sentence_meta = _translate_ocr_text_by_sentence(
+                        text,
+                        backend=sentence_backend,
+                        source_lang=source,
+                        target_lang=target,
+                    )
+                except Exception as exc:
+                    retries.append({
+                        "reason": sentence_reason,
+                        "backend": sentence_backend,
+                        "ok": False,
+                        "error": str(exc),
+                        "durationMs": round((perf_counter() - sentence_start) * 1000.0, 2),
+                    })
+                    continue
+
+                sentence_score, sentence_flags = _translation_quality_score(text, sentence_text)
+                retries.append({
+                    "reason": sentence_reason,
+                    "backend": sentence_backend,
+                    "ok": True,
+                    "score": round(sentence_score, 4),
+                    "flags": sentence_flags,
+                    "chunking": sentence_meta,
+                    "durationMs": round((perf_counter() - sentence_start) * 1000.0, 2),
+                })
+
+                if sentence_score > float(best_candidate["score"]):
+                    best_candidate = {
+                        "text": sentence_text,
+                        "backend": sentence_backend,
+                        "score": sentence_score,
+                        "flags": sentence_flags,
+                        "meta": sentence_meta,
+                    }
+        else:
+            retries.append({
+                "reason": "sentence-split-skipped-fast-mode",
+                "backend": backend,
+                "ok": True,
+                "skipped": True,
+                "durationMs": 0.0,
+            })
+
+        translated_text = str(best_candidate["text"])
+        backend = str(best_candidate["backend"])
+        quality_score = float(best_candidate["score"])
+        quality_flags = list(best_candidate["flags"])
+        translation_meta = dict(best_candidate["meta"])
+        if backend != "opusmt":
+            pipeline_meta = {
+                "applied": False,
+                "reason": "quality-retry-selected-alternate-backend",
+            }
+    timing["retryTotalMs"] = round((perf_counter() - retry_total_start) * 1000.0, 2)
+
+    severe_quality_failure = quality_score < 0.32 or (
+        "looped-phrase-repetition" in quality_flags
+        and ("\n" in text or len(text) >= 140)
+    ) or (
+        "looped-phrase-repetition" in quality_flags
+        and "dominant-word-repetition" in quality_flags
+    )
+
+    remote_fallback_applied = False
+    if severe_quality_failure and OCR_REMOTE_FALLBACK_ENABLED and OCR_REMOTE_TRANSLATE_URL:
+        remote_start = perf_counter()
+        try:
+            remote_text = _translate_with_remote_service(text, source, target)
+            remote_score, remote_flags = _translation_quality_score(text, remote_text)
+            retries.append({
+                "reason": "remote-service-fallback",
+                "backend": "remote",
+                "ok": True,
+                "score": round(remote_score, 4),
+                "flags": remote_flags,
+                "durationMs": round((perf_counter() - remote_start) * 1000.0, 2),
+            })
+            translated_text = remote_text
+            backend = "remote"
+            quality_score = remote_score
+            quality_flags = remote_flags
+            remote_fallback_applied = True
+            severe_quality_failure = quality_score < 0.28
+        except Exception as exc:
+            retries.append({
+                "reason": "remote-service-fallback",
+                "backend": "remote",
+                "ok": False,
+                "error": str(exc),
+                "durationMs": round((perf_counter() - remote_start) * 1000.0, 2),
+            })
+
+    if severe_quality_failure:
+        # Preserve best-effort output instead of always replacing with a generic
+        # failure message, which was overly strict for messy OCR passages.
+        translated_text = str(translated_text or "").strip() or (
+            "Translation quality is too low for a reliable result. "
+            "Try a tighter OCR crop or a shorter passage."
+        )
+        pipeline_meta = {
+            "applied": False,
+            "reason": "quality-gate-best-effort-output",
+        }
+        quality_flags = list(dict.fromkeys([*quality_flags, "quality-gate-best-effort-output"]))
+        quality_score = min(quality_score, 0.47)
+
+    language_gate_start = perf_counter()
     detected_lang, detected_confidence = _detect_language_fasttext(translated_text)
     source_has_japanese_script = _contains_japanese_script(text)
     has_japanese_script = _contains_japanese_script(translated_text)
@@ -1843,12 +2500,34 @@ def translate_assistant_chat_ocr_payload(text_raw: str, source_lang: str = "ja",
             f"detected={detected_lang or 'unknown'} confidence={detected_confidence:.3f} "
             f"containsJapaneseScript={has_japanese_script}"
         )
+    timing["languageGateMs"] = round((perf_counter() - language_gate_start) * 1000.0, 2)
+    timing["totalMs"] = round((perf_counter() - total_start) * 1000.0, 2)
+    timing["debug"] = {
+        "rawHadMultipleLines": raw_had_multiple_lines,
+        "preparedLength": len(text),
+        "qualityThreshold": quality_threshold,
+        "appliedMultilineThreshold": is_multiline_ocr,
+        "fastMode": fast_mode,
+        "remoteFallbackConfigured": bool(OCR_REMOTE_TRANSLATE_URL),
+        "remoteFallbackEnabled": OCR_REMOTE_FALLBACK_ENABLED,
+        "remoteFallbackApplied": remote_fallback_applied,
+    }
 
     return {
         "ok": True,
         "text": translated_text,
         "backend": backend,
+        "timing": timing,
         "pipeline": pipeline_meta,
+        "translation": {
+            "chunking": translation_meta,
+            "quality": {
+                "score": round(quality_score, 4),
+                "flags": quality_flags,
+                "retryCount": len(retries),
+                "retries": retries,
+            },
+        },
         "languageGate": {
             "model": "fasttext-lid.176",
             "detectedLanguage": detected_lang,
@@ -3570,11 +4249,18 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
 
     if command == "assistant-chat-translate-ocr":
         if len(argv) < 2:
-            return 2, {"error": "Usage: assistant-chat-translate-ocr <text> [source_lang] [target_lang]"}
+            return 2, {"error": "Usage: assistant-chat-translate-ocr <text> [source_lang] [target_lang] [fast_mode]"}
         source_lang = argv[2] if len(argv) > 2 and argv[2].strip() else "ja"
         target_lang = argv[3] if len(argv) > 3 and argv[3].strip() else "en"
+        fast_mode_raw = argv[4].strip().lower() if len(argv) > 4 else ""
+        fast_mode = fast_mode_raw in {"1", "true", "yes", "on"}
         try:
-            return 0, translate_assistant_chat_ocr_payload(argv[1], source_lang=source_lang, target_lang=target_lang)
+            return 0, translate_assistant_chat_ocr_payload(
+                argv[1],
+                source_lang=source_lang,
+                target_lang=target_lang,
+                fast_mode=fast_mode,
+            )
         except (RuntimeError, ValueError) as exc:
             return 2, {"error": str(exc)}
 

@@ -442,6 +442,7 @@ function registerIpcHandlers(options) {
     }
     const sourceLang = typeof payload?.sourceLang === 'string' ? payload.sourceLang.trim().toLowerCase() : 'ja'
     const targetLang = typeof payload?.targetLang === 'string' ? payload.targetLang.trim().toLowerCase() : 'en'
+    const fastMode = typeof payload?.fastMode === 'boolean' ? payload.fastMode : true
 
     try {
       return await options.runPythonBridgeWithArgs([
@@ -449,6 +450,7 @@ function registerIpcHandlers(options) {
         text,
         sourceLang,
         targetLang,
+        fastMode ? '1' : '0',
       ])
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)

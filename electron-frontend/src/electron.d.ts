@@ -344,6 +344,7 @@ interface AssistantChatOcrTranslationPayload {
   text: string
   sourceLang?: 'ja'
   targetLang?: 'en'
+  fastMode?: boolean
 }
 
 interface AssistantChatOcrTranslationResponse {
