@@ -262,6 +262,22 @@ function ensureJPLearnDirs() {
   return base
 }
 
+function getTutorModelsDir(base) {
+  return path.join(base, 'models', 'llama')
+}
+
+function getTutorModelPath(base, filename) {
+  const preferredPath = path.join(getTutorModelsDir(base), filename)
+  if (fs.existsSync(preferredPath)) {
+    return preferredPath
+  }
+  const legacyPath = path.join(base, 'models', filename)
+  if (fs.existsSync(legacyPath)) {
+    return legacyPath
+  }
+  return preferredPath
+}
+
 // ── Voice model install state ─────────────────────────────────────────────────
 
 function getVoiceDir(base) {
@@ -662,11 +678,10 @@ function isEmbedderInstalled(base, embedderTier) {
 }
 
 function isEmbedderTierStillNeeded(base, embedderTier, excludeChatbotTier) {
-  const modelsDir = path.join(base, 'models')
   return Object.entries(MODELS).some(([chatbotTier, model]) => {
     if (chatbotTier === excludeChatbotTier) return false
     if (CHATBOT_TIER_TO_EMBEDDER_TIER[chatbotTier] !== embedderTier) return false
-    return fs.existsSync(path.join(modelsDir, model.filename))
+    return fs.existsSync(getTutorModelPath(base, model.filename))
   })
 }
 
@@ -1241,7 +1256,6 @@ function detectLlamaBackend(gpuNames) {
 async function getSystemInfo() {
   const base = ensureJPLearnDirs()
   const totalRamGb = os.totalmem() / (1024 ** 3)
-  const modelsDir = path.join(base, 'models')
   const llamaCppDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
   const llamaCppInstalled = fs.existsSync(path.join(llamaCppDir, 'llama-server.exe'))
   const gpuAdapters = detectGpuNames()
@@ -1311,7 +1325,7 @@ async function getSystemInfo() {
       combinedSizeMb,
       label: m.label,
       description: m.description,
-      installed: fs.existsSync(path.join(modelsDir, m.filename)),
+      installed: fs.existsSync(getTutorModelPath(base, m.filename)),
       estimatedDownloadMinutes: estimateDownloadMinutes(combinedSizeMb, networkMbps),
     }
   }))
@@ -1340,7 +1354,7 @@ async function getSystemInfo() {
     || voiceEngineReachable
   const voiceDefaultModel = VOICE_DEFAULT_TIER
   const activeVoiceModel = resolveActiveVoiceModel(base)
-  const activeModelTier = resolveActiveTier(base, modelsDir)
+  const activeModelTier = resolveActiveTier(base)
   const activeEmbedderTier = activeModelTier ? CHATBOT_TIER_TO_EMBEDDER_TIER[activeModelTier] || null : null
   const activeEmbedderInstalled = activeEmbedderTier ? isEmbedderInstalled(base, activeEmbedderTier) : false
   const activeEmbedder = activeEmbedderTier ? EMBEDDERS[activeEmbedderTier] || null : null
@@ -1429,13 +1443,13 @@ function readActiveModelSelection(base) {
   return null
 }
 
-function resolveActiveTier(base, modelsDir) {
+function resolveActiveTier(base) {
   const selection = readActiveModelSelection(base)
-  if (selection && MODELS[selection.tier] && fs.existsSync(path.join(modelsDir, selection.filename))) {
+  if (selection && MODELS[selection.tier] && fs.existsSync(getTutorModelPath(base, selection.filename))) {
     return selection.tier
   }
   for (const [tier, model] of Object.entries(MODELS)) {
-    if (fs.existsSync(path.join(modelsDir, model.filename))) {
+    if (fs.existsSync(getTutorModelPath(base, model.filename))) {
       return tier
     }
   }
@@ -1447,8 +1461,7 @@ function setActiveModelTier(tier) {
   if (!model) throw new Error(`Unknown model tier: ${tier}`)
   const base = ensureJPLearnDirs()
   pruneDeprecatedVoiceAssets(base)
-  const modelsDir = path.join(base, 'models')
-  if (!fs.existsSync(path.join(modelsDir, model.filename))) {
+  if (!fs.existsSync(getTutorModelPath(base, model.filename))) {
     throw new Error(`Model tier "${tier}" is not installed`)
   }
   fs.writeFileSync(
@@ -1463,10 +1476,14 @@ function uninstallModel(tier) {
   const model = MODELS[tier]
   if (!model) throw new Error(`Unknown model tier: ${tier}`)
   const base = ensureJPLearnDirs()
-  const modelsDir = path.join(base, 'models')
-  const modelPath = path.join(modelsDir, model.filename)
-  if (fs.existsSync(modelPath)) {
-    fs.unlinkSync(modelPath)
+  const modelPaths = [
+    path.join(getTutorModelsDir(base), model.filename),
+    path.join(base, 'models', model.filename),
+  ]
+  for (const modelPath of modelPaths) {
+    if (fs.existsSync(modelPath)) {
+      fs.unlinkSync(modelPath)
+    }
   }
   const selection = readActiveModelSelection(base)
   if (selection && selection.filename === model.filename) {
@@ -2022,10 +2039,12 @@ function downloadModel(tier, sender, scriptRoot) {
   if (!model) return Promise.reject(new Error(`Unknown model tier: ${tier}`))
 
   const base = ensureJPLearnDirs()
-  const modelsDir = path.join(base, 'models')
-  const destPath = path.join(base, 'models', model.filename)
+  const modelsDir = getTutorModelsDir(base)
+  fs.mkdirSync(modelsDir, { recursive: true })
+  const legacyPath = path.join(base, 'models', model.filename)
+  const destPath = path.join(modelsDir, model.filename)
   const embedderTier = CHATBOT_TIER_TO_EMBEDDER_TIER[tier]
-  const hadActiveTier = resolveActiveTier(base, modelsDir)
+  const hadActiveTier = resolveActiveTier(base)
 
   const ensureEmbedder = async () => {
     if (!embedderTier || !scriptRoot) return
@@ -2052,7 +2071,16 @@ function downloadModel(tier, sender, scriptRoot) {
     return true
   }
 
-  if (fs.existsSync(destPath)) {
+  const hasInstalledModel = fs.existsSync(destPath) || fs.existsSync(legacyPath)
+
+  if (hasInstalledModel) {
+    if (fs.existsSync(legacyPath) && !fs.existsSync(destPath)) {
+      try {
+        fs.renameSync(legacyPath, destPath)
+      } catch {
+        // Fall back to using legacy location if move fails.
+      }
+    }
     return ensureLlamaCpp().then(async (llamaCppDownloaded) => {
       await ensureEmbedder()
       const selectedAsActive = ensureActiveSelection()

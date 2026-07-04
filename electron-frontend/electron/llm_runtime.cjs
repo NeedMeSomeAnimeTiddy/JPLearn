@@ -353,9 +353,14 @@ function resolveBundledModelPath() {
     // filename sorts first alphabetically, ignoring the user's choice.
     const activeFilename = readActiveModelFilename(dir)
     if (activeFilename) {
-      const activePath = path.join(dir, activeFilename)
-      if (fs.existsSync(activePath)) {
-        return activePath
+      const activeCandidates = [
+        path.join(dir, activeFilename),
+        path.join(dir, 'llama', activeFilename),
+      ]
+      for (const activePath of activeCandidates) {
+        if (fs.existsSync(activePath)) {
+          return activePath
+        }
       }
     }
 
@@ -383,9 +388,14 @@ function resolveDownloadedModelPath() {
   // Check for an explicitly selected tutor model first.
   const activeFilename = readActiveModelFilename(modelsDir)
   if (activeFilename) {
-    const activePath = path.join(modelsDir, activeFilename)
-    if (fs.existsSync(activePath)) {
-      return activePath
+    const activeCandidates = [
+      path.join(modelsDir, activeFilename),
+      path.join(modelsDir, 'llama', activeFilename),
+    ]
+    for (const activePath of activeCandidates) {
+      if (fs.existsSync(activePath)) {
+        return activePath
+      }
     }
   }
 
