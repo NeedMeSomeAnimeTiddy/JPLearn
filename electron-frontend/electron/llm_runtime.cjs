@@ -89,15 +89,10 @@ const DEFAULT_TUTOR_SYSTEM_PROMPT = [
 
 const DEFAULT_TRANSLATION_SYSTEM_PROMPT = [
   'You are a Japanese to English translation engine.',
-  'Translate the user text faithfully into natural English.',
-  'Return only the final translation payload in this exact format:',
-  'TRANSLATION_START',
-  '<translated text>',
-  'TRANSLATION_END',
-  'Never output any text before TRANSLATION_START or after TRANSLATION_END.',
-  'Do not output explanations, notes, roleplay, or extra formatting.',
-  'Do not reveal reasoning or internal thoughts.',
-  'Never emit markers like [Start thinking], [End thinking], or <think>.',
+  'Translate the Japanese text below into natural English.',
+  'Output only the English translation. Nothing else.',
+  'Do not explain. Do not repeat the Japanese. Do not add notes.',
+  'Do not output reasoning or thinking text.',
 ].join('\n')
 
 const BUILTIN_PROMPT_ADAPTERS = {
@@ -385,6 +380,7 @@ function resolveDownloadedModelPath() {
     return ''
   }
 
+  // Check for an explicitly selected tutor model first.
   const activeFilename = readActiveModelFilename(modelsDir)
   if (activeFilename) {
     const activePath = path.join(modelsDir, activeFilename)
@@ -393,13 +389,26 @@ function resolveDownloadedModelPath() {
     }
   }
 
-  const entries = fs.readdirSync(modelsDir, { withFileTypes: true })
-  const models = entries
+  // GGUF files placed directly in models/.
+  const directEntries = fs.readdirSync(modelsDir, { withFileTypes: true })
+  const directModels = directEntries
     .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.gguf'))
     .map((entry) => path.join(modelsDir, entry.name))
     .sort()
+  if (directModels.length > 0) return directModels[0]
 
-  return models[0] || ''
+  // Also scan models/llama/ — this is where the Qwen translation GGUF lives.
+  const llamaDir = path.join(modelsDir, 'llama')
+  if (fs.existsSync(llamaDir)) {
+    const llamaEntries = fs.readdirSync(llamaDir, { withFileTypes: true })
+    const llamaModels = llamaEntries
+      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.gguf'))
+      .map((entry) => path.join(llamaDir, entry.name))
+      .sort()
+    if (llamaModels.length > 0) return llamaModels[0]
+  }
+
+  return ''
 }
 
 function resolveTutorSystemPrompt() {
@@ -1099,48 +1108,29 @@ function normalizeTranslationOutput(rawText) {
   const stripped = stripThinkTags(rawText)
     .replace(/\[\s*start thinking\s*\]/gi, '')
     .replace(/\[\s*end thinking\s*\]/gi, '')
+    .replace(/<\/translation>/gi, '')
+    .replace(/<translation>/gi, '')
+    .replace(/TRANSLATION_START|TRANSLATION_END/gi, '')
     .trim()
   if (!stripped) {
     return ''
   }
 
-  const markerMatch = stripped.match(/TRANSLATION_START\s*([\s\S]*?)\s*TRANSLATION_END/i)
-  if (markerMatch && markerMatch[1]) {
-    return markerMatch[1].trim()
-  }
+  // Cut off at any ### section header — model sometimes re-emits the template.
+  const headerCut = stripped.search(/\n###\s/)
+  const clipped = headerCut > 0 ? stripped.slice(0, headerCut).trim() : stripped
 
-  const lines = stripped
+  const lines = clipped
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .filter((line) => !/^translation_start$/i.test(line))
-    .filter((line) => !/^translation_end$/i.test(line))
-    .filter((line) => !/^translation\s*[:-]/i.test(line))
-    .filter((line) => !/^english\s*[:-]/i.test(line))
-    .filter((line) => !/^sure[,.!]?\s*/i.test(line))
-
-  const filteredCandidates = lines.filter((line) => {
-    if (/^(okay|let me|i need to|the user|analysis:|reasoning:)/i.test(line)) {
-      return false
-    }
-    if (/^(kindle|home|close|back)$/i.test(line)) {
-      return false
-    }
-    if (/time\s+left\s+in\s+chapter/i.test(line)) {
-      return false
-    }
-    if (/^translation\s*[:-]?$/i.test(line) || /^english\s*[:-]?$/i.test(line)) {
-      return false
-    }
-    if (/let'?s keep your momentum|focused round|items feel shaky|work through those together/i.test(line)) {
-      return false
-    }
-    return true
-  })
-
-  if (filteredCandidates.length > 0) {
-    return filteredCandidates.join('\n').trim()
-  }
+    .filter((line) => !/^###/.test(line))
+    .filter((line) => !/^(translation|english|japanese)\s*[:-]?$/i.test(line))
+    .filter((line) => !/^sure[,.!]?\s*$/i.test(line))
+    .filter((line) => !/^(okay|let me|i need to|the user|analysis:|reasoning:)/i.test(line))
+    .filter((line) => !/^(kindle|home|close|back)$/i.test(line))
+    .filter((line) => !/time\s+left\s+in\s+chapter/i.test(line))
+    .filter((line) => !/let'?s keep your momentum|focused round|items feel shaky/i.test(line))
 
   return lines.join('\n').trim()
 }
@@ -1918,18 +1908,15 @@ function createTutorChatRuntime(options = {}) {
           },
           disableThinking: true,
           systemPromptOverride: DEFAULT_TRANSLATION_SYSTEM_PROMPT,
-          stopSequences: ['</s>', '<|im_end|>', '<|endoftext|>', '[End thinking]', '[Start thinking]', '\nUser:', '\nAssistant:'],
+          stopSequences: ['</s>', '<|im_end|>', '<|endoftext|>', '[End thinking]', '[Start thinking]', '\nUser:', '\nAssistant:', '\n###', '\nJapanese:'],
           allowCompletionFallback: true,
           completionPrompt: [
             DEFAULT_TRANSLATION_SYSTEM_PROMPT,
             '',
-            'Japanese:',
+            '### Japanese',
             trimmedText,
             '',
-            'Output format:',
-            'TRANSLATION_START',
-            '<translation>',
-            'TRANSLATION_END',
+            '### English',
           ].join('\n'),
         })
 

@@ -442,53 +442,20 @@ function registerIpcHandlers(options) {
     }
     const sourceLang = typeof payload?.sourceLang === 'string' ? payload.sourceLang.trim().toLowerCase() : 'ja'
     const targetLang = typeof payload?.targetLang === 'string' ? payload.targetLang.trim().toLowerCase() : 'en'
-    const fastMode = typeof payload?.fastMode === 'boolean' ? payload.fastMode : true
-
     try {
       if (
-        typeof options.localTutorRuntime.translateText === 'function'
-        && sourceLang === 'ja'
-        && targetLang === 'en'
+        typeof options.localTutorRuntime.translateText !== 'function'
+        || sourceLang !== 'ja'
+        || targetLang !== 'en'
       ) {
-        try {
-          return await options.localTutorRuntime.translateText(text, {
-            sourceLang,
-            targetLang,
-            maxOutputTokens: 180,
-          })
-        } catch {
-          // Fall back to dedicated OCR translator path below.
-        }
+        throw new Error('OCR translation is unavailable: no translation runtime found.')
       }
 
-      const encodedText = Buffer.from(text, 'utf8').toString('base64')
-      try {
-        return await options.runPythonBridgeWithArgs([
-          'assistant-chat-translate-ocr',
-          `base64:${encodedText}`,
-          sourceLang,
-          targetLang,
-          fastMode ? '1' : '0',
-        ])
-      } catch (bridgeError) {
-        // Keep OCR flow usable even when the Python bridge backend times out.
-        return {
-          ok: true,
-          text,
-          backend: 'pass-through',
-          warning: bridgeError instanceof Error ? bridgeError.message : String(bridgeError),
-          languageGate: {
-            model: 'none',
-            detectedLanguage: 'unknown',
-            confidence: 0,
-            sourceContainsJapaneseScript: true,
-            containsJapaneseScript: true,
-            passed: true,
-            mode: 'bridge-fail-open',
-            threshold: 0,
-          },
-        }
-      }
+      return await options.localTutorRuntime.translateText(text, {
+        sourceLang,
+        targetLang,
+        maxOutputTokens: 240,
+      })
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to translate OCR text: ${detail}`)

@@ -1881,15 +1881,11 @@ def _extract_llama_english_from_output(output: str) -> str:
     if not text.strip():
         return ""
 
-    marker_match = re.search(r"TRANSLATION_START\s*(.*?)\s*TRANSLATION_END", text, re.IGNORECASE | re.DOTALL)
-    if marker_match:
-        marker_text = str(marker_match.group(1) or "").strip()
-        if marker_text:
-            return marker_text
-
-    marker = "### English Translation"
-    if marker in text:
-        text = text.split(marker, 1)[1]
+    # Try to find the marker-delimited English section first.
+    for marker in ("### English\n", "### English Translation\n"):
+        if marker in text:
+            text = text.split(marker, 1)[1]
+            break
 
     lines = [line.strip() for line in text.splitlines() if line and line.strip()]
     if not lines:
@@ -1902,8 +1898,8 @@ def _extract_llama_english_from_output(output: str) -> str:
             continue
         if lowered.startswith("main:") or lowered.startswith("sampling"):
             continue
-        if lowered.startswith("### japanese") or lowered.startswith("### english"):
-            continue
+        if lowered.startswith("### "):
+            break
         filtered.append(line)
 
     return "\n".join(filtered).strip()
@@ -1917,19 +1913,13 @@ def _translate_with_llama_cpp(text: str, source_lang: str, target_lang: str) -> 
     model_path = _resolve_llama_translation_model_path()
     prompt = (
         "You are a Japanese to English translation engine.\n"
-        "Translate faithfully into natural English.\n"
-        "Output only the final translation payload in this exact format:\n"
-        "TRANSLATION_START\n"
-        "<translated text>\n"
-        "TRANSLATION_END\n"
-        "Never output any text before TRANSLATION_START or after TRANSLATION_END.\n"
-        "Do not explain. Do not include Japanese text.\n"
-        "Do not output any reasoning or thinking text.\n"
-        "Never emit [Start thinking], [End thinking], or <think>.\n\n"
-        "### Japanese Text\n"
+        "Translate the Japanese text below into natural English.\n"
+        "Output only the English translation. Nothing else.\n"
+        "Do not explain. Do not repeat the Japanese. Do not add notes.\n"
+        "Do not output reasoning or thinking text.\n\n"
+        "### Japanese\n"
         f"{text}\n\n"
-        "### Output\n"
-        "TRANSLATION_START\n"
+        "### English\n"
     )
     command = [
         str(llama_cli),
