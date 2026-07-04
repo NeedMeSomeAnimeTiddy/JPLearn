@@ -16,6 +16,7 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
 import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
+import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
 import type { RoundDictionaryNote } from './types'
@@ -6697,7 +6698,12 @@ function App() {
 
       const typedAssessment =
         roundState.mode === 'typed_recall'
-          ? assessTypedAnswer(roundState.answer, answer)
+          ? assessTypedRecallAnswer({
+            script: activeScript,
+            expectedAnswer: roundState.answer,
+            givenAnswer: answer,
+            dictionaryNote: roundState.dictionaryNote,
+          })
           : roundState.mode === 'speech_recall'
             ? (() => {
               const candidates = [
