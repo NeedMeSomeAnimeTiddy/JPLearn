@@ -3317,10 +3317,6 @@ function sanitizeOcrTranslationText(text: string): string {
   return cleanedLines.join('\n').trim()
 }
 
-function containsJapaneseScript(text: string): boolean {
-  return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(text)
-}
-
 function normalizeTranslationWhitespace(text: string): string {
   return text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 }
@@ -3452,37 +3448,27 @@ function App() {
     activeOcrModelTier?: 'standard' | null
     ocrInstalled?: boolean
     translationModels?: Array<{
-      tier: 'argos' | 'opusmt'
+      tier: 'qwen_ja_en'
       label: string
-      badge?: 'Default Translation' | 'Better Translation'
+      badge?: 'Qwen Translation'
       description: string
       sizeMb: number
       installed: boolean
       estimatedDownloadMinutes?: number | null
     }>
-    recommendedTranslationTier?: 'argos'
-    activeTranslationModelTier?: 'argos' | 'opusmt' | null
+    recommendedTranslationTier?: 'qwen_ja_en'
+    activeTranslationModelTier?: 'qwen_ja_en' | null
     translationInstalled?: boolean
-    pipelineModels?: Array<{
-      tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx'
-      label: string
-      badge?: 'Pipeline Step 1' | 'Pipeline Step 2' | 'Pipeline Step 3'
-      description: string
-      sizeMb: number
-      installed: boolean
-      estimatedDownloadMinutes?: number | null
-    }>
-    pipelineInstalled?: boolean
     translationProfiles?: Array<{
-      tier: 'ocr_argos_small' | 'ocr_pipeline_full'
+      tier: 'ocr_qwen_local'
       label: string
-      badge?: 'Smaller' | 'Higher Quality'
+      badge?: 'Recommended'
       description: string
       sizeMb: number
       installed: boolean
       estimatedDownloadMinutes?: number | null
     }>
-    activeTranslationProfileTier?: 'ocr_argos_small' | 'ocr_pipeline_full' | null
+    activeTranslationProfileTier?: 'ocr_qwen_local' | null
   } | null>(null)
   const [voiceOptions] = useState<VoiceOptionEntry[]>(FIXED_JAPANESE_VOICE_OPTIONS)
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
@@ -3496,7 +3482,7 @@ function App() {
   const [speechDownloadProgress, setSpeechDownloadProgress] = useState<number>(0)
   const [speechDownloadMethod, setSpeechDownloadMethod] = useState<string | null>(null)
   const [speechModelActionTier, setSpeechModelActionTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
-  const [translationProfileApplyingTier, setTranslationProfileApplyingTier] = useState<'ocr_argos_small' | 'ocr_pipeline_full' | null>(null)
+  const [translationProfileApplyingTier, setTranslationProfileApplyingTier] = useState<'ocr_qwen_local' | null>(null)
   const [translationProfileProgress, setTranslationProfileProgress] = useState<number>(0)
   const [translationProfileMethod, setTranslationProfileMethod] = useState<string | null>(null)
   const [voiceEngineDownloadingTier, setVoiceEngineDownloadingTier] = useState<'0.6b' | null>(null)
@@ -3657,9 +3643,7 @@ function App() {
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const customThemeImportInputRef = useRef<HTMLInputElement | null>(null)
   const customBackgroundImportInputRef = useRef<HTMLInputElement | null>(null)
-  const translationProfileTierRef = useRef<'ocr_argos_small' | 'ocr_pipeline_full' | null>(null)
-  const translationPipelineStageRef = useRef(0)
-  const translationPipelineLastPercentRef = useRef(0)
+  const translationProfileTierRef = useRef<'ocr_qwen_local' | null>(null)
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
   const dictionaryCards = useMemo(() => {
@@ -4107,8 +4091,6 @@ function App() {
         recommendedTranslationTier: setupInfo.recommendedTranslationTier,
         activeTranslationModelTier: setupInfo.activeTranslationModelTier ?? null,
         translationInstalled: setupInfo.translationInstalled ?? false,
-        pipelineModels: setupInfo.pipelineModels ?? [],
-        pipelineInstalled: setupInfo.pipelineInstalled ?? false,
         translationProfiles: setupInfo.translationProfiles ?? [],
         activeTranslationProfileTier: setupInfo.activeTranslationProfileTier ?? null,
       })
@@ -4197,9 +4179,7 @@ function App() {
         const activeTier = translationProfileTierRef.current
         if (activeTier) {
           const bounded = Math.max(0, Math.min(100, evt.percent))
-          const staged = activeTier === 'ocr_pipeline_full'
-            ? Math.round((bounded / 100) * 20)
-            : Math.round((bounded / 100) * 50)
+          const staged = Math.round((bounded / 100) * 50)
           setTranslationProfileProgress((prev) => Math.max(prev, staged))
         }
         if (method) setTranslationProfileMethod(method)
@@ -4209,23 +4189,7 @@ function App() {
         const activeTier = translationProfileTierRef.current
         if (activeTier) {
           const bounded = Math.max(0, Math.min(100, evt.percent))
-          const staged = activeTier === 'ocr_pipeline_full'
-            ? Math.round(20 + (bounded / 100) * 20)
-            : Math.round(50 + (bounded / 100) * 50)
-          setTranslationProfileProgress((prev) => Math.max(prev, staged))
-        }
-        if (method) setTranslationProfileMethod(method)
-        return
-      }
-      if (evt.id === 'pipeline') {
-        const activeTier = translationProfileTierRef.current
-        if (activeTier === 'ocr_pipeline_full') {
-          const bounded = Math.max(0, Math.min(100, evt.percent))
-          if (bounded <= 10 && translationPipelineLastPercentRef.current >= 90 && translationPipelineStageRef.current < 2) {
-            translationPipelineStageRef.current += 1
-          }
-          translationPipelineLastPercentRef.current = bounded
-          const staged = Math.round(40 + ((translationPipelineStageRef.current + bounded / 100) / 3) * 60)
+          const staged = Math.round(50 + (bounded / 100) * 50)
           setTranslationProfileProgress((prev) => Math.max(prev, staged))
         }
         if (method) setTranslationProfileMethod(method)
@@ -4347,14 +4311,12 @@ function App() {
     }
   }, [refreshTutorInstallInfo, speechModelActionTier])
 
-  const applyTranslationProfile = useCallback(async (tier: 'ocr_argos_small' | 'ocr_pipeline_full') => {
+  const applyTranslationProfile = useCallback(async (tier: 'ocr_qwen_local') => {
     const applyProfile = window.jplearnDesktop.applyTranslationProfile
     if (!applyProfile || translationProfileApplyingTier) {
       return
     }
     translationProfileTierRef.current = tier
-    translationPipelineStageRef.current = 0
-    translationPipelineLastPercentRef.current = 0
     setTranslationProfileApplyingTier(tier)
     setTranslationProfileProgress(0)
     setTranslationProfileMethod(null)
@@ -4363,8 +4325,6 @@ function App() {
       await refreshTutorInstallInfo()
     } finally {
       translationProfileTierRef.current = null
-      translationPipelineStageRef.current = 0
-      translationPipelineLastPercentRef.current = 0
       setTranslationProfileApplyingTier(null)
       setTranslationProfileProgress(0)
     }
@@ -5748,10 +5708,6 @@ function App() {
 
       if (!finalEnglishText) {
         setOcrWorkbenchError('No translation text returned.')
-        return
-      }
-      if (containsJapaneseScript(finalEnglishText)) {
-        setOcrWorkbenchError('Translator returned non-English text. Try again or switch tutor model.')
         return
       }
 
@@ -9537,7 +9493,7 @@ function App() {
                     })}
                   </div>
                   <p className="settings-help" style={{ marginTop: '0.75rem' }}>
-                    Both options include OCR extraction. Pick small for lower size, or bigger for the full translation pipeline.
+                    OCR translation now uses a single profile: OCR extraction + Qwen3.5-0.8B-JP local translation.
                   </p>
                   <div style={{ marginTop: '0.75rem' }}>
                     <label className="settings-help" htmlFor="assistant-chat-ocr-confidence-slider" style={{ display: 'block', marginBottom: '0.35rem' }}>

@@ -308,6 +308,7 @@ interface AssistantChatRuntimeStatus {
   inactivityUnloadMs: number
   configuredProvider?: string
   activeProvider?: string
+  activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
   activeModel?: string
   activePromptAdapter?: string
   adapterManifestPath?: string | null
@@ -350,7 +351,11 @@ interface AssistantChatOcrTranslationPayload {
 interface AssistantChatOcrTranslationResponse {
   ok: boolean
   text: string
-  backend?: 'argos' | 'opusmt'
+  backend?: 'llama.cpp' | 'llama.cpp+fallback' | 'llama.cpp-tutor' | 'remote'
+  provider?: string
+  model?: string
+  elapsedMs?: number
+  coldStart?: boolean
   languageGate: {
     model: string
     detectedLanguage: string
@@ -486,20 +491,13 @@ interface DesktopApi {
   downloadOcrModel?: (tier: 'standard', options?: { force?: boolean }) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   setActiveOcrModel?: (tier: 'standard') => Promise<{ ok: boolean; tier: string }>
   uninstallOcrModel?: (tier: 'standard') => Promise<{ ok: boolean; tier: string }>
-  downloadTranslationModel?: (tier: 'argos' | 'opusmt', options?: { force?: boolean }) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
-  setActiveTranslationModel?: (tier: 'argos' | 'opusmt') => Promise<{ ok: boolean; tier: string }>
-  uninstallTranslationModel?: (tier: 'argos' | 'opusmt') => Promise<{ ok: boolean; tier: string }>
-  downloadPipelineModel?: (
-    tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx',
-    options?: { force?: boolean },
-  ) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  downloadTranslationModel?: (tier: 'qwen_ja_en', options?: { force?: boolean }) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  setActiveTranslationModel?: (tier: 'qwen_ja_en') => Promise<{ ok: boolean; tier: string }>
+  uninstallTranslationModel?: (tier: 'qwen_ja_en') => Promise<{ ok: boolean; tier: string }>
   applyTranslationProfile?: (
-    tier: 'ocr_argos_small' | 'ocr_pipeline_full',
+    tier: 'ocr_qwen_local',
     options?: { force?: boolean },
   ) => Promise<{ ok?: boolean; alreadyInstalled?: boolean; profile?: string }>
-  uninstallPipelineModel?: (
-    tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx',
-  ) => Promise<{ ok: boolean; tier: string }>
   transcribeSpeech?: (payload: SpeechTranscribePayload) => Promise<SpeechTranscriptionResult>
   getSpeechStatus?: () => Promise<SpeechRuntimeStatus>
   createShortcuts?: (opts: { desktop?: boolean; startMenu?: boolean }) => Promise<{ ok: boolean }>
@@ -553,19 +551,9 @@ interface SetupOcrModelOption {
 }
 
 interface SetupTranslationModelOption {
-  tier: 'argos' | 'opusmt'
+  tier: 'qwen_ja_en'
   label: string
-  badge?: 'Default Translation' | 'Better Translation'
-  description: string
-  sizeMb: number
-  installed: boolean
-  estimatedDownloadMinutes?: number | null
-}
-
-interface SetupPipelineModelOption {
-  tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx'
-  label: string
-  badge?: 'Pipeline Step 1' | 'Pipeline Step 2' | 'Pipeline Step 3'
+  badge?: 'Qwen Translation'
   description: string
   sizeMb: number
   installed: boolean
@@ -573,9 +561,9 @@ interface SetupPipelineModelOption {
 }
 
 interface SetupTranslationProfileOption {
-  tier: 'ocr_argos_small' | 'ocr_pipeline_full'
+  tier: 'ocr_qwen_local'
   label: string
-  badge?: 'Smaller' | 'Higher Quality'
+  badge?: 'Recommended'
   description: string
   sizeMb: number
   installed: boolean
@@ -625,13 +613,11 @@ interface SetupSystemInfo {
   activeOcrModelTier?: 'standard' | null
   ocrInstalled?: boolean
   translationModels?: SetupTranslationModelOption[]
-  recommendedTranslationTier?: 'argos'
-  activeTranslationModelTier?: 'argos' | 'opusmt' | null
+  recommendedTranslationTier?: 'qwen_ja_en'
+  activeTranslationModelTier?: 'qwen_ja_en' | null
   translationInstalled?: boolean
-  pipelineModels?: SetupPipelineModelOption[]
-  pipelineInstalled?: boolean
   translationProfiles?: SetupTranslationProfileOption[]
-  activeTranslationProfileTier?: 'ocr_argos_small' | 'ocr_pipeline_full' | null
+  activeTranslationProfileTier?: 'ocr_qwen_local' | null
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
@@ -644,7 +630,7 @@ interface SetupSystemInfo {
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr' | 'translation' | 'pipeline'
+  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr' | 'translation'
   percent: number
   mb: number | null
   totalMb: number | null

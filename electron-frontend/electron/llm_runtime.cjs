@@ -24,6 +24,7 @@ const DEFAULT_MAX_CONTEXT_CHARS = 1800
 const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 420
 const DEFAULT_MAX_PROMPT_CHARS = 3200
+const DEFAULT_TRANSLATION_OUTPUT_CHARS = 900
 const DEFAULT_DICTIONARY_HTTP_TIMEOUT_MS = 4500
 const DEFAULT_OFFLINE_DICTIONARY_FULL_PATH = path.resolve(
   __dirname,
@@ -84,6 +85,19 @@ const DEFAULT_TUTOR_SYSTEM_PROMPT = [
   '- If you are uncertain, say so clearly instead of guessing.',
   '- Do not invent progress, history, preferences, or other personal facts about the user.',
   '- When helpful, end with a brief follow-up question to keep the conversation going, but never let it push you past 3 sentences total.',
+].join('\n')
+
+const DEFAULT_TRANSLATION_SYSTEM_PROMPT = [
+  'You are a Japanese to English translation engine.',
+  'Translate the user text faithfully into natural English.',
+  'Return only the final translation payload in this exact format:',
+  'TRANSLATION_START',
+  '<translated text>',
+  'TRANSLATION_END',
+  'Never output any text before TRANSLATION_START or after TRANSLATION_END.',
+  'Do not output explanations, notes, roleplay, or extra formatting.',
+  'Do not reveal reasoning or internal thoughts.',
+  'Never emit markers like [Start thinking], [End thinking], or <think>.',
 ].join('\n')
 
 const BUILTIN_PROMPT_ADAPTERS = {
@@ -1081,6 +1095,92 @@ function stripThinkTags(rawText) {
     .trim()
 }
 
+function normalizeTranslationOutput(rawText) {
+  const stripped = stripThinkTags(rawText)
+    .replace(/\[\s*start thinking\s*\]/gi, '')
+    .replace(/\[\s*end thinking\s*\]/gi, '')
+    .trim()
+  if (!stripped) {
+    return ''
+  }
+
+  const markerMatch = stripped.match(/TRANSLATION_START\s*([\s\S]*?)\s*TRANSLATION_END/i)
+  if (markerMatch && markerMatch[1]) {
+    return markerMatch[1].trim()
+  }
+
+  const lines = stripped
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^translation_start$/i.test(line))
+    .filter((line) => !/^translation_end$/i.test(line))
+    .filter((line) => !/^translation\s*[:-]/i.test(line))
+    .filter((line) => !/^english\s*[:-]/i.test(line))
+    .filter((line) => !/^sure[,.!]?\s*/i.test(line))
+
+  const filteredCandidates = lines.filter((line) => {
+    if (/^(okay|let me|i need to|the user|analysis:|reasoning:)/i.test(line)) {
+      return false
+    }
+    if (/^(kindle|home|close|back)$/i.test(line)) {
+      return false
+    }
+    if (/time\s+left\s+in\s+chapter/i.test(line)) {
+      return false
+    }
+    if (/^translation\s*[:-]?$/i.test(line) || /^english\s*[:-]?$/i.test(line)) {
+      return false
+    }
+    if (/let'?s keep your momentum|focused round|items feel shaky|work through those together/i.test(line)) {
+      return false
+    }
+    return true
+  })
+
+  if (filteredCandidates.length > 0) {
+    return filteredCandidates.join('\n').trim()
+  }
+
+  return lines.join('\n').trim()
+}
+
+function preprocessOcrTextForTranslation(rawText) {
+  const raw = String(rawText || '')
+  if (!raw.trim()) {
+    return ''
+  }
+
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length === 0) {
+    return ''
+  }
+
+  const isUiNoiseLine = (line) => {
+    const lowered = line.toLowerCase()
+    if (/^(kindle|home|close|back)$/.test(lowered)) {
+      return true
+    }
+    if (/time\s+left\s+in\s+chapter/.test(lowered) && /mins?$/.test(lowered)) {
+      return true
+    }
+    if (/^\d{1,3}%$/.test(lowered)) {
+      return true
+    }
+    if (/^\d{1,2}:\d{2}$/.test(lowered)) {
+      return true
+    }
+    return false
+  }
+
+  const filtered = lines.filter((line) => !isUiNoiseLine(line))
+  const selected = filtered.length > 0 ? filtered : lines
+  return selected.join(' ').replace(/\s+/g, ' ').trim()
+}
+
 function normalizeMojibakePunctuation(rawText) {
   // Restrict normalization to known CP1252/UTF-8 mojibake punctuation fragments.
   // Do not apply broad re-decoding so Japanese text remains intact.
@@ -1244,7 +1344,9 @@ function createLlamaServerAdapter(config = {}) {
 
     async infer(message, context = {}, runtimeOptions = {}) {
       const contextText = sanitizeContextText(context, runtimeOptions)
-      const systemPrompt = resolveTutorSystemPrompt()
+      const systemPrompt = typeof runtimeOptions.systemPromptOverride === 'string' && runtimeOptions.systemPromptOverride.trim()
+        ? runtimeOptions.systemPromptOverride.trim()
+        : resolveTutorSystemPrompt()
       const contextPriorityNote = resolveContextPriorityNote(promptTuningProfile)
       const composedSystemPrompt = contextText
         ? [
@@ -1261,7 +1363,12 @@ function createLlamaServerAdapter(config = {}) {
         ? [composedSystemPrompt, 'Adapter instructions:', promptAdapter.systemNote.trim()].join('\n\n')
         : composedSystemPrompt
       const boundedSystemPrompt = clipText(adaptedSystemPrompt, runtimeOptions.maxPromptChars || DEFAULT_MAX_PROMPT_CHARS)
-      const boundedMessage = clipText(message, DEFAULT_MAX_MESSAGE_CHARS)
+      const boundedMessage = clipText(
+        message,
+        Number.isFinite(runtimeOptions.maxMessageChars)
+          ? Math.max(60, Math.floor(runtimeOptions.maxMessageChars))
+          : DEFAULT_MAX_MESSAGE_CHARS,
+      )
       const adapterMaxTokens = Number.isFinite(promptAdapter && promptAdapter.maxOutputTokens)
         ? Math.max(24, Math.floor(promptAdapter.maxOutputTokens))
         : null
@@ -1300,28 +1407,113 @@ function createLlamaServerAdapter(config = {}) {
         cache_prompt: true,
         stream: false,
       }
-
-      const response = await httpRequestJson(
-        { host, port, path: '/v1/chat/completions', method: 'POST', timeout: requestTimeoutMs },
-        payload,
-        runtimeOptions.signal,
-      )
-
-      if (response.status !== 200) {
-        throw new Error(`llama-server returned status ${response.status}`)
+      if (runtimeOptions.disableThinking) {
+        payload.chat_template_kwargs = {
+          enable_thinking: false,
+        }
+      }
+      if (Array.isArray(runtimeOptions.stopSequences) && runtimeOptions.stopSequences.length > 0) {
+        payload.stop = runtimeOptions.stopSequences
       }
 
-      let parsed
-      try {
-        parsed = JSON.parse(response.body)
-      } catch {
-        throw new Error('llama-server returned malformed JSON')
+      const completionPrompt = typeof runtimeOptions.completionPrompt === 'string' && runtimeOptions.completionPrompt.trim()
+        ? runtimeOptions.completionPrompt
+        : [boundedSystemPrompt, '', boundedMessage].join('\n')
+
+      let text = ''
+
+      if (runtimeOptions.forceCompletion) {
+        const completionPayload = {
+          prompt: completionPrompt,
+          temperature,
+          top_p: topP,
+          top_k: topK,
+          repeat_penalty: repeatPenalty,
+          n_predict: maxOutputTokens,
+          cache_prompt: true,
+          stream: false,
+        }
+        if (Array.isArray(runtimeOptions.stopSequences) && runtimeOptions.stopSequences.length > 0) {
+          completionPayload.stop = runtimeOptions.stopSequences
+        }
+        const completionResponse = await httpRequestJson(
+          { host, port, path: '/completion', method: 'POST', timeout: requestTimeoutMs },
+          completionPayload,
+          runtimeOptions.signal,
+        )
+        if (completionResponse.status !== 200) {
+          throw new Error(`llama-server returned status ${completionResponse.status}`)
+        }
+        try {
+          const completionParsed = JSON.parse(completionResponse.body)
+          const completionText = completionParsed && typeof completionParsed.content === 'string'
+            ? completionParsed.content
+            : completionParsed && typeof completionParsed.response === 'string'
+              ? completionParsed.response
+              : ''
+          text = stripThinkTags(completionText)
+        } catch {
+          throw new Error('llama-server returned malformed JSON')
+        }
+      } else {
+        const response = await httpRequestJson(
+          { host, port, path: '/v1/chat/completions', method: 'POST', timeout: requestTimeoutMs },
+          payload,
+          runtimeOptions.signal,
+        )
+
+        if (response.status !== 200) {
+          throw new Error(`llama-server returned status ${response.status}`)
+        }
+
+        let parsed
+        try {
+          parsed = JSON.parse(response.body)
+        } catch {
+          throw new Error('llama-server returned malformed JSON')
+        }
+
+        const content = parsed && Array.isArray(parsed.choices) && parsed.choices[0] && parsed.choices[0].message
+          ? parsed.choices[0].message.content
+          : ''
+        text = stripThinkTags(content)
       }
 
-      const content = parsed && Array.isArray(parsed.choices) && parsed.choices[0] && parsed.choices[0].message
-        ? parsed.choices[0].message.content
-        : ''
-      const text = stripThinkTags(content)
+      if (!text && runtimeOptions.allowCompletionFallback) {
+        const completionPayload = {
+          prompt: completionPrompt,
+          temperature,
+          top_p: topP,
+          top_k: topK,
+          repeat_penalty: repeatPenalty,
+          n_predict: maxOutputTokens,
+          cache_prompt: true,
+          stream: false,
+        }
+        if (Array.isArray(runtimeOptions.stopSequences) && runtimeOptions.stopSequences.length > 0) {
+          completionPayload.stop = runtimeOptions.stopSequences
+        }
+
+        const completionResponse = await httpRequestJson(
+          { host, port, path: '/completion', method: 'POST', timeout: requestTimeoutMs },
+          completionPayload,
+          runtimeOptions.signal,
+        )
+        if (completionResponse.status === 200) {
+          try {
+            const completionParsed = JSON.parse(completionResponse.body)
+            const completionText = completionParsed && typeof completionParsed.content === 'string'
+              ? completionParsed.content
+              : completionParsed && typeof completionParsed.response === 'string'
+                ? completionParsed.response
+                : ''
+            text = stripThinkTags(completionText)
+          } catch {
+            // ignore completion JSON parse errors and fall through
+          }
+        }
+      }
+
       if (!text) {
         throw new Error('llama-server returned empty response')
       }
@@ -1434,6 +1626,9 @@ function createTutorChatRuntime(options = {}) {
   const maxOutputChars = Number.isFinite(options.maxOutputChars)
     ? Math.max(120, Math.floor(options.maxOutputChars))
     : DEFAULT_MAX_OUTPUT_CHARS
+  const translationOutputChars = Number.isFinite(options.translationOutputChars)
+    ? Math.max(200, Math.floor(options.translationOutputChars))
+    : DEFAULT_TRANSLATION_OUTPUT_CHARS
   const maxPromptChars = Number.isFinite(options.maxPromptChars)
     ? Math.max(240, Math.floor(options.maxPromptChars))
     : DEFAULT_MAX_PROMPT_CHARS
@@ -1673,6 +1868,110 @@ function createTutorChatRuntime(options = {}) {
       }
     },
 
+    async translateText(text, params = {}) {
+      if (typeof text !== 'string' || text.trim().length === 0) {
+        throw new Error('Translation text must not be empty')
+      }
+      if (isInferenceActive) {
+        throw new Error('Chat inference already active; cancel or wait for completion')
+      }
+
+      const sourceLang = typeof params.sourceLang === 'string' ? params.sourceLang.trim().toLowerCase() : 'ja'
+      const targetLang = typeof params.targetLang === 'string' ? params.targetLang.trim().toLowerCase() : 'en'
+      if (sourceLang !== 'ja' || targetLang !== 'en') {
+        throw new Error('Only ja->en OCR translation is currently supported.')
+      }
+
+      const preparedText = preprocessOcrTextForTranslation(text)
+      const trimmedText = clipText(
+        preparedText,
+        Number.isFinite(params.maxInputChars) ? Number(params.maxInputChars) : 2400,
+      )
+      const coldStart = await ensureLoaded()
+      lastUsedAtUtc = new Date().toISOString()
+      scheduleInactivityUnload()
+
+      const startedAt = Date.now()
+      activeInferenceController = new AbortController()
+      isInferenceActive = true
+      try {
+        const inference = await adapter.infer(trimmedText, {}, {
+          signal: activeInferenceController.signal,
+          maxPromptChars: Math.min(maxPromptChars, 2400),
+          maxMessageChars: 2400,
+          forceCompletion: true,
+          maxOutputTokens: Number.isFinite(params.maxOutputTokens)
+            ? Math.max(24, Math.floor(Number(params.maxOutputTokens)))
+            : 240,
+          promptAdapter: {
+            id: 'ocr_translation',
+            label: 'OCR Translation',
+            intents: ['translation'],
+            systemNote: '',
+            temperature: 0.0,
+            top_p: 0.82,
+            top_k: 24,
+            repeat_penalty: 1.08,
+            maxOutputTokens: Number.isFinite(params.maxOutputTokens)
+              ? Math.max(24, Math.floor(Number(params.maxOutputTokens)))
+              : 240,
+          },
+          disableThinking: true,
+          systemPromptOverride: DEFAULT_TRANSLATION_SYSTEM_PROMPT,
+          stopSequences: ['</s>', '<|im_end|>', '<|endoftext|>', '[End thinking]', '[Start thinking]', '\nUser:', '\nAssistant:'],
+          allowCompletionFallback: true,
+          completionPrompt: [
+            DEFAULT_TRANSLATION_SYSTEM_PROMPT,
+            '',
+            'Japanese:',
+            trimmedText,
+            '',
+            'Output format:',
+            'TRANSLATION_START',
+            '<translation>',
+            'TRANSLATION_END',
+          ].join('\n'),
+        })
+
+        const inferenceProvider = String((inference && inference.provider) || '').trim().toLowerCase()
+        if (inferenceProvider === 'stub' || inferenceProvider === 'scripted-fallback') {
+          throw new Error('Local OCR translation runtime is unavailable (stub adapter active)')
+        }
+
+        const cleanedText = normalizeTranslationOutput(inference && inference.text)
+        if (!cleanedText) {
+          throw new Error('Translation output was empty')
+        }
+        if (activeProvider !== 'stub-fallback') {
+          lastError = null
+        }
+        if (inference && typeof inference.provider === 'string') {
+          if (!(activeProvider === 'stub-fallback' && inference.provider === 'stub')) {
+            activeProvider = inference.provider
+          }
+        }
+        if (inference && typeof inference.model === 'string') {
+          activeModel = inference.model
+        }
+        return {
+          ok: true,
+          text: clipText(cleanedText, translationOutputChars),
+          provider: String((inference && inference.provider) || 'unknown'),
+          model: String((inference && inference.model) || 'unknown'),
+          coldStart,
+          elapsedMs: Date.now() - startedAt,
+          backend: 'llama.cpp-tutor',
+        }
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        lastError = detail
+        throw new Error(detail)
+      } finally {
+        isInferenceActive = false
+        activeInferenceController = null
+      }
+    },
+
     getStatus() {
       return {
         loaded,
@@ -1681,6 +1980,7 @@ function createTutorChatRuntime(options = {}) {
         inactivityUnloadMs,
         configuredProvider,
         activeProvider,
+        activeModelTier,
         activeModel,
         lastError,
         maxContextChars,

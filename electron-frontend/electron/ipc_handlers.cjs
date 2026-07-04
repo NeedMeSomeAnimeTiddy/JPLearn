@@ -445,13 +445,50 @@ function registerIpcHandlers(options) {
     const fastMode = typeof payload?.fastMode === 'boolean' ? payload.fastMode : true
 
     try {
-      return await options.runPythonBridgeWithArgs([
-        'assistant-chat-translate-ocr',
-        text,
-        sourceLang,
-        targetLang,
-        fastMode ? '1' : '0',
-      ])
+      if (
+        typeof options.localTutorRuntime.translateText === 'function'
+        && sourceLang === 'ja'
+        && targetLang === 'en'
+      ) {
+        try {
+          return await options.localTutorRuntime.translateText(text, {
+            sourceLang,
+            targetLang,
+            maxOutputTokens: 180,
+          })
+        } catch {
+          // Fall back to dedicated OCR translator path below.
+        }
+      }
+
+      const encodedText = Buffer.from(text, 'utf8').toString('base64')
+      try {
+        return await options.runPythonBridgeWithArgs([
+          'assistant-chat-translate-ocr',
+          `base64:${encodedText}`,
+          sourceLang,
+          targetLang,
+          fastMode ? '1' : '0',
+        ])
+      } catch (bridgeError) {
+        // Keep OCR flow usable even when the Python bridge backend times out.
+        return {
+          ok: true,
+          text,
+          backend: 'pass-through',
+          warning: bridgeError instanceof Error ? bridgeError.message : String(bridgeError),
+          languageGate: {
+            model: 'none',
+            detectedLanguage: 'unknown',
+            confidence: 0,
+            sourceContainsJapaneseScript: true,
+            containsJapaneseScript: true,
+            passed: true,
+            mode: 'bridge-fail-open',
+            threshold: 0,
+          },
+        }
+      }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to translate OCR text: ${detail}`)
@@ -1092,7 +1129,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:download-translation-model', async (event, tier, downloadOptions) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['argos', 'opusmt'].includes(tier)) {
+      if (typeof tier !== 'string' || !['qwen_ja_en'].includes(tier)) {
         throw new Error('Invalid translation model tier')
       }
       const force = Boolean(downloadOptions && typeof downloadOptions === 'object' && downloadOptions.force)
@@ -1106,7 +1143,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:set-active-translation-model', (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['argos', 'opusmt'].includes(tier)) {
+      if (typeof tier !== 'string' || !['qwen_ja_en'].includes(tier)) {
         throw new Error('Invalid translation model tier')
       }
       try {
@@ -1119,7 +1156,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:uninstall-translation-model', (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['argos', 'opusmt'].includes(tier)) {
+      if (typeof tier !== 'string' || !['qwen_ja_en'].includes(tier)) {
         throw new Error('Invalid translation model tier')
       }
       try {
@@ -1130,23 +1167,9 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:download-pipeline-model', async (event, tier, downloadOptions) => {
-      assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['opusmt_ja_en_onnx', 'llmjp_150m_onnx', 'jp_reranker_xsmall_onnx'].includes(tier)) {
-        throw new Error('Invalid pipeline model tier')
-      }
-      const force = Boolean(downloadOptions && typeof downloadOptions === 'object' && downloadOptions.force)
-      try {
-        return await setupRuntime.downloadPipelineModel(tier, event.sender, options.repoRoot, { force })
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error)
-        throw new Error(`Pipeline model download failed: ${detail}`)
-      }
-    })
-
     options.ipcMain.handle('setup:apply-translation-profile', async (event, tier, applyOptions) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['ocr_argos_small', 'ocr_pipeline_full'].includes(tier)) {
+      if (typeof tier !== 'string' || !['ocr_qwen_local'].includes(tier)) {
         throw new Error('Invalid translation profile tier')
       }
       const force = Boolean(applyOptions && typeof applyOptions === 'object' && applyOptions.force)
@@ -1155,19 +1178,6 @@ function registerIpcHandlers(options) {
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Translation profile apply failed: ${detail}`)
-      }
-    })
-
-    options.ipcMain.handle('setup:uninstall-pipeline-model', (event, tier) => {
-      assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['opusmt_ja_en_onnx', 'llmjp_150m_onnx', 'jp_reranker_xsmall_onnx'].includes(tier)) {
-        throw new Error('Invalid pipeline model tier')
-      }
-      try {
-        return setupRuntime.uninstallPipelineModel(tier)
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error)
-        throw new Error(`Failed to uninstall pipeline model: ${detail}`)
       }
     })
 

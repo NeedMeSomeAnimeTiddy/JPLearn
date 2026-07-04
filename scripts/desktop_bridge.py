@@ -16,6 +16,8 @@ import sqlite3
 import sys
 import csv
 import tempfile
+import subprocess
+import base64
 from time import perf_counter
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -178,6 +180,10 @@ FASTTEXT_LID_MODEL_URL = "https://dl.fbaipublicfiles.com/fasttext/supervised-mod
 OCR_REMOTE_TRANSLATE_URL = os.environ.get("JPLEARN_OCR_REMOTE_TRANSLATE_URL", "").strip()
 OCR_REMOTE_TRANSLATE_TIMEOUT_MS = int(os.environ.get("JPLEARN_OCR_REMOTE_TRANSLATE_TIMEOUT_MS", "7000").strip() or "7000")
 OCR_REMOTE_FALLBACK_ENABLED = os.environ.get("JPLEARN_OCR_REMOTE_FALLBACK", "0").strip().lower() in {"1", "true", "yes", "on"}
+LLAMA_TRANSLATION_TIMEOUT_MS = int(os.environ.get("JPLEARN_OCR_LLM_TIMEOUT_MS", "90000").strip() or "90000")
+LLAMA_TRANSLATION_MODEL_FILENAME = os.environ.get("JPLEARN_OCR_LLM_MODEL", "Qwen3.5-0.8B-JP-Q4_K_M.gguf").strip() or "Qwen3.5-0.8B-JP-Q4_K_M.gguf"
+LLAMA_TRANSLATION_STRICT = os.environ.get("JPLEARN_OCR_LLM_STRICT", "0").strip().lower() in {"1", "true", "yes", "on"}
+LLAMA_TRANSLATION_GPU_LAYERS = int(os.environ.get("JPLEARN_OCR_LLM_GPU_LAYERS", "99").strip() or "99")
 ACTIVE_TRANSLATION_MODEL_STATE_CANDIDATES = (
     Path(_assets_dir) / "translation" / "active-translation-model.json"
     if _assets_dir
@@ -186,15 +192,7 @@ ACTIVE_TRANSLATION_MODEL_STATE_CANDIDATES = (
     else PROJECT_ROOT / "data" / "translation" / "active-translation-model.json",
     PROJECT_ROOT / "data" / "translation" / "active-translation-model.json",
 )
-TRANSLATION_TIER_ORDER = ("opusmt", "argos")
-OPUSMT_MODEL_ID = "onnx-community/opus-mt-ja-en"
-LLMJP_150M_ONNX_MODEL_ID = "onnx-community/llm-jp-3-150m-instruct3-ONNX"
-JP_RERANKER_ONNX_MODEL_ID = "hotchpotch/japanese-reranker-xsmall-v2"
-PIPELINE_TIER_ORDER = (
-    "opusmt_ja_en_onnx",
-    "llmjp_150m_onnx",
-    "jp_reranker_xsmall_onnx",
-)
+TRANSLATION_TIER_ORDER = ("qwen_ja_en",)
 
 SENTENCE_EXAMPLES_CSV_CANDIDATES = (
     Path(_assets_dir) / "data" / "external_sources" / "sentence_examples.csv"
@@ -1148,6 +1146,9 @@ def _extract_dual_pass_ocr_payload(
 
 
 def extract_assistant_chat_ocr_payload(image_path_raw: str, min_confidence: float = 0.30) -> dict[str, object]:
+    global _PADDLE_OCR_ENGINE_CACHE
+    global _PADDLE_OCR_ENGINE_CACHE_KEY
+
     image_path = Path(image_path_raw).expanduser().resolve()
     if not image_path.exists() or not image_path.is_file():
         raise ValueError(f"Image file does not exist: {image_path}")
@@ -1278,69 +1279,47 @@ def extract_assistant_chat_ocr_payload(image_path_raw: str, min_confidence: floa
         auto_kwargs["use_angle_cls"] = False
     init_candidates.append((auto_kwargs, enable_cls))
 
-    engine = None
-    selected_enable_cls = False
-    init_errors: list[str] = []
-    for kwargs, candidate_enable_cls in init_candidates:
-        try:
-            engine = PaddleOCR(**kwargs)
-            selected_enable_cls = candidate_enable_cls
-            break
-        except Exception as exc:
-            init_errors.append(str(exc))
-
-    if engine is None:
-        details = " | ".join(error for error in init_errors if error)
-        raise RuntimeError(
-            "Unable to initialize PaddleOCR runtime with available model configuration. "
-            f"Details: {details or '(no details)'}"
-        )
-
-    ocr_signature = inspect.signature(engine.ocr)
-    candidates: list[tuple[str, dict[str, object]]] = []
-
-    dual_pass_payload = _extract_dual_pass_ocr_payload(
-        image_path=image_path,
-        min_confidence=min_confidence,
-        paddleocr_module=paddleocr_module,
+    cache_key = "|".join(
+        [
+            str(det_model_dir or ""),
+            str(rec_model_dir or ""),
+            str(cls_model_dir or ""),
+            "with_orientation" if "use_textline_orientation" in accepted_params else "no_orientation",
+        ]
     )
-    if dual_pass_payload is not None:
-        candidates.append(("dual_stream_detect_once", dual_pass_payload))
 
-    base_payload = _run_ocr_with_engine(
+    if _PADDLE_OCR_ENGINE_CACHE is not None and _PADDLE_OCR_ENGINE_CACHE_KEY == cache_key:
+        engine, selected_enable_cls, ocr_signature = _PADDLE_OCR_ENGINE_CACHE
+    else:
+        engine = None
+        selected_enable_cls = False
+        init_errors: list[str] = []
+        for kwargs, candidate_enable_cls in init_candidates:
+            try:
+                engine = PaddleOCR(**kwargs)
+                selected_enable_cls = candidate_enable_cls
+                break
+            except Exception as exc:
+                init_errors.append(str(exc))
+
+        if engine is None:
+            details = " | ".join(error for error in init_errors if error)
+            raise RuntimeError(
+                "Unable to initialize PaddleOCR runtime with available model configuration. "
+                f"Details: {details or '(no details)'}"
+            )
+
+        ocr_signature = inspect.signature(engine.ocr)
+        _PADDLE_OCR_ENGINE_CACHE = (engine, selected_enable_cls, ocr_signature)
+        _PADDLE_OCR_ENGINE_CACHE_KEY = cache_key
+
+    return _run_ocr_with_engine(
         engine,
         image_path,
         ocr_signature,
         selected_enable_cls,
         min_confidence,
     )
-    candidates.append(("full_image_original", base_payload))
-
-    if not OCR_PREPROCESS_ENABLED:
-        return _select_best_ocr_payload(candidates)
-
-    preprocessed_path = _preprocess_image_for_ocr(image_path)
-    if preprocessed_path is None:
-        return _select_best_ocr_payload(candidates)
-
-    try:
-        preprocessed_payload = _run_ocr_with_engine(
-            engine,
-            preprocessed_path,
-            ocr_signature,
-            selected_enable_cls,
-            min_confidence,
-        )
-        candidates.append(("full_image_preprocessed", preprocessed_payload))
-    except Exception:
-        return _select_best_ocr_payload(candidates)
-    finally:
-        try:
-            preprocessed_path.unlink(missing_ok=True)
-        except OSError:
-            pass
-
-    return _select_best_ocr_payload(candidates)
 
 
 def _contains_japanese_script(text: str) -> bool:
@@ -1417,22 +1396,8 @@ def _translate_text_unit_with_backend(
     source_lang: str,
     target_lang: str,
 ) -> tuple[str, bool]:
-    if backend == "opusmt":
-        try:
-            return _translate_with_transformers_model(
-                unit,
-                tier="opusmt",
-                model_id=OPUSMT_MODEL_ID,
-                source_lang=source_lang,
-                target_lang=target_lang,
-            ), False
-        except RuntimeError as exc:
-            # Recover from sporadic empty Opus outputs by falling back to Argos.
-            if "returned empty text" in str(exc):
-                return _translate_with_argos(unit, source_lang, target_lang), True
-            raise
-    if backend == "argos":
-        return _translate_with_argos(unit, source_lang, target_lang), False
+    if backend == "llama.cpp":
+        return _translate_with_llama_cpp(unit, source_lang, target_lang), False
     raise ValueError(f"Unsupported translation backend: {backend}")
 
 
@@ -1729,47 +1694,23 @@ def _translation_tier_model_dir_candidates(tier: str) -> tuple[Path, ...]:
     )
 
 
-def _pipeline_tier_model_dir_candidates(tier: str) -> tuple[Path, ...]:
-    return (
-        Path(_assets_dir) / "translation-pipeline" / tier
-        if _assets_dir
-        else Path(_docs_dir) / "translation-pipeline" / tier
-        if _docs_dir
-        else PROJECT_ROOT / "data" / "translation-pipeline" / tier,
-        PROJECT_ROOT / "data" / "translation-pipeline" / tier,
-    )
-
-
-def _translation_tier_cache_dir(tier: str) -> Path:
-    for candidate in _translation_tier_model_dir_candidates(tier):
-        if candidate.exists():
-            return candidate
-    return _translation_tier_model_dir_candidates(tier)[0]
-
-
 def _translation_tier_is_installed(tier: str) -> bool:
+    normalized_tier = _normalize_translation_backend_tier(tier)
+    if normalized_tier != "qwen_ja_en":
+        return False
+
     for base in _translation_tier_model_dir_candidates(tier):
         if (base / "model.ready").exists():
             return True
 
-        # Allow runtime-installed Hugging Face cache layout (no model.ready marker).
-        if tier == "opusmt":
-            direct_layout = (
-                (base / "onnx" / "encoder_model_int8.onnx").exists()
-                and (base / "onnx" / "decoder_model_merged_int8.onnx").exists()
-            )
-            if direct_layout:
-                return True
-
-            snapshot_encoder = next(
-                base.glob("models--onnx-community--opus-mt-ja-en/snapshots/*/onnx/encoder_model_int8.onnx"),
-                None,
-            )
-            snapshot_decoder = next(
-                base.glob("models--onnx-community--opus-mt-ja-en/snapshots/*/onnx/decoder_model_merged_int8.onnx"),
-                None,
-            )
-            if snapshot_encoder is not None and snapshot_decoder is not None:
+        # Allow direct GGUF installs without model.ready marker.
+        for candidate in (
+            base.parent.parent / "models" / "llama" / "Qwen3.5-0.8B-JP-Q4_K_M.gguf",
+            base.parent.parent / "models" / "llama" / "Qwen3.5-0.8B-JP-Q6_K.gguf",
+            PROJECT_ROOT / "models" / "llama" / "Qwen3.5-0.8B-JP-Q4_K_M.gguf",
+            PROJECT_ROOT / "models" / "llama" / "Qwen3.5-0.8B-JP-Q6_K.gguf",
+        ):
+            if candidate.exists():
                 return True
     return False
 
@@ -1777,24 +1718,9 @@ def _translation_tier_is_installed(tier: str) -> bool:
 def _normalize_translation_backend_tier(tier: str) -> str:
     normalized = str(tier or "").strip().lower()
     alias_map = {
-        "opusmt_ja_en_onnx": "opusmt",
-        "argos_ja_en": "argos",
+        "qwen": "qwen_ja_en",
     }
     return alias_map.get(normalized, normalized)
-
-
-def _pipeline_tier_cache_dir(tier: str) -> Path:
-    for candidate in _pipeline_tier_model_dir_candidates(tier):
-        if candidate.exists():
-            return candidate
-    return _pipeline_tier_model_dir_candidates(tier)[0]
-
-
-def _pipeline_tier_is_installed(tier: str) -> bool:
-    for base in _pipeline_tier_model_dir_candidates(tier):
-        if (base / "model.ready").exists():
-            return True
-    return False
 
 
 def _resolve_active_translation_backend() -> str:
@@ -1807,66 +1733,12 @@ def _resolve_active_translation_backend() -> str:
             continue
         tier = _normalize_translation_backend_tier(payload.get("tier") or "")
         if tier in TRANSLATION_TIER_ORDER and _translation_tier_is_installed(tier):
-            return tier
+            return "llama.cpp"
 
     for tier in TRANSLATION_TIER_ORDER:
         if _translation_tier_is_installed(tier):
-            return tier
-    return "argos"
-
-
-def _resolve_argos_translation(source_lang: str, target_lang: str):
-    try:
-        argos_package = importlib.import_module("argostranslate.package")
-        argos_translate = importlib.import_module("argostranslate.translate")
-    except Exception as exc:  # pragma: no cover - environment dependent
-        raise RuntimeError(
-            "Argos Translate runtime is unavailable. Install Python package 'argostranslate'."
-        ) from exc
-
-    def find_translation():
-        installed_languages = argos_translate.get_installed_languages()
-        source = next((lang for lang in installed_languages if lang.code == source_lang), None)
-        target = next((lang for lang in installed_languages if lang.code == target_lang), None)
-        if source is None or target is None:
-            return None
-        return source.get_translation(target)
-
-    translation = find_translation()
-    if translation is not None:
-        return translation
-
-    try:
-        argos_package.update_package_index()
-        available_packages = argos_package.get_available_packages()
-        package = next(
-            (
-                item
-                for item in available_packages
-                if item.from_code == source_lang and item.to_code == target_lang
-            ),
-            None,
-        )
-    except Exception as exc:  # pragma: no cover - network dependent
-        raise RuntimeError(
-            f"Unable to resolve Argos Translate package for {source_lang}->{target_lang}: {exc}"
-        ) from exc
-
-    if package is None:
-        raise RuntimeError(f"No Argos Translate package available for {source_lang}->{target_lang}.")
-
-    try:
-        downloaded_path = package.download()
-        argos_package.install_from_path(downloaded_path)
-    except Exception as exc:  # pragma: no cover - network dependent
-        raise RuntimeError(
-            f"Failed to install Argos Translate package for {source_lang}->{target_lang}: {exc}"
-        ) from exc
-
-    translation = find_translation()
-    if translation is None:
-        raise RuntimeError(f"Argos Translate package install succeeded but translation {source_lang}->{target_lang} is unavailable.")
-    return translation
+            return "llama.cpp"
+    return "llama.cpp"
 
 
 def _ensure_fasttext_lid_model_path() -> Path:
@@ -1909,74 +1781,8 @@ def _detect_language_fasttext(text: str) -> tuple[str, float]:
     return normalized.lower(), score
 
 
-_TRANSFORMERS_TRANSLATOR_CACHE: dict[str, tuple[object, object]] = {}
-_PIPELINE_LLM_REWRITE_CACHE: tuple[object, object] | None = None
-_PIPELINE_RERANKER_CACHE: tuple[object, object] | None = None
-
-
-def _translate_with_argos(text: str, source_lang: str, target_lang: str) -> str:
-    translation = _resolve_argos_translation(source_lang, target_lang)
-    translated_text = str(translation.translate(text) or "").strip()
-    if not translated_text:
-        raise RuntimeError("Argos translation returned empty text.")
-    return translated_text
-
-
-def _translate_with_transformers_model(
-    text: str,
-    *,
-    tier: str,
-    model_id: str,
-    source_lang: str,
-    target_lang: str,
-) -> str:
-    if source_lang != "ja" or target_lang != "en":
-        raise ValueError("Only ja->en OCR translation is currently supported.")
-
-    try:
-        transformers = importlib.import_module("transformers")
-        optimum_ort = importlib.import_module("optimum.onnxruntime")
-    except Exception as exc:  # pragma: no cover - environment dependent
-        raise RuntimeError(
-            "ONNX translation runtime is unavailable. Install Python packages 'transformers', 'optimum[onnxruntime]', and 'sentencepiece'."
-        ) from exc
-
-    cached = _TRANSFORMERS_TRANSLATOR_CACHE.get(tier)
-    tokenizer = cached[0] if cached else None
-    model = cached[1] if cached else None
-
-    cache_dir = _translation_tier_cache_dir(tier)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
-    if tokenizer is None or model is None:
-        tokenizer = transformers.AutoTokenizer.from_pretrained(model_id, cache_dir=str(cache_dir))
-        encoder_file_name = "encoder_model_int8.onnx"
-        decoder_file_name = "decoder_model_merged_int8.onnx"
-        decoder_with_past_file_name = "decoder_with_past_model_int8.onnx"
-        model = optimum_ort.ORTModelForSeq2SeqLM.from_pretrained(
-            model_id,
-            cache_dir=str(cache_dir),
-            subfolder="onnx",
-            encoder_file_name=encoder_file_name,
-            decoder_file_name=decoder_file_name,
-            decoder_with_past_file_name=decoder_with_past_file_name,
-        )
-        _TRANSFORMERS_TRANSLATOR_CACHE[tier] = (tokenizer, model)
-
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-    # Some ONNX-exported configs may leave generation fields unset (None).
-    # Provide explicit defaults so `generate()` remains stable across runtimes.
-    generate_kwargs: dict[str, object] = {
-        "max_new_tokens": 512,
-        "num_beams": 1,
-        "num_return_sequences": 1,
-    }
-
-    outputs = model.generate(**inputs, **generate_kwargs)
-    translated_text = str(tokenizer.batch_decode(outputs, skip_special_tokens=True)[0] or "").strip()
-    if not translated_text:
-        raise RuntimeError(f"{tier} translation returned empty text.")
-    return translated_text
+_PADDLE_OCR_ENGINE_CACHE: tuple[object, bool, inspect.Signature] | None = None
+_PADDLE_OCR_ENGINE_CACHE_KEY: str | None = None
 
 
 def _translate_with_remote_service(text: str, source_lang: str, target_lang: str) -> str:
@@ -2024,199 +1830,182 @@ def _translate_with_remote_service(text: str, source_lang: str, target_lang: str
     return translated_text
 
 
-def _load_pipeline_llm_rewriter() -> tuple[object, object]:
-    global _PIPELINE_LLM_REWRITE_CACHE
-    if _PIPELINE_LLM_REWRITE_CACHE is not None:
-        return _PIPELINE_LLM_REWRITE_CACHE
+def _resolve_llama_cli_path() -> Path:
+    configured = os.environ.get("JPLEARN_LLAMA_CPP_PATH", "").strip()
+    if configured:
+        candidate = Path(configured)
+        if candidate.exists():
+            return candidate
 
-    if not _pipeline_tier_is_installed("llmjp_150m_onnx"):
-        raise RuntimeError("Pipeline model llmjp_150m_onnx is not installed.")
-
-    try:
-        transformers = importlib.import_module("transformers")
-        optimum_ort = importlib.import_module("optimum.onnxruntime")
-    except Exception as exc:  # pragma: no cover - environment dependent
-        raise RuntimeError(
-            "LLM-JP ONNX runtime is unavailable. Install 'transformers' and 'optimum[onnxruntime]'."
-        ) from exc
-
-    cache_dir = _pipeline_tier_cache_dir("llmjp_150m_onnx")
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    tokenizer = transformers.AutoTokenizer.from_pretrained(LLMJP_150M_ONNX_MODEL_ID, cache_dir=str(cache_dir))
-    model = optimum_ort.ORTModelForCausalLM.from_pretrained(
-        LLMJP_150M_ONNX_MODEL_ID,
-        cache_dir=str(cache_dir),
-        subfolder="onnx",
-        file_name="model_int8.onnx",
+    candidates = (
+        Path(_assets_dir) / "tools" / "llama.cpp" / "build" / "bin" / "Release" / "llama-cli.exe"
+        if _assets_dir
+        else None,
+        Path(_docs_dir) / "tools" / "llama.cpp" / "build" / "bin" / "Release" / "llama-cli.exe"
+        if _docs_dir
+        else None,
+        PROJECT_ROOT / "tools" / "llama.cpp" / "build" / "bin" / "Release" / "llama-cli.exe",
+        PROJECT_ROOT / "tools" / "llama.cpp" / "build" / "bin" / "llama-cli.exe",
     )
-    _PIPELINE_LLM_REWRITE_CACHE = (tokenizer, model)
-    return _PIPELINE_LLM_REWRITE_CACHE
+    for candidate in candidates:
+        if candidate and candidate.exists():
+            return candidate
+    raise RuntimeError("llama-cli.exe not found. Install llama.cpp binaries first.")
 
 
-def _load_pipeline_reranker() -> tuple[object, object]:
-    global _PIPELINE_RERANKER_CACHE
-    if _PIPELINE_RERANKER_CACHE is not None:
-        return _PIPELINE_RERANKER_CACHE
+def _resolve_llama_translation_model_path() -> Path:
+    configured = os.environ.get("JPLEARN_LLAMA_MODEL_PATH", "").strip()
+    if configured:
+        candidate = Path(configured)
+        if candidate.exists():
+            return candidate
 
-    if not _pipeline_tier_is_installed("jp_reranker_xsmall_onnx"):
-        raise RuntimeError("Pipeline model jp_reranker_xsmall_onnx is not installed.")
-
-    try:
-        transformers = importlib.import_module("transformers")
-        optimum_ort = importlib.import_module("optimum.onnxruntime")
-    except Exception as exc:  # pragma: no cover - environment dependent
-        raise RuntimeError(
-            "Japanese reranker ONNX runtime is unavailable. Install 'transformers' and 'optimum[onnxruntime]'."
-        ) from exc
-
-    cache_dir = _pipeline_tier_cache_dir("jp_reranker_xsmall_onnx")
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    tokenizer = transformers.AutoTokenizer.from_pretrained(JP_RERANKER_ONNX_MODEL_ID, cache_dir=str(cache_dir))
-
-    model = None
-    last_exc: Exception | None = None
-    for file_name in ("model_quantized.onnx", "model_int8.onnx", "model.onnx"):
-        try:
-            model = optimum_ort.ORTModelForSequenceClassification.from_pretrained(
-                JP_RERANKER_ONNX_MODEL_ID,
-                cache_dir=str(cache_dir),
-                subfolder="onnx",
-                file_name=file_name,
-            )
-            break
-        except Exception as exc:  # pragma: no cover - runtime fallback
-            last_exc = exc
-
-    if model is None:
-        raise RuntimeError("Unable to load ONNX reranker weights for japanese-reranker-xsmall-v2") from last_exc
-
-    _PIPELINE_RERANKER_CACHE = (tokenizer, model)
-    return _PIPELINE_RERANKER_CACHE
+    model_file = LLAMA_TRANSLATION_MODEL_FILENAME
+    candidates = (
+        Path(_assets_dir) / "models" / "llama" / model_file
+        if _assets_dir
+        else None,
+        Path(_docs_dir) / "models" / "llama" / model_file
+        if _docs_dir
+        else None,
+        PROJECT_ROOT / "models" / "llama" / model_file,
+    )
+    for candidate in candidates:
+        if candidate and candidate.exists():
+            return candidate
+    raise RuntimeError(f"llama translation model not found: {model_file}")
 
 
-def _extract_english_lines(generated: str) -> list[str]:
-    lines: list[str] = []
-    for raw in generated.splitlines():
-        line = raw.strip()
-        if not line:
-            continue
-        line = re.sub(r"^[\-\*\d\.\)\s]+", "", line).strip()
-        if not line:
-            continue
-        if "### 応答" in line or "### 指示" in line:
-            continue
-        if not _contains_latin_letters(line):
-            continue
-        lines.append(line)
+def _extract_llama_english_from_output(output: str) -> str:
+    text = str(output or "")
+    if not text.strip():
+        return ""
 
-    deduped: list[str] = []
-    seen: set[str] = set()
+    marker_match = re.search(r"TRANSLATION_START\s*(.*?)\s*TRANSLATION_END", text, re.IGNORECASE | re.DOTALL)
+    if marker_match:
+        marker_text = str(marker_match.group(1) or "").strip()
+        if marker_text:
+            return marker_text
+
+    marker = "### English Translation"
+    if marker in text:
+        text = text.split(marker, 1)[1]
+
+    lines = [line.strip() for line in text.splitlines() if line and line.strip()]
+    if not lines:
+        return ""
+
+    filtered: list[str] = []
     for line in lines:
-        key = line.casefold()
-        if key in seen:
+        lowered = line.lower()
+        if lowered.startswith("llama_"):
             continue
-        seen.add(key)
-        deduped.append(line)
-    return deduped
-
-
-def _build_rewrite_prompt(source_text: str, base_translation: str) -> str:
-    return (
-        "以下の日本語文の意味を保ったまま、自然な英語文を3つ作成してください。\\n"
-        "出力は英語文のみを1行ずつ、合計3行で返してください。補足説明は不要です。\\n\\n"
-        f"日本語: {source_text}\\n"
-        f"初期訳: {base_translation}\\n"
-    )
-
-
-def _generate_llmjp_rewrite_candidates(source_text: str, base_translation: str) -> list[str]:
-    if not _pipeline_tier_is_installed("llmjp_150m_onnx"):
-        return [base_translation]
-
-    tokenizer, model = _load_pipeline_llm_rewriter()
-    prompt = _build_rewrite_prompt(source_text, base_translation)
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=160,
-        do_sample=True,
-        temperature=0.7,
-        top_p=0.9,
-        top_k=30,
-    )
-
-    generated = str(tokenizer.batch_decode(outputs, skip_special_tokens=True)[0] or "")
-    candidates = _extract_english_lines(generated)
-
-    merged: list[str] = []
-    for text in [base_translation, *candidates]:
-        normalized = str(text or "").strip()
-        if not normalized:
+        if lowered.startswith("main:") or lowered.startswith("sampling"):
             continue
-        if normalized.casefold() in {item.casefold() for item in merged}:
+        if lowered.startswith("### japanese") or lowered.startswith("### english"):
             continue
-        merged.append(normalized)
-        if len(merged) >= 3:
-            break
+        filtered.append(line)
 
-    return merged or [base_translation]
+    return "\n".join(filtered).strip()
 
 
-def _score_with_reranker(source_text: str, candidates: list[str]) -> list[float]:
-    tokenizer, model = _load_pipeline_reranker()
-    inputs = tokenizer(
-        [source_text] * len(candidates),
-        candidates,
-        padding=True,
-        truncation=True,
-        max_length=512,
-        return_tensors="np",
+def _translate_with_llama_cpp(text: str, source_lang: str, target_lang: str) -> str:
+    if source_lang != "ja" or target_lang != "en":
+        raise ValueError("Only ja->en OCR translation is currently supported.")
+
+    llama_cli = _resolve_llama_cli_path()
+    model_path = _resolve_llama_translation_model_path()
+    prompt = (
+        "You are a Japanese to English translation engine.\n"
+        "Translate faithfully into natural English.\n"
+        "Output only the final translation payload in this exact format:\n"
+        "TRANSLATION_START\n"
+        "<translated text>\n"
+        "TRANSLATION_END\n"
+        "Never output any text before TRANSLATION_START or after TRANSLATION_END.\n"
+        "Do not explain. Do not include Japanese text.\n"
+        "Do not output any reasoning or thinking text.\n"
+        "Never emit [Start thinking], [End thinking], or <think>.\n\n"
+        "### Japanese Text\n"
+        f"{text}\n\n"
+        "### Output\n"
+        "TRANSLATION_START\n"
     )
-    outputs = model(**inputs)
-    logits = getattr(outputs, "logits", None)
-    if logits is None:
-        return [0.0 for _ in candidates]
+    command = [
+        str(llama_cli),
+        "-m",
+        str(model_path),
+        "-n",
+        "160",
+        "-c",
+        "1536",
+        "--temp",
+        "0.0",
+        "--top-p",
+        "0.82",
+        "--top-k",
+        "24",
+        "--repeat-penalty",
+        "1.08",
+        "-p",
+        prompt,
+    ]
+    if LLAMA_TRANSLATION_GPU_LAYERS >= 0:
+        command[3:3] = ["-ngl", str(LLAMA_TRANSLATION_GPU_LAYERS)]
 
-    scores: list[float] = []
-    for row in logits:
-        if hasattr(row, "shape") and len(getattr(row, "shape", [])) and row.shape[-1] >= 2:
-            scores.append(float(row[-1]))
-        else:
-            scores.append(float(row[0] if hasattr(row, "__len__") else row))
-    return scores
+    primary_timeout_seconds = max(5.0, float(LLAMA_TRANSLATION_TIMEOUT_MS) / 1000.0)
 
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=primary_timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        if LLAMA_TRANSLATION_STRICT:
+            raise RuntimeError(f"llama.cpp translation timed out after {primary_timeout_seconds:.1f} seconds.")
 
-def _apply_optional_pipeline(source_text: str, base_translation: str) -> tuple[str, dict[str, object]]:
-    if not (
-        _pipeline_tier_is_installed("opusmt_ja_en_onnx")
-        and _pipeline_tier_is_installed("llmjp_150m_onnx")
-        and _pipeline_tier_is_installed("jp_reranker_xsmall_onnx")
-    ):
-        return base_translation, {"applied": False, "reason": "pipeline-components-not-installed"}
+        retry_command = list(command)
+        if "-ngl" in retry_command:
+            ngl_index = retry_command.index("-ngl")
+            if ngl_index + 1 < len(retry_command):
+                retry_command[ngl_index + 1] = "0"
+        if "-n" in retry_command:
+            n_index = retry_command.index("-n")
+            if n_index + 1 < len(retry_command):
+                retry_command[n_index + 1] = "96"
+        if "-c" in retry_command:
+            c_index = retry_command.index("-c")
+            if c_index + 1 < len(retry_command):
+                retry_command[c_index + 1] = "1024"
 
-    candidates = _generate_llmjp_rewrite_candidates(source_text, base_translation)
-    if len(candidates) <= 1:
-        return base_translation, {
-            "applied": False,
-            "reason": "no-additional-candidates",
-            "candidates": candidates,
-        }
+        try:
+            result = subprocess.run(
+                retry_command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=max(20.0, min(primary_timeout_seconds, 60.0)),
+                check=False,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"llama.cpp translation failed after timeout recovery: {exc}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"llama.cpp translation failed: {exc}") from exc
 
-    scores = _score_with_reranker(source_text, candidates)
-    best_index = max(range(len(candidates)), key=lambda idx: scores[idx])
-    selected = candidates[best_index]
-    return selected, {
-        "applied": True,
-        "modelChain": [
-            "onnx-community/opus-mt-ja-en",
-            "onnx-community/llm-jp-3-150m-instruct3-ONNX",
-            "hotchpotch/japanese-reranker-xsmall-v2",
-        ],
-        "candidateCount": len(candidates),
-        "selectedIndex": best_index,
-        "scores": [round(float(score), 4) for score in scores],
-        "selected": selected,
-    }
+    if result.returncode != 0:
+        stderr_text = (result.stderr or "").strip()
+        raise RuntimeError(f"llama.cpp translation exited with code {result.returncode}: {stderr_text}")
+
+    translated_text = _extract_llama_english_from_output(result.stdout)
+    if not translated_text:
+        raise RuntimeError("llama.cpp translation returned empty text.")
+    return translated_text
 
 
 def translate_assistant_chat_ocr_payload(
@@ -2239,13 +2028,56 @@ def translate_assistant_chat_ocr_payload(
     if source != "ja" or target != "en":
         raise ValueError("Only ja->en OCR translation is currently supported.")
 
+    # OCR sometimes produces mojibake/non-Japanese text. In that case, skip
+    # model translation entirely and return a safe pass-through payload.
+    if not _contains_japanese_script(text):
+        timing["languageGateMs"] = 0.0
+        timing["totalMs"] = round((perf_counter() - total_start) * 1000.0, 2)
+        timing["debug"] = {
+            "rawHadMultipleLines": "\n" in str(text_raw or ""),
+            "preparedLength": len(text),
+            "qualityThreshold": None,
+            "appliedMultilineThreshold": False,
+            "fastMode": fast_mode,
+            "remoteFallbackConfigured": bool(OCR_REMOTE_TRANSLATE_URL),
+            "remoteFallbackEnabled": OCR_REMOTE_FALLBACK_ENABLED,
+            "remoteFallbackApplied": False,
+        }
+        return {
+            "ok": True,
+            "text": text,
+            "backend": "pass-through",
+            "timing": timing,
+            "pipeline": {
+                "applied": False,
+                "reason": "source-not-japanese-pass-through",
+            },
+            "translation": {
+                "chunking": {
+                    "strategy": "pass-through",
+                    "chunkCount": 1,
+                },
+                "quality": {
+                    "score": 1.0,
+                    "flags": ["source-not-japanese-pass-through"],
+                    "retryCount": 0,
+                    "retries": [],
+                },
+            },
+            "languageGate": {
+                "model": "fasttext-lid.176",
+                "detectedLanguage": "unknown",
+                "confidence": 0.0,
+                "sourceContainsJapaneseScript": False,
+                "containsJapaneseScript": False,
+                "passed": True,
+                "mode": "source-pass-through",
+                "threshold": 0.45,
+            },
+        }
+
     configured_backend = os.environ.get("JPLEARN_TRANSLATION_BACKEND", "").strip().lower()
-    if configured_backend in TRANSLATION_TIER_ORDER:
-        backend = configured_backend
-    else:
-        # OCR passages need higher-fidelity translation; prefer OpusMT when
-        # local model assets are present, then fall back to active/default.
-        backend = "opusmt" if _translation_tier_is_installed("opusmt") else _resolve_active_translation_backend()
+    backend = "llama.cpp" if configured_backend in {"", "llama", "llama.cpp", "llm", "qwen", "qwen_ja_en"} else _resolve_active_translation_backend()
 
     raw_ocr_text = str(text_raw or "")
     raw_had_multiple_lines = "\n" in raw_ocr_text
@@ -2266,32 +2098,15 @@ def translate_assistant_chat_ocr_payload(
         chunk_max_lines=chunk_max_lines,
         chunk_overlap_lines=chunk_overlap_lines,
     )
+    if backend == "llama.cpp" and int(translation_meta.get("fallbackChunkCount") or 0) > 0:
+        backend = "llama.cpp+fallback"
     timing["initialTranslationMs"] = round((perf_counter() - initial_translation_start) * 1000.0, 2)
 
-    # Keep long or multiline OCR output faithful: rewrite/rerank can over-compress
-    # narrative passages and drift from source meaning.
-    should_apply_pipeline = (
-        backend == "opusmt"
-        and translation_meta.get("chunkCount") == 1
-        and len(text) <= 160
-        and "\n" not in text
-    )
-    pipeline_start = perf_counter()
-    if should_apply_pipeline:
-        try:
-            translated_text, pipeline_meta = _apply_optional_pipeline(text, translated_text)
-        except Exception as exc:
-            pipeline_meta = {
-                "applied": False,
-                "reason": "pipeline-error",
-                "error": str(exc),
-            }
-    else:
-        pipeline_meta = {
-            "applied": False,
-            "reason": "pipeline-skipped-for-faithful-ocr-mode",
-        }
-    timing["pipelineMs"] = round((perf_counter() - pipeline_start) * 1000.0, 2)
+    pipeline_meta = {
+        "applied": False,
+        "reason": "legacy-pipeline-removed",
+    }
+    timing["pipelineMs"] = 0.0
 
     quality_start = perf_counter()
     quality_score, quality_flags = _translation_quality_score(text, translated_text)
@@ -2304,10 +2119,6 @@ def translate_assistant_chat_ocr_payload(
         retry_specs: list[tuple[str, int, int, str]] = []
         if is_multiline_ocr or len(text) > 260:
             retry_specs.append((backend, 240, 2, "smaller-chunks"))
-
-        alternate_backend = "argos" if backend == "opusmt" else "opusmt"
-        if alternate_backend == "argos" or _translation_tier_is_installed("opusmt"):
-            retry_specs.append((alternate_backend, 300 if len(text) > 220 else 520, 1 if "\n" in text else 0, "alternate-backend"))
 
         best_candidate = {
             "text": translated_text,
@@ -2360,12 +2171,7 @@ def translate_assistant_chat_ocr_payload(
                 }
 
         if not fast_mode:
-            sentence_retry_backends: list[tuple[str, str]] = [(backend, "sentence-split")]
-            alt_for_sentence = "argos" if backend == "opusmt" else "opusmt"
-            if alt_for_sentence == "argos" or _translation_tier_is_installed("opusmt"):
-                sentence_retry_backends.append((alt_for_sentence, "sentence-split-alternate-backend"))
-
-            for sentence_backend, sentence_reason in sentence_retry_backends:
+            for sentence_backend, sentence_reason in [(backend, "sentence-split")]:
                 sentence_start = perf_counter()
                 try:
                     sentence_text, sentence_meta = _translate_ocr_text_by_sentence(
@@ -2417,11 +2223,6 @@ def translate_assistant_chat_ocr_payload(
         quality_score = float(best_candidate["score"])
         quality_flags = list(best_candidate["flags"])
         translation_meta = dict(best_candidate["meta"])
-        if backend != "opusmt":
-            pipeline_meta = {
-                "applied": False,
-                "reason": "quality-retry-selected-alternate-backend",
-            }
     timing["retryTotalMs"] = round((perf_counter() - retry_total_start) * 1000.0, 2)
 
     severe_quality_failure = quality_score < 0.32 or (
@@ -2495,11 +2296,11 @@ def translate_assistant_chat_ocr_payload(
     gate_passed = english_gate_passed or fallback_gate_passed
 
     if not gate_passed:
-        raise RuntimeError(
-            "Language gate rejected translation output. "
-            f"detected={detected_lang or 'unknown'} confidence={detected_confidence:.3f} "
-            f"containsJapaneseScript={has_japanese_script}"
-        )
+        # Do not hard-fail packaged/UI flows when OCR includes mixed or noisy text.
+        # Return the best available output so the renderer can still show text.
+        fallback_text = str(translated_text or "").strip() or str(text or "").strip()
+        translated_text = fallback_text
+        quality_flags = list(dict.fromkeys([*quality_flags, "language-gate-pass-through"]))
     timing["languageGateMs"] = round((perf_counter() - language_gate_start) * 1000.0, 2)
     timing["totalMs"] = round((perf_counter() - total_start) * 1000.0, 2)
     timing["debug"] = {
@@ -2535,7 +2336,7 @@ def translate_assistant_chat_ocr_payload(
             "sourceContainsJapaneseScript": source_has_japanese_script,
             "containsJapaneseScript": has_japanese_script,
             "passed": gate_passed,
-            "mode": "strict" if english_gate_passed else "fallback-mixed-ocr",
+            "mode": "strict" if english_gate_passed else "fallback-mixed-ocr" if fallback_gate_passed else "pass-through",
             "threshold": 0.45,
         },
     }
@@ -4250,13 +4051,21 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
     if command == "assistant-chat-translate-ocr":
         if len(argv) < 2:
             return 2, {"error": "Usage: assistant-chat-translate-ocr <text> [source_lang] [target_lang] [fast_mode]"}
+        text_arg = argv[1]
+        if text_arg.startswith("base64:"):
+            encoded = text_arg[len("base64:"):]
+            try:
+                decoded_bytes = base64.b64decode(encoded.encode("ascii"), validate=True)
+                text_arg = decoded_bytes.decode("utf-8", errors="replace")
+            except Exception:
+                return 2, {"error": "Invalid base64 OCR text payload."}
         source_lang = argv[2] if len(argv) > 2 and argv[2].strip() else "ja"
         target_lang = argv[3] if len(argv) > 3 and argv[3].strip() else "en"
         fast_mode_raw = argv[4].strip().lower() if len(argv) > 4 else ""
         fast_mode = fast_mode_raw in {"1", "true", "yes", "on"}
         try:
             return 0, translate_assistant_chat_ocr_payload(
-                argv[1],
+                text_arg,
                 source_lang=source_lang,
                 target_lang=target_lang,
                 fast_mode=fast_mode,

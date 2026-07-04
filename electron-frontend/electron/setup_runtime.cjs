@@ -165,58 +165,27 @@ const OCR_MODELS = {
   },
 }
 const TRANSLATION_MODELS = {
-  argos: {
-    label: 'Argos Translate',
-    badge: 'Default Translation',
-    description: 'Offline JA→EN translation using Argos. Smallest footprint and most compatible default.',
-    sizeMb: 160,
-  },
-  opusmt: {
-    label: 'ONNX Community OPUS-MT (ONNX)',
-    badge: 'Better Translation',
-    description: 'ONNX-community OPUS-MT JA→EN backend with maintained ONNX variants.',
-    sizeMb: 430,
-  },
-}
-const PIPELINE_MODELS = {
-  opusmt_ja_en_onnx: {
-    label: 'OPUS-MT JA→EN (ONNX)',
-    badge: 'Pipeline Step 1',
-    description: 'Primary translator: onnx-community/opus-mt-ja-en (quantized ONNX).',
-    sizeMb: 430,
-  },
-  llmjp_150m_onnx: {
-    label: 'LLM-JP 3 150M Instruct3 (ONNX)',
-    badge: 'Pipeline Step 2',
-    description: 'Post-edit/refinement model: onnx-community/llm-jp-3-150m-instruct3-ONNX.',
-    sizeMb: 165,
-  },
-  jp_reranker_xsmall_onnx: {
-    label: 'Japanese Reranker XSmall (ONNX)',
-    badge: 'Pipeline Step 3',
-    description: 'hotchpotch/japanese-reranker-xsmall-v2 ONNX reranker for best-match selection.',
-    sizeMb: 95,
+  qwen_ja_en: {
+    label: 'Qwen3.5-0.8B-JP (GGUF)',
+    badge: 'Qwen Translation',
+    description: 'Local Qwen JA->EN translation model fallback for OCR.',
+    sizeMb: 528,
+    filename: 'Qwen3.5-0.8B-JP-Q4_K_M.gguf',
+    repo: 'mmnga-o/Holy-fox-Qwen3.5-0.8B-JP-gguf',
   },
 }
 const TRANSLATION_PROFILES = {
-  ocr_argos_small: {
-    label: 'OCR + Argos (Small)',
-    badge: 'Smaller',
-    description: 'Installs OCR Standard + Argos translation. Smallest footprint.',
-    sizeMb: 380,
-  },
-  ocr_pipeline_full: {
-    label: 'OCR + Translation Pipeline (Bigger)',
-    badge: 'Higher Quality',
-    description: 'Installs OCR Standard + OPUS-MT + LLM-JP 150M + Japanese reranker.',
-    sizeMb: 890,
+  ocr_qwen_local: {
+    label: 'OCR + Qwen3.5-0.8B-JP',
+    badge: 'Recommended',
+    description: 'Installs OCR Standard + local Qwen3.5-0.8B-JP GGUF translation model.',
+    sizeMb: 748,
   },
 }
 const PADDLEOCR_VERSION = '3.7.0'
 const PADDLEPADDLE_VERSION = '3.2.0'
 const ACTIVE_OCR_MODEL_STATE_FILENAME = 'active-ocr-model.json'
 const ACTIVE_TRANSLATION_MODEL_STATE_FILENAME = 'active-translation-model.json'
-const PIPELINE_READY_MARKER_FILENAME = 'model.ready'
 const SPEED_TEST_TIMEOUT_MS = 12000
 const SPEED_TEST_TARGETS = [
   { url: 'https://proof.ovh.net/files/10Mb.dat', bytes: 10485760 },
@@ -959,8 +928,15 @@ function uninstallTranslationModel(tier) {
   if (!TRANSLATION_MODELS[tier]) throw new Error(`Unknown translation model tier: ${tier}`)
   const base = ensureJPLearnDirs()
   const dir = getTranslationModelDir(base, tier)
+  const translationModel = TRANSLATION_MODELS[tier]
   if (fs.existsSync(dir)) {
     fs.rmSync(dir, { recursive: true, force: true })
+  }
+  if (translationModel && translationModel.filename) {
+    const modelPath = path.join(base, 'models', 'llama', translationModel.filename)
+    if (fs.existsSync(modelPath)) {
+      fs.rmSync(modelPath, { force: true })
+    }
   }
   const selection = readActiveTranslationModelSelection(base)
   if (selection && selection.tier === tier) {
@@ -969,51 +945,17 @@ function uninstallTranslationModel(tier) {
   return { ok: true, tier }
 }
 
-function getPipelineModelDir(base, tier) {
-  return path.join(base, 'translation-pipeline', tier)
-}
-
-function getPipelineReadyMarkerPath(base, tier) {
-  return path.join(getPipelineModelDir(base, tier), PIPELINE_READY_MARKER_FILENAME)
-}
-
-function isPipelineModelInstalled(base, tier) {
-  return fs.existsSync(getPipelineReadyMarkerPath(base, tier))
-}
-
-function uninstallPipelineModel(tier) {
-  if (!PIPELINE_MODELS[tier]) throw new Error(`Unknown pipeline model tier: ${tier}`)
-  const base = ensureJPLearnDirs()
-  const dir = getPipelineModelDir(base, tier)
-  if (fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true })
-  }
-  return { ok: true, tier }
-}
-
 function isTranslationProfileInstalled(base, profile) {
-  if (profile === 'ocr_argos_small') {
-    return isOcrModelInstalled(base, 'standard') && isTranslationModelInstalled(base, 'argos')
-  }
-  if (profile === 'ocr_pipeline_full') {
-    return (
-      isOcrModelInstalled(base, 'standard')
-      && isTranslationModelInstalled(base, 'opusmt')
-      && isPipelineModelInstalled(base, 'opusmt_ja_en_onnx')
-      && isPipelineModelInstalled(base, 'llmjp_150m_onnx')
-      && isPipelineModelInstalled(base, 'jp_reranker_xsmall_onnx')
-    )
+  if (profile === 'ocr_qwen_local') {
+    return isOcrModelInstalled(base, 'standard') && isTranslationModelInstalled(base, 'qwen_ja_en')
   }
   return false
 }
 
 function resolveActiveTranslationProfile(base) {
   const activeTier = resolveActiveTranslationTier(base)
-  if (activeTier === 'argos' && isTranslationProfileInstalled(base, 'ocr_argos_small')) {
-    return 'ocr_argos_small'
-  }
-  if (activeTier === 'opusmt' && isTranslationProfileInstalled(base, 'ocr_pipeline_full')) {
-    return 'ocr_pipeline_full'
+  if (activeTier === 'qwen_ja_en' && isTranslationProfileInstalled(base, 'ocr_qwen_local')) {
+    return 'ocr_qwen_local'
   }
   return null
 }
@@ -1133,58 +1075,9 @@ async function ensureOcrPythonRuntime(scriptRoot, base) {
     await ensurePythonImport('numpy', [['numpy']])
     await ensurePythonImport('PIL', [['Pillow']])
     await ensurePythonImport('cv2', [['opencv-python-headless']])
-    await ensurePythonImport('argostranslate', [['argostranslate']])
     await ensurePythonImport('fasttext', [['fasttext-wheel'], ['fasttext']])
     return
   }
-}
-
-async function ensureTranslationPythonRuntime(scriptRoot, base) {
-  const pythonCmd = resolvePythonCommand(scriptRoot)
-  const env = {
-    ...process.env,
-    JPLEARN_ASSETS_DIR: base,
-    JPLEARN_DOCUMENTS_DIR: base,
-    PADDLE_PDX_MODEL_SOURCE: process.env.PADDLE_PDX_MODEL_SOURCE || 'BOS',
-  }
-
-  const ensurePythonImport = async (importName, installCandidates) => {
-    const initialProbe = await runPythonCapture(pythonCmd, ['-c', `import ${importName}`], env)
-    if (initialProbe.code === 0) {
-      return
-    }
-
-    let lastInstallResult = initialProbe
-    for (const candidate of installCandidates) {
-      lastInstallResult = await runPythonCapture(
-        pythonCmd,
-        ['-m', 'pip', 'install', '--disable-pip-version-check', ...candidate],
-        env,
-      )
-      const probeAfterInstall = await runPythonCapture(pythonCmd, ['-c', `import ${importName}`], env)
-      if (lastInstallResult.code === 0 && probeAfterInstall.code === 0) {
-        return
-      }
-    }
-
-    throw new Error(
-      [
-        `Failed to install Python runtime for '${importName}'.`,
-        `Python command: ${pythonCmd}`,
-        `Probe error: ${(initialProbe.stderr || initialProbe.stdout).trim() || '(empty)'}`,
-        `Last install stderr: ${(lastInstallResult.stderr || '').trim() || '(empty)'}`,
-        `Last install stdout: ${(lastInstallResult.stdout || '').trim() || '(empty)'}`,
-      ].join('\n'),
-    )
-  }
-
-  await ensurePythonImport('argostranslate', [['argostranslate']])
-  await ensurePythonImport('transformers', [['transformers>=4.44.0']])
-  await ensurePythonImport('sentencepiece', [['sentencepiece>=0.2.0']])
-  await ensurePythonImport('optimum', [['optimum[onnxruntime]>=1.22.0']])
-  await ensurePythonImport('onnxruntime', [['onnxruntime>=1.18.0']])
-  await ensurePythonImport('sacremoses', [['sacremoses>=0.1.1']])
-  await ensurePythonImport('fasttext', [['fasttext-wheel'], ['fasttext']])
 }
 
 // ── System info ──────────────────────────────────────────────────────────────
@@ -1391,15 +1284,6 @@ async function getSystemInfo() {
     installed: isTranslationModelInstalled(base, tier),
     estimatedDownloadMinutes: estimateDownloadMinutes(m.sizeMb, networkMbps),
   }))
-  const pipelineModels = Object.entries(PIPELINE_MODELS).map(([tier, m]) => ({
-    tier,
-    label: m.label,
-    badge: m.badge,
-    description: m.description,
-    sizeMb: m.sizeMb,
-    installed: isPipelineModelInstalled(base, tier),
-    estimatedDownloadMinutes: estimateDownloadMinutes(m.sizeMb, networkMbps),
-  }))
   const translationProfiles = Object.entries(TRANSLATION_PROFILES).map(([tier, m]) => ({
     tier,
     label: m.label,
@@ -1485,11 +1369,9 @@ async function getSystemInfo() {
     activeOcrModelTier: resolveActiveOcrTier(base),
     ocrInstalled: ocrModels.some((model) => model.installed),
     translationModels,
-    recommendedTranslationTier: 'argos',
+    recommendedTranslationTier: 'qwen_ja_en',
     activeTranslationModelTier: resolveActiveTranslationTier(base),
     translationInstalled: translationModels.some((model) => model.installed),
-    pipelineModels,
-    pipelineInstalled: pipelineModels.some((model) => model.installed),
     translationProfiles,
     activeTranslationProfileTier: resolveActiveTranslationProfile(base),
     isPackaged,
@@ -2615,65 +2497,39 @@ async function downloadTranslationModel(tier, sender, scriptRoot, options = {}) 
     sender.send('setup:download-progress', { id: 'translation', percent: 4, mb: null, totalMb: null, etaSec: null })
   }
 
-  await ensureTranslationPythonRuntime(scriptRoot, base)
+  const translationModel = TRANSLATION_MODELS[tier]
+  const modelsDir = path.join(base, 'models', 'llama')
+  fs.mkdirSync(modelsDir, { recursive: true })
+  const destPath = path.join(modelsDir, translationModel.filename)
 
-  if (sender && !sender.isDestroyed()) {
-    sender.send('setup:download-progress', { id: 'translation', percent: 25, mb: null, totalMb: null, etaSec: null })
+  if (force && fs.existsSync(destPath)) {
+    fs.rmSync(destPath, { force: true })
+  }
+
+  if (!fs.existsSync(destPath)) {
+    if (sender && !sender.isDestroyed()) {
+      sender.send('setup:download-progress', { id: 'translation', percent: 20, mb: null, totalMb: null, etaSec: null })
+    }
+    const url = `https://huggingface.co/${translationModel.repo}/resolve/main/${translationModel.filename}`
+    await downloadWithProgress(url, destPath, (done, total, method = null) => {
+      const percent = total > 0 ? Math.round((done / total) * 100) : 0
+      const mb = Math.round(done / (1024 * 1024))
+      const totalMb = total > 0 ? Math.round(total / (1024 * 1024)) : null
+      if (sender && !sender.isDestroyed()) {
+        sender.send('setup:download-progress', {
+          id: 'translation',
+          percent,
+          mb,
+          totalMb,
+          etaSec: null,
+          logMessage: method ? `downloading: ${percent}% [${method}]` : undefined,
+        })
+      }
+    })
   }
 
   const translationDir = getTranslationModelDir(base, tier)
-  if (force && fs.existsSync(translationDir)) {
-    fs.rmSync(translationDir, { recursive: true, force: true })
-  }
   fs.mkdirSync(translationDir, { recursive: true })
-
-  const pythonCmd = resolvePythonCommand(scriptRoot)
-  const code = [
-    'import sys',
-    'from pathlib import Path',
-    'tier = sys.argv[1]',
-    'dest = Path(sys.argv[2])',
-    'dest.mkdir(parents=True, exist_ok=True)',
-    'if tier == "opusmt":',
-    '  from transformers import AutoTokenizer',
-    '  from optimum.onnxruntime import ORTModelForSeq2SeqLM',
-    '  model_id = "onnx-community/opus-mt-ja-en"',
-    '  AutoTokenizer.from_pretrained(model_id, cache_dir=str(dest))',
-    '  ORTModelForSeq2SeqLM.from_pretrained(model_id, cache_dir=str(dest), subfolder="onnx", encoder_file_name="encoder_model_int8.onnx", decoder_file_name="decoder_model_merged_int8.onnx", decoder_with_past_file_name="decoder_with_past_model_int8.onnx")',
-    'elif tier == "argos":',
-    '  import argostranslate.package, argostranslate.translate',
-    '  argostranslate.package.update_package_index()',
-    '  packages = argostranslate.package.get_available_packages()',
-    '  selected = None',
-    '  for p in packages:',
-    '    if getattr(p, "from_code", "") == "ja" and getattr(p, "to_code", "") == "en":',
-    '      selected = p',
-    '      break',
-    '  if selected is None:',
-    '    raise RuntimeError("No Argos ja->en package found")',
-    '  downloaded = selected.download()',
-    '  argostranslate.package.install_from_path(downloaded)',
-    'else:',
-    '  raise RuntimeError(f"Unknown translation tier: {tier}")',
-  ].join('\n')
-
-  await runPythonCapture(
-    pythonCmd,
-    ['-c', code, tier, translationDir],
-    {
-      ...process.env,
-      JPLEARN_ASSETS_DIR: base,
-      JPLEARN_DOCUMENTS_DIR: base,
-      JPLEARN_TRANSLATION_CACHE_DIR: translationDir,
-      TRANSFORMERS_CACHE: translationDir,
-      HF_HOME: translationDir,
-      HUGGINGFACE_HUB_CACHE: translationDir,
-    },
-  ).then((result) => {
-    if (result.code !== 0) {
-      throw new Error(`Failed to download translation model ${tier}: ${(result.stderr || result.stdout || '').trim() || 'unknown error'}`)
-    }
-  })
 
   fs.writeFileSync(getTranslationReadyMarkerPath(base, tier), new Date().toISOString(), 'utf8')
   if (!resolveActiveTranslationTier(base)) {
@@ -2686,94 +2542,6 @@ async function downloadTranslationModel(tier, sender, scriptRoot, options = {}) 
   return { ok: true }
 }
 
-async function downloadPipelineModel(tier, sender, scriptRoot, options = {}) {
-  if (!PIPELINE_MODELS[tier]) return Promise.reject(new Error(`Unknown pipeline model tier: ${tier}`))
-
-  const base = ensureJPLearnDirs()
-  const force = Boolean(options && options.force)
-
-  if (!force && isPipelineModelInstalled(base, tier)) {
-    if (sender && !sender.isDestroyed()) {
-      sender.send('setup:download-progress', { id: 'pipeline', percent: 100, mb: null, totalMb: null, etaSec: null })
-    }
-    return Promise.resolve({ alreadyInstalled: true })
-  }
-
-  if (sender && !sender.isDestroyed()) {
-    sender.send('setup:download-progress', { id: 'pipeline', percent: 5, mb: null, totalMb: null, etaSec: null })
-  }
-
-  await ensureTranslationPythonRuntime(scriptRoot, base)
-
-  const modelDir = getPipelineModelDir(base, tier)
-  if (force && fs.existsSync(modelDir)) {
-    fs.rmSync(modelDir, { recursive: true, force: true })
-  }
-  fs.mkdirSync(modelDir, { recursive: true })
-
-  const pythonCmd = resolvePythonCommand(scriptRoot)
-  const code = [
-    'import sys',
-    'from pathlib import Path',
-    'tier = sys.argv[1]',
-    'dest = Path(sys.argv[2])',
-    'dest.mkdir(parents=True, exist_ok=True)',
-    'if tier == "opusmt_ja_en_onnx":',
-    '  from transformers import AutoTokenizer',
-    '  from optimum.onnxruntime import ORTModelForSeq2SeqLM',
-    '  model_id = "onnx-community/opus-mt-ja-en"',
-    '  AutoTokenizer.from_pretrained(model_id, cache_dir=str(dest))',
-    '  ORTModelForSeq2SeqLM.from_pretrained(model_id, cache_dir=str(dest), subfolder="onnx", encoder_file_name="encoder_model_int8.onnx", decoder_file_name="decoder_model_merged_int8.onnx", decoder_with_past_file_name="decoder_with_past_model_int8.onnx")',
-    'elif tier == "llmjp_150m_onnx":',
-    '  from transformers import AutoTokenizer',
-    '  from optimum.onnxruntime import ORTModelForCausalLM',
-    '  model_id = "onnx-community/llm-jp-3-150m-instruct3-ONNX"',
-    '  AutoTokenizer.from_pretrained(model_id, cache_dir=str(dest))',
-    '  ORTModelForCausalLM.from_pretrained(model_id, cache_dir=str(dest), subfolder="onnx", file_name="model_int8.onnx")',
-    'elif tier == "jp_reranker_xsmall_onnx":',
-    '  from transformers import AutoTokenizer',
-    '  from optimum.onnxruntime import ORTModelForSequenceClassification',
-    '  model_id = "hotchpotch/japanese-reranker-xsmall-v2"',
-    '  AutoTokenizer.from_pretrained(model_id, cache_dir=str(dest))',
-    '  loaded = False',
-    '  for file_name in ("model_quantized.onnx", "model_int8.onnx", "model.onnx"):',
-    '    try:',
-    '      ORTModelForSequenceClassification.from_pretrained(model_id, cache_dir=str(dest), subfolder="onnx", file_name=file_name)',
-    '      loaded = True',
-    '      break',
-    '    except Exception:',
-    '      pass',
-    '  if not loaded:',
-    '    raise RuntimeError("Unable to load ONNX reranker weights for japanese-reranker-xsmall-v2")',
-    'else:',
-    '  raise RuntimeError(f"Unknown pipeline tier: {tier}")',
-  ].join('\n')
-
-  await runPythonCapture(
-    pythonCmd,
-    ['-c', code, tier, modelDir],
-    {
-      ...process.env,
-      JPLEARN_ASSETS_DIR: base,
-      JPLEARN_DOCUMENTS_DIR: base,
-      TRANSFORMERS_CACHE: modelDir,
-      HF_HOME: modelDir,
-      HUGGINGFACE_HUB_CACHE: modelDir,
-    },
-  ).then((result) => {
-    if (result.code !== 0) {
-      throw new Error(`Failed to download pipeline model ${tier}: ${(result.stderr || result.stdout || '').trim() || 'unknown error'}`)
-    }
-  })
-
-  fs.writeFileSync(getPipelineReadyMarkerPath(base, tier), new Date().toISOString(), 'utf8')
-
-  if (sender && !sender.isDestroyed()) {
-    sender.send('setup:download-progress', { id: 'pipeline', percent: 100, mb: null, totalMb: null, etaSec: null })
-  }
-  return { ok: true }
-}
-
 async function applyTranslationProfile(profile, sender, scriptRoot, options = {}) {
   if (!TRANSLATION_PROFILES[profile]) return Promise.reject(new Error(`Unknown translation profile: ${profile}`))
 
@@ -2781,27 +2549,16 @@ async function applyTranslationProfile(profile, sender, scriptRoot, options = {}
   const force = Boolean(options && options.force)
 
   if (!force && isTranslationProfileInstalled(base, profile)) {
-    if (profile === 'ocr_argos_small') {
-      setActiveTranslationModelTier('argos')
-    } else if (profile === 'ocr_pipeline_full') {
-      setActiveTranslationModelTier('opusmt')
+    if (profile === 'ocr_qwen_local') {
+      setActiveTranslationModelTier('qwen_ja_en')
     }
     return { ok: true, alreadyInstalled: true, profile }
   }
 
   await downloadOcrModel('standard', sender, scriptRoot, { force })
 
-  if (profile === 'ocr_argos_small') {
-    await downloadTranslationModel('argos', sender, scriptRoot, { force })
-    setActiveTranslationModelTier('argos')
-    return { ok: true, profile }
-  }
-
-  await downloadTranslationModel('opusmt', sender, scriptRoot, { force })
-  await downloadPipelineModel('opusmt_ja_en_onnx', sender, scriptRoot, { force })
-  await downloadPipelineModel('llmjp_150m_onnx', sender, scriptRoot, { force })
-  await downloadPipelineModel('jp_reranker_xsmall_onnx', sender, scriptRoot, { force })
-  setActiveTranslationModelTier('opusmt')
+  await downloadTranslationModel('qwen_ja_en', sender, scriptRoot, { force })
+  setActiveTranslationModelTier('qwen_ja_en')
   return { ok: true, profile }
 }
 
@@ -2932,7 +2689,6 @@ function createSetupRuntime() {
     downloadSpeechModel,
     downloadOcrModel,
     downloadTranslationModel,
-    downloadPipelineModel,
     applyTranslationProfile,
     createShortcuts,
     setActiveVoiceModel,
@@ -2945,7 +2701,6 @@ function createSetupRuntime() {
     uninstallOcrModel,
     setActiveTranslationModelTier,
     uninstallTranslationModel,
-    uninstallPipelineModel,
   }
 }
 

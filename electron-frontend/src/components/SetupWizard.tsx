@@ -33,13 +33,11 @@ interface SystemInfo {
   activeOcrModelTier?: 'standard' | null
   ocrInstalled?: boolean
   translationModels?: TranslationModelOption[]
-  recommendedTranslationTier?: 'argos'
-  activeTranslationModelTier?: 'argos' | 'opusmt' | null
+  recommendedTranslationTier?: 'qwen_ja_en'
+  activeTranslationModelTier?: 'qwen_ja_en' | null
   translationInstalled?: boolean
-  pipelineModels?: PipelineModelOption[]
-  pipelineInstalled?: boolean
   translationProfiles?: TranslationProfileOption[]
-  activeTranslationProfileTier?: 'ocr_argos_small' | 'ocr_pipeline_full' | null
+  activeTranslationProfileTier?: 'ocr_qwen_local' | null
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
@@ -70,19 +68,9 @@ interface OcrModelOption {
 }
 
 interface TranslationModelOption {
-  tier: 'argos' | 'opusmt'
+  tier: 'qwen_ja_en'
   label: string
-  badge?: 'Default Translation' | 'Better Translation'
-  description: string
-  sizeMb: number
-  installed: boolean
-  estimatedDownloadMinutes?: number | null
-}
-
-interface PipelineModelOption {
-  tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx'
-  label: string
-  badge?: 'Pipeline Step 1' | 'Pipeline Step 2' | 'Pipeline Step 3'
+  badge?: 'Qwen Translation'
   description: string
   sizeMb: number
   installed: boolean
@@ -90,9 +78,9 @@ interface PipelineModelOption {
 }
 
 interface TranslationProfileOption {
-  tier: 'ocr_argos_small' | 'ocr_pipeline_full'
+  tier: 'ocr_qwen_local'
   label: string
-  badge?: 'Smaller' | 'Higher Quality'
+  badge?: 'Recommended'
   description: string
   sizeMb: number
   installed: boolean
@@ -111,7 +99,7 @@ interface VoiceModelOption {
 }
 
 interface ProgressEvent {
-  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr' | 'translation' | 'pipeline'
+  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr' | 'translation'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -139,7 +127,7 @@ type AppRegionStyle = React.CSSProperties & {
 
 type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'skip'
 type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra' | 'skip'
-type TranslationProfileTier = 'ocr_argos_small' | 'ocr_pipeline_full' | 'skip'
+type TranslationProfileTier = 'ocr_qwen_local' | 'skip'
 type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
 type VoiceTier = '0.6b' | 'skip'
 type SetupMode = 'advanced' | 'simple'
@@ -490,11 +478,9 @@ export function SetupWizard({ onComplete }: Props) {
         activeOcrModelTier: null,
         ocrInstalled: false,
         translationModels: [],
-        recommendedTranslationTier: 'argos',
+        recommendedTranslationTier: 'qwen_ja_en',
         activeTranslationModelTier: null,
         translationInstalled: false,
-        pipelineModels: [],
-        pipelineInstalled: false,
         translationProfiles: [],
         activeTranslationProfileTier: null,
         isPackaged: false,
@@ -562,8 +548,6 @@ export function SetupWizard({ onComplete }: Props) {
       } else if (evt.id === 'speech') {
         setSpeechProgress(evt.percent)
       } else if (evt.id === 'translation') {
-        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
-      } else if (evt.id === 'pipeline') {
         setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
       } else if (evt.id === 'ocr') {
         setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
@@ -842,7 +826,7 @@ export function SetupWizard({ onComplete }: Props) {
       label: profile.label,
       meta: `${formatSize(profile.sizeMb)} • ${formatDurationMinutes(profile.estimatedDownloadMinutes)}${profile.installed ? ' • Installed' : ''}`,
       badge: profile.badge,
-      badgeTone: profile.tier === 'ocr_argos_small' ? ('recommended' as const) : ('soft' as const),
+      badgeTone: 'recommended' as const,
     })) ?? []),
     {
       value: 'skip',
@@ -1169,7 +1153,7 @@ export function SetupWizard({ onComplete }: Props) {
         <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>OCR Translation Profile (optional)</p>
           <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
-            One choice installs the full OCR translation bundle: OCR + Argos (small) or OCR + full translation pipeline (bigger).
+            Installs the OCR translation bundle: OCR Standard + Qwen3.5-0.8B-JP local translation model.
           </p>
           <CompactDropdown
             ariaLabel="OCR translation profile"
@@ -1300,7 +1284,7 @@ export function SetupWizard({ onComplete }: Props) {
           <ProgressBar value={speechProgress} label="Speech recognition model" method={downloadMethods.speech} />
         )}
         {selectedTranslationProfileTier !== 'skip' && !sysInfo?.translationProfiles?.find((model) => model.tier === selectedTranslationProfileTier)?.installed && (
-          <ProgressBar value={translationProfileProgress} label="OCR translation profile" method={downloadMethods.translation ?? downloadMethods.pipeline ?? downloadMethods.ocr} />
+          <ProgressBar value={translationProfileProgress} label="OCR translation profile" method={downloadMethods.translation ?? downloadMethods.ocr} />
         )}
         {downloadError && (
           <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.35)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
