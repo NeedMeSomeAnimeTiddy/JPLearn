@@ -2074,6 +2074,8 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   void localTutorRuntime.unload('before-quit').catch(() => undefined)
+  void localVoiceRuntime.unload().catch(() => undefined)
+  void Promise.resolve(localSpeechRuntime.unload()).catch(() => undefined)
   writeBridgeTelemetry()
   stopPythonBridgeWorker()
 })

@@ -349,6 +349,7 @@ interface AssistantChatOcrTranslationPayload {
 interface AssistantChatOcrTranslationResponse {
   ok: boolean
   text: string
+  backend?: 'argos' | 'opusmt'
   languageGate: {
     model: string
     detectedLanguage: string
@@ -484,6 +485,20 @@ interface DesktopApi {
   downloadOcrModel?: (tier: 'standard', options?: { force?: boolean }) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   setActiveOcrModel?: (tier: 'standard') => Promise<{ ok: boolean; tier: string }>
   uninstallOcrModel?: (tier: 'standard') => Promise<{ ok: boolean; tier: string }>
+  downloadTranslationModel?: (tier: 'argos' | 'opusmt', options?: { force?: boolean }) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  setActiveTranslationModel?: (tier: 'argos' | 'opusmt') => Promise<{ ok: boolean; tier: string }>
+  uninstallTranslationModel?: (tier: 'argos' | 'opusmt') => Promise<{ ok: boolean; tier: string }>
+  downloadPipelineModel?: (
+    tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx',
+    options?: { force?: boolean },
+  ) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  applyTranslationProfile?: (
+    tier: 'ocr_argos_small' | 'ocr_pipeline_full',
+    options?: { force?: boolean },
+  ) => Promise<{ ok?: boolean; alreadyInstalled?: boolean; profile?: string }>
+  uninstallPipelineModel?: (
+    tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx',
+  ) => Promise<{ ok: boolean; tier: string }>
   transcribeSpeech?: (payload: SpeechTranscribePayload) => Promise<SpeechTranscriptionResult>
   getSpeechStatus?: () => Promise<SpeechRuntimeStatus>
   createShortcuts?: (opts: { desktop?: boolean; startMenu?: boolean }) => Promise<{ ok: boolean }>
@@ -536,6 +551,36 @@ interface SetupOcrModelOption {
   estimatedDownloadMinutes?: number | null
 }
 
+interface SetupTranslationModelOption {
+  tier: 'argos' | 'opusmt'
+  label: string
+  badge?: 'Default Translation' | 'Better Translation'
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
+interface SetupPipelineModelOption {
+  tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx'
+  label: string
+  badge?: 'Pipeline Step 1' | 'Pipeline Step 2' | 'Pipeline Step 3'
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
+interface SetupTranslationProfileOption {
+  tier: 'ocr_argos_small' | 'ocr_pipeline_full'
+  label: string
+  badge?: 'Smaller' | 'Higher Quality'
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
 interface SpeechTranscribePayload {
   audioBase64: string
   mimeType: 'audio/webm' | 'audio/ogg' | 'audio/wav' | 'audio/wave' | 'audio/x-wav'
@@ -578,6 +623,14 @@ interface SetupSystemInfo {
   recommendedOcrTier?: 'standard'
   activeOcrModelTier?: 'standard' | null
   ocrInstalled?: boolean
+  translationModels?: SetupTranslationModelOption[]
+  recommendedTranslationTier?: 'argos'
+  activeTranslationModelTier?: 'argos' | 'opusmt' | null
+  translationInstalled?: boolean
+  pipelineModels?: SetupPipelineModelOption[]
+  pipelineInstalled?: boolean
+  translationProfiles?: SetupTranslationProfileOption[]
+  activeTranslationProfileTier?: 'ocr_argos_small' | 'ocr_pipeline_full' | null
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
@@ -590,7 +643,7 @@ interface SetupSystemInfo {
 }
 
 interface SetupProgressEvent {
-  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr'
+  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr' | 'translation' | 'pipeline'
   percent: number
   mb: number | null
   totalMb: number | null

@@ -2,7 +2,7 @@ const http = require('node:http')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { spawn } = require('node:child_process')
+const { spawn, spawnSync } = require('node:child_process')
 
 const DEFAULT_MAX_TEXT_CHARS = 400
 const DEFAULT_REQUEST_TIMEOUT_MS = 30000
@@ -11,6 +11,8 @@ const DEFAULT_SAMPLE_RATE = 24000
 const VOICEVOX_HOST = (process.env.JPLEARN_VOICEVOX_HOST || '127.0.0.1').trim()
 const VOICEVOX_PORT = Number(process.env.JPLEARN_VOICEVOX_PORT || 50021)
 const VOICEVOX_AUTOSTART_ENABLED = String(process.env.JPLEARN_VOICEVOX_AUTOSTART || '1').trim() !== '0'
+
+let managedVoicevoxProcess = null
 
 const VOICE_CATALOG = [
   { voiceId: 'zundamon_normal', displayName: 'Zundamon', description: 'ずんだもん (ノーマル)', gender: 'neutral', searchTerms: ['zundamon', 'ずんだもん', 'normal'], speaker: 3 },
@@ -51,17 +53,26 @@ function getJPLearnDir() {
 
 function getVoicevoxExecutableCandidates() {
   const candidates = []
+  const base = getJPLearnDir()
+  const assetsInstallDir = path.join(base, 'tools', 'voicevox')
+  const assetsCandidates = [
+    path.join(assetsInstallDir, 'VOICEVOX', 'vv-engine', 'run.exe'),
+    path.join(assetsInstallDir, 'vv-engine', 'run.exe'),
+    path.join(assetsInstallDir, '_extract', 'VOICEVOX', 'vv-engine', 'run.exe'),
+    path.join(assetsInstallDir, 'VOICEVOX', 'VOICEVOX.exe'),
+    path.join(assetsInstallDir, 'VOICEVOX.exe'),
+    path.join(assetsInstallDir, '_extract', 'VOICEVOX', 'VOICEVOX.exe'),
+  ]
+
+  const existingAssetsCandidates = assetsCandidates.filter((candidate) => fs.existsSync(candidate))
+  if (existingAssetsCandidates.length > 0) {
+    return [...new Set(existingAssetsCandidates)]
+  }
+
   const explicit = (process.env.JPLEARN_VOICEVOX_EXECUTABLE || '').trim()
   if (explicit) {
     candidates.push(explicit)
   }
-
-  const base = getJPLearnDir()
-  const assetsInstallDir = path.join(base, 'tools', 'voicevox')
-  candidates.push(path.join(assetsInstallDir, 'VOICEVOX.exe'))
-  candidates.push(path.join(assetsInstallDir, 'vv-engine', 'run.exe'))
-  candidates.push(path.join(assetsInstallDir, 'VOICEVOX', 'VOICEVOX.exe'))
-  candidates.push(path.join(assetsInstallDir, 'VOICEVOX', 'vv-engine', 'run.exe'))
 
   const localAppData = (process.env.LOCALAPPDATA || '').trim()
   const programFiles = (process.env.ProgramFiles || '').trim()
@@ -101,27 +112,110 @@ function getVoicevoxExecutableCandidates() {
   return [...new Set(candidates)]
 }
 
-function resolveVoicevoxExecutable() {
-  return getVoicevoxExecutableCandidates().find((candidate) => fs.existsSync(candidate)) || null
+function resolveVoicevoxExecutableCandidates() {
+  return getVoicevoxExecutableCandidates().filter((candidate) => fs.existsSync(candidate))
 }
 
-function launchVoicevoxProcess() {
-  const executablePath = resolveVoicevoxExecutable()
-  if (!executablePath) {
+function buildVoicevoxUnavailableMessage() {
+  const candidates = resolveVoicevoxExecutableCandidates()
+  const candidateHint = candidates.length > 0
+    ? ` candidates=${candidates.join(' | ')}`
+    : ' candidates=none-found-in-assets'
+  return `VOICEVOX engine is unavailable at ${VOICEVOX_HOST}:${VOICEVOX_PORT};${candidateHint}`
+}
+
+function launchVoicevoxProcess(executablePath) {
+  if (!executablePath || !fs.existsSync(executablePath)) {
     return false
+  }
+  if (managedVoicevoxProcess && !managedVoicevoxProcess.killed) {
+    return true
   }
 
   try {
     const child = spawn(executablePath, [], {
-      detached: true,
+      cwd: path.dirname(executablePath),
       stdio: 'ignore',
       windowsHide: true,
+    })
+    managedVoicevoxProcess = child
+    child.on('exit', () => {
+      if (managedVoicevoxProcess === child) {
+        managedVoicevoxProcess = null
+      }
+    })
+    child.on('error', () => {
+      if (managedVoicevoxProcess === child) {
+        managedVoicevoxProcess = null
+      }
     })
     child.unref()
     return true
   } catch {
+    managedVoicevoxProcess = null
     return false
   }
+}
+
+function stopVoicevoxProcessesByPort() {
+  if (process.platform !== 'win32') {
+    return
+  }
+
+  const script = [
+    `$port = ${VOICEVOX_PORT}`,
+    "$targets = Get-CimInstance Win32_Process | Where-Object {",
+    "  $_.Name -in @('run.exe', 'VOICEVOX.exe') -and",
+    '  ($_.CommandLine -match ("(^|\\D)" + [regex]::Escape([string]$port) + "(\\D|$)"))',
+    '}',
+    'foreach ($p in $targets) {',
+    '  try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop } catch {}',
+    '}',
+  ].join('; ')
+
+  try {
+    spawnSync('powershell.exe', [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-Command',
+      script,
+    ], {
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+  } catch {
+    // Best-effort only.
+  }
+}
+
+function stopManagedVoicevoxProcess() {
+  const child = managedVoicevoxProcess
+  managedVoicevoxProcess = null
+  if (!child || child.killed || !child.pid) {
+    return
+  }
+
+  if (process.platform === 'win32') {
+    try {
+      spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      })
+      stopVoicevoxProcessesByPort()
+      return
+    } catch {
+      // Fall through to best-effort child kill.
+    }
+  }
+
+  try {
+    child.kill('SIGTERM')
+  } catch {
+    // Best-effort only.
+  }
+
+  stopVoicevoxProcessesByPort()
 }
 
 function sanitizeSpeechText(text) {
@@ -254,18 +348,24 @@ async function ensureVoicevoxAvailable() {
     return false
   }
 
-  const started = launchVoicevoxProcess()
-  if (!started) {
-    return false
+  const executableCandidates = resolveVoicevoxExecutableCandidates()
+  for (const executablePath of executableCandidates) {
+    const started = launchVoicevoxProcess(executablePath)
+    if (!started) {
+      continue
+    }
+
+    const deadline = Date.now() + 5000
+    while (Date.now() < deadline) {
+      await sleep(400)
+      if (await checkVoicevoxAvailable()) {
+        return true
+      }
+    }
+
+    stopManagedVoicevoxProcess()
   }
 
-  const deadline = Date.now() + 12000
-  while (Date.now() < deadline) {
-    await sleep(400)
-    if (await checkVoicevoxAvailable()) {
-      return true
-    }
-  }
   return false
 }
 
@@ -288,7 +388,7 @@ function createVoiceRuntime() {
     async preload() {
       available = await ensureVoicevoxAvailable()
       if (!available) {
-        lastError = `VOICEVOX engine is unavailable at ${VOICEVOX_HOST}:${VOICEVOX_PORT}`
+        lastError = buildVoicevoxUnavailableMessage()
         return { ok: false, ready: false }
       }
       lastError = null
@@ -296,6 +396,8 @@ function createVoiceRuntime() {
     },
 
     async unload() {
+      stopManagedVoicevoxProcess()
+      available = false
       return { ok: true }
     },
 
@@ -321,7 +423,7 @@ function createVoiceRuntime() {
 
       try {
         if (!(await ensureVoicevoxAvailable())) {
-          throw new Error(`VOICEVOX engine is unavailable at ${VOICEVOX_HOST}:${VOICEVOX_PORT}`)
+          throw new Error(buildVoicevoxUnavailableMessage())
         }
         const audioQueryPath = `/audio_query?speaker=${speakerId}&text=${encodeURIComponent(safeText)}`
         const query = await requestJson('POST', audioQueryPath, null)

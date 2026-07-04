@@ -32,6 +32,14 @@ interface SystemInfo {
   recommendedOcrTier?: 'standard'
   activeOcrModelTier?: 'standard' | null
   ocrInstalled?: boolean
+  translationModels?: TranslationModelOption[]
+  recommendedTranslationTier?: 'argos'
+  activeTranslationModelTier?: 'argos' | 'opusmt' | null
+  translationInstalled?: boolean
+  pipelineModels?: PipelineModelOption[]
+  pipelineInstalled?: boolean
+  translationProfiles?: TranslationProfileOption[]
+  activeTranslationProfileTier?: 'ocr_argos_small' | 'ocr_pipeline_full' | null
   isPackaged: boolean
   networkMbps?: number | null
   llamaCppEstimatedDownloadMinutes?: number | null
@@ -61,6 +69,36 @@ interface OcrModelOption {
   estimatedDownloadMinutes?: number | null
 }
 
+interface TranslationModelOption {
+  tier: 'argos' | 'opusmt'
+  label: string
+  badge?: 'Default Translation' | 'Better Translation'
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
+interface PipelineModelOption {
+  tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx'
+  label: string
+  badge?: 'Pipeline Step 1' | 'Pipeline Step 2' | 'Pipeline Step 3'
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
+interface TranslationProfileOption {
+  tier: 'ocr_argos_small' | 'ocr_pipeline_full'
+  label: string
+  badge?: 'Smaller' | 'Higher Quality'
+  description: string
+  sizeMb: number
+  installed: boolean
+  estimatedDownloadMinutes?: number | null
+}
+
 interface VoiceModelOption {
   tier: '0.6b'
   filename: string
@@ -73,7 +111,7 @@ interface VoiceModelOption {
 }
 
 interface ProgressEvent {
-  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr'
+  id: 'model' | 'llama' | 'voice' | 'fonts' | 'dictionary' | 'speech' | 'ocr' | 'translation' | 'pipeline'
   percent: number
   mb: number | null
   totalMb: number | null
@@ -101,7 +139,7 @@ type AppRegionStyle = React.CSSProperties & {
 
 type ModelTier = 'low' | 'medium' | 'high' | 'ultra' | 'skip'
 type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra' | 'skip'
-type OcrTier = 'standard' | 'skip'
+type TranslationProfileTier = 'ocr_argos_small' | 'ocr_pipeline_full' | 'skip'
 type LlamaBackend = 'cuda' | 'hip' | 'vulkan' | 'cpu'
 type VoiceTier = '0.6b' | 'skip'
 type SetupMode = 'advanced' | 'simple'
@@ -135,6 +173,14 @@ function formatDurationMinutes(minutes: number | null | undefined): string {
   const rem = minutes % 60
   if (rem === 0) return `~${hours} h`
   return `~${hours} h ${rem} min`
+}
+
+function parseProgressMethod(logMessage: string | null | undefined): string | null {
+  if (!logMessage) return null
+  const match = logMessage.match(/downloading:\s*\d+%\s*\[([^\]]+)\]/i)
+  if (!match) return null
+  const method = match[1].trim()
+  return method || null
 }
 
 function getModelHardwareFit(systemInfo: SystemInfo | null, tier: 'low' | 'medium' | 'high' | 'ultra') {
@@ -368,8 +414,9 @@ export function SetupWizard({ onComplete }: Props) {
   const [dictionaryProgress, setDictionaryProgress] = useState(0)
   const [selectedSpeechTier, setSelectedSpeechTier] = useState<SpeechTier>('fast')
   const [speechProgress, setSpeechProgress] = useState(0)
-  const [selectedOcrTier, setSelectedOcrTier] = useState<OcrTier>('skip')
-  const [ocrProgress, setOcrProgress] = useState(0)
+  const [selectedTranslationProfileTier, setSelectedTranslationProfileTier] = useState<TranslationProfileTier>('skip')
+  const [translationProfileProgress, setTranslationProfileProgress] = useState(0)
+  const [downloadMethods, setDownloadMethods] = useState<Partial<Record<ProgressEvent['id'], string>>>({})
   const [createDesktop, setCreateDesktop] = useState(true)
   const [createStartMenu, setCreateStartMenu] = useState(true)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -418,11 +465,11 @@ export function SetupWizard({ onComplete }: Props) {
         }
         return info.activeSpeechModelTier ?? info.recommendedSpeechTier ?? 'fast'
       })
-      setSelectedOcrTier((prev) => {
-        if (prev !== 'skip' && info.ocrModels?.some((model) => model.tier === prev)) {
+      setSelectedTranslationProfileTier((prev) => {
+        if (prev !== 'skip' && info.translationProfiles?.some((model) => model.tier === prev)) {
           return prev
         }
-        return info.activeOcrModelTier ?? 'skip'
+        return info.activeTranslationProfileTier ?? 'skip'
       })
     } catch {
       setSysInfo((prev) => prev ?? {
@@ -442,6 +489,14 @@ export function SetupWizard({ onComplete }: Props) {
         recommendedOcrTier: 'standard',
         activeOcrModelTier: null,
         ocrInstalled: false,
+        translationModels: [],
+        recommendedTranslationTier: 'argos',
+        activeTranslationModelTier: null,
+        translationInstalled: false,
+        pipelineModels: [],
+        pipelineInstalled: false,
+        translationProfiles: [],
+        activeTranslationProfileTier: null,
         isPackaged: false,
         voiceInstalled: false,
         voiceModels: [],
@@ -461,7 +516,7 @@ export function SetupWizard({ onComplete }: Props) {
     setInstallFonts(false)
     setInstallDictionary(true)
     setSelectedSpeechTier('fast')
-    setSelectedOcrTier('skip')
+    setSelectedTranslationProfileTier('skip')
   }, [])
 
   // Fetch system info once we enter the setup flow beyond mode selection.
@@ -506,8 +561,16 @@ export function SetupWizard({ onComplete }: Props) {
         setDictionaryProgress(evt.percent)
       } else if (evt.id === 'speech') {
         setSpeechProgress(evt.percent)
+      } else if (evt.id === 'translation') {
+        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+      } else if (evt.id === 'pipeline') {
+        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
       } else if (evt.id === 'ocr') {
-        setOcrProgress(evt.percent)
+        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+      }
+      const method = parseProgressMethod(evt.logMessage)
+      if (method) {
+        setDownloadMethods((prev) => ({ ...prev, [evt.id]: method }))
       }
       if (evt.logMessage) {
         appendProgressLog(evt.logMessage)
@@ -538,7 +601,8 @@ export function SetupWizard({ onComplete }: Props) {
     const needsFonts = installFonts && !effectiveSysInfo?.fontsInstalled
     const needsDictionary = installDictionary && !effectiveSysInfo?.dictionaryInstalled
     const needsSpeech = selectedSpeechTier !== 'skip' && !effectiveSysInfo?.speechModels.find((m) => m.tier === selectedSpeechTier)?.installed
-    const needsOcr = selectedOcrTier !== 'skip' && !effectiveSysInfo?.ocrModels?.find((m) => m.tier === selectedOcrTier)?.installed
+    const needsTranslationProfile = selectedTranslationProfileTier !== 'skip'
+      && !effectiveSysInfo?.translationProfiles?.find((m) => m.tier === selectedTranslationProfileTier)?.installed
 
     setDownloadError(null)
     setProgressLogs([])
@@ -554,7 +618,8 @@ export function SetupWizard({ onComplete }: Props) {
     setFontsMb(null)
     setDictionaryProgress(needsDictionary ? 0 : 100)
     setSpeechProgress(needsSpeech ? 0 : 100)
-    setOcrProgress(needsOcr ? 0 : 100)
+    setTranslationProfileProgress(needsTranslationProfile ? 0 : 100)
+    setDownloadMethods({})
     appendProgressLog('Starting setup tasks…')
     setPage(8)
 
@@ -640,14 +705,14 @@ export function SetupWizard({ onComplete }: Props) {
           })
         }
       }
-      if (needsOcr) {
-        appendProgressLog(`Starting Image Translation package download (${selectedOcrTier})…`)
-        const task = api.downloadOcrModel?.(selectedOcrTier)
+      if (needsTranslationProfile) {
+        appendProgressLog(`Starting translation profile setup (${selectedTranslationProfileTier})…`)
+        const task = api.applyTranslationProfile?.(selectedTranslationProfileTier)
         if (task) {
           downloadTasks.push({
-            name: 'ocr',
+            name: 'translation-profile',
             promise: task.then((result) => {
-              setOcrProgress(100)
+              setTranslationProfileProgress(100)
               return result
             }),
           })
@@ -674,7 +739,7 @@ export function SetupWizard({ onComplete }: Props) {
       appendProgressLog(`Setup failed: ${err instanceof Error ? err.message : String(err)}`)
       setDownloadError(err instanceof Error ? err.message : String(err))
     }
-  }, [selectedTier, selectedLlamaBackend, selectedVoiceTier, installFonts, installDictionary, selectedSpeechTier, selectedOcrTier, sysInfo, createDesktop, createStartMenu, appendProgressLog])
+  }, [selectedTier, selectedLlamaBackend, selectedVoiceTier, installFonts, installDictionary, selectedSpeechTier, selectedTranslationProfileTier, sysInfo, createDesktop, createStartMenu, appendProgressLog])
 
   const handleFinish = useCallback(async () => {
     if (!downloadDone) {
@@ -685,12 +750,12 @@ export function SetupWizard({ onComplete }: Props) {
 
   // ── Render helpers ─────────────────────────────────────────────────────────
 
-  function ProgressBar({ value, label }: { value: number; label: string }) {
+  function ProgressBar({ value, label, method }: { value: number; label: string; method?: string | null }) {
     return (
       <div style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', fontSize: '0.85rem', opacity: 0.8 }}>
           <span>{label}</span>
-          <span>{value}%</span>
+          <span>{value}%{method ? ` [${method}]` : ''}</span>
         </div>
         <div style={{ height: '8px', borderRadius: '4px', background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
           <div style={{
@@ -771,24 +836,24 @@ export function SetupWizard({ onComplete }: Props) {
       ? selectedSpeechModelHardwareFit.message
       : null)
 
-  const ocrModelOptions: CompactDropdownOption[] = [
-    ...(sysInfo?.ocrModels?.map((model) => ({
-      value: model.tier,
-      label: model.label,
-      meta: `${formatSize(model.sizeMb)} • ${formatDurationMinutes(model.estimatedDownloadMinutes)}${model.installed ? ' • Installed' : ''}`,
-      badge: model.tier === sysInfo?.recommendedOcrTier ? 'Recommended' : undefined,
-      badgeTone: model.tier === sysInfo?.recommendedOcrTier ? ('recommended' as const) : undefined,
+  const translationProfileOptions: CompactDropdownOption[] = [
+    ...(sysInfo?.translationProfiles?.map((profile) => ({
+      value: profile.tier,
+      label: profile.label,
+      meta: `${formatSize(profile.sizeMb)} • ${formatDurationMinutes(profile.estimatedDownloadMinutes)}${profile.installed ? ' • Installed' : ''}`,
+      badge: profile.badge,
+      badgeTone: profile.tier === 'ocr_argos_small' ? ('recommended' as const) : ('soft' as const),
     })) ?? []),
     {
       value: 'skip',
-      label: 'Skip Image Translation install',
+      label: 'Skip OCR translation install',
       meta: 'Install later from settings',
     },
   ]
-  const selectedOcrModel = sysInfo?.ocrModels?.find((model) => model.tier === selectedOcrTier)
-  const selectedOcrTierDescription = selectedOcrTier === 'skip'
-    ? 'You can install Image Translation later from Settings to translate text from images offline.'
-    : selectedOcrModel?.description
+  const selectedTranslationProfile = sysInfo?.translationProfiles?.find((profile) => profile.tier === selectedTranslationProfileTier)
+  const selectedTranslationProfileDescription = selectedTranslationProfileTier === 'skip'
+    ? 'You can install OCR translation profiles later from Settings.'
+    : selectedTranslationProfile?.description
 
   const availableVoiceModels = sysInfo?.voiceModels ?? []
   const defaultVoiceModel = sysInfo?.voiceDefaultModel
@@ -1102,19 +1167,19 @@ export function SetupWizard({ onComplete }: Props) {
         </div>
 
         <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Image Translation (optional)</p>
+          <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>OCR Translation Profile (optional)</p>
           <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
-            Installs the Image Translation package: PaddleOCR Japanese extraction + offline JA→EN translation.
+            One choice installs the full OCR translation bundle: OCR + Argos (small) or OCR + full translation pipeline (bigger).
           </p>
           <CompactDropdown
-            ariaLabel="Image Translation package"
-            options={ocrModelOptions}
-            value={selectedOcrTier}
-            onChange={(value) => setSelectedOcrTier(value as OcrTier)}
+            ariaLabel="OCR translation profile"
+            options={translationProfileOptions}
+            value={selectedTranslationProfileTier}
+            onChange={(value) => setSelectedTranslationProfileTier(value as TranslationProfileTier)}
           />
-          {selectedOcrTierDescription ? (
+          {selectedTranslationProfileDescription ? (
             <p style={{ opacity: 0.65, fontSize: '0.84rem', lineHeight: 1.45, margin: '0.6rem 0 0' }}>
-              {selectedOcrTierDescription}
+              {selectedTranslationProfileDescription}
             </p>
           ) : null}
         </div>
@@ -1129,18 +1194,19 @@ export function SetupWizard({ onComplete }: Props) {
       const needsFonts = installFonts && !sysInfo?.fontsInstalled
       const needsDictionary = installDictionary && !sysInfo?.dictionaryInstalled
       const needsSpeech = selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find(m => m.tier === selectedSpeechTier)?.installed
-      const needsOcr = selectedOcrTier !== 'skip' && !sysInfo?.ocrModels?.find(m => m.tier === selectedOcrTier)?.installed
+      const needsTranslationProfile = selectedTranslationProfileTier !== 'skip'
+        && !sysInfo?.translationProfiles?.find(m => m.tier === selectedTranslationProfileTier)?.installed
       const modelInfo = sysInfo?.models.find(m => m.tier === selectedTier)
       const speechModelInfo = sysInfo?.speechModels.find(m => m.tier === selectedSpeechTier)
       const voiceModelInfo = availableVoiceModels.find(m => m.tier === selectedVoiceTier)
-      const ocrModelInfo = sysInfo?.ocrModels?.find(m => m.tier === selectedOcrTier)
+      const translationProfileInfo = sysInfo?.translationProfiles?.find(m => m.tier === selectedTranslationProfileTier)
       return (
         <PageLayout
           title="Ready to download"
           subtitle="Review what will be downloaded, then click Start Setup."
           onNext={startDownloads}
           onBack={() => setPage(setupMode === 'simple' ? 2 : 6)}
-          nextLabel={needsModel || needsLlama || needsVoice || needsFonts || needsDictionary || needsSpeech || needsOcr ? 'Start Setup' : 'Finish'}
+          nextLabel={needsModel || needsLlama || needsVoice || needsFonts || needsDictionary || needsSpeech || needsTranslationProfile ? 'Start Setup' : 'Finish'}
         >
           {needsModel && modelInfo && (
             <SummaryRow label="AI Tutor model" detail={`${modelInfo.label} — ${formatSize(modelInfo.sizeMb)}`} />
@@ -1160,10 +1226,10 @@ export function SetupWizard({ onComplete }: Props) {
           {needsSpeech && speechModelInfo && (
             <SummaryRow label="Speech recognition model" detail={`${speechModelInfo.label} — ${formatSize(speechModelInfo.sizeMb)}`} />
           )}
-          {needsOcr && ocrModelInfo && (
-            <SummaryRow label="Image Translation package" detail={`${ocrModelInfo.label} — ${formatSize(ocrModelInfo.sizeMb)}`} />
+          {needsTranslationProfile && translationProfileInfo && (
+            <SummaryRow label="OCR translation profile" detail={`${translationProfileInfo.label} — ${formatSize(translationProfileInfo.sizeMb)}`} />
           )}
-          {!needsModel && !needsVoice && !needsFonts && !needsDictionary && !needsSpeech && !needsOcr && (
+          {!needsModel && !needsVoice && !needsFonts && !needsDictionary && !needsSpeech && !needsTranslationProfile && (
             <p style={{ opacity: 0.7 }}>Nothing to download — all selected components are already installed.</p>
           )}
           {sysInfo?.isPackaged && (
@@ -1191,11 +1257,13 @@ export function SetupWizard({ onComplete }: Props) {
               <ProgressBar
                 value={llamaProgress}
                 label={`llama.cpp runtime${llamaMb ? ` (${llamaMb.done} / ${llamaMb.total} MB)` : ''}`}
+                method={downloadMethods.llama}
               />
             )}
             <ProgressBar
               value={modelProgress}
               label={`AI Tutor model${modelMb ? ` (${modelMb.done} / ${modelMb.total} MB)` : ''}`}
+              method={downloadMethods.model}
             />
             {modelEta !== null && modelProgress > 0 && modelProgress < 100 && (
               <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-0.5rem', marginBottom: '0.75rem' }}>
@@ -1208,6 +1276,7 @@ export function SetupWizard({ onComplete }: Props) {
           <ProgressBar
             value={voiceProgress}
             label={`Japanese voice model${voiceMb ? ` (${voiceMb.done} / ${voiceMb.total} MB)` : ''}`}
+            method={downloadMethods.voice}
           />
         )}
         {installFonts && !sysInfo?.fontsInstalled && (
@@ -1215,6 +1284,7 @@ export function SetupWizard({ onComplete }: Props) {
             <ProgressBar
               value={fontsProgress}
               label={`Japanese fonts${fontsMb ? ` (${fontsMb.done} / ${fontsMb.total} MB)` : ''}`}
+              method={downloadMethods.fonts}
             />
             {fontsFiles && fontsProgress > 0 && fontsProgress < 100 && (
               <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '-0.5rem', marginBottom: '0.75rem' }}>
@@ -1224,13 +1294,13 @@ export function SetupWizard({ onComplete }: Props) {
           </>
         )}
         {installDictionary && !sysInfo?.dictionaryInstalled && (
-          <ProgressBar value={dictionaryProgress} label="Offline dictionary" />
+          <ProgressBar value={dictionaryProgress} label="Offline dictionary" method={downloadMethods.dictionary} />
         )}
         {selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find((model) => model.tier === selectedSpeechTier)?.installed && (
-          <ProgressBar value={speechProgress} label="Speech recognition model" />
+          <ProgressBar value={speechProgress} label="Speech recognition model" method={downloadMethods.speech} />
         )}
-        {selectedOcrTier !== 'skip' && !sysInfo?.ocrModels?.find((model) => model.tier === selectedOcrTier)?.installed && (
-          <ProgressBar value={ocrProgress} label="Image Translation package" />
+        {selectedTranslationProfileTier !== 'skip' && !sysInfo?.translationProfiles?.find((model) => model.tier === selectedTranslationProfileTier)?.installed && (
+          <ProgressBar value={translationProfileProgress} label="OCR translation profile" method={downloadMethods.translation ?? downloadMethods.pipeline ?? downloadMethods.ocr} />
         )}
         {downloadError && (
           <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.35)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>

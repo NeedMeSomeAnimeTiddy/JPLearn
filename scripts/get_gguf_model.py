@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hf_download import download_file  # noqa: E402
+from hf_download import download_file, get_last_download_method  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RAM_THRESHOLDS_GB = {
@@ -128,7 +128,8 @@ def report(done: int, total: int) -> None:
         pct = done * 100 // total
         mb_done = done // (1024 * 1024)
         mb_total = total // (1024 * 1024)
-        sys.stdout.write(f"\rdownloading: {pct:3d}%  ({mb_done} / {mb_total} MB)")
+        method = get_last_download_method()
+        sys.stdout.write(f"\rdownloading: {pct:3d}% [{method}]  ({mb_done} / {mb_total} MB)")
         sys.stdout.flush()
 
 

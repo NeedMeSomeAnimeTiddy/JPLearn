@@ -26,9 +26,12 @@ Tune/disable via environment variable:
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Callable
@@ -39,7 +42,26 @@ MIN_CHUNK_SIZE = 8 * 1024 * 1024  # never split smaller than this per worker
 MIN_SIZE_FOR_PARALLEL = 16 * 1024 * 1024  # below this, sequential is fine
 MAX_RETRIES_PER_CHUNK = 5
 
+# Download backend policy:
+# - auto: prefer HF CLI when available for HF URLs, else use HTTP downloader
+# - hf: force HF CLI for HF URLs (falls back to HTTP on failures)
+# - http: always use HTTP downloader
+BACKEND_AUTO = "auto"
+BACKEND_HF = "hf"
+BACKEND_HTTP = "http"
+
 ReportFn = Callable[[int, int], None]
+_LAST_DOWNLOAD_METHOD = "unknown"
+
+
+def get_last_download_method() -> str:
+    """Return the most recent download method label."""
+    return _LAST_DOWNLOAD_METHOD
+
+
+def _set_last_download_method(method: str) -> None:
+    global _LAST_DOWNLOAD_METHOD
+    _LAST_DOWNLOAD_METHOD = method
 
 
 def _default_workers() -> int:
@@ -47,6 +69,73 @@ def _default_workers() -> int:
     if override.isdigit() and int(override) > 0:
         return int(override)
     return 8
+
+
+def _download_backend() -> str:
+    value = os.environ.get("JPLEARN_DOWNLOAD_BACKEND", BACKEND_AUTO).strip().lower()
+    if value in {BACKEND_AUTO, BACKEND_HF, BACKEND_HTTP}:
+        return value
+    return BACKEND_AUTO
+
+
+def _find_hf_cli() -> str | None:
+    for exe in ("hf", "huggingface-cli"):
+        if shutil.which(exe):
+            return exe
+    return None
+
+
+def _parse_hf_url(url: str) -> tuple[str, str, str] | None:
+    """Extract (repo_id, revision, file_path) from a Hugging Face resolve URL."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.netloc.lower() != "huggingface.co":
+        return None
+
+    path = parsed.path.lstrip("/")
+    if "/resolve/" not in path:
+        return None
+
+    repo_part, rest = path.split("/resolve/", 1)
+    if not repo_part or "/" not in repo_part or "/" not in rest:
+        return None
+
+    revision, file_path = rest.split("/", 1)
+    if not revision or not file_path:
+        return None
+
+    return repo_part, revision, file_path
+
+
+def _download_hf_cli(url: str, dest: Path) -> bool:
+    """Try downloading via Hugging Face CLI; return True on success."""
+    cli = _find_hf_cli()
+    parsed = _parse_hf_url(url)
+    if not cli or not parsed:
+        return False
+
+    repo_id, revision, file_path = parsed
+    expected_dest = dest.parent / file_path
+    expected_dest.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        cli,
+        "download",
+        repo_id,
+        file_path,
+        "--revision",
+        revision,
+        "--local-dir",
+        str(dest.parent),
+    ]
+
+    # Keep CLI output visible (progress/errors), then fall back if it fails.
+    result = subprocess.run(cmd, check=False)
+    if result.returncode != 0 or not expected_dest.exists():
+        return False
+
+    if expected_dest != dest:
+        expected_dest.replace(dest)
+    return True
 
 
 def _request(url: str, headers: dict | None = None) -> urllib.request.Request:
@@ -179,8 +268,19 @@ def download_file(
     dest.parent.mkdir(parents=True, exist_ok=True)
     workers = num_workers if num_workers is not None else _default_workers()
 
+    backend = _download_backend()
+    should_try_hf = backend in {BACKEND_AUTO, BACKEND_HF}
+    if should_try_hf and _download_hf_cli(url, dest):
+        _set_last_download_method("hf-cli")
+        if report:
+            size = dest.stat().st_size
+            report(size, size)
+        return
+
     total, supports_range = _probe(url)
     if supports_range and total >= MIN_SIZE_FOR_PARALLEL and workers > 1:
+        _set_last_download_method("http-range")
         _download_parallel(url, dest, total, workers, report)
     else:
+        _set_last_download_method("http")
         _download_sequential(url, dest, report)

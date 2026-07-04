@@ -48,7 +48,7 @@ import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hf_download import download_file as _download_file  # noqa: E402
+from hf_download import download_file as _download_file, get_last_download_method  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -93,7 +93,8 @@ def resolve_target_dir(tier: str) -> Path:
 def report(done: int, total: int) -> None:
     if total > 0:
         pct = done * 100 // total
-        sys.stdout.write(f"\rdownloading: {pct:3d}%  ({done // (1024 * 1024)} MB)")
+        method = get_last_download_method()
+        sys.stdout.write(f"\rdownloading: {pct:3d}% [{method}]  ({done // (1024 * 1024)} MB)")
         sys.stdout.flush()
 
 

@@ -517,7 +517,14 @@ function registerIpcHandlers(options) {
       })
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to synthesize speech: ${detail}`)
+      return {
+        ok: false,
+        format: 'wav',
+        sampleRate: 24000,
+        voiceId: String(validatedPayload.speaker ?? 'unknown'),
+        audioBase64: '',
+        error: `Failed to synthesize speech: ${detail}`,
+      }
     }
   })
 
@@ -1078,6 +1085,87 @@ function registerIpcHandlers(options) {
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Failed to uninstall OCR model: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:download-translation-model', async (event, tier, downloadOptions) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['argos', 'opusmt'].includes(tier)) {
+        throw new Error('Invalid translation model tier')
+      }
+      const force = Boolean(downloadOptions && typeof downloadOptions === 'object' && downloadOptions.force)
+      try {
+        return await setupRuntime.downloadTranslationModel(tier, event.sender, options.repoRoot, { force })
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Translation model download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:set-active-translation-model', (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['argos', 'opusmt'].includes(tier)) {
+        throw new Error('Invalid translation model tier')
+      }
+      try {
+        return setupRuntime.setActiveTranslationModelTier(tier)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to select translation model: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:uninstall-translation-model', (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['argos', 'opusmt'].includes(tier)) {
+        throw new Error('Invalid translation model tier')
+      }
+      try {
+        return setupRuntime.uninstallTranslationModel(tier)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to uninstall translation model: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:download-pipeline-model', async (event, tier, downloadOptions) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['opusmt_ja_en_onnx', 'llmjp_150m_onnx', 'jp_reranker_xsmall_onnx'].includes(tier)) {
+        throw new Error('Invalid pipeline model tier')
+      }
+      const force = Boolean(downloadOptions && typeof downloadOptions === 'object' && downloadOptions.force)
+      try {
+        return await setupRuntime.downloadPipelineModel(tier, event.sender, options.repoRoot, { force })
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Pipeline model download failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:apply-translation-profile', async (event, tier, applyOptions) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['ocr_argos_small', 'ocr_pipeline_full'].includes(tier)) {
+        throw new Error('Invalid translation profile tier')
+      }
+      const force = Boolean(applyOptions && typeof applyOptions === 'object' && applyOptions.force)
+      try {
+        return await setupRuntime.applyTranslationProfile(tier, event.sender, options.repoRoot, { force })
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Translation profile apply failed: ${detail}`)
+      }
+    })
+
+    options.ipcMain.handle('setup:uninstall-pipeline-model', (event, tier) => {
+      assertTrustedIpcSender(event, trustedSenderOptions())
+      if (typeof tier !== 'string' || !['opusmt_ja_en_onnx', 'llmjp_150m_onnx', 'jp_reranker_xsmall_onnx'].includes(tier)) {
+        throw new Error('Invalid pipeline model tier')
+      }
+      try {
+        return setupRuntime.uninstallPipelineModel(tier)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(`Failed to uninstall pipeline model: ${detail}`)
       }
     })
 

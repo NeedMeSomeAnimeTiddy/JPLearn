@@ -3443,6 +3443,38 @@ function App() {
     recommendedOcrTier?: 'standard'
     activeOcrModelTier?: 'standard' | null
     ocrInstalled?: boolean
+    translationModels?: Array<{
+      tier: 'argos' | 'opusmt'
+      label: string
+      badge?: 'Default Translation' | 'Better Translation'
+      description: string
+      sizeMb: number
+      installed: boolean
+      estimatedDownloadMinutes?: number | null
+    }>
+    recommendedTranslationTier?: 'argos'
+    activeTranslationModelTier?: 'argos' | 'opusmt' | null
+    translationInstalled?: boolean
+    pipelineModels?: Array<{
+      tier: 'opusmt_ja_en_onnx' | 'llmjp_150m_onnx' | 'jp_reranker_xsmall_onnx'
+      label: string
+      badge?: 'Pipeline Step 1' | 'Pipeline Step 2' | 'Pipeline Step 3'
+      description: string
+      sizeMb: number
+      installed: boolean
+      estimatedDownloadMinutes?: number | null
+    }>
+    pipelineInstalled?: boolean
+    translationProfiles?: Array<{
+      tier: 'ocr_argos_small' | 'ocr_pipeline_full'
+      label: string
+      badge?: 'Smaller' | 'Higher Quality'
+      description: string
+      sizeMb: number
+      installed: boolean
+      estimatedDownloadMinutes?: number | null
+    }>
+    activeTranslationProfileTier?: 'ocr_argos_small' | 'ocr_pipeline_full' | null
   } | null>(null)
   const [voiceOptions] = useState<VoiceOptionEntry[]>(FIXED_JAPANESE_VOICE_OPTIONS)
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
@@ -3453,9 +3485,8 @@ function App() {
   const [speechDownloadingTier, setSpeechDownloadingTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
   const [speechDownloadProgress, setSpeechDownloadProgress] = useState<number>(0)
   const [speechModelActionTier, setSpeechModelActionTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
-  const [ocrDownloadingTier, setOcrDownloadingTier] = useState<'standard' | null>(null)
-  const [ocrDownloadProgress, setOcrDownloadProgress] = useState<number>(0)
-  const [ocrModelActionTier, setOcrModelActionTier] = useState<'standard' | null>(null)
+  const [translationProfileApplyingTier, setTranslationProfileApplyingTier] = useState<'ocr_argos_small' | 'ocr_pipeline_full' | null>(null)
+  const [translationProfileProgress, setTranslationProfileProgress] = useState<number>(0)
   const [voiceEngineDownloadingTier, setVoiceEngineDownloadingTier] = useState<'0.6b' | null>(null)
   const [voiceEngineDownloadProgress, setVoiceEngineDownloadProgress] = useState<number>(0)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
@@ -3577,7 +3608,6 @@ function App() {
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null)
-  const voicePreloadTriggeredRef = useRef<boolean>(false)
   const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const roundPresentedAtRef = useRef<number>(0)
@@ -3586,7 +3616,6 @@ function App() {
   const startupBootMarkRef = useRef<number>(performance.now())
   const startupFirstSummaryMsRef = useRef<number | null>(null)
   const startupReadySentRef = useRef(false)
-  const assistantChatPreloadTriggeredRef = useRef(false)
   const assistantChatHistoryHydratedRef = useRef(false)
   const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
   const ocrWorkbenchImageInputRef = useRef<HTMLInputElement | null>(null)
@@ -3702,6 +3731,8 @@ function App() {
         voiceAudioRef.current = audio
         await audio.play()
         setVoiceUnavailable(false)
+      } else {
+        setVoiceUnavailable(true)
       }
     } catch {
       setVoiceUnavailable(true)
@@ -4056,6 +4087,14 @@ function App() {
         recommendedOcrTier: setupInfo.recommendedOcrTier,
         activeOcrModelTier: setupInfo.activeOcrModelTier ?? null,
         ocrInstalled: setupInfo.ocrInstalled ?? false,
+        translationModels: setupInfo.translationModels ?? [],
+        recommendedTranslationTier: setupInfo.recommendedTranslationTier,
+        activeTranslationModelTier: setupInfo.activeTranslationModelTier ?? null,
+        translationInstalled: setupInfo.translationInstalled ?? false,
+        pipelineModels: setupInfo.pipelineModels ?? [],
+        pipelineInstalled: setupInfo.pipelineInstalled ?? false,
+        translationProfiles: setupInfo.translationProfiles ?? [],
+        activeTranslationProfileTier: setupInfo.activeTranslationProfileTier ?? null,
       })
     } catch {
       // Best effort only.
@@ -4102,6 +4141,21 @@ function App() {
   }, [activeSettingsTab, refreshTutorInstallInfo, showSettings])
 
   useEffect(() => {
+    if (!showSettings || activeSettingsTab !== 'voice') {
+      return
+    }
+
+    void refreshVoiceStatus()
+    const intervalHandle = window.setInterval(() => {
+      void refreshVoiceStatus()
+    }, 3000)
+
+    return () => {
+      window.clearInterval(intervalHandle)
+    }
+  }, [activeSettingsTab, refreshVoiceStatus, showSettings])
+
+  useEffect(() => {
     const onSetupProgress = window.jplearnDesktop.onSetupProgress
     if (!onSetupProgress) {
       return
@@ -4120,7 +4174,15 @@ function App() {
         return
       }
       if (evt.id === 'ocr') {
-        setOcrDownloadProgress(evt.percent)
+        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+        return
+      }
+      if (evt.id === 'translation') {
+        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+        return
+      }
+      if (evt.id === 'pipeline') {
+        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
         return
       }
       if (evt.id !== 'model') {
@@ -4235,49 +4297,21 @@ function App() {
     }
   }, [refreshTutorInstallInfo, speechModelActionTier])
 
-  const downloadOcrModel = useCallback(async (tier: 'standard', options?: { force?: boolean }) => {
-    const downloadModel = window.jplearnDesktop.downloadOcrModel
-    if (!downloadModel || ocrDownloadingTier) {
+  const applyTranslationProfile = useCallback(async (tier: 'ocr_argos_small' | 'ocr_pipeline_full') => {
+    const applyProfile = window.jplearnDesktop.applyTranslationProfile
+    if (!applyProfile || translationProfileApplyingTier) {
       return
     }
-    setOcrDownloadingTier(tier)
-    setOcrDownloadProgress(0)
+    setTranslationProfileApplyingTier(tier)
+    setTranslationProfileProgress(0)
     try {
-      await downloadModel(tier, options)
+      await applyProfile(tier, { force: true })
       await refreshTutorInstallInfo()
     } finally {
-      setOcrDownloadingTier(null)
-      setOcrDownloadProgress(0)
+      setTranslationProfileApplyingTier(null)
+      setTranslationProfileProgress(0)
     }
-  }, [ocrDownloadingTier, refreshTutorInstallInfo])
-
-  const selectOcrModel = useCallback(async (tier: 'standard') => {
-    const setActiveOcrModel = window.jplearnDesktop.setActiveOcrModel
-    if (!setActiveOcrModel || ocrModelActionTier) {
-      return
-    }
-    setOcrModelActionTier(tier)
-    try {
-      await setActiveOcrModel(tier)
-      await refreshTutorInstallInfo()
-    } finally {
-      setOcrModelActionTier(null)
-    }
-  }, [ocrModelActionTier, refreshTutorInstallInfo])
-
-  const uninstallOcrModel = useCallback(async (tier: 'standard') => {
-    const uninstallModel = window.jplearnDesktop.uninstallOcrModel
-    if (!uninstallModel || ocrModelActionTier) {
-      return
-    }
-    setOcrModelActionTier(tier)
-    try {
-      await uninstallModel(tier)
-      await refreshTutorInstallInfo()
-    } finally {
-      setOcrModelActionTier(null)
-    }
-  }, [ocrModelActionTier, refreshTutorInstallInfo])
+  }, [refreshTutorInstallInfo, translationProfileApplyingTier])
 
   const downloadVoiceEngineModel = useCallback(async (tier: '0.6b') => {
     const downloadVoiceEngine = window.jplearnDesktop.downloadVoiceEngine
@@ -4299,19 +4333,8 @@ function App() {
     }
   }, [refreshTutorInstallInfo, settings.voiceSpeaker, voiceEngineDownloadingTier])
 
-  // Warm the voice engine in the background once voice is enabled so the first
-  // spoken prompt doesn't pay the engine cold-start cost.
-  useEffect(() => {
-    if (!settings.voiceEnabled || voicePreloadTriggeredRef.current) {
-      return
-    }
-    const preloadVoice = window.jplearnDesktop.preloadVoice
-    if (!preloadVoice) {
-      return
-    }
-    voicePreloadTriggeredRef.current = true
-    void preloadVoice(settings.voiceSpeaker).catch(() => {})
-  }, [settings.voiceEnabled, settings.voiceSpeaker])
+  // Do not warm voice runtime automatically in the background.
+  // Keep startup and menu-open flows quiet; runtime initializes on first use.
 
   const toggleOverviewSection = useCallback((section: OverviewSectionKey) => {
     setOverviewSectionExpanded((prev) => ({
@@ -5420,19 +5443,6 @@ function App() {
     return hydrated
   }, [isAssistantServerActive, refreshAssistantChatHistory, refreshAssistantChatStatus])
 
-  const preloadAssistantChatRuntime = useCallback(async () => {
-    const preloadRuntime = window.jplearnDesktop.preloadAssistantChatRuntime
-    if (!preloadRuntime) {
-      return
-    }
-    try {
-      await preloadRuntime()
-      await refreshAssistantChatStatus()
-    } catch {
-      // Startup preload is best effort and should never interrupt launch.
-    }
-  }, [refreshAssistantChatStatus])
-
   useEffect(() => {
     if (!settings.assistantChatEnabled) {
       return
@@ -5526,13 +5536,8 @@ function App() {
     void unloadAssistantChatRuntime().catch(() => undefined)
   }, [settings.assistantChatEnabled])
 
-  useEffect(() => {
-    if (!settings.assistantChatEnabled || assistantChatPreloadTriggeredRef.current) {
-      return
-    }
-    assistantChatPreloadTriggeredRef.current = true
-    void preloadAssistantChatRuntime()
-  }, [preloadAssistantChatRuntime, settings.assistantChatEnabled])
+  // Avoid background tutor runtime warmup on startup.
+  // Runtime loads lazily when the user sends a chat request.
 
   const closeAssistantChat = useCallback(() => {
     cancelAssistantSpeech()
@@ -9404,17 +9409,16 @@ function App() {
                 <SettingsCollapsibleSection
                   id="image-ocr"
                   title="Image Translation"
-                  description="Install the offline Image Translation package (PaddleOCR + local JA→EN translation) for imported Japanese text images."
+                  description="Install the offline OCR extraction package (PaddleOCR) for imported Japanese text images."
                   meta={(tutorInstallInfo?.ocrModels ?? []).some((model) => model.installed) ? 'Installed' : 'Not installed'}
                   collapsed={Boolean(collapsedSettingsSections['image-ocr'])}
                   onToggle={() => toggleThemeSectionCollapsed('image-ocr')}
                   className="settings-theme-card"
                 >
                   <div style={{ display: 'grid', gap: '0.65rem' }}>
-                    {(tutorInstallInfo?.ocrModels ?? []).map((model) => {
-                      const isDownloadingThis = ocrDownloadingTier === model.tier
-                      const isActioningThis = ocrModelActionTier === model.tier
-                      const isActiveTier = tutorInstallInfo?.activeOcrModelTier === model.tier
+                    {(tutorInstallInfo?.translationProfiles ?? []).map((model) => {
+                      const isApplyingThis = translationProfileApplyingTier === model.tier
+                      const isActiveTier = tutorInstallInfo?.activeTranslationProfileTier === model.tier
 
                       return (
                         <div
@@ -9436,66 +9440,36 @@ function App() {
                               </p>
                               <p className="settings-help" style={{ marginTop: '0.25rem' }}>
                                 {formatModelSize(model.sizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
+                                {model.badge ? ` · ${model.badge}` : ''}
                               </p>
                               <p className="settings-help" style={{ marginTop: '0.2rem' }}>
                                 {model.installed ? 'Installed' : model.description}
                               </p>
-                              {tutorInstallInfo?.recommendedOcrTier === model.tier ? (
-                                <p className="settings-help" style={{ marginTop: '0.2rem', color: 'var(--accent, #7eb8ea)' }}>
-                                  Recommended default Image Translation package
-                                </p>
-                              ) : null}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                              {model.installed ? (
-                                <button
-                                  type="button"
-                                  className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
-                                  onClick={() => { void selectOcrModel(model.tier) }}
-                                  disabled={isActiveTier || ocrModelActionTier !== null || ocrDownloadingTier !== null}
-                                  aria-label={isActiveTier ? `${model.label} is the active Image Translation model` : `Use ${model.label} for image translation`}
-                                  title={isActiveTier ? 'Currently active' : 'Use this model'}
-                                >
-                                  {isActiveTier ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" /> : <Circle size={18} strokeWidth={2.25} aria-hidden="true" />}
-                                </button>
-                              ) : null}
                               <button
                                 type="button"
                                 className="settings-card-icon-button"
-                                onClick={() => { void downloadOcrModel(model.tier, { force: model.installed }) }}
-                                disabled={ocrDownloadingTier !== null || ocrModelActionTier !== null}
-                                aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
-                                title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
+                                onClick={() => { void applyTranslationProfile(model.tier) }}
+                                disabled={translationProfileApplyingTier !== null}
+                                aria-label={model.installed ? `Reapply ${model.label}` : `Apply ${model.label}`}
+                                title={model.installed ? `Reapply ${model.label}` : `Apply ${model.label}`}
                               >
-                                {isDownloadingThis
+                                {isApplyingThis
                                   ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
-                                  : model.installed
-                                    ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
+                                  : isActiveTier
+                                    ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" />
                                     : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
                               </button>
-                              {model.installed ? (
-                                <button
-                                  type="button"
-                                  className="settings-inline-icon-button"
-                                  onClick={() => { void uninstallOcrModel(model.tier) }}
-                                  disabled={ocrModelActionTier !== null || ocrDownloadingTier !== null}
-                                  aria-label={`Uninstall ${model.label}`}
-                                  title={`Uninstall ${model.label}`}
-                                >
-                                  {isActioningThis
-                                    ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
-                                    : <Trash2 size={18} strokeWidth={2.25} aria-hidden="true" />}
-                                </button>
-                              ) : null}
                             </div>
                           </div>
-                          {isDownloadingThis ? (
+                          {isApplyingThis ? (
                             <div>
                               <div className="settings-progress-track">
-                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, ocrDownloadProgress))}%` }} />
+                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, translationProfileProgress))}%` }} />
                               </div>
                               <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                Downloading… {Math.round(ocrDownloadProgress)}%
+                                Applying… {Math.round(translationProfileProgress)}%
                               </p>
                             </div>
                           ) : null}
@@ -9504,7 +9478,7 @@ function App() {
                     })}
                   </div>
                   <p className="settings-help" style={{ marginTop: '0.75rem' }}>
-                    Select the circle icon to choose the active Image Translation package used by the OCR Translator.
+                    Both options include OCR extraction. Pick small for lower size, or bigger for the full translation pipeline.
                   </p>
                   <div style={{ marginTop: '0.75rem' }}>
                     <label className="settings-help" htmlFor="assistant-chat-ocr-confidence-slider" style={{ display: 'block', marginBottom: '0.35rem' }}>
@@ -9709,6 +9683,18 @@ function App() {
                         ? 'Click a voice to hear a sample. The speaker button in games reads prompts aloud.'
                         : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
                       {voiceUnavailable ? ' (Voice runtime unavailable right now.)' : ''}
+                    </p>
+                    <p className="settings-help">
+                      VOICEVOX runtime: {
+                        !voiceStatusChecked
+                          ? 'Checking status…'
+                          : voiceRuntimeRunning
+                            ? 'Running'
+                            : 'Not running'
+                      }
+                      {!voiceRuntimeRunning && voiceStatus?.lastError
+                        ? ` (${voiceStatus.lastError})`
+                        : ''}
                     </p>
                     <p className="settings-help">
                       Synthesis debug: {lastVoiceSynthesis

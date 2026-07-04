@@ -174,6 +174,23 @@ TRANSLATION_RUNTIME_DIR = (
 )
 FASTTEXT_LID_MODEL_PATH = TRANSLATION_RUNTIME_DIR / "translation" / "fasttext" / "lid.176.ftz"
 FASTTEXT_LID_MODEL_URL = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz"
+ACTIVE_TRANSLATION_MODEL_STATE_CANDIDATES = (
+    Path(_assets_dir) / "translation" / "active-translation-model.json"
+    if _assets_dir
+    else Path(_docs_dir) / "translation" / "active-translation-model.json"
+    if _docs_dir
+    else PROJECT_ROOT / "data" / "translation" / "active-translation-model.json",
+    PROJECT_ROOT / "data" / "translation" / "active-translation-model.json",
+)
+TRANSLATION_TIER_ORDER = ("argos", "opusmt")
+OPUSMT_MODEL_ID = "onnx-community/opus-mt-ja-en"
+LLMJP_150M_ONNX_MODEL_ID = "onnx-community/llm-jp-3-150m-instruct3-ONNX"
+JP_RERANKER_ONNX_MODEL_ID = "hotchpotch/japanese-reranker-xsmall-v2"
+PIPELINE_TIER_ORDER = (
+    "opusmt_ja_en_onnx",
+    "llmjp_150m_onnx",
+    "jp_reranker_xsmall_onnx",
+)
 
 SENTENCE_EXAMPLES_CSV_CANDIDATES = (
     Path(_assets_dir) / "data" / "external_sources" / "sentence_examples.csv"
@@ -1347,6 +1364,74 @@ def _join_ocr_lines_for_translation(lines: list[str]) -> str:
     return "\n".join(deduped).strip()
 
 
+def _translation_tier_model_dir_candidates(tier: str) -> tuple[Path, ...]:
+    return (
+        Path(_assets_dir) / "translation" / tier
+        if _assets_dir
+        else Path(_docs_dir) / "translation" / tier
+        if _docs_dir
+        else PROJECT_ROOT / "data" / "translation" / tier,
+        PROJECT_ROOT / "data" / "translation" / tier,
+    )
+
+
+def _pipeline_tier_model_dir_candidates(tier: str) -> tuple[Path, ...]:
+    return (
+        Path(_assets_dir) / "translation-pipeline" / tier
+        if _assets_dir
+        else Path(_docs_dir) / "translation-pipeline" / tier
+        if _docs_dir
+        else PROJECT_ROOT / "data" / "translation-pipeline" / tier,
+        PROJECT_ROOT / "data" / "translation-pipeline" / tier,
+    )
+
+
+def _translation_tier_cache_dir(tier: str) -> Path:
+    for candidate in _translation_tier_model_dir_candidates(tier):
+        if candidate.exists():
+            return candidate
+    return _translation_tier_model_dir_candidates(tier)[0]
+
+
+def _translation_tier_is_installed(tier: str) -> bool:
+    for base in _translation_tier_model_dir_candidates(tier):
+        if (base / "model.ready").exists():
+            return True
+    return False
+
+
+def _pipeline_tier_cache_dir(tier: str) -> Path:
+    for candidate in _pipeline_tier_model_dir_candidates(tier):
+        if candidate.exists():
+            return candidate
+    return _pipeline_tier_model_dir_candidates(tier)[0]
+
+
+def _pipeline_tier_is_installed(tier: str) -> bool:
+    for base in _pipeline_tier_model_dir_candidates(tier):
+        if (base / "model.ready").exists():
+            return True
+    return False
+
+
+def _resolve_active_translation_backend() -> str:
+    for state_path in ACTIVE_TRANSLATION_MODEL_STATE_CANDIDATES:
+        if not state_path.exists():
+            continue
+        try:
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        tier = str(payload.get("tier") or "").strip().lower()
+        if tier in TRANSLATION_TIER_ORDER and _translation_tier_is_installed(tier):
+            return tier
+
+    for tier in TRANSLATION_TIER_ORDER:
+        if _translation_tier_is_installed(tier):
+            return tier
+    return "argos"
+
+
 def _resolve_argos_translation(source_lang: str, target_lang: str):
     try:
         argos_package = importlib.import_module("argostranslate.package")
@@ -1441,6 +1526,265 @@ def _detect_language_fasttext(text: str) -> tuple[str, float]:
     return normalized.lower(), score
 
 
+_TRANSFORMERS_TRANSLATOR_CACHE: dict[str, tuple[object, object]] = {}
+_PIPELINE_LLM_REWRITE_CACHE: tuple[object, object] | None = None
+_PIPELINE_RERANKER_CACHE: tuple[object, object] | None = None
+
+
+def _translate_with_argos(text: str, source_lang: str, target_lang: str) -> str:
+    translation = _resolve_argos_translation(source_lang, target_lang)
+    translated_text = str(translation.translate(text) or "").strip()
+    if not translated_text:
+        raise RuntimeError("Argos translation returned empty text.")
+    return translated_text
+
+
+def _translate_with_transformers_model(
+    text: str,
+    *,
+    tier: str,
+    model_id: str,
+    source_lang: str,
+    target_lang: str,
+) -> str:
+    if source_lang != "ja" or target_lang != "en":
+        raise ValueError("Only ja->en OCR translation is currently supported.")
+
+    try:
+        transformers = importlib.import_module("transformers")
+        optimum_ort = importlib.import_module("optimum.onnxruntime")
+    except Exception as exc:  # pragma: no cover - environment dependent
+        raise RuntimeError(
+            "ONNX translation runtime is unavailable. Install Python packages 'transformers', 'optimum[onnxruntime]', and 'sentencepiece'."
+        ) from exc
+
+    cached = _TRANSFORMERS_TRANSLATOR_CACHE.get(tier)
+    tokenizer = cached[0] if cached else None
+    model = cached[1] if cached else None
+
+    cache_dir = _translation_tier_cache_dir(tier)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    if tokenizer is None or model is None:
+        tokenizer = transformers.AutoTokenizer.from_pretrained(model_id, cache_dir=str(cache_dir))
+        encoder_file_name = "encoder_model_int8.onnx"
+        decoder_file_name = "decoder_model_merged_int8.onnx"
+        decoder_with_past_file_name = "decoder_with_past_model_int8.onnx"
+        model = optimum_ort.ORTModelForSeq2SeqLM.from_pretrained(
+            model_id,
+            cache_dir=str(cache_dir),
+            subfolder="onnx",
+            encoder_file_name=encoder_file_name,
+            decoder_file_name=decoder_file_name,
+            decoder_with_past_file_name=decoder_with_past_file_name,
+        )
+        _TRANSFORMERS_TRANSLATOR_CACHE[tier] = (tokenizer, model)
+
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+    generate_kwargs: dict[str, object] = {"max_new_tokens": 512}
+
+    outputs = model.generate(**inputs, **generate_kwargs)
+    translated_text = str(tokenizer.batch_decode(outputs, skip_special_tokens=True)[0] or "").strip()
+    if not translated_text:
+        raise RuntimeError(f"{tier} translation returned empty text.")
+    return translated_text
+
+
+def _load_pipeline_llm_rewriter() -> tuple[object, object]:
+    global _PIPELINE_LLM_REWRITE_CACHE
+    if _PIPELINE_LLM_REWRITE_CACHE is not None:
+        return _PIPELINE_LLM_REWRITE_CACHE
+
+    if not _pipeline_tier_is_installed("llmjp_150m_onnx"):
+        raise RuntimeError("Pipeline model llmjp_150m_onnx is not installed.")
+
+    try:
+        transformers = importlib.import_module("transformers")
+        optimum_ort = importlib.import_module("optimum.onnxruntime")
+    except Exception as exc:  # pragma: no cover - environment dependent
+        raise RuntimeError(
+            "LLM-JP ONNX runtime is unavailable. Install 'transformers' and 'optimum[onnxruntime]'."
+        ) from exc
+
+    cache_dir = _pipeline_tier_cache_dir("llmjp_150m_onnx")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tokenizer = transformers.AutoTokenizer.from_pretrained(LLMJP_150M_ONNX_MODEL_ID, cache_dir=str(cache_dir))
+    model = optimum_ort.ORTModelForCausalLM.from_pretrained(
+        LLMJP_150M_ONNX_MODEL_ID,
+        cache_dir=str(cache_dir),
+        subfolder="onnx",
+        file_name="model_int8.onnx",
+    )
+    _PIPELINE_LLM_REWRITE_CACHE = (tokenizer, model)
+    return _PIPELINE_LLM_REWRITE_CACHE
+
+
+def _load_pipeline_reranker() -> tuple[object, object]:
+    global _PIPELINE_RERANKER_CACHE
+    if _PIPELINE_RERANKER_CACHE is not None:
+        return _PIPELINE_RERANKER_CACHE
+
+    if not _pipeline_tier_is_installed("jp_reranker_xsmall_onnx"):
+        raise RuntimeError("Pipeline model jp_reranker_xsmall_onnx is not installed.")
+
+    try:
+        transformers = importlib.import_module("transformers")
+        optimum_ort = importlib.import_module("optimum.onnxruntime")
+    except Exception as exc:  # pragma: no cover - environment dependent
+        raise RuntimeError(
+            "Japanese reranker ONNX runtime is unavailable. Install 'transformers' and 'optimum[onnxruntime]'."
+        ) from exc
+
+    cache_dir = _pipeline_tier_cache_dir("jp_reranker_xsmall_onnx")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tokenizer = transformers.AutoTokenizer.from_pretrained(JP_RERANKER_ONNX_MODEL_ID, cache_dir=str(cache_dir))
+
+    model = None
+    last_exc: Exception | None = None
+    for file_name in ("model_quantized.onnx", "model_int8.onnx", "model.onnx"):
+        try:
+            model = optimum_ort.ORTModelForSequenceClassification.from_pretrained(
+                JP_RERANKER_ONNX_MODEL_ID,
+                cache_dir=str(cache_dir),
+                subfolder="onnx",
+                file_name=file_name,
+            )
+            break
+        except Exception as exc:  # pragma: no cover - runtime fallback
+            last_exc = exc
+
+    if model is None:
+        raise RuntimeError("Unable to load ONNX reranker weights for japanese-reranker-xsmall-v2") from last_exc
+
+    _PIPELINE_RERANKER_CACHE = (tokenizer, model)
+    return _PIPELINE_RERANKER_CACHE
+
+
+def _extract_english_lines(generated: str) -> list[str]:
+    lines: list[str] = []
+    for raw in generated.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        line = re.sub(r"^[\-\*\d\.\)\s]+", "", line).strip()
+        if not line:
+            continue
+        if "### 応答" in line or "### 指示" in line:
+            continue
+        if not _contains_latin_letters(line):
+            continue
+        lines.append(line)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        key = line.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(line)
+    return deduped
+
+
+def _build_rewrite_prompt(source_text: str, base_translation: str) -> str:
+    return (
+        "以下の日本語文の意味を保ったまま、自然な英語文を3つ作成してください。\\n"
+        "出力は英語文のみを1行ずつ、合計3行で返してください。補足説明は不要です。\\n\\n"
+        f"日本語: {source_text}\\n"
+        f"初期訳: {base_translation}\\n"
+    )
+
+
+def _generate_llmjp_rewrite_candidates(source_text: str, base_translation: str) -> list[str]:
+    if not _pipeline_tier_is_installed("llmjp_150m_onnx"):
+        return [base_translation]
+
+    tokenizer, model = _load_pipeline_llm_rewriter()
+    prompt = _build_rewrite_prompt(source_text, base_translation)
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=160,
+        do_sample=True,
+        temperature=0.7,
+        top_p=0.9,
+        top_k=30,
+    )
+
+    generated = str(tokenizer.batch_decode(outputs, skip_special_tokens=True)[0] or "")
+    candidates = _extract_english_lines(generated)
+
+    merged: list[str] = []
+    for text in [base_translation, *candidates]:
+        normalized = str(text or "").strip()
+        if not normalized:
+            continue
+        if normalized.casefold() in {item.casefold() for item in merged}:
+            continue
+        merged.append(normalized)
+        if len(merged) >= 3:
+            break
+
+    return merged or [base_translation]
+
+
+def _score_with_reranker(source_text: str, candidates: list[str]) -> list[float]:
+    tokenizer, model = _load_pipeline_reranker()
+    inputs = tokenizer(
+        [source_text] * len(candidates),
+        candidates,
+        padding=True,
+        truncation=True,
+        max_length=512,
+        return_tensors="np",
+    )
+    outputs = model(**inputs)
+    logits = getattr(outputs, "logits", None)
+    if logits is None:
+        return [0.0 for _ in candidates]
+
+    scores: list[float] = []
+    for row in logits:
+        if hasattr(row, "shape") and len(getattr(row, "shape", [])) and row.shape[-1] >= 2:
+            scores.append(float(row[-1]))
+        else:
+            scores.append(float(row[0] if hasattr(row, "__len__") else row))
+    return scores
+
+
+def _apply_optional_pipeline(source_text: str, base_translation: str) -> tuple[str, dict[str, object]]:
+    if not (
+        _pipeline_tier_is_installed("opusmt_ja_en_onnx")
+        and _pipeline_tier_is_installed("llmjp_150m_onnx")
+        and _pipeline_tier_is_installed("jp_reranker_xsmall_onnx")
+    ):
+        return base_translation, {"applied": False, "reason": "pipeline-components-not-installed"}
+
+    candidates = _generate_llmjp_rewrite_candidates(source_text, base_translation)
+    if len(candidates) <= 1:
+        return base_translation, {
+            "applied": False,
+            "reason": "no-additional-candidates",
+            "candidates": candidates,
+        }
+
+    scores = _score_with_reranker(source_text, candidates)
+    best_index = max(range(len(candidates)), key=lambda idx: scores[idx])
+    selected = candidates[best_index]
+    return selected, {
+        "applied": True,
+        "modelChain": [
+            "onnx-community/opus-mt-ja-en",
+            "onnx-community/llm-jp-3-150m-instruct3-ONNX",
+            "hotchpotch/japanese-reranker-xsmall-v2",
+        ],
+        "candidateCount": len(candidates),
+        "selectedIndex": best_index,
+        "scores": [round(float(score), 4) for score in scores],
+        "selected": selected,
+    }
+
+
 def translate_assistant_chat_ocr_payload(text_raw: str, source_lang: str = "ja", target_lang: str = "en") -> dict[str, object]:
     text = str(text_raw or "").strip()
     if not text:
@@ -1451,10 +1795,29 @@ def translate_assistant_chat_ocr_payload(text_raw: str, source_lang: str = "ja",
     if source != "ja" or target != "en":
         raise ValueError("Only ja->en OCR translation is currently supported.")
 
-    translation = _resolve_argos_translation(source, target)
-    translated_text = str(translation.translate(text) or "").strip()
-    if not translated_text:
-        raise RuntimeError("Offline translator returned empty text.")
+    configured_backend = os.environ.get("JPLEARN_TRANSLATION_BACKEND", "").strip().lower()
+    backend = configured_backend if configured_backend in TRANSLATION_TIER_ORDER else _resolve_active_translation_backend()
+
+    if backend == "opusmt":
+        translated_text = _translate_with_transformers_model(
+            text,
+            tier="opusmt",
+            model_id=OPUSMT_MODEL_ID,
+            source_lang=source,
+            target_lang=target,
+        )
+        try:
+            translated_text, pipeline_meta = _apply_optional_pipeline(text, translated_text)
+        except Exception as exc:
+            pipeline_meta = {
+                "applied": False,
+                "reason": "pipeline-error",
+                "error": str(exc),
+            }
+    else:
+        backend = "argos"
+        translated_text = _translate_with_argos(text, source, target)
+        pipeline_meta = {"applied": False, "reason": "backend-not-opusmt"}
 
     detected_lang, detected_confidence = _detect_language_fasttext(translated_text)
     source_has_japanese_script = _contains_japanese_script(text)
@@ -1484,6 +1847,8 @@ def translate_assistant_chat_ocr_payload(text_raw: str, source_lang: str = "ja",
     return {
         "ok": True,
         "text": translated_text,
+        "backend": backend,
+        "pipeline": pipeline_meta,
         "languageGate": {
             "model": "fasttext-lid.176",
             "detectedLanguage": detected_lang,
