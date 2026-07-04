@@ -1796,6 +1796,17 @@ async function preloadStartupBridgeData(splash) {
 
   const preloadTasks = [
     {
+      key: 'voice-runtime-preload',
+      label: 'Voice runtime warmup',
+      run: async () => {
+        try {
+          await localVoiceRuntime.preload()
+        } catch {
+          // Voice warmup is best-effort; listening modes stay locked when unavailable.
+        }
+      },
+    },
+    {
       key: 'summary',
       label: 'Study summary',
       run: () => runPythonBridgeCached('summary'),
