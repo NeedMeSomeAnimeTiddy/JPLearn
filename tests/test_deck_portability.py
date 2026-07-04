@@ -31,7 +31,7 @@ def test_export_progress_snapshot_includes_progress_and_custom_decks(tmp_path: P
         tags=["review"],
         session_id="s1",
     )
-    database.save_curriculum_stage("Hiragana", 1, "context_cloze", 2)
+    database.save_curriculum_stage("Hiragana", 1, "particle_cloze", 2)
     database.save_session_goal("s1", target_items=10)
     database.update_leech_state_for_card("Hiragana", 1)
 

@@ -2689,6 +2689,17 @@ def build_summary() -> dict[str, object]:
         for script_tag in SUMMARY_SCRIPT_TAGS
     }
 
+    particle_cloze_summary = {**curriculum_context_cloze, "mode": "particle_cloze"}
+    particle_cloze_by_script = {
+        script_tag: {**summary, "mode": "particle_cloze"}
+        for script_tag, summary in curriculum_by_script.items()
+    }
+    imposter_summary = {**narrative_story, "mode": "imposter"}
+    imposter_by_script = {
+        script_tag: {**summary, "mode": "imposter"}
+        for script_tag, summary in narrative_story_by_script.items()
+    }
+
     for slug, factory in ALL_DECKS.items():
         deck = factory()
         card_ids = [card.id for card in deck.cards]
@@ -2736,10 +2747,10 @@ def build_summary() -> dict[str, object]:
             for item in item_history
         ],
         "curriculum": {
-            "context_cloze": curriculum_context_cloze,
-            "context_cloze_by_script": curriculum_by_script,
-            "narrative_story": narrative_story,
-            "narrative_story_by_script": narrative_story_by_script,
+            "particle_cloze": particle_cloze_summary,
+            "particle_cloze_by_script": particle_cloze_by_script,
+            "imposter": imposter_summary,
+            "imposter_by_script": imposter_by_script,
         },
     }
 
@@ -3444,10 +3455,14 @@ def record_game_result(
         raise ValueError(f"Unknown card id {card_id} for deck slug: {slug}")
 
     normalized_minigame = minigame.strip().lower()
-    stage_mode = "context_cloze" if normalized_minigame == "narrative_story" else normalized_minigame
+    stage_mode = (
+        "context_cloze"
+        if normalized_minigame in {"particle_cloze", "imposter"}
+        else normalized_minigame
+    )
     normalized_stage = None if curriculum_stage is None else max(1, min(3, curriculum_stage))
     tags = [tag for tag in ["minigame", normalized_minigame] if tag]
-    if normalized_minigame == "narrative_story" and normalized_stage is not None:
+    if normalized_minigame == "imposter" and normalized_stage is not None:
         tags.append(f"chapter_{normalized_stage}")
 
     if slug.startswith("kanji_n"):

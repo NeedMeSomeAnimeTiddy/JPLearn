@@ -35,7 +35,7 @@ SCRIPTED_CONTENT_REGISTRY: dict[str, dict[str, str]] = {
     },
     "curriculum_stall": {
         "message_key": "coach.curriculum_stall",
-        "recommendation_key": "rec.context_cloze_recovery",
+        "recommendation_key": "rec.particle_cloze_recovery",
     },
     "activity_nudge": {
         "message_key": "coach.activity_nudge",
@@ -80,9 +80,9 @@ SCRIPTED_RECOMMENDATION_PAYLOADS: dict[str, dict[str, str]] = {
         "suggested_rounds": "8",
         "suggested_minutes": "8",
     },
-    "rec.context_cloze_recovery": {
+    "rec.particle_cloze_recovery": {
         "action_type": "curriculum_recovery",
-        "target_mode": "context_cloze",
+        "target_mode": "particle_cloze",
         "suggested_rounds": "7",
         "suggested_minutes": "9",
     },
@@ -208,7 +208,7 @@ def build_assistant_event_dedup_key(event_type: str, metadata: dict[str, str]) -
     if event_type == "weakness_spike":
         return f"weakness:{metadata.get('focus_area', 'general')}:{metadata.get('error_rate', '0')}"
     if event_type == "curriculum_stall":
-        return f"curriculum:{metadata.get('mode', 'context_cloze')}:{metadata.get('accuracy_7d', '0')}"
+        return f"curriculum:{metadata.get('mode', 'particle_cloze')}:{metadata.get('accuracy_7d', '0')}"
     if event_type == "activity_nudge":
         return f"activity:{metadata.get('active_days', '0')}:{metadata.get('reviewed', '0')}"
     if event_type == "session_recovery":
@@ -275,7 +275,7 @@ def compute_assistant_state(
     confidence_level = _clamp(50 + round(momentum * 0.4), 0, 100)
     focus_area = _resolve_focus_area(mistakes)
     if focus_area == "general" and curriculum_attempts >= 8 and curriculum_accuracy_7d < 60:
-        focus_area = "context_cloze"
+        focus_area = "particle_cloze"
 
     mood: AssistantMood = "coach_neutral"
     last_major_event = "steady_progress"
@@ -372,7 +372,7 @@ def evaluate_assistant_events(
                 priority="coaching",
                 popup_cadence=popup_cadence,
                 metadata={
-                    "mode": "context_cloze",
+                    "mode": "particle_cloze",
                     "accuracy_7d": str(curriculum_accuracy_7d),
                 },
             )

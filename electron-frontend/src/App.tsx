@@ -121,7 +121,7 @@ type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' |
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
 type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'imposter' | 'context_cloze' | 'narrative_story' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'imposter' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
@@ -380,11 +380,11 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Voice Recall: speak the meaning aloud, then let the mic catch every syllable.',
       'Say It Clean: trust the sound before you speak.',
     ],
-    context_cloze: [
+    particle_cloze: [
       'Context Ladder: use sentence clues before touching options.',
       'Meaning Lens: infer the blank, then verify carefully.',
     ],
-    narrative_story: [
+    imposter: [
       'Story Gate: read the scene and infer what completes the moment.',
       'Chapter Pulse: use narrative clues to choose the strongest fit.',
     ],
@@ -422,11 +422,11 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Voice Recall: speak the exact meaning, trusting the borrowed sound.',
       'Say It Clean: commit to the term you would use in conversation.',
     ],
-    context_cloze: [
+    particle_cloze: [
       'Loanword Context: let the sentence guide the missing term.',
       'Borrowed Meaning: infer from usage before selecting.',
     ],
-    narrative_story: [
+    imposter: [
       'Story Gate: follow the borrowed-word scene and pick the right meaning.',
       'Chapter Pulse: use the narrative beat before selecting.',
     ],
@@ -464,11 +464,11 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Voice Recall: say the meaning aloud, clearly and confidently.',
       'Spoken Kanji: commit to one meaning and speak it out loud.',
     ],
-    context_cloze: [
+    particle_cloze: [
       'Semantic Context: use nearby clues to fill the blank.',
       'N5 Sentence Drill: infer first, then commit to one meaning.',
     ],
-    narrative_story: [
+    imposter: [
       'Story Scene: read the situation and resolve the missing idea.',
       'Scene Pulse: infer from the narrative shift before choosing.',
     ],
@@ -506,11 +506,11 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Voice Recall: speak the word meaning from memory.',
       'Spoken Precision: say the best English gloss aloud.',
     ],
-    context_cloze: [
+    particle_cloze: [
       'Usage Context: use sentence context to place the right word.',
       'Meaning-in-Use: infer from surrounding clues first.',
     ],
-    narrative_story: [
+    imposter: [
       'Scene Choice: complete the mini situation with the right word.',
       'Story Fit: pick the option that best matches the scene.',
     ],
@@ -548,11 +548,11 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Voice Recall: say the intended meaning in your own words.',
       'Spoken Pattern: say aloud what this expression conveys.',
     ],
-    context_cloze: [
+    particle_cloze: [
       'Sentence Pattern: complete the line with the right structure.',
       'Grammar in Context: infer role and choose the best fit.',
     ],
-    narrative_story: [
+    imposter: [
       'Dialogue Scene: choose the pattern that fits the exchange.',
       'Conversational Fit: select the structure that sounds natural.',
     ],
@@ -590,11 +590,11 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Voice Recall: say the sentence meaning clearly and naturally.',
       'Spoken Intent: speak the core meaning in one go.',
     ],
-    context_cloze: [
+    particle_cloze: [
       'Sentence Cloze: use surrounding context to fill the missing part.',
       'Flow Completion: choose what makes the line sound natural.',
     ],
-    narrative_story: [
+    imposter: [
       'Scene Sentence: pick the line that fits the moment.',
       'Story Context: complete the exchange with natural phrasing.',
     ],
@@ -1173,8 +1173,6 @@ const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   sentence_assembly: Shuffle,
   particle_cloze: BookText,
   imposter: History,
-  context_cloze: BookText,
-  narrative_story: History,
   listening_audio_first: Volume2,
   listening_prompt_first: Volume2,
   interleave_mix: Shuffle,
@@ -1971,8 +1969,6 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -1987,8 +1983,6 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -2003,8 +1997,6 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -2019,8 +2011,6 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -2035,8 +2025,6 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -2051,8 +2039,6 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
       particle_cloze: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      narrative_story: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
@@ -2587,12 +2573,12 @@ function buildInterleaveSequence(
   return sequence.length > 0 ? sequence : allowedModes
 }
 
-function isParticleClozeMode(mode: MinigameKey): mode is 'particle_cloze' | 'context_cloze' {
-  return mode === 'particle_cloze' || mode === 'context_cloze'
+function isParticleClozeMode(mode: MinigameKey): mode is 'particle_cloze' {
+  return mode === 'particle_cloze'
 }
 
-function isImposterMode(mode: MinigameKey): mode is 'imposter' | 'narrative_story' {
-  return mode === 'imposter' || mode === 'narrative_story'
+function isImposterMode(mode: MinigameKey): mode is 'imposter' {
+  return mode === 'imposter'
 }
 
 function isSentenceAssemblyMode(mode: MinigameKey): mode is 'sentence_assembly' {
@@ -2603,20 +2589,13 @@ function isGrammarCurriculumMode(mode: MinigameKey): boolean {
   return isSentenceAssemblyMode(mode) || isParticleClozeMode(mode) || isImposterMode(mode)
 }
 
-function normalizePromptPackMode(mode: PlayableMinigame): PlayableMinigame {
-  if (mode === 'particle_cloze') return 'context_cloze'
-  if (mode === 'imposter') return 'narrative_story'
-  return mode
-}
-
 function pickSurprisePrompt(
   script: ScriptKey,
   mode: PlayableMinigame,
   tags: string[],
   seed: number,
 ): string {
-  const normalizedMode = normalizePromptPackMode(mode)
-  const scriptPool = SCRIPT_MODE_PROMPT_PACKS[script][normalizedMode] ?? SCRIPT_MODE_PROMPT_PACKS[script][mode] ?? []
+  const scriptPool = SCRIPT_MODE_PROMPT_PACKS[script][mode] ?? []
   const tagPool = tags
     .map((tag) => TAG_PROMPT_PACKS[tag.toLowerCase()])
     .filter((pack): pack is string[] => Boolean(pack))
@@ -3120,8 +3099,8 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'typed_recall') return 'Typed Recall'
   if (mode === 'speech_recall') return 'Speech Recall'
   if (mode === 'sentence_assembly') return 'Sentence Assembly'
-  if (mode === 'particle_cloze' || mode === 'context_cloze') return 'Particle Cloze'
-  if (mode === 'imposter' || mode === 'narrative_story') return 'Imposter'
+  if (mode === 'particle_cloze') return 'Particle Cloze'
+  if (mode === 'imposter') return 'Imposter'
   if (mode === 'listening_audio_first') return 'Listening: Audio First'
   if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
   return 'Interleave Mix'
@@ -3150,8 +3129,8 @@ function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'typed_recall') return 'Great effort. Keep the next answer short and clear.'
   if (mode === 'speech_recall') return 'Great effort. Speak the next answer clearly and confidently.'
   if (mode === 'sentence_assembly') return 'Good try. Keep the chunk order natural and grammatically smooth.'
-  if (mode === 'particle_cloze' || mode === 'context_cloze') return 'Good try. Follow the sentence flow and particle role.'
-  if (mode === 'imposter' || mode === 'narrative_story') return 'Good attempt. Scan for the token that breaks grammar flow.'
+  if (mode === 'particle_cloze') return 'Good try. Follow the sentence flow and particle role.'
+  if (mode === 'imposter') return 'Good attempt. Scan for the token that breaks grammar flow.'
   if (mode === 'listening_audio_first') return 'Keep listening. Audio recognition builds over time.'
   if (mode === 'listening_prompt_first') return 'Connect the sound to the character. It gets natural.'
   return 'Good attempt. Keep the next answer short and clear.'
@@ -3787,12 +3766,7 @@ function App() {
 
   const resolveScriptMinigame = useCallback((script: ScriptKey, minigame: MinigameKey): MinigameKey => {
     const allowedMinigames = SCRIPT_MINIGAMES[script]
-    const canonicalMinigame = minigame === 'context_cloze'
-      ? 'particle_cloze'
-      : minigame === 'narrative_story'
-        ? 'imposter'
-        : minigame
-    return allowedMinigames.includes(canonicalMinigame) ? canonicalMinigame : allowedMinigames[0]
+    return allowedMinigames.includes(minigame) ? minigame : allowedMinigames[0]
   }, [])
 
   const resetRoundCycle = useCallback(() => {

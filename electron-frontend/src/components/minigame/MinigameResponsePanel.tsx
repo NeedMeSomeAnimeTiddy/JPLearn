@@ -52,8 +52,8 @@ export function MinigameResponsePanel({
   const isChoiceMode =
     mode === 'meaning_match' ||
     mode === 'character_match' ||
-    mode === 'context_cloze' ||
-    mode === 'narrative_story' ||
+    mode === 'particle_cloze' ||
+    mode === 'imposter' ||
     mode === 'listening_audio_first' ||
     mode === 'listening_prompt_first'
 

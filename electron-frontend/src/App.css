@@ -7123,6 +7123,12 @@ button {
   color: var(--text-soft);
 }
 
+.sentence-assembly-tip {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
 .sentence-assembly-chip-list {
   display: grid;
   gap: 8px;
@@ -7131,6 +7137,12 @@ button {
   border-radius: 10px;
   border: 1px dashed color-mix(in oklab, var(--button-border) 74%, transparent);
   background: color-mix(in oklab, var(--chip-bg) 86%, transparent);
+}
+
+.sentence-assembly-sortable-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
 }
 
 .sentence-assembly-chip-list-active {
@@ -7142,6 +7154,7 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 9px;
   border: 1px solid var(--button-border);
   border-radius: 10px;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
@@ -7150,6 +7163,47 @@ button {
   cursor: pointer;
   font-weight: 600;
   text-align: left;
+}
+
+.sentence-assembly-reorder-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.sentence-assembly-step-button {
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-main);
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sentence-assembly-step-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sentence-assembly-chip-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 22%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 44%, var(--button-border));
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sentence-assembly-chip-text {
+  flex: 1;
 }
 
 .sentence-assembly-chip:disabled {

@@ -69,16 +69,16 @@ const baseDesktopApi = {
     mistakes: [],
     item_history: [],
     curriculum: {
-      context_cloze: { mode: 'context_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-      context_cloze_by_script: {
-        hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-        katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-        kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-        vocab_n5: { mode: 'context_cloze', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-        grammar_patterns: { mode: 'context_cloze', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+      particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+      particle_cloze_by_script: {
+        hiragana: { mode: 'particle_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+        katakana: { mode: 'particle_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+        kanji_n5: { mode: 'particle_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+        vocab_n5: { mode: 'particle_cloze', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+        grammar_patterns: { mode: 'particle_cloze', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
       },
-      narrative_story: {
-        mode: 'narrative_story',
+      imposter: {
+        mode: 'imposter',
         script_tag: 'all',
         attempts: 0,
         accuracy: 0,
@@ -88,12 +88,12 @@ const baseDesktopApi = {
           '3': { attempts: 0, accuracy: 0, completion_rate: 0 },
         },
       },
-      narrative_story_by_script: {
-        hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-        katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-        kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-        vocab_n5: { mode: 'narrative_story', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-        grammar_patterns: { mode: 'narrative_story', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+      imposter_by_script: {
+        hiragana: { mode: 'imposter', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+        katakana: { mode: 'imposter', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+        kanji_n5: { mode: 'imposter', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+        vocab_n5: { mode: 'imposter', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+        grammar_patterns: { mode: 'imposter', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
       },
     },
   }),
@@ -169,16 +169,16 @@ function buildStudyPlanDesktopApi() {
       mistakes: [],
       item_history: [],
       curriculum: {
-        context_cloze: { mode: 'context_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-        context_cloze_by_script: {
-          hiragana: { mode: 'context_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-          katakana: { mode: 'context_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-          kanji_n5: { mode: 'context_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-          vocab_n5: { mode: 'context_cloze', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
-          grammar_patterns: { mode: 'context_cloze', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+        particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+        particle_cloze_by_script: {
+          hiragana: { mode: 'particle_cloze', script_tag: 'hiragana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          katakana: { mode: 'particle_cloze', script_tag: 'katakana', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          kanji_n5: { mode: 'particle_cloze', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          vocab_n5: { mode: 'particle_cloze', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
+          grammar_patterns: { mode: 'particle_cloze', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
         },
-        narrative_story: {
-          mode: 'narrative_story',
+        imposter: {
+          mode: 'imposter',
           script_tag: 'all',
           attempts: 0,
           accuracy: 0,
@@ -188,12 +188,12 @@ function buildStudyPlanDesktopApi() {
             '3': { attempts: 0, accuracy: 0, completion_rate: 0 },
           },
         },
-        narrative_story_by_script: {
-          hiragana: { mode: 'narrative_story', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-          katakana: { mode: 'narrative_story', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-          kanji_n5: { mode: 'narrative_story', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-          vocab_n5: { mode: 'narrative_story', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
-          grammar_patterns: { mode: 'narrative_story', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+        imposter_by_script: {
+          hiragana: { mode: 'imposter', script_tag: 'hiragana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+          katakana: { mode: 'imposter', script_tag: 'katakana', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+          kanji_n5: { mode: 'imposter', script_tag: 'kanji_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+          vocab_n5: { mode: 'imposter', script_tag: 'vocab_n5', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
+          grammar_patterns: { mode: 'imposter', script_tag: 'grammar_patterns', attempts: 0, accuracy: 0, chapters: { '1': { attempts: 0, accuracy: 0, completion_rate: 100 }, '2': { attempts: 0, accuracy: 0, completion_rate: 0 }, '3': { attempts: 0, accuracy: 0, completion_rate: 0 } } },
         },
       },
     }),
@@ -223,8 +223,8 @@ describe('Minigame menu', () => {
     expect((await screen.findAllByText(/Meaning Match/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Character Match/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Interleave Mix/i)).length).toBeGreaterThan(0)
-    expect(screen.queryByText(/Context Cloze/i)).toBeNull()
-    expect(screen.queryByText(/Narrative Story/i)).toBeNull()
+    expect(screen.queryByText(/Particle Cloze/i)).toBeNull()
+    expect(screen.queryByText(/Imposter/i)).toBeNull()
   })
 
   it('removes romaji sprint for words track', async () => {
@@ -234,8 +234,8 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
 
-    expect((await screen.findAllByText(/Context Cloze/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Narrative Story/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Particle Cloze/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Imposter/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Interleave Mix/i)).length).toBeGreaterThan(0)
     expect(screen.queryByText(/Romaji Sprint/i)).toBeNull()
   })
@@ -353,8 +353,8 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Grammar')
 
-    expect((await screen.findAllByText(/Context Cloze/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Narrative Story/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Particle Cloze/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Imposter/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Interleave Mix/i)).length).toBeGreaterThan(0)
     expect(screen.queryByText(/Romaji Sprint/i)).toBeNull()
   })
@@ -424,13 +424,13 @@ describe('Minigame menu', () => {
     expect(expectedSentences.has(secondText)).toBe(true)
   })
 
-  it('renders context cloze prompts in words track with card-specific context', async () => {
+  it('renders particle cloze prompts in words track with card-specific context', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
-    const contextTiles = await screen.findAllByRole('button', { name: /Context Cloze/i })
+    const contextTiles = await screen.findAllByRole('button', { name: /Particle Cloze/i })
     fireEvent.click(within((contextTiles[0].closest('.game-tile') ?? contextTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
     const promptMain = await screen.findByText((content, node) => {
@@ -442,13 +442,13 @@ describe('Minigame menu', () => {
     expect(screen.getByText(/(あさです。|いまです。|うみです。|えきです。)/i)).toBeTruthy()
   })
 
-  it('renders reading practice passages in words track using example sentences', async () => {
+  it('renders imposter passages in words track using example sentences', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
-    const storyTiles = await screen.findAllByRole('button', { name: /Narrative Story/i })
+    const storyTiles = await screen.findAllByRole('button', { name: /Imposter/i })
     fireEvent.click(within((storyTiles[0].closest('.game-tile') ?? storyTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
 
     const storyPassage = await screen.findByText((content, node) => {
@@ -587,17 +587,156 @@ describe('Minigame menu', () => {
     expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({ minigame: 'stroke_order' }))
   })
 
-  it('shows listening modes for kanji and vocab tracks but not for hiragana', async () => {
+  it('runs sentence assembly via bridge payload and records the sentence_assembly minigame', async () => {
+    const grammarCards = [
+      {
+        id: 40,
+        character: '私',
+        romaji: 'watashi',
+        meaning: 'I',
+        tags: ['grammar_patterns'],
+        example_sentence: '私 は 学生です。',
+        dictionary_summary: null,
+        is_leech: false,
+        curriculum_stage: 1,
+        meaning_distractor_ids: [41, 42, 43],
+        character_distractor_ids: [41, 42, 43],
+      },
+      {
+        id: 41,
+        character: '彼',
+        romaji: 'kare',
+        meaning: 'he',
+        tags: ['grammar_patterns'],
+        example_sentence: '彼 は 学生です。',
+        dictionary_summary: null,
+        is_leech: false,
+        curriculum_stage: 1,
+        meaning_distractor_ids: [40, 42, 43],
+        character_distractor_ids: [40, 42, 43],
+      },
+      {
+        id: 42,
+        character: '先生',
+        romaji: 'sensei',
+        meaning: 'teacher',
+        tags: ['grammar_patterns'],
+        example_sentence: '先生 は ここです。',
+        dictionary_summary: null,
+        is_leech: false,
+        curriculum_stage: 1,
+        meaning_distractor_ids: [40, 41, 43],
+        character_distractor_ids: [40, 41, 43],
+      },
+      {
+        id: 43,
+        character: '友達',
+        romaji: 'tomodachi',
+        meaning: 'friend',
+        tags: ['grammar_patterns'],
+        example_sentence: '友達 は 元気です。',
+        dictionary_summary: null,
+        is_leech: false,
+        curriculum_stage: 1,
+        meaning_distractor_ids: [40, 41, 42],
+        character_distractor_ids: [40, 41, 42],
+      },
+    ]
+
+    const recordGameResult = vi.fn(async () => ({
+      ok: true,
+      card_id: 40,
+      repetitions: 1,
+      interval: 1,
+      next_review: '2026-01-01',
+      ease_factor: 2.5,
+      curriculum_stage: 2,
+    }))
+    const getGrammarMinigameData = vi.fn(async () => ({
+      ok: true,
+      game_type: 'sentence_assembly' as const,
+      sentence: '私は学生です。',
+      seed: 0,
+      data: {
+        game_type: 'sentence_assembly',
+        sentence: '私は学生です。',
+        chunks: [
+          { id: 'chunk-0', text: '私' },
+          { id: 'chunk-1', text: 'は' },
+          { id: 'chunk-2', text: '学生です。' },
+        ],
+        shuffled_chunks: [
+          { id: 'chunk-0', text: '私' },
+          { id: 'chunk-2', text: '学生です。' },
+          { id: 'chunk-1', text: 'は' },
+        ],
+        answer_order: ['chunk-0', 'chunk-1', 'chunk-2'],
+      },
+    }))
+
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      recordGameResult,
+      getGrammarMinigameData,
+      getDeckCards: async (slug: string) => (
+        slug === 'grammar_patterns'
+          ? { slug, name: 'Grammar Deck', cards: grammarCards }
+          : { slug: slug as any, name: 'Deck', cards: baseCards }
+      ),
+      getStudyQueue: async (slug: string) => (
+        slug === 'grammar_patterns'
+          ? {
+            ok: true,
+            queue: {
+              slug,
+              card_ids: grammarCards.map((card) => card.id),
+              indices: grammarCards.map((_, index) => index),
+            },
+          }
+          : {
+            ok: true,
+            queue: {
+              slug,
+              card_ids: baseCards.map((card) => card.id),
+              indices: baseCards.map((_, index) => index),
+            },
+          }
+      ),
+    }
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    clickTopMenuCard('Grammar')
+
+    const assemblyTiles = await screen.findAllByRole('button', { name: /Sentence Assembly/i })
+    fireEvent.click(within((assemblyTiles[0].closest('.game-tile') ?? assemblyTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+
+    fireEvent.click(await screen.findByRole('button', { name: /move 学生です。 later/i }))
+    fireEvent.click(screen.getByRole('button', { name: /submit order/i }))
+
+    await waitFor(() => expect(getGrammarMinigameData).toHaveBeenCalled())
+    expect(getGrammarMinigameData).toHaveBeenCalledWith(expect.objectContaining({
+      gameType: 'sentence_assembly',
+    }))
+
+    await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
+    expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
+      minigame: 'sentence_assembly',
+      curriculumStage: 1,
+    }))
+  })
+
+  it('shows listening modes for hiragana and vocab tracks', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
 
-    // Hiragana: listening modes must not appear
+    // Hiragana: listening modes should appear
     clickTopMenuCard('Hiragana')
     await screen.findAllByText(/Romaji Sprint/i)
-    expect(screen.queryByText(/Listening: Audio First/i)).toBeNull()
-    expect(screen.queryByText(/Listening: Prompt First/i)).toBeNull()
+    expect((await screen.findAllByText(/Listening: Audio First/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Listening: Prompt First/i)).length).toBeGreaterThan(0)
 
     cleanup()
     window.localStorage.clear()
@@ -692,4 +831,5 @@ describe('Minigame menu', () => {
     }))
   })
 })
+
 

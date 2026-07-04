@@ -10,8 +10,6 @@ export type MinigameKey =
   | 'sentence_assembly'
   | 'particle_cloze'
   | 'imposter'
-  | 'context_cloze'
-  | 'narrative_story'
   | 'listening_audio_first'
   | 'listening_prompt_first'
   | 'interleave_mix'

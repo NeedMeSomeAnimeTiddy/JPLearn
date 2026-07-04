@@ -451,7 +451,11 @@ def review_minigame_result(
         reviewed_on_utc=reviewed_on_utc,
     )
     normalized_minigame = minigame.strip().lower()
-    stage_mode = "context_cloze" if normalized_minigame == "narrative_story" else normalized_minigame
+    stage_mode = (
+        "context_cloze"
+        if normalized_minigame in {"particle_cloze", "imposter"}
+        else normalized_minigame
+    )
     if curriculum_stage is not None and stage_mode:
         resolved_stage = next_stage(curriculum_stage, is_correct)
         database.save_curriculum_stage(deck_name, card_id, stage_mode, resolved_stage)

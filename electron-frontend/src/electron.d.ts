@@ -80,7 +80,7 @@ interface StudySummary {
     }>
   }>
   curriculum: {
-    context_cloze: {
+    particle_cloze: {
       mode: string
       script_tag: string
       attempts: number
@@ -92,7 +92,7 @@ interface StudySummary {
         3: number
       }
     }
-    context_cloze_by_script: Record<ScriptCurriculumSlug, {
+    particle_cloze_by_script: Record<ScriptCurriculumSlug, {
       mode: string
       script_tag: string
       attempts: number
@@ -104,7 +104,7 @@ interface StudySummary {
         3: number
       }
     }>
-    narrative_story: {
+    imposter: {
       mode: string
       script_tag: string
       attempts: number
@@ -115,7 +115,7 @@ interface StudySummary {
         completion_rate: number
       }>
     }
-    narrative_story_by_script: Record<ScriptCurriculumSlug, {
+    imposter_by_script: Record<ScriptCurriculumSlug, {
       mode: string
       script_tag: string
       attempts: number
@@ -823,3 +823,4 @@ declare global {
 }
 
 export {}
+

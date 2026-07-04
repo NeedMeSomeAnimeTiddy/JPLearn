@@ -219,8 +219,6 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   sentence_assembly: Shuffle,
   particle_cloze: BookText,
   imposter: History,
-  context_cloze: BookText,
-  narrative_story: History,
   listening_audio_first: Volume2,
   listening_prompt_first: Volume2,
   interleave_mix: Shuffle,
@@ -420,8 +418,8 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'typed_recall') return 'Typed Recall'
   if (mode === 'speech_recall') return 'Speech Recall'
   if (mode === 'sentence_assembly') return 'Sentence Assembly'
-  if (mode === 'particle_cloze' || mode === 'context_cloze') return 'Particle Cloze'
-  if (mode === 'imposter' || mode === 'narrative_story') return 'Imposter'
+  if (mode === 'particle_cloze') return 'Particle Cloze'
+  if (mode === 'imposter') return 'Imposter'
   if (mode === 'listening_audio_first') return 'Listening: Audio First'
   if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
   return 'Interleave Mix'

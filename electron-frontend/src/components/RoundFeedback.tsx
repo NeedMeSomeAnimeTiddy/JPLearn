@@ -61,7 +61,7 @@ export function RoundFeedback({
           <p className="round-feedback-answer-value">{answer}</p>
         </div>
       ) : null}
-      {mode === 'narrative_story' ? (
+      {mode === 'imposter' ? (
         <p className="round-feedback-note">Story progress updates chapter access based on stage transitions.</p>
       ) : null}
       {autoAdvanceMs ? (

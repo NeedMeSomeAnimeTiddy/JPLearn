@@ -186,7 +186,7 @@ async function main() {
       JPLEARN_USER_DATA_DIR: appDataRoot,
       JPLEARN_SMOKE_JOURNEY: process.env.JPLEARN_SMOKE_JOURNEY || '1',
       JPLEARN_SMOKE_DECK: process.env.JPLEARN_SMOKE_DECK || 'hiragana',
-      JPLEARN_SMOKE_MINIGAME: process.env.JPLEARN_SMOKE_MINIGAME || 'context_cloze',
+      JPLEARN_SMOKE_MINIGAME: process.env.JPLEARN_SMOKE_MINIGAME || 'particle_cloze',
       JPLEARN_SMOKE_RESET_DB: process.env.JPLEARN_SMOKE_RESET_DB || '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],

@@ -95,7 +95,7 @@ def test_record_game_result_persists_review_event(tmp_path: Path, monkeypatch) -
         slug="hiragana",
         card_id=0,
         is_correct=True,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         curriculum_stage=2,
     )
 
@@ -118,7 +118,7 @@ def test_record_game_result_persists_review_event(tmp_path: Path, monkeypatch) -
     assert row is not None
     assert row["quality"] == 4
     assert row["script_tag"] == "hiragana"
-    assert row["tags_csv"] == "minigame,context_cloze"
+    assert row["tags_csv"] == "minigame,particle_cloze"
 
 
 def test_record_game_result_persists_session_id_when_provided(tmp_path: Path, monkeypatch) -> None:
@@ -129,7 +129,7 @@ def test_record_game_result_persists_session_id_when_provided(tmp_path: Path, mo
         slug="hiragana",
         card_id=0,
         is_correct=True,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         curriculum_stage=2,
         session_id="session-abc",
     )
@@ -193,14 +193,14 @@ def test_start_session_goal_and_load_summary(tmp_path: Path, monkeypatch) -> Non
         slug="hiragana",
         card_id=0,
         is_correct=True,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         session_id="session-1",
     )
     desktop_bridge.record_game_result(
         slug="hiragana",
         card_id=1,
         is_correct=False,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         session_id="session-1",
     )
 
@@ -236,7 +236,7 @@ def test_build_deck_cards_includes_curriculum_stage(tmp_path: Path, monkeypatch)
         slug="hiragana",
         card_id=0,
         is_correct=True,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         curriculum_stage=3,
     )
 
@@ -408,7 +408,7 @@ def test_record_game_result_narrative_tags_chapter_and_updates_context_stage(tmp
         slug="hiragana",
         card_id=1,
         is_correct=True,
-        minigame="narrative_story",
+        minigame="imposter",
         curriculum_stage=2,
     )
 
@@ -427,7 +427,7 @@ def test_record_game_result_narrative_tags_chapter_and_updates_context_stage(tmp
         ).fetchone()
 
     assert row is not None
-    assert row["tags_csv"] == "minigame,narrative_story,chapter_2"
+    assert row["tags_csv"] == "minigame,imposter,chapter_2"
 
 
 def test_record_game_result_rejects_unknown_card() -> None:
@@ -485,8 +485,8 @@ def test_build_summary_includes_extended_script_curriculum_maps(tmp_path: Path, 
 
     summary = cast(dict[str, Any], desktop_bridge.build_summary())
     curriculum = cast(dict[str, Any], summary["curriculum"])
-    context_by_script = cast(dict[str, object], curriculum["context_cloze_by_script"])
-    narrative_by_script = cast(dict[str, object], curriculum["narrative_story_by_script"])
+    context_by_script = cast(dict[str, object], curriculum["particle_cloze_by_script"])
+    narrative_by_script = cast(dict[str, object], curriculum["imposter_by_script"])
 
     context_keys = set(context_by_script.keys())
     narrative_keys = set(narrative_by_script.keys())
@@ -628,7 +628,7 @@ def test_track_assistant_event_persists_interaction(tmp_path: Path, monkeypatch)
     payload = desktop_bridge.track_assistant_event(
         event_id=3,
         interaction_type="clicked",
-        metadata={"reason": "cta", "target_mode": "context_cloze"},
+        metadata={"reason": "cta", "target_mode": "particle_cloze"},
     )
 
     assert payload["ok"] is True
@@ -648,7 +648,7 @@ def test_track_assistant_event_persists_interaction(tmp_path: Path, monkeypatch)
     assert row["interaction_type"] == "clicked"
     metadata = cast(dict[str, str], json.loads(str(row["metadata_json"])))
     assert metadata["reason"] == "cta"
-    assert metadata["target_mode"] == "context_cloze"
+    assert metadata["target_mode"] == "particle_cloze"
 
 
 def test_get_assistant_chat_context_returns_compact_context(tmp_path: Path, monkeypatch) -> None:
@@ -671,7 +671,7 @@ def test_record_game_result_contract_shape(tmp_path: Path, monkeypatch) -> None:
         slug="hiragana",
         card_id=0,
         is_correct=True,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         curriculum_stage=1,
         confidence_score=4,
     )
@@ -689,5 +689,6 @@ def test_record_game_result_contract_shape(tmp_path: Path, monkeypatch) -> None:
     assert expected_keys.issubset(payload.keys())
     assert payload["ok"] is True
     assert payload["card_id"] == 0
+
 
 

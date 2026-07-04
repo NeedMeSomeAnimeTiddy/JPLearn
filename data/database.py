@@ -981,10 +981,12 @@ def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> C
     if not normalized_mode:
         raise ValueError("mode must not be empty")
 
+    storage_mode = "context_cloze" if normalized_mode == "particle_cloze" else normalized_mode
+
     normalized_script = normalize_storage_text(script_tag).lower() if script_tag else ""
 
     where_clause = "WHERE mode=?"
-    params: list[object] = [normalized_mode]
+    params: list[object] = [storage_mode]
     if normalized_script:
         where_clause += " AND deck LIKE ?"
         params.append(f"%{normalized_script.replace('_', ' ').split('_')[0]}%")
@@ -1000,8 +1002,12 @@ def load_curriculum_stage_summary(mode: str, script_tag: str | None = None) -> C
             """,
             params,
         ).fetchall()
-        accuracy_where = "WHERE tags_csv LIKE ?"
-        accuracy_params: list[object] = [f"%{normalized_mode}%"]
+        if storage_mode == "context_cloze":
+            accuracy_where = "WHERE (tags_csv LIKE ? OR tags_csv LIKE ?)"
+            accuracy_params: list[object] = ["%context_cloze%", "%particle_cloze%"]
+        else:
+            accuracy_where = "WHERE tags_csv LIKE ?"
+            accuracy_params = [f"%{normalized_mode}%"]
         if normalized_script:
             accuracy_where += " AND script_tag=?"
             accuracy_params.append(normalized_script)
@@ -1057,8 +1063,8 @@ def load_narrative_chapter_summary(script_tag: str | None = None) -> NarrativeCh
     """Return chapter-level narrative metrics from review events and curriculum stages."""
     normalized_script = normalize_storage_text(script_tag).lower() if script_tag else ""
 
-    where_clause = "WHERE tags_csv LIKE ?"
-    params: list[object] = ["%narrative_story%"]
+    where_clause = "WHERE (tags_csv LIKE ? OR tags_csv LIKE ?)"
+    params: list[object] = ["%imposter%", "%narrative_story%"]
     if normalized_script:
         where_clause += " AND script_tag=?"
         params.append(normalized_script)
@@ -1127,7 +1133,7 @@ def load_narrative_chapter_summary(script_tag: str | None = None) -> NarrativeCh
     chapter_stats[3]["completion_rate"] = round((stage_3 / tracked) * 100) if tracked > 0 else 0
 
     return {
-        "mode": "narrative_story",
+        "mode": "imposter",
         "script_tag": normalized_script or "all",
         "attempts": attempts,
         "accuracy": accuracy,
@@ -1905,8 +1911,8 @@ def _derive_focus_tags(turns: list[dict[str, str]]) -> str:
         "goal": "goal",
         "accuracy": "accuracy",
         "typed": "typed_recall",
-        "cloze": "context_cloze",
-        "story": "narrative",
+        "cloze": "particle_cloze",
+        "story": "imposter",
         "leech": "leech",
     }
     seen: list[str] = []

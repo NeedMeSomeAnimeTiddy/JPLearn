@@ -209,8 +209,6 @@ export function MinigameView({
       activeRound.mode === 'character_match' ||
       activeRound.mode === 'particle_cloze' ||
       activeRound.mode === 'imposter' ||
-      activeRound.mode === 'context_cloze' ||
-      activeRound.mode === 'narrative_story' ||
       activeRound.mode === 'listening_audio_first' ||
       activeRound.mode === 'listening_prompt_first'
 
@@ -483,9 +481,9 @@ export function MinigameView({
                           ? 'Type the meaning'
                           : roundState.mode === 'speech_recall'
                             ? 'Speak the meaning'
-                            : roundState.mode === 'particle_cloze' || roundState.mode === 'context_cloze'
+                            : roundState.mode === 'particle_cloze'
                               ? 'Choose the missing particle'
-                              : roundState.mode === 'imposter' || roundState.mode === 'narrative_story'
+                              : roundState.mode === 'imposter'
                                 ? 'Spot the grammar imposter'
                             : 'Choose the best answer'
                   }
@@ -502,9 +500,9 @@ export function MinigameView({
                             ? speechFallbackToTyped
                               ? 'Short, direct answers work best.'
                               : 'Tap the mic and say your answer clearly.'
-                            : roundState.mode === 'particle_cloze' || roundState.mode === 'context_cloze'
+                            : roundState.mode === 'particle_cloze'
                               ? 'Use syntax and particle role to choose the best fit.'
-                              : roundState.mode === 'imposter' || roundState.mode === 'narrative_story'
+                              : roundState.mode === 'imposter'
                                 ? 'Pick the token that introduces the grammar error.'
                             : 'Commit to one answer and keep the run moving.'
                   }

@@ -28,9 +28,23 @@ interface SortableChunkChipProps {
   id: string
   label: string
   disabled: boolean
+  position: number
+  canMoveEarlier: boolean
+  canMoveLater: boolean
+  onMoveEarlier: () => void
+  onMoveLater: () => void
 }
 
-function SortableChunkChip({ id, label, disabled }: SortableChunkChipProps) {
+function SortableChunkChip({
+  id,
+  label,
+  disabled,
+  position,
+  canMoveEarlier,
+  canMoveLater,
+  onMoveEarlier,
+  onMoveLater,
+}: SortableChunkChipProps) {
   const {
     attributes,
     listeners,
@@ -46,18 +60,41 @@ function SortableChunkChip({ id, label, disabled }: SortableChunkChipProps) {
   }
 
   return (
-    <button
-      ref={setNodeRef}
-      type="button"
-      className={`sentence-assembly-chip sentence-assembly-chip-active${isDragging ? ' is-dragging' : ''}`}
-      style={style}
-      disabled={disabled}
-      {...attributes}
-      {...listeners}
-      title="Drag to reorder"
-    >
-      {label}
-    </button>
+    <div ref={setNodeRef} className="sentence-assembly-sortable-row" style={style}>
+      <button
+        type="button"
+        className={`sentence-assembly-chip sentence-assembly-chip-active${isDragging ? ' is-dragging' : ''}`}
+        disabled={disabled}
+        {...attributes}
+        {...listeners}
+        title="Drag to reorder"
+      >
+        <span className="sentence-assembly-chip-index" aria-hidden="true">{position}</span>
+        <span className="sentence-assembly-chip-text">{label}</span>
+      </button>
+      <div className="sentence-assembly-reorder-controls">
+        <button
+          type="button"
+          className="sentence-assembly-step-button"
+          onClick={onMoveEarlier}
+          disabled={disabled || !canMoveEarlier}
+          aria-label={`Move ${label} earlier`}
+          title="Move earlier"
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          className="sentence-assembly-step-button"
+          onClick={onMoveLater}
+          disabled={disabled || !canMoveLater}
+          aria-label={`Move ${label} later`}
+          title="Move later"
+        >
+          ↓
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -111,6 +148,14 @@ export function SentenceAssemblyAnswerPanel({
     })
   }
 
+  function moveChunk(fromIndex: number, toIndex: number) {
+    if (disabled) return
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= orderedChunkIds.length || toIndex >= orderedChunkIds.length) {
+      return
+    }
+    setOrderedChunkIds((previous) => arrayMove(previous, fromIndex, toIndex))
+  }
+
   return (
     <div className="sentence-assembly-panel">
       <div className="sentence-assembly-column" aria-label="Assembled sentence preview">
@@ -118,6 +163,9 @@ export function SentenceAssemblyAnswerPanel({
         <div className="sentence-assembly-preview" aria-live="polite">
           {assembledSentence || 'Drag chunks to build the sentence.'}
         </div>
+        <p className="sentence-assembly-tip">
+          Build left-to-right; particles usually attach to the noun phrase before them.
+        </p>
       </div>
 
       <div className="sentence-assembly-column" aria-label="Reorder chunks">
@@ -132,12 +180,17 @@ export function SentenceAssemblyAnswerPanel({
             strategy={verticalListSortingStrategy}
           >
             <div className="sentence-assembly-chip-list sentence-assembly-chip-list-active">
-              {orderedChunks.map((chunk) => (
+              {orderedChunks.map((chunk, index) => (
                 <SortableChunkChip
                   key={chunk.id}
                   id={chunk.id}
                   label={chunk.label}
                   disabled={disabled}
+                  position={index + 1}
+                  canMoveEarlier={index > 0}
+                  canMoveLater={index < orderedChunks.length - 1}
+                  onMoveEarlier={() => moveChunk(index, index - 1)}
+                  onMoveLater={() => moveChunk(index, index + 1)}
                 />
               ))}
               {orderedChunks.length === 0 ? (

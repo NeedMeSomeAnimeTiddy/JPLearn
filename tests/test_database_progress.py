@@ -69,7 +69,7 @@ def test_large_card_id_lists_are_chunked_for_sqlite_queries(tmp_path: Path, monk
         )
 
     for cid, stage in ((1, 1), (1000, 2), (2000, 3), (2500, 2)):
-        database.save_curriculum_stage("Sentence Examples", cid, "context_cloze", stage)
+        database.save_curriculum_stage("Sentence Examples", cid, "particle_cloze", stage)
 
     database.log_review("Sentence Examples", 1000, 4, reviewed_on=today)
 
@@ -77,7 +77,7 @@ def test_large_card_id_lists_are_chunked_for_sqlite_queries(tmp_path: Path, monk
     assert len(states) == len(card_ids)
     assert states[1000].repetitions == 1
 
-    stages = database.load_curriculum_stages("Sentence Examples", "context_cloze", card_ids)
+    stages = database.load_curriculum_stages("Sentence Examples", "particle_cloze", card_ids)
     assert len(stages) == len(card_ids)
     assert stages[1000] == 2
     assert stages[1500] == 1
@@ -456,27 +456,27 @@ def test_review_minigame_result_persists_curriculum_stage(tmp_path: Path, monkey
         deck_name="Hiragana",
         card_id=17,
         is_correct=True,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         curriculum_stage=3,
         script_tag="hiragana",
-        tags=["minigame", "context_cloze"],
+        tags=["minigame", "particle_cloze"],
     )
 
     stages = study_pipeline.load_curriculum_stages("Hiragana", "context_cloze", [17])
     assert stages[17] == 3
 
 
-def test_review_minigame_result_narrative_updates_context_cloze_stage(tmp_path: Path, monkeypatch) -> None:
+def test_review_minigame_result_narrative_updates_particle_cloze_stage(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
     study_pipeline.review_minigame_result(
         deck_name="Hiragana",
         card_id=18,
         is_correct=True,
-        minigame="narrative_story",
+        minigame="imposter",
         curriculum_stage=2,
         script_tag="hiragana",
-        tags=["minigame", "narrative_story", "chapter_2"],
+        tags=["minigame", "imposter", "chapter_2"],
     )
 
     stages = study_pipeline.load_curriculum_stages("Hiragana", "context_cloze", [18])
@@ -490,19 +490,19 @@ def test_load_curriculum_stage_summary_aggregates_distribution_and_accuracy(tmp_
         deck_name="Hiragana",
         card_id=1,
         is_correct=True,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         curriculum_stage=1,
         script_tag="hiragana",
-        tags=["minigame", "context_cloze"],
+        tags=["minigame", "particle_cloze"],
     )
     study_pipeline.review_minigame_result(
         deck_name="Hiragana",
         card_id=2,
         is_correct=False,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         curriculum_stage=3,
         script_tag="hiragana",
-        tags=["minigame", "context_cloze"],
+        tags=["minigame", "particle_cloze"],
     )
 
     summary = study_pipeline.load_curriculum_stage_summary("context_cloze")
@@ -522,19 +522,19 @@ def test_load_curriculum_stage_summary_supports_script_filter(tmp_path: Path, mo
         deck_name="Hiragana",
         card_id=11,
         is_correct=True,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         curriculum_stage=1,
         script_tag="hiragana",
-        tags=["minigame", "context_cloze"],
+        tags=["minigame", "particle_cloze"],
     )
     study_pipeline.review_minigame_result(
         deck_name="Kanji N5",
         card_id=12,
         is_correct=False,
-        minigame="context_cloze",
+        minigame="particle_cloze",
         curriculum_stage=2,
         script_tag="kanji_n5",
-        tags=["minigame", "context_cloze"],
+        tags=["minigame", "particle_cloze"],
     )
 
     hira = study_pipeline.load_curriculum_stage_summary("context_cloze", script_tag="hiragana")
@@ -553,23 +553,23 @@ def test_load_narrative_chapter_summary_aggregates_chapter_metrics(tmp_path: Pat
         deck_name="Hiragana",
         card_id=21,
         is_correct=True,
-        minigame="narrative_story",
+        minigame="imposter",
         curriculum_stage=1,
         script_tag="hiragana",
-        tags=["minigame", "narrative_story", "chapter_1"],
+        tags=["minigame", "imposter", "chapter_1"],
     )
     study_pipeline.review_minigame_result(
         deck_name="Hiragana",
         card_id=22,
         is_correct=False,
-        minigame="narrative_story",
+        minigame="imposter",
         curriculum_stage=2,
         script_tag="hiragana",
-        tags=["minigame", "narrative_story", "chapter_2"],
+        tags=["minigame", "imposter", "chapter_2"],
     )
 
     summary = database.load_narrative_chapter_summary(script_tag="hiragana")
-    assert summary["mode"] == "narrative_story"
+    assert summary["mode"] == "imposter"
     assert summary["attempts"] == 2
     assert summary["accuracy"] == 50
     chapters = summary["chapters"]
@@ -578,3 +578,4 @@ def test_load_narrative_chapter_summary_aggregates_chapter_metrics(tmp_path: Pat
     assert chapters["1"]["completion_rate"] == 100
     assert chapters["2"]["completion_rate"] == 50
     assert chapters["3"]["completion_rate"] == 0
+
