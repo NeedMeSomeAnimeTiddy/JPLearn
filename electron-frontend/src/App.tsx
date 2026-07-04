@@ -3657,6 +3657,9 @@ function App() {
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const customThemeImportInputRef = useRef<HTMLInputElement | null>(null)
   const customBackgroundImportInputRef = useRef<HTMLInputElement | null>(null)
+  const translationProfileTierRef = useRef<'ocr_argos_small' | 'ocr_pipeline_full' | null>(null)
+  const translationPipelineStageRef = useRef(0)
+  const translationPipelineLastPercentRef = useRef(0)
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
   const dictionaryCards = useMemo(() => {
@@ -4191,17 +4194,40 @@ function App() {
         return
       }
       if (evt.id === 'ocr') {
-        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+        const activeTier = translationProfileTierRef.current
+        if (activeTier) {
+          const bounded = Math.max(0, Math.min(100, evt.percent))
+          const staged = activeTier === 'ocr_pipeline_full'
+            ? Math.round((bounded / 100) * 20)
+            : Math.round((bounded / 100) * 50)
+          setTranslationProfileProgress((prev) => Math.max(prev, staged))
+        }
         if (method) setTranslationProfileMethod(method)
         return
       }
       if (evt.id === 'translation') {
-        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+        const activeTier = translationProfileTierRef.current
+        if (activeTier) {
+          const bounded = Math.max(0, Math.min(100, evt.percent))
+          const staged = activeTier === 'ocr_pipeline_full'
+            ? Math.round(20 + (bounded / 100) * 20)
+            : Math.round(50 + (bounded / 100) * 50)
+          setTranslationProfileProgress((prev) => Math.max(prev, staged))
+        }
         if (method) setTranslationProfileMethod(method)
         return
       }
       if (evt.id === 'pipeline') {
-        setTranslationProfileProgress((prev) => Math.max(prev, evt.percent))
+        const activeTier = translationProfileTierRef.current
+        if (activeTier === 'ocr_pipeline_full') {
+          const bounded = Math.max(0, Math.min(100, evt.percent))
+          if (bounded <= 10 && translationPipelineLastPercentRef.current >= 90 && translationPipelineStageRef.current < 2) {
+            translationPipelineStageRef.current += 1
+          }
+          translationPipelineLastPercentRef.current = bounded
+          const staged = Math.round(40 + ((translationPipelineStageRef.current + bounded / 100) / 3) * 60)
+          setTranslationProfileProgress((prev) => Math.max(prev, staged))
+        }
         if (method) setTranslationProfileMethod(method)
         return
       }
@@ -4326,6 +4352,9 @@ function App() {
     if (!applyProfile || translationProfileApplyingTier) {
       return
     }
+    translationProfileTierRef.current = tier
+    translationPipelineStageRef.current = 0
+    translationPipelineLastPercentRef.current = 0
     setTranslationProfileApplyingTier(tier)
     setTranslationProfileProgress(0)
     setTranslationProfileMethod(null)
@@ -4333,6 +4362,9 @@ function App() {
       await applyProfile(tier, { force: true })
       await refreshTutorInstallInfo()
     } finally {
+      translationProfileTierRef.current = null
+      translationPipelineStageRef.current = 0
+      translationPipelineLastPercentRef.current = 0
       setTranslationProfileApplyingTier(null)
       setTranslationProfileProgress(0)
     }
@@ -9495,7 +9527,7 @@ function App() {
                                 <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, translationProfileProgress))}%` }} />
                               </div>
                               <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                Applying… {Math.round(translationProfileProgress)}%{translationProfileMethod ? ` [${translationProfileMethod}]` : ''}
+                                Installing... {Math.round(translationProfileProgress)}%{translationProfileMethod ? ` [${translationProfileMethod}]` : ''}
                               </p>
                             </div>
                           ) : null}
