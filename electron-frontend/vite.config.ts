@@ -9,12 +9,22 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id: string) => {
+          if (!id.includes('node_modules')) {
+            return undefined
+          }
           if (id.includes('node_modules/react')) {
             return 'react-vendor'
           }
           if (id.includes('node_modules/lucide-react')) {
             return 'ui-vendor'
           }
+          if (id.includes('node_modules/@radix-ui') || id.includes('node_modules/motion')) {
+            return 'interaction-vendor'
+          }
+          if (id.includes('node_modules/embla-carousel')) {
+            return 'carousel-vendor'
+          }
+          return 'vendor'
         },
       },
     },

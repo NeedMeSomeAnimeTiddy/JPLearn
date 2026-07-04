@@ -210,6 +210,7 @@ function MinigameLaneRow({
   const reduceMotion = useReducedMotion()
   const visibleCards = expanded ? lane.cards : lane.cards.slice(0, LANE_FIRST_FOLD)
   const hasOverflow = lane.cards.length > LANE_FIRST_FOLD
+  const laneBodyId = `minigame-lane-body-${lane.key}`
 
   return (
     <section className="minigame-lane" aria-label={`${lane.title} minigames`}>
@@ -219,17 +220,24 @@ function MinigameLaneRow({
           <p className="minigame-lane-helper">{lane.helper}</p>
         </div>
         {hasOverflow ? (
-          <button type="button" className="minigame-lane-toggle" onClick={() => onToggleLane(lane.key)}>
+          <button
+            type="button"
+            className="minigame-lane-toggle"
+            onClick={() => onToggleLane(lane.key)}
+            aria-expanded={expanded}
+            aria-controls={laneBodyId}
+          >
             {expanded ? 'Show less' : `Show all (${lane.cards.length})`}
           </button>
         ) : null}
       </header>
 
-      <div className="minigame-lane-viewport" ref={emblaRef}>
+      <div id={laneBodyId} className="minigame-lane-viewport" ref={emblaRef}>
         <div className="minigame-lane-track">
           {visibleCards.map((card, index) => {
             const panel = expandedPanels[card.key] ?? null
             const slideDelay = `${120 + index * 45}ms`
+            const inlinePanelId = `game-inline-panel-${card.key}`
 
             return (
               <article
@@ -332,6 +340,8 @@ function MinigameLaneRow({
                       type="button"
                       className={clsx('game-subaction-pill', panel === 'preview' && 'is-active')}
                       disabled={card.minigameLocked}
+                      aria-expanded={panel === 'preview'}
+                      aria-controls={inlinePanelId}
                       onClick={(event: MouseEvent<HTMLButtonElement>) => {
                         event.stopPropagation()
                         onSetExpandedPanel(card.key, panel === 'preview' ? null : 'preview')
@@ -343,6 +353,8 @@ function MinigameLaneRow({
                       type="button"
                       className={clsx('game-subaction-pill', panel === 'details' && 'is-active')}
                       disabled={card.minigameLocked}
+                      aria-expanded={panel === 'details'}
+                      aria-controls={inlinePanelId}
                       onClick={(event: MouseEvent<HTMLButtonElement>) => {
                         event.stopPropagation()
                         onSetExpandedPanel(card.key, panel === 'details' ? null : 'details')
@@ -353,7 +365,7 @@ function MinigameLaneRow({
                   </div>
 
                   <Collapsible.Root open={panel !== null}>
-                    <Collapsible.Content className="game-inline-panel" forceMount>
+                    <Collapsible.Content id={inlinePanelId} className="game-inline-panel" forceMount>
                       {panel === 'preview' ? (
                         <p>
                           Preview a short sample round of {card.title} before launching.

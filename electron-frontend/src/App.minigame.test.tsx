@@ -19,6 +19,12 @@ function clickTopMenuCard(label: string): void {
   fireEvent.click(button)
 }
 
+function clickTilePrimaryAction(tileButton: HTMLElement): void {
+  const tile = (tileButton.closest('.game-tile') ?? tileButton) as HTMLElement
+  const primary = within(tile).getByRole('button', { name: /(play|launch)/i })
+  fireEvent.click(primary)
+}
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({
@@ -31,6 +37,49 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: () => undefined,
     dispatchEvent: () => false,
   }),
+})
+
+class MockIntersectionObserver {
+  readonly root: Element | Document | null = null
+  readonly rootMargin = '0px'
+  readonly thresholds = [0]
+
+  constructor(_callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
+
+  disconnect(): void {}
+  observe(_target: Element): void {}
+  unobserve(_target: Element): void {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return []
+  }
+}
+
+class MockResizeObserver {
+  constructor(_callback: ResizeObserverCallback) {}
+
+  disconnect(): void {}
+  observe(_target: Element): void {}
+  unobserve(_target: Element): void {}
+}
+
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  value: MockIntersectionObserver,
+})
+
+Object.defineProperty(globalThis, 'IntersectionObserver', {
+  writable: true,
+  value: MockIntersectionObserver,
+})
+
+Object.defineProperty(window, 'ResizeObserver', {
+  writable: true,
+  value: MockResizeObserver,
+})
+
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  writable: true,
+  value: MockResizeObserver,
 })
 
 const baseCards = [
@@ -255,7 +304,7 @@ describe('Minigame menu', () => {
     await screen.findByRole('heading', { name: /Meaning Match/i })
     await screen.findByRole('button', { name: /restart challenge/i })
 
-    expect(screen.queryByRole('button', { name: /^Play$/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^(play|launch)$/i })).toBeNull()
     expect(screen.queryByText(/Session Report/i)).toBeNull()
   })
 
@@ -301,7 +350,7 @@ describe('Minigame menu', () => {
     fireEvent.click(await screen.findByRole('button', { name: /toggle answer confidence capture/i }))
 
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
-    fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(typedTiles[0])
 
     const typedInput = await screen.findByPlaceholderText(/Type meaning/i)
     fireEvent.click(screen.getByRole('button', { name: /confidence high/i }))
@@ -408,7 +457,7 @@ describe('Minigame menu', () => {
     clickTopMenuCard('Grammar')
 
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
-    fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(typedTiles[0])
 
     fireEvent.click(await screen.findByRole('button', { name: /play target words/i }))
     fireEvent.click(await screen.findByRole('button', { name: /play example sentence/i }))
@@ -432,7 +481,7 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
     const contextTiles = await screen.findAllByRole('button', { name: /Particle Cloze/i })
-    fireEvent.click(within((contextTiles[0].closest('.game-tile') ?? contextTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(contextTiles[0])
 
     const promptMain = await screen.findByText((content, node) => {
       if (!node || !node.classList.contains('game-prompt-main')) return false
@@ -450,7 +499,7 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
     const storyTiles = await screen.findAllByRole('button', { name: /Imposter/i })
-    fireEvent.click(within((storyTiles[0].closest('.game-tile') ?? storyTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(storyTiles[0])
 
     const storyPassage = await screen.findByText((content, node) => {
       if (!node || !node.classList.contains('game-prompt-main')) return false
@@ -468,7 +517,7 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Kanji')
     const matchTiles = await screen.findAllByRole('button', { name: /Character Match/i })
-    fireEvent.click(within((matchTiles[0].closest('.game-tile') ?? matchTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(matchTiles[0])
 
     fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
     expect(await screen.findByText(/Think about how this kanji looks/i)).toBeTruthy()
@@ -524,7 +573,7 @@ describe('Minigame menu', () => {
     clickTopMenuCard('Kanji')
 
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
-    fireEvent.click(within((typedTiles[0].closest('.game-tile') ?? typedTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(typedTiles[0])
 
     fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
 
@@ -572,7 +621,7 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Kanji')
     const strokeTiles = await screen.findAllByRole('button', { name: /Stroke Order/i })
-    fireEvent.click(within((strokeTiles[0].closest('.game-tile') ?? strokeTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(strokeTiles[0])
 
     expect(await screen.findByText(/Type the romaji reading to see kanji options/i)).toBeTruthy()
     expect(screen.getByPlaceholderText(/Type romaji reading/i)).toBeTruthy()
@@ -710,7 +759,7 @@ describe('Minigame menu', () => {
     clickTopMenuCard('Grammar')
 
     const assemblyTiles = await screen.findAllByRole('button', { name: /Sentence Assembly/i })
-    fireEvent.click(within((assemblyTiles[0].closest('.game-tile') ?? assemblyTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(assemblyTiles[0])
 
     fireEvent.click(await screen.findByRole('button', { name: /move 学生です。 later/i }))
     fireEvent.click(screen.getByRole('button', { name: /submit order/i }))
@@ -768,7 +817,7 @@ describe('Minigame menu', () => {
     clickTopMenuCard('Vocabulary')
 
     const audioTiles = await screen.findAllByRole('button', { name: /Listening: Audio First/i })
-    fireEvent.click(within((audioTiles[0].closest('.game-tile') ?? audioTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(audioTiles[0])
 
     // Play audio prompt button must be present (it replaces the character display)
     await screen.findByRole('button', { name: /play audio prompt/i })
@@ -813,7 +862,7 @@ describe('Minigame menu', () => {
     clickTopMenuCard('Vocabulary')
 
     const promptTiles = await screen.findAllByRole('button', { name: /Listening: Prompt First/i })
-    fireEvent.click(within((promptTiles[0].closest('.game-tile') ?? promptTiles[0]) as HTMLElement).getByRole('button', { name: /^Play$/i }))
+    clickTilePrimaryAction(promptTiles[0])
 
     // Character must be visible in the prompt-main area
     expect(await screen.findByText((content, node) => {
@@ -830,6 +879,193 @@ describe('Minigame menu', () => {
     expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
       minigame: 'listening_prompt_first',
     }))
+  })
+
+  it('keeps locked listening cards non-interactive when voice runtime is unavailable', async () => {
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      getVoiceStatus: async () => ({
+        available: false,
+        modelReady: false,
+        downloading: false,
+        downloadProgress: 0,
+        modelName: 'voicevox',
+        lastError: 'Runtime offline',
+      }),
+    }
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    clickTopMenuCard('Vocabulary')
+
+    const lockedLaunch = await screen.findByRole('button', { name: /listening: audio first is locked/i })
+    expect((lockedLaunch as HTMLButtonElement).disabled).toBe(true)
+
+    const tile = (lockedLaunch.closest('.game-tile') ?? lockedLaunch) as HTMLElement
+    const previewButton = within(tile).getByRole('button', { name: /preview/i })
+    const detailsButton = within(tile).getByRole('button', { name: /details/i })
+
+    expect((previewButton as HTMLButtonElement).disabled).toBe(true)
+    expect((detailsButton as HTMLButtonElement).disabled).toBe(true)
+
+    fireEvent.click(lockedLaunch)
+    expect(await screen.findByRole('heading', { name: /mini game map/i })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: /listening: audio first/i })).toBeNull()
+  })
+
+  it('keeps Speech Recall locked when no speech model is enabled', async () => {
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      getSetupSystemInfo: async () => ({
+        totalRamGb: 16,
+        gpuVramGb: null,
+        models: [],
+        recommendedTier: 'low',
+        activeModelTier: null,
+        activeEmbedderTier: null,
+        activeEmbedderLabel: null,
+        activeEmbedderInstalled: false,
+        activeEmbedderEnabled: false,
+        llamaCppInstalled: false,
+        voiceInstalled: false,
+        voiceModels: [],
+        activeVoiceModel: null,
+        fontsInstalled: false,
+        dictionaryInstalled: false,
+        llamaCppEstimatedDownloadMinutes: null,
+        dictionaryEstimatedDownloadMinutes: null,
+        speechModels: [],
+        recommendedSpeechTier: 'low',
+        activeSpeechModelTier: null,
+        ocrModels: [],
+        recommendedOcrTier: 'low',
+        activeOcrModelTier: null,
+        ocrInstalled: false,
+        translationModels: [],
+        recommendedTranslationTier: 'low',
+        activeTranslationModelTier: null,
+        translationInstalled: false,
+        translationProfiles: [],
+        activeTranslationProfileTier: null,
+      } as any),
+    }
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    clickTopMenuCard('Hiragana')
+
+    const lockedLaunch = await screen.findByRole('button', { name: /speech recall is locked/i })
+    expect((lockedLaunch as HTMLButtonElement).disabled).toBe(true)
+
+    const tile = (lockedLaunch.closest('.game-tile') ?? lockedLaunch) as HTMLElement
+    const previewButton = within(tile).getByRole('button', { name: /preview/i })
+    const detailsButton = within(tile).getByRole('button', { name: /details/i })
+
+    expect((previewButton as HTMLButtonElement).disabled).toBe(true)
+    expect((detailsButton as HTMLButtonElement).disabled).toBe(true)
+
+    fireEvent.click(lockedLaunch)
+    expect(await screen.findByRole('heading', { name: /mini game map/i })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: /speech recall/i })).toBeNull()
+  })
+
+  it('exposes stable ARIA wiring for lane toggles and inline panel controls', async () => {
+    window.jplearnDesktop = baseDesktopApi
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    clickTopMenuCard('Hiragana')
+
+    const showAllButton = screen.queryByRole('button', { name: /show all/i })
+    if (showAllButton) {
+      const laneBodyId = showAllButton.getAttribute('aria-controls')
+      expect(showAllButton.getAttribute('aria-expanded')).toBe('false')
+      expect(laneBodyId).toBeTruthy()
+      if (laneBodyId) {
+        expect(document.getElementById(laneBodyId)).toBeTruthy()
+      }
+
+      fireEvent.click(showAllButton)
+      const showLessButton = await screen.findByRole('button', { name: /show less/i })
+      expect(showLessButton.getAttribute('aria-expanded')).toBe('true')
+      expect(showLessButton.getAttribute('aria-controls')).toBe(laneBodyId)
+    }
+
+    const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
+    const tile = (previewButtons[0].closest('.game-tile') ?? previewButtons[0]) as HTMLElement
+    const previewButton = within(tile).getByRole('button', { name: /preview/i })
+    const detailsButton = within(tile).getByRole('button', { name: /details/i })
+
+    const panelId = previewButton.getAttribute('aria-controls')
+    expect(panelId).toBeTruthy()
+    expect(previewButton.getAttribute('aria-expanded')).toBe('false')
+    expect(detailsButton.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(previewButton)
+    expect(previewButton.getAttribute('aria-expanded')).toBe('true')
+    if (panelId) {
+      expect(document.getElementById(panelId)).toBeTruthy()
+    }
+
+    fireEvent.click(detailsButton)
+    expect(detailsButton.getAttribute('aria-expanded')).toBe('true')
+    expect(previewButton.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('keeps minigame controls available when reduced motion preference is enabled', async () => {
+    const originalMatchMedia = window.matchMedia
+    window.matchMedia = (query: string) => ({
+      matches: query.includes('prefers-reduced-motion'),
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    })
+
+    try {
+      window.jplearnDesktop = baseDesktopApi
+
+      render(<App />)
+      await screen.findByRole('button', { name: /open shortcuts/i })
+      clickTopMenuCard('Hiragana')
+
+      const launchButtons = await screen.findAllByRole('button', { name: /launch /i })
+      expect(launchButtons.length).toBeGreaterThan(0)
+      expect((launchButtons[0] as HTMLButtonElement).disabled).toBe(false)
+
+      const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
+      expect((previewButtons[0] as HTMLButtonElement).disabled).toBe(false)
+    } finally {
+      window.matchMedia = originalMatchMedia
+    }
+  })
+
+  it('lets users expand a lane and toggle preview/details inline panels', async () => {
+    window.jplearnDesktop = baseDesktopApi
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    clickTopMenuCard('Hiragana')
+
+    const showAllButton = screen.queryByRole('button', { name: /show all/i })
+    if (showAllButton) {
+      fireEvent.click(showAllButton)
+      expect(await screen.findByRole('button', { name: /show less/i })).toBeTruthy()
+    } else {
+      expect(screen.queryByRole('button', { name: /show less/i })).toBeNull()
+    }
+
+    const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
+    const tile = (previewButtons[0].closest('.game-tile') ?? previewButtons[0]) as HTMLElement
+
+    fireEvent.click(within(tile).getByRole('button', { name: /preview/i }))
+    expect(await screen.findByText(/Preview a short sample round of .* before launching\./i)).toBeTruthy()
+
+    fireEvent.click(within(tile).getByRole('button', { name: /details/i }))
+    expect(await screen.findByText(/focuses on .* skills and currently sits in the .* difficulty tier\./i)).toBeTruthy()
   })
 })
 

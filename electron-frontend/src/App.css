@@ -5503,6 +5503,48 @@ button {
   transition: max-height 220ms ease, opacity 180ms ease;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .minigame-lane-track {
+    scroll-behavior: auto;
+  }
+
+  .game-tile {
+    animation: none;
+    transition: none;
+  }
+
+  .game-launch-pill,
+  .game-launch-pill-label,
+  .game-inline-panel[data-state='open'],
+  .game-inline-panel[data-state='closed'] {
+    transition: none;
+  }
+
+  .game-launch-pill:hover,
+  .game-launch-pill:focus-visible,
+  .game-tile:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .minigame-lane-track {
+    gap: 10px;
+  }
+
+  .game-tile {
+    flex-basis: clamp(220px, 82vw, 300px);
+  }
+
+  .game-launch-pill {
+    min-height: calc(46px * var(--ui-scale));
+  }
+
+  .game-subaction-pill {
+    min-height: calc(34px * var(--ui-scale));
+  }
+}
+
 .play-cta-button {
   margin-top: 10px;
   border: 1px solid var(--button-border);
