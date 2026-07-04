@@ -8,7 +8,7 @@ afterEach(() => {
 })
 
 function clickTopMenuCard(label: string): void {
-  const menuCards = Array.from(document.querySelectorAll('.menu-card')) as HTMLButtonElement[]
+  const menuCards = Array.from(document.querySelectorAll('.home-tape')) as HTMLButtonElement[]
   const button = menuCards.find((card) => {
     const title = card.querySelector('strong')
     return title?.textContent?.trim().toLowerCase() === label.toLowerCase()
@@ -20,9 +20,11 @@ function clickTopMenuCard(label: string): void {
 }
 
 function clickTilePrimaryAction(tileButton: HTMLElement): void {
-  const tile = (tileButton.closest('.game-tile') ?? tileButton) as HTMLElement
-  const primary = within(tile).getByRole('button', { name: /(play|launch)/i })
-  fireEvent.click(primary)
+  // Cassette carousel: first click focuses/selects the cassette, second click
+  // launches the now-focused minigame.
+  const cassette = (tileButton.closest('.cassette') ?? tileButton) as HTMLElement
+  fireEvent.click(cassette)
+  fireEvent.click(cassette)
 }
 
 Object.defineProperty(window, 'matchMedia', {
@@ -898,17 +900,12 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
 
-    const lockedLaunch = await screen.findByRole('button', { name: /listening: audio first is locked/i })
-    expect((lockedLaunch as HTMLButtonElement).disabled).toBe(true)
+    const lockedCassette = await screen.findByRole('button', { name: /listening: audio first is locked/i })
+    expect(lockedCassette.className).toContain('is-locked')
 
-    const tile = (lockedLaunch.closest('.game-tile') ?? lockedLaunch) as HTMLElement
-    const previewButton = within(tile).getByRole('button', { name: /preview/i })
-    const detailsButton = within(tile).getByRole('button', { name: /details/i })
-
-    expect((previewButton as HTMLButtonElement).disabled).toBe(true)
-    expect((detailsButton as HTMLButtonElement).disabled).toBe(true)
-
-    fireEvent.click(lockedLaunch)
+    // Clicking a locked cassette must never start a session.
+    fireEvent.click(lockedCassette)
+    fireEvent.click(lockedCassette)
     expect(await screen.findByRole('heading', { name: /mini game map/i })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: /listening: audio first/i })).toBeNull()
   })
@@ -954,62 +951,14 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Hiragana')
 
-    const lockedLaunch = await screen.findByRole('button', { name: /speech recall is locked/i })
-    expect((lockedLaunch as HTMLButtonElement).disabled).toBe(true)
+    const lockedCassette = await screen.findByRole('button', { name: /speech recall is locked/i })
+    expect(lockedCassette.className).toContain('is-locked')
 
-    const tile = (lockedLaunch.closest('.game-tile') ?? lockedLaunch) as HTMLElement
-    const previewButton = within(tile).getByRole('button', { name: /preview/i })
-    const detailsButton = within(tile).getByRole('button', { name: /details/i })
-
-    expect((previewButton as HTMLButtonElement).disabled).toBe(true)
-    expect((detailsButton as HTMLButtonElement).disabled).toBe(true)
-
-    fireEvent.click(lockedLaunch)
+    // Clicking a locked cassette must never start a session.
+    fireEvent.click(lockedCassette)
+    fireEvent.click(lockedCassette)
     expect(await screen.findByRole('heading', { name: /mini game map/i })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: /speech recall/i })).toBeNull()
-  })
-
-  it('exposes stable ARIA wiring for lane toggles and inline panel controls', async () => {
-    window.jplearnDesktop = baseDesktopApi
-
-    render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Hiragana')
-
-    const showAllButton = screen.queryByRole('button', { name: /show all/i })
-    if (showAllButton) {
-      const laneBodyId = showAllButton.getAttribute('aria-controls')
-      expect(showAllButton.getAttribute('aria-expanded')).toBe('false')
-      expect(laneBodyId).toBeTruthy()
-      if (laneBodyId) {
-        expect(document.getElementById(laneBodyId)).toBeTruthy()
-      }
-
-      fireEvent.click(showAllButton)
-      const showLessButton = await screen.findByRole('button', { name: /show less/i })
-      expect(showLessButton.getAttribute('aria-expanded')).toBe('true')
-      expect(showLessButton.getAttribute('aria-controls')).toBe(laneBodyId)
-    }
-
-    const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
-    const tile = (previewButtons[0].closest('.game-tile') ?? previewButtons[0]) as HTMLElement
-    const previewButton = within(tile).getByRole('button', { name: /preview/i })
-    const detailsButton = within(tile).getByRole('button', { name: /details/i })
-
-    const panelId = previewButton.getAttribute('aria-controls')
-    expect(panelId).toBeTruthy()
-    expect(previewButton.getAttribute('aria-expanded')).toBe('false')
-    expect(detailsButton.getAttribute('aria-expanded')).toBe('false')
-
-    fireEvent.click(previewButton)
-    expect(previewButton.getAttribute('aria-expanded')).toBe('true')
-    if (panelId) {
-      expect(document.getElementById(panelId)).toBeTruthy()
-    }
-
-    fireEvent.click(detailsButton)
-    expect(detailsButton.getAttribute('aria-expanded')).toBe('true')
-    expect(previewButton.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('keeps minigame controls available when reduced motion preference is enabled', async () => {
@@ -1032,40 +981,14 @@ describe('Minigame menu', () => {
       await screen.findByRole('button', { name: /open shortcuts/i })
       clickTopMenuCard('Hiragana')
 
-      const launchButtons = await screen.findAllByRole('button', { name: /launch /i })
-      expect(launchButtons.length).toBeGreaterThan(0)
-      expect((launchButtons[0] as HTMLButtonElement).disabled).toBe(false)
+      const cassettes = await screen.findAllByRole('button', { name: /focus |launch |is locked/i })
+      expect(cassettes.length).toBeGreaterThan(0)
 
-      const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
-      expect((previewButtons[0] as HTMLButtonElement).disabled).toBe(false)
+      const launchButton = await screen.findByRole('button', { name: /^Launch$/i })
+      expect((launchButton as HTMLButtonElement).disabled).toBe(false)
     } finally {
       window.matchMedia = originalMatchMedia
     }
-  })
-
-  it('lets users expand a lane and toggle preview/details inline panels', async () => {
-    window.jplearnDesktop = baseDesktopApi
-
-    render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Hiragana')
-
-    const showAllButton = screen.queryByRole('button', { name: /show all/i })
-    if (showAllButton) {
-      fireEvent.click(showAllButton)
-      expect(await screen.findByRole('button', { name: /show less/i })).toBeTruthy()
-    } else {
-      expect(screen.queryByRole('button', { name: /show less/i })).toBeNull()
-    }
-
-    const previewButtons = await screen.findAllByRole('button', { name: /preview/i })
-    const tile = (previewButtons[0].closest('.game-tile') ?? previewButtons[0]) as HTMLElement
-
-    fireEvent.click(within(tile).getByRole('button', { name: /preview/i }))
-    expect(await screen.findByText(/Preview a short sample round of .* before launching\./i)).toBeTruthy()
-
-    fireEvent.click(within(tile).getByRole('button', { name: /details/i }))
-    expect(await screen.findByText(/focuses on .* skills and currently sits in the .* difficulty tier\./i)).toBeTruthy()
   })
 })
 

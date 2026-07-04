@@ -17,6 +17,7 @@ import { SessionProvider } from './context/SessionContext'
 import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
+import { AmbientAudioController } from './lib/ambientAudio'
 import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
 import type { RoundDictionaryNote } from './types'
@@ -149,6 +150,7 @@ type BackgroundStyle =
 type FeedbackTone = 'success' | 'error' | null
 type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation'
 type ThemeKey =
+  | 'lofi_dusk'
   | 'harbor_mist'
   | 'sakura_dawn'
   | 'forest_ink'
@@ -159,6 +161,7 @@ type ThemeKey =
   | 'ocean_glass'
   | 'ember_night'
   | 'plum_garden'
+  | 'lofi_dusk_light'
   | 'harbor_mist_light'
   | 'sakura_dawn_light'
   | 'sunset_lacquer_light'
@@ -951,6 +954,7 @@ interface AppSettings {
   showKeyboardPrompts: boolean
   voiceEnabled: boolean
   voiceSpeaker: string
+  ambientAudioEnabled: boolean
 }
 
 interface VoiceSynthesisMeta {
@@ -1209,6 +1213,7 @@ const PETAL_STREAM = [
 ] as const
 
 const THEME_OPTIONS: Array<{ key: ThemeKey; label: string; mode: ThemeMode }> = [
+  { key: 'lofi_dusk', label: 'Lofi Dusk', mode: 'dark' },
   { key: 'harbor_mist', label: 'Harbor Mist', mode: 'dark' },
   { key: 'sakura_dawn', label: 'Sakura Dawn', mode: 'dark' },
   { key: 'forest_ink', label: 'Forest Ink', mode: 'dark' },
@@ -1219,6 +1224,7 @@ const THEME_OPTIONS: Array<{ key: ThemeKey; label: string; mode: ThemeMode }> = 
   { key: 'ocean_glass', label: 'Ocean Glass', mode: 'dark' },
   { key: 'ember_night', label: 'Ember Night', mode: 'dark' },
   { key: 'plum_garden', label: 'Plum Garden', mode: 'dark' },
+  { key: 'lofi_dusk_light', label: 'Lofi Dusk Light', mode: 'light' },
   { key: 'harbor_mist_light', label: 'Harbor Mist Light', mode: 'light' },
   { key: 'sakura_dawn_light', label: 'Sakura Dawn Light', mode: 'light' },
   { key: 'sunset_lacquer_light', label: 'Sunset Lacquer Light', mode: 'light' },
@@ -1237,8 +1243,8 @@ const THEME_MODE_SECTIONS: Array<{ key: ThemeMode; label: string }> = [
 ]
 
 const DEFAULT_THEME_BY_MODE: Record<ThemeMode, ThemeKey> = {
-  dark: 'harbor_mist',
-  light: 'harbor_mist_light',
+  dark: 'lofi_dusk',
+  light: 'lofi_dusk_light',
 }
 
 const THEME_MODE_ICON: Record<ThemeMode, LucideIcon> = {
@@ -1247,6 +1253,7 @@ const THEME_MODE_ICON: Record<ThemeMode, LucideIcon> = {
 }
 
 const THEME_SWATCH_ACCENT: Record<ThemeKey, string> = {
+  lofi_dusk: '#b07a5c',
   harbor_mist: '#7bc5df',
   sakura_dawn: '#ffb1bf',
   forest_ink: '#89d0a4',
@@ -1257,6 +1264,7 @@ const THEME_SWATCH_ACCENT: Record<ThemeKey, string> = {
   ocean_glass: '#7ed4d0',
   ember_night: '#ff9a6a',
   plum_garden: '#c89cff',
+  lofi_dusk_light: '#b07a5c',
   harbor_mist_light: '#69abc4',
   sakura_dawn_light: '#e48ea2',
   sunset_lacquer_light: '#dd8c62',
@@ -2085,7 +2093,7 @@ function defaultSettings(): AppSettings {
     fontSize: 'medium',
     appFont: 'kiwi_maru',
     themeMode: 'dark',
-    theme: 'harbor_mist',
+    theme: 'lofi_dusk',
     themeScope: 'preset',
     activeCustomThemeId: null,
     customThemes: [],
@@ -2101,6 +2109,7 @@ function defaultSettings(): AppSettings {
     showKeyboardPrompts: false,
     voiceEnabled: true,
     voiceSpeaker: DEFAULT_VOICE_SPEAKER,
+    ambientAudioEnabled: false,
   }
 }
 
@@ -2402,6 +2411,21 @@ function loadSettings(): AppSettings {
       }
     }
 
+    // One-time migration to the Lofi Dusk restyle: move users still sitting on
+    // the previous default (harbor_mist) onto the new default. Runs once and
+    // never overrides a theme the user deliberately picked afterwards.
+    if (normalizedThemeScope === 'preset') {
+      const THEME_MIGRATION_KEY = 'jplearn-desktop-theme-migration-v1'
+      if (window.localStorage.getItem(THEME_MIGRATION_KEY) !== 'done') {
+        if (resolvedTheme === 'harbor_mist') {
+          resolvedTheme = 'lofi_dusk'
+        } else if (resolvedTheme === 'harbor_mist_light') {
+          resolvedTheme = 'lofi_dusk_light'
+        }
+        window.localStorage.setItem(THEME_MIGRATION_KEY, 'done')
+      }
+    }
+
     const normalizedCustomBackgroundDataUrl = normalizeCustomBackgroundDataUrl(parsed.customBackgroundDataUrl)
     const normalizedCustomBackgroundName = typeof parsed.customBackgroundName === 'string' && parsed.customBackgroundName.trim()
       ? parsed.customBackgroundName.trim().slice(0, 120)
@@ -2450,6 +2474,10 @@ function loadSettings(): AppSettings {
           && FIXED_JAPANESE_VOICE_OPTIONS.some((option) => option.id === parsed.voiceSpeaker)
           ? parsed.voiceSpeaker
           : defaults.voiceSpeaker,
+      ambientAudioEnabled:
+        typeof parsed.ambientAudioEnabled === 'boolean'
+          ? parsed.ambientAudioEnabled
+          : defaults.ambientAudioEnabled,
     }
   } catch {
     return defaultSettings()
@@ -3694,6 +3722,7 @@ function App() {
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null)
+  const ambientAudioRef = useRef<AmbientAudioController | null>(null)
   const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const roundPresentedAtRef = useRef<number>(0)
@@ -5093,6 +5122,24 @@ function App() {
 
     void window.jplearnDesktop.setStartupTheme(effectiveTheme).catch(() => undefined)
   }, [activeCustomTheme, effectiveTheme, ensureThemePaletteCached, settings, themePaletteCache])
+
+  // Ambient audio lifecycle
+  useEffect(() => {
+    if (settings.ambientAudioEnabled) {
+      if (!ambientAudioRef.current) {
+        ambientAudioRef.current = new AmbientAudioController({
+          sources: ['/audio/lofi-loop.mp3', '/audio/lofi-loop.ogg'],
+          volume: 0.35,
+          fadeMs: 1200,
+        })
+      }
+      ambientAudioRef.current.start()
+    } else {
+      ambientAudioRef.current?.stop()
+    }
+
+    return () => ambientAudioRef.current?.dispose()
+  }, [settings.ambientAudioEnabled])
 
   const activePetalStream = useMemo(() => {
     if (settings.reducedMotion || settings.motionStyle === 'calm_fade') return []
@@ -10086,6 +10133,22 @@ function App() {
                         </span>
                         <span className="settings-icon-entry-label">{settings.voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
                       </button>
+
+                      {settings.ambientAudioEnabled !== undefined ? (
+                        <button
+                          type="button"
+                          className={`settings-icon-entry settings-theme-entry ${settings.ambientAudioEnabled ? 'is-active' : ''}`}
+                          onClick={() => setSettings((prev) => ({ ...prev, ambientAudioEnabled: !prev.ambientAudioEnabled }))}
+                          aria-label={settings.ambientAudioEnabled ? 'Ambient audio enabled. Activate to disable.' : 'Ambient audio disabled. Activate to enable.'}
+                          aria-pressed={settings.ambientAudioEnabled}
+                          title={settings.ambientAudioEnabled ? 'Ambient audio on' : 'Ambient audio off'}
+                        >
+                          <span className={`settings-mode-icon-button ${settings.ambientAudioEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+                            <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                          </span>
+                          <span className="settings-icon-entry-label">{settings.ambientAudioEnabled ? 'Ambience On' : 'Ambience Off'}</span>
+                        </button>
+                      ) : null}
 
                       {settings.voiceEnabled
                         ? voiceOptions.map((option) => (
