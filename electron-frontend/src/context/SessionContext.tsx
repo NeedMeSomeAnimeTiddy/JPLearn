@@ -106,7 +106,7 @@ export function SessionProvider({
   value: SessionContextValue
   children: ReactNode
 }) {
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  return <SessionContext value={value}>{children}</SessionContext>
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────

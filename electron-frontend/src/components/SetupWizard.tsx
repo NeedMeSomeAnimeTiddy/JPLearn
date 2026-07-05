@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ChevronDown, RefreshCw } from 'lucide-react'
+import { cva } from 'class-variance-authority'
+import { clsx } from 'clsx'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -736,19 +738,13 @@ export function SetupWizard({ onComplete }: Props) {
 
   function ProgressBar({ value, label, method }: { value: number; label: string; method?: string | null }) {
     return (
-      <div style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', fontSize: '0.85rem', opacity: 0.8 }}>
+      <div className="sw-progress-bar">
+        <div className="sw-progress-bar-header">
           <span>{label}</span>
           <span>{value}%{method ? ` [${method}]` : ''}</span>
         </div>
-        <div style={{ height: '8px', borderRadius: '4px', background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
-          <div style={{
-            height: '100%',
-            borderRadius: '4px',
-            background: 'var(--accent, #7eb8ea)',
-            width: `${value}%`,
-            transition: 'width 0.3s ease',
-          }} />
+        <div className="sw-progress-bar-track">
+          <div className="sw-progress-bar-fill" style={{ width: `${value}%` }} />
         </div>
       </div>
     )
@@ -904,7 +900,7 @@ export function SetupWizard({ onComplete }: Props) {
               textAlign: 'left',
               padding: '0.9rem',
               borderRadius: '10px',
-              border: setupMode === 'simple' ? '1px solid var(--accent, #7eb8ea)' : '1px solid rgba(255,255,255,0.14)',
+              border: setupMode === 'simple' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.14)',
               background: setupMode === 'simple' ? 'rgba(126,184,234,0.14)' : 'rgba(255,255,255,0.05)',
               color: 'inherit',
               cursor: 'pointer',
@@ -922,7 +918,7 @@ export function SetupWizard({ onComplete }: Props) {
               textAlign: 'left',
               padding: '0.9rem',
               borderRadius: '10px',
-              border: setupMode === 'advanced' ? '1px solid var(--accent, #7eb8ea)' : '1px solid rgba(255,255,255,0.14)',
+              border: setupMode === 'advanced' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.14)',
               background: setupMode === 'advanced' ? 'rgba(126,184,234,0.14)' : 'rgba(255,255,255,0.05)',
               color: 'inherit',
               cursor: 'pointer',
@@ -955,7 +951,7 @@ export function SetupWizard({ onComplete }: Props) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)' }}>
               <span style={{ opacity: 0.7 }}>Network</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <span style={{ fontWeight: 600, color: 'var(--accent, #7eb8ea)' }}>
+                <span style={{ fontWeight: 600, color: 'var(--accent)' }}>
                   {sysInfo.networkMbps ? `${sysInfo.networkMbps.toFixed(1)} Mbps` : 'Speed test unavailable'}
                 </span>
                 <button
@@ -1020,7 +1016,7 @@ export function SetupWizard({ onComplete }: Props) {
           </p>
         ) : null}
         {selectedModelWarning ? (
-          <p style={{ color: '#ffc107', fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
+          <p style={{ color: 'var(--tone-amber)', fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
             {selectedModelWarning}
           </p>
         ) : null}
@@ -1059,7 +1055,7 @@ export function SetupWizard({ onComplete }: Props) {
           study sessions.
         </p>
         {sysInfo?.voiceInstalled ? (
-          <p style={{ color: 'var(--accent, #7eb8ea)' }}>✓ A Japanese voice engine is already installed.</p>
+          <p style={{ color: 'var(--accent)' }}>✓ A Japanese voice engine is already installed.</p>
         ) : (
           <>
             <CompactDropdown
@@ -1100,7 +1096,7 @@ export function SetupWizard({ onComplete }: Props) {
             </p>
           ) : null}
           {selectedSpeechTierWarning ? (
-            <p style={{ color: '#ffc107', fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
+            <p style={{ color: 'var(--tone-amber)', fontSize: '0.82rem', lineHeight: 1.4, margin: '0.35rem 0 0' }}>
               {selectedSpeechTierWarning}
             </p>
           ) : null}
@@ -1123,7 +1119,7 @@ export function SetupWizard({ onComplete }: Props) {
             (e.g. Yu Gothic on Windows), which work fine.
           </p>
           {sysInfo?.fontsInstalled ? (
-            <p style={{ color: 'var(--accent, #7eb8ea)', fontSize: '0.9rem' }}>✓ Fonts are already installed.</p>
+            <p style={{ color: 'var(--accent)', fontSize: '0.9rem' }}>✓ Fonts are already installed.</p>
           ) : (
             <CheckboxOption
               label={`Download Japanese fonts (~100 MB)  •  ${formatDurationMinutes(sysInfo?.fontsEstimatedDownloadMinutes)}`}
@@ -1140,7 +1136,7 @@ export function SetupWizard({ onComplete }: Props) {
             connection. Downloaded from the open-source jmdict-simplified project.
           </p>
           {sysInfo?.dictionaryInstalled ? (
-            <p style={{ color: 'var(--accent, #7eb8ea)', fontSize: '0.9rem' }}>✓ Offline dictionary is already installed.</p>
+            <p style={{ color: 'var(--accent)', fontSize: '0.9rem' }}>✓ Offline dictionary is already installed.</p>
           ) : (
             <CheckboxOption
               label={`Download offline dictionary (~30 MB)  •  ${formatDurationMinutes(sysInfo?.dictionaryEstimatedDownloadMinutes)}`}
@@ -1288,11 +1284,11 @@ export function SetupWizard({ onComplete }: Props) {
         )}
         {downloadError && (
           <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(255,80,80,0.12)', border: '1px solid rgba(255,80,80,0.35)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
-            <span style={{ color: '#ff7b7b', lineHeight: 1.5, fontSize: '0.88rem', minWidth: 0 }}>Download failed: {downloadError}</span>
+            <span style={{ color: 'var(--status-error)', lineHeight: 1.5, fontSize: '0.88rem', minWidth: 0 }}>Download failed: {downloadError}</span>
             <button
               type="button"
               onClick={() => { void startDownloads() }}
-              style={{ ...btnStyle('secondary'), flexShrink: 0 }}
+              className={clsx(btnClass('secondary'), 'sw-btn-retry')}
             >
               Retry
             </button>
@@ -1388,13 +1384,13 @@ function PageLayout({
       {!hideNav && (
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center', marginTop: '0.5rem' }}>
           {skipLabel && onSkip && (
-            <button type="button" onClick={onSkip} style={btnStyle('ghost')}>{skipLabel}</button>
+            <button type="button" onClick={onSkip} className={btnClass('ghost')}>{skipLabel}</button>
           )}
           {!hideBack && onBack && (
-            <button type="button" onClick={onBack} style={btnStyle('secondary')}>Back</button>
+            <button type="button" onClick={onBack} className={btnClass('secondary')}>Back</button>
           )}
           {onNext && (
-            <button type="button" onClick={onNext} disabled={nextDisabled} style={btnStyle('primary', nextDisabled)}>
+            <button type="button" onClick={onNext} disabled={nextDisabled} className={btnClass('primary', nextDisabled)}>
               {nextLabel}
             </button>
           )}
@@ -1407,7 +1403,7 @@ function PageLayout({
 function CheckboxOption({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', cursor: 'pointer', padding: '0.65rem 0.75rem', borderRadius: '8px', background: checked ? 'rgba(255,255,255,0.06)' : 'transparent', border: `1px solid ${checked ? 'rgba(255,255,255,0.18)' : 'transparent'}` }}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ accentColor: 'var(--accent, #7eb8ea)', width: '1rem', height: '1rem', flexShrink: 0 }} />
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ accentColor: 'var(--accent)', width: '1rem', height: '1rem', flexShrink: 0 }} />
       <span style={{ fontWeight: 500 }}>{label}</span>
     </label>
   )
@@ -1417,7 +1413,7 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'rgba(255,255,255,0.05)' }}>
       <span style={{ opacity: 0.7 }}>{label}</span>
-      <span style={{ fontWeight: 600, color: highlight ? 'var(--accent, #7eb8ea)' : undefined }}>{value}</span>
+      <span style={{ fontWeight: 600, color: highlight ? 'var(--accent)' : undefined }}>{value}</span>
     </div>
   )
 }
@@ -1600,7 +1596,7 @@ function DropdownBadge({ children, tone = 'recommended' }: { children: React.Rea
         fontWeight: 700,
         letterSpacing: '0.02em',
         color: isWarning ? '#ffd4cc' : isSoft ? '#f5ddb8' : '#0b1620',
-        background: isWarning ? 'rgba(199, 77, 57, 0.18)' : isSoft ? 'rgba(242, 181, 111, 0.16)' : 'var(--accent, #7eb8ea)',
+        background: isWarning ? 'rgba(199, 77, 57, 0.18)' : isSoft ? 'rgba(242, 181, 111, 0.16)' : 'var(--accent)',
         border: isWarning ? '1px solid rgba(199, 77, 57, 0.3)' : isSoft ? '1px solid rgba(242, 181, 111, 0.24)' : '1px solid rgba(255,255,255,0.1)',
         flexShrink: 0,
       }}
@@ -1620,7 +1616,7 @@ function StepDots({ total, current }: { total: number; current: number }) {
             width: i + 1 === current ? '20px' : '8px',
             height: '8px',
             borderRadius: '4px',
-            background: i + 1 === current ? 'var(--accent, #7eb8ea)' : 'rgba(255,255,255,0.25)',
+            background: i + 1 === current ? 'var(--accent)' : 'rgba(255,255,255,0.25)',
             transition: 'width 0.25s, background 0.25s',
           }}
         />
@@ -1646,7 +1642,7 @@ const cardStyle: React.CSSProperties = {
   background: 'rgba(25, 35, 48, 0.86)',
   border: 'none',
   boxShadow: 'none',
-  color: '#e8f0fa',
+  color: 'var(--text-main)',
   fontFamily: 'inherit',
   overflow: 'hidden',
   display: 'flex',
@@ -1701,20 +1697,21 @@ const cardBodyStyle: AppRegionStyle = {
   WebkitAppRegion: 'no-drag',
 }
 
-function btnStyle(variant: 'primary' | 'secondary' | 'ghost', disabled = false): React.CSSProperties {
-  const base: React.CSSProperties = {
-    padding: '0.5rem 1.25rem',
-    borderRadius: '7px',
-    fontSize: '0.9rem',
-    fontWeight: 600,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    border: 'none',
-    transition: 'opacity 0.15s',
-    opacity: disabled ? 0.45 : 1,
-  }
-  if (variant === 'primary') return { ...base, background: 'var(--accent, #7eb8ea)', color: '#0b1620' }
-  if (variant === 'secondary') return { ...base, background: 'rgba(255,255,255,0.1)', color: '#e8f0fa' }
-  return { ...base, background: 'transparent', color: 'rgba(255,255,255,0.5)', padding: '0.5rem 0.75rem' }
+const button = cva(
+  'sw-btn',
+  {
+    variants: {
+      variant: {
+        primary: 'sw-btn-primary',
+        secondary: 'sw-btn-secondary',
+        ghost: 'sw-btn-ghost',
+      },
+    },
+  },
+)
+
+function btnClass(variant: 'primary' | 'secondary' | 'ghost', disabled = false): string {
+  return clsx(button({ variant }), disabled && 'sw-btn-disabled')
 }
 
 
