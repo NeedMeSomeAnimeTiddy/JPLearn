@@ -260,3 +260,6 @@ __marimo__/
 
 # open-mem persistent memory database
 .open-mem/
+
+# Temporary session context snapshots
+tmp_ab_context.json

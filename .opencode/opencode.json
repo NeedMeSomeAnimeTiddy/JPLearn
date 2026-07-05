@@ -4,16 +4,17 @@
     ".github/copilot-instructions.md",
     ".github/instructions/data.instructions.md",
     ".github/instructions/domain.instructions.md",
-    ".github/instructions/electron.instructions.md"
+    ".github/instructions/electron.instructions.md",
+    "C:/Users/Robbie/.config/opencode/plugin/shell-strategy/shell_strategy.md"
   ],
   "plugin": [
     "@tarquinen/opencode-dcp",
     "opencode-handoff",
-    "opencode-command-inject",
     "open-mem",
     "opencode-smart-title",
     "cc-safety-net",
-    "opencode-snip"
+    "opencode-snip",
+    "envsitter-guard"
   ],
   "mcp": {
     "playwright": {
