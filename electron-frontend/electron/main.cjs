@@ -1374,25 +1374,25 @@ async function preloadTutorChatStartupData() {
 }
 
 function createWindow() {
-  const workArea = screen.getPrimaryDisplay().workAreaSize
-  const minWidth = Math.min(1180, Math.max(860, workArea.width - 140))
-  const minHeight = Math.min(820, Math.max(640, workArea.height - 140))
-  const width = Math.min(1400, Math.max(minWidth, workArea.width - 56))
-  const height = Math.min(940, Math.max(minHeight, workArea.height - 56))
+  const winWidth = 1280
+  const winHeight = 820
 
   const win = new BrowserWindow({
     title: 'JPLearn',
     frame: false,
-    width,
-    height,
-    minWidth,
-    minHeight,
-    resizable: true,
-    maximizable: true,
+    width: winWidth,
+    height: winHeight,
+    minWidth: winWidth,
+    minHeight: winHeight,
+    maxWidth: winWidth,
+    maxHeight: winHeight,
+    resizable: false,
+    maximizable: false,
     show: false,
     autoHideMenuBar: true,
     transparent: true,
-    fullscreenable: true,
+    fullscreenable: false,
+    center: true,
     backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

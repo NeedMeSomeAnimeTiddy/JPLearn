@@ -517,35 +517,35 @@ html[data-theme='plum_garden'] {
 
 /* Lofi Dusk — warm desk-lamp study room aesthetic (dark) */
 html[data-theme='lofi_dusk'] {
-  --bg-main: #1f2433;
-  --bg-subtle: #2a3147;
-  --text-main: #f3e6d3;
-  --text-soft: #b7a896;
+  --bg-main: #f3e6d3;
+  --bg-subtle: #e6d4be;
+  --text-main: #5b4a53;
+  --text-soft: #4a3c44;
   --accent: #b07a5c;
   --accent-soft: #d9b38c;
-  --accent-ink: #241a12;
-  --blob-left: rgba(176, 122, 92, 0.22);
-  --blob-right: rgba(143, 175, 166, 0.18);
-  --blob-top: rgba(217, 179, 140, 0.2);
-  --panel-bg: #2a3147;
-  --panel-bg-alt: #252d42;
-  --panel-border: rgba(139, 116, 128, 0.22);
-  --panel-shadow: 0 24px 40px -28px rgba(0, 0, 0, 0.9);
-  --tile-bg: #2f3550;
-  --tile-border: rgba(91, 74, 83, 0.35);
-  --chip-bg: #333b56;
-  --chip-border: rgba(176, 122, 92, 0.28);
-  --button-border: rgba(176, 122, 92, 0.34);
-  --button-bg-top: #5b4a53;
-  --button-bg-bottom: #4d3f47;
-  --card-border: rgba(91, 74, 83, 0.3);
-  --card-bg-top: #2f3550;
-  --card-bg-bottom: #252b3e;
-  --track-bg: rgba(243, 230, 211, 0.14);
+  --accent-ink: #5b4a53;
+  --blob-left: rgba(178, 122, 92, 0.09);
+  --blob-right: rgba(143, 175, 166, 0.08);
+  --blob-top: rgba(217, 179, 140, 0.18);
+  --panel-bg: #e6d4be;
+  --panel-bg-alt: #dfccb2;
+  --panel-border: #8f7a6e;
+  --panel-shadow: 0 18px 34px -24px rgba(91, 74, 83, 0.25);
+  --tile-bg: #e6d4be;
+  --tile-border: #8f7a6e;
+  --chip-bg: #8f7a6e;
+  --chip-border: #5b4a53;
+  --button-border: #5b4a53;
+  --button-bg-top: #8f7a6e;
+  --button-bg-bottom: #7a685c;
+  --card-border: #8f7a6e;
+  --card-bg-top: #e6d4be;
+  --card-bg-bottom: #dfccb2;
+  --track-bg: rgba(91, 74, 83, 0.1);
   --tone-teal: #8fafa6;
-  --tone-ocean: #8fa9c0;
-  --tone-amber: #d9b38c;
-  --tone-rose: #b07a5c;
+  --tone-ocean: #7e9cb0;
+  --tone-amber: #b07a5c;
+  --tone-rose: #5b4a53;
 }
 
 /* Lofi Dusk — warm paper daytime desk aesthetic (light) */

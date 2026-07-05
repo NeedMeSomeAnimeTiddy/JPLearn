@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Flame,
   Heart,
-  Lock,
   Settings,
   Target,
 } from 'lucide-react'
@@ -203,16 +202,16 @@ export function ScriptHubView({
   onPlayGame,
 }: ScriptHubViewProps) {
   const {
-    sessionRunReport,
-    sessionStartPending,
-    sessionSummaryLoading,
-    sessionGoalError,
-    lastSessionSummary,
+    sessionRunReport: _sessionRunReport,
+    sessionStartPending: _sessionStartPending,
+    sessionSummaryLoading: _sessionSummaryLoading,
+    sessionGoalError: _sessionGoalError,
+    lastSessionSummary: _lastSessionSummary,
     livesEnabled,
     leechFocusEnabled,
     confidenceCaptureEnabled,
     activeSessionLengthPreset,
-    continueLastSession,
+    continueLastSession: _continueLastSession,
     setSessionLength,
     toggleLives,
     toggleLeechFocus,
@@ -254,6 +253,7 @@ export function ScriptHubView({
     rankedCards.map((card) => ({
       key: card.key,
       title: card.title,
+      description: card.description,
       difficultyLabel: card.difficulty.label,
       difficultyLevel: card.difficulty.level,
       accuracy: card.accuracy,
@@ -265,8 +265,22 @@ export function ScriptHubView({
 
   return (
     <div className={isSheet ? 'script-hub-sheet-content' : `view-shell view-${navDirection}`}>
+      {!isSheet ? (
+        <>
+          <div className="hub-crt-surface" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
+          <div className="hub-vhs-line" aria-hidden="true" />
+          {/* Floating crystalline accents */}
+          <div className="hub-crystal hub-crystal--a" aria-hidden="true" />
+          <div className="hub-crystal hub-crystal--b" aria-hidden="true" />
+          <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
+        </>
+      ) : null}
 
-      {/* ── Record-label topbar ────────────────────────────────── */}
+      {/* ── Bold lofi header ──────────────────────────────────── */}
       <header className="hub-topbar">
         <h1 className="sr-only">Mini Game Map</h1>
         <button
@@ -281,8 +295,9 @@ export function ScriptHubView({
 
         <div className="hub-topbar-center">
           <span className="hub-topbar-catalog">JPL-{activeScript === 'kanji_n5' ? 'KNJ' : activeScript === 'vocab_n5' ? 'VCB' : 'SCR'}-A</span>
-          <strong className="hub-topbar-title">{SCRIPT_LABELS[activeScript]}</strong>
-          <span className="hub-topbar-catalog hub-topbar-catalog--sub">cassette tape · カセット</span>
+          <strong className="hub-topbar-title"><span className="hub-glitch-text">{SCRIPT_LABELS[activeScript]}</span></strong>
+          <span className="hub-topbar-catalog hub-topbar-catalog--sub">CASSETTE TAPE · カセット · SIDE A</span>
+          <span className="hub-topbar-stripe" aria-hidden="true" />
         </div>
 
         <div className="hub-topbar-end">
@@ -306,134 +321,55 @@ export function ScriptHubView({
         </div>
       </header>
 
-      {/* ── Tape deck: two-zone layout ──────────────────────────── */}
+      {/* ── Single-zone cassette console ────────────────────────── */}
       <div className="hub-studio">
 
-        {/* Left rail: j-card tracklist */}
-        <aside className="hub-rail">
-          <div className="hub-rail-head">
-            <p className="hero-kicker">tracklist</p>
-            <span className="home-section-hint">
-              {blockProgressWithMastery.length > 0
-                ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length}/${blockProgressWithMastery.length} mastered`
-                : activeScript === 'kanji_n5'
-                  ? `${kanjiCategoryProgress.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${kanjiCategoryProgress.filter((c) => c.total > 0).length} categories`
-                  : activeScript === 'vocab_n5'
-                    ? `${vocabCategoryProgress.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${vocabCategoryProgress.filter((c) => c.total > 0).length} categories`
-                    : ''}
-            </span>
-          </div>
-
-          <div className="hub-rail-body">
-            {gameLoading ? (
-              <p className="status-line">Loading deck…</p>
-            ) : blockProgressWithMastery.length > 0 ? (
-              <div className="hub-block-list">
-                {blockProgressWithMastery.map((block, index) => {
-                  const isActive = activeBlockIndex === block.index
-                  const masteryPct = Math.round(block.mastery * 100)
-                  const previousBlock = index > 0 ? blockProgressWithMastery[index - 1] : null
-                  const lockReason = !block.unlocked
-                    ? previousBlock
-                      ? `Complete 70% of ${previousBlock.name} first.`
-                      : 'Complete the previous block first.'
-                    : null
-                  return (
-                    <button
-                      key={block.index}
-                      type="button"
-                      className={`hub-block-row${isActive ? ' is-active' : ''}${!block.unlocked ? ' is-locked' : ''}`}
-                      disabled={!block.unlocked}
-                      onClick={() => { if (block.unlocked) onSelectBlock(block.index) }}
-                      aria-pressed={isActive}
-                      aria-label={block.unlocked ? `${block.name}, ${masteryPct}% mastered` : `${block.name} locked`}
-                      title={lockReason ?? undefined}
-                    >
-                      <span className="hub-block-track">{String(index + 1).padStart(2, '0')}</span>
-                      <span className="hub-block-copy">
-                        <strong>{block.name}</strong>
-                        <span className="hub-block-bar-wrap" aria-hidden="true">
-                          <span className="hub-block-bar" style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties} />
-                        </span>
-                      </span>
-                      <span className="hub-block-pct">{masteryPct}%</span>
-                      {!block.unlocked ? <Lock size={12} strokeWidth={2} aria-hidden="true" className="hub-block-lock" /> : null}
-                    </button>
-                  )
-                })}
-              </div>
-            ) : activeScript === 'kanji_n5' || activeScript === 'vocab_n5' ? (
-              <div className="hub-block-list">
-                {(activeScript === 'kanji_n5' ? kanjiCategoryProgress : vocabCategoryProgress).map((cat, i) => {
-                  const isActive = activeScript === 'kanji_n5' ? activeKanjiCategory === cat.key : activeVocabCategory === cat.key
-                  const masteryPct = Math.round(cat.mastery * 100)
-                  const unavailable = cat.total === 0
-                  return (
-                    <button
-                      key={cat.key}
-                      type="button"
-                      className={`hub-block-row${isActive ? ' is-active' : ''}${(!cat.unlocked || unavailable) ? ' is-locked' : ''}`}
-                      disabled={!cat.unlocked || unavailable}
-                      onClick={() => {
-                        if (activeScript === 'kanji_n5') onSelectKanjiCategory(cat.key as KanjiCategory)
-                        else onSelectVocabCategory(cat.key as VocabCategory)
-                      }}
-                      aria-pressed={isActive}
-                      aria-label={(!cat.unlocked || unavailable) ? `${cat.label} locked` : `${cat.label}, ${masteryPct}%`}
-                    >
-                      <span className="hub-block-track">{String(i + 1).padStart(2, '0')}</span>
-                      <span className="hub-block-copy">
-                        <strong>{cat.label}</strong>
-                        <span className="hub-block-bar-wrap" aria-hidden="true">
-                          <span className="hub-block-bar" style={{ '--block-mastery': `${masteryPct}%` } as CSSProperties} />
-                        </span>
-                      </span>
-                      <span className="hub-block-pct">{masteryPct}%</span>
-                      {!cat.unlocked || unavailable ? <Lock size={12} strokeWidth={2} aria-hidden="true" className="hub-block-lock" /> : null}
-                    </button>
-                  )
-                })}
-              </div>
-            ) : null}
-          </div>
-        </aside>
-
-        {/* Right zone: cassette player + session controls */}
         <div className="hub-player">
+          {/* Animated atmospheric elements */}
+          <div className="hub-sweep" aria-hidden="true" />
+          <div className="hub-particle hub-particle--1" aria-hidden="true" />
+          <div className="hub-particle hub-particle--2" aria-hidden="true" />
+          <div className="hub-particle hub-particle--3" aria-hidden="true" />
+          <div className="hub-particle hub-particle--4" aria-hidden="true" />
 
           {!gameLoading && (blockProgressWithMastery.length === 0 || activeBlock?.unlocked) ? (
             <>
               <div className="hub-player-header">
                 <p className="hero-kicker">
+                  <span className="hub-rec-dot" aria-hidden="true" />{' '}
                   {blockProgressWithMastery.length > 0
                     ? `${activeBlock?.name ?? ''} · ${activeBlockCards.length} cards`
                     : activeScript === 'kanji_n5' || activeScript === 'vocab_n5'
                       ? `${activeSectionName ?? 'Category'} · ${activeBlockCards.length} cards`
                       : 'Pick a minigame'}
                 </p>
-                <span className="home-section-hint">← drag or use arrows →</span>
+                <span className="home-section-hint">◀◀  scroll  ▶▶</span>
               </div>
 
-              {/* Cassette carousel — inside a tape deck frame */}
-              <div className="hub-deck">
-                <div className="hub-deck-badge" aria-hidden="true">
-                  <span>DOLBY NR</span>
-                  <span className="hub-deck-dot" />
-                </div>
-                <div className="minigame-cassette-shelf">
-                  <MinigameCassetteCarousel
-                    items={cassetteItems}
-                    activeGame={activeGame}
-                    onSelectGame={onSelectGame}
-                    onPlayGame={onPlayGame}
-                  />
-                </div>
-                <div className="hub-deck-badge hub-deck-badge--right" aria-hidden="true">
-                  <span>TYPE II · HIGH BIAS</span>
-                </div>
+              {/* Cassette carousel */}
+              <div className="hub-eq" aria-hidden="true">
+                <span className="hub-eq-bar" style={{ animationDelay: '0s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.1s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.2s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.05s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.15s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.25s' } as CSSProperties} />
+              </div>
+              <div className="hub-deck-badge" aria-hidden="true">
+                <span>DOLBY NR</span>
+                <span className="hub-deck-dot" />
+              </div>
+              <MinigameCassetteCarousel
+                items={cassetteItems}
+                activeGame={activeGame}
+                onSelectGame={onSelectGame}
+                onPlayGame={onPlayGame}
+              />
+              <div className="hub-deck-badge hub-deck-badge--right" aria-hidden="true">
+                <span>TYPE II · HIGH BIAS</span>
               </div>
 
-              {/* Studio controls: session length + toggles as inline chips */}
+              {/* Session controls */}
               <div className="hub-controls" aria-label="Session setup">
                 <div className="hub-control-group" role="group" aria-label="Session length">
                   {SESSION_LENGTH_PRESETS.map((preset) => {
@@ -493,25 +429,62 @@ export function ScriptHubView({
                 </div>
               </div>
 
-              {sessionSummaryLoading ? <p className="status-line">Loading…</p> : null}
-              {sessionGoalError ? <p className="status-line status-error">{sessionGoalError}</p> : null}
-              {lastSessionSummary ? (
-                <section className="hub-last-session" aria-live="polite">
-                  <span className="hub-last-session-label">Last session</span>
-                  <span className="hub-last-session-stats">
-                    {lastSessionSummary.completed_items}/{lastSessionSummary.target_items} · {lastSessionSummary.accuracy}%
+              {/* Horizontal tracklist strip */}
+              {!gameLoading ? (
+                <div className="hub-tracklist-strip">
+                  <span className="hub-tracklist-label">
+                    {blockProgressWithMastery.length > 0
+                      ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length}/${blockProgressWithMastery.length} mastered`
+                      : activeScript === 'kanji_n5'
+                        ? `${kanjiCategoryProgress.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${kanjiCategoryProgress.filter((c) => c.total > 0).length}`
+                        : activeScript === 'vocab_n5'
+                          ? `${vocabCategoryProgress.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${vocabCategoryProgress.filter((c) => c.total > 0).length}`
+                          : ''}
                   </span>
-                  <button
-                    type="button"
-                    className="hub-chip-button is-active"
-                    onClick={continueLastSession}
-                    disabled={!sessionRunReport || sessionStartPending}
-                    aria-label="Continue last session"
-                  >
-                    Continue
-                  </button>
-                </section>
+                  {blockProgressWithMastery.length > 0 ? (
+                    <div className="hub-block-row-strip">
+                      {blockProgressWithMastery.map((block) => {
+                        const isActive = activeBlockIndex === block.index
+                        const masteryPct = Math.round(block.mastery * 100)
+                        return (
+                          <button
+                            key={block.index}
+                            type="button"
+                            className={`hub-block-chip${isActive ? ' is-active' : ''}${!block.unlocked ? ' is-locked' : ''}`}
+                            disabled={!block.unlocked}
+                            onClick={() => { if (block.unlocked) onSelectBlock(block.index) }}
+                            title={!block.unlocked ? 'Locked' : `${block.name} ${masteryPct}%`}
+                          >
+                            {block.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : activeScript === 'kanji_n5' || activeScript === 'vocab_n5' ? (
+                    <div className="hub-block-row-strip">
+                      {(activeScript === 'kanji_n5' ? kanjiCategoryProgress : vocabCategoryProgress).map((cat) => {
+                        const isActive = activeScript === 'kanji_n5' ? activeKanjiCategory === cat.key : activeVocabCategory === cat.key
+                        const unavailable = cat.total === 0
+                        return (
+                          <button
+                            key={cat.key}
+                            type="button"
+                            className={`hub-block-chip${isActive ? ' is-active' : ''}${(!cat.unlocked || unavailable) ? ' is-locked' : ''}`}
+                            disabled={!cat.unlocked || unavailable}
+                            onClick={() => {
+                              if (activeScript === 'kanji_n5') onSelectKanjiCategory(cat.key as KanjiCategory)
+                              else onSelectVocabCategory(cat.key as VocabCategory)
+                            }}
+                          >
+                            {cat.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
+
             </>
           ) : gameLoading ? (
             <p className="status-line">Loading deck…</p>
