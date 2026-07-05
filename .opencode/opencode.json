@@ -7,6 +7,27 @@
     ".github/instructions/electron.instructions.md",
     "C:/Users/Robbie/.config/opencode/plugin/shell-strategy/shell_strategy.md"
   ],
+  "command": {
+    "test": { "description": "Run pytest with optional path filter", "template": "python -m pytest $ARGUMENTS -q" },
+    "dev": { "description": "Start full dev environment (Electron + Vite)", "template": "cd electron-frontend && npm run dev" },
+    "lint": { "description": "Run oxlint on electron-frontend", "template": "cd electron-frontend && npm run lint" },
+    "check": { "description": "Run full aggregate check (arch + lint + test)", "template": "python scripts/dev.py" },
+    "arch": { "description": "Run architecture boundary check", "template": "python scripts/arch_check.py" },
+    "build": { "description": "Build electron-frontend (tsc + vite)", "template": "cd electron-frontend && npm run build" },
+    "run": { "description": "Build and start the Electron app", "template": "cd electron-frontend && npm run build && npm run start" }
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "provider": {
+    "deepseek": {
+      "models": {
+        "deepseek-v4-flash": {
+          "options": {
+            "reasoning_effort": "max"
+          }
+        }
+      }
+    }
+  },
   "plugin": [
     "@tarquinen/opencode-dcp",
     "opencode-handoff",
@@ -14,7 +35,8 @@
     "opencode-smart-title",
     "cc-safety-net",
     "opencode-snip",
-    "envsitter-guard"
+    "envsitter-guard",
+    "micode"
   ],
   "mcp": {
     "playwright": {
@@ -46,6 +68,16 @@
     "gh_grep": {
       "type": "remote",
       "url": "https://mcp.grep.app",
+      "enabled": true
+    },
+    "sqlite": {
+      "type": "local",
+      "command": ["npx", "-y", "@bytebase/dbhub@latest", "--transport", "stdio", "--dsn", "sqlite:///C:/Users/Robbie/Documents/Projects/JPLearn/data/jplearn.db"],
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
       "enabled": true
     }
   },

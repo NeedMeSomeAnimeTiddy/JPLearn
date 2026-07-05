@@ -263,3 +263,18 @@ __marimo__/
 
 # Temporary session context snapshots
 tmp_ab_context.json
+
+# open-mem: Auto-generated folder context files
+**/AGENTS.md
+
+# opencode: session continuity ledgers
+thoughts/
+
+# opencode: runtime artifact (separate from .opencode/opencode.json)
+/opencode.json
+
+# opencode: token usage logs
+token-usage-output.txt
+
+# opencode: TUI output
+tui.json
