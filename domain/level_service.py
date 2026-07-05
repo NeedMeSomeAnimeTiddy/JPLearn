@@ -9,7 +9,7 @@ Level curve arithmetic uses iterative integer steps identical to the
 from __future__ import annotations
 
 from datetime import date
-from typing import Sequence
+from collections.abc import Sequence
 
 from domain.xp import LevelCurve, LevelEvent, UserProgress, XPEvent
 

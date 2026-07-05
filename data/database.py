@@ -6,7 +6,8 @@ import shutil
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, TypedDict, TypeAlias, cast
+from collections.abc import Callable
+from typing import TypedDict, TypeAlias, cast
 
 from domain.activity import ActivitySummary
 from domain.assistant import AssistantEvent, AssistantEventPriority, AssistantMood, AssistantState

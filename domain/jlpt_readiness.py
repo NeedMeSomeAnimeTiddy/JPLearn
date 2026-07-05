@@ -7,7 +7,7 @@ Official pass marks sourced from jlpt.jp/e/guideline/results.html.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from collections.abc import Sequence
 
 from domain.scheduler import ReviewState
 

@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Literal, Mapping
+from collections.abc import Mapping
+from typing import Literal
 
 
 # ---------------------------------------------------------------------------

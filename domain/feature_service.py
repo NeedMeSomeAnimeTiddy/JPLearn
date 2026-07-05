@@ -6,7 +6,7 @@ Time (``today``) is always injected by the caller — never read internally.
 from __future__ import annotations
 
 from datetime import date
-from typing import Sequence
+from collections.abc import Sequence
 
 from domain.features import (
     Feature,

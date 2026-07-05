@@ -1,7 +1,6 @@
 """Card and deck data models."""
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -23,8 +22,8 @@ class Card:
     romaji: str
     meaning: str
     tags: list[str] = field(default_factory=list)
-    example_word: Optional[str] = None
-    example_sentence: Optional[str] = None
+    example_word: str | None = None
+    example_sentence: str | None = None
 
     def __str__(self) -> str:
         return f"{self.character}  ({self.romaji})"
