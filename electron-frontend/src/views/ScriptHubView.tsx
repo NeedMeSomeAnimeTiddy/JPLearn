@@ -266,8 +266,8 @@ export function ScriptHubView({
   return (
     <div className={isSheet ? 'script-hub-sheet-content' : `view-shell view-${navDirection}`}>
 
-      {/* ── Slim lofi topbar ───────────────────────────────────── */}
-      <header className="hub-topbar panel-glass">
+      {/* ── Record-label topbar ────────────────────────────────── */}
+      <header className="hub-topbar">
         <h1 className="sr-only">Mini Game Map</h1>
         <button
           type="button"
@@ -280,8 +280,9 @@ export function ScriptHubView({
         </button>
 
         <div className="hub-topbar-center">
-          <span className="hub-topbar-kicker">now playing</span>
+          <span className="hub-topbar-catalog">JPL-{activeScript === 'kanji_n5' ? 'KNJ' : activeScript === 'vocab_n5' ? 'VCB' : 'SCR'}-A</span>
           <strong className="hub-topbar-title">{SCRIPT_LABELS[activeScript]}</strong>
+          <span className="hub-topbar-catalog hub-topbar-catalog--sub">cassette tape · カセット</span>
         </div>
 
         <div className="hub-topbar-end">
@@ -305,13 +306,13 @@ export function ScriptHubView({
         </div>
       </header>
 
-      {/* ── Studio two-zone layout ─────────────────────────────── */}
-      <div className="hub-studio panel-glass">
+      {/* ── Tape deck: two-zone layout ──────────────────────────── */}
+      <div className="hub-studio">
 
-        {/* Left rail: deck path */}
+        {/* Left rail: j-card tracklist */}
         <aside className="hub-rail">
           <div className="hub-rail-head">
-            <p className="hero-kicker">Deck path</p>
+            <p className="hero-kicker">tracklist</p>
             <span className="home-section-hint">
               {blockProgressWithMastery.length > 0
                 ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length}/${blockProgressWithMastery.length} mastered`
@@ -348,7 +349,7 @@ export function ScriptHubView({
                       aria-label={block.unlocked ? `${block.name}, ${masteryPct}% mastered` : `${block.name} locked`}
                       title={lockReason ?? undefined}
                     >
-                      <span className="hub-block-chars" lang="ja" aria-hidden="true">{block.sample_chars.slice(0, 3).join(' ')}</span>
+                      <span className="hub-block-track">{String(index + 1).padStart(2, '0')}</span>
                       <span className="hub-block-copy">
                         <strong>{block.name}</strong>
                         <span className="hub-block-bar-wrap" aria-hidden="true">
@@ -363,7 +364,7 @@ export function ScriptHubView({
               </div>
             ) : activeScript === 'kanji_n5' || activeScript === 'vocab_n5' ? (
               <div className="hub-block-list">
-                {(activeScript === 'kanji_n5' ? kanjiCategoryProgress : vocabCategoryProgress).map((cat) => {
+                {(activeScript === 'kanji_n5' ? kanjiCategoryProgress : vocabCategoryProgress).map((cat, i) => {
                   const isActive = activeScript === 'kanji_n5' ? activeKanjiCategory === cat.key : activeVocabCategory === cat.key
                   const masteryPct = Math.round(cat.mastery * 100)
                   const unavailable = cat.total === 0
@@ -380,7 +381,7 @@ export function ScriptHubView({
                       aria-pressed={isActive}
                       aria-label={(!cat.unlocked || unavailable) ? `${cat.label} locked` : `${cat.label}, ${masteryPct}%`}
                     >
-                      <span className="hub-block-chars" lang="ja" aria-hidden="true">{cat.sampleChars.slice(0, 3).join(' ') || '—'}</span>
+                      <span className="hub-block-track">{String(i + 1).padStart(2, '0')}</span>
                       <span className="hub-block-copy">
                         <strong>{cat.label}</strong>
                         <span className="hub-block-bar-wrap" aria-hidden="true">
@@ -413,14 +414,23 @@ export function ScriptHubView({
                 <span className="home-section-hint">← drag or use arrows →</span>
               </div>
 
-              {/* Cassette carousel — the main stage */}
-              <div className="minigame-cassette-shelf">
-                <MinigameCassetteCarousel
-                  items={cassetteItems}
-                  activeGame={activeGame}
-                  onSelectGame={onSelectGame}
-                  onPlayGame={onPlayGame}
-                />
+              {/* Cassette carousel — inside a tape deck frame */}
+              <div className="hub-deck">
+                <div className="hub-deck-badge" aria-hidden="true">
+                  <span>DOLBY NR</span>
+                  <span className="hub-deck-dot" />
+                </div>
+                <div className="minigame-cassette-shelf">
+                  <MinigameCassetteCarousel
+                    items={cassetteItems}
+                    activeGame={activeGame}
+                    onSelectGame={onSelectGame}
+                    onPlayGame={onPlayGame}
+                  />
+                </div>
+                <div className="hub-deck-badge hub-deck-badge--right" aria-hidden="true">
+                  <span>TYPE II · HIGH BIAS</span>
+                </div>
               </div>
 
               {/* Studio controls: session length + toggles as inline chips */}
