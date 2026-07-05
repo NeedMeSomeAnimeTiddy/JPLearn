@@ -611,6 +611,11 @@ export function SetupWizard({ onComplete }: Props) {
 
     try {
       const downloadTasks: Array<{ name: string; promise: Promise<unknown> }> = []
+      const markDone = async <T,>(p: Promise<T>, setter: () => void): Promise<T> => {
+        const result = await p
+        setter()
+        return result
+      }
 
       if (needsModel && selectedTier) {
         appendProgressLog(`Starting model download (${selectedTier})…`)
@@ -618,10 +623,7 @@ export function SetupWizard({ onComplete }: Props) {
         if (task) {
           downloadTasks.push({
             name: 'model',
-            promise: task.then((result) => {
-              setModelProgress(100)
-              return result
-            }),
+            promise: markDone(task, () => setModelProgress(100)),
           })
         }
       }
@@ -632,10 +634,7 @@ export function SetupWizard({ onComplete }: Props) {
         if (task) {
           downloadTasks.push({
             name: 'llama',
-            promise: task.then((result) => {
-              setLlamaProgress(100)
-              return result
-            }),
+            promise: markDone(task, () => setLlamaProgress(100)),
           })
         }
       }
@@ -645,10 +644,7 @@ export function SetupWizard({ onComplete }: Props) {
         if (task) {
           downloadTasks.push({
             name: 'voice',
-            promise: task.then((result) => {
-              setVoiceProgress(100)
-              return result
-            }),
+            promise: markDone(task, () => setVoiceProgress(100)),
           })
         }
       }
@@ -658,10 +654,7 @@ export function SetupWizard({ onComplete }: Props) {
         if (task) {
           downloadTasks.push({
             name: 'fonts',
-            promise: task.then((result) => {
-              setFontsProgress(100)
-              return result
-            }),
+            promise: markDone(task, () => setFontsProgress(100)),
           })
         }
       }
@@ -671,10 +664,7 @@ export function SetupWizard({ onComplete }: Props) {
         if (task) {
           downloadTasks.push({
             name: 'dictionary',
-            promise: task.then((result) => {
-              setDictionaryProgress(100)
-              return result
-            }),
+            promise: markDone(task, () => setDictionaryProgress(100)),
           })
         }
       }
@@ -684,10 +674,7 @@ export function SetupWizard({ onComplete }: Props) {
         if (task) {
           downloadTasks.push({
             name: 'speech',
-            promise: task.then((result) => {
-              setSpeechProgress(100)
-              return result
-            }),
+            promise: markDone(task, () => setSpeechProgress(100)),
           })
         }
       }
@@ -697,10 +684,7 @@ export function SetupWizard({ onComplete }: Props) {
         if (task) {
           downloadTasks.push({
             name: 'translation-profile',
-            promise: task.then((result) => {
-              setTranslationProfileProgress(100)
-              return result
-            }),
+            promise: markDone(task, () => setTranslationProfileProgress(100)),
           })
         }
       }
@@ -1595,7 +1579,7 @@ function DropdownBadge({ children, tone = 'recommended' }: { children: React.Rea
         fontSize: '0.68rem',
         fontWeight: 700,
         letterSpacing: '0.02em',
-        color: isWarning ? '#ffd4cc' : isSoft ? '#f5ddb8' : '#0b1620',
+        color: isWarning ? 'var(--status-error)' : isSoft ? 'var(--tone-amber)' : 'var(--bg-main)',
         background: isWarning ? 'rgba(199, 77, 57, 0.18)' : isSoft ? 'rgba(242, 181, 111, 0.16)' : 'var(--accent)',
         border: isWarning ? '1px solid rgba(199, 77, 57, 0.3)' : isSoft ? '1px solid rgba(242, 181, 111, 0.24)' : '1px solid rgba(255,255,255,0.1)',
         flexShrink: 0,

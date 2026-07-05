@@ -3454,7 +3454,16 @@ function App() {
       setShowWizard(false)
       return
     }
-    void api.isFirstRun().then((first: boolean) => setShowWizard(first)).catch(() => setShowWizard(false))
+    const isFirstRun = api.isFirstRun // narrowed reference
+    const check = async () => {
+      try {
+        const first = await isFirstRun() as boolean
+        setShowWizard(first)
+      } catch {
+        setShowWizard(false)
+      }
+    }
+    void check()
   }, [])
 
   const [view, setView] = useState<AppView>('home')
@@ -5005,21 +5014,21 @@ function App() {
       const inFlight = studyQueueInFlightRef.current.get(cacheKey)
       if (inFlight) return inFlight
 
-      const request = window.jplearnDesktop
-        .getStudyQueue(slug)
-        .then((payload) => {
+      const fetchQueue = async (): Promise<StudyQueueResponse> => {
+        try {
+          const payload = await window.jplearnDesktop.getStudyQueue(slug)
           studyQueueCacheRef.current.set(cacheKey, {
             payload,
             cachedAtMs: performance.now(),
           })
           return payload
-        })
-        .finally(() => {
+        } finally {
           if (studyQueueInFlightRef.current.get(cacheKey) === request) {
             studyQueueInFlightRef.current.delete(cacheKey)
           }
-        })
-
+        }
+      }
+      const request = fetchQueue()
       studyQueueInFlightRef.current.set(cacheKey, request)
       return request
     },
@@ -5151,12 +5160,13 @@ function App() {
 
   useEffect(() => {
     let mounted = true
-    void window.jplearnDesktop
-      .isWindowMaximized()
-      .then((state) => {
+    const check = async () => {
+      try {
+        const state = await window.jplearnDesktop.isWindowMaximized()
         if (mounted) setIsWindowMaximized(state.isMaximized)
-      })
-      .catch(() => undefined)
+      } catch { /* ignore */ }
+    }
+    void check()
 
     return () => {
       mounted = false
@@ -5242,28 +5252,34 @@ function App() {
 
     setSessionSummaryLoading(true)
     setSessionGoalError(null)
-    void window.jplearnDesktop
-      .getSessionSummary(activeSessionId)
-      .then((response) => {
+    const fetchSummary = async () => {
+      try {
+        const response = await window.jplearnDesktop.getSessionSummary(activeSessionId)
         if (!response.ok || !response.summary) {
           setSessionGoalError(response.error ?? 'Unable to load session summary.')
           setLastSessionSummary(null)
           return
         }
         setLastSessionSummary(response.summary)
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         setSessionGoalError(error instanceof Error ? error.message : 'Unable to load session summary.')
         setLastSessionSummary(null)
-      })
-      .finally(() => {
+      } finally {
         setSessionSummaryLoading(false)
-      })
+      }
+    }
+    void fetchSummary()
 
     // Refresh XP after each session so the titlebar badge stays current (Q1-A: pull after session end).
     const getXpProgress = window.jplearnDesktop.getXpProgress
     if (getXpProgress) {
-      void getXpProgress().then((xp) => { if (xp) setXpProgress(xp) }).catch(() => undefined)
+      const refreshXp = async () => {
+        try {
+          const xp = await getXpProgress()
+          if (xp) setXpProgress(xp)
+        } catch { /* ignore */ }
+      }
+      void refreshXp()
     }
   }, [
     activeGame,
@@ -5380,18 +5396,27 @@ function App() {
     const getRecs = window.jplearnDesktop.getRecommendations
     const getTutor = window.jplearnDesktop.getTutorReactions
     const getPath = window.jplearnDesktop.getLearningPathStatus
-    void Promise.all([
-      getXp ? getXp().catch(() => null) : Promise.resolve(null),
-      getRecs ? getRecs().catch(() => null) : Promise.resolve(null),
-      getTutor ? getTutor().catch(() => null) : Promise.resolve(null),
-      getPath ? getPath().catch(() => null) : Promise.resolve(null),
-    ]).then(([xp, recs, tutor, path]) => {
+
+    const safeResolve = async <T,>(fn: (() => Promise<T>) | undefined): Promise<T | null> => {
+      if (!fn) return null
+      try { return await fn() } catch { return null }
+    }
+
+    const doFetch = async () => {
+      const [xp, recs, tutor, path] = await Promise.all([
+        safeResolve(getXp),
+        safeResolve(getRecs),
+        safeResolve(getTutor),
+        safeResolve(getPath),
+      ])
       if (!mounted) return
       if (xp) setXpProgress(xp)
       if (recs) setRecommendations(recs.recommendations)
       if (tutor) setTutorReactions(tutor.reactions)
       if (path) setLearningPathStatus(path as LearningPathStatus)
-    })
+    }
+    void doFetch()
+
     return () => { mounted = false }
   }, [summary])
 
@@ -5907,12 +5932,11 @@ function App() {
         }
 
         if (!scriptBlockCacheRef.current[script]) {
-          void getBlockProgressDeduped(script)
-            .then((blockPayload) => {
-              if (cancelled) return
-              scriptBlockCacheRef.current[script] = normalizeBlockList(blockPayload.blocks)
-            })
-            .catch(() => undefined)
+          try {
+            const blockPayload = await getBlockProgressDeduped(script)
+            if (cancelled) return
+            scriptBlockCacheRef.current[script] = normalizeBlockList(blockPayload.blocks)
+          } catch { /* ignore preload failure */ }
         }
       }
 
@@ -6012,22 +6036,23 @@ function App() {
         // Preload remaining kanji categories in background
         for (const cat of KANJI_CATEGORY_ORDER) {
           if (cat === kanjiCategory || kanjiCategoryDeckCacheRef.current[cat]) continue
-          void getDeckCardsDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat])
-            .then((payload) => {
+          void (async () => {
+            try {
+              const payload = await getDeckCardsDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat])
               const normalizedCards = normalizeDeckCards(payload.cards)
               kanjiCategoryDeckCacheRef.current[cat] = normalizedCards
               setKanjiDeckCardsByCategory((previous) => ({
                 ...previous,
                 [cat]: normalizedCards,
               }))
-            })
-            .catch(() => undefined)
-
-          void getBlockProgressDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat])
-            .then((payload) => {
+            } catch { /* ignore preload failure */ }
+          })()
+          void (async () => {
+            try {
+              const payload = await getBlockProgressDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat])
               kanjiCategoryBlockCacheRef.current[cat] = normalizeBlockList(payload.blocks)
-            })
-            .catch(() => undefined)
+            } catch { /* ignore preload failure */ }
+          })()
         }
 
         const blocks = resolvedKanjiBlocks
@@ -6077,22 +6102,23 @@ function App() {
         // Preload remaining vocab categories in background
         for (const cat of VOCAB_CATEGORY_ORDER) {
           if (cat === vocabCategory || vocabCategoryDeckCacheRef.current[cat]) continue
-          void getDeckCardsDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat])
-            .then((payload) => {
+          void (async () => {
+            try {
+              const payload = await getDeckCardsDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat])
               const normalizedCards = normalizeDeckCards(payload.cards)
               vocabCategoryDeckCacheRef.current[cat] = normalizedCards
               setVocabDeckCardsByCategory((previous) => ({
                 ...previous,
                 [cat]: normalizedCards,
               }))
-            })
-            .catch(() => undefined)
-
-          void getBlockProgressDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat])
-            .then((payload) => {
+            } catch { /* ignore preload failure */ }
+          })()
+          void (async () => {
+            try {
+              const payload = await getBlockProgressDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat])
               vocabCategoryBlockCacheRef.current[cat] = normalizeBlockList(payload.blocks)
-            })
-            .catch(() => undefined)
+            } catch { /* ignore preload failure */ }
+          })()
         }
 
         const blocks = resolvedVocabBlocks
@@ -6139,23 +6165,22 @@ function App() {
         } else {
           setBlockProgress([])
           setActiveBlockIndex(0)
-          void getBlockProgressDeduped(script)
-            .then((payload) => {
-              if (scriptLoadRequestIdRef.current !== requestId) {
-                return
-              }
-              const normalizedBlocks = normalizeBlockList(payload.blocks)
-              scriptBlockCacheRef.current[script] = normalizedBlocks
-              setBlockProgress(normalizedBlocks)
-              if (normalizedBlocks.length > 0) {
-                const lastUnlocked = normalizedBlocks.reduce(
-                  (best, b) => (b.unlocked ? b.index : best),
-                  0,
-                )
-                setActiveBlockIndex(lastUnlocked)
-              }
-            })
-            .catch(() => undefined)
+          try {
+            const payload = await getBlockProgressDeduped(script)
+            if (scriptLoadRequestIdRef.current !== requestId) {
+              return
+            }
+            const normalizedBlocks = normalizeBlockList(payload.blocks)
+            scriptBlockCacheRef.current[script] = normalizedBlocks
+            setBlockProgress(normalizedBlocks)
+            if (normalizedBlocks.length > 0) {
+              const lastUnlocked = normalizedBlocks.reduce(
+                (best, b) => (b.unlocked ? b.index : best),
+                0,
+              )
+              setActiveBlockIndex(lastUnlocked)
+            }
+          } catch { /* ignore fallback failure */ }
         }
       }
 
@@ -6189,14 +6214,14 @@ function App() {
     studyQueueCacheRef.current.clear()
 
     void loadScriptCards(activeScript, activeKanjiCategory, activeVocabCategory)
-    void window.jplearnDesktop
-      .getOverviewCharacterMastery()
-      .then((payload) => {
+    void (async () => {
+      try {
+        const payload = await window.jplearnDesktop.getOverviewCharacterMastery()
         setOverviewBlocks(payload.blocks)
         setOverviewCategoryBlocks(payload.category_blocks)
         setOverviewKanjiDeck(payload.kanji_cards)
-      })
-      .catch(() => undefined)
+      } catch { /* ignore */ }
+    })()
   }, [activeScript, activeKanjiCategory, activeVocabCategory, loadScriptCards])
 
   useEffect(() => {
@@ -7004,17 +7029,16 @@ function App() {
       setIsRoundResolving(false)
       setGameError(null)
       setRoundConfidenceScore(3)
-      void goalRequest
-        .then((goalResponse: SessionGoalStartResponse) => {
-          if (!goalResponse.ok) {
-            setSessionGoalError('Unable to start session goal.')
-            return
-          }
+      try {
+        const goalResponse: SessionGoalStartResponse = await goalRequest
+        if (!goalResponse.ok) {
+          setSessionGoalError('Unable to start session goal.')
+        } else {
           setActiveSessionId(goalResponse.goal.session_id)
-        })
-        .catch((error: unknown) => {
-          setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
-        })
+        }
+      } catch (error: unknown) {
+        setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
+      }
     } catch (error: unknown) {
       setSessionActive(false)
       setRoundState(null)
@@ -7312,33 +7336,35 @@ function App() {
             : activeScript
       studyQueueCacheRef.current.delete(resultSlug)
 
-      void window.jplearnDesktop.recordGameResult({
-        slug: resultSlug,
-        cardId: roundState.cardId,
-        isCorrect,
-        minigame: roundState.mode,
-        curriculumStage:
-          isGrammarCurriculumMode(roundState.mode)
-            ? roundState.curriculumStage
-            : undefined,
-        sessionId: activeSessionId ?? undefined,
-        confidenceScore: confidenceForAnswer,
-      }).then((result) => {
-        if (
-          !isGrammarCurriculumMode(roundState.mode) ||
-          typeof result.curriculum_stage !== 'number'
-        ) {
-          return
-        }
-        const resolvedStage = normalizeCurriculumStage(result.curriculum_stage)
-        setDeckCards((previousCards) =>
-          previousCards.map((entry) =>
-            entry.id === roundState.cardId
-              ? { ...entry, curriculum_stage: resolvedStage }
-              : entry,
-          ),
-        )
-      }).catch(() => undefined)
+      void (async () => {
+        try {
+          const result = await window.jplearnDesktop.recordGameResult({
+            slug: resultSlug,
+            cardId: roundState.cardId,
+            isCorrect,
+            minigame: roundState.mode,
+            curriculumStage:
+              isGrammarCurriculumMode(roundState.mode)
+                ? roundState.curriculumStage
+                : undefined,
+            sessionId: activeSessionId ?? undefined,
+            confidenceScore: confidenceForAnswer,
+          })
+          if (
+            isGrammarCurriculumMode(roundState.mode) &&
+            typeof result.curriculum_stage === 'number'
+          ) {
+            const resolvedStage = normalizeCurriculumStage(result.curriculum_stage)
+            setDeckCards((previousCards) =>
+              previousCards.map((entry) =>
+                entry.id === roundState.cardId
+                  ? { ...entry, curriculum_stage: resolvedStage }
+                  : entry,
+              ),
+            )
+          }
+        } catch { /* background record — ignore */ }
+      })()
 
       if (typeof confidenceForAnswer === 'number') {
         setSessionConfidenceCount((value) => value + 1)
@@ -7661,14 +7687,16 @@ function App() {
   useEffect(() => {
     if (!showOverview) return
     setOverviewBlocksLoading(true)
-    void window.jplearnDesktop.getOverviewCharacterMastery()
-      .then((payload) => {
+    const fetchMastery = async () => {
+      try {
+        const payload = await window.jplearnDesktop.getOverviewCharacterMastery()
         setOverviewBlocks(payload.blocks)
         setOverviewCategoryBlocks(payload.category_blocks)
         setOverviewKanjiDeck(payload.kanji_cards)
-      })
-      .catch(() => undefined)
-      .finally(() => setOverviewBlocksLoading(false))
+      } catch { /* ignore */ }
+      finally { setOverviewBlocksLoading(false) }
+    }
+    void fetchMastery()
   }, [showOverview])
 
   useEffect(() => {
@@ -7878,13 +7906,13 @@ function App() {
   }, [])
 
   const toggleMaximizeWindow = useCallback(() => {
-    void window.jplearnDesktop
-      .toggleMaximizeWindow()
-      .then(() => window.jplearnDesktop.isWindowMaximized())
-      .then((state) => {
+    void (async () => {
+      try {
+        await window.jplearnDesktop.toggleMaximizeWindow()
+        const state = await window.jplearnDesktop.isWindowMaximized()
         setIsWindowMaximized(state.isMaximized)
-      })
-      .catch(() => undefined)
+      } catch { /* ignore */ }
+    })()
   }, [])
 
   const closeWindow = useCallback(() => {
@@ -8084,11 +8112,14 @@ function App() {
     setShowWizard(false)
     const getPath = window.jplearnDesktop.getLearningPathStatus
     if (getPath) {
-      void getPath().then((path) => {
-        if (path) {
-          setLearningPathStatus(path as LearningPathStatus)
-        }
-      }).catch(() => undefined)
+      void (async () => {
+        try {
+          const path = await getPath()
+          if (path) {
+            setLearningPathStatus(path as LearningPathStatus)
+          }
+        } catch { /* ignore */ }
+      })()
     }
     void loadSummary()
     void refreshTutorInstallInfo()
@@ -9760,7 +9791,7 @@ function App() {
                               <p className="settings-help" style={{ marginTop: '0.2rem' }}>
                                 {model.installed ? 'Installed' : model.description}
                               </p>
-                              <p className="settings-help" style={{ marginTop: '0.2rem', color: hardwareFit.isOk ? 'rgba(242, 181, 111, 0.92)' : '#ffb3a7' }}>
+                              <p className="settings-help" style={{ marginTop: '0.2rem', color: hardwareFit.isOk ? 'rgba(242, 181, 111, 0.92)' : 'var(--status-error)' }}>
                                 {hardwareFit.detail}
                               </p>
                             </div>
@@ -10041,7 +10072,7 @@ function App() {
                                 {speechHardwareFit.badge} · {speechHardwareFit.detail}
                               </p>
                               {tutorInstallInfo?.recommendedSpeechTier === model.tier ? (
-                                <p className="settings-help" style={{ marginTop: '0.2rem', color: 'var(--accent, #7eb8ea)' }}>
+                                <p className="settings-help" style={{ marginTop: '0.2rem', color: 'var(--accent)' }}>
                                   Recommended for this hardware
                                 </p>
                               ) : null}
