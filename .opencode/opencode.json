@@ -1,0 +1,67 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    ".github/copilot-instructions.md",
+    ".github/instructions/data.instructions.md",
+    ".github/instructions/domain.instructions.md",
+    ".github/instructions/electron.instructions.md"
+  ],
+  "plugin": [
+    "@tarquinen/opencode-dcp",
+    "opencode-handoff",
+    "opencode-command-inject",
+    "open-mem",
+    "opencode-smart-title",
+    "cc-safety-net",
+    "opencode-snip"
+  ],
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "@playwright/mcp@latest"],
+      "enabled": true
+    },
+    "exa-search": {
+      "type": "local",
+      "command": ["npx", "-y", "exa-mcp-server"],
+      "enabled": true,
+      "env": {
+        "EXA_API_KEY": "{env:EXA_API_KEY}"
+      }
+    },
+    "lsp": {
+      "type": "local",
+      "command": ["C:/Users/Robbie/go/bin/mcp-language-server", "--workspace", "C:/Users/Robbie/Documents/Projects/JPLearn", "--lsp", "C:/Users/Robbie/Documents/Projects/JPLearn/.venv/Scripts/pyright-langserver.exe", "--", "--stdio"],
+      "enabled": true
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true,
+      "headers": {
+        "X-API-Key": "{env:CONTEXT7_API_KEY}"
+      }
+    },
+    "gh_grep": {
+      "type": "remote",
+      "url": "https://mcp.grep.app",
+      "enabled": true
+    }
+  },
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "git *": "allow",
+      "python -m pytest *": "allow",
+      "python scripts/arch_check.py": "allow",
+      "python scripts/dev.py": "allow",
+      "python scripts/debug_tools.py *": "allow",
+      "npm run *": "allow"
+    },
+    "external_directory": {
+      "*": "ask",
+      "C:\\Users\\Robbie\\Documents\\Projects\\JPLearn\\**": "allow",
+      "~/.config/opencode/**": "allow"
+    }
+  }
+}

@@ -257,3 +257,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# open-mem persistent memory database
+.open-mem/
