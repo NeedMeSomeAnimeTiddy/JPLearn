@@ -113,7 +113,7 @@ def _build_message(event: TutorEvent) -> TutorMessage:
                 message_type="encouragement",
                 message_key=f"tutor.rec.{reason}",
                 headline=f"You've been struggling with {name}.",
-                body=f"A focused review will help consolidate these items.",
+                body="A focused review will help consolidate these items.",
                 cta="Start a targeted review session.",
                 date=d,
             )
