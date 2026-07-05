@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MinigameGrid } from './MinigameGrid'
-import '@testing-library/jest-dom/vitest'
 
 describe('MinigameGrid', () => {
   it('renders children in a grid', () => {
