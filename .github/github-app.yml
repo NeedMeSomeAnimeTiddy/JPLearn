@@ -1,0 +1,6 @@
+scripts:
+  - name: Run App
+    command: cd electron-frontend/ && npm run build && npm run start
+automation:
+  auto_issue_session: true
+  remote_control: false
