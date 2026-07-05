@@ -9,6 +9,7 @@ import { DictionaryPopup } from './components/DictionaryPopup'
 import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
+import { MinigameSelectView } from './views/MinigameSelectView'
 import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
 import { OnboardingView } from './views/OnboardingView'
@@ -126,7 +127,7 @@ type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stro
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
-type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
+type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep' | 'minigame_select'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type AppFontPreset =
@@ -7480,6 +7481,12 @@ function App() {
           return
         }
 
+        if (view === 'minigame_select') {
+          setNavDirection('back')
+          setView('script_hub')
+          return
+        }
+
         if (view === 'jlpt_prep') {
           setNavDirection('back')
           setView('home')
@@ -8757,11 +8764,8 @@ function App() {
           learningPathExpanded={learningPathExpanded}
           learningPathTrackRows={learningPathTrackRows}
           leechCardsLength={leechCards.length}
-          minigameStats={minigameStats}
-          availableMinigames={availableMinigames}
           activeScriptStats={activeScriptStats}
           activeSectionName={activeSectionName}
-          minigameLockReasons={minigameLockReasons}
           onBack={goHome}
           onOpenSettings={openSettingsFromMenu}
           onSelectBlock={(index) => {
@@ -8852,6 +8856,45 @@ function App() {
             resetRoundCycle()
             void startSession(game)
           }}
+          onOpenGameSelect={() => {
+            setNavDirection('forward')
+            setView('minigame_select')
+          }}
+        />
+      ) : null}
+
+      {view === 'minigame_select' ? (
+        <MinigameSelectView
+          navDirection={navDirection}
+          activeScript={activeScript}
+          activeGame={activeGame}
+          availableMinigames={availableMinigames}
+          minigameStats={minigameStats}
+          activeScriptStats={activeScriptStats}
+          minigameLockReasons={minigameLockReasons}
+          onBack={() => {
+            setNavDirection('back')
+            setView('script_hub')
+          }}
+          onSelectGame={(game) => {
+            setActiveGame(game)
+          }}
+          onPlayGame={(game) => {
+            setActiveGame(game)
+            setNavDirection('forward')
+            setView('minigame')
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+            void startSession(game)
+          }}
+          onOpenSettings={openSettingsFromMenu}
         />
       ) : null}
 
@@ -8875,6 +8918,7 @@ function App() {
           onOpenSettings={openSettingsFromMenu}
         />
       ) : null}
+
 
       {view === 'jlpt_prep' ? (
         <JLPTPrepView

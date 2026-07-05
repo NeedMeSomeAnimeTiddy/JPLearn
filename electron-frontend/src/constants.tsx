@@ -27,6 +27,7 @@ import type {
   KanjiCategorySlug,
   KanjiDeckSlug,
   MinigameKey,
+  MinigameStats,
   PlayableMinigame,
   ScriptKey,
   VocabCategory,
@@ -288,6 +289,73 @@ export const MINIGAME_SKILL_GROUP: Record<MinigameKey, MinigameSkillGroupKey> = 
   interleave_mix: 'mixed',
 }
 
+// ── Minigame difficulty & ranking ───────────────────────────────────────────
+
+export type MinigameDifficultyLevel = 'easy' | 'medium' | 'hard'
+
+export interface MinigameDifficultyInfo {
+  level: MinigameDifficultyLevel
+  label: 'Easy' | 'Medium' | 'Hard'
+}
+
+export const MINIGAME_DIFFICULTY: Record<MinigameKey, MinigameDifficultyInfo> = {
+  romaji_sprint: { level: 'easy', label: 'Easy' },
+  meaning_match: { level: 'easy', label: 'Easy' },
+  character_match: { level: 'easy', label: 'Easy' },
+  stroke_order: { level: 'medium', label: 'Medium' },
+  typed_recall: { level: 'medium', label: 'Medium' },
+  speech_recall: { level: 'hard', label: 'Hard' },
+  sentence_assembly: { level: 'hard', label: 'Hard' },
+  particle_cloze: { level: 'hard', label: 'Hard' },
+  vibe_check: { level: 'hard', label: 'Hard' },
+  imposter: { level: 'hard', label: 'Hard' },
+  listening_audio_first: { level: 'medium', label: 'Medium' },
+  listening_prompt_first: { level: 'medium', label: 'Medium' },
+  interleave_mix: { level: 'hard', label: 'Hard' },
+}
+
+export interface RankedMinigameCard {
+  key: MinigameKey
+  title: string
+  description: string
+  accuracy: number
+  difficulty: MinigameDifficultyInfo
+  lockReason: string | null
+  minigameLocked: boolean
+  stats: MinigameStats
+  recommendationScore: number
+}
+
+export function buildBalancedRanking(cards: RankedMinigameCard[]): RankedMinigameCard[] {
+  if (cards.length <= 1) return cards
+  const needsWork = [...cards].sort((a, b) => b.recommendationScore - a.recommendationScore)
+  const momentum = [...cards].sort((a, b) => {
+    const aM = a.accuracy + a.stats.bestStreak * 4 + Math.min(a.stats.attempted, 12)
+    const bM = b.accuracy + b.stats.bestStreak * 4 + Math.min(b.stats.attempted, 12)
+    return bM - aM
+  })
+  const seen = new Set<MinigameKey>()
+  const balanced: RankedMinigameCard[] = []
+  for (const card of needsWork) {
+    if (balanced.length >= 2) break
+    if (seen.has(card.key)) continue
+    balanced.push(card)
+    seen.add(card.key)
+  }
+  for (const card of momentum) {
+    if (balanced.length >= 4) break
+    if (seen.has(card.key)) continue
+    balanced.push(card)
+    seen.add(card.key)
+  }
+  for (const card of cards) {
+    if (seen.has(card.key)) continue
+    balanced.push(card)
+    seen.add(card.key)
+  }
+  return balanced
+}
+
 // ── Session configuration ────────────────────────────────────────────────────
 
 export const DEFAULT_LIVES = 3
@@ -508,3 +576,5 @@ export function formatExpectedAnswer(rawAnswer: string): string {
   if (parts.length === 2) return `${parts[0]} or ${parts[1]}`
   return `${parts.slice(0, -1).join(', ')}, or ${parts[parts.length - 1]}`
 }
+
+
