@@ -1,10 +1,11 @@
+import { useMemo } from 'react'
+import type { CSSProperties } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
   Flame,
   Heart,
   Settings,
-  Grid3x3,
   Target,
 } from 'lucide-react'
 import type {
@@ -13,6 +14,7 @@ import type {
   JlptLevelProgress,
   KanjiCategory,
   MinigameKey,
+  MinigameStatsByScript,
   NavDirection,
   ScriptKey,
   StudyPlanCoverageRow,
@@ -24,9 +26,12 @@ import {
   DEFAULT_LIVES,
   DEFAULT_SESSION_LENGTH_PRESET,
   JLPT_LEVEL_LABELS,
+  MINIGAMES,
   SCRIPT_LABELS,
   SESSION_LENGTH_PRESETS,
 } from '../constants'
+import { MinigameCassetteCarousel } from '../components/MinigameCassetteCarousel'
+import type { CassetteItem } from '../components/MinigameCassetteCarousel'
 import { useSession } from '../context/SessionContext'
 
 interface BlockInfo {
@@ -63,8 +68,11 @@ interface ScriptHubViewProps {
   learningPathExpanded: boolean
   learningPathTrackRows: StudyPlanCoverageRow[]
   leechCardsLength: number
+  minigameStats: MinigameStatsByScript
+  availableMinigames: MinigameKey[]
   activeScriptStats: { bestStreak: number }
   activeSectionName: string | null
+  minigameLockReasons: Partial<Record<MinigameKey, string>>
   isSheet?: boolean
   // callbacks (navigation / deck selection only)
   onBack: () => void
@@ -77,7 +85,6 @@ interface ScriptHubViewProps {
   onToggleLearningPath: () => void
   onSelectGame: (game: MinigameKey) => void
   onPlayGame: (game: MinigameKey) => void
-  onOpenGameSelect?: () => void
 }
 
 // Suppress unused-import warnings for constants included per spec
@@ -86,10 +93,81 @@ void CONFIDENCE_SCORES
 void DEFAULT_SESSION_LENGTH_PRESET
 void JLPT_LEVEL_LABELS
 
+const MINIGAME_DIFFICULTY: Record<MinigameKey, {
+  level: 'easy' | 'medium' | 'hard'
+  label: 'Easy' | 'Medium' | 'Hard'
+}> = {
+  romaji_sprint: { level: 'easy', label: 'Easy' },
+  meaning_match: { level: 'easy', label: 'Easy' },
+  character_match: { level: 'easy', label: 'Easy' },
+  stroke_order: { level: 'medium', label: 'Medium' },
+  typed_recall: { level: 'medium', label: 'Medium' },
+  speech_recall: { level: 'hard', label: 'Hard' },
+  sentence_assembly: { level: 'hard', label: 'Hard' },
+  particle_cloze: { level: 'hard', label: 'Hard' },
+  vibe_check: { level: 'hard', label: 'Hard' },
+  imposter: { level: 'hard', label: 'Hard' },
+  listening_audio_first: { level: 'medium', label: 'Medium' },
+  listening_prompt_first: { level: 'medium', label: 'Medium' },
+  interleave_mix: { level: 'hard', label: 'Hard' },
+}
+
+interface RankedMinigameCard {
+  key: MinigameKey
+  title: string
+  description: string
+  accuracy: number
+  difficulty: (typeof MINIGAME_DIFFICULTY)[MinigameKey]
+  lockReason: string | null
+  minigameLocked: boolean
+  stats: MinigameStatsByScript[ScriptKey][MinigameKey]
+  recommendationScore: number
+}
+
+function buildBalancedRanking(cards: RankedMinigameCard[]): RankedMinigameCard[] {
+  if (cards.length <= 1) {
+    return cards
+  }
+
+  const needsWork = [...cards].sort((left, right) => right.recommendationScore - left.recommendationScore)
+  const momentum = [...cards].sort((left, right) => {
+    const leftMomentum = left.accuracy + left.stats.bestStreak * 4 + Math.min(left.stats.attempted, 12)
+    const rightMomentum = right.accuracy + right.stats.bestStreak * 4 + Math.min(right.stats.attempted, 12)
+    return rightMomentum - leftMomentum
+  })
+
+  const seen = new Set<MinigameKey>()
+  const balanced: RankedMinigameCard[] = []
+
+  for (const card of needsWork) {
+    if (balanced.length >= 2) break
+    if (seen.has(card.key)) continue
+    balanced.push(card)
+    seen.add(card.key)
+  }
+
+  for (const card of momentum) {
+    if (balanced.length >= 4) break
+    if (seen.has(card.key)) continue
+    balanced.push(card)
+    seen.add(card.key)
+  }
+
+  for (const card of cards) {
+    if (seen.has(card.key)) continue
+    balanced.push(card)
+    seen.add(card.key)
+  }
+
+  return balanced
+}
+
+// Legacy lane-based minigame browser removed — replaced by MinigameCassetteCarousel.
+
 export function ScriptHubView({
   navDirection,
   activeScript,
-  activeGame: _activeGame,
+  activeGame,
   activeBlockIndex,
   gameLoading,
   gameError,
@@ -106,8 +184,11 @@ export function ScriptHubView({
   learningPathExpanded: _learningPathExpanded,
   learningPathTrackRows: _learningPathTrackRows,
   leechCardsLength,
+  minigameStats,
+  availableMinigames,
   activeScriptStats,
   activeSectionName,
+  minigameLockReasons,
   isSheet = false,
   onBack,
   onOpenSettings,
@@ -117,9 +198,8 @@ export function ScriptHubView({
   onSelectKanjiCategory,
   onSelectVocabCategory,
   onToggleLearningPath: _onToggleLearningPath,
-  onSelectGame: _onSelectGame,
-  onPlayGame: _onPlayGame,
-  onOpenGameSelect,
+  onSelectGame,
+  onPlayGame,
 }: ScriptHubViewProps) {
   const {
     sessionRunReport: _sessionRunReport,
@@ -138,6 +218,50 @@ export function ScriptHubView({
     toggleConfidence,
   } = useSession()
   const activeBlock = blockProgressWithMastery.find((block) => block.index === activeBlockIndex)
+
+  const rankedCards = useMemo(() => {
+    const mapped = availableMinigames
+      .map((gameKey) => {
+        const game = MINIGAMES.find((entry) => entry.key === gameKey)
+        if (!game) {
+          return null
+        }
+        const stats = minigameStats[activeScript][game.key]
+        const accuracy = stats.attempted > 0 ? Math.round((stats.correct / stats.attempted) * 100) : 0
+        const lockReason = minigameLockReasons[game.key] ?? null
+        const unmetNeed = stats.attempted === 0 ? 100 : Math.max(0, 85 - accuracy)
+        const recommendationScore = unmetNeed + Math.max(0, 6 - Math.min(stats.bestStreak, 6))
+
+        return {
+          key: game.key,
+          title: game.title,
+          description: game.description,
+          accuracy,
+          difficulty: MINIGAME_DIFFICULTY[game.key],
+          lockReason,
+          minigameLocked: Boolean(lockReason),
+          stats,
+          recommendationScore,
+        } satisfies RankedMinigameCard
+      })
+      .filter((entry): entry is RankedMinigameCard => entry !== null)
+
+    return buildBalancedRanking(mapped)
+  }, [availableMinigames, minigameStats, activeScript, minigameLockReasons])
+
+  const cassetteItems = useMemo<CassetteItem[]>(() => (
+    rankedCards.map((card) => ({
+      key: card.key,
+      title: card.title,
+      description: card.description,
+      difficultyLabel: card.difficulty.label,
+      difficultyLevel: card.difficulty.level,
+      accuracy: card.accuracy,
+      bestStreak: card.stats.bestStreak,
+      locked: card.minigameLocked,
+      lockReason: card.lockReason,
+    }))
+  ), [rankedCards])
 
   return (
     <div className={isSheet ? 'script-hub-sheet-content' : `view-shell view-${navDirection}`}>
@@ -197,7 +321,7 @@ export function ScriptHubView({
         </div>
       </header>
 
-      {/* ── Script hub studio ────────────────────────── */}
+      {/* ── Single-zone cassette console ────────────────────────── */}
       <div className="hub-studio">
 
         <div className="hub-player">
@@ -219,32 +343,28 @@ export function ScriptHubView({
                       ? `${activeSectionName ?? 'Category'} · ${activeBlockCards.length} cards`
                       : 'Pick a minigame'}
                 </p>
+                <span className="home-section-hint">◀◀  scroll  ▶▶</span>
               </div>
 
-              {/* Cassette carousel replaced by browse button */}
+              {/* Cassette carousel */}
               <div className="hub-eq" aria-hidden="true">
-                <span className="hub-eq-bar" style={{ animationDelay: '0s' }} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.1s' }} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.2s' }} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.05s' }} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.15s' }} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.25s' }} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.1s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.2s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.05s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.15s' } as CSSProperties} />
+                <span className="hub-eq-bar" style={{ animationDelay: '0.25s' } as CSSProperties} />
               </div>
               <div className="hub-deck-badge" aria-hidden="true">
                 <span>DOLBY NR</span>
                 <span className="hub-deck-dot" />
               </div>
-              <div className="minigame-select-launcher">
-                <button
-                  type="button"
-                  className="hub-chip-button browse-minigames-button"
-                  onClick={onOpenGameSelect}
-                  aria-label="Browse all minigames"
-                >
-                  <Grid3x3 size={14} strokeWidth={2.2} aria-hidden="true" />
-                  <span>Browse All Minigames</span>
-                </button>
-              </div>
+              <MinigameCassetteCarousel
+                items={cassetteItems}
+                activeGame={activeGame}
+                onSelectGame={onSelectGame}
+                onPlayGame={onPlayGame}
+              />
               <div className="hub-deck-badge hub-deck-badge--right" aria-hidden="true">
                 <span>TYPE II · HIGH BIAS</span>
               </div>
