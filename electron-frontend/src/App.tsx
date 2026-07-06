@@ -3835,7 +3835,7 @@ function App() {
     if (!spoken || voiceBusy) {
       return
     }
-    const speak = window.jplearnDesktop.speakText
+    const speak = window.jplearnDesktop?.speakText
     if (!speak) {
       setVoiceUnavailable(true)
       return
@@ -3878,7 +3878,7 @@ function App() {
     text: string,
     runId: number,
   ): Promise<boolean> => {
-    const speak = window.jplearnDesktop.speakText
+    const speak = window.jplearnDesktop?.speakText
     if (!speak) {
       return false
     }
@@ -4180,7 +4180,7 @@ function App() {
   }, [tutorInstallInfo?.gpuVramGb, tutorInstallInfo?.totalRamGb])
 
   const refreshTutorInstallInfo = useCallback(async () => {
-    const getSetupSystemInfo = window.jplearnDesktop.getSetupSystemInfo
+    const getSetupSystemInfo = window.jplearnDesktop?.getSetupSystemInfo
     if (!getSetupSystemInfo) {
       return
     }
@@ -4224,7 +4224,7 @@ function App() {
   }, [])
 
   const refreshVoiceStatus = useCallback(async (): Promise<VoiceStatusPayload | null> => {
-    const getVoiceStatus = window.jplearnDesktop.getVoiceStatus
+    const getVoiceStatus = window.jplearnDesktop?.getVoiceStatus
     if (!getVoiceStatus) {
       setVoiceStatusChecked(true)
       return null
@@ -4278,7 +4278,7 @@ function App() {
   }, [activeSettingsTab, refreshVoiceStatus, showSettings])
 
   useEffect(() => {
-    const onSetupProgress = window.jplearnDesktop.onSetupProgress
+    const onSetupProgress = window.jplearnDesktop?.onSetupProgress
     if (!onSetupProgress) {
       return
     }
@@ -4329,7 +4329,7 @@ function App() {
   }, [])
 
   const downloadTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
-    const downloadModel = window.jplearnDesktop.downloadModel
+    const downloadModel = window.jplearnDesktop?.downloadModel
     if (!downloadModel || tutorDownloadingTier) {
       return
     }
@@ -4346,7 +4346,7 @@ function App() {
   }, [refreshTutorInstallInfo, tutorDownloadingTier])
 
   const selectTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
-    const setActiveTutorModel = window.jplearnDesktop.setActiveTutorModel
+    const setActiveTutorModel = window.jplearnDesktop?.setActiveTutorModel
     if (!setActiveTutorModel || tutorModelActionTier) {
       return
     }
@@ -4360,7 +4360,7 @@ function App() {
   }, [refreshTutorInstallInfo, tutorModelActionTier])
 
   const uninstallTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
-    const uninstallModel = window.jplearnDesktop.uninstallTutorModel
+    const uninstallModel = window.jplearnDesktop?.uninstallTutorModel
     if (!uninstallModel || tutorModelActionTier) {
       return
     }
@@ -4374,7 +4374,7 @@ function App() {
   }, [refreshTutorInstallInfo, tutorModelActionTier])
 
   const downloadOfflineDictionary = useCallback(async () => {
-    const downloadDictionary = window.jplearnDesktop.downloadDictionary
+    const downloadDictionary = window.jplearnDesktop?.downloadDictionary
     if (!downloadDictionary || dictionaryDownloading) {
       return
     }
@@ -4391,7 +4391,7 @@ function App() {
   }, [dictionaryDownloading, refreshTutorInstallInfo])
 
   const downloadSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
-    const downloadModel = window.jplearnDesktop.downloadSpeechModel
+    const downloadModel = window.jplearnDesktop?.downloadSpeechModel
     if (!downloadModel || speechDownloadingTier) {
       return
     }
@@ -4408,7 +4408,7 @@ function App() {
   }, [refreshTutorInstallInfo, speechDownloadingTier])
 
   const selectSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
-    const setActiveSpeechModel = window.jplearnDesktop.setActiveSpeechModel
+    const setActiveSpeechModel = window.jplearnDesktop?.setActiveSpeechModel
     if (!setActiveSpeechModel || speechModelActionTier) {
       return
     }
@@ -4422,7 +4422,7 @@ function App() {
   }, [refreshTutorInstallInfo, speechModelActionTier])
 
   const uninstallSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
-    const uninstallModel = window.jplearnDesktop.uninstallSpeechModel
+    const uninstallModel = window.jplearnDesktop?.uninstallSpeechModel
     if (!uninstallModel || speechModelActionTier) {
       return
     }
@@ -4436,7 +4436,7 @@ function App() {
   }, [refreshTutorInstallInfo, speechModelActionTier])
 
   const applyTranslationProfile = useCallback(async (tier: 'ocr_qwen_local') => {
-    const applyProfile = window.jplearnDesktop.applyTranslationProfile
+    const applyProfile = window.jplearnDesktop?.applyTranslationProfile
     if (!applyProfile || translationProfileApplyingTier) {
       return
     }
@@ -4455,7 +4455,7 @@ function App() {
   }, [refreshTutorInstallInfo, translationProfileApplyingTier])
 
   const downloadVoiceEngineModel = useCallback(async (tier: '0.6b') => {
-    const downloadVoiceEngine = window.jplearnDesktop.downloadVoiceEngine
+    const downloadVoiceEngine = window.jplearnDesktop?.downloadVoiceEngine
     if (!downloadVoiceEngine || voiceEngineDownloadingTier) {
       return
     }
@@ -4465,7 +4465,7 @@ function App() {
     try {
       await downloadVoiceEngine(tier)
       await refreshTutorInstallInfo()
-      const preloadVoice = window.jplearnDesktop.preloadVoice
+      const preloadVoice = window.jplearnDesktop?.preloadVoice
       if (preloadVoice) {
         await preloadVoice(settings.voiceSpeaker)
       }
@@ -4493,7 +4493,7 @@ function App() {
   }, [settings.fontSize])
 
   const reloadLocalFonts = useCallback(() => {
-    void window.jplearnDesktop.reloadLocalFonts?.().catch(() => undefined)
+    void window.jplearnDesktop?.reloadLocalFonts?.().catch(() => undefined)
   }, [])
 
   const availableThemes = useMemo(
@@ -5128,7 +5128,7 @@ function App() {
       }
     }
 
-    void window.jplearnDesktop.setStartupTheme(effectiveTheme).catch(() => undefined)
+    void window.jplearnDesktop?.setStartupTheme(effectiveTheme).catch(() => undefined)
   }, [activeCustomTheme, effectiveTheme, ensureThemePaletteCached, settings, themePaletteCache])
 
   // Ambient audio lifecycle
@@ -5161,8 +5161,8 @@ function App() {
     let mounted = true
     const check = async () => {
       try {
-        const state = await window.jplearnDesktop.isWindowMaximized()
-        if (mounted) setIsWindowMaximized(state.isMaximized)
+        const state = await window.jplearnDesktop?.isWindowMaximized()
+        if (mounted && state) setIsWindowMaximized(state.isMaximized)
       } catch { /* ignore */ }
     }
     void check()
@@ -5175,7 +5175,7 @@ function App() {
   // Onboarding is now gated entirely by learningPathStatus.onboarding_complete from the backend.
 
   useEffect(() => {
-    const onWindowStateChanged = window.jplearnDesktop.onWindowStateChanged
+    const onWindowStateChanged = window.jplearnDesktop?.onWindowStateChanged
     if (!onWindowStateChanged) {
       return
     }
@@ -5253,7 +5253,7 @@ function App() {
     setSessionGoalError(null)
     const fetchSummary = async () => {
       try {
-        const response = await window.jplearnDesktop.getSessionSummary(activeSessionId)
+        const response = await window.jplearnDesktop?.getSessionSummary(activeSessionId)
         if (!response.ok || !response.summary) {
           setSessionGoalError(response.error ?? 'Unable to load session summary.')
           setLastSessionSummary(null)
@@ -5270,7 +5270,7 @@ function App() {
     void fetchSummary()
 
     // Refresh XP after each session so the titlebar badge stays current (Q1-A: pull after session end).
-    const getXpProgress = window.jplearnDesktop.getXpProgress
+    const getXpProgress = window.jplearnDesktop?.getXpProgress
     if (getXpProgress) {
       const refreshXp = async () => {
         try {
@@ -5301,7 +5301,7 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const payload = await window.jplearnDesktop.getStudySummary()
+      const payload = await window.jplearnDesktop?.getStudySummary()
       setSummary(payload)
       saveSummarySnapshot(payload)
       if (startupFirstSummaryMsRef.current === null) {
@@ -5320,13 +5320,11 @@ function App() {
     startupReadySentRef.current = true
 
     const startupReadyMs = Math.round(performance.now() - startupBootMarkRef.current)
-    void window.jplearnDesktop
-      .notifyStartupReady({
-        startupReadyMs,
-        firstSummaryMs: startupFirstSummaryMsRef.current,
-        deferredLoadsQueuedAtMs,
-      })
-      .catch(() => undefined)
+    void window.jplearnDesktop?.notifyStartupReady({
+      startupReadyMs,
+      firstSummaryMs: startupFirstSummaryMsRef.current,
+      deferredLoadsQueuedAtMs,
+    }).catch(() => undefined)
   }, [])
 
   const trackAssistantToastInteraction = useCallback(
@@ -5340,7 +5338,7 @@ function App() {
         return
       }
 
-      const trackAssistantEvent = window.jplearnDesktop.trackAssistantEvent
+      const trackAssistantEvent = window.jplearnDesktop?.trackAssistantEvent
       if (!trackAssistantEvent) {
         return
       }
@@ -5391,10 +5389,10 @@ function App() {
   // on mount and whenever the summary refreshes.
   useEffect(() => {
     let mounted = true
-    const getXp = window.jplearnDesktop.getXpProgress
-    const getRecs = window.jplearnDesktop.getRecommendations
-    const getTutor = window.jplearnDesktop.getTutorReactions
-    const getPath = window.jplearnDesktop.getLearningPathStatus
+    const getXp = window.jplearnDesktop?.getXpProgress
+    const getRecs = window.jplearnDesktop?.getRecommendations
+    const getTutor = window.jplearnDesktop?.getTutorReactions
+    const getPath = window.jplearnDesktop?.getLearningPathStatus
 
     const safeResolve = async <T,>(fn: (() => Promise<T>) | undefined): Promise<T | null> => {
       if (!fn) return null
@@ -5420,7 +5418,7 @@ function App() {
   }, [summary])
 
   useEffect(() => {
-    const getAssistantSnapshotFn = window.jplearnDesktop.getAssistantSnapshot
+    const getAssistantSnapshotFn = window.jplearnDesktop?.getAssistantSnapshot
     if (!getAssistantSnapshotFn) {
       return
     }
@@ -5446,8 +5444,8 @@ function App() {
   }, [activeSessionId, summary])
 
   useEffect(() => {
-    const getAssistantEventsFn = window.jplearnDesktop.getAssistantEvents
-    const consumeAssistantEventsFn = window.jplearnDesktop.consumeAssistantEvents
+    const getAssistantEventsFn = window.jplearnDesktop?.getAssistantEvents
+    const consumeAssistantEventsFn = window.jplearnDesktop?.consumeAssistantEvents
     if (!getAssistantEventsFn || !consumeAssistantEventsFn) {
       return
     }
@@ -5540,7 +5538,7 @@ function App() {
   }, [assistantToasts, trackAssistantToastInteraction])
 
   const refreshAssistantChatHistory = useCallback(async (): Promise<boolean> => {
-    const getAssistantChatHistory = window.jplearnDesktop.getAssistantChatHistory
+    const getAssistantChatHistory = window.jplearnDesktop?.getAssistantChatHistory
     if (!getAssistantChatHistory) {
       return false
     }
@@ -5564,7 +5562,7 @@ function App() {
   }, [])
 
   const refreshAssistantChatStatus = useCallback(async (): Promise<AssistantChatRuntimeStatus | null> => {
-    const getAssistantChatRuntimeStatus = window.jplearnDesktop.getAssistantChatRuntimeStatus
+    const getAssistantChatRuntimeStatus = window.jplearnDesktop?.getAssistantChatRuntimeStatus
     if (!getAssistantChatRuntimeStatus) {
       return null
     }
@@ -5579,7 +5577,7 @@ function App() {
   }, [])
 
   const hydrateAssistantChatFromPreloaded = useCallback(async (): Promise<boolean> => {
-    const getPreloadedAssistantChatHistory = window.jplearnDesktop.getPreloadedAssistantChatHistory
+    const getPreloadedAssistantChatHistory = window.jplearnDesktop?.getPreloadedAssistantChatHistory
     if (!getPreloadedAssistantChatHistory) {
       return false
     }
@@ -5705,7 +5703,7 @@ function App() {
     setAssistantChatError(null)
     setAssistantChatFallbackNote(null)
 
-    const unloadAssistantChatRuntime = window.jplearnDesktop.unloadAssistantChatRuntime
+    const unloadAssistantChatRuntime = window.jplearnDesktop?.unloadAssistantChatRuntime
     if (!unloadAssistantChatRuntime) {
       return
     }
@@ -5730,7 +5728,7 @@ function App() {
     assistantChatHistoryHydratedRef.current = true
     setAssistantChatMessages([])
     setAssistantChatError(null)
-    const clearHistory = window.jplearnDesktop.clearAssistantChatHistory
+    const clearHistory = window.jplearnDesktop?.clearAssistantChatHistory
     if (!clearHistory) {
       return
     }
@@ -5758,7 +5756,7 @@ function App() {
       return
     }
 
-    const sendAssistantChatMessage = window.jplearnDesktop.sendAssistantChatMessage
+    const sendAssistantChatMessage = window.jplearnDesktop?.sendAssistantChatMessage
     if (!sendAssistantChatMessage) {
       setAssistantChatError('Assistant chat runtime is unavailable in this build.')
       return
@@ -5826,7 +5824,7 @@ function App() {
       return
     }
 
-    const extractAssistantChatImageText = window.jplearnDesktop.extractAssistantChatImageText
+    const extractAssistantChatImageText = window.jplearnDesktop?.extractAssistantChatImageText
     if (!extractAssistantChatImageText) {
       setOcrWorkbenchError('Image Translation is unavailable in this build.')
       return
@@ -5835,7 +5833,7 @@ function App() {
       setOcrWorkbenchError('Image Translation is not installed. Install it in Settings > Tutor > Image Translation.')
       return
     }
-    const translateAssistantChatOcrText = window.jplearnDesktop.translateAssistantChatOcrText
+    const translateAssistantChatOcrText = window.jplearnDesktop?.translateAssistantChatOcrText
     if (!translateAssistantChatOcrText) {
       setOcrWorkbenchError('Offline OCR translation runtime is unavailable in this build.')
       return
@@ -6215,7 +6213,8 @@ function App() {
     void loadScriptCards(activeScript, activeKanjiCategory, activeVocabCategory)
     void (async () => {
       try {
-        const payload = await window.jplearnDesktop.getOverviewCharacterMastery()
+        const payload = await window.jplearnDesktop?.getOverviewCharacterMastery()
+        if (!payload) return
         setOverviewBlocks(payload.blocks)
         setOverviewCategoryBlocks(payload.category_blocks)
         setOverviewKanjiDeck(payload.kanji_cards)
@@ -6252,7 +6251,7 @@ function App() {
       exampleSentenceHint,
     } = options
 
-    const getGrammarData = window.jplearnDesktop.getGrammarMinigameData
+    const getGrammarData = window.jplearnDesktop?.getGrammarMinigameData
     if (!getGrammarData) return null
 
     const sourceSentence = card.example_sentence?.trim() || card.character
@@ -6996,7 +6995,7 @@ function App() {
         : sourceCards
       const goalTargetItems = Math.max(1, Math.floor(sessionTargetItems))
 
-      const goalRequest = window.jplearnDesktop.startSessionGoal({
+      const goalRequest = window.jplearnDesktop?.startSessionGoal({
           targetItems: goalTargetItems,
         })
 
@@ -7337,7 +7336,7 @@ function App() {
 
       void (async () => {
         try {
-          const result = await window.jplearnDesktop.recordGameResult({
+          const result = await window.jplearnDesktop?.recordGameResult({
             slug: resultSlug,
             cardId: roundState.cardId,
             isCorrect,
@@ -7620,7 +7619,7 @@ function App() {
   const speechRecognitionLockReason = 'Install and enable a speech recognition model in Settings > Voice to use Speech Recall.'
 
   const voiceRuntimeRunning = useMemo(() => {
-    const hasVoiceStatusApi = typeof window.jplearnDesktop.getVoiceStatus === 'function'
+    const hasVoiceStatusApi = typeof window.jplearnDesktop?.getVoiceStatus === 'function'
     if (!hasVoiceStatusApi || !voiceStatusChecked) {
       return true
     }
@@ -7687,7 +7686,8 @@ function App() {
     setOverviewBlocksLoading(true)
     const fetchMastery = async () => {
       try {
-        const payload = await window.jplearnDesktop.getOverviewCharacterMastery()
+        const payload = await window.jplearnDesktop?.getOverviewCharacterMastery()
+        if (!payload) return
         setOverviewBlocks(payload.blocks)
         setOverviewCategoryBlocks(payload.category_blocks)
         setOverviewKanjiDeck(payload.kanji_cards)
@@ -7827,7 +7827,7 @@ function App() {
 
   const inspectElementFromMenu = useCallback(async () => {
     try {
-      await window.jplearnDesktop.openInspectElement?.()
+      await window.jplearnDesktop?.openInspectElement?.()
     } catch {
       // Devtools action is best effort in development contexts.
     } finally {
@@ -7839,7 +7839,7 @@ function App() {
     setResettingDb(true)
     setError(null)
     try {
-      await window.jplearnDesktop.resetStudyDb()
+      await window.jplearnDesktop?.resetStudyDb()
       const emptyScores: CardScores = { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} }
       const emptyStats: StatsByScript = {
         hiragana: { ...EMPTY_SCRIPT_STATS },
@@ -7900,21 +7900,21 @@ function App() {
   }, [loadSummary, refreshDeckProgressAfterSeedChange, resetRoundCycle])
 
   const minimizeWindow = useCallback(() => {
-    void window.jplearnDesktop.minimizeWindow()
+    void window.jplearnDesktop?.minimizeWindow()
   }, [])
 
   const toggleMaximizeWindow = useCallback(() => {
     void (async () => {
       try {
-        await window.jplearnDesktop.toggleMaximizeWindow()
-        const state = await window.jplearnDesktop.isWindowMaximized()
+        await window.jplearnDesktop?.toggleMaximizeWindow()
+        const state = await window.jplearnDesktop?.isWindowMaximized()
         setIsWindowMaximized(state.isMaximized)
       } catch { /* ignore */ }
     })()
   }, [])
 
   const closeWindow = useCallback(() => {
-    void window.jplearnDesktop.closeWindow()
+    void window.jplearnDesktop?.closeWindow()
   }, [])
 
   // Handles completion of the onboarding form: seeds deck expertise, persists answers, sets path.
@@ -7925,7 +7925,7 @@ function App() {
   ) => {
     const level = deriveExpertiseLevelFromChecked(checkedItems)
     try {
-      await window.jplearnDesktop.applyExpertiseLevel(level)
+      await window.jplearnDesktop?.applyExpertiseLevel(level)
       if (level === 'total_beginner') {
         setCardScores({ hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} })
       } else {
@@ -7955,10 +7955,10 @@ function App() {
     }
 
     if (pathId) {
-      const result = await window.jplearnDesktop.setLearningPath?.(pathId).catch(() => undefined)
+      const result = await window.jplearnDesktop?.setLearningPath?.(pathId).catch(() => undefined)
       if (result) setLearningPathStatus(result as LearningPathStatus)
     } else {
-      const result = await window.jplearnDesktop.completeOnboarding?.(answers).catch(() => undefined)
+      const result = await window.jplearnDesktop?.completeOnboarding?.(answers).catch(() => undefined)
       if (result) setLearningPathStatus(result as LearningPathStatus)
     }
     await loadSummary()
@@ -8108,7 +8108,7 @@ function App() {
 
   const handleSetupWizardComplete = useCallback(() => {
     setShowWizard(false)
-    const getPath = window.jplearnDesktop.getLearningPathStatus
+    const getPath = window.jplearnDesktop?.getLearningPathStatus
     if (getPath) {
       void (async () => {
         try {
@@ -8633,7 +8633,7 @@ function App() {
           }))}
           onDismissTutorBanner={(key) => {
             setTutorReactions((prev) => prev.filter((r) => r.dedup_key !== key))
-            void window.jplearnDesktop.dismissTutorReaction?.(key).catch(() => undefined)
+            void window.jplearnDesktop?.dismissTutorReaction?.(key).catch(() => undefined)
           }}
           onStartRecommendation={(nodeId) => {
             const scriptMap: Record<string, string> = {
