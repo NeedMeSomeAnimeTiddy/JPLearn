@@ -293,12 +293,6 @@ export function MinigameCassetteCarousel({
         <ChevronRight size={20} strokeWidth={2.4} aria-hidden="true" />
       </button>
 
-      {selected ? (
-        <div className="cassette-info">
-          <span className="cassette-info-meta">{selected.difficultyLabel} · {selected.accuracy}% accuracy · streak {selected.bestStreak}</span>
-          <span className="cassette-info-text">{selected.description}</span>
-        </div>
-      ) : null}
     </div>
   )
 }

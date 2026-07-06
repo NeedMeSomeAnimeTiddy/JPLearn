@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import { CornerDownLeft } from 'lucide-react'
 
 interface TypedAnswerPanelProps {
   answerInputRef: RefObject<HTMLInputElement | null>
@@ -33,8 +34,8 @@ export function TypedAnswerPanel({
         autoComplete="off"
         disabled={disabled}
       />
-      <button type="submit" disabled={disabled}>
-        Check
+      <button type="submit" disabled={disabled} aria-label="Submit answer">
+        <CornerDownLeft aria-hidden="true" size={18} strokeWidth={2.2} />
       </button>
     </form>
   )

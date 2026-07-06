@@ -255,6 +255,11 @@ export function ScriptHubView({
     }))
   ), [rankedCards])
 
+  const selectedCassette = useMemo(() =>
+    cassetteItems.find((item) => item.key === activeGame),
+    [cassetteItems, activeGame],
+  )
+
   return (
     <div className={isSheet ? 'script-hub-sheet-content' : `view-shell view-${navDirection}`}>
       {!isSheet ? (
@@ -320,7 +325,6 @@ export function ScriptHubView({
                 <span className="home-section-hint">◀◀  scroll  ▶▶</span>
               </div>
 
-              {/* Cassette carousel */}
               <div className="hub-eq" aria-hidden="true">
                 <span className="hub-eq-bar" style={{ animationDelay: '0s' } as CSSProperties} />
                 <span className="hub-eq-bar" style={{ animationDelay: '0.1s' } as CSSProperties} />
@@ -333,18 +337,28 @@ export function ScriptHubView({
                 <span>DOLBY NR</span>
                 <span className="hub-deck-dot" />
               </div>
+
+              <div className="hub-deck-shelf">
               <MinigameCassetteCarousel
                 items={cassetteItems}
                 activeGame={activeGame}
                 onSelectGame={onSelectGame}
                 onPlayGame={onPlayGame}
               />
-              <div className="hub-deck-badge hub-deck-badge--right" aria-hidden="true">
-                <span>TYPE II · HIGH BIAS</span>
-              </div>
+              <div className="hub-cassette-bay">
+                <div className="hub-deck-badge hub-deck-badge--right" aria-hidden="true">
+                  <span>TYPE II · HIGH BIAS</span>
+                </div>
 
-              {/* Session controls */}
-              <div className="hub-controls" aria-label="Session setup">
+                {selectedCassette ? (
+                  <div className="cassette-info">
+                    <span className="cassette-info-meta">{selectedCassette.difficultyLabel} · {selectedCassette.accuracy}% accuracy · streak {selectedCassette.bestStreak}</span>
+                    <span className="cassette-info-text">{selectedCassette.description}</span>
+                  </div>
+                ) : null}
+
+                {/* Session controls */}
+                <div className="hub-controls" aria-label="Session setup">
                 <div className="hub-control-group" role="group" aria-label="Session length">
                   {SESSION_LENGTH_PRESETS.map((preset) => {
                     const Icon = preset.icon
@@ -401,6 +415,8 @@ export function ScriptHubView({
                     <span>Confidence</span>
                   </button>
                 </div>
+              </div>
+              </div>
               </div>
 
               {/* Horizontal tracklist strip */}

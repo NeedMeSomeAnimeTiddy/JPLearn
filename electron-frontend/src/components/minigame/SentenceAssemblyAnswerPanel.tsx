@@ -128,8 +128,6 @@ export function SentenceAssemblyAnswerPanel({
     .map((chunkId) => chunkById.get(chunkId))
     .filter((chunk): chunk is RoundOption => Boolean(chunk))
 
-  const assembledSentence = orderedChunks.map((chunk) => chunk.label).join('')
-
   function resetOrder() {
     if (disabled) return
     setOrderedChunkIds(options.map((option) => option.id))
@@ -158,28 +156,16 @@ export function SentenceAssemblyAnswerPanel({
 
   return (
     <div className="sentence-assembly-panel">
-      <div className="sentence-assembly-column" aria-label="Assembled sentence preview">
-        <p className="sentence-assembly-label">Current sentence</p>
-        <div className="sentence-assembly-preview" aria-live="polite">
-          {assembledSentence || 'Drag chunks to build the sentence.'}
-        </div>
-        <p className="sentence-assembly-tip">
-          Build left-to-right; particles usually attach to the noun phrase before them.
-        </p>
-      </div>
-
-      <div className="sentence-assembly-column" aria-label="Reorder chunks">
-        <p className="sentence-assembly-label">Drag to reorder</p>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={orderedChunkIds}
+          strategy={verticalListSortingStrategy}
         >
-          <SortableContext
-            items={orderedChunkIds}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="sentence-assembly-chip-list sentence-assembly-chip-list-active">
+          <div className="sentence-assembly-chip-list sentence-assembly-chip-list-active">
               {orderedChunks.map((chunk, index) => (
                 <SortableChunkChip
                   key={chunk.id}
@@ -199,7 +185,6 @@ export function SentenceAssemblyAnswerPanel({
             </div>
           </SortableContext>
         </DndContext>
-      </div>
 
       <div className="game-input-row sentence-assembly-actions">
         <button

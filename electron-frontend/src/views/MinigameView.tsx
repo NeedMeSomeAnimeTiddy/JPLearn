@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { m, AnimatePresence } from 'motion/react'
+import { AnimatePresence } from 'motion/react'
 import {
   Activity,
   ArrowLeft,
   Flame,
   LoaderCircle,
+  Play,
   Target,
   Trophy,
 } from 'lucide-react'
@@ -320,6 +321,12 @@ export function MinigameView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundState?.cardId, roundState?.mode])
 
+  const tapeToneVar =
+    activeScript === 'hiragana' || activeScript === 'katakana' ? 'var(--tone-teal)'
+    : activeScript === 'kanji_n5' ? 'var(--tone-rose)'
+    : 'var(--tone-amber)'
+  const tapeStyle = { '--tape-tone': tapeToneVar } as CSSProperties
+
   return (
     <div className={`view-shell view-${navDirection} minigame-shell ${focusModeEnabled ? 'minigame-focus-mode' : ''}`}>
       <div className="hub-crt-surface" aria-hidden="true" />
@@ -386,35 +393,42 @@ export function MinigameView({
             {!sessionActive ? (
               <>
                 {sessionRunReport && !sessionStartPending ? (
-                  <SessionRunSummary
-                    report={sessionRunReport}
-                    sessionStartPending={sessionStartPending}
-                    onRestart={() => startSession()}
-                    onBack={onBack}
-                  />
+                  <div className="minigame-open-playfield" style={tapeStyle}>
+                    <SessionRunSummary
+                      report={sessionRunReport}
+                      sessionStartPending={sessionStartPending}
+                      onRestart={() => startSession()}
+                      onBack={onBack}
+                    />
+                  </div>
                 ) : (
-                  <div className="game-actions minigame-state-actions">
-                    <button
-                      type="button"
-                      onClick={() => startSession()}
-                      disabled={gameLoading || activeRunCardsLength === 0 || sessionSummaryLoading || sessionStartPending}
-                    >
-                      {sessionRunReport ? 'Play Again' : 'Play'}
-                    </button>
-                    <button
-                      type="button"
-                      className="back-button back-button-icon-only"
-                      onClick={onBack}
-                      aria-label="Back to map"
-                      title="Back to map"
-                    >
-                      <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-                    </button>
-                    {gameLoading ? (
-                      <span>Loading deck...</span>
-                    ) : (
-                      <span>{activeRunCardsLength} cards available</span>
-                    )}
+                  <div className="hub-controls" aria-label="Game controls">
+                    <div className="hub-control-group" role="group">
+                      <button
+                        type="button"
+                        className="hub-chip-button"
+                        onClick={() => startSession()}
+                        disabled={gameLoading || activeRunCardsLength === 0 || sessionSummaryLoading || sessionStartPending}
+                      >
+                        <Play size={13} strokeWidth={2.2} aria-hidden="true" />
+                        <span>{sessionRunReport ? 'Play Again' : 'Play'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="hub-chip-button"
+                        onClick={onBack}
+                        aria-label="Back to map"
+                        title="Back to map"
+                      >
+                        <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
+                        <span>Back</span>
+                      </button>
+                    </div>
+                    <div className="hub-control-divider" aria-hidden="true" />
+                    <p className="hero-kicker minigame-state-actions">
+                      <span className="hub-rec-dot" aria-hidden="true" />{' '}
+                      {gameLoading ? 'Loading deck...' : `${activeRunCardsLength} cards available`}
+                    </p>
                   </div>
                 )}
               </>
@@ -433,35 +447,10 @@ export function MinigameView({
 
             {sessionActive && roundState ? (
               <AnimatePresence mode="wait">
-                <m.article
-                  className={`game-round minigame-challenge ${
-                    roundFeedbackTone === 'error'
-                      ? 'is-wrong'
-                      : roundFeedbackTone === 'success'
-                        ? 'is-correct'
-                        : ''
-                  }`}
-                  key={`round-${sessionRounds}-${roundState.focusText}-${roundState.answer}`}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2, ease: 'easeOut' }}
-                >
-                {roundState.chapterLabel || roundState.surprisePrompt ? (
-                  <div className="game-round-head minigame-challenge-head">
-                    <div className="minigame-challenge-badges minigame-focus-optional">
-                      {roundState.chapterLabel ? (
-                        <span className="chapter-pill">
-                          {roundState.chapterNumber ? `Chapter ${roundState.chapterNumber}` : 'Chapter'} · {roundState.chapterLabel}
-                        </span>
-                      ) : null}
-                      {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
-                    </div>
-                  </div>
-                ) : null}
+                <article className="minigame-open-playfield" key={roundState.cardId} style={tapeStyle} data-feedback={roundFeedback !== null ? '' : undefined}>
 
-                <div className="minigame-challenge-body">
-                  <div className="minigame-core-column">
+                  <div className="minigame-cassette-label">
+                    <span className="cassette-brand">JPLearn · {resolvedGameTitle}</span>
                     <div
                       className="minigame-round-progress"
                       role="progressbar"
@@ -473,40 +462,42 @@ export function MinigameView({
                     >
                       <div className="minigame-round-progress-fill" style={{ width: `${roundProgressValue * 100}%` }} />
                     </div>
-                    <div className="minigame-stats-dashboard" aria-live="polite">
-                      <div className={`minigame-stat-cell ${pointsGainPulse ? 'is-gaining' : ''}`} aria-label={`Points ${sessionPoints}`}>
-                        <span className="minigame-stat-cell-icon">
-                          <Activity aria-hidden="true" strokeWidth={2.2} />
-                        </span>
-                        <span className="minigame-stat-cell-label">Points</span>
-                        <strong className="minigame-stat-cell-value">
-                          {sessionPoints}
-                          {pointsGainAmount ? <span className="minigame-stat-cell-gain">+{pointsGainAmount}</span> : null}
-                        </strong>
-                      </div>
-                      <div className="minigame-stat-cell" aria-label={`Streak ${sessionStreak}`}>
-                        <span className="minigame-stat-cell-icon">
-                          <Flame aria-hidden="true" strokeWidth={2.2} />
-                        </span>
-                        <span className="minigame-stat-cell-label">Streak</span>
-                        <strong className="minigame-stat-cell-value">{sessionStreak}</strong>
-                      </div>
-                      <div className="minigame-stat-cell" aria-label={`Current ${sessionScore} of ${sessionRounds}`}>
-                        <span className="minigame-stat-cell-icon">
-                          <Target aria-hidden="true" strokeWidth={2.2} />
-                        </span>
-                        <span className="minigame-stat-cell-label">Current</span>
-                        <strong className="minigame-stat-cell-value">{sessionScore}/{sessionRounds}</strong>
-                      </div>
-                      <div className="minigame-stat-cell" aria-label={`Goal ${sessionRounds} of ${sessionTargetItems}`}>
-                        <span className="minigame-stat-cell-icon">
-                          <Trophy aria-hidden="true" strokeWidth={2.2} />
-                        </span>
-                        <span className="minigame-stat-cell-label">Goal</span>
-                        <strong className="minigame-stat-cell-value">{sessionRounds}/{sessionTargetItems}</strong>
-                      </div>
-                    </div>
 
+                    {roundState.chapterLabel || roundState.surprisePrompt ? (
+                      <div className="minigame-cassette-label-meta">
+                        {roundState.chapterLabel ? (
+                          <span className="chapter-pill">
+                            {roundState.chapterNumber ? `Chapter ${roundState.chapterNumber}` : 'Chapter'} · {roundState.chapterLabel}
+                          </span>
+                        ) : null}
+                        {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
+                      </div>
+                    ) : null}
+
+                    <div className="game-hud-whisper" aria-live="polite">
+                      <span className={`game-hud-stat ${pointsGainPulse ? 'is-gaining' : ''}`}>
+                        <Activity aria-hidden="true" size={11} strokeWidth={2.2} />
+                        <strong>{sessionPoints}</strong>
+                        <span>pts</span>
+                        {pointsGainAmount ? <span className="game-hud-stat-gain">+{pointsGainAmount}</span> : null}
+                      </span>
+                      <span className="game-hud-stat">
+                        <Flame aria-hidden="true" size={11} strokeWidth={2.2} />
+                        <strong>{sessionStreak}</strong>
+                        <span>x</span>
+                      </span>
+                      <span className="game-hud-stat">
+                        <Target aria-hidden="true" size={11} strokeWidth={2.2} />
+                        <strong>{sessionScore}/{sessionRounds}</strong>
+                      </span>
+                      <span className="game-hud-stat">
+                        <Trophy aria-hidden="true" size={11} strokeWidth={2.2} />
+                        <strong>{sessionRounds}/{sessionTargetItems}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="minigame-cassette-window">
                     <ChallengePromptCard
                       roundState={roundState}
                       activeScript={activeScript}
@@ -517,7 +508,9 @@ export function MinigameView({
                       showRevealText={roundFeedback !== null}
                       onPlayAudio={playAudio}
                     />
+                  </div>
 
+                  <div className="minigame-cassette-body">
                     <MinigameResponsePanel
                       isRoundResolving={isRoundResolving}
                       mode={roundState.mode}
@@ -628,7 +621,7 @@ export function MinigameView({
                     </MinigameResponsePanel>
                   </div>
 
-                  <div className="minigame-support-row">
+                  <div className="minigame-cassette-base">
                     <HintAssistPanel
                       roundState={roundState}
                       isRoundResolving={isRoundResolving}
@@ -645,8 +638,7 @@ export function MinigameView({
                       onRevealMoreHint={advanceHintStep}
                     />
                   </div>
-                </div>
-              </m.article>
+                </article>
               </AnimatePresence>
             ) : null}
           </section>
