@@ -396,7 +396,6 @@ describe('Minigame menu', () => {
     fireEvent.click(shortcutButton)
 
     expect(await screen.findByRole('heading', { name: /Mini Game Map/i })).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: /browse all minigames/i }))
     expect((await screen.findAllByText(/Meaning Match/i)).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: /back to map/i })).toBeNull()
   })

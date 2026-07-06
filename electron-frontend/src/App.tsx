@@ -3,12 +3,13 @@ import type { CSSProperties } from 'react'
 import type { ChangeEvent } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import type { LearningPathStatus, MinigameStats, MinigameStatsByScript, SectionReadiness } from './types'
+import type { LearningPathStatus, SectionReadiness } from './types'
 import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
 import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
+import { MinigameSelectView } from './views/MinigameSelectView'
 import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
 import { OnboardingView } from './views/OnboardingView'
@@ -18,11 +19,10 @@ import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { AmbientAudioController } from './lib/ambientAudio'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
-import { MINIGAMES, MINIGAME_ICONS } from './constants'
-
 import type { RoundDictionaryNote } from './types'
+
 type StudySummaryPayload = Awaited<
   ReturnType<typeof window.jplearnDesktop.getStudySummary>
 >
@@ -127,7 +127,7 @@ type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stro
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
-type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
+type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep' | 'minigame_select'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type AppFontPreset =
@@ -1003,6 +1003,14 @@ interface ScriptStats {
   bestStreak: number
 }
 
+interface MinigameStats {
+  attempted: number
+  correct: number
+  currentStreak: number
+  bestStreak: number
+  points: number
+}
+
 type JlptLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
 
 interface JlptLevelProgress {
@@ -1056,6 +1064,7 @@ interface StudyPlanSnapshot {
 }
 
 type StatsByScript = Record<ScriptKey, ScriptStats>
+type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
 type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'deckSnapshot'
 
 const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples'] as const
@@ -1068,6 +1077,74 @@ const SCRIPT_LABELS: Record<ScriptKey, string> = {
   grammar_patterns: 'Grammar',
   sentence_examples: 'Sentences',
 }
+
+const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }> = [
+  {
+    key: 'romaji_sprint',
+    title: 'Romaji Sprint',
+    description: 'Type the romaji reading as quickly as you can.',
+  },
+  {
+    key: 'meaning_match',
+    title: 'Meaning Match',
+    description: 'Pick the correct meaning from four choices.',
+  },
+  {
+    key: 'character_match',
+    title: 'Character Match',
+    description: 'Pick the correct character for the meaning.',
+  },
+  {
+    key: 'stroke_order',
+    title: 'Stroke Order',
+    description: 'Type the kanji from meaning while reinforcing writing sequence.',
+  },
+  {
+    key: 'typed_recall',
+    title: 'Typed Recall',
+    description: 'Type the meaning directly with near-miss tolerance.',
+  },
+  {
+    key: 'speech_recall',
+    title: 'Speech Recall',
+    description: 'Say the meaning aloud — transcribed and graded offline.',
+  },
+  {
+    key: 'sentence_assembly',
+    title: 'Sentence Assembly',
+    description: 'Arrange shuffled sentence chunks into natural Japanese order.',
+  },
+  {
+    key: 'particle_cloze',
+    title: 'Particle Cloze',
+    description: 'Fill the missing particle using sentence context and word order cues.',
+  },
+  {
+    key: 'vibe_check',
+    title: 'Vibe Check',
+    description: 'Read social tone and pick the best context for the sentence register.',
+  },
+  {
+    key: 'imposter',
+    title: 'Imposter',
+    description: 'Find the token with a deliberate grammar error in a sentence.',
+  },
+  {
+    key: 'listening_audio_first',
+    title: 'Listening: Audio First',
+    description: 'Hear a word and choose its meaning — character hidden until feedback.',
+  },
+  {
+    key: 'listening_prompt_first',
+    title: 'Listening: Prompt First',
+    description: 'See the character while audio plays, then choose the meaning.',
+  },
+  {
+    key: 'interleave_mix',
+    title: 'Interleave Mix',
+    description: 'Cycle reading, meaning, and character rounds in one run.',
+  },
+]
 
 const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
   hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
@@ -1094,6 +1171,22 @@ const SECTION_META: Record<ScriptKey, { glyph: string }> = {
   vocab_n5: { glyph: '語' },
   grammar_patterns: { glyph: '話' },
   sentence_examples: { glyph: '文' },
+}
+
+const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
+  romaji_sprint: Keyboard,
+  meaning_match: ListChecks,
+  character_match: Languages,
+  stroke_order: Keyboard,
+  typed_recall: Keyboard,
+  speech_recall: Mic,
+  sentence_assembly: Shuffle,
+  particle_cloze: BookText,
+  vibe_check: MessageCircle,
+  imposter: History,
+  listening_audio_first: Volume2,
+  listening_prompt_first: Volume2,
+  interleave_mix: Shuffle,
 }
 
 const PETAL_STREAM = [
@@ -7388,6 +7481,12 @@ function App() {
           return
         }
 
+        if (view === 'minigame_select') {
+          setNavDirection('back')
+          setView('script_hub')
+          return
+        }
+
         if (view === 'jlpt_prep') {
           setNavDirection('back')
           setView('home')
@@ -8667,9 +8766,6 @@ function App() {
           leechCardsLength={leechCards.length}
           activeScriptStats={activeScriptStats}
           activeSectionName={activeSectionName}
-          availableMinigames={availableMinigames}
-          minigameLockReasons={minigameLockReasons}
-          minigameStats={minigameStats}
           onBack={goHome}
           onOpenSettings={openSettingsFromMenu}
           onSelectBlock={(index) => {
@@ -8760,6 +8856,45 @@ function App() {
             resetRoundCycle()
             void startSession(game)
           }}
+          onOpenGameSelect={() => {
+            setNavDirection('forward')
+            setView('minigame_select')
+          }}
+        />
+      ) : null}
+
+      {view === 'minigame_select' ? (
+        <MinigameSelectView
+          navDirection={navDirection}
+          activeScript={activeScript}
+          activeGame={activeGame}
+          availableMinigames={availableMinigames}
+          minigameStats={minigameStats}
+          activeScriptStats={activeScriptStats}
+          minigameLockReasons={minigameLockReasons}
+          onBack={() => {
+            setNavDirection('back')
+            setView('script_hub')
+          }}
+          onSelectGame={(game) => {
+            setActiveGame(game)
+          }}
+          onPlayGame={(game) => {
+            setActiveGame(game)
+            setNavDirection('forward')
+            setView('minigame')
+            setSessionActive(false)
+            setRoundState(null)
+            setRoundFeedback(null)
+            setRoundFeedbackTone(null)
+            setRoundFeedbackPoints(null)
+            setRoundFeedbackAnswer(null)
+            setIsRoundResolving(false)
+            setLivesRemaining(DEFAULT_LIVES)
+            resetRoundCycle()
+            void startSession(game)
+          }}
+          onOpenSettings={openSettingsFromMenu}
         />
       ) : null}
 
