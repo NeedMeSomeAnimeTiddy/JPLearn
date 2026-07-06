@@ -2661,20 +2661,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
   box-shadow: 0 2px 0 rgba(0,0,0,0.06);
 }
 
-/* Warm glow from top — soft on light bg */
-.hub-studio::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    ellipse 700px 260px at 25% 0%,
-    color-mix(in oklab, var(--accent) 10%, transparent) 0%,
-    transparent 60%
-  );
-  pointer-events: none;
-  z-index: 0;
-}
-
 /* Thin accent rim */
 .hub-studio::after {
   content: '';
@@ -3920,6 +3906,11 @@ html[data-reduced-motion='true'] .home-hero-steam {
 .minigame-stage-panel {
   display: grid;
   gap: 12px;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: enterUp 440ms ease both;
 }
 
 .overview-hero {
@@ -7048,7 +7039,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 .confidence-controls {
   margin-top: 4px;
   border: 1px solid var(--chip-border);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 10px 12px;
   background: var(--chip-bg);
   display: grid;
@@ -7078,7 +7069,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .confidence-chip {
   border: 1px solid var(--button-border);
-  border-radius: 10px;
+  border-radius: 0;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
   min-height: calc(38px * var(--ui-scale));
@@ -7092,7 +7083,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   gap: 0;
   min-height: calc(48px * var(--ui-scale));
   font-size: calc(1rem * var(--ui-scale));
-  border-radius: 12px;
+  border-radius: 0;
   background:
     linear-gradient(180deg, color-mix(in oklab, var(--button-bg-top) 92%, white), var(--button-bg-bottom));
   box-shadow:
@@ -7187,15 +7178,9 @@ html[data-reduced-motion='true'] .cassette-reel {
 .post-session-report {
   margin-top: 10px;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
-  border-radius: 14px;
+  border-radius: 0;
   padding: 14px;
-  background:
-    radial-gradient(circle at 10% 0%, color-mix(in oklab, var(--tone-amber) 18%, transparent), transparent 45%),
-    radial-gradient(circle at 95% 10%, color-mix(in oklab, var(--tone-teal) 22%, transparent), transparent 52%),
-    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 96%, var(--tone-ocean)), color-mix(in oklab, var(--panel-bg-alt) 94%, var(--tone-teal)));
-  box-shadow:
-    0 20px 34px -26px color-mix(in oklab, var(--tone-ocean) 56%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
   display: grid;
   gap: 10px;
 }
@@ -7233,7 +7218,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 }
 .post-session-cell {
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 30%, var(--chip-border));
-  border-radius: 10px;
+  border-radius: 0;
   padding: 8px 9px;
   background: color-mix(in oklab, var(--chip-bg) 82%, transparent);
   display: grid;
@@ -7285,7 +7270,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   gap: 4px;
   padding: 10px 12px;
   border: 1px solid color-mix(in oklab, var(--tone-amber) 42%, var(--chip-border));
-  border-radius: 14px;
+  border-radius: 0;
   background: color-mix(in oklab, var(--tone-amber) 14%, transparent);
 }
 
@@ -7313,7 +7298,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   gap: 4px;
   padding: 10px 12px;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--chip-border));
-  border-radius: 12px;
+  border-radius: 0;
   background: color-mix(in oklab, var(--chip-bg) 84%, transparent);
 }
 
@@ -7338,25 +7323,25 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .surprise-pill {
   margin-left: auto;
-  border: 1px solid color-mix(in oklab, var(--tone-amber) 50%, var(--chip-border));
-  background: color-mix(in oklab, var(--tone-amber) 24%, var(--chip-bg));
-  border-radius: 999px;
+  border: 1px solid var(--accent-ink);
+  background: var(--bg-main);
+  border-radius: 0;
   padding: 4px 10px;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: color-mix(in oklab, var(--text-main) 86%, var(--tone-amber));
+  color: var(--text-main);
 }
 
 .chapter-pill {
-  border: 1px solid color-mix(in oklab, var(--tone-teal) 46%, var(--chip-border));
-  background: color-mix(in oklab, var(--tone-teal) 22%, var(--chip-bg));
-  border-radius: 999px;
+  border: 1px solid var(--accent-ink);
+  background: var(--bg-main);
+  border-radius: 0;
   padding: 4px 10px;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: color-mix(in oklab, var(--text-main) 88%, var(--tone-teal));
+  color: var(--text-main);
 }
 
 .lives-inline {
@@ -7381,7 +7366,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .game-actions button {
   border: 1px solid var(--button-border);
-  border-radius: 10px;
+  border-radius: 0;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
   padding: 10px 14px;
@@ -7406,7 +7391,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 0;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 34%, var(--chip-border));
   background: color-mix(in oklab, var(--chip-bg) 82%, transparent);
   color: var(--text-soft);
@@ -7423,7 +7408,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 .round-feedback {
   margin-top: 12px;
   border: 1px solid var(--card-border);
-  border-radius: var(--radius-card);
+  border-radius: 0;
   padding: 12px;
   background: var(--card-bg-top);
 }
@@ -7739,9 +7724,9 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .minigame-challenge {
   margin-top: 0;
-  border-radius: var(--radius-card);
-  padding: 18px;
-  box-shadow: 0 20px 36px -28px rgba(0, 0, 0, 0.8);
+  border-radius: 0;
+  padding: 18px 0;
+  box-shadow: none;
 }
 
 .minigame-challenge-head {
@@ -7765,14 +7750,12 @@ html[data-reduced-motion='true'] .cassette-reel {
   display: grid;
   gap: 16px;
   width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
 }
 
 .minigame-round-progress {
   height: 3px;
   width: 100%;
-  border-radius: 999px;
+  border-radius: 0;
   overflow: hidden;
   background: color-mix(in oklab, var(--chip-bg) 80%, transparent);
 }
@@ -7864,6 +7847,70 @@ html[data-reduced-motion='true'] .cassette-reel {
   pointer-events: none;
 }
 
+.minigame-stats-dashboard {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--accent-ink);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.minigame-stat-cell {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--bg-main);
+  border-right: 1px solid var(--accent-ink);
+  position: relative;
+}
+
+.minigame-stat-cell:last-child {
+  border-right: none;
+}
+
+.minigame-stat-cell-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--accent-soft);
+}
+
+.minigame-stat-cell-label {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--accent-soft) 60%, var(--text-soft));
+  font-weight: 700;
+}
+
+.minigame-stat-cell-value {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1;
+}
+
+.minigame-stat-cell.is-gaining {
+  animation: minigamePointsPulse 360ms var(--motion-ease);
+}
+
+.minigame-stat-cell-gain {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  border: 1px solid var(--accent-ink);
+  border-radius: 0;
+  background: var(--bg-main);
+  color: #86dfa0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  animation: minigamePointsGainFloat 700ms var(--motion-ease);
+  pointer-events: none;
+}
+
 .minigame-support-row {
   display: grid;
   gap: 16px;
@@ -7879,7 +7926,24 @@ html[data-reduced-motion='true'] .cassette-reel {
 }
 
 .minigame-shell.minigame-focus-mode .minigame-core-column {
-  max-width: 760px;
+}
+
+.minigame-shell.minigame-focus-mode .hub-glitch-corner,
+.minigame-shell.minigame-focus-mode .hub-vhs-line,
+.minigame-shell.minigame-focus-mode .hub-crystal {
+  opacity: 0;
+  animation: none;
+}
+
+.minigame-shell .hub-player {
+  padding: 10px 14px;
+  align-content: safe center;
+}
+
+.minigame-shell .hub-studio {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
 }
 
 .minigame-response-column {
@@ -7888,8 +7952,8 @@ html[data-reduced-motion='true'] .cassette-reel {
 }
 
 .game-prompt-focus {
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius-card);
+  border: 1px solid var(--accent-ink);
+  border-radius: 0;
   background: color-mix(in oklab, var(--accent) 8%, var(--card-bg-top));
   padding: 14px;
   margin-bottom: 14px;
@@ -7898,7 +7962,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .minigame-prompt-card {
   margin-bottom: 0;
-  border-radius: 18px;
+  border-radius: 0;
   padding: 28px 18px;
   display: grid;
   justify-items: center;
@@ -7923,7 +7987,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   width: 28px;
   height: 28px;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 40%, var(--card-border));
-  border-radius: 999px;
+  border-radius: 0;
   background: color-mix(in oklab, var(--tone-ocean) 16%, transparent);
   color: var(--text-main);
   cursor: pointer;
@@ -7940,21 +8004,17 @@ html[data-reduced-motion='true'] .cassette-reel {
 }
 
 .minigame-response-card {
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--card-border));
-  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: 0;
   padding: 14px 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: var(--bg-main);
 }
 
 .minigame-assist-panel {
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--card-border));
-  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  border-radius: 0;
   padding: 14px 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: var(--bg-main);
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease;
 }
@@ -8011,7 +8071,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   width: 26px;
   height: 26px;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--card-border));
-  border-radius: 999px;
+  border-radius: 0;
   background: color-mix(in oklab, var(--chip-bg) 88%, transparent);
   color: var(--text-soft);
   transition: transform 200ms ease, color 160ms ease;
@@ -8057,7 +8117,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .minigame-shortcut-chip {
   border: 1px solid color-mix(in oklab, var(--chip-border) 94%, transparent);
-  border-radius: 999px;
+  border-radius: 0;
   padding: 2px 8px;
   font-size: 0.66rem;
   letter-spacing: 0.04em;
@@ -8131,7 +8191,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .game-hint-step {
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 18%, var(--chip-border));
-  border-radius: 12px;
+  border-radius: 0;
   padding: 9px 10px;
   background: color-mix(in oklab, var(--chip-bg) 72%, transparent);
   display: grid;
@@ -8241,8 +8301,8 @@ html[data-reduced-motion='true'] .cassette-reel {
 .game-hint-toggle {
   margin-top: 8px;
   padding: 4px 10px;
-  border: 1px dashed color-mix(in oklab, var(--panel-border) 80%, transparent);
-  border-radius: 6px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 80%, transparent);
+  border-radius: 0;
   background: transparent;
   color: var(--text-faint, var(--text-soft));
   font-size: 0.78rem;
@@ -8280,7 +8340,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   gap: 6px;
   padding: 6px 12px;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 40%, var(--card-border));
-  border-radius: 999px;
+  border-radius: 0;
   background: color-mix(in oklab, var(--tone-ocean) 16%, transparent);
   color: var(--text-main);
   font-size: 0.82rem;
@@ -8315,7 +8375,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   gap: 10px;
   padding: 14px 28px;
   border: 2px solid color-mix(in oklab, var(--tone-ocean) 60%, var(--card-border));
-  border-radius: 999px;
+  border-radius: 0;
   background: color-mix(in oklab, var(--tone-ocean) 22%, transparent);
   color: var(--text-main);
   font-size: 1rem;
@@ -8406,7 +8466,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 .game-input-row input {
   flex: 1;
   border: 1px solid var(--button-border);
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--chip-bg);
   color: var(--text-main);
   padding: 12px 14px;
@@ -8419,7 +8479,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 .option-button,
 .panel-actions button {
   border: 1px solid var(--button-border);
-  border-radius: 10px;
+  border-radius: 0;
   background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
   color: var(--text-main);
   padding: 12px 14px;
@@ -8684,7 +8744,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .minigame-option-grid .option-button {
   min-height: 74px;
-  border-radius: var(--radius-card);
+  border-radius: 0;
   padding: 14px 16px;
 }
 

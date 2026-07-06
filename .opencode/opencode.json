@@ -27,7 +27,7 @@
         },
         "deepseek-v4-pro": {
           "options": {
-            "reasoning_effort": "high"
+            "reasoning_effort": "max"
           }
         }
       }
@@ -57,7 +57,7 @@
   "mcp": {
     "playwright": {
       "type": "local",
-      "command": ["npx", "@playwright/mcp@latest"],
+      "command": ["npx", "@playwright/mcp@latest", "--browser", "chromium"],
       "enabled": true
     },
     "exa-search": {

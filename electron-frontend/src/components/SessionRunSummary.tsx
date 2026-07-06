@@ -122,7 +122,7 @@ export function SessionRunSummary({
       </div>
 
       <div className="game-actions minigame-session-summary-actions">
-        <button type="button" onClick={onRestart} disabled={sessionStartPending}>
+        <button type="button" className="hub-chip-button" onClick={onRestart} disabled={sessionStartPending}>
           Play Again
         </button>
         <button

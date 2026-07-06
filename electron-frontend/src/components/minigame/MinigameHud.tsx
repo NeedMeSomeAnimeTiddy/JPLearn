@@ -2,6 +2,15 @@ import { ArrowLeft, Focus, Heart, RotateCcw, Search, Settings } from 'lucide-rea
 import { DEFAULT_LIVES, SCRIPT_LABELS } from '../../constants'
 import type { ScriptKey } from '../../types'
 
+const SCRIPT_CODE: Record<ScriptKey, string> = {
+  hiragana: 'HNG',
+  katakana: 'KTA',
+  kanji_n5: 'KNJ',
+  vocab_n5: 'VCB',
+  grammar_patterns: 'GRM',
+  sentence_examples: 'SNT',
+}
+
 interface MinigameHudProps {
   activeScript: ScriptKey
   activeSectionName: string | null
@@ -41,8 +50,11 @@ export function MinigameHud({
   onOpenSettings,
   onToggleFocusMode,
 }: MinigameHudProps) {
+  const catalogCode = `JPL-${SCRIPT_CODE[activeScript]}-G`
+  const subCatalog = `${SCRIPT_LABELS[activeScript]}${activeSectionName ? ` · ${activeSectionName}` : ' Run'}`
+
   return (
-    <header className="topbar panel-glass minigame-hud">
+    <header className="hub-topbar">
       <div className="minigame-hud-start">
         <button
           type="button"
@@ -66,14 +78,15 @@ export function MinigameHud({
           </button>
         ) : null}
       </div>
-      <div className="brand-block minigame-brand-block">
-        <span className="brand-kicker">
-          {SCRIPT_LABELS[activeScript]}
-          {activeSectionName ? ` · ${activeSectionName}` : ' Run'}
-        </span>
-        <h1>{title}</h1>
+
+      <div className="hub-topbar-center">
+        <span className="hub-topbar-catalog">{catalogCode}</span>
+        <strong className="hub-topbar-title"><span className="hub-glitch-text">{title}</span></strong>
+        <span className="hub-topbar-catalog hub-topbar-catalog--sub">{subCatalog}</span>
+        <span className="hub-topbar-stripe" aria-hidden="true" />
       </div>
-      <div className="topbar-end">
+
+      <div className="hub-topbar-end">
         {sessionActive && livesEnabled ? (
           <div className="lives-inline minigame-lives-inline" aria-live="polite">
             {[...Array(DEFAULT_LIVES).keys()].map((life) => (

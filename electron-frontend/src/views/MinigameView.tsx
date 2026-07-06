@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { m, AnimatePresence } from 'motion/react'
 import {
   Activity,
   ArrowLeft,
@@ -20,6 +22,7 @@ import { SessionRunSummary } from '../components/SessionRunSummary'
 import type { MinigameKey, NavDirection, ScriptKey } from '../types'
 import {
   MINIGAMES,
+  SCRIPT_LABELS,
   formatExpectedAnswer,
   formatFeedbackAnswerLabel,
 } from '../constants'
@@ -319,6 +322,16 @@ export function MinigameView({
 
   return (
     <div className={`view-shell view-${navDirection} minigame-shell ${focusModeEnabled ? 'minigame-focus-mode' : ''}`}>
+      <div className="hub-crt-surface" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
+      <div className="hub-vhs-line" aria-hidden="true" />
+      <div className="hub-crystal hub-crystal--a" aria-hidden="true" />
+      <div className="hub-crystal hub-crystal--b" aria-hidden="true" />
+      <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
+
       <MinigameHud
         activeScript={activeScript}
         activeSectionName={activeSectionName}
@@ -339,266 +352,310 @@ export function MinigameView({
         onToggleFocusMode={toggleFocusMode}
       />
 
-      <section className="panel-glass game-panel minigame-stage-panel">
-        {!sessionActive ? (
-          <>
-            {sessionRunReport && !sessionStartPending ? (
-              <SessionRunSummary
-                report={sessionRunReport}
-                sessionStartPending={sessionStartPending}
-                onRestart={() => startSession()}
-                onBack={onBack}
-              />
-            ) : (
-              <div className="game-actions minigame-state-actions">
-                <button
-                  type="button"
-                  onClick={() => startSession()}
-                  disabled={gameLoading || activeRunCardsLength === 0 || sessionSummaryLoading || sessionStartPending}
-                >
-                  {sessionRunReport ? 'Play Again' : 'Play'}
-                </button>
-                <button
-                  type="button"
-                  className="back-button back-button-icon-only"
-                  onClick={onBack}
-                  aria-label="Back to map"
-                  title="Back to map"
-                >
-                  <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-                </button>
-                {gameLoading ? (
-                  <span>Loading deck...</span>
-                ) : (
-                  <span>{activeRunCardsLength} cards available</span>
-                )}
-              </div>
-            )}
-          </>
-        ) : null}
+      <div className="hub-studio">
+        <div className="hub-player">
+          <div className="hub-sweep minigame-focus-optional" aria-hidden="true" />
+          <div className="hub-particle hub-particle--1 minigame-focus-optional" aria-hidden="true" />
+          <div className="hub-particle hub-particle--2 minigame-focus-optional" aria-hidden="true" />
+          <div className="hub-particle hub-particle--3 minigame-focus-optional" aria-hidden="true" />
+          <div className="hub-particle hub-particle--4 minigame-focus-optional" aria-hidden="true" />
 
-        {(sessionStartPending && !sessionActive) || (sessionActive && !roundState) ? (
-          <div className="minigame-loading" role="status" aria-live="polite">
-            <LoaderCircle className="inline-button-icon spin-icon" strokeWidth={2.2} aria-hidden="true" />
-            <span>
-              {sessionStartPending ? 'Preparing your round...' : 'Loading next card...'}
-            </span>
+          {sessionActive ? (
+            <div className="hub-player-header minigame-focus-optional">
+              <p className="hero-kicker">
+                <span className="hub-rec-dot" aria-hidden="true" />{' '}
+                Round {sessionRounds + 1} of {sessionTargetItems} · {SCRIPT_LABELS[activeScript]}{activeSectionName ? ` · ${activeSectionName}` : ''}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="hub-eq minigame-focus-optional" aria-hidden="true">
+            <span className="hub-eq-bar" style={{ animationDelay: '0s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.1s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.2s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.05s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.15s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.25s' } as CSSProperties} />
           </div>
-        ) : null}
+          <div className="hub-deck-badge minigame-focus-optional" aria-hidden="true">
+            <span>DOLBY NR</span>
+            <span className="hub-deck-dot" />
+          </div>
 
-        {gameError ? <p className="status-line status-error">{gameError}</p> : null}
+          <section className="minigame-stage-panel">
+            {!sessionActive ? (
+              <>
+                {sessionRunReport && !sessionStartPending ? (
+                  <SessionRunSummary
+                    report={sessionRunReport}
+                    sessionStartPending={sessionStartPending}
+                    onRestart={() => startSession()}
+                    onBack={onBack}
+                  />
+                ) : (
+                  <div className="game-actions minigame-state-actions">
+                    <button
+                      type="button"
+                      onClick={() => startSession()}
+                      disabled={gameLoading || activeRunCardsLength === 0 || sessionSummaryLoading || sessionStartPending}
+                    >
+                      {sessionRunReport ? 'Play Again' : 'Play'}
+                    </button>
+                    <button
+                      type="button"
+                      className="back-button back-button-icon-only"
+                      onClick={onBack}
+                      aria-label="Back to map"
+                      title="Back to map"
+                    >
+                      <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                    </button>
+                    {gameLoading ? (
+                      <span>Loading deck...</span>
+                    ) : (
+                      <span>{activeRunCardsLength} cards available</span>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : null}
 
-        {sessionActive && roundState ? (
-          <article
-            className={`game-round minigame-challenge ${
-              roundFeedbackTone === 'error'
-                ? 'is-wrong'
-                : roundFeedbackTone === 'success'
-                  ? 'is-correct'
-                  : ''
-            }`}
-            key={`round-${sessionRounds}-${roundState.focusText}-${roundState.answer}`}
-          >
-            {roundState.chapterLabel || roundState.surprisePrompt ? (
-              <div className="game-round-head minigame-challenge-head">
-                <div className="minigame-challenge-badges minigame-focus-optional">
-                  {roundState.chapterLabel ? (
-                    <span className="chapter-pill">
-                      {roundState.chapterNumber ? `Chapter ${roundState.chapterNumber}` : 'Chapter'} · {roundState.chapterLabel}
-                    </span>
-                  ) : null}
-                  {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
-                </div>
+            {(sessionStartPending && !sessionActive) || (sessionActive && !roundState) ? (
+              <div className="minigame-loading" role="status" aria-live="polite">
+                <LoaderCircle className="inline-button-icon spin-icon" strokeWidth={2.2} aria-hidden="true" />
+                <span>
+                  {sessionStartPending ? 'Preparing your round...' : 'Loading next card...'}
+                </span>
               </div>
             ) : null}
 
-            <div className="minigame-challenge-body">
-              <div className="minigame-core-column">
-                <div
-                  className="minigame-round-progress"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={sessionTargetItems}
-                  aria-valuenow={Math.min(sessionRounds, sessionTargetItems)}
-                  aria-valuetext={`${sessionRounds} of ${sessionTargetItems} challenges, ${sessionStatusCopy}`}
-                  title={`${sessionRounds}/${sessionTargetItems} · ${sessionStatusCopy}`}
+            {gameError ? <p className="status-line status-error">{gameError}</p> : null}
+
+            {sessionActive && roundState ? (
+              <AnimatePresence mode="wait">
+                <m.article
+                  className={`game-round minigame-challenge ${
+                    roundFeedbackTone === 'error'
+                      ? 'is-wrong'
+                      : roundFeedbackTone === 'success'
+                        ? 'is-correct'
+                        : ''
+                  }`}
+                  key={`round-${sessionRounds}-${roundState.focusText}-${roundState.answer}`}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
                 >
-                  <div className="minigame-round-progress-fill" style={{ width: `${roundProgressValue * 100}%` }} />
-                </div>
-                <div className="minigame-stats-row" aria-live="polite">
-                  <span className={`minigame-stat-inline ${pointsGainPulse ? 'is-gaining' : ''}`} aria-label={`Points ${sessionPoints}`}>
-                    <span className="minigame-stat-heading">
-                      <Activity className="minigame-stat-icon" aria-hidden="true" strokeWidth={2.2} />
-                      <strong className="minigame-stat-label">Points</strong>
-                    </span>
-                    <strong className="minigame-stat-badge">{sessionPoints}</strong>
-                    {pointsGainAmount ? <span className="minigame-stat-gain">+{pointsGainAmount}</span> : null}
-                  </span>
-                  <span className="minigame-stat-inline" aria-label={`Streak ${sessionStreak}`}>
-                    <span className="minigame-stat-heading">
-                      <Flame className="minigame-stat-icon" aria-hidden="true" strokeWidth={2.2} />
-                      <strong className="minigame-stat-label">Streak</strong>
-                    </span>
-                    <strong className="minigame-stat-badge">{sessionStreak}</strong>
-                  </span>
-                  <span className="minigame-stat-inline" aria-label={`Current ${sessionScore} of ${sessionRounds}`}>
-                    <span className="minigame-stat-heading">
-                      <Target className="minigame-stat-icon" aria-hidden="true" strokeWidth={2.2} />
-                      <strong className="minigame-stat-label">Current</strong>
-                    </span>
-                    <strong className="minigame-stat-badge">{sessionScore}/{sessionRounds}</strong>
-                  </span>
-                  <span className="minigame-stat-inline" aria-label={`Goal ${sessionRounds} of ${sessionTargetItems}`}>
-                    <span className="minigame-stat-heading">
-                      <Trophy className="minigame-stat-icon" aria-hidden="true" strokeWidth={2.2} />
-                      <strong className="minigame-stat-label">Goal</strong>
-                    </span>
-                    <strong className="minigame-stat-badge">{sessionRounds}/{sessionTargetItems}</strong>
-                  </span>
-                </div>
+                {roundState.chapterLabel || roundState.surprisePrompt ? (
+                  <div className="game-round-head minigame-challenge-head">
+                    <div className="minigame-challenge-badges minigame-focus-optional">
+                      {roundState.chapterLabel ? (
+                        <span className="chapter-pill">
+                          {roundState.chapterNumber ? `Chapter ${roundState.chapterNumber}` : 'Chapter'} · {roundState.chapterLabel}
+                        </span>
+                      ) : null}
+                      {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
+                    </div>
+                  </div>
+                ) : null}
 
-                <ChallengePromptCard
-                  roundState={roundState}
-                  activeScript={activeScript}
-                  voiceEnabled={voiceEnabled}
-                  voiceBusy={voiceBusy}
-                  voiceUnavailable={voiceUnavailable}
-                  showKeyboardPrompts={showKeyboardPrompts}
-                  showRevealText={roundFeedback !== null}
-                  onPlayAudio={playAudio}
-                />
+                <div className="minigame-challenge-body">
+                  <div className="minigame-core-column">
+                    <div
+                      className="minigame-round-progress"
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={sessionTargetItems}
+                      aria-valuenow={Math.min(sessionRounds, sessionTargetItems)}
+                      aria-valuetext={`${sessionRounds} of ${sessionTargetItems} challenges, ${sessionStatusCopy}`}
+                      title={`${sessionRounds}/${sessionTargetItems} · ${sessionStatusCopy}`}
+                    >
+                      <div className="minigame-round-progress-fill" style={{ width: `${roundProgressValue * 100}%` }} />
+                    </div>
+                    <div className="minigame-stats-dashboard" aria-live="polite">
+                      <div className={`minigame-stat-cell ${pointsGainPulse ? 'is-gaining' : ''}`} aria-label={`Points ${sessionPoints}`}>
+                        <span className="minigame-stat-cell-icon">
+                          <Activity aria-hidden="true" strokeWidth={2.2} />
+                        </span>
+                        <span className="minigame-stat-cell-label">Points</span>
+                        <strong className="minigame-stat-cell-value">
+                          {sessionPoints}
+                          {pointsGainAmount ? <span className="minigame-stat-cell-gain">+{pointsGainAmount}</span> : null}
+                        </strong>
+                      </div>
+                      <div className="minigame-stat-cell" aria-label={`Streak ${sessionStreak}`}>
+                        <span className="minigame-stat-cell-icon">
+                          <Flame aria-hidden="true" strokeWidth={2.2} />
+                        </span>
+                        <span className="minigame-stat-cell-label">Streak</span>
+                        <strong className="minigame-stat-cell-value">{sessionStreak}</strong>
+                      </div>
+                      <div className="minigame-stat-cell" aria-label={`Current ${sessionScore} of ${sessionRounds}`}>
+                        <span className="minigame-stat-cell-icon">
+                          <Target aria-hidden="true" strokeWidth={2.2} />
+                        </span>
+                        <span className="minigame-stat-cell-label">Current</span>
+                        <strong className="minigame-stat-cell-value">{sessionScore}/{sessionRounds}</strong>
+                      </div>
+                      <div className="minigame-stat-cell" aria-label={`Goal ${sessionRounds} of ${sessionTargetItems}`}>
+                        <span className="minigame-stat-cell-icon">
+                          <Trophy aria-hidden="true" strokeWidth={2.2} />
+                        </span>
+                        <span className="minigame-stat-cell-label">Goal</span>
+                        <strong className="minigame-stat-cell-value">{sessionRounds}/{sessionTargetItems}</strong>
+                      </div>
+                    </div>
 
-                <MinigameResponsePanel
-                  isRoundResolving={isRoundResolving}
-                  mode={roundState.mode}
-                  title={
-                    roundState.mode === 'stroke_order'
-                      ? 'Build the matching kanji'
-                      : roundState.mode === 'romaji_sprint'
-                        ? 'Type the reading'
-                        : roundState.mode === 'sentence_assembly'
-                          ? 'Assemble the sentence'
-                        : roundState.mode === 'typed_recall'
-                          ? 'Type the meaning'
-                          : roundState.mode === 'speech_recall'
-                            ? 'Speak the meaning'
-                            : roundState.mode === 'particle_cloze'
-                              ? 'Choose the missing particle'
-                              : roundState.mode === 'vibe_check'
-                                ? 'Read the register vibe'
-                              : roundState.mode === 'imposter'
-                                ? 'Spot the grammar imposter'
-                            : 'Choose the best answer'
-                  }
-                  copy={
-                    roundState.mode === 'stroke_order'
-                      ? 'Type the romaji reading to narrow the kanji candidates.'
-                      : roundState.mode === 'romaji_sprint'
-                        ? 'Submit as soon as the reading is clear in your head.'
-                        : roundState.mode === 'sentence_assembly'
-                          ? 'Drag chunks into natural order, then submit.'
-                        : roundState.mode === 'typed_recall'
-                          ? 'Short, direct answers work best.'
-                          : roundState.mode === 'speech_recall'
-                            ? speechFallbackToTyped
+                    <ChallengePromptCard
+                      roundState={roundState}
+                      activeScript={activeScript}
+                      voiceEnabled={voiceEnabled}
+                      voiceBusy={voiceBusy}
+                      voiceUnavailable={voiceUnavailable}
+                      showKeyboardPrompts={showKeyboardPrompts}
+                      showRevealText={roundFeedback !== null}
+                      onPlayAudio={playAudio}
+                    />
+
+                    <MinigameResponsePanel
+                      isRoundResolving={isRoundResolving}
+                      mode={roundState.mode}
+                      title={
+                        roundState.mode === 'stroke_order'
+                          ? 'Build the matching kanji'
+                          : roundState.mode === 'romaji_sprint'
+                            ? 'Type the reading'
+                            : roundState.mode === 'sentence_assembly'
+                              ? 'Assemble the sentence'
+                            : roundState.mode === 'typed_recall'
+                              ? 'Type the meaning'
+                              : roundState.mode === 'speech_recall'
+                                ? 'Speak the meaning'
+                                : roundState.mode === 'particle_cloze'
+                                  ? 'Choose the missing particle'
+                                  : roundState.mode === 'vibe_check'
+                                    ? 'Read the register vibe'
+                                  : roundState.mode === 'imposter'
+                                    ? 'Spot the grammar imposter'
+                                : 'Choose the best answer'
+                      }
+                      copy={
+                        roundState.mode === 'stroke_order'
+                          ? 'Type the romaji reading to narrow the kanji candidates.'
+                          : roundState.mode === 'romaji_sprint'
+                            ? 'Submit as soon as the reading is clear in your head.'
+                            : roundState.mode === 'sentence_assembly'
+                              ? 'Drag chunks into natural order, then submit.'
+                            : roundState.mode === 'typed_recall'
                               ? 'Short, direct answers work best.'
-                              : 'Tap the mic and say your answer clearly.'
-                            : roundState.mode === 'particle_cloze'
-                              ? 'Use syntax and particle role to choose the best fit.'
-                              : roundState.mode === 'vibe_check'
-                                ? 'Use sentence endings like です, ます, or ください as tone clues.'
-                              : roundState.mode === 'imposter'
-                                ? 'Pick the token that introduces the grammar error.'
-                            : 'Commit to one answer and keep the run moving.'
-                  }
-                  confidenceCaptureEnabled={confidenceCaptureEnabled}
-                  roundConfidenceScore={roundConfidenceScore}
-                  onSetRoundConfidence={setRoundConfidence}
-                  feedback={roundFeedback}
-                  feedbackTone={roundFeedbackTone}
-                  feedbackPerformanceLabel={roundPerformanceLabel}
-                  feedbackComboBonus={roundComboBonus}
-                  feedbackMilestoneStreak={roundMilestoneStreak}
-                  feedbackAnswer={roundFeedbackAnswer}
-                  feedbackAnswerLabel={formatFeedbackAnswerLabel(roundState.mode)}
-                  livesEnabled={livesEnabled}
-                  feedbackAdvanceMs={feedbackAdvanceMs}
-                  feedbackAdvanceLabel={feedbackAdvanceLabel}
-                  showKeyboardPrompts={showKeyboardPrompts}
-                  onSkipFeedback={skipFeedback}
-                >
-                    {roundState.mode === 'stroke_order' ? (
-                      <StrokeOrderAnswerPanel
-                        activeBlockCards={activeBlockCards}
-                        answerInputRef={answerInputRef}
-                        roundInput={roundInput}
-                        disabled={isRoundResolving}
-                        onInputChange={setRoundInput}
-                        onSelect={submitAnswer}
-                      />
-                    ) : roundState.mode === 'sentence_assembly' ? (
-                      <SentenceAssemblyAnswerPanel
-                        options={roundState.options}
-                        disabled={isRoundResolving}
-                        onSubmit={submitAnswer}
-                      />
-                    ) : roundState.mode === 'speech_recall' && !speechFallbackToTyped ? (
-                      <SpeechAnswerPanel
-                        expectedAnswer={roundState.answer}
-                        disabled={isRoundResolving}
-                        onResult={({ transcript }) => submitAnswer(transcript)}
-                        onFallbackToTyped={() => setSpeechFallbackToTyped(true)}
-                      />
-                    ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' ? (
-                      <TypedAnswerPanel
-                        answerInputRef={answerInputRef}
-                        value={roundInput}
-                        placeholder={roundState.mode === 'romaji_sprint' ? 'Enter romaji' : 'Type meaning'}
-                        disabled={isRoundResolving}
-                        onChange={(value) =>
-                          setRoundInput(
-                            roundState.mode === 'romaji_sprint'
-                              ? sanitizeRomajiInput(value)
-                              : value,
-                          )
-                        }
-                        onSubmit={() => submitAnswer(roundInput)}
-                      />
-                    ) : (
-                      <ChoiceAnswerPanel
-                        options={roundState.options}
-                        disabled={isRoundResolving}
-                        characterMode={roundState.mode === 'character_match'}
-                        showKeyboardPrompts={showKeyboardPrompts}
-                        activeIndex={activeChoiceIndex}
-                        onActiveIndexChange={setActiveChoiceIndex}
-                        onSelect={submitAnswer}
-                      />
-                    )}
-                </MinigameResponsePanel>
-              </div>
+                              : roundState.mode === 'speech_recall'
+                                ? speechFallbackToTyped
+                                  ? 'Short, direct answers work best.'
+                                  : 'Tap the mic and say your answer clearly.'
+                                : roundState.mode === 'particle_cloze'
+                                  ? 'Use syntax and particle role to choose the best fit.'
+                                  : roundState.mode === 'vibe_check'
+                                    ? 'Use sentence endings like です, ます, or ください as tone clues.'
+                                  : roundState.mode === 'imposter'
+                                    ? 'Pick the token that introduces the grammar error.'
+                                : 'Commit to one answer and keep the run moving.'
+                      }
+                      confidenceCaptureEnabled={confidenceCaptureEnabled}
+                      roundConfidenceScore={roundConfidenceScore}
+                      onSetRoundConfidence={setRoundConfidence}
+                      feedback={roundFeedback}
+                      feedbackTone={roundFeedbackTone}
+                      feedbackPerformanceLabel={roundPerformanceLabel}
+                      feedbackComboBonus={roundComboBonus}
+                      feedbackMilestoneStreak={roundMilestoneStreak}
+                      feedbackAnswer={roundFeedbackAnswer}
+                      feedbackAnswerLabel={formatFeedbackAnswerLabel(roundState.mode)}
+                      livesEnabled={livesEnabled}
+                      feedbackAdvanceMs={feedbackAdvanceMs}
+                      feedbackAdvanceLabel={feedbackAdvanceLabel}
+                      showKeyboardPrompts={showKeyboardPrompts}
+                      onSkipFeedback={skipFeedback}
+                    >
+                        {roundState.mode === 'stroke_order' ? (
+                          <StrokeOrderAnswerPanel
+                            activeBlockCards={activeBlockCards}
+                            answerInputRef={answerInputRef}
+                            roundInput={roundInput}
+                            disabled={isRoundResolving}
+                            onInputChange={setRoundInput}
+                            onSelect={submitAnswer}
+                          />
+                        ) : roundState.mode === 'sentence_assembly' ? (
+                          <SentenceAssemblyAnswerPanel
+                            options={roundState.options}
+                            disabled={isRoundResolving}
+                            onSubmit={submitAnswer}
+                          />
+                        ) : roundState.mode === 'speech_recall' && !speechFallbackToTyped ? (
+                          <SpeechAnswerPanel
+                            expectedAnswer={roundState.answer}
+                            disabled={isRoundResolving}
+                            onResult={({ transcript }) => submitAnswer(transcript)}
+                            onFallbackToTyped={() => setSpeechFallbackToTyped(true)}
+                          />
+                        ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' ? (
+                          <TypedAnswerPanel
+                            answerInputRef={answerInputRef}
+                            value={roundInput}
+                            placeholder={roundState.mode === 'romaji_sprint' ? 'Enter romaji' : 'Type meaning'}
+                            disabled={isRoundResolving}
+                            onChange={(value) =>
+                              setRoundInput(
+                                roundState.mode === 'romaji_sprint'
+                                  ? sanitizeRomajiInput(value)
+                                  : value,
+                              )
+                            }
+                            onSubmit={() => submitAnswer(roundInput)}
+                          />
+                        ) : (
+                          <ChoiceAnswerPanel
+                            options={roundState.options}
+                            disabled={isRoundResolving}
+                            characterMode={roundState.mode === 'character_match'}
+                            showKeyboardPrompts={showKeyboardPrompts}
+                            activeIndex={activeChoiceIndex}
+                            onActiveIndexChange={setActiveChoiceIndex}
+                            onSelect={submitAnswer}
+                          />
+                        )}
+                    </MinigameResponsePanel>
+                  </div>
 
-              <div className="minigame-support-row">
-                <HintAssistPanel
-                  roundState={roundState}
-                  isRoundResolving={isRoundResolving}
-                  hintStep={hintStep}
-                  hintRevealCount={hintRevealCount}
-                  showKeyboardPrompts={showKeyboardPrompts}
-                  formattedAnswer={roundState.answerDisplay ?? formatExpectedAnswer(roundState.answer)}
-                  onRevealHint={() => {
-                    if (hintStep < 1) {
-                      setHintRevealCount((value) => value + 1)
-                    }
-                    setHintStep(1)
-                  }}
-                  onRevealMoreHint={advanceHintStep}
-                />
-              </div>
-            </div>
-          </article>
-        ) : null}
-      </section>
+                  <div className="minigame-support-row">
+                    <HintAssistPanel
+                      roundState={roundState}
+                      isRoundResolving={isRoundResolving}
+                      hintStep={hintStep}
+                      hintRevealCount={hintRevealCount}
+                      showKeyboardPrompts={showKeyboardPrompts}
+                      formattedAnswer={roundState.answerDisplay ?? formatExpectedAnswer(roundState.answer)}
+                      onRevealHint={() => {
+                        if (hintStep < 1) {
+                          setHintRevealCount((value) => value + 1)
+                        }
+                        setHintStep(1)
+                      }}
+                      onRevealMoreHint={advanceHintStep}
+                    />
+                  </div>
+                </div>
+              </m.article>
+              </AnimatePresence>
+            ) : null}
+          </section>
+
+          <div className="hub-deck-badge hub-deck-badge--right minigame-focus-optional" aria-hidden="true">
+            <span>TYPE II · HIGH BIAS</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
