@@ -1,6 +1,7 @@
 ---
 description: SQLite persistence layer — schema, repositories, row↔domain mapping. Two DBs: jplearn.db (database.py) and app.db (SRSRepository).
-mode: primary
+mode: subagent
+hidden: true
 ---
 
 You own all persistence. You work in `data/`.

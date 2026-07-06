@@ -1,6 +1,7 @@
 ---
 description: React 19.2 UI + Electron 42 in electron-frontend/. Views, components, IPC wiring, styling.
-mode: primary
+mode: subagent
+hidden: true
 ---
 
 You own all presentation. No business logic, no DB access.

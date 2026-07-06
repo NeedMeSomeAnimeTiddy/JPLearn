@@ -1,6 +1,8 @@
 ---
 name: Data
 description: Handles all SQLite database access in /data/. Responsible for schema management, CRUD operations, and mapping between SQLite rows and Domain models.
+mode: subagent
+hidden: true
 argument-hint: Schema changes, repository methods, or storage operations.
 tools: ['read', 'edit', 'search', 'todo']
 ---

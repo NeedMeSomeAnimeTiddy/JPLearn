@@ -1,6 +1,8 @@
 ---
 name: UI
 description: Handles all user interface and presentation logic in /ui/ and electron-frontend/. Converts domain outputs into displayable format only. No business or database logic allowed.
+mode: subagent
+hidden: true
 argument-hint: UI component, rendering logic, or user interaction behaviour.
 tools: ['read', 'edit', 'search', 'todo']
 ---

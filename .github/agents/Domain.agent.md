@@ -1,6 +1,8 @@
 ---
 name: Domain
 description: Implements all SRS, active recall, scoring, and Japanese learning logic in /domain/. Pure logic only. No database, no UI, no I/O allowed.
+mode: subagent
+hidden: true
 argument-hint: Feature or change involving learning logic, scheduling, recall behaviour, or item processing.
 tools: ['read', 'edit', 'search', 'todo']
 ---

@@ -1,6 +1,7 @@
 ---
 description: Explores divergent ideas, multiple approaches, and unconventional solutions
 mode: primary
+model: deepseek/deepseek-v4-flash
 temperature: 0.8
 ---
 

@@ -1,6 +1,7 @@
 ---
 description: Pure SRS, scoring, progression, and Japanese learning logic in /domain/. No I/O, no DB, no UI.
-mode: primary
+mode: subagent
+hidden: true
 ---
 
 You own all learning logic. Deterministic functions only — no hidden state, no randomness, no I/O.
