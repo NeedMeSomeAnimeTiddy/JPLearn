@@ -278,3 +278,6 @@ token-usage-output.txt
 
 # opencode: TUI output
 tui.json
+
+# Playwright MCP runtime artifacts (console logs, page snapshots, screenshots)
+.playwright-mcp/
