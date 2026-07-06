@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { LearningPathStatus, SectionReadiness } from '../types'
-import { ArrowRight, Check, RefreshCw } from 'lucide-react'
+import { Check, RefreshCw } from 'lucide-react'
 
 interface LearningPathPanelProps {
   status: LearningPathStatus
@@ -27,8 +27,6 @@ const STEP_GLYPHS: Record<string, string> = {
 export function LearningPathPanel({ status, onContinue, onChangePath }: LearningPathPanelProps) {
   if (!status.path_id || status.steps.length === 0) return null
 
-  const activeStep = status.steps.find((step) => step.readiness === 'suggested_next') ?? null
-
   return (
     <section className="learning-path-panel panel-glass" aria-label="Your learning path">
       <div className="lpp-header">
@@ -37,17 +35,6 @@ export function LearningPathPanel({ status, onContinue, onChangePath }: Learning
           <strong className="lpp-path-name">{status.path_name}</strong>
         </div>
         <div className="lpp-header-actions">
-          {activeStep && (
-            <button
-              type="button"
-              className="lpp-icon-btn lpp-continue-btn btn-primary"
-              onClick={() => onContinue(activeStep.section_id)}
-              aria-label={`Continue ${activeStep.label}`}
-              title={`Continue ${activeStep.label}`}
-            >
-              <ArrowRight size={13} strokeWidth={2.4} aria-hidden="true" />
-            </button>
-          )}
           <button
             type="button"
             className="lpp-icon-btn lpp-change-btn"

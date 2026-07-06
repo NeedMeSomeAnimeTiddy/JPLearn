@@ -2795,6 +2795,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: none;
+  align-content: safe center;
   position: relative;
   background:
     radial-gradient(ellipse 500px 240px at 50% 10%,
@@ -3637,7 +3638,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
 }
 
 .home-study-plan-strip {
-  margin-top: 12px;
+  margin-top: -6px;
   margin-left: -14px;
   margin-right: -14px;
   border-radius: 0;
@@ -6138,6 +6139,8 @@ html[data-reduced-motion='true'] .game-tile-reel {
   min-height: 0;
   /* hide scrollbar */
   scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
 }
 .cassette-viewport::-webkit-scrollbar { display: none; }
 
@@ -6232,7 +6235,7 @@ html[data-reduced-motion='true'] .game-tile-reel {
   font-family: var(--display-font);
   font-size: clamp(1rem, 2.4vw, 1.35rem);
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 1.2;
   color: #241a12;
   overflow: hidden;
   display: -webkit-box;
@@ -11603,7 +11606,8 @@ html[data-reduced-motion='true'] *::after {
   border-radius: 0;
   margin-left: -14px;
   margin-right: -14px;
-  margin-bottom: 7px;
+  margin-top: -6px;
+  margin-bottom: 0;
   position: relative;
   overflow: hidden;
 }
@@ -11629,15 +11633,15 @@ html[data-reduced-motion='true'] *::after {
 
 .lpp-title-group {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  flex-direction: row;
+  align-items: baseline;
   justify-content: center;
-  gap: 0;
+  gap: 8px;
   min-width: 0;
   text-align: center;
   width: max-content;
   max-width: calc(100% - 78px);
-  line-height: 1;
+  line-height: 1.2;
   position: absolute;
   left: 50%;
   top: 50%;
@@ -11646,11 +11650,11 @@ html[data-reduced-motion='true'] *::after {
 
 .lpp-title-group .hero-kicker {
   margin: 0;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .lpp-title-group .lpp-path-name {
-  margin-top: 1px;
+  margin-top: 0;
 }
 
 .lpp-path-name {

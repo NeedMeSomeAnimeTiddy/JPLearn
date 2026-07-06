@@ -52,20 +52,38 @@ export function MinigameCassetteCarousel({
     const centre = trackRect.left + trackRect.width / 2
     const half = trackRect.width / 2
 
-    slideRefs.current.forEach((slideEl, i) => {
-      const cassetteEl = cassetteRefs.current[i]
-      if (!slideEl || !cassetteEl) return
-      const slideRect = slideEl.getBoundingClientRect()
-      const slideCentre = slideRect.left + slideRect.width / 2
-      const offset = (slideCentre - centre) / Math.max(half, 1)
-      const t = Math.min(Math.abs(offset), 1)
+    let centerIdx = 0
+    let minT = Infinity
+    const data: Array<{ t: number; offset: number; scale: number; w: number } | null> =
+      slideRefs.current.map((slideEl) => {
+        if (!slideEl) return null
+        const r = slideEl.getBoundingClientRect()
+        const o = (r.left + r.width / 2 - centre) / Math.max(half, 1)
+        const t = Math.min(Math.abs(o), 1)
+        if (t < minT) { minT = t; centerIdx = slideRefs.current.indexOf(slideEl) }
+        return { t, offset: o, scale: 1 - t * 0.3, w: r.width }
+      })
 
-      const scale = 1 - t * 0.4
-      const opacity = 1 - t * 0.75
+    slideRefs.current.forEach((slideEl, i) => {
+      const cell = data[i]
+      const cassetteEl = cassetteRefs.current[i]
+      if (!slideEl || !cell || !cassetteEl) return
+      const { t, offset, scale, w } = cell
+
+      let tx = 0
+      if (i === centerIdx - 1) {
+        tx = -(1 - scale) * w / 2
+      } else if (i === centerIdx + 1) {
+        tx = (1 - scale) * w / 2
+      }
+
+      const opacity = 1 - t * 0.5
       const lift = (1 - t) * 10
       const z = Math.round((1 - t) * 90) + 10
+      const origin = offset > 0 ? 'left center' : offset < 0 ? 'right center' : 'center center'
 
-      cassetteEl.style.transform = `translate3d(0, -${lift}px, 0) scale(${scale})`
+      cassetteEl.style.transformOrigin = origin
+      cassetteEl.style.transform = `translate3d(${tx}px, -${lift}px, 0) scale(${scale})`
       cassetteEl.style.opacity = String(opacity)
       cassetteEl.style.zIndex = String(z)
       cassetteEl.style.setProperty('--tween-progress', (1 - t).toFixed(3))
