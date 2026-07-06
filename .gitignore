@@ -277,6 +277,9 @@ thoughts/
 token-usage-output.txt
 
 # opencode: TUI output
+
+# opencode: runtime temp files
+opencode/**/proc.txt
 tui.json
 
 # Playwright MCP runtime artifacts (console logs, page snapshots, screenshots)
