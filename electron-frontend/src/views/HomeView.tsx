@@ -46,13 +46,11 @@ interface RecommendationData {
 interface HomeViewProps {
   navDirection: NavDirection
   studyPlan: StudyPlanSnapshot
-  homeStudyPlanExpanded: boolean
   tutorBanner?: TutorBannerData | null
   recommendations?: RecommendationData[]
   learningPathStatus?: LearningPathStatus | null
   onSelectScript: (script: ScriptKey) => void
   onOpenJlptPrep: () => void
-  onToggleStudyPlan: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
   onDismissTutorBanner?: (dedupKey: string) => void
   onStartRecommendation?: (nodeId: string) => void
@@ -72,13 +70,11 @@ const SCRIPT_ORDER: readonly ScriptKey[] = [
 export function HomeView({
   navDirection,
   studyPlan,
-  homeStudyPlanExpanded,
   tutorBanner,
   recommendations,
   learningPathStatus,
   onSelectScript,
   onOpenJlptPrep,
-  onToggleStudyPlan,
   onJumpToSetup,
   onDismissTutorBanner,
   onStartRecommendation,
@@ -283,13 +279,7 @@ export function HomeView({
 
           {studyPlan.coverageRows.length > 0 ? (
             <section className="home-study-plan-strip panel-glass" aria-label="Study plan">
-              <button
-                type="button"
-                className="home-study-plan-toggle"
-                onClick={onToggleStudyPlan}
-                aria-expanded={homeStudyPlanExpanded}
-                aria-controls="home-study-plan-body"
-              >
+              <div className="home-study-plan-row">
                 <div className="home-study-plan-heading">
                   <p className="hero-kicker">Study Plan</p>
                   <strong>
@@ -303,57 +293,20 @@ export function HomeView({
                   </strong>
                   <span>{studyPlan.sessionNote}</span>
                 </div>
-                <div className="home-study-plan-summary">
-                  <span>{Math.round(studyPlan.overallMastery * 100)}% coverage</span>
-                  <span>{studyPlan.focusRows[0]?.label ?? 'Keep reviewing'}</span>
-                  <span
-                    aria-hidden="true"
-                    className={`home-study-plan-chevron ${homeStudyPlanExpanded ? 'is-open' : ''}`}
-                  >
-                    ▾
-                  </span>
-                </div>
-              </button>
 
-              <div
-                id="home-study-plan-body"
-                className={`home-study-plan-body ${homeStudyPlanExpanded ? 'is-open' : ''}`}
-              >
-                <div className="home-study-plan-strip-grid">
-                  <div className="home-study-plan-shortcuts" aria-label="Study plan shortcuts">
-                    {studyPlan.shortcutRows.slice(0, 2).map((shortcut) => (
-                      <button
-                        key={shortcut.key}
-                        type="button"
-                        className="study-plan-shortcut-button study-plan-shortcut-button-inline"
-                        onClick={() => onJumpToSetup(shortcut.script, shortcut.minigame)}
-                      >
-                        <span className="study-plan-shortcut-kicker">Quick shortcut</span>
-                        <strong>{shortcut.label}</strong>
-                        <p>{shortcut.note}</p>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="home-study-plan-metrics">
-                    {studyPlan.coverageRows.slice(0, 3).map((row) => {
-                      const pct = Math.round(row.mastery * 100)
-                      return (
-                        <div key={row.key} className="home-study-plan-metric-row">
-                          <div className="home-study-plan-metric-head">
-                            <strong>{row.label}</strong>
-                            <span>{pct}%</span>
-                          </div>
-                          <div className="study-plan-coverage-bar" aria-hidden="true">
-                            <div
-                              className="study-plan-coverage-fill"
-                              style={{ '--study-plan-pct': `${pct}%` } as CSSProperties}
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                <div className="home-study-plan-shortcuts" aria-label="Study plan shortcuts">
+                  {studyPlan.shortcutRows.map((shortcut) => (
+                    <button
+                      key={shortcut.key}
+                      type="button"
+                      className="study-plan-shortcut-button study-plan-shortcut-button-inline"
+                      onClick={() => onJumpToSetup(shortcut.script, shortcut.minigame)}
+                    >
+                      <span className="study-plan-shortcut-kicker">Quick shortcut</span>
+                      <strong>{shortcut.label}</strong>
+                      <p>{shortcut.note}</p>
+                    </button>
+                  ))}
                 </div>
               </div>
             </section>

@@ -3683,7 +3683,6 @@ function App() {
   const pageLoadingLabel = gameLoading ? 'Loading deck cards…' : 'Loading…'
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
-  const [homeStudyPlanExpanded, setHomeStudyPlanExpanded] = useState(false)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
   const [tutorReactions, setTutorReactions] = useState<TutorReactionItem[]>([])
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
@@ -8144,7 +8143,6 @@ function App() {
   return (
     <main className="app-shell" data-background-style={settings.backgroundStyle} style={appShellStyle}>
       <header className="window-titlebar" aria-label="Window controls">
-        <span className="window-titlebar-wordmark" aria-hidden="true">JPLearn</span>
         <div className="window-titlebar-drag">
           <div className="window-titlebar-nav" role="group" aria-label="App navigation">
             <div className="titlebar-shortcut-wrap" ref={shortcutMenuRef}>
@@ -8455,7 +8453,7 @@ function App() {
                     style={{ '--xp-pct': `${xpPercent}%` } as CSSProperties}
                   />
                 </div>
-                <span className="titlebar-xp-percent">{xpPercent}%</span>
+
               </button>
               <div
                 id="titlebar-xp-details"
@@ -8618,7 +8616,6 @@ function App() {
         <HomeView
           navDirection={navDirection}
           studyPlan={studyPlan}
-          homeStudyPlanExpanded={homeStudyPlanExpanded}
           learningPathStatus={learningPathStatus}
           tutorBanner={tutorReactions[0] ? {
             dedupKey: tutorReactions[0].dedup_key,
@@ -8700,7 +8697,6 @@ function App() {
             setNavDirection('forward')
             setView('jlpt_prep')
           }}
-          onToggleStudyPlan={() => setHomeStudyPlanExpanded((expanded) => !expanded)}
           onJumpToSetup={jumpToScriptHubSetup}
         />
       ) : null}

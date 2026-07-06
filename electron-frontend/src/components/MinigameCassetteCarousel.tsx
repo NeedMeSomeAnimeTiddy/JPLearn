@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import type { MinigameKey } from '../types'
@@ -24,41 +24,24 @@ interface MinigameCassetteCarouselProps {
   onPlayGame: (game: MinigameKey) => void
 }
 
-const CLONE_COUNT = 3
-
 export function MinigameCassetteCarousel({
   items,
   activeGame,
   onSelectGame,
   onPlayGame,
 }: MinigameCassetteCarouselProps) {
-  const N = items.length
-  // Build looped array: [last 3 clones, ...real items, ...first 3 clones]
-  const loopedItems = useMemo(
-    () => [...items.slice(-CLONE_COUNT), ...items, ...items.slice(0, CLONE_COUNT)],
-    [items],
-  )
-
-  const realStartIndex = Math.max(0, items.findIndex((item) => item.key === activeGame))
-  const loopedStartIndex = realStartIndex + CLONE_COUNT
+  const startIndex = Math.max(0, items.findIndex((item) => item.key === activeGame))
 
   const trackRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const cassetteRefs = useRef<(HTMLElement | null)[]>([])
-  const [selectedIndex, setSelectedIndex] = useState(loopedStartIndex)
-  const jumpingRef = useRef(false)
+  const [selectedIndex, setSelectedIndex] = useState(startIndex)
 
   // Stable refs so callbacks never need to re-bind.
   const itemsRef = useRef(items)
   itemsRef.current = items
   const onSelectRef = useRef(onSelectGame)
   onSelectRef.current = onSelectGame
-
-  // Map looped index → real index
-  const toReal = useCallback(
-    (i: number) => ((i - CLONE_COUNT) % N + N) % N,
-    [N],
-  )
 
   // Apply coverflow tween: measure each cassette's pixel offset from the
   // track's visible centre, derive scale / opacity / lift.
@@ -89,50 +72,10 @@ export function MinigameCassetteCarousel({
     })
   }, [])
 
-  // Jump silently to the corresponding real position when at clone edges.
-  const checkLoopJump = useCallback(() => {
-    const track = trackRef.current
-    if (!track || jumpingRef.current) return
-
-    if (selectedIndex < CLONE_COUNT) {
-      const targetIdx = selectedIndex + N
-      const slide = slideRefs.current[targetIdx]
-      if (slide && track) {
-        jumpingRef.current = true
-        track.style.scrollSnapType = 'none'
-        const trackRect = track.getBoundingClientRect()
-        const slideRect = slide.getBoundingClientRect()
-        const offset = slideRect.left - trackRect.left - trackRect.width / 2 + slideRect.width / 2
-        track.scrollLeft = track.scrollLeft + offset
-        setSelectedIndex(targetIdx)
-        requestAnimationFrame(() => {
-          track.style.scrollSnapType = ''
-          jumpingRef.current = false
-        })
-      }
-    } else if (selectedIndex >= CLONE_COUNT + N) {
-      const targetIdx = selectedIndex - N
-      const slide = slideRefs.current[targetIdx]
-      if (slide && track) {
-        jumpingRef.current = true
-        track.style.scrollSnapType = 'none'
-        const trackRect = track.getBoundingClientRect()
-        const slideRect = slide.getBoundingClientRect()
-        const offset = slideRect.left - trackRect.left - trackRect.width / 2 + slideRect.width / 2
-        track.scrollLeft = track.scrollLeft + offset
-        setSelectedIndex(targetIdx)
-        requestAnimationFrame(() => {
-          track.style.scrollSnapType = ''
-          jumpingRef.current = false
-        })
-      }
-    }
-  }, [selectedIndex, N])
-
   // Detect which slide is closest to centre once scrolling settles.
   const settleSelection = useCallback(() => {
     const track = trackRef.current
-    if (!track || jumpingRef.current) return
+    if (!track) return
     const trackRect = track.getBoundingClientRect()
     const centre = trackRect.left + trackRect.width / 2
     let bestIdx = selectedIndex
@@ -150,14 +93,10 @@ export function MinigameCassetteCarousel({
 
     if (bestIdx !== selectedIndex) {
       setSelectedIndex(bestIdx)
-      const realIdx = toReal(bestIdx)
-      const item = itemsRef.current[realIdx]
+      const item = itemsRef.current[bestIdx]
       if (item) onSelectRef.current(item.key)
     }
-
-    // Check if we need to loop-jump after settling
-    setTimeout(() => checkLoopJump(), 50)
-  }, [selectedIndex, toReal, checkLoopJump])
+  }, [selectedIndex])
 
   // Scroll event: tween every frame, debounce settle check.
   useEffect(() => {
@@ -166,7 +105,6 @@ export function MinigameCassetteCarousel({
 
     let settleTimer: ReturnType<typeof setTimeout>
     const handleScroll = () => {
-      if (jumpingRef.current) return
       applyTween()
       clearTimeout(settleTimer)
       settleTimer = setTimeout(settleSelection, 120)
@@ -185,15 +123,15 @@ export function MinigameCassetteCarousel({
   useEffect(() => {
     const track = trackRef.current
     if (!track) return
-    const slide = slideRefs.current[loopedStartIndex]
+    const slide = slideRefs.current[startIndex]
     if (slide) {
       const trackRect = track.getBoundingClientRect()
       const slideRect = slide.getBoundingClientRect()
       const offset = slideRect.left - trackRect.left - trackRect.width / 2 + slideRect.width / 2
       track.scrollLeft = track.scrollLeft + offset
-      setSelectedIndex(loopedStartIndex)
+      setSelectedIndex(startIndex)
     }
-  }, [items, loopedStartIndex])
+  }, [items, startIndex])
 
   const scrollBy = useCallback((dir: -1 | 1) => {
     const track = trackRef.current
@@ -217,22 +155,21 @@ export function MinigameCassetteCarousel({
     track.scrollBy({ left: offset, behavior: 'smooth' })
   }, [])
 
-  const handleCassetteClick = useCallback((loopedIdx: number, item: CassetteItem) => {
+  const handleCassetteClick = useCallback((idx: number, item: CassetteItem) => {
     if (item.locked) {
-      scrollToIndex(loopedIdx)
+      scrollToIndex(idx)
       return
     }
-    if (loopedIdx === selectedIndex) {
+    if (idx === selectedIndex) {
       onPlayGame(item.key)
       return
     }
-    setSelectedIndex(loopedIdx)
+    setSelectedIndex(idx)
     onSelectGame(item.key)
-    scrollToIndex(loopedIdx)
+    scrollToIndex(idx)
   }, [selectedIndex, onPlayGame, onSelectGame, scrollToIndex])
 
-  const realSelectedIndex = toReal(selectedIndex)
-  const selected = items[realSelectedIndex]
+  const selected = items[selectedIndex]
 
   // Keyboard: ← → to navigate, Enter/Space to launch focused
   const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
@@ -271,10 +208,10 @@ export function MinigameCassetteCarousel({
       </button>
 
       <div className="cassette-viewport" ref={trackRef}>
-        {loopedItems.map((item, loopedIdx) => {
-          const isSelected = loopedIdx === selectedIndex
+        {items.map((item, idx) => {
+          const isSelected = idx === selectedIndex
           return (
-            <div className="cassette-slide" key={`${item.key}-${loopedIdx}`} ref={setSlideRef(loopedIdx)}>
+            <div className="cassette-slide" key={item.key} ref={setSlideRef(idx)}>
               <button
                 type="button"
                 className={`cassette cassette--${item.difficultyLevel}${isSelected ? ' is-selected' : ''}${item.locked ? ' is-locked' : ''}`}
@@ -286,7 +223,7 @@ export function MinigameCassetteCarousel({
                       : `Focus ${item.title}`
                 }
                 aria-pressed={isSelected}
-                onClick={() => handleCassetteClick(loopedIdx, item)}
+                onClick={() => handleCassetteClick(idx, item)}
               >
                 <span className="cassette-screw cassette-screw-tl" aria-hidden="true" />
                 <span className="cassette-screw cassette-screw-tr" aria-hidden="true" />

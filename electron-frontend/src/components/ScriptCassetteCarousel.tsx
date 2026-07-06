@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import type { ScriptKey } from '../types'
@@ -22,38 +22,23 @@ interface ScriptCassetteCarouselProps {
   onPlayScript: (script: ScriptKey) => void
 }
 
-const CLONE_COUNT = 3
-
 export function ScriptCassetteCarousel({
   items,
   activeScript,
   onSelectScript,
   onPlayScript,
 }: ScriptCassetteCarouselProps) {
-  const N = items.length
-  const loopedItems = useMemo(
-    () => [...items.slice(-CLONE_COUNT), ...items, ...items.slice(0, CLONE_COUNT)],
-    [items],
-  )
-
-  const realStartIndex = Math.max(0, items.findIndex((item) => item.key === activeScript))
-  const loopedStartIndex = realStartIndex + CLONE_COUNT
+  const startIndex = Math.max(0, items.findIndex((item) => item.key === activeScript))
 
   const trackRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
   const cassetteRefs = useRef<(HTMLElement | null)[]>([])
-  const [selectedIndex, setSelectedIndex] = useState(loopedStartIndex)
-  const jumpingRef = useRef(false)
+  const [selectedIndex, setSelectedIndex] = useState(startIndex)
 
   const itemsRef = useRef(items)
   itemsRef.current = items
   const onSelectRef = useRef(onSelectScript)
   onSelectRef.current = onSelectScript
-
-  const toReal = useCallback(
-    (i: number) => ((i - CLONE_COUNT) % N + N) % N,
-    [N],
-  )
 
   const applyTween = useCallback(() => {
     const track = trackRef.current
@@ -82,48 +67,9 @@ export function ScriptCassetteCarousel({
     })
   }, [])
 
-  const checkLoopJump = useCallback(() => {
-    const track = trackRef.current
-    if (!track || jumpingRef.current) return
-
-    if (selectedIndex < CLONE_COUNT) {
-      const targetIdx = selectedIndex + N
-      const slide = slideRefs.current[targetIdx]
-      if (slide && track) {
-        jumpingRef.current = true
-        track.style.scrollSnapType = 'none'
-        const trackRect = track.getBoundingClientRect()
-        const slideRect = slide.getBoundingClientRect()
-        const offset = slideRect.left - trackRect.left - trackRect.width / 2 + slideRect.width / 2
-        track.scrollLeft = track.scrollLeft + offset
-        setSelectedIndex(targetIdx)
-        requestAnimationFrame(() => {
-          track.style.scrollSnapType = ''
-          jumpingRef.current = false
-        })
-      }
-    } else if (selectedIndex >= CLONE_COUNT + N) {
-      const targetIdx = selectedIndex - N
-      const slide = slideRefs.current[targetIdx]
-      if (slide && track) {
-        jumpingRef.current = true
-        track.style.scrollSnapType = 'none'
-        const trackRect = track.getBoundingClientRect()
-        const slideRect = slide.getBoundingClientRect()
-        const offset = slideRect.left - trackRect.left - trackRect.width / 2 + slideRect.width / 2
-        track.scrollLeft = track.scrollLeft + offset
-        setSelectedIndex(targetIdx)
-        requestAnimationFrame(() => {
-          track.style.scrollSnapType = ''
-          jumpingRef.current = false
-        })
-      }
-    }
-  }, [selectedIndex, N])
-
   const settleSelection = useCallback(() => {
     const track = trackRef.current
-    if (!track || jumpingRef.current) return
+    if (!track) return
     const trackRect = track.getBoundingClientRect()
     const centre = trackRect.left + trackRect.width / 2
     let bestIdx = selectedIndex
@@ -141,13 +87,10 @@ export function ScriptCassetteCarousel({
 
     if (bestIdx !== selectedIndex) {
       setSelectedIndex(bestIdx)
-      const realIdx = toReal(bestIdx)
-      const item = itemsRef.current[realIdx]
+      const item = itemsRef.current[bestIdx]
       if (item) onSelectRef.current(item.key)
     }
-
-    setTimeout(() => checkLoopJump(), 50)
-  }, [selectedIndex, toReal, checkLoopJump])
+  }, [selectedIndex])
 
   useEffect(() => {
     const track = trackRef.current
@@ -155,7 +98,6 @@ export function ScriptCassetteCarousel({
 
     let settleTimer: ReturnType<typeof setTimeout>
     const handleScroll = () => {
-      if (jumpingRef.current) return
       applyTween()
       clearTimeout(settleTimer)
       settleTimer = setTimeout(settleSelection, 120)
@@ -173,15 +115,15 @@ export function ScriptCassetteCarousel({
   useEffect(() => {
     const track = trackRef.current
     if (!track) return
-    const slide = slideRefs.current[loopedStartIndex]
+    const slide = slideRefs.current[startIndex]
     if (slide) {
       const trackRect = track.getBoundingClientRect()
       const slideRect = slide.getBoundingClientRect()
       const offset = slideRect.left - trackRect.left - trackRect.width / 2 + slideRect.width / 2
       track.scrollLeft = track.scrollLeft + offset
-      setSelectedIndex(loopedStartIndex)
+      setSelectedIndex(startIndex)
     }
-  }, [items, loopedStartIndex])
+  }, [items, startIndex])
 
   const scrollBy = useCallback((dir: -1 | 1) => {
     const track = trackRef.current
@@ -205,22 +147,21 @@ export function ScriptCassetteCarousel({
     track.scrollBy({ left: offset, behavior: 'smooth' })
   }, [])
 
-  const handleCassetteClick = useCallback((loopedIdx: number, item: ScriptCassetteItem) => {
+  const handleCassetteClick = useCallback((idx: number, item: ScriptCassetteItem) => {
     if (item.locked) {
-      scrollToIndex(loopedIdx)
+      scrollToIndex(idx)
       return
     }
-    if (loopedIdx === selectedIndex) {
+    if (idx === selectedIndex) {
       onPlayScript(item.key)
       return
     }
-    setSelectedIndex(loopedIdx)
+    setSelectedIndex(idx)
     onSelectScript(item.key)
-    scrollToIndex(loopedIdx)
+    scrollToIndex(idx)
   }, [selectedIndex, onPlayScript, onSelectScript, scrollToIndex])
 
-  const realSelectedIndex = toReal(selectedIndex)
-  const selected = items[realSelectedIndex]
+  const selected = items[selectedIndex]
 
   const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
     if (e.key === 'ArrowLeft') { e.preventDefault(); scrollPrev() }
@@ -257,10 +198,10 @@ export function ScriptCassetteCarousel({
       </button>
 
       <div className="cassette-viewport" ref={trackRef}>
-        {loopedItems.map((item, loopedIdx) => {
-          const isSelected = loopedIdx === selectedIndex
+        {items.map((item, idx) => {
+          const isSelected = idx === selectedIndex
           return (
-            <div className="cassette-slide" key={`${item.key}-${loopedIdx}`} ref={setSlideRef(loopedIdx)}>
+            <div className="cassette-slide" key={item.key} ref={setSlideRef(idx)}>
               <button
                 type="button"
                 className={`cassette cassette--${item.difficultyLevel}${isSelected ? ' is-selected' : ''}${item.locked ? ' is-locked' : ''}`}
@@ -272,7 +213,7 @@ export function ScriptCassetteCarousel({
                       : `Focus ${item.title}`
                 }
                 aria-pressed={isSelected}
-                onClick={() => handleCassetteClick(loopedIdx, item)}
+                onClick={() => handleCassetteClick(idx, item)}
               >
                 <span className="cassette-screw cassette-screw-tl" aria-hidden="true" />
                 <span className="cassette-screw cassette-screw-tr" aria-hidden="true" />

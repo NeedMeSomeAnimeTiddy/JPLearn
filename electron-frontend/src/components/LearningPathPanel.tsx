@@ -66,6 +66,7 @@ export function LearningPathPanel({ status, onContinue, onChangePath }: Learning
           const isDone = step.readiness === 'completed'
           const pct = Math.round(step.mastery_pct * 100)
           const prevDone = index > 0 && status.steps[index - 1].readiness === 'completed'
+          const prevPct = index > 0 ? Math.round(status.steps[index - 1].mastery_pct * 100) : 0
           const glyph = STEP_GLYPHS[step.section_id] ?? step.label.charAt(0)
           const readinessLabel = READINESS_LABELS[step.readiness]
 
@@ -96,6 +97,7 @@ export function LearningPathPanel({ status, onContinue, onChangePath }: Learning
                 prevDone ? 'lpp-stop--reached' : '',
                 `lpp-stop--${step.readiness}`,
               ].filter(Boolean).join(' ')}
+              style={{ '--lpp-prev-pct': `${prevPct}%` } as CSSProperties}
               title={`${step.label} — ${readinessLabel}, ${pct}% mastered`}
             >
               {isActive ? (
@@ -116,7 +118,6 @@ export function LearningPathPanel({ status, onContinue, onChangePath }: Learning
                 </span>
               )}
               <span className="lpp-stop-label">{step.label}</span>
-              <span className="lpp-stop-pct">{isDone ? readinessLabel : `${pct}%`}</span>
             </li>
           )
         })}
