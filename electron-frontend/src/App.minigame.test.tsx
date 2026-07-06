@@ -8,14 +8,15 @@ afterEach(() => {
 })
 
 function clickTopMenuCard(label: string): void {
-  const menuCards = Array.from(document.querySelectorAll('.home-tape')) as HTMLButtonElement[]
+  const menuCards = Array.from(document.querySelectorAll('.cassette')) as HTMLButtonElement[]
   const button = menuCards.find((card) => {
-    const title = card.querySelector('strong')
+    const title = card.querySelector('.cassette-title')
     return title?.textContent?.trim().toLowerCase() === label.toLowerCase()
   })
   if (!button) {
     throw new Error(`Top menu card not found for ${label}`)
   }
+  fireEvent.click(button)
   fireEvent.click(button)
 }
 

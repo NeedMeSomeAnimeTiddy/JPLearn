@@ -57,8 +57,9 @@ This document tracks delivery status and planned improvements.
 - [x] (Medium) Add progress analytics export
   - Export review history, accuracy trends, and mastery snapshots to CSV
   - Useful for external study tracking and self-audit
-- [ ] (High) Add session resume and per-mode defaults
+- [ ] (High) Add session persistence and quick resume
   - Restore the last deck, study mode, and prompt settings after restart
+  - Offer a one-click "resume" action from the home screen that restores previous round state when possible
   - Remember audio, hint, lives, and confidence preferences per mode
   - Reduce setup friction for short daily study sessions
 
@@ -73,6 +74,9 @@ This document tracks delivery status and planned improvements.
 - [x] (Medium) Add deck import/export workflow
   - Export user progress and custom decks
   - Import with merge/overwrite conflict modes
+- [ ] (Low) Add batch deck management
+  - Reorder, archive, rename, and delete decks from the UI
+  - Multi-select and batch card operations for managing content across decks
 
 ## Frontend, Performance, and Release Engineering
 
@@ -96,9 +100,6 @@ This document tracks delivery status and planned improvements.
 
 ## UX, Delight, and Quality of Life
 
-- [ ] (High) Add a quick resume entry point for the last study session
-  - Open the most recent deck and mode from the home screen with one click
-  - Offer a "resume" action that restores the previous round state when possible
 - [ ] (Medium) Add streak celebrations and milestone rewards
   - Show lightweight burst animations, badges, or toast moments for long streaks
   - Keep effects tasteful and easy to disable for distraction-free study
@@ -111,6 +112,13 @@ This document tracks delivery status and planned improvements.
 - [ ] (Low) Add quick dictionary lookup from answer reveals and summaries
   - Let users jump from a missed item to a lookup without losing session context
   - Support faster review of unfamiliar words and kanji
+- [ ] (Medium) Add card browser and search
+  - Browse all cards across decks with search and filtering by deck, tag, SRS state, or level
+  - Preview card content, review history, and mastery status outside of study sessions
+  - Useful for quick lookup, content audit, and finding specific items without disrupting the study flow
+- [ ] (Low) Add desktop study reminders and system tray integration
+  - Persistent system tray icon for quick access to the app
+  - Configurable daily reminder notifications for missed or incomplete study sessions
 
 ## Quality, Tooling, and Developer Experience
 

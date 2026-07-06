@@ -2157,113 +2157,7 @@ button:active:not(:disabled) {
   will-change: transform, opacity;
 }
 
-.home-view {
-  display: grid;
-  gap: 16px;
-}
-
-/* ── Lofi desk: two-region layout ─────────────────────────────── */
-.home-desk {
-  display: grid;
-  grid-template-columns: minmax(258px, 320px) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.home-desk-feature {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  gap: 14px;
-  padding: 22px;
-  border-radius: var(--radius-panel);
-  background:
-    radial-gradient(130% 90% at 100% 0%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 62%),
-    linear-gradient(160deg, var(--panel-bg), var(--panel-bg-alt));
-  animation: enterUp 460ms ease both;
-}
-
-.home-feature-scene {
-  position: relative;
-  width: 100%;
-  height: 132px;
-  margin-bottom: 2px;
-}
-
-.home-feature-scene .home-hero-window {
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-}
-
-.home-feature-scene .home-hero-plant {
-  left: 50%;
-  margin-left: -74px;
-}
-
-.home-feature-scene .home-hero-mug {
-  left: 50%;
-  margin-left: -34px;
-}
-
-.home-feature-kicker {
-  margin: 0;
-  color: color-mix(in oklab, var(--accent) 82%, var(--text-main));
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.home-feature-title {
-  margin: 0;
-  font-family: var(--display-font);
-  line-height: 1;
-}
-
-.home-feature-title [lang='ja'] {
-  font-size: clamp(30px, 4vw, 44px);
-  letter-spacing: 0.02em;
-}
-
-.home-feature-sub {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-.home-feature-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.home-feature-stat {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 9px 8px;
-  border-radius: var(--radius-control);
-  border: 1px solid var(--chip-border);
-  background: color-mix(in oklab, var(--chip-bg) 88%, transparent);
-  text-align: center;
-}
-
-.home-feature-stat strong {
-  font-size: 0.92rem;
-  color: color-mix(in oklab, var(--accent) 42%, var(--text-main));
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.home-feature-stat span {
-  font-size: 0.58rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-soft);
-}
+/* home-view layout now inherits from .view-shell:has(.hub-topbar) — see hub section */
 
 /* Decorative lofi window scene (shared pieces) */
 .home-hero-window {
@@ -2379,214 +2273,100 @@ html[data-reduced-motion='true'] .home-hero-steam {
   animation: none;
 }
 
-/* ── Deck shelf + cassette tapes ──────────────────────────────── */
-.home-desk-shelf {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-}
-
-.home-section-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .home-section-hint {
   color: var(--text-soft);
   font-size: 0.76rem;
 }
 
-.home-tape-stack {
-  display: grid;
-  gap: 10px;
-}
-
-.home-tape {
-  --tape-tone: var(--accent);
-  position: relative;
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) 118px;
+/* ── Home deck info panel (below cassette carousel) ──────────── */
+.home-deck-info {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 14px;
-  width: 100%;
-  text-align: left;
-  padding: 10px 14px 10px 10px;
-  border-radius: var(--radius-card);
-  border: 1px solid var(--card-border);
-  background: var(--card-bg-top);
-  color: var(--text-main);
-  cursor: pointer;
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--accent-soft) 14%, transparent),
-    0 14px 24px -24px rgba(0, 0, 0, 0.8);
-  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-  animation: enterUp 460ms ease both;
-}
-
-.home-tape:hover {
-  transform: translateX(4px);
-  border-color: color-mix(in oklab, var(--tape-tone) 52%, var(--card-border));
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklab, var(--accent-soft) 22%, transparent),
-    0 16px 26px -22px color-mix(in oklab, var(--tape-tone) 42%, transparent);
-}
-
-.home-tape-spine {
+  padding: 6px 10px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg-main);
   position: relative;
+  z-index: 1;
+}
+
+.home-deck-info-head {
   display: grid;
-  place-items: center;
-  width: 76px;
-  height: 62px;
-  border-radius: 10px;
-  overflow: hidden;
-  background: linear-gradient(150deg,
-    color-mix(in oklab, var(--tape-tone) 32%, var(--card-bg-top)),
-    color-mix(in oklab, var(--tape-tone) 12%, var(--card-bg-bottom)));
-  border: 1px solid color-mix(in oklab, var(--tape-tone) 34%, var(--card-border));
-}
-
-.home-tape-glyph {
-  font-family: var(--sans);
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: color-mix(in oklab, var(--tape-tone) 62%, var(--text-main));
-  z-index: 2;
-}
-
-.home-tape-reel {
-  position: absolute;
-  bottom: 6px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid color-mix(in oklab, var(--tape-tone) 46%, transparent);
-  opacity: 0.55;
-}
-
-.home-tape-reel-1 { left: 12px; }
-.home-tape-reel-2 { right: 12px; }
-
-.home-tape--diff-1 { --tape-tone: var(--tone-teal); }
-.home-tape--diff-2 { --tape-tone: var(--tone-ocean); }
-.home-tape--diff-3 { --tape-tone: var(--accent); }
-.home-tape--diff-4 { --tape-tone: var(--tone-amber); }
-.home-tape--diff-5 { --tape-tone: var(--tone-rose); }
-.home-tape--advanced { --tape-tone: var(--tone-rose); }
-
-.home-tape-body {
-  display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
-.home-tape-titlerow {
+.home-deck-info-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
-.home-tape-titlerow strong {
-  font-size: 1rem;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-tape .menu-card-readiness-badge {
+.home-deck-info-title-row .home-deck-info-glyph {
+  font-family: var(--sans);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--accent) 62%, var(--text-main));
   flex-shrink: 0;
 }
 
-.home-tape-line {
-  color: var(--text-soft);
-  font-size: 0.8rem;
+.home-deck-info-title-row strong {
+  font-size: 0.88rem;
+  font-weight: 700;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.home-tape-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+.home-deck-info-title-row .menu-card-readiness-badge {
+  flex-shrink: 0;
 }
 
-.home-tape-track {
-  flex: 1;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--track-bg);
-  overflow: hidden;
-}
-
-.home-tape-fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent-soft), var(--accent));
-}
-
-.home-tape-pct {
-  font-size: 0.72rem;
+.home-deck-info-meta {
+  font-family: var(--mono);
+  font-size: 0.54rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--accent-soft) 45%, var(--text-soft));
   font-weight: 700;
-  color: color-mix(in oklab, var(--accent) 50%, var(--text-main));
-  min-width: 34px;
-  text-align: right;
 }
 
-.home-tape-side {
-  display: grid;
-  justify-items: end;
-  align-content: center;
-  gap: 8px;
-  min-width: 0;
+.home-jlpt-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 0;
+  border: 1px solid var(--panel-border);
+  background: var(--button-bg-top);
+  color: var(--bg-main);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--accent-ink);
+  transition: transform 80ms ease, box-shadow 80ms ease, border-color 140ms ease;
 }
 
-.home-tape-side .menu-card-difficulty {
-  max-width: 100%;
+.home-jlpt-button:hover {
+  background: color-mix(in oklab, var(--button-bg-top) 80%, var(--accent));
+  color: var(--bg-main);
+  border-color: var(--accent);
 }
 
-.home-tape-play {
-  display: inline-grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in oklab, var(--tape-tone) 50%, var(--button-border));
-  color: color-mix(in oklab, var(--tape-tone) 62%, var(--text-main));
-  background: color-mix(in oklab, var(--tape-tone) 14%, var(--card-bg-top));
-  transition: transform 160ms ease, background 160ms ease;
+.home-jlpt-button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--accent-ink);
 }
 
-.home-tape:hover .home-tape-play {
-  transform: scale(1.08);
-  background: color-mix(in oklab, var(--tape-tone) 24%, var(--card-bg-top));
-}
-
-@media (max-width: 860px) {
-  .home-desk {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 560px) {
-  .home-tape {
-    grid-template-columns: 58px minmax(0, 1fr) 96px;
-    gap: 10px;
-  }
-
-  .home-tape-spine {
-    width: 58px;
-    height: 54px;
-  }
-
-  .home-tape-line {
-    white-space: normal;
-  }
+.home-jlpt-pct {
+  font-size: 0.62rem;
+  opacity: 0.7;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3854,7 +3634,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
 
 .home-study-plan-strip {
   margin-top: 12px;
-  border-radius: 18px;
+  border-radius: 6px;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 22%, var(--panel-border));
   background:
     radial-gradient(circle at 10% 0%, rgba(108, 185, 214, 0.1), transparent 32%),
@@ -11899,8 +11679,8 @@ html[data-reduced-motion='true'] *::after {
 
 /* ── Learning Path Panel ────────────────────────────────────────── */
 .learning-path-panel {
-  padding: 8px 12px 10px;
-  border-radius: 14px;
+  padding: 8px 12px 28px;
+  border-radius: 6px;
   margin-bottom: 7px;
   position: relative;
   overflow: hidden;
@@ -12007,7 +11787,7 @@ html[data-reduced-motion='true'] *::after {
 .lpp-track {
   list-style: none;
   margin: 0;
-  padding: 2px 4px 0;
+  padding: 2px 4px 10px;
   display: flex;
   align-items: flex-start;
   position: relative;

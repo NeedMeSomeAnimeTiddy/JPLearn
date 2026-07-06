@@ -32,11 +32,8 @@
     "@tarquinen/opencode-dcp",
     "opencode-handoff",
     "open-mem",
-    "opencode-smart-title",
     "cc-safety-net",
-    "opencode-snip",
-    "envsitter-guard",
-    "micode"
+    "envsitter-guard"
   ],
   "mcp": {
     "playwright": {

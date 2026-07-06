@@ -7571,7 +7571,6 @@ function App() {
     [studyPlan.coverageRows],
   )
 
-  const activeScriptStats = scriptStats[activeScript]
   const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : activeBlockCards
 
   // Use backend block mastery/unlock values so script hub and overview stay consistent.
@@ -8756,14 +8755,11 @@ function App() {
           activeVocabCategory={activeVocabCategory}
           learningPathExpanded={learningPathExpanded}
           learningPathTrackRows={learningPathTrackRows}
-          leechCardsLength={leechCards.length}
           minigameStats={minigameStats}
           availableMinigames={availableMinigames}
-          activeScriptStats={activeScriptStats}
           activeSectionName={activeSectionName}
           minigameLockReasons={minigameLockReasons}
           onBack={goHome}
-          onOpenSettings={openSettingsFromMenu}
           onSelectBlock={(index) => {
             setActiveBlockIndex(index)
             setSessionActive(false)

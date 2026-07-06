@@ -3,9 +3,7 @@ import type { CSSProperties } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
-  Flame,
   Heart,
-  Settings,
   Target,
 } from 'lucide-react'
 import type {
@@ -67,16 +65,13 @@ interface ScriptHubViewProps {
   activeVocabCategory: VocabCategory
   learningPathExpanded: boolean
   learningPathTrackRows: StudyPlanCoverageRow[]
-  leechCardsLength: number
   minigameStats: MinigameStatsByScript
   availableMinigames: MinigameKey[]
-  activeScriptStats: { bestStreak: number }
   activeSectionName: string | null
   minigameLockReasons: Partial<Record<MinigameKey, string>>
   isSheet?: boolean
   // callbacks (navigation / deck selection only)
   onBack: () => void
-  onOpenSettings: () => void
   onSelectBlock: (index: number) => void
   onSelectKanjiLevel: (level: JlptLevel) => void
   onSelectVocabLevel: (level: JlptLevel) => void
@@ -183,15 +178,12 @@ export function ScriptHubView({
   activeVocabCategory,
   learningPathExpanded: _learningPathExpanded,
   learningPathTrackRows: _learningPathTrackRows,
-  leechCardsLength,
   minigameStats,
   availableMinigames,
-  activeScriptStats,
   activeSectionName,
   minigameLockReasons,
   isSheet = false,
   onBack,
-  onOpenSettings,
   onSelectBlock,
   onSelectKanjiLevel: _onSelectKanjiLevel,
   onSelectVocabLevel: _onSelectVocabLevel,
@@ -300,25 +292,7 @@ export function ScriptHubView({
           <span className="hub-topbar-stripe" aria-hidden="true" />
         </div>
 
-        <div className="hub-topbar-end">
-          <span className="hub-stat">
-            <Flame size={13} strokeWidth={2.3} aria-hidden="true" />
-            <span>{activeScriptStats.bestStreak}</span>
-          </span>
-          <span className="hub-stat hub-stat--warn">
-            <AlertTriangle size={13} strokeWidth={2.3} aria-hidden="true" />
-            <span>{leechCardsLength}</span>
-          </span>
-          <button
-            type="button"
-            className="topbar-settings-button"
-            onClick={onOpenSettings}
-            aria-label="Open settings"
-            title="Settings"
-          >
-            <Settings aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-          </button>
-        </div>
+        <span aria-hidden="true" />
       </header>
 
       {/* ── Single-zone cassette console ────────────────────────── */}

@@ -1,5 +1,11 @@
-import { useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
+import {
+  AlertTriangle,
+  ArrowRight,
+  Languages,
+  Zap,
+} from 'lucide-react'
 import type { LearningPathStatus, MinigameKey, NavDirection, ScriptKey, SectionReadiness, StudyPlanSnapshot } from '../types'
 import {
   SCRIPT_DIFFICULTY_META,
@@ -7,12 +13,12 @@ import {
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { AlertTriangle, Languages, Play, Zap } from 'lucide-react'
 import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
 import { LearningPathPanel } from '../components/LearningPathPanel'
+import { ScriptCassetteCarousel } from '../components/ScriptCassetteCarousel'
+import type { ScriptCassetteItem } from '../components/ScriptCassetteCarousel'
 
-// Readiness badge meta — label and icon for each state shown on section cards
 const READINESS_BADGE: Record<SectionReadiness, { label: string; className: string }> = {
   completed: { label: 'Complete', className: 'badge-completed' },
   suggested_next: { label: 'Start Here', className: 'badge-suggested' },
@@ -54,6 +60,15 @@ interface HomeViewProps {
   onChangePath?: () => void
 }
 
+const SCRIPT_ORDER: readonly ScriptKey[] = [
+  'hiragana',
+  'katakana',
+  'kanji_n5',
+  'vocab_n5',
+  'grammar_patterns',
+  'sentence_examples',
+]
+
 export function HomeView({
   navDirection,
   studyPlan,
@@ -70,13 +85,30 @@ export function HomeView({
   onContinuePath,
   onChangePath,
 }: HomeViewProps) {
-  useEffect(() => {
-    // Pre-warm JLPT readiness/history so opening JLPT Prep feels instant.
-    void Promise.allSettled([
-      window.jplearnDesktop.getJLPTReadiness?.(),
-      window.jplearnDesktop.getJLPTExamHistory?.(),
-    ])
-  }, [])
+  const [selectedScript, setSelectedScript] = useState<ScriptKey>('hiragana')
+
+  const readinessBySection = useMemo(() => {
+    const map: Partial<Record<string, SectionReadiness>> = {}
+    if (learningPathStatus?.steps) {
+      for (const step of learningPathStatus.steps) {
+        map[step.section_id] = step.readiness
+      }
+    }
+    return map
+  }, [learningPathStatus])
+
+  const hourOfDay = new Date().getHours()
+  const greeting =
+    hourOfDay < 5 ? 'Late night study'
+      : hourOfDay < 12 ? 'Good morning'
+        : hourOfDay < 17 ? 'Good afternoon'
+          : hourOfDay < 21 ? 'Good evening'
+            : 'Winding down'
+
+  const stageLabel =
+    studyPlan.learnerStage === 'starter' ? 'Starter'
+      : studyPlan.learnerStage === 'building' ? 'Building'
+        : 'Advanced'
 
   const jlptCoverageRows = studyPlan.coverageRows.filter((row) => (
     row.key === 'kanji_n5' || row.key === 'vocab_n5' || row.key === 'grammar_patterns'
@@ -87,28 +119,33 @@ export function HomeView({
     ? Math.round((jlptMasteredCardsApprox / jlptTrackedCards) * 100)
     : 0
 
-  // Build a readiness lookup from the learning path steps
-  const readinessBySection: Partial<Record<string, SectionReadiness>> = {}
-  if (learningPathStatus?.steps) {
-    for (const step of learningPathStatus.steps) {
-      readinessBySection[step.section_id] = step.readiness
-    }
-  }
-  const hourOfDay = new Date().getHours()
-  const greeting =
-    hourOfDay < 5 ? 'Late night study'
-      : hourOfDay < 12 ? 'Good morning'
-        : hourOfDay < 17 ? 'Good afternoon'
-          : hourOfDay < 21 ? 'Good evening'
-            : 'Winding down'
-  const overallCoveragePct = Math.round(studyPlan.overallMastery * 100)
-  const stageLabel =
-    studyPlan.learnerStage === 'starter' ? 'Starter'
-      : studyPlan.learnerStage === 'building' ? 'Building'
-        : 'Advanced'
+  const cassetteItems = useMemo<ScriptCassetteItem[]>(() => (
+    SCRIPT_ORDER.map((script) => {
+      const difficulty = SCRIPT_DIFFICULTY_META[script]
+      const coverageRow = studyPlan.coverageRows.find((r) => r.key === script)
+      const pct = coverageRow ? Math.round(coverageRow.mastery * 100) : 0
+      return {
+        key: script,
+        title: SCRIPT_LABELS[script],
+        description: SCRIPT_MENU_LINES[script],
+        glyph: SECTION_META[script].glyph,
+        difficultyLabel: difficulty.label,
+        difficultyLevel: (difficulty.tier <= 2 ? 'easy' : difficulty.tier === 3 ? 'medium' : 'hard') as ScriptCassetteItem['difficultyLevel'],
+        coveragePct: pct,
+        locked: false,
+        lockReason: null,
+      }
+    })
+  ), [studyPlan.coverageRows])
+
+  const selectedCassette = cassetteItems.find((c) => c.key === selectedScript)
+  const selectedReadiness = readinessBySection[selectedScript]
+  const selectedBadge = selectedReadiness ? READINESS_BADGE[selectedReadiness] : null
+  const selectedIsNeedsWarning = selectedReadiness === 'challenging' || selectedReadiness === 'advanced'
 
   return (
     <div className={`view-shell home-view view-${navDirection}`}>
+
       {tutorBanner && onDismissTutorBanner && (
         <TutorBanner
           headline={tutorBanner.headline}
@@ -119,40 +156,105 @@ export function HomeView({
         />
       )}
 
-      <div className="home-desk">
-        <aside className="home-desk-feature panel-glass">
-          <div className="home-feature-scene" aria-hidden="true">
-            <div className="home-hero-window">
-              <span className="home-hero-moon" />
-              <span className="home-hero-star home-hero-star-1" />
-              <span className="home-hero-star home-hero-star-2" />
-              <span className="home-hero-star home-hero-star-3" />
-              <span className="home-hero-hill" />
+      <div className="hub-crt-surface" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
+      <div className="hub-vhs-line" aria-hidden="true" />
+      <div className="hub-crystal hub-crystal--a" aria-hidden="true" />
+      <div className="hub-crystal hub-crystal--b" aria-hidden="true" />
+      <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
+
+      <header className="hub-topbar">
+        <h1 className="sr-only">Main Menu</h1>
+
+        <span aria-hidden="true" />
+
+        <div className="hub-topbar-center">
+          <span className="hub-topbar-catalog">JPL-EARN</span>
+          <strong className="hub-topbar-title"><span className="hub-glitch-text">JPLearn</span></strong>
+          <span className="hub-topbar-catalog hub-topbar-catalog--sub">{greeting} · 日本語学習</span>
+          <span className="hub-topbar-stripe" aria-hidden="true" />
+        </div>
+
+        <span aria-hidden="true" />
+      </header>
+
+      <div className="hub-studio">
+        <div className="hub-player">
+
+          <div className="hub-sweep" aria-hidden="true" />
+          <div className="hub-particle hub-particle--1" aria-hidden="true" />
+          <div className="hub-particle hub-particle--2" aria-hidden="true" />
+          <div className="hub-particle hub-particle--3" aria-hidden="true" />
+          <div className="hub-particle hub-particle--4" aria-hidden="true" />
+
+          <div className="hub-player-header">
+            <p className="hero-kicker">
+              <span className="hub-rec-dot" aria-hidden="true" />{' '}
+              Your decks · {stageLabel} stage
+            </p>
+            <span className="home-section-hint">◀◀  scroll  ▶▶</span>
+          </div>
+
+          <div className="hub-eq" aria-hidden="true">
+            <span className="hub-eq-bar" style={{ animationDelay: '0s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.1s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.2s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.05s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.15s' } as CSSProperties} />
+            <span className="hub-eq-bar" style={{ animationDelay: '0.25s' } as CSSProperties} />
+          </div>
+          <div className="hub-deck-badge" aria-hidden="true">
+            <span>DOLBY NR</span>
+            <span className="hub-deck-dot" />
+          </div>
+
+          <ScriptCassetteCarousel
+            items={cassetteItems}
+            activeScript={selectedScript}
+            onSelectScript={setSelectedScript}
+            onPlayScript={onSelectScript}
+          />
+
+          <div className="hub-deck-badge hub-deck-badge--right" aria-hidden="true">
+            <span>TYPE II · HIGH BIAS</span>
+          </div>
+
+          {selectedCassette && (
+            <div className="home-deck-info">
+              <div className="home-deck-info-head">
+                <div className="home-deck-info-title-row">
+                  <span className="home-deck-info-glyph" lang="ja">{selectedCassette.glyph}</span>
+                  <strong>{selectedCassette.title}</strong>
+                  {selectedBadge && (
+                    <span className={`menu-card-readiness-badge ${selectedBadge.className}`}>
+                      {selectedIsNeedsWarning && <AlertTriangle size={10} strokeWidth={2.2} aria-hidden="true" />}
+                      {selectedReadiness === 'suggested_next' && <Zap size={10} strokeWidth={2.2} aria-hidden="true" />}
+                      {selectedReadiness === 'completed' && <span className="badge-check" aria-hidden="true" />}
+                      {selectedBadge.label}
+                    </span>
+                  )}
+                </div>
+                <span className="home-deck-info-meta">
+                  {selectedCassette.difficultyLabel} · {selectedCassette.coveragePct}% coverage · {stageLabel}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                className="home-jlpt-button"
+                aria-label="Open JLPT preparation"
+                onClick={onOpenJlptPrep}
+              >
+                <Languages size={14} strokeWidth={2.2} aria-hidden="true" />
+                <span>JLPT Prep</span>
+                <span className="home-jlpt-pct">{jlptPrepProgressPct}%</span>
+                <ArrowRight size={13} strokeWidth={2.2} aria-hidden="true" />
+              </button>
             </div>
-            <span className="home-hero-plant" />
-            <span className="home-hero-mug">
-              <span className="home-hero-steam" />
-            </span>
-          </div>
-
-          <p className="home-feature-kicker">{greeting} · lofi study room</p>
-          <h1 className="home-feature-title"><span lang="ja">日本語</span></h1>
-          <p className="home-feature-sub">Pick a tape off the shelf and settle in.</p>
-
-          <div className="home-feature-stats">
-            <span className="home-feature-stat">
-              <strong>{overallCoveragePct}%</strong>
-              <span>coverage</span>
-            </span>
-            <span className="home-feature-stat">
-              <strong>{studyPlan.recommendedMinutes}m</strong>
-              <span>session</span>
-            </span>
-            <span className="home-feature-stat">
-              <strong>{stageLabel}</strong>
-              <span>stage</span>
-            </span>
-          </div>
+          )}
 
           {learningPathStatus && onContinuePath && onChangePath && learningPathStatus.path_id && (
             <LearningPathPanel
@@ -164,7 +266,6 @@ export function HomeView({
 
           {recommendations && recommendations.length > 0 && onStartRecommendation ? (
             <section className="home-recommendations" aria-label="Study recommendations">
-              <p className="home-recommendations-heading hero-kicker">Recommended</p>
               <div className="home-recommendations-list">
                 {recommendations.slice(0, 2).map((rec) => (
                   <RecommendationCard
@@ -179,113 +280,6 @@ export function HomeView({
               </div>
             </section>
           ) : null}
-        </aside>
-
-        <div className="home-desk-shelf">
-          <div className="home-section-head">
-            <p className="hero-kicker">Your decks</p>
-            <span className="home-section-hint">Tap a tape to start a session</span>
-          </div>
-
-          <div className="home-tape-stack">
-            {(['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples'] as const).map((script, index) => {
-              const glyph = SECTION_META[script].glyph
-              const difficulty = SCRIPT_DIFFICULTY_META[script]
-              const DifficultyIcon = difficulty.icon
-              const coverageRow = studyPlan.coverageRows.find((r) => r.key === script)
-              const readiness = readinessBySection[script]
-              const badgeMeta = readiness ? READINESS_BADGE[readiness] : null
-              const isNeedsWarning = readiness === 'challenging' || readiness === 'advanced'
-              const pct = coverageRow ? Math.round(coverageRow.mastery * 100) : 0
-
-              return (
-                <button
-                  key={script}
-                  type="button"
-                  className={`home-tape home-tape--diff-${difficulty.tier}${readiness ? ` home-tape--${readiness}` : ''}`}
-                  aria-keyshortcuts={String(index + 1)}
-                  onClick={() => onSelectScript(script)}
-                >
-                  <span className="home-tape-spine" aria-hidden="true">
-                    <span className="home-tape-glyph" lang="ja">{glyph}</span>
-                    <span className="home-tape-reel home-tape-reel-1" />
-                    <span className="home-tape-reel home-tape-reel-2" />
-                  </span>
-                  <span className="home-tape-body">
-                    <span className="home-tape-titlerow">
-                      <strong>{SCRIPT_LABELS[script]}</strong>
-                      {badgeMeta && (
-                        <span className={`menu-card-readiness-badge ${badgeMeta.className}`}>
-                          {isNeedsWarning && <AlertTriangle size={10} strokeWidth={2.2} aria-hidden="true" />}
-                          {readiness === 'suggested_next' && <Zap size={10} strokeWidth={2.2} aria-hidden="true" />}
-                          {badgeMeta.label}
-                        </span>
-                      )}
-                    </span>
-                    <span className="home-tape-line">{SCRIPT_MENU_LINES[script]}</span>
-                    {coverageRow && coverageRow.total > 0 ? (
-                      <span className="home-tape-progress">
-                        <span className="home-tape-track" aria-hidden="true">
-                          <span className="home-tape-fill" style={{ width: `${pct}%` }} />
-                        </span>
-                        <span className="home-tape-pct" aria-label={`${pct}% mastered`}>{pct}%</span>
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="home-tape-side">
-                    <span
-                      className={`menu-card-difficulty menu-card-difficulty-${difficulty.tier}`}
-                      title={`Difficulty: ${difficulty.label}`}
-                    >
-                      <DifficultyIcon className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
-                      <span>{difficulty.label}</span>
-                    </span>
-                    <span className="home-tape-play" aria-hidden="true">
-                      <Play size={15} strokeWidth={2.4} />
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
-
-            <button
-              type="button"
-              className="home-tape home-tape--advanced"
-              aria-label="Open JLPT preparation"
-              onClick={onOpenJlptPrep}
-            >
-              <span className="home-tape-spine" aria-hidden="true">
-                <span className="home-tape-glyph" lang="ja">級</span>
-                <span className="home-tape-reel home-tape-reel-1" />
-                <span className="home-tape-reel home-tape-reel-2" />
-              </span>
-              <span className="home-tape-body">
-                <span className="home-tape-titlerow">
-                  <strong>JLPT Prep</strong>
-                  <span className="menu-card-readiness-badge badge-advanced">
-                    <AlertTriangle size={10} strokeWidth={2.2} aria-hidden="true" />
-                    Advanced
-                  </span>
-                </span>
-                <span className="home-tape-line">Timed exam sets, projected score tracking, and weak-area drills.</span>
-                <span className="home-tape-progress">
-                  <span className="home-tape-track" aria-hidden="true">
-                    <span className="home-tape-fill" style={{ width: `${jlptPrepProgressPct}%` }} />
-                  </span>
-                  <span className="home-tape-pct" aria-label={`${jlptPrepProgressPct}% JLPT prep progress`}>{jlptPrepProgressPct}%</span>
-                </span>
-              </span>
-              <span className="home-tape-side">
-                <span className="menu-card-difficulty menu-card-difficulty-5" title="Difficulty: Exam">
-                  <Languages className="menu-card-difficulty-icon" aria-hidden="true" strokeWidth={2.05} />
-                  <span>N5-N1</span>
-                </span>
-                <span className="home-tape-play" aria-hidden="true">
-                  <Play size={15} strokeWidth={2.4} />
-                </span>
-              </span>
-            </button>
-          </div>
 
           {studyPlan.coverageRows.length > 0 ? (
             <section className="home-study-plan-strip panel-glass" aria-label="Study plan">
@@ -364,6 +358,7 @@ export function HomeView({
               </div>
             </section>
           ) : null}
+
         </div>
       </div>
     </div>
