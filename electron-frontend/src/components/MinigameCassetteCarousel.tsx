@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
+import { Brain, ChevronLeft, ChevronRight, Ear, Eye, Lock, Shuffle, Zap } from 'lucide-react'
 import type { MinigameKey } from '../types'
+import type { MinigameSkillGroupKey } from '../constants'
 
 // A single cassette in the coverflow carousel. Kept intentionally lean — the
 // cassette should read as a physical tape.
@@ -17,20 +18,40 @@ export interface CassetteItem {
   lockReason: string | null
 }
 
+export type GroupedSlide =
+  | { kind: 'header'; label: string; helper: string; groupKey: MinigameSkillGroupKey }
+  | { kind: 'cassette'; item: CassetteItem }
+  | { kind: 'divider' }
+
+const SKILL_GROUP_ICONS: Record<MinigameSkillGroupKey, typeof Eye> = {
+  recognition: Eye,
+  recall: Brain,
+  listening: Ear,
+  challenge: Zap,
+  mixed: Shuffle,
+}
+
 interface MinigameCassetteCarouselProps {
-  items: CassetteItem[]
+  slides: GroupedSlide[]
   activeGame: MinigameKey
   onSelectGame: (game: MinigameKey) => void
   onPlayGame: (game: MinigameKey) => void
 }
 
 export function MinigameCassetteCarousel({
-  items,
+  slides,
   activeGame,
   onSelectGame,
   onPlayGame,
 }: MinigameCassetteCarouselProps) {
-  const startIndex = Math.max(0, items.findIndex((item) => item.key === activeGame))
+  const cassetteIndices = useMemo(() => {
+    const indices: number[] = []
+    slides.forEach((s, i) => { if (s.kind === 'cassette') indices.push(i) })
+    return indices
+  }, [slides])
+
+  const cassetteIdx = slides.findIndex((s) => s.kind === 'cassette' && s.item.key === activeGame)
+  const startIndex = cassetteIdx >= 0 ? cassetteIdx : cassetteIndices[0] ?? 0
 
   const trackRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -38,8 +59,10 @@ export function MinigameCassetteCarousel({
   const [selectedIndex, setSelectedIndex] = useState(startIndex)
 
   // Stable refs so callbacks never need to re-bind.
-  const itemsRef = useRef(items)
-  itemsRef.current = items
+  const slidesRef = useRef(slides)
+  slidesRef.current = slides
+  const cassetteIndicesRef = useRef(cassetteIndices)
+  cassetteIndicesRef.current = cassetteIndices
   const onSelectRef = useRef(onSelectGame)
   onSelectRef.current = onSelectGame
 
@@ -90,7 +113,8 @@ export function MinigameCassetteCarousel({
     })
   }, [])
 
-  // Detect which slide is closest to centre once scrolling settles.
+  // Detect which cassette slide is closest to centre once scrolling settles.
+  // Headers and dividers are excluded from selection.
   const settleSelection = useCallback(() => {
     const track = trackRef.current
     if (!track) return
@@ -99,20 +123,21 @@ export function MinigameCassetteCarousel({
     let bestIdx = selectedIndex
     let bestDist = Infinity
 
-    slideRefs.current.forEach((slideEl, i) => {
-      if (!slideEl) return
+    for (const idx of cassetteIndicesRef.current) {
+      const slideEl = slideRefs.current[idx]
+      if (!slideEl) continue
       const slideRect = slideEl.getBoundingClientRect()
       const dist = Math.abs(slideRect.left + slideRect.width / 2 - centre)
       if (dist < bestDist) {
         bestDist = dist
-        bestIdx = i
+        bestIdx = idx
       }
-    })
+    }
 
     if (bestIdx !== selectedIndex) {
       setSelectedIndex(bestIdx)
-      const item = itemsRef.current[bestIdx]
-      if (item) onSelectRef.current(item.key)
+      const slide = slidesRef.current[bestIdx]
+      if (slide && slide.kind === 'cassette') onSelectRef.current(slide.item.key)
     }
   }, [selectedIndex])
 
@@ -149,12 +174,14 @@ export function MinigameCassetteCarousel({
       track.scrollLeft = track.scrollLeft + offset
       setSelectedIndex(startIndex)
     }
-  }, [items, startIndex])
+  }, [slides, startIndex])
 
   const scrollBy = useCallback((dir: -1 | 1) => {
     const track = trackRef.current
     if (!track) return
-    const slide = slideRefs.current[0]
+    const firstCassetteIdx = cassetteIndicesRef.current[0]
+    if (firstCassetteIdx === undefined) return
+    const slide = slideRefs.current[firstCassetteIdx]
     if (!slide) return
     const slideWidth = slide.getBoundingClientRect().width + 14 // gap
     track.scrollBy({ left: dir * slideWidth, behavior: 'smooth' })
@@ -187,7 +214,8 @@ export function MinigameCassetteCarousel({
     scrollToIndex(idx)
   }, [selectedIndex, onPlayGame, onSelectGame, scrollToIndex])
 
-  const selected = items[selectedIndex]
+  const selectedSlide = slides[selectedIndex]
+  const selected = selectedSlide?.kind === 'cassette' ? selectedSlide.item : null
 
   // Keyboard: ← → to navigate, Enter/Space to launch focused
   const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
@@ -226,7 +254,27 @@ export function MinigameCassetteCarousel({
       </button>
 
       <div className="cassette-viewport" ref={trackRef}>
-        {items.map((item, idx) => {
+        {slides.map((slide, idx) => {
+          if (slide.kind === 'header') {
+            const Icon = SKILL_GROUP_ICONS[slide.groupKey]
+            return (
+              <div className="cassette-slide cassette-slide--header" key={`header-${slide.groupKey}`} ref={setSlideRef(idx)}>
+                <div className="cassette-category-header">
+                  <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+                  <span className="cassette-category-title">{slide.label}</span>
+                  <span className="cassette-category-helper">{slide.helper}</span>
+                </div>
+              </div>
+            )
+          }
+          if (slide.kind === 'divider') {
+            return (
+              <div className="cassette-slide cassette-slide--divider" key={`divider-${idx}`} ref={setSlideRef(idx)}>
+                <div className="cassette-category-divider" aria-hidden="true" />
+              </div>
+            )
+          }
+          const item = slide.item
           const isSelected = idx === selectedIndex
           return (
             <div className="cassette-slide" key={item.key} ref={setSlideRef(idx)}>
@@ -249,7 +297,9 @@ export function MinigameCassetteCarousel({
                 <span className="cassette-screw cassette-screw-br" aria-hidden="true" />
 
                 <span className="cassette-label">
-                  <span className="cassette-brand">JPLEARN · SIDE A</span>
+                  <span className={`cassette-stats cassette-stats--${item.difficultyLevel}`}>
+                    {item.difficultyLabel} · streak {item.bestStreak}
+                  </span>
                   <span className="cassette-title">{item.title}</span>
                   <span className="cassette-lines" aria-hidden="true" />
                 </span>

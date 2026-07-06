@@ -25,11 +25,14 @@ import {
   DEFAULT_SESSION_LENGTH_PRESET,
   JLPT_LEVEL_LABELS,
   MINIGAMES,
+  MINIGAME_SKILL_GROUP,
+  MINIGAME_SKILL_GROUP_META,
   SCRIPT_LABELS,
   SESSION_LENGTH_PRESETS,
 } from '../constants'
 import { MinigameCassetteCarousel } from '../components/MinigameCassetteCarousel'
-import type { CassetteItem } from '../components/MinigameCassetteCarousel'
+import type { GroupedSlide } from '../components/MinigameCassetteCarousel'
+import type { MinigameSkillGroupKey } from '../constants'
 import { useSession } from '../context/SessionContext'
 
 interface BlockInfo {
@@ -211,54 +214,84 @@ export function ScriptHubView({
   } = useSession()
   const activeBlock = blockProgressWithMastery.find((block) => block.index === activeBlockIndex)
 
-  const rankedCards = useMemo(() => {
-    const mapped = availableMinigames
-      .map((gameKey) => {
-        const game = MINIGAMES.find((entry) => entry.key === gameKey)
-        if (!game) {
-          return null
-        }
-        const stats = minigameStats[activeScript][game.key]
-        const accuracy = stats.attempted > 0 ? Math.round((stats.correct / stats.attempted) * 100) : 0
-        const lockReason = minigameLockReasons[game.key] ?? null
-        const unmetNeed = stats.attempted === 0 ? 100 : Math.max(0, 85 - accuracy)
-        const recommendationScore = unmetNeed + Math.max(0, 6 - Math.min(stats.bestStreak, 6))
+  const groupedSlides = useMemo<GroupedSlide[]>(() => {
+    // Group available minigames by skill group
+    const groups = new Map<MinigameSkillGroupKey, MinigameKey[]>()
+    for (const gameKey of availableMinigames) {
+      const groupKey = MINIGAME_SKILL_GROUP[gameKey]
+      if (!groupKey) continue
+      if (!groups.has(groupKey)) groups.set(groupKey, [])
+      groups.get(groupKey)!.push(gameKey)
+    }
 
-        return {
-          key: game.key,
-          title: game.title,
-          description: game.description,
-          accuracy,
-          difficulty: MINIGAME_DIFFICULTY[game.key],
-          lockReason,
-          minigameLocked: Boolean(lockReason),
-          stats,
-          recommendationScore,
-        } satisfies RankedMinigameCard
-      })
-      .filter((entry): entry is RankedMinigameCard => entry !== null)
+    // Sort groups by order, filter out empty ones
+    const sortedGroups = Array.from(groups.entries())
+      .filter(([, keys]) => keys.length > 0)
+      .sort((a, b) => MINIGAME_SKILL_GROUP_META[a[0]].order - MINIGAME_SKILL_GROUP_META[b[0]].order)
 
-    return buildBalancedRanking(mapped)
+    // Build slides array with headers, ranked cassettes, and dividers
+    const slides: GroupedSlide[] = []
+    sortedGroups.forEach(([groupKey, gameKeys], groupIdx) => {
+      const meta = MINIGAME_SKILL_GROUP_META[groupKey]
+
+      slides.push({ kind: 'header', label: meta.title, helper: meta.helper, groupKey })
+
+      const cards = gameKeys
+        .map((gameKey) => {
+          const game = MINIGAMES.find((entry) => entry.key === gameKey)
+          if (!game) return null
+          const stats = minigameStats[activeScript][game.key]
+          const accuracy = stats.attempted > 0 ? Math.round((stats.correct / stats.attempted) * 100) : 0
+          const lockReason = minigameLockReasons[game.key] ?? null
+          const unmetNeed = stats.attempted === 0 ? 100 : Math.max(0, 85 - accuracy)
+          const recommendationScore = unmetNeed + Math.max(0, 6 - Math.min(stats.bestStreak, 6))
+          return {
+            key: game.key,
+            title: game.title,
+            description: game.description,
+            accuracy,
+            difficulty: MINIGAME_DIFFICULTY[game.key],
+            lockReason,
+            minigameLocked: Boolean(lockReason),
+            stats,
+            recommendationScore,
+          } satisfies RankedMinigameCard
+        })
+        .filter((entry): entry is RankedMinigameCard => entry !== null)
+
+      const ranked = buildBalancedRanking(cards)
+
+      for (const card of ranked) {
+        slides.push({
+          kind: 'cassette',
+          item: {
+            key: card.key,
+            title: card.title,
+            description: card.description,
+            difficultyLabel: card.difficulty.label,
+            difficultyLevel: card.difficulty.level,
+            accuracy: card.accuracy,
+            bestStreak: card.stats.bestStreak,
+            locked: card.minigameLocked,
+            lockReason: card.lockReason,
+          },
+        })
+      }
+
+      if (groupIdx < sortedGroups.length - 1) {
+        slides.push({ kind: 'divider' })
+      }
+    })
+
+    return slides
   }, [availableMinigames, minigameStats, activeScript, minigameLockReasons])
 
-  const cassetteItems = useMemo<CassetteItem[]>(() => (
-    rankedCards.map((card) => ({
-      key: card.key,
-      title: card.title,
-      description: card.description,
-      difficultyLabel: card.difficulty.label,
-      difficultyLevel: card.difficulty.level,
-      accuracy: card.accuracy,
-      bestStreak: card.stats.bestStreak,
-      locked: card.minigameLocked,
-      lockReason: card.lockReason,
-    }))
-  ), [rankedCards])
-
-  const selectedCassette = useMemo(() =>
-    cassetteItems.find((item) => item.key === activeGame),
-    [cassetteItems, activeGame],
-  )
+  const selectedCassette = useMemo(() => {
+    for (const slide of groupedSlides) {
+      if (slide.kind === 'cassette' && slide.item.key === activeGame) return slide.item
+    }
+    return undefined
+  }, [groupedSlides, activeGame])
 
   return (
     <div className={isSheet ? 'script-hub-sheet-content' : `view-shell view-${navDirection}`}>
@@ -340,7 +373,7 @@ export function ScriptHubView({
 
               <div className="hub-deck-shelf">
               <MinigameCassetteCarousel
-                items={cassetteItems}
+                slides={groupedSlides}
                 activeGame={activeGame}
                 onSelectGame={onSelectGame}
                 onPlayGame={onPlayGame}
@@ -352,7 +385,6 @@ export function ScriptHubView({
 
                 {selectedCassette ? (
                   <div className="cassette-info">
-                    <span className="cassette-info-meta">{selectedCassette.difficultyLabel} · {selectedCassette.accuracy}% accuracy · streak {selectedCassette.bestStreak}</span>
                     <span className="cassette-info-text">{selectedCassette.description}</span>
                   </div>
                 ) : null}
