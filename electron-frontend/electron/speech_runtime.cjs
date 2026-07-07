@@ -199,7 +199,12 @@ function createSpeechRuntime(options = {}) {
     }
   }
 
-  return { transcribe, getStatus, unload }
+  function restart() {
+    unload()
+    startPromise = null
+  }
+
+  return { transcribe, getStatus, unload, restart }
 }
 
 module.exports = { createSpeechRuntime }

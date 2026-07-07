@@ -39,8 +39,19 @@ export interface SessionContextValue {
   roundFeedbackAnswer: string | null
   roundFeedbackPoints: number | null
   roundPerformanceLabel: RoundPerformanceLabel | null
+  roundResponseMs: number | null
+  roundSrsResult: {
+    repetitions: number
+    interval: number
+    next_review: string
+    ease_factor: number
+  } | null
+  roundExampleSentence: {
+    jp: string
+    en: string
+    romaji: string
+  } | null
   isRoundResolving: boolean
-  feedbackAdvanceMs: number
 
   // Session metrics
   sessionScore: number

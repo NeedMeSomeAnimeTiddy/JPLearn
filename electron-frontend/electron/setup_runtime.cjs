@@ -2319,12 +2319,12 @@ function downloadDictionary(sender, scriptRoot) {
   })
 }
 
-function downloadSpeechModel(tier, sender, scriptRoot) {
+function downloadSpeechModel(tier, sender, scriptRoot, downloadOptions = {}) {
   if (!SPEECH_MODELS[tier]) return Promise.reject(new Error(`Unknown speech model tier: ${tier}`))
 
   const base = ensureJPLearnDirs()
 
-  if (isSpeechModelInstalled(base, tier)) {
+  if (!downloadOptions.force && isSpeechModelInstalled(base, tier)) {
     return Promise.resolve({ alreadyInstalled: true })
   }
 
@@ -2380,11 +2380,56 @@ function downloadSpeechModel(tier, sender, scriptRoot) {
       }
     })
 
-    child.on('close', (code) => {
+    child.on('close', async (code) => {
       if (code === 0) {
         if (sender && !sender.isDestroyed()) {
           sender.send('setup:download-progress', { id: 'speech', percent: 100, mb: null, totalMb: null, etaSec: null })
         }
+
+        // Post-download: check GPU CUDA runtime dependencies
+        try {
+          const checkScript = [
+            '-c',
+            [
+              'import subprocess as s, json, sys',
+              'gpu = s.run(["nvidia-smi"], capture_output=True).returncode == 0',
+              'result = {"gpu_detected": gpu, "cuda_ready": False, "cuda_error": None}',
+              'if gpu:',
+              '  try:',
+              '    from ctranslate2 import get_cuda_device_count',
+              '    n = get_cuda_device_count()',
+              '    result["cuda_ready"] = n > 0',
+              '  except Exception as e:',
+              '    result["cuda_error"] = str(e)',
+              'print(json.dumps(result))',
+            ].join('\n'),
+          ]
+
+          const { stdout } = await runPythonCapture(pythonCmd, checkScript, { ...process.env })
+          const status = JSON.parse(stdout.trim())
+
+          if (status.gpu_detected && !status.cuda_ready) {
+            // GPU available but CUDA runtime libs missing — try install
+            const { code: pipCode } = await runPythonCapture(pythonCmd, [
+              '-m', 'pip', 'install', '--quiet', 'nvidia-cublas-cu12',
+            ], { ...process.env })
+
+            if (pipCode === 0 && sender && !sender.isDestroyed()) {
+              sender.send('setup:download-progress', {
+                id: 'speech', percent: 100, mb: null, totalMb: null, etaSec: null,
+                logMessage: 'CUDA runtime installed — GPU acceleration ready',
+              })
+            } else if (sender && !sender.isDestroyed()) {
+              sender.send('setup:download-progress', {
+                id: 'speech', percent: 100, mb: null, totalMb: null, etaSec: null,
+                logMessage: 'GPU found but CUDA runtime missing. Speech will use CPU (install CUDA Toolkit 12 for GPU speed).',
+              })
+            }
+          }
+        } catch {
+          // non-fatal — GPU check itself failed, speech server handles fallback
+        }
+
         resolve({ ok: true })
       } else {
         reject(new Error(`get_whisper_model.py exited with code ${code}`))

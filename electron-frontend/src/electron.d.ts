@@ -418,6 +418,11 @@ interface DesktopApi {
     confidence_score?: number | null
     curriculum_stage?: number | null
   }>
+  lookupSentence?: (payload: { query: string }) => Promise<{
+    jp: string | null
+    en: string | null
+    romaji: string | null
+  }>
   startSessionGoal: (payload: {
     targetItems: number
     targetMinutes?: number
@@ -502,7 +507,7 @@ interface DesktopApi {
   onSetupProgress?: (listener: (evt: SetupProgressEvent) => void) => () => void
   downloadFonts?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   downloadDictionary?: () => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
-  downloadSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
+  downloadSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra', options?: { force?: boolean }) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>
   setActiveSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   uninstallSpeechModel?: (tier: 'fast' | 'balanced' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   downloadOcrModel?: (tier: 'standard', options?: { force?: boolean }) => Promise<{ ok?: boolean; alreadyInstalled?: boolean }>

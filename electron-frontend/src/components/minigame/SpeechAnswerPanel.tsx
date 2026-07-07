@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { TypeAnimation } from 'react-type-animation'
 import { Mic, Square } from 'lucide-react'
 import { useMicRecorder } from '../../hooks/useMicRecorder'
 import { assessTypedAnswer } from '../../lib/answerAssessment'
@@ -67,6 +68,14 @@ export function SpeechAnswerPanel({
       })
       setLastTranscript(result.text)
       const assessment = assessTypedAnswer(expectedAnswer, result.text)
+      // Wait for TypeAnimation to finish typing the transcript
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setTimeout(resolve, Math.max(result.text.length * 25, 1800))
+          })
+        })
+      })
       onResult({ transcript: result.text, confidence: result.confidence, assessment })
     } catch (error) {
       setProcessingError(error instanceof Error ? error.message : String(error))
@@ -120,7 +129,13 @@ export function SpeechAnswerPanel({
             </button>.
           </span>
         ) : null}
-        {lastTranscript && !processingError ? <span className="speech-answer-transcript">Heard: “{lastTranscript}”</span> : null}
+        {lastTranscript && !processingError ? (
+          <span className="speech-answer-transcript">
+            Heard: &ldquo;
+            <TypeAnimation key={`${lastTranscript}`} sequence={[lastTranscript, 0]} speed={10} cursor={false} style={{ display: 'inline' }} />
+            &rdquo;
+          </span>
+        ) : null}
       </div>
     </div>
   )

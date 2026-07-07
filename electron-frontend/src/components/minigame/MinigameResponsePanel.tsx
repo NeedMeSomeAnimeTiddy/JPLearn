@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
 import { CONFIDENCE_LEVEL_LABELS, CONFIDENCE_SCORES } from '../../constants'
 import { RoundFeedback } from '../RoundFeedback'
-import type { PlayableMinigame } from '../../types'
-import type { RoundPerformanceLabel } from '../../context/SessionContext'
+import type { PlayableMinigame, RoundDictionaryNote } from '../../types'
 
 interface MinigameResponsePanelProps {
   isRoundResolving: boolean
@@ -14,16 +13,29 @@ interface MinigameResponsePanelProps {
   onSetRoundConfidence: (score: number) => void
   feedback: string | null
   feedbackTone: 'success' | 'error' | null
-  feedbackPerformanceLabel: RoundPerformanceLabel | null
   feedbackComboBonus: number
   feedbackMilestoneStreak: number | null
   feedbackAnswer: string | null
   feedbackAnswerLabel: string
   livesEnabled: boolean
-  feedbackAdvanceMs: number
-  feedbackAdvanceLabel: string
   showKeyboardPrompts: boolean
   onSkipFeedback: () => void
+  responseMs: number | null
+  srsResult: {
+    repetitions: number
+    interval: number
+    next_review: string
+    ease_factor: number
+  } | null
+  exampleSentence: {
+    jp: string
+    en: string
+    romaji: string
+  } | null
+  cardCharacter: string
+  cardMeaning: string
+  cardRomaji: string
+  dictionaryNote: RoundDictionaryNote | null
   children: ReactNode
 }
 
@@ -37,16 +49,20 @@ export function MinigameResponsePanel({
   onSetRoundConfidence,
   feedback,
   feedbackTone,
-  feedbackPerformanceLabel,
   feedbackComboBonus,
   feedbackMilestoneStreak,
   feedbackAnswer,
   feedbackAnswerLabel,
   livesEnabled,
-  feedbackAdvanceMs,
-  feedbackAdvanceLabel,
   showKeyboardPrompts,
   onSkipFeedback,
+  responseMs,
+  srsResult,
+  exampleSentence,
+  cardCharacter,
+  cardMeaning,
+  cardRomaji,
+  dictionaryNote,
   children,
 }: MinigameResponsePanelProps) {
   const isChoiceMode =
@@ -72,18 +88,22 @@ export function MinigameResponsePanel({
           <RoundFeedback
             feedback={feedback}
             tone={feedbackTone}
-            performanceLabel={feedbackPerformanceLabel}
             comboBonus={feedbackComboBonus}
             milestoneStreak={feedbackMilestoneStreak}
             answer={feedbackAnswer}
             answerLabel={feedbackAnswerLabel}
             livesEnabled={livesEnabled}
             mode={mode}
-            autoAdvanceMs={feedbackAdvanceMs}
-            autoAdvanceLabel={feedbackAdvanceLabel}
             onAction={onSkipFeedback}
             actionLabel={showKeyboardPrompts ? 'Next now ↵' : 'Next now'}
             actionTitle={showKeyboardPrompts ? 'Continue immediately (Enter)' : 'Continue immediately'}
+            responseMs={responseMs}
+            srsResult={srsResult}
+            exampleSentence={exampleSentence}
+            cardCharacter={cardCharacter}
+            cardMeaning={cardMeaning}
+            cardRomaji={cardRomaji}
+            dictionaryNote={dictionaryNote}
           />
         </div>
       ) : (

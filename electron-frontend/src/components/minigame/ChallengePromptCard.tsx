@@ -1,4 +1,5 @@
 import { Volume2 } from 'lucide-react'
+import { TypeAnimation } from 'react-type-animation'
 import type { RoundState, ScriptKey } from '../../types'
 
 function promptSizeClass(text: string): string {
@@ -79,14 +80,14 @@ export function ChallengePromptCard({
             </span>
           </button>
           {showRevealText ? (
-            <p className={revealClassName}>
-              {roundState.focusText}
+            <p className={revealClassName} style={{ textAlign: 'left' }}>
+              <TypeAnimation key={`reveal-${roundState.focusText}`} sequence={[roundState.focusText]} speed={5} cursor={false} style={{ display: 'inline' }} />
             </p>
           ) : null}
         </div>
       ) : (
-        <p className={promptClassName}>
-          {roundState.focusText}
+        <p className={promptClassName} style={{ textAlign: 'left' }}>
+          <TypeAnimation key={`prompt-${roundState.focusText}`} sequence={[roundState.focusText]} speed={5} cursor={false} style={{ display: 'inline' }} />
         </p>
       )}
       {roundState.mode !== 'listening_audio_first' && activeScript === 'grammar_patterns' &&

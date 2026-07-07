@@ -3139,6 +3139,8 @@ html[data-reduced-motion='true'] .home-hero-steam {
   height: 20px;
   padding: 0 8px;
   opacity: 0.4;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .hub-eq-bar {
@@ -7692,25 +7694,6 @@ html[data-reduced-motion='true'] .cassette-reel {
   font-size: 0.82rem;
 }
 
-.round-feedback-advance-track {
-  height: 8px;
-  border-radius: 0;
-  overflow: hidden;
-  background: color-mix(in oklab, var(--panel-bg) 82%, transparent);
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--panel-border));
-}
-
-.round-feedback-advance-fill {
-  display: block;
-  height: 100%;
-  width: 100%;
-  transform-origin: left center;
-  background: linear-gradient(90deg, var(--tone-amber), var(--tone-ocean));
-  animation-name: feedbackAdvanceCountdown;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
-}
-
 @keyframes feedbackAdvanceCountdown {
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
@@ -7731,6 +7714,129 @@ html[data-reduced-motion='true'] .cassette-reel {
 .round-feedback-skip:hover {
   background: color-mix(in oklab, var(--panel-border) 30%, transparent);
   color: var(--text-main);
+}
+
+.round-feedback-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.round-feedback-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 60%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.round-feedback-stat svg {
+  color: color-mix(in oklab, var(--text-soft) 55%, transparent);
+  flex-shrink: 0;
+}
+
+.round-feedback-stat.round-feedback-stat--fast {
+  color: #5bc8b3;
+  border-color: #5bc8b3;
+  background: rgba(91, 200, 179, 0.15);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.round-feedback-stat.round-feedback-stat--fast svg {
+  color: #5bc8b3;
+}
+
+.round-feedback-stat.round-feedback-stat--normal {
+  color: #f2b56f;
+  border-color: #f2b56f;
+  background: rgba(242, 181, 111, 0.15);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.round-feedback-stat.round-feedback-stat--normal svg {
+  color: #f2b56f;
+}
+
+.round-feedback-stat.round-feedback-stat--slow {
+  color: #ee8f87;
+  border-color: #ee8f87;
+  background: rgba(238, 143, 135, 0.15);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.round-feedback-stat.round-feedback-stat--slow svg {
+  color: #ee8f87;
+}
+
+.round-feedback-detail {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklab, var(--panel-border) 25%, transparent);
+}
+
+.round-feedback-detail-label {
+  color: color-mix(in oklab, var(--text-soft) 75%, transparent);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+  min-width: 56px;
+}
+
+.round-feedback-detail-value {
+  color: var(--text-main);
+  font-size: 0.88rem;
+}
+
+.round-feedback-example {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklab, var(--panel-border) 25%, transparent);
+}
+
+.round-feedback-example-jp {
+  color: var(--text-main);
+  font-size: 0.92rem;
+}
+
+.round-feedback-example-romaji {
+  color: color-mix(in oklab, var(--text-soft) 80%, transparent);
+  font-size: 0.82rem;
+}
+
+.round-feedback-example-en {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.round-feedback-dictionary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklab, var(--panel-border) 25%, transparent);
+}
+
+.round-feedback-dictionary-copy {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  margin: 0;
 }
 
 .round-feedback-toast {

@@ -251,6 +251,23 @@ def _load_sentence_examples_rows() -> list[tuple[str, str, str]]:
     return _SENTENCE_EXAMPLES_ROWS_CACHE
 
 
+def lookup_sentence(query: str) -> dict[str, object]:
+    """Find a sentence pair from sentence_examples.csv containing *query*."""
+    query = (query or "").strip()
+    if not query:
+        return {"jp": None, "en": None, "romaji": None}
+
+    rows = _load_sentence_examples_rows()
+    if not rows:
+        return {"jp": None, "en": None, "romaji": None}
+
+    for character, reading, meaning in rows:
+        if query in character:
+            return {"jp": character, "en": meaning, "romaji": reading}
+
+    return {"jp": None, "en": None, "romaji": None}
+
+
 def _sentence_examples_deck_factory() -> Deck:
     rows = _load_sentence_examples_rows()
     if rows:
@@ -4027,6 +4044,11 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             return 0, build_dictionary_search_payload(argv[1])
         except (FileNotFoundError, ValueError) as exc:
             return 2, {"error": str(exc)}
+
+    if command == "lookup-sentence":
+        if len(argv) < 2:
+            return 2, {"error": "Usage: lookup-sentence <query>"}
+        return 0, lookup_sentence(argv[1])
 
     if command == "assistant-snapshot":
         session_id = argv[1] if len(argv) > 1 and argv[1].strip() else None

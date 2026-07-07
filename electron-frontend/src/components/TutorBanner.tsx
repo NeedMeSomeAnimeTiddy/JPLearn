@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { TypeAnimation } from 'react-type-animation'
 
 interface TutorBannerProps {
   headline: string
@@ -18,7 +19,7 @@ export function TutorBanner({ headline, body, cta, messageType, onDismiss }: Tut
     >
       <div className="tutor-banner-content">
         <strong className="tutor-banner-headline">{headline}</strong>
-        {body && <p className="tutor-banner-body">{body}</p>}
+        {body && <p className="tutor-banner-body"><TypeAnimation key={body} sequence={[body, 0]} speed={10} cursor={false} /></p>}
         {cta && <span className="tutor-banner-cta">{cta}</span>}
       </div>
       <button

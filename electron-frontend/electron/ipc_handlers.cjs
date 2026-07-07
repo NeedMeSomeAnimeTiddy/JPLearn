@@ -23,6 +23,7 @@ const {
   validateLearningPathId,
   validateAnalyticsExportType,
   validateDictionarySearchQuery,
+  validateLookupSentencePayload,
   validateGrammarMinigameRequest,
   validateConfigKey,
   validateConfigSetPayload,
@@ -137,6 +138,17 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to search dictionary: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:lookup-sentence', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateLookupSentencePayload(payload)
+    try {
+      return await runPythonBridgeWithArgsRead(['lookup-sentence', validatedPayload.query])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to look up sentence: ${detail}`)
     }
   })
 
@@ -1032,13 +1044,16 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:download-speech-model', async (event, tier) => {
+    options.ipcMain.handle('setup:download-speech-model', async (event, tier, downloadOptions) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
         throw new Error('Invalid speech model tier')
       }
       try {
-        return await setupRuntime.downloadSpeechModel(tier, event.sender, options.repoRoot)
+        const result = await setupRuntime.downloadSpeechModel(tier, event.sender, options.repoRoot, downloadOptions || {})
+        // Restart speech server so it picks up the new model + any newly installed CUDA libs
+        options.speechRuntime?.restart()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Speech model download failed: ${detail}`)

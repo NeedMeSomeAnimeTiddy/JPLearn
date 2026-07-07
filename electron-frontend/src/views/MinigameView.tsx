@@ -71,9 +71,7 @@ export function MinigameView({
     roundFeedback,
     roundFeedbackTone,
     roundFeedbackAnswer,
-    roundPerformanceLabel,
     isRoundResolving,
-    feedbackAdvanceMs,
     sessionScore,
     sessionRounds,
     sessionPoints,
@@ -88,6 +86,9 @@ export function MinigameView({
     livesRemaining,
     confidenceCaptureEnabled,
     roundConfidenceScore,
+    roundResponseMs,
+    roundSrsResult,
+    roundExampleSentence,
     voiceBusy,
     voiceUnavailable,
     answerInputRef,
@@ -110,12 +111,6 @@ export function MinigameView({
     : sessionRunReport
       ? 'Run complete'
       : 'Ready to begin'
-  const feedbackAdvanceLabel =
-    roundFeedbackTone === 'error' && livesEnabled && livesRemaining === 0
-      ? 'Ending run...'
-      : sessionRounds >= sessionTargetItems
-        ? 'Wrapping up this run...'
-        : 'Advancing automatically...'
 
   // ── Phase 7: Progressive hint ladder ────────────────────────────────────────
   // 0 = no hint shown, 1 = prompt type label, 2 = hintText, 3 = full answer giveaway
@@ -559,16 +554,20 @@ export function MinigameView({
                       onSetRoundConfidence={setRoundConfidence}
                       feedback={roundFeedback}
                       feedbackTone={roundFeedbackTone}
-                      feedbackPerformanceLabel={roundPerformanceLabel}
                       feedbackComboBonus={roundComboBonus}
                       feedbackMilestoneStreak={roundMilestoneStreak}
                       feedbackAnswer={roundFeedbackAnswer}
                       feedbackAnswerLabel={formatFeedbackAnswerLabel(roundState.mode)}
                       livesEnabled={livesEnabled}
-                      feedbackAdvanceMs={feedbackAdvanceMs}
-                      feedbackAdvanceLabel={feedbackAdvanceLabel}
                       showKeyboardPrompts={showKeyboardPrompts}
                       onSkipFeedback={skipFeedback}
+                      responseMs={roundResponseMs}
+                      srsResult={roundSrsResult}
+                      exampleSentence={roundExampleSentence}
+                      cardCharacter={roundState.focusText}
+                      cardMeaning={roundState.answer}
+                      cardRomaji={activeBlockCards.find((c) => c.id === roundState.cardId)?.romaji ?? ''}
+                      dictionaryNote={roundState.dictionaryNote}
                     >
                         {roundState.mode === 'stroke_order' ? (
                           <StrokeOrderAnswerPanel

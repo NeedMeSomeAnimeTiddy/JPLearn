@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { TypeAnimation } from 'react-type-animation'
 import { DictionaryNoteCard } from './DictionaryNoteCard'
 import type { RoundState } from '../../types'
 
@@ -125,7 +126,11 @@ export function HintAssistPanel({
         <>
           {alwaysShowHint ? (
             <>
-              {roundState.hintText ? <p className="game-hint-text">{roundState.hintText}</p> : null}
+              {roundState.hintText ? (
+                <p className="game-hint-text">
+                  <TypeAnimation key={`hint-${roundState.hintText}`} sequence={[roundState.hintText]} speed={12} cursor={false} style={{ display: 'inline' }} />
+                </p>
+              ) : null}
             </>
           ) : (
             <div className="game-hint-ladder" aria-live="polite">
@@ -137,7 +142,9 @@ export function HintAssistPanel({
                   >
                     <span className="game-hint-step-label">{step.label}</span>
                     <span className="game-hint-step-copy">
-                      {step.revealed ? step.description : 'Locked until revealed'}
+                      {step.revealed ? (
+                        <TypeAnimation key={`step-${step.key}-${step.description}`} sequence={[step.description]} speed={12} cursor={false} style={{ display: 'inline' }} />
+                      ) : 'Locked until revealed'}
                     </span>
                   </div>
                 ))}

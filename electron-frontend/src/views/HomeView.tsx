@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { TypeAnimation } from 'react-type-animation'
 import type { CSSProperties } from 'react'
 import {
   AlertTriangle,
@@ -169,7 +170,15 @@ export function HomeView({
 
         <div className="hub-topbar-center">
           <span className="hub-topbar-catalog">JPL-EARN</span>
-          <strong className="hub-topbar-title"><span className="hub-glitch-text">JPLearn</span></strong>
+          <strong className="hub-topbar-title">
+            <TypeAnimation
+              sequence={['JPLearn', 1000]}
+              speed={20}
+              cursor={false}
+              className="hub-glitch-text"
+              style={{ display: 'inline-block' }}
+            />
+          </strong>
           <span className="hub-topbar-catalog hub-topbar-catalog--sub">{greeting} · 日本語学習</span>
           <span className="hub-topbar-stripe" aria-hidden="true" />
         </div>

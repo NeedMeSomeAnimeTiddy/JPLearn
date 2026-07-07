@@ -306,8 +306,6 @@ function SettingsCollapsibleSection({
   )
 }
 
-const FEEDBACK_REVEAL_MS = 2100
-const FEEDBACK_REVEAL_SUCCESS_MS = 500
 const PERFORMANCE_PERFECT_MS = 700
 const PERFORMANCE_GOOD_MS = 2200
 const ASSISTANT_EVENT_POLL_MS = 15000
@@ -3618,7 +3616,18 @@ function App() {
   const [roundFeedbackAnswer, setRoundFeedbackAnswer] = useState<string | null>(null)
   const [roundPerformanceLabel, setRoundPerformanceLabel] = useState<'PERFECT' | 'GOOD' | 'SLOW' | 'MISS' | null>(null)
   const [isRoundResolving, setIsRoundResolving] = useState<boolean>(false)
-  const [feedbackAdvanceMs, setFeedbackAdvanceMs] = useState<number>(FEEDBACK_REVEAL_MS)
+  const [roundResponseMs, setRoundResponseMs] = useState<number | null>(null)
+  const [roundSrsResult, setRoundSrsResult] = useState<{
+    repetitions: number
+    interval: number
+    next_review: string
+    ease_factor: number
+  } | null>(null)
+  const [roundExampleSentence, setRoundExampleSentence] = useState<{
+    jp: string
+    en: string
+    romaji: string
+  } | null>(null)
   const [sessionScore, setSessionScore] = useState<number>(0)
   const [sessionRounds, setSessionRounds] = useState<number>(0)
   const [sessionPoints, setSessionPoints] = useState<number>(0)
@@ -3748,7 +3757,6 @@ function App() {
   const streakDetailsRef = useRef<HTMLDivElement | null>(null)
   const localToastIdRef = useRef(-1)
   const previousSessionActiveRef = useRef(false)
-  const feedbackTimerRef = useRef<number | null>(null)
   const feedbackAdvanceRef = useRef<(() => void) | null>(null)
   const kanjiCategoryDeckCacheRef = useRef<Partial<Record<KanjiCategory, ScriptDeck['cards']>>>({})
   const vocabCategoryDeckCacheRef = useRef<Partial<Record<VocabCategory, ScriptDeck['cards']>>>({})
@@ -4390,7 +4398,7 @@ function App() {
     }
   }, [dictionaryDownloading, refreshTutorInstallInfo])
 
-  const downloadSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
+  const downloadSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra', options?: { force?: boolean }) => {
     const downloadModel = window.jplearnDesktop?.downloadSpeechModel
     if (!downloadModel || speechDownloadingTier) {
       return
@@ -4399,7 +4407,7 @@ function App() {
     setSpeechDownloadProgress(0)
     setSpeechDownloadMethod(null)
     try {
-      await downloadModel(tier)
+      await downloadModel(tier, options)
       await refreshTutorInstallInfo()
     } finally {
       setSpeechDownloadingTier(null)
@@ -5194,18 +5202,17 @@ function App() {
       view !== 'minigame' ||
       !sessionActive ||
       !roundState ||
-      isRoundResolving ||
-      (roundState.mode !== 'romaji_sprint' && roundState.mode !== 'typed_recall' && roundState.mode !== 'stroke_order')
+      isRoundResolving
     ) {
       return
     }
 
-    const focusHandle = window.requestAnimationFrame(() => {
+    const focusHandle = window.setTimeout(() => {
       answerInputRef.current?.focus()
-    })
+    }, 60)
 
-    return () => window.cancelAnimationFrame(focusHandle)
-  }, [isRoundResolving, roundState, sessionActive, view])
+    return () => window.clearTimeout(focusHandle)
+  }, [isRoundResolving, roundState, roundInput, sessionActive, view])
 
   useEffect(() => {
     const previouslyActive = previousSessionActiveRef.current
@@ -7058,12 +7065,8 @@ function App() {
   ])
 
   const skipFeedback = useCallback(() => {
-    if (feedbackTimerRef.current !== null) {
-      clearTimeout(feedbackTimerRef.current)
-      feedbackTimerRef.current = null
-      feedbackAdvanceRef.current?.()
-      feedbackAdvanceRef.current = null
-    }
+    feedbackAdvanceRef.current?.()
+    feedbackAdvanceRef.current = null
   }, [])
 
   const launchAssistantToastAction = useCallback((toast: AssistantToast) => {
@@ -7215,6 +7218,7 @@ function App() {
         roundPresentedAtRef.current > 0
           ? Math.max(0, performance.now() - roundPresentedAtRef.current)
           : PERFORMANCE_GOOD_MS
+      setRoundResponseMs(responseMs)
       const performanceLabel = classifyRoundPerformance(isCorrect, responseMs)
       const previousScript = scriptStats[activeScript]
       const nextStreak = isCorrect ? previousScript.currentStreak + 1 : 0
@@ -7321,9 +7325,6 @@ function App() {
         })
       }
 
-      const nextFeedbackAdvanceMs = isCorrect ? FEEDBACK_REVEAL_SUCCESS_MS : FEEDBACK_REVEAL_MS
-      setFeedbackAdvanceMs(nextFeedbackAdvanceMs)
-
       const confidenceForAnswer = confidenceCaptureEnabled ? roundConfidenceScore : undefined
 
       const resultSlug: DeckSlugInput =
@@ -7361,7 +7362,26 @@ function App() {
               ),
             )
           }
+          if (result.repetitions != null) {
+            setRoundSrsResult({
+              repetitions: result.repetitions,
+              interval: result.interval,
+              next_review: result.next_review,
+              ease_factor: result.ease_factor,
+            })
+          }
         } catch { /* background record — ignore */ }
+      })()
+
+      void (async () => {
+        try {
+          const query = roundState.focusText || roundState.answer
+          if (!query) return
+          const sentence = await window.jplearnDesktop?.lookupSentence?.({ query })
+          if (sentence?.jp) {
+            setRoundExampleSentence({ jp: sentence.jp, en: sentence.en ?? '', romaji: sentence.romaji ?? '' })
+          }
+        } catch { /* optional — ignore */ }
       })()
 
       if (typeof confidenceForAnswer === 'number') {
@@ -7382,7 +7402,6 @@ function App() {
       }))
 
       const advanceFeedback = () => {
-        feedbackTimerRef.current = null
         feedbackAdvanceRef.current = null
         if (!isCorrect && livesEnabled && nextLives <= 0) {
           setSessionActive(false)
@@ -7392,6 +7411,9 @@ function App() {
           setRoundFeedbackTone(null)
           setRoundFeedbackPoints(null)
           setRoundFeedbackAnswer(null)
+          setRoundResponseMs(null)
+          setRoundSrsResult(null)
+          setRoundExampleSentence(null)
           setIsRoundResolving(false)
           return
         }
@@ -7403,6 +7425,9 @@ function App() {
           setRoundFeedbackTone(null)
           setRoundFeedbackPoints(null)
           setRoundFeedbackAnswer(null)
+          setRoundResponseMs(null)
+          setRoundSrsResult(null)
+          setRoundExampleSentence(null)
           setIsRoundResolving(false)
           return
         }
@@ -7412,10 +7437,12 @@ function App() {
         setRoundFeedbackTone(null)
         setRoundFeedbackPoints(null)
         setRoundFeedbackAnswer(null)
+        setRoundResponseMs(null)
+        setRoundSrsResult(null)
+        setRoundExampleSentence(null)
         setIsRoundResolving(false)
       }
       feedbackAdvanceRef.current = advanceFeedback
-      feedbackTimerRef.current = window.setTimeout(advanceFeedback, nextFeedbackAdvanceMs)
     },
     [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionRounds, sessionTargetItems],
   )
@@ -8532,8 +8559,10 @@ function App() {
         roundFeedbackAnswer,
         roundFeedbackPoints,
         roundPerformanceLabel,
+        roundResponseMs,
+        roundSrsResult,
+        roundExampleSentence,
         isRoundResolving,
-        feedbackAdvanceMs,
         sessionScore,
         sessionRounds,
         sessionPoints,
@@ -10085,7 +10114,7 @@ function App() {
                               <button
                                 type="button"
                                 className="settings-card-icon-button"
-                                onClick={() => { void downloadSpeechModel(model.tier) }}
+                                onClick={() => { void downloadSpeechModel(model.tier, model.installed ? { force: true } : undefined) }}
                                 disabled={speechDownloadingTier !== null || speechModelActionTier !== null}
                                 aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
                                 title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}

@@ -313,6 +313,12 @@ export const POINT_COMBO_THRESHOLDS = [3, 6, 9] as const
 export const POINTS_RULE_COPY =
   '1 point per correct answer, with combo bonuses at streaks 3, 6, and 9 (max 4 points).'
 
+export const FEEDBACK_COPY = {
+  ANSWERED_IN: (ms: number) => `${(ms / 1000).toFixed(2)}s`,
+  NEXT_REVIEW_IN: (days: number) =>
+    `Next review in ${days <= 0 ? '1 day' : `${days} days`}`,
+} as const
+
 // ── JLPT level metadata ──────────────────────────────────────────────────────
 
 export const JLPT_LEVEL_ORDER: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']

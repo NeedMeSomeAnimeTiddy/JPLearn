@@ -238,6 +238,22 @@ function validateDictionarySearchQuery(value) {
   return normalized
 }
 
+const MAX_LOOKUP_SENTENCE_QUERY_LENGTH = 200
+
+function validateLookupSentencePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid lookup sentence payload: expected object')
+  }
+  if (typeof payload.query !== 'string') {
+    throw new Error('Invalid lookup sentence payload: query must be a string')
+  }
+  const query = payload.query.trim().slice(0, MAX_LOOKUP_SENTENCE_QUERY_LENGTH)
+  if (!query) {
+    throw new Error('Invalid lookup sentence payload: query must not be empty')
+  }
+  return { query }
+}
+
 function validateGrammarMinigameRequest(payload) {
   const allowedGameTypes = new Set(['sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter'])
 
@@ -569,6 +585,7 @@ module.exports = {
   validateOptionalSessionId,
   validatePositiveLimit,
   validateDictionarySearchQuery,
+  validateLookupSentencePayload,
   validateGrammarMinigameRequest,
   validateAssistantEventIdsPayload,
   validateAssistantEventInteractionPayload,
