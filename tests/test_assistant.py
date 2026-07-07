@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import cast
 
 from data import database
 from data import study_pipeline
@@ -379,7 +380,7 @@ def test_study_pipeline_assistant_snapshot(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
     snapshot = study_pipeline.load_assistant_snapshot()
-    assert snapshot["profile"]["llm_backend"] == "llama.cpp"
+    assert cast(dict[str, object], snapshot["profile"])["llm_backend"] == "llama.cpp"
     assert "state" in snapshot
     assert isinstance(snapshot["events"], list)
 

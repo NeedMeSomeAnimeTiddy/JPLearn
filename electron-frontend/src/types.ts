@@ -12,7 +12,7 @@ export type MinigameKey =
   | 'vibe_check'
   | 'imposter'
   | 'listening_audio_first'
-  | 'listening_prompt_first'
+  | 'dictation'
   | 'interleave_mix'
 
 export type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
@@ -177,6 +177,7 @@ export interface SessionRunReport {
   confidenceCaptureEnabled: boolean
   confidenceCapturedCount: number
   averageConfidenceScore: number | null
+  wrongCardIds: number[]
 }
 
 export interface ScriptStats {

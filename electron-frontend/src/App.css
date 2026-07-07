@@ -1492,158 +1492,165 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   }
 }
 
-.assistant-status-chip {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  pointer-events: auto;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 45%, var(--panel-border));
-  background:
-    radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--tone-ocean) 26%, transparent), transparent 58%),
-    color-mix(in oklab, var(--panel-bg) 90%, black);
-  box-shadow:
-    0 18px 28px -20px rgba(0, 0, 0, 0.9),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
+/* ── Tutor toast (hub chip style) ─────────────────────────────────────────── */
 
-.assistant-status-icon {
-  width: 16px;
-  height: 16px;
-  color: color-mix(in oklab, var(--tone-ocean) 74%, white);
-  flex-shrink: 0;
-}
-
-.assistant-status-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.assistant-status-copy strong {
-  color: var(--text-main);
-  font-size: 0.79rem;
-  letter-spacing: 0.01em;
-}
-
-.assistant-status-copy span {
-  color: var(--text-soft);
-  font-size: 0.72rem;
-  line-height: 1.28;
+.assistant-toast-anchor {
+  position: fixed;
+  bottom: 18px;
+  left: 18px;
+  display: flex;
+  pointer-events: none;
+  z-index: 920;
 }
 
 .assistant-toast-stack {
-  position: fixed;
-  left: 18px;
-  bottom: 18px;
-  width: min(360px, calc(100vw - 36px));
+  width: min(340px, calc(100vw - 36px));
   display: grid;
-  gap: 8px;
+  gap: 0;
   pointer-events: none;
-  z-index: 920;
 }
 
 .assistant-toast {
   position: relative;
   pointer-events: auto;
   overflow: hidden;
-  border-radius: 16px;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 28%, var(--panel-border));
-  background:
-    radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--tone-streak) 24%, transparent), transparent 52%),
-    radial-gradient(circle at 86% 100%, color-mix(in oklab, var(--tone-ocean) 26%, transparent), transparent 56%),
-    color-mix(in oklab, var(--panel-bg-alt) 90%, white 10%);
+  border-radius: 0;
+  border: 1px solid var(--panel-border);
+  background: var(--bg-main);
   box-shadow:
-    0 16px 30px -22px rgba(0, 0, 0, 0.82),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(5px);
-  padding: 11px 12px;
+    0 2px 0 var(--accent-ink),
+    0 12px 28px -18px rgba(0, 0, 0, 0.7);
+  padding: 10px 12px;
   animation: assistantToastLifecycle 3800ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.assistant-toast::after {
-  content: '';
-  position: absolute;
-  top: 9px;
-  right: 10px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: color-mix(in oklab, var(--tone-streak) 78%, white 22%);
-  box-shadow:
-    0 0 0 2px color-mix(in oklab, var(--panel-bg) 72%, transparent),
-    0 0 10px color-mix(in oklab, var(--tone-streak) 42%, transparent);
+.assistant-toast-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.assistant-toast h3 {
+.assistant-toast-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  color: var(--tone-ocean);
+}
+
+.assistant-toast-coaching .assistant-toast-icon {
+  color: var(--tone-skill);
+}
+
+.assistant-toast-critical .assistant-toast-icon {
+  color: var(--tone-danger);
+}
+
+.assistant-toast-celebration .assistant-toast-icon {
+  color: var(--tone-streak);
+}
+
+.assistant-toast-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.assistant-toast-header h3 {
+  flex: 1;
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.64rem;
+  font-weight: 600;
+  font-family: var(--mono);
   color: var(--text-main);
-  letter-spacing: 0.015em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.3;
 }
 
-.assistant-toast p {
+.assistant-toast-dismiss {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.assistant-toast-dismiss:hover {
+  background: var(--chip-bg);
+  color: var(--text-main);
+}
+
+.assistant-toast-dismiss:focus-visible {
+  outline: 2px solid var(--tone-ocean);
+  outline-offset: 1px;
+}
+
+.assistant-toast-dismiss svg {
+  width: 12px;
+  height: 12px;
+}
+
+.assistant-toast-body {
   margin: 6px 0 0;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   line-height: 1.38;
   color: var(--text-soft);
 }
 
 .assistant-toast-controls {
-  margin-top: 9px;
+  margin-top: 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .assistant-toast-action {
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 46%, var(--panel-border));
-  background: color-mix(in oklab, var(--tone-ocean) 22%, var(--panel-bg));
-  color: var(--text-main);
-  border-radius: 999px;
-  min-height: 30px;
-  padding: 0 11px;
+  flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--button-font);
-  font-size: 0.7rem;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 0;
+  border: 1px solid var(--panel-border);
+  background: var(--button-bg-top);
+  color: var(--bg-main);
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
   cursor: pointer;
+  box-shadow: 0 2px 0 var(--accent-ink);
+  transition: transform 80ms ease, box-shadow 80ms ease, border-color 140ms ease;
 }
 
 .assistant-toast-action:hover {
-  border-color: color-mix(in oklab, var(--tone-ocean) 72%, var(--panel-border));
+  background: color-mix(in oklab, var(--button-bg-top) 80%, var(--accent));
+  border-color: var(--accent);
 }
 
-.assistant-toast-dismiss {
-  border: 1px solid color-mix(in oklab, var(--panel-border) 86%, black);
-  background: color-mix(in oklab, var(--panel-bg-alt) 94%, black);
-  color: var(--text-soft);
-  border-radius: 999px;
-  min-height: 30px;
-  padding: 0 11px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--button-font);
-  font-size: 0.69rem;
-  cursor: pointer;
+.assistant-toast-action:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--accent-ink);
 }
 
-.assistant-toast-dismiss:hover {
-  color: var(--text-main);
-  border-color: color-mix(in oklab, var(--panel-border) 70%, white);
+.assistant-toast-action:focus-visible {
+  outline: 2px solid var(--tone-ocean);
+  outline-offset: 2px;
 }
 
 .assistant-toast-advance-track {
-  margin-top: 9px;
-  height: 8px;
-  border-radius: 999px;
+  margin-top: 8px;
+  height: 3px;
   overflow: hidden;
-  background: color-mix(in oklab, var(--chip-bg) 82%, transparent);
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--chip-border));
+  background: color-mix(in oklab, var(--chip-bg) 60%, transparent);
 }
 
 .assistant-toast-advance-fill {
@@ -1651,47 +1658,216 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   height: 100%;
   width: 100%;
   transform-origin: left center;
-  background: linear-gradient(90deg, var(--tone-amber), var(--tone-ocean));
+  background: var(--tone-ocean);
   animation-name: feedbackAdvanceCountdown;
   animation-timing-function: linear;
   animation-fill-mode: forwards;
 }
 
 .assistant-toast-info {
-  border-color: color-mix(in oklab, var(--tone-ocean) 45%, var(--panel-border));
+  border-color: var(--panel-border);
 }
 
 .assistant-toast-coaching {
-  border-color: color-mix(in oklab, var(--tone-skill) 46%, var(--panel-border));
+  border-color: color-mix(in oklab, var(--tone-skill) 40%, var(--panel-border));
 }
 
 .assistant-toast-critical {
-  border-color: color-mix(in oklab, var(--tone-danger) 56%, var(--panel-border));
+  border-color: color-mix(in oklab, var(--tone-danger) 50%, var(--panel-border));
 }
 
 .assistant-toast-celebration {
-  border-color: color-mix(in oklab, var(--tone-streak) 58%, var(--panel-border));
+  border-color: color-mix(in oklab, var(--tone-streak) 50%, var(--panel-border));
 }
+
+/* ── Resume toast (hub chip style) ────────────────────────────────────────── */
+
+.resume-toast-anchor {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 930;
+  pointer-events: none;
+}
+
+.resume-toast {
+  position: relative;
+  pointer-events: auto;
+  width: 280px;
+  overflow: hidden;
+  border-radius: 0;
+  border: 1px solid var(--panel-border);
+  background: var(--bg-main);
+  box-shadow:
+    0 2px 0 var(--accent-ink),
+    0 12px 28px -18px rgba(0, 0, 0, 0.7);
+  padding: 10px 12px;
+  animation: resumeToastEnter 0.35s ease-out;
+}
+
+.resume-toast-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.resume-toast-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  color: var(--tone-ocean);
+}
+
+.resume-toast-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.resume-toast-label {
+  flex: 1;
+  margin: 0;
+  font-size: 0.64rem;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--text-main);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.resume-toast-detail {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.38;
+  color: var(--text-soft);
+}
+
+.resume-toast-controls {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.resume-toast-action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 0;
+  border: 1px solid var(--panel-border);
+  background: var(--button-bg-top);
+  color: var(--bg-main);
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--accent-ink);
+  transition: transform 80ms ease, box-shadow 80ms ease, border-color 140ms ease;
+}
+
+.resume-toast-action:hover {
+  background: color-mix(in oklab, var(--button-bg-top) 80%, var(--accent));
+  border-color: var(--accent);
+}
+
+.resume-toast-action:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--accent-ink);
+}
+
+.resume-toast-action:focus-visible {
+  outline: 2px solid var(--tone-ocean);
+  outline-offset: 2px;
+}
+
+.resume-toast-dismiss {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.resume-toast-dismiss:hover {
+  background: var(--chip-bg);
+  color: var(--text-main);
+}
+
+.resume-toast-dismiss:focus-visible {
+  outline: 2px solid var(--tone-ocean);
+  outline-offset: 1px;
+}
+
+.resume-toast-dismiss svg {
+  width: 12px;
+  height: 12px;
+}
+
+.resume-toast-advance-track {
+  margin-top: 8px;
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--chip-bg) 60%, transparent);
+}
+
+.resume-toast-advance-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  background: var(--tone-ocean);
+  animation: resumeToastCountdown 10s linear forwards;
+}
+
+@keyframes resumeToastEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes resumeToastCountdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* ── End resume toast ─────────────────────────────────────────────────────── */
 
 @keyframes assistantToastLifecycle {
   0% {
     opacity: 0;
-    transform: translateY(8px) scale(0.975);
+    transform: translateX(-12px) scale(0.97);
   }
 
   10% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(0) scale(1);
   }
 
   80% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(0) scale(1);
   }
 
   100% {
     opacity: 0;
-    transform: translateY(6px) scale(0.985);
+    transform: translateX(-8px) scale(0.98);
   }
 }
 
@@ -1702,13 +1878,7 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   }
 
   .assistant-toast-stack {
-    left: 10px;
-    bottom: 10px;
     width: min(350px, calc(100vw - 20px));
-  }
-
-  .assistant-status-chip {
-    padding: 9px 10px;
   }
 
   .assistant-chat-panel {
@@ -5768,75 +5938,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
   animation: enterUp 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.tutor-banner-congratulation {
-  border-color: color-mix(in oklab, var(--tone-teal) 42%, var(--panel-border));
-  background: color-mix(in oklab, var(--tone-teal) 9%, var(--panel-bg));
-}
-
-.tutor-banner-encouragement {
-  border-color: color-mix(in oklab, var(--tone-amber) 42%, var(--panel-border));
-  background: color-mix(in oklab, var(--tone-amber) 9%, var(--panel-bg));
-}
-
-.tutor-banner-guidance {
-  border-color: color-mix(in oklab, var(--tone-ocean) 42%, var(--panel-border));
-  background: color-mix(in oklab, var(--tone-ocean) 9%, var(--panel-bg));
-}
-
-.tutor-banner-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.tutor-banner-headline {
-  display: block;
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--text-main);
-  line-height: 1.25;
-}
-
-.tutor-banner-body {
-  margin: 3px 0 0;
-  font-size: 0.8rem;
-  color: var(--text-soft);
-  line-height: 1.35;
-}
-
-.tutor-banner-cta {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.76rem;
-  color: var(--tone-ocean);
-  font-weight: 600;
-  font-style: italic;
-}
-
-.tutor-banner-dismiss {
-  border: none;
-  background: transparent;
-  color: var(--text-soft);
-  cursor: pointer;
-  border-radius: 6px;
-  padding: 3px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 1px;
-  transition: color 0.12s, background 0.12s;
-}
-
-.tutor-banner-dismiss:hover {
-  color: var(--text-main);
-  background: color-mix(in oklab, var(--panel-border) 35%, transparent);
-}
-
-.tutor-banner-dismiss-icon {
-  width: 14px;
-  height: 14px;
-}
-
 /* ── Home recommendations section ─────────────────────────────── */
 .home-recommendations {
   margin-top: 10px;
@@ -7309,7 +7410,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 30%, var(--chip-border));
   border-radius: 0;
   padding: 8px 9px;
-  background: color-mix(in oklab, var(--chip-bg) 82%, transparent);
+  background: var(--panel-bg);
   display: grid;
   gap: 2px;
 }
@@ -7388,7 +7489,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   padding: 10px 12px;
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--chip-border));
   border-radius: 0;
-  background: color-mix(in oklab, var(--chip-bg) 84%, transparent);
+  background: var(--panel-bg);
 }
 
 .minigame-session-summary-goal-card strong {
@@ -7408,6 +7509,24 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .minigame-session-summary-actions {
   margin-top: 0;
+}
+
+.minigame-session-summary .hub-chip-button {
+  background: var(--panel-bg);
+  color: var(--text-main);
+  border-color: var(--panel-border);
+  box-shadow: 0 2px 0 var(--panel-border);
+}
+
+.minigame-session-summary .hub-chip-button:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--panel-bg) 80%, var(--accent));
+  color: var(--text-main);
+  border-color: var(--accent);
+}
+
+.minigame-session-summary .back-button {
+  background: var(--panel-bg);
+  border-color: var(--panel-border);
 }
 
 .surprise-pill {
@@ -7671,6 +7790,15 @@ html[data-reduced-motion='true'] .cassette-reel {
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: 0.02em;
+}
+
+.round-feedback-answer-error {
+  border-color: var(--tone-rose);
+}
+
+.round-feedback-answer-value .char-wrong {
+  color: var(--tone-rose);
+  font-weight: 800;
 }
 
 .round-feedback-note {
@@ -8256,7 +8384,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 .minigame-open-playfield .minigame-session-summary-highlight {
   border: 1px solid var(--accent-ink);
   border-radius: 0;
-  background: var(--bg-main);
+  background: color-mix(in oklab, var(--tone-amber) 14%, var(--panel-bg));
 }
 
 /* —— legacy minigame-challenge (preserved for backward compat) —— */
@@ -10309,7 +10437,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 /* ── Page loading overlay ─────────────────────────────────────── */
 .page-loading-overlay {
   position: absolute;
-  inset: 40px 0 0 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10317,13 +10445,41 @@ html[data-reduced-motion='true'] .cassette-reel {
   pointer-events: none;
 }
 
+/* CRT scanlines scoped to the loading overlay */
+.page-loading-crt {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.04) 2px,
+    rgba(0, 0, 0, 0.04) 3px
+  );
+  opacity: 0.5;
+}
+
+.page-loading-crt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 40%,
+    color-mix(in oklab, var(--bg-main) 50%, transparent) 100%
+  );
+  pointer-events: none;
+}
+
 .page-loading-widget {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
   padding: 28px 40px;
-  border-radius: 18px;
+  border-radius: var(--radius-panel, 14px);
   background: color-mix(in oklab, var(--panel-bg) 85%, transparent);
   border: 1px solid color-mix(in oklab, var(--tone-ocean) 36%, var(--panel-border));
   backdrop-filter: blur(12px);
@@ -10331,15 +10487,44 @@ html[data-reduced-motion='true'] .cassette-reel {
 }
 
 .page-loading-label {
-  font-size: 0.9rem;
+  font-family: var(--display-font);
+  font-size: 1.1rem;
   font-weight: 500;
   color: color-mix(in oklab, var(--tone-ocean) 80%, white);
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
+}
+
+/* Chromatic glitch offset text */
+.page-loading-glitch {
+  position: relative;
+}
+
+.page-loading-glitch::before,
+.page-loading-glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.page-loading-glitch::before {
+  color: var(--accent);
+  clip-path: inset(0 0 60% 0);
+  transform: translate(-2px, -1px);
+  opacity: 0.5;
+}
+
+.page-loading-glitch::after {
+  color: var(--tone-teal);
+  clip-path: inset(60% 0 0 0);
+  transform: translate(2px, 1px);
+  opacity: 0.5;
 }
 
 .page-loading-track {
   position: relative;
-  width: 180px;
+  width: 200px;
   height: 4px;
   border-radius: 9999px;
   background: color-mix(in oklab, var(--tone-ocean) 16%, var(--panel-border));
@@ -10352,13 +10537,43 @@ html[data-reduced-motion='true'] .cassette-reel {
   height: 100%;
   width: 55%;
   border-radius: 9999px;
-  background: linear-gradient(90deg, transparent, var(--tone-ocean), color-mix(in oklab, var(--tone-ocean) 70%, white));
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent),
+    color-mix(in oklab, var(--accent) 70%, white)
+  );
   animation: page-bar-run 1.4s ease-in-out infinite;
 }
 
 @keyframes page-bar-run {
   0%   { left: -55%; }
   100% { left: 110%; }
+}
+
+/* Equalizer bars beneath loading track */
+.page-loading-eq {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 12px;
+}
+
+.page-loading-eq span {
+  width: 3px;
+  background: var(--accent-soft);
+  border-radius: 1px;
+  animation: page-eq-bounce 0.6s ease-in-out alternate infinite;
+}
+
+.page-loading-eq span:nth-child(1) { height: 5px; animation-delay: 0s; }
+.page-loading-eq span:nth-child(2) { height: 8px; animation-delay: 0.15s; }
+.page-loading-eq span:nth-child(3) { height: 4px; animation-delay: 0.3s; }
+.page-loading-eq span:nth-child(4) { height: 10px; animation-delay: 0.45s; }
+
+@keyframes page-eq-bounce {
+  0% { transform: scaleY(0.4); }
+  100% { transform: scaleY(1); }
 }
 
 .settings-background-note {

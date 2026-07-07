@@ -17,6 +17,7 @@ from domain.progression import ProgressionEvent, ProgressionGraph
 from domain.recommendation import StudyRecommendation
 from domain.tutor import (
     TutorEvent,
+    TutorEventPriority,
     TutorMessage,
     TutorReaction,
 )
@@ -194,7 +195,7 @@ def from_progression_event(
     if event.event_type not in ("node_mastered", "node_unlocked", "branch_unlocked"):
         return None
     label = _resolve_label(event.node_id, graph)
-    priority = "high" if event.event_type == "node_mastered" else "normal"
+    priority: TutorEventPriority = "high" if event.event_type == "node_mastered" else "normal"
     return TutorEvent(
         event_type=event.event_type,  # type: ignore[arg-type]
         subject_id=event.node_id,
@@ -252,7 +253,7 @@ def from_level_event(event: LevelEvent) -> TutorEvent:
     Milestone levels (multiples of 5) receive ``"high"`` priority;
     all others receive ``"normal"``.
     """
-    priority = "high" if event.new_level % 5 == 0 else "normal"
+    priority: TutorEventPriority = "high" if event.new_level % 5 == 0 else "normal"
     return TutorEvent(
         event_type="level_up",
         subject_id=str(event.new_level),
@@ -275,7 +276,7 @@ def from_recommendation(
         graph: Optional progression graph for node name lookup.
     """
     label = _resolve_label(rec.node_id, graph)
-    priority = "high" if rec.reason in ("high_error_rate", "leeches_detected") else "normal"
+    priority: TutorEventPriority = "high" if rec.reason in ("high_error_rate", "leeches_detected") else "normal"
     return TutorEvent(
         event_type="recommendation",
         subject_id=rec.node_id,

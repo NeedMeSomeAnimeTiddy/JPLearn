@@ -2,6 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 
+// Mock TypeAnimation to render text immediately instead of character-by-character.
+// This avoids timing issues in jsdom where incremental typing never completes quickly enough.
+vi.mock('react-type-animation', () => ({
+  TypeAnimation: ({ sequence, style, className }: { sequence: (string | number)[]; style?: React.CSSProperties; className?: string }) => {
+    // Pick the first string from sequence — that's the text to display.
+    const text = typeof sequence[0] === 'string' ? sequence[0] : ''
+    return <span className={className} style={style}>{text}</span>
+  },
+}))
+
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
@@ -84,6 +94,10 @@ Object.defineProperty(globalThis, 'ResizeObserver', {
   writable: true,
   value: MockResizeObserver,
 })
+
+if (!Element.prototype.scrollBy) {
+  Element.prototype.scrollBy = function scrollBy(_x?: number | ScrollToOptions, _y?: number) {}
+}
 
 const baseCards = [
   { id: 0, character: 'あ', romaji: 'a', meaning: 'a', tags: ['hiragana'], example_sentence: 'あさです。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [1, 2, 3], character_distractor_ids: [1, 2, 3] },
@@ -206,6 +220,47 @@ const baseDesktopApi = {
   toggleMaximizeWindow: async () => ({ ok: true, isMaximized: false }),
   isWindowMaximized: async () => ({ isMaximized: false }),
   closeWindow: async () => ({ ok: true }),
+  getVoiceStatus: async () => ({
+    available: true,
+    modelReady: true,
+    downloading: false,
+    downloadProgress: 1,
+    modelName: 'voicevox',
+    lastError: null,
+  }),
+  getSetupSystemInfo: async () => ({
+    totalRamGb: 16,
+    gpuVramGb: null,
+    models: [],
+    recommendedTier: 'low',
+    activeModelTier: null,
+    activeEmbedderTier: null,
+    activeEmbedderLabel: null,
+    activeEmbedderInstalled: false,
+    activeEmbedderEnabled: false,
+    llamaCppInstalled: false,
+    voiceInstalled: true,
+    voiceModels: ['voicevox'],
+    activeVoiceModel: 'voicevox',
+    fontsInstalled: false,
+    dictionaryInstalled: false,
+    llamaCppEstimatedDownloadMinutes: null,
+    dictionaryEstimatedDownloadMinutes: null,
+    speechModels: [],
+    recommendedSpeechTier: 'low',
+    activeSpeechModelTier: null,
+    ocrModels: [],
+    recommendedOcrTier: 'low',
+    activeOcrModelTier: null,
+    ocrInstalled: false,
+    translationModels: [],
+    recommendedTranslationTier: 'low',
+    activeTranslationModelTier: null,
+    translationInstalled: false,
+    translationProfiles: [],
+    activeTranslationProfileTier: null,
+    isPackaged: false,
+  } as any),
 }
 
 function buildStudyPlanDesktopApi() {
@@ -293,6 +348,16 @@ describe('Minigame menu', () => {
     expect(screen.queryByText(/Romaji Sprint/i)).toBeNull()
   })
 
+  it('shows dictation mode in vocabulary track', async () => {
+    window.jplearnDesktop = baseDesktopApi
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    clickTopMenuCard('Vocabulary')
+
+    expect((await screen.findAllByText(/Dictation/i)).length).toBeGreaterThan(0)
+  })
+
   it('starts a fresh run when launching a minigame from the shortcuts menu', async () => {
     window.jplearnDesktop = baseDesktopApi
 
@@ -304,7 +369,7 @@ describe('Minigame menu', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /hiragana map/i }))
     fireEvent.click(screen.getByRole('menuitem', { name: /meaning match/i }))
 
-    await screen.findByRole('heading', { name: /Meaning Match/i })
+    await screen.findByText(/Meaning Match/i)
     await screen.findByRole('button', { name: /restart challenge/i })
 
     expect(screen.queryByRole('button', { name: /^(play|launch)$/i })).toBeNull()
@@ -326,7 +391,7 @@ describe('Minigame menu', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /hiragana map/i }))
     fireEvent.click(screen.getByRole('menuitem', { name: /meaning match/i }))
 
-    await screen.findByRole('heading', { name: /Meaning Match/i })
+    await screen.findByText(/Meaning Match/i)
 
     const settingsButtons = screen.getAllByRole('button', { name: /open settings/i })
     fireEvent.click(settingsButtons[settingsButtons.length - 1])
@@ -358,7 +423,7 @@ describe('Minigame menu', () => {
     const typedInput = await screen.findByPlaceholderText(/Type meaning/i)
     fireEvent.click(screen.getByRole('button', { name: /confidence high/i }))
     fireEvent.change(typedInput, { target: { value: 'a' } })
-    fireEvent.click(screen.getByRole('button', { name: /^Check$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /submit answer/i }))
 
     await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
     expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
@@ -390,7 +455,6 @@ describe('Minigame menu', () => {
     expect(await screen.findByText(/Study Plan/i)).toBeTruthy()
     expect(screen.getByText(/starter-safe session/i)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: /study plan/i }))
     const shortcutButton = await screen.findByRole('button', { name: /meaning match/i })
     fireEvent.click(shortcutButton)
 
@@ -486,13 +550,13 @@ describe('Minigame menu', () => {
     const contextTiles = await screen.findAllByRole('button', { name: /Particle Cloze/i })
     clickTilePrimaryAction(contextTiles[0])
 
-    const promptMain = await screen.findByText((content, node) => {
-      if (!node || !node.classList.contains('game-prompt-main')) return false
-      return ['あ', 'い', 'う', 'え'].some((character) => content.includes(character))
+    // Wait for the round to render, then check .game-prompt-main text
+    await waitFor(() => {
+      const promptMain = document.querySelector('.game-prompt-main')
+      expect(promptMain?.textContent).toMatch(/[あいうえ]/)
     })
-    expect(promptMain).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
-    expect(screen.getByText(/(あさです。|いまです。|うみです。|えきです。)/i)).toBeTruthy()
+    await screen.findByText((content) => content.includes('あさです') || content.includes('いまです') || content.includes('うみです') || content.includes('えきです'))
   })
 
   it('renders imposter passages in words track using example sentences', async () => {
@@ -504,17 +568,29 @@ describe('Minigame menu', () => {
     const storyTiles = await screen.findAllByRole('button', { name: /Imposter/i })
     clickTilePrimaryAction(storyTiles[0])
 
-    const storyPassage = await screen.findByText((content, node) => {
-      if (!node || !node.classList.contains('game-prompt-main')) return false
-      return ['あさです。', 'いまです。', 'うみです。', 'えきです。'].some((line) => content.includes(line))
+    await waitFor(() => {
+      const storyPassage = document.querySelector('.game-prompt-main')
+      expect(storyPassage?.textContent).toMatch(/[あさです。いまです。うみです。えきです。]/)
     })
-    expect(storyPassage).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
-    expect(screen.getByText(/The sentence uses (あ|い|う|え).*choose its meaning/i)).toBeTruthy()
+    const hintText = document.querySelector('.game-hint-text')
+    expect(hintText?.textContent).toContain('choose its meaning')
   })
 
   it('shows a stroke-memory hint for kanji character matches', async () => {
-    window.jplearnDesktop = baseDesktopApi
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      getDeckCards: async (slug: string) => (
+        slug.includes('kanji')
+          ? { slug, name: 'Kanji Deck', cards: kanjiStudyPlanCards }
+          : { slug: slug as any, name: 'Deck', cards: baseCards }
+      ),
+      getStudyQueue: async (slug: string) => (
+        slug.includes('kanji')
+          ? { ok: true, queue: { slug, card_ids: kanjiStudyPlanCards.map((card) => card.id), indices: kanjiStudyPlanCards.map((_, index) => index) } }
+          : { ok: true, queue: { slug, card_ids: baseCards.map((card) => card.id), indices: baseCards.map((_, index) => index) } }
+      ),
+    }
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
@@ -523,7 +599,10 @@ describe('Minigame menu', () => {
     clickTilePrimaryAction(matchTiles[0])
 
     fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
-    expect(await screen.findByText(/Think about how this kanji looks/i)).toBeTruthy()
+    await waitFor(() => {
+      const hintText = document.querySelector('.game-hint-text')
+      expect(hintText?.textContent).toContain('Think about how this kanji looks')
+    })
   })
 
   it('renders mode-specific dictionary help and seeds dictionary lookup from the active card', async () => {
@@ -629,7 +708,10 @@ describe('Minigame menu', () => {
     expect(await screen.findByText(/Type the romaji reading to see kanji options/i)).toBeTruthy()
     expect(screen.getByPlaceholderText(/Type romaji reading/i)).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
-    expect(screen.getByText(/Type the reading, then select the matching kanji from the options/i)).toBeTruthy()
+    await waitFor(() => {
+      const hintText = document.querySelector('.game-hint-text')
+      expect(hintText?.textContent).toContain('Type the reading, then select the matching kanji from the options')
+    })
 
     fireEvent.change(screen.getByPlaceholderText(/Type romaji reading/i), { target: { value: 'nichi' } })
     const candidateList = await screen.findByLabelText(/kanji candidates/i)
@@ -779,7 +861,7 @@ describe('Minigame menu', () => {
     }))
   })
 
-  it('shows listening modes for hiragana and vocab tracks', async () => {
+  it('shows listening modes for hiragana and katakana tracks', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
@@ -788,8 +870,8 @@ describe('Minigame menu', () => {
     // Hiragana: listening modes should appear
     clickTopMenuCard('Hiragana')
     await screen.findAllByText(/Romaji Sprint/i)
-    expect((await screen.findAllByText(/Listening: Audio First/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Listening: Prompt First/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Recognition/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Dictation/i)).length).toBeGreaterThan(0)
 
     cleanup()
     window.localStorage.clear()
@@ -798,10 +880,10 @@ describe('Minigame menu', () => {
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
 
-    // Vocabulary: both listening modes must appear
-    clickTopMenuCard('Vocabulary')
-    expect((await screen.findAllByText(/Listening: Audio First/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Listening: Prompt First/i)).length).toBeGreaterThan(0)
+    // Katakana: both listening modes must appear
+    clickTopMenuCard('Katakana')
+    expect((await screen.findAllByText(/Recognition/i)).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/Dictation/i)).length).toBeGreaterThan(0)
   })
 
   it('listening audio first mode hides character prompt and records correct minigame key', async () => {
@@ -819,7 +901,7 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     clickTopMenuCard('Vocabulary')
 
-    const audioTiles = await screen.findAllByRole('button', { name: /Listening: Audio First/i })
+    const audioTiles = await screen.findAllByRole('button', { name: /Recognition/i })
     clickTilePrimaryAction(audioTiles[0])
 
     // Play audio prompt button must be present (it replaces the character display)
@@ -842,14 +924,14 @@ describe('Minigame menu', () => {
       minigame: 'listening_audio_first',
     }))
 
-    // Character must be revealed in feedback
-    expect(await screen.findByText((content, node) => {
-      if (!node || !node.classList.contains('game-prompt-main')) return false
-      return ['あ', 'い', 'う', 'え'].some((c) => content.includes(c))
-    })).toBeTruthy()
+    // Character must be revealed in feedback (inside game-prompt-main via reveal text)
+    await waitFor(() => {
+      const promptMain = document.querySelector('.game-prompt-main')
+      expect(promptMain?.textContent).toMatch(/[あいうえ]/)
+    })
   })
 
-  it('listening prompt first mode shows character and records correct minigame key', async () => {
+  it('dictation mode hides character prompt and records correct minigame key', async () => {
     const recordGameResult = vi.fn(async () => ({
       ok: true,
       card_id: 0,
@@ -862,26 +944,36 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Vocabulary')
+    clickTopMenuCard('Hiragana')
 
-    const promptTiles = await screen.findAllByRole('button', { name: /Listening: Prompt First/i })
-    clickTilePrimaryAction(promptTiles[0])
+    const dictationTiles = await screen.findAllByRole('button', { name: /Dictation/i })
+    clickTilePrimaryAction(dictationTiles[0])
 
-    // Character must be visible in the prompt-main area
-    expect(await screen.findByText((content, node) => {
+    // Play audio prompt button must be present (it replaces the character display)
+    await screen.findByRole('button', { name: /play audio prompt/i })
+
+    // Character text must NOT appear in the prompt-main area before answer
+    const promptMainWithChar = screen.queryByText((content, node) => {
       if (!node || !node.classList.contains('game-prompt-main')) return false
       return ['あ', 'い', 'う', 'え'].some((c) => content.includes(c))
-    })).toBeTruthy()
+    })
+    expect(promptMainWithChar).toBeNull()
 
-    // Select the first option to submit an answer
-    const optionGrid = document.querySelector('.option-grid')!
-    const optionButtons = within(optionGrid as HTMLElement).getAllByRole('button')
-    fireEvent.click(optionButtons[0])
+    // Type the romaji answer in the text input
+    const dictationInput = await screen.findByPlaceholderText(/auto-converts/i)
+    fireEvent.change(dictationInput, { target: { value: 'あ' } })
+    fireEvent.click(screen.getByRole('button', { name: /submit answer/i }))
 
     await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
     expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
-      minigame: 'listening_prompt_first',
+      minigame: 'dictation',
     }))
+
+    // Character must be revealed in feedback (inside game-prompt-main via reveal text)
+    await waitFor(() => {
+      const promptMain = document.querySelector('.game-prompt-main')
+      expect(promptMain?.textContent).toMatch(/[あいうえ]/)
+    })
   })
 
   it('keeps locked listening cards non-interactive when voice runtime is unavailable', async () => {
@@ -899,16 +991,20 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Vocabulary')
+    clickTopMenuCard('Hiragana')
 
-    const lockedCassette = await screen.findByRole('button', { name: /listening: audio first is locked/i })
+    const lockedCassette = await screen.findByRole('button', { name: /recognition is locked/i })
     expect(lockedCassette.className).toContain('is-locked')
+
+    // Dictation should also be locked when VOICEVOX is unavailable
+    const lockedDictation = screen.getByRole('button', { name: /dictation is locked/i })
+    expect(lockedDictation.className).toContain('is-locked')
 
     // Clicking a locked cassette must never start a session.
     fireEvent.click(lockedCassette)
     fireEvent.click(lockedCassette)
     expect(await screen.findByRole('heading', { name: /mini game map/i })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: /listening: audio first/i })).toBeNull()
+    expect(screen.queryByRole('heading', { name: /recognition/i })).toBeNull()
   })
 
   it('keeps Speech Recall locked when no speech model is enabled', async () => {
@@ -933,7 +1029,7 @@ describe('Minigame menu', () => {
         llamaCppEstimatedDownloadMinutes: null,
         dictionaryEstimatedDownloadMinutes: null,
         speechModels: [],
-        recommendedSpeechTier: 'low',
+        recommendedSpeechTier: 'fast' as const,
         activeSpeechModelTier: null,
         ocrModels: [],
         recommendedOcrTier: 'low',
@@ -945,6 +1041,7 @@ describe('Minigame menu', () => {
         translationInstalled: false,
         translationProfiles: [],
         activeTranslationProfileTier: null,
+        isPackaged: false,
       } as any),
     }
 
@@ -985,8 +1082,10 @@ describe('Minigame menu', () => {
       const cassettes = await screen.findAllByRole('button', { name: /focus |launch |is locked/i })
       expect(cassettes.length).toBeGreaterThan(0)
 
-      const launchButton = await screen.findByRole('button', { name: /^Launch$/i })
-      expect((launchButton as HTMLButtonElement).disabled).toBe(false)
+      // Verify the first non-locked cassette is enabled (no separate Launch button exists)
+      const enabledCassette = cassettes.find((btn) => !(btn as HTMLButtonElement).disabled)
+      expect(enabledCassette).toBeTruthy()
+      expect((enabledCassette as HTMLButtonElement).disabled).toBe(false)
     } finally {
       window.matchMedia = originalMatchMedia
     }

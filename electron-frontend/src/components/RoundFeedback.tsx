@@ -10,6 +10,7 @@ interface RoundFeedbackProps {
   milestoneStreak: number | null
   answer: string | null
   answerLabel: string
+  correctAnswer?: string | null
   livesEnabled: boolean
   mode: PlayableMinigame
   actionLabel?: string
@@ -60,6 +61,7 @@ export function RoundFeedback({
   milestoneStreak,
   answer,
   answerLabel,
+  correctAnswer,
   livesEnabled,
   mode,
   actionLabel,
@@ -92,10 +94,18 @@ export function RoundFeedback({
         {tone === 'error' && livesEnabled ? <span className="round-feedback-life">−1 life</span> : null}
       </div>
       {answer ? (
-        <div className="round-feedback-answer">
+        <div className={`round-feedback-answer ${tone === 'error' ? 'round-feedback-answer-error' : ''}`}>
           <p className="round-feedback-answer-label">{answerLabel}</p>
           <p className="round-feedback-answer-value">
-            <TypeAnimation key={`ans-${answer}`} sequence={[answer]} speed={4} cursor={false} style={{ display: 'inline' }} />
+            {mode === 'dictation' && tone === 'error' && correctAnswer ? (
+              [...answer].map((char, i) => {
+                const expected = [...correctAnswer][i]
+                const cls = expected !== undefined && char === expected ? 'char-match' : 'char-wrong'
+                return <span key={i} className={cls}>{char}</span>
+              })
+            ) : (
+              <TypeAnimation key={`ans-${answer}`} sequence={[answer]} speed={4} cursor={false} style={{ display: 'inline' }} />
+            )}
           </p>
         </div>
       ) : null}

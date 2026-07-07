@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from data.grammar_minigame_generator import (
     generate_assembly_data,
     generate_imposter_data,
@@ -21,7 +23,7 @@ def test_parse_sentence_exposes_surface_pos_and_lemma() -> None:
 
 
 def test_generate_assembly_data_returns_deterministic_shuffled_chunks() -> None:
-    payload = generate_assembly_data("私は日本語を勉強します", seed=7)
+    payload = cast(dict[str, Any], generate_assembly_data("私は日本語を勉強します", seed=7))
 
     assert payload["game_type"] == "sentence_assembly"
     assert len(payload["chunks"]) >= 2
@@ -32,7 +34,7 @@ def test_generate_assembly_data_returns_deterministic_shuffled_chunks() -> None:
 
 
 def test_generate_particle_cloze_data_targets_particle_and_options_include_answer() -> None:
-    payload = generate_particle_cloze_data("私は学校で日本語を勉強します", seed=3)
+    payload = cast(dict[str, Any], generate_particle_cloze_data("私は学校で日本語を勉強します", seed=3))
 
     assert payload["game_type"] == "particle_cloze"
     assert payload["correct_particle"] in {"は", "が", "を", "に", "で"}
@@ -42,7 +44,7 @@ def test_generate_particle_cloze_data_targets_particle_and_options_include_answe
 
 
 def test_generate_vibe_check_data_classifies_polite_endings() -> None:
-    payload = generate_vibe_check_data("今日はいい天気です")
+    payload = cast(dict[str, Any], generate_vibe_check_data("今日はいい天気です"))
 
     assert payload["game_type"] == "vibe_check"
     assert payload["correct_label"] in {"Polite", "Formal Request", "Casual / Plain"}
@@ -50,7 +52,7 @@ def test_generate_vibe_check_data_classifies_polite_endings() -> None:
 
 
 def test_generate_imposter_data_injects_single_marked_error() -> None:
-    payload = generate_imposter_data("私は図書館で日本語を勉強します", seed=1)
+    payload = cast(dict[str, Any], generate_imposter_data("私は図書館で日本語を勉強します", seed=1))
 
     assert payload["game_type"] == "imposter"
     assert isinstance(payload["error_token_index"], int)

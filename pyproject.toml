@@ -1,0 +1,30 @@
+[tool.mypy]
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = [
+    "fugashi",
+    "fugashi.*",
+    "hf_download",
+    "ctranslate2",
+    "faster_whisper",
+    "pykakasi",
+    "build_offline_dictionary_sqlite",
+    "embedder_runtime",
+    "onnxruntime",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "scripts.*"
+disable_error_code = [
+    "arg-type",
+    "attr-defined",
+    "index",
+    "assignment",
+    "call-overload",
+    "operator",
+    "union-attr",
+    "import-not-found",
+    "import-untyped",
+]

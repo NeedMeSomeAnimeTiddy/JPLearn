@@ -2006,7 +2006,7 @@ def compact_assistant_chat_memory(
                 (overflow,),
             ).fetchall()
 
-            turns_to_compact = [
+            turns_to_compact: list[dict[str, str | int]] = [
                 {
                     "id": int(row["id"]),
                     "role": str(row["role"]),

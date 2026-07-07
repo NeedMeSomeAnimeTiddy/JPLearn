@@ -366,8 +366,11 @@ async function refreshVoiceRuntimeAfterSetup() {
 }
 const FORCED_USER_DATA_DIR = process.env.JPLEARN_USER_DATA_DIR
 const FORCED_SESSION_DATA_DIR = process.env.JPLEARN_SESSION_DATA_DIR
-const DEFAULT_STARTUP_THEME = 'harbor_mist'
+const DEFAULT_STARTUP_THEME = 'crt_cassette'
 const VALID_STARTUP_THEMES = new Set([
+  'crt_cassette',
+  'lofi_dusk',
+  'lofi_dusk_light',
   'harbor_mist',
   'sakura_dawn',
   'forest_ink',
@@ -389,7 +392,6 @@ const VALID_STARTUP_THEMES = new Set([
   'plum_garden_light',
   'matcha_stone_light',
 ])
-
 function ensureAppPath(pathKey, targetDir) {
   try {
     fs.mkdirSync(targetDir, { recursive: true })
@@ -516,6 +518,51 @@ function saveStartupTheme(theme) {
 
 function getSplashPalette(theme) {
   const palettes = {
+    crt_cassette: {
+      bgA: '#ffffff',
+      bgB: '#f5f5f5',
+      glowA: 'transparent',
+      glowB: 'transparent',
+      glowC: 'transparent',
+      panelA: 'rgba(255, 255, 255, 0.92)',
+      panelB: 'rgba(245, 245, 245, 0.9)',
+      border: 'rgba(0, 0, 0, 0.1)',
+      spinnerTrack: 'rgba(0, 0, 0, 0.08)',
+      spinnerHead: '#f2b56f',
+      title: '#1a1a1a',
+      subtitle: '#666666',
+      accent: '#f2b56f',
+    },
+    lofi_dusk: {
+      bgA: '#ffffff',
+      bgB: '#f5f5f5',
+      glowA: 'transparent',
+      glowB: 'transparent',
+      glowC: 'transparent',
+      panelA: 'rgba(255, 255, 255, 0.92)',
+      panelB: 'rgba(245, 245, 245, 0.9)',
+      border: 'rgba(0, 0, 0, 0.1)',
+      spinnerTrack: 'rgba(0, 0, 0, 0.08)',
+      spinnerHead: '#f2b56f',
+      title: '#1a1a1a',
+      subtitle: '#666666',
+      accent: '#f2b56f',
+    },
+    lofi_dusk_light: {
+      bgA: '#ecf4f9',
+      bgB: '#dcebf4',
+      glowA: 'rgba(105, 171, 196, 0.24)',
+      glowB: 'rgba(99, 184, 188, 0.18)',
+      glowC: 'rgba(105, 171, 196, 0.16)',
+      panelA: 'rgba(255, 255, 255, 0.92)',
+      panelB: 'rgba(243, 250, 255, 0.9)',
+      border: 'rgba(99, 146, 171, 0.32)',
+      spinnerTrack: 'rgba(73, 179, 216, 0.2)',
+      spinnerHead: '#69abc4',
+      title: '#1f313e',
+      subtitle: 'rgba(55, 76, 90, 0.82)',
+      accent: '#69abc4',
+    },
     harbor_mist: {
       bgA: '#0b1620',
       bgB: '#101f2c',
@@ -1459,9 +1506,10 @@ function createWindow() {
 
 function createSplashWindow(themeKey) {
   const palette = getSplashPalette(themeKey)
+  if (!palette.glowC) palette.glowC = palette.glowA || 'transparent'
   const splash = new BrowserWindow({
     width: 440,
-    height: 300,
+    height: 340,
     frame: false,
     resizable: false,
     movable: true,
@@ -1490,66 +1538,96 @@ function createSplashWindow(themeKey) {
       :root {
         color-scheme: dark;
       }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         min-height: 100vh;
         display: grid;
         place-items: center;
-        font-family: "Segoe UI", "Noto Sans", sans-serif;
-        background: transparent;
+        font-family: 'Kiwi Maru', 'Segoe UI', 'Noto Sans', sans-serif;
+        background: ${palette.bgA};
         color: ${palette.title};
         overflow: hidden;
       }
-      .stage {
-        position: fixed;
+.stage {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 12% 8%, ${palette.glowA}, transparent 42%),
+        radial-gradient(circle at 85% 15%, ${palette.glowC}, transparent 40%),
+        radial-gradient(circle at 82% 84%, ${palette.glowB}, transparent 44%),
+        linear-gradient(165deg, ${palette.bgB}, ${palette.bgA});
+      z-index: 0;
+      /* Removed border-radius: 24px; */
+    }
+      .stage::before {
+        content: '';
+        position: absolute;
         inset: 0;
-        border-radius: 24px;
-        overflow: hidden;
-        background:
-          radial-gradient(circle at 12% 8%, ${palette.glowA}, transparent 42%),
-          radial-gradient(circle at 82% 84%, ${palette.glowB}, transparent 44%),
-          linear-gradient(165deg, ${palette.bgB}, ${palette.bgA});
+        background: repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 2px,
+          rgba(0, 0, 0, 0.04) 2px,
+          rgba(0, 0, 0, 0.04) 3px
+        );
+        opacity: 0.8;
+        pointer-events: none;
+        z-index: 10;
       }
-      .panel {
+      .stage::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse at center,
+          transparent 50%,
+          rgba(0, 0, 0, 0.03) 100%
+        );
+        pointer-events: none;
+        z-index: 11;
+      }
+      .content {
         position: relative;
-        width: min(340px, 88vw);
-        padding: 28px 24px;
-        border-radius: 18px;
-        border: 1px solid ${palette.border};
-        background: linear-gradient(160deg, ${palette.panelA}, ${palette.panelB});
-        box-shadow:
-          0 30px 50px -28px rgba(0, 0, 0, 0.9),
-          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        z-index: 20;
+        width: min(360px, 90vw);
         text-align: center;
-        animation: panelIn 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+        padding: 24px;
       }
       .brand {
-        margin: 0 0 8px;
-        font-size: 0.72rem;
+        font-family: 'IBM Plex Mono', 'Consolas', monospace;
+        font-size: 0.52rem;
+        letter-spacing: 0.32em;
         text-transform: uppercase;
-        letter-spacing: 0.14em;
-        color: ${palette.accent};
         font-weight: 700;
+        margin: 0 0 12px;
+        color: ${palette.accent};
       }
       h1 {
         margin: 0 0 8px;
-        font-size: 1.25rem;
+        font-size: 1.35rem;
         font-weight: 650;
-        letter-spacing: 0.02em;
-      }
-      p {
-        margin: 0 0 12px;
-        color: ${palette.subtitle};
-        font-size: 0.92rem;
+        letter-spacing: 0.04em;
+        font-family: 'Kiwi Maru', 'Segoe UI', 'Noto Sans', sans-serif;
+        color: ${palette.title};
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
       }
       .status-detail {
+        font-family: 'IBM Plex Mono', 'Consolas', monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.02em;
+        color: ${palette.subtitle};
+        margin: 0 0 24px;
         min-height: 1.35em;
       }
       .progress {
         width: 100%;
-        height: 7px;
+        height: 6px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(0, 0, 0, 0.06);
         overflow: hidden;
       }
       .progress-fill {
@@ -1564,36 +1642,155 @@ function createSplashWindow(themeKey) {
         box-shadow: 0 0 14px color-mix(in srgb, ${palette.accent} 46%, transparent);
         transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
       }
-      @keyframes panelIn {
+      /* ── REC indicator dot ── */
+      .rec-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #ff4444;
+        vertical-align: middle;
+        margin-right: 6px;
+        animation: recPulse 1.2s ease-in-out infinite;
+        box-shadow: 0 0 6px rgba(255, 68, 68, 0.6);
+      }
+      @keyframes recPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+      /* ── Corner accents ── */
+      .corner {
+        position: absolute;
+        width: 44px;
+        height: 44px;
+        z-index: 12;
+        opacity: 0.4;
+        pointer-events: none;
+      }
+      .corner::before,
+      .corner::after {
+        content: '';
+        position: absolute;
+        background: ${palette.accent};
+        border-radius: 1px;
+      }
+      .corner-tl { top: 10px; left: 10px; }
+      .corner-tl::before { top: 0; left: 0; width: 28px; height: 2px; }
+      .corner-tl::after  { top: 0; left: 0; width: 2px; height: 28px; }
+      .corner-tr { top: 10px; right: 10px; }
+      .corner-tr::before { top: 0; right: 0; width: 28px; height: 2px; }
+      .corner-tr::after  { top: 0; right: 0; width: 2px; height: 28px; }
+      .corner-bl { bottom: 10px; left: 10px; }
+      .corner-bl::before { bottom: 0; left: 0; width: 28px; height: 2px; }
+      .corner-bl::after  { bottom: 0; left: 0; width: 2px; height: 28px; }
+      .corner-br { bottom: 10px; right: 10px; }
+      .corner-br::before { bottom: 0; right: 0; width: 28px; height: 2px; }
+      .corner-br::after  { bottom: 0; right: 0; width: 2px; height: 28px; }
+      /* ── Floating crystals ── */
+      .crystal {
+        position: absolute;
+        pointer-events: none;
+        z-index: 1;
+        width: 8px;
+        height: 8px;
+        background: ${palette.accent};
+        opacity: 0.25;
+        animation: crystalFloat 6s ease-in-out infinite;
+      }
+      .crystal::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border: 1px solid color-mix(in srgb, ${palette.accent} 40%, transparent);
+        transform: rotate(45deg);
+        opacity: 0.5;
+      }
+      .crystal-a { top: 18%; right: 12%; }
+      .crystal-b { bottom: 22%; left: 8%; animation-delay: -2s; width: 6px; height: 6px; }
+      @keyframes crystalFloat {
+        0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.25; }
+        50% { transform: translateY(-8px) rotate(180deg); opacity: 0.4; }
+      }
+      /* ── Equalizer bars ── */
+      .eq {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        height: 12px;
+        margin-top: 16px;
+      }
+      .eq span {
+        width: 3px;
+        background: ${palette.accent};
+        border-radius: 1px;
+        animation: eqBounce 0.6s ease-in-out alternate infinite;
+      }
+      .eq span:nth-child(1) { height: 5px; animation-delay: 0s; }
+      .eq span:nth-child(2) { height: 8px; animation-delay: 0.15s; }
+      .eq span:nth-child(3) { height: 4px; animation-delay: 0.3s; }
+      .eq span:nth-child(4) { height: 10px; animation-delay: 0.45s; }
+      @keyframes eqBounce {
+        0% { transform: scaleY(0.4); }
+        100% { transform: scaleY(1); }
+      }
+      /* ── VHS tracking line ── */
+      .vhs-line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        pointer-events: none;
+        z-index: 13;
+        background: linear-gradient(90deg, transparent, ${palette.accent}, transparent);
+        opacity: 0.18;
+        animation: vhsDrift 7s linear infinite;
+      }
+      @keyframes vhsDrift {
+        0% { top: 0%; }
+        100% { top: 100%; }
+      }
+      @keyframes contentIn {
         from {
           opacity: 0;
-          transform: translateY(8px) scale(0.98);
+          transform: translateY(8px);
         }
         to {
           opacity: 1;
-          transform: translateY(0) scale(1);
+          transform: translateY(0);
         }
+      }
+      .content {
+        animation: contentIn 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
       }
     </style>
   </head>
   <body>
-    <div class="stage" aria-hidden="true"></div>
-    <section class="panel" aria-label="Startup status">
-      <p class="brand">JPLearn Desktop</p>
+    <div class="stage" aria-hidden="true">
+      <div class="corner corner-tl" aria-hidden="true"></div>
+      <div class="corner corner-tr" aria-hidden="true"></div>
+      <div class="corner corner-bl" aria-hidden="true"></div>
+      <div class="corner corner-br" aria-hidden="true"></div>
+      <div class="crystal crystal-a" aria-hidden="true"></div>
+      <div class="crystal crystal-b" aria-hidden="true"></div>
+      <div class="vhs-line" aria-hidden="true"></div>
+    </div>
+    <section class="content" aria-label="Startup status">
+      <p class="brand"><span class="rec-dot" aria-hidden="true"></span>JPLearn Desktop</p>
       <h1 id="startup-title">Starting JPLearn...</h1>
       <p id="startup-detail" class="status-detail" aria-live="polite">Loading decks, stats, and bridge services.</p>
       <div class="progress" aria-hidden="true"><div id="startup-progress-fill" class="progress-fill"></div></div>
+      <div class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     </section>
     <script>
       window.__setSplashStatus = function(title, detail, pct) {
         const heading = document.getElementById('startup-title')
-        const body = document.getElementById('startup-detail')
+        const bodyEl = document.getElementById('startup-detail')
         const fill = document.getElementById('startup-progress-fill')
         if (heading && typeof title === 'string' && title.trim().length > 0) {
           heading.textContent = title
         }
-        if (body && typeof detail === 'string' && detail.trim().length > 0) {
-          body.textContent = detail
+        if (bodyEl && typeof detail === 'string' && detail.trim().length > 0) {
+          bodyEl.textContent = detail
         }
         if (fill) {
           const numericPct = Number.isFinite(Number(pct)) ? Number(pct) : 0

@@ -106,7 +106,7 @@ const MINIGAME_DIFFICULTY: Record<MinigameKey, {
   vibe_check: { level: 'hard', label: 'Hard' },
   imposter: { level: 'hard', label: 'Hard' },
   listening_audio_first: { level: 'medium', label: 'Medium' },
-  listening_prompt_first: { level: 'medium', label: 'Medium' },
+  dictation: { level: 'medium', label: 'Medium' },
   interleave_mix: { level: 'hard', label: 'Hard' },
 }
 

@@ -8,8 +8,9 @@ from datetime import date, datetime, timezone
 from data import database
 from data.database import CurriculumStageSummary, NarrativeChapterSummary
 from data.text_normalization import normalize_storage_text
+from typing import cast
 from domain.activity import ActivitySummary
-from domain.assistant import compute_assistant_state, evaluate_assistant_events
+from domain.assistant import AssistantPopupCadence, AssistantState, compute_assistant_state, evaluate_assistant_events
 from domain.curriculum import next_stage
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
 from domain.mistakes import MistakeBreakdownRow
@@ -291,12 +292,12 @@ def _format_unified_memory_graph(
     The graph is serialized as deterministic fragments so local LLM context
     receives one stable, compact memory representation across app surfaces.
     """
-    profile = context_inputs["profile"]
-    activity_week = context_inputs["activity_week"]
-    streak = context_inputs["streak"]
-    mistakes = context_inputs["mistakes"]
-    leech_count = context_inputs["leech_count"]
-    session_summary = context_inputs["session_summary"]
+    profile = cast(dict[str, object], context_inputs["profile"])
+    activity_week = cast(ActivitySummary, context_inputs["activity_week"])
+    streak = cast(StreakState, context_inputs["streak"])
+    mistakes = cast(list[MistakeBreakdownRow], context_inputs["mistakes"])
+    leech_count = cast(int, context_inputs["leech_count"])
+    session_summary = cast("SessionSummary | None", context_inputs["session_summary"])
 
     fact_map = {
         str(fact["fact_key"]): str(fact["fact_value"])
@@ -565,7 +566,7 @@ def load_session_summary(session_id: str) -> SessionSummary | None:
 def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
     """Compute deterministic tutor state/events and persist a new snapshot."""
     profile = database.load_assistant_profile()
-    popup_cadence = str(profile.get("popup_cadence", "high")).lower()
+    popup_cadence = cast(AssistantPopupCadence, str(profile.get("popup_cadence", "high")).lower())
     if popup_cadence not in {"low", "medium", "high"}:
         popup_cadence = "high"
 
@@ -732,14 +733,14 @@ def clear_assistant_chat() -> int:
 
 def _assemble_assistant_chat_context_base(context_inputs: dict[str, object]) -> dict[str, str]:
     """Build the memory-independent portion of chat context (shared by v1/v2)."""
-    profile = context_inputs["profile"]
-    state = context_inputs["state"]
-    streak = context_inputs["streak"]
-    activity_week = context_inputs["activity_week"]
-    mistakes = context_inputs["mistakes"]
-    leech_count = context_inputs["leech_count"]
-    item_history = context_inputs["item_history"]
-    session_summary = context_inputs["session_summary"]
+    profile = cast(dict[str, object], context_inputs["profile"])
+    state = cast(AssistantState, context_inputs["state"])
+    streak = cast(StreakState, context_inputs["streak"])
+    activity_week = cast(ActivitySummary, context_inputs["activity_week"])
+    mistakes = cast(list[MistakeBreakdownRow], context_inputs["mistakes"])
+    leech_count = cast(int, context_inputs["leech_count"])
+    item_history = cast(list[ItemHistory], context_inputs["item_history"])
+    session_summary = cast("SessionSummary | None", context_inputs["session_summary"])
 
     emotional_state = (
         f"mood={state.mood}, momentum={state.momentum}, confidence={state.confidence_level}, focus={state.focus_area}"

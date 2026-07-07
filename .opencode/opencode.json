@@ -16,41 +16,16 @@
     "build": { "description": "Build electron-frontend (tsc + vite)", "template": "cd electron-frontend && npm run build" },
     "run": { "description": "Build and start the Electron app", "template": "cd electron-frontend && npm run build && npm run start" }
   },
-  "model": "deepseek/deepseek-v4-flash",
-  "provider": {
-    "deepseek": {
-      "models": {
-        "deepseek-v4-flash": {
-          "options": {
-            "reasoning_effort": "max"
-          }
-        },
-        "deepseek-v4-pro": {
-          "options": {
-            "reasoning_effort": "max"
-          }
-        }
-      }
-    },
-    "xiaomi": {
-      "models": {
-        "mimo-v2.5": {
-          "options": {
-            "reasoning_effort": "medium"
-          }
-        },
-        "mimo-v2.5-pro": {
-          "options": {
-            "reasoning_effort": "high"
-          }
-        }
+  "agent": {
+    "plan": {
+      "permission": {
+        "edit": "allow"
       }
     }
   },
   "plugin": [
-    "@tarquinen/opencode-dcp",
     "opencode-handoff",
-    "open-mem",
+    "opencode-mem",
     "cc-safety-net",
     "envsitter-guard"
   ],

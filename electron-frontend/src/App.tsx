@@ -4,8 +4,10 @@ import type { ChangeEvent } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { LearningPathStatus, SectionReadiness } from './types'
+import type { GameCard } from './generated/types'
 import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
+import { ResumeToast } from './components/ResumeToast'
 import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
@@ -17,8 +19,9 @@ import { SessionProvider } from './context/SessionContext'
 import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
+import { toHiragana } from 'wanakana'
 import { AmbientAudioController } from './lib/ambientAudio'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Square, Sun, Trash2, Volume2, VolumeX, X } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Ear, Flame, History, House, ImagePlus, Info, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Moon, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Sparkles, Square, Sun, Trash2, Trophy, Volume2, VolumeX, X } from 'lucide-react'
 import './App.css'
 import type { RoundDictionaryNote } from './types'
 
@@ -40,7 +43,6 @@ type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.ge
 type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
 type XPProgress = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getXpProgress>>>
 type VoiceStatusPayload = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getVoiceStatus>>>
-type TutorReactionItem = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getTutorReactions>>>['reactions'][number]
 type RecommendationItem = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getRecommendations>>>['recommendations'][number]
 interface SessionRunReport {
   script: ScriptKey
@@ -62,6 +64,7 @@ interface SessionRunReport {
   confidenceCaptureEnabled: boolean
   confidenceCapturedCount: number
   averageConfidenceScore: number | null
+  wrongCardIds: number[]
 }
 interface AssistantStatePayload {
   mood: string
@@ -122,7 +125,7 @@ type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' |
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
 type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'listening_prompt_first' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
@@ -325,6 +328,13 @@ const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
   { value: 1, label: 'On' },
 ]
+const ASSISTANT_TOAST_ICONS: Record<AssistantToast['priority'], LucideIcon> = {
+  info: Info,
+  coaching: Sparkles,
+  critical: AlertTriangle,
+  celebration: Trophy,
+}
+
 const JAPANESE_CHAR_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/
 const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
   { key: 'theme', label: 'Theme', icon: Sun },
@@ -393,9 +403,9 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Audio Challenge: listen closely before selecting the meaning.',
       'Ear First: trust what you hear and choose with confidence.',
     ],
-    listening_prompt_first: [
-      'Sound Reinforcement: see the character and hear it pronounced.',
-      'Character-Audio Link: connect the form to its sound and meaning.',
+    dictation: [
+      'Hear and Write: listen closely and type what you hear.',
+      'Sound-to-Text: trust your ear and type the character.',
     ],
   },
   katakana: {
@@ -435,9 +445,9 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Audio Challenge: listen closely before selecting the meaning.',
       'Ear First: trust what you hear and choose with confidence.',
     ],
-    listening_prompt_first: [
-      'Sound Reinforcement: see the character and hear it pronounced.',
-      'Character-Audio Link: connect the katakana form to its sound.',
+    dictation: [
+      'Katakana Dictation: hear the sound and type the character.',
+      'Sound-to-Form: listen carefully and produce the written form.',
     ],
   },
   kanji_n5: {
@@ -477,9 +487,9 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Kanji Audio Drill: hear the reading and choose the meaning.',
       'Sound Recognition: identify the kanji from its spoken form.',
     ],
-    listening_prompt_first: [
-      'Reading Reinforcement: see the kanji while hearing its reading.',
-      'Audio Anchor: link the character to its spoken pronunciation.',
+    dictation: [
+      'Kanji Dictation: hear the reading and type the character.',
+      'Sound-to-Kanji: recognise the spoken word and produce it.',
     ],
   },
   vocab_n5: {
@@ -519,9 +529,9 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Vocab Audio Drill: hear the word and choose the meaning.',
       'Listening Recognition: identify the vocab from spoken form.',
     ],
-    listening_prompt_first: [
-      'Word-Sound Pair: see the word and confirm its pronunciation.',
-      'Audio Reinforcement: connect reading to meaning through sound.',
+    dictation: [
+      'Vocab Dictation: hear the word and type it from memory.',
+      'Listening Production: recognise the spoken vocabulary.',
     ],
   },
   grammar_patterns: {
@@ -561,9 +571,9 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Pattern Audio: hear the expression and choose its meaning.',
       'Grammar Ear: recognise patterns by sound before selecting.',
     ],
-    listening_prompt_first: [
-      'Pattern Sound Link: see the grammar point while hearing it.',
-      'Audio Anchor: connect the written form to spoken usage.',
+    dictation: [
+      'Grammar Dictation: hear the pattern and type it out.',
+      'Sound-to-Pattern: recognise spoken grammar structures.',
     ],
   },
   sentence_examples: {
@@ -603,9 +613,9 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
       'Sentence Audio: hear the sentence and choose its meaning.',
       'Ear-First Context: decode the line by sound before selecting.',
     ],
-    listening_prompt_first: [
-      'Read + Listen: reinforce sentence form with pronunciation.',
-      'Audio Anchor: connect sentence text to spoken rhythm.',
+    dictation: [
+      'Sentence Dictation: hear the sentence and type it out.',
+      'Listening Composition: transcribe spoken Japanese lines.',
     ],
   },
 }
@@ -1128,13 +1138,13 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
   },
   {
     key: 'listening_audio_first',
-    title: 'Listening: Audio First',
+    title: 'Recognition',
     description: 'Hear a word and choose its meaning — character hidden until feedback.',
   },
   {
-    key: 'listening_prompt_first',
-    title: 'Listening: Prompt First',
-    description: 'See the character while audio plays, then choose the meaning.',
+    key: 'dictation',
+    title: 'Dictation',
+    description: 'Hear a word and type it in Japanese — no visual hints.',
   },
   {
     key: 'interleave_mix',
@@ -1144,12 +1154,12 @@ const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }>
 ]
 
 const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'particle_cloze', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
-  sentence_examples: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'imposter', 'listening_audio_first', 'listening_prompt_first', 'interleave_mix'],
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'interleave_mix'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'interleave_mix'],
+  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'imposter', 'listening_audio_first', 'interleave_mix'],
+  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'particle_cloze', 'imposter', 'listening_audio_first', 'dictation', 'interleave_mix'],
+  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter', 'listening_audio_first', 'interleave_mix'],
+  sentence_examples: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'imposter', 'listening_audio_first', 'interleave_mix'],
 }
 
 const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>> = {
@@ -1182,7 +1192,7 @@ const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   vibe_check: MessageCircle,
   imposter: History,
   listening_audio_first: Volume2,
-  listening_prompt_first: Volume2,
+  dictation: Ear,
   interleave_mix: Shuffle,
 }
 
@@ -1904,6 +1914,30 @@ const STATS_STORAGE_KEY = 'jplearn-desktop-script-stats-v1'
 const SETTINGS_STORAGE_KEY = 'jplearn-desktop-settings-v1'
 const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
 const SUMMARY_SNAPSHOT_STORAGE_KEY = 'jplearn-desktop-summary-snapshot-v1'
+const SESSION_STORAGE_KEY = 'jplearn-desktop-session-v1'
+
+interface PersistedSessionRestore {
+  sessionScore: number
+  sessionRounds: number
+  sessionPoints: number
+  sessionStreak: number
+  sessionBestStreak: number
+  sessionConfidenceCount: number
+  sessionConfidenceTotal: number
+  livesRemaining: number
+}
+
+interface PersistedSession {
+  activeScript: ScriptKey
+  activeGame: MinigameKey
+  livesEnabled: boolean
+  leechFocusEnabled: boolean
+  confidenceCaptureEnabled: boolean
+  sessionTargetItems: number
+  seenCardIds: number[]
+  sessionStartedAt: string
+  restore: PersistedSessionRestore
+}
 const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
@@ -1983,7 +2017,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
+      dictation: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     katakana: {
@@ -1998,7 +2032,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
+      dictation: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     kanji_n5: {
@@ -2013,7 +2047,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
+      dictation: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     vocab_n5: {
@@ -2028,7 +2062,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
+      dictation: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     grammar_patterns: {
@@ -2043,7 +2077,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
+      dictation: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     sentence_examples: {
@@ -2058,7 +2092,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       vibe_check: { ...EMPTY_MINIGAME_STATS },
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      listening_prompt_first: { ...EMPTY_MINIGAME_STATS },
+      dictation: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
   }
@@ -2755,7 +2789,7 @@ function buildRoundDictionaryNote(card: ScriptDeck['cards'][number], mode: Playa
     copy = secondaryGlosses.length > 0
       ? `In passages, ${summary.character} is read ${summary.reading} and can suggest ${glossList.join(', ')}.`
       : `In passages, ${summary.character} is read ${summary.reading} and usually suggests ${summary.primary_gloss}.`
-  } else if (mode === 'listening_audio_first' || mode === 'listening_prompt_first') {
+  } else if (mode === 'listening_audio_first' || mode === 'dictation') {
     title = 'Listening clue'
     copy = secondaryGlosses.length > 0
       ? `The audio term is ${summary.character}, read ${summary.reading}, with senses like ${glossList.join(', ')}.`
@@ -3144,8 +3178,8 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'particle_cloze') return 'Particle Cloze'
   if (mode === 'vibe_check') return 'Vibe Check'
   if (mode === 'imposter') return 'Imposter'
-  if (mode === 'listening_audio_first') return 'Listening: Audio First'
-  if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
+  if (mode === 'listening_audio_first') return 'Recognition'
+  if (mode === 'dictation') return 'Dictation'
   return 'Interleave Mix'
 }
 
@@ -3176,7 +3210,7 @@ function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'vibe_check') return 'Good try. Read the sentence ending and tone cues before deciding register.'
   if (mode === 'imposter') return 'Good attempt. Scan for the token that breaks grammar flow.'
   if (mode === 'listening_audio_first') return 'Keep listening. Audio recognition builds over time.'
-  if (mode === 'listening_prompt_first') return 'Connect the sound to the character. It gets natural.'
+  if (mode === 'dictation') return 'Listen carefully and type the romaji for what you hear.'
   return 'Good attempt. Keep the next answer short and clear.'
 }
 
@@ -3464,6 +3498,20 @@ function App() {
     void check()
   }, [])
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SESSION_STORAGE_KEY)
+      if (!raw) return
+      const parsed: PersistedSession = JSON.parse(raw)
+      if (!parsed.activeScript || !parsed.activeGame || !Array.isArray(parsed.seenCardIds) || !parsed.restore) return
+      const timer = setTimeout(() => {
+        setResumeData(parsed)
+        setShowResumeToast(true)
+      }, 2000)
+      return () => clearTimeout(timer)
+    } catch { /* ignore */ }
+  }, [])
+
   const [view, setView] = useState<AppView>('home')
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
   const [summary, setSummary] = useState<StudySummaryPayload | null>(() => loadSummarySnapshot())
@@ -3643,6 +3691,8 @@ function App() {
   const [sessionStartPending, setSessionStartPending] = useState<boolean>(false)
   const [sessionSummaryLoading, setSessionSummaryLoading] = useState<boolean>(false)
   const [sessionGoalError, setSessionGoalError] = useState<string | null>(null)
+  const [showResumeToast, setShowResumeToast] = useState<boolean>(false)
+  const [resumeData, setResumeData] = useState<PersistedSession | null>(null)
   const [livesEnabled, setLivesEnabled] = useState<boolean>(false)
   const [livesRemaining, setLivesRemaining] = useState<number>(DEFAULT_LIVES)
   const [leechFocusEnabled, setLeechFocusEnabled] = useState<boolean>(false)
@@ -3693,7 +3743,6 @@ function App() {
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
-  const [tutorReactions, setTutorReactions] = useState<TutorReactionItem[]>([])
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
   const [warningModal, setWarningModal] = useState<{
@@ -3757,6 +3806,8 @@ function App() {
   const streakDetailsRef = useRef<HTMLDivElement | null>(null)
   const localToastIdRef = useRef(-1)
   const previousSessionActiveRef = useRef(false)
+  const seenCardIdsRef = useRef<number[]>([])
+  const wrongCardIdsRef = useRef<number[]>([])
   const feedbackAdvanceRef = useRef<(() => void) | null>(null)
   const kanjiCategoryDeckCacheRef = useRef<Partial<Record<KanjiCategory, ScriptDeck['cards']>>>({})
   const vocabCategoryDeckCacheRef = useRef<Partial<Record<VocabCategory, ScriptDeck['cards']>>>({})
@@ -3773,6 +3824,7 @@ function App() {
   const interleaveCursorRef = useRef<number>(0)
   const backgroundImageCacheRef = useRef<Partial<Record<BackgroundStyle, HTMLImageElement>>>({})
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
+  const tutorSeenKeysRef = useRef<Set<string>>(new Set())
   const customThemeImportInputRef = useRef<HTMLInputElement | null>(null)
   const customBackgroundImportInputRef = useRef<HTMLInputElement | null>(null)
   const translationProfileTierRef = useRef<'ocr_qwen_local' | null>(null)
@@ -5214,11 +5266,20 @@ function App() {
     return () => window.clearTimeout(focusHandle)
   }, [isRoundResolving, roundState, roundInput, sessionActive, view])
 
+  const clearPersistedSession = useCallback(() => {
+    seenCardIdsRef.current = []
+    wrongCardIdsRef.current = []
+    try { localStorage.removeItem(SESSION_STORAGE_KEY) } catch { /* ignore */ }
+  }, [])
+
   useEffect(() => {
     const previouslyActive = previousSessionActiveRef.current
     previousSessionActiveRef.current = sessionActive
 
     if (!previouslyActive || sessionActive || !activeSessionId) return
+
+    const capturedWrongCardIds = [...wrongCardIdsRef.current]
+    clearPersistedSession()
 
     const completedRounds = sessionRounds
     const completedCorrect = sessionScore
@@ -5254,6 +5315,7 @@ function App() {
       confidenceCaptureEnabled,
       confidenceCapturedCount: sessionConfidenceCount,
       averageConfidenceScore,
+      wrongCardIds: capturedWrongCardIds,
     })
 
     setSessionSummaryLoading(true)
@@ -5302,6 +5364,7 @@ function App() {
     sessionRounds,
     sessionScore,
     sessionTargetItems,
+    clearPersistedSession,
   ])
 
   const loadSummary = useCallback(async () => {
@@ -5416,13 +5479,38 @@ function App() {
       if (!mounted) return
       if (xp) setXpProgress(xp)
       if (recs) setRecommendations(recs.recommendations)
-      if (tutor) setTutorReactions(tutor.reactions)
+      if (tutor && tutor.reactions.length > 0) {
+        const r = tutor.reactions[0]
+        if (!tutorSeenKeysRef.current.has(r.dedup_key)) {
+          tutorSeenKeysRef.current.add(r.dedup_key)
+          const priorityMap: Record<string, AssistantToast['priority']> = {
+            congratulation: 'celebration',
+            encouragement: 'coaching',
+            guidance: 'info',
+            acknowledgement: 'info',
+          }
+          localToastIdRef.current -= 1
+          queueAssistantToast({
+            id: localToastIdRef.current,
+            priority: priorityMap[r.message_type] ?? 'info',
+            eventType: 'tutor_reaction',
+            messageKey: r.dedup_key,
+            title: normalizeTrackTerms(r.headline),
+            body: normalizeTrackTerms(r.body),
+            targetMode: null,
+            focusArea: null,
+            actionType: null,
+            actionLabel: 'Got it',
+          })
+          void window.jplearnDesktop?.dismissTutorReaction?.(r.dedup_key).catch(() => undefined)
+        }
+      }
       if (path) setLearningPathStatus(path as LearningPathStatus)
     }
     void doFetch()
 
     return () => { mounted = false }
-  }, [summary])
+  }, [queueAssistantToast, summary])
 
   useEffect(() => {
     const getAssistantSnapshotFn = window.jplearnDesktop?.getAssistantSnapshot
@@ -5493,8 +5581,8 @@ function App() {
             focusArea: selectedEvent.metadata.focus_area ?? null,
             actionType: null,
             actionLabel: 'Got it',
-          })
-        }
+        })
+      }
 
         await consumeAssistantEventsFn!(response.events.map((event) => event.id))
       } catch {
@@ -6804,15 +6892,11 @@ function App() {
         }
       }
 
-      if (minigame === 'listening_prompt_first') {
-        const rankedMeaningDistractors = pickDistractorsFromPool(card.meaning_distractor_ids, 3)
-        const options = shuffleArray([
-          { id: `${card.id}-correct`, label: card.meaning },
-          ...rankedMeaningDistractors.map((candidate) => ({
-            id: `${candidate.id}-listening-prompt-meaning`,
-            label: candidate.meaning,
-          })),
-        ])
+      if (minigame === 'dictation') {
+        const isKanaScript = activeScript === 'hiragana' || activeScript === 'katakana'
+        const dictationAnswer = isKanaScript
+          ? card.character
+          : toHiragana(card.romaji.replace(/\s+/g, ''))
         return {
           cardId: card.id,
           mode: minigame,
@@ -6822,13 +6906,18 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: exampleSentenceHint ?? `Hear ${card.character} and choose its meaning.`,
+          hintText: isKanaScript
+            ? `Type the romaji for what you hear (e.g., "ka" for か).`
+            : `Type the reading you hear in Japanese.`,
           dictionarySeedQuery,
           dictionaryNote,
-          promptLabel: surprisePrompt ? surpriseLabel : 'Hear the pronunciation and choose the meaning.',
+          promptLabel: surprisePrompt ? surpriseLabel
+            : isKanaScript
+              ? 'Listen and type the romaji for what you hear.'
+              : 'Listen and type the reading in Japanese.',
           focusText: card.character,
-          answer: card.meaning,
-          options,
+          answer: dictationAnswer,
+          options: [],
         }
       }
 
@@ -6978,29 +7067,35 @@ function App() {
     setSessionTargetItems(DEFAULT_SESSION_LENGTH_PRESET.items)
   }, [activeSessionLengthPreset])
 
-  const startSession = useCallback(async (selectedGame: MinigameKey = activeGame) => {
+  const startSession = useCallback(async (selectedGame: MinigameKey = activeGame, customCards?: GameCard[], customTargetItems?: number, restore?: PersistedSessionRestore) => {
     setSessionStartPending(true)
     resetRoundCycle()
     setSessionGoalError(null)
     setLastSessionSummary(null)
     setSessionRunReport(null)
     setActiveSessionId(null)
+    seenCardIdsRef.current = []
+    wrongCardIdsRef.current = []
 
-    setSessionScore(0)
-    setSessionRounds(0)
-    setSessionPoints(0)
-    setSessionConfidenceCount(0)
-    setSessionConfidenceTotal(0)
-    setLivesRemaining(DEFAULT_LIVES)
+    setSessionScore(restore?.sessionScore ?? 0)
+    setSessionRounds(restore?.sessionRounds ?? 0)
+    setSessionPoints(restore?.sessionPoints ?? 0)
+    setSessionStreak(restore?.sessionStreak ?? 0)
+    setSessionBestStreak(restore?.sessionBestStreak ?? 0)
+    setSessionConfidenceCount(restore?.sessionConfidenceCount ?? 0)
+    setSessionConfidenceTotal(restore?.sessionConfidenceTotal ?? 0)
+    setLivesRemaining(restore?.livesRemaining ?? DEFAULT_LIVES)
 
     try {
-      const leechPool = activeBlockCards.filter((card) => card.is_leech)
-      const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
+      const sourceCards = customCards
+        ?? (leechFocusEnabled && activeBlockCards.filter((card) => card.is_leech).length > 0
+          ? activeBlockCards.filter((card) => card.is_leech)
+          : activeBlockCards)
       const modeSelection = nextRoundMode(selectedGame)
       const modeCards = isImposterMode(modeSelection.mode)
         ? narrativePriorityCards(sourceCards)
         : sourceCards
-      const goalTargetItems = Math.max(1, Math.floor(sessionTargetItems))
+      const goalTargetItems = Math.max(1, Math.floor(customTargetItems ?? sessionTargetItems))
 
       const goalRequest = window.jplearnDesktop?.startSessionGoal({
           targetItems: goalTargetItems,
@@ -7014,7 +7109,7 @@ function App() {
       if (!nextRound) {
         setSessionActive(false)
         setRoundState(null)
-        if (leechFocusEnabled && leechPool.length === 0) {
+        if (leechFocusEnabled && activeBlockCards.filter((card) => card.is_leech).length === 0) {
           setGameError('No active leech cards in this block yet. Disable focused review mode to continue.')
         } else {
           setGameError('Not enough cards in this block for the selected minigame yet.')
@@ -7136,6 +7231,54 @@ function App() {
     void startSession(minigame)
   }, [activeScript, gameLoading, resumeRequest, sessionStartPending, startSession])
 
+  const handleResume = useCallback(async () => {
+    if (!resumeData) return
+    const data = resumeData
+    setShowResumeToast(false)
+    setResumeData(null)
+    clearPersistedSession()
+
+    setActiveScript(data.activeScript)
+    setActiveGame(data.activeGame)
+    setLivesEnabled(data.livesEnabled)
+    setLeechFocusEnabled(data.leechFocusEnabled)
+    setConfidenceCaptureEnabled(data.confidenceCaptureEnabled)
+
+    try {
+      const deckPayload = await window.jplearnDesktop.getDeckCards(data.activeScript)
+      const seenSet = new Set(data.seenCardIds)
+      const remainingCards = deckPayload.cards.filter((c) => !seenSet.has(c.id))
+      const targetItems = Math.max(1, remainingCards.length)
+      setSessionTargetItems(targetItems)
+
+      setNavDirection('forward')
+      setView('minigame')
+
+      if (targetItems > 0) {
+        setTimeout(() => {
+          startSession(data.activeGame, remainingCards, targetItems, data.restore)
+        }, 100)
+      }
+    } catch {
+      setNavDirection('forward')
+      setView('minigame')
+      startSession(data.activeGame)
+    }
+  }, [resumeData, startSession, clearPersistedSession])
+
+  const handleDismissResume = useCallback(() => {
+    setShowResumeToast(false)
+    setResumeData(null)
+    clearPersistedSession()
+  }, [clearPersistedSession])
+
+  const handleRetry = useCallback((cardIds: number[]) => {
+    const retryCards = deckCards.filter((c) => cardIds.includes(c.id))
+    if (retryCards.length > 0) {
+      startSession(activeGame, retryCards)
+    }
+  }, [activeGame, deckCards, startSession])
+
   const nextRound = useCallback(async () => {
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
     const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
@@ -7209,7 +7352,9 @@ function App() {
               }
               return bestAssessment
             })()
-            : null
+            : roundState.mode === 'dictation'
+              ? assessTypedAnswer(roundState.answer, answer)
+              : null
       const isCorrect =
         typedAssessment !== null
           ? typedAssessment !== 'incorrect'
@@ -7268,7 +7413,7 @@ function App() {
       if (isCorrect) {
         setSessionScore((value) => value + 1)
         setSessionPoints((value) => value + awardedPoints)
-        if ((roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall') && typedAssessment === 'near_miss') {
+        if ((roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' || roundState.mode === 'dictation') && typedAssessment === 'near_miss') {
           setRoundFeedback(`Close enough — we’ll count it! ${pointsCopy}${comboCopy}.`)
         } else if (isImposterMode(roundState.mode)) {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
@@ -7306,9 +7451,11 @@ function App() {
         setRoundFeedbackTone('error')
         setRoundFeedbackPoints(0)
         setRoundFeedbackAnswer(
-          roundState.answerDisplay && roundState.answerDisplay.trim().length > 0
-            ? roundState.answerDisplay
-            : formatExpectedAnswer(roundState.answer),
+          roundState.mode === 'dictation'
+            ? answer
+            : roundState.answerDisplay && roundState.answerDisplay.trim().length > 0
+              ? roundState.answerDisplay
+              : formatExpectedAnswer(roundState.answer),
         )
 
         // Wrong answer deducts 1 from the card score (floored at 0).
@@ -7323,9 +7470,43 @@ function App() {
             },
           }
         })
+        if (!wrongCardIdsRef.current.includes(answeredCardId)) {
+          wrongCardIdsRef.current.push(answeredCardId)
+        }
+      }
+
+      const answeredCardId = roundState.cardId
+      if (!seenCardIdsRef.current.includes(answeredCardId)) {
+        seenCardIdsRef.current.push(answeredCardId)
       }
 
       const confidenceForAnswer = confidenceCaptureEnabled ? roundConfidenceScore : undefined
+
+      try {
+        const data: PersistedSession = {
+          activeScript,
+          activeGame,
+          livesEnabled,
+          leechFocusEnabled,
+          confidenceCaptureEnabled,
+          sessionTargetItems,
+          seenCardIds: [...seenCardIdsRef.current],
+          sessionStartedAt: new Date().toISOString(),
+          restore: {
+            sessionScore: isCorrect ? sessionScore + 1 : sessionScore,
+            sessionRounds: sessionRounds + 1,
+            sessionPoints: isCorrect ? sessionPoints + awardedPoints : sessionPoints,
+            sessionStreak: nextStreak,
+            sessionBestStreak: Math.max(sessionBestStreak, nextStreak),
+            sessionConfidenceCount:
+              typeof confidenceForAnswer === 'number' ? sessionConfidenceCount + 1 : sessionConfidenceCount,
+            sessionConfidenceTotal:
+              typeof confidenceForAnswer === 'number' ? sessionConfidenceTotal + confidenceForAnswer : sessionConfidenceTotal,
+            livesRemaining: nextLives,
+          },
+        }
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data))
+      } catch { /* ignore storage errors */ }
 
       const resultSlug: DeckSlugInput =
         activeScript === 'kanji_n5'
@@ -7444,7 +7625,7 @@ function App() {
       }
       feedbackAdvanceRef.current = advanceFeedback
     },
-    [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, livesEnabled, livesRemaining, nextRound, queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionRounds, sessionTargetItems],
+    [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, leechFocusEnabled, livesEnabled, livesRemaining, nextRound, queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionBestStreak, sessionConfidenceCount, sessionConfidenceTotal, sessionPoints, sessionRounds, sessionScore, sessionTargetItems],
   )
 
   useEffect(() => {
@@ -7674,7 +7855,7 @@ function App() {
     }
     if (listeningLockReason) {
       reasons.listening_audio_first = listeningLockReason
-      reasons.listening_prompt_first = listeningLockReason
+      reasons.dictation = listeningLockReason
     }
     return reasons
   }, [listeningLockReason, speechRecognitionModelEnabled])
@@ -7879,6 +8060,7 @@ function App() {
       window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(emptyScores))
       window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(emptyStats))
       window.localStorage.removeItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
+      window.localStorage.removeItem(SESSION_STORAGE_KEY)
       setCardScores(emptyScores)
       setScriptStats(emptyStats)
       setMinigameStats(defaultMinigameStatsByScript())
@@ -8540,10 +8722,23 @@ function App() {
 
       {pageLoading ? (
         <div className="page-loading-overlay" role="status" aria-label={pageLoadingLabel}>
+          <div className="page-loading-crt" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
           <div className="page-loading-widget">
-            <span className="page-loading-label">{pageLoadingLabel}</span>
+            <span
+              className="page-loading-label page-loading-glitch"
+              data-text={pageLoadingLabel}
+            >
+              {pageLoadingLabel}
+            </span>
             <div className="page-loading-track">
               <div className="page-loading-fill" />
+            </div>
+            <div className="page-loading-eq" aria-hidden="true">
+              <span /><span /><span /><span />
             </div>
           </div>
         </div>
@@ -8646,13 +8841,6 @@ function App() {
           navDirection={navDirection}
           studyPlan={studyPlan}
           learningPathStatus={learningPathStatus}
-          tutorBanner={tutorReactions[0] ? {
-            dedupKey: tutorReactions[0].dedup_key,
-            headline: normalizeTrackTerms(tutorReactions[0].headline),
-            body: normalizeTrackTerms(tutorReactions[0].body),
-            cta: normalizeTrackTerms(tutorReactions[0].cta),
-            messageType: tutorReactions[0].message_type,
-          } : null}
           recommendations={recommendations.map((r) => ({
             nodeId: r.node_id,
             displayLabel: r.display_label,
@@ -8660,10 +8848,6 @@ function App() {
             difficulty: r.difficulty,
             reason: r.reason,
           }))}
-          onDismissTutorBanner={(key) => {
-            setTutorReactions((prev) => prev.filter((r) => r.dedup_key !== key))
-            void window.jplearnDesktop?.dismissTutorReaction?.(key).catch(() => undefined)
-          }}
           onStartRecommendation={(nodeId) => {
             const scriptMap: Record<string, string> = {
               hiragana: 'hiragana', katakana: 'katakana',
@@ -8894,6 +9078,7 @@ function App() {
           }}
           onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
           onOpenSettings={openSettingsFromMenu}
+          onRetry={handleRetry}
         />
       ) : null}
 
@@ -10660,8 +10845,24 @@ function App() {
         {settings.assistantToastLimit > 0 && activeAssistantToast ? (
           <div className="assistant-toast-stack" role="status" aria-label="Tutor updates">
             <article key={activeAssistantToast.id} className={`assistant-toast assistant-toast-${activeAssistantToast.priority}`}>
-              <h3>{activeAssistantToast.title}</h3>
-              <p>{activeAssistantToast.body}</p>
+              <div className="assistant-toast-header">
+                <span className="assistant-toast-icon" aria-hidden="true">
+                  {(() => {
+                    const Icon = ASSISTANT_TOAST_ICONS[activeAssistantToast.priority]
+                    return <Icon strokeWidth={2.2} />
+                  })()}
+                </span>
+                <h3>{activeAssistantToast.title}</h3>
+                <button
+                  type="button"
+                  className="assistant-toast-dismiss"
+                  onClick={() => setAssistantToasts((prev) => prev.filter((t) => t.id !== activeAssistantToast.id))}
+                  aria-label="Dismiss"
+                >
+                  <X strokeWidth={2.2} />
+                </button>
+              </div>
+              <p className="assistant-toast-body">{activeAssistantToast.body}</p>
               {activeAssistantToast.targetMode ? (
                 <div className="assistant-toast-controls">
                   <button
@@ -10684,6 +10885,15 @@ function App() {
           </div>
         ) : null}
       </aside>
+
+      {showResumeToast && resumeData ? (
+        <ResumeToast
+          deck={resumeData.activeScript}
+          mode={MINIGAMES.find((m) => m.key === resumeData.activeGame)?.title ?? resumeData.activeGame}
+          onResume={handleResume}
+          onDismiss={handleDismissResume}
+        />
+      ) : null}
 
       </div>
     </main>

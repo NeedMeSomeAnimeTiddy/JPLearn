@@ -69,12 +69,12 @@ describe('llm runtime quality evals', () => {
     })
 
     const grammar = await runtime.sendMessage('Can you correct my grammar?')
-    expect(grammar.text).toMatch(/full sentence|exact Japanese sentence/i)
+    expect(grammar.text).toMatch(/全文を送ってください/)
 
     const translation = await runtime.sendMessage('Translate this in Japanese please')
-    expect(translation.text).toMatch(/exact phrase|where you want to use it/i)
+    expect(translation.text).toMatch(/語句と使う場面を教えてください/)
 
     const study = await runtime.sendMessage('What should I study next?')
-    expect(study.text).toMatch(/10-minute|20-minute|30-minute/i)
+    expect(study.text).toMatch(/10分・20分・30分/)
   })
 })

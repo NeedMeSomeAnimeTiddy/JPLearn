@@ -14,7 +14,6 @@ import {
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { TutorBanner } from '../components/TutorBanner'
 import { RecommendationCard } from '../components/RecommendationCard'
 import { LearningPathPanel } from '../components/LearningPathPanel'
 import { ScriptCassetteCarousel } from '../components/ScriptCassetteCarousel'
@@ -28,14 +27,6 @@ const READINESS_BADGE: Record<SectionReadiness, { label: string; className: stri
   advanced: { label: 'Advanced', className: 'badge-advanced' },
 }
 
-interface TutorBannerData {
-  dedupKey: string
-  headline: string
-  body: string
-  cta: string
-  messageType: 'congratulation' | 'encouragement' | 'guidance' | 'acknowledgement'
-}
-
 interface RecommendationData {
   nodeId: string
   displayLabel: string
@@ -47,13 +38,11 @@ interface RecommendationData {
 interface HomeViewProps {
   navDirection: NavDirection
   studyPlan: StudyPlanSnapshot
-  tutorBanner?: TutorBannerData | null
   recommendations?: RecommendationData[]
   learningPathStatus?: LearningPathStatus | null
   onSelectScript: (script: ScriptKey) => void
   onOpenJlptPrep: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
-  onDismissTutorBanner?: (dedupKey: string) => void
   onStartRecommendation?: (nodeId: string) => void
   onContinuePath?: (sectionId: string) => void
   onChangePath?: () => void
@@ -71,13 +60,11 @@ const SCRIPT_ORDER: readonly ScriptKey[] = [
 export function HomeView({
   navDirection,
   studyPlan,
-  tutorBanner,
   recommendations,
   learningPathStatus,
   onSelectScript,
   onOpenJlptPrep,
   onJumpToSetup,
-  onDismissTutorBanner,
   onStartRecommendation,
   onContinuePath,
   onChangePath,
@@ -142,16 +129,6 @@ export function HomeView({
 
   return (
     <div className={`view-shell home-view view-${navDirection}`}>
-
-      {tutorBanner && onDismissTutorBanner && (
-        <TutorBanner
-          headline={tutorBanner.headline}
-          body={tutorBanner.body}
-          cta={tutorBanner.cta}
-          messageType={tutorBanner.messageType}
-          onDismiss={() => onDismissTutorBanner(tutorBanner.dedupKey)}
-        />
-      )}
 
       <div className="hub-crt-surface" aria-hidden="true" />
       <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />

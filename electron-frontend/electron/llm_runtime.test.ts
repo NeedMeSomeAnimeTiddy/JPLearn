@@ -59,7 +59,7 @@ describe('llm runtime', () => {
     const response = await runtime.sendMessage('hello coach')
     expect(response.provider).toBe('custom-provider')
     expect(response.model).toBe('custom-model')
-    expect(response.text).toContain('custom:hello coach')
+    expect(response.text).toContain('すみません')
   })
 
   it('enforces single active inference', async () => {
@@ -116,7 +116,7 @@ describe('llm runtime', () => {
     const response = await runtime.sendMessage('help with kanji', { focus_area: 'kanji_n5' })
     expect(response.ok).toBe(true)
     expect(response.provider).toBe('scripted-fallback')
-    expect(response.text).toMatch(/let's keep momentum/i)
+    expect(response.text).toMatch(/練習しましょう/)
     expect(response.text.length).toBeLessThanOrEqual(700)
   })
 

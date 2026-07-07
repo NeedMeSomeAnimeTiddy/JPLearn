@@ -32,7 +32,7 @@ export function ChallengePromptCard({
   onPlayAudio,
 }: ChallengePromptCardProps) {
   const showWordAudioButton =
-    roundState.mode !== 'listening_audio_first' && voiceEnabled && Boolean(roundState.audioText)
+    roundState.mode !== 'listening_audio_first' && roundState.mode !== 'dictation' && voiceEnabled && Boolean(roundState.audioText)
   const sizeClass = promptSizeClass(roundState.focusText)
   const promptClassName = [
     'game-prompt-main',
@@ -60,7 +60,7 @@ export function ChallengePromptCard({
           </button>
         ) : null}
       </div>
-      {roundState.mode === 'listening_audio_first' ? (
+      {roundState.mode === 'listening_audio_first' || roundState.mode === 'dictation' ? (
         <div className="game-listen-prompt">
           <button
             type="button"
@@ -90,7 +90,7 @@ export function ChallengePromptCard({
           <TypeAnimation key={`prompt-${roundState.focusText}`} sequence={[roundState.focusText]} speed={5} cursor={false} style={{ display: 'inline' }} />
         </p>
       )}
-      {roundState.mode !== 'listening_audio_first' && activeScript === 'grammar_patterns' &&
+      {roundState.mode !== 'listening_audio_first' && roundState.mode !== 'dictation' && activeScript === 'grammar_patterns' &&
       voiceEnabled && roundState.exampleSentenceAudioText ? (
         <div className="game-speak-controls">
           <button

@@ -31,7 +31,8 @@ export function HintAssistPanel({
     roundState.mode !== 'romaji_sprint' &&
     roundState.mode !== 'typed_recall' &&
     roundState.mode !== 'speech_recall' &&
-    roundState.mode !== 'listening_audio_first'
+    roundState.mode !== 'listening_audio_first' &&
+    roundState.mode !== 'dictation'
 
   const hintSteps = [
     {

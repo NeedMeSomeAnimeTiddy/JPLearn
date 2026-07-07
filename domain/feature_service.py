@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import date
 from collections.abc import Sequence
+from typing import Literal
 
 from domain.features import (
     Feature,
@@ -112,7 +113,7 @@ def evaluate_features(
                     f"feature '{dep.feature_id}'"
                 )
 
-    working: dict[str, str] = dict(feature_state.statuses)
+    working: dict[str, Literal["locked", "unlocked"]] = dict(feature_state.statuses)
 
     # Ensure every feature in the catalog has a status entry.
     for f in features:

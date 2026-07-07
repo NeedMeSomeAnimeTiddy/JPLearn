@@ -47,6 +47,7 @@ interface MinigameViewProps {
   onBack: () => void
   onOpenDictionary: (seedQuery?: string) => void
   onOpenSettings: () => void
+  onRetry: (cardIds: number[]) => void
 }
 
 export function MinigameView({
@@ -63,6 +64,7 @@ export function MinigameView({
   onBack,
   onOpenDictionary,
   onOpenSettings,
+  onRetry,
 }: MinigameViewProps) {
   const {
     sessionActive,
@@ -209,14 +211,14 @@ export function MinigameView({
       activeRound.mode === 'particle_cloze' ||
       activeRound.mode === 'vibe_check' ||
       activeRound.mode === 'imposter' ||
-      activeRound.mode === 'listening_audio_first' ||
-      activeRound.mode === 'listening_prompt_first'
+      activeRound.mode === 'listening_audio_first'
 
     const isTyped =
       activeRound.mode === 'romaji_sprint' ||
       activeRound.mode === 'typed_recall' ||
       activeRound.mode === 'speech_recall' ||
-      activeRound.mode === 'stroke_order'
+      activeRound.mode === 'stroke_order' ||
+      activeRound.mode === 'dictation'
 
     function handleKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement
@@ -309,7 +311,7 @@ export function MinigameView({
     if (!roundState) return
     if (
       roundState.mode !== 'listening_audio_first' &&
-      roundState.mode !== 'listening_prompt_first'
+      roundState.mode !== 'dictation'
     ) return
     if (!voiceEnabled || !roundState.audioText) return
     playAudio(roundState.audioText)
@@ -393,6 +395,7 @@ export function MinigameView({
                       report={sessionRunReport}
                       sessionStartPending={sessionStartPending}
                       onRestart={() => startSession()}
+                      onRetry={onRetry}
                       onBack={onBack}
                     />
                   </div>
@@ -526,6 +529,8 @@ export function MinigameView({
                                     ? 'Read the register vibe'
                                   : roundState.mode === 'imposter'
                                     ? 'Spot the grammar imposter'
+                                  : roundState.mode === 'dictation'
+                                    ? 'Type the romaji'
                                 : 'Choose the best answer'
                       }
                       copy={
@@ -547,6 +552,8 @@ export function MinigameView({
                                     ? 'Use sentence endings like です, ます, or ください as tone clues.'
                                   : roundState.mode === 'imposter'
                                     ? 'Pick the token that introduces the grammar error.'
+                                    : roundState.mode === 'dictation'
+                                      ? 'Type the romaji for what you hear. Use English letters.'
                                 : 'Commit to one answer and keep the run moving.'
                       }
                       confidenceCaptureEnabled={confidenceCaptureEnabled}
@@ -558,6 +565,7 @@ export function MinigameView({
                       feedbackMilestoneStreak={roundMilestoneStreak}
                       feedbackAnswer={roundFeedbackAnswer}
                       feedbackAnswerLabel={formatFeedbackAnswerLabel(roundState.mode)}
+                      feedbackCorrectAnswer={roundState.mode === 'dictation' ? roundState.answer : undefined}
                       livesEnabled={livesEnabled}
                       showKeyboardPrompts={showKeyboardPrompts}
                       onSkipFeedback={skipFeedback}
@@ -591,11 +599,17 @@ export function MinigameView({
                             onResult={({ transcript }) => submitAnswer(transcript)}
                             onFallbackToTyped={() => setSpeechFallbackToTyped(true)}
                           />
-                        ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' ? (
+                        ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' || roundState.mode === 'dictation' ? (
                           <TypedAnswerPanel
                             answerInputRef={answerInputRef}
                             value={roundInput}
-                            placeholder={roundState.mode === 'romaji_sprint' ? 'Enter romaji' : 'Type meaning'}
+                            placeholder={
+                              roundState.mode === 'romaji_sprint'
+                                ? 'Enter romaji'
+                                : roundState.mode === 'dictation'
+                                  ? 'Type here (auto-converts to kana)'
+                                  : 'Type meaning'
+                            }
                             disabled={isRoundResolving}
                             onChange={(value) =>
                               setRoundInput(
@@ -604,7 +618,14 @@ export function MinigameView({
                                   : value,
                               )
                             }
-                            onSubmit={() => submitAnswer(roundInput)}
+                            onSubmit={(v) =>
+                              submitAnswer(
+                                roundState.mode === 'romaji_sprint'
+                                  ? sanitizeRomajiInput(v)
+                                  : v,
+                              )
+                            }
+                            wanakanaMode={roundState.mode === 'dictation' ? (activeScript === 'katakana' ? 'katakana' : 'hiragana') : undefined}
                           />
                         ) : (
                           <ChoiceAnswerPanel

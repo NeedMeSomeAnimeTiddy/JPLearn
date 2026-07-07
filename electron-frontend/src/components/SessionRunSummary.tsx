@@ -6,6 +6,7 @@ interface SessionRunSummaryProps {
   report: SessionRunReport
   sessionStartPending: boolean
   onRestart: () => void
+  onRetry: (cardIds: number[]) => void
   onBack: () => void
 }
 
@@ -13,6 +14,7 @@ export function SessionRunSummary({
   report,
   sessionStartPending,
   onRestart,
+  onRetry,
   onBack,
 }: SessionRunSummaryProps) {
   const minigameTitle =
@@ -122,6 +124,16 @@ export function SessionRunSummary({
       </div>
 
       <div className="game-actions minigame-session-summary-actions">
+        {report.wrongCardIds.length > 0 ? (
+          <button
+            type="button"
+            className="hub-chip-button"
+            onClick={() => onRetry(report.wrongCardIds)}
+            disabled={sessionStartPending}
+          >
+            Retry {report.wrongCardIds.length} Missed
+          </button>
+        ) : null}
         <button type="button" className="hub-chip-button" onClick={onRestart} disabled={sessionStartPending}>
           Play Again
         </button>

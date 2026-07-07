@@ -385,8 +385,8 @@ def test_build_deck_cards_sentence_examples_falls_back_when_csv_unavailable(tmp_
 def test_build_block_progress_includes_new_phase_one_decks(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
-    sentence_progress = desktop_bridge.build_block_progress("sentence_examples")
-    conjugation_progress = desktop_bridge.build_block_progress("conjugation_training")
+    sentence_progress = cast(dict[str, Any], desktop_bridge.build_block_progress("sentence_examples"))
+    conjugation_progress = cast(dict[str, Any], desktop_bridge.build_block_progress("conjugation_training"))
 
     assert sentence_progress["slug"] == "sentence_examples"
     assert conjugation_progress["slug"] == "conjugation_training"

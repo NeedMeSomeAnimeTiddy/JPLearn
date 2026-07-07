@@ -17,6 +17,7 @@ interface MinigameResponsePanelProps {
   feedbackMilestoneStreak: number | null
   feedbackAnswer: string | null
   feedbackAnswerLabel: string
+  feedbackCorrectAnswer?: string | null
   livesEnabled: boolean
   showKeyboardPrompts: boolean
   onSkipFeedback: () => void
@@ -53,6 +54,7 @@ export function MinigameResponsePanel({
   feedbackMilestoneStreak,
   feedbackAnswer,
   feedbackAnswerLabel,
+  feedbackCorrectAnswer,
   livesEnabled,
   showKeyboardPrompts,
   onSkipFeedback,
@@ -71,8 +73,7 @@ export function MinigameResponsePanel({
     mode === 'particle_cloze' ||
     mode === 'vibe_check' ||
     mode === 'imposter' ||
-    mode === 'listening_audio_first' ||
-    mode === 'listening_prompt_first'
+    mode === 'listening_audio_first'
 
   const shortcutHints = showKeyboardPrompts
     ? [
@@ -92,6 +93,7 @@ export function MinigameResponsePanel({
             milestoneStreak={feedbackMilestoneStreak}
             answer={feedbackAnswer}
             answerLabel={feedbackAnswerLabel}
+            correctAnswer={feedbackCorrectAnswer}
             livesEnabled={livesEnabled}
             mode={mode}
             onAction={onSkipFeedback}

@@ -6,6 +6,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   BookText,
+  Ear,
   Flame,
   History,
   Keyboard,
@@ -149,13 +150,13 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
   },
   {
     key: 'listening_audio_first',
-    title: 'Listening: Audio First',
+    title: 'Recognition',
     description: 'Hear a word and choose its meaning — character hidden until feedback.',
   },
   {
-    key: 'listening_prompt_first',
-    title: 'Listening: Prompt First',
-    description: 'See the character while audio plays, then choose the meaning.',
+    key: 'dictation',
+    title: 'Dictation',
+    description: 'Hear a word and type it in Japanese — no visual hints.',
   },
   {
     key: 'interleave_mix',
@@ -165,8 +166,8 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
 ]
 
 export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'interleave_mix'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'interleave_mix'],
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'interleave_mix'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'interleave_mix'],
   kanji_n5: [
     'romaji_sprint',
     'meaning_match',
@@ -178,7 +179,6 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'particle_cloze',
     'imposter',
     'listening_audio_first',
-    'listening_prompt_first',
     'interleave_mix',
   ],
   vocab_n5: [
@@ -189,7 +189,7 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'particle_cloze',
     'imposter',
     'listening_audio_first',
-    'listening_prompt_first',
+    'dictation',
     'interleave_mix',
   ],
   grammar_patterns: [
@@ -202,7 +202,6 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'vibe_check',
     'imposter',
     'listening_audio_first',
-    'listening_prompt_first',
     'interleave_mix',
   ],
   sentence_examples: [
@@ -213,7 +212,6 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'sentence_assembly',
     'imposter',
     'listening_audio_first',
-    'listening_prompt_first',
     'interleave_mix',
   ],
 }
@@ -230,7 +228,7 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   vibe_check: MessageCircle,
   imposter: History,
   listening_audio_first: Volume2,
-  listening_prompt_first: Volume2,
+  dictation: Ear,
   interleave_mix: Shuffle,
 }
 
@@ -284,7 +282,7 @@ export const MINIGAME_SKILL_GROUP: Record<MinigameKey, MinigameSkillGroupKey> = 
   vibe_check: 'challenge',
   imposter: 'challenge',
   listening_audio_first: 'listening',
-  listening_prompt_first: 'listening',
+  dictation: 'listening',
   interleave_mix: 'mixed',
 }
 
@@ -491,14 +489,15 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'particle_cloze') return 'Particle Cloze'
   if (mode === 'vibe_check') return 'Vibe Check'
   if (mode === 'imposter') return 'Imposter'
-  if (mode === 'listening_audio_first') return 'Listening: Audio First'
-  if (mode === 'listening_prompt_first') return 'Listening: Prompt First'
+  if (mode === 'listening_audio_first') return 'Recognition'
+  if (mode === 'dictation') return 'Dictation'
   return 'Interleave Mix'
 }
 
 export function formatFeedbackAnswerLabel(mode: PlayableMinigame): string {
   if (mode === 'romaji_sprint') return 'The reading'
   if (mode === 'stroke_order' || mode === 'character_match') return 'The character'
+  if (mode === 'dictation') return 'Your answer'
   if (mode === 'sentence_assembly') return 'Correct order'
   return 'The answer'
 }

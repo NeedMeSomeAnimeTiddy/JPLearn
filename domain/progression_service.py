@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from domain.progression import (
     NodeProgressionState,
     ProgressionEvent,
+    ProgressionEventType,
     ProgressionGraph,
     ProgressionNode,
     ProgressionState,
@@ -282,7 +283,7 @@ def record_mastery(
                     dep_id in graph.nodes[p].branches
                     for p in graph.parent_index.get(dep_id, ())
                 )
-                event_type = "branch_unlocked" if is_branch else "node_unlocked"
+                event_type: ProgressionEventType = "branch_unlocked" if is_branch else "node_unlocked"
                 events.append(
                     ProgressionEvent(event_type=event_type, node_id=dep_id, date=today)
                 )
