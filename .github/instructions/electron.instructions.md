@@ -32,6 +32,7 @@ applyTo: "electron-frontend/**/*"
 
 ## Component & Styling Standards
 
+- **Feature modules**: Self-contained features go in `src/features/<name>/` with types, constants, utils, hooks, and components subdirectories. Prefer this over scattered top-level files.
 - **Design tokens**: Use `@radix-ui/colors` as the color foundation. Never hardcode raw hex values — derive from the token scale.
 - **Component variants**: Use `class-variance-authority` + `clsx` for all component style variants. No inline style objects.
 - **Icons**: Use `lucide-react` exclusively. No raw SVGs or emoji-as-icons.
