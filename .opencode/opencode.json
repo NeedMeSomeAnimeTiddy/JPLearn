@@ -24,7 +24,6 @@
     }
   },
   "plugin": [
-    "opencode-handoff",
     "opencode-mem",
     "cc-safety-net",
     "envsitter-guard"

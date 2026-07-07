@@ -494,12 +494,8 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   return 'Interleave Mix'
 }
 
-export function formatFeedbackAnswerLabel(mode: PlayableMinigame): string {
-  if (mode === 'romaji_sprint') return 'The reading'
-  if (mode === 'stroke_order' || mode === 'character_match') return 'The character'
-  if (mode === 'dictation') return 'Your answer'
-  if (mode === 'sentence_assembly') return 'Correct order'
-  return 'The answer'
+export function formatFeedbackAnswerLabel(_mode: PlayableMinigame): string {
+  return 'Your answer'
 }
 
 export function formatExpectedAnswer(rawAnswer: string): string {

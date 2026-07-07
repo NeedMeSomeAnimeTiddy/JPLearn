@@ -8,7 +8,7 @@ import type { RoundState } from '../../types'
 interface HintAssistPanelProps {
   roundState: RoundState
   isRoundResolving: boolean
-  hintStep: 0 | 1 | 2 | 3
+  hintStep: 0 | 1 | 2
   hintRevealCount: number
   showKeyboardPrompts: boolean
   formattedAnswer: string
@@ -34,39 +34,32 @@ export function HintAssistPanel({
     roundState.mode !== 'listening_audio_first' &&
     roundState.mode !== 'dictation'
 
+  const hasClue = Boolean(roundState.hintText || roundState.dictionaryNote)
+
   const hintSteps = [
     {
-      key: 'prompt',
-      label: 'Prompt cue',
-      description: roundState.promptLabel,
-      visible: true,
+      key: 'study',
+      label: 'Clue',
+      description: roundState.hintText,
+      visible: hasClue,
       revealed: hintStep >= 1,
     },
     {
-      key: 'study',
-      label: 'Study clue',
-      description: roundState.hintText ?? 'Dictionary support',
-      visible: Boolean(roundState.hintText || roundState.dictionaryNote),
-      revealed: hintStep >= 2,
-    },
-    {
       key: 'answer',
-      label: 'Answer reveal',
+      label: 'Answer',
       description: formattedAnswer,
       visible: true,
-      revealed: hintStep >= 3,
+      revealed: hintStep >= 2,
     },
   ].filter((step) => step.visible)
 
-  const nextStepCopy =
+  const nextStepLabel =
     hintStep === 0
-      ? 'Reveal prompt cue'
-      : hintStep === 1 && (roundState.hintText || roundState.dictionaryNote)
-        ? 'Reveal study clue'
-        : 'Reveal answer'
+      ? 'Reveal clue'
+      : 'Reveal answer'
 
-  const showRevealButton = !alwaysShowHint && !isRoundResolving && hintStep < 3
-  const hintStageLabel = hintStep === 0 ? 'Stage 0/3' : `Stage ${hintStep}/3`
+  const showRevealButton = !alwaysShowHint && !isRoundResolving && hintStep < 2
+  const hintStageLabel = `Stage ${hintStep}/2`
 
   function togglePanel() {
     setIsExpanded((value) => !value)
@@ -90,7 +83,7 @@ export function HintAssistPanel({
   return (
     <aside
       className={`minigame-assist-panel ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
-      aria-label="Round support and hints"
+      aria-label="Round hints"
       role="button"
       tabIndex={0}
       aria-expanded={isExpanded}
@@ -99,7 +92,6 @@ export function HintAssistPanel({
     >
       <div className="minigame-assist-head">
         <div className="minigame-assist-head-start">
-          <span className="minigame-assist-kicker">Support</span>
           {showRevealButton ? (
             <button
               type="button"
@@ -108,15 +100,12 @@ export function HintAssistPanel({
               aria-label="Show more hint"
             >
               <span className="game-hint-toggle-label">
-                {showKeyboardPrompts ? `${nextStepCopy} (Space)` : nextStepCopy}
+                {showKeyboardPrompts ? `${nextStepLabel} (Space)` : nextStepLabel}
               </span>
             </button>
           ) : null}
         </div>
         <div className="minigame-assist-head-end">
-          <span className="minigame-assist-shortcut">
-            {showKeyboardPrompts ? 'Space to reveal hints' : 'Hints available'}
-          </span>
           <span className="minigame-assist-stage">{hintStageLabel} · Used {hintRevealCount}</span>
           <span className="minigame-assist-toggle" aria-hidden="true">
             <ChevronDown className="inline-button-icon" strokeWidth={2.2} />
@@ -144,8 +133,10 @@ export function HintAssistPanel({
                     <span className="game-hint-step-label">{step.label}</span>
                     <span className="game-hint-step-copy">
                       {step.revealed ? (
-                        <TypeAnimation key={`step-${step.key}-${step.description}`} sequence={[step.description]} speed={12} cursor={false} style={{ display: 'inline' }} />
-                      ) : 'Locked until revealed'}
+                        <TypeAnimation key={`step-${step.key}-${step.description}`} sequence={[step.description ?? '']} speed={12} cursor={false} style={{ display: 'inline' }} />
+                      ) : (
+                        'Locked until revealed'
+                      )}
                     </span>
                   </div>
                 ))}

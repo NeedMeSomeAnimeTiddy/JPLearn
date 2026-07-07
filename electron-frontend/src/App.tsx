@@ -3183,21 +3183,6 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   return 'Interleave Mix'
 }
 
-function formatExpectedAnswer(rawAnswer: string): string {
-  const compact = rawAnswer.trim().replace(/\s+/g, ' ')
-  if (!compact) return rawAnswer
-
-  const parts = compact
-    .split(/[;,]/)
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0)
-
-  if (parts.length <= 1) return compact
-  if (parts.length === 2) return `${parts[0]} or ${parts[1]}`
-
-  return `${parts.slice(0, -1).join(', ')}, or ${parts[parts.length - 1]}`
-}
-
 function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'romaji_sprint') return 'Take a breath and try the next reading.'
   if (mode === 'meaning_match') return 'You are close. Trust your first clear meaning.'
@@ -7446,16 +7431,17 @@ function App() {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage - 1)
           setRoundFeedback(`Not quite. Stage ${roundState.curriculumStage} → ${nextStage}.`)
         } else {
-          setRoundFeedback('Not quite — the answer is shown below.')
+          setRoundFeedback('Not quite.')
         }
         setRoundFeedbackTone('error')
         setRoundFeedbackPoints(0)
         setRoundFeedbackAnswer(
-          roundState.mode === 'dictation'
-            ? answer
-            : roundState.answerDisplay && roundState.answerDisplay.trim().length > 0
-              ? roundState.answerDisplay
-              : formatExpectedAnswer(roundState.answer),
+          roundState.mode === 'sentence_assembly' && roundState.options
+            ? (() => {
+                const chunkMap = new Map(roundState.options.map((o) => [o.id, o.label]))
+                return answer.split('|').map((id) => chunkMap.get(id) ?? '').join('')
+              })()
+            : answer,
         )
 
         // Wrong answer deducts 1 from the card score (floored at 0).

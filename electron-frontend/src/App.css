@@ -7356,7 +7356,6 @@ html[data-reduced-motion='true'] .cassette-reel {
   margin-top: 0;
 }
 
-.minigame-assist-kicker,
 .minigame-response-kicker {
   color: var(--text-soft);
   font-size: 0.72rem;
@@ -7793,7 +7792,13 @@ html[data-reduced-motion='true'] .cassette-reel {
 }
 
 .round-feedback-answer-error {
-  border-color: var(--tone-rose);
+  border-color: #e64553;
+  background: color-mix(in srgb, #e64553 15%, transparent);
+}
+
+.round-feedback-answer-correct {
+  border-color: var(--tone-teal);
+  background: color-mix(in srgb, var(--tone-teal) 15%, transparent);
 }
 
 .round-feedback-answer-value .char-wrong {
@@ -8223,17 +8228,6 @@ html[data-reduced-motion='true'] .cassette-reel {
   border-radius: 0;
 }
 
-/* Base zone — transparent, just padding for hints */
-.minigame-cassette-base {
-  padding: 8px 12px 4px;
-}
-
-.minigame-cassette-base .minigame-assist-panel {
-  border: none;
-  background: transparent;
-  padding: 0;
-}
-
 /* ── Correct answer beam ── */
 .correct-beam {
   position: fixed;
@@ -8608,25 +8602,185 @@ html[data-reduced-motion='true'] .cassette-reel {
   background: var(--bg-main);
 }
 
-.minigame-assist-panel {
-  border: 1px solid var(--panel-border);
-  border-radius: 0;
-  padding: 14px 16px;
+/* ── Hint popover (floating) ── */
+
+.minigame-hint-trigger.is-active {
+  background: color-mix(in oklab, var(--tone-ocean) 32%, transparent);
+  border-color: color-mix(in oklab, var(--tone-ocean) 56%, var(--card-border));
+}
+
+.minigame-hint-popover {
   background: var(--bg-main);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  box-shadow:
+    0 8px 28px color-mix(in oklab, var(--tone-ocean) 14%, transparent),
+    0 2px 8px color-mix(in oklab, var(--accent) 8%, transparent);
+  overflow: hidden;
+}
+
+.minigame-hint-popover-arrow {
+  display: none;
+}
+
+.minigame-hint-popover-body {
+  padding: 12px 14px;
+}
+
+.minigame-hint-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.minigame-hint-popover-icon {
+  color: var(--tone-ocean);
+  flex-shrink: 0;
+}
+
+.minigame-hint-popover-title {
+  color: var(--text-main);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.minigame-hint-popover-stage {
+  margin-left: auto;
+  color: color-mix(in oklab, var(--text-soft) 86%, var(--tone-ocean));
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.minigame-hint-popover-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 20%, var(--chip-border));
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-soft);
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease;
+  flex-shrink: 0;
+  transition: color 140ms ease;
 }
 
-.minigame-assist-panel:hover {
-  border-color: color-mix(in oklab, var(--tone-ocean) 40%, var(--card-border));
+.minigame-hint-popover-dismiss:hover {
+  color: var(--text-main);
 }
 
-.minigame-assist-panel:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--tone-ocean) 60%, transparent);
-  outline-offset: 2px;
+.minigame-hint-popover-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.minigame-assist-head,
+.minigame-hint-popover-stage-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.minigame-hint-popover-text {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.minigame-hint-popover-answer {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 1.05rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.minigame-hint-popover-empty {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.minigame-hint-popover-reveal {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 5px 12px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 40%, var(--card-border));
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--tone-ocean) 14%, transparent);
+  color: color-mix(in oklab, var(--tone-ocean) 90%, var(--text-main));
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.minigame-hint-popover-reveal:hover {
+  background: color-mix(in oklab, var(--tone-ocean) 24%, transparent);
+  border-color: color-mix(in oklab, var(--tone-ocean) 56%, var(--card-border));
+}
+
+.minigame-hint-popover-footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in oklab, var(--tone-ocean) 14%, var(--chip-border));
+  color: var(--text-soft);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+}
+
+.minigame-hint-popover-footer svg {
+  color: var(--tone-ocean);
+}
+
+.minigame-hint-dict-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.minigame-hint-dict-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 22%, var(--chip-border));
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--tone-ocean) 8%, transparent);
+  color: var(--text-main);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.minigame-hint-dict-chip.minigame-hint-dict-reading {
+  color: var(--text-soft);
+}
+
+.minigame-hint-dict-gloss {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--tone-ocean) 12%, transparent);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.minigame-hint-dict-gloss.is-primary {
+  color: var(--text-main);
+  font-weight: 600;
+}
+
 .minigame-response-head {
   display: flex;
   align-items: center;
@@ -8635,56 +8789,9 @@ html[data-reduced-motion='true'] .cassette-reel {
   margin-bottom: 8px;
 }
 
-.minigame-assist-shortcut,
 .minigame-response-status {
   color: var(--text-soft);
   font-size: 0.78rem;
-}
-
-.minigame-assist-stage {
-  color: color-mix(in oklab, var(--text-soft) 86%, var(--tone-ocean));
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.minigame-assist-head-start {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.minigame-assist-head-end {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.minigame-assist-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--card-border));
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-soft);
-  transition: transform 200ms ease, color 160ms ease;
-}
-
-.minigame-assist-panel:hover .minigame-assist-toggle {
-  color: var(--text-main);
-}
-
-.minigame-assist-panel.is-collapsed .minigame-assist-toggle {
-  transform: rotate(-90deg);
-}
-
-.minigame-assist-panel.is-collapsed .minigame-assist-head {
-  margin-bottom: 0;
 }
 
 .minigame-response-head-copy {
@@ -8755,173 +8862,6 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .game-prompt-main.is-size-xs {
   font-size: clamp(0.98rem, 3.1vw, 1.38rem);
-}
-
-.game-hint-text {
-  margin: 10px 0 0;
-  color: var(--text-soft);
-  font-size: 0.82rem;
-  letter-spacing: 0.02em;
-}
-
-.game-hint-type {
-  color: var(--tone-ocean);
-  font-weight: 600;
-}
-
-.game-hint-answer {
-  color: var(--tone-warning);
-  font-weight: 600;
-}
-
-.game-hint-ladder {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 10px;
-}
-
-.game-hint-step-list {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-
-.game-hint-step {
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 18%, var(--chip-border));
-  border-radius: 0;
-  padding: 9px 10px;
-  background: color-mix(in oklab, var(--panel-bg) 72%, transparent);
-  display: grid;
-  gap: 3px;
-}
-
-.game-hint-step.is-revealed {
-  border-color: color-mix(in oklab, var(--tone-ocean) 42%, var(--chip-border));
-  background: color-mix(in oklab, var(--tone-ocean) 12%, transparent);
-}
-
-.game-hint-step-label {
-  color: var(--text-main);
-  font-size: 0.73rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.game-hint-step-copy {
-  color: var(--text-soft);
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-
-.game-dictionary-note {
-  margin-top: 8px;
-  padding: 10px 12px;
-  border-radius: 0;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 34%, var(--card-border));
-  background: color-mix(in oklab, var(--tone-ocean) 10%, transparent);
-}
-
-.game-dictionary-note-title {
-  margin: 0;
-  color: var(--tone-ocean);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.game-dictionary-note-copy {
-  margin: 4px 0 0;
-  color: var(--text-soft);
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-
-.game-dictionary-sense {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--chip-border));
-  display: grid;
-  gap: 8px;
-}
-
-.game-dictionary-sense-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.game-dictionary-sense-label {
-  color: var(--text-main);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.game-dictionary-source {
-  color: var(--text-soft);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.game-dictionary-sense-meta,
-.game-dictionary-gloss-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.game-dictionary-meta-chip,
-.game-dictionary-gloss-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.5rem;
-  padding: 0 9px;
-  border-radius: 0;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 24%, var(--panel-border));
-  background: color-mix(in oklab, var(--panel-bg) 84%, transparent);
-  color: var(--text-soft);
-  font-size: 0.78rem;
-}
-
-.game-dictionary-gloss-chip.is-primary {
-  border-color: color-mix(in oklab, var(--tone-amber) 36%, var(--chip-border));
-  background: color-mix(in oklab, var(--tone-amber) 14%, transparent);
-  color: var(--text-main);
-  font-weight: 700;
-}
-
-.game-hint-toggle {
-  margin-top: 8px;
-  padding: 4px 10px;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 80%, transparent);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-faint, var(--text-soft));
-  font-size: 0.78rem;
-  cursor: pointer;
-  align-self: flex-start;
-  transition: border-color 0.1s, color 0.1s;
-}
-
-.minigame-assist-reveal {
-  margin-top: 0;
-  flex-shrink: 0;
-}
-
-.game-hint-toggle:hover {
-  border-color: var(--panel-border);
-  color: var(--text-soft);
-}
-
-.game-hint-toggle-label {
-  font-size: 0.78rem;
-  letter-spacing: 0.03em;
 }
 
 .game-speak-controls {
@@ -11735,7 +11675,6 @@ html[data-motion-style='lively'] .live-value {
     flex-direction: column;
   }
 
-  .minigame-assist-head,
   .minigame-response-head,
   .round-feedback-advance-copy {
     flex-direction: column;

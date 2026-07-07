@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { ChallengePromptCard } from '../components/minigame/ChallengePromptCard'
 import { ChoiceAnswerPanel } from '../components/minigame/ChoiceAnswerPanel'
-import { HintAssistPanel } from '../components/minigame/HintAssistPanel'
+import { HintPopover } from '../components/minigame/HintPopover'
 import { MinigameHud } from '../components/minigame/MinigameHud'
 import { MinigameResponsePanel } from '../components/minigame/MinigameResponsePanel'
 import { SentenceAssemblyAnswerPanel } from '../components/minigame/SentenceAssemblyAnswerPanel'
@@ -115,8 +115,8 @@ export function MinigameView({
       : 'Ready to begin'
 
   // ── Phase 7: Progressive hint ladder ────────────────────────────────────────
-  // 0 = no hint shown, 1 = prompt type label, 2 = hintText, 3 = full answer giveaway
-  const [hintStep, setHintStep] = useState<0 | 1 | 2 | 3>(0)
+  // 0 = no hint shown, 1 = clue, 2 = full answer giveaway
+  const [hintStep, setHintStep] = useState<0 | 1 | 2>(0)
   const [activeChoiceIndex, setActiveChoiceIndex] = useState(0)
   const [speechFallbackToTyped, setSpeechFallbackToTyped] = useState(false)
   const [hintRevealCount, setHintRevealCount] = useState(0)
@@ -125,6 +125,8 @@ export function MinigameView({
   const [pointsGainAmount, setPointsGainAmount] = useState<number | null>(null)
   const previousPointsRef = useRef(sessionPoints)
   const previousSessionActiveRef = useRef(false)
+  const [hintPopoverOpen, setHintPopoverOpen] = useState(false)
+  const hintButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const toggleFocusMode = useCallback(() => {
     const next = !focusModeEnabled
@@ -144,15 +146,17 @@ export function MinigameView({
 
   const advanceHintStep = useCallback(() => {
     setHintStep((current) => {
-      if (current >= 3) return current
+      if (current >= 2) return current
       setHintRevealCount((value) => value + 1)
-      return (current + 1) as 0 | 1 | 2 | 3
+      return (current + 1) as 0 | 1 | 2
     })
+    setHintPopoverOpen(true)
   }, [])
 
   // Reset hint when a new round starts.
   useEffect(() => {
     setHintStep(0)
+    setHintPopoverOpen(false)
   }, [roundState?.cardId])
 
   // Brief pulse + floating "+N" label whenever points increase.
@@ -504,7 +508,10 @@ export function MinigameView({
                       voiceUnavailable={voiceUnavailable}
                       showKeyboardPrompts={showKeyboardPrompts}
                       showRevealText={roundFeedback !== null}
+                      hintPopoverOpen={hintPopoverOpen}
+                      hintButtonRef={hintButtonRef}
                       onPlayAudio={playAudio}
+                      onToggleHintPopover={() => setHintPopoverOpen((v) => !v)}
                     />
                   </div>
 
@@ -565,7 +572,11 @@ export function MinigameView({
                       feedbackMilestoneStreak={roundMilestoneStreak}
                       feedbackAnswer={roundFeedbackAnswer}
                       feedbackAnswerLabel={formatFeedbackAnswerLabel(roundState.mode)}
-                      feedbackCorrectAnswer={roundState.mode === 'dictation' ? roundState.answer : undefined}
+                      feedbackCorrectAnswer={
+                        roundState.mode === 'sentence_assembly'
+                          ? (roundState.answerDisplay ?? roundState.answer)
+                          : roundState.answer
+                      }
                       livesEnabled={livesEnabled}
                       showKeyboardPrompts={showKeyboardPrompts}
                       onSkipFeedback={skipFeedback}
@@ -641,25 +652,25 @@ export function MinigameView({
                     </MinigameResponsePanel>
                   </div>
 
-                  <div className="minigame-cassette-base">
-                    <HintAssistPanel
-                      roundState={roundState}
-                      isRoundResolving={isRoundResolving}
-                      hintStep={hintStep}
-                      hintRevealCount={hintRevealCount}
-                      showKeyboardPrompts={showKeyboardPrompts}
-                      formattedAnswer={roundState.answerDisplay ?? formatExpectedAnswer(roundState.answer)}
-                      onRevealHint={() => {
-                        if (hintStep < 1) {
-                          setHintRevealCount((value) => value + 1)
-                        }
-                        setHintStep(1)
-                      }}
-                      onRevealMoreHint={advanceHintStep}
-                    />
-                  </div>
                 </article>
               </AnimatePresence>
+            ) : null}
+            {roundState ? (
+              <HintPopover
+                roundState={roundState}
+                hintStep={hintStep}
+                hintRevealCount={hintRevealCount}
+                showKeyboardPrompts={showKeyboardPrompts}
+                formattedAnswer={roundState.answerDisplay ?? formatExpectedAnswer(roundState.answer)}
+                open={hintPopoverOpen}
+                triggerRef={hintButtonRef}
+                onClose={() => setHintPopoverOpen(false)}
+                onRevealHint={() => {
+                  if (hintStep < 1) setHintRevealCount((value) => value + 1)
+                  setHintStep(1)
+                }}
+                onRevealMoreHint={advanceHintStep}
+              />
             ) : null}
           </section>
 

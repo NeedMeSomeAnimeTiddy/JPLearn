@@ -1,5 +1,5 @@
 import type { PlayableMinigame, RoundDictionaryNote } from '../types'
-import { FEEDBACK_COPY } from '../constants'
+import { FEEDBACK_COPY, formatExpectedAnswer } from '../constants'
 import { Calendar, Timer } from 'lucide-react'
 import { TypeAnimation } from 'react-type-animation'
 
@@ -37,6 +37,7 @@ interface RoundFeedbackProps {
 const SENTENCE_MODES = ['sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter'] as const
 const SPEECH_MODES = ['speech_recall'] as const
 const CHOICE_MODES = ['meaning_match', 'character_match'] as const
+const CHAR_DIFF_MODES = ['dictation', 'romaji_sprint', 'typed_recall', 'speech_recall'] as const
 
 function speedClass(ms: number, mode: PlayableMinigame): string {
   const fastThreshold = (SENTENCE_MODES as readonly string[]).includes(mode) ? 6000
@@ -97,7 +98,7 @@ export function RoundFeedback({
         <div className={`round-feedback-answer ${tone === 'error' ? 'round-feedback-answer-error' : ''}`}>
           <p className="round-feedback-answer-label">{answerLabel}</p>
           <p className="round-feedback-answer-value">
-            {mode === 'dictation' && tone === 'error' && correctAnswer ? (
+            {(CHAR_DIFF_MODES as readonly string[]).includes(mode) && tone === 'error' && correctAnswer ? (
               [...answer].map((char, i) => {
                 const expected = [...correctAnswer][i]
                 const cls = expected !== undefined && char === expected ? 'char-match' : 'char-wrong'
@@ -106,6 +107,14 @@ export function RoundFeedback({
             ) : (
               <TypeAnimation key={`ans-${answer}`} sequence={[answer]} speed={4} cursor={false} style={{ display: 'inline' }} />
             )}
+          </p>
+        </div>
+      ) : null}
+      {tone === 'error' && correctAnswer ? (
+        <div className="round-feedback-answer round-feedback-answer-correct">
+          <p className="round-feedback-answer-label">The answer</p>
+          <p className="round-feedback-answer-value">
+            <TypeAnimation key={`correct-${correctAnswer}`} sequence={[formatExpectedAnswer(correctAnswer)]} speed={4} cursor={false} style={{ display: 'inline' }} />
           </p>
         </div>
       ) : null}

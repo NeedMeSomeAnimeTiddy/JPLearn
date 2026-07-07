@@ -1,4 +1,4 @@
-import { Volume2 } from 'lucide-react'
+import { Lightbulb, Volume2 } from 'lucide-react'
 import { TypeAnimation } from 'react-type-animation'
 import type { RoundState, ScriptKey } from '../../types'
 
@@ -18,7 +18,10 @@ interface ChallengePromptCardProps {
   voiceUnavailable: boolean
   showKeyboardPrompts: boolean
   showRevealText: boolean
+  hintPopoverOpen: boolean
+  hintButtonRef: React.RefObject<HTMLButtonElement | null>
   onPlayAudio: (text: string) => void
+  onToggleHintPopover: () => void
 }
 
 export function ChallengePromptCard({
@@ -29,7 +32,10 @@ export function ChallengePromptCard({
   voiceUnavailable,
   showKeyboardPrompts,
   showRevealText,
+  hintPopoverOpen,
+  hintButtonRef,
   onPlayAudio,
+  onToggleHintPopover,
 }: ChallengePromptCardProps) {
   const showWordAudioButton =
     roundState.mode !== 'listening_audio_first' && roundState.mode !== 'dictation' && voiceEnabled && Boolean(roundState.audioText)
@@ -47,6 +53,19 @@ export function ChallengePromptCard({
     <div className="game-prompt-focus minigame-prompt-card">
       <div className="minigame-prompt-head">
         <p className="game-prompt-label">{roundState.promptLabel}</p>
+        <button
+          ref={hintButtonRef}
+          type="button"
+          className={`game-speak-icon-button minigame-hint-trigger ${hintPopoverOpen ? 'is-active' : ''}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggleHintPopover()
+          }}
+          aria-label="Toggle hint"
+          title={showKeyboardPrompts ? 'Toggle hint (Space)' : 'Toggle hint'}
+        >
+          <Lightbulb size={18} aria-hidden="true" />
+        </button>
         {showWordAudioButton ? (
           <button
             type="button"

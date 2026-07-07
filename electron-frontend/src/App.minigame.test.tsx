@@ -555,7 +555,7 @@ describe('Minigame menu', () => {
       const promptMain = document.querySelector('.game-prompt-main')
       expect(promptMain?.textContent).toMatch(/[あいうえ]/)
     })
-    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
     await screen.findByText((content) => content.includes('あさです') || content.includes('いまです') || content.includes('うみです') || content.includes('えきです'))
   })
 
@@ -572,8 +572,8 @@ describe('Minigame menu', () => {
       const storyPassage = document.querySelector('.game-prompt-main')
       expect(storyPassage?.textContent).toMatch(/[あさです。いまです。うみです。えきです。]/)
     })
-    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
-    const hintText = document.querySelector('.game-hint-text')
+    fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
+    const hintText = document.querySelector('.minigame-hint-popover-text')
     expect(hintText?.textContent).toContain('choose its meaning')
   })
 
@@ -598,9 +598,9 @@ describe('Minigame menu', () => {
     const matchTiles = await screen.findAllByRole('button', { name: /Character Match/i })
     clickTilePrimaryAction(matchTiles[0])
 
-    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
     await waitFor(() => {
-      const hintText = document.querySelector('.game-hint-text')
+      const hintText = document.querySelector('.minigame-hint-popover-text')
       expect(hintText?.textContent).toContain('Think about how this kanji looks')
     })
   })
@@ -657,7 +657,7 @@ describe('Minigame menu', () => {
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
     clickTilePrimaryAction(typedTiles[0])
 
-    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
 
     const dictionaryButtons = screen.getAllByRole('button', { name: /open dictionary/i })
     fireEvent.click(dictionaryButtons[dictionaryButtons.length - 1])
@@ -707,9 +707,9 @@ describe('Minigame menu', () => {
 
     expect(await screen.findByText(/Type the romaji reading to see kanji options/i)).toBeTruthy()
     expect(screen.getByPlaceholderText(/Type romaji reading/i)).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: /round support and hints/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
     await waitFor(() => {
-      const hintText = document.querySelector('.game-hint-text')
+      const hintText = document.querySelector('.minigame-hint-popover-text')
       expect(hintText?.textContent).toContain('Type the reading, then select the matching kanji from the options')
     })
 
