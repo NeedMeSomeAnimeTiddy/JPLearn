@@ -438,7 +438,7 @@ export function useTutor(
       return
     }
     voice.cancelAssistantSpeech()
-  }, [assistantChatOpen, settings.assistantChatAudioEnabled, voice])
+  }, [assistantChatOpen, settings.assistantChatAudioEnabled, voice.cancelAssistantSpeech])
 
   useEffect(() => {
     if (!settings.assistantChatEnabled || !assistantChatOpen) {

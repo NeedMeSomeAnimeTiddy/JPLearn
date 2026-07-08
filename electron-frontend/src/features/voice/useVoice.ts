@@ -121,14 +121,10 @@ export function useVoice(
           voiceAudioRef.current = null
         }
         const audio = new Audio(`data:audio/wav;base64,${result.audioBase64}`)
-        console.log('[voice] creating audio, volume:', audio.volume, 'readyState:', audio.readyState)
         voiceAudioRef.current = audio
         audio.play().then(() => {
-          console.log('[voice] play succeeded')
           setVoiceUnavailable(false)
-        }).catch((e) => {
-          console.log('[voice] play rejected:', e.name, e.message)
-        })
+        }).catch(() => {})
         setVoiceUnavailable(false)
       } else {
         setVoiceUnavailable(true)
