@@ -1888,6 +1888,8 @@ function App() {
   const [pendingDevCheck, setPendingDevCheck] = useState<string | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
+  const titlebarRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<{ x: number; y: number } | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const roundPresentedAtRef = useRef<number>(0)
   const scriptLoadRequestIdRef = useRef<number>(0)
@@ -1915,6 +1917,31 @@ function App() {
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
+
+  // Window drag via IPC — avoids -webkit-app-region: drag blocking mouse events
+  const handleTitlebarMouseDown = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).closest('button')) return
+    dragRef.current = { x: e.screenX, y: e.screenY }
+  }, [])
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragRef.current) return
+      const dx = e.screenX - dragRef.current.x
+      const dy = e.screenY - dragRef.current.y
+      if (dx === 0 && dy === 0) return
+      dragRef.current = { x: e.screenX, y: e.screenY }
+      void window.jplearnDesktop.moveWindow?.(Math.round(dx), Math.round(dy))
+    }
+    const onUp = () => { dragRef.current = null }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [])
+
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
   const dictionaryCards = useMemo(() => {
@@ -4789,7 +4816,7 @@ function App() {
   return (
     <main className="app-shell" data-background-style={settings.backgroundStyle} style={background.appShellStyle}>
       <header className="window-titlebar" aria-label="Window controls">
-        <div className="window-titlebar-drag">
+        <div className="window-titlebar-drag" ref={titlebarRef} onMouseDown={handleTitlebarMouseDown}>
           <div className="window-titlebar-nav" role="group" aria-label="App navigation">
             <div className="titlebar-shortcut-wrap" ref={shortcutMenuRef}>
               <button

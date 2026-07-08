@@ -475,6 +475,7 @@ interface DesktopApi {
   isWindowMaximized: () => Promise<{ isMaximized: boolean }>
   onWindowStateChanged?: (listener: (state: { isMaximized: boolean }) => void) => () => void
   closeWindow: () => Promise<{ ok: boolean }>
+  moveWindow?: (dx: number, dy: number) => Promise<{ ok: boolean }>
   getProgressionState?: () => Promise<ProgressionStatePayload>
   getFeatureState?: () => Promise<FeatureStatePayload>
   getXpProgress?: () => Promise<XPProgress>

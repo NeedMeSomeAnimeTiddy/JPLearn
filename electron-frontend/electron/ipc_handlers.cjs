@@ -647,6 +647,14 @@ function registerIpcHandlers(options) {
     return { ok: true }
   })
 
+  options.ipcMain.handle('window:move', (event, dx, dy) => {
+    const win = assertTrustedIpcSender(event, trustedSenderOptions())
+    if (!win) return { ok: false }
+    const [x, y] = win.getPosition()
+    win.setPosition(x + dx, y + dy)
+    return { ok: true }
+  })
+
   options.ipcMain.handle('ui:set-startup-theme', (event, theme) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const normalized = options.saveStartupTheme(validateStartupThemeInput(theme))
