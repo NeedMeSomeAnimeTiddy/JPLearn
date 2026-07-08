@@ -27,6 +27,11 @@ Important: `main.py` (the Python GUI) is **deprecated** — raises `RuntimeError
 - No `import React` needed (new JSX transform), no `forwardRef` (React 19)
 - Use CVA + clsx for component variants, Radix UI colors, lucide-react icons, motion for animations
 - Feature modules go in `src/features/<name>/` with types, constants, utils, hooks, and components
+- **Never add new systems inline in App.tsx** — extract into `src/features/<name>/` following the hook-over-context pattern established by theme, background, tutor, voice, and models modules
+- New feature checklist: `types.ts` → `constants.ts` → `utils.ts` → `use<Name>.ts` (hook) → `components/` → `index.ts` (barrel)
+- Static data constants (>50 lines) go in `src/lib/` (e.g. `contentTemplates.ts`)
+- App.tsx role is orchestrator only: imports feature hooks, wires JSX components, manages top-level routing/state
+- Use `npm run build` after every meaningful edit to catch regressions early
 - Tests use `pytest` for Python, `vitest` + `@testing-library/react` for frontend
 - `write` — new file creation only. `edit` — modifying existing code only. Never use `write` to overwrite an existing file.
 - If unsure about anything — ask for clarification before assuming.
