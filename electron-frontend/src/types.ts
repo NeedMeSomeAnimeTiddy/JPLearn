@@ -178,6 +178,7 @@ export interface SessionRunReport {
   confidenceCapturedCount: number
   averageConfidenceScore: number | null
   wrongCardIds: number[]
+  nearMissCardIds: number[]
 }
 
 export interface LastSessionPrefs {

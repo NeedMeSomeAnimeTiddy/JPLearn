@@ -124,14 +124,14 @@ export function SessionRunSummary({
       </div>
 
       <div className="game-actions minigame-session-summary-actions">
-        {report.wrongCardIds.length > 0 ? (
+        {report.wrongCardIds.length + report.nearMissCardIds.length > 0 ? (
           <button
             type="button"
             className="hub-chip-button"
-            onClick={() => onRetry(report.wrongCardIds)}
+            onClick={() => onRetry([...report.wrongCardIds, ...report.nearMissCardIds])}
             disabled={sessionStartPending}
           >
-            Retry {report.wrongCardIds.length} Missed
+            Retry {report.wrongCardIds.length + report.nearMissCardIds.length} Missed
           </button>
         ) : null}
         <button type="button" className="hub-chip-button" onClick={onRestart} disabled={sessionStartPending}>

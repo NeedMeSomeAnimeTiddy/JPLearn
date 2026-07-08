@@ -17,6 +17,8 @@ interface ChallengePromptCardProps {
   voiceBusy: boolean
   voiceUnavailable: boolean
   showKeyboardPrompts: boolean
+  furiganaEnabled: boolean
+  focusReading: string | null
   showRevealText: boolean
   hintPopoverOpen: boolean
   hintButtonRef: React.RefObject<HTMLButtonElement | null>
@@ -31,6 +33,8 @@ export function ChallengePromptCard({
   voiceBusy,
   voiceUnavailable,
   showKeyboardPrompts,
+  furiganaEnabled,
+  focusReading,
   showRevealText,
   hintPopoverOpen,
   hintButtonRef,
@@ -38,7 +42,7 @@ export function ChallengePromptCard({
   onToggleHintPopover,
 }: ChallengePromptCardProps) {
   const showWordAudioButton =
-    roundState.mode !== 'listening_audio_first' && roundState.mode !== 'dictation' && voiceEnabled && Boolean(roundState.audioText)
+    roundState.mode !== 'listening_audio_first' && roundState.mode !== 'dictation' && roundState.mode !== 'sentence_assembly' && voiceEnabled && Boolean(roundState.audioText)
   const sizeClass = promptSizeClass(roundState.focusText)
   const promptClassName = [
     'game-prompt-main',
@@ -48,6 +52,11 @@ export function ChallengePromptCard({
   const revealClassName = ['game-prompt-main', 'is-japanese', 'game-listen-reveal', sizeClass]
     .filter(Boolean)
     .join(' ')
+
+  const effectiveReading = furiganaEnabled && focusReading && focusReading !== roundState.focusText ? focusReading : null
+  const promptContent = (
+    <TypeAnimation key={`prompt-${roundState.focusText}`} sequence={[roundState.focusText]} speed={5} cursor={false} style={{ display: 'inline' }} />
+  )
 
   return (
     <div className="game-prompt-focus minigame-prompt-card">
@@ -98,18 +107,67 @@ export function ChallengePromptCard({
                   : 'Replay audio'}
             </span>
           </button>
-          {showRevealText ? (
-            <p className={revealClassName} style={{ textAlign: 'left' }}>
+          {effectiveReading ? (
+            <ruby className={`${revealClassName}${showRevealText ? ' is-revealed' : ''}`} style={{ textAlign: 'left' }}>
+              {promptContent}
+              <rp>(</rp>
+              <rt>{effectiveReading}</rt>
+              <rp>)</rp>
+            </ruby>
+          ) : (
+            <p className={`${revealClassName}${showRevealText ? ' is-revealed' : ''}`} style={{ textAlign: 'left' }}>
               <TypeAnimation key={`reveal-${roundState.focusText}`} sequence={[roundState.focusText]} speed={5} cursor={false} style={{ display: 'inline' }} />
             </p>
-          ) : null}
+          )}
         </div>
+      ) : roundState.mode === 'sentence_assembly' ? (
+        showRevealText ? (
+          effectiveReading ? (
+            <ruby className={promptClassName} style={{ textAlign: 'left' }}>
+              {promptContent}
+              <rp>(</rp>
+              <rt>{effectiveReading}</rt>
+              <rp>)</rp>
+            </ruby>
+          ) : (
+            <p className={promptClassName} style={{ textAlign: 'left' }}>{promptContent}</p>
+          )
+        ) : (
+          <div className="game-listen-prompt">
+            <button
+              type="button"
+              className="game-listen-play-button"
+              onClick={() => onPlayAudio(roundState.audioText)}
+              disabled={voiceBusy || !voiceEnabled}
+              aria-label="Play sentence audio"
+              title={voiceUnavailable ? 'Voice playback unavailable' : showKeyboardPrompts ? 'Play sentence (P)' : 'Play sentence audio'}
+            >
+              <Volume2 size={28} aria-hidden="true" />
+              <span>
+                {voiceBusy
+                  ? 'Loading…'
+                  : voiceUnavailable
+                    ? 'Voice unavailable'
+                    : 'Listen to sentence'}
+              </span>
+            </button>
+          </div>
+        )
       ) : (
-        <p className={promptClassName} style={{ textAlign: 'left' }}>
-          <TypeAnimation key={`prompt-${roundState.focusText}`} sequence={[roundState.focusText]} speed={5} cursor={false} style={{ display: 'inline' }} />
-        </p>
+        effectiveReading ? (
+          <ruby className={promptClassName} style={{ textAlign: 'left' }}>
+            {promptContent}
+            <rp>(</rp>
+            <rt>{effectiveReading}</rt>
+            <rp>)</rp>
+          </ruby>
+        ) : (
+          <p className={promptClassName} style={{ textAlign: 'left' }}>
+            {promptContent}
+          </p>
+        )
       )}
-      {roundState.mode !== 'listening_audio_first' && roundState.mode !== 'dictation' && activeScript === 'grammar_patterns' &&
+      {roundState.mode !== 'listening_audio_first' && roundState.mode !== 'dictation' && roundState.mode !== 'sentence_assembly' && activeScript === 'grammar_patterns' &&
       voiceEnabled && roundState.exampleSentenceAudioText ? (
         <div className="game-speak-controls">
           <button

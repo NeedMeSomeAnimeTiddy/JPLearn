@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
-import type { LastSessionPrefs, LearningPathStatus, SectionReadiness } from './types'
+import type { LastSessionPrefs, LearningPathStatus, SectionReadiness, SessionRunReport } from './types'
 import type { GameCard } from './generated/types'
 import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
@@ -63,28 +63,6 @@ type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.ge
 type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
 type XPProgress = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getXpProgress>>>
 type RecommendationItem = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getRecommendations>>>['recommendations'][number]
-interface SessionRunReport {
-  script: ScriptKey
-  minigame: MinigameKey
-  sectionName: string | null
-  completedAt: string
-  rounds: number
-  correct: number
-  wrong: number
-  accuracy: number
-  points: number
-  targetItems: number
-  goalCompletionPct: number
-  goalDelta: number
-  livesEnabled: boolean
-  livesRemaining: number
-  livesLost: number
-  leechFocusEnabled: boolean
-  confidenceCaptureEnabled: boolean
-  confidenceCapturedCount: number
-  averageConfidenceScore: number | null
-  wrongCardIds: number[]
-}
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
 type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
@@ -224,6 +202,7 @@ interface AppSettings {
   assistantChatAudioEnabled: boolean
   assistantChatOcrMinConfidence: number
   showKeyboardPrompts: boolean
+  furiganaEnabled: boolean
   voiceEnabled: boolean
   voiceSpeaker: string
   ambientAudioEnabled: boolean
@@ -704,6 +683,7 @@ function defaultSettings(): AppSettings {
     assistantChatAudioEnabled: true,
     assistantChatOcrMinConfidence: 0.3,
     showKeyboardPrompts: false,
+    furiganaEnabled: false,
     voiceEnabled: true,
     voiceSpeaker: 'zundamon_normal',
     ambientAudioEnabled: false,
@@ -808,6 +788,10 @@ function loadSettings(): AppSettings {
         typeof parsed.showKeyboardPrompts === 'boolean'
           ? parsed.showKeyboardPrompts
           : defaults.showKeyboardPrompts,
+      furiganaEnabled:
+        typeof parsed.furiganaEnabled === 'boolean'
+          ? parsed.furiganaEnabled
+          : defaults.furiganaEnabled,
       voiceEnabled:
         typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
       voiceSpeaker:
@@ -1802,6 +1786,7 @@ function App() {
   const previousSessionActiveRef = useRef(false)
   const seenCardIdsRef = useRef<number[]>([])
   const wrongCardIdsRef = useRef<number[]>([])
+  const nearMissCardIdsRef = useRef<number[]>([])
   const feedbackAdvanceRef = useRef<(() => void) | null>(null)
   const kanjiCategoryDeckCacheRef = useRef<Partial<Record<KanjiCategory, ScriptDeck['cards']>>>({})
   const vocabCategoryDeckCacheRef = useRef<Partial<Record<VocabCategory, ScriptDeck['cards']>>>({})
@@ -2270,6 +2255,7 @@ function App() {
   const clearPersistedSession = useCallback(() => {
     seenCardIdsRef.current = []
     wrongCardIdsRef.current = []
+    nearMissCardIdsRef.current = []
     try { localStorage.removeItem(SESSION_STORAGE_KEY) } catch { /* ignore */ }
   }, [])
 
@@ -2280,6 +2266,7 @@ function App() {
     if (!previouslyActive || sessionActive || !activeSessionId) return
 
     const capturedWrongCardIds = [...wrongCardIdsRef.current]
+    const capturedNearMissCardIds = [...nearMissCardIdsRef.current]
     clearPersistedSession()
 
     const completedRounds = sessionRounds
@@ -2317,6 +2304,7 @@ function App() {
       confidenceCapturedCount: sessionConfidenceCount,
       averageConfidenceScore,
       wrongCardIds: capturedWrongCardIds,
+      nearMissCardIds: capturedNearMissCardIds,
     })
 
     setSessionSummaryLoading(true)
@@ -3530,6 +3518,7 @@ function App() {
     setActiveSessionId(null)
     seenCardIdsRef.current = []
     wrongCardIdsRef.current = []
+    nearMissCardIdsRef.current = []
 
     setSessionScore(restore?.sessionScore ?? 0)
     setSessionRounds(restore?.sessionRounds ?? 0)
@@ -3773,7 +3762,12 @@ function App() {
             })()
             : roundState.mode === 'dictation'
               ? assessTypedAnswer(roundState.answer, answer)
-              : null
+              : roundState.mode === 'romaji_sprint'
+                ? (() => {
+                    const variants = roundState.answer.split('/').map(v => normalizeText(v.trim()))
+                    return variants.some(v => normalizeText(answer) === v) ? 'exact' : 'incorrect'
+                  })()
+                : null
       const isCorrect =
         typedAssessment !== null
           ? typedAssessment !== 'incorrect'
@@ -3856,6 +3850,11 @@ function App() {
             },
           }
         })
+
+        // Track near-misses alongside wrong answers for session-end retry
+        if (typedAssessment === 'near_miss' && !nearMissCardIdsRef.current.includes(answeredCardId)) {
+          nearMissCardIdsRef.current.push(answeredCardId)
+        }
       } else {
         if (livesEnabled) {
           nextLives = Math.max(0, livesRemaining - 1)
@@ -5384,6 +5383,7 @@ function App() {
           activeRunCardsLength={activeRunCards.length}
           voiceEnabled={settings.voiceEnabled}
           showKeyboardPrompts={settings.showKeyboardPrompts}
+          furiganaEnabled={settings.furiganaEnabled}
           activeBlockCards={activeBlockCards}
           onBack={() => {
             setNavDirection('back')
@@ -5662,9 +5662,35 @@ function App() {
                           <span className="settings-note">Minimize movement across the interface.</span>
                         </span>
                       </button>
-                    </div>
                   </div>
                 </div>
+                <div
+                  className="settings-section settings-control-row settings-control-row-no-icon"
+                  role="tabpanel"
+                  id="settings-panel-furigana"
+                  aria-labelledby="settings-tab-furigana"
+                >
+                  <div className="settings-control-content">
+                    <p className="settings-section-label">Study Display</p>
+                    <div className="settings-animation-grid" role="group" aria-label="Reading aid controls">
+                      <button
+                        type="button"
+                        className={`settings-icon-entry settings-theme-entry ${settings.furiganaEnabled ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({ ...prev, furiganaEnabled: !prev.furiganaEnabled }))}
+                        aria-label={settings.furiganaEnabled ? 'Furigana reading aid visible. Activate to hide.' : 'Furigana reading aid hidden. Activate to show.'}
+                        aria-pressed={settings.furiganaEnabled}
+                        title={settings.furiganaEnabled ? 'Furigana visible' : 'Furigana hidden'}
+                      >
+                        <span className={`settings-mode-icon-button ${settings.furiganaEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+                          <Languages size={18} strokeWidth={2.25} aria-hidden="true" />
+                        </span>
+                        <span className="settings-icon-entry-label">Show furigana (kana above kanji)</span>
+                      </button>
+                    </div>
+                    <p className="settings-help">When on, kana readings appear above kanji during review to help build reading confidence. Turn off as you progress.</p>
+                  </div>
+                </div>
+              </div>
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"

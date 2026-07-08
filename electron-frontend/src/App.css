@@ -8229,7 +8229,11 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .game-listen-reveal {
   font-size: clamp(1.8rem, 7vw, 3.2rem);
-  opacity: 0;
+  visibility: hidden;
+}
+
+.game-listen-reveal.is-revealed {
+  visibility: visible;
   animation: listen-reveal 0.25s ease forwards;
 }
 
@@ -8274,6 +8278,16 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .game-prompt-main.is-japanese.is-size-xs {
   font-size: clamp(1.28rem, 4.9vw, 2.25rem);
+}
+
+.game-prompt-main.is-japanese ruby {
+  ruby-align: center;
+}
+
+.game-prompt-main.is-japanese rt {
+  font-size: 0.28em;
+  font-weight: 400;
+  color: var(--text-soft);
 }
 
 .game-input-row {

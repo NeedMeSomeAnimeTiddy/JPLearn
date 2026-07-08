@@ -7,6 +7,7 @@ import type {
   RoundState,
   SessionRunReport,
 } from '../types'
+import type { GameCard } from '../generated/types'
 
 // ── Supporting types ─────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ export interface SessionContextValue {
   answerInputRef: RefObject<HTMLInputElement | null>
 
   // Actions
-  startSession: (game?: MinigameKey) => void
+  startSession: (game?: MinigameKey, customCards?: GameCard[], customTargetItems?: number) => void
   submitAnswer: (answer: string) => void
   continueLastSession: () => void
   skipFeedback: () => void

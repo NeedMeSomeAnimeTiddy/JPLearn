@@ -31,7 +31,7 @@ import { sanitizeRomajiInput } from '../utils'
 import { useSession } from '../context/SessionContext'
 
 // Minimal card shape needed for stroke-order answer candidates.
-type BasicCard = { id: number; character: string; romaji: string }
+type BasicCard = { id: number; character: string; romaji: string; meaning: string; dictionary_summary?: { reading: string } | null }
 
 interface MinigameViewProps {
   navDirection: NavDirection
@@ -43,6 +43,7 @@ interface MinigameViewProps {
   activeRunCardsLength: number
   voiceEnabled: boolean
   showKeyboardPrompts: boolean
+  furiganaEnabled: boolean
   activeBlockCards: BasicCard[]
   onBack: () => void
   onOpenDictionary: (seedQuery?: string) => void
@@ -60,6 +61,7 @@ export function MinigameView({
   activeRunCardsLength,
   voiceEnabled,
   showKeyboardPrompts,
+  furiganaEnabled,
   activeBlockCards,
   onBack,
   onOpenDictionary,
@@ -315,7 +317,8 @@ export function MinigameView({
     if (!roundState) return
     if (
       roundState.mode !== 'listening_audio_first' &&
-      roundState.mode !== 'dictation'
+      roundState.mode !== 'dictation' &&
+      roundState.mode !== 'sentence_assembly'
     ) return
     if (!voiceEnabled || !roundState.audioText) return
     playAudio(roundState.audioText)
@@ -507,6 +510,8 @@ export function MinigameView({
                       voiceBusy={voiceBusy}
                       voiceUnavailable={voiceUnavailable}
                       showKeyboardPrompts={showKeyboardPrompts}
+                      furiganaEnabled={furiganaEnabled}
+                      focusReading={furiganaEnabled ? (activeBlockCards.find((c) => c.id === roundState.cardId)?.dictionary_summary?.reading ?? null) : null}
                       showRevealText={roundFeedback !== null}
                       hintPopoverOpen={hintPopoverOpen}
                       hintButtonRef={hintButtonRef}
@@ -584,7 +589,7 @@ export function MinigameView({
                       srsResult={roundSrsResult}
                       exampleSentence={roundExampleSentence}
                       cardCharacter={roundState.focusText}
-                      cardMeaning={roundState.answer}
+                      cardMeaning={activeBlockCards.find((c) => c.id === roundState.cardId)?.meaning ?? ''}
                       cardRomaji={activeBlockCards.find((c) => c.id === roundState.cardId)?.romaji ?? ''}
                       dictionaryNote={roundState.dictionaryNote}
                     >
