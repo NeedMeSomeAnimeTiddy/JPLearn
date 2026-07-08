@@ -85,7 +85,6 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
     return () => ipcRenderer.removeListener('window:state-changed', handler)
   },
   closeWindow: () => ipcRenderer.invoke('window:close'),
-  moveWindow: (dx, dy) => ipcRenderer.invoke('window:move', dx, dy),
   getProgressionState: () => ipcRenderer.invoke('progression:get-state'),
   getFeatureState: () => ipcRenderer.invoke('features:get-state'),
   getXpProgress: () => ipcRenderer.invoke('xp:get-progress'),
