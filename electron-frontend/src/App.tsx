@@ -6283,9 +6283,9 @@ function App() {
         </div>
       ) : null}
 
-      {tutor.assistantChatOpen ? (
+      <div style={{ display: tutor.assistantChatOpen ? undefined : 'none' }}>
         <TutorChatPanel tutor={tutor} settings={settings as any} setSettings={setSettings as any} cancelAssistantSpeech={voice.cancelAssistantSpeech} />
-      ) : null}
+      </div>
 
       {cursor.cursorMode === 'animated' && createPortal(<CursorFollower {...cursor} />, document.body)}
 
