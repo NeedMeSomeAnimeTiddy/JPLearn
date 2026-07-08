@@ -99,4 +99,11 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   setLearningPath: (pathId) => ipcRenderer.invoke('learning-path:set', pathId),
   completeOnboarding: (payload) => ipcRenderer.invoke('learning-path:complete-onboarding', payload),
   exportAnalyticsCSV: (type) => ipcRenderer.invoke('analytics:export-and-save-csv', type),
+  // ─ Debug / Dev Tools ──────────────────────────────────────────────────
+  getBridgeTelemetry: () => ipcRenderer.invoke('debug:bridge-telemetry'),
+  restartBridge: () => ipcRenderer.invoke('debug:restart-bridge'),
+  clearBridgeCaches: () => ipcRenderer.invoke('debug:clear-caches'),
+  runDiagnostics: () => ipcRenderer.invoke('debug:diagnostics'),
+  getSnapshot: () => ipcRenderer.invoke('debug:snapshot'),
+  runCheck: (name) => ipcRenderer.invoke('debug:run-check', name),
 })

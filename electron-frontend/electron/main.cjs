@@ -442,6 +442,7 @@ function getBridgeTelemetrySnapshot() {
     capturedAtUtc: new Date().toISOString(),
     pendingRequests: bridgeWorkerState.pending.size,
     readCacheEntries: bridgeReadCache.size,
+    stderrTail: bridgeWorkerState.stderr.slice(-4000) || null,
   }
 }
 
@@ -1364,6 +1365,8 @@ registerIpcHandlers({
   refreshVoiceRuntime: refreshVoiceRuntimeAfterSetup,
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
   reloadLocalFontsForContents,
+  getBridgeTelemetrySnapshot,
+  stopPythonBridgeWorker,
 })
 
 async function preloadTutorChatStartupData() {

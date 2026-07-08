@@ -1222,6 +1222,79 @@ function registerIpcHandlers(options) {
     await setConfigValue(key, value)
     return { ok: true, key, value }
   })
+
+  options.ipcMain.handle('debug:bridge-telemetry', (event) => {
+    const win = assertTrustedIpcSender(event, trustedSenderOptions())
+    if (!win || win.isDestroyed()) {
+      return { ok: false, error: 'Window unavailable' }
+    }
+    const snapshot = typeof options.getBridgeTelemetrySnapshot === 'function'
+      ? options.getBridgeTelemetrySnapshot()
+      : null
+    if (!snapshot) {
+      return { ok: false, error: 'Telemetry unavailable' }
+    }
+    return { ok: true, ...snapshot }
+  })
+
+  options.ipcMain.handle('debug:restart-bridge', (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    if (typeof options.stopPythonBridgeWorker === 'function') {
+      options.stopPythonBridgeWorker()
+    }
+    return { ok: true }
+  })
+
+  options.ipcMain.handle('debug:clear-caches', (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    clearBridgeReadCaches()
+    return { ok: true }
+  })
+
+  options.ipcMain.handle('debug:reload-fonts', async (event) => {
+    const win = assertTrustedIpcSender(event, trustedSenderOptions())
+    if (!win || win.isDestroyed()) {
+      return { ok: false }
+    }
+    if (typeof options.reloadLocalFontsForContents === 'function') {
+      return await options.reloadLocalFontsForContents(win.webContents)
+    }
+    return { ok: false }
+  })
+
+  options.ipcMain.handle('debug:diagnostics', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('diagnostics')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to run diagnostics: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('debug:snapshot', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('snapshot')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to run snapshot: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('debug:run-check', async (event, checkName) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validChecks = ['arch', 'db', 'srs']
+    if (!validChecks.includes(checkName)) {
+      throw new Error(`Invalid check name: ${checkName}. Must be one of: ${validChecks.join(', ')}`)
+    }
+    try {
+      return await options.runPythonBridgeWithArgs(['run-check', checkName])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to run check '${checkName}': ${detail}`)
+    }
+  })
 }
 
 module.exports = {

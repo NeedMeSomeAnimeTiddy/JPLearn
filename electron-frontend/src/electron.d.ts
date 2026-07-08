@@ -491,6 +491,13 @@ interface DesktopApi {
   exportAnalyticsCSV?: (
     type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot',
   ) => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
+  // ─ Debug / Dev Tools ─────────────────────────────────────────────────
+  getBridgeTelemetry?: () => Promise<BridgeTelemetry | { ok: false; error: string }>
+  restartBridge?: () => Promise<{ ok: boolean }>
+  clearBridgeCaches?: () => Promise<{ ok: boolean }>
+  runDiagnostics?: () => Promise<DiagnosticsReport>
+  getSnapshot?: () => Promise<SnapshotData>
+  runCheck?: (name: 'arch' | 'db' | 'srs') => Promise<CheckResult>
   searchDictionary?: (query: string) => Promise<DictionaryLookupPayload>
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>
@@ -819,6 +826,80 @@ interface LearningPathStatusPayload {
   onboarding_complete: boolean
   suggested_next: string | null
   steps: LearningPathStep[]
+}
+
+// ─ Debug / Dev Tools ──────────────────────────────────────────────────
+
+export interface BridgeTelemetry {
+  startedAtUtc: string
+  capturedAtUtc: string
+  workerStarts: number
+  workerRequestCount: number
+  workerSuccessCount: number
+  workerFailureCount: number
+  workerTimeoutCount: number
+  fallbackCount: number
+  oneShotCount: number
+  lastWorkerError: string | null
+  lastFallbackAtUtc: string | null
+  pendingRequests: number
+  readCacheEntries: number
+  stderrTail?: string
+}
+
+export interface QueueCompositionItem {
+  deck: string
+  total: number
+  due: number
+}
+
+interface SessionCompletionItem {
+  session_id: string
+  target_items: number
+  completed_items: number
+  reviewed: number
+  accuracy: number
+  goal_met: boolean
+}
+
+interface TypedOutcomes {
+  attempts: number
+  correct: number
+  incorrect: number
+  accuracy: number
+}
+
+export interface DiagnosticsReport {
+  queue_composition: QueueCompositionItem[]
+  session_completion: SessionCompletionItem[]
+  typed_outcomes: TypedOutcomes
+}
+
+interface SnapshotFileEntry {
+  path: string
+  lines: number
+}
+
+export interface SnapshotData {
+  cwd: string
+  python: string
+  branch: string
+  commit: string
+  dirty: boolean
+  changed_count: number
+  changed_files: string[]
+  changed_files_omitted: number
+  python_file_count: number
+  test_file_count: number
+  largest_python_files: SnapshotFileEntry[]
+}
+
+export interface CheckResult {
+  check: string
+  passed: boolean
+  exitCode: number
+  output: string
+  error?: string
 }
 
 declare global {

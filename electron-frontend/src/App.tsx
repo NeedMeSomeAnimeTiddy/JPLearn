@@ -19,7 +19,7 @@ import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Ear, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Plus, RefreshCw, RotateCcw, Search, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Ear, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
 import './App.css'
 import { useTheme } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -31,6 +31,7 @@ import { useVoice, splitSpeechSegments, VoiceSettingsTab } from './features/voic
 import { useModels } from './features/models'
 import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit } from './features/tutor'
 import type { AssistantToast } from './features/tutor'
+import { DevDashboard } from './features/devtools'
 import { SURPRISE_PROMPTS, SCRIPT_MODE_PROMPT_PACKS, TAG_PROMPT_PACKS, CLOZE_TEMPLATES, STORY_CHAPTERS } from './lib/contentTemplates'
 import type { RoundDictionaryNote } from './types'
 
@@ -85,7 +86,7 @@ type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_la
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
 type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
-type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools'
+type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools' | 'dev_checks'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
 type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
 type NavDirection = 'forward' | 'back'
@@ -1884,6 +1885,8 @@ function App() {
   const [isWindowMaximized, setIsWindowMaximized] = useState(false)
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
+  const [devDashboardOpen, setDevDashboardOpen] = useState(false)
+  const [pendingDevCheck, setPendingDevCheck] = useState<string | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
@@ -4508,6 +4511,35 @@ function App() {
     }
   }, [closeShortcutMenu])
 
+  const openDevDashboard = useCallback(() => {
+    closeShortcutMenu()
+    setDevDashboardOpen(true)
+  }, [closeShortcutMenu])
+
+  const runCheckFromMenu = useCallback((checkName: string) => {
+    closeShortcutMenu()
+    setPendingDevCheck(checkName)
+    setDevDashboardOpen(true)
+  }, [closeShortcutMenu])
+
+  const restartBridgeFromMenu = useCallback(async () => {
+    closeShortcutMenu()
+    try {
+      await window.jplearnDesktop?.restartBridge?.()
+    } catch {
+      // best effort
+    }
+  }, [closeShortcutMenu])
+
+  const clearCachesFromMenu = useCallback(async () => {
+    closeShortcutMenu()
+    try {
+      await window.jplearnDesktop?.clearBridgeCaches?.()
+    } catch {
+      // best effort
+    }
+  }, [closeShortcutMenu])
+
   const resetStudyDb = useCallback(async () => {
     setResettingDb(true)
     setError(null)
@@ -4789,10 +4821,10 @@ function App() {
                       role="menuitem"
                       className="titlebar-shortcut-item titlebar-shortcut-parent"
                       aria-haspopup="true"
-                      aria-expanded={activeShortcutFlyout !== null && activeShortcutFlyout !== 'dev_tools'}
+                      aria-expanded={activeShortcutFlyout !== null && activeShortcutFlyout !== 'dev_tools' && activeShortcutFlyout !== 'dev_checks'}
                       onClick={() => {
                         setActiveShortcutFlyout((current) => (
-                          current === null || current === 'dev_tools'
+                          current === null || current === 'dev_tools' || current === 'dev_checks'
                             ? 'all_maps'
                             : null
                         ))
@@ -4803,7 +4835,7 @@ function App() {
                       <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout !== null && activeShortcutFlyout !== 'dev_tools' ? '▾' : '▸'}</span>
                     </button>
 
-                    {activeShortcutFlyout !== null && activeShortcutFlyout !== 'dev_tools' ? (
+                    {activeShortcutFlyout !== null && activeShortcutFlyout !== 'dev_tools' && activeShortcutFlyout !== 'dev_checks' ? (
                       <div className="titlebar-shortcut-righttree" role="group" aria-label="Maps and minigames">
                         {ALL_SCRIPT_KEYS.map((script) => {
                           const isScriptExpanded = activeShortcutFlyout === script
@@ -4878,18 +4910,28 @@ function App() {
                       role="menuitem"
                       className="titlebar-shortcut-item titlebar-shortcut-parent"
                       aria-haspopup="true"
-                      aria-expanded={activeShortcutFlyout === 'dev_tools'}
+                      aria-expanded={activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks'}
                       onClick={() => {
-                        setActiveShortcutFlyout((current) => (current === 'dev_tools' ? null : 'dev_tools'))
+                        setActiveShortcutFlyout((current) => (current === 'dev_tools' || current === 'dev_checks' ? null : 'dev_tools'))
                       }}
                     >
                       <Code2 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
                       Developer Tools
-                      <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout === 'dev_tools' ? '▾' : '▸'}</span>
+                      <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks' ? '▾' : '▸'}</span>
                     </button>
 
-                    {activeShortcutFlyout === 'dev_tools' ? (
+                    {(activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks') ? (
                       <div className="titlebar-shortcut-righttree" role="group" aria-label="Developer tools">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                          onClick={openDevDashboard}
+                        >
+                          <Bug className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
+                          Developer Dashboard
+                        </button>
+
                         <button
                           type="button"
                           role="menuitem"
@@ -4898,6 +4940,72 @@ function App() {
                         >
                           <span className="titlebar-shortcut-glyph" aria-hidden="true">&lt;/&gt;</span>
                           Inspect Element
+                        </button>
+
+                        <div className="titlebar-shortcut-tree-anchor">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="titlebar-shortcut-item titlebar-shortcut-parent"
+                            aria-haspopup="true"
+                            aria-expanded={activeShortcutFlyout === 'dev_checks'}
+                            onClick={() => {
+                              setActiveShortcutFlyout((current) => (current === 'dev_checks' ? 'dev_tools' : 'dev_checks'))
+                            }}
+                          >
+                            <PlayCircle className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
+                            Run Checks
+                            <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout === 'dev_checks' ? '▾' : '▸'}</span>
+                          </button>
+
+                          {activeShortcutFlyout === 'dev_checks' ? (
+                            <div className="titlebar-shortcut-childmenu" role="group" aria-label="Run checks">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                                onClick={() => runCheckFromMenu('arch')}
+                              >
+                                Architecture Check
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                                onClick={() => runCheckFromMenu('db')}
+                              >
+                                DB Schema Check
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                                onClick={() => runCheckFromMenu('srs')}
+                              >
+                                SRS Integrity Check
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                          onClick={() => { void restartBridgeFromMenu() }}
+                        >
+                          <RotateCcw className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
+                          Restart Bridge
+                        </button>
+
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                          onClick={() => { void clearCachesFromMenu() }}
+                        >
+                          <Trash2 className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
+                          Clear Caches
                         </button>
                       </div>
                     ) : null}
@@ -6224,6 +6332,13 @@ function App() {
           mode={MINIGAMES.find((m) => m.key === resumeData.activeGame)?.title ?? resumeData.activeGame}
           onResume={handleResume}
           onDismiss={handleDismissResume}
+        />
+      ) : null}
+
+      {devDashboardOpen ? (
+        <DevDashboard
+          pendingCheck={pendingDevCheck}
+          onClose={() => { setDevDashboardOpen(false); setPendingDevCheck(null) }}
         />
       ) : null}
 

@@ -139,6 +139,8 @@ from domain.jlpt_sessions import (  # noqa: E402
     build_weak_area_queue,
 )
 
+from scripts.debug_tools import build_diagnostics_report, build_snapshot  # noqa: E402
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"):
@@ -4282,6 +4284,52 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             if export_type == "mastery_snapshot":
                 return 0, {"csv": deck_portability.export_mastery_snapshot_csv(), "type": export_type}
             return 2, {"error": f"Unknown analytics export type: {export_type}"}
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "diagnostics":
+        try:
+            return 0, build_diagnostics_report()
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "snapshot":
+        try:
+            return 0, build_snapshot(max_files=50)
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "run-check":
+        if len(argv) < 2:
+            return 2, {"error": "Missing check name (arch, db, or srs)"}
+        check_name = argv[1]
+        valid_checks = {"arch", "db", "srs"}
+        if check_name not in valid_checks:
+            return 2, {"error": f"Unknown check: {check_name}. Valid: arch, db, srs"}
+        try:
+            result = subprocess.run(
+                [sys.executable, f"scripts/{check_name}_check.py"],
+                cwd=PROJECT_ROOT,
+                text=True,
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+            output = (result.stdout or "") + (result.stderr or "")
+            return 0, {
+                "check": check_name,
+                "passed": result.returncode == 0,
+                "exitCode": result.returncode,
+                "output": output[:20000],
+            }
+        except subprocess.TimeoutExpired:
+            return 0, {
+                "check": check_name,
+                "passed": False,
+                "exitCode": -1,
+                "output": "Check timed out after 30 seconds.",
+                "error": "timeout",
+            }
         except Exception as exc:
             return 2, {"error": str(exc)}
 
