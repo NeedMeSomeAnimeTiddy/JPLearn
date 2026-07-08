@@ -166,6 +166,7 @@ export function useCursor(
     }
 
     document.addEventListener('mousemove', handleMouseMove, { passive: true })
+    document.addEventListener('pointermove', handleMouseMove, { passive: true })
     document.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mouseup', handleMouseUp)
     document.addEventListener('mouseover', handleMouseOver, { passive: true })
@@ -196,6 +197,7 @@ export function useCursor(
     return () => {
       removeCursorStyle()
       document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('pointermove', handleMouseMove)
       document.removeEventListener('mousedown', handleMouseDown)
       document.removeEventListener('mouseup', handleMouseUp)
       document.removeEventListener('mouseover', handleMouseOver)

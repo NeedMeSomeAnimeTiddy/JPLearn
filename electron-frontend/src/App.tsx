@@ -5603,12 +5603,13 @@ function App() {
           onClick={() => setShowOverview(false)}
         >
           <div
-            className="overview-popup-panel"
+            className="overview-popup-panel crt-scanlines"
             role="dialog"
             aria-modal="true"
             aria-label="Study Overview"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="crt-vhs-line" />
             <OverviewView
               loading={loading}
               error={error}
@@ -5682,11 +5683,11 @@ function App() {
               </div>
               <button
                 type="button"
-                className="modal-close-button"
+                className="panel-close-button"
                 onClick={() => setShowSettings(false)}
                 aria-label="Close settings"
               >
-                x
+                <X size={16} strokeWidth={2.2} aria-hidden="true" />
               </button>
             </div>
 

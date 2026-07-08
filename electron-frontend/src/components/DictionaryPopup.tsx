@@ -364,7 +364,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
             <span className="cassette-panel-header-catalog">QUICK LOOKUP</span>
             <h2 className="cassette-panel-header-title">Dictionary</h2>
           </div>
-          <button type="button" className="dictionary-close-button" onClick={onClose} aria-label="Close dictionary" title="Close">
+          <button type="button" className="panel-close-button" onClick={onClose} aria-label="Close dictionary" title="Close">
             <X aria-hidden="true" strokeWidth={2.2} />
           </button>
         </header>

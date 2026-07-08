@@ -61,11 +61,11 @@ export function OcrWorkbench({ tutor, settings, setSettings }: OcrWorkbenchProps
             </button>
             <button
               type="button"
-              className="assistant-chat-close"
+              className="panel-close-button"
               onClick={closeOcrWorkbench}
               aria-label="Close OCR translator"
             >
-              <X size={14} strokeWidth={2.2} aria-hidden="true" />
+              <X size={16} strokeWidth={2.2} aria-hidden="true" />
             </button>
           </div>
         </header>

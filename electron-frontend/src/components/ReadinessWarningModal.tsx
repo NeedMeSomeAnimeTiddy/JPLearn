@@ -43,11 +43,12 @@ export function ReadinessWarningModal({
         <div className="crt-vhs-line" />
         <button
           type="button"
-          className="modal-close-btn"
+          className="panel-close-button"
+          style={{ position: 'absolute', top: 14, right: 14 }}
           onClick={onCancel}
-          aria-label="Go back"
-        >
-          <X size={16} strokeWidth={2.2} aria-hidden="true" />
+        aria-label="Go back"
+      >
+        <X size={16} strokeWidth={2.2} aria-hidden="true" />
         </button>
 
         <div className="rwm-icon-row">

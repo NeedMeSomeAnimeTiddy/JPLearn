@@ -223,38 +223,6 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
 
 /* ── end dictionary header ──────────────────────────────────── */
 
-.dictionary-close-button {
-  justify-self: end;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 0;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 64%, white 36%);
-  background: color-mix(in oklab, var(--panel-bg) 94%, black);
-  color: color-mix(in oklab, var(--text-main) 82%, var(--text-soft));
-  cursor: pointer;
-  box-shadow: 0 1px 0 var(--accent-ink);
-  transition: border-color 140ms ease, color 140ms ease;
-}
-
-.dictionary-close-button:hover {
-  border-color: color-mix(in oklab, var(--tone-ocean) 46%, var(--panel-border));
-  color: var(--text-main);
-}
-
-.dictionary-close-button:active {
-  transform: translateY(1px);
-  box-shadow: none;
-}
-
-.dictionary-close-button:hover {
-  color: var(--text-main);
-  border-color: color-mix(in oklab, var(--tone-ocean) 48%, var(--button-border));
-}
-
 .dictionary-search-bar {
   display: flex;
   align-items: center;
@@ -509,7 +477,7 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   padding: 0;
   border: 1px solid var(--button-border);
   border-radius: 0;
-  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  background: color-mix(in oklab, var(--panel-bg) 84%, white);
   color: var(--text-soft);
   cursor: pointer;
   flex-shrink: 0;
@@ -840,8 +808,7 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
 }
 
 .assistant-chat-audio-toggle,
-.assistant-chat-clear,
-.assistant-chat-close {
+.assistant-chat-clear {
   border: 1px solid color-mix(in oklab, var(--panel-border) 68%, white 32%);
   background: color-mix(in oklab, var(--panel-bg) 94%, black);
   color: color-mix(in oklab, var(--text-main) 84%, var(--text-soft));
@@ -861,8 +828,7 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   background: color-mix(in oklab, var(--panel-bg) 82%, var(--tone-ocean) 18%);
 }
 
-.assistant-chat-audio-toggle:hover,
-.assistant-chat-close:hover {
+.assistant-chat-audio-toggle:hover {
   border-color: color-mix(in oklab, var(--tone-ocean) 46%, var(--panel-border));
   color: var(--text-main);
 }
@@ -878,8 +844,7 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
 }
 
 .assistant-chat-audio-toggle:active,
-.assistant-chat-clear:active:not(:disabled),
-.assistant-chat-close:active {
+.assistant-chat-clear:active:not(:disabled) {
   transform: translateY(1px);
   box-shadow: none;
 }
@@ -1807,6 +1772,8 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   flex: 1;
   height: 100%;
   align-self: stretch;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .window-titlebar-wordmark {
@@ -9654,6 +9621,33 @@ html[data-reduced-motion='true'] .cassette-reel {
   box-shadow: none;
 }
 
+/* ── Unified panel close button (36x36, light bg, matches Overview) ── */
+
+.panel-close-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--panel-border);
+  border-radius: 0;
+  background: var(--bg-main);
+  color: var(--text-main);
+  cursor: pointer;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+  transition: transform 80ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.panel-close-button:hover {
+  border-color: var(--accent);
+}
+
+.panel-close-button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
 .cassette-panel-body {
   position: relative;
   z-index: 2;
@@ -11168,37 +11162,6 @@ html[data-reduced-motion='true'] .cassette-reel {
   font-family: var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-}
-
-.modal-close-button {
-  justify-self: end;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 64%, white 36%);
-  border-radius: 0;
-  background: color-mix(in oklab, var(--panel-bg) 94%, black);
-  color: color-mix(in oklab, var(--text-main) 82%, var(--text-soft));
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 1px 0 var(--accent-ink);
-  transition: border-color 140ms ease, color 140ms ease;
-}
-
-.modal-close-button:hover {
-  color: var(--text-main);
-  border-color: color-mix(in oklab, var(--tone-ocean) 46%, var(--panel-border));
-}
-
-.modal-close-button:active {
-  transform: translateY(1px);
-  box-shadow: none;
-}
-
-.modal-close-button:active {
-  transform: translateY(1px);
-  box-shadow: none;
 }
 
 .settings-section {
@@ -13363,26 +13326,6 @@ button.lpp-node:hover .lpp-node-ring {
   gap: 12px;
   max-width: 420px;
 }
-
-.modal-close-btn {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 28px;
-  height: 28px;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 64%, white 36%);
-  border-radius: 0;
-  background: color-mix(in oklab, var(--panel-bg) 94%, black);
-  color: color-mix(in oklab, var(--text-main) 82%, var(--text-soft));
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 0 var(--accent-ink);
-  transition: border-color 140ms ease, color 140ms ease;
-}
-.modal-close-btn:hover { color: var(--text-main); border-color: color-mix(in oklab, var(--tone-ocean) 46%, var(--panel-border)); }
-.modal-close-btn:active { transform: translateY(1px); box-shadow: none; }
 
 .rwm-icon-row {
   display: flex;
