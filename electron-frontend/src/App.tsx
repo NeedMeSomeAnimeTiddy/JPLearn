@@ -8,6 +8,7 @@ import type { GameCard } from './generated/types'
 import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
 import { ResumeToast } from './components/ResumeToast'
+import { MinigameIcon } from './components/MinigameIcon'
 import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
@@ -20,7 +21,7 @@ import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Ear, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Palette, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Shuffle, Square, Trash2, Volume2, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Palette, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Square, Trash2, X } from 'lucide-react'
 import './App.css'
 import { useTheme } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -36,6 +37,13 @@ import { useCursor, CursorFollower, CursorSettingsTab } from './features/cursor'
 import { DevDashboard } from './features/devtools'
 import { SURPRISE_PROMPTS, SCRIPT_MODE_PROMPT_PACKS, TAG_PROMPT_PACKS, CLOZE_TEMPLATES, STORY_CHAPTERS } from './lib/contentTemplates'
 import type { RoundDictionaryNote } from './types'
+import {
+  SECTION_META,
+  MINIGAMES,
+  SCRIPT_MINIGAMES,
+  SCRIPT_INTERLEAVE_MODES,
+  SCRIPT_LABELS,
+} from './constants'
 
 type StudySummaryPayload = Awaited<
   ReturnType<typeof window.jplearnDesktop.getStudySummary>
@@ -321,126 +329,6 @@ type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'deckSnapshot'
 
 const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples'] as const
 
-const SCRIPT_LABELS: Record<ScriptKey, string> = {
-  hiragana: 'Hiragana',
-  katakana: 'Katakana',
-  kanji_n5: 'Kanji',
-  vocab_n5: 'Vocabulary',
-  grammar_patterns: 'Grammar',
-  sentence_examples: 'Sentences',
-}
-
-const MINIGAMES: Array<{ key: MinigameKey; title: string; description: string }> = [
-  {
-    key: 'romaji_sprint',
-    title: 'Romaji Sprint',
-    description: 'Type the romaji reading as quickly as you can.',
-  },
-  {
-    key: 'meaning_match',
-    title: 'Meaning Match',
-    description: 'Pick the correct meaning from four choices.',
-  },
-  {
-    key: 'character_match',
-    title: 'Character Match',
-    description: 'Pick the correct character for the meaning.',
-  },
-  {
-    key: 'stroke_order',
-    title: 'Stroke Order',
-    description: 'Type the kanji from meaning while reinforcing writing sequence.',
-  },
-  {
-    key: 'typed_recall',
-    title: 'Typed Recall',
-    description: 'Type the meaning directly with near-miss tolerance.',
-  },
-  {
-    key: 'speech_recall',
-    title: 'Speech Recall',
-    description: 'Say the meaning aloud — transcribed and graded offline.',
-  },
-  {
-    key: 'sentence_assembly',
-    title: 'Sentence Assembly',
-    description: 'Arrange shuffled sentence chunks into natural Japanese order.',
-  },
-  {
-    key: 'particle_cloze',
-    title: 'Particle Cloze',
-    description: 'Fill the missing particle using sentence context and word order cues.',
-  },
-  {
-    key: 'vibe_check',
-    title: 'Vibe Check',
-    description: 'Read social tone and pick the best context for the sentence register.',
-  },
-  {
-    key: 'imposter',
-    title: 'Imposter',
-    description: 'Find the token with a deliberate grammar error in a sentence.',
-  },
-  {
-    key: 'listening_audio_first',
-    title: 'Recognition',
-    description: 'Hear a word and choose its meaning — character hidden until feedback.',
-  },
-  {
-    key: 'dictation',
-    title: 'Dictation',
-    description: 'Hear a word and type it in Japanese — no visual hints.',
-  },
-  {
-    key: 'interleave_mix',
-    title: 'Interleave Mix',
-    description: 'Cycle reading, meaning, and character rounds in one run.',
-  },
-]
-
-const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'interleave_mix'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'interleave_mix'],
-  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'imposter', 'listening_audio_first', 'interleave_mix'],
-  vocab_n5: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'particle_cloze', 'imposter', 'listening_audio_first', 'dictation', 'interleave_mix'],
-  grammar_patterns: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter', 'listening_audio_first', 'interleave_mix'],
-  sentence_examples: ['meaning_match', 'character_match', 'typed_recall', 'speech_recall', 'sentence_assembly', 'imposter', 'listening_audio_first', 'interleave_mix'],
-}
-
-const SCRIPT_INTERLEAVE_MODES: Record<ScriptKey, Array<keyof InterleaveWeights>> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match'],
-  kanji_n5: ['romaji_sprint', 'meaning_match', 'character_match'],
-  vocab_n5: ['meaning_match', 'character_match', 'particle_cloze'],
-  grammar_patterns: ['meaning_match', 'character_match', 'particle_cloze'],
-  sentence_examples: ['meaning_match', 'character_match', 'particle_cloze'],
-}
-
-const SECTION_META: Record<ScriptKey, { glyph: string }> = {
-  hiragana: { glyph: 'あ' },
-  katakana: { glyph: 'ア' },
-  kanji_n5: { glyph: '漢' },
-  vocab_n5: { glyph: '語' },
-  grammar_patterns: { glyph: '話' },
-  sentence_examples: { glyph: '文' },
-}
-
-const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
-  romaji_sprint: Keyboard,
-  meaning_match: ListChecks,
-  character_match: Languages,
-  stroke_order: Keyboard,
-  typed_recall: Keyboard,
-  speech_recall: Mic,
-  sentence_assembly: Shuffle,
-  particle_cloze: BookText,
-  vibe_check: MessageCircle,
-  imposter: History,
-  listening_audio_first: Volume2,
-  dictation: Ear,
-  interleave_mix: Shuffle,
-}
-
 const PETAL_STREAM = [
   { x: '6%', drift: '9vw', duration: '11.8s', delay: '-2.1s', size: '14px', opacity: 0.72 },
   { x: '12%', drift: '-8vw', duration: '13.2s', delay: '-5.4s', size: '12px', opacity: 0.66 },
@@ -596,11 +484,6 @@ const KANJI_CATEGORY_TO_DECK_SLUG: Record<KanjiCategory, KanjiCategorySlug> = {
   n1_law_order:      'kanji_n1_law_order',
   n1_ideology:       'kanji_n1_ideology',
   n1_literary:       'kanji_n1_literary',
-}
-
-function MinigameIcon({ game }: { game: MinigameKey }) {
-  const Icon = MINIGAME_ICONS[game]
-  return <Icon aria-hidden="true" className="glyph-svg" strokeWidth={2.25} />
 }
 
 const STATS_STORAGE_KEY = 'jplearn-desktop-script-stats-v1'
@@ -1973,13 +1856,58 @@ function App() {
     interleaveCursorRef.current = 0
   }, [])
 
+  /** Tears down active minigame session state — core pattern. */
+  function resetSessionCore(): void {
+    setSessionActive(false)
+    setRoundState(null)
+    setRoundFeedback(null)
+    setRoundFeedbackTone(null)
+    setRoundFeedbackPoints(null)
+    setRoundFeedbackAnswer(null)
+    setIsRoundResolving(false)
+    resetRoundCycle()
+  }
 
+  /** Core + lives reset. Used when starting a new run. */
+  function resetSessionWithLives(): void {
+    resetSessionCore()
+    setLivesRemaining(DEFAULT_LIVES)
+  }
 
+  /** Full session wipe including score/counters/input. Used when loading new deck cards. */
+  function resetSessionFull(): void {
+    resetSessionWithLives()
+    setRoundInput('')
+    setSessionScore(0)
+    setSessionRounds(0)
+    setSessionPoints(0)
+    setSessionStreak(0)
+    setSessionBestStreak(0)
+    setRoundComboBonus(0)
+    setRoundMilestoneStreak(null)
+    setRoundPerformanceLabel(null)
+    setSessionConfidenceCount(0)
+    setSessionConfidenceTotal(0)
+    setSessionGoalError(null)
+    setLeechFocusEnabled(false)
+  }
 
-
-
-  
-
+  /** End-of-session reset: core without cycle reset + per-round state + optional error message. */
+  function resetSessionEnd(options?: { errorMessage?: string }): void {
+    setSessionActive(false)
+    setRoundState(null)
+    setRoundFeedback(null)
+    setRoundFeedbackTone(null)
+    setRoundFeedbackPoints(null)
+    setRoundFeedbackAnswer(null)
+    setIsRoundResolving(false)
+    setRoundResponseMs(null)
+    setRoundSrsResult(null)
+    setRoundExampleSentence(null)
+    if (options?.errorMessage) {
+      setGameError(options.errorMessage)
+    }
+  }
 
   // Chatbot tier cards show combined footprint (chatbot + its hidden, auto-installed
   // embedder) so the displayed size matches what setup actually downloads.
@@ -2021,15 +1949,7 @@ function App() {
         setActiveGame(minigame)
         setNavDirection('forward')
         setView('minigame')
-        setSessionActive(false)
-        setRoundState(null)
-        setRoundFeedback(null)
-        setRoundFeedbackTone(null)
-        setRoundFeedbackPoints(null)
-        setRoundFeedbackAnswer(null)
-        setIsRoundResolving(false)
-        setLivesRemaining(DEFAULT_LIVES)
-        resetRoundCycle()
+        resetSessionWithLives()
         if (differentScript) {
           setActiveScript(script)
           setResumeRequest({ script, minigame })
@@ -2591,27 +2511,7 @@ function App() {
     setGameLoading(true)
     setGameError(null)
 
-    setSessionActive(false)
-    setRoundState(null)
-    setRoundFeedback(null)
-    setRoundFeedbackTone(null)
-    setRoundFeedbackPoints(null)
-    setRoundFeedbackAnswer(null)
-    setIsRoundResolving(false)
-    setRoundInput('')
-    setSessionScore(0)
-    setSessionRounds(0)
-    setSessionPoints(0)
-    setSessionStreak(0)
-    setSessionBestStreak(0)
-    setRoundComboBonus(0)
-    setRoundMilestoneStreak(null)
-    setRoundPerformanceLabel(null)
-    setSessionConfidenceCount(0)
-    setSessionConfidenceTotal(0)
-    setLivesRemaining(DEFAULT_LIVES)
-    setLeechFocusEnabled(false)
-    resetRoundCycle()
+    resetSessionFull()
 
     try {
       if (script === 'kanji_n5') {
@@ -3696,15 +3596,7 @@ function App() {
     setActiveGame(minigame)
     setNavDirection('forward')
     setView('minigame')
-    setSessionActive(false)
-    setRoundState(null)
-    setRoundFeedback(null)
-    setRoundFeedbackTone(null)
-    setRoundFeedbackPoints(null)
-    setRoundFeedbackAnswer(null)
-    setIsRoundResolving(false)
-    setLivesRemaining(DEFAULT_LIVES)
-    resetRoundCycle()
+    resetSessionWithLives()
 
     if (script !== activeScript) {
       setActiveScript(script)
@@ -4080,31 +3972,12 @@ function App() {
       const advanceFeedback = () => {
         feedbackAdvanceRef.current = null
         if (!isCorrect && livesEnabled && nextLives <= 0) {
-          setSessionActive(false)
-          setRoundState(null)
-          setGameError('Out of lives. Press Play to start a new run.')
-          setRoundFeedback(null)
-          setRoundFeedbackTone(null)
-          setRoundFeedbackPoints(null)
-          setRoundFeedbackAnswer(null)
-          setRoundResponseMs(null)
-          setRoundSrsResult(null)
-          setRoundExampleSentence(null)
-          setIsRoundResolving(false)
+          resetSessionEnd({ errorMessage: 'Out of lives. Press Play to start a new run.' })
           return
         }
 
         if (completedRoundsAfterAnswer >= targetRounds) {
-          setSessionActive(false)
-          setRoundState(null)
-          setRoundFeedback(null)
-          setRoundFeedbackTone(null)
-          setRoundFeedbackPoints(null)
-          setRoundFeedbackAnswer(null)
-          setRoundResponseMs(null)
-          setRoundSrsResult(null)
-          setRoundExampleSentence(null)
-          setIsRoundResolving(false)
+          resetSessionEnd()
           return
         }
 
@@ -4391,14 +4264,7 @@ function App() {
   const goHome = useCallback(() => {
     setNavDirection('back')
     setView('home')
-    setSessionActive(false)
-    setRoundState(null)
-    setRoundFeedback(null)
-    setRoundFeedbackTone(null)
-    setRoundFeedbackPoints(null)
-    setRoundFeedbackAnswer(null)
-    setIsRoundResolving(false)
-    resetRoundCycle()
+    resetSessionCore()
     setShowSettings(false)
     tutor.setOcrWorkbenchOpen(false)
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
@@ -4429,14 +4295,7 @@ function App() {
     setNavDirection('forward')
     setActiveScript(script)
     setView('script_hub')
-    setSessionActive(false)
-    setRoundState(null)
-    setRoundFeedback(null)
-    setRoundFeedbackTone(null)
-    setRoundFeedbackPoints(null)
-    setRoundFeedbackAnswer(null)
-    setIsRoundResolving(false)
-    resetRoundCycle()
+    resetSessionCore()
     closeShortcutMenu()
   }, [closeShortcutMenu, resetRoundCycle])
 
@@ -4449,15 +4308,7 @@ function App() {
     setSessionRunReport(null)
     setActiveGame(resolvedMinigame)
     setView('minigame')
-    setSessionActive(false)
-    setRoundState(null)
-    setRoundFeedback(null)
-    setRoundFeedbackTone(null)
-    setRoundFeedbackPoints(null)
-    setRoundFeedbackAnswer(null)
-    setIsRoundResolving(false)
-    setLivesRemaining(DEFAULT_LIVES)
-    resetRoundCycle()
+    resetSessionWithLives()
 
     if (script !== activeScript) {
       setActiveScript(script)
@@ -4476,15 +4327,7 @@ function App() {
     setActiveScript(script)
     setActiveGame(resolvedMinigame)
     setView('script_hub')
-    setSessionActive(false)
-    setRoundState(null)
-    setRoundFeedback(null)
-    setRoundFeedbackTone(null)
-    setRoundFeedbackPoints(null)
-    setRoundFeedbackAnswer(null)
-    setIsRoundResolving(false)
-    setLivesRemaining(DEFAULT_LIVES)
-    resetRoundCycle()
+    resetSessionWithLives()
     closeShortcutMenu()
   }, [closeShortcutMenu, resetRoundCycle, resolveScriptMinigame])
 
@@ -5464,90 +5307,34 @@ function App() {
           onBack={goHome}
           onSelectBlock={(index) => {
             setActiveBlockIndex(index)
-            setSessionActive(false)
-            setRoundState(null)
-            setRoundFeedback(null)
-            setRoundFeedbackTone(null)
-            setRoundFeedbackPoints(null)
-            setRoundFeedbackAnswer(null)
-            setIsRoundResolving(false)
-            setLivesRemaining(DEFAULT_LIVES)
-            resetRoundCycle()
+            resetSessionWithLives()
           }}
           onSelectKanjiLevel={(level) => {
             setActiveKanjiLevel(level)
-            setSessionActive(false)
-            setRoundState(null)
-            setRoundFeedback(null)
-            setRoundFeedbackTone(null)
-            setRoundFeedbackPoints(null)
-            setRoundFeedbackAnswer(null)
-            setIsRoundResolving(false)
-            setLivesRemaining(DEFAULT_LIVES)
-            resetRoundCycle()
+            resetSessionWithLives()
           }}
           onSelectVocabLevel={(level) => {
             setActiveVocabLevel(level)
-            setSessionActive(false)
-            setRoundState(null)
-            setRoundFeedback(null)
-            setRoundFeedbackTone(null)
-            setRoundFeedbackPoints(null)
-            setRoundFeedbackAnswer(null)
-            setIsRoundResolving(false)
-            setLivesRemaining(DEFAULT_LIVES)
-            resetRoundCycle()
+            resetSessionWithLives()
           }}
           onSelectKanjiCategory={(cat) => {
             setActiveKanjiCategory(cat)
-            setSessionActive(false)
-            setRoundState(null)
-            setRoundFeedback(null)
-            setRoundFeedbackTone(null)
-            setRoundFeedbackPoints(null)
-            setRoundFeedbackAnswer(null)
-            setIsRoundResolving(false)
-            setLivesRemaining(DEFAULT_LIVES)
-            resetRoundCycle()
+            resetSessionWithLives()
           }}
           onSelectVocabCategory={(cat) => {
             setActiveVocabCategory(cat)
-            setSessionActive(false)
-            setRoundState(null)
-            setRoundFeedback(null)
-            setRoundFeedbackTone(null)
-            setRoundFeedbackPoints(null)
-            setRoundFeedbackAnswer(null)
-            setIsRoundResolving(false)
-            setLivesRemaining(DEFAULT_LIVES)
-            resetRoundCycle()
+            resetSessionWithLives()
           }}
           onToggleLearningPath={() => setLearningPathExpanded((expanded) => !expanded)}
           onSelectGame={(game) => {
             setActiveGame(game)
-            setSessionActive(false)
-            setRoundState(null)
-            setRoundFeedback(null)
-            setRoundFeedbackTone(null)
-            setRoundFeedbackPoints(null)
-            setRoundFeedbackAnswer(null)
-            setIsRoundResolving(false)
-            setLivesRemaining(DEFAULT_LIVES)
-            resetRoundCycle()
+            resetSessionWithLives()
           }}
           onPlayGame={(game) => {
             setActiveGame(game)
             setNavDirection('forward')
             setView('minigame')
-            setSessionActive(false)
-            setRoundState(null)
-            setRoundFeedback(null)
-            setRoundFeedbackTone(null)
-            setRoundFeedbackPoints(null)
-            setRoundFeedbackAnswer(null)
-            setIsRoundResolving(false)
-            setLivesRemaining(DEFAULT_LIVES)
-            resetRoundCycle()
+            resetSessionWithLives()
             void startSession(game)
           }}
         />
