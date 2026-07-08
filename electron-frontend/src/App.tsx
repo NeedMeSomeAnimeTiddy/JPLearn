@@ -19,7 +19,7 @@ import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Ear, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Ear, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Palette, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Shuffle, Square, Trash2, Volume2, X } from 'lucide-react'
 import './App.css'
 import { useTheme } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -103,7 +103,7 @@ type AppFontPreset =
 type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
 type FeedbackTone = 'success' | 'error' | null
 type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation'
-type SettingsTabKey = 'theme' | 'background' | 'font_size' | 'animations' | 'tutor' | 'voice' | 'shortcuts' | 'data'
+type SettingsTabKey = 'appearance' | 'assistant' | 'system'
 
 interface SettingsCollapsibleSectionProps {
   id: string
@@ -173,14 +173,9 @@ const STARTUP_WARMUP_INITIAL_DELAY_MS = 900
 const STARTUP_WARMUP_YIELD_DEADLINE_MS = 45
 
 const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
-  { key: 'theme', label: 'Theme', icon: Sun },
-  { key: 'background', label: 'Background', icon: House },
-  { key: 'font_size', label: 'Font', icon: BookText },
-  { key: 'animations', label: 'Animations', icon: Activity },
-  { key: 'tutor', label: 'Tutor', icon: MessageCircle },
-  { key: 'voice', label: 'Voice', icon: Volume2 },
-  { key: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
-  { key: 'data', label: 'Data', icon: Trash2 },
+  { key: 'appearance', label: 'Appearance', icon: Palette },
+  { key: 'assistant', label: 'Assistant', icon: MessageCircle },
+  { key: 'system', label: 'System', icon: Settings },
 ]
 const DEFAULT_LIVES = 3
 const SESSION_LENGTH_PRESETS = [
@@ -1862,7 +1857,7 @@ function App() {
     const [dictionarySeedQuery, setDictionarySeedQuery] = useState('')
     const [dictionaryOpenSignal, setDictionaryOpenSignal] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
-  const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('theme')
+  const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsTabKey>('appearance')
   const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
   const [streakDetailsOpen, setStreakDetailsOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
@@ -1931,6 +1926,7 @@ function App() {
     return Array.from(byId.values())
   }, [deckCards, overviewKanjiDeck])
 
+  // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   const openDictionary = useCallback((seedQuery = '') => {
     setShowSettings(false)
     setShowOverview(false)
@@ -2038,6 +2034,7 @@ function App() {
   )
 
 
+  // oxlint-disable react-hooks/exhaustive-deps — models from useModels hook is not a stable ref
   useEffect(() => {
     void models.refreshTutorInstallInfo()
   }, [models.refreshTutorInstallInfo])
@@ -2045,19 +2042,22 @@ function App() {
 
 
   useEffect(() => {
-    if (!showSettings || activeSettingsTab !== 'tutor') {
+    if (!showSettings || activeSettingsTab !== 'assistant') {
+    // oxlint-disable react-hooks/exhaustive-deps — models from useModels hook is not a stable ref
       return
     }
     void models.refreshTutorInstallInfo()
   }, [activeSettingsTab, models.refreshTutorInstallInfo, showSettings])
 
+  // oxlint-disable react-hooks/exhaustive-deps — voice from useVoice hook is not a stable ref
   useEffect(() => {
     if (view !== 'script_hub') return
     void voice.refreshVoiceStatus()
   }, [voice.refreshVoiceStatus, view])
 
+  // oxlint-disable react-hooks/exhaustive-deps — voice from useVoice hook is not a stable ref
   useEffect(() => {
-    if (!showSettings || activeSettingsTab !== 'voice') return
+    if (!showSettings || activeSettingsTab !== 'assistant') return
     void voice.refreshVoiceStatus()
     const h = window.setInterval(() => { void voice.refreshVoiceStatus() }, 3000)
     return () => window.clearInterval(h)
@@ -4124,7 +4124,8 @@ function App() {
       }
       feedbackAdvanceRef.current = advanceFeedback
     },
-    [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, leechFocusEnabled, livesEnabled, livesRemaining, nextRound, tutor.queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionBestStreak, sessionConfidenceCount, sessionConfidenceTotal, sessionPoints, sessionRounds, sessionScore, sessionTargetItems],
+    // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
+    [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, leechFocusEnabled, livesEnabled, livesRemaining, nextRound, roundConfidenceScore, roundState, scriptStats, sessionBestStreak, sessionConfidenceCount, sessionConfidenceTotal, sessionPoints, sessionRounds, sessionScore, sessionTargetItems],
   )
 
   useEffect(() => {
@@ -4244,6 +4245,7 @@ function App() {
       }
     }
 
+    // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [tutor.assistantChatOpen, tutor.closeAssistantChat, tutor.closeOcrWorkbench, loadSummary, tutor.ocrWorkbenchOpen, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
@@ -4326,6 +4328,7 @@ function App() {
       reasons.dictation = voice.listeningLockReason
     }
     return reasons
+  // oxlint-disable react-hooks/exhaustive-deps — voice.speechRecognitionLockReason is a constant string, voice hook return is not stable
   }, [voice.listeningLockReason, voice.speechRecognitionModelEnabled])
 
   // Block session is complete when every card in the active block has reached max score.
@@ -4402,6 +4405,7 @@ function App() {
     resetRoundCycle()
     setShowSettings(false)
     tutor.setOcrWorkbenchOpen(false)
+  // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [resetRoundCycle])
 
   const closeShortcutMenu = useCallback(() => {
@@ -4422,6 +4426,7 @@ function App() {
     tutor.setOcrWorkbenchOpen(false)
     void loadSummary()
     closeShortcutMenu()
+  // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [closeShortcutMenu, loadSummary])
 
   const jumpToScriptHub = useCallback((script: ScriptKey) => {
@@ -4494,6 +4499,7 @@ function App() {
     tutor.setAssistantChatOpen(false)
     tutor.setOcrWorkbenchOpen(false)
     closeShortcutMenu()
+  // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [closeShortcutMenu])
 
   const refreshDataFromMenu = useCallback(() => {
@@ -4753,7 +4759,8 @@ function App() {
     }
     void loadSummary()
     void models.refreshTutorInstallInfo()
-  }, [loadSummary, models.refreshTutorInstallInfo])
+  // oxlint-disable react-hooks/exhaustive-deps — models from useModels hook is not a stable ref
+  }, [loadSummary])
 
   const hasInstalledTutorModel = Boolean(
     models.tutorInstallInfo?.llamaCppInstalled
@@ -5653,16 +5660,18 @@ function App() {
           }}
         >
           <div
-            className="modal-panel settings-panel settings-sheet"
+            className="modal-panel settings-panel settings-sheet crt-scanlines"
             role="dialog"
             aria-modal="true"
             aria-labelledby="settings-title"
           >
+            <div className="crt-vhs-line" />
             <div className="settings-sheet-grabber" aria-hidden="true" />
-            <div className="settings-modal-header">
-              <div>
-                <h2 id="settings-title" className="settings-modal-title">Control Panel</h2>
-                <p className="settings-modal-subtitle">Quick app controls</p>
+            <div className="settings-modal-header cassette-panel-header">
+              <div />
+              <div className="cassette-panel-header-center">
+                <span className="cassette-panel-header-catalog">QUICK APP CONTROLS</span>
+                <h2 id="settings-title" className="cassette-panel-header-title">Control Panel</h2>
               </div>
               <button
                 type="button"
@@ -5698,7 +5707,7 @@ function App() {
               </div>
 
               <div className="settings-control-grid">
-                {activeSettingsTab === 'theme' && (
+                {activeSettingsTab === 'appearance' && (<>
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -5713,9 +5722,7 @@ function App() {
                     />
                   </div>
                 </div>
-                )}
 
-                {activeSettingsTab === 'background' ? (
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -5726,10 +5733,8 @@ function App() {
                     <BackgroundSettingsTab background={background} />
                   </div>
                 </div>
-                ) : null}
 
 
-                {activeSettingsTab === 'font_size' ? (
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -5789,9 +5794,7 @@ function App() {
                     <p className="settings-help">Applies to interface text across the app.</p>
                   </div>
                 </div>
-                ) : null}
-
-                {activeSettingsTab === 'animations' ? (
+                
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -5845,9 +5848,8 @@ function App() {
                     </div>
                   </div>
                 </div>
-                ) : null}
-
-                {activeSettingsTab === 'tutor' ? (
+              </>)}
+              {activeSettingsTab === 'assistant' && (<>
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -5858,9 +5860,7 @@ function App() {
                     <TutorSettingsTab settings={settings as any} setSettings={setSettings as any} />
                   </div>
                 </div>
-                ) : null}
-
-                {activeSettingsTab === 'tutor' ? (
+                
                 <SettingsCollapsibleSection
                   id="tutor-models"
                   title="Tutor models"
@@ -5894,8 +5894,8 @@ function App() {
                           key={model.tier}
                           style={{
                             padding: '0.75rem 0.9rem',
-                            borderRadius: '12px',
-                            background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
+                            borderRadius: '2px',
+                            background: 'color-mix(in oklab, var(--panel-bg-alt) 60%, transparent)',
                             border: isActiveTier
                               ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
                               : showRecommendedBadge
@@ -5994,9 +5994,7 @@ function App() {
                     Select the circle icon to switch the Tutor to that model. Changes apply automatically without restarting the app.
                   </p>
                 </SettingsCollapsibleSection>
-                ) : null}
-
-                {activeSettingsTab === 'tutor' ? (
+                
                 <SettingsCollapsibleSection
                   id="offline-dictionary"
                   title="Offline Dictionary"
@@ -6039,9 +6037,7 @@ function App() {
                     </div>
                   ) : null}
                 </SettingsCollapsibleSection>
-                ) : null}
-
-                {activeSettingsTab === 'tutor' ? (
+                
                 <SettingsCollapsibleSection
                   id="image-ocr"
                   title="Image Translation"
@@ -6061,8 +6057,8 @@ function App() {
                           key={model.tier}
                           style={{
                             padding: '0.75rem 0.9rem',
-                            borderRadius: '12px',
-                            background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
+                            borderRadius: '2px',
+                            background: 'color-mix(in oklab, var(--panel-bg-alt) 60%, transparent)',
                             border: isActiveTier
                               ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
                               : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
@@ -6141,9 +6137,7 @@ function App() {
                     </p>
                   </div>
                 </SettingsCollapsibleSection>
-                ) : null}
-
-{activeSettingsTab === 'voice' ? (
+                
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -6163,9 +6157,8 @@ function App() {
                     />
                   </div>
                 </div>
-                ) : null}
-
-                {activeSettingsTab === 'shortcuts' ? (
+              </>)}
+              {activeSettingsTab === 'system' && (<>
                 <div
                   className="settings-section settings-control-row"
                   role="tabpanel"
@@ -6206,9 +6199,7 @@ function App() {
                     <p className="settings-help">When off, shortcut keys still work but hint labels stay hidden in game rounds.</p>
                   </div>
                 </div>
-                ) : null}
-
-                {activeSettingsTab === 'data' ? (
+                
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -6268,7 +6259,7 @@ function App() {
                     )}
                   </div>
                 </div>
-                ) : null}
+              </>)}
               </div>
             </div>
           </div>

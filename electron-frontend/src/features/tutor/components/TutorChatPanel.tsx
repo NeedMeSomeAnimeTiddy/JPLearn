@@ -1,8 +1,9 @@
 import type { UseTutorReturn } from '../useTutor'
 import type { TutorSettingsFields } from '../types'
 import type { Dispatch, SetStateAction } from 'react'
-import { Volume2, VolumeX, Trash2, X, SendHorizontal, MessageCircle } from 'lucide-react'
+import { Volume2, VolumeX, Trash2, X, SendHorizontal } from 'lucide-react'
 import { ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT } from '../constants'
+import { TypeAnimation } from 'react-type-animation'
 
 interface TutorChatPanelProps {
   tutor: UseTutorReturn
@@ -36,24 +37,20 @@ export function TutorChatPanel({ tutor, settings, setSettings, cancelAssistantSp
     >
       <section
         id="assistant-chat-panel"
-        className="assistant-chat-panel assistant-chat-window"
+        className="assistant-chat-panel assistant-chat-window crt-scanlines"
         role="dialog"
         aria-modal="true"
         aria-label="Tutor chat panel"
         onClick={(event) => event.stopPropagation()}
       >
+        <div className="crt-vhs-line" />
         <header className="assistant-chat-header">
-          <div className="assistant-chat-identity">
-            <span className="assistant-chat-avatar" aria-hidden="true">
-              <MessageCircle size={18} strokeWidth={2.2} />
-              <span className="assistant-chat-presence" />
+          <div />
+          <div className="cassette-panel-header-center">
+            <span className="cassette-panel-header-catalog">
+              {assistantChatLoading ? 'TYPING…' : 'STUDY COACH v4.2'}
             </span>
-            <span className="assistant-chat-identity-text">
-              <span className="assistant-chat-title">Study Coach</span>
-              <span className="assistant-chat-subtitle">
-                {assistantChatLoading ? 'Typing\u2026' : 'Online \u00b7 here to help'}
-              </span>
-            </span>
+            <h2 className="cassette-panel-header-title">SENSEI</h2>
           </div>
           <div className="assistant-chat-header-actions">
             <button
@@ -108,47 +105,55 @@ export function TutorChatPanel({ tutor, settings, setSettings, cancelAssistantSp
                 const turnKey = `${turn.created_at_utc}-${index}`
                 const isReplaySpeaking = assistantSpeakingTurnKey === turnKey
                 return (
-                  <article key={turnKey} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
-                    <div className="assistant-chat-turn-meta">
-                      <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
-                      {turn.role === 'assistant' ? (
-                        <button
-                          type="button"
-                          className={`assistant-chat-turn-replay ${isReplaySpeaking ? 'is-speaking' : ''}`}
-                          onClick={() => {
-                            if (isReplaySpeaking) {
-                              cancelAssistantSpeech()
-                              return
-                            }
-                            replayAssistantTurn(turn.content, turnKey)
-                          }}
-                          disabled={!settings.assistantChatAudioEnabled}
-                          aria-label={settings.assistantChatAudioEnabled
-                            ? (isReplaySpeaking ? 'Stop coach message audio' : 'Replay coach message audio')
-                            : 'Enable chat audio to replay this message'}
-                          title={settings.assistantChatAudioEnabled
-                            ? (isReplaySpeaking ? 'Stop audio' : 'Replay audio')
-                            : 'Enable chat audio to replay'}
-                        >
-                          <Volume2 size={12} strokeWidth={2.2} aria-hidden="true" />
-                        </button>
-                      ) : null}
+                  <div key={turnKey} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
+                    <div className="assistant-chat-message-card">
+                      <div className="assistant-chat-card-header">
+                        <span className="assistant-chat-role-label">
+                          {turn.role === 'assistant' ? 'SENSEI' : 'YOU'}
+                        </span>
+                        {turn.role === 'assistant' ? (
+                          <button
+                            type="button"
+                            className={`assistant-chat-turn-replay ${isReplaySpeaking ? 'is-speaking' : ''}`}
+                            onClick={() => {
+                              if (isReplaySpeaking) {
+                                cancelAssistantSpeech()
+                                return
+                              }
+                              replayAssistantTurn(turn.content, turnKey)
+                            }}
+                            disabled={!settings.assistantChatAudioEnabled}
+                            aria-label={settings.assistantChatAudioEnabled
+                              ? (isReplaySpeaking ? 'Stop coach message audio' : 'Replay coach message audio')
+                              : 'Enable chat audio to replay this message'}
+                            title={settings.assistantChatAudioEnabled
+                              ? (isReplaySpeaking ? 'Stop audio' : 'Replay audio')
+                              : 'Enable chat audio to replay'}
+                          >
+                            <Volume2 size={12} strokeWidth={2.2} aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="assistant-chat-message-text">
+                        {turn.role === 'assistant' ? (
+                          <TypeAnimation key={turnKey} sequence={[turn.content]} speed={12} cursor={false} style={{ display: 'inline' }} />
+                        ) : (
+                          turn.content
+                        )}
+                      </p>
                     </div>
-                    <p>{turn.content}</p>
-                  </article>
+                  </div>
                 )
               })}
               {assistantChatLoading ? (
-                <article className="assistant-chat-turn assistant-chat-turn-assistant assistant-chat-turn-typing" aria-label="Coach is typing">
-                  <div className="assistant-chat-turn-meta">
-                    <span className="assistant-chat-turn-role">Coach</span>
+                <div className="assistant-chat-turn assistant-chat-turn-assistant" aria-label="Coach is typing">
+                  <div className="assistant-chat-message-card">
+                    <span className="assistant-chat-role-label">SENSEI</span>
+                    <p className="assistant-chat-message-text">
+                      <span className="assistant-chat-typing">Thinking</span>
+                    </p>
                   </div>
-                  <p className="assistant-chat-typing" aria-hidden="true">
-                    <span className="assistant-chat-typing-dot" />
-                    <span className="assistant-chat-typing-dot" />
-                    <span className="assistant-chat-typing-dot" />
-                  </p>
-                </article>
+                </div>
               ) : null}
             </>
           )}

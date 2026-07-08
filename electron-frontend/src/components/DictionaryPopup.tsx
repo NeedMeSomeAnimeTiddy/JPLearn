@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { BookText, Check, ClipboardCopy, History, Search, TriangleAlert, Volume2, X } from 'lucide-react'
+import { BookText, Check, ClipboardCopy, History, TriangleAlert, Volume2, X } from 'lucide-react'
 import { toHiragana } from 'wanakana'
 
 export interface DictionaryCard {
@@ -356,15 +356,13 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <section className="dictionary-panel" role="dialog" aria-modal="true" aria-label="Dictionary lookup panel" onClick={(event) => event.stopPropagation()}>
+      <section className="dictionary-panel crt-scanlines" role="dialog" aria-modal="true" aria-label="Dictionary lookup panel" onClick={(event) => event.stopPropagation()}>
+        <div className="crt-vhs-line" />
         <header className="dictionary-header">
-          <div className="dictionary-header-copy">
-            <span className="dictionary-kicker">
-              <Search className="dictionary-kicker-icon" strokeWidth={2.2} aria-hidden="true" />
-              Quick lookup
-            </span>
-            <h2>Dictionary</h2>
-            <p>Search Japanese text, romaji, or English meanings from the offline dictionary or the loaded cards.</p>
+          <div />
+          <div className="cassette-panel-header-center">
+            <span className="cassette-panel-header-catalog">QUICK LOOKUP</span>
+            <h2 className="cassette-panel-header-title">Dictionary</h2>
           </div>
           <button type="button" className="dictionary-close-button" onClick={onClose} aria-label="Close dictionary" title="Close">
             <X aria-hidden="true" strokeWidth={2.2} />

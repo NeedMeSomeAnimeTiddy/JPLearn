@@ -39,7 +39,8 @@ export function ReadinessWarningModal({
       aria-labelledby="rwm-title"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
-      <div className="modal-panel readiness-warning-modal">
+      <div className="modal-panel readiness-warning-modal crt-scanlines">
+        <div className="crt-vhs-line" />
         <button
           type="button"
           className="modal-close-btn"

@@ -115,7 +115,6 @@ export function OverviewView({
   loading,
   error,
   lastUpdated,
-  streak,
   decks,
   activity,
   overviewBlocks,
@@ -164,8 +163,12 @@ export function OverviewView({
 
   return (
     <div className="overview-popup-content">
-      <header className="overview-popup-header">
-        <h2 className="overview-popup-title">Study Overview</h2>
+      <header className="overview-popup-header cassette-panel-header">
+        <div />
+        <div className="cassette-panel-header-center">
+          <span className="cassette-panel-header-catalog">DECK STATUS</span>
+          <h2 className="cassette-panel-header-title">Study Overview</h2>
+        </div>
         <div className="overview-popup-actions">
           {lastUpdated ? <span className="overview-popup-updated">{lastUpdated}</span> : null}
           <button
@@ -191,34 +194,6 @@ export function OverviewView({
       </header>
 
       {error ? <p className="status-line status-error overview-popup-error">Unable to load summary: {error}</p> : null}
-
-      {/* ── Snap metrics strip ─────────────────────────────────────── */}
-      {decks.length > 0 ? (() => {
-        const masteredCards = decks.reduce((acc, d) => acc + d.mastered, 0)
-        const totalCards = decks.reduce((acc, d) => acc + d.total, 0)
-        const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0
-        const completedToday = decks.reduce((acc, d) => acc + d.completed_today, 0)
-        const dueToday = decks.reduce((acc, d) => acc + d.due_today, 0)
-        return (
-          <div className="overview-snap-strip" aria-label="Quick stats">
-            <span className="overview-snap-tile">
-              <Flame aria-hidden="true" className="chip-icon metric-accent-streak" strokeWidth={2.2} />
-              <strong className="live-value">{streak.current_days}</strong>
-              <span>day streak</span>
-            </span>
-            <span className="overview-snap-tile">
-              <Target aria-hidden="true" className="chip-icon metric-accent-skill" strokeWidth={2.2} />
-              <strong className="live-value">{masteryRate}%</strong>
-              <span>mastered</span>
-            </span>
-            <span className="overview-snap-tile">
-              <BarChart3 aria-hidden="true" className="chip-icon metric-accent-insight" strokeWidth={2.2} />
-              <strong className="live-value">{completedToday}/{dueToday}</strong>
-              <span>done today</span>
-            </span>
-          </div>
-        )
-      })() : null}
 
       {/* ── Mastery grid ──────────────────────────────────────────── */}
       <section className="panel-glass char-mastery-panel">

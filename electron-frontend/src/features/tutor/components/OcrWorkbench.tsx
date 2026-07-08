@@ -33,24 +33,18 @@ export function OcrWorkbench({ tutor, settings, setSettings }: OcrWorkbenchProps
     >
       <section
         id="ocr-workbench-panel"
-        className="assistant-chat-panel assistant-chat-window"
+        className="assistant-chat-panel assistant-chat-window crt-scanlines"
         role="dialog"
         aria-modal="true"
         aria-label="OCR translator panel"
         onClick={(event) => event.stopPropagation()}
       >
+        <div className="crt-vhs-line" />
         <header className="assistant-chat-header">
-          <div className="assistant-chat-identity">
-            <span className="assistant-chat-avatar" aria-hidden="true">
-              <ImagePlus size={18} strokeWidth={2.2} />
-              <span className="assistant-chat-presence" />
-            </span>
-            <span className="assistant-chat-identity-text">
-              <span className="assistant-chat-title">OCR Translator</span>
-              <span className="assistant-chat-subtitle">
-                {ocrWorkbenchBusy ? 'Reading image\u2026' : 'Upload Japanese text image to translate'}
-              </span>
-            </span>
+          <div />
+          <div className="cassette-panel-header-center">
+            <span className="cassette-panel-header-catalog">IMAGE TRANSLATOR</span>
+            <h2 className="cassette-panel-header-title">OCR</h2>
           </div>
           <div className="assistant-chat-header-actions">
             <button

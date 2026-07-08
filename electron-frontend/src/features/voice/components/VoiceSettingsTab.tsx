@@ -138,7 +138,7 @@ export function VoiceSettingsTab({
                 key={model.tier}
                 style={{
                   padding: '0.75rem 0.9rem',
-                  borderRadius: '12px',
+                  borderRadius: '2px',
                   background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
                   border: isActiveTier
                     ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
@@ -344,7 +344,7 @@ export function VoiceSettingsTab({
                     key={model.tier}
                     style={{
                       padding: '0.75rem 0.9rem',
-                      borderRadius: '12px',
+                      borderRadius: '2px',
                       background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
                       border: isActiveTier
                         ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
