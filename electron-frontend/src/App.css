@@ -1774,11 +1774,6 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   align-self: stretch;
 }
 
-.window-titlebar-drag.is-dragging {
-  -webkit-app-region: drag;
-  app-region: drag;
-}
-
 .window-titlebar-wordmark {
   position: absolute;
   left: 50%;
@@ -1789,8 +1784,6 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   text-transform: uppercase;
   color: var(--text-main);
   pointer-events: none;
-  -webkit-app-region: drag;
-  app-region: drag;
   user-select: none;
   white-space: nowrap;
 }
