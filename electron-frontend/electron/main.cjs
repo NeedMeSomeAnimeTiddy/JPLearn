@@ -1841,7 +1841,7 @@ function loadMainWindow(win) {
         validatedURL,
       })
     })
-    new Draggable(win, { region: { y: 0, height: 40 }, maximize: true })
+    new Draggable(win, { region: { y: 0, height: 40 } })
     win.loadURL('http://localhost:5173')
     win.webContents.openDevTools({ mode: 'detach' })
     return
