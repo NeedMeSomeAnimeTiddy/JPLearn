@@ -285,3 +285,6 @@ tui.json
 
 # Playwright MCP runtime artifacts (console logs, page snapshots, screenshots)
 .playwright-mcp/
+*.png
+dom-snapshot.txt
+nul
