@@ -2065,9 +2065,9 @@ function App() {
   // oxlint-disable react-hooks/exhaustive-deps — voice from useVoice hook is not a stable ref
   useEffect(() => {
     if (!showSettings || activeSettingsTab !== 'assistant') return
-    void voice.refreshVoiceStatus()
+    const t = setTimeout(() => { void voice.refreshVoiceStatus() }, 150)
     const h = window.setInterval(() => { void voice.refreshVoiceStatus() }, 3000)
-    return () => window.clearInterval(h)
+    return () => { clearTimeout(t); window.clearInterval(h) }
   }, [activeSettingsTab, voice.refreshVoiceStatus, showSettings])
 
 
