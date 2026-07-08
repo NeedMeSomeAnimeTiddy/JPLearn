@@ -2927,6 +2927,10 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    void loadSummary()
+  }, [loadSummary])
+
   const notifyStartupReady = useCallback((deferredLoadsQueuedAtMs?: number) => {
     if (startupReadySentRef.current) return
     startupReadySentRef.current = true
