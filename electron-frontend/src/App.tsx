@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { ChangeEvent } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { LearningPathStatus, SectionReadiness } from './types'
@@ -27,6 +26,9 @@ import { useTheme } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
 import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/theme/types'
 import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme } from './features/theme/utils'
+import { useBackground, BackgroundSettingsTab, clampBackgroundBlur, normalizeCustomBackgroundDataUrl, isBackgroundStyle, BACKGROUND_BLUR_DEFAULT } from './features/background'
+import type { BackgroundStyle } from './features/background'
+import { clampAssistantChatOcrMinConfidence } from './features/tutor'
 import type { RoundDictionaryNote } from './types'
 
 type StudySummaryPayload = Awaited<
@@ -146,14 +148,6 @@ type AppFontPreset =
   | 'reggae_one'
   | 'system_ui'
 type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
-type BackgroundStyle =
-  | 'classic_scene'
-  | 'fuji_view'
-  | 'torii_gate'
-  | 'temple_reflection'
-  | 'garden_bridge'
-  | 'autumn_pond'
-  | 'custom_upload'
 type FeedbackTone = 'success' | 'error' | null
 type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation'
 type SettingsTabKey = 'theme' | 'background' | 'font_size' | 'animations' | 'tutor' | 'voice' | 'shortcuts' | 'data'
@@ -1177,60 +1171,6 @@ const MOTION_STYLE_LABEL: Record<AnimationStyle, string> = {
   lively: 'Lively',
 }
 
-const BACKGROUND_BLUR_MIN = 0
-const BACKGROUND_BLUR_MAX = 12
-const BACKGROUND_BLUR_DEFAULT = 4
-const CUSTOM_BACKGROUND_MAX_BYTES = 15 * 1024 * 1024
-const CUSTOM_BACKGROUND_MAX_EDGE = 2200
-const CUSTOM_BACKGROUND_MAX_DATA_URL_LENGTH = 6_500_000
-
-const BACKGROUND_OPTIONS: Array<{
-  key: BackgroundStyle
-  label: string
-  note: string
-  imagePath?: string
-}> = [
-  {
-    key: 'classic_scene',
-    label: 'No Background',
-    note: 'Uses a neutral app background with no image overlay.',
-  },
-  {
-    key: 'fuji_view',
-    label: 'Fuji Outlook',
-    note: 'Pagoda and mountain skyline.',
-    imagePath: 'backgrounds/fuji.jpg',
-  },
-  {
-    key: 'torii_gate',
-    label: 'Water Torii',
-    note: 'Floating torii at dusk on calm water.',
-    imagePath: 'backgrounds/torii.jpg',
-  },
-  {
-    key: 'temple_reflection',
-    label: 'Temple Reflection',
-    note: 'Temple architecture mirrored in still water.',
-    imagePath: 'backgrounds/house.jpg',
-  },
-  {
-    key: 'garden_bridge',
-    label: 'Garden Bridge',
-    note: 'Red bridge across deep green garden water.',
-    imagePath: 'backgrounds/bridge.jpg',
-  },
-  {
-    key: 'autumn_pond',
-    label: 'Autumn Pond',
-    note: 'Warm maple tones and morning light rays.',
-    imagePath: 'backgrounds/lake.jpg',
-  },
-  {
-    key: 'custom_upload',
-    label: 'Custom Image',
-    note: 'Use your own image from device storage.',
-  },
-]
 
 const JLPT_LEVEL_ORDER: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
 const JLPT_LEVEL_LABELS: Record<JlptLevel, string> = {
@@ -1632,188 +1572,6 @@ function isAssistantToastLimit(value: unknown): value is 0 | 1 {
   return value === 0 || value === 1
 }
 
-function isBackgroundStyle(value: unknown): value is BackgroundStyle {
-  return (
-    value === 'classic_scene' ||
-    value === 'fuji_view' ||
-    value === 'torii_gate' ||
-    value === 'temple_reflection' ||
-    value === 'garden_bridge' ||
-    value === 'autumn_pond' ||
-    value === 'custom_upload'
-  )
-}
-
-function clampBackgroundBlur(value: number): number {
-  return Math.max(BACKGROUND_BLUR_MIN, Math.min(BACKGROUND_BLUR_MAX, Math.round(value)))
-}
-
-function clampAssistantChatOcrMinConfidence(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 0.3
-  }
-  return Math.max(0, Math.min(1, Math.round(value * 100) / 100))
-}
-
-function resolveBackgroundImageUrl(imagePath: string): string {
-  if (typeof window === 'undefined') return imagePath
-  try {
-    return new URL(imagePath, window.location.href).toString()
-  } catch {
-    return imagePath
-  }
-}
-
-function createBackgroundPreviewDataUrl(source: HTMLImageElement, width: number, height: number): string | null {
-  if (typeof document === 'undefined') return null
-
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const context = canvas.getContext('2d')
-  if (!context) return null
-
-  const sourceWidth = source.naturalWidth || source.width
-  const sourceHeight = source.naturalHeight || source.height
-  if (sourceWidth <= 0 || sourceHeight <= 0) return null
-
-  const targetRatio = width / height
-  const sourceRatio = sourceWidth / sourceHeight
-
-  let sx = 0
-  let sy = 0
-  let sw = sourceWidth
-  let sh = sourceHeight
-
-  if (sourceRatio > targetRatio) {
-    sw = Math.round(sourceHeight * targetRatio)
-    sx = Math.round((sourceWidth - sw) / 2)
-  } else if (sourceRatio < targetRatio) {
-    sh = Math.round(sourceWidth / targetRatio)
-    sy = Math.round((sourceHeight - sh) / 2)
-  }
-
-  context.drawImage(source, sx, sy, sw, sh, 0, 0, width, height)
-
-  try {
-    return canvas.toDataURL('image/webp', 0.72)
-  } catch {
-    return canvas.toDataURL('image/jpeg', 0.78)
-  }
-}
-
-function normalizeCustomBackgroundDataUrl(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const normalized = value.trim()
-  if (!normalized.startsWith('data:image/')) return null
-  if (normalized.length > CUSTOM_BACKGROUND_MAX_DATA_URL_LENGTH) return null
-  return normalized
-}
-
-function hasSupportedImageExtension(fileName: string): boolean {
-  const normalizedName = fileName.trim().toLowerCase()
-  return normalizedName.endsWith('.png')
-    || normalizedName.endsWith('.jpg')
-    || normalizedName.endsWith('.jpeg')
-    || normalizedName.endsWith('.webp')
-    || normalizedName.endsWith('.avif')
-    || normalizedName.endsWith('.gif')
-    || normalizedName.endsWith('.bmp')
-}
-
-function isSupportedBackgroundImageFile(file: File): boolean {
-  const mimeType = (file.type || '').trim().toLowerCase()
-  if (mimeType.startsWith('image/')) {
-    return true
-  }
-  // Some Windows file pickers provide an empty MIME type for local files.
-  return hasSupportedImageExtension(file.name)
-}
-
-async function optimizeBackgroundFileToDataUrl(file: File): Promise<string> {
-  let bitmap: ImageBitmap | null = null
-  let objectUrl: string | null = null
-
-  try {
-    const canvas = document.createElement('canvas')
-    const context = canvas.getContext('2d')
-    if (!context) {
-      throw new Error('Canvas context unavailable.')
-    }
-
-    if (typeof createImageBitmap === 'function') {
-      try {
-        bitmap = await createImageBitmap(file)
-      } catch {
-        bitmap = null
-      }
-    }
-
-    if (bitmap) {
-      const sourceWidth = bitmap.width
-      const sourceHeight = bitmap.height
-      if (sourceWidth <= 0 || sourceHeight <= 0) {
-        throw new Error('Invalid image dimensions.')
-      }
-
-      const scale = Math.min(1, CUSTOM_BACKGROUND_MAX_EDGE / Math.max(sourceWidth, sourceHeight))
-      const width = Math.max(1, Math.round(sourceWidth * scale))
-      const height = Math.max(1, Math.round(sourceHeight * scale))
-
-      canvas.width = width
-      canvas.height = height
-      context.drawImage(bitmap, 0, 0, width, height)
-
-      try {
-        return canvas.toDataURL('image/webp', 0.8)
-      } catch {
-        return canvas.toDataURL('image/jpeg', 0.86)
-      }
-    }
-
-    objectUrl = URL.createObjectURL(file)
-    const image = new Image()
-    image.decoding = 'async'
-    image.src = objectUrl
-
-    try {
-      await image.decode()
-    } catch {
-      await new Promise<void>((resolve, reject) => {
-        image.onload = () => resolve()
-        image.onerror = () => reject(new Error('Unable to decode image file.'))
-      })
-    }
-
-    const sourceWidth = image.naturalWidth || image.width
-    const sourceHeight = image.naturalHeight || image.height
-    if (sourceWidth <= 0 || sourceHeight <= 0) {
-      throw new Error('Invalid image dimensions.')
-    }
-
-    const scale = Math.min(1, CUSTOM_BACKGROUND_MAX_EDGE / Math.max(sourceWidth, sourceHeight))
-    const width = Math.max(1, Math.round(sourceWidth * scale))
-    const height = Math.max(1, Math.round(sourceHeight * scale))
-
-    canvas.width = width
-    canvas.height = height
-
-    context.drawImage(image, 0, 0, width, height)
-
-    try {
-      return canvas.toDataURL('image/webp', 0.8)
-    } catch {
-      return canvas.toDataURL('image/jpeg', 0.86)
-    }
-  } finally {
-    if (bitmap) {
-      bitmap.close()
-    }
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl)
-    }
-  }
-}
 
 function loadSettings(): AppSettings {
   try {
@@ -3109,8 +2867,10 @@ function App() {
     setCollapsedSettingsSections,
   )
   const { toggleThemeSectionCollapsed } = theme
-  const [customBackgroundActionMessage, setCustomBackgroundActionMessage] = useState<string | null>(null)
-  const [backgroundPreviewUrls, setBackgroundPreviewUrls] = useState<Partial<Record<BackgroundStyle, string>>>({})
+  const background = useBackground(
+    settings as any,
+    setSettings as any,
+  )
   const [showOverview, setShowOverview] = useState(false)
   const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0)
   const [resettingDb, setResettingDb] = useState(false)
@@ -3153,10 +2913,8 @@ function App() {
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
-  const backgroundImageCacheRef = useRef<Partial<Record<BackgroundStyle, HTMLImageElement>>>({})
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const tutorSeenKeysRef = useRef<Set<string>>(new Set())
-  const customBackgroundImportInputRef = useRef<HTMLInputElement | null>(null)
   const translationProfileTierRef = useRef<'ocr_qwen_local' | null>(null)
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
@@ -3886,53 +3644,6 @@ function App() {
     void window.jplearnDesktop?.reloadLocalFonts?.().catch(() => undefined)
   }, [])
 
-  const openCustomBackgroundPicker = useCallback(() => {
-    customBackgroundImportInputRef.current?.click()
-  }, [])
-
-  const clearCustomBackground = useCallback(() => {
-    setSettings((previous) => ({
-      ...previous,
-      customBackgroundDataUrl: null,
-      customBackgroundName: null,
-      backgroundStyle: previous.backgroundStyle === 'custom_upload' ? 'classic_scene' : previous.backgroundStyle,
-    }))
-    setCustomBackgroundActionMessage('Custom background removed.')
-  }, [])
-
-  const handleCustomBackgroundFileImport = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0]
-    event.currentTarget.value = ''
-    if (!file) {
-      return
-    }
-    if (!isSupportedBackgroundImageFile(file)) {
-      setCustomBackgroundActionMessage('Please choose an image file.')
-      return
-    }
-    if (file.size > CUSTOM_BACKGROUND_MAX_BYTES) {
-      setCustomBackgroundActionMessage('Image is too large. Choose a file under 15 MB.')
-      return
-    }
-
-    try {
-      const dataUrl = await optimizeBackgroundFileToDataUrl(file)
-      if (dataUrl.length > CUSTOM_BACKGROUND_MAX_DATA_URL_LENGTH) {
-        setCustomBackgroundActionMessage('Image is still too large after compression. Choose a smaller image.')
-        return
-      }
-      setSettings((previous) => ({
-        ...previous,
-        backgroundStyle: 'custom_upload',
-        customBackgroundDataUrl: dataUrl,
-        customBackgroundName: file.name,
-      }))
-      setCustomBackgroundActionMessage(`Custom background set: ${file.name}`)
-    } catch (error) {
-      const detail = error instanceof Error && error.message ? ` (${error.message})` : ''
-      setCustomBackgroundActionMessage(`Could not process selected image${detail}`)
-    }
-  }, [])
 
   const activeDeckSlug = useMemo(() => {
     if (activeScript === 'kanji_n5') return KANJI_CATEGORY_TO_DECK_SLUG[activeKanjiCategory]
@@ -7082,79 +6793,6 @@ function App() {
     await loadSummary()
   }, [getDeckCardsDeduped, loadSummary, refreshDeckProgressAfterSeedChange])
 
-  const resolvedBackgroundUrls = useMemo(() => {
-    const next: Partial<Record<BackgroundStyle, string>> = {}
-    BACKGROUND_OPTIONS.forEach((option) => {
-      if (!option.imagePath) return
-      next[option.key] = resolveBackgroundImageUrl(option.imagePath)
-    })
-    return next
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function preloadBackgroundAssets(): Promise<void> {
-      const photoOptions = BACKGROUND_OPTIONS.filter(
-        (option): option is (typeof BACKGROUND_OPTIONS)[number] & { imagePath: string } => Boolean(option.imagePath),
-      )
-
-      const previewMap: Partial<Record<BackgroundStyle, string>> = {}
-
-      await Promise.all(
-        photoOptions.map(async (option) => {
-          const src = resolvedBackgroundUrls[option.key]
-          if (!src) return
-
-          const image = new Image()
-          image.decoding = 'async'
-          image.src = src
-
-          try {
-            await image.decode()
-          } catch {
-            await new Promise<void>((resolve) => {
-              image.onload = () => resolve()
-              image.onerror = () => resolve()
-            })
-          }
-
-          if (cancelled) return
-          backgroundImageCacheRef.current[option.key] = image
-
-          const previewDataUrl = createBackgroundPreviewDataUrl(image, 272, 112)
-          if (previewDataUrl) {
-            previewMap[option.key] = previewDataUrl
-          }
-        }),
-      )
-
-      if (!cancelled) {
-        setBackgroundPreviewUrls((previous) => ({
-          ...previous,
-          ...previewMap,
-        }))
-      }
-    }
-
-    void preloadBackgroundAssets()
-
-    return () => {
-      cancelled = true
-    }
-  }, [resolvedBackgroundUrls])
-
-  const selectedBackgroundOption =
-    BACKGROUND_OPTIONS.find((option) => option.key === settings.backgroundStyle) ?? BACKGROUND_OPTIONS[0]
-  const selectedBackgroundUrl = selectedBackgroundOption.key === 'custom_upload'
-    ? settings.customBackgroundDataUrl ?? undefined
-    : (selectedBackgroundOption.imagePath
-      ? resolvedBackgroundUrls[selectedBackgroundOption.key]
-      : undefined)
-  const appShellStyle = {
-    '--background-image': selectedBackgroundUrl ? `url("${selectedBackgroundUrl}")` : 'none',
-    '--background-blur': `${clampBackgroundBlur(settings.backgroundBlur)}px`,
-  } as CSSProperties
 
   const titlebarHistoryBack = useCallback(() => {
     const currentIndex = viewHistoryIndexRef.current
@@ -7259,7 +6897,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell" data-background-style={settings.backgroundStyle} style={appShellStyle}>
+    <main className="app-shell" data-background-style={settings.backgroundStyle} style={background.appShellStyle}>
       <header className="window-titlebar" aria-label="Window controls">
         <div className="window-titlebar-drag">
           <div className="window-titlebar-nav" role="group" aria-label="App navigation">
@@ -8284,107 +7922,11 @@ function App() {
                   aria-labelledby="settings-tab-background"
                 >
                   <div className="settings-control-content">
-                    <p className="settings-section-label">Background</p>
-                    <div className="settings-background-grid" role="radiogroup" aria-label="Background selection">
-                      {BACKGROUND_OPTIONS.map((background) => {
-                        const isActive = settings.backgroundStyle === background.key
-                        const customPreview = background.key === 'custom_upload' ? settings.customBackgroundDataUrl : null
-                        const previewSrc = customPreview ?? backgroundPreviewUrls[background.key] ?? resolvedBackgroundUrls[background.key]
-                        const hasPreview = Boolean(previewSrc)
-                        return (
-                          <button
-                            key={background.key}
-                            type="button"
-                            className={`settings-icon-entry settings-background-entry ${isActive ? 'is-active' : ''}`}
-                            onClick={() => {
-                              if (background.key === 'custom_upload' && !settings.customBackgroundDataUrl) {
-                                openCustomBackgroundPicker()
-                                setCustomBackgroundActionMessage('Pick an image to enable custom background.')
-                                return
-                              }
-                              setSettings((prev) => ({ ...prev, backgroundStyle: background.key }))
-                            }}
-                            aria-label={`Use ${background.label} background`}
-                            aria-pressed={isActive}
-                            title={background.label}
-                          >
-                            <span
-                              className={`settings-background-preview ${hasPreview ? 'is-photo' : 'is-classic'}`}
-                              aria-hidden="true"
-                            >
-                              {previewSrc ? (
-                                <img
-                                  className="settings-background-preview-image"
-                                  src={previewSrc}
-                                  alt=""
-                                  loading="eager"
-                                  decoding="async"
-                                />
-                              ) : null}
-                            </span>
-                            <span className="settings-background-copy">
-                              <span className="settings-icon-entry-label">{background.label}</span>
-                              <span className="settings-background-note">{background.note}</span>
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    <div className="settings-inline-action-group" style={{ marginTop: 10 }}>
-                      <button
-                        type="button"
-                        className="settings-inline-button"
-                        onClick={openCustomBackgroundPicker}
-                      >
-                        Choose Image
-                      </button>
-                      <button
-                        type="button"
-                        className="settings-inline-button"
-                        onClick={clearCustomBackground}
-                        disabled={!settings.customBackgroundDataUrl}
-                      >
-                        Remove Custom
-                      </button>
-                    </div>
-                    <input
-                      ref={customBackgroundImportInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/bmp"
-                      className="settings-hidden-file-input"
-                      onChange={(event) => { void handleCustomBackgroundFileImport(event) }}
-                    />
-                    {customBackgroundActionMessage ? (
-                      <p className="settings-help settings-help-inline">{customBackgroundActionMessage}</p>
-                    ) : null}
-
-                    <div className="settings-background-slider">
-                      <div className="settings-background-slider-head">
-                        <span>Blur amount</span>
-                        <span>{clampBackgroundBlur(settings.backgroundBlur)}px</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={BACKGROUND_BLUR_MIN}
-                        max={BACKGROUND_BLUR_MAX}
-                        step={1}
-                        className="settings-range"
-                        value={clampBackgroundBlur(settings.backgroundBlur)}
-                        onChange={(event) => {
-                          const nextBlur = Number(event.currentTarget.value)
-                          setSettings((prev) => ({ ...prev, backgroundBlur: clampBackgroundBlur(nextBlur) }))
-                        }}
-                        aria-label="Background blur amount"
-                        disabled={settings.backgroundStyle === 'classic_scene'}
-                      />
-                      <p className="settings-help">
-                        Applies to image backgrounds, including your custom upload. Choose No Background to restore the simpler pre-drawing background.
-                      </p>
-                    </div>
+                    <BackgroundSettingsTab background={background} />
                   </div>
                 </div>
                 ) : null}
+
 
                 {activeSettingsTab === 'font_size' ? (
                 <div

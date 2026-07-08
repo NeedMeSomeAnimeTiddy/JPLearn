@@ -1,0 +1,6 @@
+export { useBackground } from './useBackground'
+export type { UseBackgroundReturn } from './useBackground'
+export { BackgroundSettingsTab } from './components/BackgroundSettingsTab'
+export * from './types'
+export * from './constants'
+export { clampBackgroundBlur, isBackgroundStyle, normalizeCustomBackgroundDataUrl } from './utils'
