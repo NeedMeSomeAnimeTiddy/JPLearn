@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
-import type { LearningPathStatus, SectionReadiness } from './types'
+import type { LastSessionPrefs, LearningPathStatus, SectionReadiness } from './types'
 import type { GameCard } from './generated/types'
 import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
@@ -491,6 +491,7 @@ const SETTINGS_STORAGE_KEY = 'jplearn-desktop-settings-v1'
 const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
 const SUMMARY_SNAPSHOT_STORAGE_KEY = 'jplearn-desktop-summary-snapshot-v1'
 const SESSION_STORAGE_KEY = 'jplearn-desktop-session-v1'
+const PREFS_STORAGE_KEY = 'jplearn-desktop-session-prefs-v1'
 
 interface PersistedSessionRestore {
   sessionScore: number
@@ -514,6 +515,7 @@ interface PersistedSession {
   sessionStartedAt: string
   restore: PersistedSessionRestore
 }
+
 const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
@@ -1610,6 +1612,17 @@ function App() {
     } catch { /* ignore */ }
   }, [])
 
+  // Functions used in state initializers below
+  function loadSessionPrefs(): LastSessionPrefs | null {
+    try {
+      const raw = localStorage.getItem(PREFS_STORAGE_KEY)
+      if (!raw) return null
+      return JSON.parse(raw) as LastSessionPrefs
+    } catch {
+      return null
+    }
+  }
+
   const [view, setView] = useState<AppView>('home')
   const [navDirection, setNavDirection] = useState<NavDirection>('forward')
   const [summary, setSummary] = useState<StudySummaryPayload | null>(() => loadSummarySnapshot())
@@ -1620,8 +1633,8 @@ function App() {
   const [loading, setLoading] = useState<boolean>(() => loadSummarySnapshot() === null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
-  const [activeScript, setActiveScript] = useState<ScriptKey>('hiragana')
-  const [activeGame, setActiveGame] = useState<MinigameKey>('romaji_sprint')
+  const [activeScript, setActiveScript] = useState<ScriptKey>(() => loadSessionPrefs()?.script ?? 'hiragana')
+  const [activeGame, setActiveGame] = useState<MinigameKey>(() => loadSessionPrefs()?.game ?? 'romaji_sprint')
   const [deckCards, setDeckCards] = useState<ScriptDeck['cards']>([])
   const [blockProgress, setBlockProgress] = useState<BlockInfo[]>([])
   const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0)
@@ -1656,7 +1669,7 @@ function App() {
   const [sessionBestStreak, setSessionBestStreak] = useState<number>(0)
   const [roundComboBonus, setRoundComboBonus] = useState<number>(0)
   const [roundMilestoneStreak, setRoundMilestoneStreak] = useState<number | null>(null)
-  const [sessionTargetItems, setSessionTargetItems] = useState<number>(DEFAULT_SESSION_LENGTH_PRESET.items)
+  const [sessionTargetItems, setSessionTargetItems] = useState<number>(() => loadSessionPrefs()?.sessionTargetItems ?? DEFAULT_SESSION_LENGTH_PRESET.items)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [lastSessionSummary, setLastSessionSummary] = useState<SessionSummaryPayload | null>(null)
   const [sessionRunReport, setSessionRunReport] = useState<SessionRunReport | null>(null)
@@ -1666,16 +1679,21 @@ function App() {
   const [sessionGoalError, setSessionGoalError] = useState<string | null>(null)
   const [showResumeToast, setShowResumeToast] = useState<boolean>(false)
   const [resumeData, setResumeData] = useState<PersistedSession | null>(null)
-  const [livesEnabled, setLivesEnabled] = useState<boolean>(false)
+  const [livesEnabled, setLivesEnabled] = useState<boolean>(() => loadSessionPrefs()?.livesEnabled ?? false)
   const [livesRemaining, setLivesRemaining] = useState<number>(DEFAULT_LIVES)
-  const [leechFocusEnabled, setLeechFocusEnabled] = useState<boolean>(false)
+  const [leechFocusEnabled, setLeechFocusEnabled] = useState<boolean>(() => loadSessionPrefs()?.leechFocusEnabled ?? false)
   const [interleaveWeights] = useState<InterleaveWeights>({ ...DEFAULT_INTERLEAVE_WEIGHTS })
   const [interleaveSurpriseEnabled] = useState<boolean>(true)
   const [interleaveSurpriseEvery] = useState<number>(5)
-  const [confidenceCaptureEnabled, setConfidenceCaptureEnabled] = useState<boolean>(false)
+  const [confidenceCaptureEnabled, setConfidenceCaptureEnabled] = useState<boolean>(() => loadSessionPrefs()?.confidenceCaptureEnabled ?? false)
   const [roundConfidenceScore, setRoundConfidenceScore] = useState<number>(3)
   const [sessionConfidenceCount, setSessionConfidenceCount] = useState<number>(0)
   const [sessionConfidenceTotal, setSessionConfidenceTotal] = useState<number>(0)
+
+  useEffect(() => {
+    saveSessionPrefs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeScript, activeGame, livesEnabled, leechFocusEnabled, confidenceCaptureEnabled, sessionTargetItems])
 
   const [scriptStats, setScriptStats] = useState<StatsByScript>(() => loadSavedStats())
   const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
@@ -1889,7 +1907,6 @@ function App() {
     setSessionConfidenceCount(0)
     setSessionConfidenceTotal(0)
     setSessionGoalError(null)
-    setLeechFocusEnabled(false)
   }
 
   /** End-of-session reset: core without cycle reset + per-round state + optional error message. */
@@ -1907,6 +1924,21 @@ function App() {
     if (options?.errorMessage) {
       setGameError(options.errorMessage)
     }
+  }
+
+  function saveSessionPrefs(): void {
+    try {
+      const prefs: LastSessionPrefs = {
+        script: activeScript,
+        game: activeGame,
+        livesEnabled,
+        leechFocusEnabled,
+        confidenceCaptureEnabled,
+        sessionTargetItems,
+        updatedAt: new Date().toISOString(),
+      }
+      localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs))
+    } catch { /* ignore */ }
   }
 
   // Chatbot tier cards show combined footprint (chatbot + its hidden, auto-installed
@@ -3540,6 +3572,7 @@ function App() {
       }
 
       setSessionActive(true)
+      saveSessionPrefs()
       setRoundState(nextRound)
       roundPresentedAtRef.current = performance.now()
       setRoundInput('')

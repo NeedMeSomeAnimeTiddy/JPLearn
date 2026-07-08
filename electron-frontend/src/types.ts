@@ -180,6 +180,16 @@ export interface SessionRunReport {
   wrongCardIds: number[]
 }
 
+export interface LastSessionPrefs {
+  script: ScriptKey
+  game: MinigameKey
+  livesEnabled: boolean
+  leechFocusEnabled: boolean
+  confidenceCaptureEnabled: boolean
+  sessionTargetItems: number
+  updatedAt: string
+}
+
 export interface ScriptStats {
   attempted: number
   correct: number
