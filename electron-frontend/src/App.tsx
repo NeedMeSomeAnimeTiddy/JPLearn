@@ -28,6 +28,7 @@ import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbac
 import { useBackground, BackgroundSettingsTab, clampBackgroundBlur, normalizeCustomBackgroundDataUrl, isBackgroundStyle, BACKGROUND_BLUR_DEFAULT } from './features/background'
 import type { BackgroundStyle } from './features/background'
 import { useVoice, splitSpeechSegments, VoiceSettingsTab } from './features/voice'
+import { useModels } from './features/models'
 import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit } from './features/tutor'
 import type { AssistantToast } from './features/tutor'
 import type { RoundDictionaryNote } from './types'
@@ -2251,97 +2252,6 @@ function App() {
   const [sessionActive, setSessionActive] = useState<boolean>(false)
   const [roundState, setRoundState] = useState<RoundState | null>(null)
   const [roundInput, setRoundInput] = useState<string>('')
-  const [tutorInstallInfo, setTutorInstallInfo] = useState<{
-    totalRamGb: number
-    models: Array<{
-      tier: 'low' | 'medium' | 'high' | 'ultra'
-      filename: string
-      sizeMb: number
-      embedderSizeMb?: number
-      combinedSizeMb?: number
-      label: string
-      description: string
-      installed: boolean
-      estimatedDownloadMinutes?: number | null
-    }>
-    recommendedTier: 'low' | 'medium' | 'high' | 'ultra'
-    activeModelTier?: 'low' | 'medium' | 'high' | 'ultra' | null
-    activeEmbedderTier?: 'e5_small' | 'e5_base' | 'e5_large' | null
-    activeEmbedderLabel?: string | null
-    activeEmbedderInstalled?: boolean
-    activeEmbedderEnabled?: boolean
-    llamaCppInstalled: boolean
-    gpuVramGb?: number | null
-    voiceInstalled: boolean
-    voiceModels: Array<{
-      tier: '0.6b'
-      filename: string
-      sizeMb: number
-      combinedSizeMb: number
-      label: string
-      description: string
-      installed: boolean
-      estimatedDownloadMinutes?: number | null
-    }>
-    activeVoiceModel?: '0.6b' | null
-    fontsInstalled: boolean
-    dictionaryInstalled: boolean
-    llamaCppEstimatedDownloadMinutes?: number | null
-    dictionaryEstimatedDownloadMinutes?: number | null
-    speechModels: Array<{
-      tier: 'fast' | 'balanced' | 'high' | 'ultra'
-      label: string
-      description: string
-      sizeMb: number
-      installed: boolean
-      estimatedDownloadMinutes?: number | null
-    }>
-    recommendedSpeechTier?: 'fast' | 'balanced' | 'high' | 'ultra'
-    activeSpeechModelTier?: 'fast' | 'balanced' | 'high' | 'ultra' | null
-    ocrModels?: Array<{
-      tier: 'standard'
-      label: string
-      description: string
-      sizeMb: number
-      installed: boolean
-      estimatedDownloadMinutes?: number | null
-    }>
-    recommendedOcrTier?: 'standard'
-    activeOcrModelTier?: 'standard' | null
-    ocrInstalled?: boolean
-    translationModels?: Array<{
-      tier: 'qwen_ja_en'
-      label: string
-      badge?: 'Qwen Translation'
-      description: string
-      sizeMb: number
-      installed: boolean
-      estimatedDownloadMinutes?: number | null
-    }>
-    recommendedTranslationTier?: 'qwen_ja_en'
-    activeTranslationModelTier?: 'qwen_ja_en' | null
-    translationInstalled?: boolean
-    translationProfiles?: Array<{
-      tier: 'ocr_qwen_local'
-      label: string
-      badge?: 'Recommended'
-      description: string
-      sizeMb: number
-      installed: boolean
-      estimatedDownloadMinutes?: number | null
-    }>
-    activeTranslationProfileTier?: 'ocr_qwen_local' | null
-  } | null>(null)
-  const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
-  const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
-  const [tutorDownloadMethod, setTutorDownloadMethod] = useState<string | null>(null)
-  const [tutorModelActionTier, setTutorModelActionTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
-  const [dictionaryDownloading, setDictionaryDownloading] = useState(false)
-  const [dictionaryProgress, setDictionaryProgress] = useState<number>(0)
-  const [dictionaryDownloadMethod, setDictionaryDownloadMethod] = useState<string | null>(null)
-  const [translationProfileApplyingTier, setTranslationProfileApplyingTier] = useState<'ocr_qwen_local' | null>(null)
-  const [translationProfileProgress, setTranslationProfileProgress] = useState<number>(0)
-  const [translationProfileMethod, setTranslationProfileMethod] = useState<string | null>(null)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
   const [roundFeedbackTone, setRoundFeedbackTone] = useState<FeedbackTone>(null)
   const [roundFeedbackPoints, setRoundFeedbackPoints] = useState<number | null>(null)
@@ -2507,7 +2417,6 @@ function App() {
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
-  const translationProfileTierRef = useRef<'ocr_qwen_local' | null>(null)
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
   const dictionaryCards = useMemo(() => {
@@ -2572,236 +2481,22 @@ function App() {
 
   
 
-  const formatModelSize = useCallback((sizeMb: number) => {
-    if (!Number.isFinite(sizeMb)) {
-      return '—'
-    }
-    if (sizeMb >= 1000) {
-      return `${(sizeMb / 1000).toFixed(1)} GB`
-    }
-    return `${Math.round(sizeMb)} MB`
-  }, [])
 
   // Chatbot tier cards show combined footprint (chatbot + its hidden, auto-installed
   // embedder) so the displayed size matches what setup actually downloads.
-  const formatCombinedModelSize = useCallback((sizeMb: number, embedderSizeMb?: number) => {
-    if (!Number.isFinite(sizeMb)) {
-      return '—'
-    }
-    if (!embedderSizeMb || !Number.isFinite(embedderSizeMb) || embedderSizeMb <= 0) {
-      return formatModelSize(sizeMb)
-    }
-    return `${formatModelSize(sizeMb)} + ${formatModelSize(embedderSizeMb)}`
-  }, [formatModelSize])
-
-  const formatMinutes = useCallback((minutes?: number | null) => {
-    if (!Number.isFinite(minutes ?? Number.NaN) || !minutes || minutes <= 0) {
-      return 'time unknown'
-    }
-    return `${minutes} min`
-  }, [])
-
-  const getTutorModelHardwareFit = useCallback((tier: 'low' | 'medium' | 'high' | 'ultra') => {
-    const totalRamGb = tutorInstallInfo?.totalRamGb ?? 0
-    const gpuVramGb = tutorInstallInfo?.gpuVramGb ?? 0
-    const minRequirements: Record<'low' | 'medium' | 'high' | 'ultra', { ram: number; vram: number }> = {
-      low: { ram: 2, vram: 1 },
-      medium: { ram: 4, vram: 2 },
-      high: { ram: 3, vram: 4 },
-      ultra: { ram: 8, vram: 11 },
-    }
-    const makeFit = (
-      badge: string,
-      detail: string,
-      isOk: boolean,
-      tone: 'soft' | 'warning' = isOk ? 'soft' : 'warning',
-    ) => ({ badge, detail, isOk, tone })
-
-    const mins = minRequirements[tier]
-    const ramOnlyFit = totalRamGb >= mins.ram && gpuVramGb < mins.vram
-    if (ramOnlyFit) {
-      return makeFit(
-        'Usable (slower)',
-        `This tier can still run because your RAM meets the minimum (${mins.ram} GB), but GPU VRAM is below the ${mins.vram} GB target. Expect slower performance.`,
-        true,
-        'warning',
-      )
-    }
-
-    if (tier === 'low') {
-      if (totalRamGb >= 8 || gpuVramGb >= 4) {
-        return makeFit(
-          'Recommended fit',
-          'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
-          true,
-        )
-      }
-      if (totalRamGb >= 6 || gpuVramGb >= 4) {
-        return makeFit(
-          'Comfortable fit',
-          'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
-          true,
-        )
-      }
-      if (totalRamGb >= 2 || gpuVramGb >= 1) {
-        return makeFit(
-          'Minimum fit',
-          'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
-          true,
-          'warning',
-        )
-      }
-      return makeFit(
-        'Too heavy',
-        'Minimum: about 2 GB RAM and 1 GB VRAM. Comfortable on 6 GB RAM or 4 GB VRAM. Recommended on 8 GB RAM or 4 GB VRAM.',
-        false,
-      )
-    }
-
-    if (tier === 'medium') {
-      if (totalRamGb >= 10 || gpuVramGb >= 6) {
-        return makeFit(
-          'Recommended fit',
-          'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
-          true,
-        )
-      }
-      if (totalRamGb >= 8 || gpuVramGb >= 4) {
-        return makeFit(
-          'Comfortable fit',
-          'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
-          true,
-        )
-      }
-      if (totalRamGb >= 4 || gpuVramGb >= 2) {
-        return makeFit(
-          'Minimum fit',
-          'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
-          true,
-          'warning',
-        )
-      }
-      return makeFit(
-        'Too heavy',
-        'Minimum: about 4 GB RAM and 2 GB VRAM. Comfortable on 8 GB RAM or 4 GB VRAM. Recommended on 10 GB RAM or 6 GB VRAM.',
-        false,
-      )
-    }
-
-    if (tier === 'high') {
-      if (totalRamGb >= 12 || gpuVramGb >= 8) {
-        return makeFit(
-          'Recommended fit',
-          'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
-          true,
-        )
-      }
-      if (totalRamGb >= 8 || gpuVramGb >= 6) {
-        return makeFit(
-          'Comfortable fit',
-          'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
-          true,
-        )
-      }
-      if (totalRamGb >= 3 || gpuVramGb >= 4) {
-        return makeFit(
-          'Minimum fit',
-          'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
-          true,
-          'warning',
-        )
-      }
-      return makeFit(
-        'Too heavy',
-        'Minimum: about 3 GB RAM and 4 GB VRAM. Comfortable on 8 GB RAM or 6 GB VRAM. Recommended on 12 GB RAM or 8 GB VRAM.',
-        false,
-      )
-    }
-
-    if (tier === 'ultra') {
-      if (totalRamGb >= 24 || gpuVramGb >= 24) {
-        return makeFit(
-          'Recommended fit',
-          'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-          true,
-        )
-      }
-      if (totalRamGb >= 16 || gpuVramGb >= 16) {
-        return makeFit(
-          'Comfortable fit',
-          'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-          true,
-        )
-      }
-      if (totalRamGb >= 8 || gpuVramGb >= 11) {
-        return makeFit(
-          'Minimum fit',
-          'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-          true,
-          'warning',
-        )
-      }
-      return makeFit(
-        'Too heavy',
-        'Minimum: about 8 GB RAM and 11 GB VRAM. Comfortable on 16 GB RAM or 16 GB VRAM. Recommended on 24 GB RAM or 24 GB VRAM.',
-        false,
-      )
-    }
-
-    return makeFit('Unsupported tier', 'Unable to evaluate this model tier on this system.', false)
-  }, [tutorInstallInfo?.gpuVramGb, tutorInstallInfo?.totalRamGb])
 
 
-  const refreshTutorInstallInfo = useCallback(async () => {
-    const getSetupSystemInfo = window.jplearnDesktop?.getSetupSystemInfo
-    if (!getSetupSystemInfo) {
-      return
-    }
-    try {
-      const setupInfo = await getSetupSystemInfo()
-      setTutorInstallInfo({
-        totalRamGb: setupInfo.totalRamGb,
-        models: setupInfo.models ?? [],
-        recommendedTier: setupInfo.recommendedTier,
-        activeModelTier: setupInfo.activeModelTier ?? null,
-        activeEmbedderTier: setupInfo.activeEmbedderTier ?? null,
-        activeEmbedderLabel: setupInfo.activeEmbedderLabel ?? null,
-        activeEmbedderInstalled: setupInfo.activeEmbedderInstalled ?? false,
-        activeEmbedderEnabled: setupInfo.activeEmbedderEnabled ?? false,
-        llamaCppInstalled: setupInfo.llamaCppInstalled,
-        gpuVramGb: setupInfo.gpuVramGb ?? null,
-        voiceInstalled: setupInfo.voiceInstalled ?? false,
-        voiceModels: setupInfo.voiceModels ?? [],
-        activeVoiceModel: setupInfo.activeVoiceModel ?? null,
-        fontsInstalled: setupInfo.fontsInstalled,
-        dictionaryInstalled: setupInfo.dictionaryInstalled,
-        llamaCppEstimatedDownloadMinutes: setupInfo.llamaCppEstimatedDownloadMinutes ?? null,
-        dictionaryEstimatedDownloadMinutes: setupInfo.dictionaryEstimatedDownloadMinutes ?? null,
-        speechModels: setupInfo.speechModels ?? [],
-        recommendedSpeechTier: setupInfo.recommendedSpeechTier,
-        activeSpeechModelTier: setupInfo.activeSpeechModelTier ?? null,
-        ocrModels: setupInfo.ocrModels ?? [],
-        recommendedOcrTier: setupInfo.recommendedOcrTier,
-        activeOcrModelTier: setupInfo.activeOcrModelTier ?? null,
-        ocrInstalled: setupInfo.ocrInstalled ?? false,
-        translationModels: setupInfo.translationModels ?? [],
-        recommendedTranslationTier: setupInfo.recommendedTranslationTier,
-        activeTranslationModelTier: setupInfo.activeTranslationModelTier ?? null,
-        translationInstalled: setupInfo.translationInstalled ?? false,
-        translationProfiles: setupInfo.translationProfiles ?? [],
-        activeTranslationProfileTier: setupInfo.activeTranslationProfileTier ?? null,
-      })
-    } catch {
-      // Best effort only.
-    }
-  }, [])
+
+
+
+  const models = useModels()
 
   const voice = useVoice(
     settings as any,
     setSettings as any,
     {
-      tutorInstallInfo: tutorInstallInfo as any,
-      refreshTutorInstallInfo,
+      tutorInstallInfo: models.tutorInstallInfo as any,
+      refreshTutorInstallInfo: models.refreshTutorInstallInfo,
     },
   )
 
@@ -2818,7 +2513,7 @@ function App() {
       isInMinigameSession,
       activeSessionId,
       activeScript,
-      ocrInstalled: tutorInstallInfo?.ocrInstalled ?? false,
+      ocrInstalled: models.tutorInstallInfo?.ocrInstalled ?? false,
       onToastNavigate: (script, game, differentScript) => {
         const minigame = resolveScriptMinigame(script, game)
         setActiveGame(minigame)
@@ -2845,8 +2540,8 @@ function App() {
 
 
   useEffect(() => {
-    void refreshTutorInstallInfo()
-  }, [refreshTutorInstallInfo])
+    void models.refreshTutorInstallInfo()
+  }, [models.refreshTutorInstallInfo])
 
 
 
@@ -2854,94 +2549,18 @@ function App() {
     if (!showSettings || activeSettingsTab !== 'tutor') {
       return
     }
-    void refreshTutorInstallInfo()
-  }, [activeSettingsTab, refreshTutorInstallInfo, showSettings])
-
-
-
-  const downloadTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
-    const downloadModel = window.jplearnDesktop?.downloadModel
-    if (!downloadModel || tutorDownloadingTier) {
-      return
-    }
-    setTutorDownloadingTier(tier)
-    setTutorDownloadProgress({ percent: 0, mb: null, totalMb: null })
-    setTutorDownloadMethod(null)
-    try {
-      await downloadModel(tier)
-      await refreshTutorInstallInfo()
-    } finally {
-      setTutorDownloadingTier(null)
-      setTutorDownloadProgress(null)
-    }
-  }, [refreshTutorInstallInfo, tutorDownloadingTier])
-
-  const selectTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
-    const setActiveTutorModel = window.jplearnDesktop?.setActiveTutorModel
-    if (!setActiveTutorModel || tutorModelActionTier) {
-      return
-    }
-    setTutorModelActionTier(tier)
-    try {
-      await setActiveTutorModel(tier)
-      await refreshTutorInstallInfo()
-    } finally {
-      setTutorModelActionTier(null)
-    }
-  }, [refreshTutorInstallInfo, tutorModelActionTier])
-
-  const uninstallTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
-    const uninstallModel = window.jplearnDesktop?.uninstallTutorModel
-    if (!uninstallModel || tutorModelActionTier) {
-      return
-    }
-    setTutorModelActionTier(tier)
-    try {
-      await uninstallModel(tier)
-      await refreshTutorInstallInfo()
-    } finally {
-      setTutorModelActionTier(null)
-    }
-  }, [refreshTutorInstallInfo, tutorModelActionTier])
-
-  const downloadOfflineDictionary = useCallback(async () => {
-    const downloadDictionary = window.jplearnDesktop?.downloadDictionary
-    if (!downloadDictionary || dictionaryDownloading) {
-      return
-    }
-    setDictionaryDownloading(true)
-    setDictionaryProgress(0)
-    setDictionaryDownloadMethod(null)
-    try {
-      await downloadDictionary()
-      await refreshTutorInstallInfo()
-    } finally {
-      setDictionaryDownloading(false)
-      setDictionaryProgress(0)
-    }
-  }, [dictionaryDownloading, refreshTutorInstallInfo])
+    void models.refreshTutorInstallInfo()
+  }, [activeSettingsTab, models.refreshTutorInstallInfo, showSettings])
 
 
 
 
-  const applyTranslationProfile = useCallback(async (tier: 'ocr_qwen_local') => {
-    const applyProfile = window.jplearnDesktop?.applyTranslationProfile
-    if (!applyProfile || translationProfileApplyingTier) {
-      return
-    }
-    translationProfileTierRef.current = tier
-    setTranslationProfileApplyingTier(tier)
-    setTranslationProfileProgress(0)
-    setTranslationProfileMethod(null)
-    try {
-      await applyProfile(tier, { force: true })
-      await refreshTutorInstallInfo()
-    } finally {
-      translationProfileTierRef.current = null
-      setTranslationProfileApplyingTier(null)
-      setTranslationProfileProgress(0)
-    }
-  }, [refreshTutorInstallInfo, translationProfileApplyingTier])
+
+
+
+
+
+
 
 
   // Do not warm voice runtime automatically in the background.
@@ -5560,16 +5179,16 @@ function App() {
       })()
     }
     void loadSummary()
-    void refreshTutorInstallInfo()
-  }, [loadSummary, refreshTutorInstallInfo])
+    void models.refreshTutorInstallInfo()
+  }, [loadSummary, models.refreshTutorInstallInfo])
 
   const hasInstalledTutorModel = Boolean(
-    tutorInstallInfo?.llamaCppInstalled
-      && (tutorInstallInfo?.models ?? []).some((model) => model.installed),
+    models.tutorInstallInfo?.llamaCppInstalled
+      && (models.tutorInstallInfo?.models ?? []).some((model) => model.installed),
   )
-  const showOnboardingChatbotSection = tutorInstallInfo ? hasInstalledTutorModel : true
-  const showOnboardingVoiceSection = tutorInstallInfo ? tutorInstallInfo.voiceInstalled : true
-  const showOnboardingFontSection = tutorInstallInfo ? tutorInstallInfo.fontsInstalled : true
+  const showOnboardingChatbotSection = models.tutorInstallInfo ? hasInstalledTutorModel : true
+  const showOnboardingVoiceSection = models.tutorInstallInfo ? models.tutorInstallInfo.voiceInstalled : true
+  const showOnboardingFontSection = models.tutorInstallInfo ? models.tutorInstallInfo.fontsInstalled : true
 
   // Show setup wizard on first run (all hooks above must run unconditionally)
   if (showWizard === true) {
@@ -6599,8 +6218,8 @@ function App() {
                   description="Download or reinstall the local model tiers used by the Tutor runtime."
                   meta={(
                     <>
-                      {tutorInstallInfo?.llamaCppInstalled ? 'llama.cpp installed' : 'llama.cpp not installed'}
-                      {' '}· Recommended tier: <strong style={{ color: 'var(--text-main)' }}>{tutorInstallInfo?.models.find((model) => model.tier === tutorInstallInfo.recommendedTier)?.label ?? '—'}</strong>
+                      {models.tutorInstallInfo?.llamaCppInstalled ? 'llama.cpp installed' : 'llama.cpp not installed'}
+                      {' '}· Recommended tier: <strong style={{ color: 'var(--text-main)' }}>{models.tutorInstallInfo?.models.find((model) => model.tier === models.tutorInstallInfo?.recommendedTier)?.label ?? '—'}</strong>
                     </>
                   )}
                   collapsed={Boolean(collapsedSettingsSections['tutor-models'])}
@@ -6608,12 +6227,12 @@ function App() {
                   className="settings-theme-card"
                 >
                   <div style={{ display: 'grid', gap: '0.65rem' }}>
-                    {(tutorInstallInfo?.models ?? []).map((model) => {
-                      const isDownloadingThis = tutorDownloadingTier === model.tier
-                      const isActioningThis = tutorModelActionTier === model.tier
-                      const isActiveTier = tutorInstallInfo?.activeModelTier === model.tier
-                      const hardwareFit = getTutorModelHardwareFit(model.tier)
-                      const showRecommendedBadge = model.tier === tutorInstallInfo?.recommendedTier
+                    {(models.tutorInstallInfo?.models ?? []).map((model) => {
+                      const isDownloadingThis = models.tutorDownloadingTier === model.tier
+                      const isActioningThis = models.tutorModelActionTier === model.tier
+                      const isActiveTier = models.tutorInstallInfo?.activeModelTier === model.tier
+                      const hardwareFit = models.getTutorModelHardwareFit(model.tier)
+                      const showRecommendedBadge = model.tier === models.tutorInstallInfo?.recommendedTier
                         && hardwareFit.badge === 'Recommended fit'
                       const badges = [
                         showRecommendedBadge ? 'Recommended' : null,
@@ -6642,7 +6261,7 @@ function App() {
                                 {badges ? ` · ${badges}` : ''}
                               </p>
                               <p className="settings-help" style={{ marginTop: '0.25rem' }}>
-                                {formatCombinedModelSize(model.sizeMb, model.embedderSizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
+                                {models.formatCombinedModelSize(model.sizeMb, model.embedderSizeMb)} · {models.formatMinutes(model.estimatedDownloadMinutes)}
                               </p>
                               <p className="settings-help" style={{ marginTop: '0.2rem' }}>
                                 {model.installed ? 'Installed' : model.description}
@@ -6656,8 +6275,8 @@ function App() {
                                 <button
                                   type="button"
                                   className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
-                                  onClick={() => { void selectTutorModel(model.tier) }}
-                                  disabled={isActiveTier || tutorModelActionTier !== null || tutorDownloadingTier !== null}
+                                  onClick={() => { void models.selectTutorModel(model.tier) }}
+                                  disabled={isActiveTier || models.tutorModelActionTier !== null || models.tutorDownloadingTier !== null}
                                   aria-label={isActiveTier ? `${model.label} is the active Tutor model` : `Use ${model.label} for the Tutor`}
                                   title={isActiveTier ? 'Currently active' : 'Use this model'}
                                 >
@@ -6667,8 +6286,8 @@ function App() {
                               <button
                                 type="button"
                                 className="settings-card-icon-button"
-                                onClick={() => { void downloadTutorModel(model.tier) }}
-                                disabled={tutorDownloadingTier !== null || tutorModelActionTier !== null}
+                                onClick={() => { void models.downloadTutorModel(model.tier) }}
+                                disabled={models.tutorDownloadingTier !== null || models.tutorModelActionTier !== null}
                                 aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
                                 title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
                               >
@@ -6682,8 +6301,8 @@ function App() {
                                 <button
                                   type="button"
                                   className="settings-inline-icon-button"
-                                  onClick={() => { void uninstallTutorModel(model.tier) }}
-                                  disabled={tutorModelActionTier !== null || tutorDownloadingTier !== null}
+                                  onClick={() => { void models.uninstallTutorModel(model.tier) }}
+                                  disabled={models.tutorModelActionTier !== null || models.tutorDownloadingTier !== null}
                                   aria-label={`Uninstall ${model.label}`}
                                   title={`Uninstall ${model.label}`}
                                 >
@@ -6697,12 +6316,12 @@ function App() {
                           {isDownloadingThis ? (
                             <div>
                               <div className="settings-progress-track">
-                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, tutorDownloadProgress?.percent ?? 0))}%` }} />
+                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, models.tutorDownloadProgress?.percent ?? 0))}%` }} />
                               </div>
                               <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                {tutorDownloadProgress?.mb != null && tutorDownloadProgress?.totalMb != null
-                                  ? `${tutorDownloadProgress.mb.toFixed(0)} / ${tutorDownloadProgress.totalMb.toFixed(0)} MB · ${Math.round(tutorDownloadProgress.percent)}%${tutorDownloadMethod ? ` [${tutorDownloadMethod}]` : ''}`
-                                  : `Downloading… ${Math.round(tutorDownloadProgress?.percent ?? 0)}%${tutorDownloadMethod ? ` [${tutorDownloadMethod}]` : ''}`}
+                                {models.tutorDownloadProgress?.mb != null && models.tutorDownloadProgress?.totalMb != null
+                                  ? `${models.tutorDownloadProgress.mb.toFixed(0)} / ${models.tutorDownloadProgress.totalMb.toFixed(0)} MB · ${Math.round(models.tutorDownloadProgress.percent)}%${models.tutorDownloadMethod ? ` [${models.tutorDownloadMethod}]` : ''}`
+                                  : `Downloading… ${Math.round(models.tutorDownloadProgress?.percent ?? 0)}%${models.tutorDownloadMethod ? ` [${models.tutorDownloadMethod}]` : ''}`}
                               </p>
                             </div>
                           ) : null}
@@ -6712,13 +6331,13 @@ function App() {
                   </div>
                   <p className="settings-help" style={{ marginTop: '0.75rem' }}>
                     {(() => {
-                      const embedderLabel = tutorInstallInfo?.activeEmbedderLabel
-                        ?? (tutorInstallInfo?.activeEmbedderTier ? tutorInstallInfo.activeEmbedderTier.replace('_', '-').toUpperCase() : null)
+                      const embedderLabel = models.tutorInstallInfo?.activeEmbedderLabel
+                        ?? (models.tutorInstallInfo?.activeEmbedderTier ? models.tutorInstallInfo.activeEmbedderTier.replace('_', '-').toUpperCase() : null)
                       if (!embedderLabel) {
                         return 'Embedder: none active yet. Select a Tutor model to enable retrieval embeddings.'
                       }
-                      const installState = tutorInstallInfo?.activeEmbedderInstalled ? 'installed' : 'not installed'
-                      const enabledState = tutorInstallInfo?.activeEmbedderEnabled ? 'enabled' : 'disabled'
+                      const installState = models.tutorInstallInfo?.activeEmbedderInstalled ? 'installed' : 'not installed'
+                      const enabledState = models.tutorInstallInfo?.activeEmbedderEnabled ? 'enabled' : 'disabled'
                       return `Embedder: ${embedderLabel} · ${installState} · ${enabledState}`
                     })()}
                   </p>
@@ -6733,7 +6352,7 @@ function App() {
                   id="offline-dictionary"
                   title="Offline Dictionary"
                   description="Lets Tutor chat translate Japanese↔English words without an internet connection. Downloaded from the open-source jmdict-simplified project (~30 MB)."
-                  meta={tutorInstallInfo?.dictionaryInstalled ? 'Installed' : `Not installed • ${formatMinutes(tutorInstallInfo?.dictionaryEstimatedDownloadMinutes)}`}
+                  meta={models.tutorInstallInfo?.dictionaryInstalled ? 'Installed' : `Not installed • ${models.formatMinutes(models.tutorInstallInfo?.dictionaryEstimatedDownloadMinutes)}`}
                   collapsed={Boolean(collapsedSettingsSections['offline-dictionary'])}
                   onToggle={() => toggleThemeSectionCollapsed('offline-dictionary')}
                   className="settings-theme-card"
@@ -6743,30 +6362,30 @@ function App() {
                       className="settings-card-icon-button"
                       onClick={(event) => {
                         event.stopPropagation()
-                        void downloadOfflineDictionary()
+                        void models.downloadOfflineDictionary()
                       }}
-                      disabled={dictionaryDownloading || tutorInstallInfo?.dictionaryInstalled}
-                      aria-label={tutorInstallInfo?.dictionaryInstalled ? 'Offline dictionary installed' : 'Download offline dictionary'}
-                      title={tutorInstallInfo?.dictionaryInstalled ? 'Offline dictionary installed' : 'Download offline dictionary'}
+                      disabled={models.dictionaryDownloading || models.tutorInstallInfo?.dictionaryInstalled}
+                      aria-label={models.tutorInstallInfo?.dictionaryInstalled ? 'Offline dictionary installed' : 'Download offline dictionary'}
+                      title={models.tutorInstallInfo?.dictionaryInstalled ? 'Offline dictionary installed' : 'Download offline dictionary'}
                     >
-                      {dictionaryDownloading
+                      {models.dictionaryDownloading
                         ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
-                        : tutorInstallInfo?.dictionaryInstalled
+                        : models.tutorInstallInfo?.dictionaryInstalled
                           ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" />
                           : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
                     </button>
                   )}
                 >
-                  {dictionaryDownloading ? (
+                  {models.dictionaryDownloading ? (
                     <div style={{ marginTop: '0.5rem' }}>
                       <div className="settings-progress-track">
                         <div
                           className="settings-progress-fill"
-                          style={{ width: `${Math.min(100, Math.max(0, dictionaryProgress))}%` }}
+                          style={{ width: `${Math.min(100, Math.max(0, models.dictionaryProgress))}%` }}
                         />
                       </div>
                       <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                        Downloading… {Math.round(dictionaryProgress)}%{dictionaryDownloadMethod ? ` [${dictionaryDownloadMethod}]` : ''}
+                        Downloading… {Math.round(models.dictionaryProgress)}%{models.dictionaryDownloadMethod ? ` [${models.dictionaryDownloadMethod}]` : ''}
                       </p>
                     </div>
                   ) : null}
@@ -6778,15 +6397,15 @@ function App() {
                   id="image-ocr"
                   title="Image Translation"
                   description="Install the offline OCR extraction package (PaddleOCR) for imported Japanese text images."
-                  meta={(tutorInstallInfo?.ocrModels ?? []).some((model) => model.installed) ? 'Installed' : 'Not installed'}
+                  meta={(models.tutorInstallInfo?.ocrModels ?? []).some((model) => model.installed) ? 'Installed' : 'Not installed'}
                   collapsed={Boolean(collapsedSettingsSections['image-ocr'])}
                   onToggle={() => toggleThemeSectionCollapsed('image-ocr')}
                   className="settings-theme-card"
                 >
                   <div style={{ display: 'grid', gap: '0.65rem' }}>
-                    {(tutorInstallInfo?.translationProfiles ?? []).map((model) => {
-                      const isApplyingThis = translationProfileApplyingTier === model.tier
-                      const isActiveTier = tutorInstallInfo?.activeTranslationProfileTier === model.tier
+                    {(models.tutorInstallInfo?.translationProfiles ?? []).map((model) => {
+                      const isApplyingThis = models.translationProfileApplyingTier === model.tier
+                      const isActiveTier = models.tutorInstallInfo?.activeTranslationProfileTier === model.tier
 
                       return (
                         <div
@@ -6807,7 +6426,7 @@ function App() {
                                 {isActiveTier ? ' · Active' : ''}
                               </p>
                               <p className="settings-help" style={{ marginTop: '0.25rem' }}>
-                                {formatModelSize(model.sizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
+                                {models.formatModelSize(model.sizeMb)} · {models.formatMinutes(model.estimatedDownloadMinutes)}
                                 {model.badge ? ` · ${model.badge}` : ''}
                               </p>
                               <p className="settings-help" style={{ marginTop: '0.2rem' }}>
@@ -6818,8 +6437,8 @@ function App() {
                               <button
                                 type="button"
                                 className="settings-card-icon-button"
-                                onClick={() => { void applyTranslationProfile(model.tier) }}
-                                disabled={translationProfileApplyingTier !== null}
+                                onClick={() => { void models.applyTranslationProfile(model.tier) }}
+                                disabled={models.translationProfileApplyingTier !== null}
                                 aria-label={model.installed ? `Reapply ${model.label}` : `Apply ${model.label}`}
                                 title={model.installed ? `Reapply ${model.label}` : `Apply ${model.label}`}
                               >
@@ -6834,10 +6453,10 @@ function App() {
                           {isApplyingThis ? (
                             <div>
                               <div className="settings-progress-track">
-                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, translationProfileProgress))}%` }} />
+                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, models.translationProfileProgress))}%` }} />
                               </div>
                               <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                Installing... {Math.round(translationProfileProgress)}%{translationProfileMethod ? ` [${translationProfileMethod}]` : ''}
+                                Installing... {Math.round(models.translationProfileProgress)}%{models.translationProfileMethod ? ` [${models.translationProfileMethod}]` : ''}
                               </p>
                             </div>
                           ) : null}
@@ -6889,9 +6508,9 @@ function App() {
                       setSettings={setSettings as any}
                       collapsedSettingsSections={collapsedSettingsSections}
                       toggleThemeSectionCollapsed={toggleThemeSectionCollapsed}
-                      formatModelSize={formatModelSize}
-                      formatMinutes={formatMinutes}
-                      tutorInstallInfo={tutorInstallInfo as any}
+                      formatModelSize={models.formatModelSize}
+                      formatMinutes={models.formatMinutes}
+                      tutorInstallInfo={models.tutorInstallInfo as any}
                     />
                   </div>
                 </div>

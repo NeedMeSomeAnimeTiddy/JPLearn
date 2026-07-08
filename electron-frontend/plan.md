@@ -432,7 +432,7 @@ const tutor = useTutor(settings, {
 | 2 ✅ | Background | -456 | -458 | 9,056 |
 | 3 ✅ | Tutor Chat + OCR | -1,800 | -1,275 | 7,781 |
 | 4 ✅ | Voice + Audio | -875 | -703 | 7,078 |
-| 5 ⏳ | Model Management | -900 | — | ~6,180 |
+| 5 ✅ | Model Management | -900 | -381 | 6,697 |
 | 6 | Data Persistence | -400 | — | ~5,600 |
 | 7 | Content Templates | -500 | — | ~5,100 |
 | 8 | Session/Round (risky) | -1,200 | — | ~3,900 |
