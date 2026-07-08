@@ -2552,6 +2552,18 @@ function App() {
     void models.refreshTutorInstallInfo()
   }, [activeSettingsTab, models.refreshTutorInstallInfo, showSettings])
 
+  useEffect(() => {
+    if (view !== 'script_hub') return
+    void voice.refreshVoiceStatus()
+  }, [voice.refreshVoiceStatus, view])
+
+  useEffect(() => {
+    if (!showSettings || activeSettingsTab !== 'voice') return
+    void voice.refreshVoiceStatus()
+    const h = window.setInterval(() => { void voice.refreshVoiceStatus() }, 3000)
+    return () => window.clearInterval(h)
+  }, [activeSettingsTab, voice.refreshVoiceStatus, showSettings])
+
 
 
 

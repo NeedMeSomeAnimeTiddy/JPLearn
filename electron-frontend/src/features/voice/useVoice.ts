@@ -57,6 +57,7 @@ export interface UseVoiceReturn {
   speechRecognitionLockReason: string
   voiceStatusChecked: boolean
   speechModelActionTier: SpeechTier | null
+  refreshVoiceStatus: () => Promise<{ available: boolean; modelReady: boolean; downloading: boolean; lastError?: string } | null>
   playQuestionAudio: (text: string, speaker?: string) => Promise<void>
   playVoiceRuntimeAudio: (text: string, runId: number) => Promise<boolean>
   cancelAssistantSpeech: () => void
@@ -402,6 +403,7 @@ export function useVoice(
     speechRecognitionLockReason,
     voiceStatusChecked,
     speechModelActionTier,
+    refreshVoiceStatus,
     playQuestionAudio,
     playVoiceRuntimeAudio,
     cancelAssistantSpeech,
