@@ -2046,16 +2046,6 @@ function App() {
     void models.refreshTutorInstallInfo()
   }, [models.refreshTutorInstallInfo])
 
-
-
-  useEffect(() => {
-    if (!showSettings || activeSettingsTab !== 'assistant') {
-    // oxlint-disable react-hooks/exhaustive-deps — models from useModels hook is not a stable ref
-      return
-    }
-    void models.refreshTutorInstallInfo()
-  }, [activeSettingsTab, models.refreshTutorInstallInfo, showSettings])
-
   // oxlint-disable react-hooks/exhaustive-deps — voice from useVoice hook is not a stable ref
   useEffect(() => {
     if (view !== 'script_hub') return
@@ -2065,7 +2055,6 @@ function App() {
   // oxlint-disable react-hooks/exhaustive-deps — voice from useVoice hook is not a stable ref
   useEffect(() => {
     if (!showSettings || activeSettingsTab !== 'assistant') return
-    void voice.refreshVoiceStatus()
     const h = window.setInterval(() => { void voice.refreshVoiceStatus() }, 3000)
     return () => { window.clearInterval(h) }
   }, [activeSettingsTab, voice.refreshVoiceStatus, showSettings])
