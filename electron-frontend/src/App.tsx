@@ -20,7 +20,7 @@ import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { AmbientAudioController } from './lib/ambientAudio'
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Ear, Flame, History, House, ImagePlus, Info, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Plus, RefreshCw, RotateCcw, Search, SendHorizontal, Settings, Shuffle, Sparkles, Square, Sun, Trash2, Trophy, Volume2, VolumeX, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Ear, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Plus, RefreshCw, RotateCcw, Search, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
 import './App.css'
 import { useTheme } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -28,7 +28,8 @@ import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/th
 import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme } from './features/theme/utils'
 import { useBackground, BackgroundSettingsTab, clampBackgroundBlur, normalizeCustomBackgroundDataUrl, isBackgroundStyle, BACKGROUND_BLUR_DEFAULT } from './features/background'
 import type { BackgroundStyle } from './features/background'
-import { clampAssistantChatOcrMinConfidence } from './features/tutor'
+import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, parseProgressMethod } from './features/tutor'
+import type { AssistantToast } from './features/tutor'
 import type { RoundDictionaryNote } from './types'
 
 type StudySummaryPayload = Awaited<
@@ -71,56 +72,6 @@ interface SessionRunReport {
   confidenceCapturedCount: number
   averageConfidenceScore: number | null
   wrongCardIds: number[]
-}
-interface AssistantStatePayload {
-  mood: string
-  momentum: number
-  confidence_level: number
-  focus_area: string
-  last_major_event: string
-}
-interface AssistantProfilePayload {
-  persona_style: string
-  emotion_persistence: string
-  llm_backend: string
-  chat_retention: string
-  updated_at_utc: string
-}
-interface AssistantEventPayload {
-  id: number
-  event_type: string
-  priority: 'info' | 'coaching' | 'critical' | 'celebration'
-  message_key: string
-  metadata: Record<string, string>
-}
-interface AssistantToast {
-  id: number
-  priority: AssistantEventPayload['priority']
-  eventType: string
-  messageKey: string
-  title: string
-  body: string
-  targetMode: MinigameKey | null
-  focusArea: string | null
-  actionType: string | null
-  actionLabel: string
-}
-interface AssistantChatTurn {
-  role: 'user' | 'assistant'
-  content: string
-  created_at_utc: string
-}
-interface AssistantChatRuntimeStatus {
-  loaded: boolean
-  loadedAtUtc: string | null
-  lastUsedAtUtc: string | null
-  inactivityUnloadMs: number
-  configuredProvider?: string
-  activeProvider?: string
-  activeModel?: string
-  activePromptAdapter?: string
-  adapterManifestPath?: string | null
-  lastError?: string | null
 }
 type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
 type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
@@ -213,29 +164,11 @@ function SettingsCollapsibleSection({
 
 const PERFORMANCE_PERFECT_MS = 700
 const PERFORMANCE_GOOD_MS = 2200
-const ASSISTANT_EVENT_POLL_MS = 15000
-const ASSISTANT_TOAST_TTL_MS = 3800
-const ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT = 600
-const ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB = 30
-const ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_BYTES = ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB * 1024 * 1024
-const ASSISTANT_CHAT_IMAGE_MAX_DIMENSION = 2200
-const ASSISTANT_CHAT_IMAGE_JPEG_QUALITY = 0.62
 const ROUND_QUEUE_TIMEOUT_MS = 1200
 const STUDY_QUEUE_CACHE_TTL_MS = 45000
 const DECK_LOAD_TIMEOUT_MS = 15000
 const STARTUP_WARMUP_INITIAL_DELAY_MS = 900
 const STARTUP_WARMUP_YIELD_DEADLINE_MS = 45
-const ASSISTANT_MAX_TOASTS = 1
-const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
-  { value: 0, label: 'Off' },
-  { value: 1, label: 'On' },
-]
-const ASSISTANT_TOAST_ICONS: Record<AssistantToast['priority'], LucideIcon> = {
-  info: Info,
-  coaching: Sparkles,
-  critical: AlertTriangle,
-  celebration: Trophy,
-}
 
 const JAPANESE_CHAR_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/
 const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
@@ -522,81 +455,9 @@ const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<PlayableMinigam
   },
 }
 
-async function fileToDataUrl(file: File): Promise<string> {
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : ''
-      if (!result) {
-        reject(new Error('Failed to read image file.'))
-        return
-      }
-      resolve(result)
-    }
-    reader.onerror = () => reject(new Error('Failed to read image file.'))
-    reader.readAsDataURL(file)
-  })
-}
 
-async function loadImageElement(dataUrl: string): Promise<HTMLImageElement> {
-  return await new Promise((resolve, reject) => {
-    const image = new Image()
-    image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error('Unsupported image format.'))
-    image.src = dataUrl
-  })
-}
 
-function parseDataUrl(dataUrl: string): { mimeType: string; base64: string } {
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
-  if (!match) {
-    throw new Error('Invalid image data. Please try another file.')
-  }
-  return {
-    mimeType: match[1].toLowerCase(),
-    base64: match[2],
-  }
-}
 
-async function prepareAssistantChatImagePayload(file: File): Promise<{
-  mimeType: 'image/png' | 'image/jpeg' | 'image/webp'
-  imageBase64: string
-}> {
-  const originalDataUrl = await fileToDataUrl(file)
-  const originalParsed = parseDataUrl(originalDataUrl)
-  const acceptedMime = new Set(['image/png', 'image/jpeg', 'image/webp'])
-
-  const sourceImage = await loadImageElement(originalDataUrl)
-  const maxSide = Math.max(sourceImage.width, sourceImage.height, 1)
-  const scale = Math.min(1, ASSISTANT_CHAT_IMAGE_MAX_DIMENSION / maxSide)
-  const targetWidth = Math.max(1, Math.round(sourceImage.width * scale))
-  const targetHeight = Math.max(1, Math.round(sourceImage.height * scale))
-
-  const canvas = document.createElement('canvas')
-  canvas.width = targetWidth
-  canvas.height = targetHeight
-  const context = canvas.getContext('2d')
-  if (!context) {
-    throw new Error('Image processing is unavailable in this environment.')
-  }
-  context.drawImage(sourceImage, 0, 0, targetWidth, targetHeight)
-
-  const compressedDataUrl = canvas.toDataURL('image/jpeg', ASSISTANT_CHAT_IMAGE_JPEG_QUALITY)
-  const compressedParsed = parseDataUrl(compressedDataUrl)
-
-  const useOriginal = acceptedMime.has(originalParsed.mimeType) && originalParsed.base64.length <= compressedParsed.base64.length
-  if (useOriginal) {
-    return {
-      mimeType: originalParsed.mimeType as 'image/png' | 'image/jpeg' | 'image/webp',
-      imageBase64: originalParsed.base64,
-    }
-  }
-
-  return {
-    mimeType: 'image/jpeg',
-    imageBase64: compressedParsed.base64,
-  }
-}
 const TAG_PROMPT_PACKS: Record<string, string[]> = {
   hiragana: [
     'Foundations First: this kana appears everywhere.',
@@ -1484,7 +1345,7 @@ function defaultSettings(): AppSettings {
     backgroundBlur: BACKGROUND_BLUR_DEFAULT,
     customBackgroundDataUrl: null,
     customBackgroundName: null,
-    assistantToastLimit: ASSISTANT_MAX_TOASTS,
+    assistantToastLimit: 1,
     assistantChatEnabled: true,
     assistantChatAudioEnabled: true,
     assistantChatOcrMinConfidence: 0.3,
@@ -1568,9 +1429,6 @@ function splitSpeechSegments(text: string): SpeechSegment[] {
   return segments
 }
 
-function isAssistantToastLimit(value: unknown): value is 0 | 1 {
-  return value === 0 || value === 1
-}
 
 
 function loadSettings(): AppSettings {
@@ -2294,46 +2152,7 @@ function classifyRoundPerformance(isCorrect: boolean, responseMs: number): 'PERF
   return 'SLOW'
 }
 
-function formatAssistantEventTitle(event: AssistantEventPayload): string {
-  if (event.event_type === 'session_goal_met') return 'You did it'
-  if (event.event_type === 'streak_milestone') return 'Streak glow'
-  if (event.event_type === 'leech_intervention') return 'Keep going'
-  if (event.event_type === 'weakness_spike') return 'You are improving'
-  if (event.event_type === 'curriculum_stall') return 'Progress takes time'
-  if (event.event_type === 'activity_nudge') return 'Small steps count'
-  if (event.event_type === 'session_recovery') return 'Fresh start'
-  if (event.event_type === 'momentum_encouragement') return 'Nice momentum'
-  return 'You are doing great'
-}
 
-function formatAssistantEventBody(event: AssistantEventPayload): string {
-  if (event.message_key === 'coach.goal_met') {
-    return 'Great focus. Keep that same calm pace on the next card.'
-  }
-  if (event.message_key === 'coach.streak_milestone') {
-    const days = event.metadata.days ?? '0'
-    return `${days}-day streak. Your consistency is paying off.`
-  }
-  if (event.message_key === 'coach.leech_intervention') {
-    return 'Tough cards happen. You are still moving forward.'
-  }
-  if (event.message_key === 'coach.weakness_focus') {
-    return 'This is a growth zone, not a setback. Keep practicing.'
-  }
-  if (event.message_key === 'coach.curriculum_stall') {
-    return 'Learning curves are normal. Your next clean answer matters most.'
-  }
-  if (event.message_key === 'coach.activity_nudge') {
-    return 'Even short sessions build real progress. Nice effort today.'
-  }
-  if (event.message_key === 'coach.session_recovery') {
-    return 'New round, new chance. You have got this.'
-  }
-  if (event.message_key === 'coach.momentum_encouragement') {
-    return 'You are in a good flow right now. Keep riding it.'
-  }
-  return 'Nice work showing up and practicing. Keep going.'
-}
 
 function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'romaji_sprint') return 'Romaji Sprint'
@@ -2472,92 +2291,10 @@ function buildRoundCoachToast(
   return null
 }
 
-function normalizeTrackTerms(text: string): string {
-  return text
-    .replace(/Vocabulary\s*N5/gi, 'Vocabulary (N5)')
-    .replace(/Grammar\s*N5/gi, 'Grammar (N5)')
-}
 
-function inferScriptFromFocusArea(focusArea: string | null): ScriptKey | null {
-  if (!focusArea) return null
-  const normalized = focusArea.trim().toLowerCase()
-  if (normalized === 'hiragana') return 'hiragana'
-  if (normalized === 'katakana') return 'katakana'
-  if (normalized.includes('kanji')) return 'kanji_n5'
-  if (normalized.includes('vocab')) return 'vocab_n5'
-  if (normalized.includes('grammar') || normalized.includes('conversational')) return 'grammar_patterns'
-  return null
-}
 
-function sanitizeOcrTranslationText(text: string): string {
-  const lines = text.replace(/\r\n/g, '\n').split('\n')
-  const leadingBoilerplate = [
-    /^\*{0,2}English Translation\*{0,2}:?\s*$/i,
-    /^English:\s*Here's the translation and explanation:?\s*$/i,
-    /^English:?\s*$/i,
-    /^Here's the translation and explanation:?\s*$/i,
-    /^Translation:?\s*$/i,
-    /^Translated Text:?\s*$/i,
-  ]
 
-  const trailingBoilerplate = [
-    /^notes?:?$/i,
-    /^vocabulary notes?:?$/i,
-    /^explanation:?$/i,
-    /^clarification:?$/i,
-    /^context:?$/i,
-    /^literal translation:?$/i,
-    /^alternative translation:?$/i,
-    /^if you want/i,
-    /^let me know/i,
-  ]
 
-  while (lines.length > 0) {
-    const first = lines[0]?.trim() ?? ''
-    if (!first) {
-      lines.shift()
-      continue
-    }
-    if (leadingBoilerplate.some((pattern) => pattern.test(first))) {
-      lines.shift()
-      continue
-    }
-    break
-  }
-
-  if (lines.length === 0) {
-    return ''
-  }
-
-  lines[0] = (lines[0] ?? '')
-    .replace(/^\*{0,2}English Translation\*{0,2}\s*:?\s*/i, '')
-    .replace(/^English:\s*Here's the translation and explanation:?\s*/i, '')
-    .replace(/^English:\s*/i, '')
-    .replace(/^Here's the translation and explanation:?\s*/i, '')
-
-  const cleanedLines: string[] = []
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (trimmed && trailingBoilerplate.some((pattern) => pattern.test(trimmed))) {
-      break
-    }
-    cleanedLines.push(line)
-  }
-
-  return cleanedLines.join('\n').trim()
-}
-
-function normalizeTranslationWhitespace(text: string): string {
-  return text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
-}
-
-function parseProgressMethod(logMessage: string | null | undefined): string | null {
-  if (!logMessage) return null
-  const match = logMessage.match(/downloading:\s*\d+%\s*\[([^\]]+)\]/i)
-  if (!match) return null
-  const method = match[1]?.trim()
-  return method ? method : null
-}
 
 function App() {
   // First-run setup wizard check — must be the first hooks so the conditional
@@ -2604,27 +2341,6 @@ function App() {
   const isHistoryNavigationRef = useRef(false)
   const [loading, setLoading] = useState<boolean>(() => loadSummarySnapshot() === null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  const [, setAssistantState] = useState<AssistantStatePayload | null>(null)
-  const [, setAssistantProfile] = useState<AssistantProfilePayload | null>(null)
-  const [assistantToasts, setAssistantToasts] = useState<AssistantToast[]>([])
-  const [assistantChatOpen, setAssistantChatOpen] = useState(false)
-  const [assistantChatInput, setAssistantChatInput] = useState('')
-  const [assistantChatMessages, setAssistantChatMessages] = useState<AssistantChatTurn[]>([])
-  const [assistantChatLoading, setAssistantChatLoading] = useState(false)
-  const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
-  const [ocrWorkbenchOpen, setOcrWorkbenchOpen] = useState(false)
-  const [ocrWorkbenchBusy, setOcrWorkbenchBusy] = useState(false)
-  const [ocrWorkbenchError, setOcrWorkbenchError] = useState<string | null>(null)
-  const [ocrWorkbenchResult, setOcrWorkbenchResult] = useState<{
-    fileName: string
-    lineCount: number
-    japaneseText: string
-    englishText: string
-  } | null>(null)
-  const [assistantSpeakingTurnKey, setAssistantSpeakingTurnKey] = useState<string | null>(null)
-  const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
-  const [, setAssistantChatWarmup] = useState(false)
-  const [, setAssistantChatFallbackNote] = useState<string | null>(null)
 
   const [activeScript, setActiveScript] = useState<ScriptKey>('hiragana')
   const [activeGame, setActiveGame] = useState<MinigameKey>('romaji_sprint')
@@ -2826,7 +2542,7 @@ function App() {
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
-  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
+  const [recommendations] = useState<RecommendationItem[]>([])
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
   const [warningModal, setWarningModal] = useState<{
     sectionId: ScriptKey | 'jlpt_prep'
@@ -2888,10 +2604,6 @@ function App() {
   const startupBootMarkRef = useRef<number>(performance.now())
   const startupFirstSummaryMsRef = useRef<number | null>(null)
   const startupReadySentRef = useRef(false)
-  const assistantChatHistoryHydratedRef = useRef(false)
-  const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
-  const ocrWorkbenchImageInputRef = useRef<HTMLInputElement | null>(null)
-  const assistantChatClearTokenRef = useRef(0)
   const assistantSpeechRunIdRef = useRef(0)
   const xpDetailsRef = useRef<HTMLDivElement | null>(null)
   const streakDetailsRef = useRef<HTMLDivElement | null>(null)
@@ -2913,8 +2625,6 @@ function App() {
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
-  const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
-  const tutorSeenKeysRef = useRef<Set<string>>(new Set())
   const translationProfileTierRef = useRef<'ocr_qwen_local' | null>(null)
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
@@ -2936,8 +2646,8 @@ function App() {
     setShowOverview(false)
     setShortcutMenuOpen(false)
     setActiveShortcutFlyout(null)
-    setAssistantChatOpen(false)
-    setOcrWorkbenchOpen(false)
+    tutor.setAssistantChatOpen(false)
+    tutor.setOcrWorkbenchOpen(false)
     setXpDetailsOpen(false)
     setStreakDetailsOpen(false)
     setSelectedChar(null)
@@ -2949,11 +2659,6 @@ function App() {
   const closeDictionary = useCallback(() => {
     setDictionaryOpen(false)
     setDictionarySeedQuery('')
-  }, [])
-
-  const closeOcrWorkbench = useCallback(() => {
-    setOcrWorkbenchOpen(false)
-    setOcrWorkbenchError(null)
   }, [])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
@@ -3015,7 +2720,6 @@ function App() {
 
   const cancelAssistantSpeech = useCallback(() => {
     assistantSpeechRunIdRef.current += 1
-    setAssistantSpeakingTurnKey(null)
     if (voiceAudioRef.current) {
       voiceAudioRef.current.pause()
       voiceAudioRef.current = null
@@ -3055,40 +2759,45 @@ function App() {
     }
   }, [settings.voiceSpeaker])
 
-  const speakAssistantReply = useCallback(async (text: string, turnKey?: string): Promise<void> => {
-    if (!settings.assistantChatAudioEnabled) {
-      return
-    }
-    const segments = splitSpeechSegments(text)
-    if (segments.length <= 0) {
-      return
-    }
 
-    const runId = assistantSpeechRunIdRef.current + 1
-    assistantSpeechRunIdRef.current = runId
-    setAssistantSpeakingTurnKey(turnKey ?? null)
 
-    try {
-      for (const segment of segments) {
-        if (assistantSpeechRunIdRef.current !== runId) {
+  const isInMinigameSession = view === 'minigame' && sessionActive && roundState !== null
+  const tutor = useTutor(
+    settings as any,
+    {
+      voice: {
+        playVoiceRuntimeAudio,
+        cancelAssistantSpeech,
+        assistantSpeechRunIdRef,
+        splitSpeechSegments,
+      },
+      isInMinigameSession,
+      activeSessionId,
+      activeScript,
+      ocrInstalled: tutorInstallInfo?.ocrInstalled ?? false,
+      onToastNavigate: (script, game, differentScript) => {
+        const minigame = resolveScriptMinigame(script, game)
+        setActiveGame(minigame)
+        setNavDirection('forward')
+        setView('minigame')
+        setSessionActive(false)
+        setRoundState(null)
+        setRoundFeedback(null)
+        setRoundFeedbackTone(null)
+        setRoundFeedbackPoints(null)
+        setRoundFeedbackAnswer(null)
+        setIsRoundResolving(false)
+        setLivesRemaining(DEFAULT_LIVES)
+        resetRoundCycle()
+        if (differentScript) {
+          setActiveScript(script)
+          setResumeRequest({ script, minigame })
           return
         }
-        const playedByRuntime = await playVoiceRuntimeAudio(segment.text, runId)
-        if (!playedByRuntime) {
-          setVoiceUnavailable(true)
-          return
-        }
-      }
-    } finally {
-      if (assistantSpeechRunIdRef.current === runId) {
-        setAssistantSpeakingTurnKey(null)
-      }
-    }
-  }, [playVoiceRuntimeAudio, settings.assistantChatAudioEnabled])
-
-  const replayAssistantTurn = useCallback((content: string, turnKey: string) => {
-    void speakAssistantReply(content, turnKey)
-  }, [speakAssistantReply])
+        void startSession(minigame)
+      },
+    },
+  )
 
   const formatModelSize = useCallback((sizeMb: number) => {
     if (!Number.isFinite(sizeMb)) {
@@ -4016,590 +3725,30 @@ function App() {
     }).catch(() => undefined)
   }, [])
 
-  const trackAssistantToastInteraction = useCallback(
-    async (
-      toast: AssistantToast,
-      interactionType: 'clicked' | 'ignored' | 'expired',
-      extraMetadata?: Record<string, string>,
-    ): Promise<void> => {
-      // Negative IDs are locally-generated toasts (not in the DB); nothing to track.
-      if (toast.id <= 0) {
-        return
-      }
 
-      const trackAssistantEvent = window.jplearnDesktop?.trackAssistantEvent
-      if (!trackAssistantEvent) {
-        return
-      }
 
-      const metadata: Record<string, string> = {
-        event_type: toast.eventType,
-        message_key: toast.messageKey,
-      }
 
-      if (toast.targetMode) metadata.target_mode = toast.targetMode
-      if (toast.focusArea) metadata.focus_area = toast.focusArea
-      if (toast.actionType) metadata.action_type = toast.actionType
-      if (extraMetadata) {
-        for (const [key, value] of Object.entries(extraMetadata)) {
-          const normalizedKey = key.trim()
-          const normalizedValue = value.trim()
-          if (normalizedKey && normalizedValue) {
-            metadata[normalizedKey] = normalizedValue
-          }
-        }
-      }
 
-      try {
-        await trackAssistantEvent({
-          eventId: toast.id,
-          interactionType,
-          metadata,
-        })
-      } catch {
-        // Telemetry path is best-effort only.
-      }
-    },
-    [],
-  )
 
-  const queueAssistantToast = useCallback((toast: AssistantToast | null) => {
-    if (!toast || settings.assistantToastLimit <= 0) {
-      return
-    }
-    setAssistantToasts([toast])
-  }, [settings.assistantToastLimit])
 
-  useEffect(() => {
-    void loadSummary()
-  }, [loadSummary])
 
-  // Fetch XP progress, study recommendations, and tutor reactions
-  // on mount and whenever the summary refreshes.
-  useEffect(() => {
-    let mounted = true
-    const getXp = window.jplearnDesktop?.getXpProgress
-    const getRecs = window.jplearnDesktop?.getRecommendations
-    const getTutor = window.jplearnDesktop?.getTutorReactions
-    const getPath = window.jplearnDesktop?.getLearningPathStatus
 
-    const safeResolve = async <T,>(fn: (() => Promise<T>) | undefined): Promise<T | null> => {
-      if (!fn) return null
-      try { return await fn() } catch { return null }
-    }
 
-    const doFetch = async () => {
-      const [xp, recs, tutor, path] = await Promise.all([
-        safeResolve(getXp),
-        safeResolve(getRecs),
-        safeResolve(getTutor),
-        safeResolve(getPath),
-      ])
-      if (!mounted) return
-      if (xp) setXpProgress(xp)
-      if (recs) setRecommendations(recs.recommendations)
-      if (tutor && tutor.reactions.length > 0) {
-        const r = tutor.reactions[0]
-        if (!tutorSeenKeysRef.current.has(r.dedup_key)) {
-          tutorSeenKeysRef.current.add(r.dedup_key)
-          const priorityMap: Record<string, AssistantToast['priority']> = {
-            congratulation: 'celebration',
-            encouragement: 'coaching',
-            guidance: 'info',
-            acknowledgement: 'info',
-          }
-          localToastIdRef.current -= 1
-          queueAssistantToast({
-            id: localToastIdRef.current,
-            priority: priorityMap[r.message_type] ?? 'info',
-            eventType: 'tutor_reaction',
-            messageKey: r.dedup_key,
-            title: normalizeTrackTerms(r.headline),
-            body: normalizeTrackTerms(r.body),
-            targetMode: null,
-            focusArea: null,
-            actionType: null,
-            actionLabel: 'Got it',
-          })
-          void window.jplearnDesktop?.dismissTutorReaction?.(r.dedup_key).catch(() => undefined)
-        }
-      }
-      if (path) setLearningPathStatus(path as LearningPathStatus)
-    }
-    void doFetch()
 
-    return () => { mounted = false }
-  }, [queueAssistantToast, summary])
 
-  useEffect(() => {
-    const getAssistantSnapshotFn = window.jplearnDesktop?.getAssistantSnapshot
-    if (!getAssistantSnapshotFn) {
-      return
-    }
 
-    let cancelled = false
 
-    async function refreshAssistantSnapshot(): Promise<void> {
-      try {
-        const response = await getAssistantSnapshotFn!(activeSessionId ?? undefined)
-        if (!response.ok || cancelled) return
-        setAssistantProfile(response.snapshot.profile)
-        setAssistantState(response.snapshot.state)
-      } catch {
-        // Snapshot is supplementary; keep study loop uninterrupted.
-      }
-    }
 
-    void refreshAssistantSnapshot()
 
-    return () => {
-      cancelled = true
-    }
-  }, [activeSessionId, summary])
 
-  useEffect(() => {
-    const getAssistantEventsFn = window.jplearnDesktop?.getAssistantEvents
-    const consumeAssistantEventsFn = window.jplearnDesktop?.consumeAssistantEvents
-    if (!getAssistantEventsFn || !consumeAssistantEventsFn) {
-      return
-    }
-
-    let disposed = false
-
-    async function pullAssistantEvents(): Promise<void> {
-      try {
-        const response = await getAssistantEventsFn!(8)
-        if (!response.ok || disposed || response.events.length === 0) {
-          return
-        }
-
-        const fresh = response.events.filter((event) => !assistantSeenEventIdsRef.current.has(event.id))
-        for (const event of fresh) {
-          assistantSeenEventIdsRef.current.add(event.id)
-        }
-
-        const canShowToast = view === 'minigame' && sessionActive && roundState !== null
-        if (fresh.length > 0 && settings.assistantToastLimit > 0 && canShowToast) {
-          const priorityWeight: Record<AssistantEventPayload['priority'], number> = {
-            critical: 4,
-            coaching: 3,
-            celebration: 2,
-            info: 1,
-          }
-          const selectedEvent = fresh.reduce((best, candidate) => (
-            priorityWeight[candidate.priority] >= priorityWeight[best.priority] ? candidate : best
-          ))
-          queueAssistantToast({
-            id: selectedEvent.id,
-            priority: selectedEvent.priority,
-            eventType: selectedEvent.event_type,
-            messageKey: selectedEvent.message_key,
-            title: formatAssistantEventTitle(selectedEvent),
-            body: formatAssistantEventBody(selectedEvent),
-            targetMode: null,
-            focusArea: selectedEvent.metadata.focus_area ?? null,
-            actionType: null,
-            actionLabel: 'Got it',
-        })
-      }
-
-        await consumeAssistantEventsFn!(response.events.map((event) => event.id))
-      } catch {
-        // Non-blocking polling path.
-      }
-    }
-
-    void pullAssistantEvents()
-    const pollHandle = window.setInterval(() => {
-      void pullAssistantEvents()
-    }, ASSISTANT_EVENT_POLL_MS)
-
-    return () => {
-      disposed = true
-      window.clearInterval(pollHandle)
-    }
-  }, [queueAssistantToast, roundState, sessionActive, settings.assistantToastLimit, view])
-
-  useEffect(() => {
-    if (settings.assistantToastLimit <= 0) {
-      setAssistantToasts([])
-      return
-    }
-    setAssistantToasts((previous) => previous.slice(-settings.assistantToastLimit))
-  }, [settings.assistantToastLimit])
-
-  useEffect(() => {
-    if (view === 'minigame' && sessionActive && roundState !== null) {
-      return
-    }
-    setAssistantToasts([])
-  }, [roundState, sessionActive, view])
-
-  useEffect(() => {
-    if (assistantToasts.length <= 0) {
-      return
-    }
-
-    const timeoutHandle = window.setTimeout(() => {
-      const expiredToast = assistantToasts[0]
-      void trackAssistantToastInteraction(expiredToast, 'expired', { reason: 'ttl' })
-      setAssistantToasts((previous) => previous.slice(1))
-    }, ASSISTANT_TOAST_TTL_MS)
-
-    return () => {
-      window.clearTimeout(timeoutHandle)
-    }
-  }, [assistantToasts, trackAssistantToastInteraction])
-
-  const refreshAssistantChatHistory = useCallback(async (): Promise<boolean> => {
-    const getAssistantChatHistory = window.jplearnDesktop?.getAssistantChatHistory
-    if (!getAssistantChatHistory) {
-      return false
-    }
-    const clearTokenAtStart = assistantChatClearTokenRef.current
-    try {
-      const response = await getAssistantChatHistory(20)
-      if (assistantChatClearTokenRef.current !== clearTokenAtStart) {
-        // The chat was cleared while this read was in flight; do not resurrect
-        // the old turns with stale data.
-        return false
-      }
-      if (response.ok) {
-        setAssistantChatMessages(response.turns)
-        return true
-      }
-      return false
-    } catch {
-      // Chat history is optional and should never block study flow.
-      return false
-    }
-  }, [])
-
-  const refreshAssistantChatStatus = useCallback(async (): Promise<AssistantChatRuntimeStatus | null> => {
-    const getAssistantChatRuntimeStatus = window.jplearnDesktop?.getAssistantChatRuntimeStatus
-    if (!getAssistantChatRuntimeStatus) {
-      return null
-    }
-    try {
-      const status = await getAssistantChatRuntimeStatus()
-      setAssistantChatStatus(status)
-      return status
-    } catch {
-      // Runtime status is optional metadata.
-      return null
-    }
-  }, [])
-
-  const hydrateAssistantChatFromPreloaded = useCallback(async (): Promise<boolean> => {
-    const getPreloadedAssistantChatHistory = window.jplearnDesktop?.getPreloadedAssistantChatHistory
-    if (!getPreloadedAssistantChatHistory) {
-      return false
-    }
-    const clearTokenAtStart = assistantChatClearTokenRef.current
-    try {
-      const response = await getPreloadedAssistantChatHistory()
-      if (assistantChatClearTokenRef.current !== clearTokenAtStart) {
-        return false
-      }
-      if (!response.ok || !response.runtimeActive) {
-        return false
-      }
-      setAssistantChatMessages(response.turns)
-      assistantChatHistoryHydratedRef.current = true
-      return true
-    } catch {
-      return false
-    }
-  }, [])
-
-  const isAssistantServerActive = useCallback((status: AssistantChatRuntimeStatus | null): boolean => {
-    if (!status?.loaded) {
-      return false
-    }
-    return String(status.activeProvider || '').trim().toLowerCase() === 'llama.cpp'
-  }, [])
-
-  const hydrateAssistantChatFromRuntime = useCallback(async (): Promise<boolean> => {
-    const status = await refreshAssistantChatStatus()
-    if (!isAssistantServerActive(status)) {
-      return false
-    }
-    const hydrated = await refreshAssistantChatHistory()
-    if (hydrated) {
-      assistantChatHistoryHydratedRef.current = true
-    }
-    return hydrated
-  }, [isAssistantServerActive, refreshAssistantChatHistory, refreshAssistantChatStatus])
-
-  useEffect(() => {
-    if (!settings.assistantChatEnabled) {
-      return
-    }
-
-    let disposed = false
-
-    const tryHydrate = async (): Promise<void> => {
-      if (assistantChatHistoryHydratedRef.current || disposed) {
-        return
-      }
-      const hydratedFromPreload = await hydrateAssistantChatFromPreloaded()
-      if (hydratedFromPreload || assistantChatHistoryHydratedRef.current) {
-        return
-      }
-      const hydratedFromRuntime = await hydrateAssistantChatFromRuntime()
-      if (hydratedFromRuntime || assistantChatHistoryHydratedRef.current || disposed) {
-        return
-      }
-      // No live runtime (e.g. local model not installed): load any persisted
-      // chat history directly so earlier conversations appear on startup.
-      const loadedFromStore = await refreshAssistantChatHistory()
-      if (loadedFromStore) {
-        assistantChatHistoryHydratedRef.current = true
-      }
-    }
-
-    void tryHydrate()
-
-    const startupHydrationPollHandle = window.setInterval(() => {
-      void tryHydrate()
-    }, 2000)
-
-    return () => {
-      disposed = true
-      window.clearInterval(startupHydrationPollHandle)
-    }
-  }, [hydrateAssistantChatFromPreloaded, hydrateAssistantChatFromRuntime, refreshAssistantChatHistory, settings.assistantChatEnabled])
-
-  useEffect(() => {
-    if (settings.assistantChatAudioEnabled && assistantChatOpen) {
-      return
-    }
-    cancelAssistantSpeech()
-  }, [assistantChatOpen, cancelAssistantSpeech, settings.assistantChatAudioEnabled])
-
-  useEffect(() => {
-    if (!settings.assistantChatEnabled || !assistantChatOpen) {
-      return
-    }
-
-    let disposed = false
-
-    async function hydrateAssistantChatPanel(): Promise<void> {
-      // Always surface persisted history when the panel opens, then layer in
-      // any live-runtime hydration on top.
-      await refreshAssistantChatHistory()
-      if (disposed) return
-      await hydrateAssistantChatFromRuntime()
-      if (disposed) return
-    }
-
-    void hydrateAssistantChatPanel()
-
-    const statusPollHandle = window.setInterval(() => {
-      void hydrateAssistantChatFromRuntime()
-    }, 10000)
-
-    return () => {
-      disposed = true
-      window.clearInterval(statusPollHandle)
-    }
-  }, [assistantChatOpen, hydrateAssistantChatFromRuntime, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled])
-
-  useEffect(() => {
-    if (settings.assistantChatEnabled) {
-      return
-    }
-
-    assistantChatHistoryHydratedRef.current = false
-    setAssistantChatOpen(false)
-    setAssistantChatLoading(false)
-    setAssistantChatWarmup(false)
-    setAssistantChatError(null)
-    setAssistantChatFallbackNote(null)
-
-    const unloadAssistantChatRuntime = window.jplearnDesktop?.unloadAssistantChatRuntime
-    if (!unloadAssistantChatRuntime) {
-      return
-    }
-    void unloadAssistantChatRuntime().catch(() => undefined)
-  }, [settings.assistantChatEnabled])
 
   // Avoid background tutor runtime warmup on startup.
   // Runtime loads lazily when the user sends a chat request.
 
-  const closeAssistantChat = useCallback(() => {
-    cancelAssistantSpeech()
-    setAssistantChatOpen(false)
-    setAssistantChatError(null)
-    setAssistantChatWarmup(false)
-    setAssistantChatFallbackNote(null)
-  }, [cancelAssistantSpeech])
 
-  const clearAssistantChat = useCallback(async () => {
-    // Invalidate any in-flight history reads so a slow background fetch can't
-    // resurrect the conversation after the user clears it.
-    assistantChatClearTokenRef.current += 1
-    assistantChatHistoryHydratedRef.current = true
-    setAssistantChatMessages([])
-    setAssistantChatError(null)
-    const clearHistory = window.jplearnDesktop?.clearAssistantChatHistory
-    if (!clearHistory) {
-      return
-    }
-    try {
-      await clearHistory()
-    } catch {
-      // Clearing persisted history is best effort; the visible log is already empty.
-    }
-  }, [])
 
-  useEffect(() => {
-    if (!assistantChatOpen) {
-      return
-    }
-    const log = assistantChatLogRef.current
-    if (!log) {
-      return
-    }
-    log.scrollTop = log.scrollHeight
-  }, [assistantChatOpen, assistantChatMessages, assistantChatLoading])
 
-  const sendAssistantChat = useCallback(async (forcedMessage?: string) => {
-    if (!settings.assistantChatEnabled) {
-      setAssistantChatError('Chatbot is disabled in settings.')
-      return
-    }
 
-    const sendAssistantChatMessage = window.jplearnDesktop?.sendAssistantChatMessage
-    if (!sendAssistantChatMessage) {
-      setAssistantChatError('Assistant chat runtime is unavailable in this build.')
-      return
-    }
-
-    const message = (forcedMessage ?? assistantChatInput).trim()
-    if (!message) {
-      return
-    }
-    if (message.length > ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT) {
-      setAssistantChatError(`User chat is limited to ${ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT} characters.`)
-      return
-    }
-
-    // Optimistically render the user's message immediately, then show a typing
-    // indicator while the model responds (refreshAssistantChatHistory replaces
-    // these turns with the authoritative server history once the reply lands).
-    const optimisticTurn: AssistantChatTurn = {
-      role: 'user',
-      content: message,
-      created_at_utc: new Date().toISOString(),
-    }
-    setAssistantChatMessages((previous) => [...previous, optimisticTurn])
-    setAssistantChatInput('')
-    setAssistantChatLoading(true)
-    setAssistantChatError(null)
-    setAssistantChatWarmup(!assistantChatStatus?.loaded)
-    try {
-      const response = await sendAssistantChatMessage({
-        message,
-        context: {
-          session_id: activeSessionId ?? '',
-        },
-      })
-      if (response.provider === 'scripted-fallback' || response.provider === 'stub-fallback') {
-        setAssistantChatFallbackNote('Local model unavailable. Scripted coach mode is active for this chat turn.')
-      } else {
-        setAssistantChatFallbackNote(null)
-      }
-      await refreshAssistantChatStatus()
-      await refreshAssistantChatHistory()
-      if (response.text) {
-        void speakAssistantReply(response.text)
-      }
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : 'Unable to send assistant chat message.'
-      if (/llama\.cpp exited with code 130/i.test(detail) || /inference cancelled/i.test(detail)) {
-        setAssistantChatError('Chat inference cancelled.')
-      } else {
-        setAssistantChatError(detail)
-      }
-    } finally {
-      setAssistantChatWarmup(false)
-      setAssistantChatLoading(false)
-    }
-  }, [activeSessionId, assistantChatInput, assistantChatStatus?.loaded, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
-
-  const handleOcrWorkbenchImageSelected = useCallback(async (file: File) => {
-    if (file.size > ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_BYTES) {
-      setOcrWorkbenchError(`Image uploads are limited to ${ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB} MB.`)
-      return
-    }
-    if (!file.type.startsWith('image/')) {
-      setOcrWorkbenchError('Please choose a PNG, JPEG, or WEBP image.')
-      return
-    }
-
-    const extractAssistantChatImageText = window.jplearnDesktop?.extractAssistantChatImageText
-    if (!extractAssistantChatImageText) {
-      setOcrWorkbenchError('Image Translation is unavailable in this build.')
-      return
-    }
-    if (!tutorInstallInfo?.ocrInstalled) {
-      setOcrWorkbenchError('Image Translation is not installed. Install it in Settings > Tutor > Image Translation.')
-      return
-    }
-    const translateAssistantChatOcrText = window.jplearnDesktop?.translateAssistantChatOcrText
-    if (!translateAssistantChatOcrText) {
-      setOcrWorkbenchError('Offline OCR translation runtime is unavailable in this build.')
-      return
-    }
-
-    setOcrWorkbenchBusy(true)
-    setOcrWorkbenchError(null)
-    try {
-      const payload = await prepareAssistantChatImagePayload(file)
-      const ocrResponse = await extractAssistantChatImageText({
-        ...payload,
-        minConfidence: settings.assistantChatOcrMinConfidence,
-      })
-      const extractedText = typeof ocrResponse?.text === 'string' ? ocrResponse.text.trim() : ''
-      if (!extractedText) {
-        setOcrWorkbenchError('No readable text was found in that image.')
-        return
-      }
-
-      const translationResponse = await translateAssistantChatOcrText({
-        text: extractedText,
-        sourceLang: 'ja',
-        targetLang: 'en',
-        fastMode: true,
-      })
-      const rawEnglishText = (translationResponse?.text ?? '').trim()
-      const finalEnglishText = normalizeTranslationWhitespace(sanitizeOcrTranslationText(rawEnglishText))
-
-      if (!finalEnglishText) {
-        setOcrWorkbenchError('No translation text returned.')
-        return
-      }
-
-      const lineCount = Number.isFinite(ocrResponse?.lineCount)
-        ? Math.max(0, Math.trunc(ocrResponse.lineCount))
-        : extractedText.split(/\n+/).filter(Boolean).length
-      setOcrWorkbenchResult({
-        fileName: file.name,
-        lineCount,
-        japaneseText: extractedText,
-        englishText: finalEnglishText,
-      })
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : 'Unable to process image translation.'
-      setOcrWorkbenchError(detail)
-    } finally {
-      setOcrWorkbenchBusy(false)
-      if (ocrWorkbenchImageInputRef.current) {
-        ocrWorkbenchImageInputRef.current.value = ''
-      }
-    }
-  }, [settings.assistantChatOcrMinConfidence, tutorInstallInfo?.ocrInstalled])
 
   useEffect(() => {
     let cancelled = false
@@ -5783,34 +4932,6 @@ function App() {
     feedbackAdvanceRef.current = null
   }, [])
 
-  const launchAssistantToastAction = useCallback((toast: AssistantToast) => {
-    void trackAssistantToastInteraction(toast, 'clicked', { reason: 'cta-click' })
-    const suggestedScript = inferScriptFromFocusArea(toast.focusArea) ?? activeScript
-    const suggestedGame = toast.targetMode ?? 'interleave_mix'
-    const minigame = resolveScriptMinigame(suggestedScript, suggestedGame)
-
-    setActiveGame(minigame)
-    setNavDirection('forward')
-    setView('minigame')
-    setSessionActive(false)
-    setRoundState(null)
-    setRoundFeedback(null)
-    setRoundFeedbackTone(null)
-    setRoundFeedbackPoints(null)
-    setRoundFeedbackAnswer(null)
-    setIsRoundResolving(false)
-    setLivesRemaining(DEFAULT_LIVES)
-    resetRoundCycle()
-    setAssistantToasts((previous) => previous.filter((item) => item.id !== toast.id))
-
-    if (suggestedScript !== activeScript) {
-      setActiveScript(suggestedScript)
-      setResumeRequest({ script: suggestedScript, minigame })
-      return
-    }
-
-    void startSession(minigame)
-  }, [activeScript, resetRoundCycle, resolveScriptMinigame, startSession, trackAssistantToastInteraction])
 
   const continueLastSession = useCallback(() => {
     if (!sessionRunReport) return
@@ -6192,7 +5313,7 @@ function App() {
 
       const nextToastId = localToastIdRef.current - 1
       localToastIdRef.current = nextToastId
-      queueAssistantToast(buildRoundCoachToast(nextToastId, {
+      tutor.queueAssistantToast(buildRoundCoachToast(nextToastId, {
         isCorrect,
         mode: roundState.mode,
         nextStreak,
@@ -6245,7 +5366,7 @@ function App() {
       }
       feedbackAdvanceRef.current = advanceFeedback
     },
-    [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, leechFocusEnabled, livesEnabled, livesRemaining, nextRound, queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionBestStreak, sessionConfidenceCount, sessionConfidenceTotal, sessionPoints, sessionRounds, sessionScore, sessionTargetItems],
+    [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, leechFocusEnabled, livesEnabled, livesRemaining, nextRound, tutor.queueAssistantToast, roundConfidenceScore, roundState, scriptStats, sessionBestStreak, sessionConfidenceCount, sessionConfidenceTotal, sessionPoints, sessionRounds, sessionScore, sessionTargetItems],
   )
 
   useEffect(() => {
@@ -6259,8 +5380,8 @@ function App() {
           setShowSettings(false)
         } else {
           setDictionaryOpen(false)
-          setAssistantChatOpen(false)
-          setOcrWorkbenchOpen(false)
+          tutor.setAssistantChatOpen(false)
+          tutor.setOcrWorkbenchOpen(false)
           setShowOverview(false)
           setShowSettings(true)
         }
@@ -6284,13 +5405,13 @@ function App() {
           return
         }
 
-        if (assistantChatOpen) {
-          closeAssistantChat()
+        if (tutor.assistantChatOpen) {
+          tutor.closeAssistantChat()
           return
         }
 
-        if (ocrWorkbenchOpen) {
-          closeOcrWorkbench()
+        if (tutor.ocrWorkbenchOpen) {
+          tutor.closeOcrWorkbench()
           return
         }
 
@@ -6318,13 +5439,13 @@ function App() {
         }
       }
 
-      if (showSettings || assistantChatOpen || ocrWorkbenchOpen || isInput) return
+      if (showSettings || tutor.assistantChatOpen || tutor.ocrWorkbenchOpen || isInput) return
 
       if (event.key === '6') {
         setDictionaryOpen(false)
         setShowOverview(true)
         setShowSettings(false)
-        setOcrWorkbenchOpen(false)
+        tutor.setOcrWorkbenchOpen(false)
         void loadSummary()
         setShortcutMenuOpen(false)
         setActiveShortcutFlyout(null)
@@ -6367,7 +5488,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [assistantChatOpen, closeAssistantChat, closeOcrWorkbench, loadSummary, ocrWorkbenchOpen, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
+  }, [tutor.assistantChatOpen, tutor.closeAssistantChat, tutor.closeOcrWorkbench, loadSummary, tutor.ocrWorkbenchOpen, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -6553,7 +5674,7 @@ function App() {
     setIsRoundResolving(false)
     resetRoundCycle()
     setShowSettings(false)
-    setOcrWorkbenchOpen(false)
+    tutor.setOcrWorkbenchOpen(false)
   }, [resetRoundCycle])
 
   const closeShortcutMenu = useCallback(() => {
@@ -6570,8 +5691,8 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(true)
     setShowSettings(false)
-    setAssistantChatOpen(false)
-    setOcrWorkbenchOpen(false)
+    tutor.setAssistantChatOpen(false)
+    tutor.setOcrWorkbenchOpen(false)
     void loadSummary()
     closeShortcutMenu()
   }, [closeShortcutMenu, loadSummary])
@@ -6643,8 +5764,8 @@ function App() {
     setDictionaryOpen(false)
     setShowSettings(true)
     setShowOverview(false)
-    setAssistantChatOpen(false)
-    setOcrWorkbenchOpen(false)
+    tutor.setAssistantChatOpen(false)
+    tutor.setOcrWorkbenchOpen(false)
     closeShortcutMenu()
   }, [closeShortcutMenu])
 
@@ -6818,7 +5939,6 @@ function App() {
 
   const canTitlebarBack = viewHistoryIndexRef.current > 0
   const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
-  const activeAssistantToast = assistantToasts[0] ?? null
   const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
   const xpLevelCap = xpProgress?.xp_for_current_level ?? 0
   const xpPercent = xpLevelCap > 0 ? Math.round((xpInLevel / xpLevelCap) * 100) : 0
@@ -7108,15 +6228,15 @@ function App() {
                 setShowSettings(false)
                 setShortcutMenuOpen(false)
                 setActiveShortcutFlyout(null)
-                setAssistantChatOpen(false)
-                setAssistantChatError(null)
-                setOcrWorkbenchOpen((open) => !open)
-                setOcrWorkbenchError(null)
+                tutor.setAssistantChatOpen(false)
+                
+                tutor.setOcrWorkbenchOpen((open) => !open)
+                
               }}
-              aria-expanded={ocrWorkbenchOpen}
+              aria-expanded={tutor.ocrWorkbenchOpen}
               aria-controls="ocr-workbench-panel"
-              aria-label={ocrWorkbenchOpen ? 'Close OCR translator' : 'Open OCR translator'}
-              title={ocrWorkbenchOpen ? 'Close OCR translator' : 'Open OCR translator'}
+              aria-label={tutor.ocrWorkbenchOpen ? 'Close OCR translator' : 'Open OCR translator'}
+              title={tutor.ocrWorkbenchOpen ? 'Close OCR translator' : 'Open OCR translator'}
             >
               <ImagePlus className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
             </button>
@@ -7129,28 +6249,19 @@ function App() {
             >
               <Settings className="window-nav-icon" strokeWidth={2.2} />
             </button>
-            {settings.assistantChatEnabled ? (
-              <button
-                type="button"
-                className="window-nav-button"
-                onClick={() => {
-                  setDictionaryOpen(false)
-                  setShowOverview(false)
-                  setShowSettings(false)
-                  setOcrWorkbenchOpen(false)
-                  setShortcutMenuOpen(false)
-                  setActiveShortcutFlyout(null)
-                  setAssistantChatOpen((open) => !open)
-                  setAssistantChatError(null)
-                }}
-                aria-expanded={assistantChatOpen}
-                aria-controls="assistant-chat-panel"
-                aria-label={assistantChatOpen ? 'Close tutor chat' : 'Open tutor chat'}
-                title={assistantChatOpen ? 'Close tutor chat' : 'Open tutor chat'}
-              >
-                <MessageCircle className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
-              </button>
-            ) : null}
+            <TutorTitlebarButton
+              assistantChatEnabled={settings.assistantChatEnabled}
+              assistantChatOpen={tutor.assistantChatOpen}
+              onToggle={() => {
+                setDictionaryOpen(false)
+                setShowOverview(false)
+                setShowSettings(false)
+                tutor.setOcrWorkbenchOpen(false)
+                setShortcutMenuOpen(false)
+                setActiveShortcutFlyout(null)
+                tutor.setAssistantChatOpen((open) => !open)
+              }}
+            />
           </div>
         </div>
         <div className="titlebar-progress-cluster">
@@ -7452,8 +6563,8 @@ function App() {
             setDictionaryOpen(false)
             setShowOverview(false)
             setShowSettings(false)
-            setAssistantChatOpen(false)
-            setOcrWorkbenchOpen(false)
+            tutor.setAssistantChatOpen(false)
+            tutor.setOcrWorkbenchOpen(false)
             setNavDirection('forward')
             setView('jlpt_prep')
           }}
@@ -7475,8 +6586,8 @@ function App() {
             setDictionaryOpen(false)
             setShowOverview(false)
             setShowSettings(false)
-            setAssistantChatOpen(false)
-            setOcrWorkbenchOpen(false)
+            tutor.setAssistantChatOpen(false)
+            tutor.setOcrWorkbenchOpen(false)
             setNavDirection('forward')
 
             if (sectionId === 'jlpt_prep') {
@@ -7695,150 +6806,8 @@ function App() {
         voiceUnavailable={voiceUnavailable}
       />
 
-      {ocrWorkbenchOpen ? (
-        <div
-          className="modal-backdrop assistant-backdrop ocr-workbench-backdrop"
-          role="presentation"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              closeOcrWorkbench()
-            }
-          }}
-        >
-          <section
-            id="ocr-workbench-panel"
-            className="assistant-chat-panel assistant-chat-window"
-            role="dialog"
-            aria-modal="true"
-            aria-label="OCR translator panel"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="assistant-chat-header">
-              <div className="assistant-chat-identity">
-                <span className="assistant-chat-avatar" aria-hidden="true">
-                  <ImagePlus size={18} strokeWidth={2.2} />
-                  <span className="assistant-chat-presence" />
-                </span>
-                <span className="assistant-chat-identity-text">
-                  <span className="assistant-chat-title">OCR Translator</span>
-                  <span className="assistant-chat-subtitle">
-                    {ocrWorkbenchBusy ? 'Reading image…' : 'Upload Japanese text image to translate'}
-                  </span>
-                </span>
-              </div>
-              <div className="assistant-chat-header-actions">
-                <button
-                  type="button"
-                  className="assistant-chat-clear"
-                  onClick={() => {
-                    setOcrWorkbenchResult(null)
-                    setOcrWorkbenchError(null)
-                  }}
-                  disabled={ocrWorkbenchBusy || (!ocrWorkbenchResult && !ocrWorkbenchError)}
-                  aria-label="Clear OCR result"
-                  title="Clear"
-                >
-                  <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className="assistant-chat-close"
-                  onClick={closeOcrWorkbench}
-                  aria-label="Close OCR translator"
-                >
-                  <X size={14} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-              </div>
-            </header>
-
-            <div className="assistant-chat-log" role="log" aria-live="polite">
-              {!ocrWorkbenchResult ? (
-                <p className="assistant-chat-empty">Select an image to extract Japanese text and get an English translation in one response.</p>
-              ) : (
-                <article className="assistant-chat-turn assistant-chat-turn-assistant ocr-workbench-result-card" style={{ maxWidth: '100%' }}>
-                  <div className="assistant-chat-turn-meta">
-                    <span className="assistant-chat-turn-role">OCR + Tutor</span>
-                  </div>
-                  <div className="ocr-workbench-source-meta">
-                    <span className="ocr-workbench-source-label">Source image</span>
-                    <span className="ocr-workbench-source-value">{ocrWorkbenchResult.fileName}</span>
-                    <span className="ocr-workbench-source-lines">{`${ocrWorkbenchResult.lineCount} line${ocrWorkbenchResult.lineCount === 1 ? '' : 's'}`}</span>
-                  </div>
-                  <div className="ocr-workbench-flow" role="group" aria-label="Japanese to English translation flow">
-                    <section className="ocr-workbench-box ocr-workbench-box-japanese" aria-label="Japanese text">
-                      <h3>Japanese</h3>
-                      <p>{ocrWorkbenchResult.japaneseText}</p>
-                    </section>
-                    <span className="ocr-workbench-flow-arrow" aria-hidden="true">
-                      <ArrowRight size={22} strokeWidth={2.4} />
-                    </span>
-                    <section className="ocr-workbench-box ocr-workbench-box-english" aria-label="English text">
-                      <h3>English</h3>
-                      <p>{ocrWorkbenchResult.englishText}</p>
-                    </section>
-                  </div>
-                </article>
-              )}
-            </div>
-
-            {ocrWorkbenchError ? (
-              <p className="assistant-chat-error">{ocrWorkbenchError}</p>
-            ) : null}
-
-            <footer className="assistant-chat-composer">
-              <div className="assistant-chat-input-wrap ocr-workbench-controls">
-                <button
-                  type="button"
-                  className="assistant-chat-upload ocr-workbench-upload"
-                  onClick={() => ocrWorkbenchImageInputRef.current?.click()}
-                  disabled={ocrWorkbenchBusy}
-                  aria-label="Upload image for OCR"
-                  title={`Upload image (max ${ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB} MB)`}
-                >
-                  {ocrWorkbenchBusy
-                    ? <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" className="spin-icon" />
-                    : <ImagePlus size={16} strokeWidth={2.2} aria-hidden="true" />}
-                  <span>Upload image</span>
-                </button>
-                <label className="ocr-workbench-confidence" htmlFor="ocr-workbench-confidence-slider">
-                  <span className="ocr-workbench-confidence-label">Confidence</span>
-                  <div className="ocr-workbench-confidence-row">
-                    <input
-                      id="ocr-workbench-confidence-slider"
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={settings.assistantChatOcrMinConfidence}
-                      onChange={(event) => {
-                        const value = Number(event.currentTarget.value)
-                        setSettings((prev) => ({
-                          ...prev,
-                          assistantChatOcrMinConfidence: clampAssistantChatOcrMinConfidence(value),
-                        }))
-                      }}
-                      aria-label="OCR confidence filter"
-                    />
-                    <span className="ocr-workbench-confidence-value">{Math.round(settings.assistantChatOcrMinConfidence * 100)}%</span>
-                  </div>
-                </label>
-                <input
-                  ref={ocrWorkbenchImageInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  style={{ display: 'none' }}
-                  onChange={(event) => {
-                    const file = event.currentTarget.files?.[0]
-                    if (!file) {
-                      return
-                    }
-                    void handleOcrWorkbenchImageSelected(file)
-                  }}
-                />
-              </div>
-            </footer>
-          </section>
-        </div>
+      {tutor.ocrWorkbenchOpen ? (
+        <OcrWorkbench tutor={tutor} settings={settings as any} setSettings={setSettings as any} />
       ) : null}
 
       </SessionProvider>
@@ -8054,40 +7023,7 @@ function App() {
                   aria-labelledby="settings-tab-tutor"
                 >
                   <div className="settings-control-content">
-                    <p className="settings-section-label">Tutor Companion</p>
-                    <div className="settings-animation-grid" role="group" aria-label="Tutor companion controls">
-                      <button
-                        type="button"
-                        className={`settings-icon-entry settings-theme-entry ${settings.assistantChatEnabled ? 'is-active' : ''}`}
-                        onClick={() => setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))}
-                        aria-label={settings.assistantChatEnabled ? 'Chat with Tutor enabled. Activate to disable.' : 'Chat with Tutor disabled. Activate to enable.'}
-                        aria-pressed={settings.assistantChatEnabled}
-                        title={settings.assistantChatEnabled ? 'Chat with Tutor enabled' : 'Chat with Tutor disabled'}
-                      >
-                        <span className={`settings-mode-icon-button ${settings.assistantChatEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
-                          <MessageCircle size={18} strokeWidth={2.25} aria-hidden="true" />
-                        </span>
-                        <span className="settings-icon-entry-label">Chat with Tutor</span>
-                      </button>
-
-                      {ASSISTANT_TOAST_LIMIT_OPTIONS.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          className={`settings-icon-entry settings-theme-entry ${settings.assistantToastLimit === option.value ? 'is-active' : ''}`}
-                          onClick={() => setSettings((prev) => ({ ...prev, assistantToastLimit: option.value }))}
-                          aria-label={`Set tutor toast amount to ${option.label}`}
-                          aria-pressed={settings.assistantToastLimit === option.value}
-                          title={`Toast amount: ${option.label}`}
-                        >
-                          <span className={`settings-mode-icon-button ${settings.assistantToastLimit === option.value ? 'is-enabled' : ''}`} aria-hidden="true">
-                            <AlertTriangle size={18} strokeWidth={2.25} aria-hidden="true" />
-                          </span>
-                          <span className="settings-icon-entry-label">Toasts {option.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <p className="settings-help">Turn Chat with Tutor off to unload the local model runtime. Set toasts to Off to disable popup notifications.</p>
+                    <TutorSettingsTab settings={settings as any} setSettings={setSettings as any} />
                   </div>
                 </div>
                 ) : null}
@@ -8774,180 +7710,8 @@ function App() {
         </div>
       ) : null}
 
-      {assistantChatOpen ? (
-        <div
-          className="modal-backdrop assistant-backdrop"
-          role="presentation"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) closeAssistantChat()
-          }}
-        >
-          <section
-            id="assistant-chat-panel"
-            className="assistant-chat-panel assistant-chat-window"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Tutor chat panel"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="assistant-chat-header">
-              <div className="assistant-chat-identity">
-                <span className="assistant-chat-avatar" aria-hidden="true">
-                  <MessageCircle size={18} strokeWidth={2.2} />
-                  <span className="assistant-chat-presence" />
-                </span>
-                <span className="assistant-chat-identity-text">
-                  <span className="assistant-chat-title">Study Coach</span>
-                  <span className="assistant-chat-subtitle">
-                    {assistantChatLoading ? 'Typing…' : 'Online · here to help'}
-                  </span>
-                </span>
-              </div>
-              <div className="assistant-chat-header-actions">
-                <button
-                  type="button"
-                  className={`assistant-chat-audio-toggle ${settings.assistantChatAudioEnabled ? 'is-on' : 'is-off'}`}
-                  onClick={() => {
-                    if (settings.assistantChatAudioEnabled) {
-                      cancelAssistantSpeech()
-                    }
-                    setSettings((previous) => ({
-                      ...previous,
-                      assistantChatAudioEnabled: !previous.assistantChatAudioEnabled,
-                    }))
-                  }}
-                  aria-label={settings.assistantChatAudioEnabled ? 'Turn coach audio off' : 'Turn coach audio on'}
-                  aria-pressed={settings.assistantChatAudioEnabled}
-                  title={settings.assistantChatAudioEnabled ? 'Coach audio on' : 'Coach audio off'}
-                >
-                  {settings.assistantChatAudioEnabled ? (
-                    <Volume2 size={14} strokeWidth={2.2} aria-hidden="true" />
-                  ) : (
-                    <VolumeX size={14} strokeWidth={2.2} aria-hidden="true" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className="assistant-chat-clear"
-                  onClick={() => void clearAssistantChat()}
-                  disabled={assistantChatMessages.length <= 0 || assistantChatLoading}
-                  aria-label="Clear chat history"
-                  title="Clear chat"
-                >
-                  <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className="assistant-chat-close"
-                  onClick={closeAssistantChat}
-                  aria-label="Close tutor chat"
-                >
-                  <X size={14} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-              </div>
-            </header>
-
-            <div className="assistant-chat-log" role="log" aria-live="polite" ref={assistantChatLogRef}>
-              {assistantChatMessages.length <= 0 && !assistantChatLoading ? (
-                <p className="assistant-chat-empty">Start a chat when you want strategy help or encouragement.</p>
-              ) : (
-                <>
-                  {assistantChatMessages.map((turn, index) => {
-                    const turnKey = `${turn.created_at_utc}-${index}`
-                    const isReplaySpeaking = assistantSpeakingTurnKey === turnKey
-                    return (
-                      <article key={turnKey} className={`assistant-chat-turn assistant-chat-turn-${turn.role}`}>
-                        <div className="assistant-chat-turn-meta">
-                          <span className="assistant-chat-turn-role">{turn.role === 'assistant' ? 'Coach' : 'You'}</span>
-                          {turn.role === 'assistant' ? (
-                            <button
-                              type="button"
-                              className={`assistant-chat-turn-replay ${isReplaySpeaking ? 'is-speaking' : ''}`}
-                              onClick={() => {
-                                if (isReplaySpeaking) {
-                                  cancelAssistantSpeech()
-                                  return
-                                }
-                                replayAssistantTurn(turn.content, turnKey)
-                              }}
-                              disabled={!settings.assistantChatAudioEnabled}
-                              aria-label={settings.assistantChatAudioEnabled
-                                ? (isReplaySpeaking ? 'Stop coach message audio' : 'Replay coach message audio')
-                                : 'Enable chat audio to replay this message'}
-                              title={settings.assistantChatAudioEnabled
-                                ? (isReplaySpeaking ? 'Stop audio' : 'Replay audio')
-                                : 'Enable chat audio to replay'}
-                            >
-                              <Volume2 size={12} strokeWidth={2.2} aria-hidden="true" />
-                            </button>
-                          ) : null}
-                        </div>
-                        <p>{turn.content}</p>
-                      </article>
-                    )
-                  })}
-                  {assistantChatLoading ? (
-                    <article className="assistant-chat-turn assistant-chat-turn-assistant assistant-chat-turn-typing" aria-label="Coach is typing">
-                      <div className="assistant-chat-turn-meta">
-                        <span className="assistant-chat-turn-role">Coach</span>
-                      </div>
-                      <p className="assistant-chat-typing" aria-hidden="true">
-                        <span className="assistant-chat-typing-dot" />
-                        <span className="assistant-chat-typing-dot" />
-                        <span className="assistant-chat-typing-dot" />
-                      </p>
-                    </article>
-                  ) : null}
-                </>
-              )}
-            </div>
-
-            {assistantChatError ? (
-              <p className="assistant-chat-error">{assistantChatError}</p>
-            ) : null}
-
-            <footer className="assistant-chat-composer">
-              <div className="assistant-chat-input-wrap">
-                <textarea
-                  value={assistantChatInput}
-                  onChange={(event) => {
-                    setAssistantChatInput(event.currentTarget.value)
-                    if (assistantChatError?.startsWith('User chat is limited to')) {
-                      setAssistantChatError(null)
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter' || event.shiftKey) {
-                      return
-                    }
-                    event.preventDefault()
-                    if (assistantChatLoading || assistantChatInput.trim().length === 0) {
-                      return
-                    }
-                    void sendAssistantChat()
-                  }}
-                  placeholder="Ask your coach for help with your current weak area..."
-                  rows={2}
-                  maxLength={ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT}
-                  disabled={assistantChatLoading}
-                />
-                <span className="assistant-chat-limit" aria-hidden="true">
-                  {assistantChatInput.length}/{ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT}
-                </span>
-                <button
-                  type="button"
-                  className="assistant-chat-send"
-                  onClick={() => void sendAssistantChat()}
-                  disabled={assistantChatLoading || assistantChatInput.trim().length === 0}
-                  aria-label="Send tutor chat message"
-                  title="Send"
-                >
-                  <SendHorizontal size={16} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-              </div>
-            </footer>
-          </section>
-        </div>
+      {tutor.assistantChatOpen ? (
+        <TutorChatPanel tutor={tutor} settings={settings as any} setSettings={setSettings as any} cancelAssistantSpeech={cancelAssistantSpeech} />
       ) : null}
 
       {selectedChar ? (
@@ -8992,47 +7756,8 @@ function App() {
       ) : null}
 
       <aside className="assistant-toast-anchor" aria-live="polite" aria-label="Tutor updates">
-        {settings.assistantToastLimit > 0 && activeAssistantToast ? (
-          <div className="assistant-toast-stack" role="status" aria-label="Tutor updates">
-            <article key={activeAssistantToast.id} className={`assistant-toast assistant-toast-${activeAssistantToast.priority}`}>
-              <div className="assistant-toast-header">
-                <span className="assistant-toast-icon" aria-hidden="true">
-                  {(() => {
-                    const Icon = ASSISTANT_TOAST_ICONS[activeAssistantToast.priority]
-                    return <Icon strokeWidth={2.2} />
-                  })()}
-                </span>
-                <h3>{activeAssistantToast.title}</h3>
-                <button
-                  type="button"
-                  className="assistant-toast-dismiss"
-                  onClick={() => setAssistantToasts((prev) => prev.filter((t) => t.id !== activeAssistantToast.id))}
-                  aria-label="Dismiss"
-                >
-                  <X strokeWidth={2.2} />
-                </button>
-              </div>
-              <p className="assistant-toast-body">{activeAssistantToast.body}</p>
-              {activeAssistantToast.targetMode ? (
-                <div className="assistant-toast-controls">
-                  <button
-                    type="button"
-                    className="assistant-toast-action"
-                    onClick={() => launchAssistantToastAction(activeAssistantToast)}
-                  >
-                    {activeAssistantToast.actionLabel}
-                  </button>
-                </div>
-              ) : null}
-              <div className="assistant-toast-advance-track" aria-hidden="true">
-                <span
-                  key={activeAssistantToast.id}
-                  className="assistant-toast-advance-fill"
-                  style={{ animationDuration: `${ASSISTANT_TOAST_TTL_MS}ms` }}
-                />
-              </div>
-            </article>
-          </div>
+        {settings.assistantToastLimit > 0 && tutor.activeAssistantToast ? (
+          <TutorToast toast={tutor.activeAssistantToast} onDismiss={tutor.dismissAssistantToast} onAction={tutor.launchAssistantToastAction} />
         ) : null}
       </aside>
 
