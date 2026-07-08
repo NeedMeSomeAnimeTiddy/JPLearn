@@ -429,13 +429,13 @@ const tutor = useTutor(settings, {
 | Phase | System | Est. Lines | Actual | App.tsx After |
 |-------|--------|-----------|--------|---------------|
 | 1 ✅ | Theme | -1,378 | -1,378 | 9,514 |
-| 2 ✅ | Background | -456 | -456 | 9,058 |
-| 3 ✅ | Tutor Chat + OCR | -1,800 | -1,255 | 7,802 |
-| 4 ⏳ | Voice + Audio | -875 | — | ~6,930 |
-| 5 | Model Management | -900 | — | ~6,030 |
-| 6 | Data Persistence | -400 | — | ~5,630 |
-| 7 | Content Templates | -500 | — | ~5,130 |
-| 8 | Session/Round (risky) | -1,200 | — | ~3,930 |
+| 2 ✅ | Background | -456 | -458 | 9,056 |
+| 3 ✅ | Tutor Chat + OCR | -1,800 | -1,275 | 7,781 |
+| 4 ✅ | Voice + Audio | -875 | -703 | 7,078 |
+| 5 ⏳ | Model Management | -900 | — | ~6,180 |
+| 6 | Data Persistence | -400 | — | ~5,600 |
+| 7 | Content Templates | -500 | — | ~5,100 |
+| 8 | Session/Round (risky) | -1,200 | — | ~3,900 |
 
 **Target:** Get App.tsx under 4,000 lines. After Phase 8 (or without it), remaining ~4,000 lines would be:
 - Navigation/view routing (~200 lines)

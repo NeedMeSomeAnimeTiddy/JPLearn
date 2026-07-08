@@ -19,7 +19,6 @@ import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
-import { AmbientAudioController } from './lib/ambientAudio'
 import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Ear, Flame, History, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Mic, Minus, Plus, RefreshCw, RotateCcw, Search, Settings, Shuffle, Square, Sun, Trash2, Volume2, X } from 'lucide-react'
 import './App.css'
 import { useTheme } from './features/theme'
@@ -28,7 +27,8 @@ import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/th
 import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme } from './features/theme/utils'
 import { useBackground, BackgroundSettingsTab, clampBackgroundBlur, normalizeCustomBackgroundDataUrl, isBackgroundStyle, BACKGROUND_BLUR_DEFAULT } from './features/background'
 import type { BackgroundStyle } from './features/background'
-import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, parseProgressMethod } from './features/tutor'
+import { useVoice, splitSpeechSegments, VoiceSettingsTab } from './features/voice'
+import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit } from './features/tutor'
 import type { AssistantToast } from './features/tutor'
 import type { RoundDictionaryNote } from './types'
 
@@ -49,7 +49,6 @@ type SessionGoalStartResponse = Awaited<ReturnType<typeof window.jplearnDesktop.
 type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getSessionSummary>>
 type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
 type XPProgress = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getXpProgress>>>
-type VoiceStatusPayload = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getVoiceStatus>>>
 type RecommendationItem = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getRecommendations>>>['recommendations'][number]
 interface SessionRunReport {
   script: ScriptKey
@@ -170,7 +169,6 @@ const DECK_LOAD_TIMEOUT_MS = 15000
 const STARTUP_WARMUP_INITIAL_DELAY_MS = 900
 const STARTUP_WARMUP_YIELD_DEADLINE_MS = 45
 
-const JAPANESE_CHAR_REGEX = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/
 const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
   { key: 'theme', label: 'Theme', icon: Sun },
   { key: 'background', label: 'Background', icon: House },
@@ -728,19 +726,7 @@ interface AppSettings {
   ambientAudioEnabled: boolean
 }
 
-interface VoiceSynthesisMeta {
-  mode: 'single' | 'mixed_stitched'
-  profile: 'main' | 'jp' | 'en'
-  mixedSegmentCount: number
-  streamingAttempted: boolean
-  streamingFallbackUsed: boolean
-  elapsedMs: number
-}
 
-interface SpeechSegment {
-  text: string
-  language: 'ja' | 'en'
-}
 
 interface RoundOption {
   id: string
@@ -1152,19 +1138,6 @@ interface PersistedSession {
 const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
 
-const FIXED_JAPANESE_VOICE_OPTIONS: VoiceOptionEntry[] = [
-  { id: 'zundamon_normal', name: 'Zundamon', jp: 'ずんだもん', search: 'zundamon normal' },
-  { id: 'shikoku_metan_normal', name: 'Shikoku Metan', jp: '四国めたん', search: 'shikoku metan normal' },
-  { id: 'kasukabe_tsumugi_normal', name: 'Kasukabe Tsumugi', jp: '春日部つむぎ', search: 'kasukabe tsumugi normal' },
-  { id: 'namine_ritsu_normal', name: 'Namine Ritsu', jp: '波音リツ', search: 'namine ritsu normal' },
-  { id: 'genno_takehiro_normal', name: 'Genno Takehiro', jp: '玄野武宏', search: 'genno takehiro normal' },
-  { id: 'shirakami_kotaro_normal', name: 'Shirakami Kotaro', jp: '白上虎太郎', search: 'shirakami kotaro normal' },
-  { id: 'meimei_himari_normal', name: 'Meimei Himari', jp: '冥鳴ひまり', search: 'meimei himari normal' },
-  { id: 'kyushu_sora_normal', name: 'Kyushu Sora', jp: '九州そら', search: 'kyushu sora normal' },
-]
-const DEFAULT_VOICE_SPEAKER = FIXED_JAPANESE_VOICE_OPTIONS[0].id
-const VOICE_SAMPLE_LINE = 'こんにちは。いっしょにがんばりましょう。'
-type VoiceOptionEntry = { id: string; name: string; jp: string; search: string }
 
 const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
   total_beginner:       [],
@@ -1351,83 +1324,11 @@ function defaultSettings(): AppSettings {
     assistantChatOcrMinConfidence: 0.3,
     showKeyboardPrompts: false,
     voiceEnabled: true,
-    voiceSpeaker: DEFAULT_VOICE_SPEAKER,
+    voiceSpeaker: 'zundamon_normal',
     ambientAudioEnabled: false,
   }
 }
 
-function splitSpeechSegments(text: string): SpeechSegment[] {
-  const normalized = text.replace(/\s+/g, ' ').trim()
-  if (!normalized) {
-    return []
-  }
-  const splitSentenceByLanguage = (sentence: string): SpeechSegment[] => {
-    const tokens = sentence.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fffー々〆ヵヶ]+|[A-Za-z0-9][A-Za-z0-9'’-]*|[^A-Za-z0-9\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+/g) ?? [sentence]
-    const classifyToken = (token: string): 'ja' | 'en' | 'neutral' => {
-      if (JAPANESE_CHAR_REGEX.test(token)) {
-        return 'ja'
-      }
-      if (/[A-Za-z0-9]/.test(token)) {
-        return 'en'
-      }
-      return 'neutral'
-    }
-
-    const classified = tokens.map((token) => ({ token, kind: classifyToken(token) }))
-    const sentenceSegments: SpeechSegment[] = []
-
-    const findNextConcreteLanguage = (startIndex: number): SpeechSegment['language'] | null => {
-      for (let index = startIndex; index < classified.length; index += 1) {
-        const kind = classified[index].kind
-        if (kind !== 'neutral') {
-          return kind
-        }
-      }
-      return null
-    }
-
-    for (let index = 0; index < classified.length; index += 1) {
-      const entry = classified[index]
-      let language: SpeechSegment['language']
-      if (entry.kind === 'neutral') {
-        const previousLanguage = sentenceSegments[sentenceSegments.length - 1]?.language
-        language = previousLanguage ?? findNextConcreteLanguage(index + 1) ?? 'en'
-      } else {
-        language = entry.kind
-      }
-
-      const previous = sentenceSegments[sentenceSegments.length - 1]
-      if (previous && previous.language === language) {
-        previous.text += entry.token
-        continue
-      }
-      sentenceSegments.push({ text: entry.token, language })
-    }
-
-    return sentenceSegments
-      .map((segment) => ({ ...segment, text: segment.text.trim() }))
-      .filter((segment) => segment.text.length > 0)
-  }
-
-  const sentenceMatches = normalized.match(/[^.!?。！？\n]+[.!?。！？\n]*/g) ?? [normalized]
-  const segments: SpeechSegment[] = []
-  for (const sentence of sentenceMatches) {
-    const trimmed = sentence.trim()
-    if (!trimmed) {
-      continue
-    }
-    const sentenceSegments = splitSentenceByLanguage(trimmed)
-    for (const sentenceSegment of sentenceSegments) {
-      const previous = segments[segments.length - 1]
-      if (previous && previous.language === sentenceSegment.language) {
-        previous.text = `${previous.text} ${sentenceSegment.text}`.trim()
-        continue
-      }
-      segments.push(sentenceSegment)
-    }
-  }
-  return segments
-}
 
 
 
@@ -1528,10 +1429,7 @@ function loadSettings(): AppSettings {
       voiceEnabled:
         typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
       voiceSpeaker:
-        typeof parsed.voiceSpeaker === 'string'
-          && FIXED_JAPANESE_VOICE_OPTIONS.some((option) => option.id === parsed.voiceSpeaker)
-          ? parsed.voiceSpeaker
-          : defaults.voiceSpeaker,
+        typeof parsed.voiceSpeaker === 'string' ? parsed.voiceSpeaker : defaults.voiceSpeaker,
       ambientAudioEnabled:
         typeof parsed.ambientAudioEnabled === 'boolean'
           ? parsed.ambientAudioEnabled
@@ -2353,11 +2251,6 @@ function App() {
   const [sessionActive, setSessionActive] = useState<boolean>(false)
   const [roundState, setRoundState] = useState<RoundState | null>(null)
   const [roundInput, setRoundInput] = useState<string>('')
-  const [voiceBusy, setVoiceBusy] = useState<boolean>(false)
-  const [voiceUnavailable, setVoiceUnavailable] = useState<boolean>(false)
-  const [lastVoiceSynthesis, setLastVoiceSynthesis] = useState<VoiceSynthesisMeta | null>(null)
-  const [voiceStatus, setVoiceStatus] = useState<VoiceStatusPayload | null>(null)
-  const [voiceStatusChecked, setVoiceStatusChecked] = useState(false)
   const [tutorInstallInfo, setTutorInstallInfo] = useState<{
     totalRamGb: number
     models: Array<{
@@ -2439,7 +2332,6 @@ function App() {
     }>
     activeTranslationProfileTier?: 'ocr_qwen_local' | null
   } | null>(null)
-  const [voiceOptions] = useState<VoiceOptionEntry[]>(FIXED_JAPANESE_VOICE_OPTIONS)
   const [tutorDownloadingTier, setTutorDownloadingTier] = useState<'low' | 'medium' | 'high' | 'ultra' | null>(null)
   const [tutorDownloadProgress, setTutorDownloadProgress] = useState<{ percent: number; mb: number | null; totalMb: number | null } | null>(null)
   const [tutorDownloadMethod, setTutorDownloadMethod] = useState<string | null>(null)
@@ -2447,16 +2339,9 @@ function App() {
   const [dictionaryDownloading, setDictionaryDownloading] = useState(false)
   const [dictionaryProgress, setDictionaryProgress] = useState<number>(0)
   const [dictionaryDownloadMethod, setDictionaryDownloadMethod] = useState<string | null>(null)
-  const [speechDownloadingTier, setSpeechDownloadingTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
-  const [speechDownloadProgress, setSpeechDownloadProgress] = useState<number>(0)
-  const [speechDownloadMethod, setSpeechDownloadMethod] = useState<string | null>(null)
-  const [speechModelActionTier, setSpeechModelActionTier] = useState<'fast' | 'balanced' | 'high' | 'ultra' | null>(null)
   const [translationProfileApplyingTier, setTranslationProfileApplyingTier] = useState<'ocr_qwen_local' | null>(null)
   const [translationProfileProgress, setTranslationProfileProgress] = useState<number>(0)
   const [translationProfileMethod, setTranslationProfileMethod] = useState<string | null>(null)
-  const [voiceEngineDownloadingTier, setVoiceEngineDownloadingTier] = useState<'0.6b' | null>(null)
-  const [voiceEngineDownloadProgress, setVoiceEngineDownloadProgress] = useState<number>(0)
-  const [voiceEngineDownloadMethod, setVoiceEngineDownloadMethod] = useState<string | null>(null)
   const [roundFeedback, setRoundFeedback] = useState<string | null>(null)
   const [roundFeedbackTone, setRoundFeedbackTone] = useState<FeedbackTone>(null)
   const [roundFeedbackPoints, setRoundFeedbackPoints] = useState<number | null>(null)
@@ -2594,8 +2479,6 @@ function App() {
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
-  const voiceAudioRef = useRef<HTMLAudioElement | null>(null)
-  const ambientAudioRef = useRef<AmbientAudioController | null>(null)
   const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const roundPresentedAtRef = useRef<number>(0)
@@ -2604,7 +2487,6 @@ function App() {
   const startupBootMarkRef = useRef<number>(performance.now())
   const startupFirstSummaryMsRef = useRef<number | null>(null)
   const startupReadySentRef = useRef(false)
-  const assistantSpeechRunIdRef = useRef(0)
   const xpDetailsRef = useRef<HTMLDivElement | null>(null)
   const streakDetailsRef = useRef<HTMLDivElement | null>(null)
   const localToastIdRef = useRef(-1)
@@ -2683,121 +2565,12 @@ function App() {
     interleaveCursorRef.current = 0
   }, [])
 
-  const playQuestionAudio = useCallback(async (text: string, speaker?: string) => {
-    const spoken = typeof text === 'string' ? text.trim() : ''
-    if (!spoken || voiceBusy) {
-      return
-    }
-    const speak = window.jplearnDesktop?.speakText
-    if (!speak) {
-      setVoiceUnavailable(true)
-      return
-    }
-    setVoiceBusy(true)
-    try {
-      const result = await speak({
-        text: spoken,
-        speaker: speaker ?? settings.voiceSpeaker,
-      })
-      if (result?.audioBase64) {
-        setLastVoiceSynthesis((result.synthesis as VoiceSynthesisMeta | undefined) ?? null)
-        if (voiceAudioRef.current) {
-          voiceAudioRef.current.pause()
-        }
-        const audio = new Audio(`data:audio/wav;base64,${result.audioBase64}`)
-        voiceAudioRef.current = audio
-        await audio.play()
-        setVoiceUnavailable(false)
-      } else {
-        setVoiceUnavailable(true)
-      }
-    } catch {
-      setVoiceUnavailable(true)
-    } finally {
-      setVoiceBusy(false)
-    }
-  }, [voiceBusy, settings.voiceSpeaker])
-
-  const cancelAssistantSpeech = useCallback(() => {
-    assistantSpeechRunIdRef.current += 1
-    if (voiceAudioRef.current) {
-      voiceAudioRef.current.pause()
-      voiceAudioRef.current = null
-    }
-  }, [])
-
-  const playVoiceRuntimeAudio = useCallback(async (
-    text: string,
-    runId: number,
-  ): Promise<boolean> => {
-    const speak = window.jplearnDesktop?.speakText
-    if (!speak) {
-      return false
-    }
-    try {
-      const result = await speak({
-        text,
-        speaker: settings.voiceSpeaker,
-      })
-      if (!result?.audioBase64 || assistantSpeechRunIdRef.current !== runId) {
-        return false
-      }
-      setLastVoiceSynthesis((result.synthesis as VoiceSynthesisMeta | undefined) ?? null)
-      await new Promise<void>((resolve, reject) => {
-        const audio = new Audio(`data:audio/wav;base64,${result.audioBase64}`)
-        if (voiceAudioRef.current) {
-          voiceAudioRef.current.pause()
-        }
-        voiceAudioRef.current = audio
-        audio.onended = () => resolve()
-        audio.onerror = () => reject(new Error('Unable to play voice runtime audio.'))
-        void audio.play().catch(reject)
-      })
-      return true
-    } catch {
-      return false
-    }
-  }, [settings.voiceSpeaker])
 
 
 
-  const isInMinigameSession = view === 'minigame' && sessionActive && roundState !== null
-  const tutor = useTutor(
-    settings as any,
-    {
-      voice: {
-        playVoiceRuntimeAudio,
-        cancelAssistantSpeech,
-        assistantSpeechRunIdRef,
-        splitSpeechSegments,
-      },
-      isInMinigameSession,
-      activeSessionId,
-      activeScript,
-      ocrInstalled: tutorInstallInfo?.ocrInstalled ?? false,
-      onToastNavigate: (script, game, differentScript) => {
-        const minigame = resolveScriptMinigame(script, game)
-        setActiveGame(minigame)
-        setNavDirection('forward')
-        setView('minigame')
-        setSessionActive(false)
-        setRoundState(null)
-        setRoundFeedback(null)
-        setRoundFeedbackTone(null)
-        setRoundFeedbackPoints(null)
-        setRoundFeedbackAnswer(null)
-        setIsRoundResolving(false)
-        setLivesRemaining(DEFAULT_LIVES)
-        resetRoundCycle()
-        if (differentScript) {
-          setActiveScript(script)
-          setResumeRequest({ script, minigame })
-          return
-        }
-        void startSession(minigame)
-      },
-    },
-  )
+
+
+  
 
   const formatModelSize = useCallback((sizeMb: number) => {
     if (!Number.isFinite(sizeMb)) {
@@ -2978,63 +2751,6 @@ function App() {
     return makeFit('Unsupported tier', 'Unable to evaluate this model tier on this system.', false)
   }, [tutorInstallInfo?.gpuVramGb, tutorInstallInfo?.totalRamGb])
 
-  const getSpeechModelHardwareFit = useCallback((tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
-    const totalRamGb = tutorInstallInfo?.totalRamGb ?? 0
-    const gpuVramGb = tutorInstallInfo?.gpuVramGb ?? 0
-    const makeFit = (
-      badge: string,
-      detail: string,
-      isOk: boolean,
-      tone: 'soft' | 'warning' = isOk ? 'soft' : 'warning',
-    ) => ({ badge, detail, isOk, tone })
-
-    if (tier === 'fast') {
-      if (totalRamGb >= 6 || gpuVramGb >= 2) {
-        return makeFit('Recommended fit', 'Fastest option. Comfortable on most systems.', true)
-      }
-      if (totalRamGb >= 4 || gpuVramGb >= 1) {
-        return makeFit('Comfortable fit', 'Fastest option. Comfortable on most systems.', true)
-      }
-      return makeFit('Minimum fit', 'Fastest option. Comfortable on most systems.', true, 'warning')
-    }
-
-    if (tier === 'balanced') {
-      if (totalRamGb >= 12 || gpuVramGb >= 4) {
-        return makeFit('Recommended fit', 'Good balance of speed and recognition quality.', true)
-      }
-      if (totalRamGb >= 10 || gpuVramGb >= 2) {
-        return makeFit('Comfortable fit', 'Good balance of speed and recognition quality.', true)
-      }
-      if (totalRamGb >= 6) {
-        return makeFit('Minimum fit', 'Good balance of speed and recognition quality.', true, 'warning')
-      }
-      return makeFit('Too heavy', 'Works best with around 10 GB RAM or more.', false)
-    }
-
-    if (tier === 'high') {
-      if (totalRamGb >= 24 || gpuVramGb >= 12) {
-        return makeFit('Recommended fit', 'Strong quality with lower latency than Ultra.', true)
-      }
-      if (totalRamGb >= 16 || gpuVramGb >= 8) {
-        return makeFit('Comfortable fit', 'Strong quality with lower latency than Ultra.', true)
-      }
-      if (totalRamGb >= 8 || gpuVramGb >= 4) {
-        return makeFit('Minimum fit', 'Strong quality with lower latency than Ultra.', true, 'warning')
-      }
-      return makeFit('Too heavy', 'Best with around 16 GB RAM or 8 GB GPU VRAM.', false)
-    }
-
-    if (totalRamGb >= 32 || gpuVramGb >= 16) {
-      return makeFit('Recommended fit', 'Highest recognition quality; heaviest tier.', true)
-    }
-    if (totalRamGb >= 24 || gpuVramGb >= 12) {
-      return makeFit('Comfortable fit', 'Highest recognition quality; heaviest tier.', true)
-    }
-    if (totalRamGb >= 12 || gpuVramGb >= 8) {
-      return makeFit('Minimum fit', 'Highest recognition quality; heaviest tier.', true, 'warning')
-    }
-    return makeFit('Too heavy', 'Best with around 24 GB RAM or 12 GB GPU VRAM.', false)
-  }, [tutorInstallInfo?.gpuVramGb, tutorInstallInfo?.totalRamGb])
 
   const refreshTutorInstallInfo = useCallback(async () => {
     const getSetupSystemInfo = window.jplearnDesktop?.getSetupSystemInfo
@@ -3080,37 +2796,59 @@ function App() {
     }
   }, [])
 
-  const refreshVoiceStatus = useCallback(async (): Promise<VoiceStatusPayload | null> => {
-    const getVoiceStatus = window.jplearnDesktop?.getVoiceStatus
-    if (!getVoiceStatus) {
-      setVoiceStatusChecked(true)
-      return null
-    }
-    try {
-      const status = await getVoiceStatus()
-      setVoiceStatus(status)
-      setVoiceStatusChecked(true)
-      return status
-    } catch {
-      setVoiceStatusChecked(true)
-      return null
-    }
-  }, [])
+  const voice = useVoice(
+    settings as any,
+    setSettings as any,
+    {
+      tutorInstallInfo: tutorInstallInfo as any,
+      refreshTutorInstallInfo,
+    },
+  )
+
+  const isInMinigameSession = view === 'minigame' && sessionActive && roundState !== null
+  const tutor = useTutor(
+    settings as any,
+    {
+      voice: {
+        playVoiceRuntimeAudio: voice.playVoiceRuntimeAudio,
+        cancelAssistantSpeech: voice.cancelAssistantSpeech,
+        assistantSpeechRunIdRef: voice.assistantSpeechRunIdRef,
+        splitSpeechSegments,
+      },
+      isInMinigameSession,
+      activeSessionId,
+      activeScript,
+      ocrInstalled: tutorInstallInfo?.ocrInstalled ?? false,
+      onToastNavigate: (script, game, differentScript) => {
+        const minigame = resolveScriptMinigame(script, game)
+        setActiveGame(minigame)
+        setNavDirection('forward')
+        setView('minigame')
+        setSessionActive(false)
+        setRoundState(null)
+        setRoundFeedback(null)
+        setRoundFeedbackTone(null)
+        setRoundFeedbackPoints(null)
+        setRoundFeedbackAnswer(null)
+        setIsRoundResolving(false)
+        setLivesRemaining(DEFAULT_LIVES)
+        resetRoundCycle()
+        if (differentScript) {
+          setActiveScript(script)
+          setResumeRequest({ script, minigame })
+          return
+        }
+        void startSession(minigame)
+      },
+    },
+  )
+
 
   useEffect(() => {
     void refreshTutorInstallInfo()
   }, [refreshTutorInstallInfo])
 
-  useEffect(() => {
-    void refreshVoiceStatus()
-  }, [refreshVoiceStatus])
 
-  useEffect(() => {
-    if (view !== 'script_hub') {
-      return
-    }
-    void refreshVoiceStatus()
-  }, [refreshVoiceStatus, view])
 
   useEffect(() => {
     if (!showSettings || activeSettingsTab !== 'tutor') {
@@ -3119,71 +2857,7 @@ function App() {
     void refreshTutorInstallInfo()
   }, [activeSettingsTab, refreshTutorInstallInfo, showSettings])
 
-  useEffect(() => {
-    if (!showSettings || activeSettingsTab !== 'voice') {
-      return
-    }
 
-    void refreshVoiceStatus()
-    const intervalHandle = window.setInterval(() => {
-      void refreshVoiceStatus()
-    }, 3000)
-
-    return () => {
-      window.clearInterval(intervalHandle)
-    }
-  }, [activeSettingsTab, refreshVoiceStatus, showSettings])
-
-  useEffect(() => {
-    const onSetupProgress = window.jplearnDesktop?.onSetupProgress
-    if (!onSetupProgress) {
-      return
-    }
-    const unsubscribe = onSetupProgress((evt) => {
-      const method = parseProgressMethod(evt.logMessage)
-      if (evt.id === 'dictionary') {
-        setDictionaryProgress(evt.percent)
-        if (method) setDictionaryDownloadMethod(method)
-        return
-      }
-      if (evt.id === 'voice') {
-        setVoiceEngineDownloadProgress(evt.percent)
-        if (method) setVoiceEngineDownloadMethod(method)
-        return
-      }
-      if (evt.id === 'speech') {
-        setSpeechDownloadProgress(evt.percent)
-        if (method) setSpeechDownloadMethod(method)
-        return
-      }
-      if (evt.id === 'ocr') {
-        const activeTier = translationProfileTierRef.current
-        if (activeTier) {
-          const bounded = Math.max(0, Math.min(100, evt.percent))
-          const staged = Math.round((bounded / 100) * 50)
-          setTranslationProfileProgress((prev) => Math.max(prev, staged))
-        }
-        if (method) setTranslationProfileMethod(method)
-        return
-      }
-      if (evt.id === 'translation') {
-        const activeTier = translationProfileTierRef.current
-        if (activeTier) {
-          const bounded = Math.max(0, Math.min(100, evt.percent))
-          const staged = Math.round(50 + (bounded / 100) * 50)
-          setTranslationProfileProgress((prev) => Math.max(prev, staged))
-        }
-        if (method) setTranslationProfileMethod(method)
-        return
-      }
-      if (evt.id !== 'model') {
-        return
-      }
-      if (method) setTutorDownloadMethod(method)
-      setTutorDownloadProgress({ percent: evt.percent, mb: evt.mb, totalMb: evt.totalMb })
-    })
-    return unsubscribe
-  }, [])
 
   const downloadTutorModel = useCallback(async (tier: 'low' | 'medium' | 'high' | 'ultra') => {
     const downloadModel = window.jplearnDesktop?.downloadModel
@@ -3247,50 +2921,8 @@ function App() {
     }
   }, [dictionaryDownloading, refreshTutorInstallInfo])
 
-  const downloadSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra', options?: { force?: boolean }) => {
-    const downloadModel = window.jplearnDesktop?.downloadSpeechModel
-    if (!downloadModel || speechDownloadingTier) {
-      return
-    }
-    setSpeechDownloadingTier(tier)
-    setSpeechDownloadProgress(0)
-    setSpeechDownloadMethod(null)
-    try {
-      await downloadModel(tier, options)
-      await refreshTutorInstallInfo()
-    } finally {
-      setSpeechDownloadingTier(null)
-      setSpeechDownloadProgress(0)
-    }
-  }, [refreshTutorInstallInfo, speechDownloadingTier])
 
-  const selectSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
-    const setActiveSpeechModel = window.jplearnDesktop?.setActiveSpeechModel
-    if (!setActiveSpeechModel || speechModelActionTier) {
-      return
-    }
-    setSpeechModelActionTier(tier)
-    try {
-      await setActiveSpeechModel(tier)
-      await refreshTutorInstallInfo()
-    } finally {
-      setSpeechModelActionTier(null)
-    }
-  }, [refreshTutorInstallInfo, speechModelActionTier])
 
-  const uninstallSpeechModel = useCallback(async (tier: 'fast' | 'balanced' | 'high' | 'ultra') => {
-    const uninstallModel = window.jplearnDesktop?.uninstallSpeechModel
-    if (!uninstallModel || speechModelActionTier) {
-      return
-    }
-    setSpeechModelActionTier(tier)
-    try {
-      await uninstallModel(tier)
-      await refreshTutorInstallInfo()
-    } finally {
-      setSpeechModelActionTier(null)
-    }
-  }, [refreshTutorInstallInfo, speechModelActionTier])
 
   const applyTranslationProfile = useCallback(async (tier: 'ocr_qwen_local') => {
     const applyProfile = window.jplearnDesktop?.applyTranslationProfile
@@ -3311,26 +2943,6 @@ function App() {
     }
   }, [refreshTutorInstallInfo, translationProfileApplyingTier])
 
-  const downloadVoiceEngineModel = useCallback(async (tier: '0.6b') => {
-    const downloadVoiceEngine = window.jplearnDesktop?.downloadVoiceEngine
-    if (!downloadVoiceEngine || voiceEngineDownloadingTier) {
-      return
-    }
-    setVoiceEngineDownloadingTier(tier)
-    setVoiceEngineDownloadProgress(0)
-    setVoiceEngineDownloadMethod(null)
-    try {
-      await downloadVoiceEngine(tier)
-      await refreshTutorInstallInfo()
-      const preloadVoice = window.jplearnDesktop?.preloadVoice
-      if (preloadVoice) {
-        await preloadVoice(settings.voiceSpeaker)
-      }
-    } finally {
-      setVoiceEngineDownloadingTier(null)
-      setVoiceEngineDownloadProgress(0)
-    }
-  }, [refreshTutorInstallInfo, settings.voiceSpeaker, voiceEngineDownloadingTier])
 
   // Do not warm voice runtime automatically in the background.
   // Keep startup and menu-open flows quiet; runtime initializes on first use.
@@ -3519,23 +3131,6 @@ function App() {
     document.documentElement.dataset.motionStyle = settings.motionStyle
   }, [settings])
 
-  // Ambient audio lifecycle
-  useEffect(() => {
-    if (settings.ambientAudioEnabled) {
-      if (!ambientAudioRef.current) {
-        ambientAudioRef.current = new AmbientAudioController({
-          sources: ['/audio/lofi-loop.mp3', '/audio/lofi-loop.ogg'],
-          volume: 0.35,
-          fadeMs: 1200,
-        })
-      }
-      ambientAudioRef.current.start()
-    } else {
-      ambientAudioRef.current?.stop()
-    }
-
-    return () => ambientAudioRef.current?.dispose()
-  }, [settings.ambientAudioEnabled])
 
   const activePetalStream = useMemo(() => {
     if (settings.reducedMotion || settings.motionStyle === 'calm_fade') return []
@@ -5555,51 +5150,20 @@ function App() {
     return null
   }, [blockProgressWithMastery, activeBlockIndex, activeScript, kanjiCategoryProgress, activeKanjiCategory, vocabCategoryProgress, activeVocabCategory])
 
-  const speechRecognitionModelEnabled = useMemo(() => {
-    if (!tutorInstallInfo) {
-      return true
-    }
-    const activeTier = tutorInstallInfo.activeSpeechModelTier
-    if (!activeTier) {
-      return false
-    }
-    return tutorInstallInfo.speechModels.some((model) => model.tier === activeTier && model.installed)
-  }, [tutorInstallInfo])
-  const speechRecognitionLockReason = 'Install and enable a speech recognition model in Settings > Voice to use Speech Recall.'
 
-  const voiceRuntimeRunning = useMemo(() => {
-    const hasVoiceStatusApi = typeof window.jplearnDesktop?.getVoiceStatus === 'function'
-    if (!hasVoiceStatusApi || !voiceStatusChecked) {
-      return true
-    }
-    if (!voiceStatus) {
-      return false
-    }
-    return voiceStatus.available && voiceStatus.modelReady && !voiceStatus.downloading
-  }, [voiceStatus, voiceStatusChecked])
 
-  const listeningLockReason = useMemo(() => {
-    if (voiceRuntimeRunning) {
-      return null
-    }
-    const detail = voiceStatus?.lastError?.trim()
-    if (detail) {
-      return `VOICEVOX runtime is not running (${detail}). Start it in Settings > Voice.`
-    }
-    return 'VOICEVOX runtime is not running. Start it in Settings > Voice.'
-  }, [voiceRuntimeRunning, voiceStatus?.lastError])
 
   const minigameLockReasons = useMemo(() => {
     const reasons: Partial<Record<MinigameKey, string>> = {}
-    if (!speechRecognitionModelEnabled) {
-      reasons.speech_recall = speechRecognitionLockReason
+    if (!voice.speechRecognitionModelEnabled) {
+      reasons.speech_recall = voice.speechRecognitionLockReason
     }
-    if (listeningLockReason) {
-      reasons.listening_audio_first = listeningLockReason
-      reasons.dictation = listeningLockReason
+    if (voice.listeningLockReason) {
+      reasons.listening_audio_first = voice.listeningLockReason
+      reasons.dictation = voice.listeningLockReason
     }
     return reasons
-  }, [listeningLockReason, speechRecognitionModelEnabled])
+  }, [voice.listeningLockReason, voice.speechRecognitionModelEnabled])
 
   // Block session is complete when every card in the active block has reached max score.
   // sessionRounds > 0 ensures we don't trigger on a pre-mastered block before answering.
@@ -6436,8 +6000,8 @@ function App() {
         confidenceCaptureEnabled,
         roundConfidenceScore,
         activeSessionLengthPreset,
-        voiceBusy,
-        voiceUnavailable,
+        voiceBusy: voice.voiceBusy,
+        voiceUnavailable: voice.voiceUnavailable,
         answerInputRef,
         startSession: (game) => { void startSession(game) },
         submitAnswer,
@@ -6452,7 +6016,7 @@ function App() {
         },
         toggleLeechFocus: () => setLeechFocusEnabled((previous) => !previous),
         toggleConfidence: () => setConfidenceCaptureEnabled((previous) => !previous),
-        playAudio: (text) => { void playQuestionAudio(text) },
+        playAudio: (text) => { void voice.playQuestionAudio(text) },
       }}>
       {/* Home is the main landing surface; keep it mounted only for home view. */}
       {view === 'home' && !loading && learningPathStatus && !learningPathStatus.onboarding_complete ? (
@@ -6464,14 +6028,14 @@ function App() {
             setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))
           }}
           showVoiceSection={showOnboardingVoiceSection}
-          voiceOptions={voiceOptions}
+          voiceOptions={voice.voiceOptions}
           voiceEnabled={settings.voiceEnabled}
           voiceSpeaker={settings.voiceSpeaker}
-          voiceBusy={voiceBusy}
+          voiceBusy={voice.voiceBusy}
           onVoiceToggle={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
             onVoiceSelect={(id) => {
             setSettings((prev) => ({ ...prev, voiceSpeaker: id }))
-            void playQuestionAudio(VOICE_SAMPLE_LINE, id)
+            void voice.playQuestionAudio('こんにちは。いっしょにがんばりましょう。', id)
           }}
           showFontSection={showOnboardingFontSection}
           appFont={settings.appFont}
@@ -6801,9 +6365,9 @@ function App() {
         seedQuery={dictionarySeedQuery}
         cards={dictionaryCards}
         onClose={closeDictionary}
-        onPlayAudio={(text) => { void playQuestionAudio(text) }}
-        voiceBusy={voiceBusy}
-        voiceUnavailable={voiceUnavailable}
+        onPlayAudio={(text) => { void voice.playQuestionAudio(text) }}
+        voiceBusy={voice.voiceBusy}
+        voiceUnavailable={voice.voiceUnavailable}
       />
 
       {tutor.ocrWorkbenchOpen ? (
@@ -7311,129 +6875,7 @@ function App() {
                 </SettingsCollapsibleSection>
                 ) : null}
 
-                {activeSettingsTab === 'voice' ? (
-                <SettingsCollapsibleSection
-                  id="speech-recognition"
-                  title="Speech Recognition"
-                  description="Local offline speech-to-text used to answer minigame questions by speaking. Runs entirely on your device."
-                  meta={(tutorInstallInfo?.speechModels ?? []).some((model) => model.installed) ? 'Installed' : 'Not installed'}
-                  collapsed={Boolean(collapsedSettingsSections['speech-recognition'])}
-                  onToggle={() => toggleThemeSectionCollapsed('speech-recognition')}
-                  className="settings-theme-card"
-                >
-                  <div style={{ display: 'grid', gap: '0.65rem' }}>
-                    {(tutorInstallInfo?.speechModels ?? []).map((model) => {
-                      const isDownloadingThis = speechDownloadingTier === model.tier
-                      const isActioningThis = speechModelActionTier === model.tier
-                      const isActiveTier = tutorInstallInfo?.activeSpeechModelTier === model.tier
-                      const speechHardwareFit = getSpeechModelHardwareFit(model.tier)
-
-                      return (
-                        <div
-                          key={model.tier}
-                          style={{
-                            padding: '0.75rem 0.9rem',
-                            borderRadius: '12px',
-                            background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
-                            border: isActiveTier
-                              ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
-                              : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                            <div>
-                              <p style={{ margin: 0, fontWeight: 600 }}>
-                                {model.label}
-                                {isActiveTier ? ' · Active' : ''}
-                              </p>
-                              <p className="settings-help" style={{ marginTop: '0.25rem' }}>
-                                {formatModelSize(model.sizeMb)} · {formatMinutes(model.estimatedDownloadMinutes)}
-                              </p>
-                              <p className="settings-help" style={{ marginTop: '0.2rem' }}>
-                                {model.installed ? 'Installed' : model.description}
-                              </p>
-                              <p
-                                className="settings-help"
-                                style={{
-                                  marginTop: '0.2rem',
-                                  color: speechHardwareFit.tone === 'warning'
-                                    ? 'rgba(242, 181, 111, 0.92)'
-                                    : 'var(--text-soft)',
-                                }}
-                              >
-                                {speechHardwareFit.badge} · {speechHardwareFit.detail}
-                              </p>
-                              {tutorInstallInfo?.recommendedSpeechTier === model.tier ? (
-                                <p className="settings-help" style={{ marginTop: '0.2rem', color: 'var(--accent)' }}>
-                                  Recommended for this hardware
-                                </p>
-                              ) : null}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                              {model.installed ? (
-                                <button
-                                  type="button"
-                                  className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
-                                  onClick={() => { void selectSpeechModel(model.tier) }}
-                                  disabled={isActiveTier || speechModelActionTier !== null || speechDownloadingTier !== null}
-                                  aria-label={isActiveTier ? `${model.label} is the active speech model` : `Use ${model.label} for speech recognition`}
-                                  title={isActiveTier ? 'Currently active' : 'Use this model'}
-                                >
-                                  {isActiveTier ? <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" /> : <Circle size={18} strokeWidth={2.25} aria-hidden="true" />}
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                className="settings-card-icon-button"
-                                onClick={() => { void downloadSpeechModel(model.tier, model.installed ? { force: true } : undefined) }}
-                                disabled={speechDownloadingTier !== null || speechModelActionTier !== null}
-                                aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
-                                title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
-                              >
-                                {isDownloadingThis
-                                  ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
-                                  : model.installed
-                                    ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
-                                    : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
-                              </button>
-                              {model.installed ? (
-                                <button
-                                  type="button"
-                                  className="settings-inline-icon-button"
-                                  onClick={() => { void uninstallSpeechModel(model.tier) }}
-                                  disabled={speechModelActionTier !== null || speechDownloadingTier !== null}
-                                  aria-label={`Uninstall ${model.label}`}
-                                  title={`Uninstall ${model.label}`}
-                                >
-                                  {isActioningThis
-                                    ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
-                                    : <Trash2 size={18} strokeWidth={2.25} aria-hidden="true" />}
-                                </button>
-                              ) : null}
-                            </div>
-                          </div>
-                          {isDownloadingThis ? (
-                            <div>
-                              <div className="settings-progress-track">
-                                <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, speechDownloadProgress))}%` }} />
-                              </div>
-                              <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                Downloading… {Math.round(speechDownloadProgress)}%{speechDownloadMethod ? ` [${speechDownloadMethod}]` : ''}
-                              </p>
-                            </div>
-                          ) : null}
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <p className="settings-help" style={{ marginTop: '0.75rem' }}>
-                    Select the circle icon to switch the active speech recognition model. If no model is
-                    installed, speech-answer minigame rounds fall back to typed answers.
-                  </p>
-                </SettingsCollapsibleSection>
-                ) : null}
-
-                {activeSettingsTab === 'voice' ? (
+{activeSettingsTab === 'voice' ? (
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -7441,161 +6883,16 @@ function App() {
                   aria-labelledby="settings-tab-voice"
                 >
                   <div className="settings-control-content">
-                    <p className="settings-section-label">Voice</p>
-                    <div className="settings-animation-grid" role="group" aria-label="Japanese voice controls">
-                      <button
-                        type="button"
-                        className={`settings-icon-entry settings-theme-entry ${settings.voiceEnabled ? 'is-active' : ''}`}
-                        onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
-                        aria-label={settings.voiceEnabled ? 'Spoken prompts enabled. Activate to disable.' : 'Spoken prompts disabled. Activate to enable.'}
-                        aria-pressed={settings.voiceEnabled}
-                        title={settings.voiceEnabled ? 'Spoken prompts enabled' : 'Spoken prompts disabled'}
-                      >
-                        <span className={`settings-mode-icon-button ${settings.voiceEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
-                          <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                        </span>
-                        <span className="settings-icon-entry-label">{settings.voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
-                      </button>
-
-                      {settings.ambientAudioEnabled !== undefined ? (
-                        <button
-                          type="button"
-                          className={`settings-icon-entry settings-theme-entry ${settings.ambientAudioEnabled ? 'is-active' : ''}`}
-                          onClick={() => setSettings((prev) => ({ ...prev, ambientAudioEnabled: !prev.ambientAudioEnabled }))}
-                          aria-label={settings.ambientAudioEnabled ? 'Ambient audio enabled. Activate to disable.' : 'Ambient audio disabled. Activate to enable.'}
-                          aria-pressed={settings.ambientAudioEnabled}
-                          title={settings.ambientAudioEnabled ? 'Ambient audio on' : 'Ambient audio off'}
-                        >
-                          <span className={`settings-mode-icon-button ${settings.ambientAudioEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
-                            <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                          </span>
-                          <span className="settings-icon-entry-label">{settings.ambientAudioEnabled ? 'Ambience On' : 'Ambience Off'}</span>
-                        </button>
-                      ) : null}
-
-                      {settings.voiceEnabled
-                        ? voiceOptions.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            className={`settings-icon-entry settings-theme-entry ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
-                            onClick={() => {
-                              setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
-                              void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
-                            }}
-                            disabled={voiceBusy}
-                            aria-label={`Use voice ${option.name} (${option.search}) and hear a sample`}
-                            aria-pressed={settings.voiceSpeaker === option.id}
-                            title={`${option.name} · ${option.search} — click to hear a sample`}
-                          >
-                            <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
-                              <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                            </span>
-                            <span className="settings-icon-entry-label">{option.name}</span>
-                          </button>
-                        ))
-                        : null}
-
-                    </div>
-
-                    <p className="settings-help" style={{ marginTop: '0.65rem' }}>
-                      {settings.voiceEnabled
-                        ? 'Click a voice to hear a sample. The speaker button in games reads prompts aloud.'
-                        : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
-                      {voiceUnavailable ? ' (Voice runtime unavailable right now.)' : ''}
-                    </p>
-                    <p className="settings-help">
-                      VOICEVOX runtime: {
-                        !voiceStatusChecked
-                          ? 'Checking status…'
-                          : voiceRuntimeRunning
-                            ? 'Running'
-                            : 'Not running'
-                      }
-                      {!voiceRuntimeRunning && voiceStatus?.lastError
-                        ? ` (${voiceStatus.lastError})`
-                        : ''}
-                    </p>
-                    <p className="settings-help">
-                      Synthesis debug: {lastVoiceSynthesis
-                        ? `${lastVoiceSynthesis.mode}, ${lastVoiceSynthesis.profile}, ${Math.max(0, Math.round(lastVoiceSynthesis.elapsedMs))}ms`
-                        : 'No playback yet.'}
-                    </p>
-
-                    <SettingsCollapsibleSection
-                      id="voicevox-runtime"
-                      title="VOICEVOX Runtime"
-                      description="Install VOICEVOX from Settings and use it for local Japanese speech playback."
-                      meta={tutorInstallInfo?.voiceInstalled ? 'Already installed' : 'Not installed'}
-                      collapsed={Boolean(collapsedSettingsSections['voicevox-runtime'])}
-                      onToggle={() => toggleThemeSectionCollapsed('voicevox-runtime')}
-                      className="settings-theme-card"
-                    >
-                      <div style={{ display: 'grid', gap: '0.65rem' }}>
-                        {(tutorInstallInfo?.voiceModels ?? []).map((model) => {
-                          const isDownloadingThis = voiceEngineDownloadingTier === model.tier
-                          const isActiveTier = tutorInstallInfo?.activeVoiceModel === model.tier
-
-                          return (
-                            <div
-                              key={model.tier}
-                              style={{
-                                padding: '0.75rem 0.9rem',
-                                borderRadius: '12px',
-                                background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
-                                border: isActiveTier
-                                  ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
-                                  : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                <div>
-                                  <p style={{ margin: 0, fontWeight: 600 }}>
-                                    {model.label}
-                                    {isActiveTier ? ' · Active' : ''}
-                                  </p>
-                                  <p className="settings-help" style={{ marginTop: '0.25rem' }}>
-                                    {model.installed ? 'Installed' : model.description}
-                                  </p>
-                                  <p className="settings-help" style={{ marginTop: '0.2rem' }}>
-                                    {formatMinutes(model.estimatedDownloadMinutes)}
-                                  </p>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                  <button
-                                    type="button"
-                                    className="settings-card-icon-button"
-                                    onClick={() => { void downloadVoiceEngineModel(model.tier) }}
-                                    disabled={voiceEngineDownloadingTier !== null}
-                                    aria-label={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}
-                                    title={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}
-                                  >
-                                    {isDownloadingThis
-                                      ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
-                                      : model.installed
-                                        ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
-                                        : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
-                                  </button>
-                                </div>
-                              </div>
-                              {isDownloadingThis ? (
-                                <div>
-                                  <div className="settings-progress-track">
-                                    <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, voiceEngineDownloadProgress))}%` }} />
-                                  </div>
-                                  <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                                    Installing… {Math.round(voiceEngineDownloadProgress)}%{voiceEngineDownloadMethod ? ` [${voiceEngineDownloadMethod}]` : ''}
-                                  </p>
-                                </div>
-                              ) : null}
-                            </div>
-                          )
-                        })}
-                      </div>
-                      <p className="settings-help" style={{ marginTop: '0.75rem' }}>
-                        Installing from this section will also warm up the voice runtime so playback can start immediately.
-                      </p>
-                    </SettingsCollapsibleSection>
+                    <VoiceSettingsTab
+                      voice={voice}
+                      settings={settings as any}
+                      setSettings={setSettings as any}
+                      collapsedSettingsSections={collapsedSettingsSections}
+                      toggleThemeSectionCollapsed={toggleThemeSectionCollapsed}
+                      formatModelSize={formatModelSize}
+                      formatMinutes={formatMinutes}
+                      tutorInstallInfo={tutorInstallInfo as any}
+                    />
                   </div>
                 </div>
                 ) : null}
@@ -7711,7 +7008,7 @@ function App() {
       ) : null}
 
       {tutor.assistantChatOpen ? (
-        <TutorChatPanel tutor={tutor} settings={settings as any} setSettings={setSettings as any} cancelAssistantSpeech={cancelAssistantSpeech} />
+        <TutorChatPanel tutor={tutor} settings={settings as any} setSettings={setSettings as any} cancelAssistantSpeech={voice.cancelAssistantSpeech} />
       ) : null}
 
       {selectedChar ? (
