@@ -2337,7 +2337,7 @@ function App() {
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
-  const [recommendations] = useState<RecommendationItem[]>([])
+  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
   const [warningModal, setWarningModal] = useState<{
     sectionId: ScriptKey | 'jlpt_prep'
@@ -2930,6 +2930,35 @@ function App() {
   useEffect(() => {
     void loadSummary()
   }, [loadSummary])
+
+  // Fetch XP progress, study recommendations, and learning path
+  // on mount and whenever the summary refreshes.
+  useEffect(() => {
+    let mounted = true
+    const getXp = window.jplearnDesktop?.getXpProgress
+    const getRecs = window.jplearnDesktop?.getRecommendations
+    const getPath = window.jplearnDesktop?.getLearningPathStatus
+
+    const safeResolve = async <T,>(fn: (() => Promise<T>) | undefined): Promise<T | null> => {
+      if (!fn) return null
+      try { return await fn() } catch { return null }
+    }
+
+    const doFetch = async () => {
+      const [xp, recs, path] = await Promise.all([
+        safeResolve(getXp),
+        safeResolve(getRecs),
+        safeResolve(getPath),
+      ])
+      if (!mounted) return
+      if (xp) setXpProgress(xp)
+      if (recs) setRecommendations(recs.recommendations)
+      if (path) setLearningPathStatus(path as LearningPathStatus)
+    }
+    void doFetch()
+
+    return () => { mounted = false }
+  }, [summary])
 
   const notifyStartupReady = useCallback((deferredLoadsQueuedAtMs?: number) => {
     if (startupReadySentRef.current) return
