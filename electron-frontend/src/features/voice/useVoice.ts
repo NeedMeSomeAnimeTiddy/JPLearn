@@ -100,20 +100,25 @@ export function useVoice(
 
   const playQuestionAudio = useCallback(async (text: string, speaker?: string) => {
     const spoken = typeof text === 'string' ? text.trim() : ''
+    console.log('[voice] playQuestionAudio called:', { spoken, voiceBusy, speaker: speaker ?? settings.voiceSpeaker })
     if (!spoken || voiceBusy) {
+      console.log('[voice] early return - empty or busy')
       return
     }
     const speak = window.jplearnDesktop?.speakText
     if (!speak) {
+      console.log('[voice] speakText IPC not available')
       setVoiceUnavailable(true)
       return
     }
     setVoiceBusy(true)
     try {
+      console.log('[voice] calling speakText...')
       const result = await speak({
         text: spoken,
         speaker: speaker ?? settings.voiceSpeaker,
       })
+      console.log('[voice] speakText result:', { ok: result?.ok, hasAudio: !!result?.audioBase64, audioLen: result?.audioBase64?.length })
       if (result?.audioBase64) {
         setLastVoiceSynthesis((result.synthesis as VoiceSynthesisMeta | undefined) ?? null)
         if (voiceAudioRef.current) {
@@ -126,7 +131,8 @@ export function useVoice(
       } else {
         setVoiceUnavailable(true)
       }
-    } catch {
+    } catch (err) {
+      console.log('[voice] speakText failed:', err)
       setVoiceUnavailable(true)
     } finally {
       setVoiceBusy(false)
