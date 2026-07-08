@@ -385,6 +385,10 @@ interface AssistantChatOcrTranslationResponse {
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
+  getDailyActivity?: (days?: number) => Promise<{
+    ok: boolean
+    days: Array<{ date: string; count: number; accuracy: number }>
+  }>
   getBlockProgress: (slug: DeckSlug) => Promise<BlockProgressPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>

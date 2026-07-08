@@ -87,6 +87,17 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('study:get-daily-activity', async (event, days) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedDays = Math.max(1, Math.min(730, Number(days) || 365))
+    try {
+      return await runPythonBridgeWithArgsRead(['daily-activity', String(validatedDays)])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch daily activity: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('study:get-block-progress', async (event, slug) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedSlug = validateDeckSlug(slug)

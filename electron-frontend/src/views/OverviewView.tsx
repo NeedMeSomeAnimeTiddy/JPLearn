@@ -16,6 +16,8 @@ import {
 import type { CardScores, JlptLevel, JlptLevelProgress } from '../types'
 import { KANJI_OVERVIEW_PAGE_SIZE } from '../constants'
 import { jlptTagFromCard } from '../utils'
+import { useHeatmap } from '../features/heatmap'
+import { ActivityCalendar } from 'react-activity-calendar'
 
 const CARD_MASTERY_MAX = 4
 
@@ -159,6 +161,8 @@ export function OverviewView({
       setExportLoading(false)
     }
   }
+
+  const heatmap = useHeatmap()
 
   return (
     <div className="overview-popup-content">
@@ -479,6 +483,23 @@ export function OverviewView({
         </button>
 
         <div id="overview-study-activity-body" className={`overview-panel-body ${overviewSectionExpanded.studyActivity ? 'is-open' : ''}`}>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            {heatmap.data.length > 0 ? (
+              <ActivityCalendar
+                data={heatmap.data}
+                theme={heatmap.theme}
+                loading={heatmap.loading}
+                weekStart={1}
+                blockSize={12}
+                blockMargin={3}
+                fontSize={13}
+                labels={{ totalCount: '{{count}} reviews' }}
+              />
+            ) : (
+              <p className="status-line">Loading activity data...</p>
+            )}
+          </div>
+          {heatmap.error && <p className="heatmap-error">{heatmap.error}</p>}
           {!hasAnyActivity ? (
             <p className="status-line">No recent activity yet. Complete a round to populate weekly and monthly summaries.</p>
           ) : (

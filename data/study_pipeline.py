@@ -9,7 +9,7 @@ from data import database
 from data.database import CurriculumStageSummary, NarrativeChapterSummary
 from data.text_normalization import normalize_storage_text
 from typing import cast
-from domain.activity import ActivitySummary
+from domain.activity import ActivitySummary, DailyCount
 from domain.assistant import AssistantPopupCadence, AssistantState, compute_assistant_state, evaluate_assistant_events
 from domain.curriculum import next_stage
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
@@ -502,6 +502,11 @@ def load_streak_state() -> StreakState:
 def load_activity_summary(window_days: int, on_date: date | None = None) -> ActivitySummary:
     """Return aggregated activity metrics for a rolling day window."""
     return database.load_activity_summary(window_days, on_date=on_date)
+
+
+def load_daily_counts(lookback_days: int, on_date: date | None = None) -> list[DailyCount]:
+    """Return per-day review counts and accuracy for the last N days."""
+    return database.load_daily_counts(lookback_days, on_date=on_date)
 
 
 def load_mistake_breakdown(limit: int = 6) -> list[MistakeBreakdownRow]:

@@ -10,7 +10,7 @@ from pathlib import Path
 from collections.abc import Callable, Generator
 from typing import TypedDict, TypeAlias, cast
 
-from domain.activity import ActivitySummary
+from domain.activity import ActivitySummary, DailyCount
 from domain.assistant import AssistantEvent, AssistantEventPriority, AssistantMood, AssistantState
 from domain.history import ItemHistoryEvent, RawItemHistoryBucket
 from domain.leech import evaluate_leech_state
@@ -1243,6 +1243,39 @@ def load_activity_summary(window_days: int, on_date: date | None = None) -> Acti
         points_earned=points_earned,
         active_days=active_days,
     )
+
+
+def load_daily_counts(lookback_days: int, on_date: date | None = None) -> list[DailyCount]:
+    """Return per-day review counts and accuracy for the last `lookback_days` days."""
+    if lookback_days <= 0:
+        raise ValueError("lookback_days must be positive")
+
+    target_day = on_date or date.today()
+    start_day = target_day - timedelta(days=lookback_days - 1)
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                reviewed_on AS date,
+                COUNT(*) AS count,
+                ROUND(100.0 * SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) / COUNT(*)) AS accuracy_pct
+            FROM review_events
+            WHERE reviewed_on >= ?
+            GROUP BY reviewed_on
+            ORDER BY reviewed_on
+            """,
+            (start_day.isoformat(),),
+        ).fetchall()
+
+    return [
+        DailyCount(
+            date=row["date"],
+            count=int(row["count"]),
+            accuracy=int(row["accuracy_pct"] or 0),
+        )
+        for row in rows
+    ]
 
 
 def load_mistake_breakdown(limit: int = 6) -> list[MistakeBreakdownRow]:

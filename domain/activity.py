@@ -16,3 +16,12 @@ class ActivitySummary:
     accuracy: int
     points_earned: int
     active_days: int
+
+
+@dataclass(frozen=True)
+class DailyCount:
+    """Review counts for a single calendar day."""
+
+    date: str         # "2026-07-08"
+    count: int
+    accuracy: int     # percentage 0-100

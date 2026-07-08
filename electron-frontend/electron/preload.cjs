@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   applyTranslationProfile: (tier, options) => ipcRenderer.invoke('setup:apply-translation-profile', tier, options),
   createShortcuts: (opts) => ipcRenderer.invoke('setup:create-shortcuts', opts),
   getStudySummary: () => ipcRenderer.invoke('study:get-summary'),
+  getDailyActivity: (days) => ipcRenderer.invoke('study:get-daily-activity', days ?? 365),
   getBlockProgress: (slug) => ipcRenderer.invoke('study:get-block-progress', slug),
   getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),
   getStudyQueue: (slug) => ipcRenderer.invoke('study:get-study-queue', slug),

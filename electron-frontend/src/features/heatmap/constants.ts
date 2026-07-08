@@ -1,0 +1,1 @@
+export const DEFAULT_LOOKBACK_DAYS = 365

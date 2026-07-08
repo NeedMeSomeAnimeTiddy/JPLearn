@@ -4103,6 +4103,15 @@ html[data-reduced-motion='true'] .home-hero-steam {
   color: var(--text-main);
 }
 
+.heatmap-error {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  text-align: center;
+  padding: 8px 0;
+}
+
+/* ── Mistakes ──────────────────────────────────────────────────── */
+
 .mistakes-summary-panel {
   padding: 18px 20px;
   animation: enterUp 420ms ease both;

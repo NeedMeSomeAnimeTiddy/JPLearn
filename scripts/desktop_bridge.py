@@ -39,6 +39,7 @@ from data.study_pipeline import (  # noqa: E402
     init_study_db,
     load_activity_summary,
     load_active_leech_card_ids,
+    load_daily_counts,
     load_assistant_snapshot,
     load_curriculum_stage_summary,
     load_narrative_chapter_summary,
@@ -3933,6 +3934,15 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
 
     if command == "summary":
         return 0, build_summary()
+
+    if command == "daily-activity":
+        days = int(argv[1]) if len(argv) > 1 else 365
+        try:
+            from dataclasses import asdict
+            counts = load_daily_counts(days)
+            return 0, {"ok": True, "days": [asdict(c) for c in counts]}
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
 
     if command == "deck-cards":
         if len(argv) < 2:

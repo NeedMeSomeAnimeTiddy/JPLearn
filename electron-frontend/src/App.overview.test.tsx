@@ -21,6 +21,9 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 })
 
+const originalCSS = (globalThis as any).CSS
+;(globalThis as any).CSS = { ...originalCSS, supports: () => true }
+
 const baseDesktopApi = {
   versions: { chrome: '0', electron: '0', node: '0' },
   getBlockProgress: async (slug: string) => ({ slug, blocks: [] }),
