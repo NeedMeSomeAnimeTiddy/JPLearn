@@ -200,7 +200,7 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   top: 0;
   z-index: 10;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
   gap: 16px;
   padding: 14px 24px 10px;
@@ -276,7 +276,6 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   border: 0;
 }
 
-.dictionary-search-button,
 .dictionary-text-button {
   border: 1px solid var(--button-border);
   border-radius: 0;
@@ -286,21 +285,9 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   box-shadow: 0 2px 0 var(--accent-ink);
 }
 
-.dictionary-search-button:active,
 .dictionary-text-button:active {
   transform: translateY(2px);
   box-shadow: none;
-}
-
-.dictionary-search-button {
-  padding: 11px 16px;
-  min-height: 44px;
-  font-weight: 700;
-}
-
-.dictionary-search-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .dictionary-recent-row {
@@ -468,50 +455,9 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   padding: 3px 8px;
 }
 
-.dictionary-icon-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 1px solid var(--button-border);
-  border-radius: 0;
-  background: color-mix(in oklab, var(--panel-bg) 84%, white);
-  color: var(--text-soft);
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-.dictionary-icon-action svg {
-  width: 14px;
-  height: 14px;
-}
-
-.dictionary-icon-action:hover:not(:disabled) {
-  color: var(--text-main);
-  border-color: color-mix(in oklab, var(--tone-ocean) 52%, var(--button-border));
-}
-
-.dictionary-icon-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.dictionary-voice-button {
-  color: color-mix(in oklab, var(--tone-ocean) 78%, var(--text-soft));
-}
-
 .dictionary-copy-menu-wrap {
   position: relative;
   display: inline-flex;
-}
-
-.dictionary-copy-trigger.is-open {
-  color: var(--text-main);
-  background: color-mix(in oklab, var(--tone-ocean) 24%, var(--button-bg-top));
-  border-color: color-mix(in oklab, var(--tone-ocean) 55%, var(--button-border));
 }
 
 .dictionary-copy-menu {
@@ -645,10 +591,6 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
     align-items: stretch;
   }
 
-  .dictionary-search-button {
-    width: 100%;
-  }
-
   .dictionary-result-card {
     grid-template-columns: 1fr;
   }
@@ -770,7 +712,7 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
 .assistant-chat-header {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
   gap: 16px;
   padding: 14px 24px 10px;
@@ -805,48 +747,6 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   gap: 6px;
   flex-shrink: 0;
   justify-self: end;
-}
-
-.assistant-chat-audio-toggle,
-.assistant-chat-clear {
-  border: 1px solid color-mix(in oklab, var(--panel-border) 68%, white 32%);
-  background: color-mix(in oklab, var(--panel-bg) 94%, black);
-  color: color-mix(in oklab, var(--text-main) 84%, var(--text-soft));
-  border-radius: 0;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-.assistant-chat-audio-toggle.is-on {
-  border-color: color-mix(in oklab, var(--tone-ocean) 52%, var(--panel-border));
-  color: color-mix(in oklab, var(--tone-ocean) 78%, var(--text-main));
-  background: color-mix(in oklab, var(--panel-bg) 82%, var(--tone-ocean) 18%);
-}
-
-.assistant-chat-audio-toggle:hover {
-  border-color: color-mix(in oklab, var(--tone-ocean) 46%, var(--panel-border));
-  color: var(--text-main);
-}
-
-.assistant-chat-clear:hover:not(:disabled) {
-  border-color: color-mix(in oklab, var(--tone-danger) 48%, var(--panel-border));
-  color: color-mix(in oklab, var(--tone-danger) 70%, var(--text-main));
-}
-
-.assistant-chat-clear:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.assistant-chat-audio-toggle:active,
-.assistant-chat-clear:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: none;
 }
 
 /* ── removed .assistant-chat-mode-badge pill — cassette uses monospace labels ── */
@@ -6109,7 +6009,7 @@ html[data-reduced-motion='true'] .game-tile-reel {
   touch-action: pan-x pinch-zoom;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-  padding: 14px 0 65px;
+  padding: 20px 0 65px;
   padding-inline: calc(50% - 140px);
   min-height: 0;
   /* hide scrollbar */
@@ -9515,7 +9415,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
   gap: 16px;
   padding: 14px 24px 10px;
@@ -9626,6 +9526,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  justify-self: end;
   width: 36px;
   height: 36px;
   border: 1px solid var(--panel-border);
@@ -9644,6 +9545,50 @@ html[data-reduced-motion='true'] .cassette-reel {
 .panel-close-button:active:not(:disabled) {
   transform: translateY(2px);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+/* ── Unified panel action button (36x36, light bg) ── */
+
+.panel-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--panel-border);
+  border-radius: 0;
+  background: var(--bg-main);
+  color: var(--text-main);
+  cursor: pointer;
+  font-size: 0.7rem;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+  transition: transform 80ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.panel-action-button:hover {
+  border-color: var(--accent);
+}
+
+.panel-action-button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.panel-action-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.panel-action-button.is-danger:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--tone-rose) 60%, var(--panel-border));
+  color: color-mix(in oklab, var(--tone-rose) 80%, var(--text-main));
+}
+
+.panel-action-button.is-active {
+  border-color: color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
+  color: color-mix(in oklab, var(--tone-ocean) 80%, var(--text-main));
+  background: color-mix(in oklab, var(--bg-main) 92%, var(--tone-ocean));
 }
 
 .cassette-panel-body {
@@ -9799,10 +9744,10 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .settings-sheet {
   position: relative;
-  width: min(96vw, 980px);
-  max-width: min(96vw, 980px);
+  width: min(90vw, 900px);
+  max-width: min(90vw, 900px);
   aspect-ratio: 16 / 10;
-  max-height: min(calc(100dvh - 40px), 760px);
+  max-height: min(84dvh, 720px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -11134,9 +11079,9 @@ html[data-reduced-motion='true'] .cassette-reel {
 .settings-modal-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  margin: -14px -16px 0;  /* counteract .settings-panel padding — flush with edges */
+  margin: -14px -16px 0;
 }
 
 .settings-modal-title {
@@ -13363,29 +13308,6 @@ button.lpp-node:hover .lpp-node-ring {
   display: flex;
   gap: 10px;
   margin-top: 8px;
-}
-
-.rwm-back-btn {
-  flex: 1;
-  padding: 9px 14px;
-  border-radius: 0;
-  border: 1px solid var(--panel-border);
-  background: color-mix(in oklab, var(--panel-bg) 80%, var(--bg-main));
-  color: var(--text-soft);
-  font-size: 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
-  text-align: center;
-  box-shadow: 0 2px 0 var(--accent-ink);
-}
-.rwm-back-btn:hover { background: var(--panel-bg); color: var(--text-main); }
-
-.rwm-continue-btn {
-  flex: 1;
-  justify-content: center;
-  padding: 9px 14px;
-  border-radius: 0;
 }
 
 /* Readiness warning modal needs position:relative for the close button */

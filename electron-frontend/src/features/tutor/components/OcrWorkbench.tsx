@@ -49,7 +49,7 @@ export function OcrWorkbench({ tutor, settings, setSettings }: OcrWorkbenchProps
           <div className="assistant-chat-header-actions">
             <button
               type="button"
-              className="assistant-chat-clear"
+              className="panel-action-button is-danger"
               onClick={() => {
                 tutor.clearOcrWorkbenchResult()
               }}
@@ -57,7 +57,7 @@ export function OcrWorkbench({ tutor, settings, setSettings }: OcrWorkbenchProps
               aria-label="Clear OCR result"
               title="Clear"
             >
-              <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
+              <Trash2 size={16} strokeWidth={2.2} aria-hidden="true" />
             </button>
             <button
               type="button"

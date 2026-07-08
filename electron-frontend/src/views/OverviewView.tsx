@@ -114,7 +114,6 @@ interface OverviewViewProps {
 export function OverviewView({
   loading,
   error,
-  lastUpdated,
   decks,
   activity,
   overviewBlocks,
@@ -170,10 +169,9 @@ export function OverviewView({
           <h2 className="cassette-panel-header-title">Study Overview</h2>
         </div>
         <div className="overview-popup-actions">
-          {lastUpdated ? <span className="overview-popup-updated">{lastUpdated}</span> : null}
           <button
             type="button"
-            className="topbar-settings-button"
+            className="panel-action-button"
             onClick={onRefresh}
             disabled={loading}
             aria-label={loading ? 'Refreshing data' : 'Refresh data'}
@@ -183,7 +181,7 @@ export function OverviewView({
           </button>
           <button
             type="button"
-            className="topbar-settings-button"
+            className="panel-close-button"
             onClick={onClose}
             aria-label="Close overview"
             title="Close (Escape)"

@@ -55,7 +55,7 @@ export function TutorChatPanel({ tutor, settings, setSettings, cancelAssistantSp
           <div className="assistant-chat-header-actions">
             <button
               type="button"
-              className={`assistant-chat-audio-toggle ${settings.assistantChatAudioEnabled ? 'is-on' : 'is-off'}`}
+              className={`panel-action-button ${settings.assistantChatAudioEnabled ? 'is-active' : ''}`}
               onClick={() => {
                 if (settings.assistantChatAudioEnabled) {
                   cancelAssistantSpeech()
@@ -70,20 +70,20 @@ export function TutorChatPanel({ tutor, settings, setSettings, cancelAssistantSp
               title={settings.assistantChatAudioEnabled ? 'Coach audio on' : 'Coach audio off'}
             >
               {settings.assistantChatAudioEnabled ? (
-                <Volume2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                <Volume2 size={16} strokeWidth={2.2} aria-hidden="true" />
               ) : (
-                <VolumeX size={14} strokeWidth={2.2} aria-hidden="true" />
+                <VolumeX size={16} strokeWidth={2.2} aria-hidden="true" />
               )}
             </button>
             <button
               type="button"
-              className="assistant-chat-clear"
+              className="panel-action-button is-danger"
               onClick={() => void clearAssistantChat()}
               disabled={assistantChatMessages.length <= 0 || assistantChatLoading}
               aria-label="Clear chat history"
               title="Clear chat"
             >
-              <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
+              <Trash2 size={16} strokeWidth={2.2} aria-hidden="true" />
             </button>
             <button
               type="button"

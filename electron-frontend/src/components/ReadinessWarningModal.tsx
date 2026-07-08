@@ -60,10 +60,10 @@ export function ReadinessWarningModal({
         {reason && <p className="rwm-reason">{reason}</p>}
 
         <div className="rwm-actions">
-          <button type="button" className="rwm-back-btn" onClick={onCancel}>
+          <button type="button" className="panel-action-button" style={{ width: 'auto', flex: 1, padding: '9px 14px', fontWeight: 700, fontSize: '0.88rem' }} onClick={onCancel}>
             Go back
           </button>
-          <button type="button" className="rwm-continue-btn btn-primary" onClick={onContinue}>
+          <button type="button" className="panel-action-button is-active" style={{ width: 'auto', flex: 1, padding: '9px 14px', fontWeight: 700, fontSize: '0.88rem' }} onClick={onContinue}>
             Continue anyway
           </button>
         </div>

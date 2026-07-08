@@ -365,7 +365,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
             <h2 className="cassette-panel-header-title">Dictionary</h2>
           </div>
           <button type="button" className="panel-close-button" onClick={onClose} aria-label="Close dictionary" title="Close">
-            <X aria-hidden="true" strokeWidth={2.2} />
+            <X size={16} aria-hidden="true" strokeWidth={2.2} />
           </button>
         </header>
 
@@ -381,7 +381,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
               aria-label="Dictionary search"
             />
           </div>
-          <button type="submit" className="dictionary-search-button" disabled={query.trim().length <= 0}>
+          <button type="submit" className="panel-action-button" style={{ width: 'auto', minHeight: 44, padding: '11px 16px', fontWeight: 700 }} disabled={query.trim().length <= 0}>
             Search
           </button>
         </form>
@@ -485,7 +485,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                         {onPlayAudio ? (
                           <button
                             type="button"
-                            className="dictionary-icon-action dictionary-voice-button"
+                            className="panel-action-button"
                             onClick={() => {
                               pendingPlayCharacterRef.current = result.character
                               setPlayFailedFor(null)
@@ -501,7 +501,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                         <div className="dictionary-copy-menu-wrap">
                           <button
                             type="button"
-                            className={`dictionary-icon-action dictionary-copy-trigger ${isCopyMenuOpen ? 'is-open' : ''}`}
+                            className={`panel-action-button ${isCopyMenuOpen ? 'is-active' : ''}`}
                             onClick={() => setOpenCopyMenu((current) => (current === copyPrefix ? null : copyPrefix))}
                             aria-haspopup="menu"
                             aria-expanded={isCopyMenuOpen}
