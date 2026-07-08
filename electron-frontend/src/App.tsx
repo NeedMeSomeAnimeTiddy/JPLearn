@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
 import type { LearningPathStatus, SectionReadiness } from './types'
 import type { GameCard } from './generated/types'
@@ -31,6 +32,7 @@ import { useVoice, splitSpeechSegments, VoiceSettingsTab } from './features/voic
 import { useModels } from './features/models'
 import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit } from './features/tutor'
 import type { AssistantToast } from './features/tutor'
+import { useCursor, CursorFollower, CursorSettingsTab } from './features/cursor'
 import { DevDashboard } from './features/devtools'
 import { SURPRISE_PROMPTS, SCRIPT_MODE_PROMPT_PACKS, TAG_PROMPT_PACKS, CLOZE_TEMPLATES, STORY_CHAPTERS } from './lib/contentTemplates'
 import type { RoundDictionaryNote } from './types'
@@ -217,6 +219,7 @@ interface AppSettings {
   voiceEnabled: boolean
   voiceSpeaker: string
   ambientAudioEnabled: boolean
+  cursor: { mode: string; theme: string; size: number; color: string | null }
 }
 
 
@@ -819,6 +822,7 @@ function defaultSettings(): AppSettings {
     voiceEnabled: true,
     voiceSpeaker: 'zundamon_normal',
     ambientAudioEnabled: false,
+    cursor: { mode: 'system', theme: 'classic', size: 1, color: null },
   }
 }
 
@@ -1996,6 +2000,9 @@ function App() {
   )
 
   const isInMinigameSession = view === 'minigame' && sessionActive && roundState !== null
+
+  const cursor = useCursor(settings as any, setSettings as any)
+
   const tutor = useTutor(
     settings as any,
     {
@@ -5848,6 +5855,16 @@ function App() {
                     </div>
                   </div>
                 </div>
+                <div
+                  className="settings-section settings-control-row settings-control-row-no-icon"
+                  role="tabpanel"
+                  id="settings-panel-cursor"
+                  aria-labelledby="settings-tab-cursor"
+                >
+                  <div className="settings-control-content">
+                    <CursorSettingsTab cursor={cursor} />
+                  </div>
+                </div>
               </>)}
               {activeSettingsTab === 'assistant' && (<>
                 <div
@@ -6269,6 +6286,8 @@ function App() {
       {tutor.assistantChatOpen ? (
         <TutorChatPanel tutor={tutor} settings={settings as any} setSettings={setSettings as any} cancelAssistantSpeech={voice.cancelAssistantSpeech} />
       ) : null}
+
+      {cursor.cursorMode === 'animated' && createPortal(<CursorFollower {...cursor} />, document.body)}
 
       {selectedChar ? (
         <div
