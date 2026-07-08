@@ -61,6 +61,7 @@ SECTION_TO_NODE: dict[str, str] = {
     "vocab_n5": "vocabulary_n5",
     "grammar_patterns": "grammar_n5",
     "kanji_n5": "kanji_n5",
+    "sentence_examples": "sentence_examples",
 }
 
 # Soft prerequisites for readiness labels (simplified vs. the strict graph).
@@ -71,6 +72,7 @@ SECTION_PREREQUISITES: dict[str, list[str]] = {
     "vocab_n5": ["katakana"],
     "grammar_patterns": ["vocab_n5"],
     "kanji_n5": ["hiragana", "katakana"],
+    "sentence_examples": ["grammar_patterns"],
 }
 
 # Human-readable labels for each section
@@ -80,13 +82,14 @@ SECTION_LABELS: dict[str, str] = {
     "vocab_n5": "N5 Vocabulary",
     "grammar_patterns": "N5 Grammar",
     "kanji_n5": "Basic Kanji (N5)",
+    "sentence_examples": "Sentences",
 }
 
 # Ordered steps for each learning path
 LEARNING_PATHS: dict[str, dict] = {
     "complete_beginner": {
         "name": "Complete Beginner",
-        "steps": ["hiragana", "katakana", "vocab_n5", "grammar_patterns", "kanji_n5"],
+        "steps": ["hiragana", "katakana", "vocab_n5", "grammar_patterns", "sentence_examples", "kanji_n5"],
     },
 }
 

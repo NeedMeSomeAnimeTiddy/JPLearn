@@ -467,7 +467,7 @@ class TestReachableNodes:
 class TestJPLearnGraph:
     EXPECTED_NODES = {
         "tutorial", "hiragana", "katakana", "vocabulary_n5", "grammar_n5",
-        "scripted_conv", "listening", "kanji_n5", "free_conv", "reading",
+        "sentence_examples", "scripted_conv", "listening", "kanji_n5", "free_conv", "reading",
         "jlpt_n5", "jlpt_n4", "jlpt_n3", "jlpt_n2", "jlpt_n1",
     }
 

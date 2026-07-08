@@ -14,7 +14,7 @@ import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
 import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
-import { OnboardingView } from './views/OnboardingView'
+import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { SessionProvider } from './context/SessionContext'
 import { assessTypedAnswer } from './lib/answerAssessment'
@@ -2673,48 +2673,37 @@ function App() {
         let resolvedCards = cachedDeck
         let resolvedBlocks = cachedBlocks
 
-        if (!resolvedCards) {
-          const deckPayload = await getDeckCardsDeduped(script)
+        if (!resolvedCards || !resolvedBlocks) {
+          const [deckPayload, blockPayload] = await Promise.all([
+            resolvedCards ? Promise.resolve({ cards: resolvedCards }) : getDeckCardsDeduped(script),
+            resolvedBlocks ? Promise.resolve({ blocks: resolvedBlocks }) : getBlockProgressDeduped(script),
+          ])
           if (scriptLoadRequestIdRef.current !== requestId) {
             return
           }
-          resolvedCards = limitRuntimeDeckCards(script, normalizeDeckCards(deckPayload.cards))
-          scriptDeckCacheRef.current[script] = resolvedCards
+
+          if (!resolvedCards) {
+            resolvedCards = limitRuntimeDeckCards(script, normalizeDeckCards(deckPayload.cards))
+            scriptDeckCacheRef.current[script] = resolvedCards
+          }
+          if (!resolvedBlocks) {
+            resolvedBlocks = normalizeBlockList(blockPayload.blocks)
+            scriptBlockCacheRef.current[script] = resolvedBlocks
+          }
         }
 
         setDeckCards(resolvedCards ?? [])
 
-        if (resolvedBlocks) {
-          const blocks = resolvedBlocks
-          setBlockProgress(blocks)
-          if (blocks.length > 0) {
-            const lastUnlocked = blocks.reduce(
-              (best, b) => (b.unlocked ? b.index : best),
-              0,
-            )
-            setActiveBlockIndex(lastUnlocked)
-          } else {
-            setActiveBlockIndex(0)
-          }
+        const blocks = resolvedBlocks ?? []
+        setBlockProgress(blocks)
+        if (blocks.length > 0) {
+          const lastUnlocked = blocks.reduce(
+            (best, b) => (b.unlocked ? b.index : best),
+            0,
+          )
+          setActiveBlockIndex(lastUnlocked)
         } else {
-          setBlockProgress([])
           setActiveBlockIndex(0)
-          try {
-            const payload = await getBlockProgressDeduped(script)
-            if (scriptLoadRequestIdRef.current !== requestId) {
-              return
-            }
-            const normalizedBlocks = normalizeBlockList(payload.blocks)
-            scriptBlockCacheRef.current[script] = normalizedBlocks
-            setBlockProgress(normalizedBlocks)
-            if (normalizedBlocks.length > 0) {
-              const lastUnlocked = normalizedBlocks.reduce(
-                (best, b) => (b.unlocked ? b.index : best),
-                0,
-              )
-              setActiveBlockIndex(lastUnlocked)
-            }
-          } catch { /* ignore fallback failure */ }
         }
       }
 
@@ -4544,8 +4533,7 @@ function App() {
       const result = await window.jplearnDesktop?.completeOnboarding?.(answers).catch(() => undefined)
       if (result) setLearningPathStatus(result as LearningPathStatus)
     }
-    await loadSummary()
-  }, [getDeckCardsDeduped, loadSummary, refreshDeckProgressAfterSeedChange])
+  }, [getDeckCardsDeduped, refreshDeckProgressAfterSeedChange])
 
 
   const titlebarHistoryBack = useCallback(() => {
@@ -4637,17 +4625,64 @@ function App() {
     models.tutorInstallInfo?.llamaCppInstalled
       && (models.tutorInstallInfo?.models ?? []).some((model) => model.installed),
   )
+
   const showOnboardingChatbotSection = models.tutorInstallInfo ? hasInstalledTutorModel : true
   const showOnboardingVoiceSection = models.tutorInstallInfo ? models.tutorInstallInfo.voiceInstalled : true
   const showOnboardingFontSection = models.tutorInstallInfo ? models.tutorInstallInfo.fontsInstalled : true
 
-  // Show setup wizard on first run (all hooks above must run unconditionally)
+  {/* ── Early-return gate: setup wizard ────────────────────── */}
   if (showWizard === true) {
-    return <SetupWizard onComplete={handleSetupWizardComplete} />
+    return <>
+      {cursor.cursorMode === 'animated' && createPortal(<CursorFollower {...cursor} />, document.body)}
+      <SetupWizard onComplete={handleSetupWizardComplete} />
+    </>
   }
   if (showWizard === null) {
-    // Brief check in progress — render nothing to avoid flash
     return null
+  }
+
+  // Show onboarding wizard when onboarding is not complete
+  if (!loading && learningPathStatus && !learningPathStatus.onboarding_complete) {
+    return <>
+      {cursor.cursorMode === 'animated' && createPortal(<CursorFollower {...cursor} />, document.body)}
+      <OnboardingWizard
+        showChatbotSection={showOnboardingChatbotSection}
+        assistantChatEnabled={settings.assistantChatEnabled}
+        onAssistantChatToggle={() => {
+          setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))
+        }}
+        showVoiceSection={showOnboardingVoiceSection}
+        voiceOptions={voice.voiceOptions}
+        voiceEnabled={settings.voiceEnabled}
+        voiceSpeaker={settings.voiceSpeaker}
+        voiceBusy={voice.voiceBusy}
+        onVoiceToggle={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
+        onVoiceSelect={(id) => {
+          setSettings((prev) => ({ ...prev, voiceSpeaker: id }))
+          void voice.playQuestionAudio('こんにちは。いっしょにがんばりましょう。', id)
+        }}
+        showFontSection={showOnboardingFontSection}
+        appFont={settings.appFont}
+        fontOptions={APP_FONT_OPTIONS}
+        onAppFontSelect={(key) => {
+          if (!isAppFontPreset(key)) {
+            return
+          }
+          setSettings((prev) => ({ ...prev, appFont: key }))
+        }}
+        fontSize={settings.fontSize}
+        fontSizeOptions={FONT_SIZE_ORDER.map((size) => ({ key: size, label: FONT_SIZE_LABEL[size] }))}
+        onFontSizeSelect={(key) => {
+          setSettings((prev) => ({ ...prev, fontSize: key }))
+        }}
+        onComplete={(pathId, checkedItems, answers) => {
+          void handleOnboardingComplete(pathId, checkedItems, answers)
+        }}
+        onSkip={(checkedItems, answers) => {
+          void handleOnboardingComplete(null, checkedItems, answers)
+        }}
+      />
+    </>
   }
 
   return (
@@ -5165,46 +5200,7 @@ function App() {
         playAudio: (text) => { void voice.playQuestionAudio(text) },
       }}>
       {/* Home is the main landing surface; keep it mounted only for home view. */}
-      {view === 'home' && !loading && learningPathStatus && !learningPathStatus.onboarding_complete ? (
-        <OnboardingView
-          navDirection={navDirection}
-          showChatbotSection={showOnboardingChatbotSection}
-          assistantChatEnabled={settings.assistantChatEnabled}
-          onAssistantChatToggle={() => {
-            setSettings((prev) => ({ ...prev, assistantChatEnabled: !prev.assistantChatEnabled }))
-          }}
-          showVoiceSection={showOnboardingVoiceSection}
-          voiceOptions={voice.voiceOptions}
-          voiceEnabled={settings.voiceEnabled}
-          voiceSpeaker={settings.voiceSpeaker}
-          voiceBusy={voice.voiceBusy}
-          onVoiceToggle={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
-            onVoiceSelect={(id) => {
-            setSettings((prev) => ({ ...prev, voiceSpeaker: id }))
-            void voice.playQuestionAudio('こんにちは。いっしょにがんばりましょう。', id)
-          }}
-          showFontSection={showOnboardingFontSection}
-          appFont={settings.appFont}
-          fontOptions={APP_FONT_OPTIONS}
-          onAppFontSelect={(key) => {
-            if (!isAppFontPreset(key)) {
-              return
-            }
-            setSettings((prev) => ({ ...prev, appFont: key }))
-          }}
-          fontSize={settings.fontSize}
-          fontSizeOptions={FONT_SIZE_ORDER.map((size) => ({ key: size, label: FONT_SIZE_LABEL[size] }))}
-          onFontSizeSelect={(key) => {
-            setSettings((prev) => ({ ...prev, fontSize: key }))
-          }}
-          onSelectPath={(pathId, checkedItems, answers) => {
-            void handleOnboardingComplete(pathId, checkedItems, answers)
-          }}
-          onSkip={(checkedItems, answers) => {
-            void handleOnboardingComplete(null, checkedItems, answers)
-          }}
-        />
-      ) : view === 'home' ? (
+      {view === 'home' ? (
         <HomeView
           navDirection={navDirection}
           studyPlan={studyPlan}

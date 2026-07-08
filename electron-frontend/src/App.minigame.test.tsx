@@ -12,6 +12,28 @@ vi.mock('react-type-animation', () => ({
   },
 }))
 
+// Mock useTypewriter to render text immediately.
+vi.mock('./features/onboarding/useTypewriter', () => ({
+  useTypewriter: (text: string, onComplete: () => void) => {
+    onComplete()
+    return text
+  },
+}))
+
+// Mock WelcomeStep to render text immediately (uses inline setInterval typewriter).
+vi.mock('./features/onboarding/components/WelcomeStep', () => ({
+  WelcomeStep: ({ onReveal }: { onReveal: () => void }) => {
+    setTimeout(() => onReveal(), 0)
+    return (
+      <div className="obn-hero">
+        <div className="obn-hero-badge">日本語</div>
+        <h1 className="obn-hero-title">Welcome to JPLearn</h1>
+        <p className="obn-hero-subtitle">Let&apos;s take two minutes...</p>
+      </div>
+    )
+  },
+}))
+
 afterEach(() => {
   cleanup()
   window.localStorage.clear()

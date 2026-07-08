@@ -98,8 +98,17 @@ _NODES: list[ProgressionNode] = [
         category="grammar",
         unlock_requirement=_requires_mastered("vocabulary_n5"),
         mastery_requirement=MasteryRequirement(mastered_ratio=0.8),
-        children=("scripted_conv",),
+        children=("sentence_examples", "scripted_conv"),
         rewards=_content("n5_grammar_unlocked"),
+    ),
+    ProgressionNode(
+        node_id="sentence_examples",
+        name="Sentence Examples",
+        category="sentences",
+        unlock_requirement=_requires_mastered("grammar_n5"),
+        mastery_requirement=MasteryRequirement(mastered_ratio=0.8),
+        children=(),
+        rewards=_content("sentence_examples_unlocked"),
     ),
     ProgressionNode(
         node_id="scripted_conv",

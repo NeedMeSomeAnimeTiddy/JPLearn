@@ -30,6 +30,7 @@ NodeCategory = Literal[
     "vocabulary",
     "grammar",
     "scripted_conversation",
+    "sentences",
     "listening",
     "kanji",
     "free_conversation",

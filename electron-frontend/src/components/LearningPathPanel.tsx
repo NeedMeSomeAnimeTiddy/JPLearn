@@ -22,6 +22,7 @@ const STEP_GLYPHS: Record<string, string> = {
   kanji_n5: '漢',
   vocab_n5: '語',
   grammar_patterns: '話',
+  sentence_examples: '文',
 }
 
 export function LearningPathPanel({ status, onContinue, onChangePath }: LearningPathPanelProps) {
