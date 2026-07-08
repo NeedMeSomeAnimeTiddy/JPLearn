@@ -239,7 +239,9 @@ export function ScriptCassetteCarousel({
                 <span className="cassette-screw cassette-screw-br" aria-hidden="true" />
 
                 <span className="cassette-label">
-                  <span className="cassette-brand">JPLEARN · DECK</span>
+                  <span className="cassette-brand">
+                    <strong>JPLEARN</strong> · DECK
+                  </span>
                   <span className="cassette-title">{item.title}</span>
                   <span className="cassette-lines" aria-hidden="true" />
                 </span>
@@ -283,12 +285,6 @@ export function ScriptCassetteCarousel({
         <ChevronRight size={20} strokeWidth={2.4} aria-hidden="true" />
       </button>
 
-      {selected ? (
-        <div className="cassette-info">
-          <span className="cassette-info-meta">{selected.difficultyLabel} · {selected.coveragePct}% coverage</span>
-          <span className="cassette-info-text">{selected.description}</span>
-        </div>
-      ) : null}
     </div>
   )
 }

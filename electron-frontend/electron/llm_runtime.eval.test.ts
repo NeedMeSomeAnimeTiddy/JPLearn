@@ -51,6 +51,12 @@ describe('llm runtime quality evals', () => {
   it('converts low-confidence model replies into intent-specific clarifying questions', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
+      translationOfflineEntries: [],
+      translationJishoClient: {
+        async searchForPhrase() {
+          return { data: [] }
+        },
+      },
       adapterFactory: () => ({
         async load() {
           return undefined

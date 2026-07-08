@@ -433,6 +433,7 @@ export function useTutor(
     }
   }, [hydrateAssistantChatFromPreloaded, hydrateAssistantChatFromRuntime, refreshAssistantChatHistory, settings.assistantChatEnabled])
 
+  // oxlint-disable react-hooks/exhaustive-deps — voice is injected via VoiceDeps, not a stable ref
   useEffect(() => {
     if (settings.assistantChatAudioEnabled && assistantChatOpen) {
       return

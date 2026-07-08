@@ -14,6 +14,10 @@ tests/   → pytest test suite
 
 Important: `main.py` (the Python GUI) is **deprecated** — raises `RuntimeError`. Use the Electron frontend instead.
 
+## Problem-Solving Rule
+
+- **Stuck? Use Exa search before reverting.** If you've been going in circles on a problem for a while, do NOT fall back to `git checkout` or scrap your work. First, look up the issue using `exa-search_web_search_exa` (20k free requests/month — use them). Search for error messages, library docs, API patterns, or anything relevant. The answer is often a quick web search away. Only revert as a last resort.
+
 ## Key Conventions
 
 - Python 3.11+, public APIs require type hints
@@ -54,6 +58,20 @@ npm run start            # Launch Electron
 npm run lint             # oxlint (must pass with 0 warnings)
 npm run test:ui          # vitest
 npm run test:a11y        # axe-core a11y tests
+
+# GitHub
+gh issue list --repo NeedMeSomeAnimeTiddy/JPLearn --limit 5
+gh issue create --repo NeedMeSomeAnimeTiddy/JPLearn --title "..." --body "..." --label "enhancement"
+
+## GitHub Issue Automation
+
+When discovering egregious bugs, architectural violations, or significant technical debt during exploration/refactoring, **automatically create a GitHub issue**. Use full path if `gh` not in PATH:
+```bash
+"/c/Program Files/GitHub CLI/gh.exe" issue create \
+  --repo NeedMeSomeAnimeTiddy/JPLearn \
+  --title "..." --body "..." --label "bug|refactor|enhancement"
+```
+Issues can be tackled later: "let's fix a few listed issues."
 ```
 
 ## Validation Order (Quiet by Default)

@@ -87,35 +87,39 @@ export function RoundFeedback({
       }`}
     >
       <p className="round-feedback-message">
-        {feedback}
+        <TypeAnimation key={`msg-${feedback}`} sequence={[feedback]} speed={8} cursor={false} style={{ display: 'inline' }} />
       </p>
       <div className="round-feedback-meta">
         {comboBonus > 0 ? <span className="round-feedback-combo">+{comboBonus} combo</span> : null}
         {milestoneStreak ? <span className="round-feedback-milestone">Streak ×{milestoneStreak}</span> : null}
         {tone === 'error' && livesEnabled ? <span className="round-feedback-life">−1 life</span> : null}
       </div>
-      {answer ? (
-        <div className={`round-feedback-answer ${tone === 'error' ? 'round-feedback-answer-error' : ''}`}>
-          <p className="round-feedback-answer-label">{answerLabel}</p>
-          <p className="round-feedback-answer-value">
-            {(CHAR_DIFF_MODES as readonly string[]).includes(mode) && tone === 'error' && correctAnswer ? (
-              [...answer].map((char, i) => {
-                const expected = [...correctAnswer][i]
-                const cls = expected !== undefined && char === expected ? 'char-match' : 'char-wrong'
-                return <span key={i} className={cls}>{char}</span>
-              })
-            ) : (
-              <TypeAnimation key={`ans-${answer}`} sequence={[answer]} speed={4} cursor={false} style={{ display: 'inline' }} />
-            )}
-          </p>
-        </div>
-      ) : null}
-      {tone === 'error' && correctAnswer ? (
-        <div className="round-feedback-answer round-feedback-answer-correct">
-          <p className="round-feedback-answer-label">The answer</p>
-          <p className="round-feedback-answer-value">
-            <TypeAnimation key={`correct-${correctAnswer}`} sequence={[formatExpectedAnswer(correctAnswer)]} speed={4} cursor={false} style={{ display: 'inline' }} />
-          </p>
+      {(answer || (tone === 'error' && correctAnswer)) ? (
+        <div className="round-feedback-answers">
+          {answer ? (
+            <div className={`round-feedback-answer ${tone === 'error' ? 'round-feedback-answer-error' : 'round-feedback-answer-success'}`}>
+              <p className="round-feedback-answer-label">{answerLabel}</p>
+              <p className="round-feedback-answer-value">
+                {(CHAR_DIFF_MODES as readonly string[]).includes(mode) && tone === 'error' && correctAnswer ? (
+                  [...answer].map((char, i) => {
+                    const expected = [...correctAnswer][i]
+                    const cls = expected !== undefined && char === expected ? 'char-match' : 'char-wrong'
+                    return <span key={i} className={cls}>{char}</span>
+                  })
+                ) : (
+                  <TypeAnimation key={`ans-${answer}`} sequence={[answer]} speed={4} cursor={false} style={{ display: 'inline' }} />
+                )}
+              </p>
+            </div>
+          ) : null}
+          {tone === 'error' && correctAnswer ? (
+            <div className="round-feedback-answer round-feedback-answer-correct">
+              <p className="round-feedback-answer-label">The answer</p>
+              <p className="round-feedback-answer-value">
+                <TypeAnimation key={`correct-${correctAnswer}`} sequence={[formatExpectedAnswer(correctAnswer)]} speed={4} cursor={false} style={{ display: 'inline' }} />
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {responseMs ? (

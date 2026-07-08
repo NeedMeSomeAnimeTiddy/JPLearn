@@ -5,7 +5,9 @@ from __future__ import annotations
 import csv
 import io
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from collections.abc import Generator
 from typing import Any
 
 from data import database
@@ -14,10 +16,15 @@ from data.text_normalization import normalize_japanese_text, normalize_storage_t
 FORMAT_VERSION = 1
 
 
-def _connect() -> sqlite3.Connection:
+@contextmanager
+def _connect() -> Generator[sqlite3.Connection, None, None]:
     conn = sqlite3.connect(database.DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _normalize_deck_name(value: str) -> str:
@@ -341,15 +348,12 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
 def export_review_history_csv() -> str:
     """Return all review events as a CSV string."""
     database.init_db()
-    conn = _connect()
-    try:
+    with _connect() as conn:
         rows = conn.execute(
             "SELECT id, deck, card_id, quality, confidence_score, reviewed_on,"
             " reviewed_at_utc, session_id, tags_csv"
             " FROM review_events ORDER BY reviewed_at_utc"
         ).fetchall()
-    finally:
-        conn.close()
     fieldnames = ["id", "deck", "card_id", "quality", "confidence_score",
                   "reviewed_on", "reviewed_at_utc", "session_id", "tags_csv"]
     buf = io.StringIO()
@@ -363,8 +367,7 @@ def export_review_history_csv() -> str:
 def export_accuracy_trends_csv() -> str:
     """Return per-day accuracy aggregate as a CSV string."""
     database.init_db()
-    conn = _connect()
-    try:
+    with _connect() as conn:
         rows = conn.execute(
             """
             SELECT reviewed_on AS date,
@@ -377,8 +380,6 @@ def export_accuracy_trends_csv() -> str:
             ORDER BY reviewed_on
             """
         ).fetchall()
-    finally:
-        conn.close()
     fieldnames = ["date", "total_reviews", "correct_count", "accuracy_pct"]
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=fieldnames)
@@ -394,8 +395,7 @@ def export_mastery_snapshot_csv() -> str:
     Mastered threshold: repetitions >= 3 and interval >= 21.
     """
     database.init_db()
-    conn = _connect()
-    try:
+    with _connect() as conn:
         rows = conn.execute(
             """
             SELECT deck, card_id, interval, repetitions, ease_factor, next_review,
@@ -404,8 +404,6 @@ def export_mastery_snapshot_csv() -> str:
             ORDER BY deck, card_id
             """
         ).fetchall()
-    finally:
-        conn.close()
     fieldnames = ["deck", "card_id", "interval", "repetitions",
                   "ease_factor", "next_review", "is_mastered"]
     buf = io.StringIO()

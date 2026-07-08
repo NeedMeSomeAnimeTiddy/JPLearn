@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { NavDirection } from '../types'
 import { ArrowRight, BookOpen, Check, Volume2, VolumeX } from 'lucide-react'
+import { TypeAnimation } from 'react-type-animation'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -151,10 +152,16 @@ export function OnboardingView({
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <header className="onb-hero">
           <div className="onb-hero-badge">日本語</div>
-          <h1 className="onb-hero-title">Welcome to JPLearn</h1>
+          <h1 className="onb-hero-title">
+            <TypeAnimation sequence={['Welcome to JPLearn']} speed={8} cursor={false} />
+          </h1>
           <p className="onb-hero-subtitle">
-            Let's take two minutes to personalise your learning journey.
-            Every answer is optional — you can always change things later.
+            <TypeAnimation
+              sequence={[800, "Let's take two minutes to personalise your learning journey. Every answer is optional — you can always change things later."]}
+              speed={6}
+              cursor={false}
+              style={{ display: 'inline' }}
+            />
           </p>
         </header>
 

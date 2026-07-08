@@ -14,7 +14,9 @@
     "check": { "description": "Run full aggregate check (arch + lint + test)", "template": "python scripts/dev.py" },
     "arch": { "description": "Run architecture boundary check", "template": "python scripts/arch_check.py" },
     "build": { "description": "Build electron-frontend (tsc + vite)", "template": "cd electron-frontend && npm run build" },
-    "run": { "description": "Build and start the Electron app", "template": "cd electron-frontend && npm run build && npm run start" }
+    "run": { "description": "Build and start the Electron app", "template": "cd electron-frontend && npm run build && npm run start" },
+    "smoke": { "description": "Run Electron e2e smoke tests (build + vitest)", "template": "cd electron-frontend && npm run build:quiet && npx vitest run --config vitest.e2e.config.ts src/tests/smoke.e2e.ts" },
+    "snapshot": { "description": "Dump DOM tree of running Electron app for agent inspection", "template": "cd electron-frontend && npm run build:quiet && npx vitest run --config vitest.e2e.config.ts src/tests/snapshot.e2e.ts" }
   },
   "agent": {
     "plan": {
@@ -79,7 +81,8 @@
       "python scripts/arch_check.py": "allow",
       "python scripts/dev.py": "allow",
       "python scripts/debug_tools.py *": "allow",
-      "npm run *": "allow"
+      "npm run *": "allow",
+      "npx vitest run --config vitest.e2e.config.ts *": "allow"
     },
     "external_directory": {
       "*": "ask",

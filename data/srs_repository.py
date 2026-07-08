@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 
 
 DB_PATH = Path("data/app.db")
@@ -48,8 +49,14 @@ class SRSRepository:
         self.db_path = db_path
         self._init_db()
 
-    def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.db_path)
+    @contextmanager
+    def _connect(self) -> Generator[sqlite3.Connection, None, None]:
+        conn = sqlite3.connect(self.db_path)
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _init_db(self) -> None:
         with self._connect() as conn:

@@ -110,55 +110,7 @@ const MINIGAME_DIFFICULTY: Record<MinigameKey, {
   interleave_mix: { level: 'hard', label: 'Hard' },
 }
 
-interface RankedMinigameCard {
-  key: MinigameKey
-  title: string
-  description: string
-  accuracy: number
-  difficulty: (typeof MINIGAME_DIFFICULTY)[MinigameKey]
-  lockReason: string | null
-  minigameLocked: boolean
-  stats: MinigameStatsByScript[ScriptKey][MinigameKey]
-  recommendationScore: number
-}
 
-function buildBalancedRanking(cards: RankedMinigameCard[]): RankedMinigameCard[] {
-  if (cards.length <= 1) {
-    return cards
-  }
-
-  const needsWork = [...cards].sort((left, right) => right.recommendationScore - left.recommendationScore)
-  const momentum = [...cards].sort((left, right) => {
-    const leftMomentum = left.accuracy + left.stats.bestStreak * 4 + Math.min(left.stats.attempted, 12)
-    const rightMomentum = right.accuracy + right.stats.bestStreak * 4 + Math.min(right.stats.attempted, 12)
-    return rightMomentum - leftMomentum
-  })
-
-  const seen = new Set<MinigameKey>()
-  const balanced: RankedMinigameCard[] = []
-
-  for (const card of needsWork) {
-    if (balanced.length >= 2) break
-    if (seen.has(card.key)) continue
-    balanced.push(card)
-    seen.add(card.key)
-  }
-
-  for (const card of momentum) {
-    if (balanced.length >= 4) break
-    if (seen.has(card.key)) continue
-    balanced.push(card)
-    seen.add(card.key)
-  }
-
-  for (const card of cards) {
-    if (seen.has(card.key)) continue
-    balanced.push(card)
-    seen.add(card.key)
-  }
-
-  return balanced
-}
 
 // Legacy lane-based minigame browser removed — replaced by MinigameCassetteCarousel.
 
@@ -243,8 +195,6 @@ export function ScriptHubView({
           const stats = minigameStats[activeScript][game.key]
           const accuracy = stats.attempted > 0 ? Math.round((stats.correct / stats.attempted) * 100) : 0
           const lockReason = minigameLockReasons[game.key] ?? null
-          const unmetNeed = stats.attempted === 0 ? 100 : Math.max(0, 85 - accuracy)
-          const recommendationScore = unmetNeed + Math.max(0, 6 - Math.min(stats.bestStreak, 6))
           return {
             key: game.key,
             title: game.title,
@@ -254,14 +204,11 @@ export function ScriptHubView({
             lockReason,
             minigameLocked: Boolean(lockReason),
             stats,
-            recommendationScore,
-          } satisfies RankedMinigameCard
+          }
         })
-        .filter((entry): entry is RankedMinigameCard => entry !== null)
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
 
-      const ranked = buildBalancedRanking(cards)
-
-      for (const card of ranked) {
+      for (const card of cards) {
         slides.push({
           kind: 'cassette',
           item: {

@@ -22,6 +22,7 @@
     "test:a11y": "vitest run src/App.accessibility.test.tsx",
     "preview": "vite preview",
     "package": "npm run build && electron-forge package",
+    "test:e2e": "npm run build:quiet && vitest run --config vitest.e2e.config.ts",
     "smoke:packaged": "node ./scripts/packaged-smoke.cjs",
     "make": "npm run build && electron-forge make",
     "make:win": "npm run build && electron-forge make --platform=win32"
@@ -66,6 +67,7 @@
     "electron": "^42.5.0",
     "jsdom": "^26.1.0",
     "oxlint": "^1.69.0",
+    "playwright": "^1.61.1",
     "typescript": "~6.0.2",
     "vite": "^8.1.0",
     "vitest": "^3.2.4",

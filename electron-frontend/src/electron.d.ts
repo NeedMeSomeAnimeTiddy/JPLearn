@@ -908,5 +908,3 @@ declare global {
   }
 }
 
-export {}
-

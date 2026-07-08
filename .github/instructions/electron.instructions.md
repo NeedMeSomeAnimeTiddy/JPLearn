@@ -14,6 +14,46 @@ applyTo: "electron-frontend/**/*"
 - Do not access SQLite or Python persistence files directly from frontend code.
 - Controller logic delegates to services — no business logic inside IPC event listeners.
 
+### File Structure
+
+```
+src/
+├── App.tsx              (6,238 lines — orchestrator: imports hooks, wires JSX, routing/state)
+├── components/              Shared UI components (DictionaryPopup, SetupWizard, etc.)
+│   └── setup/               SetupWizard sub-components (types, utils, styles, 7 components)
+├── features/                Self-contained feature modules (hook-over-context pattern)
+│   ├── theme/               useTheme hook + ThemeSettingsTab + preset/custom editors
+│   ├── background/          useBackground hook + BackgroundSettingsTab
+│   ├── tutor/               useTutor hook + 5 components (ChatPanel, OcrWorkbench, etc.)
+│   ├── voice/               useVoice hook + VoiceSettingsTab
+│   └── models/              useModels hook (download/install/select lifecycle)
+├── views/                   Top-level view components (HomeView, MinigameView, etc.)
+├── hooks/                   Shared hooks (useMicRecorder, usePagination, etc.)
+├── lib/                     Shared utilities (contentTemplates, ambientAudio, etc.)
+├── context/                 React context providers (SessionContext)
+└── generated/               Auto-generated type definitions
+```
+
+### Feature Module Pattern
+
+**Never add new systems inline in App.tsx.** Extract into `src/features/<name>/`:
+
+```
+src/features/<name>/
+├── types.ts          # TypeScript type/interface definitions
+├── constants.ts      # Static data and configuration values
+├── utils.ts          # Pure utility functions (no React)
+├── use<Name>.ts      # Custom hook — state, callbacks, effects, memos
+├── components/       # Feature-specific UI components
+│   └── *.tsx
+└── index.ts          # Barrel exports (hook, types, components)
+```
+
+- Custom hooks receive `settings`/`setSettings` callbacks from App.tsx (avoid coupling to persistence layer)
+- Cross-feature dependencies use injection (e.g., `VoiceDeps` interface for tutor → voice)
+- More than 50 lines of static data constants go in `src/lib/` (e.g. `contentTemplates.ts`)
+- App.tsx is orchestrator only — imports hooks, wires JSX, manages top-level routing/state
+
 ## React 19.2 Patterns (non-negotiable)
 
 - Always use functional components with hooks. Class components are legacy.
@@ -40,7 +80,7 @@ applyTo: "electron-frontend/**/*"
 - **Spacing rhythm**: Follow a 4px grid (4, 8, 12, 16, 24, 32, 48). No arbitrary pixel values.
 - **Typography**: Establish a clear hierarchy — heading, subheading, body, caption. Use relative units (rem).
 - **Responsive**: Design mobile-first. Use CSS grid/flexbox; avoid fixed pixel widths for containers.
-- **Component composition**: Prefer composition over configuration. Split large components into focused sub-components.
+- **Component composition**: Prefer composition over configuration. Split large components into focused sub-components (see `components/setup/` for SetupWizard decomposition pattern: `types.ts` → `utils.ts` → `styles.ts` → `components/`).
 - **Loading states**: Every async component must have a loading skeleton or spinner. No blank screens.
 - **Empty states**: Every list/collection must have a designed empty state with helpful messaging.
 - **Error states**: Every data-fetching component must handle errors with user-facing messages and retry capability.

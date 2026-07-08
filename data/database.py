@@ -4,9 +4,10 @@ import json
 import os
 import shutil
 import sqlite3
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from typing import TypedDict, TypeAlias, cast
 
 from domain.activity import ActivitySummary
@@ -96,11 +97,16 @@ class AssistantProfile(TypedDict):
     updated_at_utc: str
 
 
-def _connect() -> sqlite3.Connection:
+@contextmanager
+def _connect() -> Generator[sqlite3.Connection, None, None]:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _iter_chunks(values: list[int], size: int) -> list[list[int]]:
@@ -159,11 +165,8 @@ def load_deck_summary_counts(
             for row in completion_rows:
                 completed_ids.add(int(row[0]))
 
-    # Missing review_states rows are default cards due immediately.
-    missing_total = max(0, len(card_ids) - persisted_total)
-    due_remaining = persisted_due + missing_total
     completed_today = len(completed_ids)
-    due_today = due_remaining + completed_today
+    due_today = persisted_due + completed_today
     return mastered_count, due_today, completed_today
 
 

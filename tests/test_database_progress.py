@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -298,7 +299,7 @@ def test_log_review_normalizes_japanese_prompt_text_and_deck_name(tmp_path: Path
         script_tag=" KATAKANA ",
     )
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         row = conn.execute(
             "SELECT deck, prompt_text, script_tag FROM review_events"
         ).fetchone()

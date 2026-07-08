@@ -29,6 +29,7 @@ export function DevDashboard({ pendingCheck, onClose }: DevDashboardProps) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+  // oxlint-disable react-hooks/exhaustive-deps — dev object recreated each render via custom hook
   useEffect(() => {
     if (dev.activeTab === 'telemetry' && !dev.telemetry) {
       void dev.fetchTelemetry()
@@ -41,6 +42,7 @@ export function DevDashboard({ pendingCheck, onClose }: DevDashboardProps) {
     }
   }, [dev.activeTab])
 
+  // oxlint-disable react-hooks/exhaustive-deps — dev object recreated each render via custom hook
   useEffect(() => {
     if (pendingCheck) {
       dev.setActiveTab('checks')

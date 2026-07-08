@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from data import database
@@ -8,7 +9,7 @@ from data.srs_repository import SRSRepository
 
 
 def _column_names(db_path: Path, table_name: str) -> set[str]:
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         return {
             str(row[1])
             for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
@@ -21,7 +22,7 @@ def test_jplearn_db_fresh_install_creates_schema_marker(tmp_path: Path, monkeypa
 
     database.init_db()
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         row = conn.execute(
             "SELECT version FROM schema_version WHERE id = 1"
         ).fetchone()
@@ -37,7 +38,7 @@ def test_jplearn_db_upgrade_adds_review_event_columns_and_schema_marker(
     db_path = tmp_path / "jplearn-migration-upgrade.db"
     monkeypatch.setattr(database, "DB_PATH", db_path)
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         conn.execute(
             """
             CREATE TABLE review_events (
@@ -105,7 +106,7 @@ def test_jplearn_db_upgrade_adds_review_event_columns_and_schema_marker(
     assert "end_turn_id" in assistant_chat_summary_columns
     assert "summary_json" in assistant_chat_summary_columns
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         row = conn.execute(
             "SELECT version FROM schema_version WHERE id = 1"
         ).fetchone()
@@ -121,7 +122,7 @@ def test_jplearn_db_upgrade_from_v1_applies_v2_and_v3_in_order(
     db_path = tmp_path / "jplearn-migration-from-v1.db"
     monkeypatch.setattr(database, "DB_PATH", db_path)
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         conn.execute(
             """
             CREATE TABLE schema_version (
@@ -154,7 +155,7 @@ def test_jplearn_db_upgrade_from_v1_applies_v2_and_v3_in_order(
     assert "session_id" in columns
     assert "confidence_score" in columns
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         version_row = conn.execute(
             "SELECT version FROM schema_version WHERE id = 1"
         ).fetchone()
@@ -170,7 +171,7 @@ def test_jplearn_db_upgrade_from_v2_only_applies_confidence_column(
     db_path = tmp_path / "jplearn-migration-from-v2.db"
     monkeypatch.setattr(database, "DB_PATH", db_path)
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         conn.execute(
             """
             CREATE TABLE schema_version (
@@ -204,7 +205,7 @@ def test_jplearn_db_upgrade_from_v2_only_applies_confidence_column(
     assert "session_id" in columns
     assert "confidence_score" in columns
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         version_row = conn.execute(
             "SELECT version FROM schema_version WHERE id = 1"
         ).fetchone()
@@ -220,7 +221,7 @@ def test_jplearn_db_upgrade_from_v3_applies_assistant_tables(
     db_path = tmp_path / "jplearn-migration-from-v3.db"
     monkeypatch.setattr(database, "DB_PATH", db_path)
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         conn.execute(
             """
             CREATE TABLE schema_version (
@@ -260,7 +261,7 @@ def test_jplearn_db_upgrade_from_v3_applies_assistant_tables(
     assert "interaction_type" in _column_names(db_path, "assistant_event_interactions")
     assert "summary_json" in _column_names(db_path, "assistant_chat_summaries")
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         version_row = conn.execute(
             "SELECT version FROM schema_version WHERE id = 1"
         ).fetchone()
@@ -274,7 +275,7 @@ def test_app_db_fresh_install_creates_schema_marker(tmp_path: Path) -> None:
     repo = SRSRepository(db_path=db_path)
 
     assert repo.all() == []
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         row = conn.execute(
             "SELECT version FROM schema_version WHERE id = 1"
         ).fetchone()
@@ -286,7 +287,7 @@ def test_app_db_fresh_install_creates_schema_marker(tmp_path: Path) -> None:
 def test_app_db_upgrade_adds_updated_at_column_and_schema_marker(tmp_path: Path) -> None:
     db_path = tmp_path / "app-migration-upgrade.db"
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         conn.execute(
             """
             CREATE TABLE srs_items (
@@ -303,7 +304,7 @@ def test_app_db_upgrade_adds_updated_at_column_and_schema_marker(tmp_path: Path)
     columns = _column_names(db_path, "srs_items")
     assert "updated_at" in columns
 
-    with sqlite3.connect(db_path) as conn:
+    with closing(sqlite3.connect(db_path)) as conn:
         row = conn.execute(
             "SELECT version FROM schema_version WHERE id = 1"
         ).fetchone()
