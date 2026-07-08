@@ -118,14 +118,17 @@ export function useVoice(
         setLastVoiceSynthesis((result.synthesis as VoiceSynthesisMeta | undefined) ?? null)
         if (voiceAudioRef.current) {
           voiceAudioRef.current.pause()
+          voiceAudioRef.current = null
         }
         const audio = new Audio(`data:audio/wav;base64,${result.audioBase64}`)
+        console.log('[voice] creating audio, volume:', audio.volume, 'readyState:', audio.readyState)
         voiceAudioRef.current = audio
-        try {
-          await audio.play()
-        } catch {
-          // play() may reject due to autoplay policy or race with pause()
-        }
+        audio.play().then(() => {
+          console.log('[voice] play succeeded')
+          setVoiceUnavailable(false)
+        }).catch((e) => {
+          console.log('[voice] play rejected:', e.name, e.message)
+        })
         setVoiceUnavailable(false)
       } else {
         setVoiceUnavailable(true)
