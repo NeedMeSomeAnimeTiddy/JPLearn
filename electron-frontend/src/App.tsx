@@ -1888,6 +1888,7 @@ function App() {
   const [pendingDevCheck, setPendingDevCheck] = useState<string | null>(null)
   const answerInputRef = useRef<HTMLInputElement | null>(null)
   const shortcutsSectionRef = useRef<HTMLDivElement | null>(null)
+  const titlebarDragRef = useRef<HTMLDivElement | null>(null)
   const shortcutMenuRef = useRef<HTMLDivElement | null>(null)
   const roundPresentedAtRef = useRef<number>(0)
   const scriptLoadRequestIdRef = useRef<number>(0)
@@ -1915,6 +1916,18 @@ function App() {
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const interleaveCursorRef = useRef<number>(0)
+
+  // Toggle -webkit-app-region: drag only during mousedown → mouseup
+  // so mousemove events fire for the custom cursor the rest of the time.
+  const handleTitlebarDragStart = useCallback(() => {
+    titlebarDragRef.current?.classList.add('is-dragging')
+  }, [])
+  useEffect(() => {
+    const onUp = () => titlebarDragRef.current?.classList.remove('is-dragging')
+    document.addEventListener('mouseup', onUp)
+    return () => document.removeEventListener('mouseup', onUp)
+  }, [])
+
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
   const dictionaryCards = useMemo(() => {
@@ -4789,7 +4802,7 @@ function App() {
   return (
     <main className="app-shell" data-background-style={settings.backgroundStyle} style={background.appShellStyle}>
       <header className="window-titlebar" aria-label="Window controls">
-        <div className="window-titlebar-drag">
+        <div className="window-titlebar-drag" ref={titlebarDragRef} onMouseDown={handleTitlebarDragStart}>
           <div className="window-titlebar-nav" role="group" aria-label="App navigation">
             <div className="titlebar-shortcut-wrap" ref={shortcutMenuRef}>
               <button
