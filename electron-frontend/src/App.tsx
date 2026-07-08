@@ -2065,9 +2065,9 @@ function App() {
   // oxlint-disable react-hooks/exhaustive-deps — voice from useVoice hook is not a stable ref
   useEffect(() => {
     if (!showSettings || activeSettingsTab !== 'assistant') return
-    const t = setTimeout(() => { void voice.refreshVoiceStatus() }, 150)
+    void voice.refreshVoiceStatus()
     const h = window.setInterval(() => { void voice.refreshVoiceStatus() }, 3000)
-    return () => { clearTimeout(t); window.clearInterval(h) }
+    return () => { window.clearInterval(h) }
   }, [activeSettingsTab, voice.refreshVoiceStatus, showSettings])
 
 
@@ -5715,7 +5715,7 @@ function App() {
               </div>
 
               <div className="settings-control-grid">
-                {activeSettingsTab === 'appearance' && (<>
+                <div style={{ display: activeSettingsTab === 'appearance' ? undefined : 'none' }}>
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -5866,8 +5866,8 @@ function App() {
                     <CursorSettingsTab cursor={cursor} />
                   </div>
                 </div>
-              </>)}
-              {activeSettingsTab === 'assistant' && (<>
+              </div>
+              <div style={{ display: activeSettingsTab === 'assistant' ? undefined : 'none' }}>
                 <div
                   className="settings-section settings-control-row settings-control-row-no-icon"
                   role="tabpanel"
@@ -6175,8 +6175,8 @@ function App() {
                     />
                   </div>
                 </div>
-              </>)}
-              {activeSettingsTab === 'system' && (<>
+              </div>
+              <div style={{ display: activeSettingsTab === 'system' ? undefined : 'none' }}>
                 <div
                   className="settings-section settings-control-row"
                   role="tabpanel"
@@ -6277,7 +6277,7 @@ function App() {
                     )}
                   </div>
                 </div>
-              </>)}
+              </div>
               </div>
             </div>
           </div>
