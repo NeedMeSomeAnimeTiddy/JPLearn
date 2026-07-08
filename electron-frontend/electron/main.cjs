@@ -4,7 +4,6 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
-const { Draggable } = require('electron-draggable')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
 const { createVoiceRuntime, isVoiceRuntimeInstalled } = require('./voice_runtime.cjs')
 const { createSetupRuntime } = require('./setup_runtime.cjs')
@@ -1841,7 +1840,6 @@ function loadMainWindow(win) {
         validatedURL,
       })
     })
-    new Draggable(win, { region: { y: 0, height: 40 } })
     win.loadURL('http://localhost:5173')
     win.webContents.openDevTools({ mode: 'detach' })
     return
@@ -1861,7 +1859,6 @@ function loadMainWindow(win) {
     win.setTitle('JPLearn')
   })
 
-  new Draggable(win, { region: { y: 0, height: 40 }, maximize: true })
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
 
   // Inject locally downloaded fonts from the assets store if available.

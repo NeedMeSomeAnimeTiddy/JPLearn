@@ -1772,6 +1772,8 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   flex: 1;
   height: 100%;
   align-self: stretch;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .window-titlebar-wordmark {
