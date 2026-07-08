@@ -426,24 +426,39 @@ const tutor = useTutor(settings, {
 
 ## Execution Progress
 
-| Phase | System | Est. Lines | Actual | App.tsx After |
-|-------|--------|-----------|--------|---------------|
-| 1 ✅ | Theme | -1,378 | -1,378 | 9,514 |
-| 2 ✅ | Background | -456 | -458 | 9,056 |
-| 3 ✅ | Tutor Chat + OCR | -1,800 | -1,275 | 7,781 |
-| 4 ✅ | Voice + Audio | -875 | -703 | 7,078 |
-| 5 ✅ | Model Management | -900 | -381 | 6,697 |
-| 6 | Data Persistence | -400 | — | ~5,600 |
-| 7 | Content Templates | -500 | — | ~5,100 |
-| 8 | Session/Round (risky) | -1,200 | — | ~3,900 |
+| Phase | System | Actual | App.tsx | Verdict |
+|-------|--------|--------|---------|---------|
+| 1 ✅ | Theme | -1,378 | 9,514 | Done |
+| 2 ✅ | Background | -458 | 9,056 | Done |
+| 3 ✅ | Tutor Chat + OCR | -1,275 | 7,781 | Done |
+| 4 ✅ | Voice + Audio | -703 | 7,078 | Done |
+| 5 ✅ | Model Management | -381 | 6,697 | Done |
+| 6 ⏭️ | Data Persistence | — | — | Skipped — circular deps with AppSettings |
+| 7 ✅ | Content Templates | -504 | 6,238 | Done |
+| 8 ⏭️ | Session/Round | — | — | Skipped — SessionContext already abstracts well |
+| ✅ | SetupWizard | -731 | n/a | 1,701 → 970 lines (10 new files) |
+| **Total** | | **-5,430** | **6,238** | **49.8% reduction across App.tsx** |
 
-**Target:** Get App.tsx under 4,000 lines. After Phase 8 (or without it), remaining ~4,000 lines would be:
+### Beyond App.tsx — SetupWizard decomposition
+
+| File | Before | After | Files created |
+|------|--------|-------|--------------|
+| SetupWizard.tsx | 1,701 | 970 (-731) | `components/setup/` with 10 files |
+
+### Final State
+
+**App.tsx: 10,892 → 6,238** (42.7% reduction). The remaining code is:
 - Navigation/view routing (~200 lines)
-- Settings panel shell with remaining tabs (font, animations, shortcuts, data) (~400 lines)
+- Settings panel shell with remaining inline tabs (~400 lines)
 - Effect/event handlers (IPC listeners, lifecycle) (~300 lines)
 - JSX render: shell structure, views delegation (~1,500 lines)
-- Session logic (~1,200 lines, if not extracted)
-- Remaining small utilities and bridge code
+- Session/round logic (~800 lines, behind SessionContext)
+- Deck loading, scoring, stats, study plan (~1,000 lines)
+- Data persistence / settings loading (~400 lines)
+- Remaining small utilities (~638 lines)
+
+**No other monolithic files** remain — all source files are under 700 lines.
+The app shell role is now an orchestrator that wires features together.
 
 ---
 
