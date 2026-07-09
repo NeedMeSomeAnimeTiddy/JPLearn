@@ -1655,6 +1655,7 @@ function App() {
   const [roundComboBonus, setRoundComboBonus] = useState<number>(0)
   const [roundMilestoneStreak, setRoundMilestoneStreak] = useState<number | null>(null)
   const [sessionTargetItems, setSessionTargetItems] = useState<number>(() => loadSessionPrefs()?.sessionTargetItems ?? DEFAULT_SESSION_LENGTH_PRESET.items)
+  const [retryTargetItems, setRetryTargetItems] = useState<number | null>(null)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [lastSessionSummary, setLastSessionSummary] = useState<SessionSummaryPayload | null>(null)
   const [sessionRunReport, setSessionRunReport] = useState<SessionRunReport | null>(null)
@@ -1719,7 +1720,7 @@ function App() {
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
-  const [xpToast, setXpToast] = useState<{ xp: number; newLevel?: number } | null>(null)
+  const [xpToasts, setXpToasts] = useState<Array<{ id: number; xp: number; levelBefore?: number; levelAfter?: number }>>([])
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
   const [warningModal, setWarningModal] = useState<{
@@ -1790,6 +1791,8 @@ function App() {
   const seenCardIdsRef = useRef<number[]>([])
   const wrongCardIdsRef = useRef<number[]>([])
   const nearMissCardIdsRef = useRef<number[]>([])
+  const retryCardsRef = useRef<GameCard[] | null>(null)
+  const retryTargetItemsRef = useRef<number | null>(null)
   const feedbackAdvanceRef = useRef<(() => void) | null>(null)
   const kanjiCategoryDeckCacheRef = useRef<Partial<Record<KanjiCategory, ScriptDeck['cards']>>>({})
   const vocabCategoryDeckCacheRef = useRef<Partial<Record<VocabCategory, ScriptDeck['cards']>>>({})
@@ -1871,6 +1874,9 @@ function App() {
     setRoundFeedbackPoints(null)
     setRoundFeedbackAnswer(null)
     setIsRoundResolving(false)
+    retryCardsRef.current = null
+    retryTargetItemsRef.current = null
+    setRetryTargetItems(null)
     resetRoundCycle()
   }
 
@@ -2276,10 +2282,11 @@ function App() {
     const completedCorrect = sessionScore
     const completedWrong = Math.max(0, completedRounds - completedCorrect)
     const accuracy = completedRounds > 0 ? Math.round((completedCorrect / completedRounds) * 100) : 0
-    const goalCompletionPct = sessionTargetItems > 0
-      ? Math.min(999, Math.round((completedRounds / sessionTargetItems) * 100))
+    const effectiveTargetItems = retryTargetItems ?? sessionTargetItems
+    const goalCompletionPct = effectiveTargetItems > 0
+      ? Math.min(999, Math.round((completedRounds / effectiveTargetItems) * 100))
       : 0
-    const goalDelta = completedRounds - sessionTargetItems
+    const goalDelta = completedRounds - effectiveTargetItems
     const livesLost = livesEnabled ? Math.max(0, DEFAULT_LIVES - livesRemaining) : 0
     const averageConfidenceScore =
       sessionConfidenceCount > 0
@@ -2296,7 +2303,7 @@ function App() {
       wrong: completedWrong,
       accuracy,
       points: sessionPoints,
-      targetItems: sessionTargetItems,
+      targetItems: effectiveTargetItems,
       goalCompletionPct,
       goalDelta,
       livesEnabled,
@@ -2356,6 +2363,7 @@ function App() {
     sessionRounds,
     sessionScore,
     sessionTargetItems,
+    retryTargetItems,
     clearPersistedSession,
   ])
 
@@ -3511,6 +3519,11 @@ function App() {
     seenCardIdsRef.current = []
     wrongCardIdsRef.current = []
     nearMissCardIdsRef.current = []
+    if (!customCards) {
+      retryCardsRef.current = null
+      retryTargetItemsRef.current = null
+      setRetryTargetItems(null)
+    }
 
     setSessionScore(restore?.sessionScore ?? 0)
     setSessionRounds(restore?.sessionRounds ?? 0)
@@ -3674,13 +3687,18 @@ function App() {
   const handleRetry = useCallback((cardIds: number[]) => {
     const retryCards = deckCards.filter((c) => cardIds.includes(c.id))
     if (retryCards.length > 0) {
-      startSession(activeGame, retryCards)
+      retryCardsRef.current = retryCards
+      retryTargetItemsRef.current = retryCards.length
+      setRetryTargetItems(retryCards.length)
+      startSession(activeGame, retryCards, retryCards.length)
     }
   }, [activeGame, deckCards, startSession])
 
   const nextRound = useCallback(async () => {
+    const retryPool = retryCardsRef.current
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
-    const sourceCards = leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards
+    const sourceCards = retryPool
+      ?? (leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards)
     const modeSelection = nextRoundMode(activeGame)
     const modeCards = isImposterMode(modeSelection.mode)
       ? narrativePriorityCards(sourceCards)
@@ -3713,10 +3731,11 @@ function App() {
   const submitAnswer = useCallback(
     (answer: string) => {
       if (!roundState || isRoundResolving) return
+      if (answer.trim().length === 0) return
 
       setIsRoundResolving(true)
       const completedRoundsAfterAnswer = sessionRounds + 1
-      const targetRounds = Math.max(1, Math.floor(sessionTargetItems))
+      const targetRounds = Math.max(1, Math.floor(retryTargetItemsRef.current ?? sessionTargetItems))
 
       const typedAssessment =
         roundState.mode === 'typed_recall'
@@ -3964,8 +3983,22 @@ function App() {
             const leveledUp = typeof result.level_after === 'number'
               && typeof result.level_before === 'number'
               && result.level_after > result.level_before
-            setXpToast({ xp: result.xp_gained, newLevel: leveledUp ? result.level_after : undefined })
-            setTimeout(() => setXpToast(null), 2500)
+            const id = Date.now()
+            setXpToasts((prev) => [...prev, {
+              id,
+              xp: result.xp_gained!,
+              levelBefore: leveledUp ? result.level_before : undefined,
+              levelAfter: leveledUp ? result.level_after : undefined,
+            }])
+            setTimeout(() => setXpToasts((prev) => prev.filter((t) => t.id !== id)), 2500)
+          }
+          if (result.xp_gained !== undefined) {
+            void (async () => {
+              try {
+                const xp = await window.jplearnDesktop?.getXpProgress?.()
+                if (xp) setXpProgress(xp)
+              } catch { /* ignore */ }
+            })()
           }
         } catch { /* background record — ignore */ }
       })()
@@ -5170,6 +5203,7 @@ function App() {
         sessionStreak,
         sessionBestStreak,
         sessionTargetItems,
+        retryTargetItems,
         blockSessionComplete,
         roundComboBonus,
         roundMilestoneStreak,
@@ -5284,33 +5318,41 @@ function App() {
       {/* Keyboard shortcut cheatsheet */}
       <KeyboardCheatsheet isOpen={keyboardCheatsheetOpen} onClose={closeKeyboardCheatsheet} />
 
-      {/* XP gain toast */}
-      {xpToast ? (
+      {/* XP gain toasts — centered, stacks vertically */}
+      {xpToasts.length > 0 ? (
         <div
           style={{
             position: 'fixed',
             top: '3rem',
             left: '50%',
-            zIndex: 300,
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            flexDirection: 'column-reverse',
+            gap: '4px',
+            alignItems: 'center',
             pointerEvents: 'none',
+            zIndex: 300,
           }}
         >
-          <div
-            className="xp-toast-inner"
-            style={{
-              background: 'color-mix(in oklab, var(--accent-soft) 18%, var(--panel-bg))',
-              border: '1px solid color-mix(in oklab, var(--accent) 42%, transparent)',
-              borderRadius: '999px',
-              padding: '6px 18px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {xpToast.newLevel != null
-              ? <span><span style={{ fontSize: '1rem', marginRight: '6px' }}>{'\u2728'}</span>Level {xpToast.newLevel}! +{xpToast.xp} XP</span>
-              : <span>+{xpToast.xp} XP</span>}
-          </div>
+          {xpToasts.map((t) => (
+            <div
+              key={t.id}
+              className="xp-toast-inner"
+              style={{
+                background: 'color-mix(in oklab, var(--accent-soft) 18%, var(--panel-bg-alt))',
+                border: '1px solid color-mix(in oklab, var(--accent) 42%, transparent)',
+                padding: '10px 28px',
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                lineHeight: 1,
+              }}
+            >
+              {t.levelAfter != null
+                ? <>Level Up! {t.levelBefore} → {t.levelAfter}</>
+                : <>+{t.xp} XP</>}
+            </div>
+          ))}
         </div>
       ) : null}
 

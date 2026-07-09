@@ -61,6 +61,7 @@ export interface SessionContextValue {
   sessionStreak: number
   sessionBestStreak: number
   sessionTargetItems: number
+  retryTargetItems: number | null
   blockSessionComplete: boolean
 
   // Round reward metadata (UI only)

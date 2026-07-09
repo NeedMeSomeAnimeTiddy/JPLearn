@@ -81,6 +81,7 @@ export function MinigameView({
     sessionPoints,
     sessionStreak,
     sessionTargetItems,
+    retryTargetItems,
     roundComboBonus,
     roundMilestoneStreak,
     sessionRunReport,
@@ -104,12 +105,13 @@ export function MinigameView({
     skipFeedback,
   } = useSession()
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
+  const effectiveTargetItems = retryTargetItems ?? sessionTargetItems
   const resolvedGameTitle =
     activeGame === 'interleave_mix'
       ? (MINIGAMES.find((game) => game.key === roundState?.mode)?.title ?? 'Mixed Round')
       : (selectedGameMeta?.title ?? 'Minigame')
-  const roundProgressValue = sessionTargetItems > 0 ? Math.min(sessionRounds / sessionTargetItems, 1) : 0
-  const remainingRounds = Math.max(sessionTargetItems - sessionRounds, 0)
+  const roundProgressValue = effectiveTargetItems > 0 ? Math.min(sessionRounds / effectiveTargetItems, 1) : 0
+  const remainingRounds = Math.max(effectiveTargetItems - sessionRounds, 0)
   const sessionStatusCopy = sessionActive
     ? `${remainingRounds} ${remainingRounds === 1 ? 'challenge' : 'challenges'} left`
     : sessionRunReport
@@ -375,7 +377,7 @@ export function MinigameView({
             <div className="hub-player-header minigame-focus-optional">
               <p className="hero-kicker">
                 <span className="hub-rec-dot" aria-hidden="true" />{' '}
-                Round {sessionRounds + 1} of {sessionTargetItems} · {SCRIPT_LABELS[activeScript]}{activeSectionName ? ` · ${activeSectionName}` : ''}
+                Round {sessionRounds + 1} of {effectiveTargetItems} · {SCRIPT_LABELS[activeScript]}{activeSectionName ? ` · ${activeSectionName}` : ''}
               </p>
             </div>
           ) : null}
@@ -460,10 +462,10 @@ export function MinigameView({
                       className="minigame-round-progress"
                       role="progressbar"
                       aria-valuemin={0}
-                      aria-valuemax={sessionTargetItems}
-                      aria-valuenow={Math.min(sessionRounds, sessionTargetItems)}
-                      aria-valuetext={`${sessionRounds} of ${sessionTargetItems} challenges, ${sessionStatusCopy}`}
-                      title={`${sessionRounds}/${sessionTargetItems} · ${sessionStatusCopy}`}
+                      aria-valuemax={effectiveTargetItems}
+                      aria-valuenow={Math.min(sessionRounds, effectiveTargetItems)}
+                      aria-valuetext={`${sessionRounds} of ${effectiveTargetItems} challenges, ${sessionStatusCopy}`}
+                      title={`${sessionRounds}/${effectiveTargetItems} · ${sessionStatusCopy}`}
                     >
                       <div className="minigame-round-progress-fill" style={{ width: `${roundProgressValue * 100}%` }} />
                     </div>
@@ -497,7 +499,7 @@ export function MinigameView({
                       </span>
                       <span className="game-hud-stat">
                         <Trophy aria-hidden="true" size={11} strokeWidth={2.2} />
-                        <strong>{sessionRounds}/{sessionTargetItems}</strong>
+                        <strong>{sessionRounds}/{effectiveTargetItems}</strong>
                       </span>
                     </div>
                   </div>

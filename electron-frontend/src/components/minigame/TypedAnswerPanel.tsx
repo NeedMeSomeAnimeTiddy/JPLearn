@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { CornerDownLeft } from 'lucide-react'
 import * as wanakana from 'wanakana'
 
@@ -22,6 +22,7 @@ export function TypedAnswerPanel({
   wanakanaMode,
 }: TypedAnswerPanelProps) {
   const boundRef = useRef(false)
+  const [shaking, setShaking] = useState(false)
 
   useEffect(() => {
     const el = answerInputRef.current
@@ -43,10 +44,15 @@ export function TypedAnswerPanel({
 
   return (
       <form
-        className="game-input-row minigame-answer-form"
+        className={`game-input-row minigame-answer-form${shaking ? ' game-input-row-shake' : ''}`}
+        onAnimationEnd={() => setShaking(false)}
         onSubmit={(event) => {
           event.preventDefault()
           const raw = (event.currentTarget as HTMLFormElement).querySelector('input')?.value ?? ''
+          if (raw.trim().length === 0) {
+            setShaking(true)
+            return
+          }
           if (wanakanaMode) {
             const finalized = wanakanaMode === 'hiragana'
               ? wanakana.toHiragana(raw)
