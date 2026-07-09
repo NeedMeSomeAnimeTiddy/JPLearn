@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, Monitor } from 'lucide-react'
 import type { ThemeKey, ThemeMode, ThemeVariableKey, ThemeSection } from './types'
 
 export const THEME_OPTIONS: Array<{ key: ThemeKey; label: string; mode: ThemeMode }> = [
@@ -30,16 +30,19 @@ export const THEME_OPTIONS: Array<{ key: ThemeKey; label: string; mode: ThemeMod
 export const THEME_MODE_SECTIONS: Array<{ key: ThemeMode; label: string }> = [
   { key: 'dark', label: 'Dark Mode' },
   { key: 'light', label: 'Light Mode' },
+  { key: 'auto', label: 'Auto Mode' },
 ]
 
 export const DEFAULT_THEME_BY_MODE: Record<ThemeMode, ThemeKey> = {
   dark: 'lofi_dusk',
   light: 'lofi_dusk_light',
+  auto: 'lofi_dusk',
 }
 
 export const THEME_MODE_ICON: Record<ThemeMode, LucideIcon> = {
   dark: Moon,
   light: Sun,
+  auto: Monitor,
 }
 
 export const THEME_SWATCH_ACCENT: Record<ThemeKey, string> = {

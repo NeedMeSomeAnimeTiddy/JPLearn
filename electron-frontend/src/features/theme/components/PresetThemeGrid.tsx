@@ -45,7 +45,7 @@ export function PresetThemeGrid({
         })}
       </div>
       <p className="settings-theme-mode-label">
-        {themeMode === 'dark' ? 'Dark Mode Themes' : 'Light Mode Themes'}
+        {themeMode === 'dark' ? 'Dark Mode Themes' : themeMode === 'light' ? 'Light Mode Themes' : 'Auto Mode Themes'}
       </p>
       <div className="settings-theme-grid" role="radiogroup" aria-label={`${themeMode} premade theme selection`}>
         {availableThemes.map((theme) => (

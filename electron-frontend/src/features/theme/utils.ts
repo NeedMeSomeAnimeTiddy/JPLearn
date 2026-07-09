@@ -9,7 +9,14 @@ import {
 } from './constants'
 
 export function isThemeMode(value: unknown): value is ThemeMode {
-  return value === 'dark' || value === 'light'
+  return value === 'dark' || value === 'light' || value === 'auto'
+}
+
+export function resolveThemeMode(mode: ThemeMode): 'dark' | 'light' {
+  if (mode === 'auto') {
+    return (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'
+  }
+  return mode
 }
 
 export function isThemeScope(value: unknown): value is ThemeScope {
@@ -30,18 +37,20 @@ export function getThemeModeForTheme(theme: ThemeKey): ThemeMode {
 }
 
 export function getThemeVariantForMode(theme: ThemeKey, mode: ThemeMode): ThemeKey {
-  if (getThemeModeForTheme(theme) === mode) {
+  const resolved = resolveThemeMode(mode)
+  if (getThemeModeForTheme(theme) === resolved) {
     return theme
   }
 
-  const candidate = mode === 'light'
+  const candidate = resolved === 'light'
     ? `${theme}_light`
     : theme.replace(/_light$/, '')
-  return isThemeKey(candidate) ? candidate : getFallbackThemeForMode(mode)
+  return isThemeKey(candidate) ? candidate : getFallbackThemeForMode(resolved)
 }
 
 export function getFallbackThemeForMode(mode: ThemeMode): ThemeKey {
-  const firstTheme = THEME_OPTIONS.find((theme) => theme.mode === mode)
+  const resolved = resolveThemeMode(mode)
+  const firstTheme = THEME_OPTIONS.find((theme) => theme.mode === resolved)
   return firstTheme?.key ?? DEFAULT_THEME_BY_MODE.dark
 }
 

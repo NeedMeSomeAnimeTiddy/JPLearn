@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { ThemeMode, ThemeKey, CustomTheme, ThemePalette, ThemeSection, ThemeVariableKey } from '../types'
 import { THEME_SECTION_DEFINITIONS, THEME_VARIABLE_DISPLAY, THEME_SWATCH_ACCENT } from '../constants'
-import { formatThemeVariableLabel, supportsColorPickerForKey, isColorLikeValue, getColorInputValue } from '../utils'
+import { formatThemeVariableLabel, supportsColorPickerForKey, isColorLikeValue, getColorInputValue, resolveThemeMode } from '../utils'
 
 interface CustomThemeEditorProps {
   activeCustomTheme: CustomTheme | null
@@ -52,7 +52,7 @@ export function CustomThemeEditor({
         <label className="settings-small-label">Base Preset ({themeMode})</label>
         <div className="settings-theme-grid" role="radiogroup" aria-label={`Base preset selection for ${themeMode} mode`}>
           {availableThemes.map((theme) => {
-            const isBaseTheme = activeCustomTheme.baseThemeByMode[themeMode] === theme.key
+            const isBaseTheme = activeCustomTheme.baseThemeByMode[resolveThemeMode(themeMode)] === theme.key
             return (
               <button
                 key={theme.key}
@@ -75,7 +75,7 @@ export function CustomThemeEditor({
       </div>
 
       {THEME_SECTION_DEFINITIONS.map((section) => {
-        const modeOverrides = activeCustomTheme.overridesByMode[themeMode]
+        const modeOverrides = activeCustomTheme.overridesByMode[resolveThemeMode(themeMode)]
         const isCollapsed = Boolean(collapsedSections[section.id])
         const overrideCount = section.keys.reduce(
           (count, key) => count + (modeOverrides[key] ? 1 : 0),
@@ -111,7 +111,7 @@ export function CustomThemeEditor({
             {!isCollapsed ? (
               <div className="settings-theme-variable-grid">
                 {section.keys.map((key) => {
-                  const overrideValue = activeCustomTheme.overridesByMode[themeMode][key] ?? ''
+                  const overrideValue = activeCustomTheme.overridesByMode[resolveThemeMode(themeMode)][key] ?? ''
                   const baseValue = activeBasePalette?.[key] ?? ''
                   const resolvedValue = overrideValue || baseValue
                   const isOverride = Boolean(overrideValue)

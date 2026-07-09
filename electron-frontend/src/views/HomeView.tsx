@@ -17,6 +17,7 @@ import {
 import { RecommendationCard } from '../components/RecommendationCard'
 import { LearningPathPanel } from '../components/LearningPathPanel'
 import { ScriptCassetteCarousel } from '../components/ScriptCassetteCarousel'
+import { XPBar } from '../components/XPBar'
 import type { ScriptCassetteItem } from '../components/ScriptCassetteCarousel'
 
 const READINESS_BADGE: Record<SectionReadiness, { label: string; className: string }> = {
@@ -40,6 +41,7 @@ interface HomeViewProps {
   studyPlan: StudyPlanSnapshot
   recommendations?: RecommendationData[]
   learningPathStatus?: LearningPathStatus | null
+  xpProgress?: { level: number; xp_for_current_level: number; xp_to_next_level: number } | null
   onSelectScript: (script: ScriptKey) => void
   onOpenJlptPrep: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
@@ -62,6 +64,7 @@ export function HomeView({
   studyPlan,
   recommendations,
   learningPathStatus,
+  xpProgress,
   onSelectScript,
   onOpenJlptPrep,
   onJumpToSetup,
@@ -162,6 +165,16 @@ export function HomeView({
 
         <span aria-hidden="true" />
       </header>
+
+      {xpProgress ? (
+        <div style={{ padding: '0 1.5rem 0.6rem' }}>
+          <XPBar
+            level={xpProgress.level}
+            xpToNextLevel={xpProgress.xp_to_next_level}
+            xpForCurrentLevel={xpProgress.xp_for_current_level}
+          />
+        </div>
+      ) : null}
 
       <div className="hub-studio">
         <div className="hub-player">

@@ -16,6 +16,7 @@ import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
 import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
+import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { SessionProvider } from './context/SessionContext'
 import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
@@ -26,7 +27,7 @@ import './App.css'
 import { useTheme } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
 import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/theme/types'
-import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme } from './features/theme/utils'
+import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme, resolveThemeMode } from './features/theme/utils'
 import { useBackground, BackgroundSettingsTab, clampBackgroundBlur, normalizeCustomBackgroundDataUrl, isBackgroundStyle, BACKGROUND_BLUR_DEFAULT } from './features/background'
 import type { BackgroundStyle } from './features/background'
 import { useVoice, splitSpeechSegments, VoiceSettingsTab } from './features/voice'
@@ -728,7 +729,7 @@ function loadSettings(): AppSettings {
     if (normalizedThemeScope === 'custom' && normalizedActiveCustomThemeId) {
       const activeCustomTheme = customThemes.find((theme) => theme.id === normalizedActiveCustomThemeId)
       if (activeCustomTheme) {
-        resolvedTheme = activeCustomTheme.baseThemeByMode[normalizedMode]
+        resolvedTheme = activeCustomTheme.baseThemeByMode[resolveThemeMode(normalizedMode)]
       }
     }
 
@@ -1763,6 +1764,7 @@ function App() {
     settings as any,
     setSettings as any,
   )
+  const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const [showOverview, setShowOverview] = useState(false)
   const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0)
   const [resettingDb, setResettingDb] = useState(false)
@@ -4036,6 +4038,11 @@ function App() {
       }
 
       if (event.key === 'Escape') {
+        if (keyboardCheatsheetOpen) {
+          closeKeyboardCheatsheet()
+          return
+        }
+
         if (shortcutMenuOpen) {
           setShortcutMenuOpen(false)
           setActiveShortcutFlyout(null)
@@ -5193,6 +5200,7 @@ function App() {
           navDirection={navDirection}
           studyPlan={studyPlan}
           learningPathStatus={learningPathStatus}
+          xpProgress={xpProgress}
           recommendations={recommendations.map((r) => ({
             nodeId: r.node_id,
             displayLabel: r.display_label,
@@ -5265,6 +5273,9 @@ function App() {
           onJumpToSetup={jumpToScriptHubSetup}
         />
       ) : null}
+
+      {/* Keyboard shortcut cheatsheet */}
+      <KeyboardCheatsheet isOpen={keyboardCheatsheetOpen} onClose={closeKeyboardCheatsheet} />
 
       {/* Readiness warning modal — shown before navigating to a non-recommended section */}
       {warningModal && (

@@ -32,6 +32,8 @@ export function ThemeSettingsTab({
   duplicateCustomTheme,
   exportCustomThemesToFile,
   copyCustomThemesToClipboard,
+  exportSingleCustomThemeToFile,
+  copySingleCustomThemeToClipboard,
   openCustomThemeImportPicker,
   importCustomThemesFromClipboard,
   handleCustomThemeFileImport,
@@ -69,6 +71,8 @@ export function ThemeSettingsTab({
         selectCustomTheme={selectCustomTheme}
         duplicateCustomTheme={duplicateCustomTheme}
         deleteCustomTheme={deleteCustomTheme}
+        exportSingleCustomThemeToFile={exportSingleCustomThemeToFile}
+        copySingleCustomThemeToClipboard={copySingleCustomThemeToClipboard}
       />
 
       {activeCustomTheme ? (

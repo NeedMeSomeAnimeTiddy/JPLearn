@@ -1,5 +1,5 @@
 import type { CSSProperties, RefObject, ChangeEvent } from 'react'
-import { Copy, Trash2 } from 'lucide-react'
+import { Copy, Trash2, Download, ClipboardCheck } from 'lucide-react'
 import type { ThemeMode, CustomTheme } from '../types'
 import { THEME_SWATCH_ACCENT } from '../constants'
 import { getFallbackThemeForMode } from '../utils'
@@ -21,6 +21,8 @@ interface CustomThemePanelProps {
   selectCustomTheme: (id: string) => void
   duplicateCustomTheme: (id: string) => void
   deleteCustomTheme: (id: string) => void
+  exportSingleCustomThemeToFile: (id: string) => void
+  copySingleCustomThemeToClipboard: (id: string) => Promise<void>
 }
 
 export function CustomThemePanel({
@@ -40,6 +42,8 @@ export function CustomThemePanel({
   selectCustomTheme,
   duplicateCustomTheme,
   deleteCustomTheme,
+  exportSingleCustomThemeToFile,
+  copySingleCustomThemeToClipboard,
 }: CustomThemePanelProps) {
   return (
     <div className="settings-theme-card settings-theme-card-custom">
@@ -122,6 +126,24 @@ export function CustomThemePanel({
                   </span>
                 </button>
                 <div className="settings-custom-theme-actions">
+                  <button
+                    type="button"
+                    className="settings-inline-icon-button"
+                    onClick={() => exportSingleCustomThemeToFile(customTheme.id)}
+                    aria-label={`Export ${customTheme.name} as JSON`}
+                    title="Export theme as JSON"
+                  >
+                    <Download size={14} strokeWidth={2.2} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-inline-icon-button"
+                    onClick={() => { void copySingleCustomThemeToClipboard(customTheme.id) }}
+                    aria-label={`Copy ${customTheme.name} JSON to clipboard`}
+                    title="Copy theme JSON to clipboard"
+                  >
+                    <ClipboardCheck size={14} strokeWidth={2.2} aria-hidden="true" />
+                  </button>
                   <button
                     type="button"
                     className="settings-inline-icon-button"

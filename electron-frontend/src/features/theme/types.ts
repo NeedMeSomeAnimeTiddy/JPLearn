@@ -21,7 +21,8 @@ export type ThemeKey =
   | 'ocean_glass_light'
   | 'plum_garden_light'
   | 'matcha_stone_light'
-export type ThemeMode = 'dark' | 'light'
+export type ThemeMode = 'dark' | 'light' | 'auto'
+export type ResolvedThemeMode = 'dark' | 'light'
 export type ThemeScope = 'preset' | 'custom'
 export type ThemeVariableKey =
   | '--bg-main'
@@ -78,8 +79,8 @@ export type ThemePalette = Record<ThemeVariableKey, string>
 export interface CustomTheme {
   id: string
   name: string
-  baseThemeByMode: Record<ThemeMode, ThemeKey>
-  overridesByMode: Record<ThemeMode, ThemeVariableOverrides>
+  baseThemeByMode: Record<ResolvedThemeMode, ThemeKey>
+  overridesByMode: Record<ResolvedThemeMode, ThemeVariableOverrides>
 }
 
 export interface ThemeSection {

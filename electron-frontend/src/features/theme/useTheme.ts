@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react'
-import type { ThemeKey, ThemeMode, ThemeScope, ThemeVariableKey, ThemePalette, CustomTheme, ThemeSection } from './types'
+import type { ThemeKey, ThemeMode, ResolvedThemeMode, ThemeScope, ThemeVariableKey, ThemePalette, CustomTheme, ThemeSection } from './types'
 import {
   THEME_OPTIONS,
   THEME_VARIABLE_KEYS,
@@ -14,6 +14,7 @@ import {
   makeCustomThemeId,
   parseImportedCustomThemes,
   makeCustomThemeExportPayload,
+  resolveThemeMode,
 } from './utils'
 export interface ThemeSettingsFields {
   themeMode: ThemeMode
@@ -41,6 +42,8 @@ export interface UseThemeReturn {
   importCustomThemesPayload: (payload: unknown) => number
   exportCustomThemesToFile: () => void
   copyCustomThemesToClipboard: () => Promise<void>
+  exportSingleCustomThemeToFile: (id: string) => void
+  copySingleCustomThemeToClipboard: (id: string) => Promise<void>
   openCustomThemeImportPicker: () => void
   importCustomThemesFromClipboard: () => Promise<void>
   handleCustomThemeFileImport: (event: ChangeEvent<HTMLInputElement>) => void
@@ -59,11 +62,26 @@ export function useTheme(
 ): UseThemeReturn {
   const [customThemeActionMessage, setCustomThemeActionMessage] = useState<string | null>(null)
   const [themePaletteCache, setThemePaletteCache] = useState<Partial<Record<ThemeKey, ThemePalette>>>({})
+  const [osPrefersDark, setOsPrefersDark] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches,
+  )
   const customThemeImportInputRef = useRef<HTMLInputElement | null>(null)
 
+  const resolvedMode: ResolvedThemeMode = settings.themeMode === 'auto'
+    ? (osPrefersDark ? 'dark' : 'light')
+    : settings.themeMode as ResolvedThemeMode
+
+  useEffect(() => {
+    if (settings.themeMode !== 'auto') return
+    const query = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = (event: MediaQueryListEvent) => setOsPrefersDark(event.matches)
+    query.addEventListener('change', handler)
+    return () => query.removeEventListener('change', handler)
+  }, [settings.themeMode])
+
   const availableThemes = useMemo(
-    () => THEME_OPTIONS.filter((theme) => theme.mode === settings.themeMode),
-    [settings.themeMode],
+    () => THEME_OPTIONS.filter((theme) => theme.mode === resolvedMode),
+    [resolvedMode],
   )
 
   const activeCustomTheme = useMemo(
@@ -73,10 +91,10 @@ export function useTheme(
 
   const effectiveTheme = useMemo(() => {
     if (settings.themeScope === 'custom' && activeCustomTheme) {
-      return activeCustomTheme.baseThemeByMode[settings.themeMode]
+      return activeCustomTheme.baseThemeByMode[resolvedMode]
     }
     return getThemeVariantForMode(settings.theme, settings.themeMode)
-  }, [activeCustomTheme, settings.theme, settings.themeMode, settings.themeScope])
+  }, [activeCustomTheme, settings.theme, settings.themeMode, settings.themeScope, resolvedMode])
 
   const ensureThemePaletteCached = useCallback((theme: ThemeKey): ThemePalette | null => {
     const cached = themePaletteCache[theme]
@@ -94,15 +112,15 @@ export function useTheme(
     if (!activeCustomTheme) {
       return null
     }
-    return themePaletteCache[activeCustomTheme.baseThemeByMode[settings.themeMode]] ?? null
-  }, [activeCustomTheme, settings.themeMode, themePaletteCache])
+    return themePaletteCache[activeCustomTheme.baseThemeByMode[resolvedMode]] ?? null
+  }, [activeCustomTheme, resolvedMode, themePaletteCache])
 
   const customThemePreviewById = useMemo(() => {
     const previews: Record<string, { accent: string; baseLabel: string }> = {}
     for (const theme of settings.customThemes) {
-      const baseTheme = theme.baseThemeByMode[settings.themeMode]
+      const baseTheme = theme.baseThemeByMode[resolvedMode]
       const basePalette = themePaletteCache[baseTheme]
-      const mergedPalette = basePalette ? mergeThemePalette(basePalette, theme.overridesByMode[settings.themeMode]) : null
+      const mergedPalette = basePalette ? mergeThemePalette(basePalette, theme.overridesByMode[resolvedMode]) : null
       const baseOption = THEME_OPTIONS.find((option) => option.key === baseTheme)
       previews[theme.id] = {
         accent: mergedPalette?.['--accent'] ?? THEME_SWATCH_ACCENT[baseTheme],
@@ -110,7 +128,7 @@ export function useTheme(
       }
     }
     return previews
-  }, [settings.customThemes, settings.themeMode, themePaletteCache])
+  }, [settings.customThemes, resolvedMode, themePaletteCache])
 
   const createCustomTheme = useCallback(() => {
     setSettings((prev) => {
@@ -134,7 +152,7 @@ export function useTheme(
         themeScope: 'custom',
         activeCustomThemeId: nextId,
         customThemes: [...prev.customThemes, nextTheme],
-        theme: nextTheme.baseThemeByMode[prev.themeMode],
+        theme: nextTheme.baseThemeByMode[resolveThemeMode(prev.themeMode)],
       }
     })
   }, [setSettings])
@@ -157,7 +175,7 @@ export function useTheme(
         ...prev,
         themeScope: 'custom',
         activeCustomThemeId: id,
-        theme: selected.baseThemeByMode[prev.themeMode],
+        theme: selected.baseThemeByMode[resolveThemeMode(prev.themeMode)],
       }
     })
   }, [setSettings])
@@ -193,7 +211,7 @@ export function useTheme(
           customThemes: remaining,
           activeCustomThemeId: fallbackCustom.id,
           themeScope: 'custom',
-          theme: fallbackCustom.baseThemeByMode[prev.themeMode],
+          theme: fallbackCustom.baseThemeByMode[resolveThemeMode(prev.themeMode)],
         }
       }
 
@@ -228,7 +246,7 @@ export function useTheme(
         themeScope: 'custom',
         activeCustomThemeId: nextId,
         customThemes: [...prev.customThemes, duplicatedTheme],
-        theme: duplicatedTheme.baseThemeByMode[prev.themeMode],
+        theme: duplicatedTheme.baseThemeByMode[resolveThemeMode(prev.themeMode)],
       }
     })
     setCustomThemeActionMessage('Custom theme duplicated.')
@@ -268,7 +286,7 @@ export function useTheme(
         customThemes: nextCustomThemes,
         themeScope: 'custom',
         activeCustomThemeId: firstImported.id,
-        theme: firstImported.baseThemeByMode[prev.themeMode],
+        theme: firstImported.baseThemeByMode[resolveThemeMode(prev.themeMode)],
       }
     })
 
@@ -302,6 +320,32 @@ export function useTheme(
       const payload = makeCustomThemeExportPayload(settings.customThemes)
       await navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
       setCustomThemeActionMessage('Copied custom themes JSON to clipboard.')
+    } catch {
+      setCustomThemeActionMessage('Clipboard copy failed in this environment.')
+    }
+  }, [settings.customThemes])
+
+  const exportSingleCustomThemeToFile = useCallback((id: string) => {
+    const theme = settings.customThemes.find((t) => t.id === id)
+    if (!theme) return
+    const payload = makeCustomThemeExportPayload([theme])
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `jplearn-custom-theme-${theme.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setCustomThemeActionMessage(`Exported "${theme.name}" as JSON.`)
+  }, [settings.customThemes])
+
+  const copySingleCustomThemeToClipboard = useCallback(async (id: string) => {
+    const theme = settings.customThemes.find((t) => t.id === id)
+    if (!theme) return
+    try {
+      const payload = makeCustomThemeExportPayload([theme])
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
+      setCustomThemeActionMessage(`Copied "${theme.name}" JSON to clipboard.`)
     } catch {
       setCustomThemeActionMessage('Clipboard copy failed in this environment.')
     }
@@ -373,7 +417,7 @@ export function useTheme(
         ...prev,
         customThemes,
         theme: prev.themeScope === 'custom' && activeCustomTheme
-          ? activeCustomTheme.baseThemeByMode[prev.themeMode]
+          ? activeCustomTheme.baseThemeByMode[resolveThemeMode(prev.themeMode)]
           : prev.theme,
       }
     })
@@ -388,7 +432,7 @@ export function useTheme(
           if (theme.id !== id) {
             return theme
           }
-          const nextOverrides = { ...theme.overridesByMode[mode] }
+          const nextOverrides = { ...theme.overridesByMode[resolveThemeMode(mode)] }
           if (trimmed) {
             nextOverrides[key] = trimmed
           } else {
@@ -413,7 +457,7 @@ export function useTheme(
         if (theme.id !== id) {
           return theme
         }
-        const nextOverrides = { ...theme.overridesByMode[mode] }
+        const nextOverrides = { ...theme.overridesByMode[resolveThemeMode(mode)] }
         for (const key of section.keys) {
           delete nextOverrides[key]
         }
@@ -442,7 +486,7 @@ export function useTheme(
       if (prev.themeMode === mode) return prev
       const activeCustomTheme = prev.customThemes.find((theme) => theme.id === prev.activeCustomThemeId)
       const nextTheme = prev.themeScope === 'custom' && activeCustomTheme
-        ? activeCustomTheme.baseThemeByMode[mode]
+        ? activeCustomTheme.baseThemeByMode[resolveThemeMode(mode)]
         : getThemeVariantForMode(prev.theme, mode)
       return {
         ...prev,
@@ -465,7 +509,7 @@ export function useTheme(
   }, [effectiveTheme, ensureThemePaletteCached, settings.customThemes])
 
   useEffect(() => {
-    document.documentElement.dataset.themeMode = settings.themeMode
+    document.documentElement.dataset.themeMode = resolvedMode
     document.documentElement.dataset.theme = effectiveTheme
 
     for (const key of THEME_VARIABLE_KEYS) {
@@ -475,7 +519,7 @@ export function useTheme(
     if (settings.themeScope === 'custom' && activeCustomTheme) {
       const basePalette = themePaletteCache[effectiveTheme] ?? ensureThemePaletteCached(effectiveTheme)
       if (basePalette) {
-        const mergedPalette = mergeThemePalette(basePalette, activeCustomTheme.overridesByMode[settings.themeMode])
+        const mergedPalette = mergeThemePalette(basePalette, activeCustomTheme.overridesByMode[resolvedMode])
         for (const key of THEME_VARIABLE_KEYS) {
           const value = mergedPalette[key]
           if (value) {
@@ -486,7 +530,7 @@ export function useTheme(
     }
 
     void setStartupTheme?.(effectiveTheme)
-  }, [activeCustomTheme, effectiveTheme, ensureThemePaletteCached, settings.themeMode, settings.themeScope, settings.customThemes, themePaletteCache, setStartupTheme])
+  }, [activeCustomTheme, effectiveTheme, ensureThemePaletteCached, resolvedMode, settings.themeScope, settings.customThemes, themePaletteCache, setStartupTheme])
 
   return {
     availableThemes,
@@ -506,6 +550,8 @@ export function useTheme(
     importCustomThemesPayload,
     exportCustomThemesToFile,
     copyCustomThemesToClipboard,
+    exportSingleCustomThemeToFile,
+    copySingleCustomThemeToClipboard,
     openCustomThemeImportPicker,
     importCustomThemesFromClipboard,
     handleCustomThemeFileImport,
