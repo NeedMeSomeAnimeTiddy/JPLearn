@@ -8854,6 +8854,13 @@ html[data-reduced-motion='true'] .cassette-reel {
   animation: enterUp 220ms ease both;
 }
 
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── Cassette panel (squared CRT aesthetic) ────────────────── */
 
 .cassette-panel {

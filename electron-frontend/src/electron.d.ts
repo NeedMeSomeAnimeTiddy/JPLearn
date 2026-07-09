@@ -402,8 +402,16 @@ interface DesktopApi {
   }) => Promise<{ ok: boolean }>
   openInspectElement?: () => Promise<{ ok: boolean }>
   setStartupTheme: (theme: string) => Promise<{ ok: boolean; theme: string }>
-  getConfigValue?: (key: 'autoUpdateEnabled') => Promise<{ ok: boolean; key: string; value: boolean }>
-  setConfigValue?: (key: 'autoUpdateEnabled', value: boolean) => Promise<{ ok: boolean; key: string; value: boolean }>
+  getConfigValue?: {
+    (key: 'autoUpdateEnabled'): Promise<{ ok: boolean; key: string; value: boolean }>
+    (key: 'closeBehavior'): Promise<{ ok: boolean; key: string; value: string }>
+    (key: string): Promise<{ ok: boolean; key: string; value: unknown }>
+  }
+  setConfigValue?: {
+    (key: 'autoUpdateEnabled', value: boolean): Promise<{ ok: boolean; key: string; value: boolean }>
+    (key: 'closeBehavior', value: string): Promise<{ ok: boolean; key: string; value: string }>
+    (key: string, value: unknown): Promise<{ ok: boolean; key: string; value: unknown }>
+  }
     reloadLocalFonts?: () => Promise<{ ok: boolean }>
   recordGameResult: (payload: {
     slug: DeckSlug
@@ -483,6 +491,9 @@ interface DesktopApi {
   isWindowMaximized: () => Promise<{ isMaximized: boolean }>
   onWindowStateChanged?: (listener: (state: { isMaximized: boolean }) => void) => () => void
   closeWindow: () => Promise<{ ok: boolean }>
+  minimizeToTray?: () => Promise<{ ok: boolean }>
+  quitApp?: () => Promise<{ ok: boolean }>
+  onTrayAction?: (listener: (action: string) => void) => () => void
   moveWindow?: (dx: number, dy: number) => Promise<{ ok: boolean }>
   getProgressionState?: () => Promise<ProgressionStatePayload>
   getFeatureState?: () => Promise<FeatureStatePayload>

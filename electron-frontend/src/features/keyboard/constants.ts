@@ -1,6 +1,7 @@
 import type { KeyboardShortcut } from './types'
 
 export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
+  { key: 'Ctrl + K', description: 'Open Command Palette', context: 'global' },
   { key: 'Ctrl + ,', description: 'Open Settings', context: 'global' },
   { key: 'Escape', description: 'Close modal / go back', context: 'global' },
 

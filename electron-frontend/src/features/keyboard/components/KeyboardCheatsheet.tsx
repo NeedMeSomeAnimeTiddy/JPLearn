@@ -28,11 +28,11 @@ export function KeyboardCheatsheet({ isOpen, onClose }: KeyboardCheatsheetProps)
       }}
     >
       <div
-        className="modal-panel crt-scanlines"
+        className="modal-panel crt-scanlines hide-scrollbar"
         role="dialog"
         aria-modal="true"
         aria-label="Keyboard shortcuts"
-        style={{ maxWidth: '480px', maxHeight: '80vh', overflowY: 'auto' }}
+        style={{ maxWidth: '560px', padding: '1.5rem', maxHeight: '85vh', overflowY: 'auto' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Keyboard Shortcuts</h2>

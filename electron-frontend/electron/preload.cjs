@@ -86,6 +86,13 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
     return () => ipcRenderer.removeListener('window:state-changed', handler)
   },
   closeWindow: () => ipcRenderer.invoke('window:close'),
+  minimizeToTray: () => ipcRenderer.invoke('window:minimize-to-tray'),
+  quitApp: () => ipcRenderer.invoke('window:quit-app'),
+  onTrayAction: (listener) => {
+    const handler = (_event, action) => listener(action)
+    ipcRenderer.on('tray:action', handler)
+    return () => ipcRenderer.removeListener('tray:action', handler)
+  },
   getProgressionState: () => ipcRenderer.invoke('progression:get-state'),
   getFeatureState: () => ipcRenderer.invoke('features:get-state'),
   getXpProgress: () => ipcRenderer.invoke('xp:get-progress'),

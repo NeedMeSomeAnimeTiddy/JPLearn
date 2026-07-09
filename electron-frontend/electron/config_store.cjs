@@ -7,6 +7,7 @@
 const CONFIG_DEFAULTS = {
   autoUpdateEnabled: true,
   notificationsEnabled: true,
+  closeBehavior: 'ask',
 }
 
 const ALLOWED_KEYS = new Set(Object.keys(CONFIG_DEFAULTS))
@@ -43,6 +44,9 @@ async function setConfigValue(key, value) {
   }
   if (typeof value !== typeof CONFIG_DEFAULTS[key]) {
     throw new Error(`Invalid value type for config key: ${String(key)}`)
+  }
+  if (key === 'closeBehavior' && !['ask', 'tray', 'quit'].includes(value)) {
+    throw new Error(`Invalid closeBehavior value: ${String(value)}. Must be 'ask', 'tray', or 'quit'.`)
   }
   const store = await getStore()
   store.set(key, value)

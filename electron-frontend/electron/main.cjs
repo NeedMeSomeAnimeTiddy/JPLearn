@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, Notification } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, Notification, Tray, Menu, nativeImage } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -262,6 +262,8 @@ const startupReadyResolvers = new Map()
 const startupTelemetryByContentsId = new Map()
 const windowExpandedStateById = new Map()
 const windowRestoreBoundsById = new Map()
+let appTray = null
+let isQuitting = false
 let localTutorRuntime = createTutorChatRuntime()
 
 function createSelectedVoiceRuntime() {
@@ -1367,6 +1369,7 @@ registerIpcHandlers({
   reloadLocalFontsForContents,
   getBridgeTelemetrySnapshot,
   stopPythonBridgeWorker,
+  setIsQuitting: () => { isQuitting = true },
 })
 
 async function preloadTutorChatStartupData() {
@@ -1421,6 +1424,50 @@ async function preloadTutorChatStartupData() {
   }
 
   return tutorRuntimePreloadPromise
+}
+
+function createTray(mainWindowRef) {
+  const iconPath = path.join(__dirname, '..', 'assets', 'icon.ico')
+  const icon = nativeImage.createFromPath(iconPath)
+  if (icon.isEmpty()) {
+    console.warn('Tray icon failed to load from', iconPath)
+  }
+  const tray = new Tray(icon.isEmpty() ? iconPath : icon)
+  tray.setToolTip('JPLearn')
+
+  const buildContextMenu = (dueCount) => {
+    const dueLabel = dueCount > 0 ? ` (${dueCount} due)` : ''
+    return Menu.buildFromTemplate([
+      { label: 'Open JPLearn', click: () => { if (mainWindowRef() && !mainWindowRef().isDestroyed()) { mainWindowRef().show(); mainWindowRef().focus() } } },
+      { label: `Start Review Session${dueLabel}`, click: () => { if (mainWindowRef() && !mainWindowRef().isDestroyed()) { mainWindowRef().show(); mainWindowRef().focus(); mainWindowRef().webContents.send('tray:action', 'start-session') } } },
+      { label: 'View Overview', click: () => { if (mainWindowRef() && !mainWindowRef().isDestroyed()) { mainWindowRef().show(); mainWindowRef().focus(); mainWindowRef().webContents.send('tray:action', 'view-overview') } } },
+      { type: 'separator' },
+      { label: 'Quit', click: () => { isQuitting = true; app.quit() } },
+    ])
+  }
+
+  tray.setContextMenu(buildContextMenu(0))
+  tray.on('click', () => {
+    if (mainWindowRef() && !mainWindowRef().isDestroyed()) {
+      mainWindowRef().show()
+      mainWindowRef().focus()
+    }
+  })
+
+  async function refreshDueCount() {
+    try {
+      const summary = await runPythonBridge('summary')
+      const decks = Array.isArray(summary?.decks) ? summary.decks : []
+      const totalDue = decks.reduce((sum, d) => sum + (typeof d.due_today === 'number' ? d.due_today : 0), 0)
+      tray.setToolTip(totalDue > 0 ? `JPLearn — ${totalDue} cards due` : 'JPLearn')
+      tray.setContextMenu(buildContextMenu(totalDue))
+    } catch { /* non-fatal */ }
+  }
+
+  setTimeout(refreshDueCount, 65_000)
+  setInterval(refreshDueCount, 300_000)
+
+  return { tray, refreshDueCount }
 }
 
 function createWindow() {
@@ -1502,6 +1549,13 @@ function createWindow() {
   win.on('closed', () => {
     windowExpandedStateById.delete(win.id)
     windowRestoreBoundsById.delete(win.id)
+  })
+
+  win.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      win.hide()
+    }
   })
 
   return win
@@ -2276,6 +2330,13 @@ app.whenReady().then(async () => {
 
   void createWindowWithSplash()
 
+  // Create system tray after window setup
+  const getMainWindow = () => {
+    const windows = BrowserWindow.getAllWindows()
+    return windows.length > 0 ? windows[0] : null
+  }
+  appTray = createTray(getMainWindow)
+
   // ── Due-review notification check (fire once per launch) ─────────────────────
   let dueReviewNotified = false
   async function checkAndNotifyDueReviews() {
@@ -2324,6 +2385,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
+  isQuitting = true
   void localTutorRuntime.unload('before-quit').catch(() => undefined)
   void localVoiceRuntime.unload().catch(() => undefined)
   void Promise.resolve(localSpeechRuntime.unload()).catch(() => undefined)
@@ -2332,7 +2394,7 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (process.platform !== 'darwin' && !appTray) {
     app.quit()
   }
 })

@@ -658,6 +658,20 @@ function registerIpcHandlers(options) {
     return { ok: true }
   })
 
+  options.ipcMain.handle('window:minimize-to-tray', (event) => {
+    const win = assertTrustedIpcSender(event, trustedSenderOptions())
+    if (win) win.hide()
+    return { ok: true }
+  })
+
+  options.ipcMain.handle('window:quit-app', (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    options.setIsQuitting()
+    const { app } = require('electron')
+    app.quit()
+    return { ok: true }
+  })
+
   options.ipcMain.handle('ui:set-startup-theme', (event, theme) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const normalized = options.saveStartupTheme(validateStartupThemeInput(theme))

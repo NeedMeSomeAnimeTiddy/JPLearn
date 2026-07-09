@@ -48,6 +48,8 @@ describe('preload contract', () => {
       "toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize')",
       "isWindowMaximized: () => ipcRenderer.invoke('window:is-maximized')",
       "closeWindow: () => ipcRenderer.invoke('window:close')",
+      "minimizeToTray: () => ipcRenderer.invoke('window:minimize-to-tray')",
+      "quitApp: () => ipcRenderer.invoke('window:quit-app')",
       "completeOnboarding: (payload) => ipcRenderer.invoke('learning-path:complete-onboarding', payload)",
     ]
 
@@ -59,5 +61,10 @@ describe('preload contract', () => {
   it('maintains window state listener subscription contract', () => {
     expect(preloadSource).toContain("ipcRenderer.on('window:state-changed', handler)")
     expect(preloadSource).toContain("ipcRenderer.removeListener('window:state-changed', handler)")
+  })
+
+  it('maintains tray action listener subscription contract', () => {
+    expect(preloadSource).toContain("ipcRenderer.on('tray:action', handler)")
+    expect(preloadSource).toContain("ipcRenderer.removeListener('tray:action', handler)")
   })
 })

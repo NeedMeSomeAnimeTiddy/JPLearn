@@ -8,6 +8,7 @@ import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
 import { SettingsCollapsibleSection } from './components/SettingsCollapsibleSection'
 import { ResumeToast } from './components/ResumeToast'
+import { CloseConfirmDialog } from './components/CloseConfirmDialog'
 import { MinigameIcon } from './components/MinigameIcon'
 import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
@@ -17,13 +18,15 @@ import { JLPTPrepView } from './views/JLPTPrepView'
 import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
+import { useCommandPalette, CommandPalette } from './features/command-palette'
+import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
 import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode } from './utils'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Palette, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, X } from 'lucide-react'
 import './App.css'
 import { useTheme } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -1726,6 +1729,7 @@ function App() {
     'speech-recognition': true,
     'voicevox-runtime': true,
     'keyboard-shortcuts': true,
+    'close-behavior': true,
     'data-management': true,
   })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1741,6 +1745,70 @@ function App() {
     setSettings as any,
   )
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
+  const commandPalette = useCommandPalette()
+
+  useEffect(() => {
+    const scripts: ScriptKey[] = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples']
+    const commands: Command[] = [
+      { id: 'nav-home', label: 'Go to Home', category: 'navigation', action: () => { setNavDirection('back'); setView('home') } },
+      { id: 'nav-script-hub', label: 'Go to Script Hub', category: 'navigation', action: () => { setNavDirection('forward'); setView('script_hub') } },
+      { id: 'nav-jlpt', label: 'Go to JLPT Prep', category: 'navigation', action: () => { setNavDirection('forward'); setView('jlpt_prep') } },
+      { id: 'nav-overview', label: 'Open Study Overview', category: 'navigation', action: () => { setShowOverview(true); void loadSummary() } },
+      { id: 'script-hiragana', label: 'Hiragana', category: 'navigation', keywords: ['hiragana', 'script'], action: () => { setNavDirection('forward'); setActiveScript('hiragana'); setView('script_hub') } },
+      { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { setNavDirection('forward'); setActiveScript('katakana'); setView('script_hub') } },
+      { id: 'open-settings', label: 'Open Settings', category: 'settings', shortcut: 'Ctrl+,', action: () => { setShowSettings(true) } },
+      { id: 'open-keyboard-cheatsheet', label: 'Keyboard Shortcuts', category: 'settings', action: () => { closeKeyboardCheatsheet(); setTimeout(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })) }, 50) } },
+    ]
+
+    for (const script of scripts) {
+      const games = SCRIPT_MINIGAMES[script]
+      for (const game of games) {
+        if (game === 'interleave_mix') continue
+        const label = `${formatRoundModeLabel(game)} (${SCRIPT_LABELS[script]})`
+        commands.push({
+          id: `play-${game}-${script}`,
+          label,
+          category: 'study',
+          keywords: ['minigame', game, script, SCRIPT_LABELS[script]],
+          action: () => {
+            setActiveGame(game)
+            setNavDirection('forward')
+            setShowOverview(false)
+            setShowSettings(false)
+            setLastSessionSummary(null)
+            setSessionRunReport(null)
+            resetSessionWithLives()
+            if (script === activeScript) {
+              setView('minigame')
+              void startSession(game)
+            } else {
+              setActiveScript(script)
+              setResumeRequest({ script, minigame: game })
+              setView('minigame')
+            }
+          },
+        })
+      }
+    }
+
+    commandPalette.registerCommands(commands)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps — registerCommands is stable, other deps are stable setters
+  }, [commandPalette.registerCommands, activeScript])
+
+  useEffect(() => {
+    const cleanup = window.jplearnDesktop?.onTrayAction?.((action: string) => {
+      if (action === 'start-session') {
+        setNavDirection('forward')
+        setView('script_hub')
+      } else if (action === 'view-overview') {
+        setShowOverview(true)
+        void loadSummary()
+      }
+    })
+    return cleanup
+    // oxlint-disable-next-line react-hooks/exhaustive-deps — loadSummary from useCallback is stable
+  }, [])
+
   const [showOverview, setShowOverview] = useState(false)
   const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0)
   const [resettingDb, setResettingDb] = useState(false)
@@ -4081,6 +4149,12 @@ function App() {
       const target = event.target as HTMLElement
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
 
+      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+        event.preventDefault()
+        commandPalette.toggle()
+        return
+      }
+
       if ((event.ctrlKey || event.metaKey) && event.key === ',') {
         event.preventDefault()
         if (showSettings) {
@@ -4096,6 +4170,16 @@ function App() {
       }
 
       if (event.key === 'Escape') {
+        if (showCloseDialog) {
+          setShowCloseDialog(false)
+          return
+        }
+
+        if (commandPalette.isOpen) {
+          commandPalette.close()
+          return
+        }
+
         if (keyboardCheatsheetOpen) {
           closeKeyboardCheatsheet()
           return
@@ -4151,7 +4235,7 @@ function App() {
         }
       }
 
-      if (showSettings || tutor.assistantChatOpen || tutor.ocrWorkbenchOpen || isInput) return
+      if (showSettings || showCloseDialog || commandPalette.isOpen || tutor.assistantChatOpen || tutor.ocrWorkbenchOpen || isInput) return
 
       if (event.key === '6') {
         setDictionaryOpen(false)
@@ -4538,8 +4622,43 @@ function App() {
     })()
   }, [])
 
-  const closeWindow = useCallback(() => {
-    void window.jplearnDesktop?.closeWindow()
+  const [showCloseDialog, setShowCloseDialog] = useState(false)
+  const [closeBehavior, setCloseBehavior] = useState<'ask' | 'tray' | 'quit'>('ask')
+
+  useEffect(() => {
+    void window.jplearnDesktop?.getConfigValue?.('closeBehavior')?.then((result) => {
+      if (result && typeof result.value === 'string' && ['ask', 'tray', 'quit'].includes(result.value)) {
+        setCloseBehavior(result.value as 'ask' | 'tray' | 'quit')
+      }
+    }).catch(() => { /* use default */ })
+  }, [])
+
+  const handleCloseRequest = useCallback(() => {
+    if (closeBehavior === 'tray') {
+      void window.jplearnDesktop?.minimizeToTray?.()
+    } else if (closeBehavior === 'quit') {
+      void window.jplearnDesktop?.quitApp?.()
+    } else {
+      setShowCloseDialog(true)
+    }
+  }, [closeBehavior])
+
+  const handleCloseMinimizeToTray = useCallback((remember: boolean) => {
+    setShowCloseDialog(false)
+    void window.jplearnDesktop?.minimizeToTray?.()
+    if (remember) {
+      void window.jplearnDesktop?.setConfigValue?.('closeBehavior', 'tray')
+      setCloseBehavior('tray')
+    }
+  }, [])
+
+  const handleCloseQuit = useCallback((remember: boolean) => {
+    setShowCloseDialog(false)
+    void window.jplearnDesktop?.quitApp?.()
+    if (remember) {
+      void window.jplearnDesktop?.setConfigValue?.('closeBehavior', 'quit')
+      setCloseBehavior('quit')
+    }
   }, [])
 
   // Handles completion of the onboarding form: seeds deck expertise, persists answers, sets path.
@@ -5171,7 +5290,7 @@ function App() {
               <Copy className="window-control-icon window-control-icon-restore" strokeWidth={1.9} />
             </span>
           </button>
-          <button type="button" className="window-control-button window-control-close" onClick={closeWindow} aria-label="Close window">
+          <button type="button" className="window-control-button window-control-close" onClick={handleCloseRequest} aria-label="Close window">
             <X className="window-control-icon" strokeWidth={2.2} />
           </button>
         </div>
@@ -5356,6 +5475,18 @@ function App() {
 
       {/* Keyboard shortcut cheatsheet */}
       <KeyboardCheatsheet isOpen={keyboardCheatsheetOpen} onClose={closeKeyboardCheatsheet} />
+
+      {/* Command palette (Ctrl+K) */}
+      <CommandPalette
+        isOpen={commandPalette.isOpen}
+        query={commandPalette.query}
+        onQueryChange={commandPalette.setQuery}
+        commands={commandPalette.filtered}
+        selectedIndex={commandPalette.selectedIndex}
+        onSelect={commandPalette.setSelectedIndex}
+        onExecute={(cmd) => { commandPalette.close(); cmd.action() }}
+        onClose={commandPalette.close}
+      />
 
       {/* XP gain toasts — centered, stacks vertically */}
       {xpToasts.length > 0 ? (
@@ -6170,7 +6301,63 @@ function App() {
                     </div>
                   </div>
                 </SettingsCollapsibleSection>
-                
+
+                <SettingsCollapsibleSection
+                  id="close-behavior"
+                  title="Window Close Behavior"
+                  description="Choose what happens when you click the close button."
+                  collapsed={Boolean(collapsedSettingsSections['close-behavior'])}
+                  onToggle={() => toggleThemeSectionCollapsed('close-behavior')}
+                  className="settings-theme-card"
+                  hideChevron
+                >
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <button
+                      type="button"
+                      className="settings-icon-tile"
+                      aria-label="Close behavior setting"
+                    >
+                      <Power size={18} strokeWidth={2.1} />
+                    </button>
+                    <div className="settings-control-content">
+                      <p className="settings-section-label">When closing the window</p>
+                      <div className="settings-animation-grid" role="radiogroup" aria-label="Close behavior options">
+                        {([
+                          { key: 'ask' as const, label: 'Ask', desc: 'Show a dialog each time' },
+                          { key: 'tray' as const, label: 'Minimize', desc: 'Hide to system tray' },
+                          { key: 'quit' as const, label: 'Quit', desc: 'Fully exit the app' },
+                        ]).map((opt) => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            className={`settings-icon-entry settings-theme-entry ${closeBehavior === opt.key ? 'is-active' : ''}`}
+                            onClick={() => {
+                              setCloseBehavior(opt.key)
+                              void window.jplearnDesktop?.setConfigValue?.('closeBehavior', opt.key)
+                            }}
+                            role="radio"
+                            aria-checked={closeBehavior === opt.key}
+                            aria-label={`${opt.label}: ${opt.desc}`}
+                            title={opt.desc}
+                          >
+                            <span className={`settings-mode-icon-button ${closeBehavior === opt.key ? 'is-enabled' : ''}`} aria-hidden="true">
+                              {opt.key === 'ask' ? <MessageCircle size={18} strokeWidth={2.25} /> : opt.key === 'tray' ? <Minimize2 size={18} strokeWidth={2.25} /> : <Power size={18} strokeWidth={2.25} />}
+                            </span>
+                            <span className="settings-icon-entry-label">{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="settings-help">
+                        {closeBehavior === 'ask'
+                          ? 'A dialog will appear each time you close the window.'
+                          : closeBehavior === 'tray'
+                            ? 'The window will hide to the system tray. The app keeps running.'
+                            : 'The app will fully exit when you close the window.'}
+                      </p>
+                    </div>
+                  </div>
+                </SettingsCollapsibleSection>
+
                 <SettingsCollapsibleSection
                   id="data-management"
                   title="Data Management"
@@ -6232,6 +6419,14 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      {/* Close confirmation dialog — rendered after settings to appear on top */}
+      <CloseConfirmDialog
+        isOpen={showCloseDialog}
+        onMinimizeToTray={handleCloseMinimizeToTray}
+        onQuit={handleCloseQuit}
+        onClose={() => setShowCloseDialog(false)}
+      />
 
       <div style={{ display: tutor.assistantChatOpen ? undefined : 'none' }}>
         <TutorChatPanel tutor={tutor} settings={settings as any} setSettings={setSettings as any} cancelAssistantSpeech={voice.cancelAssistantSpeech} />

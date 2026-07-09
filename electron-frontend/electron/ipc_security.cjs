@@ -625,7 +625,7 @@ function validateAnalyticsExportType(type) {
   return type
 }
 
-const VALID_CONFIG_KEYS = new Set(['autoUpdateEnabled'])
+const VALID_CONFIG_KEYS = new Set(['autoUpdateEnabled', 'closeBehavior'])
 
 function validateConfigKey(key) {
   if (typeof key !== 'string' || !VALID_CONFIG_KEYS.has(key)) {
@@ -639,6 +639,12 @@ function validateConfigSetPayload(payload) {
     throw new Error('Invalid config set payload')
   }
   const key = validateConfigKey(payload.key)
+  if (key === 'closeBehavior') {
+    if (typeof payload.value !== 'string' || !['ask', 'tray', 'quit'].includes(payload.value)) {
+      throw new Error(`Invalid config value for key: ${key}. Must be 'ask', 'tray', or 'quit'.`)
+    }
+    return { key, value: payload.value }
+  }
   if (typeof payload.value !== 'boolean') {
     throw new Error(`Invalid config value for key: ${key}`)
   }
