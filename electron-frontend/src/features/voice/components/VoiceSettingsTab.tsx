@@ -1,10 +1,9 @@
-import { useCallback } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { Volume2, ChevronDown, Download, RefreshCw, RotateCcw, Trash2, CheckCircle2, Circle } from 'lucide-react'
+import { Volume2, Download, RefreshCw, RotateCcw, Trash2, CheckCircle2, Circle } from 'lucide-react'
 import type { UseVoiceReturn } from '../useVoice'
 import type { VoiceSettingsFields } from '../types'
 import type { Dispatch, SetStateAction } from 'react'
 import { VOICE_SAMPLE_LINE } from '../constants'
+import { SettingsCollapsibleSection } from '../../../components/SettingsCollapsibleSection'
 
 interface VoiceSettingsTabProps {
   voice: UseVoiceReturn
@@ -22,63 +21,6 @@ interface VoiceSettingsTabProps {
     voiceModels?: Array<{ tier: string; label: string; description: string; installed: boolean; estimatedDownloadMinutes?: number | null }>
     activeVoiceModel?: string | null
   } | null
-}
-
-function SettingsCollapsibleSection({
-  id,
-  title,
-  description,
-  meta,
-  collapsed,
-  onToggle,
-  className,
-  actions,
-  children,
-}: {
-  id: string
-  title: string
-  description?: string
-  meta?: React.ReactNode
-  collapsed: boolean
-  onToggle: () => void
-  className?: string
-  actions?: React.ReactNode
-  children: React.ReactNode
-}) {
-  const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onToggle()
-    }
-  }, [onToggle])
-
-  return (
-    <section className={`settings-collapsible-card${className ? ` ${className}` : ''}`}>
-      <div
-        className="settings-collapsible-head"
-        role="button"
-        tabIndex={0}
-        aria-controls={`${id}-body`}
-        onClick={onToggle}
-        onKeyDown={handleKeyDown}
-      >
-        <div className="settings-collapsible-copy">
-          <p className="settings-collapsible-title">{title}</p>
-          {description ? <p className="settings-collapsible-description">{description}</p> : null}
-          {meta ? <p className="settings-collapsible-meta">{meta}</p> : null}
-        </div>
-        <div className="settings-collapsible-actions">
-          {actions ? <div className="settings-collapsible-action-group">{actions}</div> : null}
-          <span className={`settings-collapsible-chevron${collapsed ? '' : ' is-open'}`} aria-hidden="true">
-            <ChevronDown size={18} strokeWidth={2.25} aria-hidden="true" />
-          </span>
-        </div>
-      </div>
-      <div id={`${id}-body`} className={`settings-collapsible-body${collapsed ? '' : ' is-open'}`}>
-        {!collapsed ? children : null}
-      </div>
-    </section>
-  )
 }
 
 export function VoiceSettingsTab({
@@ -125,6 +67,7 @@ export function VoiceSettingsTab({
         collapsed={Boolean(collapsedSettingsSections['speech-recognition'])}
         onToggle={() => toggleThemeSectionCollapsed('speech-recognition')}
         className="settings-theme-card"
+        hideChevron
       >
         <div style={{ display: 'grid', gap: '0.65rem' }}>
           {(tutorInstallInfo?.speechModels ?? []).map((model) => {
@@ -237,193 +180,194 @@ export function VoiceSettingsTab({
         </p>
       </SettingsCollapsibleSection>
 
-      <div
-        className="settings-section settings-control-row settings-control-row-no-icon"
-        role="tabpanel"
-        id="settings-panel-voice"
-        aria-labelledby="settings-tab-voice"
+      <SettingsCollapsibleSection
+        id="voice"
+        title="Voice"
+        description="Configure speech output settings, speaker, and playback speed."
+        collapsed={Boolean(collapsedSettingsSections['voice'])}
+        onToggle={() => toggleThemeSectionCollapsed('voice')}
+        className="settings-theme-card"
+        hideChevron
       >
-        <div className="settings-control-content">
-          <p className="settings-section-label">Voice</p>
-          <div className="settings-animation-grid" role="group" aria-label="Japanese voice controls">
+        <div className="settings-animation-grid" role="group" aria-label="Japanese voice controls">
+          <button
+            key="voice-toggle"
+            type="button"
+            className={`settings-icon-entry settings-theme-entry ${settings.voiceEnabled ? 'is-active' : ''}`}
+            onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
+            aria-label={settings.voiceEnabled ? 'Spoken prompts enabled. Activate to disable.' : 'Spoken prompts disabled. Activate to enable.'}
+            aria-pressed={settings.voiceEnabled}
+            title={settings.voiceEnabled ? 'Spoken prompts enabled' : 'Spoken prompts disabled'}
+          >
+            <span className={`settings-mode-icon-button ${settings.voiceEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+              <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
+            </span>
+            <span className="settings-icon-entry-label">{settings.voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
+          </button>
+
+          {settings.ambientAudioEnabled !== undefined ? (
             <button
-              key="voice-toggle"
+              key="ambience-toggle"
               type="button"
-              className={`settings-icon-entry settings-theme-entry ${settings.voiceEnabled ? 'is-active' : ''}`}
-              onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
-              aria-label={settings.voiceEnabled ? 'Spoken prompts enabled. Activate to disable.' : 'Spoken prompts disabled. Activate to enable.'}
-              aria-pressed={settings.voiceEnabled}
-              title={settings.voiceEnabled ? 'Spoken prompts enabled' : 'Spoken prompts disabled'}
+              className={`settings-icon-entry settings-theme-entry ${settings.ambientAudioEnabled ? 'is-active' : ''}`}
+              onClick={() => setSettings((prev) => ({ ...prev, ambientAudioEnabled: !prev.ambientAudioEnabled }))}
+              aria-label={settings.ambientAudioEnabled ? 'Ambient audio enabled. Activate to disable.' : 'Ambient audio disabled. Activate to enable.'}
+              aria-pressed={settings.ambientAudioEnabled}
+              title={settings.ambientAudioEnabled ? 'Ambient audio on' : 'Ambient audio off'}
             >
-              <span className={`settings-mode-icon-button ${settings.voiceEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+              <span className={`settings-mode-icon-button ${settings.ambientAudioEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
                 <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
               </span>
-              <span className="settings-icon-entry-label">{settings.voiceEnabled ? 'Voice On' : 'Voice Off'}</span>
+              <span className="settings-icon-entry-label">{settings.ambientAudioEnabled ? 'Ambience On' : 'Ambience Off'}</span>
             </button>
+          ) : null}
 
-            {settings.ambientAudioEnabled !== undefined ? (
+          {settings.voiceEnabled ? (
+            <div style={{ gridColumn: '1 / -1', padding: '0 0.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <label htmlFor="voice-speed-slider" className="settings-help">Speed</label>
+                <span className="settings-help">{settings.voiceSpeed.toFixed(1)}x</span>
+              </div>
+              <input
+                id="voice-speed-slider"
+                type="range"
+                min={0.5}
+                max={2}
+                step={0.1}
+                value={settings.voiceSpeed}
+                onChange={(e) => setSettings((prev) => ({ ...prev, voiceSpeed: Number(e.target.value) }))}
+                aria-label={`Voice playback speed: ${settings.voiceSpeed.toFixed(1)}x`}
+                title="Adjust voice playback speed (0.5x–2.0x)"
+                style={{ width: '100%' }}
+              />
+            </div>
+          ) : null}
+
+          {settings.voiceEnabled
+            ? voiceOptions.map((option) => (
               <button
-                key="ambience-toggle"
+                key={option.id}
                 type="button"
-                className={`settings-icon-entry settings-theme-entry ${settings.ambientAudioEnabled ? 'is-active' : ''}`}
-                onClick={() => setSettings((prev) => ({ ...prev, ambientAudioEnabled: !prev.ambientAudioEnabled }))}
-                aria-label={settings.ambientAudioEnabled ? 'Ambient audio enabled. Activate to disable.' : 'Ambient audio disabled. Activate to enable.'}
-                aria-pressed={settings.ambientAudioEnabled}
-                title={settings.ambientAudioEnabled ? 'Ambient audio on' : 'Ambient audio off'}
+                className={`settings-icon-entry settings-theme-entry ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
+                onClick={() => {
+                  setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
+                  void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
+                }}
+                disabled={voiceBusy}
+                aria-label={`Use voice ${option.name} (${option.search}) and hear a sample`}
+                aria-pressed={settings.voiceSpeaker === option.id}
+                title={`${option.name} · ${option.search} — click to hear a sample`}
               >
-                <span className={`settings-mode-icon-button ${settings.ambientAudioEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+                <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
                   <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
                 </span>
-                <span className="settings-icon-entry-label">{settings.ambientAudioEnabled ? 'Ambience On' : 'Ambience Off'}</span>
+                <span className="settings-icon-entry-label">{option.name}</span>
               </button>
-            ) : null}
+            ))
+            : null}
 
-            {settings.voiceEnabled ? (
-              <div style={{ gridColumn: '1 / -1', padding: '0 0.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <label htmlFor="voice-speed-slider" className="settings-help">Speed</label>
-                  <span className="settings-help">{settings.voiceSpeed.toFixed(1)}x</span>
-                </div>
-                <input
-                  id="voice-speed-slider"
-                  type="range"
-                  min={0.5}
-                  max={2}
-                  step={0.1}
-                  value={settings.voiceSpeed}
-                  onChange={(e) => setSettings((prev) => ({ ...prev, voiceSpeed: Number(e.target.value) }))}
-                  aria-label={`Voice playback speed: ${settings.voiceSpeed.toFixed(1)}x`}
-                  title="Adjust voice playback speed (0.5x–2.0x)"
-                  style={{ width: '100%' }}
-                />
-              </div>
-            ) : null}
-
-            {settings.voiceEnabled
-              ? voiceOptions.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`settings-icon-entry settings-theme-entry ${settings.voiceSpeaker === option.id ? 'is-active' : ''}`}
-                  onClick={() => {
-                    setSettings((prev) => ({ ...prev, voiceSpeaker: option.id }))
-                    void playQuestionAudio(VOICE_SAMPLE_LINE, option.id)
-                  }}
-                  disabled={voiceBusy}
-                  aria-label={`Use voice ${option.name} (${option.search}) and hear a sample`}
-                  aria-pressed={settings.voiceSpeaker === option.id}
-                  title={`${option.name} · ${option.search} — click to hear a sample`}
-                >
-                  <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
-                    <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                  </span>
-                  <span className="settings-icon-entry-label">{option.name}</span>
-                </button>
-              ))
-              : null}
-
-          </div>
-
-          <p className="settings-help" style={{ marginTop: '0.65rem' }}>
-            {settings.voiceEnabled
-              ? 'Click a voice to hear a sample. The speaker button in games reads prompts aloud.'
-              : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
-            {voiceUnavailable ? ' (Voice runtime unavailable right now.)' : ''}
-          </p>
-          <p className="settings-help">
-            VOICEVOX runtime: {
-              !voiceStatusChecked
-                ? 'Checking status…'
-                : voiceRuntimeRunning
-                  ? 'Running'
-                  : 'Not running'
-            }
-            {!voiceRuntimeRunning && voiceStatus?.lastError
-              ? ` (${voiceStatus.lastError})`
-              : ''}
-          </p>
-          <p className="settings-help">
-            Synthesis debug: {lastVoiceSynthesis
-              ? `${lastVoiceSynthesis.mode}, ${lastVoiceSynthesis.profile}, ${Math.max(0, Math.round(lastVoiceSynthesis.elapsedMs))}ms`
-              : 'No playback yet.'}
-          </p>
-
-          <SettingsCollapsibleSection
-            id="voicevox-runtime"
-            title="VOICEVOX Runtime"
-            description="Install VOICEVOX from Settings and use it for local Japanese speech playback."
-            meta={tutorInstallInfo?.voiceInstalled ? 'Already installed' : 'Not installed'}
-            collapsed={Boolean(collapsedSettingsSections['voicevox-runtime'])}
-            onToggle={() => toggleThemeSectionCollapsed('voicevox-runtime')}
-            className="settings-theme-card"
-          >
-            <div style={{ display: 'grid', gap: '0.65rem' }}>
-              {(tutorInstallInfo?.voiceModels ?? []).map((model) => {
-                const isDownloadingThis = voiceEngineDownloadingTier === model.tier
-                const isActiveTier = tutorInstallInfo?.activeVoiceModel === model.tier
-
-                return (
-                  <div
-                    key={model.tier}
-                    style={{
-                      padding: '0.75rem 0.9rem',
-                      borderRadius: '2px',
-                      background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
-                      border: isActiveTier
-                        ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
-                        : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 600 }}>
-                          {model.label}
-                          {isActiveTier ? ' · Active' : ''}
-                        </p>
-                        <p className="settings-help" style={{ marginTop: '0.25rem' }}>
-                          {model.installed ? 'Installed' : model.description}
-                        </p>
-                        <p className="settings-help" style={{ marginTop: '0.2rem' }}>
-                          {formatMinutes(model.estimatedDownloadMinutes)}
-                        </p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                        <button
-                          type="button"
-                          className="settings-card-icon-button"
-                          onClick={() => { void (downloadVoiceEngineModel as any)(model.tier) }}
-                          disabled={voiceEngineDownloadingTier !== null}
-                          aria-label={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}
-                          title={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}
-                        >
-                          {isDownloadingThis
-                            ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
-                            : model.installed
-                              ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
-                              : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
-                        </button>
-                      </div>
-                    </div>
-                    {isDownloadingThis ? (
-                      <div>
-                        <div className="settings-progress-track">
-                          <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, voiceEngineDownloadProgress))}%` }} />
-                        </div>
-                        <p className="settings-help" style={{ marginTop: '0.3rem' }}>
-                          Installing… {Math.round(voiceEngineDownloadProgress)}%{voiceEngineDownloadMethod ? ` [${voiceEngineDownloadMethod}]` : ''}
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-            <p className="settings-help" style={{ marginTop: '0.75rem' }}>
-              Installing from this section will also warm up the voice runtime so playback can start immediately.
-            </p>
-          </SettingsCollapsibleSection>
         </div>
-      </div>
+
+        <p className="settings-help" style={{ marginTop: '0.65rem' }}>
+          {settings.voiceEnabled
+            ? 'Click a voice to hear a sample. The speaker button in games reads prompts aloud.'
+            : 'Turn Voice on to read prompts aloud with the speaker button in games.'}
+          {voiceUnavailable ? ' (Voice runtime unavailable right now.)' : ''}
+        </p>
+        <p className="settings-help">
+          VOICEVOX runtime: {
+            !voiceStatusChecked
+              ? 'Checking status…'
+              : voiceRuntimeRunning
+                ? 'Running'
+                : 'Not running'
+          }
+          {!voiceRuntimeRunning && voiceStatus?.lastError
+            ? ` (${voiceStatus.lastError})`
+            : ''}
+        </p>
+        <p className="settings-help">
+          Synthesis debug: {lastVoiceSynthesis
+            ? `${lastVoiceSynthesis.mode}, ${lastVoiceSynthesis.profile}, ${Math.max(0, Math.round(lastVoiceSynthesis.elapsedMs))}ms`
+            : 'No playback yet.'}
+        </p>
+      </SettingsCollapsibleSection>
+
+      <SettingsCollapsibleSection
+        id="voicevox-runtime"
+        title="VOICEVOX Runtime"
+        description="Install VOICEVOX from Settings and use it for local Japanese speech playback."
+        meta={tutorInstallInfo?.voiceInstalled ? 'Already installed' : 'Not installed'}
+        collapsed={Boolean(collapsedSettingsSections['voicevox-runtime'])}
+        onToggle={() => toggleThemeSectionCollapsed('voicevox-runtime')}
+        className="settings-theme-card"
+        hideChevron
+      >
+        <div style={{ display: 'grid', gap: '0.65rem' }}>
+          {(tutorInstallInfo?.voiceModels ?? []).map((model) => {
+            const isDownloadingThis = voiceEngineDownloadingTier === model.tier
+            const isActiveTier = tutorInstallInfo?.activeVoiceModel === model.tier
+
+            return (
+              <div
+                key={model.tier}
+                style={{
+                  padding: '0.75rem 0.9rem',
+                  borderRadius: '2px',
+                  background: 'color-mix(in oklab, var(--panel-bg-alt) 58%, transparent)',
+                  border: isActiveTier
+                    ? '1px solid color-mix(in oklab, var(--accent) 62%, var(--panel-border))'
+                    : '1px solid color-mix(in oklab, var(--panel-border) 86%, transparent)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 600 }}>
+                      {model.label}
+                      {isActiveTier ? ' · Active' : ''}
+                    </p>
+                    <p className="settings-help" style={{ marginTop: '0.25rem' }}>
+                      {model.installed ? 'Installed' : model.description}
+                    </p>
+                    <p className="settings-help" style={{ marginTop: '0.2rem' }}>
+                      {formatMinutes(model.estimatedDownloadMinutes)}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      className="settings-card-icon-button"
+                      onClick={() => { void (downloadVoiceEngineModel as any)(model.tier) }}
+                      disabled={voiceEngineDownloadingTier !== null}
+                      aria-label={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}
+                      title={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}
+                    >
+                      {isDownloadingThis
+                        ? <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" className="spin-icon" />
+                        : model.installed
+                          ? <RotateCcw size={18} strokeWidth={2.25} aria-hidden="true" />
+                          : <Download size={18} strokeWidth={2.25} aria-hidden="true" />}
+                    </button>
+                  </div>
+                </div>
+                {isDownloadingThis ? (
+                  <div>
+                    <div className="settings-progress-track">
+                      <div className="settings-progress-fill" style={{ width: `${Math.min(100, Math.max(0, voiceEngineDownloadProgress))}%` }} />
+                    </div>
+                    <p className="settings-help" style={{ marginTop: '0.3rem' }}>
+                      Installing… {Math.round(voiceEngineDownloadProgress)}%{voiceEngineDownloadMethod ? ` [${voiceEngineDownloadMethod}]` : ''}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
+        </div>
+        <p className="settings-help" style={{ marginTop: '0.75rem' }}>
+          Installing from this section will also warm up the voice runtime so playback can start immediately.
+        </p>
+      </SettingsCollapsibleSection>
     </>
   )
 }

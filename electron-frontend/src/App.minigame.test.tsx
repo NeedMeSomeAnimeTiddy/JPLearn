@@ -418,6 +418,7 @@ describe('Minigame menu', () => {
     const settingsButtons = screen.getAllByRole('button', { name: /open settings/i })
     fireEvent.click(settingsButtons[settingsButtons.length - 1])
     fireEvent.click(await screen.findByRole('tab', { name: /system/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /data management/i }))
     fireEvent.click(await screen.findByRole('button', { name: /reset all progress/i }))
     fireEvent.click(await screen.findByRole('button', { name: /i understand/i }))
     fireEvent.click(await screen.findByRole('button', { name: /yes, delete everything/i }))

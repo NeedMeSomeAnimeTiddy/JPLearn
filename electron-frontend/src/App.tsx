@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
 import type { LastSessionPrefs, LearningPathStatus, SectionReadiness, SessionRunReport } from './types'
 import type { GameCard } from './generated/types'
 import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
+import { SettingsCollapsibleSection } from './components/SettingsCollapsibleSection'
 import { ResumeToast } from './components/ResumeToast'
 import { MinigameIcon } from './components/MinigameIcon'
 import { HomeView } from './views/HomeView'
@@ -22,7 +22,7 @@ import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, ChevronDown, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Palette, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Square, Trash2, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Palette, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Square, Trash2, X } from 'lucide-react'
 import './App.css'
 import { useTheme } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -93,65 +93,6 @@ type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
 type FeedbackTone = 'success' | 'error' | null
 type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation'
 type SettingsTabKey = 'appearance' | 'assistant' | 'system'
-
-interface SettingsCollapsibleSectionProps {
-  id: string
-  title: string
-  description?: string
-  meta?: ReactNode
-  collapsed: boolean
-  onToggle: () => void
-  className?: string
-  actions?: ReactNode
-  children: ReactNode
-}
-
-function SettingsCollapsibleSection({
-  id,
-  title,
-  description,
-  meta,
-  collapsed,
-  onToggle,
-  className,
-  actions,
-  children,
-}: SettingsCollapsibleSectionProps) {
-  const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onToggle()
-    }
-  }, [onToggle])
-
-  return (
-    <section className={`settings-collapsible-card${className ? ` ${className}` : ''}`}>
-      <div
-        className="settings-collapsible-head"
-        role="button"
-        tabIndex={0}
-        aria-controls={`${id}-body`}
-        onClick={onToggle}
-        onKeyDown={handleKeyDown}
-      >
-        <div className="settings-collapsible-copy">
-          <p className="settings-collapsible-title">{title}</p>
-          {description ? <p className="settings-collapsible-description">{description}</p> : null}
-          {meta ? <p className="settings-collapsible-meta">{meta}</p> : null}
-        </div>
-        <div className="settings-collapsible-actions">
-          {actions ? <div className="settings-collapsible-action-group">{actions}</div> : null}
-          <span className={`settings-collapsible-chevron${collapsed ? '' : ' is-open'}`} aria-hidden="true">
-            <ChevronDown size={18} strokeWidth={2.25} aria-hidden="true" />
-          </span>
-        </div>
-      </div>
-      <div id={`${id}-body`} className={`settings-collapsible-body${collapsed ? '' : ' is-open'}`}>
-        {!collapsed ? children : null}
-      </div>
-    </section>
-  )
-}
 
 const PERFORMANCE_PERFECT_MS = 700
 const PERFORMANCE_GOOD_MS = 2200
@@ -1773,7 +1714,23 @@ function App() {
   const [xpDetailsOpen, setXpDetailsOpen] = useState(false)
   const [streakDetailsOpen, setStreakDetailsOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings())
-  const [collapsedSettingsSections, setCollapsedSettingsSections] = useState<Partial<Record<string, boolean>>>({})
+  const [collapsedSettingsSections, setCollapsedSettingsSections] = useState<Partial<Record<string, boolean>>>({
+    theme: true,
+    background: true,
+    typography: true,
+    animations: true,
+    'study-display': true,
+    cursor: true,
+    'tutor-assistant': true,
+    'tutor-models': true,
+    'offline-dictionary': true,
+    'image-ocr': true,
+    voice: true,
+    'speech-recognition': true,
+    'voicevox-runtime': true,
+    'keyboard-shortcuts': true,
+    'data-management': true,
+  })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const theme = useTheme(
     settings as any,
@@ -5637,194 +5594,200 @@ function App() {
 
               <div className="settings-control-grid">
                 <div style={{ display: activeSettingsTab === 'appearance' ? undefined : 'none' }}>
-                <div
-                  className="settings-section settings-control-row settings-control-row-no-icon"
-                  role="tabpanel"
-                  id="settings-panel-theme"
-                  aria-labelledby="settings-tab-theme"
+                <SettingsCollapsibleSection
+                  id="theme"
+                  title="Theme"
+                  description="Customize colors, presets, and accent tones."
+                  collapsed={Boolean(collapsedSettingsSections['theme'])}
+                  onToggle={() => toggleThemeSectionCollapsed('theme')}
+                  className="settings-theme-card"
+                  hideChevron
                 >
-                  <div className="settings-control-content">
-                    <ThemeSettingsTab
-                      {...theme}
-                      settings={settings}
-                      collapsedSettingsSections={collapsedSettingsSections}
-                    />
-                  </div>
-                </div>
+                  <ThemeSettingsTab
+                    {...theme}
+                    settings={settings}
+                    collapsedSettingsSections={collapsedSettingsSections}
+                  />
+                </SettingsCollapsibleSection>
 
-                <div
-                  className="settings-section settings-control-row settings-control-row-no-icon"
-                  role="tabpanel"
-                  id="settings-panel-background"
-                  aria-labelledby="settings-tab-background"
+                <SettingsCollapsibleSection
+                  id="background"
+                  title="Background"
+                  description="Wallpaper and background image settings."
+                  collapsed={Boolean(collapsedSettingsSections['background'])}
+                  onToggle={() => toggleThemeSectionCollapsed('background')}
+                  className="settings-theme-card"
+                  hideChevron
                 >
-                  <div className="settings-control-content">
-                    <BackgroundSettingsTab background={background} />
-                  </div>
-                </div>
+                  <BackgroundSettingsTab background={background} />
+                </SettingsCollapsibleSection>
 
 
-                <div
-                  className="settings-section settings-control-row settings-control-row-no-icon"
-                  role="tabpanel"
-                  id="settings-panel-font_size"
-                  aria-labelledby="settings-tab-font_size"
+                <SettingsCollapsibleSection
+                  id="typography"
+                  title="Typography"
+                  description="Font size, font family, and local fonts."
+                  collapsed={Boolean(collapsedSettingsSections['typography'])}
+                  onToggle={() => toggleThemeSectionCollapsed('typography')}
+                  className="settings-theme-card"
+                  hideChevron
                 >
-                  <div className="settings-control-content">
-                    <p className="settings-section-label">Font Size</p>
-                    <button
-                      type="button"
-                      className="settings-icon-entry settings-icon-entry-button"
-                      onClick={advanceFontSize}
-                      aria-label={`Font size: ${FONT_SIZE_LABEL[settings.fontSize]}. Activate to cycle.`}
-                      title={`Font size: ${FONT_SIZE_LABEL[settings.fontSize]}`}
-                    >
-                      <span className="settings-mode-icon-button" aria-hidden="true">
-                        {(() => {
-                          const Icon = FONT_SIZE_ICON[settings.fontSize]
-                          return <Icon className="settings-option-glyph" size={18} strokeWidth={2.25} aria-hidden="true" />
-                        })()}
-                      </span>
-                      <span className="settings-icon-entry-label">{FONT_SIZE_LABEL[settings.fontSize]}</span>
-                    </button>
+                  <p className="settings-section-label">Font Size</p>
+                  <button
+                    type="button"
+                    className="settings-icon-entry settings-icon-entry-button"
+                    onClick={advanceFontSize}
+                    aria-label={`Font size: ${FONT_SIZE_LABEL[settings.fontSize]}. Activate to cycle.`}
+                    title={`Font size: ${FONT_SIZE_LABEL[settings.fontSize]}`}
+                  >
+                    <span className="settings-mode-icon-button" aria-hidden="true">
+                      {(() => {
+                        const Icon = FONT_SIZE_ICON[settings.fontSize]
+                        return <Icon className="settings-option-glyph" size={18} strokeWidth={2.25} aria-hidden="true" />
+                      })()}
+                    </span>
+                    <span className="settings-icon-entry-label">{FONT_SIZE_LABEL[settings.fontSize]}</span>
+                  </button>
 
-                    <p className="settings-section-label" style={{ marginTop: 12 }}>Font Family</p>
-                    <div className="settings-animation-grid" role="radiogroup" aria-label="App font family">
-                      {APP_FONT_OPTIONS.map((fontOption) => (
-                        <button
-                          key={fontOption.key}
-                          type="button"
-                          className={`settings-icon-entry settings-theme-entry ${settings.appFont === fontOption.key ? 'is-active' : ''}`}
-                          onClick={() => setSettings((prev) => ({ ...prev, appFont: fontOption.key }))}
-                          aria-label={`Use ${fontOption.label} font`}
-                          aria-pressed={settings.appFont === fontOption.key}
-                          title={fontOption.label}
-                        >
-                          <span className={`settings-mode-icon-button ${settings.appFont === fontOption.key ? 'is-enabled' : ''}`} aria-hidden="true">
-                            <BookText size={18} strokeWidth={2.25} aria-hidden="true" />
-                          </span>
-                          <span className="settings-icon-entry-label">{fontOption.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      className="settings-icon-entry settings-icon-entry-button"
-                      onClick={reloadLocalFonts}
-                      aria-label="Reload local font files"
-                      title="Reload local fonts"
-                      style={{ marginTop: 12 }}
-                    >
-                      <span className="settings-mode-icon-button" aria-hidden="true">
-                        <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" />
-                      </span>
-                      <span className="settings-icon-entry-label">Reload Local Fonts</span>
-                    </button>
-                    <p className="settings-help">Applies to interface text across the app.</p>
+                  <p className="settings-section-label" style={{ marginTop: 12 }}>Font Family</p>
+                  <div className="settings-animation-grid" role="radiogroup" aria-label="App font family">
+                    {APP_FONT_OPTIONS.map((fontOption) => (
+                      <button
+                        key={fontOption.key}
+                        type="button"
+                        className={`settings-icon-entry settings-theme-entry ${settings.appFont === fontOption.key ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({ ...prev, appFont: fontOption.key }))}
+                        aria-label={`Use ${fontOption.label} font`}
+                        aria-pressed={settings.appFont === fontOption.key}
+                        title={fontOption.label}
+                      >
+                        <span className={`settings-mode-icon-button ${settings.appFont === fontOption.key ? 'is-enabled' : ''}`} aria-hidden="true">
+                          <BookText size={18} strokeWidth={2.25} aria-hidden="true" />
+                        </span>
+                        <span className="settings-icon-entry-label">{fontOption.label}</span>
+                      </button>
+                    ))}
                   </div>
-                </div>
+                  <button
+                    type="button"
+                    className="settings-icon-entry settings-icon-entry-button"
+                    onClick={reloadLocalFonts}
+                    aria-label="Reload local font files"
+                    title="Reload local fonts"
+                    style={{ marginTop: 12 }}
+                  >
+                    <span className="settings-mode-icon-button" aria-hidden="true">
+                      <RefreshCw size={18} strokeWidth={2.25} aria-hidden="true" />
+                    </span>
+                    <span className="settings-icon-entry-label">Reload Local Fonts</span>
+                  </button>
+                  <p className="settings-help">Applies to interface text across the app.</p>
+                </SettingsCollapsibleSection>
                 
-                <div
-                  className="settings-section settings-control-row settings-control-row-no-icon"
-                  role="tabpanel"
-                  id="settings-panel-animations"
-                  aria-labelledby="settings-tab-animations"
+                <SettingsCollapsibleSection
+                  id="animations"
+                  title="Animations"
+                  description="Motion style and reduced motion preferences."
+                  collapsed={Boolean(collapsedSettingsSections['animations'])}
+                  onToggle={() => toggleThemeSectionCollapsed('animations')}
+                  className="settings-theme-card"
+                  hideChevron
                 >
-                  <div className="settings-control-content">
-                    <p className="settings-section-label">Motion Style</p>
-                    <div className="settings-animation-grid" role="radiogroup" aria-label="Animation style">
-                      {MOTION_STYLE_OPTIONS.map((motionStyle) => (
-                        <button
-                          key={motionStyle.key}
-                          type="button"
-                          className={`settings-icon-entry settings-theme-entry ${settings.motionStyle === motionStyle.key ? 'is-active' : ''}`}
-                          onClick={() => setSettings((prev) => ({ ...prev, motionStyle: motionStyle.key }))}
-                          aria-label={`Use ${motionStyle.label} animation style`}
-                          aria-pressed={settings.motionStyle === motionStyle.key}
-                          title={motionStyle.label}
-                        >
-                          <span className={`settings-mode-icon-button ${settings.motionStyle === motionStyle.key ? 'is-enabled' : ''}`} aria-hidden="true">
-                            {motionStyle.key === 'calm_fade' ? (
-                              <Minus size={18} strokeWidth={2.25} aria-hidden="true" />
-                            ) : motionStyle.key === 'glide' ? (
-                              <ArrowRight size={18} strokeWidth={2.25} aria-hidden="true" />
-                            ) : (
-                              <Flame size={18} strokeWidth={2.25} aria-hidden="true" />
-                            )}
-                          </span>
-                          <span className="settings-icon-entry-label">{MOTION_STYLE_LABEL[motionStyle.key]}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="settings-theme-card settings-collapsible-card-inline" style={{ marginTop: 10 }}>
-                      <p className="settings-section-label" style={{ marginBottom: 8 }}>Reduce Motion</p>
+                  <p className="settings-section-label">Motion Style</p>
+                  <div className="settings-animation-grid" role="radiogroup" aria-label="Animation style">
+                    {MOTION_STYLE_OPTIONS.map((motionStyle) => (
                       <button
+                        key={motionStyle.key}
                         type="button"
-                        className={`settings-toggle settings-reduced-motion-toggle ${settings.reducedMotion ? 'is-active' : ''}`}
-                        onClick={() => setSettings((prev) => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
-                        aria-label={settings.reducedMotion ? 'Reduce motion enabled. Activate to disable.' : 'Reduce motion disabled. Activate to enable.'}
-                        aria-pressed={settings.reducedMotion}
-                        title={settings.reducedMotion ? 'Reduce motion enabled' : 'Reduce motion disabled'}
+                        className={`settings-icon-entry settings-theme-entry ${settings.motionStyle === motionStyle.key ? 'is-active' : ''}`}
+                        onClick={() => setSettings((prev) => ({ ...prev, motionStyle: motionStyle.key }))}
+                        aria-label={`Use ${motionStyle.label} animation style`}
+                        aria-pressed={settings.motionStyle === motionStyle.key}
+                        title={motionStyle.label}
                       >
-                        <span className={`settings-mode-icon-button ${settings.reducedMotion ? 'is-enabled' : ''}`} aria-hidden="true">
-                          <Activity size={18} strokeWidth={2.25} aria-hidden="true" />
+                        <span className={`settings-mode-icon-button ${settings.motionStyle === motionStyle.key ? 'is-enabled' : ''}`} aria-hidden="true">
+                          {motionStyle.key === 'calm_fade' ? (
+                            <Minus size={18} strokeWidth={2.25} aria-hidden="true" />
+                          ) : motionStyle.key === 'glide' ? (
+                            <ArrowRight size={18} strokeWidth={2.25} aria-hidden="true" />
+                          ) : (
+                            <Flame size={18} strokeWidth={2.25} aria-hidden="true" />
+                          )}
                         </span>
-                        <span className="settings-toggle-copy">
-                          <span className="settings-icon-entry-label">Reduce Motion</span>
-                          <span className="settings-note">Minimize movement across the interface.</span>
-                        </span>
+                        <span className="settings-icon-entry-label">{MOTION_STYLE_LABEL[motionStyle.key]}</span>
                       </button>
+                    ))}
                   </div>
-                </div>
-                <div
-                  className="settings-section settings-control-row settings-control-row-no-icon"
-                  role="tabpanel"
-                  id="settings-panel-furigana"
-                  aria-labelledby="settings-tab-furigana"
+                  <div className="settings-theme-card settings-collapsible-card-inline" style={{ marginTop: 10 }}>
+                    <p className="settings-section-label" style={{ marginBottom: 8 }}>Reduce Motion</p>
+                    <button
+                      type="button"
+                      className={`settings-toggle settings-reduced-motion-toggle ${settings.reducedMotion ? 'is-active' : ''}`}
+                      onClick={() => setSettings((prev) => ({ ...prev, reducedMotion: !prev.reducedMotion }))}
+                      aria-label={settings.reducedMotion ? 'Reduce motion enabled. Activate to disable.' : 'Reduce motion disabled. Activate to enable.'}
+                      aria-pressed={settings.reducedMotion}
+                      title={settings.reducedMotion ? 'Reduce motion enabled' : 'Reduce motion disabled'}
+                    >
+                      <span className={`settings-mode-icon-button ${settings.reducedMotion ? 'is-enabled' : ''}`} aria-hidden="true">
+                        <Activity size={18} strokeWidth={2.25} aria-hidden="true" />
+                      </span>
+                      <span className="settings-toggle-copy">
+                        <span className="settings-icon-entry-label">Reduce Motion</span>
+                        <span className="settings-note">Minimize movement across the interface.</span>
+                      </span>
+                    </button>
+                  </div>
+                </SettingsCollapsibleSection>
+                <SettingsCollapsibleSection
+                  id="study-display"
+                  title="Study Display"
+                  description="Furigana reading aid and kanji display preferences."
+                  collapsed={Boolean(collapsedSettingsSections['study-display'])}
+                  onToggle={() => toggleThemeSectionCollapsed('study-display')}
+                  className="settings-theme-card"
+                  hideChevron
                 >
-                  <div className="settings-control-content">
-                    <p className="settings-section-label">Study Display</p>
-                    <div className="settings-animation-grid" role="group" aria-label="Reading aid controls">
-                      <button
-                        type="button"
-                        className={`settings-icon-entry settings-theme-entry ${settings.furiganaEnabled ? 'is-active' : ''}`}
-                        onClick={() => setSettings((prev) => ({ ...prev, furiganaEnabled: !prev.furiganaEnabled }))}
-                        aria-label={settings.furiganaEnabled ? 'Furigana reading aid visible. Activate to hide.' : 'Furigana reading aid hidden. Activate to show.'}
-                        aria-pressed={settings.furiganaEnabled}
-                        title={settings.furiganaEnabled ? 'Furigana visible' : 'Furigana hidden'}
-                      >
-                        <span className={`settings-mode-icon-button ${settings.furiganaEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
-                          <Languages size={18} strokeWidth={2.25} aria-hidden="true" />
-                        </span>
-                        <span className="settings-icon-entry-label">Show furigana (kana above kanji)</span>
-                      </button>
-                    </div>
-                    <p className="settings-help">When on, kana readings appear above kanji during review to help build reading confidence. Turn off as you progress.</p>
+                  <div className="settings-animation-grid" role="group" aria-label="Reading aid controls">
+                    <button
+                      type="button"
+                      className={`settings-icon-entry settings-theme-entry ${settings.furiganaEnabled ? 'is-active' : ''}`}
+                      onClick={() => setSettings((prev) => ({ ...prev, furiganaEnabled: !prev.furiganaEnabled }))}
+                      aria-label={settings.furiganaEnabled ? 'Furigana reading aid visible. Activate to hide.' : 'Furigana reading aid hidden. Activate to show.'}
+                      aria-pressed={settings.furiganaEnabled}
+                      title={settings.furiganaEnabled ? 'Furigana visible' : 'Furigana hidden'}
+                    >
+                      <span className={`settings-mode-icon-button ${settings.furiganaEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+                        <Languages size={18} strokeWidth={2.25} aria-hidden="true" />
+                      </span>
+                      <span className="settings-icon-entry-label">Show furigana (kana above kanji)</span>
+                    </button>
                   </div>
-                </div>
-              </div>
-                <div
-                  className="settings-section settings-control-row settings-control-row-no-icon"
-                  role="tabpanel"
-                  id="settings-panel-cursor"
-                  aria-labelledby="settings-tab-cursor"
+                  <p className="settings-help">When on, kana readings appear above kanji during review to help build reading confidence. Turn off as you progress.</p>
+                </SettingsCollapsibleSection>
+                <SettingsCollapsibleSection
+                  id="cursor"
+                  title="Cursor"
+                  description="Custom cursor style and appearance."
+                  collapsed={Boolean(collapsedSettingsSections['cursor'])}
+                  onToggle={() => toggleThemeSectionCollapsed('cursor')}
+                  className="settings-theme-card"
+                  hideChevron
                 >
-                  <div className="settings-control-content">
-                    <CursorSettingsTab cursor={cursor} />
-                  </div>
-                </div>
+                  <CursorSettingsTab cursor={cursor} />
+                </SettingsCollapsibleSection>
               </div>
               <div style={{ display: activeSettingsTab === 'assistant' ? undefined : 'none' }}>
-                <div
-                  className="settings-section settings-control-row settings-control-row-no-icon"
-                  role="tabpanel"
-                  id="settings-panel-tutor"
-                  aria-labelledby="settings-tab-tutor"
+                <SettingsCollapsibleSection
+                  id="tutor-assistant"
+                  title="Tutor Assistant"
+                  description="Chat behavior, toast limits, and audio prompts."
+                  collapsed={Boolean(collapsedSettingsSections['tutor-assistant'])}
+                  onToggle={() => toggleThemeSectionCollapsed('tutor-assistant')}
+                  className="settings-theme-card"
+                  hideChevron
                 >
-                  <div className="settings-control-content">
-                    <TutorSettingsTab settings={settings as any} setSettings={setSettings as any} />
-                  </div>
-                </div>
+                  <TutorSettingsTab settings={settings as any} setSettings={setSettings as any} />
+                </SettingsCollapsibleSection>
                 
                 <SettingsCollapsibleSection
                   id="tutor-models"
@@ -5839,6 +5802,7 @@ function App() {
                   collapsed={Boolean(collapsedSettingsSections['tutor-models'])}
                   onToggle={() => toggleThemeSectionCollapsed('tutor-models')}
                   className="settings-theme-card"
+                  hideChevron
                 >
                   <div style={{ display: 'grid', gap: '0.65rem' }}>
                     {(models.tutorInstallInfo?.models ?? []).map((model) => {
@@ -5968,6 +5932,7 @@ function App() {
                   collapsed={Boolean(collapsedSettingsSections['offline-dictionary'])}
                   onToggle={() => toggleThemeSectionCollapsed('offline-dictionary')}
                   className="settings-theme-card"
+                  hideChevron
                   actions={(
                     <button
                       type="button"
@@ -6011,6 +5976,7 @@ function App() {
                   collapsed={Boolean(collapsedSettingsSections['image-ocr'])}
                   onToggle={() => toggleThemeSectionCollapsed('image-ocr')}
                   className="settings-theme-card"
+                  hideChevron
                 >
                   <div style={{ display: 'grid', gap: '0.65rem' }}>
                     {(models.tutorInstallInfo?.translationProfiles ?? []).map((model) => {
@@ -6103,13 +6069,6 @@ function App() {
                   </div>
                 </SettingsCollapsibleSection>
                 
-                <div
-                  className="settings-section settings-control-row settings-control-row-no-icon"
-                  role="tabpanel"
-                  id="settings-panel-voice"
-                  aria-labelledby="settings-tab-voice"
-                >
-                  <div className="settings-control-content">
                     <VoiceSettingsTab
                       voice={voice}
                       settings={settings as any}
@@ -6120,110 +6079,109 @@ function App() {
                       formatMinutes={models.formatMinutes}
                       tutorInstallInfo={models.tutorInstallInfo as any}
                     />
-                  </div>
-                </div>
               </div>
               <div style={{ display: activeSettingsTab === 'system' ? undefined : 'none' }}>
-                <div
-                  className="settings-section settings-control-row"
-                  role="tabpanel"
-                  id="settings-panel-shortcuts"
-                  aria-labelledby="settings-tab-shortcuts"
+                <SettingsCollapsibleSection
+                  id="keyboard-shortcuts"
+                  title="Keyboard Shortcuts"
+                  description="Key prompt visibility and shortcut reference."
+                  collapsed={Boolean(collapsedSettingsSections['keyboard-shortcuts'])}
+                  onToggle={() => toggleThemeSectionCollapsed('keyboard-shortcuts')}
+                  className="settings-theme-card"
+                  hideChevron
                 >
-                  <button
-                    type="button"
-                    className="settings-icon-tile"
-                    onClick={() => shortcutsSectionRef.current?.focus()}
-                    aria-label="Focus keyboard shortcuts"
-                  >
-                    <Keyboard size={18} strokeWidth={2.1} />
-                  </button>
-                  <div ref={shortcutsSectionRef} className="settings-control-content" tabIndex={-1}>
-                    <p className="settings-section-label">Keyboard Shortcuts</p>
-                    <div className="settings-animation-grid" role="group" aria-label="Keyboard prompt controls">
-                      <button
-                        type="button"
-                        className={`settings-icon-entry settings-theme-entry ${settings.showKeyboardPrompts ? 'is-active' : ''}`}
-                        onClick={() => setSettings((prev) => ({ ...prev, showKeyboardPrompts: !prev.showKeyboardPrompts }))}
-                        aria-label={settings.showKeyboardPrompts ? 'Keyboard prompts visible. Activate to hide.' : 'Keyboard prompts hidden. Activate to show.'}
-                        aria-pressed={settings.showKeyboardPrompts}
-                        title={settings.showKeyboardPrompts ? 'Keyboard prompts visible' : 'Keyboard prompts hidden'}
-                      >
-                        <span className={`settings-mode-icon-button ${settings.showKeyboardPrompts ? 'is-enabled' : ''}`} aria-hidden="true">
-                          <Keyboard size={18} strokeWidth={2.25} aria-hidden="true" />
-                        </span>
-                        <span className="settings-icon-entry-label">Show key prompts</span>
-                      </button>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <button
+                      type="button"
+                      className="settings-icon-tile"
+                      onClick={() => shortcutsSectionRef.current?.focus()}
+                      aria-label="Focus keyboard shortcuts"
+                    >
+                      <Keyboard size={18} strokeWidth={2.1} />
+                    </button>
+                    <div ref={shortcutsSectionRef} className="settings-control-content" tabIndex={-1}>
+                      <p className="settings-section-label">Keyboard Shortcuts</p>
+                      <div className="settings-animation-grid" role="group" aria-label="Keyboard prompt controls">
+                        <button
+                          type="button"
+                          className={`settings-icon-entry settings-theme-entry ${settings.showKeyboardPrompts ? 'is-active' : ''}`}
+                          onClick={() => setSettings((prev) => ({ ...prev, showKeyboardPrompts: !prev.showKeyboardPrompts }))}
+                          aria-label={settings.showKeyboardPrompts ? 'Keyboard prompts visible. Activate to hide.' : 'Keyboard prompts hidden. Activate to show.'}
+                          aria-pressed={settings.showKeyboardPrompts}
+                          title={settings.showKeyboardPrompts ? 'Keyboard prompts visible' : 'Keyboard prompts hidden'}
+                        >
+                          <span className={`settings-mode-icon-button ${settings.showKeyboardPrompts ? 'is-enabled' : ''}`} aria-hidden="true">
+                            <Keyboard size={18} strokeWidth={2.25} aria-hidden="true" />
+                          </span>
+                          <span className="settings-icon-entry-label">Show key prompts</span>
+                        </button>
+                      </div>
+                      <div className="settings-shortcuts">
+                        <code className="command-hint">Ctrl+,</code><span>Settings</span>
+                        <code className="command-hint">Esc</code><span>Close modal / back</span>
+                        <code className="command-hint">1 / 2 / 3 / 4 / 5</code><span>Learning tracks (home)</span>
+                        <code className="command-hint">6</code><span>Study overview (home)</span>
+                      </div>
+                      <p className="settings-help">When off, shortcut keys still work but hint labels stay hidden in game rounds.</p>
                     </div>
-                    <div className="settings-shortcuts">
-                      <code className="command-hint">Ctrl+,</code><span>Settings</span>
-                      <code className="command-hint">Esc</code><span>Close modal / back</span>
-                      <code className="command-hint">1 / 2 / 3 / 4 / 5</code><span>Learning tracks (home)</span>
-                      <code className="command-hint">6</code><span>Study overview (home)</span>
-                    </div>
-                    <p className="settings-help">When off, shortcut keys still work but hint labels stay hidden in game rounds.</p>
                   </div>
-                </div>
+                </SettingsCollapsibleSection>
                 
-                <div
-                  className="settings-section settings-control-row settings-control-row-no-icon"
-                  role="tabpanel"
-                  id="settings-panel-data"
-                  aria-labelledby="settings-tab-data"
+                <SettingsCollapsibleSection
+                  id="data-management"
+                  title="Data Management"
+                  description="Reset all study progress — review history, streaks, leech data, and locally-tracked scores. This cannot be undone."
+                  collapsed={Boolean(collapsedSettingsSections['data-management'])}
+                  onToggle={() => toggleThemeSectionCollapsed('data-management')}
+                  className="settings-theme-card"
+                  hideChevron
                 >
-                  <div className="settings-control-content">
-                    <p className="settings-section-label">Data Management</p>
-                    <p className="settings-help">
-                      Reset all study progress — review history, streaks, leech data, and locally-tracked scores.
-                      This cannot be undone.
-                    </p>
-                    {resetConfirmStep === 0 ? (
-                      <button
-                        type="button"
-                        className="settings-reset-button"
-                        onClick={() => setResetConfirmStep(1)}
-                        disabled={resettingDb}
-                      >
-                        <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
-                        Reset all progress
-                      </button>
-                    ) : resetConfirmStep === 1 ? (
-                      <div className="settings-reset-confirm">
-                        <p className="settings-reset-warning">Are you sure? All progress will be permanently deleted.</p>
-                        <div className="reset-confirm-actions">
-                          <button
-                            type="button"
-                            className="danger-button"
-                        onClick={() => setResetConfirmStep(2)}
-                            disabled={resettingDb}
-                          >
-                            I understand — continue
-                          </button>
-                          <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
-                            Cancel
-                          </button>
-                        </div>
+                  {resetConfirmStep === 0 ? (
+                    <button
+                      type="button"
+                      className="settings-reset-button"
+                      onClick={() => setResetConfirmStep(1)}
+                      disabled={resettingDb}
+                    >
+                      <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
+                      Reset all progress
+                    </button>
+                  ) : resetConfirmStep === 1 ? (
+                    <div className="settings-reset-confirm">
+                      <p className="settings-reset-warning">Are you sure? All progress will be permanently deleted.</p>
+                      <div className="reset-confirm-actions">
+                        <button
+                          type="button"
+                          className="danger-button"
+                      onClick={() => setResetConfirmStep(2)}
+                          disabled={resettingDb}
+                        >
+                          I understand — continue
+                        </button>
+                        <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
+                          Cancel
+                        </button>
                       </div>
-                    ) : (
-                      <div className="settings-reset-confirm">
-                        <p className="settings-reset-warning"><strong>Final step:</strong> this will erase everything.</p>
-                        <div className="reset-confirm-actions">
-                          <button
-                            type="button"
-                            className="danger-button danger-button-final"
-                            onClick={() => void resetStudyDb()}
-                            disabled={resettingDb}
-                          >
-                            {resettingDb ? 'Resetting…' : '⚠ Yes, delete everything'}
-                          </button>
-                          <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
-                            Cancel
-                          </button>
-                        </div>
+                    </div>
+                  ) : (
+                    <div className="settings-reset-confirm">
+                      <p className="settings-reset-warning"><strong>Final step:</strong> this will erase everything.</p>
+                      <div className="reset-confirm-actions">
+                        <button
+                          type="button"
+                          className="danger-button danger-button-final"
+                          onClick={() => void resetStudyDb()}
+                          disabled={resettingDb}
+                        >
+                          {resettingDb ? 'Resetting…' : '⚠ Yes, delete everything'}
+                        </button>
+                        <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
+                          Cancel
+                        </button>
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  )}
+                </SettingsCollapsibleSection>
               </div>
               </div>
             </div>
