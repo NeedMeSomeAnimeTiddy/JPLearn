@@ -754,6 +754,66 @@ export function OverviewView({
                 {label}
               </button>
             ))}
+            <button
+              type="button"
+              className="jlpt-action-btn"
+              onClick={async () => {
+                if (!window.jplearnDesktop.exportAnalyticsJSON) return
+                setExportLoading(true)
+                setExportMessage(null)
+                try {
+                  const result = await window.jplearnDesktop.exportAnalyticsJSON()
+                  if (result.cancelled) {
+                    setExportMessage(null)
+                  } else if (result.ok) {
+                    setExportMessage(`Saved: ${result.path ?? 'file'}`)
+                  } else {
+                    setExportMessage('Export failed.')
+                  }
+                } catch {
+                  setExportMessage('Export failed.')
+                } finally {
+                  setExportLoading(false)
+                }
+              }}
+              disabled={exportLoading}
+              aria-label="Export full backup as JSON"
+            >
+              Full Backup (JSON)
+            </button>
+            {window.jplearnDesktop.importAnalyticsJSON ? (
+              <button
+                type="button"
+                className="jlpt-action-btn"
+                onClick={async () => {
+                  setExportLoading(true)
+                  setExportMessage(null)
+                  try {
+                    const result = await window.jplearnDesktop.importAnalyticsJSON!()
+                    if (result.cancelled) {
+                      setExportMessage(null)
+                    } else if (result.ok) {
+                      const counts = result.imported ?? {}
+                      const parts = Object.entries(counts)
+                        .filter(([, v]) => v > 0)
+                        .map(([k, v]) => `${v} ${k}`)
+                      setExportMessage(`Imported: ${parts.join(', ') || 'no changes'}`)
+                      if (typeof onRefresh === 'function') onRefresh()
+                    } else {
+                      setExportMessage('Import failed.')
+                    }
+                  } catch {
+                    setExportMessage('Import failed.')
+                  } finally {
+                    setExportLoading(false)
+                  }
+                }}
+                disabled={exportLoading}
+                aria-label="Import backup from JSON file"
+              >
+                Import Backup
+              </button>
+            ) : null}
           </div>
           {exportMessage ? (
             <p className="status-line" style={{ marginTop: '10px' }}>{exportMessage}</p>

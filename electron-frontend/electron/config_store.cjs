@@ -6,6 +6,7 @@
 
 const CONFIG_DEFAULTS = {
   autoUpdateEnabled: true,
+  notificationsEnabled: true,
 }
 
 const ALLOWED_KEYS = new Set(Object.keys(CONFIG_DEFAULTS))

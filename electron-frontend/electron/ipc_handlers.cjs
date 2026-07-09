@@ -900,6 +900,77 @@ function registerIpcHandlers(options) {
       throw new Error(`Failed to export analytics CSV: ${detail}`)
     }
   })
+
+  options.ipcMain.handle('analytics:export-and-save-json', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      const response = await runPythonBridgeWithArgsRead(['analytics-export-json'])
+      if (!response || typeof response.json !== 'object') {
+        throw new Error('Invalid analytics JSON export response from bridge')
+      }
+      const { dialog, app } = require('electron')
+      const defaultFilename = `jplearn-full-backup-${new Date().toISOString().slice(0, 10)}.json`
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        defaultPath: require('path').join(app.getPath('downloads'), defaultFilename),
+        filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      })
+      if (canceled || !filePath) {
+        return { ok: false, cancelled: true }
+      }
+      require('fs').writeFileSync(filePath, JSON.stringify(response.json, null, 2), 'utf-8')
+      return { ok: true, path: filePath }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to export analytics JSON: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('analytics:import-from-json', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      const { dialog, app } = require('electron')
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: 'Import JPLearn Backup',
+        defaultPath: app.getPath('downloads'),
+        filters: [{ name: 'JSON Files', extensions: ['json'] }],
+        properties: ['openFile'],
+      })
+      if (canceled || !filePaths || filePaths.length === 0) {
+        return { ok: false, cancelled: true }
+      }
+      const response = await runPythonBridgeWithArgsRead(['analytics-import-json', filePaths[0], 'merge'])
+      if (!response || typeof response !== 'object') {
+        throw new Error('Invalid import response from bridge')
+      }
+      clearBridgeReadCaches()
+      return response
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to import analytics JSON: ${detail}`)
+    }
+  })
+  // ── Daily goal ───────────────────────────────────────────────────────────────────
+  options.ipcMain.handle('study:get-daily-goal', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const payload = await runPythonBridgeWithArgsRead(['daily-goal'])
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Invalid daily goal response from bridge')
+    }
+    return payload
+  })
+
+  options.ipcMain.handle('study:set-daily-goal', async (event, target) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    if (typeof target !== 'number' || target < 1) {
+      throw new Error('Invalid daily goal target')
+    }
+    const payload = await runPythonBridgeWithArgsRead(['daily-goal-set', String(target)])
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Invalid daily goal response from bridge')
+    }
+    return payload
+  })
+
   // ── Setup wizard ────────────────────────────────────────────────────────────────────
   const setupRuntime = options.setupRuntime
   if (setupRuntime) {
@@ -1290,6 +1361,23 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to run snapshot: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('debug:test-notification', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      const { Notification } = require('electron')
+      const n = new Notification({
+        title: 'JPLearn',
+        body: 'Test notification — notifications are working!',
+        silent: false,
+      })
+      n.show()
+      return { ok: true }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      return { ok: false, error: detail }
     }
   })
 

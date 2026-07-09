@@ -497,9 +497,13 @@ interface DesktopApi {
   getLearningPathStatus?: () => Promise<LearningPathStatusPayload>
   setLearningPath?: (pathId: string) => Promise<LearningPathStatusPayload>
   completeOnboarding?: (payload: OnboardingCompletionPayload) => Promise<LearningPathStatusPayload>
+  getDailyGoal?: () => Promise<{ target: number; current: number; goal_met: boolean; presets: number[] }>
+  setDailyGoal?: (target: number) => Promise<{ target: number; current: number; goal_met: boolean; presets: number[] }>
   exportAnalyticsCSV?: (
     type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot',
   ) => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
+  exportAnalyticsJSON?: () => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
+  importAnalyticsJSON?: () => Promise<{ ok: boolean; cancelled?: boolean; imported?: Record<string, number>; conflict_mode?: string }>
   // ─ Debug / Dev Tools ─────────────────────────────────────────────────
   getBridgeTelemetry?: () => Promise<BridgeTelemetry | { ok: false; error: string }>
   restartBridge?: () => Promise<{ ok: boolean }>
@@ -507,6 +511,7 @@ interface DesktopApi {
   runDiagnostics?: () => Promise<DiagnosticsReport>
   getSnapshot?: () => Promise<SnapshotData>
   runCheck?: (name: 'arch' | 'db' | 'srs') => Promise<CheckResult>
+  testNotification?: () => Promise<{ ok: boolean; error?: string }>
   searchDictionary?: (query: string) => Promise<DictionaryLookupPayload>
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>

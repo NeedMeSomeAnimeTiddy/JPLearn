@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, Notification } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -2275,6 +2275,46 @@ app.whenReady().then(async () => {
   } catch { /* non-fatal */ }
 
   void createWindowWithSplash()
+
+  // ── Due-review notification check (fire once per launch) ─────────────────────
+  let dueReviewNotified = false
+  async function checkAndNotifyDueReviews() {
+    if (dueReviewNotified) return
+    try {
+      const enabled = await getConfigValue('notificationsEnabled')
+      if (!enabled) return
+    } catch { return }
+
+    let mainWindow = null
+    try {
+      const windows = BrowserWindow.getAllWindows()
+      mainWindow = windows.length > 0 ? windows[0] : null
+    } catch { /* continue without window reference */ }
+
+    // Don't notify if the user is actively looking at the app
+    if (mainWindow && mainWindow.isFocused()) return
+
+    try {
+      const summary = await runPythonBridge('summary')
+      const decks = Array.isArray(summary?.decks) ? summary.decks : []
+      const totalDue = decks.reduce((sum, d) => sum + (typeof d.due_today === 'number' ? d.due_today : 0), 0)
+      if (totalDue >= 1) {
+        dueReviewNotified = true
+        const n = new Notification({
+          title: 'JPLearn',
+          body: `You have ${totalDue} cards due for review today`,
+          silent: false,
+        })
+        n.on('click', () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.show()
+            mainWindow.focus()
+          }
+        })
+      }
+    } catch { /* non-fatal — bridge may not be ready yet */ }
+  }
+  setTimeout(checkAndNotifyDueReviews, 60_000)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

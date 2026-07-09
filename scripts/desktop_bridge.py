@@ -86,6 +86,7 @@ from domain.feature_catalog import JPLEARN_FEATURES  # noqa: E402
 from domain.feature_service import evaluate_features  # noqa: E402
 from domain.features import FeatureState  # noqa: E402
 from domain.xp import DEFAULT_CURVE, XP_CORRECT_ANSWER, UserProgress, XPEvent  # noqa: E402
+from domain.daily_goal import DailyGoal, default_card_target, PRESET_CARD_GOALS  # noqa: E402
 from domain.level_service import (  # noqa: E402
     apply_xp,
     compute_level as compute_xp_level,
@@ -103,6 +104,7 @@ from domain.tutor_service import (  # noqa: E402
     generate_reactions,
 )
 from data.database import (  # noqa: E402
+    load_daily_counts,
     load_feature_unlocks,
     load_tutor_seen_keys,
     load_user_progression,
@@ -3568,6 +3570,26 @@ def get_session_goal_summary(session_id: str) -> dict[str, object]:
     return {"ok": True, "summary": asdict(SessionSummaryPayload(**asdict(summary)))}
 
 
+def build_daily_goal() -> dict[str, object]:
+    init_study_db()
+    onboarding_minutes_raw = get_setting("onboarding_daily_minutes")
+    onboarding_minutes = int(onboarding_minutes_raw) if onboarding_minutes_raw else None
+
+    explicit_goal_raw = get_setting("daily_goal_items")
+    target = int(explicit_goal_raw) if explicit_goal_raw else default_card_target(onboarding_minutes)
+
+    daily_counts = load_daily_counts(1)
+    today_count = daily_counts[0].count if daily_counts else 0
+
+    goal = DailyGoal(target_items=target, current_items=today_count)
+    return {
+        "target": goal.target_items,
+        "current": goal.current_items,
+        "goal_met": goal.goal_met,
+        "presets": list(PRESET_CARD_GOALS),
+    }
+
+
 def build_study_queue_payload(slug: str) -> dict[str, object]:
     init_study_db()
     factory = ALL_DECKS.get(slug)
@@ -4019,6 +4041,22 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             return 2, {"error": "Usage: session-summary <session_id>"}
         return 0, get_session_goal_summary(argv[1])
 
+    if command == "daily-goal":
+        try:
+            return 0, build_daily_goal()
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "daily-goal-set":
+        if len(argv) < 2:
+            return 2, {"error": "Usage: daily-goal-set <target_items>"}
+        try:
+            target = int(argv[1])
+            set_setting("daily_goal_items", str(target))
+            return 0, build_daily_goal()
+        except ValueError as exc:
+            return 2, {"error": f"Invalid target: {exc}"}
+
     if command == "apply-expertise-level":
         if len(argv) < 2:
             return 2, {"error": "Usage: apply-expertise-level <level>"}
@@ -4296,6 +4334,29 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             if export_type == "mastery_snapshot":
                 return 0, {"csv": deck_portability.export_mastery_snapshot_csv(), "type": export_type}
             return 2, {"error": f"Unknown analytics export type: {export_type}"}
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "analytics-export-json":
+        try:
+            snapshot = deck_portability.export_progress_snapshot()
+            return 0, {"json": snapshot}
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "analytics-import-json":
+        if len(argv) < 2:
+            return 2, {"error": "Usage: analytics-import-json <file_path> [merge|overwrite]"}
+        file_path = argv[1]
+        conflict_mode = argv[2] if len(argv) > 2 else "merge"
+        if conflict_mode not in ("merge", "overwrite"):
+            return 2, {"error": f"Invalid conflict_mode: {conflict_mode}. Use 'merge' or 'overwrite'."}
+        try:
+            import json as _json
+            with open(file_path, "r", encoding="utf-8") as f:
+                snapshot = _json.load(f)
+            result = deck_portability.import_progress_snapshot(snapshot, conflict_mode=conflict_mode)
+            return 0, {"ok": True, "imported": result, "conflict_mode": conflict_mode}
         except Exception as exc:
             return 2, {"error": str(exc)}
 

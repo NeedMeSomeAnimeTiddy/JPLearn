@@ -3457,6 +3457,113 @@ html[data-reduced-motion='true'] .home-hero-steam {
   flex-shrink: 0;
 }
 
+/* ── Daily Goal Widget (inline in study plan strip) ──── */
+.daily-goal-widget {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.daily-goal-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  min-height: 36px;
+}
+
+.daily-goal-display:hover {
+  border-color: var(--text-muted);
+}
+
+.daily-goal-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.daily-goal-track {
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.daily-goal-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  width: var(--goal-pct);
+  min-width: 2px;
+  transition: width 0.4s ease;
+}
+
+.daily-goal-fill.is-met {
+  background: var(--color-success, #22c55e);
+}
+
+.daily-goal-count {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 4.5ch;
+  text-align: right;
+  color: var(--text-soft);
+}
+
+.daily-goal-count.is-met {
+  color: var(--color-success, #22c55e);
+}
+
+.daily-goal-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: flex;
+  gap: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 5px 6px;
+  z-index: 10;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.daily-goal-preset {
+  background: var(--bg-main);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 9px;
+  cursor: pointer;
+  font: inherit;
+  min-width: 30px;
+  text-align: center;
+}
+
+.daily-goal-preset:hover {
+  border-color: var(--text-muted);
+  background: var(--bg-surface);
+}
+
+.daily-goal-preset.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-main);
+}
+
 .topbar {
   position: relative;
   overflow: hidden;

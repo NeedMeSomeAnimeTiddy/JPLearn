@@ -99,7 +99,11 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getLearningPathStatus: () => ipcRenderer.invoke('learning-path:get-status'),
   setLearningPath: (pathId) => ipcRenderer.invoke('learning-path:set', pathId),
   completeOnboarding: (payload) => ipcRenderer.invoke('learning-path:complete-onboarding', payload),
+  getDailyGoal: () => ipcRenderer.invoke('study:get-daily-goal'),
+  setDailyGoal: (target) => ipcRenderer.invoke('study:set-daily-goal', target),
   exportAnalyticsCSV: (type) => ipcRenderer.invoke('analytics:export-and-save-csv', type),
+  exportAnalyticsJSON: () => ipcRenderer.invoke('analytics:export-and-save-json'),
+  importAnalyticsJSON: () => ipcRenderer.invoke('analytics:import-from-json'),
   // ─ Debug / Dev Tools ──────────────────────────────────────────────────
   getBridgeTelemetry: () => ipcRenderer.invoke('debug:bridge-telemetry'),
   restartBridge: () => ipcRenderer.invoke('debug:restart-bridge'),
@@ -107,4 +111,5 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   runDiagnostics: () => ipcRenderer.invoke('debug:diagnostics'),
   getSnapshot: () => ipcRenderer.invoke('debug:snapshot'),
   runCheck: (name) => ipcRenderer.invoke('debug:run-check', name),
+  testNotification: () => ipcRenderer.invoke('debug:test-notification'),
 })
