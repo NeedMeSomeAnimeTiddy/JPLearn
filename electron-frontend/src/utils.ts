@@ -72,6 +72,14 @@ interface CardWithTags {
   tags: string[]
 }
 
+// ── Minigame mode helpers ────────────────────────────────────────────────────
+
+export function isGrammarCurriculumMode(mode: string): boolean {
+  return mode === 'sentence_assembly' || mode === 'particle_cloze' || mode === 'vibe_check' || mode === 'imposter'
+}
+
+// ── JLPT tag extraction ──────────────────────────────────────────────────────
+
 export function jlptTagFromCard(card: CardWithTags): JlptLevel {
   for (const tag of card.tags) {
     const normalized = tag.trim().toLowerCase()

@@ -22,6 +22,7 @@ import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
+import { isGrammarCurriculumMode } from './utils'
 import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Palette, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Square, Trash2, X } from 'lucide-react'
 import './App.css'
 import { useTheme } from './features/theme'
@@ -911,10 +912,6 @@ function isImposterMode(mode: MinigameKey): mode is 'imposter' {
 
 function isSentenceAssemblyMode(mode: MinigameKey): mode is 'sentence_assembly' {
   return mode === 'sentence_assembly'
-}
-
-function isGrammarCurriculumMode(mode: MinigameKey): boolean {
-  return isSentenceAssemblyMode(mode) || isParticleClozeMode(mode) || isVibeCheckMode(mode) || isImposterMode(mode)
 }
 
 function pickSurprisePrompt(

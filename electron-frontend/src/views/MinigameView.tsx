@@ -27,7 +27,7 @@ import {
   formatExpectedAnswer,
   formatFeedbackAnswerLabel,
 } from '../constants'
-import { sanitizeRomajiInput } from '../utils'
+import { isGrammarCurriculumMode, sanitizeRomajiInput } from '../utils'
 import { useSession } from '../context/SessionContext'
 
 // Minimal card shape needed for stroke-order answer candidates.
@@ -591,8 +591,8 @@ export function MinigameView({
                       srsResult={roundSrsResult}
                       exampleSentence={roundExampleSentence}
                       cardCharacter={roundState.focusText}
-                      cardMeaning={activeBlockCards.find((c) => c.id === roundState.cardId)?.meaning ?? ''}
-                      cardRomaji={activeBlockCards.find((c) => c.id === roundState.cardId)?.romaji ?? ''}
+                      cardMeaning={!isGrammarCurriculumMode(roundState.mode) ? (activeBlockCards.find((c) => c.id === roundState.cardId)?.meaning ?? '') : ''}
+                      cardRomaji={!isGrammarCurriculumMode(roundState.mode) ? (activeBlockCards.find((c) => c.id === roundState.cardId)?.romaji ?? '') : ''}
                       dictionaryNote={roundState.dictionaryNote}
                     >
                         {roundState.mode === 'stroke_order' ? (
