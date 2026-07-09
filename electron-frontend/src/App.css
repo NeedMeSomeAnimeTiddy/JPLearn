@@ -2617,90 +2617,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
   z-index: 0;
 }
 
-/* ── Channel Strip Rail (hidden — moved to tracklist strip) ──── */
-.hub-rail,
-.hub-rail-head,
-.hub-rail-body,
-.hub-rail-head .hero-kicker,
-.hub-vu,
-.hub-vu-bar,
-.hub-block-track,
-.hub-block-copy,
-.hub-block-pct,
-.hub-block-lock,
-.hub-block-bar-wrap,
-.hub-block-bar,
-.hub-block-list {
-  display: none;
-}
-
-.hub-block-row {
-  display: none;
-}
-
-.hub-block-track {
-  font-family: var(--mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.06em;
-  color: color-mix(in oklab, var(--accent-soft) 30%, var(--text-soft));
-  text-align: center;
-  font-weight: 700;
-}
-
-.hub-block-row.is-active .hub-block-track {
-  color: var(--accent-soft);
-}
-
-.hub-block-copy {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.hub-block-copy strong {
-  font-size: 0.72rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.hub-block-bar-wrap {
-  height: 2px;
-  border-radius: 2px;
-  background: var(--track-bg);
-  overflow: hidden;
-}
-
-.hub-block-bar {
-  display: block;
-  height: 100%;
-  width: var(--block-mastery, 0%);
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--tone-teal), var(--accent-soft), var(--accent));
-  box-shadow: 0 0 6px color-mix(in oklab, var(--accent-soft) 25%, transparent);
-}
-
-.hub-block-pct {
-  font-size: 0.52rem;
-  font-weight: 700;
-  font-family: var(--mono);
-  color: color-mix(in oklab, var(--accent-soft) 25%, var(--text-soft));
-}
-
-.hub-block-row.is-active .hub-block-pct {
-  color: color-mix(in oklab, var(--accent) 60%, var(--text-main));
-}
-
-.hub-block-lock {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-soft);
-  opacity: 0.4;
-}
-
 /* ── Tape Deck Player Area ────────────────────────────────────── */
 .hub-player {
   display: flex;
@@ -2955,59 +2871,9 @@ html[data-reduced-motion='true'] .home-hero-steam {
   cursor: not-allowed;
 }
 
-/* (legacy) */
-.hub-rail-session,
-.hub-rail-session-label,
-.hub-rail-session-stats,
-.hub-rail-session-btn {
-  display: none;
-}
-
-/* (legacy hub-last-session — kept for any other views) */
-.hub-last-session {
-  display: none;
-}
-
-.hub-last-session-label,
-.hub-last-session-stats {
-  display: none;
-}
-
 /* ═══════════════════════════════════════════════════════════════
    Animated Deck Elements
    ═══════════════════════════════════════════════════════════════ */
-
-/* ── VU meter (left rail edge) ────────────────────────────────── */
-.hub-vu {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 8px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 2px;
-  padding: 8px 1px;
-  background: color-mix(in oklab, var(--bg-main) 70%, transparent);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.hub-vu-bar {
-  display: block;
-  height: 6px;
-  width: 100%;
-  border-radius: 0;
-  background: var(--tone-teal);
-  opacity: 0.4;
-  animation: vuBounce 0.8s ease-in-out infinite alternate;
-}
-
-@keyframes vuBounce {
-  0% { opacity: 0.2; transform: scaleX(0.4); background: var(--tone-teal); }
-  100% { opacity: 0.8; transform: scaleX(1); background: var(--accent); }
-}
 
 /* ── Sweeping scanner line ────────────────────────────────────── */
 .hub-sweep {
@@ -3125,25 +2991,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
   color: var(--bg-main);
   box-shadow: inset 0 3px 6px rgba(0,0,0,0.3), 0 1px 0 var(--accent-ink);
   transform: translateY(2px);
-}
-
-/* ── Launch button ──────────────────────────────────────────── */
-.cassette-launch {
-  border-radius: 0;
-  padding: 6px 14px;
-  background: linear-gradient(180deg,
-    color-mix(in oklab, var(--accent) 70%, var(--button-bg-top)) 0%,
-    color-mix(in oklab, var(--accent) 40%, var(--button-bg-bottom)) 100%);
-  border: 1px solid var(--accent-ink);
-  box-shadow: 0 3px 0 var(--accent-ink), 0 4px 8px rgba(0,0,0,0.15);
-}
-
-.cassette-caption {
-  clip-path: polygon(
-    0 8px, 8px 0, calc(100% - 8px) 0, 100% 8px,
-    100% calc(100% - 8px), calc(100% - 8px) 100%,
-    8px 100%, 0 calc(100% - 8px)
-  );
 }
 
 /* ── Responsive ───────────────────────────────────────────────── */
@@ -6147,66 +5994,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
 }
 
 .cassette-nav { display: none; }
-
-.cassette-caption {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 8px 12px;
-  border-radius: 0;
-  border: 1px solid var(--panel-border);
-  background: var(--bg-main);
-}
-
-.cassette-caption-copy {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.cassette-caption-copy strong {
-  font-size: 0.95rem;
-  font-family: var(--display-font);
-}
-
-.cassette-caption-copy span {
-  color: var(--text-soft);
-  font-size: 0.72rem;
-}
-
-.cassette-launch {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 0;
-  border: 1px solid var(--panel-border);
-  background: var(--button-bg-top);
-  color: var(--bg-main);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-size: 0.72rem;
-  cursor: pointer;
-  box-shadow: 0 2px 0 var(--accent-ink);
-  transition: transform 80ms ease, box-shadow 80ms ease;
-}
-
-.cassette-launch:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--button-bg-top) 85%, var(--accent));
-}
-
-.cassette-launch:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-.cassette-launch:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
 
 html[data-reduced-motion='true'] .cassette-reel {
   animation: none;
