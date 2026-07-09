@@ -25,6 +25,8 @@ export const THEME_OPTIONS: Array<{ key: ThemeKey; label: string; mode: ThemeMod
   { key: 'ocean_glass_light', label: 'Ocean Glass Light', mode: 'light' },
   { key: 'plum_garden_light', label: 'Plum Garden Light', mode: 'light' },
   { key: 'matcha_stone_light', label: 'Matcha Stone Light', mode: 'light' },
+  { key: 'high_contrast', label: 'High Contrast', mode: 'dark' },
+  { key: 'high_contrast_light', label: 'High Contrast Light', mode: 'light' },
 ]
 
 export const THEME_MODE_SECTIONS: Array<{ key: ThemeMode; label: string }> = [
@@ -46,28 +48,30 @@ export const THEME_MODE_ICON: Record<ThemeMode, LucideIcon> = {
 }
 
 export const THEME_SWATCH_ACCENT: Record<ThemeKey, string> = {
-  lofi_dusk: '#b07a5c',
+  lofi_dusk: '#d4a56a',
   harbor_mist: '#7bc5df',
-  sakura_dawn: '#ffb1bf',
-  forest_ink: '#89d0a4',
-  sunset_lacquer: '#ffab73',
-  midnight_neon: '#79d5ff',
-  paper_crane: '#d4a57d',
-  matcha_stone: '#b6d387',
-  ocean_glass: '#7ed4d0',
-  ember_night: '#ff9a6a',
-  plum_garden: '#c89cff',
-  lofi_dusk_light: '#b07a5c',
-  harbor_mist_light: '#69abc4',
-  sakura_dawn_light: '#e48ea2',
-  sunset_lacquer_light: '#dd8c62',
-  midnight_neon_light: '#66a8d6',
-  paper_crane_light: '#b8906d',
-  ember_night_light: '#d8836f',
-  forest_ink_light: '#74b591',
-  ocean_glass_light: '#63b9b3',
-  plum_garden_light: '#ae86e6',
-  matcha_stone_light: '#9fbf70',
+  sakura_dawn: '#f5a0b4',
+  forest_ink: '#7ec99a',
+  sunset_lacquer: '#f0945c',
+  midnight_neon: '#6cbfff',
+  paper_crane: '#c89868',
+  matcha_stone: '#a4c878',
+  ocean_glass: '#6cc8c4',
+  ember_night: '#f08050',
+  plum_garden: '#b88cf0',
+  lofi_dusk_light: '#c8905c',
+  harbor_mist_light: '#5aa0bc',
+  sakura_dawn_light: '#d47894',
+  sunset_lacquer_light: '#d07a50',
+  midnight_neon_light: '#5a98d0',
+  paper_crane_light: '#b88058',
+  ember_night_light: '#d47454',
+  forest_ink_light: '#68a87a',
+  ocean_glass_light: '#5aaaa4',
+  plum_garden_light: '#a070dc',
+  matcha_stone_light: '#8eac5a',
+  high_contrast: '#ffdd00',
+  high_contrast_light: '#0055cc',
 }
 
 export const THEME_KEY_SET = new Set<ThemeKey>(THEME_OPTIONS.map((theme) => theme.key))
@@ -88,6 +92,7 @@ export const THEME_VARIABLE_KEYS: ThemeVariableKey[] = [
   '--panel-shadow',
   '--tile-bg',
   '--tile-border',
+  '--tile-shadow',
   '--chip-bg',
   '--chip-border',
   '--button-border',
@@ -145,7 +150,7 @@ export const THEME_SECTION_DEFINITIONS: ThemeSection[] = [
     id: 'borders',
     label: 'Borders and Depth Effects',
     description: 'Panel borders and shadow depth that define component edges.',
-    keys: ['--panel-border', '--tile-border', '--chip-border', '--button-border', '--card-border', '--panel-shadow'],
+    keys: ['--panel-border', '--tile-border', '--tile-shadow', '--chip-border', '--button-border', '--card-border', '--panel-shadow'],
   },
   {
     id: 'components',
@@ -238,6 +243,10 @@ export const THEME_VARIABLE_DISPLAY: Record<ThemeVariableKey, { label: string; d
   '--tile-border': {
     label: 'Tile Border',
     description: 'Border color for small tiles.',
+  },
+  '--tile-shadow': {
+    label: 'Tile Shadow',
+    description: 'Shadow style for elevated tile depth.',
   },
   '--chip-bg': {
     label: 'Tag Background',
