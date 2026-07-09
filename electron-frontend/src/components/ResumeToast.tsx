@@ -1,6 +1,8 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { Play, X } from 'lucide-react'
 import { formatTimelineScriptTag } from '../utils'
+
+const RESUME_TOAST_TTL_MS = 10_000
 
 interface ResumeToastProps {
   deck: string
@@ -10,6 +12,13 @@ interface ResumeToastProps {
 }
 
 export function ResumeToast({ deck, mode, onResume, onDismiss }: ResumeToastProps) {
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      onDismiss()
+    }, RESUME_TOAST_TTL_MS)
+    return () => window.clearTimeout(handle)
+  }, [onDismiss])
+
   const handleResume = useCallback(() => {
     onResume()
   }, [onResume])
