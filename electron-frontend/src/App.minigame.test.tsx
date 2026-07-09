@@ -155,6 +155,7 @@ const baseDesktopApi = {
       month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
     },
     mistakes: [],
+    minigame_performance: [],
     item_history: [],
     curriculum: {
       particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
@@ -296,6 +297,7 @@ function buildStudyPlanDesktopApi() {
         month: { days: 30, reviewed: 4, correct: 4, incorrect: 0, accuracy: 100, points_earned: 4, active_days: 2 },
       },
       mistakes: [],
+      minigame_performance: [],
       item_history: [],
       curriculum: {
         particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },

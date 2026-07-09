@@ -67,6 +67,12 @@ interface StudySummary {
     mistakes: number
     error_rate: number
   }>
+  minigame_performance: Array<{
+    minigame: string
+    attempts: number
+    correct: number
+    accuracy: number
+  }>
   item_history: Array<{
     key: string
     script_tag: string

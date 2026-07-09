@@ -47,6 +47,7 @@ from data.study_pipeline import (  # noqa: E402
     load_recent_assistant_chat_turns,
     load_item_history,
     load_mistake_breakdown,
+    load_minigame_breakdown,
     load_curriculum_stages,
     load_deck_summary_counts,
     load_review_states,
@@ -2700,6 +2701,7 @@ def build_summary() -> dict[str, object]:
     activity_week = load_activity_summary(7)
     activity_month = load_activity_summary(30)
     mistakes = load_mistake_breakdown(limit=6)
+    minigame_perf = load_minigame_breakdown()
     item_history = load_item_history(limit_items=8, events_per_item=8)
     curriculum_context_cloze = load_curriculum_stage_summary("context_cloze")
     curriculum_by_script = {
@@ -2757,6 +2759,7 @@ def build_summary() -> dict[str, object]:
             "month": asdict(activity_month),
         },
         "mistakes": [asdict(item) for item in mistakes],
+        "minigame_performance": [asdict(item) for item in minigame_perf],
         "item_history": [
             {
                 **asdict(item),

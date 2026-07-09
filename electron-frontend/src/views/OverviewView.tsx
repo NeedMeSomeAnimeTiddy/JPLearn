@@ -10,6 +10,7 @@ import {
   Flame,
   Languages,
   ListChecks,
+  PlayCircle,
   RefreshCw,
   Target,
   X,
@@ -22,7 +23,7 @@ import { ActivityCalendar } from 'react-activity-calendar'
 
 const CARD_MASTERY_MAX = 4
 
-export type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'deckSnapshot'
+export type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot'
 
 interface DeckSummary {
   slug: string
@@ -75,6 +76,13 @@ interface MistakeRow {
   error_rate: number
 }
 
+interface MinigamePerfRow {
+  minigame: string
+  attempts: number
+  correct: number
+  accuracy: number
+}
+
 interface SelectedChar {
   character: string
   romaji: string
@@ -96,8 +104,10 @@ interface OverviewViewProps {
   overviewKanjiLevelProgress: JlptLevelProgress[]
   overviewBlocksLoading: boolean
   mistakes: MistakeRow[]
+  minigamePerf: MinigamePerfRow[]
   hasAnyActivity: boolean
   hasMistakeData: boolean
+  hasMinigamePerfData: boolean
   charMasteryExpanded: boolean
   expandedBlocks: string | null
   overviewSectionExpanded: Record<OverviewSectionKey, boolean>
@@ -125,8 +135,10 @@ export function OverviewView({
   overviewKanjiLevelProgress,
   overviewBlocksLoading,
   mistakes,
+  minigamePerf,
   hasAnyActivity,
   hasMistakeData,
+  hasMinigamePerfData,
   charMasteryExpanded,
   expandedBlocks,
   overviewSectionExpanded,
@@ -654,6 +666,48 @@ export function OverviewView({
                     <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`rate-${row.key}-${row.error_rate}`} className="live-value">{row.error_rate}%</strong> error rate</span>
                     <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`mistakes-${row.key}-${row.mistakes}`} className="live-value">{row.mistakes}</strong> mistakes</span>
                     <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`attempts-${row.key}-${row.attempts}`} className="live-value">{row.attempts}</strong> attempts</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── Minigame Performance ─────────────────────────────────────────── */}
+      <section className="panel-glass mistakes-summary-panel overview-collapsible-panel">
+        <button
+          type="button"
+          className="overview-panel-toggle"
+          onClick={() => onToggleSection('minigamePerformance')}
+          aria-expanded={overviewSectionExpanded.minigamePerformance}
+          aria-controls="overview-minigame-performance-body"
+        >
+          <div className="panel-head">
+            <h2 className="panel-title-with-icon"><PlayCircle aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Minigame Performance</h2>
+            <div className="panel-actions">
+              <span>Accuracy and attempts per game type</span>
+            </div>
+            <span className={`overview-panel-chevron ${overviewSectionExpanded.minigamePerformance ? 'is-open' : ''}`} aria-hidden="true">▾</span>
+          </div>
+        </button>
+
+        <div id="overview-minigame-performance-body" className={`overview-panel-body ${overviewSectionExpanded.minigamePerformance ? 'is-open' : ''}`}>
+          {!hasMinigamePerfData ? (
+            <p className="status-line">No minigame data yet. Play some minigames to see performance breakdowns here.</p>
+          ) : (
+            <div className="mistake-grid">
+              {minigamePerf.map((row, index) => (
+                <article
+                  key={row.minigame}
+                  className="mistake-card"
+                  style={{ animationDelay: `${140 + index * 60}ms` }}
+                >
+                  <h3>{row.minigame.replace(/_/g, ' ')}</h3>
+                  <div className="mistake-card-metrics">
+                    <span className="metric-accent-danger"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`acc-${row.minigame}-${row.accuracy}`} className="live-value">{row.accuracy}%</strong> accuracy</span>
+                    <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`att-${row.minigame}-${row.attempts}`} className="live-value">{row.attempts}</strong> attempts</span>
+                    <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`cor-${row.minigame}-${row.correct}`} className="live-value">{row.correct}</strong> correct</span>
                   </div>
                 </article>
               ))}

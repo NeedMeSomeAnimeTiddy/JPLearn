@@ -74,6 +74,7 @@ const baseDesktopApi = {
       month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
     },
     mistakes: [],
+    minigame_performance: [],
     item_history: [],
     curriculum: emptyCurriculumStub,
   }),

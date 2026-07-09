@@ -14,7 +14,7 @@ from domain.activity import ActivitySummary, DailyCount
 from domain.assistant import AssistantEvent, AssistantEventPriority, AssistantMood, AssistantState
 from domain.history import ItemHistoryEvent, RawItemHistoryBucket
 from domain.leech import evaluate_leech_state
-from domain.mistakes import MistakeBreakdownRow
+from domain.mistakes import MistakeBreakdownRow, MinigamePerformanceRow
 from domain.scheduler import ReviewState
 from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState
@@ -1354,6 +1354,40 @@ def load_mistake_breakdown(limit: int = 6) -> list[MistakeBreakdownRow]:
                 attempts=attempts,
                 mistakes=mistakes,
                 error_rate=error_rate,
+            )
+        )
+    return breakdown
+
+
+def load_minigame_breakdown() -> list[MinigamePerformanceRow]:
+    """Return performance metrics grouped by minigame type from review events."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                tags_csv,
+                COUNT(*) AS attempts,
+                SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct
+            FROM review_events
+            WHERE tags_csv LIKE 'minigame,%'
+            GROUP BY tags_csv
+            ORDER BY attempts DESC
+            """,
+        ).fetchall()
+
+    breakdown: list[MinigamePerformanceRow] = []
+    for row in rows:
+        tags_csv = str(row["tags_csv"] or "")
+        minigame_name = tags_csv.split(",", 1)[1] if "," in tags_csv else tags_csv
+        attempts = int(row["attempts"] or 0)
+        correct = int(row["correct"] or 0)
+        accuracy = round((correct / attempts) * 100) if attempts > 0 else 0
+        breakdown.append(
+            MinigamePerformanceRow(
+                minigame=minigame_name,
+                attempts=attempts,
+                correct=correct,
+                accuracy=accuracy,
             )
         )
     return breakdown

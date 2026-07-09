@@ -42,51 +42,10 @@
   mix-blend-mode: normal;
 }
 
-.app-shell:not([data-background-style='classic_scene'])::before {
-  background-image: var(--background-image);
-  background-position: center center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  opacity: 0.98;
-  transform: scale(1.015);
-  filter: blur(var(--background-blur, 4px)) saturate(108%) brightness(0.98);
-  animation: none;
-}
-
-.app-shell:not([data-background-style='classic_scene'])::after {
-  background:
-    linear-gradient(180deg, rgba(116, 186, 231, 0.06) 0%, rgba(255, 255, 255, 0.02) 28%, rgba(112, 167, 96, 0.2) 58%, rgba(16, 35, 18, 0.44) 100%),
-    radial-gradient(circle at 78% 18%, rgba(255, 244, 184, 0.32) 0 8%, transparent 14%),
-    radial-gradient(circle at 50% 64%, transparent 42%, rgba(0, 0, 0, 0.16) 100%);
-  opacity: 1;
-}
-
-.app-shell:not([data-background-style='classic_scene']) {
-  background: linear-gradient(180deg, rgba(13, 22, 32, 0.16), rgba(8, 14, 20, 0.22));
-}
-
-.app-shell[data-background-style='classic_scene'] {
-  background: linear-gradient(180deg, var(--bg-subtle), var(--bg-main));
-}
-
-.app-shell[data-background-style='classic_scene']::before {
-  background: transparent;
-  opacity: 0;
-  transform: none;
-  filter: none;
-  animation: none;
-}
-
-.app-shell[data-background-style='classic_scene']::after {
-  background: transparent;
-  opacity: 0;
-  animation: none;
-}
-
-/* Lofi Dusk — cozy ambient lamp glow + vignette on the default background.
-   Scoped to the lofi themes so other presets keep their flat classic scene. */
-html[data-theme='lofi_dusk'] .app-shell[data-background-style='classic_scene']::before,
-html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_scene']::before {
+/* Lofi Dusk — cozy ambient lamp glow + vignette.
+   Always visible now that background feature is removed. */
+html[data-theme='lofi_dusk'] .app-shell::before,
+html[data-theme='lofi_dusk_light'] .app-shell::before {
   background:
     radial-gradient(115% 85% at 84% 6%, var(--blob-top) 0%, transparent 44%),
     radial-gradient(95% 80% at 10% 102%, var(--blob-left) 0%, transparent 52%),
@@ -97,13 +56,13 @@ html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_sce
   animation: none;
 }
 
-html[data-theme='lofi_dusk'] .app-shell[data-background-style='classic_scene']::after {
+html[data-theme='lofi_dusk'] .app-shell::after {
   background: radial-gradient(150% 120% at 50% -8%, transparent 56%, rgba(0, 0, 0, 0.40) 100%);
   opacity: 1;
   animation: none;
 }
 
-html[data-theme='lofi_dusk_light'] .app-shell[data-background-style='classic_scene']::after {
+html[data-theme='lofi_dusk_light'] .app-shell::after {
   background: radial-gradient(150% 120% at 50% -8%, transparent 60%, color-mix(in oklab, var(--text-main) 18%, transparent) 100%);
   opacity: 1;
   animation: none;
@@ -9624,12 +9583,6 @@ html[data-reduced-motion='true'] .cassette-reel {
   font-size: 0.76rem;
 }
 
-.settings-background-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
 .settings-icon-entry {
   appearance: none;
   display: inline-flex;
@@ -9668,58 +9621,6 @@ html[data-reduced-motion='true'] .cassette-reel {
 
 .settings-theme-entry {
   width: 100%;
-}
-
-.settings-background-entry {
-  width: 100%;
-  align-items: stretch;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  contain: layout paint;
-}
-
-.settings-background-preview {
-  position: relative;
-  height: 68px;
-  width: 100%;
-  border-radius: 2px;
-  overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 92%, transparent);
-  content-visibility: auto;
-  contain: paint;
-}
-
-.settings-background-preview-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  user-select: none;
-  pointer-events: none;
-}
-
-.settings-background-preview::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.16));
-}
-
-.settings-background-preview.is-classic {
-  background: linear-gradient(180deg, var(--bg-subtle), var(--bg-main));
-}
-
-.settings-background-preview.is-classic::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.12));
-}
-
-.settings-background-copy {
-  display: grid;
-  gap: 2px;
 }
 
 /* ── Page loading overlay ─────────────────────────────────────── */
@@ -9834,39 +9735,6 @@ html[data-reduced-motion='true'] .cassette-reel {
 @keyframes page-eq-bounce {
   0% { transform: scaleY(0.4); }
   100% { transform: scaleY(1); }
-}
-
-.settings-background-note {
-  color: var(--text-soft);
-  font-size: 0.72rem;
-  line-height: 1.3;
-}
-
-.settings-background-slider {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.settings-background-slider-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.settings-background-slider-head span:first-child {
-  color: var(--text-soft);
-  font-size: 0.74rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: 700;
-}
-
-.settings-background-slider-head span:last-child {
-  color: var(--text-main);
-  font-size: 0.78rem;
-  font-weight: 700;
 }
 
 .settings-range {

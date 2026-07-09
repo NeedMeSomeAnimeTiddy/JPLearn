@@ -32,8 +32,6 @@ import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
 import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/theme/types'
 import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme, resolveThemeMode } from './features/theme/utils'
-import { useBackground, BackgroundSettingsTab, clampBackgroundBlur, normalizeCustomBackgroundDataUrl, isBackgroundStyle, BACKGROUND_BLUR_DEFAULT, type BackgroundSettingsFields } from './features/background'
-import type { BackgroundStyle } from './features/background'
 import { useVoice, splitSpeechSegments, VoiceSettingsTab, DEFAULT_VOICE_SPEED, type VoiceSettingsFields } from './features/voice'
 import { useModels } from './features/models'
 import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, type TutorSettingsFields } from './features/tutor'
@@ -139,10 +137,6 @@ interface AppSettings {
   activeCustomThemeId: string | null
   customThemes: CustomTheme[]
   motionStyle: AnimationStyle
-  backgroundStyle: BackgroundStyle
-  backgroundBlur: number
-  customBackgroundDataUrl: string | null
-  customBackgroundName: string | null
   assistantToastLimit: 0 | 1
   assistantChatEnabled: boolean
   assistantChatAudioEnabled: boolean
@@ -251,7 +245,7 @@ interface StudyPlanSnapshot {
 
 type StatsByScript = Record<ScriptKey, ScriptStats>
 type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
-type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'deckSnapshot'
+type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot'
 
 const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples'] as const
 
@@ -621,10 +615,6 @@ function defaultSettings(): AppSettings {
     activeCustomThemeId: null,
     customThemes: [],
     motionStyle: 'glide',
-    backgroundStyle: 'classic_scene',
-    backgroundBlur: BACKGROUND_BLUR_DEFAULT,
-    customBackgroundDataUrl: null,
-    customBackgroundName: null,
     assistantToastLimit: 1,
     assistantChatEnabled: true,
     assistantChatAudioEnabled: true,
@@ -695,15 +685,6 @@ function loadSettings(): AppSettings {
       }
     }
 
-    const normalizedCustomBackgroundDataUrl = normalizeCustomBackgroundDataUrl(parsed.customBackgroundDataUrl)
-    const normalizedCustomBackgroundName = typeof parsed.customBackgroundName === 'string' && parsed.customBackgroundName.trim()
-      ? parsed.customBackgroundName.trim().slice(0, 120)
-      : null
-    const normalizedBackgroundStyle = isBackgroundStyle(parsed.backgroundStyle) ? parsed.backgroundStyle : defaults.backgroundStyle
-    const resolvedBackgroundStyle = normalizedBackgroundStyle === 'custom_upload' && !normalizedCustomBackgroundDataUrl
-      ? defaults.backgroundStyle
-      : normalizedBackgroundStyle
-
     return {
       ...defaults,
       ...parsed,
@@ -713,10 +694,6 @@ function loadSettings(): AppSettings {
       themeScope: normalizedThemeScope,
       activeCustomThemeId: normalizedActiveCustomThemeId,
       customThemes,
-      backgroundStyle: resolvedBackgroundStyle,
-      backgroundBlur: typeof parsed.backgroundBlur === 'number' ? clampBackgroundBlur(parsed.backgroundBlur) : defaults.backgroundBlur,
-      customBackgroundDataUrl: normalizedCustomBackgroundDataUrl,
-      customBackgroundName: normalizedCustomBackgroundName,
       assistantToastLimit: isAssistantToastLimit(parsed.assistantToastLimit)
         ? parsed.assistantToastLimit
         : defaults.assistantToastLimit,
@@ -1695,6 +1672,7 @@ function App() {
   const [overviewSectionExpanded, setOverviewSectionExpanded] = useState<Record<OverviewSectionKey, boolean>>({
     studyActivity: false,
     mistakeBreakdown: false,
+    minigamePerformance: false,
     deckSnapshot: false,
   })
 
@@ -1740,10 +1718,6 @@ function App() {
     setCollapsedSettingsSections,
   )
   const { toggleThemeSectionCollapsed } = theme
-  const background = useBackground(
-    settings as BackgroundSettingsFields,
-    setSettings as unknown as Dispatch<SetStateAction<BackgroundSettingsFields>>,
-  )
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const commandPalette = useCommandPalette()
 
@@ -4304,6 +4278,7 @@ function App() {
     [summary],
   )
   const mistakes = useMemo(() => summary?.mistakes ?? [], [summary])
+  const minigamePerf = useMemo(() => summary?.minigame_performance ?? [], [summary])
   const studyPlan = useMemo(
     () => buildStudyPlan(decks, kanjiLevelProgress, vocabLevelProgress, activity, streak.current_days),
     [activity, decks, kanjiLevelProgress, streak.current_days, vocabLevelProgress],
@@ -4380,6 +4355,7 @@ function App() {
   }, [sessionActive, sessionRounds, activeBlockCards, cardScores, activeScript])
   const hasAnyActivity = activity.week.reviewed > 0 || activity.month.reviewed > 0
   const hasMistakeData = mistakes.length > 0
+  const hasMinigamePerfData = minigamePerf.length > 0
 
   useEffect(() => {
     if (activeScript !== 'kanji_n5' || blockProgress.length > 0) return
@@ -4867,7 +4843,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell" data-background-style={settings.backgroundStyle} style={background.appShellStyle}>
+    <main className="app-shell">
       <header className="window-titlebar" aria-label="Window controls">
         <div className="window-titlebar-drag">
           <div className="window-titlebar-nav" role="group" aria-label="App navigation">
@@ -5685,8 +5661,10 @@ function App() {
               overviewKanjiLevelProgress={overviewKanjiLevelProgress}
               overviewBlocksLoading={overviewBlocksLoading}
               mistakes={mistakes}
+              minigamePerf={minigamePerf}
               hasAnyActivity={hasAnyActivity}
               hasMistakeData={hasMistakeData}
+              hasMinigamePerfData={hasMinigamePerfData}
               charMasteryExpanded={charMasteryExpanded}
               expandedBlocks={expandedBlocks}
               overviewSectionExpanded={overviewSectionExpanded}
@@ -5792,18 +5770,6 @@ function App() {
                     settings={settings}
                     collapsedSettingsSections={collapsedSettingsSections}
                   />
-                </SettingsCollapsibleSection>
-
-                <SettingsCollapsibleSection
-                  id="background"
-                  title="Background"
-                  description="Wallpaper and background image settings."
-                  collapsed={Boolean(collapsedSettingsSections['background'])}
-                  onToggle={() => toggleThemeSectionCollapsed('background')}
-                  className="settings-theme-card"
-                  hideChevron
-                >
-                  <BackgroundSettingsTab background={background} />
                 </SettingsCollapsibleSection>
 
 

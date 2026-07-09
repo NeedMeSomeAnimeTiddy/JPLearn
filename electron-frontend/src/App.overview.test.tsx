@@ -85,6 +85,7 @@ describe('Overview activity panel', () => {
           month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
         },
         mistakes: [],
+        minigame_performance: [],
         item_history: [],
         curriculum: {
           particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
@@ -135,6 +136,7 @@ describe('Overview activity panel', () => {
           month: { days: 30, reviewed: 38, correct: 28, incorrect: 10, accuracy: 74, points_earned: 28, active_days: 12 },
         },
         mistakes: [],
+        minigame_performance: [],
         item_history: [],
         curriculum: {
           particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 12, accuracy: 75, accuracy_7d: 67, stage_distribution: { 1: 4, 2: 5, 3: 3 } },
@@ -188,6 +190,7 @@ describe('Overview activity panel', () => {
           month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
         },
         mistakes: [],
+        minigame_performance: [],
         item_history: [],
         curriculum: {
           particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
