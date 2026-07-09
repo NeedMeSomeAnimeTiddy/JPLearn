@@ -8005,20 +8005,20 @@ html[data-reduced-motion='true'] .cassette-reel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 20px 0 8px;
+  gap: 10px;
+  padding: 12px 0 6px;
 }
 
 .game-listen-play-button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 28px;
+  padding: 8px 22px;
   border: 2px solid color-mix(in oklab, var(--tone-ocean) 60%, var(--card-border));
   border-radius: 0;
   background: color-mix(in oklab, var(--tone-ocean) 22%, transparent);
   color: var(--text-main);
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -8045,25 +8045,28 @@ html[data-reduced-motion='true'] .cassette-reel {
 }
 
 .game-listen-reveal {
-  font-size: clamp(1.8rem, 7vw, 3.2rem);
-  visibility: hidden;
+  font-size: clamp(1.2rem, 4.5vw, 2.2rem);
+  filter: blur(14px);
+  opacity: 0.3;
+  transition: filter 0.35s ease, opacity 0.35s ease;
 }
 
 .game-listen-reveal.is-revealed {
-  visibility: visible;
+  filter: blur(0);
+  opacity: 1;
   animation: listen-reveal 0.25s ease forwards;
 }
 
 .game-listen-reveal.is-size-md {
-  font-size: clamp(1.28rem, 4.8vw, 2.2rem);
+  font-size: clamp(1rem, 3.6vw, 1.6rem);
 }
 
 .game-listen-reveal.is-size-sm {
-  font-size: clamp(1.12rem, 4.2vw, 1.85rem);
+  font-size: clamp(0.92rem, 3.2vw, 1.4rem);
 }
 
 .game-listen-reveal.is-size-xs {
-  font-size: clamp(0.96rem, 3.6vw, 1.55rem);
+  font-size: clamp(0.82rem, 2.8vw, 1.15rem);
 }
 
 @keyframes listen-reveal {
@@ -8074,6 +8077,13 @@ html[data-reduced-motion='true'] .cassette-reel {
 @media (prefers-reduced-motion: reduce) {
   .game-listen-reveal {
     animation: none;
+    filter: blur(14px);
+    opacity: 0.3;
+    transition: none;
+  }
+
+  .game-listen-reveal.is-revealed {
+    filter: none;
     opacity: 1;
   }
 }

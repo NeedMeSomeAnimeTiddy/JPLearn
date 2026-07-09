@@ -928,14 +928,12 @@ describe('Minigame menu', () => {
     clickTilePrimaryAction(audioTiles[0])
 
     // Play audio prompt button must be present (it replaces the character display)
-    await screen.findByRole('button', { name: /play audio prompt/i })
+    await screen.findByRole('button', { name: /replay audio/i })
 
-    // Character text must NOT appear in the prompt-main area before answer
-    const promptMainWithChar = screen.queryByText((content, node) => {
-      if (!node || !node.classList.contains('game-prompt-main')) return false
-      return ['あ', 'い', 'う', 'え'].some((c) => content.includes(c))
-    })
-    expect(promptMainWithChar).toBeNull()
+    // Reveal element must exist in blurred state (not yet revealed)
+    const revealEl = document.querySelector('.game-listen-reveal')
+    expect(revealEl).not.toBeNull()
+    expect(revealEl?.classList.contains('is-revealed')).toBe(false)
 
     // Select the first option to submit an answer
     const optionGrid = document.querySelector('.option-grid')!
@@ -947,10 +945,11 @@ describe('Minigame menu', () => {
       minigame: 'listening_audio_first',
     }))
 
-    // Character must be revealed in feedback (inside game-prompt-main via reveal text)
+    // Character must be revealed after answering
     await waitFor(() => {
-      const promptMain = document.querySelector('.game-prompt-main')
-      expect(promptMain?.textContent).toMatch(/[あいうえ]/)
+      const revealed = document.querySelector('.game-listen-reveal.is-revealed')
+      expect(revealed).not.toBeNull()
+      expect(revealed?.textContent).toMatch(/[あいうえ]/)
     })
   })
 
@@ -973,14 +972,12 @@ describe('Minigame menu', () => {
     clickTilePrimaryAction(dictationTiles[0])
 
     // Play audio prompt button must be present (it replaces the character display)
-    await screen.findByRole('button', { name: /play audio prompt/i })
+    await screen.findByRole('button', { name: /replay audio/i })
 
-    // Character text must NOT appear in the prompt-main area before answer
-    const promptMainWithChar = screen.queryByText((content, node) => {
-      if (!node || !node.classList.contains('game-prompt-main')) return false
-      return ['あ', 'い', 'う', 'え'].some((c) => content.includes(c))
-    })
-    expect(promptMainWithChar).toBeNull()
+    // Reveal element must exist in blurred state (not yet revealed)
+    const revealEl = document.querySelector('.game-listen-reveal')
+    expect(revealEl).not.toBeNull()
+    expect(revealEl?.classList.contains('is-revealed')).toBe(false)
 
     // Type the kana sequence in the text input (multi-character: あい for ai)
     const dictationInput = await screen.findByPlaceholderText(/auto-converts/i)
@@ -992,10 +989,11 @@ describe('Minigame menu', () => {
       minigame: 'dictation',
     }))
 
-    // Character must be revealed in feedback (inside game-prompt-main via reveal text)
+    // Character must be revealed after answering
     await waitFor(() => {
-      const promptMain = document.querySelector('.game-prompt-main')
-      expect(promptMain?.textContent).toMatch(/[あいうえ]/)
+      const revealed = document.querySelector('.game-listen-reveal.is-revealed')
+      expect(revealed).not.toBeNull()
+      expect(revealed?.textContent).toMatch(/[あいうえ]/)
     })
   })
 

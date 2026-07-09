@@ -43,6 +43,8 @@ export function ChallengePromptCard({
 }: ChallengePromptCardProps) {
   const showWordAudioButton =
     roundState.mode !== 'listening_audio_first' && roundState.mode !== 'dictation' && roundState.mode !== 'sentence_assembly' && voiceEnabled && Boolean(roundState.audioText)
+  const showListenAudioButton =
+    (roundState.mode === 'listening_audio_first' || roundState.mode === 'dictation') && voiceEnabled && Boolean(roundState.audioText)
   const sizeClass = promptSizeClass(roundState.focusText)
   const promptClassName = [
     'game-prompt-main',
@@ -87,35 +89,30 @@ export function ChallengePromptCard({
             <Volume2 size={18} aria-hidden="true" />
           </button>
         ) : null}
+        {showListenAudioButton ? (
+          <button
+            type="button"
+            className="game-speak-icon-button"
+            onClick={() => onPlayAudio(roundState.audioText)}
+            disabled={voiceBusy}
+            aria-label="Replay audio"
+            title={voiceUnavailable ? 'Voice playback unavailable' : showKeyboardPrompts ? 'Replay audio (P)' : 'Replay audio'}
+          >
+            <Volume2 size={18} aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
       {roundState.mode === 'listening_audio_first' || roundState.mode === 'dictation' ? (
         <div className="game-listen-prompt">
-          <button
-            type="button"
-            className="game-listen-play-button"
-            onClick={() => onPlayAudio(roundState.audioText)}
-            disabled={voiceBusy || !voiceEnabled}
-            aria-label="Play audio prompt"
-            title={voiceUnavailable ? 'Voice playback unavailable' : showKeyboardPrompts ? 'Replay audio (P)' : 'Replay audio'}
-          >
-            <Volume2 size={28} aria-hidden="true" />
-            <span>
-              {voiceBusy
-                ? 'Loading…'
-                : voiceUnavailable
-                  ? 'Voice unavailable'
-                  : 'Replay audio'}
-            </span>
-          </button>
           {effectiveReading ? (
-            <ruby className={`${revealClassName}${showRevealText ? ' is-revealed' : ''}`} style={{ textAlign: 'left' }}>
+            <ruby className={`${revealClassName}${showRevealText ? ' is-revealed' : ''}`} aria-hidden={!showRevealText} style={{ textAlign: 'left' }}>
               {promptContent}
               <rp>(</rp>
               <rt>{effectiveReading}</rt>
               <rp>)</rp>
             </ruby>
           ) : (
-            <p className={`${revealClassName}${showRevealText ? ' is-revealed' : ''}`} style={{ textAlign: 'left' }}>
+            <p className={`${revealClassName}${showRevealText ? ' is-revealed' : ''}`} aria-hidden={!showRevealText} style={{ textAlign: 'left' }}>
               <TypeAnimation key={`reveal-${roundState.focusText}`} sequence={[roundState.focusText]} speed={5} cursor={false} style={{ display: 'inline' }} />
             </p>
           )}
