@@ -60,7 +60,8 @@ MIGRATION_V8 = 8
 MIGRATION_V9 = 9
 MIGRATION_V10 = 10
 MIGRATION_V11 = 11
-LATEST_SCHEMA_VERSION = 11
+MIGRATION_V12 = 12
+LATEST_SCHEMA_VERSION = 12
 _SQLITE_IN_CHUNK_SIZE = 900
 
 StageDistribution: TypeAlias = dict[int, int]
@@ -245,11 +246,13 @@ def _migration_0001(conn: sqlite3.Connection) -> None:
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS streak_state (
-            id                   INTEGER PRIMARY KEY CHECK (id = 1),
-            last_study_day_utc   TEXT,
-            last_study_day_local TEXT,
-            current_streak_days  INTEGER NOT NULL DEFAULT 0,
-            best_streak_days     INTEGER NOT NULL DEFAULT 0
+            id                        INTEGER PRIMARY KEY CHECK (id = 1),
+            last_study_day_utc        TEXT,
+            last_study_day_local      TEXT,
+            current_streak_days       INTEGER NOT NULL DEFAULT 0,
+            best_streak_days          INTEGER NOT NULL DEFAULT 0,
+            freezes_available         INTEGER NOT NULL DEFAULT 0,
+            last_freeze_granted_local TEXT
         )
     """)
     conn.execute("""
@@ -517,6 +520,31 @@ def _migration_0011(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE review_states ADD COLUMN last_review TEXT")
 
 
+def _migration_0012(conn: sqlite3.Connection) -> None:
+    """Add streak freeze columns to streak_state."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS streak_state (
+            id                        INTEGER PRIMARY KEY CHECK (id = 1),
+            last_study_day_utc        TEXT,
+            last_study_day_local      TEXT,
+            current_streak_days       INTEGER NOT NULL DEFAULT 0,
+            best_streak_days          INTEGER NOT NULL DEFAULT 0,
+            freezes_available         INTEGER NOT NULL DEFAULT 0,
+            last_freeze_granted_local TEXT
+        )
+    """)
+    existing_columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(streak_state)").fetchall()
+    }
+    if "freezes_available" not in existing_columns:
+        conn.execute(
+            "ALTER TABLE streak_state ADD COLUMN freezes_available INTEGER NOT NULL DEFAULT 0"
+        )
+    if "last_freeze_granted_local" not in existing_columns:
+        conn.execute("ALTER TABLE streak_state ADD COLUMN last_freeze_granted_local TEXT")
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -529,6 +557,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V9: _migration_0009,
     MIGRATION_V10: _migration_0010,
     MIGRATION_V11: _migration_0011,
+    MIGRATION_V12: _migration_0012,
 }
 
 
@@ -1166,7 +1195,8 @@ def load_streak_state() -> StreakState:
     with _connect() as conn:
         row = conn.execute(
             """
-            SELECT last_study_day_utc, last_study_day_local, current_streak_days, best_streak_days
+            SELECT last_study_day_utc, last_study_day_local, current_streak_days, best_streak_days,
+                   freezes_available, last_freeze_granted_local
             FROM streak_state
             WHERE id=1
             """
@@ -1180,6 +1210,8 @@ def load_streak_state() -> StreakState:
         last_study_day_local=date.fromisoformat(row["last_study_day_local"]) if row["last_study_day_local"] else None,
         current_streak_days=row["current_streak_days"],
         best_streak_days=row["best_streak_days"],
+        freezes_available=row["freezes_available"],
+        last_freeze_granted_local=date.fromisoformat(row["last_freeze_granted_local"]) if row["last_freeze_granted_local"] else None,
     )
 
 
@@ -1188,19 +1220,24 @@ def save_streak_state(state: StreakState) -> None:
     with _connect() as conn:
         conn.execute(
             """
-            INSERT INTO streak_state (id, last_study_day_utc, last_study_day_local, current_streak_days, best_streak_days)
-            VALUES (1, ?, ?, ?, ?)
+            INSERT INTO streak_state (id, last_study_day_utc, last_study_day_local, current_streak_days, best_streak_days,
+                                      freezes_available, last_freeze_granted_local)
+            VALUES (1, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 last_study_day_utc=excluded.last_study_day_utc,
                 last_study_day_local=excluded.last_study_day_local,
                 current_streak_days=excluded.current_streak_days,
-                best_streak_days=excluded.best_streak_days
+                best_streak_days=excluded.best_streak_days,
+                freezes_available=excluded.freezes_available,
+                last_freeze_granted_local=excluded.last_freeze_granted_local
             """,
             (
                 state.last_study_day_utc.isoformat() if state.last_study_day_utc else None,
                 state.last_study_day_local.isoformat() if state.last_study_day_local else None,
                 state.current_streak_days,
                 state.best_streak_days,
+                state.freezes_available,
+                state.last_freeze_granted_local.isoformat() if state.last_freeze_granted_local else None,
             ),
         )
 

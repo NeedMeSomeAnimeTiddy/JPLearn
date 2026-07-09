@@ -23,7 +23,7 @@ import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode } from './utils'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Palette, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Square, Trash2, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minus, Palette, PlayCircle, Plus, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, X } from 'lucide-react'
 import './App.css'
 import { useTheme } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -4205,7 +4205,7 @@ function App() {
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
-    () => summary?.streak ?? { current_days: 0, best_days: 0 },
+    () => summary?.streak ?? { current_days: 0, best_days: 0, freezes_available: 0 },
     [summary],
   )
   const activity = useMemo(
@@ -5076,6 +5076,18 @@ function App() {
               <Flame className="titlebar-streak-icon" strokeWidth={2.1} aria-hidden="true" />
               <span className="titlebar-streak-value">{streak.current_days}</span>
             </button>
+            <button
+              type="button"
+              className="titlebar-streak-chip titlebar-streak-freeze-chip"
+              onClick={() => setStreakDetailsOpen((open) => !open)}
+              title={`${streak.freezes_available} streak freeze${streak.freezes_available === 1 ? '' : 's'}`}
+              aria-label={`${streak.freezes_available} streak freeze${streak.freezes_available === 1 ? '' : 's'}`}
+              aria-expanded={streakDetailsOpen}
+              aria-controls="titlebar-streak-details"
+            >
+              <Snowflake className="titlebar-streak-icon" strokeWidth={1.8} aria-hidden="true" />
+              <span className="titlebar-streak-value">{streak.freezes_available}</span>
+            </button>
             <div
               id="titlebar-streak-details"
               className={`titlebar-streak-details ${streakDetailsOpen ? 'is-open' : ''}`}
@@ -5090,6 +5102,16 @@ function App() {
                 {streak.current_days > 0
                   ? 'Keep it up — review something today!'
                   : 'Complete a session to start your streak.'}
+              </p>
+              <div className="titlebar-streak-details-divider" />
+              <p className="titlebar-streak-details-row">
+                <Snowflake className="titlebar-streak-details-freeze-icon" strokeWidth={1.8} aria-hidden="true" />
+                {streak.freezes_available > 0
+                  ? `${streak.freezes_available} freeze${streak.freezes_available === 1 ? '' : 's'} available`
+                  : 'No freezes — study this week to earn one!'}
+              </p>
+              <p className="titlebar-streak-details-tip">
+                Earn 1 freeze per week (max 3). Each missed day costs 1 freeze. If you have enough freezes, your streak stays alive.
               </p>
             </div>
           </div>

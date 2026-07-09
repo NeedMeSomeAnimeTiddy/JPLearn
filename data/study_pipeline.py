@@ -416,7 +416,10 @@ def review_card(
         confidence_score=confidence_score,
     )
     database.update_leech_state_for_card(deck_name, updated_state.card_id)
-    next_streak = apply_study_day(database.load_streak_state(), review_day_utc, review_day_local)
+    next_streak = apply_study_day(
+        database.load_streak_state(), review_day_utc, review_day_local,
+        grant_freeze=True,
+    )
     database.save_streak_state(next_streak)
     return updated_state
 

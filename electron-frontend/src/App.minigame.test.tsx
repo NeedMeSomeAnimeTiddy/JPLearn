@@ -149,7 +149,7 @@ const baseDesktopApi = {
   versions: { chrome: '0', electron: '0', node: '0' },
   getStudySummary: async () => ({
     decks: [],
-    streak: { current_days: 0, best_days: 0 },
+    streak: { current_days: 0, best_days: 0, freezes_available: 0 },
     activity: {
       week: { days: 7, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
       month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
@@ -290,7 +290,7 @@ function buildStudyPlanDesktopApi() {
     ...baseDesktopApi,
     getStudySummary: async () => ({
       decks: [],
-      streak: { current_days: 0, best_days: 0 },
+      streak: { current_days: 0, best_days: 0, freezes_available: 0 },
       activity: {
         week: { days: 7, reviewed: 2, correct: 2, incorrect: 0, accuracy: 100, points_earned: 2, active_days: 1 },
         month: { days: 30, reviewed: 4, correct: 4, incorrect: 0, accuracy: 100, points_earned: 4, active_days: 2 },

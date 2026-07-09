@@ -39,6 +39,7 @@ interface StudySummary {
   streak: {
     current_days: number
     best_days: number
+    freezes_available: number
   }
   activity: {
     week: {

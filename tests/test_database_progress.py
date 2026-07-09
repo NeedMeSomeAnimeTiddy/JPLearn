@@ -104,6 +104,8 @@ def test_streak_state_defaults_when_missing(tmp_path: Path, monkeypatch) -> None
     assert streak.best_streak_days == 0
     assert streak.last_study_day_utc is None
     assert streak.last_study_day_local is None
+    assert streak.freezes_available == 0
+    assert streak.last_freeze_granted_local is None
 
 
 def test_streak_state_persists_and_resets(tmp_path: Path, monkeypatch) -> None:
@@ -126,6 +128,27 @@ def test_streak_state_persists_and_resets(tmp_path: Path, monkeypatch) -> None:
     assert reset.best_streak_days == 0
     assert reset.last_study_day_utc is None
     assert reset.last_study_day_local is None
+    assert reset.freezes_available == 0
+    assert reset.last_freeze_granted_local is None
+
+
+def test_streak_freeze_roundtrip(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    state = StreakState(
+        last_study_day_utc=date(2026, 2, 14),
+        last_study_day_local=date(2026, 2, 14),
+        current_streak_days=5,
+        best_streak_days=9,
+        freezes_available=2,
+        last_freeze_granted_local=date(2026, 2, 9),
+    )
+    database.save_streak_state(state)
+
+    loaded = database.load_streak_state()
+    assert loaded == state
+    assert loaded.freezes_available == 2
+    assert loaded.last_freeze_granted_local == date(2026, 2, 9)
 
 
 def test_review_card_updates_streak_by_local_day(tmp_path: Path, monkeypatch) -> None:

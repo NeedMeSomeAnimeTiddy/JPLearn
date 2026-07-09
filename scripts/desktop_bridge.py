@@ -2508,6 +2508,7 @@ class DeckSummary:
 class StudyStreak:
     current_days: int
     best_days: int
+    freezes_available: int
 
 
 @dataclass(frozen=True)
@@ -2746,6 +2747,7 @@ def build_summary() -> dict[str, object]:
             StudyStreak(
                 current_days=streak.current_streak_days,
                 best_days=streak.best_streak_days,
+                freezes_available=streak.freezes_available,
             )
         ),
         "activity": {

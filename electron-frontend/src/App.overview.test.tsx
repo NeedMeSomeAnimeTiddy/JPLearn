@@ -79,7 +79,7 @@ describe('Overview activity panel', () => {
       ...baseDesktopApi,
       getStudySummary: async () => ({
         decks: [],
-        streak: { current_days: 0, best_days: 0 },
+        streak: { current_days: 0, best_days: 0, freezes_available: 0 },
         activity: {
           week: { days: 7, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
           month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
@@ -129,7 +129,7 @@ describe('Overview activity panel', () => {
       ...baseDesktopApi,
       getStudySummary: async () => ({
         decks: [],
-        streak: { current_days: 2, best_days: 5 },
+        streak: { current_days: 2, best_days: 5, freezes_available: 0 },
         activity: {
           week: { days: 7, reviewed: 11, correct: 8, incorrect: 3, accuracy: 73, points_earned: 8, active_days: 4 },
           month: { days: 30, reviewed: 38, correct: 28, incorrect: 10, accuracy: 74, points_earned: 28, active_days: 12 },
@@ -182,7 +182,7 @@ describe('Overview activity panel', () => {
       ...baseDesktopApi,
       getStudySummary: async () => ({
         decks: [],
-        streak: { current_days: 0, best_days: 0 },
+        streak: { current_days: 0, best_days: 0, freezes_available: 0 },
         activity: {
           week: { days: 7, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
           month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },

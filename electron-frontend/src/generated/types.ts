@@ -16,6 +16,7 @@ export interface DeckSummary {
 export interface StudyStreak {
   current_days: number
   best_days: number
+  freezes_available: number
 }
 
 export interface DictionaryCardSummary {
