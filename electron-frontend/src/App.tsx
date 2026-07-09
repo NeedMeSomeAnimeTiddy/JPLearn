@@ -5200,7 +5200,6 @@ function App() {
           navDirection={navDirection}
           studyPlan={studyPlan}
           learningPathStatus={learningPathStatus}
-          xpProgress={xpProgress}
           recommendations={recommendations.map((r) => ({
             nodeId: r.node_id,
             displayLabel: r.display_label,
