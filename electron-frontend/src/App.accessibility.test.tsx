@@ -3,11 +3,18 @@
  * Covers the app in onboarding state and post-onboarding home state.
  * Zero violations is the pass threshold.
  */
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 // axe-core ships as a CJS export = module; Vite handles interop at runtime.
 import axe from 'axe-core'
 import App from './App'
+
+vi.mock('react-type-animation', () => ({
+  TypeAnimation: ({ sequence, style, className }: { sequence: (string | number)[]; style?: React.CSSProperties; className?: string }) => {
+    const text = typeof sequence[0] === 'string' ? sequence[0] : ''
+    return <span className={className} style={style}>{text}</span>
+  },
+}))
 
 afterEach(() => {
   cleanup()

@@ -89,17 +89,3 @@ export function DownloadSummaryPage({
     </>
   )
 }
-
-export function needsAnyDownload(props: DownloadSummaryPageProps): boolean {
-  const { sysInfo, selectedTier, selectedVoiceTier, installFonts, installDictionary, selectedSpeechTier, selectedTranslationProfileTier } = props
-  const needsModel = selectedTier && selectedTier !== 'skip' && !sysInfo?.models.find((m) => m.tier === selectedTier)?.installed
-  const needsLlama = selectedTier && selectedTier !== 'skip' && !sysInfo?.llamaCppInstalled
-  const availableVoiceModels = sysInfo?.voiceModels ?? []
-  const needsVoice = selectedVoiceTier !== 'skip' && !availableVoiceModels.find((m) => m.tier === selectedVoiceTier)?.installed
-  const needsFonts = installFonts && !sysInfo?.fontsInstalled
-  const needsDictionary = installDictionary && !sysInfo?.dictionaryInstalled
-  const needsSpeech = selectedSpeechTier !== 'skip' && !sysInfo?.speechModels.find((m) => m.tier === selectedSpeechTier)?.installed
-  const needsTranslationProfile = selectedTranslationProfileTier !== 'skip'
-    && !sysInfo?.translationProfiles?.find((m) => m.tier === selectedTranslationProfileTier)?.installed
-  return !!(needsModel || needsLlama || needsVoice || needsFonts || needsDictionary || needsSpeech || needsTranslationProfile)
-}

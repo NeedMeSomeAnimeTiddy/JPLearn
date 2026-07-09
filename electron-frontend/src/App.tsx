@@ -3573,8 +3573,7 @@ function App() {
         setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
       }
     } catch (error: unknown) {
-      setSessionActive(false)
-      setRoundState(null)
+      resetSessionCore()
       setGameError(error instanceof Error ? error.message : 'Unable to start session.')
       setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session.')
     } finally {
@@ -3692,8 +3691,7 @@ function App() {
       ? null
       : await buildRoundWithBridge(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
     if (!candidate) {
-      setRoundState(null)
-      setSessionActive(false)
+      resetSessionCore()
       return
     }
 
@@ -4427,23 +4425,13 @@ function App() {
       setCardScores(emptyScores)
       setScriptStats(emptyStats)
       setMinigameStats(defaultMinigameStatsByScript())
-      setSessionActive(false)
-      setRoundState(null)
-      setRoundInput('')
-      setRoundFeedback(null)
-      setRoundFeedbackTone(null)
-      setRoundFeedbackPoints(null)
-      setRoundFeedbackAnswer(null)
-      setIsRoundResolving(false)
+      resetSessionFull()
       setSessionStartPending(false)
       setSessionSummaryLoading(false)
-      setSessionGoalError(null)
       setLastSessionSummary(null)
       setSessionRunReport(null)
       setActiveSessionId(null)
       setGameError(null)
-      setLivesRemaining(DEFAULT_LIVES)
-      resetRoundCycle()
       setShowSettings(false)
       setShowOverview(false)
       setShortcutMenuOpen(false)

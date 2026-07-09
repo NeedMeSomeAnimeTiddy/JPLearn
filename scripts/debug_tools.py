@@ -5,8 +5,10 @@ import json
 import sqlite3
 import subprocess
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Generator
 from typing import cast
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -178,11 +180,15 @@ def print_checks(args: argparse.Namespace) -> int:
     return overall
 
 
-def _connect_progress_db() -> sqlite3.Connection:
+@contextmanager
+def _connect_progress_db() -> Generator[sqlite3.Connection, None, None]:
     database.init_db()
     conn = sqlite3.connect(database.DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def _load_queue_diagnostics(conn: sqlite3.Connection) -> list[dict[str, object]]:

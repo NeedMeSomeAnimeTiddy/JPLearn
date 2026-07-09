@@ -247,6 +247,7 @@ export function VoiceSettingsTab({
           <p className="settings-section-label">Voice</p>
           <div className="settings-animation-grid" role="group" aria-label="Japanese voice controls">
             <button
+              key="voice-toggle"
               type="button"
               className={`settings-icon-entry settings-theme-entry ${settings.voiceEnabled ? 'is-active' : ''}`}
               onClick={() => setSettings((prev) => ({ ...prev, voiceEnabled: !prev.voiceEnabled }))}
@@ -262,6 +263,7 @@ export function VoiceSettingsTab({
 
             {settings.ambientAudioEnabled !== undefined ? (
               <button
+                key="ambience-toggle"
                 type="button"
                 className={`settings-icon-entry settings-theme-entry ${settings.ambientAudioEnabled ? 'is-active' : ''}`}
                 onClick={() => setSettings((prev) => ({ ...prev, ambientAudioEnabled: !prev.ambientAudioEnabled }))}
