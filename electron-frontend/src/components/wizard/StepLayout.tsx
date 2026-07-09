@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
-import { useTypewriter } from '../useTypewriter'
+import { useTypewriter } from './useTypewriter'
 
 interface StepLayoutProps {
   title: string
@@ -13,8 +13,9 @@ interface StepLayoutProps {
   nextDisabled?: boolean
   hideNav?: boolean
   hideBack?: boolean
-  revealed: boolean
-  onReveal: () => void
+  enableTypewriter?: boolean
+  revealed?: boolean
+  onReveal?: () => void
 }
 
 export function StepLayout({
@@ -29,14 +30,18 @@ export function StepLayout({
   nextDisabled = false,
   hideNav = false,
   hideBack = false,
-  revealed,
+  enableTypewriter = false,
+  revealed = false,
   onReveal,
 }: StepLayoutProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
-  const displayedTitle = useTypewriter(title, onReveal)
+  const displayedTitle = useTypewriter(
+    enableTypewriter ? title : '',
+    enableTypewriter && onReveal ? onReveal : () => {},
+  )
 
   useLayoutEffect(() => {
-    if (revealed && title && wrapperRef.current) {
+    if (enableTypewriter && revealed && title && wrapperRef.current) {
       const el = wrapperRef.current
       el.style.opacity = '0'
       el.style.transform = 'translateY(24px)'
@@ -53,46 +58,44 @@ export function StepLayout({
         cancelAnimationFrame(raf2)
       }
     }
-  }, [revealed, title])
+  }, [enableTypewriter, revealed, title])
 
-  // Typing stage: centered title types out character by character
-  if (!revealed && title) {
+  if (enableTypewriter && !revealed && title) {
     return (
-      <div className="obn-step-body">
-        <div className="obn-reveal-stage">
-          <h1 className="obn-typed-title">{displayedTitle}</h1>
+      <div className="wiz-step-body">
+        <div className="wiz-reveal-stage">
+          <h1 className="wiz-typed-title">{displayedTitle}</h1>
         </div>
         {skipLabel && onSkip && (
-          <div className="obn-step-nav" style={{ justifyContent: 'center' }}>
-            <button type="button" onClick={onSkip} className="obn-btn obn-btn-ghost">{skipLabel}</button>
+          <div className="wiz-step-nav" style={{ justifyContent: 'center' }}>
+            <button type="button" onClick={onSkip} className="wiz-btn wiz-btn-ghost">{skipLabel}</button>
           </div>
         )}
       </div>
     )
   }
 
-  // Revealed stage: title stays, content transitions in
   return (
-    <div className="obn-step-body">
+    <div className="wiz-step-body">
       <div>
-        {title ? <h1 className="obn-step-title">{title}</h1> : null}
-        {subtitle && <p className="obn-step-subtitle">{subtitle}</p>}
+        {title ? <h1 className="wiz-step-title">{title}</h1> : null}
+        {subtitle && <p className="wiz-step-subtitle">{subtitle}</p>}
       </div>
-      <div className="obn-content-reveal" ref={wrapperRef}>
-        <div className="obn-step-content">
+      <div className="wiz-content-reveal" ref={wrapperRef}>
+        <div className="wiz-step-content">
           {children}
         </div>
         {!hideNav && (title !== '' || revealed) && (
-          <div className="obn-step-nav">
+          <div className="wiz-step-nav">
             {skipLabel && onSkip && (
-              <button type="button" onClick={onSkip} className="obn-btn obn-btn-ghost">{skipLabel}</button>
+              <button type="button" onClick={onSkip} className="wiz-btn wiz-btn-ghost">{skipLabel}</button>
             )}
-            <div className="obn-step-nav-spacer" />
+            <div className="wiz-step-nav-spacer" />
             {!hideBack && onBack && (
-              <button type="button" onClick={onBack} className="obn-btn obn-btn-secondary">Back</button>
+              <button type="button" onClick={onBack} className="wiz-btn wiz-btn-secondary">Back</button>
             )}
             {onNext && (
-              <button type="button" onClick={onNext} disabled={nextDisabled} className={`obn-btn obn-btn-primary${nextDisabled ? ' obn-btn-disabled' : ''}`}>
+              <button type="button" onClick={onNext} disabled={nextDisabled} className={`wiz-btn wiz-btn-primary${nextDisabled ? ' wiz-btn-disabled' : ''}`}>
                 {nextLabel}
               </button>
             )}

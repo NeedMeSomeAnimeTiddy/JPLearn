@@ -53,9 +53,9 @@ export function CompactDropdown({
         flexDirection: 'column',
         gap: '0.5rem',
         padding: '0.75rem',
-        borderRadius: '8px',
-        background: 'rgba(255,255,255,0.05)',
-        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: '0',
+        background: 'color-mix(in oklab, var(--panel-bg) 80%, white)',
+        border: '1px solid var(--panel-border)',
         position: 'relative',
       }}
     >
@@ -67,9 +67,9 @@ export function CompactDropdown({
         onClick={() => setOpen((current) => !current)}
         style={{
           width: '100%',
-          borderRadius: '8px',
-          border: '1px solid rgba(255,255,255,0.16)',
-          background: 'rgba(255,255,255,0.06)',
+          borderRadius: '0',
+          border: '1px solid var(--button-border)',
+          background: 'color-mix(in oklab, var(--panel-bg) 80%, white)',
           color: 'inherit',
           padding: '0.7rem 0.8rem',
           fontSize: '0.92rem',
@@ -109,9 +109,9 @@ export function CompactDropdown({
             flexDirection: 'column',
             gap: '0.25rem',
             padding: '0.4rem',
-            borderRadius: '10px',
-            background: 'rgba(18, 27, 37, 0.98)',
-            border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: '0',
+            background: 'color-mix(in oklab, var(--panel-bg) 95%, var(--bg-main))',
+            border: '1px solid var(--panel-border)',
             boxShadow: '0 18px 38px rgba(0,0,0,0.34)',
             backdropFilter: 'blur(10px)',
           }}
@@ -129,9 +129,9 @@ export function CompactDropdown({
                   setOpen(false)
                 }}
                 style={{
-                  borderRadius: '8px',
-                  border: isActive ? '1px solid rgba(255,255,255,0.18)' : '1px solid transparent',
-                  background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  borderRadius: '0',
+                  border: isActive ? '1px solid var(--panel-border)' : '1px solid transparent',
+                  background: isActive ? 'color-mix(in oklab, var(--accent) 12%, transparent)' : 'transparent',
                   color: 'inherit',
                   textAlign: 'left',
                   padding: '0.58rem 0.68rem',

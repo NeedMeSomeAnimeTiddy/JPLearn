@@ -7,7 +7,7 @@ export function DropdownBadge({ children, tone = 'recommended' }: { children: Re
         display: 'inline-flex',
         alignItems: 'center',
         padding: '0.12rem 0.42rem',
-        borderRadius: '999px',
+        borderRadius: '0',
         fontSize: '0.68rem',
         fontWeight: 700,
         letterSpacing: '0.02em',

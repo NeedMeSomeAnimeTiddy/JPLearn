@@ -1,0 +1,180 @@
+/* ── Setup Wizard Page Styles ─────────────────────────────────────────── */
+
+/* ── Progress Bars ──────────────────────────────────────────────────── */
+
+.setup-progress {
+  margin-bottom: 1rem;
+}
+
+.setup-progress-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.setup-progress-track {
+  height: 8px;
+  border-radius: 0;
+  background: var(--track-bg, rgba(255, 255, 255, 0.12));
+  overflow: hidden;
+}
+
+.setup-progress-fill {
+  height: 100%;
+  border-radius: 0;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+/* ── Activity Log ───────────────────────────────────────────────────── */
+
+.setup-log {
+  margin-top: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.setup-log-header {
+  padding: 0.55rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  opacity: 0.85;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.setup-log-body {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  opacity: 0.85;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+/* ── Error Banner ───────────────────────────────────────────────────── */
+
+.setup-error {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0;
+  background: rgba(255, 80, 80, 0.12);
+  border: 1px solid rgba(255, 80, 80, 0.35);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.setup-error-text {
+  color: var(--status-error);
+  line-height: 1.5;
+  font-size: 0.88rem;
+  min-width: 0;
+}
+
+/* ── Mode Selection Cards ───────────────────────────────────────────── */
+
+.setup-mode-grid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.setup-mode-card {
+  text-align: left;
+  padding: 0.9rem;
+  border-radius: 0;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 90%, var(--text-main));
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+
+.setup-mode-card:hover {
+  border-color: color-mix(in oklab, var(--accent) 40%, rgba(255, 255, 255, 0.14));
+  background: color-mix(in oklab, var(--accent) 5%, rgba(255, 255, 255, 0.05));
+  transform: translateY(-1px);
+}
+
+.setup-mode-card.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 22%, transparent) inset;
+}
+
+.setup-mode-card-title {
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.setup-mode-card-desc {
+  opacity: 0.75;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+/* ── Info Row ────────────────────────────────────────────────────────── */
+
+.setup-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.setup-info-label {
+  opacity: 0.7;
+}
+
+.setup-info-value {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ── System Check Network Row ───────────────────────────────────────── */
+
+.setup-network-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.setup-network-value {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* ── Refresh Button ──────────────────────────────────────────────────── */
+
+.setup-refresh-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  border-radius: 0;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.setup-refresh-btn:disabled {
+  cursor: wait;
+}

@@ -1,0 +1,203 @@
+/* ── Wizard Shell ──────────────────────────────────────────────────── */
+
+.wiz-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--bg-subtle), var(--bg-main));
+  color: var(--text-main);
+  font-family: inherit;
+  overflow: hidden;
+}
+
+.wiz-shell-dragbar {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  -webkit-app-region: drag;
+  app-region: drag;
+  position: relative;
+}
+
+.wiz-shell-dragbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  pointer-events: none;
+}
+
+.wiz-shell-title {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.68;
+  font-weight: 700;
+  user-select: none;
+  pointer-events: none;
+  padding-left: 0.9rem;
+}
+
+.wiz-viewport {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.4rem 1.25rem 1.4rem;
+}
+
+.wiz-card {
+  width: 100%;
+  max-width: 760px;
+  margin: 0;
+  padding: 2rem;
+}
+
+/* ── Step Dots ─────────────────────────────────────────────────────── */
+
+.wiz-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  padding: 0.75rem 1.25rem 0.2rem;
+}
+
+.wiz-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.25);
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1), background 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wiz-dot.is-active {
+  width: 20px;
+  background: var(--accent);
+}
+
+/* ── Step Layout ───────────────────────────────────────────────────── */
+
+.wiz-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.wiz-step-title {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.wiz-step-subtitle {
+  margin: 0.4rem 0 0;
+  opacity: 0.65;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.wiz-step-content {
+  flex: 1;
+}
+
+.wiz-step-nav-spacer {
+  flex: 1;
+}
+
+/* ── Typewriter Stage ──────────────────────────────────────────────── */
+
+.wiz-reveal-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 2rem 0;
+}
+
+.wiz-typed-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--text-main);
+  text-align: center;
+  display: inline-block;
+}
+
+.wiz-content-reveal {
+  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+
+/* ── Navigation ────────────────────────────────────────────────────── */
+
+.wiz-step-nav {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 0.5rem;
+  animation: wizNavIn 0.5s ease-out 0.05s both;
+}
+
+@keyframes wizNavIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+
+.wiz-btn {
+  padding: 0.5rem 1.25rem;
+  border-radius: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--button-border);
+  transition: opacity 0.15s, transform 0.12s ease;
+}
+
+.wiz-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.wiz-btn-primary {
+  background: var(--accent);
+  color: #0b1620;
+  border-color: var(--accent);
+}
+
+.wiz-btn-secondary {
+  background: color-mix(in oklab, var(--panel-bg) 80%, white);
+  color: var(--text-main);
+}
+
+.wiz-btn-ghost {
+  background: transparent;
+  color: var(--text-soft);
+  border-color: transparent;
+  padding: 0.5rem 0.75rem;
+}
+
+.wiz-btn-ghost:hover:not(:disabled) {
+  color: var(--text-main);
+}
+
+.wiz-btn-disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}

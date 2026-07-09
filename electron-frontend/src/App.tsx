@@ -667,7 +667,7 @@ function defaultSettings(): AppSettings {
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     fontSize: 'medium',
-    appFont: 'kiwi_maru',
+    appFont: 'system_ui',
     themeMode: 'dark',
     theme: 'lofi_dusk',
     themeScope: 'preset',
