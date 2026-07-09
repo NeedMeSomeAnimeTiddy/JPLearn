@@ -1316,6 +1316,9 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const { key, value } = validateConfigSetPayload(payload)
     await setConfigValue(key, value)
+    if (key === 'autoStartOnLogin') {
+      try { require('electron').app.setLoginItemSettings({ openAtLogin: value }) } catch { /* non-fatal */ }
+    }
     return { ok: true, key, value }
   })
 

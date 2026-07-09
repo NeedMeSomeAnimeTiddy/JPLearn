@@ -625,7 +625,7 @@ function validateAnalyticsExportType(type) {
   return type
 }
 
-const VALID_CONFIG_KEYS = new Set(['autoUpdateEnabled', 'closeBehavior'])
+const VALID_CONFIG_KEYS = new Set(['autoUpdateEnabled', 'closeBehavior', 'autoStartOnLogin'])
 
 function validateConfigKey(key) {
   if (typeof key !== 'string' || !VALID_CONFIG_KEYS.has(key)) {

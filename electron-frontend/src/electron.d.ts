@@ -403,11 +403,13 @@ interface DesktopApi {
   openInspectElement?: () => Promise<{ ok: boolean }>
   setStartupTheme: (theme: string) => Promise<{ ok: boolean; theme: string }>
   getConfigValue?: {
+    (key: 'autoStartOnLogin'): Promise<{ ok: boolean; key: string; value: boolean }>
     (key: 'autoUpdateEnabled'): Promise<{ ok: boolean; key: string; value: boolean }>
     (key: 'closeBehavior'): Promise<{ ok: boolean; key: string; value: string }>
     (key: string): Promise<{ ok: boolean; key: string; value: unknown }>
   }
   setConfigValue?: {
+    (key: 'autoStartOnLogin', value: boolean): Promise<{ ok: boolean; key: string; value: boolean }>
     (key: 'autoUpdateEnabled', value: boolean): Promise<{ ok: boolean; key: string; value: boolean }>
     (key: 'closeBehavior', value: string): Promise<{ ok: boolean; key: string; value: string }>
     (key: string, value: unknown): Promise<{ ok: boolean; key: string; value: unknown }>

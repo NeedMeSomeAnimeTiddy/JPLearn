@@ -2380,6 +2380,12 @@ app.whenReady().then(async () => {
     }
   } catch { /* non-fatal */ }
 
+  // Apply auto-start setting
+  try {
+    const autoStartOnLogin = await getConfigValue('autoStartOnLogin')
+    app.setLoginItemSettings({ openAtLogin: autoStartOnLogin })
+  } catch { /* non-fatal */ }
+
   void createWindowWithSplash()
 
   // Create system tray after window setup

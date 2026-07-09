@@ -1730,6 +1730,7 @@ function App() {
     'voicevox-runtime': true,
     'keyboard-shortcuts': true,
     'close-behavior': true,
+    'auto-start': true,
     'data-management': true,
   })
   const theme = useTheme(
@@ -4626,11 +4627,17 @@ function App() {
 
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const [closeBehavior, setCloseBehavior] = useState<'ask' | 'tray' | 'quit'>('ask')
+  const [autoStartOnLogin, setAutoStartOnLogin] = useState(false)
 
   useEffect(() => {
     void window.jplearnDesktop?.getConfigValue?.('closeBehavior')?.then((result) => {
       if (result && typeof result.value === 'string' && ['ask', 'tray', 'quit'].includes(result.value)) {
         setCloseBehavior(result.value as 'ask' | 'tray' | 'quit')
+      }
+    }).catch(() => { /* use default */ })
+    void window.jplearnDesktop?.getConfigValue?.('autoStartOnLogin')?.then((result) => {
+      if (result && typeof result.value === 'boolean') {
+        setAutoStartOnLogin(result.value)
       }
     }).catch(() => { /* use default */ })
   }, [])
@@ -6355,6 +6362,55 @@ function App() {
                           : closeBehavior === 'tray'
                             ? 'The window will hide to the system tray. The app keeps running.'
                             : 'The app will fully exit when you close the window.'}
+                      </p>
+                    </div>
+                  </div>
+                </SettingsCollapsibleSection>
+
+                <SettingsCollapsibleSection
+                  id="auto-start"
+                  title="Startup"
+                  description="Open JPLearn automatically when you log in to your computer."
+                  collapsed={Boolean(collapsedSettingsSections['auto-start'])}
+                  onToggle={() => toggleThemeSectionCollapsed('auto-start')}
+                  className="settings-theme-card"
+                  hideChevron
+                >
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <button type="button" className="settings-icon-tile" aria-label="Startup setting">
+                      <PlayCircle size={18} strokeWidth={2.1} />
+                    </button>
+                    <div className="settings-control-content">
+                      <p className="settings-section-label">Auto-start on login</p>
+                      <div className="settings-animation-grid" role="radiogroup" aria-label="Auto-start options">
+                        {([
+                          { key: true, label: 'On', desc: 'Start when you log in' },
+                          { key: false, label: 'Off', desc: 'Start manually only' },
+                        ]).map((opt) => (
+                          <button
+                            key={String(opt.key)}
+                            type="button"
+                            className={`settings-icon-entry settings-theme-entry ${autoStartOnLogin === opt.key ? 'is-active' : ''}`}
+                            onClick={() => {
+                              setAutoStartOnLogin(opt.key)
+                              void window.jplearnDesktop?.setConfigValue?.('autoStartOnLogin', opt.key)
+                            }}
+                            role="radio"
+                            aria-checked={autoStartOnLogin === opt.key}
+                            aria-label={`${opt.label}: ${opt.desc}`}
+                            title={opt.desc}
+                          >
+                            <span className={`settings-mode-icon-button ${autoStartOnLogin === opt.key ? 'is-enabled' : ''}`} aria-hidden="true">
+                              {opt.key ? <CheckCircle2 size={18} strokeWidth={2.25} /> : <Circle size={18} strokeWidth={2.25} />}
+                            </span>
+                            <span className="settings-icon-entry-label">{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="settings-help">
+                        {autoStartOnLogin
+                          ? 'JPLearn will launch automatically when you log in to your computer.'
+                          : 'JPLearn will only start when you open it manually.'}
                       </p>
                     </div>
                   </div>
