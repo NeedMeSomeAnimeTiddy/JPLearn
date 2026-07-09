@@ -421,6 +421,9 @@ interface DesktopApi {
     ease_factor: number
     confidence_score?: number | null
     curriculum_stage?: number | null
+    xp_gained?: number
+    level_before?: number
+    level_after?: number
   }>
   lookupSentence?: (payload: { query: string }) => Promise<{
     jp: string | null

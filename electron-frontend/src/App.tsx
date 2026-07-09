@@ -1719,6 +1719,7 @@ function App() {
   const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
+  const [xpToast, setXpToast] = useState<{ xp: number; newLevel?: number } | null>(null)
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
   const [warningModal, setWarningModal] = useState<{
@@ -3959,6 +3960,13 @@ function App() {
               ease_factor: result.ease_factor,
             })
           }
+          if (typeof result.xp_gained === 'number' && result.xp_gained > 0) {
+            const leveledUp = typeof result.level_after === 'number'
+              && typeof result.level_before === 'number'
+              && result.level_after > result.level_before
+            setXpToast({ xp: result.xp_gained, newLevel: leveledUp ? result.level_after : undefined })
+            setTimeout(() => setXpToast(null), 2500)
+          }
         } catch { /* background record — ignore */ }
       })()
 
@@ -5275,6 +5283,36 @@ function App() {
 
       {/* Keyboard shortcut cheatsheet */}
       <KeyboardCheatsheet isOpen={keyboardCheatsheetOpen} onClose={closeKeyboardCheatsheet} />
+
+      {/* XP gain toast */}
+      {xpToast ? (
+        <div
+          style={{
+            position: 'fixed',
+            top: '3rem',
+            left: '50%',
+            zIndex: 300,
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            className="xp-toast-inner"
+            style={{
+              background: 'color-mix(in oklab, var(--accent-soft) 18%, var(--panel-bg))',
+              border: '1px solid color-mix(in oklab, var(--accent) 42%, transparent)',
+              borderRadius: '999px',
+              padding: '6px 18px',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {xpToast.newLevel != null
+              ? <span><span style={{ fontSize: '1rem', marginRight: '6px' }}>{'\u2728'}</span>Level {xpToast.newLevel}! +{xpToast.xp} XP</span>
+              : <span>+{xpToast.xp} XP</span>}
+          </div>
+        </div>
+      ) : null}
 
       {/* Readiness warning modal — shown before navigating to a non-recommended section */}
       {warningModal && (
