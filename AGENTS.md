@@ -40,7 +40,7 @@ Important: `main.py` (the Python GUI) is **deprecated** — raises `RuntimeError
 - `write` — new file creation only. `edit` — modifying existing code only. Never use `write` to overwrite an existing file.
 - If unsure about anything — ask for clarification before assuming.
 - When using `compress`, explicitly preserve the current task, what's done, and what remains — don't let task context get lost.
-- **Plan files**: For any non-trivial planning phase, write a `plan.md` in the relevant directory (project root or alongside the work). This survives conversation compression. Delete after full execution unless there's reason to keep it. When starting implementation or any follow-up work, check for a `plan.md` in the relevant directory first and follow it.
+- **Plan files (orchestrator only)**: The main agent (you) should write a `plan.md` in the relevant directory for any non-trivial planning phase. This survives conversation compression. **Subagents must NOT write plan.md** — they don't have the `write` tool. Subagents use the `todo` tool for task tracking instead. When starting implementation or any follow-up work, check for a `plan.md` in the relevant directory first and follow it. Delete `plan.md` after full execution unless there's reason to keep it.
 
 ## Commands
 
@@ -92,6 +92,20 @@ Read the corresponding `.github/instructions/<layer>.instructions.md` before edi
 | `domain/**/*.py` | `domain.instructions.md` |
 | `data/**/*.py` | `data.instructions.md` |
 | `electron-frontend/**/*` | `electron.instructions.md` |
+
+## Subagent Type Selection
+
+When delegating work via the `task` tool, pick the correct subagent type:
+
+| Agent Type | Can Edit? | Use For |
+|------------|-----------|---------|
+| `data` | ✅ `read`/`edit`/`search`/`todo` | SQLite persistence, repositories, DB schema |
+| `domain` | ✅ `read`/`edit`/`search`/`todo` | Pure SRS, scoring, Japanese learning logic |
+| `ui` | ✅ `read`/`edit`/`search`/`todo` | React components, views, IPC wiring, styling |
+| `reviewer` | ✅ `read`/`edit`/`search`/`todo` | Code review, correctness checks, lint |
+| `explore` | ❌ **read-only** — STRICTLY FORBIDDEN edits | Research only: find files, grep patterns, answer codebase questions |
+
+**Critical**: `explore` is built into opencode and has a hard-coded "STRICTLY FORBIDDEN: ANY file edits" constraint. Do NOT call `explore` when you need to make changes. Use `data`/`domain`/`ui` for implementation work. If a subtask is pure research (e.g. "find all files that use X"), `explore` is fine — but follow up with the correct agent type to do the actual work.
 
 ## Existing Agent Definitions
 
