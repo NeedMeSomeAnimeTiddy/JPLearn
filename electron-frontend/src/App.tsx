@@ -30,7 +30,7 @@ import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/th
 import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme, resolveThemeMode } from './features/theme/utils'
 import { useBackground, BackgroundSettingsTab, clampBackgroundBlur, normalizeCustomBackgroundDataUrl, isBackgroundStyle, BACKGROUND_BLUR_DEFAULT } from './features/background'
 import type { BackgroundStyle } from './features/background'
-import { useVoice, splitSpeechSegments, VoiceSettingsTab } from './features/voice'
+import { useVoice, splitSpeechSegments, VoiceSettingsTab, DEFAULT_VOICE_SPEED } from './features/voice'
 import { useModels } from './features/models'
 import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit } from './features/tutor'
 import type { AssistantToast } from './features/tutor'
@@ -206,6 +206,7 @@ interface AppSettings {
   furiganaEnabled: boolean
   voiceEnabled: boolean
   voiceSpeaker: string
+  voiceSpeed: number
   ambientAudioEnabled: boolean
   cursor: { mode: string; theme: string; size: number; color: string | null }
 }
@@ -687,6 +688,7 @@ function defaultSettings(): AppSettings {
     furiganaEnabled: false,
     voiceEnabled: true,
     voiceSpeaker: 'zundamon_normal',
+    voiceSpeed: DEFAULT_VOICE_SPEED,
     ambientAudioEnabled: false,
     cursor: { mode: 'system', theme: 'classic', size: 1, color: null },
   }
@@ -797,6 +799,10 @@ function loadSettings(): AppSettings {
         typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
       voiceSpeaker:
         typeof parsed.voiceSpeaker === 'string' ? parsed.voiceSpeaker : defaults.voiceSpeaker,
+      voiceSpeed:
+        typeof parsed.voiceSpeed === 'number' && parsed.voiceSpeed >= 0.5 && parsed.voiceSpeed <= 2
+          ? parsed.voiceSpeed
+          : defaults.voiceSpeed,
       ambientAudioEnabled:
         typeof parsed.ambientAudioEnabled === 'boolean'
           ? parsed.ambientAudioEnabled
@@ -938,6 +944,20 @@ function buildInterleaveSequence(
 
 function isParticleClozeMode(mode: MinigameKey): mode is 'particle_cloze' {
   return mode === 'particle_cloze'
+}
+
+const PARTICLE_EXPLANATIONS: Record<string, { romaji: string; explanation: string }> = {
+  'は': { romaji: 'wa', explanation: 'Topic marker — sets the topic of the sentence' },
+  'が': { romaji: 'ga', explanation: 'Subject marker — marks the subject or adds emphasis' },
+  'を': { romaji: 'wo', explanation: 'Direct object marker — marks what the verb acts on' },
+  'に': { romaji: 'ni', explanation: 'Location/direction/time — marks existence, destination, or when' },
+  'で': { romaji: 'de', explanation: 'Location/means — marks where an action happens or how' },
+  'へ': { romaji: 'e', explanation: 'Direction — marks the direction of movement' },
+  'と': { romaji: 'to', explanation: 'And/with — connects nouns or marks a companion' },
+  'の': { romaji: 'no', explanation: 'Possession/genitive — links nouns together' },
+  'も': { romaji: 'mo', explanation: 'Also/even — adds emphasis or inclusion' },
+  'から': { romaji: 'kara', explanation: 'From/because — marks origin or reason' },
+  'まで': { romaji: 'made', explanation: 'Until/up to — marks endpoint in time or space' },
 }
 
 function isVibeCheckMode(mode: MinigameKey): mode is 'vibe_check' {
@@ -2883,6 +2903,19 @@ function App() {
         label,
       }))
 
+      const particleInfo = PARTICLE_EXPLANATIONS[answer]
+      const particleNote: RoundDictionaryNote | null = particleInfo
+        ? {
+            title: `${answer} (${particleInfo.romaji})`,
+            copy: particleInfo.explanation,
+            character: answer,
+            reading: particleInfo.romaji,
+            primaryGloss: particleInfo.explanation,
+            secondaryGlosses: [],
+            source: 'grammar_particle',
+          }
+        : dictionaryNote
+
       return {
         cardId: card.id,
         mode: minigame,
@@ -2894,7 +2927,7 @@ function App() {
         chapterLabel: null,
         hintText: exampleSentenceHint ?? 'Use sentence flow to pick the correct particle.',
         dictionarySeedQuery,
-        dictionaryNote,
+        dictionaryNote: particleNote,
         promptLabel: surprisePrompt ? surpriseLabel : 'Fill in the missing particle.',
         focusText: prompt,
         answer,
@@ -3872,6 +3905,11 @@ function App() {
         if (isImposterMode(roundState.mode)) {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage - 1)
           setRoundFeedback(`Not quite. Stage ${roundState.curriculumStage} → ${nextStage}.`)
+        } else if (isParticleClozeMode(roundState.mode)) {
+          const info = PARTICLE_EXPLANATIONS[roundState.answer]
+          setRoundFeedback(info
+            ? `Not quite. The answer is ${roundState.answer} (${info.romaji}) — ${info.explanation}.`
+            : `Not quite. The answer is ${roundState.answer}.`)
         } else {
           setRoundFeedback('Not quite.')
         }

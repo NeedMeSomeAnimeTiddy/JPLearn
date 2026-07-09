@@ -12,4 +12,5 @@ export const FIXED_JAPANESE_VOICE_OPTIONS: VoiceOptionEntry[] = [
 ]
 
 export const DEFAULT_VOICE_SPEAKER = FIXED_JAPANESE_VOICE_OPTIONS[0].id
+export const DEFAULT_VOICE_SPEED = 1.0
 export const VOICE_SAMPLE_LINE = 'こんにちは。いっしょにがんばりましょう。'

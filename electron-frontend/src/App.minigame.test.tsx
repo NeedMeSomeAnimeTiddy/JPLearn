@@ -983,7 +983,7 @@ describe('Minigame menu', () => {
 
     // Type the romaji answer in the text input
     const dictationInput = await screen.findByPlaceholderText(/auto-converts/i)
-    fireEvent.change(dictationInput, { target: { value: 'あ' } })
+    fireEvent.input(dictationInput, { target: { value: 'あ' } })
     fireEvent.click(screen.getByRole('button', { name: /submit answer/i }))
 
     await waitFor(() => expect(recordGameResult).toHaveBeenCalled())

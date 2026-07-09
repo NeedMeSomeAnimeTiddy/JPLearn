@@ -97,6 +97,8 @@ export function useVoice(
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null)
   const ambientAudioRef = useRef<AmbientAudioController | null>(null)
   const assistantSpeechRunIdRef = useRef(0)
+  const voiceSpeedRef = useRef(settings.voiceSpeed)
+  voiceSpeedRef.current = settings.voiceSpeed
 
   const playQuestionAudio = useCallback(async (text: string, speaker?: string) => {
     const spoken = typeof text === 'string' ? text.trim() : ''
@@ -113,6 +115,7 @@ export function useVoice(
       const result = await speak({
         text: spoken,
         speaker: speaker ?? settings.voiceSpeaker,
+        speed: voiceSpeedRef.current,
       })
       if (result?.audioBase64) {
         setLastVoiceSynthesis((result.synthesis as VoiceSynthesisMeta | undefined) ?? null)
@@ -156,6 +159,7 @@ export function useVoice(
       const result = await speak({
         text,
         speaker: settings.voiceSpeaker,
+        speed: voiceSpeedRef.current,
       })
       if (!result?.audioBase64 || assistantSpeechRunIdRef.current !== runId) {
         return false

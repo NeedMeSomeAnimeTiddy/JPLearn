@@ -278,6 +278,27 @@ export function VoiceSettingsTab({
               </button>
             ) : null}
 
+            {settings.voiceEnabled ? (
+              <div style={{ gridColumn: '1 / -1', padding: '0 0.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label htmlFor="voice-speed-slider" className="settings-help">Speed</label>
+                  <span className="settings-help">{settings.voiceSpeed.toFixed(1)}x</span>
+                </div>
+                <input
+                  id="voice-speed-slider"
+                  type="range"
+                  min={0.5}
+                  max={2}
+                  step={0.1}
+                  value={settings.voiceSpeed}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, voiceSpeed: Number(e.target.value) }))}
+                  aria-label={`Voice playback speed: ${settings.voiceSpeed.toFixed(1)}x`}
+                  title="Adjust voice playback speed (0.5x–2.0x)"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            ) : null}
+
             {settings.voiceEnabled
               ? voiceOptions.map((option) => (
                 <button

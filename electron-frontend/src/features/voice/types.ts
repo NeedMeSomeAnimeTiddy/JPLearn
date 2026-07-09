@@ -19,5 +19,6 @@ export type VoiceOptionEntry = { id: string; name: string; jp: string; search: s
 export interface VoiceSettingsFields {
   voiceEnabled: boolean
   voiceSpeaker: string
+  voiceSpeed: number
   ambientAudioEnabled: boolean
 }
