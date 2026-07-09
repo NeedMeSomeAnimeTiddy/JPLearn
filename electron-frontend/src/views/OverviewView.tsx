@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Activity,
   AlertTriangle,
@@ -163,6 +164,79 @@ export function OverviewView({
   }
 
   const heatmap = useHeatmap()
+
+  const calendarRef = useRef<HTMLDivElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
+  const [activeCell, setActiveCell] = useState<{
+    count: number
+    accuracy: number | undefined
+    date: string
+    x: number
+    y: number
+  } | null>(null)
+
+  useEffect(() => {
+    const wrap = calendarRef.current
+    if (!wrap) return
+
+    function handlePointerOver(e: PointerEvent) {
+      const rect = (e.target as Element).closest('rect[data-date]') as SVGRectElement | null
+      if (!rect) return
+      wrap!.querySelectorAll('rect[data-date]').forEach((r) => {
+        ;(r as SVGRectElement).style.strokeWidth = ''
+        ;(r as SVGRectElement).style.stroke = ''
+      })
+      rect.style.stroke = 'var(--tone-amber)'
+      rect.style.strokeWidth = '2'
+    }
+
+    function handlePointerOut(e: PointerEvent) {
+      const rect = (e.target as Element).closest('rect[data-date]') as SVGRectElement | null
+      if (!rect) return
+      rect.style.strokeWidth = ''
+      rect.style.stroke = ''
+    }
+
+    function handleClick(e: MouseEvent) {
+      const rect = (e.target as Element).closest('rect[data-date]') as SVGRectElement | null
+      if (!rect) return
+      const date = rect.getAttribute('data-date')
+      if (!date) return
+      const hit = heatmap.data.find((d) => d.date === date)
+      if (!hit) return
+      const bounds = rect.getBoundingClientRect()
+      setActiveCell({
+        count: hit.count,
+        accuracy: heatmap.accuracyByDate.get(date),
+        date,
+        x: bounds.left + bounds.width / 2,
+        y: bounds.bottom + 8,
+      })
+    }
+
+    wrap.addEventListener('pointerover', handlePointerOver)
+    wrap.addEventListener('pointerout', handlePointerOut)
+    wrap.addEventListener('click', handleClick)
+    return () => {
+      wrap.removeEventListener('pointerover', handlePointerOver)
+      wrap.removeEventListener('pointerout', handlePointerOut)
+      wrap.removeEventListener('click', handleClick)
+    }
+  }, [heatmap.data, heatmap.accuracyByDate])
+
+  useEffect(() => {
+    if (!activeCell) return
+
+    function handleDismiss(e: MouseEvent) {
+      const target = e.target as Element
+      if (target.closest('rect[data-date]')) return
+      if (target.closest('.heatmap-tooltip')) return
+      setActiveCell(null)
+    }
+
+    document.addEventListener('mousedown', handleDismiss)
+    return () => document.removeEventListener('mousedown', handleDismiss)
+  }, [activeCell])
 
   return (
     <div className="overview-popup-content">
@@ -483,7 +557,7 @@ export function OverviewView({
         </button>
 
         <div id="overview-study-activity-body" className={`overview-panel-body ${overviewSectionExpanded.studyActivity ? 'is-open' : ''}`}>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div ref={calendarRef} style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
             {heatmap.data.length > 0 ? (
               <ActivityCalendar
                 data={heatmap.data}
@@ -498,6 +572,26 @@ export function OverviewView({
             ) : (
               <p className="status-line">Loading activity data...</p>
             )}
+            {activeCell &&
+              createPortal(
+                <div
+                  ref={tooltipRef}
+                  className="heatmap-tooltip"
+                  style={{
+                    position: 'fixed',
+                    left: activeCell.x,
+                    top: activeCell.y,
+                    transform: 'translateX(-50%)',
+                  }}
+                >
+                  <strong>{activeCell.count} review{activeCell.count !== 1 ? 's' : ''}</strong>
+                  {activeCell.accuracy !== undefined && (
+                    <span> · {activeCell.accuracy}% correct</span>
+                  )}
+                  <span className="heatmap-tooltip-date">{activeCell.date}</span>
+                </div>,
+                document.body,
+              )}
           </div>
           {heatmap.error && <p className="heatmap-error">{heatmap.error}</p>}
           {!hasAnyActivity ? (

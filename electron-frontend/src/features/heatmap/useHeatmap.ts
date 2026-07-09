@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Activity } from 'react-activity-calendar'
-import { DEFAULT_LOOKBACK_DAYS } from './constants'
+import { DEFAULT_LOOKBACK_DAYS, REVIEWS_PER_ROUND } from './constants'
 
 function toLevel(count: number): number {
   if (count === 0) return 0
-  if (count <= 3) return 1
-  if (count <= 7) return 2
-  if (count <= 14) return 3
+  if (count < REVIEWS_PER_ROUND) return 1
+  if (count <= REVIEWS_PER_ROUND * 3 - 1) return 2
+  if (count <= REVIEWS_PER_ROUND * 6 - 1) return 3
   return 4
 }
 
@@ -69,6 +69,7 @@ function buildFullDateRange(): Activity[] {
 
 export function useHeatmap() {
   const [data, setData] = useState<Activity[]>([])
+  const [accuracyByDate, setAccuracyByDate] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const mountedRef = useRef(true)
@@ -80,6 +81,7 @@ export function useHeatmap() {
       const result = await window.jplearnDesktop?.getDailyActivity?.(DEFAULT_LOOKBACK_DAYS)
       if (!mountedRef.current) return
       const full = buildFullDateRange()
+      const accMap = new Map<string, number>()
       if (result?.ok && result.days.length > 0) {
         const dayMap = new Map(result.days.map((d) => [d.date, d]))
         for (const entry of full) {
@@ -87,10 +89,12 @@ export function useHeatmap() {
           if (hit) {
             entry.count = hit.count
             entry.level = toLevel(hit.count)
+            accMap.set(entry.date, hit.accuracy)
           }
         }
       }
       setData(full)
+      setAccuracyByDate(accMap)
     } catch (e: unknown) {
       if (!mountedRef.current) return
       setError(e instanceof Error ? e.message : 'Failed to load activity data.')
@@ -107,5 +111,5 @@ export function useHeatmap() {
 
   const theme = useMemo(() => computeTheme(), [])
 
-  return { data, loading, error, refetch: fetch, theme }
+  return { data, loading, error, refetch: fetch, theme, accuracyByDate }
 }

@@ -3949,6 +3949,30 @@ html[data-reduced-motion='true'] .home-hero-steam {
   padding: 8px 0;
 }
 
+.heatmap-tooltip {
+  z-index: 10000;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  color: var(--text-primary);
+}
+
+.heatmap-tooltip strong {
+  color: var(--tone-amber);
+}
+
+.heatmap-tooltip-date {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  margin-top: 2px;
+}
+
 /* ── Mistakes ──────────────────────────────────────────────────── */
 
 .mistakes-summary-panel {
