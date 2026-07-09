@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, Dispatch, SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
 import type { LastSessionPrefs, LearningPathStatus, SectionReadiness, SessionRunReport } from './types'
@@ -28,17 +28,17 @@ import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode } from './utils'
 import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, X } from 'lucide-react'
 import './App.css'
-import { useTheme } from './features/theme'
+import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
 import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/theme/types'
 import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme, resolveThemeMode } from './features/theme/utils'
-import { useBackground, BackgroundSettingsTab, clampBackgroundBlur, normalizeCustomBackgroundDataUrl, isBackgroundStyle, BACKGROUND_BLUR_DEFAULT } from './features/background'
+import { useBackground, BackgroundSettingsTab, clampBackgroundBlur, normalizeCustomBackgroundDataUrl, isBackgroundStyle, BACKGROUND_BLUR_DEFAULT, type BackgroundSettingsFields } from './features/background'
 import type { BackgroundStyle } from './features/background'
-import { useVoice, splitSpeechSegments, VoiceSettingsTab, DEFAULT_VOICE_SPEED } from './features/voice'
+import { useVoice, splitSpeechSegments, VoiceSettingsTab, DEFAULT_VOICE_SPEED, type VoiceSettingsFields } from './features/voice'
 import { useModels } from './features/models'
-import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit } from './features/tutor'
+import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, type TutorSettingsFields } from './features/tutor'
 import type { AssistantToast } from './features/tutor'
-import { useCursor, CursorFollower, CursorSettingsTab } from './features/cursor'
+import { useCursor, CursorFollower, CursorSettingsTab, type CursorSettings } from './features/cursor'
 import { DevDashboard } from './features/devtools'
 import { SURPRISE_PROMPTS, SCRIPT_MODE_PROMPT_PACKS, TAG_PROMPT_PACKS, CLOZE_TEMPLATES, STORY_CHAPTERS } from './lib/contentTemplates'
 import type { RoundDictionaryNote } from './types'
@@ -1732,17 +1732,16 @@ function App() {
     'close-behavior': true,
     'data-management': true,
   })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const theme = useTheme(
-    settings as any,
-    setSettings as any,
+    settings as ThemeSettingsFields,
+    setSettings as unknown as Dispatch<SetStateAction<ThemeSettingsFields>>,
     (t: string) => { void window.jplearnDesktop?.setStartupTheme(t) },
     setCollapsedSettingsSections,
   )
   const { toggleThemeSectionCollapsed } = theme
   const background = useBackground(
-    settings as any,
-    setSettings as any,
+    settings as BackgroundSettingsFields,
+    setSettings as unknown as Dispatch<SetStateAction<BackgroundSettingsFields>>,
   )
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const commandPalette = useCommandPalette()
@@ -1987,20 +1986,23 @@ function App() {
   const models = useModels()
 
   const voice = useVoice(
-    settings as any,
-    setSettings as any,
+    settings as VoiceSettingsFields,
+    setSettings as unknown as Dispatch<SetStateAction<VoiceSettingsFields>>,
     {
-      tutorInstallInfo: models.tutorInstallInfo as any,
+      tutorInstallInfo: models.tutorInstallInfo,
       refreshTutorInstallInfo: models.refreshTutorInstallInfo,
     },
   )
 
   const isInMinigameSession = view === 'minigame' && sessionActive && roundState !== null
 
-  const cursor = useCursor(settings as any, setSettings as any)
+  const cursor = useCursor(
+    settings as unknown as { cursor: CursorSettings },
+    setSettings as unknown as Dispatch<SetStateAction<{ cursor: CursorSettings }>>,
+  )
 
   const tutor = useTutor(
-    settings as any,
+    settings as TutorSettingsFields,
     {
       voice: {
         playVoiceRuntimeAudio: voice.playVoiceRuntimeAudio,
@@ -5707,7 +5709,7 @@ function App() {
       />
 
       {tutor.ocrWorkbenchOpen ? (
-        <OcrWorkbench tutor={tutor} settings={settings as any} setSettings={setSettings as any} />
+        <OcrWorkbench tutor={tutor} settings={settings as TutorSettingsFields} setSettings={setSettings as unknown as Dispatch<SetStateAction<TutorSettingsFields>>} />
       ) : null}
 
       </SessionProvider>
@@ -5961,7 +5963,7 @@ function App() {
                   className="settings-theme-card"
                   hideChevron
                 >
-                  <TutorSettingsTab settings={settings as any} setSettings={setSettings as any} />
+                  <TutorSettingsTab settings={settings as TutorSettingsFields} setSettings={setSettings as unknown as Dispatch<SetStateAction<TutorSettingsFields>>} />
                 </SettingsCollapsibleSection>
                 
                 <SettingsCollapsibleSection
@@ -6246,13 +6248,13 @@ function App() {
                 
                     <VoiceSettingsTab
                       voice={voice}
-                      settings={settings as any}
-                      setSettings={setSettings as any}
+                      settings={settings as VoiceSettingsFields}
+                      setSettings={setSettings as unknown as Dispatch<SetStateAction<VoiceSettingsFields>>}
                       collapsedSettingsSections={collapsedSettingsSections}
                       toggleThemeSectionCollapsed={toggleThemeSectionCollapsed}
                       formatModelSize={models.formatModelSize}
                       formatMinutes={models.formatMinutes}
-                      tutorInstallInfo={models.tutorInstallInfo as any}
+                      tutorInstallInfo={models.tutorInstallInfo}
                     />
               </div>
               <div style={{ display: activeSettingsTab === 'system' ? undefined : 'none' }}>
@@ -6429,7 +6431,7 @@ function App() {
       />
 
       <div style={{ display: tutor.assistantChatOpen ? undefined : 'none' }}>
-        <TutorChatPanel tutor={tutor} settings={settings as any} setSettings={setSettings as any} cancelAssistantSpeech={voice.cancelAssistantSpeech} />
+        <TutorChatPanel tutor={tutor} settings={settings as TutorSettingsFields} setSettings={setSettings as unknown as Dispatch<SetStateAction<TutorSettingsFields>>} cancelAssistantSpeech={voice.cancelAssistantSpeech} />
       </div>
 
       {cursor.cursorMode === 'animated' && createPortal(<CursorFollower {...cursor} />, document.body)}

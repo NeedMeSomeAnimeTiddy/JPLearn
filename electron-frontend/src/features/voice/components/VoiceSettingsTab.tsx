@@ -1,5 +1,5 @@
 import { Volume2, Download, RefreshCw, RotateCcw, Trash2, CheckCircle2, Circle } from 'lucide-react'
-import type { UseVoiceReturn } from '../useVoice'
+import type { UseVoiceReturn, SpeechTier, VoiceEngineTier } from '../useVoice'
 import type { VoiceSettingsFields } from '../types'
 import type { Dispatch, SetStateAction } from 'react'
 import { VOICE_SAMPLE_LINE } from '../constants'
@@ -14,12 +14,12 @@ interface VoiceSettingsTabProps {
   formatModelSize: (sizeMb: number) => string
   formatMinutes: (minutes?: number | null) => string
   tutorInstallInfo: {
-    speechModels?: Array<{ tier: string; label: string; description: string; sizeMb: number; installed: boolean; estimatedDownloadMinutes?: number | null }>
-    activeSpeechModelTier?: string | null
-    recommendedSpeechTier?: string
+    speechModels?: Array<{ tier: SpeechTier; label: string; description: string; sizeMb: number; installed: boolean; estimatedDownloadMinutes?: number | null }>
+    activeSpeechModelTier?: SpeechTier | null
+    recommendedSpeechTier?: SpeechTier
     voiceInstalled?: boolean
-    voiceModels?: Array<{ tier: string; label: string; description: string; installed: boolean; estimatedDownloadMinutes?: number | null }>
-    activeVoiceModel?: string | null
+    voiceModels?: Array<{ tier: VoiceEngineTier; label: string; description: string; installed: boolean; estimatedDownloadMinutes?: number | null }>
+    activeVoiceModel?: VoiceEngineTier | null
   } | null
 }
 
@@ -74,7 +74,7 @@ export function VoiceSettingsTab({
             const isDownloadingThis = speechDownloadingTier === model.tier
             const isActioningThis = speechModelActionTier === model.tier
             const isActiveTier = tutorInstallInfo?.activeSpeechModelTier === model.tier
-            const speechHardwareFit = getSpeechModelHardwareFit(model.tier as any)
+            const speechHardwareFit = getSpeechModelHardwareFit(model.tier)
 
             return (
               <div
@@ -122,7 +122,7 @@ export function VoiceSettingsTab({
                       <button
                         type="button"
                         className={`settings-card-icon-button ${isActiveTier ? 'is-active' : ''}`}
-                        onClick={() => { void (selectSpeechModel as any)(model.tier) }}
+                        onClick={() => { void selectSpeechModel(model.tier) }}
                         disabled={isActiveTier || speechModelActionTier !== null || speechDownloadingTier !== null}
                         aria-label={isActiveTier ? `${model.label} is the active speech model` : `Use ${model.label} for speech recognition`}
                         title={isActiveTier ? 'Currently active' : 'Use this model'}
@@ -133,7 +133,7 @@ export function VoiceSettingsTab({
                     <button
                       type="button"
                       className="settings-card-icon-button"
-                      onClick={() => { void (downloadSpeechModel as any)(model.tier, model.installed ? { force: true } : undefined) }}
+                      onClick={() => { void downloadSpeechModel(model.tier, model.installed ? { force: true } : undefined) }}
                       disabled={speechDownloadingTier !== null || speechModelActionTier !== null}
                       aria-label={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
                       title={model.installed ? `Reinstall ${model.label}` : `Download ${model.label}`}
@@ -148,7 +148,7 @@ export function VoiceSettingsTab({
                       <button
                         type="button"
                         className="settings-inline-icon-button"
-                        onClick={() => { void (uninstallSpeechModel as any)(model.tier) }}
+                        onClick={() => { void uninstallSpeechModel(model.tier) }}
                         disabled={speechModelActionTier !== null || speechDownloadingTier !== null}
                         aria-label={`Uninstall ${model.label}`}
                         title={`Uninstall ${model.label}`}
@@ -337,7 +337,7 @@ export function VoiceSettingsTab({
                     <button
                       type="button"
                       className="settings-card-icon-button"
-                      onClick={() => { void (downloadVoiceEngineModel as any)(model.tier) }}
+                      onClick={() => { void downloadVoiceEngineModel(model.tier) }}
                       disabled={voiceEngineDownloadingTier !== null}
                       aria-label={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}
                       title={model.installed ? `Reinstall ${model.label}` : `Install ${model.label}`}

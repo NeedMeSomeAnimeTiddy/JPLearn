@@ -6,29 +6,29 @@ import { splitSpeechSegments } from './utils'
 import { AmbientAudioController } from '../../lib/ambientAudio'
 import { parseProgressMethod } from '../tutor'
 
-type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra'
-type VoiceEngineTier = '0.6b'
+export type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra'
+export type VoiceEngineTier = '0.6b'
 
 interface TutorInstallInfo {
   totalRamGb: number
-  gpuVramGb: number | null
+  gpuVramGb?: number | null
   voiceInstalled: boolean
   voiceModels: Array<{
     tier: VoiceEngineTier
     label: string
     description: string
     installed: boolean
-    estimatedDownloadMinutes: number | null
+    estimatedDownloadMinutes?: number | null
     sizeMb: number
   }>
-  activeVoiceModel: VoiceEngineTier | null
+  activeVoiceModel?: VoiceEngineTier | null
   speechModels: Array<{
     tier: SpeechTier
     label: string
     description: string
     sizeMb: number
     installed: boolean
-    estimatedDownloadMinutes: number | null
+    estimatedDownloadMinutes?: number | null
   }>
   recommendedSpeechTier?: SpeechTier
   activeSpeechModelTier?: SpeechTier | null

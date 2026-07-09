@@ -460,6 +460,17 @@ interface DesktopApi {
     interactionType: 'clicked' | 'ignored' | 'expired'
     metadata?: Record<string, string>
   }) => Promise<{ ok: boolean }>
+  trackAssistantToastInteraction?: (payload: {
+    id: number
+    priority: string
+    messageKey: string
+    eventType: string
+    targetMode?: string
+    focusArea?: string
+    actionKind?: string
+    interactionType?: 'clicked' | 'ignored' | 'expired'
+    metadata?: Record<string, string>
+  }) => Promise<{ ok: boolean }>
   appendAssistantChatTurn?: (payload: {
     role: 'user' | 'assistant'
     content: string

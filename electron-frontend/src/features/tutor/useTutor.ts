@@ -117,7 +117,7 @@ export function useTutor(
     (toast: AssistantToast, actionKind: string, extra?: Record<string, string>) => {
       try {
         const metadata: Record<string, string> = { ...extra }
-        ;(window.jplearnDesktop as any)?.trackAssistantToastInteraction?.({
+        ;window.jplearnDesktop?.trackAssistantToastInteraction?.({
           id: toast.id,
           priority: toast.priority,
           messageKey: toast.messageKey,
