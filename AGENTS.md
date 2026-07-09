@@ -40,7 +40,7 @@ Important: `main.py` (the Python GUI) is **deprecated** — raises `RuntimeError
 - `write` — new file creation only. `edit` — modifying existing code only. Never use `write` to overwrite an existing file.
 - If unsure about anything — ask for clarification before assuming.
 - When using `compress`, explicitly preserve the current task, what's done, and what remains — don't let task context get lost.
-- **Plan files (orchestrator only)**: The main agent (you) should write a `plan.md` in the relevant directory for any non-trivial planning phase. This survives conversation compression. **Subagents must NOT write plan.md** — they don't have the `write` tool. Subagents use the `todo` tool for task tracking instead. When starting implementation or any follow-up work, check for a `plan.md` in the relevant directory first and follow it. Delete `plan.md` after full execution unless there's reason to keep it.
+- **Plan files (orchestrator or research agent)**: The main agent (you) should write a `plan.md` in the relevant directory for any non-trivial planning phase. This survives conversation compression. **Other subagents must NOT write plan.md** — they don't have the `write` tool or the appropriate prompt. Subagents use the `todo` tool for task tracking instead. The exception is the `research` agent (defined in `.opencode/agents/research.md`) which has explicit write permission and is designed for exploration + plan.md creation. When starting implementation or any follow-up work, check for a `plan.md` in the relevant directory first and follow it. Delete `plan.md` after full execution unless there's reason to keep it.
 
 ## Commands
 
@@ -103,9 +103,10 @@ When delegating work via the `task` tool, pick the correct subagent type:
 | `domain` | ✅ `read`/`edit`/`search`/`todo` | Pure SRS, scoring, Japanese learning logic |
 | `ui` | ✅ `read`/`edit`/`search`/`todo` | React components, views, IPC wiring, styling |
 | `reviewer` | ✅ `read`/`edit`/`search`/`todo` | Code review, correctness checks, lint |
-| `explore` | ❌ **read-only** — STRICTLY FORBIDDEN edits | Research only: find files, grep patterns, answer codebase questions |
+| `research` | ✅ `read`/`edit`/`search`/`todo` | Codebase exploration + plan.md creation, research with write access |
+| `explore` | ❌ **read-only** — STRICTLY FORBIDDEN edits | Pure read-only research: find files, grep patterns, answer codebase questions |
 
-**Critical**: `explore` is built into opencode and has a hard-coded "STRICTLY FORBIDDEN: ANY file edits" constraint. Do NOT call `explore` when you need to make changes. Use `data`/`domain`/`ui` for implementation work. If a subtask is pure research (e.g. "find all files that use X"), `explore` is fine — but follow up with the correct agent type to do the actual work.
+**Critical**: `explore` is built into opencode and has a hard-coded "STRICTLY FORBIDDEN: ANY file edits" constraint. Do NOT call `explore` when you need to make changes. Use `data`/`domain`/`ui` for implementation work, or `research` when you need exploration + write capability (e.g. creating plan.md). If a subtask is pure read-only research (e.g. "find all files that use X"), `explore` is fine — but follow up with the correct agent type to do the actual work. The `research` agent is defined in `.opencode/agents/research.md` as a custom subagent with explicit write/edit permissions and a clean prompt (no "STRICTLY FORBIDDEN" constraint).
 
 ## Existing Agent Definitions
 
