@@ -982,9 +982,9 @@ describe('Minigame menu', () => {
     })
     expect(promptMainWithChar).toBeNull()
 
-    // Type the romaji answer in the text input
+    // Type the kana sequence in the text input (multi-character: あい for ai)
     const dictationInput = await screen.findByPlaceholderText(/auto-converts/i)
-    fireEvent.input(dictationInput, { target: { value: 'あ' } })
+    fireEvent.input(dictationInput, { target: { value: 'あい' } })
     fireEvent.click(screen.getByRole('button', { name: /submit answer/i }))
 
     await waitFor(() => expect(recordGameResult).toHaveBeenCalled())

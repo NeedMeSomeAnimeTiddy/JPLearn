@@ -3326,9 +3326,39 @@ function App() {
 
       if (minigame === 'dictation') {
         const isKanaScript = activeScript === 'hiragana' || activeScript === 'katakana'
-        const dictationAnswer = isKanaScript
-          ? card.character
-          : toHiragana(card.romaji.replace(/\s+/g, ''))
+        if (isKanaScript) {
+          const maxCompanions = curriculumStage >= 3 ? 2 : 1
+          const companionCount = Math.min(maxCompanions, cards.length - 1)
+          const companions: ScriptDeck['cards'] = []
+          for (let i = 1; i <= companionCount; i++) {
+            const companionIndex = (cardIndex + i) % cards.length
+            const companion = cards[companionIndex]
+            if (companion.id !== card.id) {
+              companions.push(companion)
+            }
+          }
+          const allKana = [card, ...companions].map(c => c.character).join('')
+          const firstPairRomaji = [card, ...companions.slice(0, 1)].map(c => c.romaji).join('')
+
+          return {
+            cardId: card.id,
+            mode: minigame,
+            audioText: allKana,
+            exampleSentenceAudioText: null,
+            surprisePrompt,
+            curriculumStage,
+            chapterNumber: null,
+            chapterLabel: null,
+            hintText: `Type the romaji for what you hear (e.g., "${firstPairRomaji}" → ${allKana}).`,
+            dictionarySeedQuery: card.character || card.romaji || null,
+            dictionaryNote,
+            promptLabel: surprisePrompt ? surpriseLabel : 'Listen and type the characters you hear.',
+            focusText: allKana,
+            answer: allKana,
+            options: [],
+          }
+        }
+        const dictationAnswer = toHiragana(card.romaji.replace(/\s+/g, ''))
         return {
           cardId: card.id,
           mode: minigame,
@@ -3338,15 +3368,10 @@ function App() {
           curriculumStage,
           chapterNumber: null,
           chapterLabel: null,
-          hintText: isKanaScript
-            ? `Type the romaji for what you hear (e.g., "ka" for か).`
-            : `Type the reading you hear in Japanese.`,
+          hintText: `Type the reading you hear in Japanese.`,
           dictionarySeedQuery,
           dictionaryNote,
-          promptLabel: surprisePrompt ? surpriseLabel
-            : isKanaScript
-              ? 'Listen and type the romaji for what you hear.'
-              : 'Listen and type the reading in Japanese.',
+          promptLabel: surprisePrompt ? surpriseLabel : 'Listen and type the reading in Japanese.',
           focusText: card.character,
           answer: dictationAnswer,
           options: [],
