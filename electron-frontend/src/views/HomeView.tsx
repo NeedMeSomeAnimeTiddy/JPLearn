@@ -147,7 +147,7 @@ export function HomeView({
         <span aria-hidden="true" />
 
         <div className="hub-topbar-center">
-          <span className="hub-topbar-catalog">JPL-EARN</span>
+          <span className="hub-topbar-catalog">JP-LEARN</span>
           <strong className="hub-topbar-title">
             <TypeAnimation
               sequence={['JPLearn', 1000]}
