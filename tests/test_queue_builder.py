@@ -2,7 +2,7 @@ from domain.queue_builder import build_study_queue
 
 
 def test_build_study_queue_includes_all_cards_once() -> None:
-    queue = build_study_queue(
+    queue, _ = build_study_queue(
         card_ids=[5, 1, 3, 2, 4],
         due_card_ids={1, 2},
         leech_card_ids={3},
@@ -14,7 +14,7 @@ def test_build_study_queue_includes_all_cards_once() -> None:
 
 
 def test_build_study_queue_prioritizes_due_with_blended_leech_new() -> None:
-    queue = build_study_queue(
+    queue, _ = build_study_queue(
         card_ids=[1, 2, 3, 4, 5, 6, 7],
         due_card_ids={1, 2, 3, 4},
         leech_card_ids={5},
@@ -27,7 +27,7 @@ def test_build_study_queue_prioritizes_due_with_blended_leech_new() -> None:
 
 
 def test_build_study_queue_does_not_starve_review_cards() -> None:
-    queue = build_study_queue(
+    queue, _ = build_study_queue(
         card_ids=[1, 2, 3, 4, 5, 6, 7, 8],
         due_card_ids={1, 2, 3, 4},
         leech_card_ids={5},

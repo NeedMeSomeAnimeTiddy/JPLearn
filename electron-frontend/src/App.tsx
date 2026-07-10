@@ -247,7 +247,7 @@ interface StudyPlanSnapshot {
 
 type StatsByScript = Record<ScriptKey, ScriptStats>
 type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
-type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot'
+type OverviewSectionKey = 'studyActivity' | 'sessionHistory' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot'
 
 const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples'] as const
 
@@ -1678,6 +1678,7 @@ function App() {
   const [learningPathExpanded, setLearningPathExpanded] = useState(false)
   const [overviewSectionExpanded, setOverviewSectionExpanded] = useState<Record<OverviewSectionKey, boolean>>({
     studyActivity: false,
+    sessionHistory: false,
     mistakeBreakdown: false,
     minigamePerformance: false,
     deckSnapshot: false,
@@ -4294,6 +4295,7 @@ function App() {
   )
   const mistakes = useMemo(() => summary?.mistakes ?? [], [summary])
   const minigamePerf = useMemo(() => summary?.minigame_performance ?? [], [summary])
+  const sessionHistory = useMemo(() => summary?.session_history ?? [], [summary])
   const studyPlan = useMemo(
     () => buildStudyPlan(decks, kanjiLevelProgress, vocabLevelProgress, activity, streak.current_days),
     [activity, decks, kanjiLevelProgress, streak.current_days, vocabLevelProgress],
@@ -4371,6 +4373,7 @@ function App() {
   const hasAnyActivity = activity.week.reviewed > 0 || activity.month.reviewed > 0
   const hasMistakeData = mistakes.length > 0
   const hasMinigamePerfData = minigamePerf.length > 0
+  const hasSessionHistory = sessionHistory.length > 0
 
   useEffect(() => {
     if (activeScript !== 'kanji_n5' || blockProgress.length > 0) return
@@ -5678,9 +5681,11 @@ function App() {
               overviewBlocksLoading={overviewBlocksLoading}
               mistakes={mistakes}
               minigamePerf={minigamePerf}
+              sessionHistory={sessionHistory}
               hasAnyActivity={hasAnyActivity}
               hasMistakeData={hasMistakeData}
               hasMinigamePerfData={hasMinigamePerfData}
+              hasSessionHistory={hasSessionHistory}
               charMasteryExpanded={charMasteryExpanded}
               expandedBlocks={expandedBlocks}
               overviewSectionExpanded={overviewSectionExpanded}

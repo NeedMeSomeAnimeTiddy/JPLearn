@@ -156,6 +156,7 @@ const baseDesktopApi = {
     },
     mistakes: [],
     minigame_performance: [],
+    session_history: [],
     item_history: [],
     curriculum: {
       particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
@@ -194,6 +195,10 @@ const baseDesktopApi = {
       slug,
       card_ids: baseCards.map((card) => card.id),
       indices: baseCards.map((_, index) => index),
+      buckets_due: 0,
+      buckets_leech: 0,
+      buckets_new: 0,
+      buckets_review: 0,
     },
   }),
   getOverviewCharacterMastery: async () => ({
@@ -298,6 +303,7 @@ function buildStudyPlanDesktopApi() {
       },
       mistakes: [],
       minigame_performance: [],
+      session_history: [],
       item_history: [],
       curriculum: {
         particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
@@ -531,6 +537,10 @@ describe('Minigame menu', () => {
               slug,
               card_ids: conversationalCards.map((card) => card.id),
               indices: conversationalCards.map((_, index) => index),
+              buckets_due: 0,
+              buckets_leech: 0,
+              buckets_new: 0,
+              buckets_review: 0,
             },
           }
           : {
@@ -539,6 +549,10 @@ describe('Minigame menu', () => {
               slug,
               card_ids: baseCards.map((card) => card.id),
               indices: baseCards.map((_, index) => index),
+              buckets_due: 0,
+              buckets_leech: 0,
+              buckets_new: 0,
+              buckets_review: 0,
             },
           }
       ),
@@ -612,8 +626,8 @@ describe('Minigame menu', () => {
       ),
       getStudyQueue: async (slug: string) => (
         slug.includes('kanji')
-          ? { ok: true, queue: { slug, card_ids: kanjiStudyPlanCards.map((card) => card.id), indices: kanjiStudyPlanCards.map((_, index) => index) } }
-          : { ok: true, queue: { slug, card_ids: baseCards.map((card) => card.id), indices: baseCards.map((_, index) => index) } }
+          ? { ok: true, queue: { slug, card_ids: kanjiStudyPlanCards.map((card) => card.id), indices: kanjiStudyPlanCards.map((_, index) => index), buckets_due: 0, buckets_leech: 0, buckets_new: 0, buckets_review: 0 } }
+          : { ok: true, queue: { slug, card_ids: baseCards.map((card) => card.id), indices: baseCards.map((_, index) => index), buckets_due: 0, buckets_leech: 0, buckets_new: 0, buckets_review: 0 } }
       ),
     }
 
@@ -662,6 +676,10 @@ describe('Minigame menu', () => {
               slug,
               card_ids: [kanjiStudyPlanCards[0].id],
               indices: [0],
+              buckets_due: 0,
+              buckets_leech: 0,
+              buckets_new: 0,
+              buckets_review: 0,
             },
           }
           : {
@@ -670,6 +688,10 @@ describe('Minigame menu', () => {
               slug,
               card_ids: baseCards.map((card) => card.id),
               indices: baseCards.map((_, index) => index),
+              buckets_due: 0,
+              buckets_leech: 0,
+              buckets_new: 0,
+              buckets_review: 0,
             },
           }
       ),
@@ -711,6 +733,10 @@ describe('Minigame menu', () => {
               slug,
               card_ids: kanjiStrokeCards.map((card) => card.id),
               indices: kanjiStrokeCards.map((_, index) => index),
+              buckets_due: 0,
+              buckets_leech: 0,
+              buckets_new: 0,
+              buckets_review: 0,
             },
           }
           : {
@@ -719,6 +745,10 @@ describe('Minigame menu', () => {
               slug,
               card_ids: baseCards.map((card) => card.id),
               indices: baseCards.map((_, index) => index),
+              buckets_due: 0,
+              buckets_leech: 0,
+              buckets_new: 0,
+              buckets_review: 0,
             },
           }
       ),
@@ -851,6 +881,10 @@ describe('Minigame menu', () => {
               slug,
               card_ids: grammarCards.map((card) => card.id),
               indices: grammarCards.map((_, index) => index),
+              buckets_due: 0,
+              buckets_leech: 0,
+              buckets_new: 0,
+              buckets_review: 0,
             },
           }
           : {
@@ -859,6 +893,10 @@ describe('Minigame menu', () => {
               slug,
               card_ids: baseCards.map((card) => card.id),
               indices: baseCards.map((_, index) => index),
+              buckets_due: 0,
+              buckets_leech: 0,
+              buckets_new: 0,
+              buckets_review: 0,
             },
           }
       ),

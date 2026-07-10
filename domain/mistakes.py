@@ -23,3 +23,16 @@ class MinigamePerformanceRow:
     attempts: int
     correct: int
     accuracy: int
+
+
+@dataclass(frozen=True)
+class SessionHistoryRow:
+    """Summary of a single completed study session."""
+
+    session_id: str
+    started_at_utc: str
+    target_items: int
+    reviewed: int
+    correct: int
+    accuracy: int
+    goal_met: bool

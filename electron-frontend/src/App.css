@@ -3695,6 +3695,10 @@ html[data-reduced-motion='true'] .home-hero-steam {
   color: #f2c27a;
 }
 
+.metric-accent-success .chip-icon {
+  color: #88e0a3;
+}
+
 .panel-title-with-icon {
   display: inline-flex;
   align-items: center;

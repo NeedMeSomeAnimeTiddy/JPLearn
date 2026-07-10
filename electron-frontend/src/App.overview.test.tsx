@@ -28,7 +28,7 @@ const baseDesktopApi = {
   versions: { chrome: '0', electron: '0', node: '0' },
   getBlockProgress: async (slug: string) => ({ slug, blocks: [] }),
   getDeckCards: async () => ({ slug: 'hiragana' as const, name: 'Hiragana', cards: [] }),
-  getStudyQueue: async () => ({ ok: true, queue: { slug: 'hiragana' as const, card_ids: [], indices: [] } }),
+  getStudyQueue: async () => ({ ok: true, queue: { slug: 'hiragana' as const, card_ids: [], indices: [], buckets_due: 0, buckets_leech: 0, buckets_new: 0, buckets_review: 0 } }),
   getOverviewCharacterMastery: async () => ({
     blocks: { hiragana: [], katakana: [] },
     category_blocks: { vocab_n5: [], grammar_patterns: [] },
@@ -86,6 +86,7 @@ describe('Overview activity panel', () => {
         },
         mistakes: [],
         minigame_performance: [],
+        session_history: [],
         item_history: [],
         curriculum: {
           particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },
@@ -137,6 +138,7 @@ describe('Overview activity panel', () => {
         },
         mistakes: [],
         minigame_performance: [],
+        session_history: [],
         item_history: [],
         curriculum: {
           particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 12, accuracy: 75, accuracy_7d: 67, stage_distribution: { 1: 4, 2: 5, 3: 3 } },
@@ -191,6 +193,7 @@ describe('Overview activity panel', () => {
         },
         mistakes: [],
         minigame_performance: [],
+        session_history: [],
         item_history: [],
         curriculum: {
           particle_cloze: { mode: 'particle_cloze', script_tag: 'all', attempts: 0, accuracy: 0, accuracy_7d: 0, stage_distribution: { 1: 0, 2: 0, 3: 0 } },

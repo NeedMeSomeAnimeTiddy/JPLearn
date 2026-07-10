@@ -13,7 +13,7 @@ from domain.activity import ActivitySummary, DailyCount
 from domain.assistant import AssistantPopupCadence, AssistantState, compute_assistant_state, evaluate_assistant_events
 from domain.curriculum import next_stage
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
-from domain.mistakes import MistakeBreakdownRow, MinigamePerformanceRow
+from domain.mistakes import MistakeBreakdownRow, MinigamePerformanceRow, SessionHistoryRow
 from domain.retrieval import embed_text, rank_by_similarity
 from domain.scheduler import ReviewState, update
 from domain.session import SessionGoal, SessionSummary
@@ -520,6 +520,11 @@ def load_mistake_breakdown(limit: int = 6) -> list[MistakeBreakdownRow]:
 def load_minigame_breakdown() -> list[MinigamePerformanceRow]:
     """Return performance metrics grouped by minigame type."""
     return database.load_minigame_breakdown()
+
+
+def load_session_history(limit: int = 8) -> list[SessionHistoryRow]:
+    """Return recent completed study sessions."""
+    return database.load_session_history(limit=limit)
 
 
 def load_item_history(limit_items: int = 8, events_per_item: int = 8) -> list[ItemHistory]:

@@ -73,6 +73,15 @@ interface StudySummary {
     correct: number
     accuracy: number
   }>
+  session_history: Array<{
+    session_id: string
+    started_at_utc: string
+    target_items: number
+    reviewed: number
+    correct: number
+    accuracy: number
+    goal_met: boolean
+  }>
   item_history: Array<{
     key: string
     script_tag: string
@@ -204,6 +213,10 @@ interface StudyQueuePayload {
   slug: string
   card_ids: number[]
   indices: number[]
+  buckets_due: number
+  buckets_leech: number
+  buckets_new: number
+  buckets_review: number
 }
 
 interface StudyQueueResponse {

@@ -20,8 +20,8 @@ def build_study_queue(
     due_card_ids: set[int],
     leech_card_ids: set[int],
     new_card_ids: set[int],
-) -> list[int]:
-    """Return a deterministic blended queue of card ids.
+) -> tuple[list[int], QueueBuckets]:
+    """Return a deterministic blended queue of card ids plus bucket composition.
 
     Priority is blended in fixed ratio windows to avoid starvation:
     due x3, leech x1, new x1, review x1.
@@ -46,7 +46,7 @@ def build_study_queue(
         review.append(card_id)
 
     buckets = QueueBuckets(due=due, leech=leech, new=new, review=review)
-    return _interleave_buckets(buckets)
+    return _interleave_buckets(buckets), buckets
 
 
 def _interleave_buckets(buckets: QueueBuckets) -> list[int]:

@@ -14,7 +14,7 @@ from domain.activity import ActivitySummary, DailyCount
 from domain.assistant import AssistantEvent, AssistantEventPriority, AssistantMood, AssistantState
 from domain.history import ItemHistoryEvent, RawItemHistoryBucket
 from domain.leech import evaluate_leech_state
-from domain.mistakes import MistakeBreakdownRow, MinigamePerformanceRow
+from domain.mistakes import MistakeBreakdownRow, MinigamePerformanceRow, SessionHistoryRow
 from domain.scheduler import ReviewState
 from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState
@@ -1391,6 +1391,51 @@ def load_minigame_breakdown() -> list[MinigamePerformanceRow]:
             )
         )
     return breakdown
+
+
+def load_session_history(limit: int = 8) -> list[SessionHistoryRow]:
+    """Return recent completed study sessions with aggregate metrics."""
+    if limit <= 0:
+        raise ValueError("limit must be positive")
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                sg.session_id,
+                sg.started_at_utc,
+                sg.target_items,
+                COUNT(re.id) AS reviewed,
+                SUM(CASE WHEN re.quality >= 3 THEN 1 ELSE 0 END) AS correct
+            FROM session_goals sg
+            LEFT JOIN review_events re ON re.session_id = sg.session_id
+            WHERE sg.started_at_utc IS NOT NULL AND sg.started_at_utc != ''
+            GROUP BY sg.session_id
+            ORDER BY sg.started_at_utc DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    history: list[SessionHistoryRow] = []
+    for row in rows:
+        reviewed = int(row["reviewed"] or 0)
+        correct = int(row["correct"] or 0)
+        accuracy = round((correct / reviewed) * 100) if reviewed > 0 else 0
+        target = int(row["target_items"] or 0)
+        goal_met = reviewed >= target if target > 0 else reviewed > 0
+        history.append(
+            SessionHistoryRow(
+                session_id=str(row["session_id"]),
+                started_at_utc=str(row["started_at_utc"]),
+                target_items=target,
+                reviewed=reviewed,
+                correct=correct,
+                accuracy=accuracy,
+                goal_met=goal_met,
+            )
+        )
+    return history
 
 
 def load_raw_item_history(limit_items: int = 8, events_per_item: int = 8) -> list[RawItemHistoryBucket]:

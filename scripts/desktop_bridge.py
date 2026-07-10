@@ -48,6 +48,7 @@ from data.study_pipeline import (  # noqa: E402
     load_item_history,
     load_mistake_breakdown,
     load_minigame_breakdown,
+    load_session_history,
     load_curriculum_stages,
     load_deck_summary_counts,
     load_review_states,
@@ -2573,6 +2574,10 @@ class StudyQueuePayload:
     slug: str
     card_ids: list[int]
     indices: list[int]
+    buckets_due: int
+    buckets_leech: int
+    buckets_new: int
+    buckets_review: int
 
 
 @dataclass(frozen=True)
@@ -2702,6 +2707,7 @@ def build_summary() -> dict[str, object]:
     activity_month = load_activity_summary(30)
     mistakes = load_mistake_breakdown(limit=6)
     minigame_perf = load_minigame_breakdown()
+    session_history = load_session_history(limit=8)
     item_history = load_item_history(limit_items=8, events_per_item=8)
     curriculum_context_cloze = load_curriculum_stage_summary("context_cloze")
     curriculum_by_script = {
@@ -2760,6 +2766,7 @@ def build_summary() -> dict[str, object]:
         },
         "mistakes": [asdict(item) for item in mistakes],
         "minigame_performance": [asdict(item) for item in minigame_perf],
+        "session_history": [asdict(item) for item in session_history],
         "item_history": [
             {
                 **asdict(item),
@@ -3606,7 +3613,7 @@ def build_study_queue_payload(slug: str) -> dict[str, object]:
     new_card_ids = {card_id for card_id, state in states.items() if state.repetitions <= 0}
     leech_card_ids = load_active_leech_card_ids(deck.name)
 
-    queue_card_ids = build_study_queue(
+    queue_card_ids, queue_buckets = build_study_queue(
         card_ids=card_ids,
         due_card_ids=due_card_ids,
         leech_card_ids=leech_card_ids,
@@ -3621,6 +3628,10 @@ def build_study_queue_payload(slug: str) -> dict[str, object]:
                 slug=slug,
                 card_ids=queue_card_ids,
                 indices=queue_indices,
+                buckets_due=len(queue_buckets.due),
+                buckets_leech=len(queue_buckets.leech),
+                buckets_new=len(queue_buckets.new),
+                buckets_review=len(queue_buckets.review),
             )
         ),
     }

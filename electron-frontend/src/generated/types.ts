@@ -73,6 +73,10 @@ export interface StudyQueuePayload {
   slug: string
   card_ids: number[]
   indices: number[]
+  buckets_due: number
+  buckets_leech: number
+  buckets_new: number
+  buckets_review: number
 }
 
 export interface ProgressionNodeStatusPayload {

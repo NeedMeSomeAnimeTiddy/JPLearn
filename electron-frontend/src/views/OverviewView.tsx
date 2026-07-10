@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarDays,
+  CheckCircle2,
   Download,
   Flame,
   Languages,
@@ -24,7 +25,7 @@ import { ActivityCalendar } from 'react-activity-calendar'
 
 const CARD_MASTERY_MAX = 4
 
-export type OverviewSectionKey = 'studyActivity' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot'
+export type OverviewSectionKey = 'studyActivity' | 'sessionHistory' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot'
 
 interface DeckSummary {
   slug: string
@@ -84,6 +85,16 @@ interface MinigamePerfRow {
   accuracy: number
 }
 
+interface SessionHistoryRow {
+  session_id: string
+  started_at_utc: string
+  target_items: number
+  reviewed: number
+  correct: number
+  accuracy: number
+  goal_met: boolean
+}
+
 interface SelectedChar {
   character: string
   romaji: string
@@ -106,9 +117,11 @@ interface OverviewViewProps {
   overviewBlocksLoading: boolean
   mistakes: MistakeRow[]
   minigamePerf: MinigamePerfRow[]
+  sessionHistory: SessionHistoryRow[]
   hasAnyActivity: boolean
   hasMistakeData: boolean
   hasMinigamePerfData: boolean
+  hasSessionHistory: boolean
   charMasteryExpanded: boolean
   expandedBlocks: string | null
   overviewSectionExpanded: Record<OverviewSectionKey, boolean>
@@ -137,9 +150,11 @@ export function OverviewView({
   overviewBlocksLoading,
   mistakes,
   minigamePerf,
+  sessionHistory,
   hasAnyActivity,
   hasMistakeData,
   hasMinigamePerfData,
+  hasSessionHistory,
   charMasteryExpanded,
   expandedBlocks,
   overviewSectionExpanded,
@@ -628,6 +643,49 @@ export function OverviewView({
                     <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`accuracy-${windowData.days}-${windowData.accuracy}`} className="live-value">{windowData.accuracy}%</strong> accuracy</span>
                     <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`earned-${windowData.days}-${windowData.points_earned}`} className="live-value">{windowData.points_earned}</strong> points</span>
                     <span className="metric-accent-warning"><CalendarDays aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`days-${windowData.days}-${windowData.active_days}`} className="live-value">{windowData.active_days}</strong> active days</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── Session History ─────────────────────────────────────────── */}
+      <section className="panel-glass mistakes-summary-panel overview-collapsible-panel">
+        <button
+          type="button"
+          className="overview-panel-toggle"
+          onClick={() => onToggleSection('sessionHistory')}
+          aria-expanded={overviewSectionExpanded.sessionHistory}
+          aria-controls="overview-session-history-body"
+        >
+          <div className="panel-head">
+            <h2 className="panel-title-with-icon"><CalendarDays aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Session History</h2>
+            <div className="panel-actions">
+              <span>Recent completed study sessions</span>
+            </div>
+            <span className={`overview-panel-chevron ${overviewSectionExpanded.sessionHistory ? 'is-open' : ''}`} aria-hidden="true">▾</span>
+          </div>
+        </button>
+
+        <div id="overview-session-history-body" className={`overview-panel-body ${overviewSectionExpanded.sessionHistory ? 'is-open' : ''}`}>
+          {!hasSessionHistory ? (
+            <p className="status-line">No completed sessions yet. Finish a study session to see it here.</p>
+          ) : (
+            <div className="mistake-grid">
+              {sessionHistory.map((row, index) => (
+                <article
+                  key={row.session_id}
+                  className="mistake-card"
+                  style={{ animationDelay: `${140 + index * 60}ms` }}
+                >
+                  <h3>{new Date(row.started_at_utc).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</h3>
+                  <div className="mistake-card-metrics">
+                    <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`rev-${row.session_id}-${row.reviewed}`} className="live-value">{row.reviewed}</strong> reviewed</span>
+                    <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`acc-${row.session_id}-${row.accuracy}`} className="live-value">{row.accuracy}%</strong> accuracy</span>
+                    <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`cor-${row.session_id}-${row.correct}`} className="live-value">{row.correct}</strong> correct</span>
+                    <span className={`metric-accent-${row.goal_met ? 'success' : 'danger'}`}><CheckCircle2 aria-hidden="true" className="chip-icon" strokeWidth={2.2} />{row.goal_met ? 'Goal met' : `Target: ${row.target_items}`}</span>
                   </div>
                 </article>
               ))}
