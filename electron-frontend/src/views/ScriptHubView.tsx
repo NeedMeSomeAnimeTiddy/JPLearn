@@ -47,6 +47,7 @@ interface BlockInfo {
 interface BasicCard {
   id: number
   is_leech: boolean
+  tags?: string[]
 }
 
 interface ScriptHubViewProps {

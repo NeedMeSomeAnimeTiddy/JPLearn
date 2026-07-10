@@ -143,6 +143,7 @@ interface AppSettings {
   assistantChatOcrMinConfidence: number
   showKeyboardPrompts: boolean
   furiganaEnabled: boolean
+  furiganaAutoHideMastered: boolean
   voiceEnabled: boolean
   voiceSpeaker: string
   voiceSpeed: number
@@ -174,6 +175,7 @@ interface RoundState {
   answer: string
   answerDisplay?: string | null
   options: RoundOption[]
+  isMastered?: boolean
 }
 
 interface ScriptStats {
@@ -621,6 +623,7 @@ function defaultSettings(): AppSettings {
     assistantChatOcrMinConfidence: 0.3,
     showKeyboardPrompts: false,
     furiganaEnabled: false,
+    furiganaAutoHideMastered: false,
     voiceEnabled: true,
     voiceSpeaker: 'zundamon_normal',
     voiceSpeed: DEFAULT_VOICE_SPEED,
@@ -717,6 +720,10 @@ function loadSettings(): AppSettings {
         typeof parsed.furiganaEnabled === 'boolean'
           ? parsed.furiganaEnabled
           : defaults.furiganaEnabled,
+      furiganaAutoHideMastered:
+        typeof parsed.furiganaAutoHideMastered === 'boolean'
+          ? parsed.furiganaAutoHideMastered
+          : defaults.furiganaAutoHideMastered,
       voiceEnabled:
         typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
       voiceSpeaker:
@@ -3022,6 +3029,7 @@ function App() {
       const card = cards[cardIndex]
       const surpriseLabel = pickSurprisePrompt(activeScript, minigame, card.tags, promptSeed)
       const currentScore = cardScores[activeScript][card.id] ?? 0
+      const isMasteredBuild = currentScore >= CARD_MASTERY_MAX
       const persistedStage = normalizeCurriculumStage(card.curriculum_stage)
       const scoreStage = curriculumStageFromScore(currentScore)
       const curriculumStage = isGrammarCurriculumMode(minigame)
@@ -3054,6 +3062,7 @@ function App() {
           focusText: card.character,
           answer: card.romaji,
           options: [],
+          isMastered: isMasteredBuild,
         }
       }
 
@@ -3077,6 +3086,7 @@ function App() {
           focusText: card.character,
           answer: card.meaning,
           options: [],
+          isMastered: isMasteredBuild,
         }
       }
 
@@ -3100,6 +3110,7 @@ function App() {
           focusText: card.character,
           answer: card.meaning,
           options: [],
+          isMastered: isMasteredBuild,
         }
       }
 
@@ -3123,6 +3134,7 @@ function App() {
           focusText: card.meaning,
           answer: card.character,
           options: [],
+          isMastered: isMasteredBuild,
         }
       }
 
@@ -3398,6 +3410,7 @@ function App() {
             focusText: allKana,
             answer: allKana,
             options: [],
+          isMastered: isMasteredBuild,
           }
         }
         const dictationAnswer = toHiragana(card.romaji.replace(/\s+/g, ''))
@@ -3417,6 +3430,7 @@ function App() {
           focusText: card.character,
           answer: dictationAnswer,
           options: [],
+          isMastered: isMasteredBuild,
         }
       }
 
@@ -3488,7 +3502,8 @@ function App() {
       dictionaryNote,
       exampleSentenceHint,
     })
-    if (bridgeRound) return bridgeRound
+    const isMasteredFromBridge = currentScore >= CARD_MASTERY_MAX
+    if (bridgeRound) return { ...bridgeRound, isMastered: isMasteredFromBridge }
 
     return buildRound(cards, minigame, cardIndex, surprisePrompt, promptSeed)
   }, [activeScript, buildBridgeGrammarRound, buildRound, cardScores])
@@ -5613,6 +5628,7 @@ function App() {
           voiceEnabled={settings.voiceEnabled}
           showKeyboardPrompts={settings.showKeyboardPrompts}
           furiganaEnabled={settings.furiganaEnabled}
+          furiganaAutoHideMastered={settings.furiganaAutoHideMastered}
           activeBlockCards={activeBlockCards}
           onBack={() => {
             setNavDirection('back')
@@ -5911,8 +5927,21 @@ function App() {
                       </span>
                       <span className="settings-icon-entry-label">Show furigana (kana above kanji)</span>
                     </button>
+                    <button
+                      type="button"
+                      className={`settings-icon-entry settings-theme-entry ${settings.furiganaAutoHideMastered ? 'is-active' : ''}`}
+                      onClick={() => setSettings((prev) => ({ ...prev, furiganaAutoHideMastered: !prev.furiganaAutoHideMastered }))}
+                      aria-label={settings.furiganaAutoHideMastered ? 'Furigana auto-hide on mastered cards is enabled. Activate to disable.' : 'Furigana auto-hide on mastered cards is disabled. Activate to enable.'}
+                      aria-pressed={settings.furiganaAutoHideMastered}
+                      title={settings.furiganaAutoHideMastered ? 'Auto-hide enabled' : 'Auto-hide disabled'}
+                    >
+                      <span className={`settings-mode-icon-button ${settings.furiganaAutoHideMastered ? 'is-enabled' : ''}`} aria-hidden="true">
+                        <CheckCircle2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                      </span>
+                      <span className="settings-icon-entry-label">Auto-hide furigana on mastered cards</span>
+                    </button>
                   </div>
-                  <p className="settings-help">When on, kana readings appear above kanji during review to help build reading confidence. Turn off as you progress.</p>
+                  <p className="settings-help">When on, kana readings appear above kanji during review. When auto-hide is also enabled, cards you've mastered will hide furigana — helping you graduate from reading aids.</p>
                 </SettingsCollapsibleSection>
                 <SettingsCollapsibleSection
                   id="cursor"

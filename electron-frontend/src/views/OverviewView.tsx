@@ -18,6 +18,7 @@ import {
 import type { CardScores, JlptLevel, JlptLevelProgress } from '../types'
 import { KANJI_OVERVIEW_PAGE_SIZE } from '../constants'
 import { jlptTagFromCard } from '../utils'
+import { formatTagLabel } from '../utils'
 import { useHeatmap } from '../features/heatmap'
 import { ActivityCalendar } from 'react-activity-calendar'
 
@@ -429,6 +430,9 @@ export function OverviewView({
                                     <span className="char-mastery-chip-copy">
                                       <span className="char-mastery-chip-reading">{card.romaji}</span>
                                       <span className="char-mastery-chip-meaning">{card.meaning}</span>
+                                      {card.tags.length > 0 ? (
+                                        <span className="char-mastery-chip-tag">{formatTagLabel(card.tags[0])}</span>
+                                      ) : null}
                                     </span>
                                   </button>
                                 )

@@ -31,7 +31,7 @@ import { isGrammarCurriculumMode, sanitizeRomajiInput } from '../utils'
 import { useSession } from '../context/SessionContext'
 
 // Minimal card shape needed for stroke-order answer candidates.
-type BasicCard = { id: number; character: string; romaji: string; meaning: string; dictionary_summary?: { reading: string } | null }
+type BasicCard = { id: number; character: string; romaji: string; meaning: string; dictionary_summary?: { reading: string } | null; tags?: string[] }
 
 interface MinigameViewProps {
   navDirection: NavDirection
@@ -44,6 +44,7 @@ interface MinigameViewProps {
   voiceEnabled: boolean
   showKeyboardPrompts: boolean
   furiganaEnabled: boolean
+  furiganaAutoHideMastered: boolean
   activeBlockCards: BasicCard[]
   onBack: () => void
   onOpenDictionary: (seedQuery?: string) => void
@@ -62,6 +63,7 @@ export function MinigameView({
   voiceEnabled,
   showKeyboardPrompts,
   furiganaEnabled,
+  furiganaAutoHideMastered,
   activeBlockCards,
   onBack,
   onOpenDictionary,
@@ -513,8 +515,11 @@ export function MinigameView({
                       voiceUnavailable={voiceUnavailable}
                       showKeyboardPrompts={showKeyboardPrompts}
                       furiganaEnabled={furiganaEnabled}
+                      furiganaAutoHideMastered={furiganaAutoHideMastered}
                       focusReading={furiganaEnabled ? (activeBlockCards.find((c) => c.id === roundState.cardId)?.dictionary_summary?.reading ?? null) : null}
                       showRevealText={roundFeedback !== null}
+                      isMastered={Boolean(roundState.isMastered)}
+                      cardTags={activeBlockCards.find((c) => c.id === roundState.cardId)?.tags ?? []}
                       hintPopoverOpen={hintPopoverOpen}
                       hintButtonRef={hintButtonRef}
                       onPlayAudio={playAudio}

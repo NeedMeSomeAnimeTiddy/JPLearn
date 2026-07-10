@@ -95,3 +95,43 @@ export function jlptTagFromCard(card: CardWithTags): JlptLevel {
   }
   return 'n5'
 }
+
+// ── Tag display ────────────────────────────────────────────────────────────────
+
+const TAG_LABELS: Record<string, string> = {
+  hiragana: 'Hiragana',
+  katakana: 'Katakana',
+  kanji: 'Kanji',
+  vocab: 'Vocab',
+  grammar: 'Grammar',
+  sentence: 'Sentence',
+  example: 'Example',
+  conjugation: 'Conjugation',
+  n5: 'N5',
+  n4: 'N4',
+  n3: 'N3',
+  n2: 'N2',
+  n1: 'N1',
+  kanji_numbers_time: 'Numbers & Time',
+  kanji_nature_world: 'Nature & World',
+  kanji_people_body: 'People & Body',
+  kanji_study_language: 'Study & Language',
+  kanji_actions_travel: 'Actions & Travel',
+  vocab_greetings: 'Greetings',
+  vocab_numbers: 'Numbers',
+  vocab_time_days: 'Time & Days',
+  vocab_family: 'Family',
+  vocab_body: 'Body',
+  vocab_food_drink: 'Food & Drink',
+  vocab_school_study: 'School & Study',
+  vocab_places: 'Places',
+  vocab_transport: 'Transport',
+  vocab_adjectives: 'Adjectives',
+  vocab_verbs: 'Verbs',
+  vocab_nouns: 'Nouns',
+  offline_dictionary: 'Dictionary',
+}
+
+export function formatTagLabel(tag: string): string {
+  return TAG_LABELS[tag] ?? tag.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}

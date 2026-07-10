@@ -5093,6 +5093,12 @@ html[data-reduced-motion='true'] .home-hero-steam {
   color: var(--text-main);
 }
 
+.char-mastery-chip-tag {
+  font-size: 0.56rem;
+  color: var(--text-soft);
+  letter-spacing: 0.04em;
+}
+
 .char-mastery-chip:hover {
   transform: translateY(-1px) scale(1.04);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);

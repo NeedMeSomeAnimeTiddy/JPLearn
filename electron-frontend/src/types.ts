@@ -155,6 +155,7 @@ export interface RoundState {
   answer: string
   answerDisplay?: string | null
   options: RoundOption[]
+  isMastered?: boolean
 }
 
 export interface SessionRunReport {

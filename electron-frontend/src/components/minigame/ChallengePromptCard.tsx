@@ -1,6 +1,7 @@
 import { Lightbulb, Volume2 } from 'lucide-react'
 import { TypeAnimation } from 'react-type-animation'
 import type { RoundState, ScriptKey } from '../../types'
+import { formatTagLabel } from '../../utils'
 
 function promptSizeClass(text: string): string {
   const length = Array.from(text.trim()).length
@@ -18,8 +19,11 @@ interface ChallengePromptCardProps {
   voiceUnavailable: boolean
   showKeyboardPrompts: boolean
   furiganaEnabled: boolean
+  furiganaAutoHideMastered: boolean
   focusReading: string | null
   showRevealText: boolean
+  isMastered: boolean
+  cardTags: string[]
   hintPopoverOpen: boolean
   hintButtonRef: React.RefObject<HTMLButtonElement | null>
   onPlayAudio: (text: string) => void
@@ -34,8 +38,11 @@ export function ChallengePromptCard({
   voiceUnavailable,
   showKeyboardPrompts,
   furiganaEnabled,
+  furiganaAutoHideMastered,
   focusReading,
   showRevealText,
+  isMastered,
+  cardTags,
   hintPopoverOpen,
   hintButtonRef,
   onPlayAudio,
@@ -55,7 +62,8 @@ export function ChallengePromptCard({
     .filter(Boolean)
     .join(' ')
 
-  const effectiveReading = furiganaEnabled && focusReading && focusReading !== roundState.focusText ? focusReading : null
+  const shouldHideMastered = furiganaAutoHideMastered && isMastered
+  const effectiveReading = furiganaEnabled && !shouldHideMastered && focusReading && focusReading !== roundState.focusText ? focusReading : null
   const promptContent = (
     <TypeAnimation key={`prompt-${roundState.focusText}`} sequence={[roundState.focusText]} speed={5} cursor={false} style={{ display: 'inline' }} />
   )
@@ -63,8 +71,15 @@ export function ChallengePromptCard({
   return (
     <div className="game-prompt-focus minigame-prompt-card">
       <div className="minigame-prompt-head">
-        <p className="game-prompt-label">{roundState.promptLabel}</p>
-        <button
+          <p className="game-prompt-label">{roundState.promptLabel}</p>
+          {cardTags.length > 0 ? (
+            <div className="dictionary-tag-row" aria-label="Card tags" style={{ justifyContent: 'center', marginTop: 0, marginBottom: 10 }}>
+              {cardTags.map((tag) => (
+                <span key={tag} className="dictionary-tag">{formatTagLabel(tag)}</span>
+              ))}
+            </div>
+          ) : null}
+          <button
           ref={hintButtonRef}
           type="button"
           className={`game-speak-icon-button minigame-hint-trigger ${hintPopoverOpen ? 'is-active' : ''}`}
