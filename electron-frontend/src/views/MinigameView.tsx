@@ -56,6 +56,7 @@ interface MinigameViewProps {
   pomodoroDisplay: PomodoroDisplay | null
   onPomodoroSkip: () => void
   onPomodoroStartNext: () => void
+  onPomodoroToggle: () => void
 }
 
 export function MinigameView({
@@ -78,6 +79,7 @@ export function MinigameView({
   pomodoroDisplay,
   onPomodoroSkip,
   onPomodoroStartNext,
+  onPomodoroToggle,
 }: MinigameViewProps) {
   const {
     sessionActive,
@@ -503,10 +505,15 @@ export function MinigameView({
                         <span>x</span>
                       </span>
                       {pomodoroDisplay ? (
-                        <span className={`game-hud-stat pomodoro-stat ${pomodoroDisplay.phase === 'break' || pomodoroDisplay.phase === 'long-break' ? 'pomodoro-stat--break' : ''}`}>
+                        <button
+                          type="button"
+                          className={`game-hud-stat pomodoro-stat ${pomodoroDisplay.phase === 'break' || pomodoroDisplay.phase === 'long-break' ? 'pomodoro-stat--break' : ''} pomodoro-stat--clickable`}
+                          onClick={onPomodoroToggle}
+                          aria-label={pomodoroDisplay.isRunning ? `Pause timer (${pomodoroDisplay.formatted})` : `Resume timer (${pomodoroDisplay.formatted})`}
+                        >
                           <Clock aria-hidden="true" size={11} strokeWidth={2.2} />
                           <strong>{pomodoroDisplay.formatted}</strong>
-                        </span>
+                        </button>
                       ) : null}
                       <span className="game-hud-stat">
                         <Target aria-hidden="true" size={11} strokeWidth={2.2} />

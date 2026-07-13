@@ -7,7 +7,7 @@ import type {
   PomodoroState,
   UsePomodoroReturn,
 } from './types'
-import { calculateBreakDuration, formatTimerDisplay } from './utils'
+import { formatTimerDisplay } from './utils'
 
 function createIdleState(): PomodoroState {
   return { phase: 'idle', secondsRemaining: 0, completedWorkSessions: 0, isRunning: false }
@@ -19,7 +19,6 @@ export function usePomodoro(
 ): UsePomodoroReturn {
   const [state, setState] = useState<PomodoroState>(createIdleState)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const activeSessionRef = useRef(false)
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -36,20 +35,11 @@ export function usePomodoro(
       completedWorkSessions: prev.completedWorkSessions,
       isRunning: true,
     }))
-
-    intervalRef.current = setInterval(() => {
-      setState((prev) => {
-        const next = prev.secondsRemaining - 1
-        if (next <= 0) return { ...prev, secondsRemaining: 0, isRunning: false }
-        return { ...prev, secondsRemaining: next }
-      })
-    }, 1000)
   }, [clearTimer])
 
   const startWork = useCallback(() => {
     startPhase('work', settings.pomodoroWorkMinutes * 60)
   }, [startPhase, settings.pomodoroWorkMinutes])
-
 
   const pause = useCallback(() => {
     clearTimer()
@@ -79,21 +69,15 @@ export function usePomodoro(
           isRunning: false,
         }
       }
-      return { ...prev, phase: 'idle', secondsRemaining: 0, isRunning: false }
+      setState(createIdleState())
+      return createIdleState()
     })
   }, [clearTimer, settings.pomodoroBreakMinutes, settings.pomodoroLongBreakMinutes, settings.pomodoroSessionsBeforeLongBreak])
 
   const reset = useCallback(() => {
     clearTimer()
     setState(createIdleState())
-    activeSessionRef.current = false
   }, [clearTimer])
-
-  useEffect(() => {
-    if (state.secondsRemaining <= 0 && state.isRunning) {
-      clearTimer()
-    }
-  }, [state.secondsRemaining, state.isRunning, clearTimer])
 
   useEffect(() => {
     if (state.phase === 'idle') return
@@ -151,33 +135,21 @@ export function usePomodoro(
 
   const isActive = settings.pomodoroEnabled && state.phase !== 'idle'
 
-  const onSessionStart = useCallback(() => {
-    if (!settings.pomodoroEnabled) return
-    activeSessionRef.current = true
-    startWork()
-  }, [settings.pomodoroEnabled, startWork])
+  // Timer is manual-only — sessions do not auto-start or auto-end it.
+  const onSessionStart = useCallback(() => {}, [])
+  const onSessionEnd = useCallback(() => {}, [])
 
-  const onSessionEnd = useCallback(() => {
-    if (!settings.pomodoroEnabled || !activeSessionRef.current) return
-    activeSessionRef.current = false
-
+  const toggle = useCallback(() => {
     setState((prev) => {
-      if (prev.phase !== 'work') return prev
-      const nextSessions = prev.completedWorkSessions + 1
-      const isLong = (nextSessions % settings.pomodoroSessionsBeforeLongBreak) === 0
-      return {
-        phase: isLong ? 'long-break' : 'break',
-        secondsRemaining: calculateBreakDuration(
-          nextSessions,
-          settings.pomodoroSessionsBeforeLongBreak,
-          settings.pomodoroBreakMinutes,
-          settings.pomodoroLongBreakMinutes,
-        ),
-        completedWorkSessions: nextSessions,
-        isRunning: true,
+      if (prev.phase === 'idle' || prev.secondsRemaining <= 0) {
+        // When idle or expired, start a new work phase. Use setTimeout to avoid
+        // setState-during-setState when called from a setState update.
+        window.setTimeout(() => { startWork() }, 0)
+        return prev
       }
+      return { ...prev, isRunning: !prev.isRunning }
     })
-  }, [settings.pomodoroEnabled, settings.pomodoroBreakMinutes, settings.pomodoroLongBreakMinutes, settings.pomodoroSessionsBeforeLongBreak])
+  }, [startWork])
 
   return {
     state,
@@ -186,6 +158,7 @@ export function usePomodoro(
     startWork,
     pause,
     resume,
+    toggle,
     skip,
     reset,
     onSessionStart,

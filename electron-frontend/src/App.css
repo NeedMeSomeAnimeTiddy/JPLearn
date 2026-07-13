@@ -7284,6 +7284,19 @@ html[data-reduced-motion='true'] .cassette-reel {
   opacity: 0.75;
 }
 
+.pomodoro-stat--clickable {
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.pomodoro-stat--clickable:hover {
+  opacity: 1;
+}
+
 .pomodoro-stat--break strong {
   color: var(--green-11);
 }

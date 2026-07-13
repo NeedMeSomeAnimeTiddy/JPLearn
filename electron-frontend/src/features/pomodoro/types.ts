@@ -31,6 +31,7 @@ export interface UsePomodoroReturn {
   startWork: () => void
   pause: () => void
   resume: () => void
+  toggle: () => void
   skip: () => void
   reset: () => void
   onSessionStart: () => void

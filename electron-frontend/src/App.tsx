@@ -5739,6 +5739,7 @@ function App() {
           pomodoroDisplay={pomodoro.display}
           onPomodoroSkip={pomodoro.skip}
           onPomodoroStartNext={pomodoro.startWork}
+          onPomodoroToggle={pomodoro.toggle}
         />
       ) : null}
 
