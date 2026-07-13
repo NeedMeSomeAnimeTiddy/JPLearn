@@ -5483,6 +5483,11 @@ html[data-reduced-motion='true'] .home-hero-steam {
   color: var(--green-9);
 }
 
+.titlebar-pomodoro-value {
+  min-width: 2.6rem;
+  text-align: center;
+}
+
 .titlebar-streak-details {
   position: absolute;
   top: calc(100% + 8px);

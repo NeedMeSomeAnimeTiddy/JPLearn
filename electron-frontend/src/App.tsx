@@ -5279,6 +5279,20 @@ function App() {
           </div>
         </div>
         <div className="titlebar-progress-cluster">
+          {settings.pomodoroEnabled ? (
+            <button
+              type="button"
+              className={`titlebar-streak-chip ${pomodoro.display && (pomodoro.display.phase === 'break' || pomodoro.display.phase === 'long-break') ? 'titlebar-pomodoro--break' : ''}`}
+              onClick={pomodoro.toggle}
+              aria-label={pomodoro.display ? `${pomodoro.display.isRunning ? 'Pause' : 'Resume'} timer (${pomodoro.display.formatted})` : 'Start timer'}
+              title={pomodoro.display ? `${pomodoro.display.phase} — ${pomodoro.display.formatted}` : 'Start timer'}
+            >
+              <Clock className="titlebar-streak-icon" strokeWidth={2.1} aria-hidden="true" />
+              <span className="titlebar-streak-value titlebar-pomodoro-value">
+                {pomodoro.display ? pomodoro.display.formatted : 'Start'}
+              </span>
+            </button>
+          ) : null}
           <div className="titlebar-streak" ref={streakDetailsRef}>
             <button
               type="button"
@@ -5331,21 +5345,6 @@ function App() {
               </p>
             </div>
           </div>
-
-          {settings.pomodoroEnabled ? (
-            <button
-              type="button"
-              className={`titlebar-streak-chip ${pomodoro.display && (pomodoro.display.phase === 'break' || pomodoro.display.phase === 'long-break') ? 'titlebar-pomodoro--break' : ''}`}
-              onClick={pomodoro.toggle}
-              aria-label={pomodoro.display ? `${pomodoro.display.isRunning ? 'Pause' : 'Resume'} timer (${pomodoro.display.formatted})` : 'Start timer'}
-              title={pomodoro.display ? `${pomodoro.display.phase} — ${pomodoro.display.formatted}` : 'Start timer'}
-            >
-              <Clock className="titlebar-streak-icon" strokeWidth={2.1} aria-hidden="true" />
-              <span className="titlebar-streak-value">
-                {pomodoro.display ? pomodoro.display.formatted : 'Start'}
-              </span>
-            </button>
-          ) : null}
 
           {xpProgress ? (
             <div className="titlebar-xp" ref={xpDetailsRef}>
