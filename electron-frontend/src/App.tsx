@@ -26,7 +26,7 @@ import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode } from './utils'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Upload, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Upload, X } from 'lucide-react'
 import './App.css'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -37,7 +37,7 @@ import { useModels } from './features/models'
 import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, type TutorSettingsFields } from './features/tutor'
 import type { AssistantToast } from './features/tutor'
 import { useCursor, CursorFollower, CursorSettingsTab, type CursorSettings } from './features/cursor'
-import { usePomodoro, PomodoroSettingsTab, type PomodoroSettingsFields } from './features/pomodoro'
+import { usePomodoro, BreakOverlay, PomodoroSettingsTab, type PomodoroSettingsFields } from './features/pomodoro'
 import { DevDashboard } from './features/devtools'
 import { SURPRISE_PROMPTS, SCRIPT_MODE_PROMPT_PACKS, TAG_PROMPT_PACKS, CLOZE_TEMPLATES, STORY_CHAPTERS } from './lib/contentTemplates'
 import type { RoundDictionaryNote } from './types'
@@ -5332,6 +5332,21 @@ function App() {
             </div>
           </div>
 
+          {settings.pomodoroEnabled ? (
+            <button
+              type="button"
+              className={`titlebar-streak-chip ${pomodoro.display && (pomodoro.display.phase === 'break' || pomodoro.display.phase === 'long-break') ? 'titlebar-pomodoro--break' : ''}`}
+              onClick={pomodoro.toggle}
+              aria-label={pomodoro.display ? `${pomodoro.display.isRunning ? 'Pause' : 'Resume'} timer (${pomodoro.display.formatted})` : 'Start timer'}
+              title={pomodoro.display ? `${pomodoro.display.phase} — ${pomodoro.display.formatted}` : 'Start timer'}
+            >
+              <Clock className="titlebar-streak-icon" strokeWidth={2.1} aria-hidden="true" />
+              <span className="titlebar-streak-value">
+                {pomodoro.display ? pomodoro.display.formatted : 'Start'}
+              </span>
+            </button>
+          ) : null}
+
           {xpProgress ? (
             <div className="titlebar-xp" ref={xpDetailsRef}>
               <button
@@ -5736,10 +5751,6 @@ function App() {
           onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
           onOpenSettings={openSettingsFromMenu}
           onRetry={handleRetry}
-          pomodoroDisplay={pomodoro.display}
-          onPomodoroSkip={pomodoro.skip}
-          onPomodoroStartNext={pomodoro.startWork}
-          onPomodoroToggle={pomodoro.toggle}
         />
       ) : null}
 
@@ -6810,6 +6821,12 @@ function App() {
           onClose={() => { setDevDashboardOpen(false); setPendingDevCheck(null) }}
         />
       ) : null}
+
+      <BreakOverlay
+        display={pomodoro.display && (pomodoro.display.phase === 'break' || pomodoro.display.phase === 'long-break') ? pomodoro.display : null}
+        onSkip={pomodoro.skip}
+        onStartNext={pomodoro.startWork}
+      />
 
       </div>
     </main>

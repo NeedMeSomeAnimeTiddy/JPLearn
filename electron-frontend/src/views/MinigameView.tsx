@@ -4,7 +4,6 @@ import { AnimatePresence } from 'motion/react'
 import {
   Activity,
   ArrowLeft,
-  Clock,
   Flame,
   LoaderCircle,
   Play,
@@ -14,7 +13,6 @@ import {
 import { ChallengePromptCard } from '../components/minigame/ChallengePromptCard'
 import { ChoiceAnswerPanel } from '../components/minigame/ChoiceAnswerPanel'
 import { HintPopover } from '../components/minigame/HintPopover'
-import { BreakOverlay, type PomodoroDisplay } from '../features/pomodoro'
 import { MinigameHud } from '../components/minigame/MinigameHud'
 import { MinigameResponsePanel } from '../components/minigame/MinigameResponsePanel'
 import { QueuePreview } from '../components/minigame/QueuePreview'
@@ -53,10 +51,6 @@ interface MinigameViewProps {
   onOpenDictionary: (seedQuery?: string) => void
   onOpenSettings: () => void
   onRetry: (cardIds: number[]) => void
-  pomodoroDisplay: PomodoroDisplay | null
-  onPomodoroSkip: () => void
-  onPomodoroStartNext: () => void
-  onPomodoroToggle: () => void
 }
 
 export function MinigameView({
@@ -76,10 +70,6 @@ export function MinigameView({
   onOpenDictionary,
   onOpenSettings,
   onRetry,
-  pomodoroDisplay,
-  onPomodoroSkip,
-  onPomodoroStartNext,
-  onPomodoroToggle,
 }: MinigameViewProps) {
   const {
     sessionActive,
@@ -504,17 +494,6 @@ export function MinigameView({
                         <strong>{sessionStreak}</strong>
                         <span>x</span>
                       </span>
-                      {pomodoroDisplay ? (
-                        <button
-                          type="button"
-                          className={`game-hud-stat pomodoro-stat ${pomodoroDisplay.phase === 'break' || pomodoroDisplay.phase === 'long-break' ? 'pomodoro-stat--break' : ''} pomodoro-stat--clickable`}
-                          onClick={onPomodoroToggle}
-                          aria-label={pomodoroDisplay.isRunning ? `Pause timer (${pomodoroDisplay.formatted})` : `Resume timer (${pomodoroDisplay.formatted})`}
-                        >
-                          <Clock aria-hidden="true" size={11} strokeWidth={2.2} />
-                          <strong>{pomodoroDisplay.formatted}</strong>
-                        </button>
-                      ) : null}
                       <span className="game-hud-stat">
                         <Target aria-hidden="true" size={11} strokeWidth={2.2} />
                         <strong>{sessionScore}/{sessionRounds}</strong>
@@ -719,11 +698,6 @@ export function MinigameView({
           </div>
         </div>
       </div>
-      <BreakOverlay
-        display={pomodoroDisplay}
-        onSkip={onPomodoroSkip}
-        onStartNext={onPomodoroStartNext}
-      />
     </div>
   )
 }

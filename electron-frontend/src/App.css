@@ -5475,6 +5475,14 @@ html[data-reduced-motion='true'] .home-hero-steam {
   color: inherit;
 }
 
+.titlebar-pomodoro--break {
+  color: var(--green-11);
+}
+
+.titlebar-pomodoro--break:hover {
+  color: var(--green-9);
+}
+
 .titlebar-streak-details {
   position: absolute;
   top: calc(100% + 8px);

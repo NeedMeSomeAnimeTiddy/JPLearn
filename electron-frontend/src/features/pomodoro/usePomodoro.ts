@@ -140,16 +140,12 @@ export function usePomodoro(
   const onSessionEnd = useCallback(() => {}, [])
 
   const toggle = useCallback(() => {
-    setState((prev) => {
-      if (prev.phase === 'idle' || prev.secondsRemaining <= 0) {
-        // When idle or expired, start a new work phase. Use setTimeout to avoid
-        // setState-during-setState when called from a setState update.
-        window.setTimeout(() => { startWork() }, 0)
-        return prev
-      }
-      return { ...prev, isRunning: !prev.isRunning }
-    })
-  }, [startWork])
+    if (state.phase === 'idle' || state.secondsRemaining <= 0) {
+      startWork()
+      return
+    }
+    setState((prev) => ({ ...prev, isRunning: !prev.isRunning }))
+  }, [state.phase, state.secondsRemaining, startWork])
 
   return {
     state,
