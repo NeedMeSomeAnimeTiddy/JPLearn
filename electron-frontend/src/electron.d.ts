@@ -402,6 +402,17 @@ interface AssistantChatOcrTranslationResponse {
   }
 }
 
+interface OptimizeFSRSResult {
+  ok: boolean
+  error?: string
+  previous_weights?: number[]
+  new_weights?: number[]
+  loss_before?: number
+  loss_after?: number
+  log_count?: number
+  card_count?: number
+}
+
 interface DesktopApi {
   versions: DesktopVersions
   getStudySummary: () => Promise<StudySummary>
@@ -555,6 +566,10 @@ interface DesktopApi {
   getSnapshot?: () => Promise<SnapshotData>
   runCheck?: (name: 'arch' | 'db' | 'srs') => Promise<CheckResult>
   testNotification?: () => Promise<{ ok: boolean; error?: string }>
+  // ─ FSRS Optimization ─────────────────────────────────────────────────
+  getFSRSWeights?: () => Promise<{ weights: number[]; is_custom: boolean }>
+  optimizeFSRS?: () => Promise<OptimizeFSRSResult>
+  resetFSRSWeights?: () => Promise<{ ok: boolean; weights: number[] }>
   searchDictionary?: (query: string) => Promise<DictionaryLookupPayload>
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>

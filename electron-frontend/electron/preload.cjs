@@ -119,4 +119,8 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getSnapshot: () => ipcRenderer.invoke('debug:snapshot'),
   runCheck: (name) => ipcRenderer.invoke('debug:run-check', name),
   testNotification: () => ipcRenderer.invoke('debug:test-notification'),
+  // ─ FSRS Optimization ──────────────────────────────────────────────────
+  getFSRSWeights: () => ipcRenderer.invoke('fsrs:get-weights'),
+  optimizeFSRS: () => ipcRenderer.invoke('fsrs:optimize'),
+  resetFSRSWeights: () => ipcRenderer.invoke('fsrs:reset-weights'),
 })

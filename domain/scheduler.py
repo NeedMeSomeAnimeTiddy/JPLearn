@@ -55,10 +55,35 @@ _TARGET_RETENTION = 0.9
 
 # FSRS-4.5 default optimizer weights (17 values). See
 # https://github.com/open-spaced-repetition/fsrs4anki for derivation.
-_W: tuple[float, ...] = (
+_DEFAULT_W: tuple[float, ...] = (
     0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14,
     0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61,
 )
+
+# Active weights — may be overridden via set_weights() (e.g. by the FSRS
+# optimizer in domain/fsrs_optimizer.py). Module-level mutable state by design
+# so existing callers are unaffected.
+_W: tuple[float, ...] = _DEFAULT_W
+
+
+def get_weights() -> tuple[float, ...]:
+    """Return the currently active FSRS weights (custom or default)."""
+    return _W
+
+
+def set_weights(weights: tuple[float, ...]) -> None:
+    """Override the active FSRS weights.
+
+    Call :func:`reset_weights` to revert to the default values.
+    """
+    global _W
+    _W = weights
+
+
+def reset_weights() -> None:
+    """Revert to the default FSRS-4.5 weights."""
+    global _W
+    _W = _DEFAULT_W
 
 _MIN_DIFFICULTY = 1.0
 _MAX_DIFFICULTY = 10.0

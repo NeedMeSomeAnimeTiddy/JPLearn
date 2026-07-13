@@ -26,7 +26,7 @@ import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode } from './utils'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, X } from 'lucide-react'
 import './App.css'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -1718,6 +1718,7 @@ function App() {
     'close-behavior': true,
     'auto-start': true,
     'data-management': true,
+    'fsrs-optimization': true,
   })
   const theme = useTheme(
     settings as ThemeSettingsFields,
@@ -1794,6 +1795,9 @@ function App() {
   const [showOverview, setShowOverview] = useState(false)
   const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0)
   const [resettingDb, setResettingDb] = useState(false)
+  const [optimizingFSRS, setOptimizingFSRS] = useState(false)
+  const [fsrsResult, setFsrsResult] = useState<{ ok: boolean; error?: string; loss_before?: number; loss_after?: number; card_count?: number; log_count?: number } | null>(null)
+  const [fsrsCustom, setFsrsCustom] = useState(false)
   const [isWindowMaximized, setIsWindowMaximized] = useState(false)
   const [shortcutMenuOpen, setShortcutMenuOpen] = useState(false)
   const [activeShortcutFlyout, setActiveShortcutFlyout] = useState<ShortcutSubmenuKey | null>(null)
@@ -4605,6 +4609,39 @@ function App() {
     }
   }, [loadSummary, refreshDeckProgressAfterSeedChange, resetRoundCycle])
 
+  const loadFSRSStatus = useCallback(async () => {
+    try {
+      const result = await window.jplearnDesktop?.getFSRSWeights?.()
+      if (result) {
+        setFsrsCustom(result.is_custom)
+      }
+    } catch { /* ignore */ }
+  }, [])
+
+  const optimizeFSRSWeights = useCallback(async () => {
+    setOptimizingFSRS(true)
+    setFsrsResult(null)
+    try {
+      const result = await window.jplearnDesktop?.optimizeFSRS?.()
+      setFsrsResult(result ?? null)
+      if (result?.ok) {
+        setFsrsCustom(true)
+      }
+    } catch (err) {
+      setFsrsResult({ ok: false, error: err instanceof Error ? err.message : 'Unknown error' })
+    } finally {
+      setOptimizingFSRS(false)
+    }
+  }, [])
+
+  const resetFSRSWeights = useCallback(async () => {
+    try {
+      await window.jplearnDesktop?.resetFSRSWeights?.()
+      setFsrsCustom(false)
+      setFsrsResult(null)
+    } catch { /* ignore */ }
+  }, [])
+
   const minimizeWindow = useCallback(() => {
     void window.jplearnDesktop?.minimizeWindow()
   }, [])
@@ -4618,6 +4655,12 @@ function App() {
       } catch { /* ignore */ }
     })()
   }, [])
+
+  useEffect(() => {
+    if (showSettings) {
+      void loadFSRSStatus()
+    }
+  }, [showSettings, loadFSRSStatus])
 
   const [showCloseDialog, setShowCloseDialog] = useState(false)
   const [closeBehavior, setCloseBehavior] = useState<'ask' | 'tray' | 'quit'>('ask')
@@ -6412,6 +6455,73 @@ function App() {
                           ? 'JPLearn will launch automatically when you log in to your computer.'
                           : 'JPLearn will only start when you open it manually.'}
                       </p>
+                    </div>
+                  </div>
+                </SettingsCollapsibleSection>
+
+                <SettingsCollapsibleSection
+                  id="fsrs-optimization"
+                  title="FSRS Optimization"
+                  description="Personalize spaced-repetition weights from your review history."
+                  collapsed={Boolean(collapsedSettingsSections['fsrs-optimization'])}
+                  onToggle={() => toggleThemeSectionCollapsed('fsrs-optimization')}
+                  className="settings-theme-card"
+                  hideChevron
+                >
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <button type="button" className="settings-icon-tile" aria-label="FSRS optimization">
+                      <BrainCircuit size={18} strokeWidth={2.1} />
+                    </button>
+                    <div className="settings-control-content">
+                      <p className="settings-section-label">Spaced Repetition Weights</p>
+                      <p className="settings-help" style={{ marginBottom: 12 }}>
+                        {fsrsCustom
+                          ? 'Personalized weights are active based on your review patterns.'
+                          : 'Using default FSRS v4.5 weights. Run optimization to personalize.'}
+                      </p>
+                      <div className="settings-animation-grid" role="group" aria-label="FSRS controls">
+                        <button
+                          type="button"
+                          className={`settings-icon-entry settings-theme-entry`}
+                          onClick={() => void optimizeFSRSWeights()}
+                          disabled={optimizingFSRS}
+                          aria-label="Optimize FSRS weights"
+                        >
+                          <span className={`settings-mode-icon-button ${fsrsCustom ? 'is-enabled' : ''}`} aria-hidden="true">
+                            <RefreshCw size={18} strokeWidth={2.25} className={optimizingFSRS ? 'spin-icon' : ''} />
+                          </span>
+                          <span className="settings-icon-entry-label">
+                            {optimizingFSRS ? 'Optimizing…' : 'Optimize'}
+                          </span>
+                        </button>
+                        {fsrsCustom && (
+                          <button
+                            type="button"
+                            className="settings-icon-entry settings-theme-entry"
+                            onClick={() => void resetFSRSWeights()}
+                            aria-label="Reset to default FSRS weights"
+                          >
+                            <span className="settings-mode-icon-button" aria-hidden="true">
+                              <RotateCcw size={18} strokeWidth={2.25} />
+                            </span>
+                            <span className="settings-icon-entry-label">Reset to Defaults</span>
+                          </button>
+                        )}
+                      </div>
+                      {fsrsResult && (
+                        <div style={{ marginTop: 12 }}>
+                          {fsrsResult.ok ? (
+                            <p className="settings-help" style={{ color: 'var(--green-11)' }}>
+                              Optimized. Loss: {fsrsResult.loss_before?.toFixed(4)} → {fsrsResult.loss_after?.toFixed(4)}
+                              {' '}({fsrsResult.card_count} cards, {fsrsResult.log_count} reviews)
+                            </p>
+                          ) : (
+                            <p className="settings-help" style={{ color: 'var(--red-11)' }}>
+                              {fsrsResult.error || 'Optimization failed'}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </SettingsCollapsibleSection>

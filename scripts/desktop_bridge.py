@@ -69,7 +69,7 @@ from domain.blocks import (  # noqa: E402
 from domain.cards import Card, Deck  # noqa: E402
 from domain.distractors import rank_distractor_ids  # noqa: E402
 from domain.decks import ALL_DECKS  # noqa: E402
-from domain.scheduler import ReviewState, update  # noqa: E402
+from domain.scheduler import ReviewState, get_weights, set_weights as set_scheduler_weights, update  # noqa: E402
 from domain.queue_builder import build_study_queue  # noqa: E402
 from domain.decks import (  # noqa: E402
     VOCAB_N1_EXTERNAL_DATA,
@@ -128,6 +128,11 @@ from data.grammar_minigame_generator import (  # noqa: E402
     generate_vibe_check_data,
 )
 from data.settings_repository import get_setting, set_setting  # noqa: E402
+from data.fsrs_optimization import (  # noqa: E402
+    load_saved_weights as load_fsrs_weights,
+    run_optimization as run_fsrs_optimization,
+    reset_saved_weights as reset_fsrs_saved_weights,
+)
 from domain.readiness import (  # noqa: E402
     LEARNING_PATHS,
     build_learning_path_status,
@@ -145,6 +150,14 @@ from domain.jlpt_sessions import (  # noqa: E402
 )
 
 from scripts.debug_tools import build_diagnostics_report, build_snapshot  # noqa: E402
+
+# ── Load persisted FSRS weights on backend startup ─────────────────────────
+try:
+    _saved = load_fsrs_weights()
+    if _saved is not None:
+        set_scheduler_weights(_saved)
+except Exception:
+    pass
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -4417,6 +4430,41 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
                 "output": "Check timed out after 30 seconds.",
                 "error": "timeout",
             }
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "fsrs-get-weights":
+        try:
+            saved = load_fsrs_weights()
+            current = list(saved) if saved is not None else list(get_weights())
+            return 0, {
+                "weights": current,
+                "is_custom": saved is not None,
+            }
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "fsrs-optimize":
+        try:
+            result = run_fsrs_optimization()
+            if result is None:
+                return 0, {"ok": False, "error": "Insufficient review data (need 5+ cards with 2+ reviews)."}
+            return 0, {
+                "ok": True,
+                "previous_weights": list(result["previous_weights"]),
+                "new_weights": list(result["new_weights"]),
+                "loss_before": result["loss_before"],
+                "loss_after": result["loss_after"],
+                "log_count": result["log_count"],
+                "card_count": result["card_count"],
+            }
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "fsrs-reset-weights":
+        try:
+            reset_fsrs_saved_weights()
+            return 0, {"ok": True, "weights": list(get_weights())}
         except Exception as exc:
             return 2, {"error": str(exc)}
 

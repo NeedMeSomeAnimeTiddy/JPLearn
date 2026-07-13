@@ -1411,6 +1411,21 @@ function registerIpcHandlers(options) {
       throw new Error(`Failed to run check '${checkName}': ${detail}`)
     }
   })
+
+  options.ipcMain.handle('fsrs:get-weights', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    return await options.runPythonBridgeWithArgs(['fsrs-get-weights'])
+  })
+
+  options.ipcMain.handle('fsrs:optimize', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    return await options.runPythonBridgeWithArgs(['fsrs-optimize'])
+  })
+
+  options.ipcMain.handle('fsrs:reset-weights', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    return await options.runPythonBridgeWithArgs(['fsrs-reset-weights'])
+  })
 }
 
 module.exports = {
