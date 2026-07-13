@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { Check, Target } from 'lucide-react'
 
 const DEFAULT_PRESETS = [10, 20, 30, 50, 75]
 
@@ -27,7 +25,7 @@ export function DailyGoalWidget({ onGoalChange }: DailyGoalWidgetProps) {
     try {
       const data = await window.jplearnDesktop.getDailyGoal()
       if (mountedRef.current) setGoal(data)
-    } catch { /* bridge may not be ready */ }
+    } catch {}
   }, [])
 
   useEffect(() => {
@@ -57,7 +55,7 @@ export function DailyGoalWidget({ onGoalChange }: DailyGoalWidgetProps) {
         setShowPicker(false)
         onGoalChange?.()
       }
-    } catch { /* ignore */ }
+    } catch {}
     if (mountedRef.current) setLoading(false)
   }
 
@@ -65,45 +63,32 @@ export function DailyGoalWidget({ onGoalChange }: DailyGoalWidgetProps) {
   const target = goal?.target ?? 0
   const current = goal?.current ?? 0
   const pct = target > 0 ? Math.min(Math.round((current / target) * 100), 100) : 0
-  const isMet = goal?.goal_met ?? false
 
   if (!goal) return null
 
   return (
-    <div className="daily-goal-widget" ref={widgetRef}>
+    <div className="home-bar daily-goal-widget" ref={widgetRef}>
       <button
         type="button"
-        className="daily-goal-display"
+        className="home-bar-clickable"
         onClick={() => setShowPicker((v) => !v)}
         disabled={loading}
-        aria-label={`Daily goal: ${current} of ${target} cards${isMet ? ' — goal met!' : ''}`}
+        aria-label={`Daily goal: ${current} of ${target} cards`}
       >
-        <Target size={14} strokeWidth={2} aria-hidden="true" />
-        <span className="daily-goal-label">Daily Goal</span>
-        <div
-          className="daily-goal-track"
-          role="progressbar"
-          aria-valuenow={pct}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          <div
-            className={`daily-goal-fill${isMet ? ' is-met' : ''}`}
-            style={{ '--goal-pct': `${pct}%` } as CSSProperties}
-          />
+        <span className="home-bar-label">Daily Goal</span>
+        <div className="home-bar-meter">
+          <div className="home-bar-meter-fill" style={{ width: `${pct}%` }} />
         </div>
-        <span className={`daily-goal-count${isMet ? ' is-met' : ''}`}>
-          {isMet ? <Check size={12} strokeWidth={2.5} /> : `${current} / ${target}`}
-        </span>
+        <span className="home-bar-count">{current}/{target}</span>
       </button>
 
       {showPicker && (
-        <div className="daily-goal-picker">
+        <div className="home-bar-picker">
           {presets.map((n) => (
             <button
               key={n}
               type="button"
-              className={`daily-goal-preset${n === target ? ' is-active' : ''}`}
+              className={`home-bar-picker-btn${n === target ? ' is-active' : ''}`}
               onClick={() => { void handleSetGoal(n) }}
               disabled={loading}
             >

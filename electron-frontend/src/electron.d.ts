@@ -553,6 +553,7 @@ interface DesktopApi {
   completeOnboarding?: (payload: OnboardingCompletionPayload) => Promise<LearningPathStatusPayload>
   getDailyGoal?: () => Promise<{ target: number; current: number; goal_met: boolean; presets: number[] }>
   setDailyGoal?: (target: number) => Promise<{ target: number; current: number; goal_met: boolean; presets: number[] }>
+  getWordOfDay?: () => Promise<WordOfDayPayload>
   exportAnalyticsCSV?: (
     type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot',
   ) => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
@@ -861,6 +862,15 @@ type RecommendationItem = RecommendationPayload
 
 interface FeatureStatePayload {
   features: FeatureStatus[]
+}
+
+interface WordOfDayPayload {
+  character: string
+  romaji: string
+  meaning: string
+  deck_name: string
+  reason: string
+  example_sentence: string | null
 }
 
 interface RecommendationsPayload {

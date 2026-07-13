@@ -61,7 +61,10 @@ MIGRATION_V9 = 9
 MIGRATION_V10 = 10
 MIGRATION_V11 = 11
 MIGRATION_V12 = 12
-LATEST_SCHEMA_VERSION = 12
+MIGRATION_V13 = 13
+
+
+LATEST_SCHEMA_VERSION = 13
 _SQLITE_IN_CHUNK_SIZE = 900
 
 StageDistribution: TypeAlias = dict[int, int]
@@ -545,6 +548,16 @@ def _migration_0012(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE streak_state ADD COLUMN last_freeze_granted_local TEXT")
 
 
+def _migration_0013(conn: sqlite3.Connection) -> None:
+    """Add user_badges table for earned badge tracking."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_badges (
+            badge_descriptor TEXT PRIMARY KEY,
+            earned_at        TEXT NOT NULL
+        )
+    """)
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -558,6 +571,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V10: _migration_0010,
     MIGRATION_V11: _migration_0011,
     MIGRATION_V12: _migration_0012,
+    MIGRATION_V13: _migration_0013,
 }
 
 
@@ -610,6 +624,7 @@ def reset_db() -> None:
         conn.execute("DELETE FROM assistant_chat_summaries")
         conn.execute("DELETE FROM user_progression")
         conn.execute("DELETE FROM user_feature_unlocks")
+        conn.execute("DELETE FROM user_badges")
         conn.execute("DELETE FROM user_xp")
         conn.execute("DELETE FROM tutor_reactions_seen")
 
@@ -678,6 +693,27 @@ def save_feature_unlock(feature_id: str, unlocked_at: str) -> None:
             VALUES (?, ?)
             """,
             (feature_id, unlocked_at),
+        )
+
+
+def load_badges() -> set[str]:
+    """Return the set of earned badge descriptors."""
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute("SELECT badge_descriptor FROM user_badges").fetchall()
+    return {row["badge_descriptor"] for row in rows}
+
+
+def save_badge(badge_descriptor: str, earned_at: str) -> None:
+    """Record a badge as earned (idempotent)."""
+    init_db()
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO user_badges (badge_descriptor, earned_at)
+            VALUES (?, ?)
+            """,
+            (badge_descriptor, earned_at),
         )
 
 

@@ -70,6 +70,7 @@ from domain.cards import Card, Deck  # noqa: E402
 from domain.distractors import rank_distractor_ids  # noqa: E402
 from domain.decks import ALL_DECKS  # noqa: E402
 from domain.scheduler import ReviewState, get_weights, set_weights as set_scheduler_weights, update  # noqa: E402
+from domain.word_of_the_day import WordOfDay, select_word_of_the_day  # noqa: E402
 from domain.queue_builder import build_study_queue  # noqa: E402
 from domain.decks import (  # noqa: E402
     VOCAB_N1_EXTERNAL_DATA,
@@ -111,6 +112,7 @@ from data.database import (  # noqa: E402
     load_tutor_seen_keys,
     load_user_progression,
     load_user_xp,
+    save_badge,
     save_feature_unlock,
     save_tutor_seen_key,
     save_user_xp,
@@ -2608,6 +2610,7 @@ class FeatureStatusPayload:
     name: str
     category: str
     is_unlocked: bool
+    badges: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -3170,13 +3173,20 @@ def build_feature_unlock_status() -> dict[str, object]:
     feat_state = _load_feature_state()
     # Evaluate in case progression unlocks new features
     prog_state = _load_progression_state()
-    feat_state, events = evaluate_features(JPLEARN_FEATURES, prog_state, feat_state, __import__("datetime").date.today())
-    # Persist any newly unlocked features
+    today = __import__("datetime").date.today()
+    feat_state, events = evaluate_features(JPLEARN_FEATURES, prog_state, feat_state, today)
+    # Persist any newly unlocked features and badge rewards
     now = _NOW_UTC()
     for ev in events:
         save_feature_unlock(ev.feature_id, now)
+        for reward in ev.unlock.rewards:
+            if reward.reward_type == "badge":
+                save_badge(reward.descriptor, now)
     result = []
     for feat in JPLEARN_FEATURES:
+        badge_descriptors = tuple(
+            r.descriptor for r in feat.unlock.rewards if r.reward_type == "badge"
+        )
         result.append(
             asdict(
                 FeatureStatusPayload(
@@ -3184,6 +3194,7 @@ def build_feature_unlock_status() -> dict[str, object]:
                     name=feat.name,
                     category=feat.category,
                     is_unlocked=feat_state.statuses.get(feat.feature_id) == "unlocked",
+                    badges=badge_descriptors,
                 )
             )
         )
@@ -3611,6 +3622,28 @@ def build_daily_goal() -> dict[str, object]:
         "goal_met": goal.goal_met,
         "presets": list(PRESET_CARD_GOALS),
     }
+
+
+def build_word_of_the_day() -> dict[str, object]:
+    """Return the Word of the Day payload from a suitable vocab deck."""
+    init_study_db()
+    from datetime import date as _date
+    today = _date.today()
+    # Try vocab decks from N5 up; fall back to any deck with content.
+    candidate_slugs = ["vocab_n5", "vocab_n4", "hiragana", "vocab_n3"]
+    for slug in candidate_slugs:
+        factory = ALL_DECKS.get(slug)
+        if factory is None:
+            continue
+        deck = factory()
+        if not deck.cards:
+            continue
+        card_ids = [card.id for card in deck.cards]
+        states = load_review_states(deck.name, card_ids)
+        result = select_word_of_the_day(deck.cards, states, deck.name, today)
+        if result is not None:
+            return asdict(result)
+    return {"character": "", "romaji": "", "meaning": "", "deck_name": "", "reason": "", "example_sentence": None}
 
 
 def build_study_queue_payload(slug: str) -> dict[str, object]:
@@ -4071,6 +4104,12 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
     if command == "daily-goal":
         try:
             return 0, build_daily_goal()
+        except Exception as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "word-of-the-day":
+        try:
+            return 0, build_word_of_the_day()
         except Exception as exc:
             return 2, {"error": str(exc)}
 

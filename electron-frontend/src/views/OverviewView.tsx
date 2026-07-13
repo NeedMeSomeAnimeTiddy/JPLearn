@@ -21,6 +21,7 @@ import { KANJI_OVERVIEW_PAGE_SIZE } from '../constants'
 import { jlptTagFromCard } from '../utils'
 import { formatTagLabel } from '../utils'
 import { useHeatmap } from '../features/heatmap'
+import { useAchievements, AchievementsPanel } from '../features/achievements'
 import { ActivityCalendar } from 'react-activity-calendar'
 
 const CARD_MASTERY_MAX = 4
@@ -192,6 +193,7 @@ export function OverviewView({
   }
 
   const heatmap = useHeatmap()
+  const achievements = useAchievements()
 
   const calendarRef = useRef<HTMLDivElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
@@ -839,6 +841,24 @@ export function OverviewView({
           </div>
         </section>
       ) : null}
+
+      {/* ── Achievements ────────────────────────────────────────────── */}
+      <section className="panel-glass overview-collapsible-panel achievements-section">
+        <div className="panel-head">
+          <h2 className="panel-title-with-icon"><BarChart3 aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Achievements</h2>
+        </div>
+        {achievements.loading ? (
+          <p className="status-line">Loading achievements...</p>
+        ) : achievements.error ? (
+          <p className="status-line">{achievements.error}</p>
+        ) : (
+          <AchievementsPanel
+            badges={achievements.badges}
+            earnedCount={achievements.earnedCount}
+            totalCount={achievements.totalCount}
+          />
+        )}
+      </section>
 
       {window.jplearnDesktop.exportAnalyticsCSV ? (
         <section className="panel-glass activity-summary-panel" aria-label="Export data">

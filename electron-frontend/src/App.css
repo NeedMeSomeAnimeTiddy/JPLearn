@@ -3398,108 +3398,162 @@ html[data-reduced-motion='true'] .home-hero-steam {
   flex-shrink: 0;
 }
 
-/* ── Daily Goal Widget (inline in study plan strip) ──── */
-.daily-goal-widget {
-  position: relative;
+/* ── Home widgets (Daily Goal + Word of the Day) ──── */
+.home-widgets {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 96px;
+  min-width: 180px;
   flex-shrink: 0;
 }
 
-.daily-goal-display {
+.home-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--bg-surface);
+  padding: 3px 8px;
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 7px 14px;
-  cursor: pointer;
-  font: inherit;
-  color: var(--text);
-  min-height: 36px;
+  background: var(--bg-surface);
+  font-size: 0.85rem;
 }
 
-.daily-goal-display:hover {
-  border-color: var(--text-muted);
+.home-bar--loading {
+  width: 100px;
+  animation: shimmer 1.5s ease-in-out infinite;
 }
 
-.daily-goal-label {
-  font-size: 0.76rem;
+@keyframes shimmer {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.4; }
+}
+
+.home-bar--due_for_review {
+  border-color: color-mix(in oklab, var(--tone-amber) 46%, var(--panel-border));
+  background: color-mix(in oklab, var(--bg-surface) 90%, var(--tone-amber) 10%);
+}
+
+.home-bar--new_item {
+  border-color: color-mix(in oklab, var(--tone-teal) 46%, var(--panel-border));
+  background: color-mix(in oklab, var(--bg-surface) 90%, var(--tone-teal) 10%);
+}
+
+.home-bar--discovery {
+  border-color: color-mix(in oklab, var(--tone-ocean) 46%, var(--panel-border));
+  background: color-mix(in oklab, var(--bg-surface) 90%, var(--tone-ocean) 10%);
+}
+
+.home-bar-label {
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
-  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.daily-goal-track {
-  width: 64px;
+.home-bar-char {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.home-bar-sub {
+  color: var(--text-soft);
+}
+
+.home-bar-chip {
+  margin-left: auto;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 4px;
+  font-weight: 600;
+  border-radius: 2px;
+}
+
+.home-bar--due_for_review .home-bar-chip {
+  background: color-mix(in oklab, var(--tone-amber) 18%, transparent);
+  color: var(--tone-amber);
+}
+
+.home-bar--new_item .home-bar-chip {
+  background: color-mix(in oklab, var(--tone-teal) 18%, transparent);
+  color: var(--tone-teal);
+}
+
+.home-bar--discovery .home-bar-chip {
+  background: color-mix(in oklab, var(--tone-ocean) 18%, transparent);
+  color: var(--tone-ocean);
+}
+
+.home-bar-clickable {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.home-bar-meter {
+  flex: 1;
   height: 6px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.3);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.daily-goal-fill {
+.home-bar-meter-fill {
   height: 100%;
-  border-radius: 3px;
   background: var(--accent);
-  width: var(--goal-pct);
   min-width: 2px;
   transition: width 0.4s ease;
 }
 
-.daily-goal-fill.is-met {
-  background: var(--color-success, #22c55e);
-}
-
-.daily-goal-count {
-  font-size: 0.82rem;
+.home-bar-count {
+  font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  min-width: 4.5ch;
-  text-align: right;
   color: var(--text-soft);
+  flex-shrink: 0;
 }
 
-.daily-goal-count.is-met {
-  color: var(--color-success, #22c55e);
+.daily-goal-widget {
+  position: relative;
 }
 
-.daily-goal-picker {
+.home-bar-picker {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 4px);
   right: 0;
   display: flex;
-  gap: 4px;
+  gap: 3px;
   background: var(--bg-surface);
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 5px 6px;
+  padding: 4px 5px;
   z-index: 10;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
 }
 
-.daily-goal-preset {
+.home-bar-picker-btn {
   background: var(--bg-main);
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
   color: var(--text);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
-  padding: 4px 9px;
+  padding: 3px 7px;
   cursor: pointer;
   font: inherit;
-  min-width: 30px;
+  min-width: 24px;
   text-align: center;
 }
 
-.daily-goal-preset:hover {
+.home-bar-picker-btn:hover {
   border-color: var(--text-muted);
   background: var(--bg-surface);
 }
 
-.daily-goal-preset.is-active {
+.home-bar-picker-btn.is-active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--text-main);
@@ -3950,6 +4004,95 @@ html[data-reduced-motion='true'] .home-hero-steam {
   opacity: 1;
   padding-bottom: 18px;
   transition: max-height 500ms ease, opacity 260ms ease, padding-bottom 260ms ease;
+}
+
+.achievements-section {
+  margin-top: 18px;
+}
+
+.achievements-panel {
+  padding: 4px 0 8px;
+}
+
+.achievements-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.achievements-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.achievements-count {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.badge-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 2px;
+  border: 1px solid var(--card-border);
+  transition: opacity 200ms ease;
+}
+
+.badge-card.badge-locked {
+  opacity: 0.45;
+}
+
+.badge-icon-wrapper {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--panel-bg) 84%, white);
+}
+
+.badge-icon-earned {
+  color: var(--tone-amber);
+}
+
+.badge-icon-locked {
+  color: var(--text-soft);
+}
+
+.badge-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badge-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+
+.badge-desc {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  line-height: 1.3;
+}
+
+.badge-earned-label {
+  font-size: 0.72rem;
+  color: var(--tone-amber);
+  font-weight: 500;
+  margin-top: 2px;
 }
 
 .activity-window-grid {

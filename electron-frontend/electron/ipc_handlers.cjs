@@ -985,6 +985,15 @@ function registerIpcHandlers(options) {
     return payload
   })
 
+  options.ipcMain.handle('study:get-word-of-the-day', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const payload = await runPythonBridgeWithArgsRead(['word-of-the-day'])
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Invalid word-of-the-day response from bridge')
+    }
+    return payload
+  })
+
   // ── Setup wizard ────────────────────────────────────────────────────────────────────
   const setupRuntime = options.setupRuntime
   if (setupRuntime) {

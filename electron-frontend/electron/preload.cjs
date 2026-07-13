@@ -108,6 +108,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   completeOnboarding: (payload) => ipcRenderer.invoke('learning-path:complete-onboarding', payload),
   getDailyGoal: () => ipcRenderer.invoke('study:get-daily-goal'),
   setDailyGoal: (target) => ipcRenderer.invoke('study:set-daily-goal', target),
+  getWordOfDay: () => ipcRenderer.invoke('study:get-word-of-the-day'),
   exportAnalyticsCSV: (type) => ipcRenderer.invoke('analytics:export-and-save-csv', type),
   exportAnalyticsJSON: () => ipcRenderer.invoke('analytics:export-and-save-json'),
   importAnalyticsJSON: () => ipcRenderer.invoke('analytics:import-from-json'),

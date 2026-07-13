@@ -17,6 +17,7 @@ import { RecommendationCard } from '../components/RecommendationCard'
 import { LearningPathPanel } from '../components/LearningPathPanel'
 import { ScriptCassetteCarousel } from '../components/ScriptCassetteCarousel'
 import { DailyGoalWidget } from '../components/DailyGoalWidget'
+import { WordOfDayWidget } from '../components/WordOfDayWidget'
 import type { ScriptCassetteItem } from '../components/ScriptCassetteCarousel'
 
 const READINESS_BADGE: Record<SectionReadiness, { label: string; className: string }> = {
@@ -272,7 +273,10 @@ export function HomeView({
                   <span>{studyPlan.sessionNote}</span>
                 </div>
 
+              <div className="home-widgets">
+                <WordOfDayWidget />
                 <DailyGoalWidget />
+              </div>
 
                 <div className="home-study-plan-shortcuts" aria-label="Study plan shortcuts">
                   {studyPlan.shortcutRows.map((shortcut) => (
