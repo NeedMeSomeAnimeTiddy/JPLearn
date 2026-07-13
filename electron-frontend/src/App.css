@@ -10413,6 +10413,69 @@ html[data-reduced-motion='true'] .cassette-reel {
   font-weight: 700;
 }
 
+/* ── Pomodoro duration inputs ─────────────────────────────────── */
+.pomodoro-duration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.pomodoro-duration-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pomodoro-duration-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  letter-spacing: 0.03em;
+}
+
+.pomodoro-duration-input-wrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 86%, transparent);
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--panel-bg-alt) 68%, transparent);
+  overflow: hidden;
+}
+
+.pomodoro-duration-input-wrap:focus-within {
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--panel-border));
+}
+
+.pomodoro-duration-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 5px 8px;
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.pomodoro-duration-input::-webkit-outer-spin-button,
+.pomodoro-duration-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pomodoro-duration-suffix {
+  padding: 5px 8px 5px 2px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  letter-spacing: 0.04em;
+  border-left: 1px solid color-mix(in oklab, var(--panel-border) 86%, transparent);
+}
+
 .settings-voice-stepper {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

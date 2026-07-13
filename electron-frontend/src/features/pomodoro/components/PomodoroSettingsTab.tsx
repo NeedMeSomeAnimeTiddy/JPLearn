@@ -11,6 +11,12 @@ interface PomodoroSettingsTabProps {
   onToggle: () => void
 }
 
+const DURATION_INPUTS = [
+  { key: 'pomodoroWorkMinutes' as const, label: 'Work', min: 1, max: 120 },
+  { key: 'pomodoroBreakMinutes' as const, label: 'Break', min: 1, max: 30 },
+  { key: 'pomodoroLongBreakMinutes' as const, label: 'Long break', min: 1, max: 60 },
+] as const
+
 export function PomodoroSettingsTab({
   settings,
   setSettings,
@@ -33,6 +39,11 @@ export function PomodoroSettingsTab({
       pomodoroBreakMinutes: preset.break,
       pomodoroLongBreakMinutes: preset.longBreak,
     }))
+  }
+
+  function handleDurationChange(key: string, raw: string, min: number, max: number) {
+    const value = Math.max(min, Math.min(max, parseInt(raw, 10) || min))
+    setSettings((prev) => ({ ...prev, [key]: value }))
   }
 
   return (
@@ -87,46 +98,44 @@ export function PomodoroSettingsTab({
               </div>
             </div>
 
-            <div className="settings-section" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <p className="settings-section-label">Custom durations (minutes)</p>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {([
-                  { key: 'pomodoroWorkMinutes', label: 'Work' },
-                  { key: 'pomodoroBreakMinutes', label: 'Break' },
-                  { key: 'pomodoroLongBreakMinutes', label: 'Long Break' },
-                ] as const).map(({ key, label }) => (
-                  <label key={key} className="settings-number-field" style={{ flex: 1, minWidth: 100 }}>
-                    <span>{label}</span>
-                    <input
-                      type="number"
-                      className="settings-number-input"
-                      min={1}
-                      max={120}
-                      value={settings[key]}
-                      onChange={(e) => {
-                        const value = Math.max(1, Math.min(120, parseInt(e.target.value, 10) || 1))
-                        setSettings((prev) => ({ ...prev, [key]: value }))
-                      }}
-                    />
+            <div className="settings-section">
+              <p className="settings-section-label">Duration</p>
+              <div className="pomodoro-duration-grid">
+                {DURATION_INPUTS.map(({ key, label, min, max }) => (
+                  <label key={key} className="pomodoro-duration-field">
+                    <span className="pomodoro-duration-label">{label}</span>
+                    <div className="pomodoro-duration-input-wrap">
+                      <input
+                        type="number"
+                        className="pomodoro-duration-input"
+                        min={min}
+                        max={max}
+                        value={settings[key]}
+                        onChange={(e) => handleDurationChange(key, e.target.value, min, max)}
+                      />
+                      <span className="pomodoro-duration-suffix">min</span>
+                    </div>
                   </label>
                 ))}
               </div>
             </div>
 
             <div className="settings-section">
-              <label className="settings-number-field" style={{ maxWidth: 200 }}>
-                <span>Sessions before long break</span>
-                <input
-                  type="number"
-                  className="settings-number-input"
-                  min={1}
-                  max={10}
-                  value={settings.pomodoroSessionsBeforeLongBreak}
-                  onChange={(e) => {
-                    const value = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1))
-                    setSettings((prev) => ({ ...prev, pomodoroSessionsBeforeLongBreak: value }))
-                  }}
-                />
+              <label className="pomodoro-duration-field" style={{ maxWidth: 200 }}>
+                <span className="pomodoro-duration-label">Sessions before long break</span>
+                <div className="pomodoro-duration-input-wrap">
+                  <input
+                    type="number"
+                    className="pomodoro-duration-input"
+                    min={1}
+                    max={10}
+                    value={settings.pomodoroSessionsBeforeLongBreak}
+                    onChange={(e) => {
+                      const value = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 4))
+                      setSettings((prev) => ({ ...prev, pomodoroSessionsBeforeLongBreak: value }))
+                    }}
+                  />
+                </div>
               </label>
             </div>
           </>
