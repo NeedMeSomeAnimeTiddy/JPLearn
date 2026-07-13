@@ -2583,7 +2583,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
   gap: 6px;
   padding: 8px 14px 10px;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   scrollbar-width: none;
   position: relative;
   background:
@@ -2617,12 +2617,11 @@ html[data-reduced-motion='true'] .home-hero-steam {
   justify-content: space-between;
   gap: 14px;
   padding: 0;
-  margin-bottom: 0;
-  position: absolute;
-  top: 8px;
-  left: 14px;
-  right: 14px;
-  z-index: 2;
+  margin: 0;
+  height: 0;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 
 .hub-player-header .hero-kicker {
@@ -5866,7 +5865,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
   touch-action: pan-x pinch-zoom;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-  padding: 40px 0;
+  padding: 60px 0;
   padding-inline: calc(50% - 140px);
   min-height: 0;
   /* hide scrollbar */
@@ -7725,6 +7724,7 @@ html[data-reduced-motion='true'] .cassette-reel {
 .minigame-shell .hub-player {
   padding: 14px 20px;
   align-content: safe center;
+  overflow-y: auto;
 }
 
 .minigame-shell .hub-studio {
