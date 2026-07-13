@@ -4,6 +4,7 @@ import { AnimatePresence } from 'motion/react'
 import {
   Activity,
   ArrowLeft,
+  Clock,
   Flame,
   LoaderCircle,
   Play,
@@ -13,8 +14,10 @@ import {
 import { ChallengePromptCard } from '../components/minigame/ChallengePromptCard'
 import { ChoiceAnswerPanel } from '../components/minigame/ChoiceAnswerPanel'
 import { HintPopover } from '../components/minigame/HintPopover'
+import { BreakOverlay, type PomodoroDisplay } from '../features/pomodoro'
 import { MinigameHud } from '../components/minigame/MinigameHud'
 import { MinigameResponsePanel } from '../components/minigame/MinigameResponsePanel'
+import { QueuePreview } from '../components/minigame/QueuePreview'
 import { SentenceAssemblyAnswerPanel } from '../components/minigame/SentenceAssemblyAnswerPanel'
 import { StrokeOrderAnswerPanel } from '../components/minigame/StrokeOrderAnswerPanel'
 import { TypedAnswerPanel } from '../components/minigame/TypedAnswerPanel'
@@ -50,6 +53,9 @@ interface MinigameViewProps {
   onOpenDictionary: (seedQuery?: string) => void
   onOpenSettings: () => void
   onRetry: (cardIds: number[]) => void
+  pomodoroDisplay: PomodoroDisplay | null
+  onPomodoroSkip: () => void
+  onPomodoroStartNext: () => void
 }
 
 export function MinigameView({
@@ -69,6 +75,9 @@ export function MinigameView({
   onOpenDictionary,
   onOpenSettings,
   onRetry,
+  pomodoroDisplay,
+  onPomodoroSkip,
+  onPomodoroStartNext,
 }: MinigameViewProps) {
   const {
     sessionActive,
@@ -105,6 +114,7 @@ export function MinigameView({
     setRoundConfidence,
     playAudio,
     skipFeedback,
+    upcomingCards,
   } = useSession()
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
   const effectiveTargetItems = retryTargetItems ?? sessionTargetItems
@@ -133,6 +143,8 @@ export function MinigameView({
   const previousSessionActiveRef = useRef(false)
   const [hintPopoverOpen, setHintPopoverOpen] = useState(false)
   const hintButtonRef = useRef<HTMLButtonElement | null>(null)
+  const [queueOpen, setQueueOpen] = useState(false)
+  const queueButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const toggleFocusMode = useCallback(() => {
     const next = !focusModeEnabled
@@ -365,6 +377,9 @@ export function MinigameView({
         onOpenDictionary={onOpenDictionary}
         onOpenSettings={onOpenSettings}
         onToggleFocusMode={toggleFocusMode}
+        onToggleQueue={() => setQueueOpen((prev) => !prev)}
+        queueOpen={queueOpen}
+        queueButtonRef={queueButtonRef}
       />
 
       <div className="hub-studio">
@@ -384,14 +399,6 @@ export function MinigameView({
             </div>
           ) : null}
 
-          <div className="hub-eq minigame-focus-optional" aria-hidden="true">
-            <span className="hub-eq-bar" style={{ animationDelay: '0s' } as CSSProperties} />
-            <span className="hub-eq-bar" style={{ animationDelay: '0.1s' } as CSSProperties} />
-            <span className="hub-eq-bar" style={{ animationDelay: '0.2s' } as CSSProperties} />
-            <span className="hub-eq-bar" style={{ animationDelay: '0.05s' } as CSSProperties} />
-            <span className="hub-eq-bar" style={{ animationDelay: '0.15s' } as CSSProperties} />
-            <span className="hub-eq-bar" style={{ animationDelay: '0.25s' } as CSSProperties} />
-          </div>
           <div className="hub-deck-badge minigame-focus-optional" aria-hidden="true">
             <span>DOLBY NR</span>
             <span className="hub-deck-dot" />
@@ -495,6 +502,12 @@ export function MinigameView({
                         <strong>{sessionStreak}</strong>
                         <span>x</span>
                       </span>
+                      {pomodoroDisplay ? (
+                        <span className={`game-hud-stat pomodoro-stat ${pomodoroDisplay.phase === 'break' || pomodoroDisplay.phase === 'long-break' ? 'pomodoro-stat--break' : ''}`}>
+                          <Clock aria-hidden="true" size={11} strokeWidth={2.2} />
+                          <strong>{pomodoroDisplay.formatted}</strong>
+                        </span>
+                      ) : null}
                       <span className="game-hud-stat">
                         <Target aria-hidden="true" size={11} strokeWidth={2.2} />
                         <strong>{sessionScore}/{sessionRounds}</strong>
@@ -684,6 +697,14 @@ export function MinigameView({
                 onRevealMoreHint={advanceHintStep}
               />
             ) : null}
+            {sessionActive ? (
+              <QueuePreview
+                upcomingCards={upcomingCards}
+                open={queueOpen}
+                triggerRef={queueButtonRef}
+                onClose={() => setQueueOpen(false)}
+              />
+            ) : null}
           </section>
 
           <div className="hub-deck-badge hub-deck-badge--right minigame-focus-optional" aria-hidden="true">
@@ -691,6 +712,11 @@ export function MinigameView({
           </div>
         </div>
       </div>
+      <BreakOverlay
+        display={pomodoroDisplay}
+        onSkip={onPomodoroSkip}
+        onStartNext={onPomodoroStartNext}
+      />
     </div>
   )
 }

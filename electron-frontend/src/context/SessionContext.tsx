@@ -85,6 +85,15 @@ export interface SessionContextValue {
   roundConfidenceScore: number
   activeSessionLengthPreset: SessionLengthPreset | null
 
+  // Queue preview
+  upcomingCards: GameCard[]
+  queueBucketCounts: {
+    due: number
+    leech: number
+    new: number
+    review: number
+  } | null
+
   // Audio
   voiceBusy: boolean
   voiceUnavailable: boolean

@@ -26,7 +26,7 @@ import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode } from './utils'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Upload, X } from 'lucide-react'
 import './App.css'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -37,6 +37,7 @@ import { useModels } from './features/models'
 import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, type TutorSettingsFields } from './features/tutor'
 import type { AssistantToast } from './features/tutor'
 import { useCursor, CursorFollower, CursorSettingsTab, type CursorSettings } from './features/cursor'
+import { usePomodoro, PomodoroSettingsTab, type PomodoroSettingsFields } from './features/pomodoro'
 import { DevDashboard } from './features/devtools'
 import { SURPRISE_PROMPTS, SCRIPT_MODE_PROMPT_PACKS, TAG_PROMPT_PACKS, CLOZE_TEMPLATES, STORY_CHAPTERS } from './lib/contentTemplates'
 import type { RoundDictionaryNote } from './types'
@@ -149,6 +150,12 @@ interface AppSettings {
   voiceSpeed: number
   ambientAudioEnabled: boolean
   cursor: { mode: string; theme: string; size: number; color: string | null }
+  pomodoroEnabled: boolean
+  pomodoroWorkMinutes: number
+  pomodoroBreakMinutes: number
+  pomodoroLongBreakMinutes: number
+  pomodoroSessionsBeforeLongBreak: number
+  pomodoroShowTimerInHud: boolean
 }
 
 
@@ -629,6 +636,12 @@ function defaultSettings(): AppSettings {
     voiceSpeed: DEFAULT_VOICE_SPEED,
     ambientAudioEnabled: false,
     cursor: { mode: 'system', theme: 'classic', size: 1, color: null },
+    pomodoroEnabled: false,
+    pomodoroWorkMinutes: 25,
+    pomodoroBreakMinutes: 5,
+    pomodoroLongBreakMinutes: 15,
+    pomodoroSessionsBeforeLongBreak: 4,
+    pomodoroShowTimerInHud: true,
   }
 }
 
@@ -1714,9 +1727,11 @@ function App() {
     voice: true,
     'speech-recognition': true,
     'voicevox-runtime': true,
+    'pomodoro': true,
     'keyboard-shortcuts': true,
     'close-behavior': true,
     'auto-start': true,
+    'backup-restore': true,
     'data-management': true,
     'fsrs-optimization': true,
   })
@@ -1795,6 +1810,8 @@ function App() {
   const [showOverview, setShowOverview] = useState(false)
   const [resetConfirmStep, setResetConfirmStep] = useState<0 | 1 | 2>(0)
   const [resettingDb, setResettingDb] = useState(false)
+  const [backupLoading, setBackupLoading] = useState(false)
+  const [backupMessage, setBackupMessage] = useState<string | null>(null)
   const [optimizingFSRS, setOptimizingFSRS] = useState(false)
   const [fsrsResult, setFsrsResult] = useState<{ ok: boolean; error?: string; loss_before?: number; loss_after?: number; card_count?: number; log_count?: number } | null>(null)
   const [fsrsCustom, setFsrsCustom] = useState(false)
@@ -1834,6 +1851,8 @@ function App() {
   const studyQueueCacheRef = useRef<Map<string, { payload: StudyQueueResponse; cachedAtMs: number }>>(new Map())
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
+  const queueBucketCountsRef = useRef<{ due: number; leech: number; new: number; review: number } | null>(null)
+  const [queueRevision, setQueueRevision] = useState(0)
   const interleaveCursorRef = useRef<number>(0)
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
@@ -1934,6 +1953,7 @@ function App() {
   /** End-of-session reset: core without cycle reset + per-round state + optional error message. */
   function resetSessionEnd(options?: { errorMessage?: string }): void {
     setSessionActive(false)
+    pomodoro.onSessionEnd()
     setRoundState(null)
     setRoundFeedback(null)
     setRoundFeedbackTone(null)
@@ -1986,6 +2006,11 @@ function App() {
   const cursor = useCursor(
     settings as unknown as { cursor: CursorSettings },
     setSettings as unknown as Dispatch<SetStateAction<{ cursor: CursorSettings }>>,
+  )
+
+  const pomodoro = usePomodoro(
+    settings as PomodoroSettingsFields,
+    setSettings as unknown as Dispatch<SetStateAction<PomodoroSettingsFields>>,
   )
 
   const tutor = useTutor(
@@ -2200,10 +2225,18 @@ function App() {
       roundCycleRef.current = queue
         ? buildQueueCycle(queue, sourceCards)
         : shuffleArray([...Array(sourceCards.length).keys()])
+      queueBucketCountsRef.current = queue?.queue ? {
+        due: queue.queue.buckets_due,
+        leech: queue.queue.buckets_leech,
+        new: queue.queue.buckets_new,
+        review: queue.queue.buckets_review,
+      } : null
     } catch {
       roundCycleRef.current = shuffleArray([...Array(sourceCards.length).keys()])
+      queueBucketCountsRef.current = null
     }
     roundCursorRef.current = 0
+    setQueueRevision((prev) => prev + 1)
   }, [activeDeckSlug, buildQueueCycle, getStudyQueueDeduped, resetRoundCycle])
 
   const nextCardIndex = useCallback((cardsLength: number): number | null => {
@@ -2215,6 +2248,7 @@ function App() {
 
     const index = roundCycleRef.current[roundCursorRef.current]
     roundCursorRef.current += 1
+    setQueueRevision((prev) => prev + 1)
     return index
   }, [])
 
@@ -3576,6 +3610,22 @@ function App() {
     return matchingCards.length > 0 ? matchingCards : deckCards
   }, [deckCards, blockProgress, activeBlockIndex])
 
+  const upcomingCards = useMemo((): GameCard[] => {
+    if (!sessionActive) return []
+    const cursor = roundCursorRef.current
+    const cycle = roundCycleRef.current
+    const result: GameCard[] = []
+    for (let index = cursor; index < cycle.length && result.length < 5; index += 1) {
+      const cardIndex = cycle[index]
+      if (cardIndex < activeBlockCards.length) {
+        result.push(activeBlockCards[cardIndex])
+      }
+    }
+    return result
+    // queueRevision is a state counter bumped when the queue or cursor changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionActive, activeBlockCards, queueRevision])
+
   const activeSessionLengthPreset = useMemo(
     () => SESSION_LENGTH_PRESETS.find((preset) => preset.items === sessionTargetItems) ?? null,
     [sessionTargetItems],
@@ -3632,8 +3682,8 @@ function App() {
         ? null
         : await buildRoundWithBridge(modeCards, modeSelection.mode, index, modeSelection.surprisePrompt, modeSelection.promptSeed)
       if (!nextRound) {
-        setSessionActive(false)
-        setRoundState(null)
+    setSessionActive(false)
+    setRoundState(null)
         if (leechFocusEnabled && activeBlockCards.filter((card) => card.is_leech).length === 0) {
           setGameError('No active leech cards in this block yet. Disable focused review mode to continue.')
         } else {
@@ -3643,6 +3693,7 @@ function App() {
       }
 
       setSessionActive(true)
+      pomodoro.onSessionStart()
       saveSessionPrefs()
       setRoundState(nextRound)
       roundPresentedAtRef.current = performance.now()
@@ -5422,6 +5473,8 @@ function App() {
         confidenceCaptureEnabled,
         roundConfidenceScore,
         activeSessionLengthPreset,
+        upcomingCards,
+        queueBucketCounts: queueBucketCountsRef.current,
         voiceBusy: voice.voiceBusy,
         voiceUnavailable: voice.voiceUnavailable,
         answerInputRef,
@@ -5683,6 +5736,9 @@ function App() {
           onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
           onOpenSettings={openSettingsFromMenu}
           onRetry={handleRetry}
+          pomodoroDisplay={pomodoro.display}
+          onPomodoroSkip={pomodoro.skip}
+          onPomodoroStartNext={pomodoro.startWork}
         />
       ) : null}
 
@@ -6354,6 +6410,13 @@ function App() {
                   </div>
                 </SettingsCollapsibleSection>
 
+                <PomodoroSettingsTab
+                  settings={settings as PomodoroSettingsFields}
+                  setSettings={setSettings as unknown as Dispatch<SetStateAction<PomodoroSettingsFields>>}
+                  collapsed={Boolean(collapsedSettingsSections['pomodoro'])}
+                  onToggle={() => toggleThemeSectionCollapsed('pomodoro')}
+                />
+
                 <SettingsCollapsibleSection
                   id="close-behavior"
                   title="Window Close Behavior"
@@ -6524,6 +6587,88 @@ function App() {
                       )}
                     </div>
                   </div>
+                </SettingsCollapsibleSection>
+
+                <SettingsCollapsibleSection
+                  id="backup-restore"
+                  title="Backup &amp; Restore"
+                  description="Export or restore your full study progress — review history, streaks, leech data, and SRS state."
+                  collapsed={Boolean(collapsedSettingsSections['backup-restore'])}
+                  onToggle={() => toggleThemeSectionCollapsed('backup-restore')}
+                  className="settings-theme-card"
+                  hideChevron
+                >
+                  {window.jplearnDesktop.exportAnalyticsJSON ? (
+                    <div className="settings-control-content" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          className="jlpt-action-btn"
+                          onClick={async () => {
+                            setBackupLoading(true)
+                            setBackupMessage(null)
+                            try {
+                              const result = await window.jplearnDesktop.exportAnalyticsJSON!()
+                              if (result.cancelled) {
+                                setBackupMessage(null)
+                              } else if (result.ok) {
+                                setBackupMessage(`Saved: ${result.path ?? 'file'}`)
+                              } else {
+                                setBackupMessage('Export failed.')
+                              }
+                            } catch {
+                              setBackupMessage('Export failed.')
+                            } finally {
+                              setBackupLoading(false)
+                            }
+                          }}
+                          disabled={backupLoading}
+                          aria-label="Export full backup as JSON"
+                        >
+                          <Download aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                          Export Backup
+                        </button>
+                        {window.jplearnDesktop.importAnalyticsJSON ? (
+                          <button
+                            type="button"
+                            className="jlpt-action-btn"
+                            onClick={async () => {
+                              setBackupLoading(true)
+                              setBackupMessage(null)
+                              try {
+                                const result = await window.jplearnDesktop.importAnalyticsJSON!()
+                                if (result.cancelled) {
+                                  setBackupMessage(null)
+                                } else if (result.ok) {
+                                  const counts = result.imported ?? {}
+                                  const parts = Object.entries(counts)
+                                    .filter(([, v]) => v > 0)
+                                    .map(([k, v]) => `${v} ${k}`)
+                                  setBackupMessage(`Imported: ${parts.join(', ') || 'no changes'}`)
+                                } else {
+                                  setBackupMessage('Import failed.')
+                                }
+                              } catch {
+                                setBackupMessage('Import failed.')
+                              } finally {
+                                setBackupLoading(false)
+                              }
+                            }}
+                            disabled={backupLoading}
+                            aria-label="Import backup from JSON file"
+                          >
+                            <Upload aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                            Import Backup
+                          </button>
+                        ) : null}
+                      </div>
+                      {backupMessage ? (
+                        <p className="status-line">{backupMessage}</p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="settings-help">Backup functionality is only available in the desktop app.</p>
+                  )}
                 </SettingsCollapsibleSection>
 
                 <SettingsCollapsibleSection

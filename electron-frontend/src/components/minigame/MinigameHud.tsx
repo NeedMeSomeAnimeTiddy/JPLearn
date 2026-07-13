@@ -1,4 +1,5 @@
-import { ArrowLeft, Focus, Heart, RotateCcw, Search, Settings } from 'lucide-react'
+import { ArrowLeft, Focus, Heart, ListOrdered, RotateCcw, Search, Settings } from 'lucide-react'
+import type { RefObject } from 'react'
 import { DEFAULT_LIVES, SCRIPT_LABELS } from '../../constants'
 import type { ScriptKey } from '../../types'
 
@@ -29,6 +30,9 @@ interface MinigameHudProps {
   onOpenDictionary: (seedQuery?: string) => void
   onOpenSettings: () => void
   onToggleFocusMode: () => void
+  onToggleQueue: () => void
+  queueOpen: boolean
+  queueButtonRef: RefObject<HTMLButtonElement | null>
 }
 
 export function MinigameHud({
@@ -49,6 +53,9 @@ export function MinigameHud({
   onOpenDictionary,
   onOpenSettings,
   onToggleFocusMode,
+  onToggleQueue,
+  queueOpen,
+  queueButtonRef,
 }: MinigameHudProps) {
   const catalogCode = `JPL-${SCRIPT_CODE[activeScript]}-G`
   const subCatalog = `${SCRIPT_LABELS[activeScript]}${activeSectionName ? ` · ${activeSectionName}` : ' Run'}`
@@ -99,6 +106,18 @@ export function MinigameHud({
               </span>
             ))}
           </div>
+        ) : null}
+        {sessionActive ? (
+          <button
+            ref={queueButtonRef}
+            type="button"
+            className={`topbar-settings-button minigame-focus-optional ${queueOpen ? 'is-active' : ''}`}
+            onClick={onToggleQueue}
+            aria-label={queueOpen ? 'Hide upcoming cards' : 'Show upcoming cards'}
+            title={queueOpen ? 'Hide queue (Q)' : 'Queue preview (Q)'}
+          >
+            <ListOrdered aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+          </button>
         ) : null}
         <button
           type="button"

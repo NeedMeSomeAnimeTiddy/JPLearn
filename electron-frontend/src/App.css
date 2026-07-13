@@ -2663,10 +2663,16 @@ html[data-reduced-motion='true'] .home-hero-steam {
   color: color-mix(in oklab, var(--accent-soft) 44%, var(--text-soft));
   font-weight: 700;
   opacity: 0.55;
+  position: absolute;
+  bottom: -2px;
+  left: 14px;
+  pointer-events: none;
 }
 
 .hub-deck-badge--right {
   justify-content: flex-end;
+  left: auto;
+  right: 14px;
 }
 
 .hub-deck-dot {
@@ -2881,31 +2887,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
   50% { transform: translate(40px, -30px) scale(1.5); opacity: 0.3; }
   80% { opacity: 0.5; }
   100% { transform: translate(-20px, -60px) scale(0.5); opacity: 0; }
-}
-
-/* ── Equalizer waveform ───────────────────────────────────────── */
-.hub-eq {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 20px;
-  padding: 0 8px;
-  opacity: 0.4;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.hub-eq-bar {
-  flex: 1;
-  min-width: 3px;
-  max-width: 8px;
-  background: var(--tone-teal);
-  animation: eqBounce 0.6s ease-in-out infinite alternate;
-}
-
-@keyframes eqBounce {
-  0% { height: 4px; background: var(--tone-teal); }
-  100% { height: 18px; background: var(--accent); }
 }
 
 /* ── Glitch text ──────────────────────────────────────────────── */
@@ -7269,7 +7250,7 @@ html[data-reduced-motion='true'] .cassette-reel {
   align-items: center;
   gap: 4px;
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--text-soft);
   letter-spacing: 0.06em;
@@ -7297,6 +7278,14 @@ html[data-reduced-motion='true'] .cassette-reel {
   animation: minigamePointsGainFloat 700ms var(--motion-ease);
   pointer-events: none;
   white-space: nowrap;
+}
+
+.pomodoro-stat {
+  opacity: 0.75;
+}
+
+.pomodoro-stat--break strong {
+  color: var(--green-11);
 }
 
 /* Window zone — transparent, centered content only */
@@ -7956,6 +7945,214 @@ html[data-reduced-motion='true'] .cassette-reel {
 .minigame-hint-dict-gloss.is-primary {
   color: var(--text-main);
   font-weight: 600;
+}
+
+/* ── Queue Preview (upcoming cards popover) ────────────────────────────────────── */
+
+.minigame-queue-preview {
+  background: var(--panel-glass-bg);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--panel-glass-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.queue-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.queue-preview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.queue-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--panel-glass-bg) 60%, transparent);
+  border: 1px solid color-mix(in oklab, var(--panel-glass-border) 50%, transparent);
+}
+
+.queue-card-character {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--text-main);
+  min-width: 2em;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.queue-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.queue-card-reading {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-card-meaning {
+  font-size: 0.78rem;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-card-leech {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red-11);
+  flex-shrink: 0;
+}
+
+.queue-preview-empty {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  margin: 0;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.queue-preview-more {
+  font-size: 0.68rem;
+  color: var(--text-soft);
+  margin: 8px 0 0;
+  text-align: center;
+  letter-spacing: 0.03em;
+}
+
+/* ── Pomodoro Timer ──────────────────────────────────────────────────────────── */
+
+.pomodoro-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px 2px 5px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, transparent);
+}
+
+.pomodoro-timer--break {
+  background: color-mix(in oklab, var(--green-11) 10%, transparent);
+  border-color: color-mix(in oklab, var(--green-11) 18%, transparent);
+}
+
+.pomodoro-timer--paused {
+  opacity: 0.6;
+}
+
+.pomodoro-ring {
+  flex-shrink: 0;
+}
+
+.pomodoro-ring-track {
+  stroke: color-mix(in oklab, var(--text-soft) 25%, transparent);
+}
+
+.pomodoro-timer--break .pomodoro-ring-track {
+  stroke: color-mix(in oklab, var(--green-11) 25%, transparent);
+}
+
+.pomodoro-ring-fill {
+  stroke: var(--accent);
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.pomodoro-timer--break .pomodoro-ring-fill {
+  stroke: var(--green-11);
+}
+
+.pomodoro-time {
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-main);
+  letter-spacing: 0.02em;
+}
+
+.pomodoro-phase-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-soft);
+}
+
+/* ── Pomodoro Break Overlay ──────────────────────────────────────────────────── */
+
+.pomodoro-break-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+}
+
+.pomodoro-break-card {
+  text-align: center;
+  max-width: 360px;
+  padding: 40px 36px;
+  background: var(--panel-glass-bg);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--panel-glass-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.pomodoro-break-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0 0 16px;
+}
+
+.pomodoro-break-timer {
+  font-size: 2.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-11);
+  margin: 0 0 20px;
+}
+
+.pomodoro-break-hint {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  margin: 0 0 28px;
+  line-height: 1.5;
+}
+
+.pomodoro-break-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pomodoro-break-skip {
+  opacity: 0.6;
 }
 
 .minigame-response-head {
