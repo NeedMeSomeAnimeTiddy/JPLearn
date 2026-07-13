@@ -2171,7 +2171,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 6px 24px;
+  padding: 2px 24px 6px;
   border: 1px solid var(--panel-border);
   border-left: 0;
   border-right: 0;
@@ -2580,7 +2580,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
 .hub-player {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 14px 14px;
   min-height: 0;
   overflow-y: auto;
