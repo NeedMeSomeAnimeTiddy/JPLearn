@@ -2171,7 +2171,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 0px 24px 6px;
+  padding: 6px 24px;
   border: 1px solid var(--panel-border);
   border-left: 0;
   border-right: 0;
@@ -2581,7 +2581,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 14px;
+  padding: 8px 14px 10px;
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: none;
@@ -2618,8 +2618,11 @@ html[data-reduced-motion='true'] .home-hero-steam {
   gap: 14px;
   padding: 0;
   margin-bottom: 0;
-  position: relative;
-  z-index: 1;
+  position: absolute;
+  top: 8px;
+  left: 14px;
+  right: 14px;
+  z-index: 2;
 }
 
 .hub-player-header .hero-kicker {
@@ -5863,7 +5866,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
   touch-action: pan-x pinch-zoom;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-  padding: 20px 0 65px;
+  padding: 40px 0;
   padding-inline: calc(50% - 140px);
   min-height: 0;
   /* hide scrollbar */
