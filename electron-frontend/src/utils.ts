@@ -135,3 +135,11 @@ const TAG_LABELS: Record<string, string> = {
 export function formatTagLabel(tag: string): string {
   return TAG_LABELS[tag] ?? tag.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
+
+export function blankOutWordInSentence(sentence: string, word: string): string | null {
+  const index = sentence.indexOf(word)
+  if (index === -1) return null
+  const before = sentence.slice(0, index)
+  const after = sentence.slice(index + word.length)
+  return `${before}___${after}`
+}

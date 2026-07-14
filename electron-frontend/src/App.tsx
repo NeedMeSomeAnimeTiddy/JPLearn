@@ -25,7 +25,8 @@ import { assessTypedAnswer } from './lib/answerAssessment'
 import type { TypedAnswerState } from './lib/answerAssessment'
 import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
-import { isGrammarCurriculumMode } from './utils'
+import { isGrammarCurriculumMode, blankOutWordInSentence } from './utils'
+import { KANJI_MEANINGS } from './lib/kanjiMeanings'
 import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Upload, X } from 'lucide-react'
 import './App.css'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
@@ -76,7 +77,7 @@ type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' |
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
 type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'kanji_compound_builder' | 'context_cloze' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools' | 'dev_checks'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
@@ -512,6 +513,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       dictation: { ...EMPTY_MINIGAME_STATS },
+      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     katakana: {
@@ -527,6 +530,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       dictation: { ...EMPTY_MINIGAME_STATS },
+      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     kanji_n5: {
@@ -542,6 +547,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       dictation: { ...EMPTY_MINIGAME_STATS },
+      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     vocab_n5: {
@@ -557,6 +564,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       dictation: { ...EMPTY_MINIGAME_STATS },
+      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     grammar_patterns: {
@@ -572,6 +581,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       dictation: { ...EMPTY_MINIGAME_STATS },
+      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     sentence_examples: {
@@ -587,6 +598,8 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       imposter: { ...EMPTY_MINIGAME_STATS },
       listening_audio_first: { ...EMPTY_MINIGAME_STATS },
       dictation: { ...EMPTY_MINIGAME_STATS },
+      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
+      context_cloze: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
   }
@@ -1043,6 +1056,16 @@ function buildRoundDictionaryNote(card: ScriptDeck['cards'][number], mode: Playa
     copy = secondaryGlosses.length > 0
       ? `The audio term is ${summary.character}, read ${summary.reading}, with senses like ${glossList.join(', ')}.`
       : `The audio term is ${summary.character}, read ${summary.reading}, and usually means ${summary.primary_gloss}.`
+  } else if (mode === 'kanji_compound_builder') {
+    title = 'Compound clue'
+    copy = secondaryGlosses.length > 0
+      ? `${summary.character} (${summary.reading}) is built from kanji with senses like ${glossList.join(', ')}.`
+      : `${summary.character} (${summary.reading}) is built from kanji that each carry distinct meaning.`
+  } else if (mode === 'context_cloze') {
+    title = 'Sentence clue'
+    copy = secondaryGlosses.length > 0
+      ? `Use context to choose the right word. ${summary.character} (${summary.reading}) can mean ${glossList.join(', ')}.`
+      : `Use context to choose the right word. ${summary.character} (${summary.reading}) fits this sentence.`
   }
 
   return {
@@ -1390,6 +1413,8 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'imposter') return 'Imposter'
   if (mode === 'listening_audio_first') return 'Recognition'
   if (mode === 'dictation') return 'Dictation'
+  if (mode === 'kanji_compound_builder') return 'Compound Builder'
+  if (mode === 'context_cloze') return 'Context Cloze'
   return 'Interleave Mix'
 }
 
@@ -1406,6 +1431,8 @@ function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'imposter') return 'Good attempt. Scan for the token that breaks grammar flow.'
   if (mode === 'listening_audio_first') return 'Keep listening. Audio recognition builds over time.'
   if (mode === 'dictation') return 'Listen carefully and type the romaji for what you hear.'
+  if (mode === 'kanji_compound_builder') return 'Good try. Think about what each kanji contributes to the meaning.'
+  if (mode === 'context_cloze') return 'Good try. Use the surrounding sentence context to infer the missing word.'
   return 'Good attempt. Keep the next answer short and clear.'
 }
 
@@ -2791,7 +2818,7 @@ function App() {
       setDeckCards([])
       setBlockProgress([])
       setActiveBlockIndex(0)
-      setGameError(err instanceof Error ? err.message : 'Unknown game bridge error')
+      setGameError(err instanceof Error ? err.message : 'Could not load deck data. Restart the app if this persists.')
     } finally {
       if (scriptLoadRequestIdRef.current === requestId) {
         setGameLoading(false)
@@ -3473,6 +3500,77 @@ function App() {
         }
       }
 
+      if (minigame === 'kanji_compound_builder') {
+        const kanjiChars = [...card.character].filter((c) => /\p{Script=Han}/u.test(c))
+        const meanings = kanjiChars.map((c) => KANJI_MEANINGS[c] ?? '?')
+        const meaningHints = meanings.join(' + ')
+
+        const rankedCompoundDistractors = pickDistractorsFromPool(card.character_distractor_ids, 3)
+        const compoundOptions = shuffleArray([
+          { id: `${card.id}-correct`, label: card.character },
+          ...rankedCompoundDistractors.map((candidate) => ({
+            id: `${candidate.id}-compound`,
+            label: candidate.character,
+          })),
+        ])
+
+        return {
+          cardId: card.id,
+          mode: minigame,
+          audioText: card.character,
+          exampleSentenceAudioText,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: `This word means: ${card.meaning}`,
+          dictionarySeedQuery,
+          dictionaryNote,
+          promptLabel: surprisePrompt
+            ? surpriseLabel
+            : `Build: ${meaningHints}`,
+          focusText: meaningHints,
+          answer: card.character,
+          options: compoundOptions,
+        }
+      }
+
+      if (minigame === 'context_cloze') {
+        const sentence = card.example_sentence?.trim()
+        const clozeResult = sentence ? blankOutWordInSentence(sentence, card.character) : null
+
+        const rankedClozeDistractors = pickDistractorsFromPool(card.character_distractor_ids, 3)
+        const clozeOptions = shuffleArray([
+          { id: `${card.id}-correct`, label: card.character },
+          ...rankedClozeDistractors.map((candidate) => ({
+            id: `${candidate.id}-cloze`,
+            label: candidate.character,
+          })),
+        ])
+
+        return {
+          cardId: card.id,
+          mode: minigame,
+          audioText: clozeResult ? sentence! : card.character,
+          exampleSentenceAudioText: clozeResult ?? exampleSentenceAudioText,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: clozeResult
+            ? `The missing word means: ${card.meaning}`
+            : exampleSentenceHint ?? `Think about what ${card.character} means.`,
+          dictionarySeedQuery,
+          dictionaryNote,
+          promptLabel: clozeResult
+            ? (surprisePrompt ? surpriseLabel : 'Fill the blank in the sentence.')
+            : (surprisePrompt ? surpriseLabel : 'Which character matches this meaning?'),
+          focusText: clozeResult ?? card.meaning,
+          answer: card.character,
+          options: clozeOptions,
+        }
+      }
+
       const rankedCharacterDistractors = pickDistractorsFromPool(card.character_distractor_ids, 3)
       const options = shuffleArray([
         { id: `${card.id}-correct`, label: card.character },
@@ -3667,9 +3765,16 @@ function App() {
           ? activeBlockCards.filter((card) => card.is_leech)
           : activeBlockCards)
       const modeSelection = nextRoundMode(selectedGame)
-      const modeCards = isImposterMode(modeSelection.mode)
+      let modeCards = isImposterMode(modeSelection.mode)
         ? narrativePriorityCards(sourceCards)
         : sourceCards
+
+      if (modeSelection.mode === 'kanji_compound_builder') {
+        modeCards = modeCards.filter((c) => {
+          const kanjiChars = [...c.character].filter((ch) => /\p{Script=Han}/u.test(ch))
+          return kanjiChars.length >= 2 && !kanjiChars.some((ch) => !(ch in KANJI_MEANINGS))
+        })
+      }
       const goalTargetItems = Math.max(1, Math.floor(customTargetItems ?? sessionTargetItems))
 
       const goalRequest = window.jplearnDesktop?.startSessionGoal({
@@ -3685,9 +3790,9 @@ function App() {
     setSessionActive(false)
     setRoundState(null)
         if (leechFocusEnabled && activeBlockCards.filter((card) => card.is_leech).length === 0) {
-          setGameError('No active leech cards in this block yet. Disable focused review mode to continue.')
+          setGameError('No cards flagged for review. Disable Leech Focus to play normally.')
         } else {
-          setGameError('Not enough cards in this block for the selected minigame yet.')
+          setGameError('This block has too few cards for this minigame. Try a different block.')
         }
         return
       }
@@ -3718,7 +3823,7 @@ function App() {
       }
     } catch (error: unknown) {
       resetSessionCore()
-      setGameError(error instanceof Error ? error.message : 'Unable to start session.')
+      setGameError(error instanceof Error ? error.message : 'Could not start the session. Try again or restart the app.')
       setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session.')
     } finally {
       setSessionStartPending(false)
@@ -3828,9 +3933,16 @@ function App() {
     const sourceCards = retryPool
       ?? (leechFocusEnabled && leechPool.length > 0 ? leechPool : activeBlockCards)
     const modeSelection = nextRoundMode(activeGame)
-    const modeCards = isImposterMode(modeSelection.mode)
+    let modeCards = isImposterMode(modeSelection.mode)
       ? narrativePriorityCards(sourceCards)
       : sourceCards
+
+    if (modeSelection.mode === 'kanji_compound_builder') {
+      modeCards = modeCards.filter((c) => {
+        const kanjiChars = [...c.character].filter((ch) => /\p{Script=Han}/u.test(ch))
+        return kanjiChars.length >= 2 && !kanjiChars.some((ch) => !(ch in KANJI_MEANINGS))
+      })
+    }
     let index = nextCardIndex(modeCards.length)
     if (index === null) {
       await hydrateRoundCycle(modeCards)
@@ -4414,9 +4526,30 @@ function App() {
       reasons.listening_audio_first = voice.listeningLockReason
       reasons.dictation = voice.listeningLockReason
     }
+    if (activeScript === 'vocab_n5' && activeBlockCards.length > 0) {
+      const hasCompounds = activeBlockCards.some((c) => {
+        const kanjiChars = [...c.character].filter((ch) => /\p{Script=Han}/u.test(ch))
+        return kanjiChars.length >= 2 && !kanjiChars.some((ch) => !(ch in KANJI_MEANINGS))
+      })
+      if (!hasCompounds) {
+        reasons.kanji_compound_builder = 'No compound words in this block'
+      }
+    }
+    if (leechFocusEnabled && activeBlockCards.length > 0 && activeBlockCards.filter((c) => c.is_leech).length === 0) {
+      const leechModes: MinigameKey[] = ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter', 'listening_audio_first', 'dictation', 'kanji_compound_builder', 'context_cloze', 'interleave_mix']
+      for (const mode of leechModes) {
+        if (!reasons[mode]) reasons[mode] = 'No leech cards in this block'
+      }
+    }
+    if (activeBlockCards.length > 0 && activeBlockCards.length < 2) {
+      const mcModes: MinigameKey[] = ['meaning_match', 'character_match', 'particle_cloze', 'vibe_check', 'imposter', 'listening_audio_first', 'kanji_compound_builder', 'context_cloze']
+      for (const mode of mcModes) {
+        if (!reasons[mode]) reasons[mode] = 'Not enough cards for this mode'
+      }
+    }
     return reasons
   // oxlint-disable react-hooks/exhaustive-deps — voice.speechRecognitionLockReason is a constant string, voice hook return is not stable
-  }, [voice.listeningLockReason, voice.speechRecognitionModelEnabled])
+  }, [voice.listeningLockReason, voice.speechRecognitionModelEnabled, activeScript, activeBlockCards, leechFocusEnabled])
 
   // Block session is complete when every card in the active block has reached max score.
   // sessionRounds > 0 ensures we don't trigger on a pre-mastered block before answering.

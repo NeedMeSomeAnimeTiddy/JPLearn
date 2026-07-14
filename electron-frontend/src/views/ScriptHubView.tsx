@@ -108,6 +108,8 @@ const MINIGAME_DIFFICULTY: Record<MinigameKey, {
   imposter: { level: 'hard', label: 'Hard' },
   listening_audio_first: { level: 'medium', label: 'Medium' },
   dictation: { level: 'medium', label: 'Medium' },
+  kanji_compound_builder: { level: 'medium', label: 'Medium' },
+  context_cloze: { level: 'hard', label: 'Hard' },
   interleave_mix: { level: 'hard', label: 'Hard' },
 }
 

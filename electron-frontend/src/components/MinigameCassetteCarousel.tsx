@@ -320,7 +320,10 @@ export function MinigameCassetteCarousel({
 
                 {item.locked ? (
                   <span className="cassette-lock" aria-hidden="true">
-                    <Lock size={20} strokeWidth={2} />
+                    <Lock size={16} strokeWidth={2} />
+                    {item.lockReason ? (
+                      <span className="cassette-lock-reason">{item.lockReason}</span>
+                    ) : null}
                   </span>
                 ) : null}
               </button>

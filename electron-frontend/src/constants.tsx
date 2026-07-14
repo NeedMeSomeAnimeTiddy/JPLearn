@@ -6,7 +6,9 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   BookText,
+  Combine,
   Ear,
+  FileText,
   Flame,
   History,
   Keyboard,
@@ -159,6 +161,16 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
     description: 'Hear a word and type it in Japanese — no visual hints.',
   },
   {
+    key: 'kanji_compound_builder',
+    title: 'Compound Builder',
+    description: 'Build compound words from individual kanji meanings.',
+  },
+  {
+    key: 'context_cloze',
+    title: 'Context Cloze',
+    description: 'Fill the missing word in a sentence from vocabulary options.',
+  },
+  {
     key: 'interleave_mix',
     title: 'Interleave Mix',
     description: 'Cycle reading, meaning, and character rounds in one run.',
@@ -166,8 +178,8 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
 ]
 
 export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'interleave_mix'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'interleave_mix'],
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'context_cloze', 'interleave_mix'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'context_cloze', 'interleave_mix'],
   kanji_n5: [
     'romaji_sprint',
     'meaning_match',
@@ -177,6 +189,7 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'speech_recall',
     'particle_cloze',
     'imposter',
+    'context_cloze',
     'listening_audio_first',
     'interleave_mix',
   ],
@@ -184,9 +197,11 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'meaning_match',
     'character_match',
     'typed_recall',
+    'kanji_compound_builder',
     'speech_recall',
     'particle_cloze',
     'imposter',
+    'context_cloze',
     'listening_audio_first',
     'dictation',
     'interleave_mix',
@@ -200,6 +215,7 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'particle_cloze',
     'vibe_check',
     'imposter',
+    'context_cloze',
     'listening_audio_first',
     'interleave_mix',
   ],
@@ -210,6 +226,7 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
     'speech_recall',
     'sentence_assembly',
     'imposter',
+    'context_cloze',
     'listening_audio_first',
     'interleave_mix',
   ],
@@ -228,6 +245,8 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   imposter: History,
   listening_audio_first: Volume2,
   dictation: Ear,
+  kanji_compound_builder: Combine,
+  context_cloze: FileText,
   interleave_mix: Shuffle,
 }
 
@@ -282,6 +301,8 @@ export const MINIGAME_SKILL_GROUP: Record<MinigameKey, MinigameSkillGroupKey> = 
   imposter: 'challenge',
   listening_audio_first: 'listening',
   dictation: 'listening',
+  kanji_compound_builder: 'recognition',
+  context_cloze: 'challenge',
   interleave_mix: 'mixed',
 }
 

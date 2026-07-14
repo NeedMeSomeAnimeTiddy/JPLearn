@@ -13,6 +13,8 @@ export type MinigameKey =
   | 'imposter'
   | 'listening_audio_first'
   | 'dictation'
+  | 'kanji_compound_builder'
+  | 'context_cloze'
   | 'interleave_mix'
 
 export type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>

@@ -225,7 +225,9 @@ export function MinigameView({
       activeRound.mode === 'particle_cloze' ||
       activeRound.mode === 'vibe_check' ||
       activeRound.mode === 'imposter' ||
-      activeRound.mode === 'listening_audio_first'
+      activeRound.mode === 'listening_audio_first' ||
+      activeRound.mode === 'kanji_compound_builder' ||
+      activeRound.mode === 'context_cloze'
 
     const isTyped =
       activeRound.mode === 'romaji_sprint' ||

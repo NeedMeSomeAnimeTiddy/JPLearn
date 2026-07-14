@@ -6206,12 +6206,28 @@ html[data-reduced-motion='true'] .home-hero-steam {
 .cassette-lock {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.55);
   color: var(--accent-soft);
   backdrop-filter: blur(1px);
+  padding: 12px;
+}
+
+.cassette-lock-reason {
+  font-size: 0.62rem;
+  color: var(--text-soft);
+  line-height: 1.25;
+  text-align: center;
+  max-width: 26ch;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .cassette-nav {

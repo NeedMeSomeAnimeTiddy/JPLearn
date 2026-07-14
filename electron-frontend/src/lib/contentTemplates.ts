@@ -2,7 +2,7 @@
 // Static data for round-building functions
 
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns' | 'sentence_examples'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'kanji_compound_builder' | 'context_cloze' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 
 export const SURPRISE_PROMPTS = [
@@ -53,6 +53,10 @@ export const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<Playable
       'Hear and Write: listen closely and type what you hear.',
       'Sound-to-Text: trust your ear and type the character.',
     ],
+    context_cloze: [
+      'Kana Read: fill the missing word from the sentence context.',
+      'Script Gap: use the sentence clues to choose the right word.',
+    ],
   },
   katakana: {
     romaji_sprint: [
@@ -94,6 +98,10 @@ export const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<Playable
     dictation: [
       'Katakana Dictation: hear the sound and type the character.',
       'Sound-to-Form: listen carefully and produce the written form.',
+    ],
+    context_cloze: [
+      'Sharp Fill: use the sentence to find the right katakana word.',
+      'Loanword Gap: pick the katakana word that fits the sentence.',
     ],
   },
   kanji_n5: {
@@ -137,6 +145,14 @@ export const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<Playable
       'Kanji Dictation: hear the reading and type the character.',
       'Sound-to-Kanji: recognise the spoken word and produce it.',
     ],
+    kanji_compound_builder: [
+      'Kanji Build: choose the compound built from these meanings.',
+      'Piece Puzzle: each kanji brings its own meaning to the word.',
+    ],
+    context_cloze: [
+      'Sentence Fill: read the context and pick the word that fits.',
+      'Meaning Blank: use the surrounding words to choose the answer.',
+    ],
   },
   vocab_n5: {
     romaji_sprint: [
@@ -178,6 +194,14 @@ export const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<Playable
     dictation: [
       'Vocab Dictation: hear the word and type it from memory.',
       'Listening Production: recognise the spoken vocabulary.',
+    ],
+    kanji_compound_builder: [
+      'Build Mode: combine kanji meanings to form the compound word.',
+      'Compound Link: find the word built from these kanji cues.',
+    ],
+    context_cloze: [
+      'Word in Context: read the sentence and fill the missing word.',
+      'Sentence Gap: choose the vocabulary that completes the meaning.',
     ],
   },
   grammar_patterns: {
@@ -221,6 +245,10 @@ export const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<Playable
       'Grammar Dictation: hear the pattern and type it out.',
       'Sound-to-Pattern: recognise spoken grammar structures.',
     ],
+    context_cloze: [
+      'Pattern Fill: use sentence context to select the right grammar.',
+      'Grammar Gap: read the sentence and pick the missing structure.',
+    ],
   },
   sentence_examples: {
     romaji_sprint: [
@@ -262,6 +290,10 @@ export const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<Playable
     dictation: [
       'Sentence Dictation: hear the sentence and type it out.',
       'Listening Composition: transcribe spoken Japanese lines.',
+    ],
+    context_cloze: [
+      'Sentence Fill: use context clues to pick the missing word.',
+      'Flow Gap: find the word that completes the sentence naturally.',
     ],
   },
 }
