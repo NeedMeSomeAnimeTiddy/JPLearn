@@ -3,6 +3,7 @@ import { TypeAnimation } from 'react-type-animation'
 import {
   AlertTriangle,
   ArrowRight,
+  BookText,
   Languages,
   Zap,
 } from 'lucide-react'
@@ -43,6 +44,7 @@ interface HomeViewProps {
   learningPathStatus?: LearningPathStatus | null
   onSelectScript: (script: ScriptKey) => void
   onOpenJlptPrep: () => void
+  onOpenPassages?: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
   onStartRecommendation?: (nodeId: string) => void
   onContinuePath?: (sectionId: string) => void
@@ -65,6 +67,7 @@ export function HomeView({
   learningPathStatus,
   onSelectScript,
   onOpenJlptPrep,
+  onOpenPassages,
   onJumpToSetup,
   onStartRecommendation,
   onContinuePath,
@@ -228,6 +231,19 @@ export function HomeView({
                 <span className="home-jlpt-pct">{jlptPrepProgressPct}%</span>
                 <ArrowRight size={13} strokeWidth={2.2} aria-hidden="true" />
               </button>
+
+              {onOpenPassages ? (
+                <button
+                  type="button"
+                  className="home-jlpt-button"
+                  aria-label="Open reading passages"
+                  onClick={onOpenPassages}
+                >
+                  <BookText size={14} strokeWidth={2.2} aria-hidden="true" />
+                  <span>Passages</span>
+                  <ArrowRight size={13} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+              ) : null}
             </div>
           )}
 

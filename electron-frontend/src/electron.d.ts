@@ -540,6 +540,7 @@ interface DesktopApi {
   moveWindow?: (dx: number, dy: number) => Promise<{ ok: boolean }>
   getProgressionState?: () => Promise<ProgressionStatePayload>
   getFeatureState?: () => Promise<FeatureStatePayload>
+  getPassages?: () => Promise<PassagesPayload>
   getXpProgress?: () => Promise<XPProgress>
   getRecommendations?: () => Promise<RecommendationsPayload>
   getTutorReactions?: () => Promise<TutorReactionsPayload>
@@ -908,6 +909,26 @@ interface LearningPathStatusPayload {
   onboarding_complete: boolean
   suggested_next: string | null
   steps: LearningPathStep[]
+}
+
+interface PassageItem {
+  id: string
+  title: string
+  title_reading: string
+  author: string
+  source: string
+  source_url: string
+  original_publication: string
+  difficulty: number
+  difficulty_label: 'beginner' | 'elementary'
+  word_count: number
+  text_jp: string
+  raw_text: string
+  vocabulary: { word: string; reading: string }[]
+}
+
+interface PassagesPayload {
+  passages: PassageItem[]
 }
 
 // ─ Debug / Dev Tools ──────────────────────────────────────────────────

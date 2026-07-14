@@ -3032,6 +3032,213 @@ html[data-reduced-motion='true'] .home-hero-steam {
 .home-jlpt-btn:hover:not(.is-locked) { border-color: var(--accent); color: var(--accent); }
 .home-jlpt-btn.is-locked { opacity: 0.45; cursor: default; }
 
+/* ── PassageHubView ─────────────────────────────────────────── */
+.passages-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.passages-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: border-color 0.15s;
+  flex-shrink: 0;
+}
+.passages-back-button:hover { border-color: var(--accent); }
+.passages-title { font-size: 1.2rem; font-weight: 700; color: var(--text-main); }
+.passages-subtitle { font-size: 0.8rem; color: var(--text-soft); margin-left: 0.25rem; }
+.passages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 0;
+  overflow-y: auto;
+}
+.passages-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+  width: 100%;
+}
+.passages-card:hover { border-color: var(--accent); background: var(--panel-bg-alt); }
+.passages-card-left { min-width: 0; flex: 1; }
+.passages-card-header { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.25rem; }
+.passages-card-title { font-size: 1rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.passages-card-reading { font-size: 0.8rem; color: var(--text-soft); flex-shrink: 0; }
+.passages-card-meta { display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: var(--text-soft); }
+.passages-card-dot { color: var(--text-soft); opacity: 0.5; }
+.passages-card-right { flex-shrink: 0; margin-left: 0.75rem; }
+.passages-progress-icon { flex-shrink: 0; }
+.passages-progress-icon.completed { color: var(--tone-teal); }
+.passages-progress-icon.in-progress { color: var(--accent); }
+.passages-progress-icon.not-started { color: var(--text-soft); opacity: 0.4; }
+.passages-difficulty[data-level="beginner"] { color: var(--tone-teal); }
+.passages-difficulty[data-level="elementary"] { color: var(--tone-amber); }
+.passages-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: var(--text-soft);
+  text-align: center;
+}
+.passages-retry-button {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--text-main);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: border-color 0.15s;
+}
+.passages-retry-button:hover { border-color: var(--accent); }
+.passages-skeleton-list { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem 0; }
+.passages-skeleton-card {
+  height: 64px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.passages-footer { padding: 0.75rem 0 0; border-top: 1px solid var(--panel-border); }
+.passages-footer-text { font-size: 0.75rem; color: var(--text-soft); }
+.passages-footer-text a { color: var(--accent); text-decoration: none; }
+.passages-footer-text a:hover { text-decoration: underline; }
+
+/* ── PassageReader ────────────────────────────────────────── */
+.passage-reader-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--panel-border);
+  margin-bottom: 1rem;
+}
+.passage-control-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--text-main);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: border-color 0.15s;
+}
+.passage-control-button:hover { border-color: var(--accent); }
+.passage-control-button:disabled { opacity: 0.6; cursor: default; }
+.passage-spinner { animation: passage-spin 1s linear infinite; }
+@keyframes passage-spin { to { transform: rotate(360deg); } }
+.passage-control-spacer { flex: 1; }
+.passage-font-size-label {
+  font-size: 0.7rem;
+  color: var(--text-soft);
+  min-width: 3ch;
+  text-align: center;
+}
+.passage-reader-header { margin-bottom: 1rem; }
+.passage-reader-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.passage-reader-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+.passage-reader-content {
+  flex: 1;
+  overflow-y: auto;
+  line-height: 2.2;
+  padding: 1rem 0;
+  color: var(--text-main);
+}
+.passage-word {
+  display: inline;
+  padding: 1px 2px;
+  margin: 0 1px;
+}
+.passage-word.clickable {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+.passage-word.clickable:hover { background: var(--accent-soft); }
+.passage-word.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.passage-word-text { display: inline; }
+.passage-word-furigana {
+  display: inline;
+  font-size: 0.7em;
+  color: var(--text-soft);
+  font-style: normal;
+}
+
+/* ── Word Popup Menu ─────────────────────────────────────── */
+.passage-word-popup {
+  position: fixed;
+  z-index: 1000;
+  transform: translateX(-50%);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 0.5rem;
+  min-width: 160px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.passage-word-popup-label {
+  font-size: 0.9rem;
+  color: var(--text-main);
+  padding: 0.25rem 0.5rem 0.5rem;
+  border-bottom: 1px solid var(--panel-border);
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.passage-word-popup-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.passage-word-popup-btn:hover { background: var(--accent-soft); }
+
 .home-copy {
   color: var(--text-soft);
   max-width: 62ch;

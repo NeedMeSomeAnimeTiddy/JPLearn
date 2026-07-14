@@ -757,6 +757,16 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('passages:list', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('passages:list')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch passages: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('recommendations:get', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {

@@ -15,6 +15,7 @@ import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
 import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
+import { PassageHubView } from './views/PassageHubView'
 import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
@@ -81,7 +82,7 @@ type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stro
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools' | 'dev_checks'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
-type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep'
+type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep' | 'passage_hub'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type AppFontPreset =
@@ -4389,6 +4390,12 @@ function App() {
           return
         }
 
+        if (view === 'passage_hub') {
+          setNavDirection('back')
+          setView('home')
+          return
+        }
+
         if (showOverview) {
           setShowOverview(false)
           return
@@ -5130,6 +5137,17 @@ function App() {
                     JLPT Prep
                   </button>
 
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="titlebar-shortcut-item"
+                    onClick={() => { setView('passage_hub'); setShortcutMenuOpen(false) }}
+                    title="Passages"
+                  >
+                    <BookText className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    Passages
+                  </button>
+
                   <div className="titlebar-shortcut-tree-anchor">
                     <button
                       type="button"
@@ -5715,6 +5733,13 @@ function App() {
             setNavDirection('forward')
             setView('jlpt_prep')
           }}
+          onOpenPassages={() => {
+            setDictionaryOpen(false)
+            setShowOverview(false)
+            setShowSettings(false)
+            setNavDirection('forward')
+            setView('passage_hub')
+          }}
           onJumpToSetup={jumpToScriptHubSetup}
         />
       ) : null}
@@ -5892,6 +5917,18 @@ function App() {
             setNavDirection('back')
             setView('home')
           }}
+        />
+      ) : null}
+
+      {view === 'passage_hub' ? (
+        <PassageHubView
+          onBack={() => {
+            setNavDirection('back')
+            setView('home')
+          }}
+          onOpenDictionary={(query) => openDictionary(query ?? '')}
+          onPlayAudio={(text) => { void voice.playQuestionAudio(text) }}
+          voiceBusy={voice.voiceBusy}
         />
       ) : null}
 

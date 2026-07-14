@@ -356,6 +356,56 @@ _DICTIONARY_RESULT_LIMIT = 120
 _DICTIONARY_COMMON_FALLBACK_THRESHOLD = 5
 _DICTIONARY_JAPANESE_RE = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]")
 _DICTIONARY_KATAKANA_ONLY_RE = re.compile(r"^[\u30a0-\u30ffー・\s]+$")
+_KATAKANA_TO_HIRAGANA_SHIFT = 0x60
+
+# Lazy-loaded fugashi tagger for dictionary query deinflection.
+_fugashi_tagger: object | None = None
+
+
+def _get_fugashi_tagger() -> object | None:
+    """Return a fugashi Tagger instance (cached), or None if unavailable."""
+    global _fugashi_tagger
+    if _fugashi_tagger is None:
+        try:
+            import fugashi  # type: ignore[import-untyped]
+
+            _fugashi_tagger = fugashi.Tagger()
+        except Exception:
+            return None
+    return _fugashi_tagger
+
+
+def _deinflect_query(query: str) -> list[str]:
+    """Use fugashi to find base (dictionary) forms for a Japanese query.
+    Returns lemmas for content words (nouns, verbs, adjectives).
+    """
+    tagger = _get_fugashi_tagger()
+    if tagger is None:
+        return []
+
+    from typing import Any
+
+    tagger_any: Any = tagger
+    lemmas: list[str] = []
+    for word in tagger_any(query):
+        pos1 = word.feature.pos1
+        if pos1 in ("名詞", "動詞", "形容詞", "形容動詞"):
+            lemma = getattr(word.feature, "orthBase", "") or getattr(word.feature, "lemma", "")
+            if lemma and lemma not in lemmas:
+                lemmas.append(lemma)
+    return lemmas
+
+
+def _katakana_to_hiragana(text: str) -> str:
+    """Convert katakana to hiragana using the Unicode code point offset."""
+    result: list[str] = []
+    for ch in text:
+        cp = ord(ch)
+        if 0x30A1 <= cp <= 0x30F6:  # standard katakana range
+            result.append(chr(cp - _KATAKANA_TO_HIRAGANA_SHIFT))
+        else:
+            result.append(ch)
+    return "".join(result)
 _DICTIONARY_SEMANTIC_RERANK_LIMIT = 80
 _DICTIONARY_GREETINGS_QUERY_BOOST = {
     "hello",
@@ -463,22 +513,56 @@ def _search_dictionary_japanese(conn: sqlite3.Connection, normalized_query: str)
         "ORDER BY LENGTH(japanese), entry_id "
         "LIMIT ?"
     )
-    match_params = [
-        normalized_query,
-        f"{normalized_query}%",
-        normalized_query,
-        f"{normalized_query}%",
-    ]
 
-    rows = conn.execute(base_sql, [*match_params, 1, _DICTIONARY_RESULT_LIMIT]).fetchall()
+    def _run_search(query: str) -> list[tuple]:
+        match_params = [
+            query,
+            f"{query}%",
+            query,
+            f"{query}%",
+        ]
+        rows = conn.execute(base_sql, [*match_params, 1, _DICTIONARY_RESULT_LIMIT]).fetchall()
+        if len(rows) < _DICTIONARY_COMMON_FALLBACK_THRESHOLD:
+            seen_ids = {row[0] for row in rows}
+            remaining = _DICTIONARY_RESULT_LIMIT - len(rows)
+            extra_rows = conn.execute(base_sql, [*match_params, 0, remaining]).fetchall()
+            rows.extend(row for row in extra_rows if row[0] not in seen_ids)
+        return rows
 
-    if len(rows) < _DICTIONARY_COMMON_FALLBACK_THRESHOLD:
-        seen_ids = {row[0] for row in rows}
-        remaining = _DICTIONARY_RESULT_LIMIT - len(rows)
-        extra_rows = conn.execute(base_sql, [*match_params, 0, remaining]).fetchall()
-        rows.extend(row for row in extra_rows if row[0] not in seen_ids)
+    def _try_queries(queries: list[str]) -> list[tuple]:
+        for q in queries:
+            rows = _run_search(q)
+            if rows:
+                return rows
+        return []
 
-    return rows
+    # Build a list of queries to try: deinflected lemmas first (exact
+    # dictionary forms), then hiragana form, then katakana original, then
+    # progressively shorter prefixes to find the root word.
+    candidates: list[str] = []
+
+    # Try fugashi lemmas first — they give exact dictionary headwords.
+    lemma_candidates = _deinflect_query(normalized_query)
+    candidates.extend(lemma_candidates)
+
+    is_katakana = _DICTIONARY_KATAKANA_ONLY_RE.fullmatch(normalized_query)
+    if is_katakana:
+        hiragana_query = _katakana_to_hiragana(normalized_query)
+        if hiragana_query != normalized_query:
+            candidates.append(hiragana_query)
+
+    candidates.append(normalized_query)
+
+    # Add progressively shorter prefixes of the first candidates (lemma or
+    # hiragana form if available, otherwise original).
+    base = candidates[0] if candidates else normalized_query
+    prefix_len = len(base) - 1
+    while prefix_len >= 2:
+        if base[:prefix_len] not in candidates:
+            candidates.append(base[:prefix_len])
+        prefix_len -= 1
+
+    return _try_queries(candidates)
 
 
 def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
@@ -4285,6 +4369,17 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
 
     if command == "feature-unlocks":
         return 0, build_feature_unlock_status()
+
+    if command == "passages:list":
+        try:
+            from pathlib import Path
+            passages_path = Path("data/external_sources/passages/aozora/passages.json")
+            if not passages_path.exists():
+                return 2, {"error": "Passages data not found. Run build_passages_db.py first."}
+            passages = json.loads(passages_path.read_text(encoding="utf-8"))
+            return 0, {"passages": passages}
+        except Exception as exc:
+            return 2, {"error": str(exc)}
 
     if command == "xp-progress":
         return 0, build_xp_progress()

@@ -313,7 +313,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
         if (left.character !== right.character) return left.character.localeCompare(right.character)
         return left.romaji.localeCompare(right.romaji)
       })
-    const mergedResults = remoteResults.length > 0 ? [...remoteResults, ...localResults] : localResults
+    const mergedResults = remoteResults.length > 0 ? [...remoteResults, ...localResults] : remoteResults
     return dedupeResults(mergedResults)
   }, [cards, query, remoteResults])
 
