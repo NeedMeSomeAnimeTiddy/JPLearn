@@ -1,6 +1,7 @@
 import { cva } from 'class-variance-authority'
 import { startTransition, useEffect, useRef, useState } from 'react'
-import type { CompositionEvent, FormEvent, KeyboardEvent } from 'react'
+import type { FormEvent, KeyboardEvent } from 'react'
+import * as wanakana from 'wanakana'
 import { CROSSWORD_COPY } from '../constants'
 import type { CrosswordCoordinate, CrosswordEntry, CrosswordBoard, DailyGamesAttemptOutcomeInput } from '../types'
 
@@ -45,6 +46,8 @@ function normalizeCharacter(value: string): string {
   return Array.from(value.trim())[0] ?? ''
 }
 
+const JAPANESE_CHARACTER_PATTERN = /^[\p{Script_Extensions=Katakana}\p{Script_Extensions=Han}]$/u
+
 export function CrosswordGame({ board, isSaving, onComplete }: CrosswordGameProps) {
   const [values, setValues] = useState<Map<string, string>>(() => new Map())
   const [activeEntryId, setActiveEntryId] = useState(board.entries[0]?.id ?? '')
@@ -52,7 +55,6 @@ export function CrosswordGame({ board, isSaving, onComplete }: CrosswordGameProp
   const [status, setStatus] = useState('')
   const completed = useRef(false)
   const cellRefs = useRef<Array<Array<HTMLInputElement | null>>>([])
-  const composingCells = useRef<Set<string>>(new Set())
   const activeEntry = board.entries.find((entry) => entry.id === activeEntryId) ?? board.entries[0]
 
   useEffect(() => {
@@ -71,29 +73,63 @@ export function CrosswordGame({ board, isSaving, onComplete }: CrosswordGameProp
       ?? board.entries.find((entry) => entry.cells.some((cell) => coordinateKey(cell) === coordinateKey(coordinate)))
   }
 
-  function updateValue(coordinate: CrosswordCoordinate, value: string, preserveComposition = false): void {
+  function updateValue(coordinate: CrosswordCoordinate, value: string, isComposing = false): void {
     if (isSaving || completed.current) return
+    // Store the raw value so the user can type full readings for IME conversion.
     startTransition(() => {
       setValues((current) => {
         const next = new Map(current)
-        next.set(coordinateKey(coordinate), preserveComposition ? value : normalizeCharacter(value))
+        next.set(coordinateKey(coordinate), value)
+        return next
+      })
+    })
+    const normalized = normalizeCharacter(value)
+    if (!normalized || !JAPANESE_CHARACTER_PATTERN.test(normalized) || isComposing) return
+    const entry = activeEntry ?? board.entries.find((e) => e.cells.some((c) => coordinateKey(c) === coordinateKey(coordinate)))
+    if (!entry) return
+    const cellIndex = entry.cells.findIndex((c) => coordinateKey(c) === coordinateKey(coordinate))
+    if (cellIndex < 0 || cellIndex >= entry.cells.length - 1) return
+    const nextCell = entry.cells[cellIndex + 1]
+    setActiveEntryId(entry.id)
+    cellRefs.current[nextCell.row]?.[nextCell.column]?.focus()
+  }
+
+  function normalizeCell(coordinate: CrosswordCoordinate): void {
+    startTransition(() => {
+      setValues((current) => {
+        const key = coordinateKey(coordinate)
+        const raw = current.get(key)
+        if (!raw) return current
+        const normalized = normalizeCharacter(raw)
+        if (normalized === raw) return current
+        const next = new Map(current)
+        next.set(key, normalized)
         return next
       })
     })
   }
 
-  function handleCompositionStart(coordinate: CrosswordCoordinate): void {
-    composingCells.current.add(coordinateKey(coordinate))
-  }
-
-  function handleCompositionEnd(event: CompositionEvent<HTMLInputElement>, coordinate: CrosswordCoordinate): void {
-    composingCells.current.delete(coordinateKey(coordinate))
-    updateValue(coordinate, event.currentTarget.value)
-  }
-
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>, coordinate: CrosswordCoordinate): void {
-    if (event.key === 'Enter' && (event.nativeEvent.isComposing || composingCells.current.has(coordinateKey(coordinate)))) {
+    if (event.key === 'Enter' && event.nativeEvent.isComposing) {
       event.preventDefault()
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      normalizeCell(coordinate)
+      return
+    }
+    if (event.key === ' ' && !event.nativeEvent.isComposing) {
+      const entry = getEntryAt(coordinate)
+      if (!entry) return
+      const cellIndex = entry.cells.findIndex((c) => coordinateKey(c) === coordinateKey(coordinate))
+      if (cellIndex < 0) return
+      const expectedChar = Array.from(entry.answer)[cellIndex]
+      if (!expectedChar || !JAPANESE_CHARACTER_PATTERN.test(expectedChar)) return
+      const raw = (event.currentTarget as HTMLInputElement).value
+      if (!raw) return
+      event.preventDefault()
+      updateValue(coordinate, expectedChar)
       return
     }
     const moves: Record<string, CrosswordCoordinate> = {
@@ -115,7 +151,7 @@ export function CrosswordGame({ board, isSaving, onComplete }: CrosswordGameProp
 
   function submit(): void {
     if (isSaving || completed.current) return
-    const solvedEntries = board.entries.filter((entry) => entry.cells.every((cell, index) => values.get(coordinateKey(cell)) === Array.from(entry.answer)[index]))
+    const solvedEntries = board.entries.filter((entry) => entry.cells.every((cell, index) => normalizeCharacter(values.get(coordinateKey(cell)) ?? '') === Array.from(entry.answer)[index]))
     if (solvedEntries.length !== board.entries.length) {
       setStatus(CROSSWORD_COPY.incomplete)
       return
@@ -133,7 +169,7 @@ export function CrosswordGame({ board, isSaving, onComplete }: CrosswordGameProp
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault()
-    if (composingCells.current.size > 0) return
+    if ((event.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return
     submit()
   }
 
@@ -159,17 +195,17 @@ export function CrosswordGame({ board, isSaving, onComplete }: CrosswordGameProp
                   className={crosswordCell({ active: entry?.id === activeEntry?.id })}
                   aria-label={getCellLabel(row, column)}
                   aria-describedby="crossword-current-clue"
-                  lang="ja"
-                  inputMode="text"
                   autoComplete="off"
                   autoCapitalize="off"
                   spellCheck={false}
                   value={values.get(coordinateKey(coordinate)) ?? ''}
                   disabled={isSaving || completed.current}
                   onClick={() => { if (entry) setActiveEntryId(entry.id) }}
-                  onChange={(event) => updateValue(coordinate, event.target.value, composingCells.current.has(coordinateKey(coordinate)))}
-                  onCompositionStart={() => handleCompositionStart(coordinate)}
-                  onCompositionEnd={(event) => handleCompositionEnd(event, coordinate)}
+                  onFocus={(event) => { wanakana.bind(event.currentTarget, { IMEMode: 'toHiragana' }) }}
+                  onBlur={(event) => { wanakana.unbind(event.currentTarget); normalizeCell(coordinate) }}
+                  onChange={(event) => updateValue(coordinate, event.target.value)}
+                  onInput={(event) => updateValue(coordinate, event.currentTarget.value, (event.nativeEvent as unknown as { isComposing?: boolean }).isComposing)}
+                  onCompositionEnd={(event) => updateValue(coordinate, event.currentTarget.value)}
                   onKeyDown={(event) => handleKeyDown(event, coordinate)}
                 />
               )

@@ -1,5 +1,4 @@
-import { ArrowLeft, Check, Gamepad2 } from 'lucide-react'
-import { motion, useReducedMotion } from 'motion/react'
+import { Check } from 'lucide-react'
 import { cva } from 'class-variance-authority'
 import { clsx } from 'clsx'
 import { useMemo, useState } from 'react'
@@ -10,7 +9,6 @@ import { getDefaultDailyGamesSessionDependencies, useDailyGames } from '../useDa
 import { isDailyGameComplete } from '../utils'
 import { DailyStreakBadge } from './DailyStreakBadge'
 import { DailyGameSession } from './DailyGameSession'
-import { getGamesHubEntrance } from './gamesHubMotion'
 import '../daily-games.css'
 
 const modeControl = cva('daily-games-mode-control', {
@@ -30,13 +28,11 @@ const tile = cva('daily-game-tile', {
 })
 
 interface GamesHubProps {
-  onBack: () => void
   dependencies?: DailyGamesSessionDependencies
   onReviewMissedWords?: (missedWords: DailyGamesMissedWordPayload[]) => Promise<void>
 }
 
-export function GamesHub({ onBack, dependencies, onReviewMissedWords }: GamesHubProps) {
-  const shouldReduceMotion = useReducedMotion()
+export function GamesHub({ dependencies, onReviewMissedWords }: GamesHubProps) {
   const sessionDependencies = useMemo(() => dependencies ?? getDefaultDailyGamesSessionDependencies(), [dependencies])
   const { data, error, isLoading, mode, retry, replaceData, setMode } = useDailyGames(sessionDependencies)
   const [activeSession, setActiveSession] = useState<{ data: NonNullable<typeof data>; gameType: DailyGameType; mode: DailyGamesMode } | null>(null)
@@ -46,24 +42,7 @@ export function GamesHub({ onBack, dependencies, onReviewMissedWords }: GamesHub
   }
 
   return (
-    <motion.main
-      className="daily-games-hub"
-       {...getGamesHubEntrance(shouldReduceMotion ?? false)}
-      aria-labelledby="daily-games-title"
-    >
-      <header className="daily-games-header">
-        <button type="button" className="daily-games-back" onClick={onBack}>
-          <ArrowLeft aria-hidden="true" size={18} />
-          {DAILY_GAMES_COPY.back}
-        </button>
-        <div className="daily-games-heading">
-          <Gamepad2 aria-hidden="true" size={26} />
-          <div>
-            <p>{DAILY_GAMES_COPY.dailyMode}</p>
-            <h1 id="daily-games-title">{DAILY_GAMES_COPY.title}</h1>
-          </div>
-        </div>
-      </header>
+    <div className="daily-games-hub" aria-labelledby="daily-games-title">
 
       {isLoading ? <div className="daily-games-skeleton" role="status" aria-label={DAILY_GAMES_COPY.loading}><span /><span /><span /><span /></div> : null}
 
@@ -138,7 +117,7 @@ export function GamesHub({ onBack, dependencies, onReviewMissedWords }: GamesHub
           </div>
         </section>
       ) : null}
-    </motion.main>
+    </div>
   )
 }
 

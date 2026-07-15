@@ -141,7 +141,7 @@ describe('Daily Games navigation', () => {
     fireEvent.click(within(matchPairsTile!).getByRole('button', { name: 'Play' }))
     expect(await screen.findByRole('button', { name: /back to games/i })).toBeTruthy()
     fireEvent.keyDown(screen.getByRole('button', { name: /back to games/i }), { key: 'Escape' })
-    expect(await screen.findByRole('button', { name: /back to home/i })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Back to main menu' })).toBeTruthy()
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(await screen.findByRole('button', { name: 'Daily Games' })).toBeTruthy()
 

@@ -72,22 +72,23 @@ describe('CrosswordGame', () => {
     expect(input).not.toHaveProperty('disabled', true)
   })
 
-  it('preserves Japanese IME pre-edit text, commits one character, and blocks Enter submission while composing', () => {
+  it('converts romaji to kana via wanakana, commits one character per cell, auto-advances, and blocks Enter during OS IME', () => {
     const onComplete = vi.fn()
     renderGame(onComplete)
-    const firstCell = board.entries[0].cells[0]
-    const input = screen.getByRole('textbox', { name: cellName(firstCell.row, firstCell.column) }) as HTMLInputElement
+    const entry = board.entries[0]
+    const [firstCell, secondCell] = entry.cells
+    const firstInput = screen.getByRole('textbox', { name: cellName(firstCell.row, firstCell.column) }) as HTMLInputElement
 
-    fireEvent.compositionStart(input)
-    fireEvent.change(input, { target: { value: 'がっこう' } })
-    expect(input.value).toBe('がっこう')
-    expect(fireEvent.keyDown(input, { key: 'Enter', isComposing: true })).toBe(false)
-    fireEvent.submit(input.closest('form')!)
-    expect(screen.getAllByRole('status').at(-1)?.textContent).toBe('')
+    fireEvent.change(firstInput, { target: { value: 'が' } })
+    expect(firstInput.value).toBe('が')
+
+    fireEvent.keyDown(firstInput, { key: 'Enter', isComposing: true })
+    fireEvent.submit(firstInput.closest('form')!)
     expect(onComplete).not.toHaveBeenCalled()
 
-    fireEvent.compositionEnd(input, { data: '学校', target: { value: '学校' } })
-    expect(input.value).toBe('学')
+    const secondInput = screen.getByRole('textbox', { name: cellName(secondCell.row, secondCell.column) }) as HTMLInputElement
+    fireEvent.change(secondInput, { target: { value: 'っ' } })
+    expect(secondInput.value).toBe('っ')
   })
 
   it('completes the fallback without fabricating a vocabulary outcome', () => {

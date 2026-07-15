@@ -18,12 +18,12 @@ afterEach(() => {
 })
 
 describe('TypingBlitzGame', () => {
-  it('records answers through accessible input interaction', () => {
+  it('records answers through accessible input and matches kana reading against kanji targets', () => {
     const onComplete = vi.fn()
     render(<TypingBlitzGame words={words} isSaving={false} onComplete={onComplete} />)
 
     const input = screen.getByLabelText(/type the japanese word/i)
-    fireEvent.change(input, { target: { value: '猫' } })
+    fireEvent.change(input, { target: { value: 'ねこ' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     fireEvent.submit(input.closest('form')!)
     expect(screen.getByText('犬')).toBeTruthy()

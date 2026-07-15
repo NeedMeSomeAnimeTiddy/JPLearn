@@ -6152,14 +6152,50 @@ function App() {
       ) : null}
 
       {view === 'daily_games' ? (
-        <ErrorBoundary>
-          <Suspense fallback={<div className="daily-games-hub" role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
-            <DailyGamesHub onBack={() => {
-              setNavDirection('back')
-              setView('home')
-            }} onReviewMissedWords={startMissedWordReview} />
-          </Suspense>
-        </ErrorBoundary>
+        <div className={`view-shell view-${navDirection}`}>
+          <div className="hub-crt-surface" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
+          <div className="hub-vhs-line" aria-hidden="true" />
+          <div className="hub-crystal hub-crystal--a" aria-hidden="true" />
+          <div className="hub-crystal hub-crystal--b" aria-hidden="true" />
+          <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
+
+          <header className="hub-topbar">
+            <h1 className="sr-only">Daily Games</h1>
+            <button
+              type="button"
+              className="back-button back-button-icon-only"
+              onClick={() => { setNavDirection('back'); setView('home'); }}
+              aria-label="Back to main menu"
+            >
+              <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+            </button>
+
+            <div className="hub-topbar-center">
+              <span className="hub-topbar-catalog">JPL-DLY-A</span>
+              <strong className="hub-topbar-title">
+                <span className="hub-glitch-text">{DAILY_GAMES_COPY.title}</span>
+              </strong>
+              <span className="hub-topbar-catalog hub-topbar-catalog--sub">DAILY GAMES · 毎日</span>
+              <span className="hub-topbar-stripe" aria-hidden="true" />
+            </div>
+
+            <span aria-hidden="true" />
+          </header>
+
+          <div className="hub-studio">
+            <ErrorBoundary>
+              <Suspense fallback={<div className="daily-games-hub" role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
+                <DailyGamesHub
+                  onReviewMissedWords={startMissedWordReview}
+                />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+        </div>
       ) : null}
 
       {/* Study Overview popup — accessible on top of any view */}

@@ -4,7 +4,6 @@ import * as axeCore from 'axe-core'
 import type { DailyGamesStatePayload } from '../../generated/types'
 import type { DailyGamesSessionDependencies } from './types'
 import { GamesHub } from './components/GamesHub'
-import { getGamesHubEntrance } from './components/gamesHubMotion'
 import { buildCrossword } from './crossword'
 
 const readyState: DailyGamesStatePayload = {
@@ -33,11 +32,6 @@ afterEach(() => {
 })
 
 describe('GamesHub', () => {
-  it('disables the entrance animation for reduced motion', () => {
-    expect(getGamesHubEntrance(true).initial).toBe(false)
-    expect(getGamesHubEntrance(false).initial).toEqual({ opacity: 0, y: 12 })
-  })
-
   it('keeps an active game on its original state without replacing the rolled-over hub on completion', async () => {
     vi.useFakeTimers()
     let now = new Date(2026, 6, 15, 23, 59, 59)
@@ -66,7 +60,7 @@ describe('GamesHub', () => {
       clipboard: { writeText: async () => undefined },
       now: () => now,
     }
-    render(<GamesHub onBack={vi.fn()} dependencies={sessionDependencies} />)
+    render(<GamesHub dependencies={sessionDependencies} />)
 
     await act(async () => {})
     expect(screen.getByRole('heading', { name: 'Crossword' })).toBeTruthy()
@@ -100,8 +94,7 @@ describe('GamesHub', () => {
       ...readyState,
       pool: { ...readyState.pool, game_seeds: { word_search: 91 } },
     }
-    const onBack = vi.fn()
-    render(<GamesHub onBack={onBack} dependencies={dependencies(async () => wordSearchState)} />)
+    render(<GamesHub dependencies={dependencies(async () => wordSearchState)} />)
     const tile = (await screen.findByRole('heading', { name: 'Word Search' })).closest('article')
     fireEvent.click(within(tile!).getByRole('button', { name: 'Play' }))
     const firstCell = await screen.findAllByRole('button', { name: /Row 1, column/i })
@@ -110,18 +103,15 @@ describe('GamesHub', () => {
 
     expect(screen.getByRole('status').textContent).toMatch(/cancelled/i)
     expect(screen.getByRole('button', { name: /back to games/i })).toBeTruthy()
-    expect(onBack).not.toHaveBeenCalled()
 
     fireEvent.keyDown(firstCell[0], { key: 'Escape' })
-    expect(await screen.findByRole('button', { name: /back to home/i })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /back to home/i }))
-    expect(onBack).toHaveBeenCalledOnce()
+    expect(await screen.findByRole('heading', { name: 'Match Pairs' })).toBeTruthy()
   })
 
   it('shows a loading state, then Crossword, Word Search, Match Pairs, and Typing Blitz as playable daily games', async () => {
     let resolveState: (value: DailyGamesStatePayload) => void = () => undefined
     const getState = vi.fn(() => new Promise<DailyGamesStatePayload>((resolve) => { resolveState = resolve }))
-    render(<GamesHub onBack={vi.fn()} dependencies={dependencies(getState)} />)
+    render(<GamesHub dependencies={dependencies(getState)} />)
 
     expect(screen.getByRole('status', { name: /loading today/i })).toBeTruthy()
     resolveState(readyState)
@@ -140,7 +130,7 @@ describe('GamesHub', () => {
       ...dependencies(async () => readyState),
       createPracticeSeed,
     }
-    render(<GamesHub onBack={vi.fn()} dependencies={sessionDependencies} />)
+    render(<GamesHub dependencies={sessionDependencies} />)
 
     const tile = (await screen.findByRole('heading', { name: 'Word Search' })).closest('article')
     fireEvent.click(within(tile!).getByRole('button', { name: 'Play' }))
@@ -152,35 +142,32 @@ describe('GamesHub', () => {
     const getState = vi.fn()
       .mockRejectedValueOnce(new Error('Network unavailable'))
       .mockResolvedValueOnce(readyState)
-    render(<GamesHub onBack={vi.fn()} dependencies={dependencies(getState)} />)
+    render(<GamesHub dependencies={dependencies(getState)} />)
 
     expect((await screen.findByRole('alert')).textContent).toContain('Network unavailable')
     fireEvent.click(screen.getByRole('button', { name: /try again/i }))
     expect(await screen.findByText(/shared set of four/i)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Practice' }))
-    expect(screen.getByText(/without changing today’s progress/i)).toBeTruthy()
+    expect(screen.getByText(/without changing today.s progress/i)).toBeTruthy()
     expect(screen.queryByText('Complete')).toBeNull()
   })
 
-  it('renders an empty state and returns through the supplied back callback', async () => {
-    const onBack = vi.fn()
-    render(<GamesHub onBack={onBack} dependencies={dependencies(async () => ({ ...readyState, pool: { ...readyState.pool, words: [] } }))} />)
+  it('renders an empty state when the pool has no words', async () => {
+    render(<GamesHub dependencies={dependencies(async () => ({ ...readyState, pool: { ...readyState.pool, words: [] } }))} />)
 
     expect(await screen.findByRole('heading', { name: /build your game pool/i })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /back to home/i }))
-    expect(onBack).toHaveBeenCalledOnce()
   })
 
   it('has no axe violations in ready, error, and empty states', async () => {
-    const { container, rerender } = render(<GamesHub onBack={vi.fn()} dependencies={dependencies(async () => readyState)} />)
+    const { container, rerender } = render(<GamesHub dependencies={dependencies(async () => readyState)} />)
     await screen.findByRole('heading', { name: 'Word Search' })
     expect((await runAxe(container)).violations).toEqual([])
 
-    rerender(<GamesHub onBack={vi.fn()} dependencies={dependencies(async () => { throw new Error('Network unavailable') })} />)
+    rerender(<GamesHub dependencies={dependencies(async () => { throw new Error('Network unavailable') })} />)
     await screen.findByRole('alert')
     expect((await runAxe(container)).violations).toEqual([])
 
-    rerender(<GamesHub onBack={vi.fn()} dependencies={dependencies(async () => ({ ...readyState, pool: { ...readyState.pool, words: [] } }))} />)
+    rerender(<GamesHub dependencies={dependencies(async () => ({ ...readyState, pool: { ...readyState.pool, words: [] } }))} />)
     await waitFor(() => expect(screen.getByRole('heading', { name: /build your game pool/i })).toBeTruthy())
     expect((await runAxe(container)).violations).toEqual([])
   })

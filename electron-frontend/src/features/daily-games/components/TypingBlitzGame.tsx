@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
+import * as wanakana from 'wanakana'
 import { TYPING_BLITZ_COPY, TYPING_BLITZ_DURATION_SECONDS } from '../constants'
 import type { DailyGamesAttemptOutcomeInput, TypingBlitzWord } from '../types'
 
@@ -29,6 +30,13 @@ export function TypingBlitzGame({ words, isSaving, onComplete }: TypingBlitzGame
     intervalId.current = null
   }
 
+  useEffect(() => {
+    const el = document.getElementById('typing-blitz-input') as HTMLInputElement | null
+    if (!el) return
+    wanakana.bind(el, { IMEMode: 'toHiragana' })
+    return () => { wanakana.unbind(el) }
+  }, [])
+
   function finish(): void {
     if (completed.current) return
     completed.current = true
@@ -52,7 +60,10 @@ export function TypingBlitzGame({ words, isSaving, onComplete }: TypingBlitzGame
   function submit(): void {
     if (isSaving || completed.current || composing.current || !words[currentIndex]) return
     const word = words[currentIndex]
-    const isCorrect = input.trim() === word.word.character.trim()
+    const trimmed = input.trim()
+    const targetChar = word.word.character.trim()
+    const targetReading = word.word.romaji.trim()
+    const isCorrect = trimmed === targetChar || wanakana.toHiragana(trimmed) === wanakana.toHiragana(targetReading)
     outcomes.current[currentIndex] = { poolPosition: word.poolPosition, outcome: isCorrect ? 'correct' : 'incorrect' }
     if (isCorrect) correctCount.current += 1
     setStatus(isCorrect ? TYPING_BLITZ_COPY.correct : TYPING_BLITZ_COPY.incorrect)
@@ -99,7 +110,7 @@ export function TypingBlitzGame({ words, isSaving, onComplete }: TypingBlitzGame
       </div>
       <form className="typing-blitz-form" onSubmit={handleSubmit}>
         <label htmlFor="typing-blitz-input">{TYPING_BLITZ_COPY.inputLabel}</label>
-        <input id="typing-blitz-input" lang="ja" inputMode="text" autoComplete="off" autoCapitalize="off" spellCheck={false} value={input} placeholder={TYPING_BLITZ_COPY.inputPlaceholder} disabled={isSaving} onChange={(event) => setInput(event.target.value)} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onKeyDown={handleKeyDown} />
+        <input id="typing-blitz-input" autoComplete="off" autoCapitalize="off" spellCheck={false} value={input} placeholder={TYPING_BLITZ_COPY.inputPlaceholder} disabled={isSaving} onChange={(event) => setInput(event.target.value)} onInput={(event) => setInput(event.currentTarget.value)} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onKeyDown={handleKeyDown} />
         <button type="submit" className="daily-game-button is-primary" disabled={isSaving}>{TYPING_BLITZ_COPY.submit}</button>
       </form>
       <p className="typing-blitz-feedback" role="status">{status}</p>
