@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CONFIDENCE_LEVEL_LABELS, CONFIDENCE_SCORES } from '../../constants'
+import { CONFIDENCE_LEVEL_LABELS, CONFIDENCE_SCORES, FEEDBACK_COPY } from '../../constants'
 import { RoundFeedback } from '../RoundFeedback'
 import type { PlayableMinigame, RoundDictionaryNote } from '../../types'
 
@@ -21,6 +21,8 @@ interface MinigameResponsePanelProps {
   livesEnabled: boolean
   showKeyboardPrompts: boolean
   onSkipFeedback: () => void
+  feedbackAdvancePending: boolean
+  feedbackAdvanceError: boolean
   responseMs: number | null
   srsResult: {
     repetitions: number
@@ -58,6 +60,8 @@ export function MinigameResponsePanel({
   livesEnabled,
   showKeyboardPrompts,
   onSkipFeedback,
+  feedbackAdvancePending,
+  feedbackAdvanceError,
   responseMs,
   srsResult,
   exampleSentence,
@@ -97,6 +101,7 @@ export function MinigameResponsePanel({
             livesEnabled={livesEnabled}
             mode={mode}
             onAction={onSkipFeedback}
+            actionDisabled={feedbackAdvancePending || feedbackAdvanceError}
             actionLabel={showKeyboardPrompts ? 'Next now ↵' : 'Next now'}
             actionTitle={showKeyboardPrompts ? 'Continue immediately (Enter)' : 'Continue immediately'}
             responseMs={responseMs}
@@ -107,6 +112,8 @@ export function MinigameResponsePanel({
             cardRomaji={cardRomaji}
             dictionaryNote={dictionaryNote}
           />
+          {feedbackAdvancePending ? <p className="status-line" role="status">{FEEDBACK_COPY.REVIEW_SAVING}</p> : null}
+          {feedbackAdvanceError ? <p className="status-line status-error" role="alert">{FEEDBACK_COPY.REVIEW_SAVE_FAILURE}</p> : null}
         </div>
       ) : (
         <section className="minigame-response-card" aria-label="Answer challenge">

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
+import io
 import sqlite3
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
 
 from data import database
+from data.daily_games_repository import DailyGameAttempt, DailyGameWordOutcome, DailyGamesRepository
 from domain.cards import Card, Deck
 from domain.decks import ALL_DECKS
+from domain.daily_games import DailyGamesStreakState, DailyGameWord, DailyWordPool
+from domain.scheduler import ReviewState
 from scripts import desktop_bridge
 
 
@@ -83,6 +88,41 @@ def _build_dictionary_db_many(path: Path, rows: list[tuple[str, str, str, int]])
                 "INSERT INTO dictionary_fts (rowid, gloss) VALUES (?, ?)",
                 (cursor.lastrowid, gloss),
             )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _add_pitch_accent(
+    path: Path,
+    *,
+    word: str,
+    reading: str,
+    pitch_positions: list[int],
+    mora_count: int,
+) -> None:
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE dictionary_pitch_accents (
+              word TEXT NOT NULL,
+              reading TEXT NOT NULL,
+              pitch_positions TEXT NOT NULL,
+              mora_count INTEGER NOT NULL,
+              source TEXT NOT NULL,
+              PRIMARY KEY (word, reading)
+            );
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO dictionary_pitch_accents
+              (word, reading, pitch_positions, mora_count, source)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (word, reading, json.dumps(pitch_positions), mora_count, "Kanjium test data"),
+        )
         conn.commit()
     finally:
         conn.close()
@@ -229,6 +269,84 @@ def test_build_study_queue_payload_returns_card_ids_and_indices(tmp_path: Path, 
     assert len(card_ids) > 0
 
 
+def test_study_queue_keeps_due_and_leech_ahead_of_daily_game_miss_reviews(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    today = date.today()
+    deck = Deck(
+        name="Phase 10 Priority",
+        cards=[
+            Card(id=1, character="あ", romaji="a", meaning="a"),
+            Card(id=2, character="い", romaji="i", meaning="i"),
+            Card(id=3, character="う", romaji="u", meaning="u"),
+            Card(id=4, character="え", romaji="e", meaning="e"),
+        ],
+    )
+    monkeypatch.setitem(ALL_DECKS, "phase10_priority", lambda: deck)
+    database.init_db()
+    database.save_state(
+        deck.name,
+        ReviewState(card_id=1, repetitions=1, interval=1, next_review=today),
+    )
+    for card_id in (2, 3, 4):
+        database.save_state(
+            deck.name,
+            ReviewState(
+                card_id=card_id,
+                repetitions=1,
+                interval=1,
+                next_review=today + timedelta(days=1),
+            ),
+        )
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        conn.execute(
+            """
+            INSERT INTO leech_items (
+                deck, card_id, is_active, attempts_recent, failures_recent, last_evaluated_utc
+            )
+            VALUES (?, ?, 1, 3, 3, ?)
+            """,
+            (deck.name, 2, datetime.combine(today, time.min, timezone.utc).isoformat()),
+        )
+
+    repository = DailyGamesRepository()
+    repository.save_word_pool(
+        DailyWordPool(
+            day=today,
+            algorithm_version=1,
+            words=(
+                DailyGameWord(
+                    deck_slug="phase10_priority",
+                    deck_name=deck.name,
+                    card_id=4,
+                    character="え",
+                    romaji="e",
+                    meaning="e",
+                    source="recent",
+                ),
+            ),
+        )
+    )
+    repository.save_attempt(
+        DailyGameAttempt(
+            pool_day=today,
+            game_type="word_search",
+            mode="practice",
+            score=0,
+            completed=False,
+            duration_seconds=None,
+            completed_at_utc=datetime.combine(today, time.min, timezone.utc),
+            outcomes=(DailyGameWordOutcome(pool_position=0, outcome="incorrect"),),
+        )
+    )
+
+    payload = desktop_bridge.build_study_queue_payload("phase10_priority")
+
+    assert payload["queue"]["card_ids"] == [1, 2, 4, 3]  # type: ignore[index]
+
+
 def test_build_deck_cards_includes_curriculum_stage(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
@@ -259,6 +377,13 @@ def test_build_deck_cards_includes_dictionary_summary_when_available(tmp_path: P
         reading="にち",
         gloss=f"{target_card.meaning}; calendar day; sun marker",
     )
+    _add_pitch_accent(
+        dictionary_db_path,
+        word=target_card.character,
+        reading="にち",
+        pitch_positions=[1],
+        mora_count=2,
+    )
     monkeypatch.setattr(
         desktop_bridge,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
@@ -275,6 +400,48 @@ def test_build_deck_cards_includes_dictionary_summary_when_available(tmp_path: P
     assert dictionary_summary["primary_gloss"] == target_card.meaning
     assert dictionary_summary["glosses"] == [target_card.meaning, "calendar day", "sun marker"]
     assert dictionary_summary["source"] == "offline_dictionary"
+    assert dictionary_summary["pitch_accents"] == [
+        {
+            "reading": "にち",
+            "pitch_positions": [1],
+            "mora_count": 2,
+            "source": "Kanjium test data",
+        }
+    ]
+
+
+def test_dictionary_search_includes_pitch_accent_when_available(tmp_path: Path, monkeypatch) -> None:
+    dictionary_db_path = tmp_path / "dictionary.sqlite"
+    _build_dictionary_db(
+        dictionary_db_path,
+        japanese="箸",
+        reading="はし",
+        gloss="chopsticks",
+    )
+    _add_pitch_accent(
+        dictionary_db_path,
+        word="箸",
+        reading="はし",
+        pitch_positions=[1],
+        mora_count=2,
+    )
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (dictionary_db_path,),
+    )
+
+    payload = desktop_bridge.build_dictionary_search_payload("箸")
+    results = cast(list[dict[str, object]], payload["results"])
+
+    assert results[0]["pitch_accents"] == [
+        {
+            "reading": "はし",
+            "pitch_positions": [1],
+            "mora_count": 2,
+            "source": "Kanjium test data",
+        }
+    ]
 
 
 def test_dictionary_hello_prefers_konnichiwa_over_katakana_hello(tmp_path: Path, monkeypatch) -> None:
@@ -478,6 +645,453 @@ def test_main_unknown_command_exits_with_error(monkeypatch, capsys) -> None:
     assert code == 2
     parsed = json.loads(output)
     assert "Unknown command" in parsed["error"]
+
+
+def test_main_returns_handled_error_for_corrupt_daily_games_database(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    db_path = tmp_path / "corrupt-jplearn.db"
+    corrupted_contents = b"not a sqlite database"
+    db_path.write_bytes(corrupted_contents)
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+    monkeypatch.setattr(desktop_bridge.sys, "argv", ["desktop_bridge.py", "daily-games-state", "2026-07-15"])
+
+    code = desktop_bridge.main()
+    payload = json.loads(capsys.readouterr().out)
+
+    assert code == 2
+    assert payload["error"].startswith("Database unavailable:")
+    assert db_path.read_bytes() == corrupted_contents
+
+
+def test_worker_returns_handled_error_for_corrupt_daily_games_database(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    db_path = tmp_path / "corrupt-jplearn-worker.db"
+    corrupted_contents = b"not a sqlite database"
+    db_path.write_bytes(corrupted_contents)
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+    monkeypatch.setattr(
+        desktop_bridge.sys,
+        "stdin",
+        io.StringIO('{"id":1,"args":["daily-games-state","2026-07-15"]}\n'),
+    )
+
+    code = desktop_bridge._run_server()
+    response = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    assert response["ok"] is False
+    assert response["payload"]["error"].startswith("Database unavailable:")
+    assert db_path.read_bytes() == corrupted_contents
+
+
+def test_daily_games_state_creates_a_stable_same_day_pool(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    first = desktop_bridge.build_daily_games_state("2026-07-15")
+    second = desktop_bridge.build_daily_games_state("2026-07-15")
+
+    assert first["pool"] == second["pool"]
+    assert first["pool"]["day"] == "2026-07-15"
+    assert first["pool"]["words"]
+    assert set(first["pool"]["game_seeds"]) == {
+        "crossword",
+        "word_search",
+        "match_pairs",
+        "typing_blitz",
+    }
+
+
+def test_daily_games_practice_seeds_are_fresh_and_nonnegative(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    first = desktop_bridge.build_daily_games_practice_seed("2026-07-15", "crossword")
+    second = desktop_bridge.build_daily_games_practice_seed("2026-07-15", "crossword")
+
+    assert first["pool_day"] == "2026-07-15"
+    assert first["game_type"] == "crossword"
+    assert isinstance(first["seed"], int)
+    assert first["seed"] >= 0
+    assert first["seed"] != second["seed"]
+
+
+def test_daily_games_record_attempt_updates_daily_only_progress_and_streak(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    state = desktop_bridge.build_daily_games_state("2026-07-15")
+    assert state["pool"]["words"]
+
+    updated = desktop_bridge.record_daily_games_attempt(
+        "2026-07-15",
+        "crossword",
+        "daily",
+        125,
+        True,
+        42,
+        (
+            desktop_bridge.DailyGameWordOutcome(pool_position=0, outcome="incorrect"),
+        ),
+    )
+
+    assert updated["progress"]["attempt_count"] == 1
+    assert updated["progress"]["completed_daily_game_types"] == ["crossword"]
+    assert updated["progress"]["missed_words"][0]["miss_count"] == 1
+    assert updated["streak"]["current_streak_days"] == 1
+    assert updated["attempts"][0]["outcomes"] == [
+        {"pool_position": 0, "outcome": "incorrect"}
+    ]
+
+
+def test_daily_games_repeated_daily_completion_is_idempotent_and_practice_is_isolated(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    database.init_db()
+    database.save_state(
+        "Vocabulary N5",
+        ReviewState(card_id=0, repetitions=1, interval=2, next_review=date(2026, 7, 16)),
+    )
+    database.log_review("Vocabulary N5", 0, 4, reviewed_on=date(2026, 7, 15))
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        before_states = conn.execute("SELECT * FROM review_states").fetchall()
+        before_events = conn.execute("SELECT * FROM review_events").fetchall()
+
+    first = desktop_bridge.record_daily_games_attempt(
+        "2026-07-15", "crossword", "daily", 125, True, 42,
+        (desktop_bridge.DailyGameWordOutcome(pool_position=0, outcome="correct"),),
+    )
+    repeated = desktop_bridge.record_daily_games_attempt(
+        "2026-07-15", "crossword", "daily", 99, True, 10,
+        (desktop_bridge.DailyGameWordOutcome(pool_position=1, outcome="incorrect"),),
+    )
+    practiced = desktop_bridge.record_daily_games_attempt(
+        "2026-07-15", "crossword", "practice", 50, True, 30,
+        (desktop_bridge.DailyGameWordOutcome(pool_position=0, outcome="incorrect"),),
+    )
+
+    assert first["progress"]["attempt_count"] == 1
+    assert repeated["progress"]["attempt_count"] == 1
+    assert repeated["streak"]["current_streak_days"] == 1
+    assert practiced["progress"]["attempt_count"] == 2
+    assert practiced["progress"]["completed_daily_game_types"] == ["crossword"]
+    assert practiced["streak"]["current_streak_days"] == 1
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        assert conn.execute("SELECT * FROM review_states").fetchall() == before_states
+        assert conn.execute("SELECT * FROM review_events").fetchall() == before_events
+
+
+def test_daily_games_state_and_duplicate_retry_reconcile_stale_streak(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.build_daily_games_state("2026-07-15")
+    repository = DailyGamesRepository()
+    repository.save_attempt(
+        DailyGameAttempt(
+            pool_day=date(2026, 7, 15),
+            game_type="crossword",
+            mode="daily",
+            score=50,
+            completed=True,
+            duration_seconds=20,
+            completed_at_utc=datetime(2026, 7, 15, tzinfo=timezone.utc),
+            outcomes=(DailyGameWordOutcome(pool_position=0, outcome="correct"),),
+        )
+    )
+    repository.save_streak_state(DailyGamesStreakState())
+
+    loaded = desktop_bridge.build_daily_games_state("2026-07-15")
+
+    assert loaded["streak"]["current_streak_days"] == 1
+    assert repository.load_streak_state().last_completed_day == date(2026, 7, 15)
+
+    repository.save_streak_state(DailyGamesStreakState())
+    retried = desktop_bridge.record_daily_games_attempt(
+        "2026-07-15",
+        "crossword",
+        "daily",
+        99,
+        True,
+        10,
+        (DailyGameWordOutcome(pool_position=1, outcome="incorrect"),),
+    )
+
+    assert retried["progress"]["attempt_count"] == 1
+    assert retried["streak"]["current_streak_days"] == 1
+    assert repository.load_streak_state().last_completed_day == date(2026, 7, 15)
+
+
+def test_daily_games_new_completion_reconstructs_streak_from_attempt_days(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.build_daily_games_state("2026-07-15")
+    repository = DailyGamesRepository()
+    repository.save_streak_state(
+        DailyGamesStreakState(
+            last_completed_day=date(2026, 7, 14),
+            current_streak_days=4,
+            best_streak_days=4,
+            freezes_available=3,
+            freeze_month=date(2026, 7, 1),
+        )
+    )
+    repository.save_attempt(
+        DailyGameAttempt(
+            pool_day=date(2026, 7, 15),
+            game_type="crossword",
+            mode="daily",
+            score=50,
+            completed=True,
+            duration_seconds=20,
+            completed_at_utc=datetime(2026, 7, 15, tzinfo=timezone.utc),
+            outcomes=(DailyGameWordOutcome(pool_position=0, outcome="correct"),),
+        )
+    )
+
+    updated = desktop_bridge.record_daily_games_attempt(
+        "2026-07-16",
+        "crossword",
+        "daily",
+        60,
+        True,
+        18,
+        (DailyGameWordOutcome(pool_position=0, outcome="correct"),),
+    )
+
+    assert updated["streak"]["last_completed_day"] == "2026-07-16"
+    assert updated["streak"]["current_streak_days"] == 2
+    assert updated["streak"]["freezes_available"] == 3
+
+    save_calls: list[DailyGamesStreakState] = []
+    monkeypatch.setattr(repository, "save_streak_state", save_calls.append)
+    reconciled_again = desktop_bridge._reconcile_daily_games_streak(repository)
+
+    assert save_calls == []
+    assert reconciled_again == repository.load_streak_state()
+    assert reconciled_again.current_streak_days == 2
+
+
+def test_daily_games_state_resolves_misses_by_completion_time_not_insertion_order(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.build_daily_games_state("2026-07-15")
+    repository = DailyGamesRepository()
+    repository.save_attempt(
+        DailyGameAttempt(
+            pool_day=date(2026, 7, 15),
+            game_type="typing_blitz",
+            mode="practice",
+            score=0,
+            completed=False,
+            duration_seconds=None,
+            completed_at_utc=datetime(2026, 7, 15, 12, tzinfo=timezone.utc),
+            outcomes=(DailyGameWordOutcome(pool_position=0, outcome="incorrect"),),
+        )
+    )
+    repository.save_attempt(
+        DailyGameAttempt(
+            pool_day=date(2026, 7, 15),
+            game_type="typing_blitz",
+            mode="practice",
+            score=1,
+            completed=False,
+            duration_seconds=None,
+            completed_at_utc=datetime(2026, 7, 15, 10, tzinfo=timezone.utc),
+            outcomes=(DailyGameWordOutcome(pool_position=0, outcome="correct"),),
+        )
+    )
+
+    state = desktop_bridge.build_daily_games_state("2026-07-15")
+
+    assert state["progress"]["missed_words"] == [
+        {"word": state["pool"]["words"][0], "miss_count": 1}
+    ]
+
+
+def test_daily_games_state_clears_resolved_miss_summary(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.build_daily_games_state("2026-07-15")
+
+    missed = desktop_bridge.record_daily_games_attempt(
+        "2026-07-15",
+        "typing_blitz",
+        "practice",
+        0,
+        False,
+        None,
+        (DailyGameWordOutcome(pool_position=0, outcome="incorrect"),),
+    )
+    corrected = desktop_bridge.record_daily_games_attempt(
+        "2026-07-15",
+        "typing_blitz",
+        "practice",
+        1,
+        False,
+        None,
+        (DailyGameWordOutcome(pool_position=0, outcome="correct"),),
+    )
+
+    assert missed["progress"]["missed_words"][0]["miss_count"] == 1
+    assert corrected["progress"]["missed_words"] == []
+    assert DailyGamesRepository().load_active_game_miss_card_ids(
+        "Vocabulary N5", date(2026, 7, 15)
+    ) == set()
+
+
+def test_daily_games_commands_reject_malformed_arguments(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    invalid_day_code, invalid_day_payload = desktop_bridge._run_command(
+        ["daily-games-state", "2026-7-15"]
+    )
+    invalid_type_code, invalid_type_payload = desktop_bridge._run_command(
+        ["daily-games-practice-seed", "2026-07-15", "anagram"]
+    )
+    invalid_attempt_code, invalid_attempt_payload = desktop_bridge._run_command(
+        [
+            "daily-games-record-attempt",
+            "2026-07-15",
+            "crossword",
+            "daily",
+            "5",
+            "true",
+            "",
+            "not-json",
+        ]
+    )
+
+    assert invalid_day_code == invalid_type_code == invalid_attempt_code == 2
+    assert "YYYY-MM-DD" in str(invalid_day_payload["error"])
+    assert "game_type" in str(invalid_type_payload["error"])
+    assert "outcomes_json" in str(invalid_attempt_payload["error"])
+
+
+def test_daily_games_crossword_clue_commands_save_first_accepted_values(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    database.init_db()
+    database.save_state(
+        "Vocabulary N5",
+        ReviewState(card_id=0, repetitions=1, interval=2, next_review=date(2026, 7, 16)),
+    )
+    database.log_review("Vocabulary N5", 0, 4, reviewed_on=date(2026, 7, 15))
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        before_states = conn.execute("SELECT * FROM review_states").fetchall()
+        before_events = conn.execute("SELECT * FROM review_events").fetchall()
+    desktop_bridge.build_daily_games_state("2026-07-15")
+
+    first_code, first = desktop_bridge._run_command(
+        [
+            "daily-games-save-crossword-clues",
+            "2026-07-15",
+            '[{"pool_position":1,"clue":"first feline clue"},{"pool_position":0,"clue":"first party clue"}]',
+        ]
+    )
+    repeated_code, repeated = desktop_bridge._run_command(
+        [
+            "daily-games-save-crossword-clues",
+            "2026-07-15",
+            '[{"pool_position":0,"clue":"replacement clue"}]',
+        ]
+    )
+    load_code, loaded = desktop_bridge._run_command(
+        ["daily-games-crossword-clues", "2026-07-15"]
+    )
+
+    expected = {
+        "day": "2026-07-15",
+        "clues": [
+            {"pool_position": 0, "clue": "first party clue"},
+            {"pool_position": 1, "clue": "first feline clue"},
+        ],
+    }
+    assert first_code == repeated_code == load_code == 0
+    assert first == repeated == loaded == expected
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        assert conn.execute("SELECT * FROM review_states").fetchall() == before_states
+        assert conn.execute("SELECT * FROM review_events").fetchall() == before_events
+
+
+def test_daily_games_crossword_clue_commands_reject_invalid_payloads(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    invalid_day_code, invalid_day = desktop_bridge._run_command(
+        ["daily-games-crossword-clues", "2026-7-15"]
+    )
+    invalid_json_code, invalid_json = desktop_bridge._run_command(
+        ["daily-games-save-crossword-clues", "2026-07-15", "not-json"]
+    )
+    invalid_shape_code, invalid_shape = desktop_bridge._run_command(
+        [
+            "daily-games-save-crossword-clues",
+            "2026-07-15",
+            '[{"pool_position":0,"clue":"x","extra":true}]',
+        ]
+    )
+
+    assert invalid_day_code == invalid_json_code == invalid_shape_code == 2
+    assert "YYYY-MM-DD" in str(invalid_day["error"])
+    assert "clues_json" in str(invalid_json["error"])
+    assert "only pool_position and clue" in str(invalid_shape["error"])
+
+
+def test_daily_games_bridge_recording_does_not_change_review_data(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    database.init_db()
+    database.save_state(
+        "Vocabulary N5",
+        ReviewState(
+            card_id=0,
+            repetitions=1,
+            interval=2,
+            next_review=date(2026, 7, 16),
+            last_review=date(2026, 7, 15),
+        ),
+    )
+    database.log_review("Vocabulary N5", 0, 4, reviewed_on=date(2026, 7, 15))
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        before_states = conn.execute("SELECT * FROM review_states").fetchall()
+        before_events = conn.execute("SELECT * FROM review_events").fetchall()
+
+    desktop_bridge.record_daily_games_attempt(
+        "2026-07-15",
+        "typing_blitz",
+        "daily",
+        10,
+        True,
+        None,
+        (
+            desktop_bridge.DailyGameWordOutcome(pool_position=0, outcome="correct"),
+        ),
+    )
+
+    with database._connect() as conn:  # type: ignore[attr-defined]
+        after_states = conn.execute("SELECT * FROM review_states").fetchall()
+        after_events = conn.execute("SELECT * FROM review_events").fetchall()
+
+    assert after_states == before_states
+    assert after_events == before_events
 
 
 def test_build_summary_includes_extended_script_curriculum_maps(tmp_path: Path, monkeypatch) -> None:

@@ -31,7 +31,7 @@ export function WordOfDayWidget() {
     discovery: 'review',
   }
 
-  if (loading) return <span className="home-bar home-bar--loading" aria-label="Loading" />
+  if (loading) return <span className="home-bar home-bar--loading" role="status" aria-label="Loading" />
   if (!word || !word.character) return null
 
   return (

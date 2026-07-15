@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { BookText, Check, ClipboardCopy, History, TriangleAlert, Volume2, X } from 'lucide-react'
 import { toHiragana } from 'wanakana'
+import type { PitchAccent } from '../generated/types'
+import { DictionaryPitchAccent } from './DictionaryPitchAccent'
 
 export interface DictionaryCard {
   id: number
@@ -10,6 +12,8 @@ export interface DictionaryCard {
   meaning: string
   tags?: string[]
   example_sentence?: string | null
+  pitch_accents?: PitchAccent[]
+  dictionary_summary?: { pitch_accents: PitchAccent[] } | null
 }
 
 interface DictionaryPopupProps {
@@ -313,7 +317,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
         if (left.character !== right.character) return left.character.localeCompare(right.character)
         return left.romaji.localeCompare(right.romaji)
       })
-    const mergedResults = remoteResults.length > 0 ? [...remoteResults, ...localResults] : remoteResults
+    const mergedResults = remoteResults.length > 0 ? [...remoteResults, ...localResults] : localResults
     return dedupeResults(mergedResults)
   }, [cards, query, remoteResults])
 
@@ -459,6 +463,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                   const copyPrefix = `${result.id}-${result.character}`
                   const visibleTags = (result.tags ?? []).filter((tag) => tag !== 'offline_dictionary')
                   const isCopyMenuOpen = openCopyMenu === copyPrefix
+                  const pitchAccents = result.pitch_accents ?? result.dictionary_summary?.pitch_accents ?? []
                   return (
                     <article key={copyPrefix} className="dictionary-result-card">
                       <div className="dictionary-result-main">
@@ -471,6 +476,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                             </span>
                           ) : null}
                         </div>
+                        <DictionaryPitchAccent accents={pitchAccents} />
                         <p className="dictionary-result-meaning">{result.meaning}</p>
                         {result.example_sentence ? <p className="dictionary-result-example">{result.example_sentence}</p> : null}
                         {visibleTags.length > 0 ? (

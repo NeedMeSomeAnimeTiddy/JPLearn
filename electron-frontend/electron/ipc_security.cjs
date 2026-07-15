@@ -291,6 +291,147 @@ function validateGrammarMinigameRequest(payload) {
   }
 }
 
+const VALID_DAILY_GAMES_TYPES = new Set(['crossword', 'word_search', 'match_pairs', 'typing_blitz'])
+const VALID_DAILY_GAMES_MODES = new Set(['daily', 'practice'])
+const VALID_DAILY_GAMES_OUTCOMES = new Set(['correct', 'incorrect'])
+const MAX_DAILY_GAMES_POOL_POSITION = 19
+const MAX_DAILY_GAMES_SCORE = 1_000_000_000
+const MAX_DAILY_GAMES_DURATION_SECONDS = 86_400
+const MAX_CROSSWORD_CLUE_ENTRIES = 6
+const MAX_CROSSWORD_CLUE_LENGTH = 120
+
+function validateDailyGamesDay(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error('Invalid Daily Games day: expected YYYY-MM-DD')
+  }
+
+  const [year, month, day] = value.split('-').map(Number)
+  const parsed = new Date(year, month - 1, day)
+  if (
+    parsed.getFullYear() !== year
+    || parsed.getMonth() !== month - 1
+    || parsed.getDate() !== day
+  ) {
+    throw new Error('Invalid Daily Games day: expected a valid calendar date')
+  }
+  return value
+}
+
+function validateDailyGamesGameType(value) {
+  if (typeof value !== 'string' || !VALID_DAILY_GAMES_TYPES.has(value)) {
+    throw new Error(`Invalid Daily Games gameType: ${String(value)}`)
+  }
+  return value
+}
+
+function validateDailyGamesPracticeSeedPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('Invalid Daily Games practice seed payload: expected object')
+  }
+  return {
+    day: validateDailyGamesDay(payload.day),
+    gameType: validateDailyGamesGameType(payload.gameType),
+  }
+}
+
+function validateDailyGamesAttemptPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('Invalid Daily Games attempt payload: expected object')
+  }
+
+  if (typeof payload.mode !== 'string' || !VALID_DAILY_GAMES_MODES.has(payload.mode)) {
+    throw new Error(`Invalid Daily Games mode: ${String(payload.mode)}`)
+  }
+  if (!Number.isInteger(payload.score) || payload.score < 0 || payload.score > MAX_DAILY_GAMES_SCORE) {
+    throw new Error(`Invalid Daily Games score: ${String(payload.score)}`)
+  }
+  if (typeof payload.completed !== 'boolean') {
+    throw new Error(`Invalid Daily Games completed value: ${String(payload.completed)}`)
+  }
+
+  let durationSeconds
+  if (payload.durationSeconds !== undefined) {
+    if (
+      !Number.isInteger(payload.durationSeconds)
+      || payload.durationSeconds < 0
+      || payload.durationSeconds > MAX_DAILY_GAMES_DURATION_SECONDS
+    ) {
+      throw new Error(`Invalid Daily Games durationSeconds: ${String(payload.durationSeconds)}`)
+    }
+    durationSeconds = payload.durationSeconds
+  }
+
+  if (!Array.isArray(payload.outcomes) || payload.outcomes.length === 0) {
+    throw new Error('Invalid Daily Games outcomes: expected a non-empty array')
+  }
+  const positions = new Set()
+  const outcomes = payload.outcomes.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error(`Invalid Daily Games outcome at index ${index}: expected object`)
+    }
+    if (
+      !Number.isInteger(item.poolPosition)
+      || item.poolPosition < 0
+      || item.poolPosition > MAX_DAILY_GAMES_POOL_POSITION
+    ) {
+      throw new Error(`Invalid Daily Games poolPosition at index ${index}: ${String(item.poolPosition)}`)
+    }
+    if (positions.has(item.poolPosition)) {
+      throw new Error(`Invalid Daily Games outcomes: duplicate poolPosition ${item.poolPosition}`)
+    }
+    if (typeof item.outcome !== 'string' || !VALID_DAILY_GAMES_OUTCOMES.has(item.outcome)) {
+      throw new Error(`Invalid Daily Games outcome value at index ${index}: ${String(item.outcome)}`)
+    }
+    positions.add(item.poolPosition)
+    return {
+      poolPosition: item.poolPosition,
+      outcome: item.outcome,
+    }
+  })
+
+  return {
+    day: validateDailyGamesDay(payload.day),
+    gameType: validateDailyGamesGameType(payload.gameType),
+    mode: payload.mode,
+    score: payload.score,
+    completed: payload.completed,
+    durationSeconds,
+    outcomes,
+  }
+}
+
+function validateDailyGamesCrosswordClues(value, requireAnswers) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CROSSWORD_CLUE_ENTRIES) {
+    throw new Error('Invalid crossword clues: expected a bounded non-empty array')
+  }
+  const positions = new Set()
+  return value.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error(`Invalid crossword clue at index ${index}`)
+    }
+    if (!Number.isInteger(item.poolPosition) || item.poolPosition < 0 || item.poolPosition > MAX_DAILY_GAMES_POOL_POSITION || positions.has(item.poolPosition)) {
+      throw new Error(`Invalid crossword clue poolPosition at index ${index}`)
+    }
+    let entry
+    if (requireAnswers) {
+      const answer = typeof item.answer === 'string' ? item.answer.trim() : ''
+      const fallbackClue = typeof item.fallbackClue === 'string' ? item.fallbackClue.trim() : ''
+      if (!answer || answer.length > 24 || !fallbackClue || fallbackClue.length > MAX_CROSSWORD_CLUE_LENGTH) {
+        throw new Error(`Invalid crossword clue request at index ${index}`)
+      }
+      entry = { poolPosition: item.poolPosition, answer, fallbackClue }
+    } else {
+      const clue = typeof item.clue === 'string' ? item.clue.trim() : ''
+      if (!clue || clue.length > MAX_CROSSWORD_CLUE_LENGTH) {
+        throw new Error(`Invalid crossword clue text at index ${index}`)
+      }
+      entry = { poolPosition: item.poolPosition, clue }
+    }
+    positions.add(item.poolPosition)
+    return entry
+  })
+}
+
 function validateAssistantEventIdsPayload(payload) {
   if (!Array.isArray(payload)) {
     throw new Error('Invalid assistant event ids payload: expected array')
@@ -587,6 +728,10 @@ module.exports = {
   validateDictionarySearchQuery,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,
+  validateDailyGamesDay,
+  validateDailyGamesPracticeSeedPayload,
+  validateDailyGamesAttemptPayload,
+  validateDailyGamesCrosswordClues,
   validateAssistantEventIdsPayload,
   validateAssistantEventInteractionPayload,
   validateAssistantChatAppendPayload,

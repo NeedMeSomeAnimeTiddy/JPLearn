@@ -1675,6 +1675,7 @@ function createTutorChatRuntime(options = {}) {
   let unloadTimer = null
   let activeInferenceController = null
   let isInferenceActive = false
+  let activeInferenceLease = null
   let loadPromise = null
   let activePromptAdapterId = 'default'
   let loadedAdapterManifestPath = ''
@@ -1691,6 +1692,28 @@ function createTutorChatRuntime(options = {}) {
     unloadTimer = setTimeout(() => {
       void runtime.unload('inactivity')
     }, inactivityUnloadMs)
+  }
+
+  function acquireInferenceLease() {
+    if (isInferenceActive) {
+      return null
+    }
+    const lease = {
+      controller: new AbortController(),
+    }
+    activeInferenceLease = lease
+    activeInferenceController = lease.controller
+    isInferenceActive = true
+    return lease
+  }
+
+  function releaseInferenceLease(lease) {
+    if (activeInferenceLease !== lease) {
+      return
+    }
+    activeInferenceLease = null
+    activeInferenceController = null
+    isInferenceActive = false
   }
 
   async function ensureLoaded() {
@@ -1787,84 +1810,93 @@ function createTutorChatRuntime(options = {}) {
       }
 
       const adapterState = promptAdapterManifest.getAdapters()
-      loadedAdapterManifestPath = adapterState.manifestPath
       const selectedPromptAdapter = resolvePromptAdapterSelection(trimmedMessage, boundedContext, adapterState.adapters)
-      activePromptAdapterId = selectedPromptAdapter && selectedPromptAdapter.id
+      const selectedPromptAdapterId = selectedPromptAdapter && selectedPromptAdapter.id
         ? selectedPromptAdapter.id
         : 'default'
 
-      const coldStart = await ensureLoaded()
-      lastUsedAtUtc = new Date().toISOString()
-      scheduleInactivityUnload()
+      const inferenceLease = acquireInferenceLease()
+      if (!inferenceLease) {
+        throw new Error('Chat inference already active; cancel or wait for completion')
+      }
 
-      const startedAt = Date.now()
-      activeInferenceController = new AbortController()
-      isInferenceActive = true
+      loadedAdapterManifestPath = adapterState.manifestPath
+      activePromptAdapterId = selectedPromptAdapterId
+
       try {
-        let inference = null
-        let cleanedText = ''
-        for (let attempt = 0; attempt < 2; attempt += 1) {
-          inference = await adapter.infer(trimmedMessage, boundedContext, {
-            signal: activeInferenceController.signal,
-            maxContextChars,
-            maxPromptChars,
-            maxOutputTokens,
-            promptAdapter: selectedPromptAdapter,
-          })
-          cleanedText = normalizeMojibakePunctuation(String(inference.text || ''))
-          if (isLowConfidenceAssistantReply(cleanedText)) {
-            cleanedText = buildClarifyingQuestionForIntent(trimmedMessage)
-            break
+        const coldStart = await ensureLoaded()
+        lastUsedAtUtc = new Date().toISOString()
+        scheduleInactivityUnload()
+
+        const startedAt = Date.now()
+        try {
+          if (inferenceLease.controller.signal.aborted) {
+            throw new Error('aborted')
           }
-          if (!isLowSignalAssistantReply(cleanedText)) {
-            break
+          let inference = null
+          let cleanedText = ''
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            inference = await adapter.infer(trimmedMessage, boundedContext, {
+              signal: inferenceLease.controller.signal,
+              maxContextChars,
+              maxPromptChars,
+              maxOutputTokens,
+              promptAdapter: selectedPromptAdapter,
+            })
+            cleanedText = normalizeMojibakePunctuation(String(inference.text || ''))
+            if (isLowConfidenceAssistantReply(cleanedText)) {
+              cleanedText = buildClarifyingQuestionForIntent(trimmedMessage)
+              break
+            }
+            if (!isLowSignalAssistantReply(cleanedText)) {
+              break
+            }
+            if (attempt >= 1) {
+              cleanedText = buildLowSignalRecoveryReply(trimmedMessage)
+              break
+            }
           }
-          if (attempt >= 1) {
-            cleanedText = buildLowSignalRecoveryReply(trimmedMessage)
-            break
+          const elapsedMs = Date.now() - startedAt
+          cleanedText = enforceJapaneseOnlyReply(cleanedText, trimmedMessage)
+          if (activeProvider !== 'stub-fallback') {
+            lastError = null
           }
-        }
-        const elapsedMs = Date.now() - startedAt
-        cleanedText = enforceJapaneseOnlyReply(cleanedText, trimmedMessage)
-        if (activeProvider !== 'stub-fallback') {
-          lastError = null
-        }
-        if (inference && typeof inference.provider === 'string') {
-          if (!(activeProvider === 'stub-fallback' && inference.provider === 'stub')) {
-            activeProvider = inference.provider
+          if (inference && typeof inference.provider === 'string') {
+            if (!(activeProvider === 'stub-fallback' && inference.provider === 'stub')) {
+              activeProvider = inference.provider
+            }
           }
-        }
-        if (inference && typeof inference.model === 'string') {
-          activeModel = inference.model
-        }
-        return {
-          ok: true,
-          text: clipText(cleanedText, maxOutputChars),
-          provider: String((inference && inference.provider) || 'unknown'),
-          model: String((inference && inference.model) || 'unknown'),
-          adapter: activePromptAdapterId,
-          coldStart,
-          elapsedMs,
-        }
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error)
-        if (error instanceof InferenceAbortError || /llama\.cpp exited with code 130/i.test(detail)) {
-          lastError = 'inference-cancelled'
-          throw new Error('Chat inference cancelled')
-        }
-        lastError = detail
-        const fallback = buildScriptedFallbackResponse(trimmedMessage, boundedContext, detail)
-        return {
-          ok: true,
-          text: clipText(enforceJapaneseOnlyReply(normalizeMojibakePunctuation(fallback.text), trimmedMessage), maxOutputChars),
-          provider: fallback.provider,
-          model: fallback.model,
-          coldStart,
-          elapsedMs: Date.now() - startedAt,
+          if (inference && typeof inference.model === 'string') {
+            activeModel = inference.model
+          }
+          return {
+            ok: true,
+            text: clipText(cleanedText, maxOutputChars),
+            provider: String((inference && inference.provider) || 'unknown'),
+            model: String((inference && inference.model) || 'unknown'),
+            adapter: selectedPromptAdapterId,
+            coldStart,
+            elapsedMs,
+          }
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error)
+          if (error instanceof InferenceAbortError || /llama\.cpp exited with code 130/i.test(detail)) {
+            lastError = 'inference-cancelled'
+            throw new Error('Chat inference cancelled')
+          }
+          lastError = detail
+          const fallback = buildScriptedFallbackResponse(trimmedMessage, boundedContext, detail)
+          return {
+            ok: true,
+            text: clipText(enforceJapaneseOnlyReply(normalizeMojibakePunctuation(fallback.text), trimmedMessage), maxOutputChars),
+            provider: fallback.provider,
+            model: fallback.model,
+            coldStart,
+            elapsedMs: Date.now() - startedAt,
+          }
         }
       } finally {
-        isInferenceActive = false
-        activeInferenceController = null
+        releaseInferenceLease(inferenceLease)
       }
     },
 
@@ -1887,85 +1919,154 @@ function createTutorChatRuntime(options = {}) {
         preparedText,
         Number.isFinite(params.maxInputChars) ? Number(params.maxInputChars) : 2400,
       )
-      const coldStart = await ensureLoaded()
-      lastUsedAtUtc = new Date().toISOString()
-      scheduleInactivityUnload()
+      const inferenceLease = acquireInferenceLease()
+      if (!inferenceLease) {
+        throw new Error('Chat inference already active; cancel or wait for completion')
+      }
 
-      const startedAt = Date.now()
-      activeInferenceController = new AbortController()
-      isInferenceActive = true
       try {
-        const inference = await adapter.infer(trimmedText, {}, {
-          signal: activeInferenceController.signal,
-          maxPromptChars: Math.min(maxPromptChars, 2400),
-          maxMessageChars: 2400,
-          forceCompletion: true,
-          maxOutputTokens: Number.isFinite(params.maxOutputTokens)
-            ? Math.max(24, Math.floor(Number(params.maxOutputTokens)))
-            : 240,
-          promptAdapter: {
-            id: 'ocr_translation',
-            label: 'OCR Translation',
-            intents: ['translation'],
-            systemNote: '',
-            temperature: 0.0,
-            top_p: 0.82,
-            top_k: 24,
-            repeat_penalty: 1.08,
+        const coldStart = await ensureLoaded()
+        lastUsedAtUtc = new Date().toISOString()
+        scheduleInactivityUnload()
+
+        const startedAt = Date.now()
+        try {
+          if (inferenceLease.controller.signal.aborted) {
+            throw new InferenceAbortError()
+          }
+          const inference = await adapter.infer(trimmedText, {}, {
+            signal: inferenceLease.controller.signal,
+            maxPromptChars: Math.min(maxPromptChars, 2400),
+            maxMessageChars: 2400,
+            forceCompletion: true,
             maxOutputTokens: Number.isFinite(params.maxOutputTokens)
               ? Math.max(24, Math.floor(Number(params.maxOutputTokens)))
               : 240,
-          },
-          disableThinking: true,
-          systemPromptOverride: DEFAULT_TRANSLATION_SYSTEM_PROMPT,
-          stopSequences: ['</s>', '<|im_end|>', '<|endoftext|>', '[End thinking]', '[Start thinking]', '\nUser:', '\nAssistant:', '\n###', '\nJapanese:'],
-          allowCompletionFallback: true,
-          completionPrompt: [
-            DEFAULT_TRANSLATION_SYSTEM_PROMPT,
-            '',
-            '### Japanese',
-            trimmedText,
-            '',
-            '### English',
-          ].join('\n'),
-        })
+            promptAdapter: {
+              id: 'ocr_translation',
+              label: 'OCR Translation',
+              intents: ['translation'],
+              systemNote: '',
+              temperature: 0.0,
+              top_p: 0.82,
+              top_k: 24,
+              repeat_penalty: 1.08,
+              maxOutputTokens: Number.isFinite(params.maxOutputTokens)
+                ? Math.max(24, Math.floor(Number(params.maxOutputTokens)))
+                : 240,
+            },
+            disableThinking: true,
+            systemPromptOverride: DEFAULT_TRANSLATION_SYSTEM_PROMPT,
+            stopSequences: ['</s>', '<|im_end|>', '<|endoftext|>', '[End thinking]', '[Start thinking]', '\nUser:', '\nAssistant:', '\n###', '\nJapanese:'],
+            allowCompletionFallback: true,
+            completionPrompt: [
+              DEFAULT_TRANSLATION_SYSTEM_PROMPT,
+              '',
+              '### Japanese',
+              trimmedText,
+              '',
+              '### English',
+            ].join('\n'),
+          })
 
-        const inferenceProvider = String((inference && inference.provider) || '').trim().toLowerCase()
-        if (inferenceProvider === 'stub' || inferenceProvider === 'scripted-fallback') {
-          throw new Error('Local OCR translation runtime is unavailable (stub adapter active)')
-        }
-
-        const cleanedText = normalizeTranslationOutput(inference && inference.text)
-        if (!cleanedText) {
-          throw new Error('Translation output was empty')
-        }
-        if (activeProvider !== 'stub-fallback') {
-          lastError = null
-        }
-        if (inference && typeof inference.provider === 'string') {
-          if (!(activeProvider === 'stub-fallback' && inference.provider === 'stub')) {
-            activeProvider = inference.provider
+          const inferenceProvider = String((inference && inference.provider) || '').trim().toLowerCase()
+          if (inferenceProvider === 'stub' || inferenceProvider === 'scripted-fallback') {
+            throw new Error('Local OCR translation runtime is unavailable (stub adapter active)')
           }
+
+          const cleanedText = normalizeTranslationOutput(inference && inference.text)
+          if (!cleanedText) {
+            throw new Error('Translation output was empty')
+          }
+          if (activeProvider !== 'stub-fallback') {
+            lastError = null
+          }
+          if (inference && typeof inference.provider === 'string') {
+            if (!(activeProvider === 'stub-fallback' && inference.provider === 'stub')) {
+              activeProvider = inference.provider
+            }
+          }
+          if (inference && typeof inference.model === 'string') {
+            activeModel = inference.model
+          }
+          return {
+            ok: true,
+            text: clipText(cleanedText, translationOutputChars),
+            provider: String((inference && inference.provider) || 'unknown'),
+            model: String((inference && inference.model) || 'unknown'),
+            coldStart,
+            elapsedMs: Date.now() - startedAt,
+            backend: 'llama.cpp-tutor',
+          }
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error)
+          lastError = detail
+          throw new Error(detail)
         }
-        if (inference && typeof inference.model === 'string') {
-          activeModel = inference.model
-        }
-        return {
-          ok: true,
-          text: clipText(cleanedText, translationOutputChars),
-          provider: String((inference && inference.provider) || 'unknown'),
-          model: String((inference && inference.model) || 'unknown'),
-          coldStart,
-          elapsedMs: Date.now() - startedAt,
-          backend: 'llama.cpp-tutor',
-        }
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error)
-        lastError = detail
-        throw new Error(detail)
       } finally {
-        isInferenceActive = false
-        activeInferenceController = null
+        releaseInferenceLease(inferenceLease)
+      }
+    },
+
+    async generateCrosswordClues(entries) {
+      if (isInferenceActive || configuredProvider !== 'llama.cpp') {
+        return { ok: false, text: '' }
+      }
+      if (!Array.isArray(entries) || entries.length === 0) {
+        return { ok: false, text: '' }
+      }
+
+      const inferenceLease = acquireInferenceLease()
+      if (!inferenceLease) {
+        return { ok: false, text: '' }
+      }
+
+      let timeout = null
+      try {
+        const coldStart = await ensureLoaded()
+        if (inferenceLease.controller.signal.aborted || activeProvider === 'stub-fallback') {
+          return { ok: false, text: '' }
+        }
+
+        const prompt = [
+          'Return only a JSON array. Create concise English crossword clues.',
+          'Each object must contain exactly poolPosition and clue.',
+          'Do not include, transliterate, or reveal any Japanese answer. Do not add entries.',
+          JSON.stringify(entries.map((entry) => ({
+            poolPosition: entry.poolPosition,
+            answer: entry.answer,
+            fallbackClue: entry.fallbackClue,
+          }))),
+        ].join('\n')
+        timeout = setTimeout(() => inferenceLease.controller.abort(), 8_000)
+        const inference = await adapter.infer(prompt, {}, {
+          signal: inferenceLease.controller.signal,
+          maxContextChars: 2_000,
+          maxPromptChars: 2_000,
+          maxOutputTokens: 240,
+          disableThinking: true,
+          systemPromptOverride: 'You generate safe English crossword clues. Return only the requested JSON array and never reveal a Japanese answer.',
+          promptAdapter: {
+            id: 'crossword_clues',
+            systemNote: 'Use concise English clues. Output valid JSON only.',
+            temperature: 0,
+            top_p: 0.8,
+            top_k: 20,
+            repeat_penalty: 1.05,
+            maxOutputTokens: 240,
+          },
+        })
+        if (inferenceLease.controller.signal.aborted || inference?.provider === 'stub') {
+          return { ok: false, text: '' }
+        }
+        return { ok: true, text: String(inference?.text || ''), coldStart }
+      } catch {
+        return { ok: false, text: '' }
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout)
+        }
+        releaseInferenceLease(inferenceLease)
       }
     },
 
@@ -2024,12 +2125,21 @@ function createTutorChatRuntime(options = {}) {
         activeInferenceController.abort()
       }
       clearUnloadTimer()
+      const pendingLoad = loadPromise
+      if (pendingLoad) {
+        try {
+          await pendingLoad
+        } catch {
+          // Continue resetting runtime state after a failed or cancelled cold load.
+        }
+      }
       if (loaded && adapter && typeof adapter.unload === 'function') {
         await adapter.unload(reason)
       }
       loaded = false
       adapter = null
       loadedAtUtc = null
+      activeInferenceLease = null
       isInferenceActive = false
       activeInferenceController = null
       activeProvider = configuredProvider

@@ -129,19 +129,19 @@ const baseCards = [
 ]
 
 const kanjiStudyPlanCards = [
-  { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', dictionary_summary: { character: '日', reading: 'にち', primary_gloss: 'day', glosses: ['day', 'sun'], source: 'offline_dictionary' }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
+  { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', dictionary_summary: { character: '日', reading: 'にち', primary_gloss: 'day', glosses: ['day', 'sun'], source: 'offline_dictionary', pitch_accents: [] }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
   { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
 ]
 
 const vocabStudyPlanCards = [
-  { id: 20, character: '予定', romaji: 'yotei', meaning: 'schedule', tags: ['vocab', 'n5'], example_sentence: '予定 を たてます。', dictionary_summary: { character: '予定', reading: 'よてい', primary_gloss: 'schedule', glosses: ['schedule', 'plan'], source: 'offline_dictionary' }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [21], character_distractor_ids: [21] },
+  { id: 20, character: '予定', romaji: 'yotei', meaning: 'schedule', tags: ['vocab', 'n5'], example_sentence: '予定 を たてます。', dictionary_summary: { character: '予定', reading: 'よてい', primary_gloss: 'schedule', glosses: ['schedule', 'plan'], source: 'offline_dictionary', pitch_accents: [] }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [21], character_distractor_ids: [21] },
   { id: 21, character: '計画', romaji: 'keikaku', meaning: 'plan', tags: ['vocab', 'n5'], example_sentence: null, dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [20], character_distractor_ids: [20] },
 ]
 
 const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
 
 const kanjiStrokeCards = [
-  { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', dictionary_summary: { character: '日', reading: 'にち', primary_gloss: 'day', glosses: ['day', 'sun'], source: 'offline_dictionary' }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
+  { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', dictionary_summary: { character: '日', reading: 'にち', primary_gloss: 'day', glosses: ['day', 'sun'], source: 'offline_dictionary', pitch_accents: [] }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
   { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
 ]
 
@@ -406,6 +406,42 @@ describe('Minigame menu', () => {
     expect(screen.queryByText(/Session Report/i)).toBeNull()
   })
 
+  it('uses the backend-ranked study queue for the first launched minigame card', async () => {
+    const getStudyQueue = vi.fn(async (slug: string) => ({
+      ok: true,
+      queue: {
+        slug,
+        card_ids: [3, 2, 1, 0],
+        indices: [3, 2, 1, 0],
+        buckets_due: 1,
+        buckets_leech: 0,
+        buckets_new: 0,
+        buckets_review: 3,
+      },
+    }))
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      getStudyQueue,
+    }
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    fireEvent.click(screen.getByRole('button', { name: /open shortcuts/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /all maps/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /vocabulary map/i }))
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+    try {
+      fireEvent.click(screen.getByRole('menuitem', { name: /typed recall/i }))
+      await waitFor(() => {
+        expect(document.querySelector('.game-prompt-main')?.textContent).toBe('え')
+      })
+    } finally {
+      randomSpy.mockRestore()
+    }
+
+    expect(getStudyQueue).toHaveBeenCalledWith('vocab_greetings')
+  })
+
   it('exits the minigame and shows onboarding after resetting data from settings', async () => {
     const resetStudyDb = vi.fn(async () => ({ ok: true }))
     window.jplearnDesktop = {
@@ -656,6 +692,7 @@ describe('Minigame menu', () => {
           meaning: 'day',
           tags: ['offline_dictionary'],
           example_sentence: null,
+          pitch_accents: [],
         },
       ],
     }))

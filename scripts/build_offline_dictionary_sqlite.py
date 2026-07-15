@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,9 @@ DEFAULT_INPUT_CANDIDATES = [
     Path("data/external_sources/offline_dictionary/jmdict-eng-common-3.6.2.json"),
 ]
 DEFAULT_OUTPUT = Path("data/external_sources/offline_dictionary/jmdict_lookup.sqlite")
+DEFAULT_PITCH_ACCENT_CANDIDATES = [
+    Path("data/external_sources/offline_dictionary/pitch-accent.json"),
+]
 
 
 def first_gloss(entry: dict[str, Any]) -> str:
@@ -151,7 +155,70 @@ def resolve_input_path(cli_input: str | None) -> Path:
     raise FileNotFoundError("No JMdict input file found. Expected one of: " + ", ".join(str(p) for p in DEFAULT_INPUT_CANDIDATES))
 
 
-def build_lookup_db(input_path: Path, output_path: Path) -> dict[str, int]:
+def resolve_pitch_accent_path(cli_input: str | None) -> Path | None:
+    if cli_input:
+        candidate = Path(cli_input)
+        if candidate.exists():
+            return candidate
+        raise FileNotFoundError(f"Pitch accent file not found: {candidate}")
+    return next((path for path in DEFAULT_PITCH_ACCENT_CANDIDATES if path.exists()), None)
+
+
+def _normalize_pitch_text(value: object) -> str:
+    return unicodedata.normalize("NFKC", str(value or "")).strip().lower()
+
+
+def load_pitch_accents(input_path: Path | None) -> list[tuple[str, str, str, int, str]]:
+    if input_path is None:
+        return []
+
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    entries = payload.get("entries") if isinstance(payload, dict) else None
+    metadata = payload.get("metadata") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("Pitch accent JSON is missing a top-level 'entries' array")
+
+    source = "Kanjium"
+    if isinstance(metadata, dict) and isinstance(metadata.get("source"), str):
+        source = metadata["source"].strip() or source
+
+    merged: dict[tuple[str, str], tuple[set[int], int]] = {}
+    for raw_entry in entries:
+        if not isinstance(raw_entry, dict):
+            continue
+        word = _normalize_pitch_text(raw_entry.get("word"))
+        reading = _normalize_pitch_text(raw_entry.get("reading"))
+        raw_positions = raw_entry.get("pitch_positions")
+        raw_mora_count = raw_entry.get("mora_count")
+        if not word or not reading or not isinstance(raw_positions, list):
+            continue
+        positions = {
+            position
+            for position in raw_positions
+            if isinstance(position, int) and not isinstance(position, bool) and position >= 0
+        }
+        if not positions or not isinstance(raw_mora_count, int) or raw_mora_count <= 0:
+            continue
+        valid_positions = {position for position in positions if position <= raw_mora_count}
+        if not valid_positions:
+            continue
+
+        key = (word, reading)
+        previous_positions, previous_mora_count = merged.get(key, (set(), raw_mora_count))
+        previous_positions.update(valid_positions)
+        merged[key] = (previous_positions, max(previous_mora_count, raw_mora_count))
+
+    return [
+        (word, reading, json.dumps(sorted(positions)), mora_count, source)
+        for (word, reading), (positions, mora_count) in sorted(merged.items())
+    ]
+
+
+def build_lookup_db(
+    input_path: Path,
+    output_path: Path,
+    pitch_accent_path: Path | None = None,
+) -> dict[str, int]:
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     words = payload.get("words") if isinstance(payload, dict) else None
     if not isinstance(words, list):
@@ -196,6 +263,18 @@ def build_lookup_db(input_path: Path, output_path: Path) -> dict[str, int]:
               key TEXT PRIMARY KEY,
               value TEXT NOT NULL
             );
+
+            CREATE TABLE dictionary_pitch_accents (
+              word TEXT NOT NULL,
+              reading TEXT NOT NULL,
+              pitch_positions TEXT NOT NULL,
+              mora_count INTEGER NOT NULL,
+              source TEXT NOT NULL,
+              PRIMARY KEY (word, reading)
+            );
+
+            CREATE INDEX idx_dictionary_pitch_accents_reading
+              ON dictionary_pitch_accents(reading);
             """
         )
 
@@ -231,11 +310,23 @@ def build_lookup_db(input_path: Path, output_path: Path) -> dict[str, int]:
             )
             entries_used += 1
 
+        pitch_accent_rows = load_pitch_accents(pitch_accent_path)
+        conn.executemany(
+            """
+            INSERT INTO dictionary_pitch_accents
+              (word, reading, pitch_positions, mora_count, source)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            pitch_accent_rows,
+        )
+
         metadata = {
             "source": str(input_path.name),
             "word_count": str(len(words)),
             "entries_used": str(entries_used),
-            "schema_version": "2",
+            "pitch_accent_source": str(pitch_accent_path.name) if pitch_accent_path else "none",
+            "pitch_accent_entries": str(len(pitch_accent_rows)),
+            "schema_version": "3",
         }
         conn.executemany(
             "INSERT INTO dictionary_metadata (key, value) VALUES (?, ?)",
@@ -246,6 +337,7 @@ def build_lookup_db(input_path: Path, output_path: Path) -> dict[str, int]:
             "word_count": len(words),
             "entries_used": entries_used,
             "lookup_rows": entries_used,
+            "pitch_accent_entries": len(pitch_accent_rows),
         }
     finally:
         conn.close()
@@ -260,12 +352,23 @@ def main() -> int:
         default=str(DEFAULT_OUTPUT),
         help="Output path for generated SQLite lookup database",
     )
+    parser.add_argument(
+        "--pitch-accent",
+        dest="pitch_accent_path",
+        default=None,
+        help="Optional pitch-accent JSON path",
+    )
     args = parser.parse_args()
 
     input_path = resolve_input_path(args.input_path)
     output_path = Path(args.output_path)
+    pitch_accent_path = resolve_pitch_accent_path(args.pitch_accent_path)
 
-    stats = build_lookup_db(input_path=input_path, output_path=output_path)
+    stats = build_lookup_db(
+        input_path=input_path,
+        output_path=output_path,
+        pitch_accent_path=pitch_accent_path,
+    )
     print(
         json.dumps(
             {

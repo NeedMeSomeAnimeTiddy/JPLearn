@@ -11,6 +11,10 @@ const {
   validateAssistantEventInteractionPayload,
   validateStartupThemeInput,
   validateGrammarMinigameRequest,
+  validateDailyGamesAttemptPayload,
+  validateDailyGamesDay,
+  validateDailyGamesPracticeSeedPayload,
+  validateDailyGamesCrosswordClues,
   validateRecordGameResultPayload,
   validateSpeakPayload,
 } = require('./ipc_security.cjs')
@@ -161,6 +165,76 @@ describe('ipc_security', () => {
         seed: -1,
       }),
     ).toThrow(/invalid grammar minigame seed/i)
+  })
+
+  it('validates Daily Games request payloads and rejects invalid day or outcome data', () => {
+    expect(validateDailyGamesDay('2026-07-15')).toBe('2026-07-15')
+    expect(validateDailyGamesPracticeSeedPayload({
+      day: '2026-07-15',
+      gameType: 'crossword',
+    })).toEqual({
+      day: '2026-07-15',
+      gameType: 'crossword',
+    })
+    expect(validateDailyGamesAttemptPayload({
+      day: '2026-07-15',
+      gameType: 'typing_blitz',
+      mode: 'daily',
+      score: 120,
+      completed: true,
+      durationSeconds: 45,
+      outcomes: [{ poolPosition: 0, outcome: 'correct' }],
+    })).toMatchObject({
+      day: '2026-07-15',
+      gameType: 'typing_blitz',
+      mode: 'daily',
+      score: 120,
+      completed: true,
+      durationSeconds: 45,
+    })
+
+    expect(() => validateDailyGamesDay('2026-02-29')).toThrow(/valid calendar date/i)
+    expect(() => validateDailyGamesDay('2026/07/15')).toThrow(/YYYY-MM-DD/i)
+    expect(() => validateDailyGamesAttemptPayload({
+      day: '2026-07-15',
+      gameType: 'crossword',
+      mode: 'daily',
+      score: 1,
+      completed: true,
+      outcomes: [
+        { poolPosition: 0, outcome: 'correct' },
+        { poolPosition: 0, outcome: 'incorrect' },
+      ],
+    })).toThrow(/duplicate poolPosition/i)
+    expect(() => validateDailyGamesAttemptPayload({
+      day: '2026-07-15',
+      gameType: 'crossword',
+      mode: 'daily',
+      score: 1,
+      completed: true,
+      outcomes: [{ poolPosition: 20, outcome: 'correct' }],
+    })).toThrow(/poolPosition/i)
+  })
+
+  it('bounds crossword clue IPC payloads and rejects duplicate positions', () => {
+    expect(validateDailyGamesCrosswordClues([
+      { poolPosition: 0, answer: '学校', fallbackClue: 'school' },
+    ], true)).toEqual([
+      { poolPosition: 0, answer: '学校', fallbackClue: 'school' },
+    ])
+    expect(validateDailyGamesCrosswordClues([
+      { poolPosition: 0, clue: ' school ' },
+    ], false)).toEqual([{ poolPosition: 0, clue: 'school' }])
+    expect(() => validateDailyGamesCrosswordClues([
+      { poolPosition: 0, answer: '学校', fallbackClue: 'school' },
+    ], false)).toThrow(/clue text/i)
+    expect(() => validateDailyGamesCrosswordClues([
+      { poolPosition: 0, clue: 'school' },
+    ], true)).toThrow(/clue request/i)
+    expect(() => validateDailyGamesCrosswordClues([
+      { poolPosition: 0, clue: 'one' },
+      { poolPosition: 0, clue: 'two' },
+    ], false)).toThrow(/poolPosition/i)
   })
 
   it('validates session goal payload and session id values', () => {

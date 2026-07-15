@@ -146,4 +146,3 @@ describe('Accessibility — zero axe violations', () => {
     expect(results.violations).toHaveLength(0)
   })
 })
-

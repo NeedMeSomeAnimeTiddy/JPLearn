@@ -53,6 +53,8 @@ export interface SessionContextValue {
     romaji: string
   } | null
   isRoundResolving: boolean
+  roundAdvancePending: boolean
+  roundAdvanceError: boolean
 
   // Session metrics
   sessionScore: number

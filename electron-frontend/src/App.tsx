@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, Dispatch, SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
 import type { LastSessionPrefs, LearningPathStatus, SectionReadiness, SessionRunReport } from './types'
-import type { GameCard } from './generated/types'
+import type { DailyGamesMissedWordPayload, GameCard } from './generated/types'
 import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
 import { SettingsCollapsibleSection } from './components/SettingsCollapsibleSection'
 import { ResumeToast } from './components/ResumeToast'
 import { CloseConfirmDialog } from './components/CloseConfirmDialog'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { MinigameIcon } from './components/MinigameIcon'
 import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
@@ -16,6 +17,7 @@ import { MinigameView } from './views/MinigameView'
 import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
 import { PassageHubView } from './views/PassageHubView'
+import { DAILY_GAMES_COPY } from './features/daily-games/constants'
 import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
@@ -28,7 +30,7 @@ import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode, blankOutWordInSentence } from './utils'
 import { KANJI_MEANINGS } from './lib/kanjiMeanings'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Upload, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, Gamepad2, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Upload, X } from 'lucide-react'
 import './App.css'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -82,7 +84,7 @@ type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stro
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools' | 'dev_checks'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
-type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep' | 'passage_hub'
+type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep' | 'passage_hub' | 'daily_games'
 type NavDirection = 'forward' | 'back'
 type FontSize = 'small' | 'medium' | 'large'
 type AppFontPreset =
@@ -106,6 +108,7 @@ const STUDY_QUEUE_CACHE_TTL_MS = 45000
 const DECK_LOAD_TIMEOUT_MS = 15000
 const STARTUP_WARMUP_INITIAL_DELAY_MS = 900
 const STARTUP_WARMUP_YIELD_DEADLINE_MS = 45
+const DailyGamesHub = lazy(() => import('./features/daily-games/components/GamesHub'))
 
 const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
   { key: 'appearance', label: 'Appearance', icon: Palette },
@@ -169,6 +172,7 @@ interface RoundOption {
 
 interface RoundState {
   cardId: number
+  deckSlug?: DeckSlugInput
   mode: PlayableMinigame
   audioText: string
   exampleSentenceAudioText: string | null
@@ -185,6 +189,12 @@ interface RoundState {
   answerDisplay?: string | null
   options: RoundOption[]
   isMastered?: boolean
+}
+
+interface ExplicitReviewItem {
+  deckSlug: DeckSlugInput
+  cardId: number
+  card: ScriptDeck['cards'][number]
 }
 
 interface ScriptStats {
@@ -1576,6 +1586,7 @@ function App() {
       const parsed: PersistedSession = JSON.parse(raw)
       if (!parsed.activeScript || !parsed.activeGame || !Array.isArray(parsed.seenCardIds) || !parsed.restore) return
       const timer = setTimeout(() => {
+        if (localStorage.getItem(SESSION_STORAGE_KEY) !== raw) return
         setResumeData(parsed)
         setShowResumeToast(true)
       }, 2000)
@@ -1621,6 +1632,8 @@ function App() {
   const [roundFeedbackAnswer, setRoundFeedbackAnswer] = useState<string | null>(null)
   const [roundPerformanceLabel, setRoundPerformanceLabel] = useState<'PERFECT' | 'GOOD' | 'SLOW' | 'MISS' | null>(null)
   const [isRoundResolving, setIsRoundResolving] = useState<boolean>(false)
+  const [roundAdvancePending, setRoundAdvancePending] = useState(false)
+  const [roundAdvanceError, setRoundAdvanceError] = useState(false)
   const [roundResponseMs, setRoundResponseMs] = useState<number | null>(null)
   const [roundSrsResult, setRoundSrsResult] = useState<{
     repetitions: number
@@ -1649,6 +1662,7 @@ function App() {
   const [sessionStartPending, setSessionStartPending] = useState<boolean>(false)
   const [sessionSummaryLoading, setSessionSummaryLoading] = useState<boolean>(false)
   const [sessionGoalError, setSessionGoalError] = useState<string | null>(null)
+  const [explicitReviewItems, setExplicitReviewItems] = useState<ExplicitReviewItem[] | null>(null)
   const [showResumeToast, setShowResumeToast] = useState<boolean>(false)
   const [resumeData, setResumeData] = useState<PersistedSession | null>(null)
   const [livesEnabled, setLivesEnabled] = useState<boolean>(() => loadSessionPrefs()?.livesEnabled ?? false)
@@ -1773,12 +1787,25 @@ function App() {
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const commandPalette = useCommandPalette()
 
+  function openDailyGames(): void {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    tutor.setAssistantChatOpen(false)
+    tutor.setOcrWorkbenchOpen(false)
+    setNavDirection('forward')
+    setView('daily_games')
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+  }
+
   useEffect(() => {
     const scripts: ScriptKey[] = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples']
     const commands: Command[] = [
       { id: 'nav-home', label: 'Go to Home', category: 'navigation', action: () => { setNavDirection('back'); setView('home') } },
       { id: 'nav-script-hub', label: 'Go to Script Hub', category: 'navigation', action: () => { setNavDirection('forward'); setView('script_hub') } },
       { id: 'nav-jlpt', label: 'Go to JLPT Prep', category: 'navigation', action: () => { setNavDirection('forward'); setView('jlpt_prep') } },
+      { id: 'nav-daily-games', label: DAILY_GAMES_COPY.title, category: 'navigation', keywords: ['daily', 'games', 'practice'], action: openDailyGames },
       { id: 'nav-overview', label: 'Open Study Overview', category: 'navigation', action: () => { setShowOverview(true); void loadSummary() } },
       { id: 'script-hiragana', label: 'Hiragana', category: 'navigation', keywords: ['hiragana', 'script'], action: () => { setNavDirection('forward'); setActiveScript('hiragana'); setView('script_hub') } },
       { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { setNavDirection('forward'); setActiveScript('katakana'); setView('script_hub') } },
@@ -1866,6 +1893,9 @@ function App() {
   const nearMissCardIdsRef = useRef<number[]>([])
   const retryCardsRef = useRef<GameCard[] | null>(null)
   const retryTargetItemsRef = useRef<number | null>(null)
+  const explicitReviewItemsRef = useRef<ExplicitReviewItem[] | null>(null)
+  const explicitReviewCursorRef = useRef(0)
+  const explicitReviewPersistenceRequestRef = useRef(0)
   const feedbackAdvanceRef = useRef<(() => void) | null>(null)
   const kanjiCategoryDeckCacheRef = useRef<Partial<Record<KanjiCategory, ScriptDeck['cards']>>>({})
   const vocabCategoryDeckCacheRef = useRef<Partial<Record<VocabCategory, ScriptDeck['cards']>>>({})
@@ -1949,9 +1979,16 @@ function App() {
     setRoundFeedbackPoints(null)
     setRoundFeedbackAnswer(null)
     setIsRoundResolving(false)
+    setRoundAdvancePending(false)
+    setRoundAdvanceError(false)
+    explicitReviewPersistenceRequestRef.current += 1
+    feedbackAdvanceRef.current = null
     retryCardsRef.current = null
     retryTargetItemsRef.current = null
     setRetryTargetItems(null)
+    explicitReviewItemsRef.current = null
+    explicitReviewCursorRef.current = 0
+    setExplicitReviewItems(null)
     resetRoundCycle()
   }
 
@@ -2231,7 +2268,7 @@ function App() {
       ordered.push(index)
     }
 
-    return shuffleArray(ordered)
+    return ordered
   }, [])
 
   const hydrateRoundCycle = useCallback(async (sourceCards: ScriptDeck['cards']): Promise<void> => {
@@ -3711,6 +3748,10 @@ function App() {
 
   const upcomingCards = useMemo((): GameCard[] => {
     if (!sessionActive) return []
+    const explicitItems = explicitReviewItemsRef.current
+    if (explicitItems) {
+      return explicitItems.slice(explicitReviewCursorRef.current, explicitReviewCursorRef.current + 5).map((item) => item.card)
+    }
     const cursor = roundCursorRef.current
     const cycle = roundCycleRef.current
     const result: GameCard[] = []
@@ -3723,7 +3764,7 @@ function App() {
     return result
     // queueRevision is a state counter bumped when the queue or cursor changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionActive, activeBlockCards, queueRevision])
+  }, [sessionActive, activeBlockCards, explicitReviewItems, queueRevision])
 
   const activeSessionLengthPreset = useMemo(
     () => SESSION_LENGTH_PRESETS.find((preset) => preset.items === sessionTargetItems) ?? null,
@@ -3734,6 +3775,85 @@ function App() {
     if (activeSessionLengthPreset) return
     setSessionTargetItems(DEFAULT_SESSION_LENGTH_PRESET.items)
   }, [activeSessionLengthPreset])
+
+  async function startMissedWordReview(missedWords: DailyGamesMissedWordPayload[]): Promise<void> {
+    const uniqueMisses = missedWords.filter((miss, index) => {
+      const identity = `${miss.word.deck_slug}:${miss.word.card_id}`
+      return missedWords.findIndex((candidate) => `${candidate.word.deck_slug}:${candidate.word.card_id}` === identity) === index
+    })
+    if (uniqueMisses.length === 0) return
+
+    setSessionStartPending(true)
+    try {
+      const getDeckCards = window.jplearnDesktop?.getDeckCards
+      if (!getDeckCards) throw new Error('Deck cards API unavailable')
+      const deckSlugs = [...new Set(uniqueMisses.map((miss) => miss.word.deck_slug as DeckSlugInput))]
+      const decks = await Promise.all(deckSlugs.map(async (slug) => [slug, await getDeckCards(slug)] as const))
+      const cardsByDeck = new Map(decks.map(([slug, deck]) => [slug, new Map(deck.cards.map((card) => [card.id, card]))]))
+      const items = uniqueMisses.flatMap((miss) => {
+        const deckSlug = miss.word.deck_slug as DeckSlugInput
+        const card = cardsByDeck.get(deckSlug)?.get(miss.word.card_id)
+        return card ? [{ deckSlug, cardId: miss.word.card_id, card }] : []
+      })
+      if (items.length === 0) throw new Error('Missed words are no longer available for review.')
+
+      clearPersistedSession()
+      setShowResumeToast(false)
+      setResumeData(null)
+      resetSessionFull()
+      explicitReviewItemsRef.current = items
+      explicitReviewCursorRef.current = 1
+      setExplicitReviewItems(items)
+      retryTargetItemsRef.current = items.length
+      setRetryTargetItems(items.length)
+      setLastSessionSummary(null)
+      setSessionRunReport(null)
+      setActiveSessionId(null)
+      seenCardIdsRef.current = []
+      wrongCardIdsRef.current = []
+      nearMissCardIdsRef.current = []
+
+      const firstItem = items[0]
+      const firstRound = buildRound([firstItem.card], 'romaji_sprint', 0, false, 0)
+      if (!firstRound) throw new Error('Missed-word review could not prepare a question.')
+
+      setSessionActive(true)
+      pomodoro.onSessionStart()
+      setRoundState({ ...firstRound, deckSlug: firstItem.deckSlug })
+      roundPresentedAtRef.current = performance.now()
+      setRoundInput('')
+      setRoundFeedback(null)
+      setRoundFeedbackTone(null)
+      setRoundFeedbackPoints(null)
+      setRoundFeedbackAnswer(null)
+      setRoundPerformanceLabel(null)
+      setIsRoundResolving(false)
+      setRoundAdvancePending(false)
+      setRoundAdvanceError(false)
+      setGameError(null)
+      setRoundConfidenceScore(3)
+      setNavDirection('forward')
+      setView('minigame')
+    } finally {
+      setSessionStartPending(false)
+    }
+  }
+
+  function returnToDailyGamesHub(): void {
+    resetSessionEnd()
+    explicitReviewPersistenceRequestRef.current += 1
+    feedbackAdvanceRef.current = null
+    setRoundAdvancePending(false)
+    setRoundAdvanceError(false)
+    explicitReviewItemsRef.current = null
+    explicitReviewCursorRef.current = 0
+    setExplicitReviewItems(null)
+    retryCardsRef.current = null
+    retryTargetItemsRef.current = null
+    setRetryTargetItems(null)
+    setNavDirection('back')
+    setView('daily_games')
+  }
 
   const startSession = useCallback(async (selectedGame: MinigameKey = activeGame, customCards?: GameCard[], customTargetItems?: number, restore?: PersistedSessionRestore) => {
     setSessionStartPending(true)
@@ -3929,6 +4049,35 @@ function App() {
   }, [activeGame, deckCards, startSession])
 
   const nextRound = useCallback(async () => {
+    const explicitItems = explicitReviewItemsRef.current
+    if (explicitItems) {
+      const nextItem = explicitItems[explicitReviewCursorRef.current]
+      explicitReviewCursorRef.current += 1
+      if (!nextItem) {
+        returnToDailyGamesHub()
+        return
+      }
+
+      const candidate = buildRound([nextItem.card], 'romaji_sprint', 0, false, 0)
+      if (!candidate) {
+        returnToDailyGamesHub()
+        return
+      }
+
+      setRoundState({ ...candidate, deckSlug: nextItem.deckSlug })
+      roundPresentedAtRef.current = performance.now()
+      setRoundInput('')
+      setRoundFeedback(null)
+      setRoundFeedbackTone(null)
+      setRoundFeedbackPoints(null)
+      setRoundFeedbackAnswer(null)
+      setRoundPerformanceLabel(null)
+      setRoundComboBonus(0)
+      setRoundMilestoneStreak(null)
+      setQueueRevision((previous) => previous + 1)
+      return
+    }
+
     const retryPool = retryCardsRef.current
     const leechPool = activeBlockCards.filter((card) => card.is_leech)
     const sourceCards = retryPool
@@ -4156,41 +4305,82 @@ function App() {
 
       const confidenceForAnswer = confidenceCaptureEnabled ? roundConfidenceScore : undefined
 
-      try {
-        const data: PersistedSession = {
-          activeScript,
-          activeGame,
-          livesEnabled,
-          leechFocusEnabled,
-          confidenceCaptureEnabled,
-          sessionTargetItems,
-          seenCardIds: [...seenCardIdsRef.current],
-          sessionStartedAt: new Date().toISOString(),
-          restore: {
-            sessionScore: isCorrect ? sessionScore + 1 : sessionScore,
-            sessionRounds: sessionRounds + 1,
-            sessionPoints: isCorrect ? sessionPoints + awardedPoints : sessionPoints,
-            sessionStreak: nextStreak,
-            sessionBestStreak: Math.max(sessionBestStreak, nextStreak),
-            sessionConfidenceCount:
-              typeof confidenceForAnswer === 'number' ? sessionConfidenceCount + 1 : sessionConfidenceCount,
-            sessionConfidenceTotal:
-              typeof confidenceForAnswer === 'number' ? sessionConfidenceTotal + confidenceForAnswer : sessionConfidenceTotal,
-            livesRemaining: nextLives,
-          },
-        }
-        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data))
-      } catch { /* ignore storage errors */ }
+      if (!explicitReviewItemsRef.current) {
+        try {
+          const data: PersistedSession = {
+            activeScript,
+            activeGame,
+            livesEnabled,
+            leechFocusEnabled,
+            confidenceCaptureEnabled,
+            sessionTargetItems,
+            seenCardIds: [...seenCardIdsRef.current],
+            sessionStartedAt: new Date().toISOString(),
+            restore: {
+              sessionScore: isCorrect ? sessionScore + 1 : sessionScore,
+              sessionRounds: sessionRounds + 1,
+              sessionPoints: isCorrect ? sessionPoints + awardedPoints : sessionPoints,
+              sessionStreak: nextStreak,
+              sessionBestStreak: Math.max(sessionBestStreak, nextStreak),
+              sessionConfidenceCount:
+                typeof confidenceForAnswer === 'number' ? sessionConfidenceCount + 1 : sessionConfidenceCount,
+              sessionConfidenceTotal:
+                typeof confidenceForAnswer === 'number' ? sessionConfidenceTotal + confidenceForAnswer : sessionConfidenceTotal,
+              livesRemaining: nextLives,
+            },
+          }
+          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data))
+        } catch { /* ignore storage errors */ }
+      }
 
-      const resultSlug: DeckSlugInput =
-        activeScript === 'kanji_n5'
+      const resultSlug: DeckSlugInput = roundState.deckSlug
+        ?? (activeScript === 'kanji_n5'
           ? KANJI_CATEGORY_TO_DECK_SLUG[activeKanjiCategory]
           : activeScript === 'vocab_n5'
             ? VOCAB_CATEGORY_TO_DECK_SLUG[activeVocabCategory]
-            : activeScript
+            : activeScript)
       studyQueueCacheRef.current.delete(resultSlug)
 
+      const isExplicitReview = explicitReviewItemsRef.current !== null
+      const persistenceRequestId = isExplicitReview
+        ? ++explicitReviewPersistenceRequestRef.current
+        : explicitReviewPersistenceRequestRef.current
+      const advanceFeedback = () => {
+        feedbackAdvanceRef.current = null
+        if (!isCorrect && livesEnabled && nextLives <= 0) {
+          resetSessionEnd({ errorMessage: 'Out of lives. Press Play to start a new run.' })
+          return
+        }
+
+        if (completedRoundsAfterAnswer >= targetRounds) {
+          if (explicitReviewItemsRef.current) {
+            returnToDailyGamesHub()
+            return
+          }
+          resetSessionEnd()
+          return
+        }
+
+        void nextRound()
+        setRoundFeedback(null)
+        setRoundFeedbackTone(null)
+        setRoundFeedbackPoints(null)
+        setRoundFeedbackAnswer(null)
+        setRoundResponseMs(null)
+        setRoundSrsResult(null)
+        setRoundExampleSentence(null)
+        setIsRoundResolving(false)
+      }
+      if (isExplicitReview) {
+        feedbackAdvanceRef.current = null
+        setRoundAdvancePending(true)
+        setRoundAdvanceError(false)
+      } else {
+        feedbackAdvanceRef.current = advanceFeedback
+      }
+
       void (async () => {
+        let persistenceSucceeded = false
         try {
           const result = await window.jplearnDesktop?.recordGameResult({
             slug: resultSlug,
@@ -4204,6 +4394,16 @@ function App() {
             sessionId: activeSessionId ?? undefined,
             confidenceScore: confidenceForAnswer,
           })
+          if (!result) throw new Error('Review persistence unavailable')
+          persistenceSucceeded = true
+          if (
+            isExplicitReview
+            && explicitReviewPersistenceRequestRef.current === persistenceRequestId
+            && explicitReviewItemsRef.current
+          ) {
+            setRoundAdvancePending(false)
+            feedbackAdvanceRef.current = advanceFeedback
+          }
           if (
             isGrammarCurriculumMode(roundState.mode) &&
             typeof result.curriculum_stage === 'number'
@@ -4246,7 +4446,18 @@ function App() {
               } catch { /* ignore */ }
             })()
           }
-        } catch { /* background record — ignore */ }
+        } catch {
+          if (
+            isExplicitReview
+            && !persistenceSucceeded
+            && explicitReviewPersistenceRequestRef.current === persistenceRequestId
+            && explicitReviewItemsRef.current
+          ) {
+            setRoundAdvancePending(false)
+            setRoundAdvanceError(true)
+            feedbackAdvanceRef.current = null
+          }
+        }
       })()
 
       void (async () => {
@@ -4277,29 +4488,6 @@ function App() {
         typedAssessment,
       }))
 
-      const advanceFeedback = () => {
-        feedbackAdvanceRef.current = null
-        if (!isCorrect && livesEnabled && nextLives <= 0) {
-          resetSessionEnd({ errorMessage: 'Out of lives. Press Play to start a new run.' })
-          return
-        }
-
-        if (completedRoundsAfterAnswer >= targetRounds) {
-          resetSessionEnd()
-          return
-        }
-
-        void nextRound()
-        setRoundFeedback(null)
-        setRoundFeedbackTone(null)
-        setRoundFeedbackPoints(null)
-        setRoundFeedbackAnswer(null)
-        setRoundResponseMs(null)
-        setRoundSrsResult(null)
-        setRoundExampleSentence(null)
-        setIsRoundResolving(false)
-      }
-      feedbackAdvanceRef.current = advanceFeedback
     },
     // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, leechFocusEnabled, livesEnabled, livesRemaining, nextRound, roundConfidenceScore, roundState, scriptStats, sessionBestStreak, sessionConfidenceCount, sessionConfidenceTotal, sessionPoints, sessionRounds, sessionScore, sessionTargetItems],
@@ -4373,6 +4561,10 @@ function App() {
         }
 
         if (view === 'minigame') {
+          if (explicitReviewItemsRef.current) {
+            returnToDailyGamesHub()
+            return
+          }
           setNavDirection('back')
           setView('script_hub')
           return
@@ -4391,6 +4583,12 @@ function App() {
         }
 
         if (view === 'passage_hub') {
+          setNavDirection('back')
+          setView('home')
+          return
+        }
+
+        if (view === 'daily_games') {
           setNavDirection('back')
           setView('home')
           return
@@ -5141,6 +5339,17 @@ function App() {
                     type="button"
                     role="menuitem"
                     className="titlebar-shortcut-item"
+                    onClick={openDailyGames}
+                    title={DAILY_GAMES_COPY.title}
+                  >
+                    <Gamepad2 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                    {DAILY_GAMES_COPY.title}
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="titlebar-shortcut-item"
                     onClick={() => { setView('passage_hub'); setShortcutMenuOpen(false) }}
                     title="Passages"
                   >
@@ -5617,6 +5826,8 @@ function App() {
         roundSrsResult,
         roundExampleSentence,
         isRoundResolving,
+        roundAdvancePending,
+        roundAdvanceError,
         sessionScore,
         sessionRounds,
         sessionPoints,
@@ -5740,6 +5951,7 @@ function App() {
             setNavDirection('forward')
             setView('passage_hub')
           }}
+          onOpenDailyGames={openDailyGames}
           onJumpToSetup={jumpToScriptHubSetup}
         />
       ) : null}
@@ -5891,17 +6103,24 @@ function App() {
         <MinigameView
           navDirection={navDirection}
           activeScript={activeScript}
-          activeGame={activeGame}
+          activeGame={explicitReviewItems ? 'romaji_sprint' : activeGame}
           activeSectionName={activeSectionName}
           gameLoading={gameLoading}
           gameError={gameError}
-          activeRunCardsLength={activeRunCards.length}
+          activeRunCardsLength={explicitReviewItems?.length ?? activeRunCards.length}
           voiceEnabled={settings.voiceEnabled}
           showKeyboardPrompts={settings.showKeyboardPrompts}
           furiganaEnabled={settings.furiganaEnabled}
           furiganaAutoHideMastered={settings.furiganaAutoHideMastered}
-          activeBlockCards={activeBlockCards}
+          activeBlockCards={explicitReviewItems?.map((item) => item.card) ?? activeBlockCards}
+          activeRoundCard={explicitReviewItems && roundState?.deckSlug
+            ? explicitReviewItems.find((item) => item.deckSlug === roundState.deckSlug && item.cardId === roundState.cardId)?.card ?? null
+            : null}
           onBack={() => {
+            if (explicitReviewItemsRef.current) {
+              returnToDailyGamesHub()
+              return
+            }
             setNavDirection('back')
             setView('script_hub')
           }}
@@ -5930,6 +6149,17 @@ function App() {
           onPlayAudio={(text) => { void voice.playQuestionAudio(text) }}
           voiceBusy={voice.voiceBusy}
         />
+      ) : null}
+
+      {view === 'daily_games' ? (
+        <ErrorBoundary>
+          <Suspense fallback={<div className="daily-games-hub" role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
+            <DailyGamesHub onBack={() => {
+              setNavDirection('back')
+              setView('home')
+            }} onReviewMissedWords={startMissedWordReview} />
+          </Suspense>
+        </ErrorBoundary>
       ) : null}
 
       {/* Study Overview popup — accessible on top of any view */}
@@ -6391,7 +6621,7 @@ function App() {
                 <SettingsCollapsibleSection
                   id="offline-dictionary"
                   title="Offline Dictionary"
-                  description="Lets Tutor chat translate Japanese↔English words without an internet connection. Downloaded from the open-source jmdict-simplified project (~30 MB)."
+                  description="Provides offline Japanese↔English lookup with JMdict definitions and Kanjium pitch accent data."
                   meta={models.tutorInstallInfo?.dictionaryInstalled ? 'Installed' : `Not installed • ${models.formatMinutes(models.tutorInstallInfo?.dictionaryEstimatedDownloadMinutes)}`}
                   collapsed={Boolean(collapsedSettingsSections['offline-dictionary'])}
                   onToggle={() => toggleThemeSectionCollapsed('offline-dictionary')}

@@ -62,9 +62,13 @@ MIGRATION_V10 = 10
 MIGRATION_V11 = 11
 MIGRATION_V12 = 12
 MIGRATION_V13 = 13
+MIGRATION_V14 = 14
+MIGRATION_V15 = 15
+MIGRATION_V16 = 16
+MIGRATION_V17 = 17
 
 
-LATEST_SCHEMA_VERSION = 13
+LATEST_SCHEMA_VERSION = 17
 _SQLITE_IN_CHUNK_SIZE = 900
 
 StageDistribution: TypeAlias = dict[int, int]
@@ -558,6 +562,138 @@ def _migration_0013(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migration_0014(conn: sqlite3.Connection) -> None:
+    """Add isolated persistence for Daily Games snapshots, attempts, and streaks."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_word_pools (
+            pool_day          TEXT    PRIMARY KEY,
+            algorithm_version INTEGER NOT NULL CHECK (algorithm_version > 0)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_word_pool_words (
+            pool_day      TEXT    NOT NULL,
+            pool_position INTEGER NOT NULL CHECK (pool_position >= 0),
+            deck_slug     TEXT    NOT NULL,
+            deck_name     TEXT    NOT NULL,
+            card_id       INTEGER NOT NULL CHECK (card_id >= 0),
+            character     TEXT    NOT NULL,
+            romaji        TEXT    NOT NULL,
+            meaning       TEXT    NOT NULL,
+            source        TEXT    NOT NULL CHECK (source IN ('due', 'recent', 'new')),
+            PRIMARY KEY (pool_day, pool_position),
+            FOREIGN KEY (pool_day) REFERENCES daily_word_pools(pool_day)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_game_attempts (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            pool_day         TEXT    NOT NULL,
+            game_type        TEXT    NOT NULL CHECK (
+                game_type IN ('crossword', 'word_search', 'match_pairs', 'typing_blitz')
+            ),
+            mode             TEXT    NOT NULL CHECK (mode IN ('daily', 'practice')),
+            score            INTEGER NOT NULL CHECK (score >= 0),
+            completed        INTEGER NOT NULL CHECK (completed IN (0, 1)),
+            duration_seconds INTEGER CHECK (duration_seconds IS NULL OR duration_seconds >= 0),
+            completed_at_utc TEXT    NOT NULL,
+            FOREIGN KEY (pool_day) REFERENCES daily_word_pools(pool_day)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_game_attempt_word_outcomes (
+            attempt_id    INTEGER NOT NULL,
+            pool_position INTEGER NOT NULL CHECK (pool_position >= 0),
+            outcome       TEXT    NOT NULL CHECK (outcome IN ('correct', 'incorrect')),
+            PRIMARY KEY (attempt_id, pool_position),
+            FOREIGN KEY (attempt_id) REFERENCES daily_game_attempts(id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_games_streak_state (
+            id                  INTEGER PRIMARY KEY CHECK (id = 1),
+            last_completed_day  TEXT,
+            current_streak_days INTEGER NOT NULL CHECK (current_streak_days >= 0),
+            best_streak_days    INTEGER NOT NULL CHECK (best_streak_days >= 0),
+            freezes_available   INTEGER NOT NULL CHECK (freezes_available >= 0),
+            freeze_month        TEXT
+        )
+        """
+    )
+
+
+def _migration_0015(conn: sqlite3.Connection) -> None:
+    """Add non-destructive completion identities for daily-attempt idempotency."""
+    conn.execute("ALTER TABLE daily_game_attempts ADD COLUMN completion_key TEXT")
+    conn.execute(
+        """
+        UPDATE daily_game_attempts
+        SET completion_key = 'daily:' || pool_day || ':' || game_type
+        WHERE mode = 'daily' AND completed = 1
+          AND id = (
+              SELECT MIN(existing.id)
+              FROM daily_game_attempts AS existing
+              WHERE existing.pool_day = daily_game_attempts.pool_day
+                AND existing.game_type = daily_game_attempts.game_type
+                AND existing.mode = 'daily'
+                AND existing.completed = 1
+          )
+        """
+    )
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS daily_game_completed_daily_attempt_unique
+        ON daily_game_attempts (completion_key)
+        WHERE completion_key IS NOT NULL
+        """
+    )
+
+
+def _migration_0016(conn: sqlite3.Connection) -> None:
+    """Add immutable accepted-clue cache entries for Daily Games crosswords."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_crossword_clues (
+            pool_day      TEXT    NOT NULL,
+            pool_position INTEGER NOT NULL CHECK (pool_position >= 0),
+            clue          TEXT    NOT NULL CHECK (length(clue) BETWEEN 1 AND 500),
+            PRIMARY KEY (pool_day, pool_position),
+            FOREIGN KEY (pool_day, pool_position)
+                REFERENCES daily_word_pool_words (pool_day, pool_position)
+        )
+        """
+    )
+
+
+def _migration_0017(conn: sqlite3.Connection) -> None:
+    """Add isolated, time-bounded Daily Games miss-priority signals."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_game_miss_signals (
+            deck_name TEXT    NOT NULL,
+            card_id   INTEGER NOT NULL CHECK (card_id >= 0),
+            missed_on TEXT    NOT NULL,
+            PRIMARY KEY (deck_name, card_id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_daily_game_miss_signals_active
+        ON daily_game_miss_signals (deck_name, missed_on)
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -572,6 +708,10 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V11: _migration_0011,
     MIGRATION_V12: _migration_0012,
     MIGRATION_V13: _migration_0013,
+    MIGRATION_V14: _migration_0014,
+    MIGRATION_V15: _migration_0015,
+    MIGRATION_V16: _migration_0016,
+    MIGRATION_V17: _migration_0017,
 }
 
 
@@ -607,7 +747,7 @@ def _normalize_deck_name(deck_name: str) -> str:
 
 
 def reset_db() -> None:
-    """Delete all persisted review progress while keeping schema intact."""
+    """Delete persisted learner progress while keeping schema intact."""
     init_db()
     with _connect() as conn:
         conn.execute("DELETE FROM review_events")
@@ -627,6 +767,13 @@ def reset_db() -> None:
         conn.execute("DELETE FROM user_badges")
         conn.execute("DELETE FROM user_xp")
         conn.execute("DELETE FROM tutor_reactions_seen")
+        conn.execute("DELETE FROM daily_game_attempt_word_outcomes")
+        conn.execute("DELETE FROM daily_game_attempts")
+        conn.execute("DELETE FROM daily_game_miss_signals")
+        conn.execute("DELETE FROM daily_crossword_clues")
+        conn.execute("DELETE FROM daily_word_pool_words")
+        conn.execute("DELETE FROM daily_word_pools")
+        conn.execute("DELETE FROM daily_games_streak_state")
 
 
 # ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ interface RoundFeedbackProps {
   actionLabel?: string
   actionTitle?: string
   onAction?: () => void
+  actionDisabled?: boolean
   responseMs: number | null
   srsResult: {
     repetitions: number
@@ -68,6 +69,7 @@ export function RoundFeedback({
   actionLabel,
   actionTitle,
   onAction,
+  actionDisabled = false,
   responseMs,
   srsResult,
   exampleSentence,
@@ -170,6 +172,7 @@ export function RoundFeedback({
               type="button"
               className="round-feedback-skip"
               onClick={onAction}
+              disabled={actionDisabled}
               aria-label={actionTitle ?? actionLabel ?? 'Continue now'}
               title={actionTitle ?? actionLabel ?? 'Continue now'}
             >

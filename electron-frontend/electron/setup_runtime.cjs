@@ -663,8 +663,12 @@ function getOfflineDictionarySqlitePath(base) {
   return path.join(base, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite')
 }
 
+function getOfflineDictionaryReadyPath(base) {
+  return path.join(base, 'data', 'external_sources', 'offline_dictionary', '.pitch-accent-ready')
+}
+
 function isOfflineDictionaryInstalled(base) {
-  return fs.existsSync(getOfflineDictionarySqlitePath(base))
+  return fs.existsSync(getOfflineDictionarySqlitePath(base)) && fs.existsSync(getOfflineDictionaryReadyPath(base))
 }
 
 // ── Embedder install state (hidden — installed alongside chatbot tiers) ─────
@@ -2266,8 +2270,8 @@ function downloadDictionary(sender, scriptRoot) {
       windowsHide: true,
     })
 
-    // 5 dictionary downloads + 1 SQLite build phase.
-    const TOTAL_PHASES = 6
+    // 5 dictionary downloads + pitch accent data + 1 SQLite build phase.
+    const TOTAL_PHASES = 7
     let currentPhase = 0
     let currentPhasePct = 0
 

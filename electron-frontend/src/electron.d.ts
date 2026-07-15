@@ -2,9 +2,12 @@
 // Run: python scripts/generate_ts_types.py
 import type {
   DeckSummary,
+  DailyGamesPracticeSeedPayload,
+  DailyGamesStatePayload,
   FeatureStatusPayload,
   GameCard,
   OverviewCharacterCard,
+  PitchAccent,
   ProgressionNodeStatusPayload,
   RecommendationPayload,
   SessionGoalPayload,
@@ -26,6 +29,7 @@ interface DictionaryLookupItem {
   meaning: string
   tags: string[]
   example_sentence: string | null
+  pitch_accents: PitchAccent[]
 }
 
 interface DictionaryLookupPayload {
@@ -226,6 +230,38 @@ interface StudyQueueResponse {
 
 type GrammarMinigameType = 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter'
 
+type DailyGamesGameType = 'crossword' | 'word_search' | 'match_pairs' | 'typing_blitz'
+type DailyGamesMode = 'daily' | 'practice'
+
+interface DailyGamesAttemptOutcomeInput {
+  poolPosition: number
+  outcome: 'correct' | 'incorrect'
+}
+
+interface DailyGamesPracticeSeedRequest {
+  day: string
+  gameType: DailyGamesGameType
+}
+
+interface DailyGamesAttemptRequest extends DailyGamesPracticeSeedRequest {
+  mode: DailyGamesMode
+  score: number
+  completed: boolean
+  durationSeconds?: number
+  outcomes: DailyGamesAttemptOutcomeInput[]
+}
+
+interface DailyGamesCrosswordClue {
+  poolPosition: number
+  clue: string
+}
+
+interface DailyGamesCrosswordClueRequest {
+  poolPosition: number
+  answer: string
+  fallbackClue: string
+}
+
 interface GrammarMinigameRequest {
   gameType: GrammarMinigameType
   sentence?: string
@@ -424,6 +460,12 @@ interface DesktopApi {
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>
   getGrammarMinigameData?: (payload: GrammarMinigameRequest) => Promise<GrammarMinigameResponse>
+  getDailyGamesState?: (day: string) => Promise<DailyGamesStatePayload>
+  createDailyGamesPracticeSeed?: (payload: DailyGamesPracticeSeedRequest) => Promise<DailyGamesPracticeSeedPayload>
+  recordDailyGamesAttempt?: (payload: DailyGamesAttemptRequest) => Promise<DailyGamesStatePayload>
+  getDailyGamesCrosswordClues?: (day: string) => Promise<DailyGamesCrosswordClue[]>
+  saveDailyGamesCrosswordClues?: (day: string, clues: DailyGamesCrosswordClue[]) => Promise<DailyGamesCrosswordClue[]>
+  generateDailyGamesCrosswordClues?: (entries: DailyGamesCrosswordClueRequest[]) => Promise<{ ok: boolean; text: string }>
   getOverviewCharacterMastery: () => Promise<OverviewCharacterMasteryPayload>
   notifyStartupReady: (payload?: {
     startupReadyMs?: number

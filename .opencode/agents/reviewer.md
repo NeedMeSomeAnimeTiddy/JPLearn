@@ -2,7 +2,6 @@
 description: Reviews code changes for correctness, layer violations, and project convention adherence.
 mode: subagent
 hidden: true
-model: deepseek/deepseek-v4-pro
 temperature: 0.1
 ---
 

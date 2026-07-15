@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const { createTutorChatRuntime, createAdapterRegistry, extractCliResponseText } = require('./llm_runtime.cjs')
 
@@ -95,6 +95,98 @@ describe('llm runtime', () => {
     await expect(runtime.sendMessage('second')).rejects.toThrow(/already active/i)
     gate.release()
     await expect(first).resolves.toMatchObject({ ok: true })
+  })
+
+  it('returns fallback-ready output for crossword clues without disturbing active tutor inference', async () => {
+    let releaseTutor
+    let tutorInferenceCount = 0
+    const infer = vi.fn(async (message) => {
+      if (message === 'tutor message') {
+        tutorInferenceCount += 1
+        if (tutorInferenceCount === 1) {
+          await new Promise((resolve) => { releaseTutor = resolve })
+        }
+        return { text: '次は苦手な単語を三つ復習してから、新しい問題に進みましょう。', provider: 'llama.cpp', model: 'test-model' }
+      }
+      return { text: '[]', provider: 'llama.cpp', model: 'test-model' }
+    })
+    const runtime = createTutorChatRuntime({
+      provider: 'llama.cpp',
+      adapterFactory: () => ({ load: async () => undefined, unload: async () => undefined, infer }),
+    })
+    const tutor = runtime.sendMessage('tutor message')
+    while (!releaseTutor) await new Promise((resolve) => setTimeout(resolve, 0))
+
+    await expect(runtime.generateCrosswordClues([{ poolPosition: 0, answer: '学校', fallbackClue: 'school' }]))
+      .resolves.toEqual({ ok: false, text: '' })
+    expect(infer).toHaveBeenCalledTimes(1)
+    releaseTutor()
+    await tutor
+  })
+
+  it('reserves cold loading for tutor inference before a competing crossword request', async () => {
+    let releaseLoad: (() => void) | undefined
+    const loadGate = new Promise<void>((resolve) => {
+      releaseLoad = resolve
+    })
+    const infer = vi.fn(async () => ({
+      text: '次は単語を復習しましょう。',
+      provider: 'llama.cpp',
+      model: 'test-model',
+    }))
+    const runtime = createTutorChatRuntime({
+      provider: 'llama.cpp',
+      adapterFactory: () => ({
+        load: async () => loadGate,
+        unload: async () => undefined,
+        infer,
+      }),
+    })
+
+    const tutor = runtime.sendMessage('cold tutor request')
+    expect(runtime.getStatus().inferenceActive).toBe(true)
+
+    await expect(runtime.generateCrosswordClues([{ poolPosition: 0, answer: '学校', fallbackClue: 'school' }]))
+      .resolves.toEqual({ ok: false, text: '' })
+    expect(runtime.getStatus().inferenceActive).toBe(true)
+    expect(infer).not.toHaveBeenCalled()
+
+    releaseLoad?.()
+    await expect(tutor).resolves.toMatchObject({ ok: true, provider: 'llama.cpp' })
+    expect(infer).toHaveBeenCalledTimes(1)
+    expect(runtime.getStatus().inferenceActive).toBe(false)
+  })
+
+  it('reserves cold loading for crossword inference before a competing tutor request', async () => {
+    let releaseLoad: (() => void) | undefined
+    const loadGate = new Promise<void>((resolve) => {
+      releaseLoad = resolve
+    })
+    const infer = vi.fn(async () => ({
+      text: '[{"poolPosition":0,"clue":"Place to learn"}]',
+      provider: 'llama.cpp',
+      model: 'test-model',
+    }))
+    const runtime = createTutorChatRuntime({
+      provider: 'llama.cpp',
+      adapterFactory: () => ({
+        load: async () => loadGate,
+        unload: async () => undefined,
+        infer,
+      }),
+    })
+
+    const crossword = runtime.generateCrosswordClues([{ poolPosition: 0, answer: '学校', fallbackClue: 'school' }])
+    expect(runtime.getStatus().inferenceActive).toBe(true)
+
+    await expect(runtime.sendMessage('competing tutor request')).rejects.toThrow(/already active/i)
+    expect(runtime.getStatus().inferenceActive).toBe(true)
+    expect(infer).not.toHaveBeenCalled()
+
+    releaseLoad?.()
+    await expect(crossword).resolves.toMatchObject({ ok: true })
+    expect(infer).toHaveBeenCalledTimes(1)
+    expect(runtime.getStatus().inferenceActive).toBe(false)
   })
 
   it('returns scripted fallback response when adapter inference fails', async () => {

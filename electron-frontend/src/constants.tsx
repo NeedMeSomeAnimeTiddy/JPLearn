@@ -332,6 +332,8 @@ export const POINTS_RULE_COPY =
   '1 point per correct answer, with combo bonuses at streaks 3, 6, and 9 (max 4 points).'
 
 export const FEEDBACK_COPY = {
+  REVIEW_SAVING: 'Saving review progress…',
+  REVIEW_SAVE_FAILURE: 'We couldn’t save this review answer, so the review has not advanced. Use Back to return to Daily Games safely.',
   ANSWERED_IN: (ms: number) => `${(ms / 1000).toFixed(2)}s`,
   NEXT_REVIEW_IN: (days: number) =>
     `Next review in ${days <= 0 ? '1 day' : `${days} days`}`,

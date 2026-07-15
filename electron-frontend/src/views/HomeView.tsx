@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowRight,
   BookText,
+  Gamepad2,
   Languages,
   Zap,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ import { ScriptCassetteCarousel } from '../components/ScriptCassetteCarousel'
 import { DailyGoalWidget } from '../components/DailyGoalWidget'
 import { WordOfDayWidget } from '../components/WordOfDayWidget'
 import type { ScriptCassetteItem } from '../components/ScriptCassetteCarousel'
+import { DAILY_GAMES_COPY } from '../features/daily-games/constants'
 
 const READINESS_BADGE: Record<SectionReadiness, { label: string; className: string }> = {
   completed: { label: 'Complete', className: 'badge-completed' },
@@ -45,6 +47,7 @@ interface HomeViewProps {
   onSelectScript: (script: ScriptKey) => void
   onOpenJlptPrep: () => void
   onOpenPassages?: () => void
+  onOpenDailyGames: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
   onStartRecommendation?: (nodeId: string) => void
   onContinuePath?: (sectionId: string) => void
@@ -68,6 +71,7 @@ export function HomeView({
   onSelectScript,
   onOpenJlptPrep,
   onOpenPassages,
+  onOpenDailyGames,
   onJumpToSetup,
   onStartRecommendation,
   onContinuePath,
@@ -244,6 +248,17 @@ export function HomeView({
                   <ArrowRight size={13} strokeWidth={2.2} aria-hidden="true" />
                 </button>
               ) : null}
+
+              <button
+                type="button"
+                className="home-jlpt-button"
+                aria-label={DAILY_GAMES_COPY.title}
+                onClick={onOpenDailyGames}
+              >
+                <Gamepad2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                <span>{DAILY_GAMES_COPY.title}</span>
+                <ArrowRight size={13} strokeWidth={2.2} aria-hidden="true" />
+              </button>
             </div>
           )}
 

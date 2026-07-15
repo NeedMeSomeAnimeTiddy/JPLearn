@@ -33,7 +33,7 @@
   "mcp": {
     "playwright": {
       "type": "local",
-      "command": ["npx", "@playwright/mcp@latest", "--browser", "chromium"],
+      "command": ["npx", "-y", "@playwright/mcp@latest", "--browser", "chromium"],
       "enabled": true
     },
     "exa-search": {
@@ -43,11 +43,6 @@
       "env": {
         "EXA_API_KEY": "{env:EXA_API_KEY}"
       }
-    },
-    "lsp": {
-      "type": "local",
-      "command": ["C:/Users/Robbie/go/bin/mcp-language-server", "--workspace", "C:/Users/Robbie/Documents/Projects/JPLearn", "--lsp", "C:/Users/Robbie/Documents/Projects/JPLearn/.venv/Scripts/pyright-langserver.exe", "--", "--stdio"],
-      "enabled": true
     },
     "context7": {
       "type": "remote",

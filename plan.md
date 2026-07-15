@@ -1,79 +1,165 @@
-# Plan: Passages — Reading Practice for JPLearn ✅ DONE
+# Plan: Restyle Daily Games to Match App CRT/Squared Aesthetic
 
-A **"Passages"** button on the HomeView (next to JLPT Prep) that opens a reading practice view. Content from **curated Aozora Bunko** public-domain short stories (30 texts) bundled as JSON. No external API dependencies — fully self-contained. Replaces the vague "Reading Mode" concept from issue #16.
+## Current vs Target
 
----
+| Aspect | Current Daily Games | Target (HomeView / ScriptHubView) |
+|--------|-------------------|-----------------------------------|
+| View wrapping | Direct in `.app-shell-scroll` | `.view-shell view-${navDirection}` with `:has(.hub-topbar)` negative-margin bleed |
+| Top bar | `.daily-games-header` (back button + Gamepad2 + title) | `.hub-topbar` with catalog code, glitch title, stripe |
+| CRT scanlines | None | `.hub-crt-surface` (repeating-linear-gradient + vignette) |
+| CRT corners | None | 4× `.hub-glitch-corner` |
+| VHS lines | None | `.hub-vhs-line` with color-shift animation |
+| Crystals | None | `.hub-crystal--a/b/c` |
+| Corners | `border-radius: var(--radius-card)` (10px), `var(--radius-control)` (8px), `var(--radius-pill)` (999px) | `border-radius: 0` or `2px` |
+| Buttons | Standard border + focus ring | 3D push-button: `box-shadow: 0 2px 0 var(--accent-ink)`, push-down on :active |
+| Color vars | Scoped `--daily-*` variables mapped to panel/text vars | Direct global variables (`--accent`, `--button-bg-top`, etc.) |
+| Fonts | Inherited | Mono for labels/stats, display font for titles |
+| Entrance | motion `opacity + y` (0.2s) | CSS `viewSlideForward`/`viewSlideBack` keyframe (280ms) |
+| Mode toggle | Rounded pills | Squared `hub-chip-button` style |
+| Streak badge | Rounded pills | Squared `hub-stat` style |
+| Game tiles | Rounded cards, padded | Squared push-button panels |
 
-## Navigation Flow
+## Files to Modify
+
+### 1. `electron-frontend/src/App.tsx`
+- **Wrap DailyGamesHub in a proper view-shell**: Replace the current `{view === 'daily_games' ? ...}` block with a `view-shell` div wrapper containing CRT decorative elements, a `hub-topbar` header, and a `hub-studio` body wrapping the `<DailyGamesHub>` component.
+- **Pass `navDirection` prop**: The wrapper needs `view-${navDirection}` class for slide animation.
+- **Pass `mode` and `setMode` from a local state**: The top bar catalog/subtitle should change based on daily/practice mode.
+
+### 2. `electron-frontend/src/features/daily-games/daily-games.css`
+Major rewrite:
+
+- **Remove all `--daily-*` scoped custom properties** (lines 1-13). Use global `--accent`, `--accent-ink`, `--button-bg-top`, `--button-bg-bottom`, `--panel-bg`, `--panel-bg-alt`, `--panel-border`, `--text-main`, `--text-soft`, `--mono` directly.
+- **Squared borders**: Replace all `border-radius: var(--radius-card)` with `border-radius: 0`. Replace all `border-radius: var(--radius-control)` with `border-radius: 0`. Replace all `border-radius: var(--radius-pill)` with `border-radius: 0`.
+- **3D push buttons**: Add `box-shadow: 0 2px 0 var(--accent-ink)` to `.daily-game-button`, `.daily-games-back`, `.daily-games-retry`, `.daily-games-mode-control`, `.match-pairs-card`. Add hover border-color accent, active translateY(2px) + reduced shadow.
+- **Mode toggle buttons**: Style `.daily-games-mode-control` like `.hub-chip-button` — mono font, uppercase, small size, 3D shadow. Active state: `background: var(--accent-ink)`, `inset 0 2px 4px rgba(0,0,0,0.2)`, `transform: translateY(2px)`.
+- **Streak badge**: Style `.daily-streak-badge` like `.hub-stat` — `border-radius: 0`, mono font, `border: 1px solid var(--accent-ink)`, `box-shadow: 0 1px 0 var(--accent-ink)`.
+- **Game tiles**: Style `.daily-game-tile` like `cassette-panel` — `border-radius: 2px`, `background: linear-gradient(145deg, var(--panel-bg), var(--panel-bg-alt))`, `border: 1px solid var(--panel-border)`, `box-shadow: 0 2px 0 var(--accent-ink), 0 8px 28px -16px rgba(0,0,0,0.68)`. Add vignette `::after`.
+- **Game session wrappers**: Square `.match-pairs-game`, `.word-search-game`, `.crossword-game`, `.typing-blitz-game`, `.daily-game-results` containers — `border-radius: 2px`, panel bg, subtle border.
+- **Header**: `.daily-games-header` is no longer used in the hub (replaced by `hub-topbar`). Keep for session views but square the back button.
+- **Remove `margin: 0 auto; max-width: 72rem; padding: 1.5rem`** from `.daily-games-hub` — the `hub-studio` grid handles layout.
+- **Responsive**: Update breakpoints to maintain the squared aesthetic at mobile widths.
+
+### 3. `electron-frontend/src/features/daily-games/components/GamesHub.tsx`
+- **Remove the `<header className="daily-games-header">`** (back button + Gamepad2 heading). The hub top bar is now provided by the wrapper in App.tsx.
+- **Remove the Motion animation wrapper** — slide animation is handled by `viewSlideForward`/`viewSlideBack`.
+- **Replace `motion.main` with a plain `<div>` or `<section>`** since it sits inside `hub-studio`.
+- **Keep the internal content structure** (mode toggle, summary, streak badge, tile grid) — just styled differently.
+- **Remove `useReducedMotion`/`motion` imports** no longer needed.
+- **Remove the `gamesHubMotion.ts` helper file** if no longer referenced elsewhere.
+- **Update the back button to use `onBack` prop** which triggers `setNavDirection('back'); setView('home')` in App.tsx.
+
+### 4. `electron-frontend/src/features/daily-games/components/DailyGameSession.tsx`
+- The session component keeps its current structure but the back button and game containers pick up the squared styles from CSS changes.
+
+### 5. `electron-frontend/src/features/daily-games/components/DailyStreakBadge.tsx`
+- No structural changes needed — styling changes come from CSS.
+
+### 6. `electron-frontend/src/features/daily-games/components/GameResultsOverlay.tsx`
+- No structural changes needed — styling changes from CSS.
+
+### 7. `electron-frontend/src/features/daily-games/components/gamesHubMotion.ts`
+- **Delete** — animation handled by viewSlide CSS keyframes.
+
+### 8. `electron-frontend/src/App.css`
+- No changes to existing global styles needed. The Daily Games CSS rewrite handles everything scoped to `.daily-games-hub` and `.daily-game-session`.
+
+## App.tsx Hub Wrapper Structure
+
+The wrapper in App.tsx replaces the current `{view === 'daily_games' ? (...)}` block:
+
+```tsx
+{view === 'daily_games' ? (
+  <div className={`view-shell view-${navDirection}`}>
+    <div className="hub-crt-surface" aria-hidden="true" />
+    <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
+    <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
+    <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
+    <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
+    <div className="hub-vhs-line" aria-hidden="true" />
+    <div className="hub-crystal hub-crystal--a" aria-hidden="true" />
+    <div className="hub-crystal hub-crystal--b" aria-hidden="true" />
+    <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
+
+    <header className="hub-topbar">
+      <h1 className="sr-only">Daily Games</h1>
+      <button
+        type="button"
+        className="back-button back-button-icon-only"
+        onClick={() => { setNavDirection('back'); setView('home'); }}
+        aria-label="Back to main menu"
+      >
+        <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+      </button>
+
+      <div className="hub-topbar-center">
+        <span className="hub-topbar-catalog">JPL-DLY-A</span>
+        <strong className="hub-topbar-title">
+          <span className="hub-glitch-text">{DAILY_GAMES_COPY.title}</span>
+        </strong>
+        <span className="hub-topbar-catalog hub-topbar-catalog--sub">
+          {dailyGamesMode === 'practice' ? 'PRACTICE · 練習' : 'DAILY · 毎日'}
+        </span>
+        <span className="hub-topbar-stripe" aria-hidden="true" />
+      </div>
+
+      <span aria-hidden="true" />
+    </header>
+
+    <div className="hub-studio">
+      <Suspense fallback={<div className="daily-games-hub" role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
+        <DailyGamesHub
+          onBack={() => { setNavDirection('back'); setView('home'); }}
+          onReviewMissedWords={startMissedWordReview}
+        />
+      </Suspense>
+    </div>
+  </div>
+) : null}
 ```
-HomeView → [📖 Passages] button (next to JLPT Prep)
-       ↓
-  PassageHubView (list of 30 passages, sorted by difficulty)
-       ↓
-  PassageReaderView (reading with furigana toggle, tap word → DictionaryPopup)
-```
 
----
+**Note:** The mode toggle state needs to be lifted or tracked. Since `useDailyGames` manages `mode` internally, we have two options:
+- A) Lift mode state to App.tsx and pass it down (adds coupling)
+- B) **Keep mode state in the hook but derive the catalog subtitle from the view.** Since the top bar catalog is static text, we don't need live mode tracking in App.tsx. Use a static label like "DAILY GAMES · 毎日".
 
-## Files (11 created, 8 modified)
+**Decision: Option B** — use a static catalog subtitle. The mode is clear from the toggle button's active state in the hub content.
 
-| File | What |
-|------|------|
-| `scripts/build_passages_db.py` | One-time pipeline: downloads 5K Aozora texts, filters to 30 children's stories, generates `漢字（かんじ）` furigana via fugashi, extracts vocabulary, bundles as JSON |
-| `data/external_sources/passages/aozora/passages.json` | 30 curated passages (24,151 words) — Ogawa Mimei children's stories, public domain |
-| `scripts/desktop_bridge.py` | +1 handler: `passages:list` → reads bundled JSON, returns `{"passages": [...]}` |
-| `src/features/passages/types.ts` | `Passage`, `ReaderSettings`, `PassageProgress` types |
-| `src/features/passages/constants.ts` | Difficulty labels, default settings, font size map |
-| `src/features/passages/utils.ts` | Sort by difficulty, furigana toggle helpers |
-| `src/features/passages/index.ts` | Barrel exports |
-| `src/features/passages/usePassages.ts` | Hook: load passages from IPC, reader state, furigana/font settings, progress tracking |
-| `src/features/passages/components/PassageControls.tsx` | Toolbar: furigana toggle (Eye/EyeOff), font size cycler (S/M/L), back button |
-| `src/features/passages/components/PassageReader.tsx` | Reading view: text with inline furigana, every word is a clickable span, scroll tracking |
-| `src/views/PassageHubView.tsx` | Hub + reader internal routing: passage cards with progress badges, loading/error/empty states |
-| `electron/ipc_handlers.cjs` | +1 handler: `passages:list` |
-| `electron/preload.cjs` | +1 binding: `getPassages` |
-| `src/electron.d.ts` | +2 types: `PassageItem`, `PassagesPayload`, +1 method: `getPassages` |
-| `src/App.tsx` | +`passage_hub` to AppView type, render block, escape key, shortcut menu, HomeView callback |
-| `src/views/HomeView.tsx` | +`onOpenPassages` prop, "Passages" button next to JLPT Prep (BookText icon) |
-| `src/App.css` | ~100 lines: passage cards, skeleton, reader controls, word spans, furigana styling, header |
+## Task Breakdown
 
----
+### Batch 1: CSS Rewrite (core)
+1. Rewrite `daily-games.css` — remove `--daily-*` vars, square all corners, add 3D push-button shadows, style mode toggles like `hub-chip-button`, style streak badges like `hub-stat`, style tiles like `cassette-panel` with vignette, square game containers.
+2. Update responsive breakpoints.
 
-## Content Pipeline
-- **Source:** `ronantakizawa/aozora-text-difficulty` HuggingFace dataset (18K+ jReadability-scored Aozora texts)
-- **Filter:** NDC K (children's literature), 新字新仮名 (modern orthography), 100-4000 chars
-- **Result:** 30 passages, all Beginner/Elementary, mostly Ogawa Mimei, 24,151 total words
-- **Furigana:** `漢字（かんじ）` inline paren notation via fugashi, whitespace preserved
-- **One-time script** — not a runtime dependency
+### Batch 2: App.tsx Wrapper
+3. Rewrite the `view === 'daily_games'` block with view-shell, CRT decorations, hub-topbar, and hub-studio.
+4. Remove `motion`/`useReducedMotion` from GamesHub imports if still present.
+5. Remove or simplify `LazyDailyGamesHub` fallback (keep `Suspense` + `ErrorBoundary` but update the fallback class).
 
----
+### Batch 3: Component Cleanup
+6. Remove `<header>` from GamesHub.tsx.
+7. Remove motion animation wrapper from GamesHub.tsx.
+8. Delete `gamesHubMotion.ts`.
+9. Verify GamesHub back button uses `onBack` prop correctly.
+
+### Batch 4: Game Session Views
+10. Verify DailyGameSession and sub-game components pick up squared styles properly.
+11. Verify GameResultsOverlay looks good with squared styling.
+
+### Batch 5: Validation
+12. Run `npm run lint` → must be 0 warnings.
+13. Run `npm run build` → must pass.
+14. Run `npm run test:ui` → all tests pass.
+15. Run `npm run test:a11y` → no new violations.
+16. Visual check: contrast, focus rings, spacing.
 
 ## Design Decisions
+
 | Decision | Rationale |
 |----------|-----------|
-| Standalone button, not a ScriptKey | ScriptKey requires ~20 file changes. A button (like JLPT Prep) is ~5. |
-| New top-level view, not an overlay | Reading is a primary activity — deserves full navigation state + history. |
-| Aozora only for v1 | NHK Easy is broken (JWT API, JS SPA). Aozora is public domain, bundled offline. |
-| No comprehension questions | Focus on reading experience. Quiz logic adds complexity. |
-| No audio | Aozora texts have no narration. NHK audio is v2. |
-| Furigana as inline parens | `漢字（かんじ）` — simple regex toggle, readable plain text, no HTML needed. |
-| Vocabulary: word + reading only | Definitions require a dictionary API. Deferred. |
-| No word mining | User rejected. Tap-to-lookup via DictionaryPopup only. |
-
----
-
-## Dependencies — Zero New
-| Layer | What | Notes |
-|-------|------|-------|
-| Python | fugashi, unidic-lite | Already in requirements.txt, used only in the offline build pipeline |
-| Node | React 19, lucide-react, motion, etc. | All already in package.json |
-
----
-
-## Deferred to v2
-- Comprehension questions (post-passage quizzes)
-- Audio narration (TTS-generated via existing voice engine)
-- Vocabulary English definitions
-- NHK News Web Easy (platform migrated, all scrapers broken — needs reverse-engineering)
-- User-submitted passages (import arbitrary text)
-- Feature unlock gating behind `reading_mode` progression milestone
+| Static catalog subtitle ("DAILY GAMES · 毎日") | Avoids lifting mode state to App.tsx; mode is clear from the toggle in content |
+| No crystals/particles/sweep inside hub-studio for Daily Games | The game tile grid is the visual content — overlay particles would interfere with the grid layout. The view-shell-level CRT effects (scanlines, corners, VHS) provide enough atmospheric depth. |
+| Keep cursor-style focus rings from existing CSS | Hub elements use `outline: 0.25rem solid color-mix(...)` for focus — keep this consistent |
+| `border-radius: 2px` for game containers (not `0`) | Matches `cassette-panel`/`dictionary-panel` — subtle chamfer that still reads as "squared" |
+| `border-radius: 0` for buttons, badges, mode toggles | Matches `hub-chip-button`/`hub-stat`/`back-button` aesthetic |
+| Keep `daily-game-tile` as `<article>` | Semantic HTML, just restyled |
+| Delete `gamesHubMotion.ts` | No longer needed since viewSlide CSS handles entrance animation |

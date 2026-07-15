@@ -27,6 +27,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_offline_dictionary_sqlite as sqlite_builder  # noqa: E402
 
 API_URL = "https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest"
+PITCH_ACCENT_URL = (
+    "https://raw.githubusercontent.com/jkindrix/japanese-language-data/"
+    "v0.7.2/data/enrichment/pitch-accent.json"
+)
+PITCH_ACCENT_FILENAME = "pitch-accent.json"
+PITCH_ACCENT_READY_FILENAME = ".pitch-accent-ready"
 
 # (key, regex matching the release asset filename). Order also drives the
 # printed PHASE numbers, so keep the SQLite build step counted separately.
@@ -38,7 +44,7 @@ ASSET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("radkfile", re.compile(r"^radkfile-[\d.]+(?:\+\d+)?\.json\.zip$")),
 ]
 
-TOTAL_PHASES = len(ASSET_PATTERNS) + 1  # + 1 SQLite build phase
+TOTAL_PHASES = len(ASSET_PATTERNS) + 2  # + pitch accent download and SQLite build
 
 
 def resolve_target_dir() -> Path:
@@ -98,6 +104,23 @@ def download_and_extract_zip(url: str, target_dir: Path) -> list[str]:
     return extracted
 
 
+def download_file(url: str, target_path: Path) -> None:
+    req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
+    temporary_path = target_path.with_suffix(f"{target_path.suffix}.part")
+    with urllib.request.urlopen(req) as response, temporary_path.open("wb") as output:
+        total = int(response.headers.get("Content-Length") or 0)
+        done = 0
+        while True:
+            chunk = response.read(1024 * 256)
+            if not chunk:
+                break
+            output.write(chunk)
+            done += len(chunk)
+            report(done, total)
+    sys.stdout.write("\n")
+    temporary_path.replace(target_path)
+
+
 def main() -> int:
     target_dir = resolve_target_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -128,6 +151,13 @@ def main() -> int:
         else:
             print(f"  WARNING: no .json file found inside {key} archive", file=sys.stderr)
 
+    pitch_phase = len(ASSET_PATTERNS) + 1
+    print(f"PHASE {pitch_phase}/{TOTAL_PHASES}: pitch-accent")
+    pitch_accent_path = target_dir / PITCH_ACCENT_FILENAME
+    download_file(PITCH_ACCENT_URL, pitch_accent_path)
+    downloaded_files["pitch-accent"] = pitch_accent_path.name
+    print(f"  Saved: {pitch_accent_path.name}")
+
     print(f"PHASE {TOTAL_PHASES}/{TOTAL_PHASES}: build-sqlite-index")
     input_name = downloaded_files.get("jmdict-eng") or downloaded_files.get("jmdict-eng-common")
     if not input_name:
@@ -135,7 +165,27 @@ def main() -> int:
         return 1
 
     output_path = target_dir / "jmdict_lookup.sqlite"
-    stats = sqlite_builder.build_lookup_db(input_path=target_dir / input_name, output_path=output_path)
+    ready_path = target_dir / PITCH_ACCENT_READY_FILENAME
+    ready_path.unlink(missing_ok=True)
+    stats = sqlite_builder.build_lookup_db(
+        input_path=target_dir / input_name,
+        output_path=output_path,
+        pitch_accent_path=pitch_accent_path,
+    )
+    if stats["pitch_accent_entries"] <= 0:
+        raise RuntimeError("Pitch accent import produced no usable entries")
+    ready_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 3,
+                "pitch_accent_source": PITCH_ACCENT_URL,
+                "pitch_accent_entries": stats["pitch_accent_entries"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     print(
         json.dumps(
             {

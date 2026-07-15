@@ -19,12 +19,20 @@ export interface StudyStreak {
   freezes_available: number
 }
 
+export interface PitchAccent {
+  reading: string
+  pitch_positions: number[]
+  mora_count: number
+  source: string
+}
+
 export interface DictionaryCardSummary {
   character: string
   reading: string
   primary_gloss: string
   glosses: string[]
   source: string
+  pitch_accents: PitchAccent[]
 }
 
 export interface GameCard {
@@ -119,4 +127,70 @@ export interface TutorReactionPayload {
   headline: string
   body: string
   cta: string
+}
+
+export interface DailyGamesWordPayload {
+  deck_slug: string
+  deck_name: string
+  card_id: number
+  character: string
+  romaji: string
+  meaning: string
+  source: string
+}
+
+export interface DailyGamesPoolPayload {
+  day: string
+  algorithm_version: number
+  words: DailyGamesWordPayload[]
+  game_seeds: Record<string, number>
+}
+
+export interface DailyGamesStreakPayload {
+  last_completed_day: string | null
+  current_streak_days: number
+  best_streak_days: number
+  freezes_available: number
+  freeze_month: string | null
+}
+
+export interface DailyGamesAttemptOutcomePayload {
+  pool_position: number
+  outcome: string
+}
+
+export interface DailyGamesAttemptPayload {
+  attempt_id: number
+  pool_day: string
+  game_type: string
+  mode: string
+  score: number
+  completed: boolean
+  duration_seconds: number | null
+  completed_at_utc: string
+  outcomes: DailyGamesAttemptOutcomePayload[]
+}
+
+export interface DailyGamesMissedWordPayload {
+  word: DailyGamesWordPayload
+  miss_count: number
+}
+
+export interface DailyGamesProgressPayload {
+  attempt_count: number
+  completed_daily_game_types: string[]
+  missed_words: DailyGamesMissedWordPayload[]
+}
+
+export interface DailyGamesStatePayload {
+  pool: DailyGamesPoolPayload
+  streak: DailyGamesStreakPayload
+  attempts: DailyGamesAttemptPayload[]
+  progress: DailyGamesProgressPayload
+}
+
+export interface DailyGamesPracticeSeedPayload {
+  pool_day: string
+  game_type: string
+  seed: number
 }

@@ -50,6 +50,16 @@ def _ts_type(node: ast.expr) -> str:
         if isinstance(outer, ast.Name):
             if outer.id == "list":
                 return f"{_ts_type(inner)}[]"
+            if outer.id == "tuple":
+                if isinstance(inner, ast.Tuple):
+                    if (
+                        len(inner.elts) == 2
+                        and isinstance(inner.elts[1], ast.Constant)
+                        and inner.elts[1].value is Ellipsis
+                    ):
+                        return f"{_ts_type(inner.elts[0])}[]"
+                    return f"[{', '.join(_ts_type(element) for element in inner.elts)}]"
+                return f"{_ts_type(inner)}[]"
             if outer.id == "dict":
                 # dict[K, V] — inner is a Tuple of two elements
                 if isinstance(inner, ast.Tuple) and len(inner.elts) == 2:

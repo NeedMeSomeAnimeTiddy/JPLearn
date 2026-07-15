@@ -18,9 +18,10 @@ import csv
 import tempfile
 import subprocess
 import base64
+import secrets
 from time import perf_counter
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 import unicodedata
 from typing import Callable, Mapping
@@ -130,6 +131,12 @@ from data.grammar_minigame_generator import (  # noqa: E402
     generate_vibe_check_data,
 )
 from data.settings_repository import get_setting, set_setting  # noqa: E402
+from data.daily_games_repository import (  # noqa: E402
+    DailyGameAttempt,
+    DailyCrosswordClue,
+    DailyGameWordOutcome,
+    DailyGamesRepository,
+)
 from data.fsrs_optimization import (  # noqa: E402
     load_saved_weights as load_fsrs_weights,
     run_optimization as run_fsrs_optimization,
@@ -138,6 +145,15 @@ from data.fsrs_optimization import (  # noqa: E402
 from domain.readiness import (  # noqa: E402
     LEARNING_PATHS,
     build_learning_path_status,
+)
+from domain.daily_games import (  # noqa: E402
+    DailyGameWord,
+    DailyGameWordCandidate,
+    DailyGamesStreakState,
+    DailyWordPool,
+    apply_daily_game_completion,
+    daily_game_seed,
+    select_daily_word_pool,
 )
 from domain.jlpt_readiness import (  # noqa: E402
     JLPT_LEVEL_SPECS,
@@ -424,13 +440,72 @@ def _dictionary_has_supported_schema(conn: sqlite3.Connection) -> bool:
     return "dictionary_entries" in table_names and "dictionary_fts" in table_names
 
 
+def _dictionary_has_pitch_accent_data(conn: sqlite3.Connection) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'dictionary_pitch_accents'"
+    ).fetchone()
+    return row is not None
+
+
+def _lookup_pitch_accents(
+    conn: sqlite3.Connection | None,
+    *,
+    word: str,
+    reading: str,
+    available: bool | None = None,
+) -> list[PitchAccent]:
+    if conn is None or available is False:
+        return []
+    if available is None and not _dictionary_has_pitch_accent_data(conn):
+        return []
+
+    row = conn.execute(
+        """
+        SELECT reading, pitch_positions, mora_count, source
+        FROM dictionary_pitch_accents
+        WHERE word = ? AND reading = ?
+        """,
+        (_normalize_dictionary_query(word), _normalize_dictionary_query(reading)),
+    ).fetchone()
+    if row is None:
+        return []
+
+    try:
+        raw_positions = json.loads(str(row[1]))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(raw_positions, list):
+        return []
+    pitch_positions = [
+        position
+        for position in raw_positions
+        if isinstance(position, int) and not isinstance(position, bool) and position >= 0
+    ]
+    mora_count = int(row[2])
+    if not pitch_positions or mora_count <= 0:
+        return []
+
+    return [
+        PitchAccent(
+            reading=str(row[0]),
+            pitch_positions=pitch_positions,
+            mora_count=mora_count,
+            source=str(row[3]),
+        )
+    ]
+
+
 def _search_dictionary_rows(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
     if _DICTIONARY_JAPANESE_RE.search(normalized_query):
         return _search_dictionary_japanese(conn, normalized_query)
     return _search_dictionary_english(conn, normalized_query)
 
 
-def _dictionary_results_from_rows(rows: list[tuple]) -> list[dict[str, object]]:
+def _dictionary_results_from_rows(
+    rows: list[tuple],
+    conn: sqlite3.Connection,
+) -> list[dict[str, object]]:
+    pitch_accent_available = _dictionary_has_pitch_accent_data(conn)
     return [
         {
             "id": int(row[0]),
@@ -439,6 +514,15 @@ def _dictionary_results_from_rows(rows: list[tuple]) -> list[dict[str, object]]:
             "meaning": row[3],
             "tags": ["offline_dictionary"],
             "example_sentence": None,
+            "pitch_accents": [
+                asdict(accent)
+                for accent in _lookup_pitch_accents(
+                    conn,
+                    word=str(row[1]),
+                    reading=str(row[2]),
+                    available=pitch_accent_available,
+                )
+            ],
         }
         for row in rows
     ]
@@ -479,6 +563,7 @@ def _lookup_card_dictionary_summary(
     character: str,
     meaning: str,
     tags: list[str],
+    pitch_accent_available: bool | None = None,
 ) -> DictionaryCardSummary | None:
     if conn is None or not _should_enrich_card_from_dictionary(tags):
         return None
@@ -502,6 +587,12 @@ def _lookup_card_dictionary_summary(
         primary_gloss=glosses[0],
         glosses=glosses,
         source="offline_dictionary",
+        pitch_accents=_lookup_pitch_accents(
+            conn,
+            word=str(match[1]),
+            reading=str(match[2]),
+            available=pitch_accent_available,
+        ),
     )
 
 
@@ -671,10 +762,10 @@ def build_dictionary_search_payload(query: str) -> dict[str, object]:
             raise FileNotFoundError("Offline dictionary index is outdated; please re-download it")
 
         fetched_rows = _search_dictionary_rows(conn, normalized_query)
+        results = _dictionary_results_from_rows(fetched_rows, conn)
     finally:
         conn.close()
 
-    results = _dictionary_results_from_rows(fetched_rows)
     return {
         "query": normalized_query,
         "source": "offline_dictionary",
@@ -2615,12 +2706,21 @@ class StudyStreak:
 
 
 @dataclass(frozen=True)
+class PitchAccent:
+    reading: str
+    pitch_positions: list[int]
+    mora_count: int
+    source: str
+
+
+@dataclass(frozen=True)
 class DictionaryCardSummary:
     character: str
     reading: str
     primary_gloss: str
     glosses: list[str]
     source: str
+    pitch_accents: list[PitchAccent]
 
 @dataclass(frozen=True)
 class GameCard:
@@ -2724,6 +2824,432 @@ class TutorReactionPayload:
     headline: str
     body: str
     cta: str
+
+
+@dataclass(frozen=True)
+class DailyGamesWordPayload:
+    deck_slug: str
+    deck_name: str
+    card_id: int
+    character: str
+    romaji: str
+    meaning: str
+    source: str
+
+
+@dataclass(frozen=True)
+class DailyGamesPoolPayload:
+    day: str
+    algorithm_version: int
+    words: list[DailyGamesWordPayload]
+    game_seeds: dict[str, int]
+
+
+@dataclass(frozen=True)
+class DailyGamesStreakPayload:
+    last_completed_day: str | None
+    current_streak_days: int
+    best_streak_days: int
+    freezes_available: int
+    freeze_month: str | None
+
+
+@dataclass(frozen=True)
+class DailyGamesAttemptOutcomePayload:
+    pool_position: int
+    outcome: str
+
+
+@dataclass(frozen=True)
+class DailyGamesAttemptPayload:
+    attempt_id: int
+    pool_day: str
+    game_type: str
+    mode: str
+    score: int
+    completed: bool
+    duration_seconds: int | None
+    completed_at_utc: str
+    outcomes: list[DailyGamesAttemptOutcomePayload]
+
+
+@dataclass(frozen=True)
+class DailyGamesMissedWordPayload:
+    word: DailyGamesWordPayload
+    miss_count: int
+
+
+@dataclass(frozen=True)
+class DailyGamesProgressPayload:
+    attempt_count: int
+    completed_daily_game_types: list[str]
+    missed_words: list[DailyGamesMissedWordPayload]
+
+
+@dataclass(frozen=True)
+class DailyGamesStatePayload:
+    pool: DailyGamesPoolPayload
+    streak: DailyGamesStreakPayload
+    attempts: list[DailyGamesAttemptPayload]
+    progress: DailyGamesProgressPayload
+
+
+@dataclass(frozen=True)
+class DailyGamesPracticeSeedPayload:
+    pool_day: str
+    game_type: str
+    seed: int
+
+
+_DAILY_GAME_TYPES = ("crossword", "word_search", "match_pairs", "typing_blitz")
+_DAILY_GAME_MODES = ("daily", "practice")
+
+
+def _parse_daily_games_day(value: str) -> date:
+    """Parse the strict ISO local day used to identify a Daily Games pool."""
+    if not isinstance(value, str) or re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) is None:
+        raise ValueError("pool_day must use YYYY-MM-DD format")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("pool_day must be a valid calendar date") from exc
+
+
+def _require_daily_game_type(value: str) -> str:
+    if value not in _DAILY_GAME_TYPES:
+        raise ValueError("game_type must be one of: crossword, word_search, match_pairs, typing_blitz")
+    return value
+
+
+def _require_daily_game_mode(value: str) -> str:
+    if value not in _DAILY_GAME_MODES:
+        raise ValueError("mode must be daily or practice")
+    return value
+
+
+def _require_daily_games_nonnegative_int(value: object, field: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{field} must be a non-negative integer")
+    return value
+
+
+def _daily_games_word_payload(word: DailyGameWord) -> DailyGamesWordPayload:
+    return DailyGamesWordPayload(
+        deck_slug=word.deck_slug,
+        deck_name=word.deck_name,
+        card_id=word.card_id,
+        character=word.character,
+        romaji=word.romaji,
+        meaning=word.meaning,
+        source=word.source,
+    )
+
+
+def _daily_games_pool_payload(pool: DailyWordPool) -> DailyGamesPoolPayload:
+    return DailyGamesPoolPayload(
+        day=pool.day.isoformat(),
+        algorithm_version=pool.algorithm_version,
+        words=[_daily_games_word_payload(word) for word in pool.words],
+        game_seeds={
+            game_type: daily_game_seed(pool, game_type)
+            for game_type in _DAILY_GAME_TYPES
+        },
+    )
+
+
+def _daily_games_attempt_payload(attempt: DailyGameAttempt) -> DailyGamesAttemptPayload:
+    if attempt.attempt_id is None:
+        raise RuntimeError("Persisted Daily Games attempt has no id")
+    return DailyGamesAttemptPayload(
+        attempt_id=attempt.attempt_id,
+        pool_day=attempt.pool_day.isoformat(),
+        game_type=attempt.game_type,
+        mode=attempt.mode,
+        score=attempt.score,
+        completed=attempt.completed,
+        duration_seconds=attempt.duration_seconds,
+        completed_at_utc=attempt.completed_at_utc.isoformat(),
+        outcomes=[
+            DailyGamesAttemptOutcomePayload(
+                pool_position=outcome.pool_position,
+                outcome=outcome.outcome,
+            )
+            for outcome in attempt.outcomes
+        ],
+    )
+
+
+def _daily_games_candidates(repository: DailyGamesRepository) -> list[DailyGameWordCandidate]:
+    """Join static vocabulary cards with persisted metadata for domain selection."""
+    candidates: list[DailyGameWordCandidate] = []
+    for deck_slug, factory in ALL_DECKS.items():
+        if not deck_slug.startswith("vocab_"):
+            continue
+        deck = factory()
+        metadata_by_card_id = repository.load_persisted_review_metadata(
+            deck.name,
+            [card.id for card in deck.cards],
+        )
+        for card in deck.cards:
+            metadata = metadata_by_card_id.get(card.id)
+            candidates.append(
+                DailyGameWordCandidate(
+                    deck_slug=deck_slug,
+                    deck_name=deck.name,
+                    card_id=card.id,
+                    character=card.character,
+                    romaji=card.romaji,
+                    meaning=card.meaning,
+                    has_persisted_state=metadata is not None,
+                    repetitions=metadata.repetitions if metadata is not None else 0,
+                    next_review=metadata.next_review if metadata is not None else None,
+                    last_review=metadata.latest_review_date if metadata is not None else None,
+                )
+            )
+    return candidates
+
+
+def _ensure_daily_games_pool(pool_day: date, repository: DailyGamesRepository) -> DailyWordPool:
+    saved_pool = repository.load_word_pool(pool_day)
+    if saved_pool is not None:
+        return saved_pool
+    selected_pool = select_daily_word_pool(_daily_games_candidates(repository), pool_day)
+    return repository.save_word_pool(selected_pool)
+
+
+def _daily_games_state_payload(
+    pool_day: date,
+    repository: DailyGamesRepository,
+) -> DailyGamesStatePayload:
+    pool = _ensure_daily_games_pool(pool_day, repository)
+    attempts = repository.load_attempts(pool_day)
+    streak = _reconcile_daily_games_streak(repository)
+    words_by_position = dict(enumerate(pool.words))
+    miss_counts: dict[int, int] = {}
+    for attempt in sorted(
+        attempts,
+        key=lambda saved_attempt: (
+            saved_attempt.completed_at_utc,
+            saved_attempt.attempt_id if saved_attempt.attempt_id is not None else -1,
+        ),
+    ):
+        for outcome in attempt.outcomes:
+            if outcome.outcome == "incorrect":
+                miss_counts[outcome.pool_position] = miss_counts.get(outcome.pool_position, 0) + 1
+            else:
+                miss_counts.pop(outcome.pool_position, None)
+
+    missed_words = [
+        DailyGamesMissedWordPayload(
+            word=_daily_games_word_payload(words_by_position[position]),
+            miss_count=miss_counts[position],
+        )
+        for position in sorted(miss_counts)
+        if position in words_by_position
+    ]
+    completed_daily_game_types = [
+        game_type
+        for game_type in _DAILY_GAME_TYPES
+        if any(
+            attempt.game_type == game_type and attempt.mode == "daily" and attempt.completed
+            for attempt in attempts
+        )
+    ]
+    return DailyGamesStatePayload(
+        pool=_daily_games_pool_payload(pool),
+        streak=DailyGamesStreakPayload(
+            last_completed_day=(
+                streak.last_completed_day.isoformat() if streak.last_completed_day else None
+            ),
+            current_streak_days=streak.current_streak_days,
+            best_streak_days=streak.best_streak_days,
+            freezes_available=streak.freezes_available,
+            freeze_month=streak.freeze_month.isoformat() if streak.freeze_month else None,
+        ),
+        attempts=[_daily_games_attempt_payload(attempt) for attempt in attempts],
+        progress=DailyGamesProgressPayload(
+            attempt_count=len(attempts),
+            completed_daily_game_types=completed_daily_game_types,
+            missed_words=missed_words,
+        ),
+    )
+
+
+def _reconcile_daily_games_streak(
+    repository: DailyGamesRepository,
+) -> DailyGamesStreakState:
+    """Idempotently rebuild streak state from persisted completed daily days."""
+    saved_streak = repository.load_streak_state()
+    completed_days = sorted(
+        {
+            attempt.pool_day
+            for attempt in repository.load_attempts()
+            if attempt.mode == "daily" and attempt.completed
+        }
+    )
+    reconciled = DailyGamesStreakState()
+    for completed_day in completed_days:
+        reconciled = apply_daily_game_completion(reconciled, completed_day)
+    if reconciled != saved_streak:
+        repository.save_streak_state(reconciled)
+    return reconciled
+
+
+def build_daily_games_state(pool_day_raw: str) -> dict[str, object]:
+    """Get or create the immutable pool and current Daily Games-only progress."""
+    pool_day = _parse_daily_games_day(pool_day_raw)
+    return asdict(_daily_games_state_payload(pool_day, DailyGamesRepository()))
+
+
+def build_daily_games_practice_seed(
+    pool_day_raw: str,
+    game_type: str,
+) -> dict[str, object]:
+    """Ensure the daily pool exists and return a fresh non-negative practice seed."""
+    pool_day = _parse_daily_games_day(pool_day_raw)
+    validated_game_type = _require_daily_game_type(game_type)
+    repository = DailyGamesRepository()
+    _ensure_daily_games_pool(pool_day, repository)
+    return asdict(
+        DailyGamesPracticeSeedPayload(
+            pool_day=pool_day.isoformat(),
+            game_type=validated_game_type,
+            seed=secrets.randbelow(1 << 63),
+        )
+    )
+
+
+def get_daily_games_crossword_clues(pool_day_raw: str) -> dict[str, object]:
+    """Return accepted stable crossword clues for one persisted Daily Games pool."""
+    pool_day = _parse_daily_games_day(pool_day_raw)
+    clues = DailyGamesRepository().load_crossword_clues(pool_day)
+    return {
+        "day": pool_day.isoformat(),
+        "clues": [
+            {"pool_position": clue.pool_position, "clue": clue.clue}
+            for clue in clues
+        ],
+    }
+
+
+def save_daily_games_crossword_clues(
+    pool_day_raw: str,
+    clues: tuple[DailyCrosswordClue, ...],
+) -> dict[str, object]:
+    """Save accepted crossword clues without changing the pool or SRS data."""
+    pool_day = _parse_daily_games_day(pool_day_raw)
+    saved_clues = DailyGamesRepository().save_crossword_clues(pool_day, clues)
+    return {
+        "day": pool_day.isoformat(),
+        "clues": [
+            {"pool_position": clue.pool_position, "clue": clue.clue}
+            for clue in saved_clues
+        ],
+    }
+
+
+def record_daily_games_attempt(
+    pool_day_raw: str,
+    game_type: str,
+    mode: str,
+    score: int,
+    completed: bool,
+    duration_seconds: int | None,
+    outcomes: tuple[DailyGameWordOutcome, ...],
+) -> dict[str, object]:
+    """Persist one Daily Games attempt without touching review, SRS, or XP data."""
+    pool_day = _parse_daily_games_day(pool_day_raw)
+    validated_game_type = _require_daily_game_type(game_type)
+    validated_mode = _require_daily_game_mode(mode)
+    _require_daily_games_nonnegative_int(score, "score")
+    if not isinstance(completed, bool):
+        raise ValueError("completed must be a boolean")
+    if duration_seconds is not None:
+        _require_daily_games_nonnegative_int(duration_seconds, "duration_seconds")
+    if not isinstance(outcomes, tuple) or not outcomes:
+        raise ValueError("outcomes must be a non-empty tuple")
+    outcome_positions: set[int] = set()
+    for outcome in outcomes:
+        if not isinstance(outcome, DailyGameWordOutcome):
+            raise ValueError("outcomes must contain DailyGameWordOutcome records")
+        _require_daily_games_nonnegative_int(outcome.pool_position, "outcome.pool_position")
+        if not isinstance(outcome.outcome, str) or outcome.outcome not in {
+            "correct",
+            "incorrect",
+        }:
+            raise ValueError("outcome.outcome must be correct or incorrect")
+        if outcome.pool_position in outcome_positions:
+            raise ValueError("outcomes must not repeat a pool position")
+        outcome_positions.add(outcome.pool_position)
+
+    repository = DailyGamesRepository()
+    _ensure_daily_games_pool(pool_day, repository)
+    repository.save_attempt_result(
+        DailyGameAttempt(
+            pool_day=pool_day,
+            game_type=validated_game_type,
+            mode=validated_mode,
+            score=score,
+            completed=completed,
+            duration_seconds=duration_seconds,
+            completed_at_utc=datetime.now(timezone.utc),
+            outcomes=outcomes,
+        )
+    )
+    return asdict(_daily_games_state_payload(pool_day, repository))
+
+
+def _parse_daily_games_outcomes_json(raw: str) -> tuple[DailyGameWordOutcome, ...]:
+    try:
+        decoded = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError("outcomes_json must be valid JSON") from exc
+    if not isinstance(decoded, list) or not decoded:
+        raise ValueError("outcomes_json must decode to a non-empty array")
+
+    outcomes: list[DailyGameWordOutcome] = []
+    for index, item in enumerate(decoded):
+        if not isinstance(item, dict) or set(item) != {"pool_position", "outcome"}:
+            raise ValueError(
+                f"outcomes_json entry {index} must contain only pool_position and outcome"
+            )
+        pool_position = _require_daily_games_nonnegative_int(
+            item["pool_position"],
+            f"outcomes_json entry {index}.pool_position",
+        )
+        outcome = item["outcome"]
+        if not isinstance(outcome, str) or outcome not in {"correct", "incorrect"}:
+            raise ValueError(
+                f"outcomes_json entry {index}.outcome must be correct or incorrect"
+            )
+        outcomes.append(DailyGameWordOutcome(pool_position=pool_position, outcome=outcome))
+    return tuple(outcomes)
+
+
+def _parse_daily_games_crossword_clues_json(raw: str) -> tuple[DailyCrosswordClue, ...]:
+    """Parse the strict IPC wire shape for accepted crossword clues."""
+    try:
+        decoded = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError("clues_json must be valid JSON") from exc
+    if not isinstance(decoded, list) or not decoded:
+        raise ValueError("clues_json must decode to a non-empty array")
+
+    clues: list[DailyCrosswordClue] = []
+    for index, item in enumerate(decoded):
+        if not isinstance(item, dict) or set(item) != {"pool_position", "clue"}:
+            raise ValueError(
+                f"clues_json entry {index} must contain only pool_position and clue"
+            )
+        pool_position = _require_daily_games_nonnegative_int(
+            item["pool_position"],
+            f"clues_json entry {index}.pool_position",
+        )
+        clue = item["clue"]
+        if not isinstance(clue, str):
+            raise ValueError(f"clues_json entry {index}.clue must be a string")
+        clues.append(DailyCrosswordClue(pool_position=pool_position, clue=clue))
+    return tuple(clues)
 
 
 HEAVY_DECK_ENRICHMENT_CARD_THRESHOLD = 800
@@ -2904,12 +3430,14 @@ def build_deck_cards(slug: str) -> dict[str, object]:
     )
     id_to_index = {card_id: index for index, card_id in enumerate(card_ids)}
     dictionary_conn: sqlite3.Connection | None = None
+    pitch_accent_available = False
     if not use_lightweight_enrichment:
         db_path = _dictionary_db_path()
         if db_path is not None:
             candidate_conn = sqlite3.connect(db_path)
             if _dictionary_has_supported_schema(candidate_conn):
                 dictionary_conn = candidate_conn
+                pitch_accent_available = _dictionary_has_pitch_accent_data(candidate_conn)
             else:
                 candidate_conn.close()
 
@@ -2930,6 +3458,7 @@ def build_deck_cards(slug: str) -> dict[str, object]:
                         character=card.character,
                         meaning=card.meaning,
                         tags=card.tags,
+                        pitch_accent_available=pitch_accent_available,
                     )
                 ),
                 is_leech=card.id in active_leech_ids,
@@ -3742,12 +4271,17 @@ def build_study_queue_payload(slug: str) -> dict[str, object]:
     due_card_ids = {card_id for card_id, state in states.items() if state.is_due()}
     new_card_ids = {card_id for card_id, state in states.items() if state.repetitions <= 0}
     leech_card_ids = load_active_leech_card_ids(deck.name)
+    game_miss_card_ids = DailyGamesRepository().load_active_game_miss_card_ids(
+        deck.name,
+        date.today(),
+    )
 
     queue_card_ids, queue_buckets = build_study_queue(
         card_ids=card_ids,
         due_card_ids=due_card_ids,
         leech_card_ids=leech_card_ids,
         new_card_ids=new_card_ids,
+        game_miss_card_ids=game_miss_card_ids,
     )
     id_to_index = {card_id: index for index, card_id in enumerate(card_ids)}
     queue_indices = [id_to_index[card_id] for card_id in queue_card_ids if card_id in id_to_index]
@@ -4191,6 +4725,71 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         except Exception as exc:
             return 2, {"error": str(exc)}
 
+    if command == "daily-games-state":
+        if len(argv) != 2:
+            return 2, {"error": "Usage: daily-games-state <YYYY-MM-DD>"}
+        try:
+            return 0, build_daily_games_state(argv[1])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "daily-games-practice-seed":
+        if len(argv) != 3:
+            return 2, {
+                "error": "Usage: daily-games-practice-seed <YYYY-MM-DD> <game_type>"
+            }
+        try:
+            return 0, build_daily_games_practice_seed(argv[1], argv[2])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "daily-games-crossword-clues":
+        if len(argv) != 2:
+            return 2, {"error": "Usage: daily-games-crossword-clues <YYYY-MM-DD>"}
+        try:
+            return 0, get_daily_games_crossword_clues(argv[1])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "daily-games-save-crossword-clues":
+        if len(argv) != 3:
+            return 2, {
+                "error": (
+                    "Usage: daily-games-save-crossword-clues <YYYY-MM-DD> <clues_json>"
+                )
+            }
+        try:
+            clues = _parse_daily_games_crossword_clues_json(argv[2])
+            return 0, save_daily_games_crossword_clues(argv[1], clues)
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "daily-games-record-attempt":
+        if len(argv) != 8:
+            return 2, {
+                "error": (
+                    "Usage: daily-games-record-attempt <YYYY-MM-DD> <game_type> "
+                    "<mode> <score> <completed_flag> <duration_seconds_or_empty> "
+                    "<outcomes_json>"
+                )
+            }
+        try:
+            score = int(argv[4])
+            completed = _parse_bool_flag(argv[5])
+            duration_seconds = int(argv[6]) if argv[6] else None
+            outcomes = _parse_daily_games_outcomes_json(argv[7])
+            return 0, record_daily_games_attempt(
+                argv[1],
+                argv[2],
+                argv[3],
+                score,
+                completed,
+                duration_seconds,
+                outcomes,
+            )
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
     if command == "word-of-the-day":
         try:
             return 0, build_word_of_the_day()
@@ -4619,6 +5218,9 @@ def _run_server() -> int:
             if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
                 raise ValueError("Invalid worker request args")
             code, payload = _run_command(args)
+        except sqlite3.DatabaseError as exc:
+            code = 2
+            payload = {"error": f"Database unavailable: {exc}"}
         except Exception as exc:  # pragma: no cover - defensive worker envelope.
             code = 2
             payload = {"error": str(exc)}
@@ -4640,7 +5242,10 @@ def main() -> int:
     if args and args[0] == "--server":
         return _run_server()
 
-    code, payload = _run_command(args)
+    try:
+        code, payload = _run_command(args)
+    except sqlite3.DatabaseError as exc:
+        code, payload = 2, {"error": f"Database unavailable: {exc}"}
     print(json.dumps(payload, ensure_ascii=False))
     return code
 

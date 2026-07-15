@@ -20,17 +20,21 @@ def build_study_queue(
     due_card_ids: set[int],
     leech_card_ids: set[int],
     new_card_ids: set[int],
+    game_miss_card_ids: set[int] | None = None,
 ) -> tuple[list[int], QueueBuckets]:
     """Return a deterministic blended queue of card ids plus bucket composition.
 
     Priority is blended in fixed ratio windows to avoid starvation:
-    due x3, leech x1, new x1, review x1.
+    due x3, leech x1, new x1, review x1. Daily Games misses only order
+    ordinary review cards ahead of other ordinary reviews.
     """
     sorted_ids = sorted(set(card_ids))
+    active_game_misses = game_miss_card_ids or set()
 
     due: list[int] = []
     leech: list[int] = []
     new: list[int] = []
+    missed_review: list[int] = []
     review: list[int] = []
 
     for card_id in sorted_ids:
@@ -43,9 +47,17 @@ def build_study_queue(
         if card_id in due_card_ids:
             due.append(card_id)
             continue
-        review.append(card_id)
+        if card_id in active_game_misses:
+            missed_review.append(card_id)
+        else:
+            review.append(card_id)
 
-    buckets = QueueBuckets(due=due, leech=leech, new=new, review=review)
+    buckets = QueueBuckets(
+        due=due,
+        leech=leech,
+        new=new,
+        review=[*missed_review, *review],
+    )
     return _interleave_buckets(buckets), buckets
 
 

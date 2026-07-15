@@ -47,6 +47,7 @@ interface MinigameViewProps {
   furiganaEnabled: boolean
   furiganaAutoHideMastered: boolean
   activeBlockCards: BasicCard[]
+  activeRoundCard?: BasicCard | null
   onBack: () => void
   onOpenDictionary: (seedQuery?: string) => void
   onOpenSettings: () => void
@@ -66,6 +67,7 @@ export function MinigameView({
   furiganaEnabled,
   furiganaAutoHideMastered,
   activeBlockCards,
+  activeRoundCard,
   onBack,
   onOpenDictionary,
   onOpenSettings,
@@ -79,6 +81,8 @@ export function MinigameView({
     roundFeedbackTone,
     roundFeedbackAnswer,
     isRoundResolving,
+    roundAdvancePending,
+    roundAdvanceError,
     sessionScore,
     sessionRounds,
     sessionPoints,
@@ -114,6 +118,7 @@ export function MinigameView({
     activeGame === 'interleave_mix'
       ? (MINIGAMES.find((game) => game.key === roundState?.mode)?.title ?? 'Mixed Round')
       : (selectedGameMeta?.title ?? 'Minigame')
+  const displayedRoundCard = activeRoundCard ?? activeBlockCards.find((card) => card.id === roundState?.cardId) ?? null
   const roundProgressValue = effectiveTargetItems > 0 ? Math.min(sessionRounds / effectiveTargetItems, 1) : 0
   const remainingRounds = Math.max(effectiveTargetItems - sessionRounds, 0)
   const sessionStatusCopy = sessionActive
@@ -517,10 +522,10 @@ export function MinigameView({
                       showKeyboardPrompts={showKeyboardPrompts}
                       furiganaEnabled={furiganaEnabled}
                       furiganaAutoHideMastered={furiganaAutoHideMastered}
-                      focusReading={furiganaEnabled ? (activeBlockCards.find((c) => c.id === roundState.cardId)?.dictionary_summary?.reading ?? null) : null}
+                      focusReading={furiganaEnabled ? (displayedRoundCard?.dictionary_summary?.reading ?? null) : null}
                       showRevealText={roundFeedback !== null}
                       isMastered={Boolean(roundState.isMastered)}
-                      cardTags={activeBlockCards.find((c) => c.id === roundState.cardId)?.tags ?? []}
+                      cardTags={displayedRoundCard?.tags ?? []}
                       hintPopoverOpen={hintPopoverOpen}
                       hintButtonRef={hintButtonRef}
                       onPlayAudio={playAudio}
@@ -593,12 +598,14 @@ export function MinigameView({
                       livesEnabled={livesEnabled}
                       showKeyboardPrompts={showKeyboardPrompts}
                       onSkipFeedback={skipFeedback}
+                      feedbackAdvancePending={roundAdvancePending}
+                      feedbackAdvanceError={roundAdvanceError}
                       responseMs={roundResponseMs}
                       srsResult={roundSrsResult}
                       exampleSentence={roundExampleSentence}
                       cardCharacter={roundState.focusText}
-                      cardMeaning={!isGrammarCurriculumMode(roundState.mode) ? (activeBlockCards.find((c) => c.id === roundState.cardId)?.meaning ?? '') : ''}
-                      cardRomaji={!isGrammarCurriculumMode(roundState.mode) ? (activeBlockCards.find((c) => c.id === roundState.cardId)?.romaji ?? '') : ''}
+                      cardMeaning={!isGrammarCurriculumMode(roundState.mode) ? (displayedRoundCard?.meaning ?? '') : ''}
+                      cardRomaji={!isGrammarCurriculumMode(roundState.mode) ? (displayedRoundCard?.romaji ?? '') : ''}
                       dictionaryNote={roundState.dictionaryNote}
                     >
                         {roundState.mode === 'stroke_order' ? (

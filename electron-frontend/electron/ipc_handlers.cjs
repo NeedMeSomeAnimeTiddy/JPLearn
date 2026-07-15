@@ -25,6 +25,10 @@ const {
   validateDictionarySearchQuery,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,
+  validateDailyGamesDay,
+  validateDailyGamesPracticeSeedPayload,
+  validateDailyGamesAttemptPayload,
+  validateDailyGamesCrosswordClues,
   validateConfigKey,
   validateConfigSetPayload,
 } = require('./ipc_security.cjs')
@@ -176,6 +180,102 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch grammar minigame data: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('daily-games:get-state', async (event, day) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedDay = validateDailyGamesDay(day)
+    try {
+      return await options.runPythonBridgeWithArgs(['daily-games-state', validatedDay])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch Daily Games state: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('daily-games:create-practice-seed', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateDailyGamesPracticeSeedPayload(payload)
+    try {
+      return await options.runPythonBridgeWithArgs([
+        'daily-games-practice-seed',
+        validatedPayload.day,
+        validatedPayload.gameType,
+      ])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to create Daily Games practice seed: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('daily-games:record-attempt', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateDailyGamesAttemptPayload(payload)
+    try {
+      const response = await options.runPythonBridgeWithArgs([
+        'daily-games-record-attempt',
+        validatedPayload.day,
+        validatedPayload.gameType,
+        validatedPayload.mode,
+        String(validatedPayload.score),
+        validatedPayload.completed ? '1' : '0',
+        validatedPayload.durationSeconds === undefined ? '' : String(validatedPayload.durationSeconds),
+        JSON.stringify(
+          validatedPayload.outcomes.map((outcome) => ({
+            pool_position: outcome.poolPosition,
+            outcome: outcome.outcome,
+          })),
+        ),
+      ])
+      clearBridgeReadCaches()
+      return response
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to record Daily Games attempt: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('daily-games:crossword-clues', async (event, day) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedDay = validateDailyGamesDay(day)
+    try {
+      const response = await options.runPythonBridgeWithArgs(['daily-games-crossword-clues', validatedDay])
+      const clues = Array.isArray(response?.clues) ? response.clues : []
+      return clues.map((clue) => ({ poolPosition: clue.pool_position, clue: clue.clue }))
+    } catch {
+      return []
+    }
+  })
+
+  options.ipcMain.handle('daily-games:save-crossword-clues', async (event, day, clues) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedDay = validateDailyGamesDay(day)
+    const validatedClues = validateDailyGamesCrosswordClues(clues, false)
+    try {
+      const response = await options.runPythonBridgeWithArgs([
+        'daily-games-save-crossword-clues',
+        validatedDay,
+        JSON.stringify(validatedClues.map((clue) => ({
+          pool_position: clue.poolPosition,
+          clue: clue.clue,
+        }))),
+      ])
+      const savedClues = Array.isArray(response?.clues) ? response.clues : []
+      return savedClues.map((clue) => ({ poolPosition: clue.pool_position, clue: clue.clue }))
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to save Daily Games crossword clues: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('daily-games:generate-crossword-clues', async (event, entries) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedEntries = validateDailyGamesCrosswordClues(entries, true)
+    try {
+      return await options.localTutorRuntime.generateCrosswordClues(validatedEntries)
+    } catch {
+      return { ok: false, text: '' }
     }
   })
 

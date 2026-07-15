@@ -400,6 +400,101 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   font-weight: 600;
 }
 
+.dictionary-pitch-accent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.dictionary-pitch-accent-title {
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.dictionary-pitch-accent-variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.dictionary-pitch-accent-variant {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dictionary-pitch-accent-type {
+  color: color-mix(in oklab, var(--tone-ocean) 78%, var(--text-main));
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dictionary-pitch-contour {
+  display: inline-flex;
+  align-items: flex-start;
+  min-height: 34px;
+}
+
+.dictionary-pitch-mora {
+  display: grid;
+  grid-template-rows: 16px 18px;
+  justify-items: center;
+  min-width: 26px;
+}
+
+.dictionary-pitch-node {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 7px;
+  height: 7px;
+  border: 2px solid color-mix(in oklab, var(--tone-ocean) 82%, var(--text-main));
+  border-radius: 50%;
+  background: var(--panel-bg);
+}
+
+.dictionary-pitch-node[data-level='low'] {
+  margin-top: 9px;
+}
+
+.dictionary-pitch-node:not([data-last])::after {
+  position: absolute;
+  top: 1px;
+  left: 5px;
+  width: 26px;
+  height: 2px;
+  background: color-mix(in oklab, var(--tone-ocean) 72%, var(--text-soft));
+  content: '';
+  transform-origin: left center;
+}
+
+.dictionary-pitch-node[data-level='low'][data-next-level='high']::after {
+  transform: rotate(-20deg);
+}
+
+.dictionary-pitch-node[data-level='high'][data-next-level='low']::after {
+  transform: rotate(20deg);
+}
+
+.dictionary-pitch-node[data-drop] {
+  border-color: color-mix(in oklab, var(--tone-rose) 80%, var(--text-main));
+  background: color-mix(in oklab, var(--tone-rose) 38%, var(--panel-bg));
+}
+
+.dictionary-pitch-mora-text {
+  align-self: end;
+  color: var(--text-main);
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1;
+}
+
 .dictionary-fallback-badge {
   display: inline-flex;
   align-items: center;

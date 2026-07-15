@@ -1,7 +1,6 @@
 ---
 description: Plans implementation work after exploring the codebase. Creates plan.md files to document approach, tasks, and architecture decisions before implementation begins.
 mode: primary
-model: deepseek/deepseek-v4-pro
 permission:
   edit: allow
   bash: ask

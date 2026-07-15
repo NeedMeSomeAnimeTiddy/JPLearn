@@ -37,3 +37,18 @@ def test_build_study_queue_does_not_starve_review_cards() -> None:
     # Review cards remain in queue even when due/leech/new buckets are populated.
     assert 7 in queue
     assert 8 in queue
+
+
+def test_game_misses_only_prioritize_ordinary_review_cards() -> None:
+    queue, buckets = build_study_queue(
+        card_ids=[1, 2, 3, 4, 5],
+        due_card_ids={1},
+        leech_card_ids={2},
+        new_card_ids={3},
+        game_miss_card_ids={1, 2, 5},
+    )
+
+    assert queue == [1, 2, 3, 5, 4]
+    assert buckets.due == [1]
+    assert buckets.leech == [2]
+    assert buckets.review == [5, 4]
