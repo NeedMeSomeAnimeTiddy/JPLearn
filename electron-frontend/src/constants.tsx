@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Mic,
   Minus,
+  PenLine,
   Plus,
   Shuffle,
   Square,
@@ -121,6 +122,11 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
     description: 'Type the kanji from meaning while reinforcing writing sequence.',
   },
   {
+    key: 'handwriting',
+    title: 'Handwriting',
+    description: 'Draw one Japanese character in its correct stroke order.',
+  },
+  {
     key: 'typed_recall',
     title: 'Typed Recall',
     description: 'Type the meaning directly with near-miss tolerance.',
@@ -178,13 +184,14 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
 ]
 
 export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
-  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'context_cloze', 'interleave_mix'],
-  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'context_cloze', 'interleave_mix'],
+  hiragana: ['romaji_sprint', 'meaning_match', 'character_match', 'handwriting', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'context_cloze', 'interleave_mix'],
+  katakana: ['romaji_sprint', 'meaning_match', 'character_match', 'handwriting', 'sentence_assembly', 'particle_cloze', 'imposter', 'speech_recall', 'listening_audio_first', 'dictation', 'context_cloze', 'interleave_mix'],
   kanji_n5: [
     'romaji_sprint',
     'meaning_match',
     'character_match',
     'stroke_order',
+    'handwriting',
     'typed_recall',
     'speech_recall',
     'particle_cloze',
@@ -237,6 +244,7 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   meaning_match: ListChecks,
   character_match: Languages,
   stroke_order: Keyboard,
+  handwriting: PenLine,
   typed_recall: Keyboard,
   speech_recall: Mic,
   sentence_assembly: Shuffle,
@@ -293,6 +301,7 @@ export const MINIGAME_SKILL_GROUP: Record<MinigameKey, MinigameSkillGroupKey> = 
   meaning_match: 'recognition',
   character_match: 'recognition',
   stroke_order: 'recall',
+  handwriting: 'recall',
   typed_recall: 'recall',
   speech_recall: 'recall',
   sentence_assembly: 'listening',
@@ -505,6 +514,7 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'meaning_match') return 'Meaning Match'
   if (mode === 'character_match') return 'Character Match'
   if (mode === 'stroke_order') return 'Stroke Order'
+  if (mode === 'handwriting') return 'Handwriting'
   if (mode === 'typed_recall') return 'Typed Recall'
   if (mode === 'speech_recall') return 'Speech Recall'
   if (mode === 'sentence_assembly') return 'Sentence Assembly'

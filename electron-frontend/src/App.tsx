@@ -43,6 +43,8 @@ import type { AssistantToast } from './features/tutor'
 import { useCursor, CursorFollower, CursorSettingsTab, type CursorSettings } from './features/cursor'
 import { usePomodoro, BreakOverlay, PomodoroSettingsTab, type PomodoroSettingsFields } from './features/pomodoro'
 import { DevDashboard } from './features/devtools'
+import type { HandwritingOutcome } from './features/handwriting'
+import { isHandwritingEligibleCharacter, isHandwritingOutcomeCorrect } from './features/handwriting'
 import { SURPRISE_PROMPTS, SCRIPT_MODE_PROMPT_PACKS, TAG_PROMPT_PACKS, CLOZE_TEMPLATES, STORY_CHAPTERS } from './lib/contentTemplates'
 import type { RoundDictionaryNote } from './types'
 import {
@@ -80,7 +82,7 @@ type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' |
 type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
 type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
 type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'kanji_compound_builder' | 'context_cloze' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'handwriting' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'kanji_compound_builder' | 'context_cloze' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools' | 'dev_checks'
 type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
@@ -516,6 +518,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
+      handwriting: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
@@ -533,6 +536,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
+      handwriting: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
@@ -550,6 +554,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
+      handwriting: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
@@ -567,6 +572,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
+      handwriting: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
@@ -584,6 +590,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
+      handwriting: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
@@ -601,6 +608,7 @@ function defaultMinigameStatsByScript(): MinigameStatsByScript {
       meaning_match: { ...EMPTY_MINIGAME_STATS },
       character_match: { ...EMPTY_MINIGAME_STATS },
       stroke_order: { ...EMPTY_MINIGAME_STATS },
+      handwriting: { ...EMPTY_MINIGAME_STATS },
       typed_recall: { ...EMPTY_MINIGAME_STATS },
       speech_recall: { ...EMPTY_MINIGAME_STATS },
       sentence_assembly: { ...EMPTY_MINIGAME_STATS },
@@ -1416,6 +1424,7 @@ function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'meaning_match') return 'Meaning Match'
   if (mode === 'character_match') return 'Character Match'
   if (mode === 'stroke_order') return 'Stroke Order'
+  if (mode === 'handwriting') return 'Handwriting'
   if (mode === 'typed_recall') return 'Typed Recall'
   if (mode === 'speech_recall') return 'Speech Recall'
   if (mode === 'sentence_assembly') return 'Sentence Assembly'
@@ -1434,6 +1443,7 @@ function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'meaning_match') return 'You are close. Trust your first clear meaning.'
   if (mode === 'character_match') return 'You are building pattern memory one step at a time.'
   if (mode === 'stroke_order') return 'Nice attempt. Visual memory gets stronger with reps.'
+  if (mode === 'handwriting') return 'Nice attempt. Stroke order becomes clearer with each careful repetition.'
   if (mode === 'typed_recall') return 'Great effort. Keep the next answer short and clear.'
   if (mode === 'speech_recall') return 'Great effort. Speak the next answer clearly and confidently.'
   if (mode === 'sentence_assembly') return 'Good try. Keep the chunk order natural and grammatically smooth.'
@@ -3242,6 +3252,30 @@ function App() {
         }
       }
 
+      if (minigame === 'handwriting') {
+        const promptLabel = surprisePrompt
+          ? surpriseLabel
+          : 'Draw the character using its correct stroke order.'
+        return {
+          cardId: card.id,
+          mode: minigame,
+          audioText: card.character,
+          exampleSentenceAudioText,
+          surprisePrompt,
+          curriculumStage,
+          chapterNumber: null,
+          chapterLabel: null,
+          hintText: 'Draw one stroke at a time. The target will guide stroke order without using recognition.',
+          dictionarySeedQuery,
+          dictionaryNote,
+          promptLabel,
+          focusText: activeScript === 'kanji_n5' ? card.meaning : card.romaji,
+          answer: card.character,
+          options: [],
+          isMastered: isMasteredBuild,
+        }
+      }
+
       if (isSentenceAssemblyMode(minigame)) {
         const sourceSentence = card.example_sentence?.trim() || ''
         const chunks = splitSentenceIntoAssemblyChunks(sourceSentence)
@@ -3896,6 +3930,9 @@ function App() {
           return kanjiChars.length >= 2 && !kanjiChars.some((ch) => !(ch in KANJI_MEANINGS))
         })
       }
+      if (modeSelection.mode === 'handwriting') {
+        modeCards = modeCards.filter((card) => isHandwritingEligibleCharacter(card.character))
+      }
       const goalTargetItems = Math.max(1, Math.floor(customTargetItems ?? sessionTargetItems))
 
       const goalRequest = window.jplearnDesktop?.startSessionGoal({
@@ -4057,7 +4094,6 @@ function App() {
         returnToDailyGamesHub()
         return
       }
-
       const candidate = buildRound([nextItem.card], 'romaji_sprint', 0, false, 0)
       if (!candidate) {
         returnToDailyGamesHub()
@@ -4093,6 +4129,9 @@ function App() {
         return kanjiChars.length >= 2 && !kanjiChars.some((ch) => !(ch in KANJI_MEANINGS))
       })
     }
+    if (modeSelection.mode === 'handwriting') {
+      modeCards = modeCards.filter((card) => isHandwritingEligibleCharacter(card.character))
+    }
     let index = nextCardIndex(modeCards.length)
     if (index === null) {
       await hydrateRoundCycle(modeCards)
@@ -4119,7 +4158,7 @@ function App() {
   }, [activeBlockCards, activeGame, buildRoundWithBridge, hydrateRoundCycle, leechFocusEnabled, nextCardIndex, nextRoundMode])
 
   const submitAnswer = useCallback(
-    (answer: string) => {
+    (answer: string, correctnessOverride?: boolean) => {
       if (!roundState || isRoundResolving) return
       if (answer.trim().length === 0) return
 
@@ -4167,10 +4206,10 @@ function App() {
                     return variants.some(v => normalizeText(answer) === v) ? 'exact' : 'incorrect'
                   })()
                 : null
-      const isCorrect =
-        typedAssessment !== null
+      const isCorrect = correctnessOverride
+        ?? (typedAssessment !== null
           ? typedAssessment !== 'incorrect'
-          : normalizeText(answer) === normalizeText(roundState.answer)
+          : normalizeText(answer) === normalizeText(roundState.answer))
       const responseMs =
         roundPresentedAtRef.current > 0
           ? Math.max(0, performance.now() - roundPresentedAtRef.current)
@@ -4492,6 +4531,11 @@ function App() {
     // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     [activeGame, activeKanjiCategory, activeScript, activeSessionId, activeVocabCategory, confidenceCaptureEnabled, isRoundResolving, leechFocusEnabled, livesEnabled, livesRemaining, nextRound, roundConfidenceScore, roundState, scriptStats, sessionBestStreak, sessionConfidenceCount, sessionConfidenceTotal, sessionPoints, sessionRounds, sessionScore, sessionTargetItems],
   )
+
+  const submitHandwritingOutcome = useCallback((outcome: HandwritingOutcome) => {
+    if (!roundState || roundState.mode !== 'handwriting') return
+    submitAnswer(roundState.answer, isHandwritingOutcomeCorrect(outcome))
+  }, [roundState, submitAnswer])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
@@ -6127,6 +6171,7 @@ function App() {
           onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
           onOpenSettings={openSettingsFromMenu}
           onRetry={handleRetry}
+          onHandwritingOutcome={submitHandwritingOutcome}
         />
       ) : null}
 

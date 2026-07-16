@@ -100,6 +100,7 @@ const MINIGAME_DIFFICULTY: Record<MinigameKey, {
   meaning_match: { level: 'easy', label: 'Easy' },
   character_match: { level: 'easy', label: 'Easy' },
   stroke_order: { level: 'medium', label: 'Medium' },
+  handwriting: { level: 'medium', label: 'Medium' },
   typed_recall: { level: 'medium', label: 'Medium' },
   speech_recall: { level: 'hard', label: 'Hard' },
   sentence_assembly: { level: 'hard', label: 'Hard' },

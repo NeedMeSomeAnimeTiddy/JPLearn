@@ -20,6 +20,8 @@ import { SentenceAssemblyAnswerPanel } from '../components/minigame/SentenceAsse
 import { StrokeOrderAnswerPanel } from '../components/minigame/StrokeOrderAnswerPanel'
 import { TypedAnswerPanel } from '../components/minigame/TypedAnswerPanel'
 import { SpeechAnswerPanel } from '../components/minigame/SpeechAnswerPanel'
+import { HandwritingAnswerPanel } from '../features/handwriting'
+import type { HandwritingOutcome } from '../features/handwriting'
 import { SessionRunSummary } from '../components/SessionRunSummary'
 import type { MinigameKey, NavDirection, ScriptKey } from '../types'
 import {
@@ -52,6 +54,7 @@ interface MinigameViewProps {
   onOpenDictionary: (seedQuery?: string) => void
   onOpenSettings: () => void
   onRetry: (cardIds: number[]) => void
+  onHandwritingOutcome: (outcome: HandwritingOutcome) => void
 }
 
 export function MinigameView({
@@ -72,6 +75,7 @@ export function MinigameView({
   onOpenDictionary,
   onOpenSettings,
   onRetry,
+  onHandwritingOutcome,
 }: MinigameViewProps) {
   const {
     sessionActive,
@@ -540,6 +544,8 @@ export function MinigameView({
                       title={
                         roundState.mode === 'stroke_order'
                           ? 'Build the matching kanji'
+                          : roundState.mode === 'handwriting'
+                            ? 'Draw the character'
                           : roundState.mode === 'romaji_sprint'
                             ? 'Type the reading'
                             : roundState.mode === 'sentence_assembly'
@@ -561,6 +567,8 @@ export function MinigameView({
                       copy={
                         roundState.mode === 'stroke_order'
                           ? 'Type the romaji reading to narrow the kanji candidates.'
+                          : roundState.mode === 'handwriting'
+                            ? 'Draw one character in stroke order. Guided feedback appears only after repeated misses.'
                           : roundState.mode === 'romaji_sprint'
                             ? 'Submit as soon as the reading is clear in your head.'
                             : roundState.mode === 'sentence_assembly'
@@ -608,7 +616,13 @@ export function MinigameView({
                       cardRomaji={!isGrammarCurriculumMode(roundState.mode) ? (displayedRoundCard?.romaji ?? '') : ''}
                       dictionaryNote={roundState.dictionaryNote}
                     >
-                        {roundState.mode === 'stroke_order' ? (
+                        {roundState.mode === 'handwriting' ? (
+                          <HandwritingAnswerPanel
+                            character={roundState.answer}
+                            disabled={isRoundResolving}
+                            onComplete={onHandwritingOutcome}
+                          />
+                        ) : roundState.mode === 'stroke_order' ? (
                           <StrokeOrderAnswerPanel
                             activeBlockCards={activeBlockCards}
                             answerInputRef={answerInputRef}

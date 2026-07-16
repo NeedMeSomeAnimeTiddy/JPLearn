@@ -2,7 +2,7 @@
 // Static data for round-building functions
 
 type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns' | 'sentence_examples'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'kanji_compound_builder' | 'context_cloze' | 'interleave_mix'
+type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'handwriting' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'kanji_compound_builder' | 'context_cloze' | 'interleave_mix'
 type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
 
 export const SURPRISE_PROMPTS = [
@@ -28,6 +28,10 @@ export const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<Playable
     stroke_order: [
       'Stroke Trace: picture the write order before you answer.',
       'Form First: rebuild the symbol one part at a time.',
+    ],
+    handwriting: [
+      'Handwriting Drill: draw one kana stroke by stroke.',
+      'Shape Practice: follow the stroke path with care.',
     ],
     typed_recall: [
       'Typed Recall: write the meaning from memory with clean spelling.',
@@ -75,6 +79,10 @@ export const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<Playable
       'Stroke Trace: picture the write order before you answer.',
       'Form First: rebuild the symbol one part at a time.',
     ],
+    handwriting: [
+      'Handwriting Drill: draw one kana stroke by stroke.',
+      'Shape Practice: follow the stroke path with care.',
+    ],
     typed_recall: [
       'Typed Recall: write the exact meaning from memory.',
       'No hints mode: type what the prompt means in one shot.',
@@ -120,6 +128,10 @@ export const SCRIPT_MODE_PROMPT_PACKS: Record<ScriptKey, Partial<Record<Playable
     stroke_order: [
       'Writing Trace: start from the meaning and rebuild the character.',
       'Stroke Path: picture the order before you type the kanji.',
+    ],
+    handwriting: [
+      'Writing Trace: draw the kanji one stroke at a time.',
+      'Stroke Path: commit the order before you begin.',
     ],
     typed_recall: [
       'Concept Recall: type the meaning directly without choices.',

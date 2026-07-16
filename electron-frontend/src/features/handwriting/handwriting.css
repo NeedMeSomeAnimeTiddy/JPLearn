@@ -1,0 +1,80 @@
+.handwriting-answer-panel {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+}
+
+.handwriting-instructions,
+.handwriting-status {
+  margin: 0;
+  max-width: 32rem;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.handwriting-canvas {
+  display: grid;
+  place-items: center;
+  width: min(100%, 18rem);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px dashed color-mix(in srgb, var(--tone-teal) 55%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--panel-deep) 84%, black);
+  touch-action: none;
+}
+
+.handwriting-canvas svg,
+.handwriting-canvas canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.handwriting-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.handwriting-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--tone-teal) 55%, transparent);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--panel-deep) 75%, transparent);
+  color: var(--ink-bright);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.handwriting-control:hover:not(:disabled) {
+  border-color: var(--tone-teal);
+  color: var(--tone-teal);
+}
+
+.handwriting-control:focus-visible {
+  outline: 2px solid var(--tone-amber);
+  outline-offset: 2px;
+}
+
+.handwriting-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.handwriting-control--give-up {
+  border-color: color-mix(in srgb, var(--tone-rose) 60%, transparent);
+}
+
+@media (max-width: 420px) {
+  .handwriting-canvas {
+    width: min(100%, 15.5rem);
+  }
+}

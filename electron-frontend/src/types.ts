@@ -5,6 +5,7 @@ export type MinigameKey =
   | 'meaning_match'
   | 'character_match'
   | 'stroke_order'
+  | 'handwriting'
   | 'typed_recall'
   | 'speech_recall'
   | 'sentence_assembly'
