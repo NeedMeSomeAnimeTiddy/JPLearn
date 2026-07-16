@@ -41,6 +41,7 @@ Important: `main.py` (the Python GUI) is **deprecated** — raises `RuntimeError
 - If unsure about anything — ask for clarification before assuming.
 - When using `compress`, explicitly preserve the current task, what's done, and what remains — don't let task context get lost.
 - **Plan files (orchestrator or research agent)**: The main agent (you) should write a `plan.md` in the relevant directory for any non-trivial planning phase. This survives conversation compression. **Other subagents must NOT write plan.md** — they don't have the `write` tool or the appropriate prompt. Subagents use the `todo` tool for task tracking instead. The exception is the `research` agent (defined in `.opencode/agents/research.md`) which has explicit write permission and is designed for exploration + plan.md creation. When starting implementation or any follow-up work, check for a `plan.md` in the relevant directory first and follow it. Delete `plan.md` after full execution unless there's reason to keep it.
+- **NEVER commit `plan.md`**. Always check `git status` before staging — plan.md must not appear in commits. If accidentally staged, unstage it before committing.
 
 ## Commands
 

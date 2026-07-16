@@ -7,6 +7,7 @@
 - Keep implementations simple
 - Use `pytest`
 - Read the matching layer instruction before editing `domain/`, `data/`, or `electron-frontend/`
+- **Never commit `plan.md`**. It is a temporary planning artifact, not project source. Always check `git status` before staging and exclude it.
 
 ## Context-Budget Policy
 

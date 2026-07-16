@@ -21,7 +21,7 @@
   "agent": {
     "plan": {
       "permission": {
-        "edit": "allow"
+        "write": "ask"
       }
     }
   },
