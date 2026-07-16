@@ -96,7 +96,7 @@ export function RoundFeedback({
         {milestoneStreak ? <span className="round-feedback-milestone">Streak ×{milestoneStreak}</span> : null}
         {tone === 'error' && livesEnabled ? <span className="round-feedback-life">−1 life</span> : null}
       </div>
-      {(answer || (tone === 'error' && correctAnswer)) ? (
+      {(answer || ((tone === 'error' || mode === 'handwriting') && correctAnswer)) ? (
         <div className="round-feedback-answers">
           {answer ? (
             <div className={`round-feedback-answer ${tone === 'error' ? 'round-feedback-answer-error' : 'round-feedback-answer-success'}`}>
@@ -114,7 +114,7 @@ export function RoundFeedback({
               </p>
             </div>
           ) : null}
-          {tone === 'error' && correctAnswer ? (
+          {(tone === 'error' || mode === 'handwriting') && correctAnswer ? (
             <div className="round-feedback-answer round-feedback-answer-correct">
               <p className="round-feedback-answer-label">The answer</p>
               <p className="round-feedback-answer-value">

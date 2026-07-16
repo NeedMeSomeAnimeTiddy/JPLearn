@@ -7,10 +7,11 @@ import '../handwriting.css'
 interface HandwritingAnswerPanelProps {
   character: string
   disabled: boolean
+  externalHintUsed: boolean
   onComplete: (outcome: HandwritingOutcome) => void
 }
 
-export function HandwritingAnswerPanel({ character, disabled, onComplete }: HandwritingAnswerPanelProps) {
+export function HandwritingAnswerPanel({ character, disabled, externalHintUsed, onComplete }: HandwritingAnswerPanelProps) {
   const {
     targetRef,
     status,
@@ -19,7 +20,7 @@ export function HandwritingAnswerPanel({ character, disabled, onComplete }: Hand
     retry,
     showAnimation,
     giveUp,
-  } = useHandwritingQuiz({ character, disabled, onComplete })
+  } = useHandwritingQuiz({ character, disabled, externalHintUsed, onComplete })
 
   const controlsDisabled = disabled || status !== 'ready'
 

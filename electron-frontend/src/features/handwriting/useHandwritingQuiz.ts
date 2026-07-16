@@ -1,64 +1,130 @@
 import HanziWriter from 'hanzi-writer'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { HANDWRITING_MISS_THRESHOLD } from './constants'
-import type { HandwritingOutcome, HandwritingStatus } from './types'
-import { loadHandwritingCharacterData } from './utils'
+import { HANDWRITING_MISS_THRESHOLD, HANDWRITING_QUIZ_OPTIONS } from './constants'
+import type { HandwritingCharacterData, HandwritingOutcome, HandwritingStatus } from './types'
+import {
+  isCurvedKanaStroke,
+  loadHandwritingCharacterData,
+  matchesCurvedKanaFallback,
+  resolveHandwritingColors,
+} from './utils'
 
 interface UseHandwritingQuizOptions {
   character: string
   disabled: boolean
+  externalHintUsed: boolean
   onComplete: (outcome: HandwritingOutcome) => void
 }
 
-function createOutcome(): HandwritingOutcome {
+function createOutcome(usedHint = false): HandwritingOutcome {
   return {
     completed: false,
     mistakeCount: 0,
-    usedHint: false,
+    usedHint,
     usedAnimation: false,
     gaveUp: false,
   }
 }
 
-export function useHandwritingQuiz({ character, disabled, onComplete }: UseHandwritingQuizOptions) {
+function getHandwritingColors() {
+  const root = document.documentElement
+  const style = getComputedStyle(root)
+  return resolveHandwritingColors(
+    root.dataset.themeMode === 'light' ? 'light' : 'dark',
+    {
+      textMain: style.getPropertyValue('--text-main').trim(),
+      toneTeal: style.getPropertyValue('--tone-teal').trim(),
+      toneAmber: style.getPropertyValue('--tone-amber').trim(),
+    },
+  )
+}
+
+export function useHandwritingQuiz({ character, disabled, externalHintUsed, onComplete }: UseHandwritingQuizOptions) {
   const targetRef = useRef<HTMLDivElement | null>(null)
   const writerRef = useRef<HanziWriter | null>(null)
+  const characterDataRef = useRef<HandwritingCharacterData | null>(null)
   const outcomeRef = useRef<HandwritingOutcome>(createOutcome())
   const completedRef = useRef(false)
+  const disabledRef = useRef(disabled)
+  const fallbackAdvancePendingRef = useRef(false)
+  const startQuizRef = useRef<(startStrokeNum?: number) => void>(() => undefined)
+  const onCompleteRef = useRef(onComplete)
+  const externalHintUsedRef = useRef(externalHintUsed)
   const [status, setStatus] = useState<HandwritingStatus>('loading')
   const [mistakeCount, setMistakeCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    disabledRef.current = disabled
+    onCompleteRef.current = onComplete
+  }, [disabled, onComplete])
+
+  useEffect(() => {
+    externalHintUsedRef.current = externalHintUsed
+    if (externalHintUsed && !completedRef.current) {
+      outcomeRef.current = { ...outcomeRef.current, usedHint: true }
+    }
+  }, [externalHintUsed])
 
   const finish = useCallback((outcome: HandwritingOutcome) => {
     if (completedRef.current) return
     completedRef.current = true
     outcomeRef.current = outcome
     setStatus('complete')
-    onComplete(outcome)
-  }, [onComplete])
+    onCompleteRef.current(outcome)
+  }, [])
 
-  const startQuiz = useCallback(() => {
+  const startQuiz = useCallback((startStrokeNum = 0) => {
     const writer = writerRef.current
-    if (!writer || disabled || completedRef.current) return
+    if (!writer || disabledRef.current || completedRef.current) return
+    fallbackAdvancePendingRef.current = false
     writer.cancelQuiz()
     void writer.quiz({
       showHintAfterMisses: HANDWRITING_MISS_THRESHOLD,
       highlightOnComplete: true,
-      onMistake: ({ totalMistakes, mistakesOnStroke }) => {
+      ...HANDWRITING_QUIZ_OPTIONS,
+      onMistake: ({ drawnPath, mistakesOnStroke, strokeNum, totalMistakes }) => {
+        const nextMistakeCount = Math.max(outcomeRef.current.mistakeCount, totalMistakes)
         const nextOutcome = {
           ...outcomeRef.current,
-          mistakeCount: totalMistakes,
+          mistakeCount: nextMistakeCount,
           usedHint: outcomeRef.current.usedHint || mistakesOnStroke >= HANDWRITING_MISS_THRESHOLD,
         }
         outcomeRef.current = nextOutcome
-        setMistakeCount(totalMistakes)
+        setMistakeCount(nextMistakeCount)
+
+        const characterData = characterDataRef.current
+        const expectedMedian = characterData?.medians[strokeNum]
+        const shouldAdvanceCurvedKana =
+          !fallbackAdvancePendingRef.current &&
+          expectedMedian !== undefined &&
+          isCurvedKanaStroke(character, expectedMedian) &&
+          matchesCurvedKanaFallback(drawnPath.points, expectedMedian)
+
+        if (!shouldAdvanceCurvedKana) return
+
+        fallbackAdvancePendingRef.current = true
+        const nextStrokeNum = strokeNum + 1
+        const strokeCount = characterData?.strokes.length ?? 0
+        queueMicrotask(() => {
+          if (completedRef.current || disabledRef.current) return
+          if (nextStrokeNum >= strokeCount) {
+            writer.cancelQuiz()
+            finish({ ...outcomeRef.current, completed: true, mistakeCount: nextMistakeCount })
+            return
+          }
+          startQuizRef.current(nextStrokeNum)
+        })
       },
-      onComplete: ({ totalMistakes }) => {
-        finish({ ...outcomeRef.current, completed: true, mistakeCount: totalMistakes })
+      onComplete: () => {
+        finish({ ...outcomeRef.current, completed: true, mistakeCount: outcomeRef.current.mistakeCount })
       },
+      quizStartStrokeNum: startStrokeNum,
     })
-  }, [disabled, finish])
+  }, [character, finish])
+
+  startQuizRef.current = startQuiz
 
   useEffect(() => {
     const target = targetRef.current
@@ -66,7 +132,8 @@ export function useHandwritingQuiz({ character, disabled, onComplete }: UseHandw
     let disposed = false
     target.replaceChildren()
     writerRef.current = null
-    outcomeRef.current = createOutcome()
+    characterDataRef.current = null
+    outcomeRef.current = createOutcome(externalHintUsedRef.current)
     completedRef.current = false
     setMistakeCount(0)
     setError(null)
@@ -75,15 +142,14 @@ export function useHandwritingQuiz({ character, disabled, onComplete }: UseHandw
     void loadHandwritingCharacterData(character)
       .then((data) => {
         if (disposed || !targetRef.current) return
+        characterDataRef.current = data
         const writer = HanziWriter.create(targetRef.current, character, {
           width: 280,
           height: 280,
           padding: 12,
           showCharacter: false,
           showOutline: false,
-          strokeColor: '#f9f6e7',
-          drawingColor: '#75d5c8',
-          highlightColor: '#f2b95c',
+          ...getHandwritingColors(),
           charDataLoader: () => data,
           onLoadCharDataError: () => {
             if (!disposed) {
@@ -110,12 +176,13 @@ export function useHandwritingQuiz({ character, disabled, onComplete }: UseHandw
       disposed = true
       writerRef.current?.cancelQuiz()
       writerRef.current = null
+      characterDataRef.current = null
     }
   }, [character, reloadKey])
 
   useEffect(() => {
-    if (status === 'ready' && !disabled) startQuiz()
-  }, [disabled, startQuiz, status])
+    if (status === 'ready' && !disabledRef.current) startQuiz()
+  }, [startQuiz, status])
 
   const retry = useCallback(() => {
     if (disabled) return
@@ -132,7 +199,7 @@ export function useHandwritingQuiz({ character, disabled, onComplete }: UseHandw
     if (!writer || status !== 'ready' || disabled || completedRef.current) return
     outcomeRef.current = { ...outcomeRef.current, usedAnimation: true }
     writer.cancelQuiz()
-    void writer.animateCharacter({ onComplete: startQuiz })
+    void writer.animateCharacter({ onComplete: () => startQuiz() })
   }, [disabled, startQuiz, status])
 
   const giveUp = useCallback(() => {

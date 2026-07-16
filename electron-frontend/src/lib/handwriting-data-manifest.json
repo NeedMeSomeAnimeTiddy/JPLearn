@@ -1,0 +1,9286 @@
+{
+  "characters": {
+    "あ": {
+      "chunk": "hiragana"
+    },
+    "い": {
+      "chunk": "hiragana"
+    },
+    "う": {
+      "chunk": "hiragana"
+    },
+    "え": {
+      "chunk": "hiragana"
+    },
+    "お": {
+      "chunk": "hiragana"
+    },
+    "か": {
+      "chunk": "hiragana"
+    },
+    "が": {
+      "chunk": "hiragana"
+    },
+    "き": {
+      "chunk": "hiragana"
+    },
+    "ぎ": {
+      "chunk": "hiragana"
+    },
+    "く": {
+      "chunk": "hiragana"
+    },
+    "ぐ": {
+      "chunk": "hiragana"
+    },
+    "け": {
+      "chunk": "hiragana"
+    },
+    "げ": {
+      "chunk": "hiragana"
+    },
+    "こ": {
+      "chunk": "hiragana"
+    },
+    "ご": {
+      "chunk": "hiragana"
+    },
+    "さ": {
+      "chunk": "hiragana"
+    },
+    "ざ": {
+      "chunk": "hiragana"
+    },
+    "し": {
+      "chunk": "hiragana"
+    },
+    "じ": {
+      "chunk": "hiragana"
+    },
+    "す": {
+      "chunk": "hiragana"
+    },
+    "ず": {
+      "chunk": "hiragana"
+    },
+    "せ": {
+      "chunk": "hiragana"
+    },
+    "ぜ": {
+      "chunk": "hiragana"
+    },
+    "そ": {
+      "chunk": "hiragana"
+    },
+    "ぞ": {
+      "chunk": "hiragana"
+    },
+    "た": {
+      "chunk": "hiragana"
+    },
+    "だ": {
+      "chunk": "hiragana"
+    },
+    "ち": {
+      "chunk": "hiragana"
+    },
+    "ぢ": {
+      "chunk": "hiragana"
+    },
+    "つ": {
+      "chunk": "hiragana"
+    },
+    "づ": {
+      "chunk": "hiragana"
+    },
+    "て": {
+      "chunk": "hiragana"
+    },
+    "で": {
+      "chunk": "hiragana"
+    },
+    "と": {
+      "chunk": "hiragana"
+    },
+    "ど": {
+      "chunk": "hiragana"
+    },
+    "な": {
+      "chunk": "hiragana"
+    },
+    "に": {
+      "chunk": "hiragana"
+    },
+    "ぬ": {
+      "chunk": "hiragana"
+    },
+    "ね": {
+      "chunk": "hiragana"
+    },
+    "の": {
+      "chunk": "hiragana"
+    },
+    "は": {
+      "chunk": "hiragana"
+    },
+    "ば": {
+      "chunk": "hiragana"
+    },
+    "ぱ": {
+      "chunk": "hiragana"
+    },
+    "ひ": {
+      "chunk": "hiragana"
+    },
+    "び": {
+      "chunk": "hiragana"
+    },
+    "ぴ": {
+      "chunk": "hiragana"
+    },
+    "ふ": {
+      "chunk": "hiragana"
+    },
+    "ぶ": {
+      "chunk": "hiragana"
+    },
+    "ぷ": {
+      "chunk": "hiragana"
+    },
+    "へ": {
+      "chunk": "hiragana"
+    },
+    "べ": {
+      "chunk": "hiragana"
+    },
+    "ぺ": {
+      "chunk": "hiragana"
+    },
+    "ほ": {
+      "chunk": "hiragana"
+    },
+    "ぼ": {
+      "chunk": "hiragana"
+    },
+    "ぽ": {
+      "chunk": "hiragana"
+    },
+    "ま": {
+      "chunk": "hiragana"
+    },
+    "み": {
+      "chunk": "hiragana"
+    },
+    "む": {
+      "chunk": "hiragana"
+    },
+    "め": {
+      "chunk": "hiragana"
+    },
+    "も": {
+      "chunk": "hiragana"
+    },
+    "や": {
+      "chunk": "hiragana"
+    },
+    "ゆ": {
+      "chunk": "hiragana"
+    },
+    "よ": {
+      "chunk": "hiragana"
+    },
+    "ら": {
+      "chunk": "hiragana"
+    },
+    "り": {
+      "chunk": "hiragana"
+    },
+    "る": {
+      "chunk": "hiragana"
+    },
+    "れ": {
+      "chunk": "hiragana"
+    },
+    "ろ": {
+      "chunk": "hiragana"
+    },
+    "わ": {
+      "chunk": "hiragana"
+    },
+    "を": {
+      "chunk": "hiragana"
+    },
+    "ん": {
+      "chunk": "hiragana"
+    },
+    "ア": {
+      "chunk": "katakana"
+    },
+    "イ": {
+      "chunk": "katakana"
+    },
+    "ウ": {
+      "chunk": "katakana"
+    },
+    "エ": {
+      "chunk": "katakana"
+    },
+    "オ": {
+      "chunk": "katakana"
+    },
+    "カ": {
+      "chunk": "katakana"
+    },
+    "ガ": {
+      "chunk": "katakana"
+    },
+    "キ": {
+      "chunk": "katakana"
+    },
+    "ギ": {
+      "chunk": "katakana"
+    },
+    "ク": {
+      "chunk": "katakana"
+    },
+    "グ": {
+      "chunk": "katakana"
+    },
+    "ケ": {
+      "chunk": "katakana"
+    },
+    "ゲ": {
+      "chunk": "katakana"
+    },
+    "コ": {
+      "chunk": "katakana"
+    },
+    "ゴ": {
+      "chunk": "katakana"
+    },
+    "サ": {
+      "chunk": "katakana"
+    },
+    "ザ": {
+      "chunk": "katakana"
+    },
+    "シ": {
+      "chunk": "katakana"
+    },
+    "ジ": {
+      "chunk": "katakana"
+    },
+    "ス": {
+      "chunk": "katakana"
+    },
+    "ズ": {
+      "chunk": "katakana"
+    },
+    "セ": {
+      "chunk": "katakana"
+    },
+    "ゼ": {
+      "chunk": "katakana"
+    },
+    "ソ": {
+      "chunk": "katakana"
+    },
+    "ゾ": {
+      "chunk": "katakana"
+    },
+    "タ": {
+      "chunk": "katakana"
+    },
+    "ダ": {
+      "chunk": "katakana"
+    },
+    "チ": {
+      "chunk": "katakana"
+    },
+    "ヂ": {
+      "chunk": "katakana"
+    },
+    "ツ": {
+      "chunk": "katakana"
+    },
+    "ヅ": {
+      "chunk": "katakana"
+    },
+    "テ": {
+      "chunk": "katakana"
+    },
+    "デ": {
+      "chunk": "katakana"
+    },
+    "ト": {
+      "chunk": "katakana"
+    },
+    "ド": {
+      "chunk": "katakana"
+    },
+    "ナ": {
+      "chunk": "katakana"
+    },
+    "ニ": {
+      "chunk": "katakana"
+    },
+    "ヌ": {
+      "chunk": "katakana"
+    },
+    "ネ": {
+      "chunk": "katakana"
+    },
+    "ノ": {
+      "chunk": "katakana"
+    },
+    "ハ": {
+      "chunk": "katakana"
+    },
+    "バ": {
+      "chunk": "katakana"
+    },
+    "パ": {
+      "chunk": "katakana"
+    },
+    "ヒ": {
+      "chunk": "katakana"
+    },
+    "ビ": {
+      "chunk": "katakana"
+    },
+    "ピ": {
+      "chunk": "katakana"
+    },
+    "フ": {
+      "chunk": "katakana"
+    },
+    "ブ": {
+      "chunk": "katakana"
+    },
+    "プ": {
+      "chunk": "katakana"
+    },
+    "ヘ": {
+      "chunk": "katakana"
+    },
+    "ベ": {
+      "chunk": "katakana"
+    },
+    "ペ": {
+      "chunk": "katakana"
+    },
+    "ホ": {
+      "chunk": "katakana"
+    },
+    "ボ": {
+      "chunk": "katakana"
+    },
+    "ポ": {
+      "chunk": "katakana"
+    },
+    "マ": {
+      "chunk": "katakana"
+    },
+    "ミ": {
+      "chunk": "katakana"
+    },
+    "ム": {
+      "chunk": "katakana"
+    },
+    "メ": {
+      "chunk": "katakana"
+    },
+    "モ": {
+      "chunk": "katakana"
+    },
+    "ヤ": {
+      "chunk": "katakana"
+    },
+    "ユ": {
+      "chunk": "katakana"
+    },
+    "ヨ": {
+      "chunk": "katakana"
+    },
+    "ラ": {
+      "chunk": "katakana"
+    },
+    "リ": {
+      "chunk": "katakana"
+    },
+    "ル": {
+      "chunk": "katakana"
+    },
+    "レ": {
+      "chunk": "katakana"
+    },
+    "ロ": {
+      "chunk": "katakana"
+    },
+    "ワ": {
+      "chunk": "katakana"
+    },
+    "ヲ": {
+      "chunk": "katakana"
+    },
+    "ン": {
+      "chunk": "katakana"
+    },
+    "丁": {
+      "chunk": "kanji-n1-b"
+    },
+    "七": {
+      "chunk": "kanji-n5"
+    },
+    "上": {
+      "chunk": "kanji-n5"
+    },
+    "下": {
+      "chunk": "kanji-n5"
+    },
+    "不": {
+      "chunk": "kanji-n4"
+    },
+    "与": {
+      "chunk": "kanji-n3"
+    },
+    "丑": {
+      "chunk": "kanji-n1-b"
+    },
+    "且": {
+      "chunk": "kanji-n1-a"
+    },
+    "世": {
+      "chunk": "kanji-n4"
+    },
+    "丘": {
+      "chunk": "kanji-n1-a"
+    },
+    "丙": {
+      "chunk": "kanji-n1-b"
+    },
+    "丞": {
+      "chunk": "kanji-n1-c"
+    },
+    "両": {
+      "chunk": "kanji-n3"
+    },
+    "並": {
+      "chunk": "kanji-n2"
+    },
+    "中": {
+      "chunk": "kanji-n5"
+    },
+    "丸": {
+      "chunk": "kanji-n2"
+    },
+    "丹": {
+      "chunk": "kanji-n1-b"
+    },
+    "主": {
+      "chunk": "kanji-n4"
+    },
+    "乃": {
+      "chunk": "kanji-n1-d"
+    },
+    "久": {
+      "chunk": "kanji-n2"
+    },
+    "之": {
+      "chunk": "kanji-n1-d"
+    },
+    "乏": {
+      "chunk": "kanji-n1-d"
+    },
+    "乗": {
+      "chunk": "kanji-n4"
+    },
+    "乙": {
+      "chunk": "kanji-n1-b"
+    },
+    "九": {
+      "chunk": "kanji-n5"
+    },
+    "也": {
+      "chunk": "kanji-n1-d"
+    },
+    "乱": {
+      "chunk": "kanji-n2"
+    },
+    "乳": {
+      "chunk": "kanji-n2"
+    },
+    "乾": {
+      "chunk": "kanji-n2"
+    },
+    "亀": {
+      "chunk": "kanji-n1-a"
+    },
+    "了": {
+      "chunk": "kanji-n2"
+    },
+    "予": {
+      "chunk": "kanji-n3"
+    },
+    "争": {
+      "chunk": "kanji-n3"
+    },
+    "事": {
+      "chunk": "kanji-n4"
+    },
+    "互": {
+      "chunk": "kanji-n3"
+    },
+    "井": {
+      "chunk": "kanji-n1-b"
+    },
+    "亘": {
+      "chunk": "kanji-n1-a"
+    },
+    "亜": {
+      "chunk": "kanji-n1-a"
+    },
+    "亡": {
+      "chunk": "kanji-n3"
+    },
+    "交": {
+      "chunk": "kanji-n3"
+    },
+    "亥": {
+      "chunk": "kanji-n1-b"
+    },
+    "亦": {
+      "chunk": "kanji-n1-c"
+    },
+    "亨": {
+      "chunk": "kanji-n1-a"
+    },
+    "享": {
+      "chunk": "kanji-n1-d"
+    },
+    "京": {
+      "chunk": "kanji-n4"
+    },
+    "亭": {
+      "chunk": "kanji-n1-b"
+    },
+    "亮": {
+      "chunk": "kanji-n1-c"
+    },
+    "人": {
+      "chunk": "kanji-n5"
+    },
+    "仁": {
+      "chunk": "kanji-n1-b"
+    },
+    "今": {
+      "chunk": "kanji-n5"
+    },
+    "介": {
+      "chunk": "kanji-n2"
+    },
+    "仏": {
+      "chunk": "kanji-n2"
+    },
+    "仕": {
+      "chunk": "kanji-n4"
+    },
+    "付": {
+      "chunk": "kanji-n3"
+    },
+    "仙": {
+      "chunk": "kanji-n1-b"
+    },
+    "代": {
+      "chunk": "kanji-n4"
+    },
+    "令": {
+      "chunk": "kanji-n2"
+    },
+    "以": {
+      "chunk": "kanji-n4"
+    },
+    "仮": {
+      "chunk": "kanji-n1-c"
+    },
+    "仰": {
+      "chunk": "kanji-n1-a"
+    },
+    "仲": {
+      "chunk": "kanji-n2"
+    },
+    "任": {
+      "chunk": "kanji-n3"
+    },
+    "企": {
+      "chunk": "kanji-n2"
+    },
+    "伊": {
+      "chunk": "kanji-n1-c"
+    },
+    "伍": {
+      "chunk": "kanji-n1-b"
+    },
+    "伎": {
+      "chunk": "kanji-n1-c"
+    },
+    "伏": {
+      "chunk": "kanji-n1-d"
+    },
+    "伐": {
+      "chunk": "kanji-n1-a"
+    },
+    "休": {
+      "chunk": "kanji-n5"
+    },
+    "会": {
+      "chunk": "kanji-n4"
+    },
+    "伝": {
+      "chunk": "kanji-n3"
+    },
+    "伯": {
+      "chunk": "kanji-n1-d"
+    },
+    "伴": {
+      "chunk": "kanji-n1-a"
+    },
+    "伶": {
+      "chunk": "kanji-n1-c"
+    },
+    "伸": {
+      "chunk": "kanji-n2"
+    },
+    "伺": {
+      "chunk": "kanji-n2"
+    },
+    "似": {
+      "chunk": "kanji-n3"
+    },
+    "伽": {
+      "chunk": "kanji-n1-b"
+    },
+    "但": {
+      "chunk": "kanji-n1-c"
+    },
+    "位": {
+      "chunk": "kanji-n3"
+    },
+    "低": {
+      "chunk": "kanji-n2"
+    },
+    "住": {
+      "chunk": "kanji-n4"
+    },
+    "佐": {
+      "chunk": "kanji-n1-a"
+    },
+    "佑": {
+      "chunk": "kanji-n1-b"
+    },
+    "体": {
+      "chunk": "kanji-n4"
+    },
+    "何": {
+      "chunk": "kanji-n5"
+    },
+    "余": {
+      "chunk": "kanji-n3"
+    },
+    "作": {
+      "chunk": "kanji-n4"
+    },
+    "佳": {
+      "chunk": "kanji-n1-d"
+    },
+    "併": {
+      "chunk": "kanji-n1-b"
+    },
+    "使": {
+      "chunk": "kanji-n4"
+    },
+    "侃": {
+      "chunk": "kanji-n1-d"
+    },
+    "侍": {
+      "chunk": "kanji-n1-b"
+    },
+    "侑": {
+      "chunk": "kanji-n1-b"
+    },
+    "供": {
+      "chunk": "kanji-n3"
+    },
+    "依": {
+      "chunk": "kanji-n2"
+    },
+    "価": {
+      "chunk": "kanji-n3"
+    },
+    "侮": {
+      "chunk": "kanji-n1-c"
+    },
+    "侯": {
+      "chunk": "kanji-n1-d"
+    },
+    "侵": {
+      "chunk": "kanji-n1-b"
+    },
+    "便": {
+      "chunk": "kanji-n3"
+    },
+    "係": {
+      "chunk": "kanji-n3"
+    },
+    "促": {
+      "chunk": "kanji-n2"
+    },
+    "俊": {
+      "chunk": "kanji-n1-c"
+    },
+    "俗": {
+      "chunk": "kanji-n1-d"
+    },
+    "保": {
+      "chunk": "kanji-n3"
+    },
+    "信": {
+      "chunk": "kanji-n3"
+    },
+    "修": {
+      "chunk": "kanji-n1-c"
+    },
+    "俳": {
+      "chunk": "kanji-n1-d"
+    },
+    "俵": {
+      "chunk": "kanji-n1-b"
+    },
+    "俸": {
+      "chunk": "kanji-n1-a"
+    },
+    "倉": {
+      "chunk": "kanji-n1-b"
+    },
+    "個": {
+      "chunk": "kanji-n2"
+    },
+    "倍": {
+      "chunk": "kanji-n2"
+    },
+    "倒": {
+      "chunk": "kanji-n3"
+    },
+    "倖": {
+      "chunk": "kanji-n1-c"
+    },
+    "候": {
+      "chunk": "kanji-n3"
+    },
+    "借": {
+      "chunk": "kanji-n4"
+    },
+    "倣": {
+      "chunk": "kanji-n1-d"
+    },
+    "値": {
+      "chunk": "kanji-n3"
+    },
+    "倫": {
+      "chunk": "kanji-n1-d"
+    },
+    "倭": {
+      "chunk": "kanji-n1-b"
+    },
+    "倹": {
+      "chunk": "kanji-n1-b"
+    },
+    "偉": {
+      "chunk": "kanji-n3"
+    },
+    "偏": {
+      "chunk": "kanji-n1-d"
+    },
+    "停": {
+      "chunk": "kanji-n2"
+    },
+    "健": {
+      "chunk": "kanji-n1-b"
+    },
+    "偲": {
+      "chunk": "kanji-n1-c"
+    },
+    "側": {
+      "chunk": "kanji-n3"
+    },
+    "偵": {
+      "chunk": "kanji-n1-b"
+    },
+    "偶": {
+      "chunk": "kanji-n3"
+    },
+    "偽": {
+      "chunk": "kanji-n1-b"
+    },
+    "傍": {
+      "chunk": "kanji-n1-b"
+    },
+    "傑": {
+      "chunk": "kanji-n1-b"
+    },
+    "傘": {
+      "chunk": "kanji-n1-a"
+    },
+    "備": {
+      "chunk": "kanji-n3"
+    },
+    "催": {
+      "chunk": "kanji-n1-a"
+    },
+    "債": {
+      "chunk": "kanji-n1-b"
+    },
+    "傷": {
+      "chunk": "kanji-n1-d"
+    },
+    "傾": {
+      "chunk": "kanji-n2"
+    },
+    "働": {
+      "chunk": "kanji-n3"
+    },
+    "像": {
+      "chunk": "kanji-n2"
+    },
+    "僚": {
+      "chunk": "kanji-n1-c"
+    },
+    "儀": {
+      "chunk": "kanji-n1-a"
+    },
+    "億": {
+      "chunk": "kanji-n2"
+    },
+    "儒": {
+      "chunk": "kanji-n1-c"
+    },
+    "償": {
+      "chunk": "kanji-n1-d"
+    },
+    "優": {
+      "chunk": "kanji-n3"
+    },
+    "允": {
+      "chunk": "kanji-n1-b"
+    },
+    "元": {
+      "chunk": "kanji-n4"
+    },
+    "兄": {
+      "chunk": "kanji-n4"
+    },
+    "充": {
+      "chunk": "kanji-n1-b"
+    },
+    "兆": {
+      "chunk": "kanji-n2"
+    },
+    "先": {
+      "chunk": "kanji-n5"
+    },
+    "光": {
+      "chunk": "kanji-n3"
+    },
+    "克": {
+      "chunk": "kanji-n1-d"
+    },
+    "免": {
+      "chunk": "kanji-n1-b"
+    },
+    "児": {
+      "chunk": "kanji-n2"
+    },
+    "入": {
+      "chunk": "kanji-n5"
+    },
+    "全": {
+      "chunk": "kanji-n4"
+    },
+    "公": {
+      "chunk": "kanji-n4"
+    },
+    "共": {
+      "chunk": "kanji-n3"
+    },
+    "兵": {
+      "chunk": "kanji-n2"
+    },
+    "具": {
+      "chunk": "kanji-n3"
+    },
+    "典": {
+      "chunk": "kanji-n1-a"
+    },
+    "兼": {
+      "chunk": "kanji-n1-a"
+    },
+    "内": {
+      "chunk": "kanji-n5"
+    },
+    "円": {
+      "chunk": "kanji-n5"
+    },
+    "冊": {
+      "chunk": "kanji-n2"
+    },
+    "再": {
+      "chunk": "kanji-n2"
+    },
+    "冒": {
+      "chunk": "kanji-n1-c"
+    },
+    "冗": {
+      "chunk": "kanji-n1-d"
+    },
+    "写": {
+      "chunk": "kanji-n4"
+    },
+    "冠": {
+      "chunk": "kanji-n1-a"
+    },
+    "冬": {
+      "chunk": "kanji-n4"
+    },
+    "冴": {
+      "chunk": "kanji-n1-a"
+    },
+    "冶": {
+      "chunk": "kanji-n1-c"
+    },
+    "冷": {
+      "chunk": "kanji-n3"
+    },
+    "准": {
+      "chunk": "kanji-n1-c"
+    },
+    "凌": {
+      "chunk": "kanji-n1-a"
+    },
+    "凍": {
+      "chunk": "kanji-n2"
+    },
+    "凜": {
+      "chunk": "kanji-n1-a"
+    },
+    "凝": {
+      "chunk": "kanji-n1-b"
+    },
+    "凡": {
+      "chunk": "kanji-n1-b"
+    },
+    "処": {
+      "chunk": "kanji-n3"
+    },
+    "凪": {
+      "chunk": "kanji-n1-c"
+    },
+    "凱": {
+      "chunk": "kanji-n1-b"
+    },
+    "凶": {
+      "chunk": "kanji-n1-c"
+    },
+    "凸": {
+      "chunk": "kanji-n1-a"
+    },
+    "凹": {
+      "chunk": "kanji-n1-b"
+    },
+    "出": {
+      "chunk": "kanji-n5"
+    },
+    "刀": {
+      "chunk": "kanji-n1-a"
+    },
+    "刃": {
+      "chunk": "kanji-n1-d"
+    },
+    "分": {
+      "chunk": "kanji-n5"
+    },
+    "切": {
+      "chunk": "kanji-n4"
+    },
+    "刈": {
+      "chunk": "kanji-n1-a"
+    },
+    "刊": {
+      "chunk": "kanji-n2"
+    },
+    "刑": {
+      "chunk": "kanji-n1-b"
+    },
+    "初": {
+      "chunk": "kanji-n3"
+    },
+    "判": {
+      "chunk": "kanji-n3"
+    },
+    "別": {
+      "chunk": "kanji-n4"
+    },
+    "利": {
+      "chunk": "kanji-n3"
+    },
+    "到": {
+      "chunk": "kanji-n3"
+    },
+    "制": {
+      "chunk": "kanji-n3"
+    },
+    "刷": {
+      "chunk": "kanji-n2"
+    },
+    "刺": {
+      "chunk": "kanji-n2"
+    },
+    "刻": {
+      "chunk": "kanji-n3"
+    },
+    "則": {
+      "chunk": "kanji-n2"
+    },
+    "削": {
+      "chunk": "kanji-n1-c"
+    },
+    "前": {
+      "chunk": "kanji-n5"
+    },
+    "剖": {
+      "chunk": "kanji-n1-c"
+    },
+    "剛": {
+      "chunk": "kanji-n1-d"
+    },
+    "剣": {
+      "chunk": "kanji-n1-d"
+    },
+    "剤": {
+      "chunk": "kanji-n1-a"
+    },
+    "副": {
+      "chunk": "kanji-n2"
+    },
+    "剰": {
+      "chunk": "kanji-n1-a"
+    },
+    "割": {
+      "chunk": "kanji-n3"
+    },
+    "創": {
+      "chunk": "kanji-n1-b"
+    },
+    "力": {
+      "chunk": "kanji-n5"
+    },
+    "功": {
+      "chunk": "kanji-n1-d"
+    },
+    "加": {
+      "chunk": "kanji-n3"
+    },
+    "劣": {
+      "chunk": "kanji-n1-d"
+    },
+    "助": {
+      "chunk": "kanji-n3"
+    },
+    "努": {
+      "chunk": "kanji-n3"
+    },
+    "励": {
+      "chunk": "kanji-n1-b"
+    },
+    "労": {
+      "chunk": "kanji-n3"
+    },
+    "効": {
+      "chunk": "kanji-n2"
+    },
+    "劾": {
+      "chunk": "kanji-n1-c"
+    },
+    "勁": {
+      "chunk": "kanji-n1-b"
+    },
+    "勅": {
+      "chunk": "kanji-n1-b"
+    },
+    "勇": {
+      "chunk": "kanji-n2"
+    },
+    "勉": {
+      "chunk": "kanji-n4"
+    },
+    "動": {
+      "chunk": "kanji-n4"
+    },
+    "勘": {
+      "chunk": "kanji-n1-a"
+    },
+    "務": {
+      "chunk": "kanji-n3"
+    },
+    "勝": {
+      "chunk": "kanji-n3"
+    },
+    "募": {
+      "chunk": "kanji-n2"
+    },
+    "勢": {
+      "chunk": "kanji-n2"
+    },
+    "勤": {
+      "chunk": "kanji-n3"
+    },
+    "勧": {
+      "chunk": "kanji-n1-d"
+    },
+    "勲": {
+      "chunk": "kanji-n1-c"
+    },
+    "勺": {
+      "chunk": "kanji-n1-c"
+    },
+    "匁": {
+      "chunk": "kanji-n1-b"
+    },
+    "包": {
+      "chunk": "kanji-n2"
+    },
+    "化": {
+      "chunk": "kanji-n4"
+    },
+    "北": {
+      "chunk": "kanji-n5"
+    },
+    "匠": {
+      "chunk": "kanji-n1-a"
+    },
+    "匡": {
+      "chunk": "kanji-n1-b"
+    },
+    "匹": {
+      "chunk": "kanji-n2"
+    },
+    "区": {
+      "chunk": "kanji-n2"
+    },
+    "医": {
+      "chunk": "kanji-n4"
+    },
+    "匿": {
+      "chunk": "kanji-n1-d"
+    },
+    "升": {
+      "chunk": "kanji-n1-d"
+    },
+    "午": {
+      "chunk": "kanji-n5"
+    },
+    "卑": {
+      "chunk": "kanji-n1-b"
+    },
+    "卒": {
+      "chunk": "kanji-n2"
+    },
+    "卓": {
+      "chunk": "kanji-n1-d"
+    },
+    "協": {
+      "chunk": "kanji-n2"
+    },
+    "南": {
+      "chunk": "kanji-n5"
+    },
+    "単": {
+      "chunk": "kanji-n3"
+    },
+    "博": {
+      "chunk": "kanji-n1-c"
+    },
+    "占": {
+      "chunk": "kanji-n2"
+    },
+    "卯": {
+      "chunk": "kanji-n1-d"
+    },
+    "印": {
+      "chunk": "kanji-n2"
+    },
+    "危": {
+      "chunk": "kanji-n3"
+    },
+    "即": {
+      "chunk": "kanji-n2"
+    },
+    "却": {
+      "chunk": "kanji-n1-a"
+    },
+    "卵": {
+      "chunk": "kanji-n2"
+    },
+    "卸": {
+      "chunk": "kanji-n1-a"
+    },
+    "厄": {
+      "chunk": "kanji-n1-a"
+    },
+    "厘": {
+      "chunk": "kanji-n1-a"
+    },
+    "厚": {
+      "chunk": "kanji-n2"
+    },
+    "原": {
+      "chunk": "kanji-n3"
+    },
+    "厳": {
+      "chunk": "kanji-n1-d"
+    },
+    "去": {
+      "chunk": "kanji-n4"
+    },
+    "参": {
+      "chunk": "kanji-n3"
+    },
+    "又": {
+      "chunk": "kanji-n1-a"
+    },
+    "及": {
+      "chunk": "kanji-n1-c"
+    },
+    "友": {
+      "chunk": "kanji-n5"
+    },
+    "双": {
+      "chunk": "kanji-n2"
+    },
+    "反": {
+      "chunk": "kanji-n3"
+    },
+    "収": {
+      "chunk": "kanji-n3"
+    },
+    "叔": {
+      "chunk": "kanji-n1-a"
+    },
+    "取": {
+      "chunk": "kanji-n3"
+    },
+    "受": {
+      "chunk": "kanji-n3"
+    },
+    "叙": {
+      "chunk": "kanji-n1-b"
+    },
+    "叡": {
+      "chunk": "kanji-n1-b"
+    },
+    "口": {
+      "chunk": "kanji-n5"
+    },
+    "古": {
+      "chunk": "kanji-n5"
+    },
+    "只": {
+      "chunk": "kanji-n1-c"
+    },
+    "叫": {
+      "chunk": "kanji-n2"
+    },
+    "召": {
+      "chunk": "kanji-n2"
+    },
+    "台": {
+      "chunk": "kanji-n4"
+    },
+    "史": {
+      "chunk": "kanji-n2"
+    },
+    "叶": {
+      "chunk": "kanji-n1-c"
+    },
+    "号": {
+      "chunk": "kanji-n3"
+    },
+    "司": {
+      "chunk": "kanji-n1-a"
+    },
+    "各": {
+      "chunk": "kanji-n2"
+    },
+    "合": {
+      "chunk": "kanji-n3"
+    },
+    "吉": {
+      "chunk": "kanji-n1-b"
+    },
+    "同": {
+      "chunk": "kanji-n4"
+    },
+    "名": {
+      "chunk": "kanji-n5"
+    },
+    "后": {
+      "chunk": "kanji-n1-c"
+    },
+    "吏": {
+      "chunk": "kanji-n1-d"
+    },
+    "吐": {
+      "chunk": "kanji-n1-a"
+    },
+    "向": {
+      "chunk": "kanji-n3"
+    },
+    "君": {
+      "chunk": "kanji-n3"
+    },
+    "吟": {
+      "chunk": "kanji-n1-d"
+    },
+    "否": {
+      "chunk": "kanji-n3"
+    },
+    "含": {
+      "chunk": "kanji-n2"
+    },
+    "吸": {
+      "chunk": "kanji-n3"
+    },
+    "吹": {
+      "chunk": "kanji-n3"
+    },
+    "呂": {
+      "chunk": "kanji-n1-c"
+    },
+    "呈": {
+      "chunk": "kanji-n1-a"
+    },
+    "呉": {
+      "chunk": "kanji-n1-b"
+    },
+    "告": {
+      "chunk": "kanji-n3"
+    },
+    "周": {
+      "chunk": "kanji-n2"
+    },
+    "味": {
+      "chunk": "kanji-n4"
+    },
+    "呼": {
+      "chunk": "kanji-n3"
+    },
+    "命": {
+      "chunk": "kanji-n3"
+    },
+    "和": {
+      "chunk": "kanji-n3"
+    },
+    "咲": {
+      "chunk": "kanji-n2"
+    },
+    "哀": {
+      "chunk": "kanji-n1-a"
+    },
+    "品": {
+      "chunk": "kanji-n4"
+    },
+    "哉": {
+      "chunk": "kanji-n1-b"
+    },
+    "員": {
+      "chunk": "kanji-n4"
+    },
+    "哲": {
+      "chunk": "kanji-n1-c"
+    },
+    "唄": {
+      "chunk": "kanji-n1-a"
+    },
+    "唆": {
+      "chunk": "kanji-n1-c"
+    },
+    "唇": {
+      "chunk": "kanji-n1-d"
+    },
+    "唯": {
+      "chunk": "kanji-n1-d"
+    },
+    "唱": {
+      "chunk": "kanji-n1-b"
+    },
+    "啄": {
+      "chunk": "kanji-n1-a"
+    },
+    "商": {
+      "chunk": "kanji-n3"
+    },
+    "問": {
+      "chunk": "kanji-n4"
+    },
+    "啓": {
+      "chunk": "kanji-n1-d"
+    },
+    "善": {
+      "chunk": "kanji-n1-a"
+    },
+    "喚": {
+      "chunk": "kanji-n1-c"
+    },
+    "喜": {
+      "chunk": "kanji-n3"
+    },
+    "喝": {
+      "chunk": "kanji-n1-b"
+    },
+    "喪": {
+      "chunk": "kanji-n1-c"
+    },
+    "喫": {
+      "chunk": "kanji-n2"
+    },
+    "喬": {
+      "chunk": "kanji-n1-a"
+    },
+    "営": {
+      "chunk": "kanji-n3"
+    },
+    "嗣": {
+      "chunk": "kanji-n1-d"
+    },
+    "嘆": {
+      "chunk": "kanji-n1-c"
+    },
+    "嘉": {
+      "chunk": "kanji-n1-b"
+    },
+    "嘱": {
+      "chunk": "kanji-n1-b"
+    },
+    "器": {
+      "chunk": "kanji-n1-a"
+    },
+    "噴": {
+      "chunk": "kanji-n1-a"
+    },
+    "嚇": {
+      "chunk": "kanji-n1-d"
+    },
+    "囚": {
+      "chunk": "kanji-n1-c"
+    },
+    "四": {
+      "chunk": "kanji-n5"
+    },
+    "回": {
+      "chunk": "kanji-n3"
+    },
+    "因": {
+      "chunk": "kanji-n3"
+    },
+    "団": {
+      "chunk": "kanji-n2"
+    },
+    "困": {
+      "chunk": "kanji-n3"
+    },
+    "囲": {
+      "chunk": "kanji-n2"
+    },
+    "図": {
+      "chunk": "kanji-n4"
+    },
+    "固": {
+      "chunk": "kanji-n2"
+    },
+    "国": {
+      "chunk": "kanji-n5"
+    },
+    "圏": {
+      "chunk": "kanji-n1-d"
+    },
+    "園": {
+      "chunk": "kanji-n3"
+    },
+    "土": {
+      "chunk": "kanji-n5"
+    },
+    "圧": {
+      "chunk": "kanji-n2"
+    },
+    "在": {
+      "chunk": "kanji-n3"
+    },
+    "圭": {
+      "chunk": "kanji-n1-b"
+    },
+    "坂": {
+      "chunk": "kanji-n2"
+    },
+    "均": {
+      "chunk": "kanji-n2"
+    },
+    "坑": {
+      "chunk": "kanji-n1-b"
+    },
+    "坪": {
+      "chunk": "kanji-n1-c"
+    },
+    "垂": {
+      "chunk": "kanji-n1-c"
+    },
+    "型": {
+      "chunk": "kanji-n2"
+    },
+    "垣": {
+      "chunk": "kanji-n1-d"
+    },
+    "埋": {
+      "chunk": "kanji-n2"
+    },
+    "城": {
+      "chunk": "kanji-n2"
+    },
+    "域": {
+      "chunk": "kanji-n2"
+    },
+    "執": {
+      "chunk": "kanji-n1-d"
+    },
+    "培": {
+      "chunk": "kanji-n1-b"
+    },
+    "基": {
+      "chunk": "kanji-n1-c"
+    },
+    "堀": {
+      "chunk": "kanji-n1-a"
+    },
+    "堂": {
+      "chunk": "kanji-n4"
+    },
+    "堅": {
+      "chunk": "kanji-n1-b"
+    },
+    "堕": {
+      "chunk": "kanji-n1-b"
+    },
+    "堤": {
+      "chunk": "kanji-n1-a"
+    },
+    "堪": {
+      "chunk": "kanji-n1-c"
+    },
+    "報": {
+      "chunk": "kanji-n3"
+    },
+    "場": {
+      "chunk": "kanji-n4"
+    },
+    "塀": {
+      "chunk": "kanji-n1-a"
+    },
+    "塁": {
+      "chunk": "kanji-n1-b"
+    },
+    "塊": {
+      "chunk": "kanji-n1-c"
+    },
+    "塑": {
+      "chunk": "kanji-n1-b"
+    },
+    "塗": {
+      "chunk": "kanji-n2"
+    },
+    "塚": {
+      "chunk": "kanji-n1-c"
+    },
+    "塩": {
+      "chunk": "kanji-n2"
+    },
+    "境": {
+      "chunk": "kanji-n2"
+    },
+    "墓": {
+      "chunk": "kanji-n1-d"
+    },
+    "増": {
+      "chunk": "kanji-n3"
+    },
+    "墜": {
+      "chunk": "kanji-n1-a"
+    },
+    "墨": {
+      "chunk": "kanji-n1-a"
+    },
+    "墳": {
+      "chunk": "kanji-n1-d"
+    },
+    "墾": {
+      "chunk": "kanji-n1-c"
+    },
+    "壁": {
+      "chunk": "kanji-n1-b"
+    },
+    "壇": {
+      "chunk": "kanji-n1-d"
+    },
+    "壊": {
+      "chunk": "kanji-n1-c"
+    },
+    "壌": {
+      "chunk": "kanji-n1-a"
+    },
+    "士": {
+      "chunk": "kanji-n1-d"
+    },
+    "壮": {
+      "chunk": "kanji-n1-c"
+    },
+    "声": {
+      "chunk": "kanji-n3"
+    },
+    "壱": {
+      "chunk": "kanji-n1-b"
+    },
+    "売": {
+      "chunk": "kanji-n4"
+    },
+    "夏": {
+      "chunk": "kanji-n4"
+    },
+    "夕": {
+      "chunk": "kanji-n4"
+    },
+    "外": {
+      "chunk": "kanji-n5"
+    },
+    "多": {
+      "chunk": "kanji-n4"
+    },
+    "夜": {
+      "chunk": "kanji-n4"
+    },
+    "夢": {
+      "chunk": "kanji-n3"
+    },
+    "大": {
+      "chunk": "kanji-n5"
+    },
+    "天": {
+      "chunk": "kanji-n5"
+    },
+    "太": {
+      "chunk": "kanji-n3"
+    },
+    "夫": {
+      "chunk": "kanji-n3"
+    },
+    "央": {
+      "chunk": "kanji-n2"
+    },
+    "失": {
+      "chunk": "kanji-n3"
+    },
+    "奇": {
+      "chunk": "kanji-n1-d"
+    },
+    "奈": {
+      "chunk": "kanji-n1-a"
+    },
+    "奉": {
+      "chunk": "kanji-n1-b"
+    },
+    "奎": {
+      "chunk": "kanji-n1-c"
+    },
+    "奏": {
+      "chunk": "kanji-n1-d"
+    },
+    "契": {
+      "chunk": "kanji-n1-b"
+    },
+    "奔": {
+      "chunk": "kanji-n1-a"
+    },
+    "奥": {
+      "chunk": "kanji-n2"
+    },
+    "奨": {
+      "chunk": "kanji-n1-a"
+    },
+    "奪": {
+      "chunk": "kanji-n1-c"
+    },
+    "奮": {
+      "chunk": "kanji-n1-c"
+    },
+    "女": {
+      "chunk": "kanji-n5"
+    },
+    "奴": {
+      "chunk": "kanji-n1-a"
+    },
+    "好": {
+      "chunk": "kanji-n3"
+    },
+    "如": {
+      "chunk": "kanji-n1-c"
+    },
+    "妃": {
+      "chunk": "kanji-n1-d"
+    },
+    "妄": {
+      "chunk": "kanji-n1-a"
+    },
+    "妊": {
+      "chunk": "kanji-n1-c"
+    },
+    "妙": {
+      "chunk": "kanji-n1-b"
+    },
+    "妥": {
+      "chunk": "kanji-n1-b"
+    },
+    "妨": {
+      "chunk": "kanji-n1-a"
+    },
+    "妹": {
+      "chunk": "kanji-n4"
+    },
+    "妻": {
+      "chunk": "kanji-n3"
+    },
+    "姉": {
+      "chunk": "kanji-n4"
+    },
+    "始": {
+      "chunk": "kanji-n4"
+    },
+    "姓": {
+      "chunk": "kanji-n2"
+    },
+    "委": {
+      "chunk": "kanji-n2"
+    },
+    "姫": {
+      "chunk": "kanji-n1-d"
+    },
+    "姻": {
+      "chunk": "kanji-n1-d"
+    },
+    "姿": {
+      "chunk": "kanji-n1-d"
+    },
+    "威": {
+      "chunk": "kanji-n1-b"
+    },
+    "娘": {
+      "chunk": "kanji-n3"
+    },
+    "娠": {
+      "chunk": "kanji-n1-a"
+    },
+    "娯": {
+      "chunk": "kanji-n1-d"
+    },
+    "婆": {
+      "chunk": "kanji-n1-c"
+    },
+    "婚": {
+      "chunk": "kanji-n3"
+    },
+    "婦": {
+      "chunk": "kanji-n3"
+    },
+    "婿": {
+      "chunk": "kanji-n1-d"
+    },
+    "媒": {
+      "chunk": "kanji-n1-c"
+    },
+    "媛": {
+      "chunk": "kanji-n1-d"
+    },
+    "嫁": {
+      "chunk": "kanji-n1-b"
+    },
+    "嫌": {
+      "chunk": "kanji-n1-a"
+    },
+    "嫡": {
+      "chunk": "kanji-n1-b"
+    },
+    "嬉": {
+      "chunk": "kanji-n1-b"
+    },
+    "嬢": {
+      "chunk": "kanji-n1-c"
+    },
+    "子": {
+      "chunk": "kanji-n5"
+    },
+    "孔": {
+      "chunk": "kanji-n1-a"
+    },
+    "字": {
+      "chunk": "kanji-n5"
+    },
+    "存": {
+      "chunk": "kanji-n3"
+    },
+    "孟": {
+      "chunk": "kanji-n1-d"
+    },
+    "季": {
+      "chunk": "kanji-n2"
+    },
+    "孤": {
+      "chunk": "kanji-n1-a"
+    },
+    "学": {
+      "chunk": "kanji-n5"
+    },
+    "孫": {
+      "chunk": "kanji-n2"
+    },
+    "宅": {
+      "chunk": "kanji-n3"
+    },
+    "宇": {
+      "chunk": "kanji-n2"
+    },
+    "守": {
+      "chunk": "kanji-n3"
+    },
+    "安": {
+      "chunk": "kanji-n5"
+    },
+    "完": {
+      "chunk": "kanji-n3"
+    },
+    "宏": {
+      "chunk": "kanji-n1-d"
+    },
+    "宗": {
+      "chunk": "kanji-n1-d"
+    },
+    "官": {
+      "chunk": "kanji-n3"
+    },
+    "宙": {
+      "chunk": "kanji-n1-b"
+    },
+    "定": {
+      "chunk": "kanji-n4"
+    },
+    "宜": {
+      "chunk": "kanji-n1-a"
+    },
+    "宝": {
+      "chunk": "kanji-n2"
+    },
+    "実": {
+      "chunk": "kanji-n3"
+    },
+    "宣": {
+      "chunk": "kanji-n1-d"
+    },
+    "室": {
+      "chunk": "kanji-n4"
+    },
+    "宥": {
+      "chunk": "kanji-n1-b"
+    },
+    "宮": {
+      "chunk": "kanji-n1-c"
+    },
+    "宰": {
+      "chunk": "kanji-n1-a"
+    },
+    "宴": {
+      "chunk": "kanji-n1-a"
+    },
+    "宵": {
+      "chunk": "kanji-n1-b"
+    },
+    "家": {
+      "chunk": "kanji-n4"
+    },
+    "容": {
+      "chunk": "kanji-n3"
+    },
+    "宿": {
+      "chunk": "kanji-n3"
+    },
+    "寂": {
+      "chunk": "kanji-n1-c"
+    },
+    "寄": {
+      "chunk": "kanji-n3"
+    },
+    "寅": {
+      "chunk": "kanji-n1-b"
+    },
+    "富": {
+      "chunk": "kanji-n3"
+    },
+    "寒": {
+      "chunk": "kanji-n3"
+    },
+    "寛": {
+      "chunk": "kanji-n1-d"
+    },
+    "寝": {
+      "chunk": "kanji-n3"
+    },
+    "察": {
+      "chunk": "kanji-n3"
+    },
+    "寡": {
+      "chunk": "kanji-n1-b"
+    },
+    "寧": {
+      "chunk": "kanji-n1-d"
+    },
+    "審": {
+      "chunk": "kanji-n1-b"
+    },
+    "寸": {
+      "chunk": "kanji-n1-a"
+    },
+    "寺": {
+      "chunk": "kanji-n2"
+    },
+    "対": {
+      "chunk": "kanji-n3"
+    },
+    "封": {
+      "chunk": "kanji-n2"
+    },
+    "専": {
+      "chunk": "kanji-n2"
+    },
+    "射": {
+      "chunk": "kanji-n1-a"
+    },
+    "将": {
+      "chunk": "kanji-n2"
+    },
+    "尉": {
+      "chunk": "kanji-n1-b"
+    },
+    "尊": {
+      "chunk": "kanji-n2"
+    },
+    "尋": {
+      "chunk": "kanji-n1-d"
+    },
+    "導": {
+      "chunk": "kanji-n3"
+    },
+    "小": {
+      "chunk": "kanji-n5"
+    },
+    "少": {
+      "chunk": "kanji-n4"
+    },
+    "尚": {
+      "chunk": "kanji-n1-c"
+    },
+    "尭": {
+      "chunk": "kanji-n1-b"
+    },
+    "就": {
+      "chunk": "kanji-n1-b"
+    },
+    "尺": {
+      "chunk": "kanji-n1-c"
+    },
+    "尼": {
+      "chunk": "kanji-n1-a"
+    },
+    "尽": {
+      "chunk": "kanji-n1-b"
+    },
+    "尾": {
+      "chunk": "kanji-n1-c"
+    },
+    "居": {
+      "chunk": "kanji-n3"
+    },
+    "屈": {
+      "chunk": "kanji-n1-a"
+    },
+    "届": {
+      "chunk": "kanji-n2"
+    },
+    "屋": {
+      "chunk": "kanji-n4"
+    },
+    "展": {
+      "chunk": "kanji-n1-b"
+    },
+    "属": {
+      "chunk": "kanji-n3"
+    },
+    "層": {
+      "chunk": "kanji-n2"
+    },
+    "履": {
+      "chunk": "kanji-n1-b"
+    },
+    "屯": {
+      "chunk": "kanji-n1-d"
+    },
+    "山": {
+      "chunk": "kanji-n5"
+    },
+    "岐": {
+      "chunk": "kanji-n1-a"
+    },
+    "岩": {
+      "chunk": "kanji-n2"
+    },
+    "岬": {
+      "chunk": "kanji-n1-a"
+    },
+    "岳": {
+      "chunk": "kanji-n1-d"
+    },
+    "岸": {
+      "chunk": "kanji-n2"
+    },
+    "峡": {
+      "chunk": "kanji-n1-b"
+    },
+    "峰": {
+      "chunk": "kanji-n1-a"
+    },
+    "島": {
+      "chunk": "kanji-n2"
+    },
+    "峻": {
+      "chunk": "kanji-n1-d"
+    },
+    "崇": {
+      "chunk": "kanji-n1-d"
+    },
+    "崎": {
+      "chunk": "kanji-n1-c"
+    },
+    "崚": {
+      "chunk": "kanji-n1-c"
+    },
+    "崩": {
+      "chunk": "kanji-n1-b"
+    },
+    "嵐": {
+      "chunk": "kanji-n1-a"
+    },
+    "嵩": {
+      "chunk": "kanji-n1-b"
+    },
+    "嵯": {
+      "chunk": "kanji-n1-d"
+    },
+    "嶺": {
+      "chunk": "kanji-n1-c"
+    },
+    "巌": {
+      "chunk": "kanji-n1-a"
+    },
+    "川": {
+      "chunk": "kanji-n5"
+    },
+    "州": {
+      "chunk": "kanji-n2"
+    },
+    "巡": {
+      "chunk": "kanji-n1-b"
+    },
+    "巣": {
+      "chunk": "kanji-n1-d"
+    },
+    "工": {
+      "chunk": "kanji-n4"
+    },
+    "巧": {
+      "chunk": "kanji-n1-d"
+    },
+    "巨": {
+      "chunk": "kanji-n2"
+    },
+    "差": {
+      "chunk": "kanji-n3"
+    },
+    "己": {
+      "chunk": "kanji-n1-b"
+    },
+    "巳": {
+      "chunk": "kanji-n1-d"
+    },
+    "巴": {
+      "chunk": "kanji-n1-a"
+    },
+    "巻": {
+      "chunk": "kanji-n2"
+    },
+    "巽": {
+      "chunk": "kanji-n1-b"
+    },
+    "市": {
+      "chunk": "kanji-n4"
+    },
+    "布": {
+      "chunk": "kanji-n2"
+    },
+    "帆": {
+      "chunk": "kanji-n1-c"
+    },
+    "希": {
+      "chunk": "kanji-n2"
+    },
+    "帝": {
+      "chunk": "kanji-n1-b"
+    },
+    "帥": {
+      "chunk": "kanji-n1-b"
+    },
+    "師": {
+      "chunk": "kanji-n3"
+    },
+    "帯": {
+      "chunk": "kanji-n2"
+    },
+    "帰": {
+      "chunk": "kanji-n5"
+    },
+    "帳": {
+      "chunk": "kanji-n1-d"
+    },
+    "常": {
+      "chunk": "kanji-n3"
+    },
+    "帽": {
+      "chunk": "kanji-n2"
+    },
+    "幅": {
+      "chunk": "kanji-n2"
+    },
+    "幕": {
+      "chunk": "kanji-n1-b"
+    },
+    "幣": {
+      "chunk": "kanji-n1-d"
+    },
+    "干": {
+      "chunk": "kanji-n2"
+    },
+    "平": {
+      "chunk": "kanji-n3"
+    },
+    "年": {
+      "chunk": "kanji-n5"
+    },
+    "幸": {
+      "chunk": "kanji-n3"
+    },
+    "幹": {
+      "chunk": "kanji-n2"
+    },
+    "幻": {
+      "chunk": "kanji-n1-d"
+    },
+    "幼": {
+      "chunk": "kanji-n2"
+    },
+    "幽": {
+      "chunk": "kanji-n1-b"
+    },
+    "幾": {
+      "chunk": "kanji-n3"
+    },
+    "庁": {
+      "chunk": "kanji-n2"
+    },
+    "広": {
+      "chunk": "kanji-n4"
+    },
+    "庄": {
+      "chunk": "kanji-n1-a"
+    },
+    "床": {
+      "chunk": "kanji-n2"
+    },
+    "序": {
+      "chunk": "kanji-n1-d"
+    },
+    "底": {
+      "chunk": "kanji-n2"
+    },
+    "店": {
+      "chunk": "kanji-n4"
+    },
+    "府": {
+      "chunk": "kanji-n4"
+    },
+    "度": {
+      "chunk": "kanji-n4"
+    },
+    "座": {
+      "chunk": "kanji-n3"
+    },
+    "庫": {
+      "chunk": "kanji-n2"
+    },
+    "庭": {
+      "chunk": "kanji-n3"
+    },
+    "庶": {
+      "chunk": "kanji-n2"
+    },
+    "康": {
+      "chunk": "kanji-n1-d"
+    },
+    "庸": {
+      "chunk": "kanji-n1-a"
+    },
+    "廃": {
+      "chunk": "kanji-n1-d"
+    },
+    "廉": {
+      "chunk": "kanji-n1-b"
+    },
+    "廊": {
+      "chunk": "kanji-n1-c"
+    },
+    "延": {
+      "chunk": "kanji-n2"
+    },
+    "廷": {
+      "chunk": "kanji-n1-d"
+    },
+    "建": {
+      "chunk": "kanji-n4"
+    },
+    "弁": {
+      "chunk": "kanji-n1-b"
+    },
+    "弊": {
+      "chunk": "kanji-n1-c"
+    },
+    "式": {
+      "chunk": "kanji-n3"
+    },
+    "弐": {
+      "chunk": "kanji-n1-a"
+    },
+    "弓": {
+      "chunk": "kanji-n1-d"
+    },
+    "弔": {
+      "chunk": "kanji-n1-a"
+    },
+    "引": {
+      "chunk": "kanji-n3"
+    },
+    "弘": {
+      "chunk": "kanji-n1-a"
+    },
+    "弟": {
+      "chunk": "kanji-n4"
+    },
+    "弥": {
+      "chunk": "kanji-n1-b"
+    },
+    "弦": {
+      "chunk": "kanji-n1-c"
+    },
+    "弧": {
+      "chunk": "kanji-n1-d"
+    },
+    "弱": {
+      "chunk": "kanji-n4"
+    },
+    "張": {
+      "chunk": "kanji-n1-b"
+    },
+    "強": {
+      "chunk": "kanji-n4"
+    },
+    "弾": {
+      "chunk": "kanji-n1-c"
+    },
+    "当": {
+      "chunk": "kanji-n3"
+    },
+    "彗": {
+      "chunk": "kanji-n1-d"
+    },
+    "形": {
+      "chunk": "kanji-n3"
+    },
+    "彦": {
+      "chunk": "kanji-n1-c"
+    },
+    "彩": {
+      "chunk": "kanji-n1-b"
+    },
+    "彪": {
+      "chunk": "kanji-n1-c"
+    },
+    "彫": {
+      "chunk": "kanji-n1-d"
+    },
+    "彬": {
+      "chunk": "kanji-n1-a"
+    },
+    "彰": {
+      "chunk": "kanji-n1-a"
+    },
+    "影": {
+      "chunk": "kanji-n1-b"
+    },
+    "役": {
+      "chunk": "kanji-n3"
+    },
+    "彼": {
+      "chunk": "kanji-n3"
+    },
+    "往": {
+      "chunk": "kanji-n1-a"
+    },
+    "征": {
+      "chunk": "kanji-n1-b"
+    },
+    "径": {
+      "chunk": "kanji-n1-a"
+    },
+    "待": {
+      "chunk": "kanji-n4"
+    },
+    "律": {
+      "chunk": "kanji-n2"
+    },
+    "後": {
+      "chunk": "kanji-n5"
+    },
+    "徐": {
+      "chunk": "kanji-n1-a"
+    },
+    "徒": {
+      "chunk": "kanji-n3"
+    },
+    "従": {
+      "chunk": "kanji-n1-d"
+    },
+    "得": {
+      "chunk": "kanji-n3"
+    },
+    "御": {
+      "chunk": "kanji-n3"
+    },
+    "復": {
+      "chunk": "kanji-n2"
+    },
+    "循": {
+      "chunk": "kanji-n1-c"
+    },
+    "微": {
+      "chunk": "kanji-n1-c"
+    },
+    "徳": {
+      "chunk": "kanji-n1-d"
+    },
+    "徴": {
+      "chunk": "kanji-n1-a"
+    },
+    "徹": {
+      "chunk": "kanji-n1-b"
+    },
+    "心": {
+      "chunk": "kanji-n4"
+    },
+    "必": {
+      "chunk": "kanji-n3"
+    },
+    "忌": {
+      "chunk": "kanji-n1-a"
+    },
+    "忍": {
+      "chunk": "kanji-n1-b"
+    },
+    "志": {
+      "chunk": "kanji-n1-d"
+    },
+    "忘": {
+      "chunk": "kanji-n3"
+    },
+    "忙": {
+      "chunk": "kanji-n3"
+    },
+    "応": {
+      "chunk": "kanji-n3"
+    },
+    "忠": {
+      "chunk": "kanji-n1-a"
+    },
+    "快": {
+      "chunk": "kanji-n2"
+    },
+    "怒": {
+      "chunk": "kanji-n3"
+    },
+    "怖": {
+      "chunk": "kanji-n3"
+    },
+    "怜": {
+      "chunk": "kanji-n1-a"
+    },
+    "思": {
+      "chunk": "kanji-n4"
+    },
+    "怠": {
+      "chunk": "kanji-n1-a"
+    },
+    "急": {
+      "chunk": "kanji-n3"
+    },
+    "性": {
+      "chunk": "kanji-n3"
+    },
+    "怪": {
+      "chunk": "kanji-n1-c"
+    },
+    "恋": {
+      "chunk": "kanji-n2"
+    },
+    "恐": {
+      "chunk": "kanji-n3"
+    },
+    "恒": {
+      "chunk": "kanji-n1-c"
+    },
+    "恕": {
+      "chunk": "kanji-n1-b"
+    },
+    "恥": {
+      "chunk": "kanji-n3"
+    },
+    "恨": {
+      "chunk": "kanji-n1-a"
+    },
+    "恩": {
+      "chunk": "kanji-n1-b"
+    },
+    "恭": {
+      "chunk": "kanji-n1-b"
+    },
+    "息": {
+      "chunk": "kanji-n3"
+    },
+    "恵": {
+      "chunk": "kanji-n1-b"
+    },
+    "悌": {
+      "chunk": "kanji-n1-a"
+    },
+    "悔": {
+      "chunk": "kanji-n1-a"
+    },
+    "悟": {
+      "chunk": "kanji-n1-d"
+    },
+    "悠": {
+      "chunk": "kanji-n1-a"
+    },
+    "患": {
+      "chunk": "kanji-n2"
+    },
+    "悦": {
+      "chunk": "kanji-n1-c"
+    },
+    "悩": {
+      "chunk": "kanji-n2"
+    },
+    "悪": {
+      "chunk": "kanji-n4"
+    },
+    "悲": {
+      "chunk": "kanji-n3"
+    },
+    "悼": {
+      "chunk": "kanji-n1-a"
+    },
+    "情": {
+      "chunk": "kanji-n3"
+    },
+    "惇": {
+      "chunk": "kanji-n1-d"
+    },
+    "惑": {
+      "chunk": "kanji-n1-b"
+    },
+    "惜": {
+      "chunk": "kanji-n1-a"
+    },
+    "惟": {
+      "chunk": "kanji-n1-d"
+    },
+    "惣": {
+      "chunk": "kanji-n1-d"
+    },
+    "惨": {
+      "chunk": "kanji-n1-a"
+    },
+    "惰": {
+      "chunk": "kanji-n1-a"
+    },
+    "想": {
+      "chunk": "kanji-n3"
+    },
+    "愁": {
+      "chunk": "kanji-n1-b"
+    },
+    "愉": {
+      "chunk": "kanji-n1-b"
+    },
+    "愚": {
+      "chunk": "kanji-n1-c"
+    },
+    "愛": {
+      "chunk": "kanji-n3"
+    },
+    "感": {
+      "chunk": "kanji-n3"
+    },
+    "慈": {
+      "chunk": "kanji-n1-a"
+    },
+    "態": {
+      "chunk": "kanji-n1-d"
+    },
+    "慎": {
+      "chunk": "kanji-n1-c"
+    },
+    "慕": {
+      "chunk": "kanji-n1-b"
+    },
+    "慢": {
+      "chunk": "kanji-n1-c"
+    },
+    "慣": {
+      "chunk": "kanji-n3"
+    },
+    "慧": {
+      "chunk": "kanji-n1-d"
+    },
+    "慨": {
+      "chunk": "kanji-n1-a"
+    },
+    "慮": {
+      "chunk": "kanji-n1-c"
+    },
+    "慰": {
+      "chunk": "kanji-n1-a"
+    },
+    "慶": {
+      "chunk": "kanji-n1-c"
+    },
+    "憂": {
+      "chunk": "kanji-n1-c"
+    },
+    "憎": {
+      "chunk": "kanji-n2"
+    },
+    "憤": {
+      "chunk": "kanji-n1-a"
+    },
+    "憧": {
+      "chunk": "kanji-n1-d"
+    },
+    "憩": {
+      "chunk": "kanji-n1-b"
+    },
+    "憲": {
+      "chunk": "kanji-n1-c"
+    },
+    "憶": {
+      "chunk": "kanji-n1-c"
+    },
+    "憾": {
+      "chunk": "kanji-n1-c"
+    },
+    "懇": {
+      "chunk": "kanji-n1-d"
+    },
+    "懐": {
+      "chunk": "kanji-n1-a"
+    },
+    "懲": {
+      "chunk": "kanji-n1-c"
+    },
+    "懸": {
+      "chunk": "kanji-n1-a"
+    },
+    "成": {
+      "chunk": "kanji-n3"
+    },
+    "我": {
+      "chunk": "kanji-n1-b"
+    },
+    "戒": {
+      "chunk": "kanji-n1-c"
+    },
+    "戦": {
+      "chunk": "kanji-n3"
+    },
+    "戯": {
+      "chunk": "kanji-n1-d"
+    },
+    "戴": {
+      "chunk": "kanji-n1-a"
+    },
+    "戸": {
+      "chunk": "kanji-n2"
+    },
+    "戻": {
+      "chunk": "kanji-n3"
+    },
+    "房": {
+      "chunk": "kanji-n1-d"
+    },
+    "所": {
+      "chunk": "kanji-n3"
+    },
+    "扇": {
+      "chunk": "kanji-n1-d"
+    },
+    "扉": {
+      "chunk": "kanji-n1-b"
+    },
+    "手": {
+      "chunk": "kanji-n5"
+    },
+    "才": {
+      "chunk": "kanji-n3"
+    },
+    "打": {
+      "chunk": "kanji-n3"
+    },
+    "払": {
+      "chunk": "kanji-n3"
+    },
+    "扱": {
+      "chunk": "kanji-n1-b"
+    },
+    "扶": {
+      "chunk": "kanji-n1-c"
+    },
+    "批": {
+      "chunk": "kanji-n1-b"
+    },
+    "承": {
+      "chunk": "kanji-n2"
+    },
+    "技": {
+      "chunk": "kanji-n2"
+    },
+    "抄": {
+      "chunk": "kanji-n1-a"
+    },
+    "把": {
+      "chunk": "kanji-n1-c"
+    },
+    "抑": {
+      "chunk": "kanji-n1-b"
+    },
+    "投": {
+      "chunk": "kanji-n3"
+    },
+    "抗": {
+      "chunk": "kanji-n1-d"
+    },
+    "折": {
+      "chunk": "kanji-n3"
+    },
+    "抜": {
+      "chunk": "kanji-n3"
+    },
+    "択": {
+      "chunk": "kanji-n2"
+    },
+    "披": {
+      "chunk": "kanji-n1-d"
+    },
+    "抱": {
+      "chunk": "kanji-n3"
+    },
+    "抵": {
+      "chunk": "kanji-n1-b"
+    },
+    "抹": {
+      "chunk": "kanji-n1-b"
+    },
+    "押": {
+      "chunk": "kanji-n3"
+    },
+    "抽": {
+      "chunk": "kanji-n1-b"
+    },
+    "担": {
+      "chunk": "kanji-n2"
+    },
+    "拍": {
+      "chunk": "kanji-n1-b"
+    },
+    "拐": {
+      "chunk": "kanji-n1-a"
+    },
+    "拒": {
+      "chunk": "kanji-n1-c"
+    },
+    "拓": {
+      "chunk": "kanji-n1-d"
+    },
+    "拘": {
+      "chunk": "kanji-n1-a"
+    },
+    "拙": {
+      "chunk": "kanji-n1-b"
+    },
+    "招": {
+      "chunk": "kanji-n3"
+    },
+    "拝": {
+      "chunk": "kanji-n2"
+    },
+    "拠": {
+      "chunk": "kanji-n1-a"
+    },
+    "拡": {
+      "chunk": "kanji-n2"
+    },
+    "括": {
+      "chunk": "kanji-n1-a"
+    },
+    "拳": {
+      "chunk": "kanji-n1-d"
+    },
+    "拷": {
+      "chunk": "kanji-n1-d"
+    },
+    "拾": {
+      "chunk": "kanji-n2"
+    },
+    "持": {
+      "chunk": "kanji-n4"
+    },
+    "指": {
+      "chunk": "kanji-n3"
+    },
+    "挑": {
+      "chunk": "kanji-n1-b"
+    },
+    "挙": {
+      "chunk": "kanji-n1-b"
+    },
+    "挟": {
+      "chunk": "kanji-n2"
+    },
+    "振": {
+      "chunk": "kanji-n1-d"
+    },
+    "挿": {
+      "chunk": "kanji-n1-d"
+    },
+    "捕": {
+      "chunk": "kanji-n3"
+    },
+    "捜": {
+      "chunk": "kanji-n2"
+    },
+    "捨": {
+      "chunk": "kanji-n2"
+    },
+    "据": {
+      "chunk": "kanji-n1-c"
+    },
+    "捷": {
+      "chunk": "kanji-n1-d"
+    },
+    "捺": {
+      "chunk": "kanji-n1-c"
+    },
+    "掃": {
+      "chunk": "kanji-n2"
+    },
+    "授": {
+      "chunk": "kanji-n1-a"
+    },
+    "掌": {
+      "chunk": "kanji-n1-a"
+    },
+    "排": {
+      "chunk": "kanji-n1-c"
+    },
+    "掘": {
+      "chunk": "kanji-n2"
+    },
+    "掛": {
+      "chunk": "kanji-n3"
+    },
+    "採": {
+      "chunk": "kanji-n2"
+    },
+    "探": {
+      "chunk": "kanji-n3"
+    },
+    "接": {
+      "chunk": "kanji-n3"
+    },
+    "控": {
+      "chunk": "kanji-n1-d"
+    },
+    "推": {
+      "chunk": "kanji-n1-a"
+    },
+    "措": {
+      "chunk": "kanji-n1-c"
+    },
+    "掲": {
+      "chunk": "kanji-n1-c"
+    },
+    "描": {
+      "chunk": "kanji-n1-d"
+    },
+    "提": {
+      "chunk": "kanji-n3"
+    },
+    "揚": {
+      "chunk": "kanji-n1-c"
+    },
+    "換": {
+      "chunk": "kanji-n2"
+    },
+    "握": {
+      "chunk": "kanji-n1-b"
+    },
+    "揮": {
+      "chunk": "kanji-n1-c"
+    },
+    "援": {
+      "chunk": "kanji-n2"
+    },
+    "揺": {
+      "chunk": "kanji-n1-c"
+    },
+    "搬": {
+      "chunk": "kanji-n1-a"
+    },
+    "搭": {
+      "chunk": "kanji-n1-b"
+    },
+    "携": {
+      "chunk": "kanji-n1-c"
+    },
+    "搾": {
+      "chunk": "kanji-n1-c"
+    },
+    "摂": {
+      "chunk": "kanji-n1-c"
+    },
+    "摘": {
+      "chunk": "kanji-n1-a"
+    },
+    "摩": {
+      "chunk": "kanji-n1-b"
+    },
+    "撃": {
+      "chunk": "kanji-n2"
+    },
+    "撤": {
+      "chunk": "kanji-n1-a"
+    },
+    "撮": {
+      "chunk": "kanji-n1-c"
+    },
+    "撲": {
+      "chunk": "kanji-n1-c"
+    },
+    "擁": {
+      "chunk": "kanji-n1-b"
+    },
+    "操": {
+      "chunk": "kanji-n2"
+    },
+    "擦": {
+      "chunk": "kanji-n1-c"
+    },
+    "擬": {
+      "chunk": "kanji-n1-a"
+    },
+    "支": {
+      "chunk": "kanji-n3"
+    },
+    "改": {
+      "chunk": "kanji-n2"
+    },
+    "攻": {
+      "chunk": "kanji-n1-d"
+    },
+    "放": {
+      "chunk": "kanji-n3"
+    },
+    "政": {
+      "chunk": "kanji-n3"
+    },
+    "故": {
+      "chunk": "kanji-n1-b"
+    },
+    "敏": {
+      "chunk": "kanji-n1-d"
+    },
+    "救": {
+      "chunk": "kanji-n1-b"
+    },
+    "敗": {
+      "chunk": "kanji-n3"
+    },
+    "教": {
+      "chunk": "kanji-n4"
+    },
+    "敢": {
+      "chunk": "kanji-n1-c"
+    },
+    "散": {
+      "chunk": "kanji-n3"
+    },
+    "敦": {
+      "chunk": "kanji-n1-c"
+    },
+    "敬": {
+      "chunk": "kanji-n2"
+    },
+    "数": {
+      "chunk": "kanji-n3"
+    },
+    "整": {
+      "chunk": "kanji-n1-a"
+    },
+    "敷": {
+      "chunk": "kanji-n1-d"
+    },
+    "文": {
+      "chunk": "kanji-n5"
+    },
+    "斉": {
+      "chunk": "kanji-n1-b"
+    },
+    "斎": {
+      "chunk": "kanji-n1-c"
+    },
+    "斐": {
+      "chunk": "kanji-n1-a"
+    },
+    "斗": {
+      "chunk": "kanji-n1-d"
+    },
+    "料": {
+      "chunk": "kanji-n4"
+    },
+    "斜": {
+      "chunk": "kanji-n1-a"
+    },
+    "斤": {
+      "chunk": "kanji-n1-a"
+    },
+    "斥": {
+      "chunk": "kanji-n1-b"
+    },
+    "断": {
+      "chunk": "kanji-n3"
+    },
+    "新": {
+      "chunk": "kanji-n5"
+    },
+    "方": {
+      "chunk": "kanji-n4"
+    },
+    "於": {
+      "chunk": "kanji-n1-a"
+    },
+    "施": {
+      "chunk": "kanji-n1-b"
+    },
+    "旅": {
+      "chunk": "kanji-n4"
+    },
+    "旋": {
+      "chunk": "kanji-n1-d"
+    },
+    "族": {
+      "chunk": "kanji-n4"
+    },
+    "旗": {
+      "chunk": "kanji-n1-d"
+    },
+    "既": {
+      "chunk": "kanji-n1-c"
+    },
+    "日": {
+      "chunk": "kanji-n5"
+    },
+    "旦": {
+      "chunk": "kanji-n1-c"
+    },
+    "旧": {
+      "chunk": "kanji-n2"
+    },
+    "旨": {
+      "chunk": "kanji-n1-a"
+    },
+    "早": {
+      "chunk": "kanji-n4"
+    },
+    "旬": {
+      "chunk": "kanji-n1-a"
+    },
+    "旭": {
+      "chunk": "kanji-n1-b"
+    },
+    "旺": {
+      "chunk": "kanji-n1-c"
+    },
+    "昂": {
+      "chunk": "kanji-n1-c"
+    },
+    "昆": {
+      "chunk": "kanji-n1-c"
+    },
+    "昇": {
+      "chunk": "kanji-n2"
+    },
+    "昌": {
+      "chunk": "kanji-n1-a"
+    },
+    "明": {
+      "chunk": "kanji-n4"
+    },
+    "易": {
+      "chunk": "kanji-n3"
+    },
+    "昔": {
+      "chunk": "kanji-n3"
+    },
+    "星": {
+      "chunk": "kanji-n2"
+    },
+    "映": {
+      "chunk": "kanji-n4"
+    },
+    "春": {
+      "chunk": "kanji-n4"
+    },
+    "昧": {
+      "chunk": "kanji-n1-d"
+    },
+    "昭": {
+      "chunk": "kanji-n1-b"
+    },
+    "是": {
+      "chunk": "kanji-n1-d"
+    },
+    "昴": {
+      "chunk": "kanji-n1-a"
+    },
+    "昼": {
+      "chunk": "kanji-n4"
+    },
+    "時": {
+      "chunk": "kanji-n5"
+    },
+    "晃": {
+      "chunk": "kanji-n1-d"
+    },
+    "晋": {
+      "chunk": "kanji-n1-d"
+    },
+    "晏": {
+      "chunk": "kanji-n1-d"
+    },
+    "晟": {
+      "chunk": "kanji-n1-d"
+    },
+    "晨": {
+      "chunk": "kanji-n1-a"
+    },
+    "普": {
+      "chunk": "kanji-n2"
+    },
+    "景": {
+      "chunk": "kanji-n3"
+    },
+    "晴": {
+      "chunk": "kanji-n3"
+    },
+    "晶": {
+      "chunk": "kanji-n1-c"
+    },
+    "智": {
+      "chunk": "kanji-n1-c"
+    },
+    "暁": {
+      "chunk": "kanji-n1-b"
+    },
+    "暇": {
+      "chunk": "kanji-n1-d"
+    },
+    "暉": {
+      "chunk": "kanji-n1-b"
+    },
+    "暑": {
+      "chunk": "kanji-n1-b"
+    },
+    "暖": {
+      "chunk": "kanji-n1-c"
+    },
+    "暗": {
+      "chunk": "kanji-n4"
+    },
+    "暢": {
+      "chunk": "kanji-n1-c"
+    },
+    "暦": {
+      "chunk": "kanji-n1-c"
+    },
+    "暫": {
+      "chunk": "kanji-n1-d"
+    },
+    "暮": {
+      "chunk": "kanji-n3"
+    },
+    "暴": {
+      "chunk": "kanji-n2"
+    },
+    "曇": {
+      "chunk": "kanji-n2"
+    },
+    "曖": {
+      "chunk": "kanji-n1-c"
+    },
+    "曙": {
+      "chunk": "kanji-n1-b"
+    },
+    "曜": {
+      "chunk": "kanji-n4"
+    },
+    "曲": {
+      "chunk": "kanji-n3"
+    },
+    "更": {
+      "chunk": "kanji-n3"
+    },
+    "書": {
+      "chunk": "kanji-n5"
+    },
+    "曹": {
+      "chunk": "kanji-n1-b"
+    },
+    "替": {
+      "chunk": "kanji-n2"
+    },
+    "最": {
+      "chunk": "kanji-n3"
+    },
+    "月": {
+      "chunk": "kanji-n5"
+    },
+    "有": {
+      "chunk": "kanji-n4"
+    },
+    "朋": {
+      "chunk": "kanji-n1-d"
+    },
+    "服": {
+      "chunk": "kanji-n4"
+    },
+    "朔": {
+      "chunk": "kanji-n1-a"
+    },
+    "朕": {
+      "chunk": "kanji-n1-b"
+    },
+    "朗": {
+      "chunk": "kanji-n1-d"
+    },
+    "望": {
+      "chunk": "kanji-n3"
+    },
+    "朝": {
+      "chunk": "kanji-n4"
+    },
+    "期": {
+      "chunk": "kanji-n3"
+    },
+    "木": {
+      "chunk": "kanji-n5"
+    },
+    "未": {
+      "chunk": "kanji-n3"
+    },
+    "末": {
+      "chunk": "kanji-n3"
+    },
+    "本": {
+      "chunk": "kanji-n5"
+    },
+    "札": {
+      "chunk": "kanji-n2"
+    },
+    "朱": {
+      "chunk": "kanji-n1-b"
+    },
+    "朴": {
+      "chunk": "kanji-n1-a"
+    },
+    "机": {
+      "chunk": "kanji-n2"
+    },
+    "朽": {
+      "chunk": "kanji-n1-b"
+    },
+    "杉": {
+      "chunk": "kanji-n1-b"
+    },
+    "李": {
+      "chunk": "kanji-n1-c"
+    },
+    "杏": {
+      "chunk": "kanji-n1-d"
+    },
+    "材": {
+      "chunk": "kanji-n2"
+    },
+    "村": {
+      "chunk": "kanji-n4"
+    },
+    "杜": {
+      "chunk": "kanji-n1-a"
+    },
+    "束": {
+      "chunk": "kanji-n3"
+    },
+    "条": {
+      "chunk": "kanji-n1-b"
+    },
+    "来": {
+      "chunk": "kanji-n5"
+    },
+    "杯": {
+      "chunk": "kanji-n3"
+    },
+    "東": {
+      "chunk": "kanji-n5"
+    },
+    "松": {
+      "chunk": "kanji-n1-c"
+    },
+    "板": {
+      "chunk": "kanji-n2"
+    },
+    "析": {
+      "chunk": "kanji-n1-a"
+    },
+    "林": {
+      "chunk": "kanji-n2"
+    },
+    "枚": {
+      "chunk": "kanji-n2"
+    },
+    "果": {
+      "chunk": "kanji-n3"
+    },
+    "枝": {
+      "chunk": "kanji-n2"
+    },
+    "枢": {
+      "chunk": "kanji-n1-c"
+    },
+    "枯": {
+      "chunk": "kanji-n2"
+    },
+    "架": {
+      "chunk": "kanji-n1-c"
+    },
+    "柄": {
+      "chunk": "kanji-n1-a"
+    },
+    "柊": {
+      "chunk": "kanji-n1-c"
+    },
+    "某": {
+      "chunk": "kanji-n1-a"
+    },
+    "染": {
+      "chunk": "kanji-n1-d"
+    },
+    "柔": {
+      "chunk": "kanji-n2"
+    },
+    "柚": {
+      "chunk": "kanji-n1-c"
+    },
+    "柱": {
+      "chunk": "kanji-n2"
+    },
+    "柳": {
+      "chunk": "kanji-n1-d"
+    },
+    "査": {
+      "chunk": "kanji-n3"
+    },
+    "柾": {
+      "chunk": "kanji-n1-c"
+    },
+    "栄": {
+      "chunk": "kanji-n2"
+    },
+    "栗": {
+      "chunk": "kanji-n1-d"
+    },
+    "栞": {
+      "chunk": "kanji-n1-c"
+    },
+    "校": {
+      "chunk": "kanji-n5"
+    },
+    "株": {
+      "chunk": "kanji-n1-c"
+    },
+    "根": {
+      "chunk": "kanji-n2"
+    },
+    "格": {
+      "chunk": "kanji-n3"
+    },
+    "栽": {
+      "chunk": "kanji-n1-b"
+    },
+    "桂": {
+      "chunk": "kanji-n1-c"
+    },
+    "桃": {
+      "chunk": "kanji-n1-d"
+    },
+    "桐": {
+      "chunk": "kanji-n1-a"
+    },
+    "桑": {
+      "chunk": "kanji-n1-b"
+    },
+    "桜": {
+      "chunk": "kanji-n1-a"
+    },
+    "桟": {
+      "chunk": "kanji-n1-d"
+    },
+    "梅": {
+      "chunk": "kanji-n1-b"
+    },
+    "梓": {
+      "chunk": "kanji-n1-d"
+    },
+    "梢": {
+      "chunk": "kanji-n1-c"
+    },
+    "梧": {
+      "chunk": "kanji-n1-d"
+    },
+    "梨": {
+      "chunk": "kanji-n1-a"
+    },
+    "械": {
+      "chunk": "kanji-n2"
+    },
+    "棄": {
+      "chunk": "kanji-n1-a"
+    },
+    "棋": {
+      "chunk": "kanji-n1-d"
+    },
+    "棚": {
+      "chunk": "kanji-n1-c"
+    },
+    "森": {
+      "chunk": "kanji-n2"
+    },
+    "棺": {
+      "chunk": "kanji-n1-c"
+    },
+    "椋": {
+      "chunk": "kanji-n1-d"
+    },
+    "植": {
+      "chunk": "kanji-n2"
+    },
+    "椎": {
+      "chunk": "kanji-n1-c"
+    },
+    "検": {
+      "chunk": "kanji-n3"
+    },
+    "椰": {
+      "chunk": "kanji-n1-a"
+    },
+    "椿": {
+      "chunk": "kanji-n1-d"
+    },
+    "楊": {
+      "chunk": "kanji-n1-c"
+    },
+    "楓": {
+      "chunk": "kanji-n1-d"
+    },
+    "楠": {
+      "chunk": "kanji-n1-a"
+    },
+    "業": {
+      "chunk": "kanji-n4"
+    },
+    "極": {
+      "chunk": "kanji-n2"
+    },
+    "楼": {
+      "chunk": "kanji-n1-a"
+    },
+    "楽": {
+      "chunk": "kanji-n4"
+    },
+    "概": {
+      "chunk": "kanji-n1-c"
+    },
+    "榛": {
+      "chunk": "kanji-n1-d"
+    },
+    "構": {
+      "chunk": "kanji-n3"
+    },
+    "様": {
+      "chunk": "kanji-n3"
+    },
+    "槙": {
+      "chunk": "kanji-n1-b"
+    },
+    "槻": {
+      "chunk": "kanji-n1-d"
+    },
+    "槽": {
+      "chunk": "kanji-n1-b"
+    },
+    "標": {
+      "chunk": "kanji-n1-b"
+    },
+    "模": {
+      "chunk": "kanji-n2"
+    },
+    "権": {
+      "chunk": "kanji-n3"
+    },
+    "横": {
+      "chunk": "kanji-n3"
+    },
+    "樹": {
+      "chunk": "kanji-n1-b"
+    },
+    "樺": {
+      "chunk": "kanji-n1-c"
+    },
+    "橋": {
+      "chunk": "kanji-n2"
+    },
+    "橘": {
+      "chunk": "kanji-n1-a"
+    },
+    "機": {
+      "chunk": "kanji-n3"
+    },
+    "檀": {
+      "chunk": "kanji-n1-a"
+    },
+    "欠": {
+      "chunk": "kanji-n3"
+    },
+    "次": {
+      "chunk": "kanji-n3"
+    },
+    "欣": {
+      "chunk": "kanji-n1-d"
+    },
+    "欧": {
+      "chunk": "kanji-n2"
+    },
+    "欺": {
+      "chunk": "kanji-n1-c"
+    },
+    "欽": {
+      "chunk": "kanji-n1-b"
+    },
+    "款": {
+      "chunk": "kanji-n1-c"
+    },
+    "歌": {
+      "chunk": "kanji-n4"
+    },
+    "歓": {
+      "chunk": "kanji-n1-d"
+    },
+    "止": {
+      "chunk": "kanji-n4"
+    },
+    "正": {
+      "chunk": "kanji-n4"
+    },
+    "武": {
+      "chunk": "kanji-n2"
+    },
+    "歩": {
+      "chunk": "kanji-n4"
+    },
+    "歯": {
+      "chunk": "kanji-n3"
+    },
+    "歳": {
+      "chunk": "kanji-n3"
+    },
+    "歴": {
+      "chunk": "kanji-n2"
+    },
+    "死": {
+      "chunk": "kanji-n4"
+    },
+    "殉": {
+      "chunk": "kanji-n1-b"
+    },
+    "殊": {
+      "chunk": "kanji-n1-c"
+    },
+    "残": {
+      "chunk": "kanji-n3"
+    },
+    "殖": {
+      "chunk": "kanji-n1-c"
+    },
+    "殴": {
+      "chunk": "kanji-n1-a"
+    },
+    "段": {
+      "chunk": "kanji-n3"
+    },
+    "殺": {
+      "chunk": "kanji-n3"
+    },
+    "殻": {
+      "chunk": "kanji-n1-d"
+    },
+    "殿": {
+      "chunk": "kanji-n2"
+    },
+    "毅": {
+      "chunk": "kanji-n1-b"
+    },
+    "母": {
+      "chunk": "kanji-n5"
+    },
+    "毎": {
+      "chunk": "kanji-n5"
+    },
+    "比": {
+      "chunk": "kanji-n2"
+    },
+    "毛": {
+      "chunk": "kanji-n2"
+    },
+    "毬": {
+      "chunk": "kanji-n1-a"
+    },
+    "民": {
+      "chunk": "kanji-n3"
+    },
+    "気": {
+      "chunk": "kanji-n5"
+    },
+    "水": {
+      "chunk": "kanji-n5"
+    },
+    "氷": {
+      "chunk": "kanji-n2"
+    },
+    "永": {
+      "chunk": "kanji-n2"
+    },
+    "汁": {
+      "chunk": "kanji-n1-b"
+    },
+    "求": {
+      "chunk": "kanji-n3"
+    },
+    "汐": {
+      "chunk": "kanji-n1-a"
+    },
+    "汗": {
+      "chunk": "kanji-n2"
+    },
+    "汚": {
+      "chunk": "kanji-n2"
+    },
+    "江": {
+      "chunk": "kanji-n1-d"
+    },
+    "池": {
+      "chunk": "kanji-n2"
+    },
+    "汰": {
+      "chunk": "kanji-n1-a"
+    },
+    "汽": {
+      "chunk": "kanji-n1-b"
+    },
+    "沈": {
+      "chunk": "kanji-n2"
+    },
+    "沖": {
+      "chunk": "kanji-n1-c"
+    },
+    "沙": {
+      "chunk": "kanji-n1-b"
+    },
+    "没": {
+      "chunk": "kanji-n1-b"
+    },
+    "沢": {
+      "chunk": "kanji-n1-c"
+    },
+    "河": {
+      "chunk": "kanji-n2"
+    },
+    "沸": {
+      "chunk": "kanji-n2"
+    },
+    "油": {
+      "chunk": "kanji-n2"
+    },
+    "治": {
+      "chunk": "kanji-n3"
+    },
+    "沼": {
+      "chunk": "kanji-n1-a"
+    },
+    "沿": {
+      "chunk": "kanji-n2"
+    },
+    "況": {
+      "chunk": "kanji-n2"
+    },
+    "泉": {
+      "chunk": "kanji-n2"
+    },
+    "泊": {
+      "chunk": "kanji-n2"
+    },
+    "泌": {
+      "chunk": "kanji-n1-a"
+    },
+    "法": {
+      "chunk": "kanji-n3"
+    },
+    "泡": {
+      "chunk": "kanji-n1-b"
+    },
+    "波": {
+      "chunk": "kanji-n2"
+    },
+    "泣": {
+      "chunk": "kanji-n1-d"
+    },
+    "泥": {
+      "chunk": "kanji-n2"
+    },
+    "泰": {
+      "chunk": "kanji-n1-a"
+    },
+    "泳": {
+      "chunk": "kanji-n4"
+    },
+    "洋": {
+      "chunk": "kanji-n4"
+    },
+    "洗": {
+      "chunk": "kanji-n3"
+    },
+    "洞": {
+      "chunk": "kanji-n1-c"
+    },
+    "津": {
+      "chunk": "kanji-n1-b"
+    },
+    "洪": {
+      "chunk": "kanji-n1-c"
+    },
+    "洲": {
+      "chunk": "kanji-n1-c"
+    },
+    "洵": {
+      "chunk": "kanji-n1-b"
+    },
+    "洸": {
+      "chunk": "kanji-n1-a"
+    },
+    "活": {
+      "chunk": "kanji-n3"
+    },
+    "派": {
+      "chunk": "kanji-n1-c"
+    },
+    "流": {
+      "chunk": "kanji-n3"
+    },
+    "浄": {
+      "chunk": "kanji-n1-a"
+    },
+    "浅": {
+      "chunk": "kanji-n2"
+    },
+    "浜": {
+      "chunk": "kanji-n1-a"
+    },
+    "浦": {
+      "chunk": "kanji-n1-c"
+    },
+    "浩": {
+      "chunk": "kanji-n1-b"
+    },
+    "浪": {
+      "chunk": "kanji-n1-c"
+    },
+    "浮": {
+      "chunk": "kanji-n3"
+    },
+    "浴": {
+      "chunk": "kanji-n2"
+    },
+    "海": {
+      "chunk": "kanji-n4"
+    },
+    "浸": {
+      "chunk": "kanji-n1-a"
+    },
+    "消": {
+      "chunk": "kanji-n3"
+    },
+    "涙": {
+      "chunk": "kanji-n2"
+    },
+    "涯": {
+      "chunk": "kanji-n1-d"
+    },
+    "涼": {
+      "chunk": "kanji-n2"
+    },
+    "淑": {
+      "chunk": "kanji-n1-b"
+    },
+    "淡": {
+      "chunk": "kanji-n1-b"
+    },
+    "深": {
+      "chunk": "kanji-n3"
+    },
+    "淳": {
+      "chunk": "kanji-n1-d"
+    },
+    "混": {
+      "chunk": "kanji-n2"
+    },
+    "添": {
+      "chunk": "kanji-n1-d"
+    },
+    "清": {
+      "chunk": "kanji-n2"
+    },
+    "渇": {
+      "chunk": "kanji-n1-d"
+    },
+    "済": {
+      "chunk": "kanji-n3"
+    },
+    "渉": {
+      "chunk": "kanji-n1-b"
+    },
+    "渋": {
+      "chunk": "kanji-n1-d"
+    },
+    "渓": {
+      "chunk": "kanji-n1-d"
+    },
+    "渚": {
+      "chunk": "kanji-n1-c"
+    },
+    "減": {
+      "chunk": "kanji-n3"
+    },
+    "渡": {
+      "chunk": "kanji-n3"
+    },
+    "渥": {
+      "chunk": "kanji-n1-b"
+    },
+    "渦": {
+      "chunk": "kanji-n1-c"
+    },
+    "温": {
+      "chunk": "kanji-n2"
+    },
+    "測": {
+      "chunk": "kanji-n2"
+    },
+    "港": {
+      "chunk": "kanji-n3"
+    },
+    "湖": {
+      "chunk": "kanji-n2"
+    },
+    "湧": {
+      "chunk": "kanji-n1-d"
+    },
+    "湯": {
+      "chunk": "kanji-n2"
+    },
+    "湿": {
+      "chunk": "kanji-n2"
+    },
+    "満": {
+      "chunk": "kanji-n3"
+    },
+    "源": {
+      "chunk": "kanji-n2"
+    },
+    "準": {
+      "chunk": "kanji-n2"
+    },
+    "溝": {
+      "chunk": "kanji-n1-b"
+    },
+    "溶": {
+      "chunk": "kanji-n2"
+    },
+    "滅": {
+      "chunk": "kanji-n1-b"
+    },
+    "滉": {
+      "chunk": "kanji-n1-b"
+    },
+    "滋": {
+      "chunk": "kanji-n1-d"
+    },
+    "滑": {
+      "chunk": "kanji-n1-b"
+    },
+    "滝": {
+      "chunk": "kanji-n1-b"
+    },
+    "滞": {
+      "chunk": "kanji-n1-c"
+    },
+    "滴": {
+      "chunk": "kanji-n2"
+    },
+    "漁": {
+      "chunk": "kanji-n2"
+    },
+    "漂": {
+      "chunk": "kanji-n1-c"
+    },
+    "漆": {
+      "chunk": "kanji-n1-c"
+    },
+    "漏": {
+      "chunk": "kanji-n1-d"
+    },
+    "演": {
+      "chunk": "kanji-n3"
+    },
+    "漠": {
+      "chunk": "kanji-n1-a"
+    },
+    "漢": {
+      "chunk": "kanji-n4"
+    },
+    "漫": {
+      "chunk": "kanji-n1-d"
+    },
+    "漬": {
+      "chunk": "kanji-n1-a"
+    },
+    "漱": {
+      "chunk": "kanji-n1-b"
+    },
+    "漸": {
+      "chunk": "kanji-n1-a"
+    },
+    "潔": {
+      "chunk": "kanji-n1-a"
+    },
+    "潜": {
+      "chunk": "kanji-n1-a"
+    },
+    "潟": {
+      "chunk": "kanji-n1-d"
+    },
+    "潤": {
+      "chunk": "kanji-n1-a"
+    },
+    "潮": {
+      "chunk": "kanji-n1-c"
+    },
+    "澄": {
+      "chunk": "kanji-n1-a"
+    },
+    "澪": {
+      "chunk": "kanji-n1-c"
+    },
+    "激": {
+      "chunk": "kanji-n1-a"
+    },
+    "濁": {
+      "chunk": "kanji-n1-b"
+    },
+    "濃": {
+      "chunk": "kanji-n2"
+    },
+    "濫": {
+      "chunk": "kanji-n1-d"
+    },
+    "濯": {
+      "chunk": "kanji-n2"
+    },
+    "瀬": {
+      "chunk": "kanji-n1-a"
+    },
+    "火": {
+      "chunk": "kanji-n5"
+    },
+    "灯": {
+      "chunk": "kanji-n2"
+    },
+    "灰": {
+      "chunk": "kanji-n2"
+    },
+    "災": {
+      "chunk": "kanji-n1-b"
+    },
+    "炉": {
+      "chunk": "kanji-n1-b"
+    },
+    "炊": {
+      "chunk": "kanji-n1-c"
+    },
+    "炎": {
+      "chunk": "kanji-n1-c"
+    },
+    "炭": {
+      "chunk": "kanji-n2"
+    },
+    "為": {
+      "chunk": "kanji-n1-c"
+    },
+    "烈": {
+      "chunk": "kanji-n1-a"
+    },
+    "焦": {
+      "chunk": "kanji-n1-c"
+    },
+    "然": {
+      "chunk": "kanji-n3"
+    },
+    "焼": {
+      "chunk": "kanji-n2"
+    },
+    "煙": {
+      "chunk": "kanji-n3"
+    },
+    "照": {
+      "chunk": "kanji-n2"
+    },
+    "煩": {
+      "chunk": "kanji-n1-b"
+    },
+    "煮": {
+      "chunk": "kanji-n1-c"
+    },
+    "熊": {
+      "chunk": "kanji-n1-c"
+    },
+    "熙": {
+      "chunk": "kanji-n1-b"
+    },
+    "熟": {
+      "chunk": "kanji-n1-d"
+    },
+    "熱": {
+      "chunk": "kanji-n3"
+    },
+    "燃": {
+      "chunk": "kanji-n2"
+    },
+    "燎": {
+      "chunk": "kanji-n1-c"
+    },
+    "燥": {
+      "chunk": "kanji-n2"
+    },
+    "燦": {
+      "chunk": "kanji-n1-c"
+    },
+    "燿": {
+      "chunk": "kanji-n1-d"
+    },
+    "爆": {
+      "chunk": "kanji-n2"
+    },
+    "爵": {
+      "chunk": "kanji-n1-b"
+    },
+    "父": {
+      "chunk": "kanji-n5"
+    },
+    "爽": {
+      "chunk": "kanji-n1-b"
+    },
+    "爾": {
+      "chunk": "kanji-n1-c"
+    },
+    "片": {
+      "chunk": "kanji-n2"
+    },
+    "牛": {
+      "chunk": "kanji-n4"
+    },
+    "牧": {
+      "chunk": "kanji-n1-d"
+    },
+    "物": {
+      "chunk": "kanji-n4"
+    },
+    "牲": {
+      "chunk": "kanji-n1-c"
+    },
+    "特": {
+      "chunk": "kanji-n4"
+    },
+    "犠": {
+      "chunk": "kanji-n1-a"
+    },
+    "犬": {
+      "chunk": "kanji-n4"
+    },
+    "犯": {
+      "chunk": "kanji-n3"
+    },
+    "状": {
+      "chunk": "kanji-n3"
+    },
+    "狂": {
+      "chunk": "kanji-n1-c"
+    },
+    "狩": {
+      "chunk": "kanji-n1-b"
+    },
+    "独": {
+      "chunk": "kanji-n1-a"
+    },
+    "狭": {
+      "chunk": "kanji-n1-b"
+    },
+    "猛": {
+      "chunk": "kanji-n1-d"
+    },
+    "猟": {
+      "chunk": "kanji-n1-d"
+    },
+    "猪": {
+      "chunk": "kanji-n1-c"
+    },
+    "猫": {
+      "chunk": "kanji-n3"
+    },
+    "献": {
+      "chunk": "kanji-n1-c"
+    },
+    "猶": {
+      "chunk": "kanji-n1-c"
+    },
+    "猿": {
+      "chunk": "kanji-n1-d"
+    },
+    "獄": {
+      "chunk": "kanji-n1-a"
+    },
+    "獣": {
+      "chunk": "kanji-n1-d"
+    },
+    "獲": {
+      "chunk": "kanji-n2"
+    },
+    "玄": {
+      "chunk": "kanji-n1-a"
+    },
+    "率": {
+      "chunk": "kanji-n1-d"
+    },
+    "玉": {
+      "chunk": "kanji-n2"
+    },
+    "王": {
+      "chunk": "kanji-n3"
+    },
+    "玖": {
+      "chunk": "kanji-n1-c"
+    },
+    "玲": {
+      "chunk": "kanji-n1-c"
+    },
+    "珍": {
+      "chunk": "kanji-n2"
+    },
+    "珠": {
+      "chunk": "kanji-n1-a"
+    },
+    "現": {
+      "chunk": "kanji-n3"
+    },
+    "球": {
+      "chunk": "kanji-n3"
+    },
+    "理": {
+      "chunk": "kanji-n4"
+    },
+    "琉": {
+      "chunk": "kanji-n1-b"
+    },
+    "琢": {
+      "chunk": "kanji-n1-c"
+    },
+    "琳": {
+      "chunk": "kanji-n1-d"
+    },
+    "瑚": {
+      "chunk": "kanji-n1-c"
+    },
+    "瑛": {
+      "chunk": "kanji-n1-d"
+    },
+    "瑞": {
+      "chunk": "kanji-n1-c"
+    },
+    "瑠": {
+      "chunk": "kanji-n1-a"
+    },
+    "瑳": {
+      "chunk": "kanji-n1-d"
+    },
+    "瑶": {
+      "chunk": "kanji-n1-c"
+    },
+    "璃": {
+      "chunk": "kanji-n1-d"
+    },
+    "璧": {
+      "chunk": "kanji-n1-d"
+    },
+    "環": {
+      "chunk": "kanji-n2"
+    },
+    "瓶": {
+      "chunk": "kanji-n2"
+    },
+    "甘": {
+      "chunk": "kanji-n2"
+    },
+    "甚": {
+      "chunk": "kanji-n1-c"
+    },
+    "生": {
+      "chunk": "kanji-n5"
+    },
+    "産": {
+      "chunk": "kanji-n3"
+    },
+    "用": {
+      "chunk": "kanji-n4"
+    },
+    "甫": {
+      "chunk": "kanji-n1-d"
+    },
+    "田": {
+      "chunk": "kanji-n5"
+    },
+    "由": {
+      "chunk": "kanji-n3"
+    },
+    "甲": {
+      "chunk": "kanji-n1-c"
+    },
+    "申": {
+      "chunk": "kanji-n3"
+    },
+    "男": {
+      "chunk": "kanji-n5"
+    },
+    "町": {
+      "chunk": "kanji-n4"
+    },
+    "画": {
+      "chunk": "kanji-n4"
+    },
+    "界": {
+      "chunk": "kanji-n4"
+    },
+    "畔": {
+      "chunk": "kanji-n1-a"
+    },
+    "留": {
+      "chunk": "kanji-n3"
+    },
+    "畜": {
+      "chunk": "kanji-n2"
+    },
+    "畝": {
+      "chunk": "kanji-n1-b"
+    },
+    "略": {
+      "chunk": "kanji-n2"
+    },
+    "番": {
+      "chunk": "kanji-n3"
+    },
+    "畳": {
+      "chunk": "kanji-n2"
+    },
+    "疎": {
+      "chunk": "kanji-n1-c"
+    },
+    "疑": {
+      "chunk": "kanji-n3"
+    },
+    "疫": {
+      "chunk": "kanji-n1-d"
+    },
+    "疲": {
+      "chunk": "kanji-n3"
+    },
+    "疾": {
+      "chunk": "kanji-n1-c"
+    },
+    "病": {
+      "chunk": "kanji-n4"
+    },
+    "症": {
+      "chunk": "kanji-n1-d"
+    },
+    "痘": {
+      "chunk": "kanji-n1-a"
+    },
+    "痛": {
+      "chunk": "kanji-n3"
+    },
+    "痢": {
+      "chunk": "kanji-n1-c"
+    },
+    "痴": {
+      "chunk": "kanji-n1-a"
+    },
+    "療": {
+      "chunk": "kanji-n2"
+    },
+    "癒": {
+      "chunk": "kanji-n1-c"
+    },
+    "癖": {
+      "chunk": "kanji-n1-c"
+    },
+    "発": {
+      "chunk": "kanji-n4"
+    },
+    "登": {
+      "chunk": "kanji-n3"
+    },
+    "白": {
+      "chunk": "kanji-n5"
+    },
+    "皆": {
+      "chunk": "kanji-n3"
+    },
+    "皇": {
+      "chunk": "kanji-n1-d"
+    },
+    "皐": {
+      "chunk": "kanji-n1-a"
+    },
+    "皓": {
+      "chunk": "kanji-n1-d"
+    },
+    "皮": {
+      "chunk": "kanji-n2"
+    },
+    "皿": {
+      "chunk": "kanji-n2"
+    },
+    "益": {
+      "chunk": "kanji-n2"
+    },
+    "盗": {
+      "chunk": "kanji-n3"
+    },
+    "盛": {
+      "chunk": "kanji-n1-d"
+    },
+    "盟": {
+      "chunk": "kanji-n1-d"
+    },
+    "監": {
+      "chunk": "kanji-n1-d"
+    },
+    "盤": {
+      "chunk": "kanji-n2"
+    },
+    "目": {
+      "chunk": "kanji-n5"
+    },
+    "盲": {
+      "chunk": "kanji-n1-c"
+    },
+    "直": {
+      "chunk": "kanji-n3"
+    },
+    "相": {
+      "chunk": "kanji-n4"
+    },
+    "盾": {
+      "chunk": "kanji-n1-c"
+    },
+    "省": {
+      "chunk": "kanji-n2"
+    },
+    "眉": {
+      "chunk": "kanji-n1-b"
+    },
+    "看": {
+      "chunk": "kanji-n1-d"
+    },
+    "県": {
+      "chunk": "kanji-n2"
+    },
+    "真": {
+      "chunk": "kanji-n4"
+    },
+    "眠": {
+      "chunk": "kanji-n3"
+    },
+    "眸": {
+      "chunk": "kanji-n1-a"
+    },
+    "眺": {
+      "chunk": "kanji-n1-c"
+    },
+    "眼": {
+      "chunk": "kanji-n1-a"
+    },
+    "着": {
+      "chunk": "kanji-n4"
+    },
+    "睡": {
+      "chunk": "kanji-n1-b"
+    },
+    "督": {
+      "chunk": "kanji-n1-d"
+    },
+    "睦": {
+      "chunk": "kanji-n1-c"
+    },
+    "瞬": {
+      "chunk": "kanji-n1-a"
+    },
+    "瞭": {
+      "chunk": "kanji-n1-b"
+    },
+    "瞳": {
+      "chunk": "kanji-n1-d"
+    },
+    "矛": {
+      "chunk": "kanji-n1-d"
+    },
+    "矢": {
+      "chunk": "kanji-n1-c"
+    },
+    "知": {
+      "chunk": "kanji-n4"
+    },
+    "短": {
+      "chunk": "kanji-n2"
+    },
+    "矯": {
+      "chunk": "kanji-n1-d"
+    },
+    "石": {
+      "chunk": "kanji-n3"
+    },
+    "砂": {
+      "chunk": "kanji-n2"
+    },
+    "研": {
+      "chunk": "kanji-n4"
+    },
+    "砕": {
+      "chunk": "kanji-n1-b"
+    },
+    "砲": {
+      "chunk": "kanji-n1-c"
+    },
+    "破": {
+      "chunk": "kanji-n3"
+    },
+    "硝": {
+      "chunk": "kanji-n1-b"
+    },
+    "硫": {
+      "chunk": "kanji-n1-d"
+    },
+    "硬": {
+      "chunk": "kanji-n2"
+    },
+    "碧": {
+      "chunk": "kanji-n1-d"
+    },
+    "碩": {
+      "chunk": "kanji-n1-b"
+    },
+    "確": {
+      "chunk": "kanji-n3"
+    },
+    "磁": {
+      "chunk": "kanji-n1-b"
+    },
+    "磨": {
+      "chunk": "kanji-n2"
+    },
+    "磯": {
+      "chunk": "kanji-n1-d"
+    },
+    "礁": {
+      "chunk": "kanji-n1-b"
+    },
+    "礎": {
+      "chunk": "kanji-n1-c"
+    },
+    "示": {
+      "chunk": "kanji-n3"
+    },
+    "礼": {
+      "chunk": "kanji-n3"
+    },
+    "社": {
+      "chunk": "kanji-n4"
+    },
+    "祈": {
+      "chunk": "kanji-n2"
+    },
+    "祉": {
+      "chunk": "kanji-n1-b"
+    },
+    "祐": {
+      "chunk": "kanji-n1-a"
+    },
+    "祖": {
+      "chunk": "kanji-n3"
+    },
+    "祝": {
+      "chunk": "kanji-n2"
+    },
+    "神": {
+      "chunk": "kanji-n3"
+    },
+    "祥": {
+      "chunk": "kanji-n1-b"
+    },
+    "祭": {
+      "chunk": "kanji-n2"
+    },
+    "禁": {
+      "chunk": "kanji-n2"
+    },
+    "禄": {
+      "chunk": "kanji-n1-a"
+    },
+    "禅": {
+      "chunk": "kanji-n1-b"
+    },
+    "禍": {
+      "chunk": "kanji-n1-b"
+    },
+    "禎": {
+      "chunk": "kanji-n1-c"
+    },
+    "福": {
+      "chunk": "kanji-n3"
+    },
+    "秀": {
+      "chunk": "kanji-n1-a"
+    },
+    "私": {
+      "chunk": "kanji-n4"
+    },
+    "秋": {
+      "chunk": "kanji-n4"
+    },
+    "科": {
+      "chunk": "kanji-n3"
+    },
+    "秘": {
+      "chunk": "kanji-n1-a"
+    },
+    "租": {
+      "chunk": "kanji-n1-d"
+    },
+    "秦": {
+      "chunk": "kanji-n1-c"
+    },
+    "秩": {
+      "chunk": "kanji-n1-b"
+    },
+    "称": {
+      "chunk": "kanji-n1-a"
+    },
+    "移": {
+      "chunk": "kanji-n2"
+    },
+    "稀": {
+      "chunk": "kanji-n1-a"
+    },
+    "程": {
+      "chunk": "kanji-n3"
+    },
+    "税": {
+      "chunk": "kanji-n2"
+    },
+    "稔": {
+      "chunk": "kanji-n1-a"
+    },
+    "稚": {
+      "chunk": "kanji-n1-c"
+    },
+    "稜": {
+      "chunk": "kanji-n1-a"
+    },
+    "種": {
+      "chunk": "kanji-n3"
+    },
+    "稲": {
+      "chunk": "kanji-n1-c"
+    },
+    "稼": {
+      "chunk": "kanji-n1-a"
+    },
+    "稿": {
+      "chunk": "kanji-n1-d"
+    },
+    "穀": {
+      "chunk": "kanji-n1-a"
+    },
+    "穂": {
+      "chunk": "kanji-n1-c"
+    },
+    "積": {
+      "chunk": "kanji-n3"
+    },
+    "穏": {
+      "chunk": "kanji-n2"
+    },
+    "穣": {
+      "chunk": "kanji-n1-d"
+    },
+    "穫": {
+      "chunk": "kanji-n1-d"
+    },
+    "穴": {
+      "chunk": "kanji-n1-a"
+    },
+    "究": {
+      "chunk": "kanji-n4"
+    },
+    "空": {
+      "chunk": "kanji-n4"
+    },
+    "突": {
+      "chunk": "kanji-n3"
+    },
+    "窃": {
+      "chunk": "kanji-n1-d"
+    },
+    "窒": {
+      "chunk": "kanji-n1-c"
+    },
+    "窓": {
+      "chunk": "kanji-n3"
+    },
+    "窮": {
+      "chunk": "kanji-n1-c"
+    },
+    "窯": {
+      "chunk": "kanji-n1-d"
+    },
+    "立": {
+      "chunk": "kanji-n5"
+    },
+    "竜": {
+      "chunk": "kanji-n1-a"
+    },
+    "章": {
+      "chunk": "kanji-n2"
+    },
+    "竣": {
+      "chunk": "kanji-n1-d"
+    },
+    "童": {
+      "chunk": "kanji-n2"
+    },
+    "端": {
+      "chunk": "kanji-n1-d"
+    },
+    "競": {
+      "chunk": "kanji-n2"
+    },
+    "竹": {
+      "chunk": "kanji-n2"
+    },
+    "笑": {
+      "chunk": "kanji-n3"
+    },
+    "笙": {
+      "chunk": "kanji-n1-b"
+    },
+    "笛": {
+      "chunk": "kanji-n1-d"
+    },
+    "符": {
+      "chunk": "kanji-n2"
+    },
+    "第": {
+      "chunk": "kanji-n1-a"
+    },
+    "笹": {
+      "chunk": "kanji-n1-b"
+    },
+    "筆": {
+      "chunk": "kanji-n2"
+    },
+    "等": {
+      "chunk": "kanji-n3"
+    },
+    "筋": {
+      "chunk": "kanji-n1-d"
+    },
+    "筒": {
+      "chunk": "kanji-n2"
+    },
+    "答": {
+      "chunk": "kanji-n4"
+    },
+    "箇": {
+      "chunk": "kanji-n1-d"
+    },
+    "算": {
+      "chunk": "kanji-n3"
+    },
+    "管": {
+      "chunk": "kanji-n3"
+    },
+    "箱": {
+      "chunk": "kanji-n3"
+    },
+    "節": {
+      "chunk": "kanji-n1-a"
+    },
+    "範": {
+      "chunk": "kanji-n2"
+    },
+    "築": {
+      "chunk": "kanji-n2"
+    },
+    "篤": {
+      "chunk": "kanji-n1-a"
+    },
+    "簡": {
+      "chunk": "kanji-n2"
+    },
+    "簿": {
+      "chunk": "kanji-n1-d"
+    },
+    "籍": {
+      "chunk": "kanji-n2"
+    },
+    "米": {
+      "chunk": "kanji-n3"
+    },
+    "粉": {
+      "chunk": "kanji-n2"
+    },
+    "粒": {
+      "chunk": "kanji-n2"
+    },
+    "粗": {
+      "chunk": "kanji-n1-d"
+    },
+    "粘": {
+      "chunk": "kanji-n1-a"
+    },
+    "粛": {
+      "chunk": "kanji-n1-d"
+    },
+    "精": {
+      "chunk": "kanji-n3"
+    },
+    "糖": {
+      "chunk": "kanji-n1-c"
+    },
+    "糧": {
+      "chunk": "kanji-n1-d"
+    },
+    "糸": {
+      "chunk": "kanji-n2"
+    },
+    "系": {
+      "chunk": "kanji-n1-d"
+    },
+    "糾": {
+      "chunk": "kanji-n1-c"
+    },
+    "紀": {
+      "chunk": "kanji-n1-a"
+    },
+    "紅": {
+      "chunk": "kanji-n2"
+    },
+    "紋": {
+      "chunk": "kanji-n1-d"
+    },
+    "納": {
+      "chunk": "kanji-n1-b"
+    },
+    "純": {
+      "chunk": "kanji-n2"
+    },
+    "紗": {
+      "chunk": "kanji-n1-d"
+    },
+    "紘": {
+      "chunk": "kanji-n1-a"
+    },
+    "紙": {
+      "chunk": "kanji-n4"
+    },
+    "級": {
+      "chunk": "kanji-n1-c"
+    },
+    "紛": {
+      "chunk": "kanji-n1-d"
+    },
+    "素": {
+      "chunk": "kanji-n1-a"
+    },
+    "紡": {
+      "chunk": "kanji-n1-b"
+    },
+    "索": {
+      "chunk": "kanji-n1-c"
+    },
+    "紫": {
+      "chunk": "kanji-n1-d"
+    },
+    "紬": {
+      "chunk": "kanji-n1-a"
+    },
+    "累": {
+      "chunk": "kanji-n1-d"
+    },
+    "細": {
+      "chunk": "kanji-n2"
+    },
+    "紳": {
+      "chunk": "kanji-n1-d"
+    },
+    "紹": {
+      "chunk": "kanji-n2"
+    },
+    "終": {
+      "chunk": "kanji-n4"
+    },
+    "絃": {
+      "chunk": "kanji-n1-d"
+    },
+    "組": {
+      "chunk": "kanji-n3"
+    },
+    "経": {
+      "chunk": "kanji-n3"
+    },
+    "結": {
+      "chunk": "kanji-n1-a"
+    },
+    "絞": {
+      "chunk": "kanji-n1-c"
+    },
+    "絡": {
+      "chunk": "kanji-n2"
+    },
+    "絢": {
+      "chunk": "kanji-n1-c"
+    },
+    "給": {
+      "chunk": "kanji-n3"
+    },
+    "統": {
+      "chunk": "kanji-n2"
+    },
+    "絵": {
+      "chunk": "kanji-n3"
+    },
+    "絶": {
+      "chunk": "kanji-n3"
+    },
+    "絹": {
+      "chunk": "kanji-n1-b"
+    },
+    "継": {
+      "chunk": "kanji-n1-b"
+    },
+    "続": {
+      "chunk": "kanji-n3"
+    },
+    "綜": {
+      "chunk": "kanji-n1-a"
+    },
+    "維": {
+      "chunk": "kanji-n1-b"
+    },
+    "綱": {
+      "chunk": "kanji-n1-b"
+    },
+    "網": {
+      "chunk": "kanji-n1-c"
+    },
+    "綸": {
+      "chunk": "kanji-n1-a"
+    },
+    "綺": {
+      "chunk": "kanji-n1-c"
+    },
+    "綾": {
+      "chunk": "kanji-n1-c"
+    },
+    "綿": {
+      "chunk": "kanji-n2"
+    },
+    "緊": {
+      "chunk": "kanji-n2"
+    },
+    "緋": {
+      "chunk": "kanji-n1-d"
+    },
+    "総": {
+      "chunk": "kanji-n2"
+    },
+    "緑": {
+      "chunk": "kanji-n2"
+    },
+    "緒": {
+      "chunk": "kanji-n3"
+    },
+    "締": {
+      "chunk": "kanji-n1-a"
+    },
+    "編": {
+      "chunk": "kanji-n2"
+    },
+    "緩": {
+      "chunk": "kanji-n1-b"
+    },
+    "緯": {
+      "chunk": "kanji-n1-d"
+    },
+    "練": {
+      "chunk": "kanji-n2"
+    },
+    "緻": {
+      "chunk": "kanji-n1-d"
+    },
+    "縁": {
+      "chunk": "kanji-n1-b"
+    },
+    "縄": {
+      "chunk": "kanji-n1-a"
+    },
+    "縛": {
+      "chunk": "kanji-n1-d"
+    },
+    "縦": {
+      "chunk": "kanji-n1-c"
+    },
+    "縫": {
+      "chunk": "kanji-n1-d"
+    },
+    "縮": {
+      "chunk": "kanji-n2"
+    },
+    "績": {
+      "chunk": "kanji-n2"
+    },
+    "繁": {
+      "chunk": "kanji-n1-b"
+    },
+    "繊": {
+      "chunk": "kanji-n1-c"
+    },
+    "織": {
+      "chunk": "kanji-n1-a"
+    },
+    "繕": {
+      "chunk": "kanji-n1-b"
+    },
+    "繭": {
+      "chunk": "kanji-n1-b"
+    },
+    "繰": {
+      "chunk": "kanji-n1-a"
+    },
+    "缶": {
+      "chunk": "kanji-n2"
+    },
+    "罪": {
+      "chunk": "kanji-n3"
+    },
+    "置": {
+      "chunk": "kanji-n3"
+    },
+    "署": {
+      "chunk": "kanji-n2"
+    },
+    "罷": {
+      "chunk": "kanji-n1-d"
+    },
+    "羅": {
+      "chunk": "kanji-n1-b"
+    },
+    "羊": {
+      "chunk": "kanji-n1-c"
+    },
+    "美": {
+      "chunk": "kanji-n3"
+    },
+    "群": {
+      "chunk": "kanji-n2"
+    },
+    "義": {
+      "chunk": "kanji-n1-b"
+    },
+    "羽": {
+      "chunk": "kanji-n2"
+    },
+    "翁": {
+      "chunk": "kanji-n1-b"
+    },
+    "翌": {
+      "chunk": "kanji-n2"
+    },
+    "習": {
+      "chunk": "kanji-n4"
+    },
+    "翔": {
+      "chunk": "kanji-n1-a"
+    },
+    "翠": {
+      "chunk": "kanji-n1-a"
+    },
+    "翻": {
+      "chunk": "kanji-n1-d"
+    },
+    "翼": {
+      "chunk": "kanji-n1-a"
+    },
+    "耀": {
+      "chunk": "kanji-n1-a"
+    },
+    "老": {
+      "chunk": "kanji-n3"
+    },
+    "考": {
+      "chunk": "kanji-n4"
+    },
+    "者": {
+      "chunk": "kanji-n4"
+    },
+    "耐": {
+      "chunk": "kanji-n1-a"
+    },
+    "耕": {
+      "chunk": "kanji-n2"
+    },
+    "耗": {
+      "chunk": "kanji-n1-d"
+    },
+    "耳": {
+      "chunk": "kanji-n5"
+    },
+    "耶": {
+      "chunk": "kanji-n1-c"
+    },
+    "聖": {
+      "chunk": "kanji-n1-c"
+    },
+    "聞": {
+      "chunk": "kanji-n5"
+    },
+    "聡": {
+      "chunk": "kanji-n1-b"
+    },
+    "聴": {
+      "chunk": "kanji-n1-a"
+    },
+    "肇": {
+      "chunk": "kanji-n1-d"
+    },
+    "肌": {
+      "chunk": "kanji-n2"
+    },
+    "肖": {
+      "chunk": "kanji-n1-c"
+    },
+    "肝": {
+      "chunk": "kanji-n1-b"
+    },
+    "肢": {
+      "chunk": "kanji-n1-c"
+    },
+    "肥": {
+      "chunk": "kanji-n1-b"
+    },
+    "肩": {
+      "chunk": "kanji-n2"
+    },
+    "肪": {
+      "chunk": "kanji-n1-c"
+    },
+    "肯": {
+      "chunk": "kanji-n2"
+    },
+    "育": {
+      "chunk": "kanji-n3"
+    },
+    "胆": {
+      "chunk": "kanji-n1-c"
+    },
+    "背": {
+      "chunk": "kanji-n3"
+    },
+    "胎": {
+      "chunk": "kanji-n1-c"
+    },
+    "胞": {
+      "chunk": "kanji-n1-c"
+    },
+    "胡": {
+      "chunk": "kanji-n1-b"
+    },
+    "胤": {
+      "chunk": "kanji-n1-a"
+    },
+    "胸": {
+      "chunk": "kanji-n2"
+    },
+    "能": {
+      "chunk": "kanji-n3"
+    },
+    "脂": {
+      "chunk": "kanji-n2"
+    },
+    "脅": {
+      "chunk": "kanji-n1-b"
+    },
+    "脚": {
+      "chunk": "kanji-n1-c"
+    },
+    "脩": {
+      "chunk": "kanji-n1-b"
+    },
+    "脱": {
+      "chunk": "kanji-n1-b"
+    },
+    "脳": {
+      "chunk": "kanji-n2"
+    },
+    "脹": {
+      "chunk": "kanji-n1-b"
+    },
+    "腐": {
+      "chunk": "kanji-n1-a"
+    },
+    "腕": {
+      "chunk": "kanji-n2"
+    },
+    "腰": {
+      "chunk": "kanji-n2"
+    },
+    "腹": {
+      "chunk": "kanji-n3"
+    },
+    "膚": {
+      "chunk": "kanji-n2"
+    },
+    "膨": {
+      "chunk": "kanji-n1-a"
+    },
+    "臓": {
+      "chunk": "kanji-n2"
+    },
+    "臣": {
+      "chunk": "kanji-n2"
+    },
+    "臨": {
+      "chunk": "kanji-n1-a"
+    },
+    "自": {
+      "chunk": "kanji-n4"
+    },
+    "臭": {
+      "chunk": "kanji-n1-b"
+    },
+    "至": {
+      "chunk": "kanji-n1-d"
+    },
+    "致": {
+      "chunk": "kanji-n1-a"
+    },
+    "興": {
+      "chunk": "kanji-n1-a"
+    },
+    "舌": {
+      "chunk": "kanji-n1-a"
+    },
+    "舎": {
+      "chunk": "kanji-n1-c"
+    },
+    "舗": {
+      "chunk": "kanji-n1-d"
+    },
+    "舜": {
+      "chunk": "kanji-n1-a"
+    },
+    "舞": {
+      "chunk": "kanji-n3"
+    },
+    "舟": {
+      "chunk": "kanji-n2"
+    },
+    "航": {
+      "chunk": "kanji-n2"
+    },
+    "般": {
+      "chunk": "kanji-n2"
+    },
+    "舶": {
+      "chunk": "kanji-n1-c"
+    },
+    "船": {
+      "chunk": "kanji-n3"
+    },
+    "艇": {
+      "chunk": "kanji-n1-d"
+    },
+    "艦": {
+      "chunk": "kanji-n1-c"
+    },
+    "良": {
+      "chunk": "kanji-n3"
+    },
+    "色": {
+      "chunk": "kanji-n4"
+    },
+    "艶": {
+      "chunk": "kanji-n1-c"
+    },
+    "芋": {
+      "chunk": "kanji-n1-d"
+    },
+    "芙": {
+      "chunk": "kanji-n1-b"
+    },
+    "芝": {
+      "chunk": "kanji-n1-b"
+    },
+    "花": {
+      "chunk": "kanji-n5"
+    },
+    "芳": {
+      "chunk": "kanji-n1-d"
+    },
+    "芸": {
+      "chunk": "kanji-n2"
+    },
+    "芹": {
+      "chunk": "kanji-n1-b"
+    },
+    "芽": {
+      "chunk": "kanji-n1-b"
+    },
+    "苑": {
+      "chunk": "kanji-n1-b"
+    },
+    "苗": {
+      "chunk": "kanji-n1-d"
+    },
+    "若": {
+      "chunk": "kanji-n3"
+    },
+    "英": {
+      "chunk": "kanji-n4"
+    },
+    "茂": {
+      "chunk": "kanji-n1-c"
+    },
+    "茄": {
+      "chunk": "kanji-n1-a"
+    },
+    "茅": {
+      "chunk": "kanji-n1-b"
+    },
+    "茉": {
+      "chunk": "kanji-n1-b"
+    },
+    "茎": {
+      "chunk": "kanji-n1-c"
+    },
+    "茜": {
+      "chunk": "kanji-n1-a"
+    },
+    "草": {
+      "chunk": "kanji-n3"
+    },
+    "荒": {
+      "chunk": "kanji-n2"
+    },
+    "荘": {
+      "chunk": "kanji-n1-a"
+    },
+    "荷": {
+      "chunk": "kanji-n2"
+    },
+    "莉": {
+      "chunk": "kanji-n1-b"
+    },
+    "莞": {
+      "chunk": "kanji-n1-c"
+    },
+    "菊": {
+      "chunk": "kanji-n1-c"
+    },
+    "菓": {
+      "chunk": "kanji-n2"
+    },
+    "菖": {
+      "chunk": "kanji-n1-c"
+    },
+    "菜": {
+      "chunk": "kanji-n2"
+    },
+    "菫": {
+      "chunk": "kanji-n1-d"
+    },
+    "華": {
+      "chunk": "kanji-n1-d"
+    },
+    "萌": {
+      "chunk": "kanji-n1-a"
+    },
+    "萩": {
+      "chunk": "kanji-n1-b"
+    },
+    "落": {
+      "chunk": "kanji-n3"
+    },
+    "葉": {
+      "chunk": "kanji-n3"
+    },
+    "著": {
+      "chunk": "kanji-n2"
+    },
+    "葬": {
+      "chunk": "kanji-n1-a"
+    },
+    "葵": {
+      "chunk": "kanji-n1-b"
+    },
+    "蒔": {
+      "chunk": "kanji-n1-a"
+    },
+    "蒸": {
+      "chunk": "kanji-n2"
+    },
+    "蒼": {
+      "chunk": "kanji-n1-a"
+    },
+    "蓄": {
+      "chunk": "kanji-n1-a"
+    },
+    "蓉": {
+      "chunk": "kanji-n1-b"
+    },
+    "蓮": {
+      "chunk": "kanji-n1-c"
+    },
+    "蔦": {
+      "chunk": "kanji-n1-c"
+    },
+    "蔵": {
+      "chunk": "kanji-n2"
+    },
+    "蕉": {
+      "chunk": "kanji-n1-b"
+    },
+    "蕗": {
+      "chunk": "kanji-n1-d"
+    },
+    "薄": {
+      "chunk": "kanji-n2"
+    },
+    "薦": {
+      "chunk": "kanji-n1-c"
+    },
+    "薪": {
+      "chunk": "kanji-n1-c"
+    },
+    "薫": {
+      "chunk": "kanji-n1-d"
+    },
+    "薬": {
+      "chunk": "kanji-n4"
+    },
+    "藍": {
+      "chunk": "kanji-n1-b"
+    },
+    "藤": {
+      "chunk": "kanji-n1-a"
+    },
+    "藩": {
+      "chunk": "kanji-n1-b"
+    },
+    "藻": {
+      "chunk": "kanji-n1-d"
+    },
+    "蘭": {
+      "chunk": "kanji-n1-b"
+    },
+    "虎": {
+      "chunk": "kanji-n1-c"
+    },
+    "虐": {
+      "chunk": "kanji-n1-a"
+    },
+    "虚": {
+      "chunk": "kanji-n1-c"
+    },
+    "虜": {
+      "chunk": "kanji-n1-a"
+    },
+    "虞": {
+      "chunk": "kanji-n1-c"
+    },
+    "虫": {
+      "chunk": "kanji-n2"
+    },
+    "虹": {
+      "chunk": "kanji-n1-b"
+    },
+    "蚊": {
+      "chunk": "kanji-n1-c"
+    },
+    "蚕": {
+      "chunk": "kanji-n1-b"
+    },
+    "蛇": {
+      "chunk": "kanji-n1-d"
+    },
+    "蛍": {
+      "chunk": "kanji-n1-b"
+    },
+    "蛮": {
+      "chunk": "kanji-n1-c"
+    },
+    "融": {
+      "chunk": "kanji-n1-b"
+    },
+    "血": {
+      "chunk": "kanji-n2"
+    },
+    "衆": {
+      "chunk": "kanji-n1-c"
+    },
+    "行": {
+      "chunk": "kanji-n5"
+    },
+    "術": {
+      "chunk": "kanji-n3"
+    },
+    "街": {
+      "chunk": "kanji-n1-d"
+    },
+    "衛": {
+      "chunk": "kanji-n2"
+    },
+    "衝": {
+      "chunk": "kanji-n1-b"
+    },
+    "衡": {
+      "chunk": "kanji-n1-b"
+    },
+    "衣": {
+      "chunk": "kanji-n2"
+    },
+    "衰": {
+      "chunk": "kanji-n1-a"
+    },
+    "衷": {
+      "chunk": "kanji-n1-d"
+    },
+    "衿": {
+      "chunk": "kanji-n1-d"
+    },
+    "袈": {
+      "chunk": "kanji-n1-a"
+    },
+    "袋": {
+      "chunk": "kanji-n2"
+    },
+    "被": {
+      "chunk": "kanji-n2"
+    },
+    "裁": {
+      "chunk": "kanji-n2"
+    },
+    "裂": {
+      "chunk": "kanji-n1-c"
+    },
+    "装": {
+      "chunk": "kanji-n2"
+    },
+    "裏": {
+      "chunk": "kanji-n2"
+    },
+    "裕": {
+      "chunk": "kanji-n1-b"
+    },
+    "補": {
+      "chunk": "kanji-n2"
+    },
+    "裟": {
+      "chunk": "kanji-n1-d"
+    },
+    "裸": {
+      "chunk": "kanji-n1-a"
+    },
+    "製": {
+      "chunk": "kanji-n1-b"
+    },
+    "複": {
+      "chunk": "kanji-n2"
+    },
+    "褐": {
+      "chunk": "kanji-n1-a"
+    },
+    "褒": {
+      "chunk": "kanji-n1-c"
+    },
+    "襟": {
+      "chunk": "kanji-n1-d"
+    },
+    "襲": {
+      "chunk": "kanji-n1-c"
+    },
+    "西": {
+      "chunk": "kanji-n5"
+    },
+    "要": {
+      "chunk": "kanji-n3"
+    },
+    "覆": {
+      "chunk": "kanji-n1-c"
+    },
+    "覇": {
+      "chunk": "kanji-n1-d"
+    },
+    "見": {
+      "chunk": "kanji-n5"
+    },
+    "規": {
+      "chunk": "kanji-n3"
+    },
+    "視": {
+      "chunk": "kanji-n1-c"
+    },
+    "覚": {
+      "chunk": "kanji-n3"
+    },
+    "覧": {
+      "chunk": "kanji-n1-d"
+    },
+    "親": {
+      "chunk": "kanji-n4"
+    },
+    "観": {
+      "chunk": "kanji-n3"
+    },
+    "角": {
+      "chunk": "kanji-n2"
+    },
+    "解": {
+      "chunk": "kanji-n3"
+    },
+    "触": {
+      "chunk": "kanji-n2"
+    },
+    "言": {
+      "chunk": "kanji-n4"
+    },
+    "訂": {
+      "chunk": "kanji-n1-c"
+    },
+    "計": {
+      "chunk": "kanji-n4"
+    },
+    "討": {
+      "chunk": "kanji-n1-c"
+    },
+    "訓": {
+      "chunk": "kanji-n2"
+    },
+    "託": {
+      "chunk": "kanji-n1-d"
+    },
+    "記": {
+      "chunk": "kanji-n3"
+    },
+    "訟": {
+      "chunk": "kanji-n1-d"
+    },
+    "訪": {
+      "chunk": "kanji-n3"
+    },
+    "設": {
+      "chunk": "kanji-n3"
+    },
+    "許": {
+      "chunk": "kanji-n3"
+    },
+    "訳": {
+      "chunk": "kanji-n2"
+    },
+    "訴": {
+      "chunk": "kanji-n1-a"
+    },
+    "診": {
+      "chunk": "kanji-n2"
+    },
+    "証": {
+      "chunk": "kanji-n1-a"
+    },
+    "詐": {
+      "chunk": "kanji-n1-a"
+    },
+    "詔": {
+      "chunk": "kanji-n1-a"
+    },
+    "評": {
+      "chunk": "kanji-n2"
+    },
+    "詞": {
+      "chunk": "kanji-n2"
+    },
+    "詠": {
+      "chunk": "kanji-n1-a"
+    },
+    "詢": {
+      "chunk": "kanji-n1-c"
+    },
+    "試": {
+      "chunk": "kanji-n4"
+    },
+    "詰": {
+      "chunk": "kanji-n2"
+    },
+    "話": {
+      "chunk": "kanji-n5"
+    },
+    "該": {
+      "chunk": "kanji-n1-c"
+    },
+    "詳": {
+      "chunk": "kanji-n1-d"
+    },
+    "誇": {
+      "chunk": "kanji-n1-d"
+    },
+    "誉": {
+      "chunk": "kanji-n1-b"
+    },
+    "誌": {
+      "chunk": "kanji-n2"
+    },
+    "認": {
+      "chunk": "kanji-n3"
+    },
+    "誓": {
+      "chunk": "kanji-n1-d"
+    },
+    "誕": {
+      "chunk": "kanji-n1-b"
+    },
+    "誘": {
+      "chunk": "kanji-n1-a"
+    },
+    "語": {
+      "chunk": "kanji-n5"
+    },
+    "誠": {
+      "chunk": "kanji-n1-a"
+    },
+    "誤": {
+      "chunk": "kanji-n3"
+    },
+    "説": {
+      "chunk": "kanji-n3"
+    },
+    "読": {
+      "chunk": "kanji-n5"
+    },
+    "誼": {
+      "chunk": "kanji-n1-a"
+    },
+    "調": {
+      "chunk": "kanji-n3"
+    },
+    "諄": {
+      "chunk": "kanji-n1-a"
+    },
+    "談": {
+      "chunk": "kanji-n3"
+    },
+    "請": {
+      "chunk": "kanji-n1-d"
+    },
+    "諒": {
+      "chunk": "kanji-n1-c"
+    },
+    "論": {
+      "chunk": "kanji-n3"
+    },
+    "諭": {
+      "chunk": "kanji-n1-b"
+    },
+    "諮": {
+      "chunk": "kanji-n1-c"
+    },
+    "諸": {
+      "chunk": "kanji-n2"
+    },
+    "諾": {
+      "chunk": "kanji-n1-c"
+    },
+    "謀": {
+      "chunk": "kanji-n1-a"
+    },
+    "謁": {
+      "chunk": "kanji-n1-b"
+    },
+    "謄": {
+      "chunk": "kanji-n1-a"
+    },
+    "謙": {
+      "chunk": "kanji-n1-b"
+    },
+    "講": {
+      "chunk": "kanji-n2"
+    },
+    "謝": {
+      "chunk": "kanji-n1-b"
+    },
+    "謡": {
+      "chunk": "kanji-n1-b"
+    },
+    "謹": {
+      "chunk": "kanji-n1-b"
+    },
+    "識": {
+      "chunk": "kanji-n3"
+    },
+    "譜": {
+      "chunk": "kanji-n1-a"
+    },
+    "警": {
+      "chunk": "kanji-n3"
+    },
+    "議": {
+      "chunk": "kanji-n3"
+    },
+    "譲": {
+      "chunk": "kanji-n1-c"
+    },
+    "護": {
+      "chunk": "kanji-n1-d"
+    },
+    "谷": {
+      "chunk": "kanji-n2"
+    },
+    "豆": {
+      "chunk": "kanji-n1-c"
+    },
+    "豊": {
+      "chunk": "kanji-n2"
+    },
+    "豚": {
+      "chunk": "kanji-n1-c"
+    },
+    "象": {
+      "chunk": "kanji-n2"
+    },
+    "豪": {
+      "chunk": "kanji-n1-c"
+    },
+    "貝": {
+      "chunk": "kanji-n2"
+    },
+    "貞": {
+      "chunk": "kanji-n1-c"
+    },
+    "負": {
+      "chunk": "kanji-n3"
+    },
+    "財": {
+      "chunk": "kanji-n3"
+    },
+    "貢": {
+      "chunk": "kanji-n1-c"
+    },
+    "貧": {
+      "chunk": "kanji-n3"
+    },
+    "貨": {
+      "chunk": "kanji-n2"
+    },
+    "販": {
+      "chunk": "kanji-n2"
+    },
+    "貫": {
+      "chunk": "kanji-n1-d"
+    },
+    "責": {
+      "chunk": "kanji-n3"
+    },
+    "貯": {
+      "chunk": "kanji-n2"
+    },
+    "貴": {
+      "chunk": "kanji-n1-a"
+    },
+    "買": {
+      "chunk": "kanji-n4"
+    },
+    "貸": {
+      "chunk": "kanji-n4"
+    },
+    "費": {
+      "chunk": "kanji-n3"
+    },
+    "貿": {
+      "chunk": "kanji-n2"
+    },
+    "賀": {
+      "chunk": "kanji-n1-a"
+    },
+    "賃": {
+      "chunk": "kanji-n1-d"
+    },
+    "賄": {
+      "chunk": "kanji-n1-a"
+    },
+    "資": {
+      "chunk": "kanji-n3"
+    },
+    "賊": {
+      "chunk": "kanji-n1-c"
+    },
+    "賓": {
+      "chunk": "kanji-n1-d"
+    },
+    "賛": {
+      "chunk": "kanji-n3"
+    },
+    "賜": {
+      "chunk": "kanji-n1-a"
+    },
+    "賠": {
+      "chunk": "kanji-n1-a"
+    },
+    "賢": {
+      "chunk": "kanji-n2"
+    },
+    "賦": {
+      "chunk": "kanji-n1-c"
+    },
+    "質": {
+      "chunk": "kanji-n4"
+    },
+    "購": {
+      "chunk": "kanji-n1-a"
+    },
+    "贈": {
+      "chunk": "kanji-n2"
+    },
+    "赤": {
+      "chunk": "kanji-n5"
+    },
+    "赦": {
+      "chunk": "kanji-n1-c"
+    },
+    "走": {
+      "chunk": "kanji-n4"
+    },
+    "赳": {
+      "chunk": "kanji-n1-d"
+    },
+    "赴": {
+      "chunk": "kanji-n1-a"
+    },
+    "起": {
+      "chunk": "kanji-n4"
+    },
+    "超": {
+      "chunk": "kanji-n2"
+    },
+    "越": {
+      "chunk": "kanji-n3"
+    },
+    "趣": {
+      "chunk": "kanji-n1-d"
+    },
+    "足": {
+      "chunk": "kanji-n5"
+    },
+    "距": {
+      "chunk": "kanji-n1-b"
+    },
+    "跡": {
+      "chunk": "kanji-n2"
+    },
+    "路": {
+      "chunk": "kanji-n3"
+    },
+    "跳": {
+      "chunk": "kanji-n1-d"
+    },
+    "践": {
+      "chunk": "kanji-n1-b"
+    },
+    "踊": {
+      "chunk": "kanji-n2"
+    },
+    "踏": {
+      "chunk": "kanji-n1-d"
+    },
+    "躇": {
+      "chunk": "kanji-n1-d"
+    },
+    "躊": {
+      "chunk": "kanji-n1-c"
+    },
+    "躍": {
+      "chunk": "kanji-n1-b"
+    },
+    "車": {
+      "chunk": "kanji-n5"
+    },
+    "軌": {
+      "chunk": "kanji-n1-a"
+    },
+    "軒": {
+      "chunk": "kanji-n2"
+    },
+    "軟": {
+      "chunk": "kanji-n2"
+    },
+    "転": {
+      "chunk": "kanji-n4"
+    },
+    "軽": {
+      "chunk": "kanji-n2"
+    },
+    "較": {
+      "chunk": "kanji-n1-d"
+    },
+    "載": {
+      "chunk": "kanji-n1-b"
+    },
+    "輔": {
+      "chunk": "kanji-n1-a"
+    },
+    "輝": {
+      "chunk": "kanji-n1-b"
+    },
+    "輩": {
+      "chunk": "kanji-n1-b"
+    },
+    "輪": {
+      "chunk": "kanji-n2"
+    },
+    "輸": {
+      "chunk": "kanji-n2"
+    },
+    "轄": {
+      "chunk": "kanji-n1-a"
+    },
+    "辛": {
+      "chunk": "kanji-n2"
+    },
+    "辞": {
+      "chunk": "kanji-n3"
+    },
+    "辰": {
+      "chunk": "kanji-n1-a"
+    },
+    "辱": {
+      "chunk": "kanji-n1-b"
+    },
+    "農": {
+      "chunk": "kanji-n2"
+    },
+    "辺": {
+      "chunk": "kanji-n2"
+    },
+    "込": {
+      "chunk": "kanji-n3"
+    },
+    "迅": {
+      "chunk": "kanji-n1-b"
+    },
+    "迎": {
+      "chunk": "kanji-n3"
+    },
+    "近": {
+      "chunk": "kanji-n4"
+    },
+    "返": {
+      "chunk": "kanji-n3"
+    },
+    "迪": {
+      "chunk": "kanji-n1-c"
+    },
+    "迫": {
+      "chunk": "kanji-n1-d"
+    },
+    "迭": {
+      "chunk": "kanji-n1-b"
+    },
+    "述": {
+      "chunk": "kanji-n2"
+    },
+    "迷": {
+      "chunk": "kanji-n3"
+    },
+    "追": {
+      "chunk": "kanji-n3"
+    },
+    "退": {
+      "chunk": "kanji-n3"
+    },
+    "送": {
+      "chunk": "kanji-n4"
+    },
+    "逃": {
+      "chunk": "kanji-n3"
+    },
+    "逆": {
+      "chunk": "kanji-n2"
+    },
+    "透": {
+      "chunk": "kanji-n1-d"
+    },
+    "逐": {
+      "chunk": "kanji-n1-a"
+    },
+    "逓": {
+      "chunk": "kanji-n1-d"
+    },
+    "途": {
+      "chunk": "kanji-n3"
+    },
+    "通": {
+      "chunk": "kanji-n4"
+    },
+    "逝": {
+      "chunk": "kanji-n1-b"
+    },
+    "速": {
+      "chunk": "kanji-n3"
+    },
+    "造": {
+      "chunk": "kanji-n2"
+    },
+    "連": {
+      "chunk": "kanji-n3"
+    },
+    "逮": {
+      "chunk": "kanji-n1-c"
+    },
+    "進": {
+      "chunk": "kanji-n3"
+    },
+    "逸": {
+      "chunk": "kanji-n1-a"
+    },
+    "遂": {
+      "chunk": "kanji-n1-c"
+    },
+    "遅": {
+      "chunk": "kanji-n3"
+    },
+    "遇": {
+      "chunk": "kanji-n1-d"
+    },
+    "遊": {
+      "chunk": "kanji-n3"
+    },
+    "遍": {
+      "chunk": "kanji-n1-b"
+    },
+    "過": {
+      "chunk": "kanji-n3"
+    },
+    "道": {
+      "chunk": "kanji-n4"
+    },
+    "達": {
+      "chunk": "kanji-n3"
+    },
+    "違": {
+      "chunk": "kanji-n3"
+    },
+    "遜": {
+      "chunk": "kanji-n1-a"
+    },
+    "遠": {
+      "chunk": "kanji-n4"
+    },
+    "遡": {
+      "chunk": "kanji-n1-b"
+    },
+    "遣": {
+      "chunk": "kanji-n1-d"
+    },
+    "遥": {
+      "chunk": "kanji-n1-b"
+    },
+    "適": {
+      "chunk": "kanji-n3"
+    },
+    "遭": {
+      "chunk": "kanji-n1-b"
+    },
+    "遮": {
+      "chunk": "kanji-n1-c"
+    },
+    "遵": {
+      "chunk": "kanji-n1-b"
+    },
+    "遷": {
+      "chunk": "kanji-n1-d"
+    },
+    "選": {
+      "chunk": "kanji-n3"
+    },
+    "遺": {
+      "chunk": "kanji-n1-c"
+    },
+    "遼": {
+      "chunk": "kanji-n1-a"
+    },
+    "避": {
+      "chunk": "kanji-n1-d"
+    },
+    "還": {
+      "chunk": "kanji-n1-a"
+    },
+    "邑": {
+      "chunk": "kanji-n1-b"
+    },
+    "那": {
+      "chunk": "kanji-n1-d"
+    },
+    "邦": {
+      "chunk": "kanji-n1-c"
+    },
+    "邪": {
+      "chunk": "kanji-n1-c"
+    },
+    "邸": {
+      "chunk": "kanji-n1-a"
+    },
+    "郁": {
+      "chunk": "kanji-n1-b"
+    },
+    "郊": {
+      "chunk": "kanji-n2"
+    },
+    "郎": {
+      "chunk": "kanji-n1-c"
+    },
+    "部": {
+      "chunk": "kanji-n3"
+    },
+    "郭": {
+      "chunk": "kanji-n1-b"
+    },
+    "郵": {
+      "chunk": "kanji-n2"
+    },
+    "郷": {
+      "chunk": "kanji-n1-d"
+    },
+    "都": {
+      "chunk": "kanji-n4"
+    },
+    "酉": {
+      "chunk": "kanji-n1-b"
+    },
+    "酌": {
+      "chunk": "kanji-n1-a"
+    },
+    "配": {
+      "chunk": "kanji-n3"
+    },
+    "酒": {
+      "chunk": "kanji-n3"
+    },
+    "酔": {
+      "chunk": "kanji-n1-a"
+    },
+    "酢": {
+      "chunk": "kanji-n1-c"
+    },
+    "酪": {
+      "chunk": "kanji-n1-c"
+    },
+    "酬": {
+      "chunk": "kanji-n1-a"
+    },
+    "酵": {
+      "chunk": "kanji-n1-b"
+    },
+    "酷": {
+      "chunk": "kanji-n1-d"
+    },
+    "醜": {
+      "chunk": "kanji-n1-a"
+    },
+    "醸": {
+      "chunk": "kanji-n1-a"
+    },
+    "采": {
+      "chunk": "kanji-n1-d"
+    },
+    "釈": {
+      "chunk": "kanji-n1-a"
+    },
+    "重": {
+      "chunk": "kanji-n4"
+    },
+    "野": {
+      "chunk": "kanji-n4"
+    },
+    "量": {
+      "chunk": "kanji-n2"
+    },
+    "金": {
+      "chunk": "kanji-n5"
+    },
+    "針": {
+      "chunk": "kanji-n2"
+    },
+    "釣": {
+      "chunk": "kanji-n1-d"
+    },
+    "鈍": {
+      "chunk": "kanji-n2"
+    },
+    "鈴": {
+      "chunk": "kanji-n1-a"
+    },
+    "鉄": {
+      "chunk": "kanji-n2"
+    },
+    "鉛": {
+      "chunk": "kanji-n1-d"
+    },
+    "鉢": {
+      "chunk": "kanji-n1-c"
+    },
+    "鉱": {
+      "chunk": "kanji-n2"
+    },
+    "銀": {
+      "chunk": "kanji-n4"
+    },
+    "銑": {
+      "chunk": "kanji-n1-b"
+    },
+    "銘": {
+      "chunk": "kanji-n1-a"
+    },
+    "銭": {
+      "chunk": "kanji-n1-b"
+    },
+    "鋭": {
+      "chunk": "kanji-n2"
+    },
+    "鋳": {
+      "chunk": "kanji-n1-d"
+    },
+    "鋼": {
+      "chunk": "kanji-n1-a"
+    },
+    "錘": {
+      "chunk": "kanji-n1-a"
+    },
+    "錠": {
+      "chunk": "kanji-n1-a"
+    },
+    "錦": {
+      "chunk": "kanji-n1-c"
+    },
+    "錬": {
+      "chunk": "kanji-n1-a"
+    },
+    "錯": {
+      "chunk": "kanji-n1-d"
+    },
+    "録": {
+      "chunk": "kanji-n2"
+    },
+    "鍛": {
+      "chunk": "kanji-n1-d"
+    },
+    "鎌": {
+      "chunk": "kanji-n1-a"
+    },
+    "鎖": {
+      "chunk": "kanji-n1-c"
+    },
+    "鎮": {
+      "chunk": "kanji-n1-c"
+    },
+    "鏡": {
+      "chunk": "kanji-n1-b"
+    },
+    "鐘": {
+      "chunk": "kanji-n1-a"
+    },
+    "鑑": {
+      "chunk": "kanji-n1-b"
+    },
+    "長": {
+      "chunk": "kanji-n5"
+    },
+    "閉": {
+      "chunk": "kanji-n3"
+    },
+    "開": {
+      "chunk": "kanji-n4"
+    },
+    "閑": {
+      "chunk": "kanji-n1-b"
+    },
+    "間": {
+      "chunk": "kanji-n5"
+    },
+    "関": {
+      "chunk": "kanji-n3"
+    },
+    "閣": {
+      "chunk": "kanji-n1-d"
+    },
+    "閥": {
+      "chunk": "kanji-n1-b"
+    },
+    "閲": {
+      "chunk": "kanji-n1-c"
+    },
+    "闘": {
+      "chunk": "kanji-n1-a"
+    },
+    "防": {
+      "chunk": "kanji-n2"
+    },
+    "阻": {
+      "chunk": "kanji-n1-d"
+    },
+    "阿": {
+      "chunk": "kanji-n1-d"
+    },
+    "附": {
+      "chunk": "kanji-n1-a"
+    },
+    "降": {
+      "chunk": "kanji-n4"
+    },
+    "限": {
+      "chunk": "kanji-n3"
+    },
+    "陛": {
+      "chunk": "kanji-n1-d"
+    },
+    "院": {
+      "chunk": "kanji-n4"
+    },
+    "除": {
+      "chunk": "kanji-n3"
+    },
+    "陥": {
+      "chunk": "kanji-n1-b"
+    },
+    "陪": {
+      "chunk": "kanji-n1-c"
+    },
+    "陰": {
+      "chunk": "kanji-n1-a"
+    },
+    "陳": {
+      "chunk": "kanji-n1-d"
+    },
+    "陵": {
+      "chunk": "kanji-n1-b"
+    },
+    "陶": {
+      "chunk": "kanji-n1-c"
+    },
+    "陸": {
+      "chunk": "kanji-n2"
+    },
+    "険": {
+      "chunk": "kanji-n3"
+    },
+    "陽": {
+      "chunk": "kanji-n3"
+    },
+    "隅": {
+      "chunk": "kanji-n2"
+    },
+    "隆": {
+      "chunk": "kanji-n1-c"
+    },
+    "階": {
+      "chunk": "kanji-n2"
+    },
+    "随": {
+      "chunk": "kanji-n1-d"
+    },
+    "隔": {
+      "chunk": "kanji-n1-a"
+    },
+    "際": {
+      "chunk": "kanji-n3"
+    },
+    "障": {
+      "chunk": "kanji-n2"
+    },
+    "隠": {
+      "chunk": "kanji-n1-a"
+    },
+    "隣": {
+      "chunk": "kanji-n1-d"
+    },
+    "隷": {
+      "chunk": "kanji-n1-d"
+    },
+    "隻": {
+      "chunk": "kanji-n2"
+    },
+    "隼": {
+      "chunk": "kanji-n1-a"
+    },
+    "雄": {
+      "chunk": "kanji-n1-a"
+    },
+    "雅": {
+      "chunk": "kanji-n1-b"
+    },
+    "集": {
+      "chunk": "kanji-n4"
+    },
+    "雇": {
+      "chunk": "kanji-n2"
+    },
+    "雌": {
+      "chunk": "kanji-n1-a"
+    },
+    "雑": {
+      "chunk": "kanji-n3"
+    },
+    "雛": {
+      "chunk": "kanji-n1-d"
+    },
+    "離": {
+      "chunk": "kanji-n1-c"
+    },
+    "難": {
+      "chunk": "kanji-n3"
+    },
+    "雨": {
+      "chunk": "kanji-n5"
+    },
+    "雪": {
+      "chunk": "kanji-n3"
+    },
+    "雰": {
+      "chunk": "kanji-n1-a"
+    },
+    "雲": {
+      "chunk": "kanji-n2"
+    },
+    "雷": {
+      "chunk": "kanji-n1-d"
+    },
+    "電": {
+      "chunk": "kanji-n5"
+    },
+    "需": {
+      "chunk": "kanji-n2"
+    },
+    "震": {
+      "chunk": "kanji-n2"
+    },
+    "霊": {
+      "chunk": "kanji-n1-c"
+    },
+    "霜": {
+      "chunk": "kanji-n1-a"
+    },
+    "霞": {
+      "chunk": "kanji-n1-c"
+    },
+    "霧": {
+      "chunk": "kanji-n1-d"
+    },
+    "露": {
+      "chunk": "kanji-n1-c"
+    },
+    "青": {
+      "chunk": "kanji-n5"
+    },
+    "靖": {
+      "chunk": "kanji-n1-c"
+    },
+    "静": {
+      "chunk": "kanji-n3"
+    },
+    "非": {
+      "chunk": "kanji-n3"
+    },
+    "面": {
+      "chunk": "kanji-n3"
+    },
+    "革": {
+      "chunk": "kanji-n2"
+    },
+    "靴": {
+      "chunk": "kanji-n3"
+    },
+    "鞠": {
+      "chunk": "kanji-n1-a"
+    },
+    "音": {
+      "chunk": "kanji-n4"
+    },
+    "韻": {
+      "chunk": "kanji-n1-d"
+    },
+    "響": {
+      "chunk": "kanji-n1-d"
+    },
+    "頂": {
+      "chunk": "kanji-n3"
+    },
+    "項": {
+      "chunk": "kanji-n1-b"
+    },
+    "順": {
+      "chunk": "kanji-n2"
+    },
+    "須": {
+      "chunk": "kanji-n1-a"
+    },
+    "頌": {
+      "chunk": "kanji-n1-a"
+    },
+    "預": {
+      "chunk": "kanji-n2"
+    },
+    "頑": {
+      "chunk": "kanji-n1-b"
+    },
+    "頒": {
+      "chunk": "kanji-n1-c"
+    },
+    "領": {
+      "chunk": "kanji-n2"
+    },
+    "頭": {
+      "chunk": "kanji-n3"
+    },
+    "頻": {
+      "chunk": "kanji-n1-d"
+    },
+    "頼": {
+      "chunk": "kanji-n3"
+    },
+    "額": {
+      "chunk": "kanji-n2"
+    },
+    "顔": {
+      "chunk": "kanji-n3"
+    },
+    "顕": {
+      "chunk": "kanji-n1-b"
+    },
+    "願": {
+      "chunk": "kanji-n3"
+    },
+    "顛": {
+      "chunk": "kanji-n1-d"
+    },
+    "顧": {
+      "chunk": "kanji-n1-d"
+    },
+    "風": {
+      "chunk": "kanji-n4"
+    },
+    "颯": {
+      "chunk": "kanji-n1-d"
+    },
+    "飛": {
+      "chunk": "kanji-n3"
+    },
+    "食": {
+      "chunk": "kanji-n5"
+    },
+    "飢": {
+      "chunk": "kanji-n1-c"
+    },
+    "飯": {
+      "chunk": "kanji-n4"
+    },
+    "飲": {
+      "chunk": "kanji-n5"
+    },
+    "飼": {
+      "chunk": "kanji-n1-a"
+    },
+    "飽": {
+      "chunk": "kanji-n1-b"
+    },
+    "飾": {
+      "chunk": "kanji-n1-c"
+    },
+    "養": {
+      "chunk": "kanji-n1-c"
+    },
+    "餓": {
+      "chunk": "kanji-n1-d"
+    },
+    "館": {
+      "chunk": "kanji-n4"
+    },
+    "首": {
+      "chunk": "kanji-n3"
+    },
+    "香": {
+      "chunk": "kanji-n2"
+    },
+    "馨": {
+      "chunk": "kanji-n1-a"
+    },
+    "馬": {
+      "chunk": "kanji-n3"
+    },
+    "駄": {
+      "chunk": "kanji-n1-a"
+    },
+    "駆": {
+      "chunk": "kanji-n1-c"
+    },
+    "駐": {
+      "chunk": "kanji-n2"
+    },
+    "駒": {
+      "chunk": "kanji-n1-c"
+    },
+    "駿": {
+      "chunk": "kanji-n1-d"
+    },
+    "騎": {
+      "chunk": "kanji-n1-c"
+    },
+    "騒": {
+      "chunk": "kanji-n1-c"
+    },
+    "験": {
+      "chunk": "kanji-n4"
+    },
+    "騰": {
+      "chunk": "kanji-n1-a"
+    },
+    "驚": {
+      "chunk": "kanji-n1-c"
+    },
+    "骨": {
+      "chunk": "kanji-n2"
+    },
+    "髄": {
+      "chunk": "kanji-n1-a"
+    },
+    "高": {
+      "chunk": "kanji-n5"
+    },
+    "髪": {
+      "chunk": "kanji-n3"
+    },
+    "鬱": {
+      "chunk": "kanji-n1-b"
+    },
+    "鬼": {
+      "chunk": "kanji-n1-a"
+    },
+    "魁": {
+      "chunk": "kanji-n1-b"
+    },
+    "魂": {
+      "chunk": "kanji-n1-c"
+    },
+    "魅": {
+      "chunk": "kanji-n1-b"
+    },
+    "魔": {
+      "chunk": "kanji-n1-a"
+    },
+    "魚": {
+      "chunk": "kanji-n4"
+    },
+    "鮎": {
+      "chunk": "kanji-n1-c"
+    },
+    "鮮": {
+      "chunk": "kanji-n1-c"
+    },
+    "鯉": {
+      "chunk": "kanji-n1-b"
+    },
+    "鯛": {
+      "chunk": "kanji-n1-d"
+    },
+    "鯨": {
+      "chunk": "kanji-n1-a"
+    },
+    "鳥": {
+      "chunk": "kanji-n4"
+    },
+    "鳩": {
+      "chunk": "kanji-n1-b"
+    },
+    "鳳": {
+      "chunk": "kanji-n1-d"
+    },
+    "鳴": {
+      "chunk": "kanji-n3"
+    },
+    "鴻": {
+      "chunk": "kanji-n1-d"
+    },
+    "鵬": {
+      "chunk": "kanji-n1-a"
+    },
+    "鶏": {
+      "chunk": "kanji-n1-d"
+    },
+    "鶴": {
+      "chunk": "kanji-n1-a"
+    },
+    "鷹": {
+      "chunk": "kanji-n1-b"
+    },
+    "鹿": {
+      "chunk": "kanji-n1-d"
+    },
+    "麗": {
+      "chunk": "kanji-n1-d"
+    },
+    "麟": {
+      "chunk": "kanji-n1-d"
+    },
+    "麦": {
+      "chunk": "kanji-n2"
+    },
+    "麻": {
+      "chunk": "kanji-n1-d"
+    },
+    "麿": {
+      "chunk": "kanji-n1-d"
+    },
+    "黄": {
+      "chunk": "kanji-n2"
+    },
+    "黎": {
+      "chunk": "kanji-n1-c"
+    },
+    "黒": {
+      "chunk": "kanji-n4"
+    },
+    "黙": {
+      "chunk": "kanji-n1-b"
+    },
+    "黛": {
+      "chunk": "kanji-n1-d"
+    },
+    "鼓": {
+      "chunk": "kanji-n1-d"
+    },
+    "鼻": {
+      "chunk": "kanji-n2"
+    },
+    "齢": {
+      "chunk": "kanji-n2"
+    }
+  },
+  "chunks": {
+    "hiragana": {
+      "characterCount": 71,
+      "path": "chunks/hiragana.json",
+      "sha256": "c8fdd73c729574dfd1a10ba11523fb159d9b732689b86a4051bfa288013850e7"
+    },
+    "kanji-n1-a": {
+      "characterCount": 295,
+      "path": "chunks/kanji-n1-a.json",
+      "sha256": "afb62098fe60ea4839ee9084f2db62126b361fb1d4ef2127279028c47ee5cb23"
+    },
+    "kanji-n1-b": {
+      "characterCount": 289,
+      "path": "chunks/kanji-n1-b.json",
+      "sha256": "53332618f89a8ef1430a4fad318e4ea00f5dcf57ce4af6da2f310b1c65836305"
+    },
+    "kanji-n1-c": {
+      "characterCount": 291,
+      "path": "chunks/kanji-n1-c.json",
+      "sha256": "31c062e29338f8f643649f0c40d40982faf86caa381845702dc212d451eaf706"
+    },
+    "kanji-n1-d": {
+      "characterCount": 292,
+      "path": "chunks/kanji-n1-d.json",
+      "sha256": "4f758e3437355f59fddab9b327a05f98b90481b2a72ab025b93956ce840246f3"
+    },
+    "kanji-n2": {
+      "characterCount": 366,
+      "path": "chunks/kanji-n2.json",
+      "sha256": "2da377c37fd7f710f451e76f622ade19a56f5db9f0a53631f39ccc87123ee50f"
+    },
+    "kanji-n3": {
+      "characterCount": 348,
+      "path": "chunks/kanji-n3.json",
+      "sha256": "381872077c90fca71da8548febe8c8c5db5aa7bb28140b8885f94266a734e6c0"
+    },
+    "kanji-n4": {
+      "characterCount": 154,
+      "path": "chunks/kanji-n4.json",
+      "sha256": "11a62463d597f6d7e07cff3041a7a795fa5ddced945f4cdd934f9b570cd1eec4"
+    },
+    "kanji-n5": {
+      "characterCount": 86,
+      "path": "chunks/kanji-n5.json",
+      "sha256": "b319df66d388fa4e220c3557f9312c1b73e69dfd1db22dfd5480bd504fcb8b92"
+    },
+    "katakana": {
+      "characterCount": 71,
+      "path": "chunks/katakana.json",
+      "sha256": "657da65427735adc9afa04b5b0816e95658d49b8632a877bf78e6ed83469067f"
+    }
+  },
+  "coverage": {
+    "decks": {
+      "Hiragana": [
+        "あ",
+        "い",
+        "う",
+        "え",
+        "お",
+        "か",
+        "が",
+        "き",
+        "ぎ",
+        "く",
+        "ぐ",
+        "け",
+        "げ",
+        "こ",
+        "ご",
+        "さ",
+        "ざ",
+        "し",
+        "じ",
+        "す",
+        "ず",
+        "せ",
+        "ぜ",
+        "そ",
+        "ぞ",
+        "た",
+        "だ",
+        "ち",
+        "ぢ",
+        "つ",
+        "づ",
+        "て",
+        "で",
+        "と",
+        "ど",
+        "な",
+        "に",
+        "ぬ",
+        "ね",
+        "の",
+        "は",
+        "ば",
+        "ぱ",
+        "ひ",
+        "び",
+        "ぴ",
+        "ふ",
+        "ぶ",
+        "ぷ",
+        "へ",
+        "べ",
+        "ぺ",
+        "ほ",
+        "ぼ",
+        "ぽ",
+        "ま",
+        "み",
+        "む",
+        "め",
+        "も",
+        "や",
+        "ゆ",
+        "よ",
+        "ら",
+        "り",
+        "る",
+        "れ",
+        "ろ",
+        "わ",
+        "を",
+        "ん"
+      ],
+      "Kanji N1": [
+        "丁",
+        "丑",
+        "且",
+        "丘",
+        "丙",
+        "丞",
+        "丹",
+        "乃",
+        "之",
+        "乏",
+        "乙",
+        "也",
+        "亀",
+        "井",
+        "亘",
+        "亜",
+        "亥",
+        "亦",
+        "亨",
+        "享",
+        "亭",
+        "亮",
+        "仁",
+        "仙",
+        "仮",
+        "仰",
+        "企",
+        "伊",
+        "伍",
+        "伎",
+        "伏",
+        "伐",
+        "伯",
+        "伴",
+        "伶",
+        "伽",
+        "但",
+        "佐",
+        "佑",
+        "佳",
+        "併",
+        "侃",
+        "侍",
+        "侑",
+        "価",
+        "侮",
+        "侯",
+        "侵",
+        "促",
+        "俊",
+        "俗",
+        "保",
+        "修",
+        "俳",
+        "俵",
+        "俸",
+        "倉",
+        "倖",
+        "倣",
+        "倫",
+        "倭",
+        "倹",
+        "偏",
+        "健",
+        "偲",
+        "偵",
+        "偽",
+        "傍",
+        "傑",
+        "傘",
+        "催",
+        "債",
+        "傷",
+        "僚",
+        "儀",
+        "儒",
+        "償",
+        "允",
+        "充",
+        "克",
+        "免",
+        "典",
+        "兼",
+        "冒",
+        "冗",
+        "冠",
+        "冴",
+        "冶",
+        "准",
+        "凌",
+        "凜",
+        "凝",
+        "凡",
+        "凪",
+        "凱",
+        "凶",
+        "凸",
+        "凹",
+        "刀",
+        "刃",
+        "刈",
+        "刑",
+        "削",
+        "剖",
+        "剛",
+        "剣",
+        "剤",
+        "剰",
+        "創",
+        "功",
+        "劣",
+        "励",
+        "劾",
+        "勁",
+        "勅",
+        "勘",
+        "勧",
+        "勲",
+        "勺",
+        "匁",
+        "匠",
+        "匡",
+        "匿",
+        "升",
+        "卑",
+        "卓",
+        "博",
+        "卯",
+        "却",
+        "卸",
+        "厄",
+        "厘",
+        "厳",
+        "又",
+        "及",
+        "叔",
+        "叙",
+        "叡",
+        "只",
+        "叶",
+        "司",
+        "吉",
+        "后",
+        "吏",
+        "吐",
+        "吟",
+        "呂",
+        "呈",
+        "呉",
+        "哀",
+        "哉",
+        "哲",
+        "唄",
+        "唆",
+        "唇",
+        "唯",
+        "唱",
+        "啄",
+        "啓",
+        "善",
+        "喚",
+        "喝",
+        "喪",
+        "喬",
+        "嗣",
+        "嘆",
+        "嘉",
+        "嘱",
+        "器",
+        "噴",
+        "嚇",
+        "囚",
+        "圏",
+        "圭",
+        "坑",
+        "坪",
+        "垂",
+        "垣",
+        "執",
+        "培",
+        "基",
+        "堀",
+        "堅",
+        "堕",
+        "堤",
+        "堪",
+        "塀",
+        "塁",
+        "塊",
+        "塑",
+        "塚",
+        "墓",
+        "墜",
+        "墨",
+        "墳",
+        "墾",
+        "壁",
+        "壇",
+        "壊",
+        "壌",
+        "士",
+        "壮",
+        "壱",
+        "奇",
+        "奈",
+        "奉",
+        "奎",
+        "奏",
+        "契",
+        "奔",
+        "奨",
+        "奪",
+        "奮",
+        "奴",
+        "如",
+        "妃",
+        "妄",
+        "妊",
+        "妙",
+        "妥",
+        "妨",
+        "姫",
+        "姻",
+        "姿",
+        "威",
+        "娠",
+        "娯",
+        "婆",
+        "婿",
+        "媒",
+        "媛",
+        "嫁",
+        "嫌",
+        "嫡",
+        "嬉",
+        "嬢",
+        "孔",
+        "孟",
+        "孤",
+        "宏",
+        "宗",
+        "宙",
+        "宜",
+        "宣",
+        "宥",
+        "宮",
+        "宰",
+        "宴",
+        "宵",
+        "寂",
+        "寅",
+        "寛",
+        "寡",
+        "寧",
+        "審",
+        "寸",
+        "射",
+        "尉",
+        "尋",
+        "尚",
+        "尭",
+        "就",
+        "尺",
+        "尼",
+        "尽",
+        "尾",
+        "屈",
+        "展",
+        "属",
+        "履",
+        "屯",
+        "岐",
+        "岬",
+        "岳",
+        "峡",
+        "峰",
+        "峻",
+        "崇",
+        "崎",
+        "崚",
+        "崩",
+        "嵐",
+        "嵩",
+        "嵯",
+        "嶺",
+        "巌",
+        "巡",
+        "巣",
+        "巧",
+        "己",
+        "巳",
+        "巴",
+        "巽",
+        "帆",
+        "帝",
+        "帥",
+        "帳",
+        "幕",
+        "幣",
+        "幹",
+        "幻",
+        "幽",
+        "庄",
+        "序",
+        "康",
+        "庸",
+        "廃",
+        "廉",
+        "廊",
+        "廷",
+        "弁",
+        "弊",
+        "弐",
+        "弓",
+        "弔",
+        "弘",
+        "弥",
+        "弦",
+        "弧",
+        "張",
+        "弾",
+        "彗",
+        "彦",
+        "彩",
+        "彪",
+        "彫",
+        "彬",
+        "彰",
+        "影",
+        "往",
+        "征",
+        "径",
+        "徐",
+        "従",
+        "循",
+        "微",
+        "徳",
+        "徴",
+        "徹",
+        "忌",
+        "忍",
+        "志",
+        "応",
+        "忠",
+        "怜",
+        "怠",
+        "怪",
+        "恒",
+        "恕",
+        "恨",
+        "恩",
+        "恭",
+        "恵",
+        "悌",
+        "悔",
+        "悟",
+        "悠",
+        "悦",
+        "悼",
+        "惇",
+        "惑",
+        "惜",
+        "惟",
+        "惣",
+        "惨",
+        "惰",
+        "愁",
+        "愉",
+        "愚",
+        "慈",
+        "態",
+        "慎",
+        "慕",
+        "慢",
+        "慧",
+        "慨",
+        "慮",
+        "慰",
+        "慶",
+        "憂",
+        "憤",
+        "憧",
+        "憩",
+        "憲",
+        "憶",
+        "憾",
+        "懇",
+        "懐",
+        "懲",
+        "懸",
+        "我",
+        "戒",
+        "戯",
+        "戴",
+        "房",
+        "扇",
+        "扉",
+        "扱",
+        "扶",
+        "批",
+        "抄",
+        "把",
+        "抑",
+        "抗",
+        "披",
+        "抵",
+        "抹",
+        "抽",
+        "拍",
+        "拐",
+        "拒",
+        "拓",
+        "拘",
+        "拙",
+        "拠",
+        "拡",
+        "括",
+        "拳",
+        "拷",
+        "挑",
+        "挙",
+        "振",
+        "挿",
+        "据",
+        "捷",
+        "捺",
+        "授",
+        "掌",
+        "排",
+        "控",
+        "推",
+        "措",
+        "掲",
+        "描",
+        "提",
+        "揚",
+        "握",
+        "揮",
+        "揺",
+        "搬",
+        "搭",
+        "携",
+        "搾",
+        "摂",
+        "摘",
+        "摩",
+        "撃",
+        "撤",
+        "撮",
+        "撲",
+        "擁",
+        "操",
+        "擦",
+        "擬",
+        "攻",
+        "故",
+        "敏",
+        "救",
+        "敢",
+        "敦",
+        "整",
+        "敷",
+        "斉",
+        "斎",
+        "斐",
+        "斗",
+        "斜",
+        "斤",
+        "斥",
+        "於",
+        "施",
+        "旋",
+        "旗",
+        "既",
+        "旦",
+        "旨",
+        "旬",
+        "旭",
+        "旺",
+        "昂",
+        "昆",
+        "昌",
+        "昧",
+        "昭",
+        "是",
+        "昴",
+        "晃",
+        "晋",
+        "晏",
+        "晟",
+        "晨",
+        "晶",
+        "智",
+        "暁",
+        "暇",
+        "暉",
+        "暑",
+        "暖",
+        "暢",
+        "暦",
+        "暫",
+        "曖",
+        "曙",
+        "曹",
+        "朋",
+        "朔",
+        "朕",
+        "朗",
+        "朱",
+        "朴",
+        "朽",
+        "杉",
+        "李",
+        "杏",
+        "杜",
+        "条",
+        "松",
+        "析",
+        "枢",
+        "架",
+        "柄",
+        "柊",
+        "某",
+        "染",
+        "柚",
+        "柳",
+        "柾",
+        "栗",
+        "栞",
+        "株",
+        "栽",
+        "桂",
+        "桃",
+        "桐",
+        "桑",
+        "桜",
+        "桟",
+        "梅",
+        "梓",
+        "梢",
+        "梧",
+        "梨",
+        "棄",
+        "棋",
+        "棚",
+        "棺",
+        "椋",
+        "椎",
+        "椰",
+        "椿",
+        "楊",
+        "楓",
+        "楠",
+        "楼",
+        "概",
+        "榛",
+        "槙",
+        "槻",
+        "槽",
+        "標",
+        "樹",
+        "樺",
+        "橘",
+        "檀",
+        "欣",
+        "欺",
+        "欽",
+        "款",
+        "歓",
+        "殉",
+        "殊",
+        "殖",
+        "殴",
+        "殻",
+        "毅",
+        "毬",
+        "汁",
+        "汐",
+        "江",
+        "汰",
+        "汽",
+        "沖",
+        "沙",
+        "没",
+        "沢",
+        "沼",
+        "沿",
+        "泌",
+        "泡",
+        "泣",
+        "泰",
+        "洞",
+        "津",
+        "洪",
+        "洲",
+        "洵",
+        "洸",
+        "派",
+        "浄",
+        "浜",
+        "浦",
+        "浩",
+        "浪",
+        "浸",
+        "涯",
+        "淑",
+        "淡",
+        "淳",
+        "添",
+        "渇",
+        "渉",
+        "渋",
+        "渓",
+        "渚",
+        "渥",
+        "渦",
+        "湧",
+        "源",
+        "溝",
+        "滅",
+        "滉",
+        "滋",
+        "滑",
+        "滝",
+        "滞",
+        "漂",
+        "漆",
+        "漏",
+        "漠",
+        "漫",
+        "漬",
+        "漱",
+        "漸",
+        "潔",
+        "潜",
+        "潟",
+        "潤",
+        "潮",
+        "澄",
+        "澪",
+        "激",
+        "濁",
+        "濫",
+        "瀬",
+        "災",
+        "炉",
+        "炊",
+        "炎",
+        "為",
+        "烈",
+        "焦",
+        "煩",
+        "煮",
+        "熊",
+        "熙",
+        "熟",
+        "燎",
+        "燦",
+        "燿",
+        "爵",
+        "爽",
+        "爾",
+        "牧",
+        "牲",
+        "犠",
+        "狂",
+        "狩",
+        "独",
+        "狭",
+        "猛",
+        "猟",
+        "猪",
+        "献",
+        "猶",
+        "猿",
+        "獄",
+        "獣",
+        "獲",
+        "玄",
+        "率",
+        "玖",
+        "玲",
+        "珠",
+        "琉",
+        "琢",
+        "琳",
+        "瑚",
+        "瑛",
+        "瑞",
+        "瑠",
+        "瑳",
+        "瑶",
+        "璃",
+        "璧",
+        "甚",
+        "甫",
+        "甲",
+        "畔",
+        "畝",
+        "疎",
+        "疫",
+        "疾",
+        "症",
+        "痘",
+        "痢",
+        "痴",
+        "癒",
+        "癖",
+        "皇",
+        "皐",
+        "皓",
+        "益",
+        "盛",
+        "盟",
+        "監",
+        "盤",
+        "盲",
+        "盾",
+        "眉",
+        "看",
+        "眸",
+        "眺",
+        "眼",
+        "睡",
+        "督",
+        "睦",
+        "瞬",
+        "瞭",
+        "瞳",
+        "矛",
+        "矢",
+        "矯",
+        "砕",
+        "砲",
+        "硝",
+        "硫",
+        "碧",
+        "碩",
+        "磁",
+        "磯",
+        "礁",
+        "礎",
+        "祉",
+        "祐",
+        "祥",
+        "禄",
+        "禅",
+        "禍",
+        "禎",
+        "秀",
+        "秘",
+        "租",
+        "秦",
+        "秩",
+        "称",
+        "稀",
+        "稔",
+        "稚",
+        "稜",
+        "稲",
+        "稼",
+        "稿",
+        "穀",
+        "穂",
+        "穏",
+        "穣",
+        "穫",
+        "穴",
+        "窃",
+        "窒",
+        "窮",
+        "窯",
+        "竜",
+        "竣",
+        "端",
+        "笙",
+        "笛",
+        "第",
+        "笹",
+        "筋",
+        "箇",
+        "節",
+        "範",
+        "篤",
+        "簿",
+        "粗",
+        "粘",
+        "粛",
+        "糖",
+        "糧",
+        "系",
+        "糾",
+        "紀",
+        "紋",
+        "納",
+        "紗",
+        "紘",
+        "級",
+        "紛",
+        "素",
+        "紡",
+        "索",
+        "紫",
+        "紬",
+        "累",
+        "紳",
+        "絃",
+        "結",
+        "絞",
+        "絢",
+        "統",
+        "絹",
+        "継",
+        "綜",
+        "維",
+        "綱",
+        "網",
+        "綸",
+        "綺",
+        "綾",
+        "緋",
+        "締",
+        "緩",
+        "緯",
+        "緻",
+        "縁",
+        "縄",
+        "縛",
+        "縦",
+        "縫",
+        "縮",
+        "繁",
+        "繊",
+        "織",
+        "繕",
+        "繭",
+        "繰",
+        "罷",
+        "羅",
+        "羊",
+        "義",
+        "翁",
+        "翔",
+        "翠",
+        "翻",
+        "翼",
+        "耀",
+        "耐",
+        "耗",
+        "耶",
+        "聖",
+        "聡",
+        "聴",
+        "肇",
+        "肖",
+        "肝",
+        "肢",
+        "肥",
+        "肪",
+        "胆",
+        "胎",
+        "胞",
+        "胡",
+        "胤",
+        "脅",
+        "脚",
+        "脩",
+        "脱",
+        "脹",
+        "腐",
+        "膨",
+        "臨",
+        "臭",
+        "至",
+        "致",
+        "興",
+        "舌",
+        "舎",
+        "舗",
+        "舜",
+        "舶",
+        "艇",
+        "艦",
+        "艶",
+        "芋",
+        "芙",
+        "芝",
+        "芳",
+        "芹",
+        "芽",
+        "苑",
+        "苗",
+        "茂",
+        "茄",
+        "茅",
+        "茉",
+        "茎",
+        "茜",
+        "荘",
+        "莉",
+        "莞",
+        "菊",
+        "菖",
+        "菫",
+        "華",
+        "萌",
+        "萩",
+        "葬",
+        "葵",
+        "蒔",
+        "蒼",
+        "蓄",
+        "蓉",
+        "蓮",
+        "蔦",
+        "蕉",
+        "蕗",
+        "薦",
+        "薪",
+        "薫",
+        "藍",
+        "藤",
+        "藩",
+        "藻",
+        "蘭",
+        "虎",
+        "虐",
+        "虚",
+        "虜",
+        "虞",
+        "虹",
+        "蚊",
+        "蚕",
+        "蛇",
+        "蛍",
+        "蛮",
+        "融",
+        "衆",
+        "街",
+        "衝",
+        "衡",
+        "衰",
+        "衷",
+        "衿",
+        "袈",
+        "裁",
+        "裂",
+        "裕",
+        "裟",
+        "裸",
+        "製",
+        "褐",
+        "褒",
+        "襟",
+        "襲",
+        "覆",
+        "覇",
+        "視",
+        "覧",
+        "訂",
+        "討",
+        "託",
+        "訟",
+        "訴",
+        "証",
+        "詐",
+        "詔",
+        "詠",
+        "詢",
+        "該",
+        "詳",
+        "誇",
+        "誉",
+        "誓",
+        "誕",
+        "誘",
+        "誠",
+        "誼",
+        "諄",
+        "請",
+        "諒",
+        "諭",
+        "諮",
+        "諾",
+        "謀",
+        "謁",
+        "謄",
+        "謙",
+        "謝",
+        "謡",
+        "謹",
+        "譜",
+        "譲",
+        "護",
+        "豆",
+        "豚",
+        "豪",
+        "貞",
+        "貢",
+        "貫",
+        "貴",
+        "賀",
+        "賃",
+        "賄",
+        "賊",
+        "賓",
+        "賜",
+        "賠",
+        "賦",
+        "購",
+        "赦",
+        "赳",
+        "赴",
+        "趣",
+        "距",
+        "跳",
+        "践",
+        "踏",
+        "躇",
+        "躊",
+        "躍",
+        "軌",
+        "較",
+        "載",
+        "輔",
+        "輝",
+        "輩",
+        "轄",
+        "辰",
+        "辱",
+        "迅",
+        "迪",
+        "迫",
+        "迭",
+        "透",
+        "逐",
+        "逓",
+        "逝",
+        "逮",
+        "逸",
+        "遂",
+        "遇",
+        "遍",
+        "遜",
+        "遡",
+        "遣",
+        "遥",
+        "遭",
+        "遮",
+        "遵",
+        "遷",
+        "遺",
+        "遼",
+        "避",
+        "還",
+        "邑",
+        "那",
+        "邦",
+        "邪",
+        "邸",
+        "郁",
+        "郎",
+        "郭",
+        "郷",
+        "酉",
+        "酌",
+        "酔",
+        "酢",
+        "酪",
+        "酬",
+        "酵",
+        "酷",
+        "醜",
+        "醸",
+        "采",
+        "釈",
+        "釣",
+        "鈴",
+        "鉛",
+        "鉢",
+        "銑",
+        "銘",
+        "銭",
+        "鋳",
+        "鋼",
+        "錘",
+        "錠",
+        "錦",
+        "錬",
+        "錯",
+        "鍛",
+        "鎌",
+        "鎖",
+        "鎮",
+        "鏡",
+        "鐘",
+        "鑑",
+        "閑",
+        "閣",
+        "閥",
+        "閲",
+        "闘",
+        "阻",
+        "阿",
+        "附",
+        "陛",
+        "陥",
+        "陪",
+        "陰",
+        "陳",
+        "陵",
+        "陶",
+        "隅",
+        "隆",
+        "随",
+        "隔",
+        "障",
+        "隠",
+        "隣",
+        "隷",
+        "隼",
+        "雄",
+        "雅",
+        "雌",
+        "雛",
+        "離",
+        "雰",
+        "雷",
+        "霊",
+        "霜",
+        "霞",
+        "霧",
+        "露",
+        "靖",
+        "鞠",
+        "韻",
+        "響",
+        "項",
+        "須",
+        "頌",
+        "頑",
+        "頒",
+        "頻",
+        "顕",
+        "顛",
+        "顧",
+        "颯",
+        "飢",
+        "飼",
+        "飽",
+        "飾",
+        "養",
+        "餓",
+        "馨",
+        "駄",
+        "駆",
+        "駒",
+        "駿",
+        "騎",
+        "騒",
+        "騰",
+        "驚",
+        "髄",
+        "鬱",
+        "鬼",
+        "魁",
+        "魂",
+        "魅",
+        "魔",
+        "鮎",
+        "鮮",
+        "鯉",
+        "鯛",
+        "鯨",
+        "鳩",
+        "鳳",
+        "鴻",
+        "鵬",
+        "鶏",
+        "鶴",
+        "鷹",
+        "鹿",
+        "麗",
+        "麟",
+        "麻",
+        "麿",
+        "黎",
+        "黙",
+        "黛",
+        "鼓"
+      ],
+      "Kanji N2": [
+        "並",
+        "丸",
+        "久",
+        "乱",
+        "乳",
+        "乾",
+        "了",
+        "争",
+        "介",
+        "仏",
+        "令",
+        "仲",
+        "企",
+        "伸",
+        "伺",
+        "低",
+        "依",
+        "促",
+        "個",
+        "倍",
+        "停",
+        "傾",
+        "像",
+        "億",
+        "兆",
+        "児",
+        "兵",
+        "冊",
+        "再",
+        "凍",
+        "刊",
+        "刷",
+        "刺",
+        "則",
+        "副",
+        "効",
+        "勇",
+        "募",
+        "勢",
+        "包",
+        "匹",
+        "区",
+        "卒",
+        "協",
+        "占",
+        "印",
+        "危",
+        "即",
+        "卵",
+        "厚",
+        "双",
+        "叫",
+        "召",
+        "史",
+        "各",
+        "含",
+        "周",
+        "咲",
+        "喫",
+        "営",
+        "団",
+        "囲",
+        "固",
+        "圧",
+        "坂",
+        "均",
+        "型",
+        "埋",
+        "城",
+        "域",
+        "塗",
+        "塩",
+        "境",
+        "央",
+        "奥",
+        "姓",
+        "委",
+        "季",
+        "孫",
+        "宇",
+        "宝",
+        "寺",
+        "封",
+        "専",
+        "将",
+        "尊",
+        "導",
+        "届",
+        "層",
+        "岩",
+        "岸",
+        "島",
+        "州",
+        "巨",
+        "巻",
+        "布",
+        "希",
+        "帯",
+        "帽",
+        "幅",
+        "干",
+        "幹",
+        "幼",
+        "庁",
+        "床",
+        "底",
+        "庫",
+        "庶",
+        "延",
+        "律",
+        "復",
+        "快",
+        "恋",
+        "患",
+        "悩",
+        "憎",
+        "戸",
+        "承",
+        "技",
+        "択",
+        "担",
+        "拝",
+        "拡",
+        "拾",
+        "挟",
+        "捜",
+        "捨",
+        "掃",
+        "掘",
+        "採",
+        "接",
+        "換",
+        "援",
+        "撃",
+        "操",
+        "改",
+        "敬",
+        "旧",
+        "昇",
+        "星",
+        "普",
+        "暴",
+        "曇",
+        "替",
+        "札",
+        "机",
+        "材",
+        "村",
+        "板",
+        "林",
+        "枚",
+        "枝",
+        "枯",
+        "柔",
+        "柱",
+        "栄",
+        "根",
+        "械",
+        "森",
+        "植",
+        "極",
+        "模",
+        "権",
+        "橋",
+        "欧",
+        "武",
+        "歴",
+        "殿",
+        "比",
+        "毛",
+        "氷",
+        "永",
+        "汗",
+        "汚",
+        "池",
+        "沈",
+        "河",
+        "沸",
+        "油",
+        "沿",
+        "況",
+        "泉",
+        "泊",
+        "波",
+        "泥",
+        "浅",
+        "浴",
+        "涙",
+        "涼",
+        "混",
+        "清",
+        "減",
+        "温",
+        "測",
+        "湖",
+        "湯",
+        "湿",
+        "源",
+        "準",
+        "溶",
+        "滴",
+        "漁",
+        "演",
+        "濃",
+        "濯",
+        "灯",
+        "灰",
+        "炭",
+        "焼",
+        "照",
+        "燃",
+        "燥",
+        "爆",
+        "片",
+        "獲",
+        "玉",
+        "珍",
+        "環",
+        "瓶",
+        "甘",
+        "畜",
+        "略",
+        "畳",
+        "療",
+        "皮",
+        "皿",
+        "益",
+        "盤",
+        "省",
+        "県",
+        "短",
+        "砂",
+        "硬",
+        "磨",
+        "祈",
+        "祝",
+        "祭",
+        "禁",
+        "移",
+        "税",
+        "穏",
+        "章",
+        "童",
+        "競",
+        "竹",
+        "符",
+        "筆",
+        "筒",
+        "管",
+        "範",
+        "築",
+        "簡",
+        "籍",
+        "粉",
+        "粒",
+        "精",
+        "糸",
+        "紅",
+        "純",
+        "細",
+        "紹",
+        "絡",
+        "統",
+        "綿",
+        "緊",
+        "総",
+        "緑",
+        "編",
+        "練",
+        "縮",
+        "績",
+        "缶",
+        "署",
+        "群",
+        "羽",
+        "翌",
+        "耕",
+        "肌",
+        "肩",
+        "肯",
+        "胸",
+        "脂",
+        "脳",
+        "腕",
+        "腰",
+        "膚",
+        "臓",
+        "臣",
+        "舟",
+        "航",
+        "般",
+        "芸",
+        "荒",
+        "荷",
+        "菓",
+        "菜",
+        "著",
+        "蒸",
+        "蔵",
+        "薄",
+        "虫",
+        "血",
+        "衛",
+        "衣",
+        "袋",
+        "被",
+        "裁",
+        "装",
+        "裏",
+        "補",
+        "複",
+        "角",
+        "触",
+        "訓",
+        "設",
+        "訳",
+        "診",
+        "評",
+        "詞",
+        "詰",
+        "誌",
+        "諸",
+        "講",
+        "谷",
+        "豊",
+        "象",
+        "貝",
+        "貨",
+        "販",
+        "貯",
+        "貿",
+        "賢",
+        "贈",
+        "超",
+        "跡",
+        "踊",
+        "軒",
+        "軟",
+        "軽",
+        "輪",
+        "輸",
+        "辛",
+        "農",
+        "辺",
+        "述",
+        "逆",
+        "造",
+        "違",
+        "郊",
+        "郵",
+        "量",
+        "針",
+        "鈍",
+        "鉄",
+        "鉱",
+        "鋭",
+        "録",
+        "防",
+        "陸",
+        "隅",
+        "階",
+        "障",
+        "隻",
+        "雇",
+        "雲",
+        "需",
+        "震",
+        "革",
+        "順",
+        "預",
+        "領",
+        "額",
+        "香",
+        "駐",
+        "骨",
+        "麦",
+        "黄",
+        "鼻",
+        "齢"
+      ],
+      "Kanji N3": [
+        "与",
+        "両",
+        "乗",
+        "予",
+        "争",
+        "互",
+        "亡",
+        "交",
+        "付",
+        "任",
+        "伝",
+        "似",
+        "位",
+        "余",
+        "供",
+        "価",
+        "便",
+        "係",
+        "保",
+        "信",
+        "倒",
+        "候",
+        "値",
+        "偉",
+        "側",
+        "偶",
+        "備",
+        "働",
+        "優",
+        "光",
+        "全",
+        "共",
+        "具",
+        "内",
+        "冷",
+        "処",
+        "初",
+        "判",
+        "利",
+        "到",
+        "制",
+        "刻",
+        "割",
+        "加",
+        "助",
+        "努",
+        "労",
+        "務",
+        "勝",
+        "勤",
+        "化",
+        "単",
+        "危",
+        "原",
+        "参",
+        "反",
+        "収",
+        "取",
+        "受",
+        "号",
+        "合",
+        "向",
+        "君",
+        "否",
+        "吸",
+        "吹",
+        "告",
+        "呼",
+        "命",
+        "和",
+        "商",
+        "喜",
+        "営",
+        "回",
+        "因",
+        "困",
+        "園",
+        "在",
+        "報",
+        "増",
+        "声",
+        "夢",
+        "太",
+        "夫",
+        "失",
+        "好",
+        "妻",
+        "娘",
+        "婚",
+        "婦",
+        "存",
+        "宅",
+        "守",
+        "完",
+        "官",
+        "定",
+        "実",
+        "容",
+        "宿",
+        "寄",
+        "富",
+        "寒",
+        "寝",
+        "察",
+        "対",
+        "導",
+        "少",
+        "居",
+        "属",
+        "差",
+        "市",
+        "師",
+        "常",
+        "平",
+        "幸",
+        "幾",
+        "座",
+        "庭",
+        "式",
+        "引",
+        "当",
+        "形",
+        "役",
+        "彼",
+        "徒",
+        "得",
+        "御",
+        "必",
+        "忘",
+        "忙",
+        "応",
+        "怒",
+        "怖",
+        "急",
+        "性",
+        "恐",
+        "恥",
+        "息",
+        "悲",
+        "情",
+        "想",
+        "愛",
+        "感",
+        "慣",
+        "成",
+        "戦",
+        "戻",
+        "所",
+        "才",
+        "打",
+        "払",
+        "投",
+        "折",
+        "抜",
+        "抱",
+        "押",
+        "招",
+        "指",
+        "捕",
+        "掛",
+        "探",
+        "接",
+        "提",
+        "支",
+        "放",
+        "政",
+        "敗",
+        "散",
+        "数",
+        "断",
+        "旅",
+        "易",
+        "昔",
+        "景",
+        "晴",
+        "暗",
+        "暮",
+        "曲",
+        "更",
+        "最",
+        "望",
+        "期",
+        "未",
+        "末",
+        "束",
+        "杯",
+        "果",
+        "査",
+        "格",
+        "検",
+        "構",
+        "様",
+        "権",
+        "横",
+        "機",
+        "欠",
+        "次",
+        "歯",
+        "歳",
+        "残",
+        "段",
+        "殺",
+        "民",
+        "求",
+        "治",
+        "法",
+        "泳",
+        "洗",
+        "活",
+        "流",
+        "浮",
+        "消",
+        "深",
+        "済",
+        "減",
+        "渡",
+        "港",
+        "満",
+        "演",
+        "然",
+        "煙",
+        "熱",
+        "犯",
+        "状",
+        "猫",
+        "王",
+        "現",
+        "球",
+        "産",
+        "由",
+        "申",
+        "留",
+        "番",
+        "疑",
+        "疲",
+        "痛",
+        "登",
+        "皆",
+        "盗",
+        "直",
+        "相",
+        "眠",
+        "石",
+        "破",
+        "確",
+        "示",
+        "礼",
+        "祖",
+        "神",
+        "福",
+        "科",
+        "程",
+        "種",
+        "積",
+        "突",
+        "窓",
+        "笑",
+        "等",
+        "算",
+        "管",
+        "箱",
+        "米",
+        "精",
+        "組",
+        "経",
+        "給",
+        "絵",
+        "絶",
+        "続",
+        "緒",
+        "罪",
+        "置",
+        "美",
+        "老",
+        "耳",
+        "育",
+        "背",
+        "能",
+        "腹",
+        "舞",
+        "船",
+        "良",
+        "若",
+        "草",
+        "落",
+        "葉",
+        "薬",
+        "術",
+        "要",
+        "規",
+        "覚",
+        "観",
+        "解",
+        "記",
+        "訪",
+        "設",
+        "許",
+        "認",
+        "誤",
+        "説",
+        "調",
+        "談",
+        "論",
+        "識",
+        "警",
+        "議",
+        "負",
+        "財",
+        "貧",
+        "責",
+        "費",
+        "資",
+        "賛",
+        "起",
+        "越",
+        "路",
+        "転",
+        "辞",
+        "込",
+        "迎",
+        "返",
+        "迷",
+        "追",
+        "退",
+        "逃",
+        "途",
+        "速",
+        "連",
+        "進",
+        "遅",
+        "遊",
+        "過",
+        "達",
+        "違",
+        "遠",
+        "適",
+        "選",
+        "部",
+        "都",
+        "配",
+        "酒",
+        "閉",
+        "関",
+        "降",
+        "限",
+        "除",
+        "険",
+        "陽",
+        "際",
+        "雑",
+        "難",
+        "雪",
+        "静",
+        "非",
+        "面",
+        "靴",
+        "頂",
+        "頭",
+        "頼",
+        "顔",
+        "願",
+        "飛",
+        "首",
+        "馬",
+        "髪",
+        "鳴"
+      ],
+      "Kanji N4": [
+        "不",
+        "世",
+        "主",
+        "乗",
+        "事",
+        "京",
+        "仕",
+        "代",
+        "以",
+        "会",
+        "住",
+        "体",
+        "何",
+        "作",
+        "使",
+        "借",
+        "元",
+        "兄",
+        "全",
+        "公",
+        "内",
+        "写",
+        "冬",
+        "切",
+        "別",
+        "力",
+        "勉",
+        "動",
+        "化",
+        "医",
+        "去",
+        "口",
+        "古",
+        "台",
+        "同",
+        "名",
+        "味",
+        "品",
+        "員",
+        "問",
+        "図",
+        "堂",
+        "場",
+        "売",
+        "夏",
+        "夕",
+        "多",
+        "夜",
+        "妹",
+        "姉",
+        "始",
+        "安",
+        "定",
+        "室",
+        "家",
+        "少",
+        "屋",
+        "工",
+        "市",
+        "帰",
+        "広",
+        "店",
+        "府",
+        "度",
+        "建",
+        "弟",
+        "弱",
+        "強",
+        "待",
+        "心",
+        "思",
+        "悪",
+        "手",
+        "持",
+        "教",
+        "文",
+        "料",
+        "新",
+        "方",
+        "旅",
+        "族",
+        "早",
+        "明",
+        "映",
+        "春",
+        "昼",
+        "時",
+        "暗",
+        "曜",
+        "有",
+        "服",
+        "朝",
+        "村",
+        "業",
+        "楽",
+        "歌",
+        "止",
+        "正",
+        "歩",
+        "死",
+        "泳",
+        "洋",
+        "海",
+        "漢",
+        "牛",
+        "物",
+        "特",
+        "犬",
+        "理",
+        "用",
+        "田",
+        "町",
+        "画",
+        "界",
+        "病",
+        "発",
+        "目",
+        "相",
+        "真",
+        "着",
+        "知",
+        "研",
+        "社",
+        "私",
+        "秋",
+        "究",
+        "空",
+        "立",
+        "答",
+        "紙",
+        "終",
+        "習",
+        "考",
+        "者",
+        "自",
+        "色",
+        "花",
+        "英",
+        "薬",
+        "親",
+        "言",
+        "計",
+        "試",
+        "買",
+        "貸",
+        "質",
+        "赤",
+        "走",
+        "起",
+        "足",
+        "転",
+        "近",
+        "送",
+        "通",
+        "道",
+        "遠",
+        "都",
+        "重",
+        "野",
+        "銀",
+        "開",
+        "間",
+        "降",
+        "院",
+        "集",
+        "青",
+        "音",
+        "風",
+        "飯",
+        "飲",
+        "館",
+        "験",
+        "魚",
+        "鳥",
+        "黒"
+      ],
+      "Kanji N5": [
+        "七",
+        "上",
+        "下",
+        "中",
+        "九",
+        "人",
+        "今",
+        "休",
+        "何",
+        "先",
+        "入",
+        "内",
+        "円",
+        "出",
+        "分",
+        "前",
+        "力",
+        "北",
+        "午",
+        "南",
+        "友",
+        "口",
+        "古",
+        "名",
+        "四",
+        "国",
+        "土",
+        "外",
+        "大",
+        "天",
+        "女",
+        "子",
+        "字",
+        "学",
+        "安",
+        "小",
+        "山",
+        "川",
+        "帰",
+        "年",
+        "後",
+        "手",
+        "文",
+        "新",
+        "日",
+        "時",
+        "書",
+        "月",
+        "木",
+        "本",
+        "来",
+        "東",
+        "校",
+        "母",
+        "毎",
+        "気",
+        "水",
+        "火",
+        "父",
+        "生",
+        "田",
+        "男",
+        "白",
+        "目",
+        "立",
+        "耳",
+        "聞",
+        "花",
+        "行",
+        "西",
+        "見",
+        "話",
+        "語",
+        "読",
+        "赤",
+        "足",
+        "車",
+        "金",
+        "長",
+        "間",
+        "雨",
+        "電",
+        "青",
+        "食",
+        "飲",
+        "高"
+      ],
+      "Katakana": [
+        "ア",
+        "イ",
+        "ウ",
+        "エ",
+        "オ",
+        "カ",
+        "ガ",
+        "キ",
+        "ギ",
+        "ク",
+        "グ",
+        "ケ",
+        "ゲ",
+        "コ",
+        "ゴ",
+        "サ",
+        "ザ",
+        "シ",
+        "ジ",
+        "ス",
+        "ズ",
+        "セ",
+        "ゼ",
+        "ソ",
+        "ゾ",
+        "タ",
+        "ダ",
+        "チ",
+        "ヂ",
+        "ツ",
+        "ヅ",
+        "テ",
+        "デ",
+        "ト",
+        "ド",
+        "ナ",
+        "ニ",
+        "ヌ",
+        "ネ",
+        "ノ",
+        "ハ",
+        "バ",
+        "パ",
+        "ヒ",
+        "ビ",
+        "ピ",
+        "フ",
+        "ブ",
+        "プ",
+        "ヘ",
+        "ベ",
+        "ペ",
+        "ホ",
+        "ボ",
+        "ポ",
+        "マ",
+        "ミ",
+        "ム",
+        "メ",
+        "モ",
+        "ヤ",
+        "ユ",
+        "ヨ",
+        "ラ",
+        "リ",
+        "ル",
+        "レ",
+        "ロ",
+        "ワ",
+        "ヲ",
+        "ン"
+      ]
+    },
+    "eligibleCharacters": 2263,
+    "excludedMultiCharacterCards": {
+      "Hiragana": [
+        "きゃ",
+        "きゅ",
+        "きょ",
+        "ぎゃ",
+        "ぎゅ",
+        "ぎょ",
+        "しゃ",
+        "しゅ",
+        "しょ",
+        "じゃ",
+        "じゅ",
+        "じょ",
+        "ちゃ",
+        "ちゅ",
+        "ちょ",
+        "にゃ",
+        "にゅ",
+        "にょ",
+        "ひゃ",
+        "ひゅ",
+        "ひょ",
+        "びゃ",
+        "びゅ",
+        "びょ",
+        "ぴゃ",
+        "ぴゅ",
+        "ぴょ",
+        "みゃ",
+        "みゅ",
+        "みょ",
+        "りゃ",
+        "りゅ",
+        "りょ"
+      ],
+      "Kanji N1": [],
+      "Kanji N2": [],
+      "Kanji N3": [],
+      "Kanji N4": [],
+      "Kanji N5": [],
+      "Katakana": [
+        "キャ",
+        "キュ",
+        "キョ",
+        "ギャ",
+        "ギュ",
+        "ギョ",
+        "シャ",
+        "シュ",
+        "ショ",
+        "ジャ",
+        "ジュ",
+        "ジョ",
+        "チャ",
+        "チュ",
+        "チョ",
+        "ニャ",
+        "ニュ",
+        "ニョ",
+        "ヒャ",
+        "ヒュ",
+        "ヒョ",
+        "ビャ",
+        "ビュ",
+        "ビョ",
+        "ピャ",
+        "ピュ",
+        "ピョ",
+        "ミャ",
+        "ミュ",
+        "ミョ",
+        "リャ",
+        "リュ",
+        "リョ"
+      ]
+    }
+  },
+  "formatVersion": 2,
+  "upstream": {
+    "japaneseDataRepository": "https://github.com/chanind/hanzi-writer-data-jp",
+    "japaneseDataRevision": "efbea0cb93ba0301475ae92f9d3e512b9e4cd2ca",
+    "repository": "https://github.com/madladsquad/hanzi-writer-data-youyin",
+    "revision": "7d4aaeebe35b4cd9c251ecf17d0bbb6742644327"
+  }
+}

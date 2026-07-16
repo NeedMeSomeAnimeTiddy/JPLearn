@@ -34,6 +34,22 @@ vi.mock('./features/onboarding/components/WelcomeStep', () => ({
   },
 }))
 
+vi.mock('./features/handwriting/components/HandwritingAnswerPanel', () => ({
+  HandwritingAnswerPanel: ({ onComplete }: { onComplete: (outcome: { completed: boolean; mistakeCount: number; usedHint: boolean; usedAnimation: boolean; gaveUp: boolean }) => void }) => (
+    <div>
+      <button type="button" onClick={() => onComplete({ completed: true, mistakeCount: 0, usedHint: false, usedAnimation: false, gaveUp: false })}>
+        Complete unassisted handwriting
+      </button>
+      <button type="button" onClick={() => onComplete({ completed: true, mistakeCount: 3, usedHint: true, usedAnimation: true, gaveUp: false })}>
+        Complete handwriting after retries
+      </button>
+      <button type="button" onClick={() => onComplete({ completed: false, mistakeCount: 0, usedHint: false, usedAnimation: false, gaveUp: true })}>
+        Give up handwriting
+      </button>
+    </div>
+  ),
+}))
+
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
@@ -58,6 +74,14 @@ function clickTilePrimaryAction(tileButton: HTMLElement): void {
   const cassette = (tileButton.closest('.cassette') ?? tileButton) as HTMLElement
   fireEvent.click(cassette)
   fireEvent.click(cassette)
+}
+
+async function openHandwritingRound(): Promise<void> {
+  render(<App />)
+  await screen.findByRole('button', { name: /open shortcuts/i })
+  clickTopMenuCard('Hiragana')
+  const handwritingTiles = await screen.findAllByRole('button', { name: /Handwriting/i })
+  clickTilePrimaryAction(handwritingTiles[0])
 }
 
 Object.defineProperty(window, 'matchMedia', {
@@ -812,6 +836,60 @@ describe('Minigame menu', () => {
 
     await waitFor(() => expect(recordGameResult).toHaveBeenCalled())
     expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({ minigame: 'stroke_order' }))
+  })
+
+  it('records an unassisted handwriting completion as correct and keeps the feedback aligned', async () => {
+    const recordGameResult = vi.fn(async () => ({ ok: true, card_id: 0, repetitions: 1, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
+    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+
+    await openHandwritingRound()
+    expect(document.querySelector('.minigame-response-copy')).toBeNull()
+
+    fireEvent.click(await screen.findByRole('button', { name: /complete unassisted handwriting/i }))
+
+    await waitFor(() => expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
+      minigame: 'handwriting',
+      isCorrect: true,
+    })))
+    expect(screen.getByText(/stroke order complete/i)).toBeTruthy()
+    expect(screen.getByText(/your answer/i)).toBeTruthy()
+    expect(screen.getByText(/the answer/i)).toBeTruthy()
+    const completedAnswerValues = Array.from(document.querySelectorAll('.round-feedback-answer-value')).map((value) => value.textContent)
+    expect(completedAnswerValues).toHaveLength(2)
+    expect(completedAnswerValues[0]).toBe(completedAnswerValues[1])
+  })
+
+  it('records a completed handwriting round with retries and assistance as correct', async () => {
+    const recordGameResult = vi.fn(async () => ({ ok: true, card_id: 0, repetitions: 1, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
+    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+
+    await openHandwritingRound()
+    fireEvent.click(await screen.findByRole('button', { name: /complete handwriting after retries/i }))
+
+    await waitFor(() => expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
+      minigame: 'handwriting',
+      isCorrect: true,
+    })))
+    expect(screen.getByText(/stroke order complete/i)).toBeTruthy()
+    expect(screen.queryByText(/stroke-order animation|rejected strokes|guide hint/i)).toBeNull()
+    const retryAnswerValues = Array.from(document.querySelectorAll('.round-feedback-answer-value')).map((value) => value.textContent)
+    expect(retryAnswerValues).toHaveLength(2)
+    expect(retryAnswerValues[0]).toBe(retryAnswerValues[1])
+  })
+
+  it('records a given-up handwriting round as incomplete and incorrect', async () => {
+    const recordGameResult = vi.fn(async () => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
+    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+
+    await openHandwritingRound()
+    fireEvent.click(await screen.findByRole('button', { name: /give up handwriting/i }))
+
+    await waitFor(() => expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({
+      minigame: 'handwriting',
+      isCorrect: false,
+    })))
+    expect(screen.getByText(/character not completed/i)).toBeTruthy()
+    expect(Array.from(document.querySelectorAll('.round-feedback-answer-value')).map((value) => value.textContent)[0]).toBe('Not completed')
   })
 
   it('runs sentence assembly via bridge payload and records the sentence_assembly minigame', async () => {

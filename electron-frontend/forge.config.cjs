@@ -1,5 +1,6 @@
 const fs = require("node:fs")
 const path = require("node:path")
+const { verifyPackagedHandwritingAssets } = require("./scripts/verify-handwriting-assets.cjs")
 
 const extraResourceCandidates = ["../scripts", "../data", "../domain", "../python-bundle"]
 const extraResource = extraResourceCandidates.filter((relativePath) => {
@@ -30,6 +31,7 @@ module.exports = {
             console.log("[forge hook] removed: " + dir)
           }
         }
+        verifyPackagedHandwritingAssets(path.join(resourcesDir, "app.asar"))
       }
     },
   },

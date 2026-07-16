@@ -143,6 +143,7 @@ export function MinigameView({
   const previousPointsRef = useRef(sessionPoints)
   const previousSessionActiveRef = useRef(false)
   const [hintPopoverOpen, setHintPopoverOpen] = useState(false)
+  const [handwritingHintUsed, setHandwritingHintUsed] = useState(false)
   const hintButtonRef = useRef<HTMLButtonElement | null>(null)
   const [queueOpen, setQueueOpen] = useState(false)
   const queueButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -170,12 +171,14 @@ export function MinigameView({
       return (current + 1) as 0 | 1 | 2
     })
     setHintPopoverOpen(true)
-  }, [])
+    if (roundState?.mode === 'handwriting') setHandwritingHintUsed(true)
+  }, [roundState?.mode])
 
   // Reset hint when a new round starts.
   useEffect(() => {
     setHintStep(0)
     setHintPopoverOpen(false)
+    setHandwritingHintUsed(false)
   }, [roundState?.cardId])
 
   // Brief pulse + floating "+N" label whenever points increase.
@@ -466,7 +469,12 @@ export function MinigameView({
 
             {sessionActive && roundState ? (
               <AnimatePresence mode="wait">
-                <article className="minigame-open-playfield" key={roundState.cardId} style={tapeStyle} data-feedback={roundFeedback !== null ? '' : undefined}>
+                <article
+                  className={`minigame-open-playfield${roundState.mode === 'handwriting' ? ' minigame-open-playfield--handwriting' : ''}`}
+                  key={roundState.cardId}
+                  style={tapeStyle}
+                  data-feedback={roundFeedback !== null ? '' : undefined}
+                >
 
                   <div className="minigame-cassette-label">
                     <span className="cassette-brand">JPLearn · {resolvedGameTitle}</span>
@@ -533,7 +541,10 @@ export function MinigameView({
                       hintPopoverOpen={hintPopoverOpen}
                       hintButtonRef={hintButtonRef}
                       onPlayAudio={playAudio}
-                      onToggleHintPopover={() => setHintPopoverOpen((v) => !v)}
+                      onToggleHintPopover={() => {
+                        if (roundState.mode === 'handwriting') setHandwritingHintUsed(true)
+                        setHintPopoverOpen((v) => !v)
+                      }}
                     />
                   </div>
 
@@ -568,7 +579,7 @@ export function MinigameView({
                         roundState.mode === 'stroke_order'
                           ? 'Type the romaji reading to narrow the kanji candidates.'
                           : roundState.mode === 'handwriting'
-                            ? 'Draw one character in stroke order. Guided feedback appears only after repeated misses.'
+                            ? null
                           : roundState.mode === 'romaji_sprint'
                             ? 'Submit as soon as the reading is clear in your head.'
                             : roundState.mode === 'sentence_assembly'
@@ -620,6 +631,7 @@ export function MinigameView({
                           <HandwritingAnswerPanel
                             character={roundState.answer}
                             disabled={isRoundResolving}
+                            externalHintUsed={handwritingHintUsed}
                             onComplete={onHandwritingOutcome}
                           />
                         ) : roundState.mode === 'stroke_order' ? (
@@ -702,6 +714,7 @@ export function MinigameView({
                 onRevealHint={() => {
                   if (hintStep < 1) setHintRevealCount((value) => value + 1)
                   setHintStep(1)
+                  if (roundState.mode === 'handwriting') setHandwritingHintUsed(true)
                 }}
                 onRevealMoreHint={advanceHintStep}
               />

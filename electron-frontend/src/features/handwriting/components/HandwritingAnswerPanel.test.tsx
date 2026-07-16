@@ -28,7 +28,7 @@ describe('HandwritingAnswerPanel', () => {
       giveUp,
     })
 
-    render(<HandwritingAnswerPanel character="日" disabled={false} onComplete={vi.fn()} />)
+    render(<HandwritingAnswerPanel character="日" disabled={false} externalHintUsed={false} onComplete={vi.fn()} />)
 
     expect(screen.queryByText('日')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /restart strokes/i }))
@@ -51,7 +51,7 @@ describe('HandwritingAnswerPanel', () => {
       giveUp: vi.fn(),
     })
 
-    render(<HandwritingAnswerPanel character="あ" disabled={false} onComplete={vi.fn()} />)
+    render(<HandwritingAnswerPanel character="あ" disabled={false} externalHintUsed={false} onComplete={vi.fn()} />)
 
     expect(screen.getByRole('status').textContent).toMatch(/unavailable or malformed/i)
     fireEvent.click(screen.getByRole('button', { name: /retry data load/i }))

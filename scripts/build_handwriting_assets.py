@@ -1,10 +1,4 @@
-"""Vendor and verify the offline handwriting character-data subset.
-
-The source directory must be a pinned checkout of
-``madladsquad/hanzi-writer-data-youyin`` with its
-``ThirdParty/hanzi-writer-data-jp`` submodule initialised. The generated data
-is intentionally committed so packaged Electron builds never request a CDN.
-"""
+"""Generate committed, offline handwriting data chunks from pinned source data."""
 
 from __future__ import annotations
 
@@ -27,7 +21,8 @@ UPSTREAM_REPOSITORY = "https://github.com/madladsquad/hanzi-writer-data-youyin"
 UPSTREAM_REVISION = "7d4aaeebe35b4cd9c251ecf17d0bbb6742644327"
 JAPANESE_DATA_REPOSITORY = "https://github.com/chanind/hanzi-writer-data-jp"
 JAPANESE_DATA_REVISION = "efbea0cb93ba0301475ae92f9d3e512b9e4cd2ca"
-
+DEFAULT_DESTINATION = Path("electron-frontend/public/handwriting-data")
+DEFAULT_MANIFEST_MODULE = Path("electron-frontend/src/lib/handwriting-data-manifest.json")
 DECK_FACTORIES = (
     decks.get_hiragana_deck,
     decks.get_katakana_deck,
@@ -37,30 +32,35 @@ DECK_FACTORIES = (
     decks.get_kanji_n2_deck,
     decks.get_kanji_n1_deck,
 )
+KANJI_CHUNKS = ("kanji-n5", "kanji-n4", "kanji-n3", "kanji-n2")
+N1_SHARDS = ("kanji-n1-a", "kanji-n1-b", "kanji-n1-c", "kanji-n1-d")
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
 
 
-def _validate_character_data(path: Path) -> dict[str, Any]:
+def _read_character_data(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Malformed handwriting data in {path}: {exc}") from exc
+    return _read_character_data_from_value(data, str(path))
 
+
+def _read_character_data_from_value(data: Any, label: str) -> dict[str, Any]:
     if not isinstance(data, dict):
-        raise ValueError(f"Malformed handwriting data in {path}: expected object")
+        raise ValueError(f"Malformed handwriting data in {label}: expected object")
     strokes = data.get("strokes")
     medians = data.get("medians")
     if not isinstance(strokes, list) or not isinstance(medians, list) or not strokes:
-        raise ValueError(f"Malformed handwriting data in {path}: missing strokes or medians")
+        raise ValueError(f"Malformed handwriting data in {label}: missing strokes or medians")
     if len(strokes) != len(medians):
-        raise ValueError(f"Malformed handwriting data in {path}: stroke and median counts differ")
+        raise ValueError(f"Malformed handwriting data in {label}: stroke and median counts differ")
     if not all(isinstance(stroke, str) and stroke for stroke in strokes):
-        raise ValueError(f"Malformed handwriting data in {path}: invalid SVG stroke path")
+        raise ValueError(f"Malformed handwriting data in {label}: invalid SVG stroke path")
     if not all(isinstance(median, list) and median for median in medians):
-        raise ValueError(f"Malformed handwriting data in {path}: invalid stroke median")
+        raise ValueError(f"Malformed handwriting data in {label}: invalid stroke median")
     return data
 
 
@@ -83,70 +83,86 @@ def _source_path(source_data_dir: Path, character: str) -> Path | None:
     return None
 
 
-def build_assets(source_dir: Path, destination: Path) -> dict[str, Any]:
-    """Build a verified, local-only subset and return its manifest."""
-    source_data_dir = source_dir / "data"
+def _assign_chunks(characters_by_deck: dict[str, list[str]]) -> dict[str, str]:
+    assignments: dict[str, str] = {}
+    for deck_name, chunk in (("Hiragana", "hiragana"), ("Katakana", "katakana")):
+        for character in characters_by_deck[deck_name]:
+            assignments[character] = chunk
+    for deck_name, chunk in zip(("Kanji N5", "Kanji N4", "Kanji N3", "Kanji N2"), KANJI_CHUNKS, strict=True):
+        for character in characters_by_deck[deck_name]:
+            assignments.setdefault(character, chunk)
+    for character in characters_by_deck["Kanji N1"]:
+        assignments.setdefault(character, N1_SHARDS[ord(character) % len(N1_SHARDS)])
+    return assignments
+
+
+def _copy_notices(source_dir: Path, notices_dir: Path) -> None:
+    if (source_dir / "manifest.json").is_file() and (source_dir / "notices").is_dir():
+        shutil.copytree(source_dir / "notices", notices_dir)
+        return
+    if (source_dir / "manifest.json").is_file() and (source_dir / "licenses").is_dir():
+        shutil.copytree(source_dir / "licenses", notices_dir)
+        return
     japanese_submodule = source_dir / "ThirdParty" / "hanzi-writer-data-jp"
-    if not source_data_dir.is_dir() or not japanese_submodule.is_dir():
-        raise ValueError("source_dir must contain data/ and initialised ThirdParty/hanzi-writer-data-jp/")
-    if destination.exists():
-        raise ValueError(f"Refusing to overwrite existing destination: {destination}")
-
-    deck_set = tuple(factory() for factory in DECK_FACTORIES)
-    characters_by_deck, excluded_by_deck = _eligible_characters(deck_set)
-    eligible = sorted({character for characters in characters_by_deck.values() for character in characters})
-
-    character_dir = destination / "characters"
-    licences_dir = destination / "licenses"
-    character_dir.mkdir(parents=True)
-    licences_dir.mkdir(parents=True)
-
-    files: dict[str, dict[str, str]] = {}
-    missing: list[str] = []
-    for character in eligible:
-        source_path = _source_path(source_data_dir, character)
-        if source_path is None:
-            missing.append(character)
-            continue
-        _validate_character_data(source_path)
-        filename = f"{ord(character):05x}.json"
-        destination_path = character_dir / filename
-        shutil.copyfile(source_path, destination_path)
-        files[character] = {
-            "path": f"characters/{filename}",
-            "source": source_path.name,
-            "sha256": _sha256(destination_path),
-        }
-
-    if missing:
-        missing_points = ", ".join(f"U+{ord(character):04X}" for character in missing)
-        raise ValueError(f"Missing handwriting data for eligible characters: {missing_points}")
-
-    shutil.copyfile(source_dir / "LICENSE", licences_dir / "hanzi-writer-data-youyin-MIT.txt")
-    shutil.copyfile(japanese_submodule / "README.md", licences_dir / "hanzi-writer-data-jp-README.md")
-    shutil.copytree(japanese_submodule / "licenses", licences_dir / "hanzi-writer-data-jp")
-    (licences_dir / "ATTRIBUTION.md").write_text(
+    package_root = Path(__file__).resolve().parents[1] / "electron-frontend" / "node_modules" / "hanzi-writer"
+    notices_dir.mkdir(parents=True)
+    shutil.copyfile(package_root / "LICENSE", notices_dir / "hanzi-writer-MIT.txt")
+    shutil.copyfile(source_dir / "LICENSE", notices_dir / "hanzi-writer-data-youyin-MIT.txt")
+    shutil.copyfile(japanese_submodule / "README.md", notices_dir / "hanzi-writer-data-jp-README.md")
+    shutil.copytree(japanese_submodule / "licenses", notices_dir / "hanzi-writer-data-jp")
+    (notices_dir / "ATTRIBUTION.md").write_text(
         """# Japanese handwriting data attribution
 
 This directory contains a generated subset of `hanzi-writer-data-youyin` for
 JPLearn's offline handwriting minigame.
 
+- Runtime: `hanzi-writer` 3.6.0 (MIT).
 - Aggregator: MadLadSquad, `hanzi-writer-data-youyin` at revision
   7d4aaeebe35b4cd9c251ecf17d0bbb6742644327 (MIT for aggregator code).
 - Japanese data: `hanzi-writer-data-jp` at revision
   efbea0cb93ba0301475ae92f9d3e512b9e4cd2ca.
-- The Japanese data is derived from AnimCJK (Francois Mizessyn, LGPL-3.0-or-later)
-  and Make Me A Hanzi / Arphic fonts (Arphic Public License).
+- The Japanese data is derived from AnimCJK (LGPL-3.0-or-later) and Make Me A
+  Hanzi / Arphic fonts (Arphic Public License).
 
-The copied upstream notices in this directory govern the character data. The
-JPLearn application source remains Apache-2.0; this separately stored data is
-not relicensed by that application licence.
+The copied upstream notices in this directory govern the character data.
 """,
         encoding="utf-8",
     )
 
+
+def _write_assets(
+    destination: Path,
+    manifest_module: Path,
+    characters_by_deck: dict[str, list[str]],
+    excluded_by_deck: dict[str, list[str]],
+    data_by_character: dict[str, dict[str, Any]],
+    notice_source_dir: Path,
+) -> dict[str, Any]:
+    if destination.exists():
+        raise ValueError(f"Refusing to overwrite existing destination: {destination}")
+    assignments = _assign_chunks(characters_by_deck)
+    if set(assignments) != set(data_by_character):
+        raise ValueError("Chunk assignments do not exactly match verified character data")
+
+    chunk_data: dict[str, dict[str, dict[str, Any]]] = {}
+    for character, data in data_by_character.items():
+        chunk_data.setdefault(assignments[character], {})[character] = data
+
+    chunks_dir = destination / "chunks"
+    chunks_dir.mkdir(parents=True)
+    chunks: dict[str, dict[str, Any]] = {}
+    for chunk_name in sorted(chunk_data):
+        payload = json.dumps(chunk_data[chunk_name], ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        filename = f"{chunk_name}.json"
+        (chunks_dir / filename).write_bytes(payload)
+        chunks[chunk_name] = {
+            "path": f"chunks/{filename}",
+            "sha256": _sha256_bytes(payload),
+            "characterCount": len(chunk_data[chunk_name]),
+        }
+
     manifest: dict[str, Any] = {
-        "formatVersion": 1,
+        "formatVersion": 2,
         "upstream": {
             "repository": UPSTREAM_REPOSITORY,
             "revision": UPSTREAM_REVISION,
@@ -154,30 +170,83 @@ not relicensed by that application licence.
             "japaneseDataRevision": JAPANESE_DATA_REVISION,
         },
         "coverage": {
-            "eligibleCharacters": len(eligible),
+            "eligibleCharacters": len(data_by_character),
             "decks": characters_by_deck,
             "excludedMultiCharacterCards": excluded_by_deck,
         },
-        "characters": files,
+        "chunks": chunks,
+        "characters": {character: {"chunk": assignments[character]} for character in sorted(assignments)},
     }
-    (destination / "manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    manifest_text = json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    (destination / "manifest.json").write_text(manifest_text, encoding="utf-8")
+    manifest_module.parent.mkdir(parents=True, exist_ok=True)
+    manifest_module.write_text(manifest_text, encoding="utf-8")
+    _copy_notices(notice_source_dir, destination / "notices")
     return manifest
+
+
+def build_assets(source_dir: Path, destination: Path, manifest_module: Path) -> dict[str, Any]:
+    """Build a verified subset from a pinned upstream checkout."""
+    source_data_dir = source_dir / "data"
+    japanese_submodule = source_dir / "ThirdParty" / "hanzi-writer-data-jp"
+    if not source_data_dir.is_dir() or not japanese_submodule.is_dir():
+        raise ValueError("source_dir must contain data/ and initialised ThirdParty/hanzi-writer-data-jp/")
+    characters_by_deck, excluded_by_deck = _eligible_characters(factory() for factory in DECK_FACTORIES)
+    data_by_character: dict[str, dict[str, Any]] = {}
+    missing: list[str] = []
+    for character in sorted({character for values in characters_by_deck.values() for character in values}):
+        source_path = _source_path(source_data_dir, character)
+        if source_path is None:
+            missing.append(character)
+        else:
+            data_by_character[character] = _read_character_data(source_path)
+    if missing:
+        missing_points = ", ".join(f"U+{ord(character):04X}" for character in missing)
+        raise ValueError(f"Missing handwriting data for eligible characters: {missing_points}")
+    return _write_assets(destination, manifest_module, characters_by_deck, excluded_by_deck, data_by_character, source_dir)
+
+
+def repack_assets(source_assets: Path, destination: Path, manifest_module: Path) -> dict[str, Any]:
+    """Repackage an already verified asset directory without upstream access."""
+    source_manifest = json.loads((source_assets / "manifest.json").read_text(encoding="utf-8"))
+    if source_manifest["formatVersion"] == 1:
+        data_by_character = {
+            character: _read_character_data(source_assets / entry["path"])
+            for character, entry in source_manifest["characters"].items()
+        }
+    else:
+        chunk_payloads = {
+            name: json.loads((source_assets / entry["path"]).read_text(encoding="utf-8"))
+            for name, entry in source_manifest["chunks"].items()
+        }
+        data_by_character = {
+            character: _read_character_data_from_value(chunk_payloads[entry["chunk"]][character], character)
+            for character, entry in source_manifest["characters"].items()
+        }
+    return _write_assets(
+        destination,
+        manifest_module,
+        source_manifest["coverage"]["decks"],
+        source_manifest["coverage"]["excludedMultiCharacterCards"],
+        data_by_character,
+        source_assets,
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source_dir", type=Path)
-    parser.add_argument(
-        "--destination",
-        type=Path,
-        default=Path("electron-frontend/src/lib/handwriting-data"),
-    )
+    parser.add_argument("source_dir", type=Path, nargs="?")
+    parser.add_argument("--source-assets", type=Path, help="Repackage an existing v1 committed asset directory")
+    parser.add_argument("--destination", type=Path, default=DEFAULT_DESTINATION)
+    parser.add_argument("--manifest-module", type=Path, default=DEFAULT_MANIFEST_MODULE)
     args = parser.parse_args()
-    manifest = build_assets(args.source_dir.resolve(), args.destination.resolve())
-    print(f"Wrote {manifest['coverage']['eligibleCharacters']} verified handwriting character files.")
+    if bool(args.source_dir) == bool(args.source_assets):
+        parser.error("provide exactly one of source_dir or --source-assets")
+    if args.source_assets:
+        manifest = repack_assets(args.source_assets.resolve(), args.destination.resolve(), args.manifest_module.resolve())
+    else:
+        manifest = build_assets(args.source_dir.resolve(), args.destination.resolve(), args.manifest_module.resolve())
+    print(f"Wrote {len(manifest['chunks'])} chunks for {manifest['coverage']['eligibleCharacters']} verified characters.")
 
 
 if __name__ == "__main__":

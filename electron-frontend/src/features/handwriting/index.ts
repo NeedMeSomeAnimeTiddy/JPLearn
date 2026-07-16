@@ -1,3 +1,3 @@
 export { HandwritingAnswerPanel } from './components/HandwritingAnswerPanel'
 export type { HandwritingOutcome } from './types'
-export { isHandwritingEligibleCharacter, isHandwritingOutcomeCorrect } from './utils'
+export { formatHandwritingAttemptValue, isHandwritingEligibleCharacter, isHandwritingOutcomeCorrect } from './utils'

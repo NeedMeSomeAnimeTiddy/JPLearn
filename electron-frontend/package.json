@@ -20,6 +20,7 @@
     "session:check": "powershell -ExecutionPolicy Bypass -File ./scripts/session-recover.ps1 -SkipInstall -RunChecks",
     "test:ui": "vitest run",
     "test:a11y": "vitest run src/App.accessibility.test.tsx",
+    "verify:handwriting-assets": "node ./scripts/verify-handwriting-assets.cjs",
     "preview": "vite preview",
     "package": "npm run build && electron-forge package",
     "test:e2e": "npm run build:quiet && vitest run --config vitest.e2e.config.ts",

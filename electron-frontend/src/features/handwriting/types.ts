@@ -13,9 +13,13 @@ export interface HandwritingCharacterData {
 }
 
 export interface HandwritingManifestEntry {
+  chunk: string
+}
+
+export interface HandwritingChunkManifestEntry {
   path: string
-  source: string
   sha256: string
+  characterCount: number
 }
 
 export interface HandwritingManifest {
@@ -31,6 +35,7 @@ export interface HandwritingManifest {
     decks: Record<string, string[]>
     excludedMultiCharacterCards: Record<string, string[]>
   }
+  chunks: Record<string, HandwritingChunkManifestEntry>
   characters: Record<string, HandwritingManifestEntry>
 }
 

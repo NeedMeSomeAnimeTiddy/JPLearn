@@ -44,7 +44,7 @@ import { useCursor, CursorFollower, CursorSettingsTab, type CursorSettings } fro
 import { usePomodoro, BreakOverlay, PomodoroSettingsTab, type PomodoroSettingsFields } from './features/pomodoro'
 import { DevDashboard } from './features/devtools'
 import type { HandwritingOutcome } from './features/handwriting'
-import { isHandwritingEligibleCharacter, isHandwritingOutcomeCorrect } from './features/handwriting'
+import { formatHandwritingAttemptValue, isHandwritingEligibleCharacter, isHandwritingOutcomeCorrect } from './features/handwriting'
 import { SURPRISE_PROMPTS, SCRIPT_MODE_PROMPT_PACKS, TAG_PROMPT_PACKS, CLOZE_TEMPLATES, STORY_CHAPTERS } from './lib/contentTemplates'
 import type { RoundDictionaryNote } from './types'
 import {
@@ -4158,7 +4158,7 @@ function App() {
   }, [activeBlockCards, activeGame, buildRoundWithBridge, hydrateRoundCycle, leechFocusEnabled, nextCardIndex, nextRoundMode])
 
   const submitAnswer = useCallback(
-    (answer: string, correctnessOverride?: boolean) => {
+    (answer: string, correctnessOverride?: boolean, handwritingOutcome?: HandwritingOutcome) => {
       if (!roundState || isRoundResolving) return
       if (answer.trim().length === 0) return
 
@@ -4269,12 +4269,14 @@ function App() {
         } else if (isImposterMode(roundState.mode)) {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
           setRoundFeedback(`Nice work! ${pointsCopy}${comboCopy}. Stage ${roundState.curriculumStage} → ${nextStage}.`)
+        } else if (roundState.mode === 'handwriting') {
+          setRoundFeedback(`Stroke order complete! ${pointsCopy}${comboCopy}.`)
         } else {
           setRoundFeedback(`Nice work! ${pointsCopy}${comboCopy}.`)
         }
         setRoundFeedbackTone('success')
         setRoundFeedbackPoints(awardedPoints)
-        setRoundFeedbackAnswer(null)
+        setRoundFeedbackAnswer(roundState.mode === 'handwriting' ? answer : null)
 
         // Update per-card score: correct → +1 (capped at CARD_MASTERY_MAX).
         const answeredCardId = roundState.cardId
@@ -4306,6 +4308,8 @@ function App() {
           setRoundFeedback(info
             ? `Not quite. The answer is ${roundState.answer} (${info.romaji}) — ${info.explanation}.`
             : `Not quite. The answer is ${roundState.answer}.`)
+        } else if (roundState.mode === 'handwriting' && handwritingOutcome) {
+          setRoundFeedback('Character not completed. It counts as a retry.')
         } else {
           setRoundFeedback('Not quite.')
         }
@@ -4317,7 +4321,9 @@ function App() {
                 const chunkMap = new Map(roundState.options.map((o) => [o.id, o.label]))
                 return answer.split('|').map((id) => chunkMap.get(id) ?? '').join('')
               })()
-            : answer,
+            : roundState.mode === 'handwriting' && handwritingOutcome
+              ? formatHandwritingAttemptValue(handwritingOutcome, roundState.answer)
+              : answer,
         )
 
         // Wrong answer deducts 1 from the card score (floored at 0).
@@ -4534,7 +4540,7 @@ function App() {
 
   const submitHandwritingOutcome = useCallback((outcome: HandwritingOutcome) => {
     if (!roundState || roundState.mode !== 'handwriting') return
-    submitAnswer(roundState.answer, isHandwritingOutcomeCorrect(outcome))
+    submitAnswer(roundState.answer, isHandwritingOutcomeCorrect(outcome), outcome)
   }, [roundState, submitAnswer])
 
   useEffect(() => {

@@ -7,7 +7,7 @@ interface MinigameResponsePanelProps {
   isRoundResolving: boolean
   mode: PlayableMinigame
   title: string
-  copy: string
+  copy: string | null
   confidenceCaptureEnabled: boolean
   roundConfidenceScore: number
   onSetRoundConfidence: (score: number) => void
@@ -125,7 +125,7 @@ export function MinigameResponsePanel({
             <span className="minigame-response-status">{isRoundResolving ? 'Resolving…' : 'Your move'}</span>
           </div>
 
-          <p className="minigame-response-copy">{copy}</p>
+          {copy ? <p className="minigame-response-copy">{copy}</p> : null}
 
           {children}
 
