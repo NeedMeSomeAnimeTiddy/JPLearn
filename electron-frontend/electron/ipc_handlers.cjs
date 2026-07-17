@@ -23,6 +23,7 @@ const {
   validateLearningPathId,
   validateAnalyticsExportType,
   validateDictionarySearchQuery,
+  validateKanjiDetailCharacter,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,
   validateDailyGamesDay,
@@ -153,6 +154,17 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to search dictionary: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:get-kanji-detail', async (event, character) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedCharacter = validateKanjiDetailCharacter(character)
+    try {
+      return await runPythonBridgeWithArgsRead(['kanji-detail', validatedCharacter])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch kanji detail: ${detail}`)
     }
   })
 

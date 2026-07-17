@@ -18,6 +18,7 @@ import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
 import { PassageHubView } from './views/PassageHubView'
 import { DAILY_GAMES_COPY } from './features/daily-games/constants'
+import { KanjiDetailPanel } from './features/kanji-detail'
 import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
@@ -1757,6 +1758,36 @@ function App() {
     score: number
   }
   const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
+  const [kanjiDetailCharacter, setKanjiDetailCharacter] = useState<string | null>(null)
+  const kanjiDetailTriggerRef = useRef<HTMLElement | null>(null)
+
+  const openKanjiDetail = useCallback((character: string, trigger: HTMLElement) => {
+    kanjiDetailTriggerRef.current = trigger
+    setSelectedChar(null)
+    setKanjiDetailCharacter(character)
+  }, [])
+
+  const closeKanjiDetail = useCallback(() => {
+    const trigger = kanjiDetailTriggerRef.current
+    if (!trigger) {
+      setKanjiDetailCharacter(null)
+      return
+    }
+
+    const fallbackId = trigger.dataset.kanjiDetailFocusFallback
+    kanjiDetailTriggerRef.current = null
+    setKanjiDetailCharacter(null)
+    window.setTimeout(() => {
+      const fallback = fallbackId ? document.getElementById(fallbackId) : null
+      const target = trigger.isConnected
+        ? trigger
+        : fallback instanceof HTMLElement
+          ? fallback
+          : document.querySelector<HTMLElement>('[aria-label="Close overview"], [aria-label="Dictionary search"]')
+      target?.focus()
+    }, 0)
+  }, [])
+
     const [dictionaryOpen, setDictionaryOpen] = useState(false)
     const [dictionarySeedQuery, setDictionarySeedQuery] = useState('')
     const [dictionaryOpenSignal, setDictionaryOpenSignal] = useState(0)
@@ -1798,6 +1829,7 @@ function App() {
   const commandPalette = useCommandPalette()
 
   function openDailyGames(): void {
+    closeKanjiDetail()
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
@@ -1816,10 +1848,10 @@ function App() {
       { id: 'nav-script-hub', label: 'Go to Script Hub', category: 'navigation', action: () => { setNavDirection('forward'); setView('script_hub') } },
       { id: 'nav-jlpt', label: 'Go to JLPT Prep', category: 'navigation', action: () => { setNavDirection('forward'); setView('jlpt_prep') } },
       { id: 'nav-daily-games', label: DAILY_GAMES_COPY.title, category: 'navigation', keywords: ['daily', 'games', 'practice'], action: openDailyGames },
-      { id: 'nav-overview', label: 'Open Study Overview', category: 'navigation', action: () => { setShowOverview(true); void loadSummary() } },
+      { id: 'nav-overview', label: 'Open Study Overview', category: 'navigation', action: () => { closeKanjiDetail(); setShowOverview(true); void loadSummary() } },
       { id: 'script-hiragana', label: 'Hiragana', category: 'navigation', keywords: ['hiragana', 'script'], action: () => { setNavDirection('forward'); setActiveScript('hiragana'); setView('script_hub') } },
       { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { setNavDirection('forward'); setActiveScript('katakana'); setView('script_hub') } },
-      { id: 'open-settings', label: 'Open Settings', category: 'settings', shortcut: 'Ctrl+,', action: () => { setShowSettings(true) } },
+      { id: 'open-settings', label: 'Open Settings', category: 'settings', shortcut: 'Ctrl+,', action: () => { closeKanjiDetail(); setShowSettings(true) } },
       { id: 'open-keyboard-cheatsheet', label: 'Keyboard Shortcuts', category: 'settings', action: () => { closeKeyboardCheatsheet(); setTimeout(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })) }, 50) } },
     ]
 
@@ -1864,6 +1896,7 @@ function App() {
         setNavDirection('forward')
         setView('script_hub')
       } else if (action === 'view-overview') {
+        closeKanjiDetail()
         setShowOverview(true)
         void loadSummary()
       }
@@ -1939,6 +1972,7 @@ function App() {
 
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   const openDictionary = useCallback((seedQuery = '') => {
+    closeKanjiDetail()
     setShowSettings(false)
     setShowOverview(false)
     setShortcutMenuOpen(false)
@@ -1951,12 +1985,13 @@ function App() {
     setDictionarySeedQuery(seedQuery)
     setDictionaryOpen(true)
     setDictionaryOpenSignal((previous) => previous + 1)
-  }, [])
+  }, [closeKanjiDetail])
 
   const closeDictionary = useCallback(() => {
+    closeKanjiDetail()
     setDictionaryOpen(false)
     setDictionarySeedQuery('')
-  }, [])
+  }, [closeKanjiDetail])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
   const interleaveSequence = useMemo(
@@ -4569,6 +4604,11 @@ function App() {
       }
 
       if (event.key === 'Escape') {
+        if (kanjiDetailCharacter) {
+          closeKanjiDetail()
+          return
+        }
+
         if (showCloseDialog) {
           setShowCloseDialog(false)
           return
@@ -4700,7 +4740,7 @@ function App() {
     // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [tutor.assistantChatOpen, tutor.closeAssistantChat, tutor.closeOcrWorkbench, loadSummary, tutor.ocrWorkbenchOpen, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
+  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.assistantChatOpen, tutor.closeAssistantChat, tutor.closeOcrWorkbench, loadSummary, tutor.ocrWorkbenchOpen, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -4870,13 +4910,14 @@ function App() {
   }, [view])
 
   const goHome = useCallback(() => {
+    closeKanjiDetail()
     setNavDirection('back')
     setView('home')
     resetSessionCore()
     setShowSettings(false)
     tutor.setOcrWorkbenchOpen(false)
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
-  }, [resetRoundCycle])
+  }, [closeKanjiDetail, resetRoundCycle])
 
   const closeShortcutMenu = useCallback(() => {
     setShortcutMenuOpen(false)
@@ -4889,6 +4930,7 @@ function App() {
   }, [closeShortcutMenu, goHome])
 
   const jumpToOverview = useCallback(() => {
+    closeKanjiDetail()
     setDictionaryOpen(false)
     setShowOverview(true)
     setShowSettings(false)
@@ -4897,17 +4939,19 @@ function App() {
     void loadSummary()
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
-  }, [closeShortcutMenu, loadSummary])
+  }, [closeKanjiDetail, closeShortcutMenu, loadSummary])
 
   const jumpToScriptHub = useCallback((script: ScriptKey) => {
+    closeKanjiDetail()
     setNavDirection('forward')
     setActiveScript(script)
     setView('script_hub')
     resetSessionCore()
     closeShortcutMenu()
-  }, [closeShortcutMenu, resetRoundCycle])
+  }, [closeKanjiDetail, closeShortcutMenu, resetRoundCycle])
 
   const jumpToScriptHubMinigame = useCallback((script: ScriptKey, minigame: MinigameKey) => {
+    closeKanjiDetail()
     const resolvedMinigame = resolveScriptMinigame(script, minigame)
     setNavDirection('forward')
     setShowOverview(false)
@@ -4927,9 +4971,10 @@ function App() {
 
     void startSession(resolvedMinigame)
     closeShortcutMenu()
-  }, [activeScript, closeShortcutMenu, resetRoundCycle, resolveScriptMinigame, startSession])
+  }, [activeScript, closeKanjiDetail, closeShortcutMenu, resetRoundCycle, resolveScriptMinigame, startSession])
 
   const jumpToScriptHubSetup = useCallback((script: ScriptKey, minigame: MinigameKey) => {
+    closeKanjiDetail()
     const resolvedMinigame = resolveScriptMinigame(script, minigame)
     setNavDirection('forward')
     setActiveScript(script)
@@ -4937,9 +4982,10 @@ function App() {
     setView('script_hub')
     resetSessionWithLives()
     closeShortcutMenu()
-  }, [closeShortcutMenu, resetRoundCycle, resolveScriptMinigame])
+  }, [closeKanjiDetail, closeShortcutMenu, resetRoundCycle, resolveScriptMinigame])
 
   const openSettingsFromMenu = useCallback(() => {
+    closeKanjiDetail()
     setDictionaryOpen(false)
     setShowSettings(true)
     setShowOverview(false)
@@ -4947,7 +4993,7 @@ function App() {
     tutor.setOcrWorkbenchOpen(false)
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
-  }, [closeShortcutMenu])
+  }, [closeKanjiDetail, closeShortcutMenu])
 
   const refreshDataFromMenu = useCallback(() => {
     void loadSummary()
@@ -6294,6 +6340,7 @@ function App() {
               onSetExpandedBlocks={setExpandedBlocks}
               onToggleSection={toggleOverviewSection}
               onSetKanjiOverviewPage={setKanjiOverviewPage}
+              onOpenKanjiDetail={openKanjiDetail}
               onSetSelectedChar={setSelectedChar}
             />
           </div>
@@ -6306,10 +6353,15 @@ function App() {
         seedQuery={dictionarySeedQuery}
         cards={dictionaryCards}
         onClose={closeDictionary}
+        onOpenKanjiDetail={openKanjiDetail}
         onPlayAudio={(text) => { void voice.playQuestionAudio(text) }}
         voiceBusy={voice.voiceBusy}
         voiceUnavailable={voice.voiceUnavailable}
       />
+
+      {kanjiDetailCharacter ? (
+        <KanjiDetailPanel character={kanjiDetailCharacter} onClose={closeKanjiDetail} />
+      ) : null}
 
       {tutor.ocrWorkbenchOpen ? (
         <OcrWorkbench tutor={tutor} settings={settings as TutorSettingsFields} setSettings={setSettings as unknown as Dispatch<SetStateAction<TutorSettingsFields>>} />

@@ -238,6 +238,19 @@ function validateDictionarySearchQuery(value) {
   return normalized
 }
 
+const HAN_IDEOGRAPH_PATTERN = /^\p{Unified_Ideograph}$/u
+
+function validateKanjiDetailCharacter(value) {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid kanji detail character: ${String(value)}`)
+  }
+  const normalized = value.normalize('NFC').trim()
+  if (Array.from(normalized).length !== 1 || !HAN_IDEOGRAPH_PATTERN.test(normalized)) {
+    throw new Error('Invalid kanji detail character: expected exactly one Unicode Han character')
+  }
+  return normalized
+}
+
 const MAX_LOOKUP_SENTENCE_QUERY_LENGTH = 200
 
 function validateLookupSentencePayload(payload) {
@@ -726,6 +739,7 @@ module.exports = {
   validateOptionalSessionId,
   validatePositiveLimit,
   validateDictionarySearchQuery,
+  validateKanjiDetailCharacter,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,
   validateDailyGamesDay,

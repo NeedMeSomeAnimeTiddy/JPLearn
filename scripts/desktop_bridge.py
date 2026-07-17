@@ -366,6 +366,34 @@ def _escape_fts5_term(term: str) -> str:
 
 
 _DICTIONARY_RESULT_LIMIT = 120
+_KANJI_DETAIL_SCHEMA_VERSION = "4"
+_KANJI_COMPOUND_LIMIT = 12
+_KANJI_READING_EXAMPLE_LIMIT = 2
+_KANJI_DETAIL_REQUIRED_COLUMNS = {
+    "kanji_details": {
+        "character",
+        "meanings_json",
+        "on_readings_json",
+        "kun_readings_json",
+        "jlpt_level",
+        "stroke_count",
+        "classical_radical_number",
+    },
+    "kanji_radicals": {
+        "character",
+        "position",
+        "radical",
+        "stroke_count",
+        "code",
+    },
+    "dictionary_kanji_index": {"character", "entry_id"},
+}
+_KANJI_DETAIL_REQUIRED_METADATA = {
+    "schema_version",
+    "kanji_details_count",
+    "kanji_radicals_count",
+    "dictionary_kanji_index_count",
+}
 # If the common-word tier returns fewer than this many hits, also search the
 # rest of the dictionary (rare/obscure entries, foreign-greeting loanwords,
 # etc.) and append those below the common results.
@@ -438,6 +466,187 @@ def _dictionary_has_supported_schema(conn: sqlite3.Connection) -> bool:
         for row in conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')")
     }
     return "dictionary_entries" in table_names and "dictionary_fts" in table_names
+
+
+def _dictionary_has_kanji_detail_schema(conn: sqlite3.Connection) -> bool:
+    table_names = {
+        str(row[0])
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    }
+    required_tables = {
+        "dictionary_entries",
+        "dictionary_metadata",
+        *_KANJI_DETAIL_REQUIRED_COLUMNS,
+    }
+    if not required_tables.issubset(table_names):
+        return False
+
+    index_row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?",
+        ("idx_dictionary_kanji_index_character_entry",),
+    ).fetchone()
+    if index_row is None:
+        return False
+
+    metadata = dict(
+        conn.execute(
+            "SELECT key, value FROM dictionary_metadata WHERE key IN (?, ?, ?, ?)",
+            tuple(sorted(_KANJI_DETAIL_REQUIRED_METADATA)),
+        )
+    )
+    if set(metadata) != _KANJI_DETAIL_REQUIRED_METADATA:
+        return False
+    if str(metadata["schema_version"]) != _KANJI_DETAIL_SCHEMA_VERSION:
+        return False
+    try:
+        if any(int(metadata[key]) < 0 for key in _KANJI_DETAIL_REQUIRED_METADATA - {"schema_version"}):
+            return False
+    except (TypeError, ValueError):
+        return False
+
+    for table_name, required_columns in _KANJI_DETAIL_REQUIRED_COLUMNS.items():
+        columns = {
+            str(row[1])
+            for row in conn.execute(f"PRAGMA table_info({table_name})")
+        }
+        if not required_columns.issubset(columns):
+            return False
+    return True
+
+
+def _is_han_character(value: str) -> bool:
+    if len(value) != 1:
+        return False
+    name = unicodedata.name(value, "")
+    return name.startswith("CJK UNIFIED IDEOGRAPH-") or name.startswith(
+        "CJK COMPATIBILITY IDEOGRAPH-"
+    )
+
+
+def _validate_kanji_detail_character(value: str) -> str:
+    normalized = unicodedata.normalize("NFC", value).strip()
+    if not _is_han_character(normalized):
+        raise ValueError("Kanji detail character must be exactly one Unicode Han character")
+    return normalized
+
+
+def _load_string_list_json(raw_value: object, field_name: str) -> list[str]:
+    try:
+        decoded = json.loads(str(raw_value))
+    except json.JSONDecodeError as exc:
+        raise sqlite3.DatabaseError(
+            f"Offline dictionary {field_name} contains malformed JSON"
+        ) from exc
+    if not isinstance(decoded, list) or not all(isinstance(item, str) for item in decoded):
+        raise sqlite3.DatabaseError(
+            f"Offline dictionary {field_name} must contain a JSON string array"
+        )
+    return list(dict.fromkeys(item.strip() for item in decoded if item.strip()))
+
+
+def _normalize_kanji_reading_for_match(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).strip()
+    normalized = re.sub(r"[.・･\-‐‑‒–—―]", "", normalized)
+    return _katakana_to_hiragana(normalized)
+
+
+def _deck_metadata_for_kanji(character: str) -> tuple[list[str], list[str], str | None]:
+    tags: list[str] = []
+    categories: list[str] = []
+    for slug, factory in ALL_DECKS.items():
+        if not slug.startswith("kanji_"):
+            continue
+        deck = factory()
+        matching_cards = [card for card in deck.cards if card.character == character]
+        if not matching_cards:
+            continue
+        if deck.name not in categories:
+            categories.append(deck.name)
+        for card in matching_cards:
+            for tag in card.tags:
+                if tag not in tags:
+                    tags.append(tag)
+
+    fallback_level = next(
+        (tag.upper() for tag in tags if re.fullmatch(r"n[1-5]", tag.lower())),
+        None,
+    )
+    return tags, categories, fallback_level
+
+
+def _reading_examples_by_normalized_reading(
+    conn: sqlite3.Connection,
+    character: str,
+) -> dict[str, list[KanjiReadingExample]]:
+    rows = conn.execute(
+        """
+        SELECT japanese, reading, gloss, is_common
+        FROM dictionary_entries
+        WHERE japanese = ?
+        ORDER BY is_common DESC, entry_id
+        """,
+        (character,),
+    ).fetchall()
+    examples: dict[str, list[KanjiReadingExample]] = {}
+    for word, reading, gloss, is_common in rows:
+        normalized_reading = _normalize_kanji_reading_for_match(str(reading))
+        if not normalized_reading:
+            continue
+        bucket = examples.setdefault(normalized_reading, [])
+        if len(bucket) >= _KANJI_READING_EXAMPLE_LIMIT:
+            continue
+        bucket.append(
+            KanjiReadingExample(
+                word=str(word),
+                reading=str(reading),
+                meanings=_split_dictionary_glosses(str(gloss)),
+                is_common=bool(is_common),
+            )
+        )
+    return examples
+
+
+def _build_kanji_readings(
+    readings: list[str],
+    examples_by_reading: dict[str, list[KanjiReadingExample]],
+) -> list[KanjiReading]:
+    return [
+        KanjiReading(
+            reading=reading,
+            examples=list(
+                examples_by_reading.get(_normalize_kanji_reading_for_match(reading), [])
+            ),
+        )
+        for reading in readings
+    ]
+
+
+def _load_kanji_compounds(
+    conn: sqlite3.Connection,
+    character: str,
+) -> tuple[list[KanjiCompound], bool]:
+    rows = conn.execute(
+        """
+        SELECT e.japanese, e.reading, e.gloss, e.is_common
+        FROM dictionary_kanji_index AS i
+             INDEXED BY idx_dictionary_kanji_index_character_entry
+        JOIN dictionary_entries AS e ON e.entry_id = i.entry_id
+        WHERE i.character = ? AND e.japanese <> ?
+        ORDER BY e.is_common DESC, LENGTH(e.japanese), e.entry_id
+        LIMIT ?
+        """,
+        (character, character, _KANJI_COMPOUND_LIMIT + 1),
+    ).fetchall()
+    compounds = [
+        KanjiCompound(
+            word=str(word),
+            reading=str(reading),
+            meanings=_split_dictionary_glosses(str(gloss)),
+            is_common=bool(is_common),
+        )
+        for word, reading, gloss, is_common in rows[:_KANJI_COMPOUND_LIMIT]
+    ]
+    return compounds, len(rows) > _KANJI_COMPOUND_LIMIT
 
 
 def _dictionary_has_pitch_accent_data(conn: sqlite3.Connection) -> bool:
@@ -771,6 +980,95 @@ def build_dictionary_search_payload(query: str) -> dict[str, object]:
         "source": "offline_dictionary",
         "results": results,
     }
+
+
+def build_kanji_detail_payload(character: str) -> dict[str, object]:
+    validated_character = _validate_kanji_detail_character(character)
+    db_path = _dictionary_db_path()
+    if db_path is None:
+        raise FileNotFoundError("Offline dictionary index is not installed")
+
+    database_uri = f"{db_path.resolve().as_uri()}?mode=ro"
+    conn = sqlite3.connect(database_uri, uri=True)
+    try:
+        if not _dictionary_has_kanji_detail_schema(conn):
+            raise FileNotFoundError(
+                "Offline dictionary kanji detail index is outdated; please re-download it"
+            )
+
+        detail_row = conn.execute(
+            """
+            SELECT meanings_json, on_readings_json, kun_readings_json,
+                   jlpt_level, stroke_count, classical_radical_number
+            FROM kanji_details
+            WHERE character = ?
+            """,
+            (validated_character,),
+        ).fetchone()
+        if detail_row is None:
+            meanings: list[str] = []
+            on_reading_values: list[str] = []
+            kun_reading_values: list[str] = []
+            kanjidic_jlpt_level = None
+            stroke_count = None
+            classical_radical_number = None
+        else:
+            meanings = _load_string_list_json(detail_row[0], "meanings_json")
+            on_reading_values = _load_string_list_json(detail_row[1], "on_readings_json")
+            kun_reading_values = _load_string_list_json(detail_row[2], "kun_readings_json")
+            kanjidic_jlpt_level = str(detail_row[3]) if detail_row[3] is not None else None
+            stroke_count = int(detail_row[4]) if detail_row[4] is not None else None
+            classical_radical_number = int(detail_row[5]) if detail_row[5] is not None else None
+
+        radicals = [
+            KanjiRadical(
+                position=int(position),
+                radical=str(radical),
+                stroke_count=int(radical_stroke_count)
+                if radical_stroke_count is not None
+                else None,
+                code=str(code) if code is not None else None,
+            )
+            for position, radical, radical_stroke_count, code in conn.execute(
+                """
+                SELECT position, radical, stroke_count, code
+                FROM kanji_radicals
+                WHERE character = ?
+                ORDER BY position
+                """,
+                (validated_character,),
+            )
+        ]
+        examples_by_reading = _reading_examples_by_normalized_reading(
+            conn,
+            validated_character,
+        )
+        compounds, has_more_compounds = _load_kanji_compounds(conn, validated_character)
+    finally:
+        conn.close()
+
+    tags, categories, deck_jlpt_level = _deck_metadata_for_kanji(validated_character)
+    jlpt_level = kanjidic_jlpt_level or deck_jlpt_level
+    jlpt_level_source = (
+        "kanjidic" if kanjidic_jlpt_level else "deck" if deck_jlpt_level else None
+    )
+    payload = KanjiDetailPayload(
+        character=validated_character,
+        meanings=meanings,
+        on_readings=_build_kanji_readings(on_reading_values, examples_by_reading),
+        kun_readings=_build_kanji_readings(kun_reading_values, examples_by_reading),
+        radicals=radicals,
+        jlpt_level=jlpt_level,
+        jlpt_level_source=jlpt_level_source,
+        stroke_count=stroke_count,
+        classical_radical_number=classical_radical_number,
+        tags=tags,
+        categories=categories,
+        compounds=compounds,
+        has_more_compounds=has_more_compounds,
+        source="offline_dictionary",
+    )
+    return asdict(payload)
 
 
 def _resolve_ocr_model_root() -> Path | None:
@@ -2721,6 +3019,55 @@ class DictionaryCardSummary:
     glosses: list[str]
     source: str
     pitch_accents: list[PitchAccent]
+
+
+@dataclass(frozen=True)
+class KanjiRadical:
+    position: int
+    radical: str
+    stroke_count: int | None
+    code: str | None
+
+
+@dataclass(frozen=True)
+class KanjiReadingExample:
+    word: str
+    reading: str
+    meanings: list[str]
+    is_common: bool
+
+
+@dataclass(frozen=True)
+class KanjiReading:
+    reading: str
+    examples: list[KanjiReadingExample]
+
+
+@dataclass(frozen=True)
+class KanjiCompound:
+    word: str
+    reading: str
+    meanings: list[str]
+    is_common: bool
+
+
+@dataclass(frozen=True)
+class KanjiDetailPayload:
+    character: str
+    meanings: list[str]
+    on_readings: list[KanjiReading]
+    kun_readings: list[KanjiReading]
+    radicals: list[KanjiRadical]
+    jlpt_level: str | None
+    jlpt_level_source: str | None
+    stroke_count: int | None
+    classical_radical_number: int | None
+    tags: list[str]
+    categories: list[str]
+    compounds: list[KanjiCompound]
+    has_more_compounds: bool
+    source: str
+
 
 @dataclass(frozen=True)
 class GameCard:
@@ -4843,6 +5190,14 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
             return 2, {"error": "Usage: dictionary-search <query>"}
         try:
             return 0, build_dictionary_search_payload(argv[1])
+        except (FileNotFoundError, ValueError) as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "kanji-detail":
+        if len(argv) != 2:
+            return 2, {"error": "Usage: kanji-detail <character>"}
+        try:
+            return 0, build_kanji_detail_payload(argv[1])
         except (FileNotFoundError, ValueError) as exc:
             return 2, {"error": str(exc)}
 

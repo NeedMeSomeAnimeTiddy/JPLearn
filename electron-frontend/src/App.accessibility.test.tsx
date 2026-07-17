@@ -4,7 +4,7 @@
  * Zero violations is the pass threshold.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 // axe-core ships as a CJS export = module; Vite handles interop at runtime.
 import axe from 'axe-core'
 import App from './App'
@@ -34,6 +34,11 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: () => false,
   }),
 })
+
+const originalCSS = (globalThis as any).CSS
+;(globalThis as any).CSS = { ...originalCSS, supports: () => true }
+const getComputedStyleWithoutPseudo = window.getComputedStyle.bind(window)
+window.getComputedStyle = (element: Element) => getComputedStyleWithoutPseudo(element)
 
 const emptyCurriculumStub = {
   particle_cloze: {
@@ -144,5 +149,94 @@ describe('Accessibility — zero axe violations', () => {
       throw new Error(`axe violations in home view:\n${formatViolations(results.violations)}`)
     }
     expect(results.violations).toHaveLength(0)
+  })
+
+  it('kanji detail panel opened from Study Overview has no violations', async () => {
+    window.localStorage.setItem('onboarding_complete', 'true')
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      getKanjiDetail: async () => { throw new Error('detail data is intentionally unavailable in this accessibility test') },
+      getOverviewCharacterMastery: async () => ({
+        blocks: { hiragana: [], katakana: [] },
+        category_blocks: { vocab_n5: [], grammar_patterns: [] },
+        kanji_cards: [
+          {
+            id: 1,
+            character: '日',
+            romaji: 'nichi',
+            meaning: 'sun',
+            tags: ['kanji', 'jlpt_n5'],
+            example_sentence: null,
+          },
+        ],
+      }),
+    }
+    const { container } = render(<App />)
+    await act(async () => {})
+    fireEvent.click(await screen.findByRole('button', { name: /open study overview/i }))
+    const masteryToggle = document.querySelector('.char-mastery-toggle') as HTMLButtonElement | null
+    if (!masteryToggle) throw new Error('Expected mastery toggle button to be present')
+    fireEvent.click(masteryToggle)
+    fireEvent.click(await screen.findByRole('button', { name: 'JLPT N5: 0% mastered' }))
+    fireEvent.click(screen.getByRole('button', { name: '日, nichi, sun: 0/4' }))
+    await screen.findByRole('dialog', { name: 'Kanji details: 日' })
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const results = await (axe as { run: (el: Element) => Promise<{ violations: Array<{ id: string; description: string; nodes: unknown[] }> }> }).run(container)
+    if (results.violations.length > 0) {
+      throw new Error(`axe violations in kanji detail panel:\n${formatViolations(results.violations)}`)
+    }
+    expect(results.violations).toHaveLength(0)
+  })
+
+  it('Dictionary keeps its state and restores multi-kanji chooser focus when the accessible panel closes', async () => {
+    window.localStorage.setItem('onboarding_complete', 'true')
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      searchDictionary: async (query: string) => ({
+        query,
+        source: 'offline_dictionary' as const,
+        results: [
+          {
+            id: 1,
+            character: '日本',
+            romaji: 'にほん',
+            meaning: 'Japan',
+            tags: ['offline_dictionary'],
+            example_sentence: null,
+            pitch_accents: [],
+          },
+        ],
+      }),
+      getKanjiDetail: async () => { throw new Error('detail data is intentionally unavailable in this accessibility test') },
+    }
+    const { container } = render(<App />)
+    await act(async () => {})
+    fireEvent.click(await screen.findByRole('button', { name: 'Open dictionary' }))
+    const searchInput = await screen.findByRole('searchbox', { name: 'Dictionary search' })
+    fireEvent.change(searchInput, { target: { value: '日本' } })
+    const chooserButton = await screen.findByRole('button', { name: 'Choose a kanji from 日本 to view details' })
+    fireEvent.click(chooserButton)
+    fireEvent.click(screen.getByRole('button', { name: 'View details for 本' }))
+    await screen.findByRole('dialog', { name: 'Kanji details: 本' })
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const results = await (axe as { run: (el: Element) => Promise<{ violations: Array<{ id: string; description: string; nodes: unknown[] }> }> }).run(container)
+    if (results.violations.length > 0) {
+      throw new Error(`axe violations in Dictionary kanji detail panel:\n${formatViolations(results.violations)}`)
+    }
+    expect(results.violations).toHaveLength(0)
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kanji details: 本' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Dictionary lookup panel' })).toBeTruthy()
+    expect((searchInput as HTMLInputElement).value).toBe('日本')
+    await waitFor(() => expect(document.activeElement).toBe(chooserButton))
+
+    fireEvent.click(chooserButton)
+    fireEvent.click(screen.getByRole('button', { name: 'View details for 本' }))
+    fireEvent.pointerDown(screen.getByTestId('kanji-detail-backdrop'))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kanji details: 本' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Dictionary lookup panel' })).toBeTruthy()
   })
 })

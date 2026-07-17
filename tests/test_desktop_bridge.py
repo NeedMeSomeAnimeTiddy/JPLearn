@@ -7,6 +7,8 @@ from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
 from data import database
 from data.daily_games_repository import DailyGameAttempt, DailyGameWordOutcome, DailyGamesRepository
 from domain.cards import Card, Deck
@@ -87,6 +89,145 @@ def _build_dictionary_db_many(path: Path, rows: list[tuple[str, str, str, int]])
             conn.execute(
                 "INSERT INTO dictionary_fts (rowid, gloss) VALUES (?, ?)",
                 (cursor.lastrowid, gloss),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _build_kanji_detail_db(
+    path: Path,
+    *,
+    character: str = "日",
+    meanings_json: str = '["day", "sun"]',
+    jlpt_level: str | None = "N5",
+) -> None:
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE dictionary_entries (
+              entry_id INTEGER PRIMARY KEY,
+              source_id TEXT NOT NULL,
+              japanese TEXT NOT NULL,
+              reading TEXT NOT NULL,
+              gloss TEXT NOT NULL,
+              is_common INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE TABLE dictionary_metadata (
+              key TEXT PRIMARY KEY,
+              value TEXT NOT NULL
+            );
+            CREATE TABLE kanji_details (
+              character TEXT PRIMARY KEY,
+              meanings_json TEXT NOT NULL,
+              on_readings_json TEXT NOT NULL,
+              kun_readings_json TEXT NOT NULL,
+              jlpt_level TEXT,
+              stroke_count INTEGER,
+              classical_radical_number INTEGER
+            );
+            CREATE TABLE kanji_radicals (
+              character TEXT NOT NULL,
+              position INTEGER NOT NULL,
+              radical TEXT NOT NULL,
+              stroke_count INTEGER,
+              code TEXT,
+              PRIMARY KEY (character, position)
+            );
+            CREATE TABLE dictionary_kanji_index (
+              character TEXT NOT NULL,
+              entry_id INTEGER NOT NULL,
+              PRIMARY KEY (character, entry_id)
+            );
+            CREATE INDEX idx_dictionary_kanji_index_character_entry
+              ON dictionary_kanji_index(character, entry_id);
+            """
+        )
+        metadata = {
+            "schema_version": "4",
+            "kanji_details_count": "1",
+            "kanji_radicals_count": "2" if character == "日" else "0",
+            "dictionary_kanji_index_count": "13" if character == "日" else "0",
+        }
+        conn.executemany(
+            "INSERT INTO dictionary_metadata (key, value) VALUES (?, ?)",
+            metadata.items(),
+        )
+        conn.execute(
+            """
+            INSERT INTO kanji_details (
+              character, meanings_json, on_readings_json, kun_readings_json,
+              jlpt_level, stroke_count, classical_radical_number
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                character,
+                meanings_json,
+                '["ニチ", "ジツ"]' if character == "日" else "[]",
+                '["ひ", "-び"]' if character == "日" else "[]",
+                jlpt_level,
+                4 if character == "日" else None,
+                72 if character == "日" else None,
+            ),
+        )
+        if character == "日":
+            conn.executemany(
+                """
+                INSERT INTO kanji_radicals
+                  (character, position, radical, stroke_count, code)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                [
+                    ("日", 0, "日", 4, "js72"),
+                    ("日", 1, "一", 1, None),
+                ],
+            )
+            exact_entries = [
+                (1, "exact-common-1", "日", "にち", "day", 1),
+                (2, "exact-uncommon", "日", "にち", "counter for days", 0),
+                (3, "exact-common-2", "日", "ニチ", "sun", 1),
+                (4, "exact-kun", "日", "ひ", "sunlight", 1),
+            ]
+            compound_entries = [
+                (
+                    index,
+                    f"compound-{index}",
+                    word,
+                    reading,
+                    gloss,
+                    0 if word == "日本" else 1,
+                )
+                for index, (word, reading, gloss) in enumerate(
+                    [
+                        ("日本", "にほん", "Japan"),
+                        ("日光", "にっこう", "sunlight"),
+                        ("毎日", "まいにち", "every day"),
+                        ("休日", "きゅうじつ", "holiday"),
+                        ("日記", "にっき", "diary"),
+                        ("日程", "にってい", "schedule"),
+                        ("本日", "ほんじつ", "today"),
+                        ("明日", "あした", "tomorrow"),
+                        ("平日", "へいじつ", "weekday"),
+                        ("祝日", "しゅくじつ", "public holiday"),
+                        ("日常", "にちじょう", "everyday life"),
+                        ("近日", "きんじつ", "soon"),
+                        ("先日", "せんじつ", "the other day"),
+                    ],
+                    start=5,
+                )
+            ]
+            conn.executemany(
+                """
+                INSERT INTO dictionary_entries
+                  (entry_id, source_id, japanese, reading, gloss, is_common)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [*exact_entries, *compound_entries],
+            )
+            conn.executemany(
+                "INSERT INTO dictionary_kanji_index (character, entry_id) VALUES (?, ?)",
+                [("日", entry[0]) for entry in compound_entries],
             )
         conn.commit()
     finally:
@@ -442,6 +583,160 @@ def test_dictionary_search_includes_pitch_accent_when_available(tmp_path: Path, 
             "source": "Kanjium test data",
         }
     ]
+
+
+def test_build_kanji_detail_payload_uses_indexed_compounds_and_verified_examples(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    dictionary_db_path = tmp_path / "dictionary.sqlite"
+    _build_kanji_detail_db(dictionary_db_path)
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (dictionary_db_path,),
+    )
+
+    payload = desktop_bridge.build_kanji_detail_payload("日")
+
+    assert payload["character"] == "日"
+    assert payload["meanings"] == ["day", "sun"]
+    assert payload["jlpt_level"] == "N5"
+    assert payload["jlpt_level_source"] == "kanjidic"
+    assert payload["stroke_count"] == 4
+    assert payload["classical_radical_number"] == 72
+    assert payload["radicals"] == [
+        {"position": 0, "radical": "日", "stroke_count": 4, "code": "js72"},
+        {"position": 1, "radical": "一", "stroke_count": 1, "code": None},
+    ]
+    assert payload["tags"] == ["kanji", "n5", "kanji_numbers_time"]
+    assert payload["categories"] == [
+        "Kanji N5",
+        "Kanji: N5 · Numbers & Time",
+    ]
+
+    on_readings = cast(list[dict[str, Any]], payload["on_readings"])
+    assert on_readings[0]["reading"] == "ニチ"
+    assert on_readings[0]["examples"] == [
+        {"word": "日", "reading": "にち", "meanings": ["day"], "is_common": True},
+        {"word": "日", "reading": "ニチ", "meanings": ["sun"], "is_common": True},
+    ]
+    assert on_readings[1] == {"reading": "ジツ", "examples": []}
+
+    kun_readings = cast(list[dict[str, Any]], payload["kun_readings"])
+    assert kun_readings[0]["examples"] == [
+        {"word": "日", "reading": "ひ", "meanings": ["sunlight"], "is_common": True}
+    ]
+    assert kun_readings[1] == {"reading": "-び", "examples": []}
+    assert all(
+        example["word"] == "日"
+        for reading in [*on_readings, *kun_readings]
+        for example in cast(list[dict[str, Any]], reading["examples"])
+    )
+
+    compounds = cast(list[dict[str, Any]], payload["compounds"])
+    assert len(compounds) == 12
+    assert [compound["word"] for compound in compounds[:3]] == ["日光", "毎日", "休日"]
+    assert all(compound["is_common"] is True for compound in compounds)
+    assert all(compound["word"] != "日本" for compound in compounds)
+    assert all(compound["word"] != "日" for compound in compounds)
+    assert payload["has_more_compounds"] is True
+    assert payload["source"] == "offline_dictionary"
+
+
+def test_build_kanji_detail_payload_uses_deck_level_fallback(tmp_path: Path, monkeypatch) -> None:
+    dictionary_db_path = tmp_path / "dictionary.sqlite"
+    _build_kanji_detail_db(dictionary_db_path, jlpt_level=None)
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (dictionary_db_path,),
+    )
+
+    payload = desktop_bridge.build_kanji_detail_payload("日")
+
+    assert payload["jlpt_level"] == "N5"
+    assert payload["jlpt_level_source"] == "deck"
+
+
+def test_build_kanji_detail_payload_preserves_missing_optional_fields(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    dictionary_db_path = tmp_path / "dictionary.sqlite"
+    _build_kanji_detail_db(
+        dictionary_db_path,
+        character="龘",
+        meanings_json="[]",
+        jlpt_level=None,
+    )
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (dictionary_db_path,),
+    )
+
+    payload = desktop_bridge.build_kanji_detail_payload("龘")
+
+    assert payload["meanings"] == []
+    assert payload["on_readings"] == []
+    assert payload["kun_readings"] == []
+    assert payload["radicals"] == []
+    assert payload["jlpt_level"] is None
+    assert payload["jlpt_level_source"] is None
+    assert payload["stroke_count"] is None
+    assert payload["classical_radical_number"] is None
+    assert payload["tags"] == []
+    assert payload["categories"] == []
+    assert payload["compounds"] == []
+    assert payload["has_more_compounds"] is False
+
+
+def test_build_kanji_detail_payload_rejects_old_or_malformed_v4_index(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    old_db_path = tmp_path / "old.sqlite"
+    _build_kanji_detail_db(old_db_path)
+    with sqlite3.connect(old_db_path) as conn:
+        conn.execute(
+            "UPDATE dictionary_metadata SET value = '3' WHERE key = 'schema_version'"
+        )
+    monkeypatch.setattr(desktop_bridge, "OFFLINE_DICTIONARY_DB_CANDIDATES", (old_db_path,))
+    with pytest.raises(FileNotFoundError, match="outdated.*re-download"):
+        desktop_bridge.build_kanji_detail_payload("日")
+
+    malformed_db_path = tmp_path / "malformed.sqlite"
+    _build_kanji_detail_db(malformed_db_path, meanings_json="not-json")
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (malformed_db_path,),
+    )
+    with pytest.raises(sqlite3.DatabaseError, match="meanings_json.*malformed JSON"):
+        desktop_bridge.build_kanji_detail_payload("日")
+
+
+def test_kanji_detail_bridge_command_validates_single_han_character(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    dictionary_db_path = tmp_path / "dictionary.sqlite"
+    _build_kanji_detail_db(dictionary_db_path)
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (dictionary_db_path,),
+    )
+
+    code, payload = desktop_bridge._run_command(["kanji-detail", " 日 "])
+    assert code == 0
+    assert payload["character"] == "日"
+
+    for invalid in ("", "日本", "ひ", "A", "々"):
+        code, payload = desktop_bridge._run_command(["kanji-detail", invalid])
+        assert code == 2
+        assert "exactly one Unicode Han character" in str(payload["error"])
 
 
 def test_dictionary_hello_prefers_konnichiwa_over_katakana_hello(tmp_path: Path, monkeypatch) -> None:

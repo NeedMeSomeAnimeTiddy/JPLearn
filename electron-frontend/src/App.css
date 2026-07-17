@@ -509,7 +509,8 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   padding: 3px 8px;
 }
 
-.dictionary-copy-menu-wrap {
+.dictionary-copy-menu-wrap,
+.dictionary-kanji-picker-wrap {
   position: relative;
   display: inline-flex;
 }
@@ -577,6 +578,42 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   color: color-mix(in oklab, var(--tone-ocean) 84%, var(--text-main));
 }
 
+.dictionary-kanji-picker {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  display: flex;
+  gap: 5px;
+  min-width: max-content;
+  padding: 6px;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 40%, var(--panel-border));
+  border-radius: 2px;
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--tone-ocean) 30%, transparent), transparent 44%),
+    linear-gradient(160deg, color-mix(in oklab, var(--panel-bg) 96%, black), color-mix(in oklab, var(--panel-bg-alt) 95%, black));
+  box-shadow:
+    0 18px 34px -20px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dictionary-kanji-picker button {
+  min-width: 38px;
+  min-height: 38px;
+  border: 1px solid var(--chip-border);
+  border-radius: 2px;
+  background: var(--chip-bg);
+  color: var(--text-main);
+  cursor: pointer;
+  font-size: 1.15rem;
+}
+
+.dictionary-kanji-picker button:hover,
+.dictionary-kanji-picker button:focus-visible {
+  border-color: color-mix(in oklab, var(--tone-ocean) 70%, var(--panel-border));
+  background: color-mix(in oklab, var(--tone-ocean) 24%, var(--panel-bg));
+}
+
 .dictionary-result-meaning {
   margin: 8px 0 0;
   font-size: 0.95rem;
@@ -617,7 +654,7 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
 .dictionary-result-actions {
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 6px;
   align-content: start;
   align-self: start;

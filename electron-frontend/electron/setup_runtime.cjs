@@ -667,8 +667,20 @@ function getOfflineDictionaryReadyPath(base) {
   return path.join(base, 'data', 'external_sources', 'offline_dictionary', '.pitch-accent-ready')
 }
 
+const OFFLINE_DICTIONARY_SCHEMA_VERSION = 4
+
 function isOfflineDictionaryInstalled(base) {
-  return fs.existsSync(getOfflineDictionarySqlitePath(base)) && fs.existsSync(getOfflineDictionaryReadyPath(base))
+  const sqlitePath = getOfflineDictionarySqlitePath(base)
+  const readyPath = getOfflineDictionaryReadyPath(base)
+  if (!fs.existsSync(sqlitePath) || !fs.existsSync(readyPath)) {
+    return false
+  }
+  try {
+    const marker = JSON.parse(fs.readFileSync(readyPath, 'utf8'))
+    return marker?.schema_version === OFFLINE_DICTIONARY_SCHEMA_VERSION
+  } catch {
+    return false
+  }
 }
 
 // ── Embedder install state (hidden — installed alongside chatbot tiers) ─────
@@ -2781,7 +2793,7 @@ function createSetupRuntime() {
   }
 }
 
-module.exports = { createSetupRuntime }
+module.exports = { createSetupRuntime, isOfflineDictionaryInstalled }
 
 
 

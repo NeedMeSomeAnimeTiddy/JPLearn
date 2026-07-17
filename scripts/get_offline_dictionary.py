@@ -45,6 +45,7 @@ ASSET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 ]
 
 TOTAL_PHASES = len(ASSET_PATTERNS) + 2  # + pitch accent download and SQLite build
+REQUIRED_KANJI_ASSET_KEYS = ("kanjidic2-en", "kradfile", "radkfile")
 
 
 def resolve_target_dir() -> Path:
@@ -121,9 +122,59 @@ def download_file(url: str, target_path: Path) -> None:
     temporary_path.replace(target_path)
 
 
+def build_downloaded_index(
+    target_dir: Path,
+    downloaded_files: dict[str, str],
+    pitch_accent_path: Path,
+) -> tuple[Path, dict[str, int]]:
+    ready_path = target_dir / PITCH_ACCENT_READY_FILENAME
+    ready_path.unlink(missing_ok=True)
+
+    input_name = downloaded_files.get("jmdict-eng") or downloaded_files.get("jmdict-eng-common")
+    if not input_name:
+        raise FileNotFoundError("No JMdict word file was downloaded; cannot build lookup index")
+
+    missing_assets = [key for key in REQUIRED_KANJI_ASSET_KEYS if not downloaded_files.get(key)]
+    if missing_assets:
+        raise FileNotFoundError(
+            f"Missing required offline dictionary assets: {', '.join(missing_assets)}"
+        )
+
+    output_path = target_dir / "jmdict_lookup.sqlite"
+    stats = sqlite_builder.build_lookup_db(
+        input_path=target_dir / input_name,
+        output_path=output_path,
+        pitch_accent_path=pitch_accent_path,
+        kanjidic_path=target_dir / downloaded_files["kanjidic2-en"],
+        kradfile_path=target_dir / downloaded_files["kradfile"],
+        radkfile_path=target_dir / downloaded_files["radkfile"],
+    )
+    if stats["pitch_accent_entries"] <= 0:
+        raise RuntimeError("Pitch accent import produced no usable entries")
+
+    ready_path.write_text(
+        json.dumps(
+            {
+                "schema_version": sqlite_builder.SCHEMA_VERSION,
+                "pitch_accent_source": PITCH_ACCENT_URL,
+                "pitch_accent_entries": stats["pitch_accent_entries"],
+                "kanji_details_count": stats["kanji_details_count"],
+                "kanji_radicals_count": stats["kanji_radicals_count"],
+                "dictionary_kanji_index_count": stats["dictionary_kanji_index_count"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return output_path, stats
+
+
 def main() -> int:
     target_dir = resolve_target_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
+    ready_path = target_dir / PITCH_ACCENT_READY_FILENAME
+    ready_path.unlink(missing_ok=True)
 
     print(f"Offline dictionary directory: {target_dir}")
     print("Fetching latest jmdict-simplified release metadata...")
@@ -159,33 +210,15 @@ def main() -> int:
     print(f"  Saved: {pitch_accent_path.name}")
 
     print(f"PHASE {TOTAL_PHASES}/{TOTAL_PHASES}: build-sqlite-index")
-    input_name = downloaded_files.get("jmdict-eng") or downloaded_files.get("jmdict-eng-common")
-    if not input_name:
-        print("ERROR: no JMdict word file was downloaded; cannot build lookup index", file=sys.stderr)
+    try:
+        output_path, stats = build_downloaded_index(
+            target_dir,
+            downloaded_files,
+            pitch_accent_path,
+        )
+    except (FileNotFoundError, RuntimeError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-
-    output_path = target_dir / "jmdict_lookup.sqlite"
-    ready_path = target_dir / PITCH_ACCENT_READY_FILENAME
-    ready_path.unlink(missing_ok=True)
-    stats = sqlite_builder.build_lookup_db(
-        input_path=target_dir / input_name,
-        output_path=output_path,
-        pitch_accent_path=pitch_accent_path,
-    )
-    if stats["pitch_accent_entries"] <= 0:
-        raise RuntimeError("Pitch accent import produced no usable entries")
-    ready_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 3,
-                "pitch_accent_source": PITCH_ACCENT_URL,
-                "pitch_accent_entries": stats["pitch_accent_entries"],
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
     print(
         json.dumps(
             {

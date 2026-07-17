@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   saveDailyGamesCrosswordClues: (day, clues) => ipcRenderer.invoke('daily-games:save-crossword-clues', day, clues),
   generateDailyGamesCrosswordClues: (entries) => ipcRenderer.invoke('daily-games:generate-crossword-clues', entries),
   searchDictionary: (query) => ipcRenderer.invoke('study:search-dictionary', query),
+  getKanjiDetail: (character) => ipcRenderer.invoke('study:get-kanji-detail', character),
   getOverviewCharacterMastery: () => ipcRenderer.invoke('study:get-overview-character-mastery'),
   recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload),
   lookupSentence: (payload) => ipcRenderer.invoke('study:lookup-sentence', payload),

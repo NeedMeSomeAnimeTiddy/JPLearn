@@ -35,6 +35,49 @@ export interface DictionaryCardSummary {
   pitch_accents: PitchAccent[]
 }
 
+export interface KanjiRadical {
+  position: number
+  radical: string
+  stroke_count: number | null
+  code: string | null
+}
+
+export interface KanjiReadingExample {
+  word: string
+  reading: string
+  meanings: string[]
+  is_common: boolean
+}
+
+export interface KanjiReading {
+  reading: string
+  examples: KanjiReadingExample[]
+}
+
+export interface KanjiCompound {
+  word: string
+  reading: string
+  meanings: string[]
+  is_common: boolean
+}
+
+export interface KanjiDetailPayload {
+  character: string
+  meanings: string[]
+  on_readings: KanjiReading[]
+  kun_readings: KanjiReading[]
+  radicals: KanjiRadical[]
+  jlpt_level: string | null
+  jlpt_level_source: string | null
+  stroke_count: number | null
+  classical_radical_number: number | null
+  tags: string[]
+  categories: string[]
+  compounds: KanjiCompound[]
+  has_more_compounds: boolean
+  source: string
+}
+
 export interface GameCard {
   id: number
   character: string

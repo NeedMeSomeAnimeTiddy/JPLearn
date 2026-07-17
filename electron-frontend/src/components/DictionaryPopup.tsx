@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { BookText, Check, ClipboardCopy, History, TriangleAlert, Volume2, X } from 'lucide-react'
+import { BookText, Check, ClipboardCopy, History, ScanText, TriangleAlert, Volume2, X } from 'lucide-react'
 import { toHiragana } from 'wanakana'
 import type { PitchAccent } from '../generated/types'
+import { extractKanjiCharacters } from '../features/kanji-detail'
 import { DictionaryPitchAccent } from './DictionaryPitchAccent'
 
 export interface DictionaryCard {
@@ -22,6 +23,7 @@ interface DictionaryPopupProps {
   seedQuery: string
   cards: DictionaryCard[]
   onClose: () => void
+  onOpenKanjiDetail: (character: string, trigger: HTMLElement) => void
   onPlayAudio?: (text: string) => void
   voiceBusy?: boolean
   voiceUnavailable?: boolean
@@ -171,7 +173,7 @@ async function copyText(value: string): Promise<void> {
   await navigator.clipboard.writeText(value)
 }
 
-export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, onPlayAudio, voiceBusy, voiceUnavailable }: DictionaryPopupProps) {
+export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, onOpenKanjiDetail, onPlayAudio, voiceBusy, voiceUnavailable }: DictionaryPopupProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const resultsPaneRef = useRef<HTMLElement | null>(null)
   const searchRequestIdRef = useRef(0)
@@ -183,6 +185,8 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
   const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_RESULTS)
   const [openCopyMenu, setOpenCopyMenu] = useState<string | null>(null)
   const openCopyMenuRef = useRef<string | null>(null)
+  const [openKanjiPicker, setOpenKanjiPicker] = useState<string | null>(null)
+  const openKanjiPickerRef = useRef<string | null>(null)
   const [playFailedFor, setPlayFailedFor] = useState<string | null>(null)
   const wasVoiceBusyRef = useRef(false)
   const pendingPlayCharacterRef = useRef<string | null>(null)
@@ -204,6 +208,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
       setSearchStatus('idle')
       setVisibleCount(INITIAL_VISIBLE_RESULTS)
       setOpenCopyMenu(null)
+      setOpenKanjiPicker(null)
       setPlayFailedFor(null)
       pendingPlayCharacterRef.current = null
     }
@@ -231,12 +236,17 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
   }, [openCopyMenu])
 
   useEffect(() => {
+    openKanjiPickerRef.current = openKanjiPicker
+  }, [openKanjiPicker])
+
+  useEffect(() => {
     if (!open) return
     function handleDocumentMouseDown(event: MouseEvent) {
-      if (!openCopyMenuRef.current) return
+      if (!openCopyMenuRef.current && !openKanjiPickerRef.current) return
       const target = event.target as HTMLElement | null
-      if (target && target.closest('.dictionary-copy-menu-wrap')) return
+      if (target?.closest('.dictionary-copy-menu-wrap, .dictionary-kanji-picker-wrap')) return
       setOpenCopyMenu(null)
+      setOpenKanjiPicker(null)
     }
     document.addEventListener('mousedown', handleDocumentMouseDown)
     return () => document.removeEventListener('mousedown', handleDocumentMouseDown)
@@ -463,6 +473,9 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                   const copyPrefix = `${result.id}-${result.character}`
                   const visibleTags = (result.tags ?? []).filter((tag) => tag !== 'offline_dictionary')
                   const isCopyMenuOpen = openCopyMenu === copyPrefix
+                  const kanjiCharacters = extractKanjiCharacters(result.character)
+                  const kanjiPickerId = `dictionary-kanji-picker-${result.id}`
+                  const isKanjiPickerOpen = openKanjiPicker === copyPrefix
                   const pitchAccents = result.pitch_accents ?? result.dictionary_summary?.pitch_accents ?? []
                   return (
                     <article key={copyPrefix} className="dictionary-result-card">
@@ -488,6 +501,66 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                         ) : null}
                       </div>
                       <div className="dictionary-result-actions">
+                        {kanjiCharacters.length === 1 ? (
+                          <button
+                            type="button"
+                            className="panel-action-button"
+                            onClick={(event) => {
+                              setOpenCopyMenu(null)
+                              setOpenKanjiPicker(null)
+                              onOpenKanjiDetail(kanjiCharacters[0], event.currentTarget)
+                            }}
+                            aria-label={`View details for ${kanjiCharacters[0]}`}
+                            title="Kanji details"
+                          >
+                            <ScanText aria-hidden="true" strokeWidth={2.2} />
+                          </button>
+                        ) : null}
+                        {kanjiCharacters.length > 1 ? (
+                          <div className="dictionary-kanji-picker-wrap">
+                            <button
+                              id={`${kanjiPickerId}-trigger`}
+                              type="button"
+                              className={`panel-action-button ${isKanjiPickerOpen ? 'is-active' : ''}`}
+                              onClick={() => {
+                                setOpenCopyMenu(null)
+                                setOpenKanjiPicker((current) => (current === copyPrefix ? null : copyPrefix))
+                              }}
+                              aria-expanded={isKanjiPickerOpen}
+                              aria-controls={kanjiPickerId}
+                              aria-label={`Choose a kanji from ${result.character} to view details`}
+                              title="Choose kanji details"
+                            >
+                              <ScanText aria-hidden="true" strokeWidth={2.2} />
+                            </button>
+                            {isKanjiPickerOpen ? (
+                              <div
+                                id={kanjiPickerId}
+                                className="dictionary-kanji-picker crt-scanlines"
+                                role="group"
+                                aria-label={`Choose a kanji from ${result.character} to view details`}
+                              >
+                                <div className="crt-vhs-line" />
+                                {kanjiCharacters.map((character) => (
+                                  <button
+                                    key={character}
+                                    type="button"
+                                    lang="ja"
+                                    data-kanji-detail-focus-fallback={`${kanjiPickerId}-trigger`}
+                                    aria-label={`View details for ${character}`}
+                                    onClick={(event) => {
+                                      setOpenCopyMenu(null)
+                                      setOpenKanjiPicker(null)
+                                      onOpenKanjiDetail(character, event.currentTarget)
+                                    }}
+                                  >
+                                    {character}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                         {onPlayAudio ? (
                           <button
                             type="button"

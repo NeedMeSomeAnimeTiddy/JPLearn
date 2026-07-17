@@ -6,6 +6,7 @@ import type {
   DailyGamesStatePayload,
   FeatureStatusPayload,
   GameCard,
+  KanjiDetailPayload,
   OverviewCharacterCard,
   PitchAccent,
   ProgressionNodeStatusPayload,
@@ -615,6 +616,7 @@ interface DesktopApi {
   optimizeFSRS?: () => Promise<OptimizeFSRSResult>
   resetFSRSWeights?: () => Promise<{ ok: boolean; weights: number[] }>
   searchDictionary?: (query: string) => Promise<DictionaryLookupPayload>
+  getKanjiDetail?: (character: string) => Promise<KanjiDetailPayload>
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>
   getSetupSystemInfo?: () => Promise<SetupSystemInfo>

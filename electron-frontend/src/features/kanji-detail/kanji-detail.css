@@ -1,0 +1,432 @@
+.kanji-detail-backdrop {
+  z-index: 1200;
+  align-items: flex-start;
+  padding-top: 3rem;
+  background: rgba(21, 17, 14, 0.76);
+}
+
+.kanji-detail-panel {
+  display: flex;
+  width: min(92vw, 64rem);
+  max-height: min(84dvh, 52rem);
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text-main);
+  animation: enterUp 220ms ease both;
+}
+
+.kanji-detail-header {
+  flex: 0 0 auto;
+}
+
+.kanji-detail-header h1,
+.kanji-detail-section h2,
+.kanji-detail-reading-group h3 {
+  margin: 0;
+}
+
+.kanji-detail-header h1 {
+  font-size: 1.14rem;
+}
+
+.kanji-detail-close {
+  position: relative;
+  z-index: 3;
+}
+
+.kanji-detail-close svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.kanji-detail-secondary-action {
+  border: 1px solid var(--panel-border);
+  border-radius: 0;
+  background: var(--bg-main);
+  color: var(--text-main);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+  transition: transform 80ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.kanji-detail-secondary-action:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.kanji-detail-secondary-action:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.kanji-detail-close:focus-visible,
+.kanji-detail-secondary-action:focus-visible,
+.kanji-detail-reading-entry:focus-within {
+  outline: 2px solid var(--tone-ocean);
+  outline-offset: 2px;
+}
+
+.kanji-detail-secondary-action:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.kanji-detail-content,
+.kanji-detail-state {
+  position: relative;
+  z-index: 2;
+  overflow-y: auto;
+  padding: 1rem 1.25rem 1.5rem;
+  scrollbar-color: var(--panel-border) transparent;
+}
+
+.kanji-detail-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.kanji-detail-state {
+  display: grid;
+  min-height: 9rem;
+  align-content: center;
+  gap: 0.75rem;
+}
+
+.kanji-detail-section {
+  min-width: 0;
+  border-top: 1px solid color-mix(in oklab, var(--accent-soft) 42%, var(--panel-border));
+  padding-top: 0.75rem;
+}
+
+.kanji-detail-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-main);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kanji-detail-section h2::after {
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(90deg, var(--accent-soft), transparent);
+  content: '';
+  opacity: 0.65;
+}
+
+.kanji-detail-summary {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr);
+  gap: 1rem;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.kanji-detail-glyph {
+  display: grid;
+  min-height: 8rem;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 42%, var(--panel-border));
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--tone-ocean) 10%, transparent), transparent),
+    var(--bg-main);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent-soft) 12%, transparent);
+  color: var(--text-main);
+  font-size: clamp(4rem, 10vw, 6.5rem);
+  line-height: 1;
+}
+
+.kanji-detail-summary-main {
+  min-width: 0;
+}
+
+.kanji-detail-meanings {
+  margin: 0 0 0.75rem;
+  color: var(--text-main);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.kanji-detail-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.kanji-detail-facts div {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  border-left: 2px solid var(--accent-soft);
+  background: color-mix(in oklab, var(--panel-bg) 84%, var(--bg-main));
+  padding: 0.3rem 0.5rem;
+}
+
+.kanji-detail-facts dt {
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kanji-detail-facts dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.kanji-detail-meta,
+.kanji-detail-kana,
+.kanji-detail-example-empty,
+.kanji-detail-empty {
+  color: var(--text-soft);
+}
+
+.kanji-detail-empty,
+.kanji-detail-example-empty {
+  margin: 0;
+  font-size: 0.76rem;
+}
+
+.kanji-detail-chip-groups,
+.kanji-detail-chips,
+.kanji-detail-reading-list,
+.kanji-detail-example-list,
+.kanji-detail-radical-list,
+.kanji-detail-compound-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kanji-detail-chip-groups {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.kanji-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.kanji-detail-chips li {
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 38%, var(--chip-border));
+  border-radius: 0;
+  background: color-mix(in oklab, var(--tone-ocean) 10%, var(--chip-bg));
+  color: color-mix(in oklab, var(--tone-ocean) 80%, var(--text-main));
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
+  padding: 0.25rem 0.4rem;
+}
+
+.kanji-detail-primary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(13rem, 0.8fr);
+  gap: 1rem;
+}
+
+.kanji-detail-primary-grid .kanji-detail-section {
+  margin: 0;
+}
+
+.kanji-detail-readings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.kanji-detail-reading-group {
+  min-width: 0;
+  border-left: 2px solid color-mix(in oklab, var(--tone-ocean) 55%, var(--panel-border));
+  padding-left: 0.6rem;
+}
+
+.kanji-detail-reading-group h3 {
+  margin-bottom: 0.4rem;
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kanji-detail-reading-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.kanji-detail-reading-entry {
+  display: grid;
+  gap: 0.2rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--panel-border) 62%, transparent);
+  padding-bottom: 0.35rem;
+}
+
+.kanji-detail-reading {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.kanji-detail-example-list {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.kanji-detail-example-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.kanji-detail-radical-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.kanji-detail-radical-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--chip-border);
+  background: var(--chip-bg);
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  padding: 0.3rem 0.4rem;
+}
+
+.kanji-detail-radical {
+  color: var(--text-main);
+  font-family: var(--display-font);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kanji-detail-compound-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.kanji-detail-compound-list li {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.35rem;
+  border-left: 2px solid color-mix(in oklab, var(--accent-soft) 58%, var(--panel-border));
+  background: color-mix(in oklab, var(--panel-bg) 84%, var(--bg-main));
+  padding: 0.35rem 0.45rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.kanji-detail-compound-word {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.kanji-detail-stroke-section {
+  padding-bottom: 0.25rem;
+}
+
+.kanji-detail-stroke {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 12rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--panel-border);
+  background: color-mix(in oklab, var(--panel-bg) 88%, var(--bg-main));
+  padding: 0.5rem;
+}
+
+.kanji-detail-stroke-canvas {
+  display: grid;
+  width: 100%;
+  max-width: 11rem;
+  aspect-ratio: 1;
+  min-height: 0;
+  justify-self: center;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--tone-ocean) 32%, var(--panel-border));
+  background: var(--bg-main);
+}
+
+.kanji-detail-stroke-canvas svg {
+  display: block;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+.kanji-detail-stroke-controls p {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 48rem) {
+  .kanji-detail-primary-grid,
+  .kanji-detail-readings-grid,
+  .kanji-detail-compound-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 38rem) {
+  .kanji-detail-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .kanji-detail-panel {
+    width: 100%;
+    max-height: 92dvh;
+  }
+
+  .kanji-detail-header {
+    padding-inline: 1rem;
+  }
+
+  .kanji-detail-content,
+  .kanji-detail-state {
+    padding-inline: 1rem;
+  }
+
+  .kanji-detail-summary,
+  .kanji-detail-stroke {
+    grid-template-columns: 1fr;
+  }
+
+  .kanji-detail-glyph {
+    min-height: 6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kanji-detail-stroke-canvas *,
+  .kanji-detail-panel {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+html[data-reduced-motion='true'] .kanji-detail-stroke-canvas *,
+html[data-reduced-motion='true'] .kanji-detail-panel {
+  animation: none !important;
+  transition: none !important;
+}

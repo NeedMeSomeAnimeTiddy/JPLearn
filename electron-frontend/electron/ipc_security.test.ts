@@ -9,6 +9,7 @@ const {
   validateSessionGoalPayload,
   validateSessionId,
   validateAssistantEventInteractionPayload,
+  validateKanjiDetailCharacter,
   validateStartupThemeInput,
   validateGrammarMinigameRequest,
   validateDailyGamesAttemptPayload,
@@ -28,6 +29,15 @@ describe('ipc_security', () => {
   it('rejects untrusted renderer URLs', () => {
     expect(isAllowedRendererUrl('https://example.com', true)).toBe(false)
     expect(isAllowedRendererUrl('https://example.com', false)).toBe(false)
+  })
+
+  it('validates exactly one Unicode Han character for kanji detail requests', () => {
+    expect(validateKanjiDetailCharacter('  日  ')).toBe('日')
+    expect(validateKanjiDetailCharacter('𠮷')).toBe('𠮷')
+
+    for (const invalid of ['', '日本', 'ひ', 'A', '々', '日\uFE0F', 42, null]) {
+      expect(() => validateKanjiDetailCharacter(invalid)).toThrow(/exactly one Unicode Han character|Invalid kanji detail character/i)
+    }
   })
 
   it('normalizes and bounds speak payloads', () => {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 
 afterEach(() => {
@@ -181,7 +181,7 @@ describe('Overview activity panel', () => {
     expect((await screen.findAllByText(/38/)).length).toBeGreaterThan(0)
   })
 
-  it('shows vocabulary and grammar sections in character mastery', async () => {
+  it('routes kanji mastery to the shared panel while kana, vocabulary, and grammar stay lightweight', async () => {
     window.jplearnDesktop = {
       ...baseDesktopApi,
       getStudySummary: async () => ({
@@ -224,8 +224,24 @@ describe('Overview activity panel', () => {
           },
         },
       }),
+      getKanjiDetail: async () => { throw new Error('detail data is intentionally unavailable in this integration test') },
       getOverviewCharacterMastery: async () => ({
-        blocks: { hiragana: [], katakana: [] },
+        blocks: {
+          hiragana: [
+            {
+              index: 0,
+              name: 'Vowels',
+              card_ids: [100],
+              sample_chars: ['あ'],
+              characters: ['あ'],
+              meanings: ['a'],
+              romajis: ['a'],
+              mastery: 0,
+              unlocked: true,
+            },
+          ],
+          katakana: [],
+        },
         category_blocks: {
           vocab_n5: [
             {
@@ -254,7 +270,16 @@ describe('Overview activity panel', () => {
             },
           ],
         },
-        kanji_cards: [],
+        kanji_cards: [
+          {
+            id: 1,
+            character: '日',
+            romaji: 'nichi',
+            meaning: 'sun',
+            tags: ['kanji', 'jlpt_n5'],
+            example_sentence: null,
+          },
+        ],
       }),
     }
 
@@ -268,7 +293,36 @@ describe('Overview activity panel', () => {
 
     expect(await screen.findByText('Greetings')).toBeTruthy()
     expect(await screen.findByText('Common Patterns')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'JLPT N5: 0% mastered' }))
+    const kanjiTile = screen.getByRole('button', { name: '日, nichi, sun: 0/4' })
+    fireEvent.click(kanjiTile)
+    expect(await screen.findByRole('dialog', { name: 'Kanji details: 日' })).toBeTruthy()
+
+    fireEvent.pointerDown(screen.getByTestId('kanji-detail-backdrop'))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kanji details: 日' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Study Overview' })).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(kanjiTile))
+
+    fireEvent.click(kanjiTile)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kanji details: 日' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Study Overview' })).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(kanjiTile))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vowels: 0% mastered' }))
+    fireEvent.click(screen.getByRole('button', { name: 'あ (a): 0/4' }))
+    expect(screen.getByRole('dialog', { name: 'Character detail: あ' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Greetings: 0% mastered' }))
+    fireEvent.click(screen.getByRole('button', { name: '日本 (nihon): 0/4' }))
+    expect(screen.getByRole('dialog', { name: 'Character detail: 日本' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Common Patterns: 0% mastered' }))
+    fireEvent.click(screen.getByRole('button', { name: 'です (desu): 0/4' }))
+    expect(screen.getByRole('dialog', { name: 'Character detail: です' })).toBeTruthy()
   })
 
 })
-

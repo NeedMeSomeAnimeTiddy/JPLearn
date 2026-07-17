@@ -136,6 +136,7 @@ interface OverviewViewProps {
   onSetKanjiOverviewPage: (
     updater: (prev: Partial<Record<JlptLevel, number>>) => Partial<Record<JlptLevel, number>>,
   ) => void
+  onOpenKanjiDetail: (character: string, trigger: HTMLElement) => void
   onSetSelectedChar: (char: SelectedChar) => void
 }
 
@@ -167,6 +168,7 @@ export function OverviewView({
   onSetExpandedBlocks,
   onToggleSection,
   onSetKanjiOverviewPage,
+  onOpenKanjiDetail,
   onSetSelectedChar,
 }: OverviewViewProps) {
   const [exportMessage, setExportMessage] = useState<string | null>(null)
@@ -441,7 +443,7 @@ export function OverviewView({
                                     className="char-mastery-chip char-mastery-chip-kanji"
                                     data-level={levelScore}
                                     aria-label={`${card.character}, ${card.romaji}, ${card.meaning}: ${levelScore}/${CARD_MASTERY_MAX}`}
-                                    onClick={() => onSetSelectedChar({ character: card.character, romaji: card.romaji, meaning: card.meaning, label: 'Reading / English meaning', score: levelScore })}
+                                    onClick={(event) => onOpenKanjiDetail(card.character, event.currentTarget)}
                                   >
                                     <span className="char-mastery-chip-glyph" lang="ja">{card.character}</span>
                                     <span className="char-mastery-chip-copy">
