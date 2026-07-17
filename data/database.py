@@ -66,9 +66,10 @@ MIGRATION_V14 = 14
 MIGRATION_V15 = 15
 MIGRATION_V16 = 16
 MIGRATION_V17 = 17
+MIGRATION_V18 = 18
 
 
-LATEST_SCHEMA_VERSION = 17
+LATEST_SCHEMA_VERSION = 18
 _SQLITE_IN_CHUNK_SIZE = 900
 
 StageDistribution: TypeAlias = dict[int, int]
@@ -694,6 +695,22 @@ def _migration_0017(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0018(conn: sqlite3.Connection) -> None:
+    """Add local learner annotations keyed by stable opaque note identities."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS card_notes (
+            note_key       TEXT PRIMARY KEY
+                           CHECK (length(note_key) BETWEEN 1 AND 192),
+            note_text      TEXT NOT NULL
+                           CHECK (length(note_text) BETWEEN 1 AND 2000),
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL
+        )
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -712,6 +729,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V15: _migration_0015,
     MIGRATION_V16: _migration_0016,
     MIGRATION_V17: _migration_0017,
+    MIGRATION_V18: _migration_0018,
 }
 
 

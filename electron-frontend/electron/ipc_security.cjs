@@ -238,6 +238,55 @@ function validateDictionarySearchQuery(value) {
   return normalized
 }
 
+const MAX_CARD_NOTE_KEY_LENGTH = 192
+const MAX_CARD_NOTE_TEXT_LENGTH = 2000
+const MAX_JMDICT_SOURCE_ID_LENGTH = 128
+const CARD_NOTE_BUILTIN_KEY_PATTERN = /^note:v1:builtin:[0-9a-f]{64}$/
+const CARD_NOTE_JMDICT_KEY_PATTERN = /^note:v1:offline_dictionary:jmdict:([a-z0-9]+(?:-[a-z0-9]+)*)$/
+const CARD_NOTE_FALLBACK_KEY_PATTERN = /^note:v1:offline_dictionary:fallback:[0-9a-f]{64}$/
+
+function validateCardNoteKey(value) {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid card note key: ${String(value)}`)
+  }
+  if (Array.from(value).length > MAX_CARD_NOTE_KEY_LENGTH) {
+    throw new Error(`Invalid card note key: exceeds ${MAX_CARD_NOTE_KEY_LENGTH} characters`)
+  }
+  if (CARD_NOTE_BUILTIN_KEY_PATTERN.test(value) || CARD_NOTE_FALLBACK_KEY_PATTERN.test(value)) {
+    return value
+  }
+  const jmdictMatch = CARD_NOTE_JMDICT_KEY_PATTERN.exec(value)
+  if (jmdictMatch && jmdictMatch[1].length <= MAX_JMDICT_SOURCE_ID_LENGTH) {
+    return value
+  }
+  throw new Error('Invalid card note key: expected a supported opaque v1 key')
+}
+
+function validateCardNoteText(value) {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid card note text: ${String(value)}`)
+  }
+  const normalized = value.replace(/\r\n?/g, '\n')
+  const characterCount = Array.from(normalized).length
+  if (characterCount < 1 || !normalized.trim()) {
+    throw new Error('Invalid card note text: value must not be empty')
+  }
+  if (characterCount > MAX_CARD_NOTE_TEXT_LENGTH) {
+    throw new Error(`Invalid card note text: exceeds ${MAX_CARD_NOTE_TEXT_LENGTH} characters`)
+  }
+  return normalized
+}
+
+function validateCardNoteSavePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid card note save payload: expected object')
+  }
+  return {
+    noteKey: validateCardNoteKey(payload.noteKey),
+    noteText: validateCardNoteText(payload.noteText),
+  }
+}
+
 const HAN_IDEOGRAPH_PATTERN = /^\p{Unified_Ideograph}$/u
 
 function validateKanjiDetailCharacter(value) {
@@ -739,6 +788,9 @@ module.exports = {
   validateOptionalSessionId,
   validatePositiveLimit,
   validateDictionarySearchQuery,
+  validateCardNoteKey,
+  validateCardNoteText,
+  validateCardNoteSavePayload,
   validateKanjiDetailCharacter,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,

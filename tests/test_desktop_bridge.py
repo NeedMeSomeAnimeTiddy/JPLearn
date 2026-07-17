@@ -22,7 +22,15 @@ def _use_temp_db(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "jplearn-bridge-test.db")
 
 
-def _build_dictionary_db(path: Path, *, japanese: str, reading: str, gloss: str) -> None:
+def _build_dictionary_db(
+    path: Path,
+    *,
+    japanese: str,
+    reading: str,
+    gloss: str,
+    source_id: str = "test-entry",
+    entry_id: int = 1,
+) -> None:
     conn = sqlite3.connect(path)
     try:
         conn.executescript(
@@ -44,10 +52,11 @@ def _build_dictionary_db(path: Path, *, japanese: str, reading: str, gloss: str)
         )
         cursor = conn.execute(
             """
-            INSERT INTO dictionary_entries (source_id, japanese, reading, gloss, is_common)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO dictionary_entries
+              (entry_id, source_id, japanese, reading, gloss, is_common)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            ("test-entry", japanese, reading, gloss, 1),
+            (entry_id, source_id, japanese, reading, gloss, 1),
         )
         conn.execute(
             "INSERT INTO dictionary_fts (rowid, gloss) VALUES (?, ?)",
@@ -507,6 +516,47 @@ def test_build_deck_cards_includes_curriculum_stage(tmp_path: Path, monkeypatch)
     assert first_card["dictionary_summary"] is None
 
 
+def test_builtin_note_keys_share_across_decks_and_allow_empty_readings(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        desktop_bridge,
+        "OFFLINE_DICTIONARY_DB_CANDIDATES",
+        (tmp_path / "missing-dictionary.sqlite",),
+    )
+    first_deck = Deck(
+        name="Shared learning item A",
+        cards=[Card(id=7, character=" 学ぶ ", romaji="", meaning="to learn")],
+    )
+    second_deck = Deck(
+        name="Shared learning item B",
+        cards=[Card(id=9001, character="学ぶ", romaji="", meaning="study")],
+    )
+    monkeypatch.setitem(desktop_bridge.ALL_DECKS, "note_identity_a", lambda: first_deck)
+    monkeypatch.setitem(desktop_bridge.ALL_DECKS, "note_identity_b", lambda: second_deck)
+
+    first_payload = desktop_bridge.build_deck_cards("note_identity_a")
+    second_payload = desktop_bridge.build_deck_cards("note_identity_b")
+    first_card = cast(list[dict[str, object]], first_payload["cards"])[0]
+    second_card = cast(list[dict[str, object]], second_payload["cards"])[0]
+
+    assert first_card["id"] != second_card["id"]
+    assert first_card["note_key"] == second_card["note_key"]
+    assert str(first_card["note_key"]).startswith("note:v1:builtin:")
+
+
+def test_overview_cards_expose_python_generated_note_keys(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.build_overview_character_mastery()
+    cards = cast(list[dict[str, object]], payload["kanji_cards"])
+
+    assert cards
+    assert all(str(card["note_key"]).startswith("note:v1:builtin:") for card in cards)
+
+
 def test_build_deck_cards_includes_dictionary_summary_when_available(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
@@ -575,6 +625,8 @@ def test_dictionary_search_includes_pitch_accent_when_available(tmp_path: Path, 
     payload = desktop_bridge.build_dictionary_search_payload("箸")
     results = cast(list[dict[str, object]], payload["results"])
 
+    assert results[0]["source_id"] == "test-entry"
+    assert results[0]["note_key"] == "note:v1:offline_dictionary:jmdict:test-entry"
     assert results[0]["pitch_accents"] == [
         {
             "reading": "はし",
@@ -583,6 +635,155 @@ def test_dictionary_search_includes_pitch_accent_when_available(tmp_path: Path, 
             "source": "Kanjium test data",
         }
     ]
+
+
+def test_offline_note_keys_prefer_source_id_and_ignore_local_entry_id(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def _search(path: Path) -> dict[str, object]:
+        monkeypatch.setattr(desktop_bridge, "OFFLINE_DICTIONARY_DB_CANDIDATES", (path,))
+        payload = desktop_bridge.build_dictionary_search_payload("箸")
+        return cast(list[dict[str, object]], payload["results"])[0]
+
+    first_path = tmp_path / "first.sqlite"
+    second_path = tmp_path / "second.sqlite"
+    distinct_path = tmp_path / "distinct.sqlite"
+    for path, source_id, entry_id in (
+        (first_path, "test-entry", 7),
+        (second_path, "test-entry", 9001),
+        (distinct_path, "another-entry", 7),
+    ):
+        _build_dictionary_db(
+            path,
+            japanese="箸",
+            reading="はし",
+            gloss="chopsticks",
+            source_id=source_id,
+            entry_id=entry_id,
+        )
+
+    first = _search(first_path)
+    second = _search(second_path)
+    distinct = _search(distinct_path)
+
+    assert first["id"] != second["id"]
+    assert first["source_id"] == second["source_id"] == "test-entry"
+    assert first["note_key"] == second["note_key"]
+    assert str(first["note_key"]).startswith("note:v1:offline_dictionary:jmdict:")
+    assert distinct["note_key"] != first["note_key"]
+
+
+def test_offline_note_key_uses_marked_fallback_only_for_missing_source_id(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def _search(path: Path) -> dict[str, object]:
+        monkeypatch.setattr(desktop_bridge, "OFFLINE_DICTIONARY_DB_CANDIDATES", (path,))
+        payload = desktop_bridge.build_dictionary_search_payload("箸")
+        return cast(list[dict[str, object]], payload["results"])[0]
+
+    first_path = tmp_path / "missing-source-first.sqlite"
+    second_path = tmp_path / "missing-source-second.sqlite"
+    malformed_path = tmp_path / "malformed-source.sqlite"
+    for path, source_id, entry_id in (
+        (first_path, "", 3),
+        (second_path, "  ", 800),
+        (malformed_path, "bad/source", 4),
+    ):
+        _build_dictionary_db(
+            path,
+            japanese="箸",
+            reading="はし",
+            gloss="chopsticks",
+            source_id=source_id,
+            entry_id=entry_id,
+        )
+
+    first = _search(first_path)
+    second = _search(second_path)
+
+    assert first["source_id"] is None
+    assert second["source_id"] is None
+    assert first["note_key"] == second["note_key"]
+    assert str(first["note_key"]).startswith(
+        "note:v1:offline_dictionary:fallback:"
+    )
+    with pytest.raises(ValueError, match="source_id"):
+        _search(malformed_path)
+
+
+def test_card_note_bridge_commands_round_trip_unicode_crud(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    note_key = desktop_bridge._build_builtin_note_key("学ぶ", "manabu")
+
+    missing_code, missing = desktop_bridge._run_command(["card-note-get", note_key])
+    save_code, saved = desktop_bridge._run_command(
+        ["card-note-save", note_key, "  覚え方\r\ncafe\u0301 😀  "]
+    )
+    load_code, loaded = desktop_bridge._run_command(["card-note-get", note_key])
+    update_code, updated = desktop_bridge._run_command(
+        ["card-note-save", note_key, "更新したメモ\nsecond line"]
+    )
+    delete_code, deleted = desktop_bridge._run_command(["card-note-delete", note_key])
+    repeat_delete_code, repeated = desktop_bridge._run_command(
+        ["card-note-delete", note_key]
+    )
+
+    assert missing_code == save_code == load_code == update_code == 0
+    assert delete_code == repeat_delete_code == 0
+    assert missing == {"note": None}
+    assert saved["note_key"] == note_key
+    assert saved["note_text"] == "覚え方\ncafé 😀"
+    assert loaded["note"] == saved
+    assert updated["created_at_utc"] == saved["created_at_utc"]
+    assert updated["note_text"] == "更新したメモ\nsecond line"
+    assert deleted == {"note_key": note_key, "deleted": True}
+    assert repeated == {"note_key": note_key, "deleted": False}
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["card-note-get"],
+        ["card-note-get", "key", "extra"],
+        ["card-note-save", "key"],
+        ["card-note-save", "key", "text", "extra"],
+        ["card-note-delete"],
+        ["card-note-delete", "key", "extra"],
+    ],
+)
+def test_card_note_bridge_commands_reject_wrong_argument_counts(argv: list[str]) -> None:
+    code, payload = desktop_bridge._run_command(argv)
+
+    assert code == 2
+    assert str(payload["error"]).startswith("Usage: card-note-")
+
+
+def test_card_note_bridge_commands_reject_invalid_keys_and_notes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    note_key = desktop_bridge._build_builtin_note_key("学ぶ", "manabu")
+
+    malformed_key_code, malformed_key = desktop_bridge._run_command(
+        ["card-note-get", "note:v1:builtin:not-a-digest"]
+    )
+    blank_code, blank = desktop_bridge._run_command(
+        ["card-note-save", note_key, " \r\n\t "]
+    )
+    oversized_code, oversized = desktop_bridge._run_command(
+        ["card-note-save", note_key, "😀" * 2001]
+    )
+
+    assert malformed_key_code == blank_code == oversized_code == 2
+    assert "supported opaque v1" in str(malformed_key["error"])
+    assert "must not be empty" in str(blank["error"])
+    assert "at most 2000" in str(oversized["error"])
 
 
 def test_build_kanji_detail_payload_uses_indexed_compounds_and_verified_examples(
@@ -760,6 +961,10 @@ def test_dictionary_hello_prefers_konnichiwa_over_katakana_hello(tmp_path: Path,
 
     assert len(results) > 0
     assert results[0]["character"] == "今日は"
+    assert results[0]["source_id"] == "test-entry-2"
+    assert results[0]["note_key"] == (
+        "note:v1:offline_dictionary:jmdict:test-entry-2"
+    )
     assert any(result["character"] == "ハロー" for result in results)
 
 

@@ -1,6 +1,9 @@
 // Core payload types are generated from Python dataclasses in desktop_bridge.py.
 // Run: python scripts/generate_ts_types.py
 import type {
+  CardNoteDeletePayload,
+  CardNoteLookupPayload,
+  CardNotePayload,
   DeckSummary,
   DailyGamesPracticeSeedPayload,
   DailyGamesStatePayload,
@@ -25,6 +28,8 @@ interface DesktopVersions {
 
 interface DictionaryLookupItem {
   id: number
+  source_id: string | null
+  note_key: string
   character: string
   romaji: string
   meaning: string
@@ -237,6 +242,11 @@ type DailyGamesMode = 'daily' | 'practice'
 interface DailyGamesAttemptOutcomeInput {
   poolPosition: number
   outcome: 'correct' | 'incorrect'
+}
+
+interface CardNoteSaveRequest {
+  noteKey: string
+  noteText: string
 }
 
 interface DailyGamesPracticeSeedRequest {
@@ -616,6 +626,9 @@ interface DesktopApi {
   optimizeFSRS?: () => Promise<OptimizeFSRSResult>
   resetFSRSWeights?: () => Promise<{ ok: boolean; weights: number[] }>
   searchDictionary?: (query: string) => Promise<DictionaryLookupPayload>
+  getCardNote: (noteKey: string) => Promise<CardNoteLookupPayload>
+  saveCardNote: (payload: CardNoteSaveRequest) => Promise<CardNotePayload>
+  deleteCardNote: (noteKey: string) => Promise<CardNoteDeletePayload>
   getKanjiDetail?: (character: string) => Promise<KanjiDetailPayload>
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>

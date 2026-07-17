@@ -150,24 +150,36 @@ const baseCards = [
   { id: 1, character: 'い', romaji: 'i', meaning: 'i', tags: ['hiragana'], example_sentence: 'いまです。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 2, 3], character_distractor_ids: [0, 2, 3] },
   { id: 2, character: 'う', romaji: 'u', meaning: 'u', tags: ['hiragana'], example_sentence: 'うみです。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 3], character_distractor_ids: [0, 1, 3] },
   { id: 3, character: 'え', romaji: 'e', meaning: 'e', tags: ['hiragana'], example_sentence: 'えきです。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [0, 1, 2], character_distractor_ids: [0, 1, 2] },
-]
+].map((card) => ({
+  ...card,
+  note_key: `note:v1:builtin:${card.id.toString(16).padStart(64, '0')}`,
+}))
 
 const kanjiStudyPlanCards = [
   { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', dictionary_summary: { character: '日', reading: 'にち', primary_gloss: 'day', glosses: ['day', 'sun'], source: 'offline_dictionary', pitch_accents: [] }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
   { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
-]
+].map((card) => ({
+  ...card,
+  note_key: `note:v1:builtin:${card.id.toString(16).padStart(64, '0')}`,
+}))
 
 const vocabStudyPlanCards = [
   { id: 20, character: '予定', romaji: 'yotei', meaning: 'schedule', tags: ['vocab', 'n5'], example_sentence: '予定 を たてます。', dictionary_summary: { character: '予定', reading: 'よてい', primary_gloss: 'schedule', glosses: ['schedule', 'plan'], source: 'offline_dictionary', pitch_accents: [] }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [21], character_distractor_ids: [21] },
   { id: 21, character: '計画', romaji: 'keikaku', meaning: 'plan', tags: ['vocab', 'n5'], example_sentence: null, dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [20], character_distractor_ids: [20] },
-]
+].map((card) => ({
+  ...card,
+  note_key: `note:v1:builtin:${card.id.toString(16).padStart(64, '0')}`,
+}))
 
 const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
 
 const kanjiStrokeCards = [
   { id: 10, character: '日', romaji: 'nichi', meaning: 'day', tags: ['kanji', 'n5'], example_sentence: '日 を つかいます。', dictionary_summary: { character: '日', reading: 'にち', primary_gloss: 'day', glosses: ['day', 'sun'], source: 'offline_dictionary', pitch_accents: [] }, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [11], character_distractor_ids: [11] },
   { id: 11, character: '月', romaji: 'getsu', meaning: 'month', tags: ['kanji', 'n5'], example_sentence: null, dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [10], character_distractor_ids: [10] },
-]
+].map((card) => ({
+  ...card,
+  note_key: `note:v1:builtin:${card.id.toString(16).padStart(64, '0')}`,
+}))
 
 const baseDesktopApi = {
   versions: { chrome: '0', electron: '0', node: '0' },
@@ -235,6 +247,14 @@ const baseDesktopApi = {
     source: 'offline_dictionary' as const,
     results: [],
   }),
+  getCardNote: async () => ({ note: null }),
+  saveCardNote: async (payload: { noteKey: string; noteText: string }) => ({
+    note_key: payload.noteKey,
+    note_text: payload.noteText,
+    created_at_utc: '2026-01-01T00:00:00+00:00',
+    updated_at_utc: '2026-01-01T00:00:00+00:00',
+  }),
+  deleteCardNote: async (noteKey: string) => ({ note_key: noteKey, deleted: true }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
   recordGameResult: async () => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
@@ -573,7 +593,10 @@ describe('Minigame menu', () => {
       { id: 31, character: 'ます', romaji: 'masu', meaning: 'polite verb ending', tags: ['grammar_patterns'], example_sentence: 'べんきょう します。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 32, 33], character_distractor_ids: [30, 32, 33] },
       { id: 32, character: 'から', romaji: 'kara', meaning: 'because', tags: ['grammar_patterns'], example_sentence: 'あめ です から。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 33], character_distractor_ids: [30, 31, 33] },
       { id: 33, character: 'けど', romaji: 'kedo', meaning: 'but', tags: ['grammar_patterns'], example_sentence: 'いきたい けど、いけません。', dictionary_summary: null, is_leech: false, curriculum_stage: 1, meaning_distractor_ids: [30, 31, 32], character_distractor_ids: [30, 31, 32] },
-    ]
+    ].map((card) => ({
+      ...card,
+      note_key: `note:v1:builtin:${card.id.toString(16).padStart(64, '0')}`,
+    }))
     const speakText = vi.fn(async (_payload: string | { text: string; speaker?: string | number; speed?: number }) => ({
       ok: true,
       format: 'wav' as const,
@@ -711,6 +734,8 @@ describe('Minigame menu', () => {
       results: [
         {
           id: 900,
+          source_id: 'test-entry',
+          note_key: 'note:v1:offline_dictionary:jmdict:test-entry',
           character: '日',
           romaji: 'にち',
           meaning: 'day',
@@ -946,7 +971,10 @@ describe('Minigame menu', () => {
         meaning_distractor_ids: [40, 41, 42],
         character_distractor_ids: [40, 41, 42],
       },
-    ]
+    ].map((card) => ({
+      ...card,
+      note_key: `note:v1:builtin:${card.id.toString(16).padStart(64, '0')}`,
+    }))
 
     const recordGameResult = vi.fn(async () => ({
       ok: true,

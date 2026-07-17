@@ -78,8 +78,25 @@ export interface KanjiDetailPayload {
   source: string
 }
 
+export interface CardNotePayload {
+  note_key: string
+  note_text: string
+  created_at_utc: string
+  updated_at_utc: string
+}
+
+export interface CardNoteLookupPayload {
+  note: CardNotePayload | null
+}
+
+export interface CardNoteDeletePayload {
+  note_key: string
+  deleted: boolean
+}
+
 export interface GameCard {
   id: number
+  note_key: string
   character: string
   romaji: string
   meaning: string
@@ -94,6 +111,7 @@ export interface GameCard {
 
 export interface OverviewCharacterCard {
   id: number
+  note_key: string
   character: string
   romaji: string
   meaning: string

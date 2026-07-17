@@ -270,6 +270,71 @@ def test_jplearn_db_upgrade_from_v3_applies_assistant_tables(
     assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION
 
 
+def test_jplearn_db_v18_creates_card_notes_without_timestamp_index(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "jplearn-card-notes-fresh.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+
+    database.init_db()
+
+    columns = _column_names(db_path, "card_notes")
+    assert columns == {
+        "note_key",
+        "note_text",
+        "created_at_utc",
+        "updated_at_utc",
+    }
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        version_row = conn.execute(
+            "SELECT version FROM schema_version WHERE id = 1"
+        ).fetchone()
+        index_names = {
+            str(row[1])
+            for row in conn.execute("PRAGMA index_list(card_notes)").fetchall()
+        }
+
+    assert version_row is not None
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION == 18
+    assert "idx_card_notes_updated_at" not in index_names
+
+
+def test_jplearn_db_upgrade_from_v17_preserves_existing_rows_and_adds_card_notes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "jplearn-card-notes-upgrade.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE schema_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
+            );
+            INSERT INTO schema_version (id, version) VALUES (1, 17);
+            CREATE TABLE retained_data (value TEXT NOT NULL);
+            INSERT INTO retained_data (value) VALUES ('preserve me');
+            """
+        )
+
+    database.init_db()
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        version_row = conn.execute(
+            "SELECT version FROM schema_version WHERE id = 1"
+        ).fetchone()
+        retained_row = conn.execute("SELECT value FROM retained_data").fetchone()
+
+    assert "note_key" in _column_names(db_path, "card_notes")
+    assert version_row is not None
+    assert int(version_row[0]) == 18
+    assert retained_row == ("preserve me",)
+
+
 def test_app_db_fresh_install_creates_schema_marker(tmp_path: Path) -> None:
     db_path = tmp_path / "app-migration-fresh.db"
     repo = SRSRepository(db_path=db_path)

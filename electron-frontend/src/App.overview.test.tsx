@@ -34,6 +34,14 @@ const baseDesktopApi = {
     category_blocks: { vocab_n5: [], grammar_patterns: [] },
     kanji_cards: [],
   }),
+  getCardNote: async () => ({ note: null }),
+  saveCardNote: async (payload: { noteKey: string; noteText: string }) => ({
+    note_key: payload.noteKey,
+    note_text: payload.noteText,
+    created_at_utc: '2026-01-01T00:00:00+00:00',
+    updated_at_utc: '2026-01-01T00:00:00+00:00',
+  }),
+  deleteCardNote: async (noteKey: string) => ({ note_key: noteKey, deleted: true }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
   recordGameResult: async () => ({ ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
@@ -273,6 +281,7 @@ describe('Overview activity panel', () => {
         kanji_cards: [
           {
             id: 1,
+            note_key: `note:v1:builtin:${'a'.repeat(64)}`,
             character: '日',
             romaji: 'nichi',
             meaning: 'sun',

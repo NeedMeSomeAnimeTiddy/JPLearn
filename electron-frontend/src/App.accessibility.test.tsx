@@ -92,6 +92,14 @@ const baseDesktopApi = {
     category_blocks: { vocab_n5: [], grammar_patterns: [] },
     kanji_cards: [],
   }),
+  getCardNote: async () => ({ note: null }),
+  saveCardNote: async (payload: { noteKey: string; noteText: string }) => ({
+    note_key: payload.noteKey,
+    note_text: payload.noteText,
+    created_at_utc: '2026-01-01T00:00:00+00:00',
+    updated_at_utc: '2026-01-01T00:00:00+00:00',
+  }),
+  deleteCardNote: async (noteKey: string) => ({ note_key: noteKey, deleted: true }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
   recordGameResult: async () => ({
@@ -162,6 +170,7 @@ describe('Accessibility — zero axe violations', () => {
         kanji_cards: [
           {
             id: 1,
+            note_key: `note:v1:builtin:${'a'.repeat(64)}`,
             character: '日',
             romaji: 'nichi',
             meaning: 'sun',
@@ -199,6 +208,8 @@ describe('Accessibility — zero axe violations', () => {
         results: [
           {
             id: 1,
+            source_id: 'test-entry',
+            note_key: 'note:v1:offline_dictionary:jmdict:test-entry',
             character: '日本',
             romaji: 'にほん',
             meaning: 'Japan',

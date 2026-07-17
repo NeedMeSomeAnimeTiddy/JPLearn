@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
-import { BookText, Check, ClipboardCopy, History, ScanText, TriangleAlert, Volume2, X } from 'lucide-react'
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { BookText, Check, ClipboardCopy, History, NotebookPen, ScanText, TriangleAlert, Volume2, X } from 'lucide-react'
 import { toHiragana } from 'wanakana'
 import type { PitchAccent } from '../generated/types'
+import { CardNoteEditor } from '../features/card-notes/CardNoteEditor'
+import { useCardNote } from '../features/card-notes/useCardNote'
+import {
+  dedupeDictionaryCards,
+  dictionaryItemRenderKey,
+  isValidCardNoteKey,
+} from '../features/card-notes/utils'
 import { extractKanjiCharacters } from '../features/kanji-detail'
 import { DictionaryPitchAccent } from './DictionaryPitchAccent'
 
@@ -15,6 +22,8 @@ export interface DictionaryCard {
   example_sentence?: string | null
   pitch_accents?: PitchAccent[]
   dictionary_summary?: { pitch_accents: PitchAccent[] } | null
+  note_key?: string
+  source_id?: string | null
 }
 
 interface DictionaryPopupProps {
@@ -128,15 +137,27 @@ function updateHistory(history: string[], query: string): string[] {
 }
 
 function dedupeResults(results: DictionaryResult[]): DictionaryResult[] {
-  const seen = new Set<string>()
-  const deduped: DictionaryResult[] = []
-  for (const result of results) {
-    const key = `${result.character}::${result.romaji}::${result.meaning}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    deduped.push(result)
+  return dedupeDictionaryCards(results)
+}
+
+function isCapturedDialogNavigationShortcut(
+  event: ReactKeyboardEvent<HTMLElement>,
+): boolean {
+  const key = event.key.toLowerCase()
+  if ((event.ctrlKey || event.metaKey) && (key === 'k' || event.key === ',')) {
+    return true
   }
-  return deduped
+  if (event.key === 'Escape') {
+    return true
+  }
+
+  const target = event.target as HTMLElement
+  const isTextInput =
+    target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+  if (isTextInput || event.ctrlKey || event.metaKey || event.altKey) {
+    return false
+  }
+  return event.key === '?' || /^[1-7]$/u.test(event.key)
 }
 
 function mapLookupResult(
@@ -187,13 +208,20 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
   const openCopyMenuRef = useRef<string | null>(null)
   const [openKanjiPicker, setOpenKanjiPicker] = useState<string | null>(null)
   const openKanjiPickerRef = useRef<string | null>(null)
+  const [activeNoteKey, setActiveNoteKey] = useState<string | null>(null)
+  const noteTriggerRefs = useRef(new Map<string, HTMLButtonElement>())
   const [playFailedFor, setPlayFailedFor] = useState<string | null>(null)
   const wasVoiceBusyRef = useRef(false)
   const pendingPlayCharacterRef = useRef<string | null>(null)
+  const noteController = useCardNote(open ? activeNoteKey : null, {
+    onCollapse: () => setActiveNoteKey(null),
+    restoreTriggerFocus: () => activeNoteKey && noteTriggerRefs.current.get(activeNoteKey)?.focus(),
+  })
 
   useEffect(() => {
     if (!open) return
     const nextQuery = seedQuery.trim().length > 0 ? seedQuery.trim() : history[0] ?? ''
+    setActiveNoteKey(null)
     setQuery(nextQuery)
     window.setTimeout(() => {
       inputRef.current?.focus()
@@ -209,6 +237,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
       setVisibleCount(INITIAL_VISIBLE_RESULTS)
       setOpenCopyMenu(null)
       setOpenKanjiPicker(null)
+      setActiveNoteKey(null)
       setPlayFailedFor(null)
       pendingPlayCharacterRef.current = null
     }
@@ -343,6 +372,8 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!noteController.requestLeave()) return
+    setActiveNoteKey(null)
     const nextHistory = updateHistory(history, query)
     setHistory(nextHistory)
     saveHistory(nextHistory)
@@ -360,6 +391,44 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
     }
   }
 
+  const requestDictionaryClose = () => {
+    if (noteController.requestLeave()) {
+      onClose()
+    }
+  }
+
+  const replaceResults = (action: () => void) => {
+    if (!noteController.requestLeave()) return
+    setActiveNoteKey(null)
+    action()
+  }
+
+  const toggleNote = (noteKey: string) => {
+    setOpenCopyMenu(null)
+    setOpenKanjiPicker(null)
+    if (activeNoteKey === noteKey) {
+      noteController.collapse()
+      return
+    }
+    if (activeNoteKey !== null && !noteController.requestLeave()) {
+      return
+    }
+    setActiveNoteKey(noteKey)
+  }
+
+  const handleDialogKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (
+      event.defaultPrevented ||
+      !noteController.isDirty ||
+      !isCapturedDialogNavigationShortcut(event)
+    ) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    noteController.requestLeave()
+  }
+
   if (!open) return null
 
   return (
@@ -367,10 +436,10 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
       className="modal-backdrop dictionary-backdrop"
       role="presentation"
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === event.currentTarget) requestDictionaryClose()
       }}
     >
-      <section className="dictionary-panel crt-scanlines" role="dialog" aria-modal="true" aria-label="Dictionary lookup panel" onClick={(event) => event.stopPropagation()}>
+      <section className="dictionary-panel crt-scanlines" role="dialog" aria-modal="true" aria-label="Dictionary lookup panel" onClick={(event) => event.stopPropagation()} onKeyDown={handleDialogKeyDown}>
         <div className="crt-vhs-line" />
         <header className="dictionary-header">
           <div />
@@ -378,7 +447,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
             <span className="cassette-panel-header-catalog">QUICK LOOKUP</span>
             <h2 className="cassette-panel-header-title">Dictionary</h2>
           </div>
-          <button type="button" className="panel-close-button" onClick={onClose} aria-label="Close dictionary" title="Close">
+          <button type="button" className="panel-close-button" onClick={requestDictionaryClose} aria-label="Close dictionary" title="Close">
             <X size={16} aria-hidden="true" strokeWidth={2.2} />
           </button>
         </header>
@@ -390,7 +459,11 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
               ref={inputRef}
               type="search"
               value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
+              onChange={(event) => {
+                const nextQuery = event.currentTarget.value
+                if (nextQuery === query) return
+                replaceResults(() => setQuery(nextQuery))
+              }}
               placeholder="Search Japanese, romaji, or English meaning"
               aria-label="Dictionary search"
             />
@@ -412,7 +485,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                   key={entry}
                   type="button"
                   className="dictionary-history-chip"
-                  onClick={() => setQuery(entry)}
+                  onClick={() => replaceResults(() => setQuery(entry))}
                 >
                   {entry}
                 </button>
@@ -422,8 +495,10 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
               type="button"
               className="dictionary-text-button dictionary-recent-clear"
               onClick={() => {
-                setHistory([])
-                saveHistory([])
+                replaceResults(() => {
+                  setHistory([])
+                  saveHistory([])
+                })
               }}
             >
               Clear
@@ -470,15 +545,20 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
             ) : results.length > 0 ? (
               <div className="dictionary-result-list">
                 {visibleResults.map((result) => {
-                  const copyPrefix = `${result.id}-${result.character}`
+                  const resultIdentity = dictionaryItemRenderKey(result)
+                  const resultDomIdentity = encodeURIComponent(resultIdentity)
+                  const copyPrefix = resultIdentity
                   const visibleTags = (result.tags ?? []).filter((tag) => tag !== 'offline_dictionary')
                   const isCopyMenuOpen = openCopyMenu === copyPrefix
                   const kanjiCharacters = extractKanjiCharacters(result.character)
-                  const kanjiPickerId = `dictionary-kanji-picker-${result.id}`
+                  const kanjiPickerId = `dictionary-kanji-picker-${resultDomIdentity}`
                   const isKanjiPickerOpen = openKanjiPicker === copyPrefix
                   const pitchAccents = result.pitch_accents ?? result.dictionary_summary?.pitch_accents ?? []
+                  const noteKey = isValidCardNoteKey(result.note_key) ? result.note_key : null
+                  const noteSectionId = `dictionary-card-note-${resultDomIdentity}`
+                  const isNoteOpen = noteKey !== null && activeNoteKey === noteKey
                   return (
-                    <article key={copyPrefix} className="dictionary-result-card">
+                    <article key={resultIdentity} className="dictionary-result-card">
                       <div className="dictionary-result-main">
                         <div className="dictionary-result-headline">
                           <span className="dictionary-result-character" lang="ja">{result.character}</span>
@@ -501,6 +581,26 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                         ) : null}
                       </div>
                       <div className="dictionary-result-actions">
+                        {noteKey ? (
+                          <button
+                            type="button"
+                            className={`panel-action-button ${isNoteOpen ? 'is-active' : ''}`}
+                            ref={(node) => {
+                              if (node) {
+                                noteTriggerRefs.current.set(noteKey, node)
+                              } else {
+                                noteTriggerRefs.current.delete(noteKey)
+                              }
+                            }}
+                            onClick={() => toggleNote(noteKey)}
+                            aria-controls={noteSectionId}
+                            aria-expanded={isNoteOpen}
+                            aria-label={`Open personal note for ${result.character}`}
+                            title="Personal note"
+                          >
+                            <NotebookPen aria-hidden="true" strokeWidth={2.2} />
+                          </button>
+                        ) : null}
                         {kanjiCharacters.length === 1 ? (
                           <button
                             type="button"
@@ -622,6 +722,13 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
                           ) : null}
                         </div>
                       </div>
+                      {isNoteOpen ? (
+                        <CardNoteEditor
+                          character={result.character}
+                          controller={noteController}
+                          sectionId={noteSectionId}
+                        />
+                      ) : null}
                     </article>
                   )
                 })}

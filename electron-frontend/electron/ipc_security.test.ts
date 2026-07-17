@@ -16,6 +16,9 @@ const {
   validateDailyGamesDay,
   validateDailyGamesPracticeSeedPayload,
   validateDailyGamesCrosswordClues,
+  validateCardNoteKey,
+  validateCardNoteSavePayload,
+  validateCardNoteText,
   validateRecordGameResultPayload,
   validateSpeakPayload,
 } = require('./ipc_security.cjs')
@@ -38,6 +41,39 @@ describe('ipc_security', () => {
     for (const invalid of ['', '日本', 'ひ', 'A', '々', '日\uFE0F', 42, null]) {
       expect(() => validateKanjiDetailCharacter(invalid)).toThrow(/exactly one Unicode Han character|Invalid kanji detail character/i)
     }
+  })
+
+  it('validates opaque card note keys and Unicode-aware note text payloads', () => {
+    const builtinKey = `note:v1:builtin:${'a'.repeat(64)}`
+    const fallbackKey = `note:v1:offline_dictionary:fallback:${'b'.repeat(64)}`
+    const sourceKey = 'note:v1:offline_dictionary:jmdict:test-entry-1'
+
+    expect(validateCardNoteKey(builtinKey)).toBe(builtinKey)
+    expect(validateCardNoteKey(sourceKey)).toBe(sourceKey)
+    expect(validateCardNoteKey(fallbackKey)).toBe(fallbackKey)
+    expect(validateCardNoteText('first\r\nsecond\rthird 😀')).toBe('first\nsecond\nthird 😀')
+    expect(validateCardNoteText('😀'.repeat(2000))).toHaveLength(4000)
+    expect(validateCardNoteSavePayload({
+      noteKey: builtinKey,
+      noteText: '  mnemonic\r\nline two  ',
+    })).toEqual({
+      noteKey: builtinKey,
+      noteText: '  mnemonic\nline two  ',
+    })
+
+    for (const invalidKey of [
+      '',
+      `note:v1:builtin:${'A'.repeat(64)}`,
+      'note:v1:offline_dictionary:jmdict:test_entry',
+      `note:v1:offline_dictionary:jmdict:${'a'.repeat(129)}`,
+      `note:v1:offline_dictionary:fallback:${'B'.repeat(64)}`,
+      `note:v2:builtin:${'a'.repeat(64)}`,
+    ]) {
+      expect(() => validateCardNoteKey(invalidKey)).toThrow(/Invalid card note key/i)
+    }
+    expect(() => validateCardNoteText(' \r\n\t ')).toThrow(/must not be empty/i)
+    expect(() => validateCardNoteText('😀'.repeat(2001))).toThrow(/exceeds 2000/i)
+    expect(() => validateCardNoteSavePayload({ noteKey: builtinKey })).toThrow(/Invalid card note text/i)
   })
 
   it('normalizes and bounds speak payloads', () => {

@@ -1,0 +1,135 @@
+.card-note-section {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-main) 88%, transparent);
+}
+
+.card-note-heading,
+.card-note-status,
+.card-note-text,
+.card-note-count,
+.card-note-confirmation-title,
+.card-note-live {
+  margin: 0;
+}
+
+.card-note-heading {
+  color: var(--text-main);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.card-note-status,
+.card-note-count {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.card-note-view,
+.card-note-editor,
+.card-note-confirmation {
+  display: grid;
+  gap: 12px;
+}
+
+.card-note-text {
+  max-height: 18rem;
+  overflow: auto;
+  color: var(--text-main);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.card-note-label,
+.card-note-confirmation-title {
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.card-note-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.card-note-textarea:focus-visible,
+.card-note-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.card-note-count {
+  justify-self: end;
+}
+
+.card-note-count-invalid,
+.card-note-error {
+  color: var(--tone-rose);
+}
+
+.card-note-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.card-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card-note-button {
+  width: auto;
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+.card-note-button-danger {
+  color: var(--tone-rose);
+}
+
+.card-note-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 720px) {
+  .card-note-section {
+    padding: 12px;
+  }
+
+  .card-note-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .card-note-button {
+    width: 100%;
+  }
+}

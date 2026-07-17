@@ -23,6 +23,8 @@ const {
   validateLearningPathId,
   validateAnalyticsExportType,
   validateDictionarySearchQuery,
+  validateCardNoteKey,
+  validateCardNoteSavePayload,
   validateKanjiDetailCharacter,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,
@@ -154,6 +156,43 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to search dictionary: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:get-card-note', async (event, noteKey) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedKey = validateCardNoteKey(noteKey)
+    try {
+      return await options.runPythonBridgeWithArgs(['card-note-get', validatedKey])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to load card note: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:save-card-note', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateCardNoteSavePayload(payload)
+    try {
+      return await options.runPythonBridgeWithArgs([
+        'card-note-save',
+        validatedPayload.noteKey,
+        validatedPayload.noteText,
+      ])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to save card note: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:delete-card-note', async (event, noteKey) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedKey = validateCardNoteKey(noteKey)
+    try {
+      return await options.runPythonBridgeWithArgs(['card-note-delete', validatedKey])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to delete card note: ${detail}`)
     }
   })
 

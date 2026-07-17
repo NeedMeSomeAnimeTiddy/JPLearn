@@ -6,9 +6,10 @@ request JSON payloads over a subprocess boundary.
 
 from __future__ import annotations
 
-import json
+import hashlib
 import importlib
 import inspect
+import json
 import os
 import re
 import urllib.request
@@ -61,6 +62,16 @@ from data.study_pipeline import (  # noqa: E402
     track_assistant_event_interaction,
 )
 from data.database import save_state  # noqa: E402
+from data.card_notes_repository import (  # noqa: E402
+    CardNoteRecord,
+    CardNotesRepository,
+    validate_jmdict_source_id,
+    validate_note_key,
+)
+from data.text_normalization import (  # noqa: E402
+    normalize_japanese_text,
+    normalize_storage_text,
+)
 from domain.blocks import (  # noqa: E402
     blocks_for_slug,
     compute_block_mastery,
@@ -334,6 +345,64 @@ ALL_DECKS["sentence_examples"] = _sentence_examples_deck_factory
 
 def _normalize_dictionary_query(value: str) -> str:
     return unicodedata.normalize("NFKC", value).strip().lower()
+
+
+def _normalize_note_identity_part(value: str, *, japanese: bool) -> str:
+    """Return one canonical identity component with Unicode whitespace collapsed."""
+    if not isinstance(value, str):
+        raise ValueError("Note identity values must be strings")
+    normalized = (
+        normalize_japanese_text(value) if japanese else normalize_storage_text(value)
+    )
+    return " ".join(normalized.split()).casefold()
+
+
+def _note_identity_digest(source_kind: str, character: str, reading: str) -> str:
+    normalized_character = _normalize_note_identity_part(character, japanese=True)
+    if not normalized_character:
+        raise ValueError("Note identity written form must not be empty")
+    normalized_reading = _normalize_note_identity_part(
+        reading,
+        japanese=bool(_DICTIONARY_JAPANESE_RE.search(reading)),
+    )
+    canonical = json.dumps(
+        [1, source_kind, normalized_character, normalized_reading],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _build_builtin_note_key(character: str, reading: str) -> str:
+    """Build a deck-independent learning-item note identity."""
+    digest = _note_identity_digest("builtin", character, reading)
+    return validate_note_key(f"note:v1:builtin:{digest}")
+
+
+def _canonical_jmdict_source_id(source_id: str | None) -> str | None:
+    if source_id is None:
+        return None
+    if not isinstance(source_id, str):
+        raise ValueError("source_id must be a string or null")
+    normalized = normalize_storage_text(source_id).casefold()
+    if not normalized:
+        return None
+    return validate_jmdict_source_id(normalized)
+
+
+def _build_offline_note_key(
+    source_id: str | None,
+    character: str,
+    reading: str,
+) -> str:
+    """Build a source-backed key, falling back only for a missing source ID."""
+    canonical_source_id = _canonical_jmdict_source_id(source_id)
+    if canonical_source_id is not None:
+        return validate_note_key(
+            f"note:v1:offline_dictionary:jmdict:{canonical_source_id}"
+        )
+    digest = _note_identity_digest("offline_dictionary_fallback", character, reading)
+    return validate_note_key(f"note:v1:offline_dictionary:fallback:{digest}")
 
 
 def _dictionary_db_path() -> Path | None:
@@ -718,17 +787,25 @@ def _dictionary_results_from_rows(
     return [
         {
             "id": int(row[0]),
-            "character": row[1],
-            "romaji": row[2],
-            "meaning": row[3],
+            "source_id": _canonical_jmdict_source_id(
+                str(row[1]) if row[1] is not None else None
+            ),
+            "note_key": _build_offline_note_key(
+                str(row[1]) if row[1] is not None else None,
+                str(row[2]),
+                str(row[3]),
+            ),
+            "character": row[2],
+            "romaji": row[3],
+            "meaning": row[4],
             "tags": ["offline_dictionary"],
             "example_sentence": None,
             "pitch_accents": [
                 asdict(accent)
                 for accent in _lookup_pitch_accents(
                     conn,
-                    word=str(row[1]),
-                    reading=str(row[2]),
+                    word=str(row[2]),
+                    reading=str(row[3]),
                     available=pitch_accent_available,
                 )
             ],
@@ -751,8 +828,8 @@ def _select_dictionary_row(rows: list[tuple], character: str, meaning: str) -> t
     normalized_meaning = _normalize_dictionary_query(meaning)
 
     def _score(row: tuple) -> tuple[int, int, int]:
-        row_character = _normalize_dictionary_query(str(row[1]))
-        row_gloss = _normalize_dictionary_query(str(row[3]))
+        row_character = _normalize_dictionary_query(str(row[2]))
+        row_gloss = _normalize_dictionary_query(str(row[4]))
         exact_character = 1 if row_character == normalized_character else 0
         meaning_match = 1 if normalized_meaning and normalized_meaning in row_gloss else 0
         starts_with_character = 1 if row_character.startswith(normalized_character) else 0
@@ -760,7 +837,7 @@ def _select_dictionary_row(rows: list[tuple], character: str, meaning: str) -> t
 
     ranked_rows = sorted(
         rows,
-        key=lambda row: (_score(row), -len(str(row[1]))),
+        key=lambda row: (_score(row), -len(str(row[2]))),
         reverse=True,
     )
     return ranked_rows[0] if ranked_rows else None
@@ -786,20 +863,20 @@ def _lookup_card_dictionary_summary(
     if match is None:
         return None
 
-    glosses = _split_dictionary_glosses(str(match[3]))
+    glosses = _split_dictionary_glosses(str(match[4]))
     if not glosses:
         return None
 
     return DictionaryCardSummary(
-        character=str(match[1]),
-        reading=str(match[2]),
+        character=str(match[2]),
+        reading=str(match[3]),
         primary_gloss=glosses[0],
         glosses=glosses,
         source="offline_dictionary",
         pitch_accents=_lookup_pitch_accents(
             conn,
-            word=str(match[1]),
-            reading=str(match[2]),
+            word=str(match[2]),
+            reading=str(match[3]),
             available=pitch_accent_available,
         ),
     )
@@ -807,7 +884,7 @@ def _lookup_card_dictionary_summary(
 
 def _search_dictionary_japanese(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
     base_sql = (
-        "SELECT entry_id, japanese, reading, gloss "
+        "SELECT entry_id, source_id, japanese, reading, gloss "
         "FROM dictionary_entries "
         "WHERE (japanese = ? OR japanese LIKE ? OR reading = ? OR reading LIKE ?) AND is_common = ? "
         "ORDER BY LENGTH(japanese), entry_id "
@@ -874,7 +951,8 @@ def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) 
     candidate_limit = max(_DICTIONARY_RESULT_LIMIT * 4, 40)
 
     base_sql = (
-        "SELECT e.entry_id, e.japanese, e.reading, e.gloss, bm25(dictionary_fts) AS score "
+        "SELECT e.entry_id, e.source_id, e.japanese, e.reading, e.gloss, "
+        "bm25(dictionary_fts) AS score "
         "FROM dictionary_fts "
         "JOIN dictionary_entries e ON e.entry_id = dictionary_fts.rowid "
         "WHERE dictionary_fts MATCH ? AND e.is_common = ? "
@@ -900,7 +978,7 @@ def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) 
     semantic_embed = _resolve_dictionary_semantic_embedder()
     if semantic_embed and rows:
         semantic_candidates = rows[: min(len(rows), _DICTIONARY_SEMANTIC_RERANK_LIMIT)]
-        semantic_texts = [str(row[3]) for row in semantic_candidates]
+        semantic_texts = [str(row[4]) for row in semantic_candidates]
         try:
             semantic_scores = semantic_embed(normalized_query, semantic_texts)
             for row, score in zip(semantic_candidates, semantic_scores):
@@ -911,10 +989,10 @@ def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) 
             semantic_scores_by_id = {}
 
     def _rank_row(row: tuple) -> tuple:
-        japanese = str(row[1])
-        reading = str(row[2])
-        gloss_text = str(row[3])
-        bm25_score = float(row[4]) if len(row) > 4 and row[4] is not None else 0.0
+        japanese = str(row[2])
+        reading = str(row[3])
+        gloss_text = str(row[4])
+        bm25_score = float(row[5]) if len(row) > 5 and row[5] is not None else 0.0
 
         glosses = [_normalize_dictionary_query(part) for part in _split_dictionary_glosses(gloss_text)]
         exact_gloss_match = 1 if normalized_query in glosses else 0
@@ -951,7 +1029,7 @@ def _search_dictionary_english(conn: sqlite3.Connection, normalized_query: str) 
         )
 
     ranked_rows = sorted(rows, key=_rank_row, reverse=True)
-    return [tuple(row[:4]) for row in ranked_rows[:_DICTIONARY_RESULT_LIMIT]]
+    return [tuple(row[:5]) for row in ranked_rows[:_DICTIONARY_RESULT_LIMIT]]
 
 
 def build_dictionary_search_payload(query: str) -> dict[str, object]:
@@ -3070,8 +3148,59 @@ class KanjiDetailPayload:
 
 
 @dataclass(frozen=True)
+class CardNotePayload:
+    note_key: str
+    note_text: str
+    created_at_utc: str
+    updated_at_utc: str
+
+
+@dataclass(frozen=True)
+class CardNoteLookupPayload:
+    note: CardNotePayload | None
+
+
+@dataclass(frozen=True)
+class CardNoteDeletePayload:
+    note_key: str
+    deleted: bool
+
+
+def _card_note_payload(record: CardNoteRecord) -> CardNotePayload:
+    return CardNotePayload(
+        note_key=record.note_key,
+        note_text=record.note_text,
+        created_at_utc=record.created_at_utc,
+        updated_at_utc=record.updated_at_utc,
+    )
+
+
+def load_card_note(note_key: str) -> dict[str, object]:
+    """Load a personal note by its validated opaque identity."""
+    record = CardNotesRepository().load(note_key)
+    payload = CardNoteLookupPayload(
+        note=_card_note_payload(record) if record is not None else None
+    )
+    return asdict(payload)
+
+
+def save_card_note(note_key: str, note_text: str) -> dict[str, object]:
+    """Create or replace a personal note and return its normalized payload."""
+    record = CardNotesRepository().save(note_key, note_text)
+    return asdict(_card_note_payload(record))
+
+
+def delete_card_note(note_key: str) -> dict[str, object]:
+    """Delete a personal note and report whether a row existed."""
+    validated_key = validate_note_key(note_key)
+    deleted = CardNotesRepository().delete(validated_key)
+    return asdict(CardNoteDeletePayload(note_key=validated_key, deleted=deleted))
+
+
+@dataclass(frozen=True)
 class GameCard:
     id: int
+    note_key: str
     character: str
     romaji: str
     meaning: str
@@ -3087,6 +3216,7 @@ class GameCard:
 @dataclass(frozen=True)
 class OverviewCharacterCard:
     id: int
+    note_key: str
     character: str
     romaji: str
     meaning: str
@@ -3792,6 +3922,7 @@ def build_deck_cards(slug: str) -> dict[str, object]:
         cards = [
             GameCard(
                 id=card.id,
+                note_key=_build_builtin_note_key(card.character, card.romaji),
                 character=card.character,
                 romaji=card.romaji,
                 meaning=card.meaning,
@@ -3899,6 +4030,7 @@ def build_overview_character_mastery() -> dict[str, object]:
         kanji_cards.extend(
             OverviewCharacterCard(
                 id=card.id,
+                note_key=_build_builtin_note_key(card.character, card.romaji),
                 character=card.character,
                 romaji=card.romaji,
                 meaning=card.meaning,
@@ -5184,6 +5316,30 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         except ValueError as exc:
             return 2, {"error": str(exc)}
         return 0, payload
+
+    if command == "card-note-get":
+        if len(argv) != 2:
+            return 2, {"error": "Usage: card-note-get <note_key>"}
+        try:
+            return 0, load_card_note(argv[1])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "card-note-save":
+        if len(argv) != 3:
+            return 2, {"error": "Usage: card-note-save <note_key> <note_text>"}
+        try:
+            return 0, save_card_note(argv[1], argv[2])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "card-note-delete":
+        if len(argv) != 2:
+            return 2, {"error": "Usage: card-note-delete <note_key>"}
+        try:
+            return 0, delete_card_note(argv[1])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
 
     if command == "dictionary-search":
         if len(argv) < 2:

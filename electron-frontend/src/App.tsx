@@ -18,6 +18,7 @@ import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
 import { PassageHubView } from './views/PassageHubView'
 import { DAILY_GAMES_COPY } from './features/daily-games/constants'
+import { dedupeDictionaryCards } from './features/card-notes/utils'
 import { KanjiDetailPanel } from './features/kanji-detail'
 import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
@@ -1958,16 +1959,7 @@ function App() {
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
 
   const dictionaryCards = useMemo(() => {
-    const byId = new Map<number, ScriptDeck['cards'][number]>()
-    for (const card of deckCards) {
-      byId.set(card.id, card)
-    }
-    for (const card of overviewKanjiDeck) {
-      if (!byId.has(card.id)) {
-        byId.set(card.id, card as ScriptDeck['cards'][number])
-      }
-    }
-    return Array.from(byId.values())
+    return dedupeDictionaryCards([...deckCards, ...overviewKanjiDeck])
   }, [deckCards, overviewKanjiDeck])
 
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref

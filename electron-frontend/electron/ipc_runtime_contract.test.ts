@@ -187,6 +187,62 @@ describe('ipc runtime contract', () => {
     expect(options.runPythonBridgeWithArgsCached).not.toHaveBeenCalled()
   })
 
+  it('uses direct bridge calls for card note CRUD without clearing read caches', async () => {
+    const noteKey = `note:v1:builtin:${'a'.repeat(64)}`
+    const note = {
+      note_key: noteKey,
+      note_text: 'mnemonic\nline two',
+      created_at_utc: '2026-07-17T12:00:00+00:00',
+      updated_at_utc: '2026-07-17T12:00:00+00:00',
+    }
+    const { handlers, options } = createRegisteredHandlers({
+      runPythonBridgeWithArgs: vi.fn()
+        .mockResolvedValueOnce({ note })
+        .mockResolvedValueOnce(note)
+        .mockResolvedValueOnce({ note_key: noteKey, deleted: true }),
+      runPythonBridgeWithArgsCached: vi.fn().mockResolvedValue({ cached: true }),
+    })
+
+    await expect(handlers.get('study:get-card-note')(createValidEvent(), noteKey)).resolves.toEqual({ note })
+    await expect(handlers.get('study:save-card-note')(createValidEvent(), {
+      noteKey,
+      noteText: 'mnemonic\r\nline two',
+    })).resolves.toEqual(note)
+    await expect(handlers.get('study:delete-card-note')(createValidEvent(), noteKey)).resolves.toEqual({
+      note_key: noteKey,
+      deleted: true,
+    })
+
+    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(1, ['card-note-get', noteKey])
+    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(2, [
+      'card-note-save',
+      noteKey,
+      'mnemonic\nline two',
+    ])
+    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(3, ['card-note-delete', noteKey])
+    expect(options.runPythonBridgeWithArgsCached).not.toHaveBeenCalled()
+    expect(options.clearBridgeReadCaches).not.toHaveBeenCalled()
+  })
+
+  it('rejects invalid card note payloads before bridge dispatch and wraps bridge failures', async () => {
+    const noteKey = `note:v1:builtin:${'a'.repeat(64)}`
+    const { handlers, options } = createRegisteredHandlers({
+      runPythonBridgeWithArgs: vi.fn().mockRejectedValue(new Error('database locked')),
+    })
+
+    await expect(
+      handlers.get('study:save-card-note')(createValidEvent(), {
+        noteKey: 'not-a-note-key',
+        noteText: 'mnemonic',
+      }),
+    ).rejects.toThrow(/Invalid card note key/i)
+    expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
+
+    await expect(
+      handlers.get('study:get-card-note')(createValidEvent(), noteKey),
+    ).rejects.toThrow(/Failed to load card note: database locked/)
+  })
+
   it('maps cached crossword clue fields to the renderer contract and never calls the tutor on cache reads', async () => {
     const { handlers, options } = createRegisteredHandlers({
       runPythonBridgeWithArgs: vi.fn().mockResolvedValue({ clues: [{ pool_position: 2, clue: 'school gate' }] }),
