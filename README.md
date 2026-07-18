@@ -186,6 +186,13 @@ python scripts/debug_tools.py diagnostics
 powershell -ExecutionPolicy Bypass -File scripts/setup_llama_env.ps1
 ```
 
+## Acknowledgments
+
+A lot of the architecture and bodywork in JPLearn was done with ChatGPT — the three-layer
+structure, the frontend hook pattern, the SRS engine, and most of the feature wiring. It
+served as a capable architect, reviewer, and debugger across the full stack, and the project
+is better for it.
+
 ## Notes
 
 - The legacy Python GUI entrypoint is deprecated.
