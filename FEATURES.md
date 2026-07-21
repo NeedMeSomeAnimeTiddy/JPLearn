@@ -1,6 +1,6 @@
 # JPLearn Features
 
-Updated: 2026-07-07
+Updated: 2026-07-21
 
 JPLearn is a desktop Japanese learning app focused on daily retention, fast review loops, and measurable progress. It combines an Electron + React + TypeScript frontend with a Python backend running FSRS spaced repetition, game-like practice modes, and progress analytics.
 
@@ -17,9 +17,9 @@ JPLearn is a desktop Japanese learning app focused on daily retention, fast revi
 - **Sentence Examples** — Structured example sentences for grammar-in-context learning
 
 ### Deeper Content Tracks
-- **Conjugation Training** — Dedicated verb/adjective conjugation drills with staged block progression
+- **Conjugation Pattern Reference** — A flashcard deck (`conjugation_training`) covering verb/adjective conjugation pattern names and usage (e.g. "〜ています" / ongoing action), with staged block progression. This is recognition content, not an interactive conjugation drill — there's no mode where the learner produces a conjugated form of an arbitrary verb (te-form, potential, passive, etc.). It also isn't exposed anywhere in the frontend UI today (no `ScriptKey`/minigame wiring) — it exists only as backend deck + block-progress data. See [issue #22](https://github.com/NeedMeSomeAnimeTiddy/JPLearn/issues/22) for the still-open ask.
 - **Reading Practice** — Narrative story rounds that surface example sentences as reading passages with comprehension tracking
-- **Stroke-Order Writing** — Kanji stroke-order drill mode for N5 characters with writing sequence reinforcement
+- **Kanji Handwriting** — Canvas-based stroke-order writing minigame (mouse/touch/stylus) using `hanzi-writer`, validating stroke order/direction/completeness; currently scoped to N5 characters
 
 ---
 
@@ -36,6 +36,7 @@ JPLearn is a desktop Japanese learning app focused on daily retention, fast revi
 | Mode | Description |
 |------|-------------|
 | **Stroke Order** | Type kanji from meaning while reinforcing writing sequence |
+| **Handwriting** | Draw the kanji stroke-by-stroke on a canvas (mouse/touch/stylus); validates order, direction, and completeness |
 | **Typed Recall** | Type the meaning directly with near-miss tolerance (Levenshtein distance, transposition detection) |
 | **Speech Recall** | Say the meaning aloud — transcribed and graded offline via VOICEVOX/Whisper |
 
@@ -44,6 +45,8 @@ JPLearn is a desktop Japanese learning app focused on daily retention, fast revi
 |------|-------------|
 | **Sentence Assembly** | Arrange shuffled sentence chunks into natural Japanese order (Fugashi/MeCab tokenization) |
 | **Particle Cloze** | Fill the missing particle using sentence context and word-order cues |
+| **Context Cloze** | Fill the missing word (not a particle) using the surrounding example-sentence context |
+| **Kanji Compound Builder** | Pick the correct multi-kanji word, hinted by each component kanji's individual meaning |
 | **Vibe Check** | Read social register/tone and classify sentence as polite, casual, formal request, or context-dependent |
 | **Imposter** | Find the deliberate grammar error injected into a sentence (particle swaps, conjugation mutations) |
 
@@ -51,7 +54,7 @@ JPLearn is a desktop Japanese learning app focused on daily retention, fast revi
 | Mode | Description |
 |------|-------------|
 | **Recognition** | Hear a word and choose its meaning — character hidden until feedback |
-| **Listening: Prompt First** | See the character while audio plays, then choose the meaning |
+| **Dictation** | Listen and type the romaji for what you hear |
 
 ### Blended Mode
 | Mode | Description |
@@ -59,13 +62,13 @@ JPLearn is a desktop Japanese learning app focused on daily retention, fast revi
 | **Interleave Mix** | Cycles through reading, meaning, and character rounds in one session |
 
 ### Per-Script Minigame Availability
-Each script deck has a tailored set of available minigames:
+Each script deck has a tailored set of available minigames (`electron-frontend/src/constants.tsx` `SCRIPT_MINIGAMES`):
 
-- **Hiragana / Katakana**: romaji_sprint, meaning_match, character_match, sentence_assembly, particle_cloze, imposter, interleave_mix
-- **Kanji N5**: All minigames including stroke_order, typed_recall, speech_recall, and both listening modes
-- **Vocab N5**: meaning_match, character_match, typed_recall, speech_recall, particle_cloze, imposter, both listening modes, interleave_mix
-- **Grammar Patterns**: meaning_match, character_match, typed_recall, speech_recall, sentence_assembly, particle_cloze, vibe_check, imposter, both listening modes, interleave_mix
-- **Sentence Examples**: meaning_match, character_match, typed_recall, speech_recall, sentence_assembly, imposter, both listening modes, interleave_mix
+- **Hiragana / Katakana**: romaji_sprint, meaning_match, character_match, handwriting, sentence_assembly, particle_cloze, imposter, speech_recall, listening (recognition), dictation, context_cloze, interleave_mix
+- **Kanji N5**: romaji_sprint, meaning_match, character_match, stroke_order, handwriting, typed_recall, speech_recall, particle_cloze, imposter, context_cloze, listening (recognition), interleave_mix
+- **Vocab N5**: meaning_match, character_match, typed_recall, kanji_compound_builder, speech_recall, particle_cloze, imposter, context_cloze, listening (recognition), dictation, interleave_mix
+- **Grammar Patterns**: meaning_match, character_match, typed_recall, speech_recall, sentence_assembly, particle_cloze, vibe_check, imposter, context_cloze, listening (recognition), interleave_mix
+- **Sentence Examples**: meaning_match, character_match, typed_recall, speech_recall, sentence_assembly, imposter, context_cloze, listening (recognition), interleave_mix
 
 ---
 
@@ -105,9 +108,9 @@ Each script deck has a tailored set of available minigames:
 - Mastery rewards: milestone badges and content descriptors
 
 ### Feature Unlock System
-- Feature gating via progression node mastery (e.g., listening_mode requires hiragana mastery)
-- Feature dependency chains (e.g., tutor_chat requires conversation_mode)
+- Backend model for feature gating via progression node mastery (e.g., listening_mode requires hiragana mastery) and feature dependency chains (e.g., tutor_chat requires conversation_mode)
 - Currently cataloged features: themes, achievements, listening_mode, conversation_mode, kanji_mode, reading_mode, advanced_analytics, jlpt_dashboard, tutor_chat
+- **Not currently used to gate navigation or minigame access in the frontend** — nothing in the Electron UI reads `is_unlocked` except the Achievements panel (for the "badge" rewards below). Every feature is reachable from the UI regardless of unlock state today; this system only drives which feature-unlock badges show as earned.
 
 ### Milestone Achievement Badges
 - Review-count milestones (100 / 500 / 1,000 reviews completed) and best-streak milestones (3 / 7 / 14 / 30 / 100 days), independent of the feature-unlock badge system above
