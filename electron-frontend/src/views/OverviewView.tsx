@@ -26,7 +26,7 @@ import { ActivityCalendar } from 'react-activity-calendar'
 
 const CARD_MASTERY_MAX = 4
 
-export type OverviewSectionKey = 'studyActivity' | 'sessionHistory' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot'
+export type OverviewSectionKey = 'studyActivity' | 'sessionHistory' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot' | 'achievements'
 
 interface DeckSummary {
   slug: string
@@ -846,20 +846,32 @@ export function OverviewView({
 
       {/* ── Achievements ────────────────────────────────────────────── */}
       <section className="panel-glass overview-collapsible-panel achievements-section">
-        <div className="panel-head">
-          <h2 className="panel-title-with-icon"><BarChart3 aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Achievements</h2>
+        <button
+          type="button"
+          className="overview-panel-toggle"
+          onClick={() => onToggleSection('achievements')}
+          aria-expanded={overviewSectionExpanded.achievements}
+          aria-controls="overview-achievements-body"
+        >
+          <div className="panel-head">
+            <h2 className="panel-title-with-icon"><BarChart3 aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Achievements</h2>
+            <span className={`overview-panel-chevron ${overviewSectionExpanded.achievements ? 'is-open' : ''}`} aria-hidden="true">▾</span>
+          </div>
+        </button>
+
+        <div id="overview-achievements-body" className={`overview-panel-body ${overviewSectionExpanded.achievements ? 'is-open' : ''}`}>
+          {achievements.loading ? (
+            <p className="status-line">Loading achievements...</p>
+          ) : achievements.error ? (
+            <p className="status-line">{achievements.error}</p>
+          ) : (
+            <AchievementsPanel
+              badges={achievements.badges}
+              earnedCount={achievements.earnedCount}
+              totalCount={achievements.totalCount}
+            />
+          )}
         </div>
-        {achievements.loading ? (
-          <p className="status-line">Loading achievements...</p>
-        ) : achievements.error ? (
-          <p className="status-line">{achievements.error}</p>
-        ) : (
-          <AchievementsPanel
-            badges={achievements.badges}
-            earnedCount={achievements.earnedCount}
-            totalCount={achievements.totalCount}
-          />
-        )}
       </section>
 
       {window.jplearnDesktop.exportAnalyticsCSV ? (

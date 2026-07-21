@@ -1,4 +1,4 @@
-import { Headphones, MessageCircle, PenTool, BookOpen, Target, Bot } from 'lucide-react'
+import { Headphones, MessageCircle, PenTool, BookOpen, Target, Bot, Flame } from 'lucide-react'
 import { clsx } from 'clsx'
 import { BADGE_METADATA } from '../constants'
 import type { BadgeEntry } from '../types'
@@ -10,6 +10,7 @@ const ICON_MAP: Record<string, typeof Headphones> = {
   bookOpen: BookOpen,
   target: Target,
   bot: Bot,
+  flame: Flame,
 }
 
 interface BadgeCardProps {

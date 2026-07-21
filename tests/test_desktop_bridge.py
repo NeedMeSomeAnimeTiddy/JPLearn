@@ -369,6 +369,189 @@ def test_record_game_result_persists_confidence_score_when_provided(tmp_path: Pa
     assert row["confidence_score"] == 5
 
 
+def test_record_game_result_milestones_reached_empty_when_no_threshold_crossed(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.record_game_result(
+        slug="hiragana", card_id=0, is_correct=True, minigame="meaning_match",
+    )
+
+    assert payload["milestones_reached"] == []
+
+
+def test_record_game_result_reports_newly_crossed_review_milestone(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    for _ in range(99):
+        desktop_bridge.record_game_result(
+            slug="hiragana", card_id=0, is_correct=True, minigame="meaning_match",
+        )
+
+    payload = desktop_bridge.record_game_result(
+        slug="hiragana", card_id=0, is_correct=True, minigame="meaning_match",
+    )
+
+    assert payload["milestones_reached"] == ["reviews_100"]
+
+
+def test_build_achievement_milestones_status_reports_totals_and_earned_state(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    for _ in range(100):
+        desktop_bridge.record_game_result(
+            slug="hiragana", card_id=0, is_correct=True, minigame="meaning_match",
+        )
+
+    status = desktop_bridge.build_achievement_milestones_status()
+
+    assert status["total_reviews"] == 100
+    milestones_by_descriptor = {m["descriptor"]: m for m in status["milestones"]}
+    assert milestones_by_descriptor["reviews_100"]["earned"] is True
+    assert milestones_by_descriptor["reviews_500"]["earned"] is False
+
+
+def test_build_achievement_milestones_status_backfills_badge_from_existing_history(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    for _ in range(100):
+        desktop_bridge.record_game_result(
+            slug="hiragana", card_id=0, is_correct=True, minigame="meaning_match",
+        )
+
+    desktop_bridge.build_achievement_milestones_status()
+
+    assert "reviews_100" in database.load_badges()
+
+
+def test_record_game_result_reports_newly_crossed_streak_milestone(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    from domain.streaks import StreakState
+
+    call_count = {"n": 0}
+
+    def fake_load_streak_state() -> StreakState:
+        call_count["n"] += 1
+        # First call (pre-review) sees best=2; second call (post-review,
+        # after study_pipeline's real apply_study_day already ran) sees best=3.
+        return StreakState(best_streak_days=2 if call_count["n"] == 1 else 3)
+
+    monkeypatch.setattr(desktop_bridge, "load_streak_state", fake_load_streak_state)
+
+    payload = desktop_bridge.record_game_result(
+        slug="hiragana", card_id=0, is_correct=True, minigame="meaning_match",
+    )
+
+    assert payload["milestones_reached"] == ["streak_3"]
+
+
+def test_record_game_result_streak_milestones_reached_empty_when_streak_unchanged(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    from domain.streaks import StreakState
+
+    monkeypatch.setattr(
+        desktop_bridge, "load_streak_state", lambda: StreakState(best_streak_days=1),
+    )
+
+    payload = desktop_bridge.record_game_result(
+        slug="hiragana", card_id=0, is_correct=True, minigame="meaning_match",
+    )
+
+    assert payload["milestones_reached"] == []
+
+
+def test_sync_progression_state_masters_tutorial_and_hiragana_after_reviews(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.set_setting("onboarding_complete", "1")
+
+    hiragana_deck = ALL_DECKS["hiragana"]()
+    for card in hiragana_deck.cards:
+        desktop_bridge.record_game_result(
+            slug="hiragana", card_id=card.id, is_correct=True, minigame="meaning_match",
+        )
+
+    state, events = desktop_bridge.sync_progression_state()
+
+    assert state.node_states["tutorial"].status == "mastered"
+    assert state.node_states["hiragana"].status == "mastered"
+    assert state.node_states["katakana"].status == "unlocked"
+    event_node_ids = {e.node_id for e in events if e.event_type == "node_mastered"}
+    assert {"tutorial", "hiragana"} <= event_node_ids
+
+
+def test_sync_progression_state_leaves_hiragana_locked_without_onboarding(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+
+    hiragana_deck = ALL_DECKS["hiragana"]()
+    for card in hiragana_deck.cards:
+        desktop_bridge.record_game_result(
+            slug="hiragana", card_id=card.id, is_correct=True, minigame="meaning_match",
+        )
+
+    state, _events = desktop_bridge.sync_progression_state()
+
+    assert state.node_states["tutorial"].status != "mastered"
+    assert state.node_states["hiragana"].status == "locked"
+
+
+def test_build_achievement_milestones_status_reports_node_mastery_badges(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.set_setting("onboarding_complete", "1")
+
+    hiragana_deck = ALL_DECKS["hiragana"]()
+    for card in hiragana_deck.cards:
+        desktop_bridge.record_game_result(
+            slug="hiragana", card_id=card.id, is_correct=True, minigame="meaning_match",
+        )
+
+    status = desktop_bridge.build_achievement_milestones_status()
+
+    badges_by_descriptor = {b["descriptor"]: b for b in status["node_mastery_badges"]}
+    assert badges_by_descriptor["hiragana_mastered"]["earned"] is True
+    assert badges_by_descriptor["tutorial_complete"]["earned"] is True
+    assert badges_by_descriptor["katakana_mastered"]["earned"] is False
+    # Not-yet-synced nodes (need completion-tracking that doesn't exist yet)
+    # are reported as unearned, never dropped from the list.
+    assert badges_by_descriptor["jlpt_n5_passed"]["earned"] is False
+    assert "hiragana_mastered" in database.load_badges()
+
+
+def test_build_progression_status_reflects_synced_node_state(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.set_setting("onboarding_complete", "1")
+
+    hiragana_deck = ALL_DECKS["hiragana"]()
+    for card in hiragana_deck.cards:
+        desktop_bridge.record_game_result(
+            slug="hiragana", card_id=card.id, is_correct=True, minigame="meaning_match",
+        )
+
+    status = desktop_bridge.build_progression_status()
+
+    nodes_by_id = {n["node_id"]: n for n in status["nodes"]}
+    assert nodes_by_id["hiragana"]["status"] == "mastered"
+    assert nodes_by_id["katakana"]["status"] == "unlocked"
+
+
 def test_start_session_goal_and_load_summary(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

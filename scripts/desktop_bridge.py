@@ -96,15 +96,26 @@ from domain.decks import (  # noqa: E402
     VOCAB_N4_EXTERNAL_DATA,
     VOCAB_N5_EXTERNAL_DATA,
 )
-from domain.progression import NodeProgressionState, ProgressionState  # noqa: E402
+from domain.progression import NodeProgressionState, ProgressionEvent, ProgressionState  # noqa: E402
 from domain.progression_curriculum import JPLEARN_GRAPH  # noqa: E402
 from domain.progression_service import (  # noqa: E402
     build_initial_state,
     reachable_nodes,
+    record_mastery,
 )
 from domain.feature_catalog import JPLEARN_FEATURES  # noqa: E402
 from domain.feature_service import evaluate_features  # noqa: E402
 from domain.features import FeatureState  # noqa: E402
+from domain.milestones import (  # noqa: E402
+    REVIEW_COUNT_MILESTONES,
+    STREAK_MILESTONES,
+    earned_review_milestones,
+    earned_streak_milestones,
+    milestone_descriptor,
+    newly_crossed_review_milestones,
+    newly_crossed_streak_milestones,
+    streak_milestone_descriptor,
+)
 from domain.xp import DEFAULT_CURVE, XP_CORRECT_ANSWER, UserProgress, XPEvent  # noqa: E402
 from domain.daily_goal import DailyGoal, default_card_target, PRESET_CARD_GOALS  # noqa: E402
 from domain.level_service import (  # noqa: E402
@@ -124,6 +135,8 @@ from domain.tutor_service import (  # noqa: E402
     generate_reactions,
 )
 from data.database import (  # noqa: E402
+    count_total_reviews,
+    load_badges,
     load_daily_counts,
     load_feature_unlocks,
     load_tutor_seen_keys,
@@ -133,6 +146,7 @@ from data.database import (  # noqa: E402
     save_feature_unlock,
     save_tutor_seen_key,
     save_user_xp,
+    upsert_progression_node,
 )
 from data.jlpt_repository import (  # noqa: E402
     load_card_accuracy_map,
@@ -4371,6 +4385,77 @@ def set_learning_path_handler(path_id: str) -> dict[str, object]:
 
 
 # ---------------------------------------------------------------------------
+# Progression sync
+# ---------------------------------------------------------------------------
+#
+# Only a subset of the progression graph is wired to live mastery data below.
+# The remaining nodes (scripted_conv, listening, kanji_n5, free_conv, reading,
+# jlpt_n5..jlpt_n1) would need completion-tracking that doesn't exist yet in
+# the Python backend (scenario/tutor-chat/reading-passage completion isn't
+# persisted here). Those nodes are simply left unsynced — same "locked"
+# status as before this module existed — rather than guessed at.
+
+_PROGRESSION_SYNC_ORDER: tuple[str, ...] = (
+    "tutorial", "hiragana", "katakana", "vocabulary_n5", "grammar_n5",
+)
+
+_PROGRESSION_SYNC_DECK_SLUGS: dict[str, str] = {
+    "hiragana": "hiragana",
+    "katakana": "katakana",
+    "vocabulary_n5": "vocab_n5",
+    "grammar_n5": "grammar_patterns",
+}
+
+
+def _compute_node_mastery_counts(node_id: str) -> tuple[int, int]:
+    """Return (mastered_count, total_count) for one synced progression node.
+
+    A card counts as mastered once it has been answered correctly at least
+    once (repetitions > 0) — the same definition already used for block
+    mastery in build_block_progress().
+    """
+    if node_id == "tutorial":
+        return (1, 1) if get_setting("onboarding_complete") == "1" else (0, 1)
+
+    slug = _PROGRESSION_SYNC_DECK_SLUGS[node_id]
+    deck = ALL_DECKS[slug]()
+    card_ids = [card.id for card in deck.cards]
+    states = load_review_states(deck.name, card_ids)
+    mastered = sum(1 for cid in card_ids if getattr(states.get(cid), "repetitions", 0) > 0)
+    return mastered, len(card_ids)
+
+
+def sync_progression_state() -> tuple[ProgressionState, tuple[ProgressionEvent, ...]]:
+    """Recompute mastery for the synced nodes and persist any transitions.
+
+    Follows the same recompute-on-read convention as build_feature_unlock_status:
+    reload stored state, re-evaluate against current data, persist any newly
+    reached transitions, and return the resulting state plus emitted events.
+    """
+    init_study_db()
+    state = _load_progression_state()
+    today = date.today()
+    all_events: list[ProgressionEvent] = []
+    for node_id in _PROGRESSION_SYNC_ORDER:
+        mastered_count, total_count = _compute_node_mastery_counts(node_id)
+        state, events = record_mastery(JPLEARN_GRAPH, state, node_id, mastered_count, total_count, today)
+        all_events.extend(events)
+
+    for node_id in _PROGRESSION_SYNC_ORDER:
+        ns = state.node_states[node_id]
+        upsert_progression_node(
+            node_id=ns.node_id,
+            status=ns.status,
+            mastered_item_count=ns.mastered_item_count,
+            total_item_count=ns.total_item_count,
+            first_activated_at=ns.first_activated_date.isoformat() if ns.first_activated_date else None,
+            mastered_at=ns.mastered_date.isoformat() if ns.mastered_date else None,
+        )
+
+    return state, tuple(all_events)
+
+
+# ---------------------------------------------------------------------------
 # New bridge commands
 # ---------------------------------------------------------------------------
 
@@ -4378,7 +4463,7 @@ def set_learning_path_handler(path_id: str) -> dict[str, object]:
 def build_progression_status() -> dict[str, object]:
     """Return the learner's current progression state for all nodes."""
     init_study_db()
-    prog_state = _load_progression_state()
+    prog_state, _events = sync_progression_state()
     reachable = reachable_nodes(JPLEARN_GRAPH, prog_state)
     result = []
     for node_id, node in JPLEARN_GRAPH.nodes.items():
@@ -4435,6 +4520,68 @@ def build_feature_unlock_status() -> dict[str, object]:
             )
         )
     return {"features": result}
+
+
+def build_achievement_milestones_status() -> dict[str, object]:
+    """Return review-count, streak, and node-mastery achievement badges.
+
+    Backfills any already-earned badge (review/streak thresholds already
+    crossed, progression nodes already mastered) so this is safe to call
+    fresh on every load, matching build_feature_unlock_status's convention.
+    """
+    init_study_db()
+    total_reviews = count_total_reviews()
+    best_streak_days = load_streak_state().best_streak_days
+    now = _NOW_UTC()
+
+    for descriptor in earned_review_milestones(total_reviews):
+        save_badge(descriptor, now)
+    for descriptor in earned_streak_milestones(best_streak_days):
+        save_badge(descriptor, now)
+
+    prog_state, _events = sync_progression_state()
+    for node_id in _PROGRESSION_SYNC_ORDER:
+        ns = prog_state.node_states.get(node_id)
+        if ns is None or ns.status != "mastered":
+            continue
+        for reward in JPLEARN_GRAPH.nodes[node_id].rewards:
+            if reward.reward_type == "milestone":
+                save_badge(reward.descriptor, now)
+
+    earned_badges = load_badges()
+
+    node_mastery_badges = [
+        {
+            "descriptor": reward.descriptor,
+            "node_id": node_id,
+            "earned": reward.descriptor in earned_badges,
+        }
+        for node_id, node in JPLEARN_GRAPH.nodes.items()
+        for reward in node.rewards
+        if reward.reward_type == "milestone"
+    ]
+
+    return {
+        "total_reviews": total_reviews,
+        "best_streak_days": best_streak_days,
+        "milestones": [
+            {
+                "descriptor": milestone_descriptor(threshold),
+                "threshold": threshold,
+                "earned": milestone_descriptor(threshold) in earned_badges,
+            }
+            for threshold in REVIEW_COUNT_MILESTONES
+        ],
+        "streak_milestones": [
+            {
+                "descriptor": streak_milestone_descriptor(threshold),
+                "threshold": threshold,
+                "earned": streak_milestone_descriptor(threshold) in earned_badges,
+            }
+            for threshold in STREAK_MILESTONES
+        ],
+        "node_mastery_badges": node_mastery_badges,
+    }
 
 
 def build_xp_progress() -> dict[str, object]:
@@ -4743,6 +4890,8 @@ def record_game_result(
     if factory is None:
         raise ValueError(f"Unknown deck slug: {slug}")
 
+    previous_best_streak = load_streak_state().best_streak_days
+
     deck = factory()
     matching_card = next((card for card in deck.cards if card.id == card_id), None)
     if matching_card is None:
@@ -4798,6 +4947,18 @@ def record_game_result(
         xp_gained = XP_CORRECT_ANSWER if dedup not in progress.applied_dedup_keys else 0
         level_after = new_progress.level
 
+    # review_minigame_result() above logs exactly one review_events row, so
+    # the pre-review total is always one less than the post-review total.
+    total_reviews_after = count_total_reviews()
+    new_best_streak = load_streak_state().best_streak_days
+    milestones_reached = list(
+        newly_crossed_review_milestones(total_reviews_after - 1, total_reviews_after)
+    ) + list(
+        newly_crossed_streak_milestones(previous_best_streak, new_best_streak)
+    )
+    for descriptor in milestones_reached:
+        save_badge(descriptor, _NOW_UTC())
+
     return {
         "ok": True,
         "card_id": updated_state.card_id,
@@ -4812,6 +4973,7 @@ def record_game_result(
         "xp_gained": xp_gained,
         "level_before": level_before,
         "level_after": level_after,
+        "milestones_reached": milestones_reached,
     }
 
 
@@ -5671,6 +5833,9 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
 
     if command == "feature-unlocks":
         return 0, build_feature_unlock_status()
+
+    if command == "achievement-milestones":
+        return 0, build_achievement_milestones_status()
 
     if command == "passages:list":
         try:

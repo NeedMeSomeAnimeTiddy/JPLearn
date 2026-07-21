@@ -20,6 +20,7 @@ import { PassageHubView } from './views/PassageHubView'
 import { DAILY_GAMES_COPY } from './features/daily-games/constants'
 import { dedupeDictionaryCards } from './features/card-notes/utils'
 import { KanjiDetailPanel } from './features/kanji-detail'
+import { BADGE_METADATA } from './features/achievements'
 import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
@@ -32,7 +33,7 @@ import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode, blankOutWordInSentence } from './utils'
 import { KANJI_MEANINGS } from './lib/kanjiMeanings'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, Gamepad2, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Upload, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, Gamepad2, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Trophy, Upload, X } from 'lucide-react'
 import './App.css'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -274,7 +275,7 @@ interface StudyPlanSnapshot {
 
 type StatsByScript = Record<ScriptKey, ScriptStats>
 type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
-type OverviewSectionKey = 'studyActivity' | 'sessionHistory' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot'
+type OverviewSectionKey = 'studyActivity' | 'sessionHistory' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot' | 'achievements'
 
 const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples'] as const
 
@@ -1747,6 +1748,7 @@ function App() {
   const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
   const [xpToasts, setXpToasts] = useState<Array<{ id: number; xp: number; levelBefore?: number; levelAfter?: number }>>([])
+  const [milestoneToasts, setMilestoneToasts] = useState<Array<{ id: number; descriptor: string }>>([])
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
   const [warningModal, setWarningModal] = useState<{
@@ -1763,6 +1765,7 @@ function App() {
     mistakeBreakdown: false,
     minigamePerformance: false,
     deckSnapshot: false,
+    achievements: false,
   })
 
   interface SelectedChar {
@@ -4552,6 +4555,16 @@ function App() {
             }])
             setTimeout(() => setXpToasts((prev) => prev.filter((t) => t.id !== id)), 2500)
           }
+          if (result.milestones_reached && result.milestones_reached.length > 0) {
+            const newToasts = result.milestones_reached.map((descriptor, index) => ({
+              id: Date.now() + index,
+              descriptor,
+            }))
+            setMilestoneToasts((prev) => [...prev, ...newToasts])
+            for (const toast of newToasts) {
+              setTimeout(() => setMilestoneToasts((prev) => prev.filter((t) => t.id !== toast.id)), 3500)
+            }
+          }
           if (result.xp_gained !== undefined) {
             void (async () => {
               try {
@@ -6117,6 +6130,51 @@ function App() {
                 : <>+{t.xp} XP</>}
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {/* Milestone achievement toasts — centered, stacks vertically */}
+      {milestoneToasts.length > 0 ? (
+        <div
+          style={{
+            position: 'fixed',
+            top: '6.5rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            flexDirection: 'column-reverse',
+            gap: '4px',
+            alignItems: 'center',
+            pointerEvents: 'none',
+            zIndex: 300,
+          }}
+        >
+          {milestoneToasts.map((t) => {
+            const meta = BADGE_METADATA[t.descriptor]
+            if (!meta) return null
+            return (
+              <div
+                key={t.id}
+                className="milestone-toast-inner"
+                style={{
+                  background: 'color-mix(in oklab, var(--tone-amber) 18%, var(--panel-bg-alt))',
+                  border: '1px solid color-mix(in oklab, var(--tone-amber) 42%, transparent)',
+                  padding: '10px 28px',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.4,
+                  textAlign: 'center',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Trophy size={16} aria-hidden="true" />
+                <span>{meta.name} — {meta.description}</span>
+              </div>
+            )
+          })}
         </div>
       ) : null}
 

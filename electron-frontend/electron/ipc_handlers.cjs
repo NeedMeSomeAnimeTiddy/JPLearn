@@ -1106,6 +1106,16 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('achievements:get-milestones', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeRead('achievement-milestones')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch achievement milestones: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('xp:get-progress', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {

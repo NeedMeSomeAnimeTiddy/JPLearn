@@ -109,6 +109,13 @@ Each script deck has a tailored set of available minigames:
 - Feature dependency chains (e.g., tutor_chat requires conversation_mode)
 - Currently cataloged features: themes, achievements, listening_mode, conversation_mode, kanji_mode, reading_mode, advanced_analytics, jlpt_dashboard, tutor_chat
 
+### Milestone Achievement Badges
+- Review-count milestones (100 / 500 / 1,000 reviews completed) and best-streak milestones (3 / 7 / 14 / 30 / 100 days), independent of the feature-unlock badge system above
+- Node-mastery badges (tutorial, hiragana, katakana, scripted conversation, free conversation, reading, JLPT N5-N1) tied to the progression graph's "milestone"-type rewards; silent (no toast) since node mastery already has its own tutor-reaction celebration
+- Sticky once earned (persisted in `user_badges`); review-count and streak milestones fire a celebratory toast the moment a threshold is crossed
+- Shown alongside feature-unlock badges in the Achievements panel on the Overview page
+- Progression-node mastery (hiragana/katakana/vocabulary_n5/grammar_n5, gated behind tutorial completion) is synced from live review data on each read; deeper nodes (scripted conversation, listening, kanji, free conversation, reading, JLPT) aren't wired to live data yet
+
 ### Learning Path System
 - Guided "complete_beginner" path with readiness labels (completed, suggested_next, recommended, challenging, advanced)
 - Section-to-node mapping for soft readiness guidance

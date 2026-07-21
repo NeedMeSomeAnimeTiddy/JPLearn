@@ -114,6 +114,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   },
   getProgressionState: () => ipcRenderer.invoke('progression:get-state'),
   getFeatureState: () => ipcRenderer.invoke('features:get-state'),
+  getAchievementMilestones: () => ipcRenderer.invoke('achievements:get-milestones'),
   getPassages: () => ipcRenderer.invoke('passages:list'),
   getXpProgress: () => ipcRenderer.invoke('xp:get-progress'),
   getRecommendations: () => ipcRenderer.invoke('recommendations:get'),

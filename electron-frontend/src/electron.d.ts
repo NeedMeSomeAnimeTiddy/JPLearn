@@ -566,6 +566,7 @@ interface DesktopApi {
     xp_gained?: number
     level_before?: number
     level_after?: number
+    milestones_reached?: string[]
   }>
   lookupSentence?: (payload: { query: string }) => Promise<{
     jp: string | null
@@ -643,6 +644,7 @@ interface DesktopApi {
   moveWindow?: (dx: number, dy: number) => Promise<{ ok: boolean }>
   getProgressionState?: () => Promise<ProgressionStatePayload>
   getFeatureState?: () => Promise<FeatureStatePayload>
+  getAchievementMilestones?: () => Promise<AchievementMilestonesPayload>
   getPassages?: () => Promise<PassagesPayload>
   getXpProgress?: () => Promise<XPProgress>
   getRecommendations?: () => Promise<RecommendationsPayload>
@@ -978,6 +980,26 @@ type RecommendationItem = RecommendationPayload
 
 interface FeatureStatePayload {
   features: FeatureStatus[]
+}
+
+interface AchievementMilestoneStatus {
+  descriptor: string
+  threshold: number
+  earned: boolean
+}
+
+interface NodeMasteryBadgeStatus {
+  descriptor: string
+  node_id: string
+  earned: boolean
+}
+
+interface AchievementMilestonesPayload {
+  total_reviews: number
+  best_streak_days: number
+  milestones: AchievementMilestoneStatus[]
+  streak_milestones: AchievementMilestoneStatus[]
+  node_mastery_badges: NodeMasteryBadgeStatus[]
 }
 
 interface WordOfDayPayload {

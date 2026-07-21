@@ -43,6 +43,139 @@ export const BADGE_METADATA: Record<string, BadgeMeta> = {
     icon: 'bot',
     category: 'learning_mode',
   },
+  reviews_100: {
+    descriptor: 'reviews_100',
+    name: 'Century Club',
+    description: 'Completed 100 reviews.',
+    icon: 'target',
+    category: 'milestone',
+  },
+  reviews_500: {
+    descriptor: 'reviews_500',
+    name: 'Dedicated Learner',
+    description: 'Completed 500 reviews.',
+    icon: 'target',
+    category: 'milestone',
+  },
+  reviews_1000: {
+    descriptor: 'reviews_1000',
+    name: 'Review Master',
+    description: 'Completed 1,000 reviews.',
+    icon: 'target',
+    category: 'milestone',
+  },
+  streak_3: {
+    descriptor: 'streak_3',
+    name: 'Getting Started',
+    description: 'Reached a 3-day study streak.',
+    icon: 'flame',
+    category: 'milestone',
+  },
+  streak_7: {
+    descriptor: 'streak_7',
+    name: 'Week Warrior',
+    description: 'Reached a 7-day study streak.',
+    icon: 'flame',
+    category: 'milestone',
+  },
+  streak_14: {
+    descriptor: 'streak_14',
+    name: 'Two Weeks Strong',
+    description: 'Reached a 14-day study streak.',
+    icon: 'flame',
+    category: 'milestone',
+  },
+  streak_30: {
+    descriptor: 'streak_30',
+    name: 'Monthly Master',
+    description: 'Reached a 30-day study streak.',
+    icon: 'flame',
+    category: 'milestone',
+  },
+  streak_100: {
+    descriptor: 'streak_100',
+    name: 'Streak Legend',
+    description: 'Reached a 100-day study streak.',
+    icon: 'flame',
+    category: 'milestone',
+  },
+  tutorial_complete: {
+    descriptor: 'tutorial_complete',
+    name: 'First Steps',
+    description: 'Completed the tutorial.',
+    icon: 'bookOpen',
+    category: 'mastery',
+  },
+  hiragana_mastered: {
+    descriptor: 'hiragana_mastered',
+    name: 'Hiragana Master',
+    description: 'Mastered every Hiragana character.',
+    icon: 'penTool',
+    category: 'mastery',
+  },
+  katakana_mastered: {
+    descriptor: 'katakana_mastered',
+    name: 'Katakana Master',
+    description: 'Mastered every Katakana character.',
+    icon: 'penTool',
+    category: 'mastery',
+  },
+  scripted_conversation_complete: {
+    descriptor: 'scripted_conversation_complete',
+    name: 'Conversationalist',
+    description: 'Completed scripted conversation practice.',
+    icon: 'messageCircle',
+    category: 'mastery',
+  },
+  free_conversation_unlocked: {
+    descriptor: 'free_conversation_unlocked',
+    name: 'Free Talker',
+    description: 'Reached free conversation practice.',
+    icon: 'messageCircle',
+    category: 'mastery',
+  },
+  reading_unlocked: {
+    descriptor: 'reading_unlocked',
+    name: 'Avid Reader',
+    description: 'Reached reading practice.',
+    icon: 'bookOpen',
+    category: 'mastery',
+  },
+  jlpt_n5_passed: {
+    descriptor: 'jlpt_n5_passed',
+    name: 'JLPT N5 Ready',
+    description: 'Reached JLPT N5 readiness.',
+    icon: 'target',
+    category: 'mastery',
+  },
+  jlpt_n4_passed: {
+    descriptor: 'jlpt_n4_passed',
+    name: 'JLPT N4 Ready',
+    description: 'Reached JLPT N4 readiness.',
+    icon: 'target',
+    category: 'mastery',
+  },
+  jlpt_n3_passed: {
+    descriptor: 'jlpt_n3_passed',
+    name: 'JLPT N3 Ready',
+    description: 'Reached JLPT N3 readiness.',
+    icon: 'target',
+    category: 'mastery',
+  },
+  jlpt_n2_passed: {
+    descriptor: 'jlpt_n2_passed',
+    name: 'JLPT N2 Ready',
+    description: 'Reached JLPT N2 readiness.',
+    icon: 'target',
+    category: 'mastery',
+  },
+  jlpt_n1_passed: {
+    descriptor: 'jlpt_n1_passed',
+    name: 'JLPT N1 Ready',
+    description: 'Reached JLPT N1 readiness.',
+    icon: 'target',
+    category: 'mastery',
+  },
 }
 
 export const EARNED_BADGE_ORDER = [
@@ -52,4 +185,22 @@ export const EARNED_BADGE_ORDER = [
   'reading_mode_unlocked',
   'jlpt_dashboard_unlocked',
   'tutor_chat_unlocked',
+]
+
+export const MILESTONE_BADGE_ORDER = ['reviews_100', 'reviews_500', 'reviews_1000']
+
+export const STREAK_BADGE_ORDER = ['streak_3', 'streak_7', 'streak_14', 'streak_30', 'streak_100']
+
+export const NODE_MASTERY_BADGE_ORDER = [
+  'tutorial_complete',
+  'hiragana_mastered',
+  'katakana_mastered',
+  'scripted_conversation_complete',
+  'free_conversation_unlocked',
+  'reading_unlocked',
+  'jlpt_n5_passed',
+  'jlpt_n4_passed',
+  'jlpt_n3_passed',
+  'jlpt_n2_passed',
+  'jlpt_n1_passed',
 ]

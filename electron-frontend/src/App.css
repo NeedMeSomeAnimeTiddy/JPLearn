@@ -4347,12 +4347,8 @@ html[data-reduced-motion='true'] .home-hero-steam {
   transition: max-height 500ms ease, opacity 260ms ease, padding-bottom 260ms ease;
 }
 
-.achievements-section {
-  margin-top: 18px;
-}
-
 .achievements-panel {
-  padding: 4px 0 8px;
+  padding: 0;
 }
 
 .achievements-header {

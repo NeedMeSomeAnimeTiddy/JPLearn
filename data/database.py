@@ -1102,6 +1102,13 @@ def log_review(
         )
 
 
+def count_total_reviews() -> int:
+    """Return the all-time count of logged review events."""
+    with _connect() as conn:
+        row = conn.execute("SELECT COUNT(*) AS total FROM review_events").fetchone()
+    return int((row or {})["total"] or 0)
+
+
 def save_session_goal(
     session_id: str,
     target_items: int,
