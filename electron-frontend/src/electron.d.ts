@@ -586,6 +586,8 @@ interface DesktopApi {
   toggleMaximizeWindow: () => Promise<{ ok: boolean; isMaximized: boolean }>
   isWindowMaximized: () => Promise<{ isMaximized: boolean }>
   onWindowStateChanged?: (listener: (state: { isMaximized: boolean }) => void) => () => void
+  startWindowDrag?: () => Promise<{ ok: boolean; dragging: boolean }>
+  endWindowDrag?: () => Promise<{ ok: boolean }>
   closeWindow: () => Promise<{ ok: boolean }>
   minimizeToTray?: () => Promise<{ ok: boolean }>
   quitApp?: () => Promise<{ ok: boolean }>

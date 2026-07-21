@@ -95,6 +95,8 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
     ipcRenderer.on('window:state-changed', handler)
     return () => ipcRenderer.removeListener('window:state-changed', handler)
   },
+  startWindowDrag: () => ipcRenderer.invoke('window:drag-start'),
+  endWindowDrag: () => ipcRenderer.invoke('window:drag-end'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
   minimizeToTray: () => ipcRenderer.invoke('window:minimize-to-tray'),
   quitApp: () => ipcRenderer.invoke('window:quit-app'),

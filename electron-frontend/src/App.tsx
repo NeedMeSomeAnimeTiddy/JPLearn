@@ -43,6 +43,7 @@ import { useModels } from './features/models'
 import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, type TutorSettingsFields } from './features/tutor'
 import type { AssistantToast } from './features/tutor'
 import { useCursor, CursorFollower, CursorSettingsTab, type CursorSettings } from './features/cursor'
+import { useWindowDrag } from './features/window-drag'
 import { usePomodoro, BreakOverlay, PomodoroSettingsTab, type PomodoroSettingsFields } from './features/pomodoro'
 import { DevDashboard } from './features/devtools'
 import type { HandwritingOutcome } from './features/handwriting'
@@ -2109,6 +2110,7 @@ function App() {
     settings as unknown as { cursor: CursorSettings },
     setSettings as unknown as Dispatch<SetStateAction<{ cursor: CursorSettings }>>,
   )
+  const windowDrag = useWindowDrag()
 
   const pomodoro = usePomodoro(
     settings as PomodoroSettingsFields,
@@ -5383,7 +5385,7 @@ function App() {
   return (
     <main className="app-shell">
       <header className="window-titlebar" aria-label="Window controls">
-        <div className="window-titlebar-drag">
+        <div className="window-titlebar-drag" {...windowDrag}>
           <div className="window-titlebar-nav" role="group" aria-label="App navigation">
             <div className="titlebar-shortcut-wrap" ref={shortcutMenuRef}>
               <button

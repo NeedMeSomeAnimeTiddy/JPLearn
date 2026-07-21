@@ -1763,8 +1763,10 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   flex: 1;
   height: 100%;
   align-self: stretch;
-  -webkit-app-region: drag;
-  app-region: drag;
+  /* Intentionally not `-webkit-app-region: drag`: on Windows that makes the
+     strip non-client, which blocks every mouse event and freezes the custom
+     animated cursor. Dragging is handled by useWindowDrag + the main process. */
+  user-select: none;
 }
 
 .window-titlebar-wordmark {

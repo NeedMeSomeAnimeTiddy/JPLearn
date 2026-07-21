@@ -37,6 +37,9 @@ const {
 } = require('./ipc_security.cjs')
 const { getConfigValue, setConfigValue } = require('./config_store.cjs')
 
+const WINDOW_DRAG_INTERVAL_MS = 16
+const WINDOW_DRAG_MAX_DURATION_MS = 60_000
+
 function isTransientSetupNetworkError(error) {
   const detail = error instanceof Error ? error.message : String(error)
   return /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE/i.test(detail)
@@ -820,6 +823,87 @@ function registerIpcHandlers(options) {
     options.setIsQuitting()
     const { app } = require('electron')
     app.quit()
+    return { ok: true }
+  })
+
+  // ── Manual titlebar drag ──────────────────────────────────────────────
+  // The titlebar does not use `-webkit-app-region: drag`, because on Windows
+  // that makes the strip non-client (HTCAPTION): no mouse events reach the
+  // renderer and the OS paints its own arrow, freezing the custom cursor.
+  // Dragging is driven here instead, from the OS cursor position.
+  const activeWindowDrags = new Map()
+
+  const stopWindowDrag = (windowId) => {
+    const drag = activeWindowDrags.get(windowId)
+    if (!drag) return false
+    clearInterval(drag.timer)
+    drag.detach()
+    activeWindowDrags.delete(windowId)
+    return true
+  }
+
+  options.ipcMain.handle('window:drag-start', (event) => {
+    const win = assertTrustedIpcSender(event, trustedSenderOptions())
+    if (!win) return { ok: false, dragging: false }
+
+    stopWindowDrag(win.id)
+
+    if (win.isDestroyed() || win.isMinimized() || options.isWindowExpanded(win)) {
+      return { ok: true, dragging: false }
+    }
+
+    const screen = options.screen
+    if (!screen) return { ok: false, dragging: false }
+
+    // Snapshot both anchors once. The size below is re-asserted verbatim on
+    // every tick and never re-read: win.setPosition() internally re-reads
+    // GetSize(), so on a fractional-DPI display (e.g. 125%) each call rounds
+    // the size up ~1px and the window grows from the right/bottom for the
+    // whole drag. Measured: 400 setPosition calls grew 1280x820 to 1681x1243.
+    const originBounds = win.getBounds()
+    const originCursor = screen.getCursorScreenPoint()
+    const startedAt = Date.now()
+
+    const timer = setInterval(() => {
+      if (win.isDestroyed()) {
+        stopWindowDrag(win.id)
+        return
+      }
+      // Safety valve: a dropped pointerup must not leave the loop running.
+      if (Date.now() - startedAt > WINDOW_DRAG_MAX_DURATION_MS) {
+        stopWindowDrag(win.id)
+        return
+      }
+
+      const cursor = screen.getCursorScreenPoint()
+      win.setBounds({
+        x: originBounds.x + (cursor.x - originCursor.x),
+        y: originBounds.y + (cursor.y - originCursor.y),
+        width: originBounds.width,
+        height: originBounds.height,
+      })
+    }, WINDOW_DRAG_INTERVAL_MS)
+
+    // A renderer that reloads or navigates mid-drag never sends drag-end, so
+    // release the loop on those too rather than waiting out the safety valve.
+    const abort = () => stopWindowDrag(win.id)
+    const contents = win.webContents
+    contents?.once?.('did-start-navigation', abort)
+    contents?.once?.('destroyed', abort)
+    const detach = () => {
+      contents?.removeListener?.('did-start-navigation', abort)
+      contents?.removeListener?.('destroyed', abort)
+    }
+
+    activeWindowDrags.set(win.id, { timer, detach })
+    return { ok: true, dragging: true }
+  })
+
+  options.ipcMain.handle('window:drag-end', (event) => {
+    const win = assertTrustedIpcSender(event, trustedSenderOptions())
+    if (!win) return { ok: false }
+
+    stopWindowDrag(win.id)
     return { ok: true }
   })
 

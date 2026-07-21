@@ -276,6 +276,166 @@ describe('ipc runtime contract', () => {
     expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
   })
 
+  describe('titlebar window drag', () => {
+    function createDragHarness(overrides = {}) {
+      const cursor = { x: 500, y: 300 }
+      const contentsListeners = new Map<string, () => void>()
+      const windowMock = {
+        ...createWindowMock(),
+        getBounds: vi.fn(() => ({ x: 100, y: 80, width: 1280, height: 822 })),
+        setPosition: vi.fn(),
+        webContents: {
+          once: (channel: string, listener: () => void) => contentsListeners.set(channel, listener),
+          removeListener: (channel: string) => contentsListeners.delete(channel),
+          emit: (channel: string) => contentsListeners.get(channel)?.(),
+        },
+      }
+      const { handlers, options } = createRegisteredHandlers({
+        getWindowFromSender: () => windowMock,
+        screen: { getCursorScreenPoint: () => ({ ...cursor }) },
+        ...overrides,
+      })
+      return { handlers, options, windowMock, cursor }
+    }
+
+    it('moves the window by the cursor delta while preserving the snapshot size', () => {
+      vi.useFakeTimers()
+      try {
+        const { handlers, windowMock, cursor } = createDragHarness()
+
+        expect(handlers.get('window:drag-start')(createValidEvent())).toEqual({
+          ok: true,
+          dragging: true,
+        })
+
+        cursor.x += 40
+        cursor.y -= 25
+        vi.advanceTimersByTime(16)
+
+        expect(windowMock.setBounds).toHaveBeenLastCalledWith({
+          x: 140,
+          y: 55,
+          width: 1280,
+          height: 822,
+        })
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('never re-reads window size during a drag, so fractional DPI cannot inflate it', () => {
+      vi.useFakeTimers()
+      try {
+        const { handlers, windowMock, cursor } = createDragHarness()
+        handlers.get('window:drag-start')(createValidEvent())
+
+        // Emulate the OS reporting a slightly larger window each tick, which is
+        // what fractional DPI readback does. A correct drag ignores it.
+        let inflated = 1280
+        windowMock.getBounds.mockImplementation(() => {
+          inflated += 1
+          return { x: 100, y: 80, width: inflated, height: 822 }
+        })
+
+        for (let i = 0; i < 200; i++) {
+          cursor.x += 1
+          vi.advanceTimersByTime(16)
+        }
+
+        for (const call of windowMock.setBounds.mock.calls) {
+          expect(call[0].width).toBe(1280)
+          expect(call[0].height).toBe(822)
+        }
+        // setPosition re-reads GetSize() internally and is the original bug.
+        expect(windowMock.setPosition).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stops moving the window once the drag ends', () => {
+      vi.useFakeTimers()
+      try {
+        const { handlers, windowMock, cursor } = createDragHarness()
+        handlers.get('window:drag-start')(createValidEvent())
+        vi.advanceTimersByTime(16)
+        const callsWhileDragging = windowMock.setBounds.mock.calls.length
+
+        expect(handlers.get('window:drag-end')(createValidEvent())).toEqual({ ok: true })
+
+        cursor.x += 300
+        vi.advanceTimersByTime(320)
+        expect(windowMock.setBounds.mock.calls.length).toBe(callsWhileDragging)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('refuses to drag an expanded window', () => {
+      vi.useFakeTimers()
+      try {
+        const { handlers, windowMock, cursor } = createDragHarness({
+          isWindowExpanded: vi.fn(() => true),
+        })
+
+        expect(handlers.get('window:drag-start')(createValidEvent())).toEqual({
+          ok: true,
+          dragging: false,
+        })
+
+        cursor.x += 120
+        vi.advanceTimersByTime(160)
+        expect(windowMock.setBounds).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('abandons a drag whose pointerup never arrived', () => {
+      vi.useFakeTimers()
+      try {
+        const { handlers, windowMock, cursor } = createDragHarness()
+        handlers.get('window:drag-start')(createValidEvent())
+
+        vi.advanceTimersByTime(60_000 + 32)
+        const callsAfterTimeout = windowMock.setBounds.mock.calls.length
+
+        cursor.x += 200
+        vi.advanceTimersByTime(320)
+        expect(windowMock.setBounds.mock.calls.length).toBe(callsAfterTimeout)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('abandons a drag when the renderer navigates away mid-drag', () => {
+      vi.useFakeTimers()
+      try {
+        const { handlers, windowMock, cursor } = createDragHarness()
+        handlers.get('window:drag-start')(createValidEvent())
+        vi.advanceTimersByTime(16)
+        const callsBeforeReload = windowMock.setBounds.mock.calls.length
+
+        windowMock.webContents.emit('did-start-navigation')
+
+        cursor.x += 250
+        vi.advanceTimersByTime(320)
+        expect(windowMock.setBounds.mock.calls.length).toBe(callsBeforeReload)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('rejects drag requests from untrusted senders', () => {
+      const { handlers, windowMock } = createDragHarness()
+
+      expect(
+        () => handlers.get('window:drag-start')(createValidEvent('https://evil.example')),
+      ).toThrow(/untrusted URL/i)
+      expect(windowMock.setBounds).not.toHaveBeenCalled()
+    })
+  })
+
   it('wraps bridge failures with handler-specific study summary context', async () => {
     const { handlers } = createRegisteredHandlers({
       runPythonBridge: vi.fn().mockRejectedValue(new Error('bridge exploded')),

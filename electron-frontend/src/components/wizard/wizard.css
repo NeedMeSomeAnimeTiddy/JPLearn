@@ -20,8 +20,9 @@
   flex-shrink: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
-  -webkit-app-region: drag;
-  app-region: drag;
+  /* See .window-titlebar-drag in App.css: a drag region would block mouse
+     events and freeze the custom cursor. Dragging comes from useWindowDrag. */
+  user-select: none;
   position: relative;
 }
 

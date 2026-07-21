@@ -1396,6 +1396,7 @@ function toggleWindowFullscreen(win) {
 
 registerIpcHandlers({
   ipcMain,
+  screen,
   isDev: process.env.ELECTRON_DEV === '1',
   getWindowFromSender: BrowserWindow.fromWebContents,
   runPythonBridge,

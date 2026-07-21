@@ -1,6 +1,7 @@
 import './wizard.css'
 import { StepDots } from './StepDots'
 import { Minus, Square, X } from 'lucide-react'
+import { useWindowDrag } from '../../features/window-drag'
 
 interface WizardShellProps {
   title: string
@@ -21,9 +22,11 @@ export function WizardShell({
   onMaximize,
   onClose,
 }: WizardShellProps) {
+  const windowDrag = useWindowDrag()
+
   return (
     <div className="wiz-shell" data-wizard={title.toLowerCase()}>
-      <div className="wiz-shell-dragbar">
+      <div className="wiz-shell-dragbar" {...windowDrag}>
         <span className="wiz-shell-title">{title}</span>
         <div className="window-controls" role="group" aria-label="Window actions">
           <button type="button" className="window-control-button"
