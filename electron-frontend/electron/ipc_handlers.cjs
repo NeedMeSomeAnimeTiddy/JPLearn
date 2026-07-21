@@ -25,6 +25,10 @@ const {
   validateDictionarySearchQuery,
   validateCardNoteKey,
   validateCardNoteSavePayload,
+  validateScenarioSessionId,
+  validateScenarioSessionSavePayload,
+  validateScenarioSrsCardSavePayload,
+  validateScenarioEvaluationRequest,
   validateKanjiDetailCharacter,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,
@@ -196,6 +200,126 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to delete card note: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('scenario:save-session', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateScenarioSessionSavePayload(payload)
+    const fs = require('node:fs')
+    const os = require('node:os')
+    const path = require('node:path')
+    const tempFile = path.join(
+      os.tmpdir(),
+      `jplearn-scenario-session-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+    )
+    try {
+      fs.writeFileSync(tempFile, JSON.stringify({
+        session_id: validatedPayload.sessionId,
+        scenario_id: validatedPayload.scenarioId,
+        scenario_version: validatedPayload.scenarioVersion,
+        learner_level: validatedPayload.learnerLevel,
+        started_at_utc: validatedPayload.startedAtUtc,
+        transcript: validatedPayload.transcript,
+        summary: validatedPayload.summary,
+      }))
+      return await options.runPythonBridgeWithArgs(['scenario-session-save', tempFile])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to save scenario session: ${detail}`)
+    } finally {
+      try {
+        fs.unlinkSync(tempFile)
+      } catch {
+        // Best-effort temp cleanup.
+      }
+    }
+  })
+
+  options.ipcMain.handle('scenario:list-sessions', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await options.runPythonBridgeWithArgs(['scenario-session-list'])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to list scenario sessions: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('scenario:get-session', async (event, sessionId) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedId = validateScenarioSessionId(sessionId)
+    try {
+      return await options.runPythonBridgeWithArgs(['scenario-session-get', validatedId])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch scenario session: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('scenario:delete-session', async (event, sessionId) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedId = validateScenarioSessionId(sessionId)
+    try {
+      return await options.runPythonBridgeWithArgs(['scenario-session-delete', validatedId])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to delete scenario session: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('scenario:clear-sessions', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await options.runPythonBridgeWithArgs(['scenario-sessions-clear'])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to clear scenario sessions: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('scenario:save-srs-card', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateScenarioSrsCardSavePayload(payload)
+    const fs = require('node:fs')
+    const os = require('node:os')
+    const path = require('node:path')
+    const tempFile = path.join(
+      os.tmpdir(),
+      `jplearn-scenario-srs-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+    )
+    try {
+      fs.writeFileSync(tempFile, JSON.stringify({
+        id: validatedPayload.id,
+        session_id: validatedPayload.sessionId,
+        scenario_id: validatedPayload.scenarioId,
+        front: validatedPayload.front,
+        back: validatedPayload.back,
+        reading: validatedPayload.reading,
+        notes: validatedPayload.notes,
+      }))
+      return await options.runPythonBridgeWithArgs(['scenario-srs-save', tempFile])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to save scenario SRS card: ${detail}`)
+    } finally {
+      try {
+        fs.unlinkSync(tempFile)
+      } catch {
+        // Best-effort temp cleanup.
+      }
+    }
+  })
+
+  options.ipcMain.handle('scenario:evaluate-response', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedRequest = validateScenarioEvaluationRequest(payload)
+    try {
+      return await options.localTutorRuntime.evaluateScenarioResponse(validatedRequest)
+    } catch {
+      // A failed judgement is never an error the learner has to deal with —
+      // the scenario falls back to its authored recovery line.
+      return { ok: false, text: '' }
     }
   })
 

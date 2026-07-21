@@ -1,6 +1,6 @@
 import type { TutorSettingsFields } from '../types'
 import type { Dispatch, SetStateAction } from 'react'
-import { AlertTriangle, MessageCircle } from 'lucide-react'
+import { AlertTriangle, Drama, MessageCircle } from 'lucide-react'
 import { ASSISTANT_TOAST_LIMIT_OPTIONS } from '../constants'
 
 interface TutorSettingsTabProps {
@@ -27,6 +27,22 @@ export function TutorSettingsTab({ settings, setSettings }: TutorSettingsTabProp
           <span className="settings-icon-entry-label">Chat with Tutor</span>
         </button>
 
+        <button
+          type="button"
+          className={`settings-icon-entry settings-theme-entry ${settings.scenarioAiEvaluationEnabled ? 'is-active' : ''}`}
+          onClick={() => setSettings((prev) => ({ ...prev, scenarioAiEvaluationEnabled: !prev.scenarioAiEvaluationEnabled }))}
+          aria-label={settings.scenarioAiEvaluationEnabled
+            ? 'Scenario AI evaluation enabled. Activate to disable.'
+            : 'Scenario AI evaluation disabled. Activate to enable.'}
+          aria-pressed={settings.scenarioAiEvaluationEnabled}
+          title={settings.scenarioAiEvaluationEnabled ? 'Scenario AI evaluation enabled' : 'Scenario AI evaluation disabled'}
+        >
+          <span className={`settings-mode-icon-button ${settings.scenarioAiEvaluationEnabled ? 'is-enabled' : ''}`} aria-hidden="true">
+            <Drama size={18} strokeWidth={2.25} aria-hidden="true" />
+          </span>
+          <span className="settings-icon-entry-label">Scenario AI evaluation</span>
+        </button>
+
         {ASSISTANT_TOAST_LIMIT_OPTIONS.map((option) => (
           <button
             key={option.value}
@@ -44,7 +60,11 @@ export function TutorSettingsTab({ settings, setSettings }: TutorSettingsTabProp
           </button>
         ))}
       </div>
-      <p className="settings-help">Turn Chat with Tutor off to unload the local model runtime. Set toasts to Off to disable popup notifications.</p>
+      <p className="settings-help">
+        Turn Chat with Tutor off to unload the local model runtime. Set toasts to Off to disable popup notifications.
+        Scenario AI evaluation only takes effect when a local model is installed — Scenario Practice always works
+        without one, using authored deterministic rules and recovery.
+      </p>
     </>
   )
 }

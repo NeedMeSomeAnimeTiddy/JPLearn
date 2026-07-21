@@ -1,3 +1,5 @@
+import type { LucideIcon } from 'lucide-react'
+
 export type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'interleave_mix'
 export type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns' | 'sentence_examples'
 
@@ -74,6 +76,15 @@ export interface TutorSettingsFields {
   assistantChatEnabled: boolean
   assistantChatAudioEnabled: boolean
   assistantChatOcrMinConfidence: number
+  /** Whether Scenario Practice may consult an installed local model for
+   * responses deterministic evaluation can't classify confidently. Has no
+   * effect when no model is installed — the scenario always falls back to
+   * authored recovery either way. */
+  scenarioAiEvaluationEnabled: boolean
+  /** Whether the Tutor chat and Scenario Practice inputs convert typed
+   * romaji to kana as-you-type. Off leaves the field as a plain textarea, so
+   * a real OS Japanese IME's own kanji conversion is never competed with. */
+  romajiConversionEnabled: boolean
 }
 
 export interface VoiceDeps {
@@ -90,4 +101,21 @@ export interface TutorDeps {
   activeScript: ScriptKey
   ocrInstalled: boolean
   onToastNavigate: (script: ScriptKey, minigame: MinigameKey, differentScript: boolean) => void
+}
+
+// --- Shared Tutor popup: menu + mode navigation ------------------------------
+
+/** Which activity the shared Tutor popup is showing. 'menu' lists the activities. */
+export type TutorPanelMode = 'menu' | 'chat' | 'scenarios' | 'ocr'
+
+export interface TutorMenuItem {
+  mode: Exclude<TutorPanelMode, 'menu'>
+  label: string
+  description: string
+  icon: LucideIcon
+}
+
+export interface TutorPanelHeaderCopy {
+  title: string
+  catalog: string
 }

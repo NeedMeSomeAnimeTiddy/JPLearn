@@ -67,9 +67,10 @@ MIGRATION_V15 = 15
 MIGRATION_V16 = 16
 MIGRATION_V17 = 17
 MIGRATION_V18 = 18
+MIGRATION_V19 = 19
 
 
-LATEST_SCHEMA_VERSION = 18
+LATEST_SCHEMA_VERSION = 19
 _SQLITE_IN_CHUNK_SIZE = 900
 
 StageDistribution: TypeAlias = dict[int, int]
@@ -711,6 +712,50 @@ def _migration_0018(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0019(conn: sqlite3.Connection) -> None:
+    """Add Scenario Conversation Tutor completed-session transcripts and SRS drafts."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS scenario_sessions (
+            id                 TEXT PRIMARY KEY
+                               CHECK (length(id) BETWEEN 1 AND 64),
+            scenario_id        TEXT NOT NULL
+                               CHECK (length(scenario_id) BETWEEN 1 AND 128),
+            scenario_version   INTEGER NOT NULL CHECK (scenario_version >= 1),
+            learner_level      TEXT NOT NULL
+                               CHECK (learner_level IN ('beginner', 'intermediate')),
+            status             TEXT NOT NULL CHECK (status = 'completed'),
+            started_at_utc     TEXT NOT NULL,
+            completed_at_utc   TEXT NOT NULL,
+            transcript_json    TEXT NOT NULL CHECK (length(transcript_json) BETWEEN 1 AND 200000),
+            summary_json       TEXT NOT NULL CHECK (length(summary_json) BETWEEN 1 AND 50000)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS scenario_srs_cards (
+            id             TEXT PRIMARY KEY
+                           CHECK (length(id) BETWEEN 1 AND 64),
+            session_id     TEXT NOT NULL
+                           CHECK (length(session_id) BETWEEN 1 AND 64),
+            scenario_id    TEXT NOT NULL CHECK (length(scenario_id) BETWEEN 1 AND 128),
+            front          TEXT NOT NULL CHECK (length(front) BETWEEN 1 AND 500),
+            back           TEXT NOT NULL CHECK (length(back) BETWEEN 1 AND 1000),
+            reading        TEXT NOT NULL CHECK (length(reading) <= 500),
+            notes          TEXT NOT NULL CHECK (length(notes) <= 1000),
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_scenario_srs_cards_session
+        ON scenario_srs_cards (session_id)
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -730,6 +775,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V16: _migration_0016,
     MIGRATION_V17: _migration_0017,
     MIGRATION_V18: _migration_0018,
+    MIGRATION_V19: _migration_0019,
 }
 
 
@@ -792,6 +838,8 @@ def reset_db() -> None:
         conn.execute("DELETE FROM daily_word_pool_words")
         conn.execute("DELETE FROM daily_word_pools")
         conn.execute("DELETE FROM daily_games_streak_state")
+        conn.execute("DELETE FROM scenario_srs_cards")
+        conn.execute("DELETE FROM scenario_sessions")
 
 
 # ---------------------------------------------------------------------------

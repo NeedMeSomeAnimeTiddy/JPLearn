@@ -21,6 +21,12 @@ const {
   validateCardNoteText,
   validateRecordGameResultPayload,
   validateSpeakPayload,
+  validateScenarioSessionId,
+  validateScenarioId,
+  validateScenarioLearnerLevel,
+  validateScenarioSessionSavePayload,
+  validateScenarioSrsCardSavePayload,
+  validateScenarioEvaluationRequest,
 } = require('./ipc_security.cjs')
 
 describe('ipc_security', () => {
@@ -74,6 +80,119 @@ describe('ipc_security', () => {
     expect(() => validateCardNoteText(' \r\n\t ')).toThrow(/must not be empty/i)
     expect(() => validateCardNoteText('😀'.repeat(2001))).toThrow(/exceeds 2000/i)
     expect(() => validateCardNoteSavePayload({ noteKey: builtinKey })).toThrow(/Invalid card note text/i)
+  })
+
+  it('validates scenario session ids, scenario ids, and learner levels', () => {
+    expect(validateScenarioSessionId('11111111-1111-1111-1111-111111111111')).toBe('11111111-1111-1111-1111-111111111111')
+    expect(validateScenarioId('cafe-order')).toBe('cafe-order')
+    expect(validateScenarioLearnerLevel('beginner')).toBe('beginner')
+    expect(validateScenarioLearnerLevel('intermediate')).toBe('intermediate')
+
+    for (const invalid of ['', 'has space', 'a'.repeat(65), 'under_score', null, 42]) {
+      expect(() => validateScenarioSessionId(invalid)).toThrow(/Invalid scenario session id/i)
+    }
+    for (const invalid of ['', 'Cafe-Order', 'cafe_order', 'a'.repeat(129), null]) {
+      expect(() => validateScenarioId(invalid)).toThrow(/Invalid scenario id/i)
+    }
+    for (const invalid of ['expert', '', null, 42]) {
+      expect(() => validateScenarioLearnerLevel(invalid)).toThrow(/Invalid scenario learner level/i)
+    }
+  })
+
+  it('validates scenario session save payloads including size caps', () => {
+    const basePayload = {
+      sessionId: '11111111-1111-1111-1111-111111111111',
+      scenarioId: 'cafe-order',
+      scenarioVersion: 1,
+      learnerLevel: 'beginner',
+      startedAtUtc: '2026-07-21T00:00:00.000Z',
+      transcript: [{ turnIndex: 0 }],
+      summary: { objectives: [] },
+    }
+
+    expect(validateScenarioSessionSavePayload(basePayload)).toEqual(basePayload)
+
+    expect(() => validateScenarioSessionSavePayload({ ...basePayload, scenarioVersion: 0 }))
+      .toThrow(/scenarioVersion must be a positive integer/i)
+    expect(() => validateScenarioSessionSavePayload({ ...basePayload, startedAtUtc: '' }))
+      .toThrow(/startedAtUtc must be a non-empty string/i)
+    expect(() => validateScenarioSessionSavePayload({ ...basePayload, transcript: 'not-an-array' }))
+      .toThrow(/transcript must be an array/i)
+    expect(() => validateScenarioSessionSavePayload({ ...basePayload, summary: null }))
+      .toThrow(/summary must be an object/i)
+    expect(() => validateScenarioSessionSavePayload({
+      ...basePayload,
+      transcript: [{ filler: 'x'.repeat(200001) }],
+    })).toThrow(/transcript exceeds/i)
+    expect(() => validateScenarioSessionSavePayload(null)).toThrow(/expected object/i)
+  })
+
+  it('validates scenario SRS card save payloads including size caps', () => {
+    const basePayload = {
+      id: 'srs-1',
+      sessionId: '11111111-1111-1111-1111-111111111111',
+      scenarioId: 'cafe-order',
+      front: 'コーヒー',
+      back: 'coffee',
+      reading: 'こーひー',
+      notes: '',
+    }
+
+    expect(validateScenarioSrsCardSavePayload(basePayload)).toEqual(basePayload)
+    expect(validateScenarioSrsCardSavePayload({
+      id: 'srs-2', sessionId: basePayload.sessionId, scenarioId: 'cafe-order', front: 'x', back: 'y',
+    })).toEqual({ id: 'srs-2', sessionId: basePayload.sessionId, scenarioId: 'cafe-order', front: 'x', back: 'y', reading: '', notes: '' })
+
+    expect(() => validateScenarioSrsCardSavePayload({ ...basePayload, front: '' }))
+      .toThrow(/front must be non-empty/i)
+    expect(() => validateScenarioSrsCardSavePayload({ ...basePayload, back: '' }))
+      .toThrow(/back must be non-empty/i)
+    expect(() => validateScenarioSrsCardSavePayload({ ...basePayload, front: 'x'.repeat(501) }))
+      .toThrow(/front must be non-empty and at most 500/i)
+    expect(() => validateScenarioSrsCardSavePayload({ ...basePayload, reading: 'x'.repeat(501) }))
+      .toThrow(/reading exceeds 500/i)
+    expect(() => validateScenarioSrsCardSavePayload(null)).toThrow(/expected object/i)
+  })
+
+  it('bounds the single-turn context sent for scenario AI evaluation', () => {
+    const baseRequest = {
+      scenarioTitle: 'Order at a Cafe',
+      npcLine: 'いらっしゃいませ',
+      objectiveDescription: 'Order a drink',
+      expectedIntents: [{ id: 'intent-order', description: 'Order a drink politely', examplePhrases: ['コーヒーをください'] }],
+      requiredSlotIds: ['drink'],
+      learnerResponse: 'ホットのコーヒーをひとつ',
+      learnerLevel: 'beginner',
+    }
+
+    expect(validateScenarioEvaluationRequest(baseRequest)).toEqual(baseRequest)
+    // Optional fields normalize rather than fail.
+    expect(validateScenarioEvaluationRequest({
+      ...baseRequest,
+      objectiveDescription: '',
+      requiredSlotIds: undefined,
+      expectedIntents: [{ id: 'intent-order', description: 'Order a drink politely' }],
+    })).toEqual({ ...baseRequest, objectiveDescription: '', requiredSlotIds: [], expectedIntents: [{ id: 'intent-order', description: 'Order a drink politely', examplePhrases: [] }] })
+
+    expect(() => validateScenarioEvaluationRequest(null)).toThrow(/expected object/i)
+    expect(() => validateScenarioEvaluationRequest({ ...baseRequest, expectedIntents: [] }))
+      .toThrow(/expectedIntents must hold/i)
+    expect(() => validateScenarioEvaluationRequest({
+      ...baseRequest,
+      expectedIntents: Array.from({ length: 9 }, (_, index) => ({ id: `intent-${index}`, description: 'x', examplePhrases: [] })),
+    })).toThrow(/expectedIntents must hold/i)
+    expect(() => validateScenarioEvaluationRequest({ ...baseRequest, learnerResponse: '' }))
+      .toThrow(/learnerResponse must not be empty/i)
+    expect(() => validateScenarioEvaluationRequest({ ...baseRequest, learnerResponse: 'x'.repeat(601) }))
+      .toThrow(/learnerResponse exceeds 600/i)
+    expect(() => validateScenarioEvaluationRequest({ ...baseRequest, learnerLevel: 'expert' }))
+      .toThrow(/Invalid scenario learner level/i)
+    expect(() => validateScenarioEvaluationRequest({ ...baseRequest, requiredSlotIds: ['drink size!'] }))
+      .toThrow(/required slot id at index 0/i)
+    expect(() => validateScenarioEvaluationRequest({
+      ...baseRequest,
+      expectedIntents: [{ id: 'intent-order', description: 'x', examplePhrases: ['a', 'b', 'c', 'd'] }],
+    })).toThrow(/too many example phrases/i)
   })
 
   it('normalizes and bounds speak payloads', () => {

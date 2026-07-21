@@ -20,6 +20,9 @@ try {
 
 const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
 const DEFAULT_LLAMACPP_TIMEOUT_MS = 90000
+// Scenario Practice cannot wait on a slow judgement: past this the turn falls
+// back to the authored recovery line, exactly as if no model were installed.
+const SCENARIO_EVALUATION_TIMEOUT_MS = 15000
 const DEFAULT_MAX_CONTEXT_CHARS = 1800
 const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 420
@@ -2059,6 +2062,84 @@ function createTutorChatRuntime(options = {}) {
         if (inferenceLease.controller.signal.aborted || inference?.provider === 'stub') {
           return { ok: false, text: '' }
         }
+        return { ok: true, text: String(inference?.text || ''), coldStart }
+      } catch {
+        return { ok: false, text: '' }
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout)
+        }
+        releaseInferenceLease(inferenceLease)
+      }
+    },
+
+    /**
+     * Judges one uncertain Scenario Practice response and returns the model's
+     * raw JSON text for the renderer to validate. Deliberately narrow: it never
+     * writes dialogue, names nodes, or decides progression — the scenario
+     * engine owns all of that. Any problem at all (no model, busy lease, cold
+     * start, abort, timeout, stub adapter) resolves to `{ ok: false }`, which
+     * the caller treats exactly like "no model installed".
+     */
+    async evaluateScenarioResponse(request) {
+      if (!request || typeof request !== 'object' || configuredProvider !== 'llama.cpp') {
+        return { ok: false, text: '' }
+      }
+
+      const inferenceLease = acquireInferenceLease()
+      if (!inferenceLease) {
+        return { ok: false, text: '' }
+      }
+
+      let timeout = null
+      try {
+        const coldStart = await ensureLoaded()
+        if (inferenceLease.controller.signal.aborted || activeProvider === 'stub-fallback') {
+          return { ok: false, text: '' }
+        }
+
+        const intents = Array.isArray(request.expectedIntents) ? request.expectedIntents : []
+        const prompt = [
+          'You judge one Japanese learner response against a fixed list of expected intents.',
+          'Return only a JSON object with exactly these keys: outcome, matchedIntentId, missingInfo, correction, explanation, confidence.',
+          'outcome must be one of "correct", "partial", "incorrect", "unclear".',
+          'matchedIntentId must be one of the listed intent ids, or null.',
+          'missingInfo must be an array holding only the listed required information ids.',
+          'confidence must be a number between 0 and 1.',
+          'Never write dialogue for the shopkeeper or continue the conversation.',
+          '',
+          `Scenario: ${String(request.scenarioTitle || '')}`,
+          `Learner level: ${String(request.learnerLevel || '')}`,
+          `What the other speaker just said: ${String(request.npcLine || '')}`,
+          `What the learner is meant to do: ${String(request.objectiveDescription || '')}`,
+          `Required information ids: ${JSON.stringify(request.requiredSlotIds || [])}`,
+          `Expected intents: ${JSON.stringify(intents)}`,
+          `Learner response: ${String(request.learnerResponse || '')}`,
+        ].join('\n')
+
+        timeout = setTimeout(() => inferenceLease.controller.abort(), SCENARIO_EVALUATION_TIMEOUT_MS)
+        const inference = await adapter.infer(prompt, {}, {
+          signal: inferenceLease.controller.signal,
+          maxContextChars: 3_000,
+          maxPromptChars: 3_000,
+          maxOutputTokens: 220,
+          disableThinking: true,
+          systemPromptOverride: 'You grade a single Japanese utterance and reply with one JSON object only. You never produce conversation.',
+          promptAdapter: {
+            id: 'scenario_evaluation',
+            systemNote: 'Return one JSON object only. Never invent intent ids.',
+            temperature: 0,
+            top_p: 0.8,
+            top_k: 20,
+            repeat_penalty: 1.05,
+            maxOutputTokens: 220,
+          },
+        })
+        if (inferenceLease.controller.signal.aborted || inference?.provider === 'stub') {
+          return { ok: false, text: '' }
+        }
+        lastUsedAtUtc = new Date().toISOString()
+        scheduleInactivityUnload()
         return { ok: true, text: String(inference?.text || ''), coldStart }
       } catch {
         return { ok: false, text: '' }

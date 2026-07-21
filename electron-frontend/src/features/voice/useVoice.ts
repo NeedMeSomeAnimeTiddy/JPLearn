@@ -59,7 +59,7 @@ export interface UseVoiceReturn {
   speechModelActionTier: SpeechTier | null
   refreshVoiceStatus: () => Promise<{ available: boolean; modelReady: boolean; downloading: boolean; lastError?: string } | null>
   playQuestionAudio: (text: string, speaker?: string) => Promise<void>
-  playVoiceRuntimeAudio: (text: string, runId: number) => Promise<boolean>
+  playVoiceRuntimeAudio: (text: string, runId: number, speedScale?: number) => Promise<boolean>
   cancelAssistantSpeech: () => void
   assistantSpeechRunIdRef: RefObject<number>
   speechDownloadingTier: SpeechTier | null
@@ -150,16 +150,21 @@ export function useVoice(
   const playVoiceRuntimeAudio = useCallback(async (
     text: string,
     runId: number,
+    /** Multiplies the learner's voice-speed setting — used by Scenario
+     * Practice to slow beginner NPC lines. Clamped to the range the
+     * speak bridge accepts. */
+    speedScale?: number,
   ): Promise<boolean> => {
     const speak = window.jplearnDesktop?.speakText
     if (!speak) {
       return false
     }
     try {
+      const scaled = voiceSpeedRef.current * (typeof speedScale === 'number' && speedScale > 0 ? speedScale : 1)
       const result = await speak({
         text,
         speaker: settings.voiceSpeaker,
-        speed: voiceSpeedRef.current,
+        speed: Math.min(2, Math.max(0.5, scaled)),
       })
       if (!result?.audioBase64 || assistantSpeechRunIdRef.current !== runId) {
         return false

@@ -297,7 +297,7 @@ def test_jplearn_db_v18_creates_card_notes_without_timestamp_index(
         }
 
     assert version_row is not None
-    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION == 18
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION
     assert "idx_card_notes_updated_at" not in index_names
 
 
@@ -331,7 +331,72 @@ def test_jplearn_db_upgrade_from_v17_preserves_existing_rows_and_adds_card_notes
 
     assert "note_key" in _column_names(db_path, "card_notes")
     assert version_row is not None
-    assert int(version_row[0]) == 18
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION
+    assert retained_row == ("preserve me",)
+
+
+def test_jplearn_db_v19_creates_scenario_tables(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "jplearn-scenario-fresh.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+
+    database.init_db()
+
+    session_columns = _column_names(db_path, "scenario_sessions")
+    assert session_columns == {
+        "id", "scenario_id", "scenario_version", "learner_level", "status",
+        "started_at_utc", "completed_at_utc", "transcript_json", "summary_json",
+    }
+    srs_columns = _column_names(db_path, "scenario_srs_cards")
+    assert srs_columns == {
+        "id", "session_id", "scenario_id", "front", "back", "reading", "notes", "created_at_utc",
+    }
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        version_row = conn.execute(
+            "SELECT version FROM schema_version WHERE id = 1"
+        ).fetchone()
+
+    assert version_row is not None
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION == 19
+
+
+def test_jplearn_db_upgrade_from_v18_preserves_existing_rows_and_adds_scenario_tables(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "jplearn-scenario-upgrade.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE schema_version (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                version INTEGER NOT NULL
+            );
+            INSERT INTO schema_version (id, version) VALUES (1, 18);
+            CREATE TABLE card_notes (
+                note_key TEXT PRIMARY KEY,
+                note_text TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL
+            );
+            INSERT INTO card_notes (note_key, note_text, created_at_utc, updated_at_utc)
+            VALUES ('note:v1:builtin:' || printf('%.64d', 0), 'preserve me', 'x', 'x');
+            """
+        )
+
+    database.init_db()
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        version_row = conn.execute(
+            "SELECT version FROM schema_version WHERE id = 1"
+        ).fetchone()
+        retained_row = conn.execute("SELECT note_text FROM card_notes").fetchone()
+
+    assert "transcript_json" in _column_names(db_path, "scenario_sessions")
+    assert version_row is not None
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION
     assert retained_row == ("preserve me",)
 
 

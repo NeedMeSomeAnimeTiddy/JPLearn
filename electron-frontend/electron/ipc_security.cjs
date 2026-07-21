@@ -287,6 +287,171 @@ function validateCardNoteSavePayload(payload) {
   }
 }
 
+const MAX_SCENARIO_SLUG_LENGTH = 128
+const MAX_SCENARIO_TRANSCRIPT_JSON_LENGTH = 200000
+const MAX_SCENARIO_SUMMARY_JSON_LENGTH = 50000
+const MAX_SCENARIO_SRS_FRONT_LENGTH = 500
+const MAX_SCENARIO_SRS_BACK_LENGTH = 1000
+const MAX_SCENARIO_SRS_READING_LENGTH = 500
+const MAX_SCENARIO_SRS_NOTES_LENGTH = 1000
+const SCENARIO_OPAQUE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
+const SCENARIO_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/
+const SCENARIO_LEARNER_LEVELS = new Set(['beginner', 'intermediate'])
+
+function validateScenarioOpaqueId(value, label) {
+  if (typeof value !== 'string' || !SCENARIO_OPAQUE_ID_PATTERN.test(value)) {
+    throw new Error(`Invalid ${label}: ${String(value)}`)
+  }
+  return value
+}
+
+function validateScenarioSessionId(value) {
+  return validateScenarioOpaqueId(value, 'scenario session id')
+}
+
+function validateScenarioId(value) {
+  if (typeof value !== 'string' || value.length > MAX_SCENARIO_SLUG_LENGTH || !SCENARIO_SLUG_PATTERN.test(value)) {
+    throw new Error(`Invalid scenario id: ${String(value)}`)
+  }
+  return value
+}
+
+function validateScenarioLearnerLevel(value) {
+  if (typeof value !== 'string' || !SCENARIO_LEARNER_LEVELS.has(value)) {
+    throw new Error(`Invalid scenario learner level: ${String(value)}`)
+  }
+  return value
+}
+
+function validateScenarioSessionSavePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid scenario session save payload: expected object')
+  }
+  const sessionId = validateScenarioSessionId(payload.sessionId)
+  const scenarioId = validateScenarioId(payload.scenarioId)
+  const learnerLevel = validateScenarioLearnerLevel(payload.learnerLevel)
+  if (!Number.isInteger(payload.scenarioVersion) || payload.scenarioVersion < 1) {
+    throw new Error('Invalid scenario session save payload: scenarioVersion must be a positive integer')
+  }
+  if (typeof payload.startedAtUtc !== 'string' || !payload.startedAtUtc.trim()) {
+    throw new Error('Invalid scenario session save payload: startedAtUtc must be a non-empty string')
+  }
+  if (!Array.isArray(payload.transcript)) {
+    throw new Error('Invalid scenario session save payload: transcript must be an array')
+  }
+  if (!payload.summary || typeof payload.summary !== 'object') {
+    throw new Error('Invalid scenario session save payload: summary must be an object')
+  }
+  const transcriptJson = JSON.stringify(payload.transcript)
+  const summaryJson = JSON.stringify(payload.summary)
+  if (transcriptJson.length > MAX_SCENARIO_TRANSCRIPT_JSON_LENGTH) {
+    throw new Error(`Invalid scenario session save payload: transcript exceeds ${MAX_SCENARIO_TRANSCRIPT_JSON_LENGTH} characters`)
+  }
+  if (summaryJson.length > MAX_SCENARIO_SUMMARY_JSON_LENGTH) {
+    throw new Error(`Invalid scenario session save payload: summary exceeds ${MAX_SCENARIO_SUMMARY_JSON_LENGTH} characters`)
+  }
+  return {
+    sessionId,
+    scenarioId,
+    scenarioVersion: payload.scenarioVersion,
+    learnerLevel,
+    startedAtUtc: payload.startedAtUtc,
+    transcript: payload.transcript,
+    summary: payload.summary,
+  }
+}
+
+function validateScenarioSrsCardSavePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid scenario SRS card save payload: expected object')
+  }
+  const id = validateScenarioOpaqueId(payload.id, 'scenario SRS card id')
+  const sessionId = validateScenarioSessionId(payload.sessionId)
+  const scenarioId = validateScenarioId(payload.scenarioId)
+  if (typeof payload.front !== 'string' || !payload.front.trim() || Array.from(payload.front).length > MAX_SCENARIO_SRS_FRONT_LENGTH) {
+    throw new Error(`Invalid scenario SRS card save payload: front must be non-empty and at most ${MAX_SCENARIO_SRS_FRONT_LENGTH} characters`)
+  }
+  if (typeof payload.back !== 'string' || !payload.back.trim() || Array.from(payload.back).length > MAX_SCENARIO_SRS_BACK_LENGTH) {
+    throw new Error(`Invalid scenario SRS card save payload: back must be non-empty and at most ${MAX_SCENARIO_SRS_BACK_LENGTH} characters`)
+  }
+  const reading = typeof payload.reading === 'string' ? payload.reading : ''
+  const notes = typeof payload.notes === 'string' ? payload.notes : ''
+  if (Array.from(reading).length > MAX_SCENARIO_SRS_READING_LENGTH) {
+    throw new Error(`Invalid scenario SRS card save payload: reading exceeds ${MAX_SCENARIO_SRS_READING_LENGTH} characters`)
+  }
+  if (Array.from(notes).length > MAX_SCENARIO_SRS_NOTES_LENGTH) {
+    throw new Error(`Invalid scenario SRS card save payload: notes exceeds ${MAX_SCENARIO_SRS_NOTES_LENGTH} characters`)
+  }
+  return { id, sessionId, scenarioId, front: payload.front, back: payload.back, reading, notes }
+}
+
+const MAX_SCENARIO_AI_TEXT_LENGTH = 600
+const MAX_SCENARIO_AI_INTENTS = 8
+const MAX_SCENARIO_AI_EXAMPLES = 3
+const MAX_SCENARIO_AI_SLOT_IDS = 8
+
+function validateScenarioAiText(value, label, { allowEmpty = false } = {}) {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid scenario evaluation request: ${label} must be a string`)
+  }
+  if (!allowEmpty && !value.trim()) {
+    throw new Error(`Invalid scenario evaluation request: ${label} must not be empty`)
+  }
+  if (Array.from(value).length > MAX_SCENARIO_AI_TEXT_LENGTH) {
+    throw new Error(`Invalid scenario evaluation request: ${label} exceeds ${MAX_SCENARIO_AI_TEXT_LENGTH} characters`)
+  }
+  return value
+}
+
+/**
+ * Bounds the single-turn context sent to a local model for an uncertain
+ * learner response. Nothing about the conversation graph crosses this
+ * boundary: only the current NPC line, the authored intent descriptions, the
+ * required-slot labels, and what the learner just said.
+ */
+function validateScenarioEvaluationRequest(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid scenario evaluation request: expected object')
+  }
+  if (!Array.isArray(payload.expectedIntents) || payload.expectedIntents.length === 0
+    || payload.expectedIntents.length > MAX_SCENARIO_AI_INTENTS) {
+    throw new Error(`Invalid scenario evaluation request: expectedIntents must hold 1-${MAX_SCENARIO_AI_INTENTS} entries`)
+  }
+  const expectedIntents = payload.expectedIntents.map((intent, index) => {
+    if (!intent || typeof intent !== 'object') {
+      throw new Error(`Invalid scenario evaluation request: intent at index ${index} must be an object`)
+    }
+    const examplePhrases = Array.isArray(intent.examplePhrases) ? intent.examplePhrases : []
+    if (examplePhrases.length > MAX_SCENARIO_AI_EXAMPLES) {
+      throw new Error(`Invalid scenario evaluation request: intent at index ${index} has too many example phrases`)
+    }
+    return {
+      id: validateScenarioOpaqueId(intent.id, `scenario intent id at index ${index}`),
+      description: validateScenarioAiText(intent.description, `intent description at index ${index}`),
+      examplePhrases: examplePhrases.map((phrase, phraseIndex) => (
+        validateScenarioAiText(phrase, `intent ${index} example phrase ${phraseIndex}`)
+      )),
+    }
+  })
+
+  const requiredSlotIds = Array.isArray(payload.requiredSlotIds) ? payload.requiredSlotIds : []
+  if (requiredSlotIds.length > MAX_SCENARIO_AI_SLOT_IDS) {
+    throw new Error(`Invalid scenario evaluation request: at most ${MAX_SCENARIO_AI_SLOT_IDS} required slot ids`)
+  }
+
+  return {
+    scenarioTitle: validateScenarioAiText(payload.scenarioTitle, 'scenarioTitle'),
+    npcLine: validateScenarioAiText(payload.npcLine, 'npcLine'),
+    objectiveDescription: validateScenarioAiText(payload.objectiveDescription, 'objectiveDescription', { allowEmpty: true }),
+    expectedIntents,
+    requiredSlotIds: requiredSlotIds.map((slotId, index) => (
+      validateScenarioOpaqueId(slotId, `required slot id at index ${index}`)
+    )),
+    learnerResponse: validateScenarioAiText(payload.learnerResponse, 'learnerResponse'),
+    learnerLevel: validateScenarioLearnerLevel(payload.learnerLevel),
+  }
+}
+
 const HAN_IDEOGRAPH_PATTERN = /^\p{Unified_Ideograph}$/u
 
 function validateKanjiDetailCharacter(value) {
@@ -791,6 +956,13 @@ module.exports = {
   validateCardNoteKey,
   validateCardNoteText,
   validateCardNoteSavePayload,
+  validateScenarioOpaqueId,
+  validateScenarioSessionId,
+  validateScenarioId,
+  validateScenarioLearnerLevel,
+  validateScenarioSessionSavePayload,
+  validateScenarioSrsCardSavePayload,
+  validateScenarioEvaluationRequest,
   validateKanjiDetailCharacter,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,

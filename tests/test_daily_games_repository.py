@@ -93,7 +93,7 @@ def test_fresh_migration_creates_daily_games_schema(tmp_path: Path, monkeypatch)
         "completed_at_utc",
         "completion_key",
     }
-    assert version == (database.MIGRATION_V18,)
+    assert version == (database.LATEST_SCHEMA_VERSION,)
 
 
 def test_upgrade_from_v13_preserves_review_rows(tmp_path: Path, monkeypatch) -> None:
@@ -139,7 +139,7 @@ def test_upgrade_from_v13_preserves_review_rows(tmp_path: Path, monkeypatch) -> 
 
     assert state == ("Vocabulary N5", 4, 2)
     assert event == ("Vocabulary N5", 4, 4, "2026-07-15")
-    assert version == (database.MIGRATION_V18,)
+    assert version == (database.LATEST_SCHEMA_VERSION,)
     assert daily_table == ("daily_word_pools",)
 
 
@@ -184,7 +184,7 @@ def test_upgrade_from_v14_preserves_duplicate_completed_daily_attempts(
         (10, 1, "daily:2026-07-15:crossword"),
         (20, 1, None),
     ]
-    assert version == (database.MIGRATION_V18,)
+    assert version == (database.LATEST_SCHEMA_VERSION,)
 
 
 def test_pool_round_trip_normalizes_text_and_preserves_word_order(tmp_path: Path, monkeypatch) -> None:

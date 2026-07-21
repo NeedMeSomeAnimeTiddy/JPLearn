@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { CornerDownLeft } from 'lucide-react'
 import * as wanakana from 'wanakana'
+import { bindWanakanaIme } from '../../lib/wanakanaBinding'
 
 interface TypedAnswerPanelProps {
   answerInputRef: RefObject<HTMLInputElement | null>
@@ -21,23 +22,20 @@ export function TypedAnswerPanel({
   onSubmit,
   wanakanaMode,
 }: TypedAnswerPanelProps) {
-  const boundRef = useRef(false)
+  const isComposingRef = useRef(false)
   const [shaking, setShaking] = useState(false)
 
   useEffect(() => {
     const el = answerInputRef.current
     if (!el || !wanakanaMode) return
-
-    wanakana.bind(el, { IMEMode: wanakanaMode === 'hiragana' ? 'toHiragana' : 'toKatakana' })
-    boundRef.current = true
-    return () => {
-      wanakana.unbind(el)
-      boundRef.current = false
-    }
+    // Composition-safe: without this, an active Japanese IME (kanji henkan)
+    // gets corrupted by wanakana rewriting the field on every keystroke —
+    // see bindWanakanaIme for why plain-keyboard romaji still works fine.
+    return bindWanakanaIme(el, wanakanaMode === 'hiragana' ? 'toHiragana' : 'toKatakana')
   }, [answerInputRef, wanakanaMode])
 
   const handleInput = (rawValue: string) => {
-    if (wanakanaMode) {
+    if (wanakanaMode && !isComposingRef.current) {
       onChange(rawValue)
     }
   }
@@ -75,6 +73,11 @@ export function TypedAnswerPanel({
           if (wanakanaMode) {
             handleInput(event.currentTarget.value)
           }
+        }}
+        onCompositionStart={() => { isComposingRef.current = true }}
+        onCompositionEnd={(event) => {
+          isComposingRef.current = false
+          if (wanakanaMode) onChange(event.currentTarget.value)
         }}
         placeholder={placeholder}
         autoComplete="off"

@@ -32,7 +32,7 @@ import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode, blankOutWordInSentence } from './utils'
 import { KANJI_MEANINGS } from './lib/kanjiMeanings'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, Gamepad2, House, ImagePlus, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Upload, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, Gamepad2, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Upload, X } from 'lucide-react'
 import './App.css'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
@@ -40,7 +40,8 @@ import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/th
 import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme, resolveThemeMode } from './features/theme/utils'
 import { useVoice, splitSpeechSegments, VoiceSettingsTab, DEFAULT_VOICE_SPEED, type VoiceSettingsFields } from './features/voice'
 import { useModels } from './features/models'
-import { useTutor, TutorChatPanel, OcrWorkbench, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, type TutorSettingsFields } from './features/tutor'
+import { useTutor, TutorPanel, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, type TutorSettingsFields } from './features/tutor'
+import { useScenarioTutor } from './features/scenario-tutor'
 import type { AssistantToast } from './features/tutor'
 import { useCursor, CursorFollower, CursorSettingsTab, type CursorSettings } from './features/cursor'
 import { useWindowDrag } from './features/window-drag'
@@ -152,6 +153,8 @@ interface AppSettings {
   assistantChatEnabled: boolean
   assistantChatAudioEnabled: boolean
   assistantChatOcrMinConfidence: number
+  scenarioAiEvaluationEnabled: boolean
+  romajiConversionEnabled: boolean
   showKeyboardPrompts: boolean
   furiganaEnabled: boolean
   furiganaAutoHideMastered: boolean
@@ -663,6 +666,8 @@ function defaultSettings(): AppSettings {
     assistantChatEnabled: true,
     assistantChatAudioEnabled: true,
     assistantChatOcrMinConfidence: 0.3,
+    scenarioAiEvaluationEnabled: true,
+    romajiConversionEnabled: true,
     showKeyboardPrompts: false,
     furiganaEnabled: false,
     furiganaAutoHideMastered: false,
@@ -760,6 +765,14 @@ function loadSettings(): AppSettings {
         typeof parsed.assistantChatOcrMinConfidence === 'number'
           ? clampAssistantChatOcrMinConfidence(parsed.assistantChatOcrMinConfidence)
           : defaults.assistantChatOcrMinConfidence,
+      scenarioAiEvaluationEnabled:
+        typeof parsed.scenarioAiEvaluationEnabled === 'boolean'
+          ? parsed.scenarioAiEvaluationEnabled
+          : defaults.scenarioAiEvaluationEnabled,
+      romajiConversionEnabled:
+        typeof parsed.romajiConversionEnabled === 'boolean'
+          ? parsed.romajiConversionEnabled
+          : defaults.romajiConversionEnabled,
       showKeyboardPrompts:
         typeof parsed.showKeyboardPrompts === 'boolean'
           ? parsed.showKeyboardPrompts
@@ -1762,6 +1775,7 @@ function App() {
   const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
   const [kanjiDetailCharacter, setKanjiDetailCharacter] = useState<string | null>(null)
   const kanjiDetailTriggerRef = useRef<HTMLElement | null>(null)
+  const tutorTitlebarButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const openKanjiDetail = useCallback((character: string, trigger: HTMLElement) => {
     kanjiDetailTriggerRef.current = trigger
@@ -1835,8 +1849,7 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.setAssistantChatOpen(false)
-    tutor.setOcrWorkbenchOpen(false)
+    tutor.closeTutorPanel()
     setNavDirection('forward')
     setView('daily_games')
     setShortcutMenuOpen(false)
@@ -1855,6 +1868,10 @@ function App() {
       { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { setNavDirection('forward'); setActiveScript('katakana'); setView('script_hub') } },
       { id: 'open-settings', label: 'Open Settings', category: 'settings', shortcut: 'Ctrl+,', action: () => { closeKanjiDetail(); setShowSettings(true) } },
       { id: 'open-keyboard-cheatsheet', label: 'Keyboard Shortcuts', category: 'settings', action: () => { closeKeyboardCheatsheet(); setTimeout(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })) }, 50) } },
+      { id: 'tutor-open-menu', label: 'Open Tutor', category: 'navigation', keywords: ['tutor', 'menu'], action: () => tutor.openTutorPanel() },
+      { id: 'tutor-open-chat', label: 'Chat with Tutor', category: 'navigation', keywords: ['tutor', 'chat', 'sensei'], action: () => tutor.openTutorPanel('chat') },
+      { id: 'tutor-open-scenarios', label: 'Scenario Practice', category: 'navigation', keywords: ['tutor', 'scenario', 'roleplay', 'conversation'], action: () => tutor.openTutorPanel('scenarios') },
+      { id: 'tutor-open-ocr', label: 'Image Translation', category: 'navigation', keywords: ['tutor', 'ocr', 'image', 'translate'], action: () => tutor.openTutorPanel('ocr') },
     ]
 
     for (const script of scripts) {
@@ -1970,8 +1987,7 @@ function App() {
     setShowOverview(false)
     setShortcutMenuOpen(false)
     setActiveShortcutFlyout(null)
-    tutor.setAssistantChatOpen(false)
-    tutor.setOcrWorkbenchOpen(false)
+    tutor.closeTutorPanel()
     setXpDetailsOpen(false)
     setStreakDetailsOpen(false)
     setSelectedChar(null)
@@ -2146,6 +2162,30 @@ function App() {
     },
   )
 
+  // Scenario Practice shares the tutor's single audio channel (same run-id ref
+  // and the same coach-audio toggle), so NPC playback and chat replies can
+  // never talk over each other.
+  const scenarioTutor = useScenarioTutor({
+    voice: {
+      playVoiceRuntimeAudio: voice.playVoiceRuntimeAudio,
+      cancelAssistantSpeech: voice.cancelAssistantSpeech,
+      assistantSpeechRunIdRef: voice.assistantSpeechRunIdRef,
+      voiceUnavailable: voice.voiceUnavailable,
+    },
+    audioEnabled: settings.assistantChatAudioEnabled,
+    aiEvaluationEnabled: settings.scenarioAiEvaluationEnabled,
+  })
+
+  // Restores focus to the Tutor titlebar button when the popup closes —
+  // Back (within the popup) restores focus to the menu item instead, via
+  // TutorMenu's own autofocus bookkeeping.
+  const tutorPanelWasOpenRef = useRef(false)
+  useEffect(() => {
+    if (tutorPanelWasOpenRef.current && !tutor.tutorPanelOpen) {
+      tutorTitlebarButtonRef.current?.focus()
+    }
+    tutorPanelWasOpenRef.current = tutor.tutorPanelOpen
+  }, [tutor.tutorPanelOpen])
 
   // oxlint-disable react-hooks/exhaustive-deps — models from useModels hook is not a stable ref
   useEffect(() => {
@@ -4589,8 +4629,7 @@ function App() {
           setShowSettings(false)
         } else {
           setDictionaryOpen(false)
-          tutor.setAssistantChatOpen(false)
-          tutor.setOcrWorkbenchOpen(false)
+          tutor.closeTutorPanel()
           setShowOverview(false)
           setShowSettings(true)
         }
@@ -4634,13 +4673,17 @@ function App() {
           return
         }
 
-        if (tutor.assistantChatOpen) {
-          tutor.closeAssistantChat()
-          return
-        }
-
-        if (tutor.ocrWorkbenchOpen) {
-          tutor.closeOcrWorkbench()
+        if (tutor.tutorPanelOpen) {
+          // The shell's own Escape handler (TutorPanelShell) normally
+          // catches this first and stops propagation while focus is inside
+          // the popup; this is a defensive fallback for the rare case focus
+          // isn't there. Same policy: close at the menu, back to the menu
+          // from any activity — Escape never abandons a scenario.
+          if (tutor.tutorPanelMode === 'menu') {
+            tutor.closeTutorPanel()
+          } else {
+            tutor.returnToTutorMenu()
+          }
           return
         }
 
@@ -4684,13 +4727,12 @@ function App() {
         }
       }
 
-      if (showSettings || showCloseDialog || commandPalette.isOpen || tutor.assistantChatOpen || tutor.ocrWorkbenchOpen || isInput) return
+      if (showSettings || showCloseDialog || commandPalette.isOpen || tutor.tutorPanelOpen || isInput) return
 
       if (event.key === '6') {
         setDictionaryOpen(false)
         setShowOverview(true)
         setShowSettings(false)
-        tutor.setOcrWorkbenchOpen(false)
         void loadSummary()
         setShortcutMenuOpen(false)
         setActiveShortcutFlyout(null)
@@ -4734,7 +4776,7 @@ function App() {
     // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.assistantChatOpen, tutor.closeAssistantChat, tutor.closeOcrWorkbench, loadSummary, tutor.ocrWorkbenchOpen, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
+  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -4909,7 +4951,7 @@ function App() {
     setView('home')
     resetSessionCore()
     setShowSettings(false)
-    tutor.setOcrWorkbenchOpen(false)
+    tutor.closeTutorPanel()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [closeKanjiDetail, resetRoundCycle])
 
@@ -4928,8 +4970,7 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(true)
     setShowSettings(false)
-    tutor.setAssistantChatOpen(false)
-    tutor.setOcrWorkbenchOpen(false)
+    tutor.closeTutorPanel()
     void loadSummary()
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
@@ -4983,8 +5024,7 @@ function App() {
     setDictionaryOpen(false)
     setShowSettings(true)
     setShowOverview(false)
-    tutor.setAssistantChatOpen(false)
-    tutor.setOcrWorkbenchOpen(false)
+    tutor.closeTutorPanel()
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [closeKanjiDetail, closeShortcutMenu])
@@ -5686,27 +5726,6 @@ function App() {
             <button
               type="button"
               className="window-nav-button"
-              onClick={() => {
-                setDictionaryOpen(false)
-                setShowOverview(false)
-                setShowSettings(false)
-                setShortcutMenuOpen(false)
-                setActiveShortcutFlyout(null)
-                tutor.setAssistantChatOpen(false)
-                
-                tutor.setOcrWorkbenchOpen((open) => !open)
-                
-              }}
-              aria-expanded={tutor.ocrWorkbenchOpen}
-              aria-controls="ocr-workbench-panel"
-              aria-label={tutor.ocrWorkbenchOpen ? 'Close OCR translator' : 'Open OCR translator'}
-              title={tutor.ocrWorkbenchOpen ? 'Close OCR translator' : 'Open OCR translator'}
-            >
-              <ImagePlus className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="window-nav-button"
               onClick={openSettingsFromMenu}
               aria-label="Open settings"
               title="Settings"
@@ -5714,16 +5733,19 @@ function App() {
               <Settings className="window-nav-icon" strokeWidth={2.2} />
             </button>
             <TutorTitlebarButton
-              assistantChatEnabled={settings.assistantChatEnabled}
-              assistantChatOpen={tutor.assistantChatOpen}
-              onToggle={() => {
+              ref={tutorTitlebarButtonRef}
+              tutorPanelOpen={tutor.tutorPanelOpen}
+              onClick={() => {
                 setDictionaryOpen(false)
                 setShowOverview(false)
                 setShowSettings(false)
-                tutor.setOcrWorkbenchOpen(false)
                 setShortcutMenuOpen(false)
                 setActiveShortcutFlyout(null)
-                tutor.setAssistantChatOpen((open) => !open)
+                if (tutor.tutorPanelOpen) {
+                  tutor.closeTutorPanel()
+                } else {
+                  tutor.openTutorPanel()
+                }
               }}
             />
           </div>
@@ -6029,8 +6051,7 @@ function App() {
             setDictionaryOpen(false)
             setShowOverview(false)
             setShowSettings(false)
-            tutor.setAssistantChatOpen(false)
-            tutor.setOcrWorkbenchOpen(false)
+            tutor.closeTutorPanel()
             setNavDirection('forward')
             setView('jlpt_prep')
           }}
@@ -6113,8 +6134,7 @@ function App() {
             setDictionaryOpen(false)
             setShowOverview(false)
             setShowSettings(false)
-            tutor.setAssistantChatOpen(false)
-            tutor.setOcrWorkbenchOpen(false)
+            tutor.closeTutorPanel()
             setNavDirection('forward')
 
             if (sectionId === 'jlpt_prep') {
@@ -6355,10 +6375,6 @@ function App() {
 
       {kanjiDetailCharacter ? (
         <KanjiDetailPanel character={kanjiDetailCharacter} onClose={closeKanjiDetail} />
-      ) : null}
-
-      {tutor.ocrWorkbenchOpen ? (
-        <OcrWorkbench tutor={tutor} settings={settings as TutorSettingsFields} setSettings={setSettings as unknown as Dispatch<SetStateAction<TutorSettingsFields>>} />
       ) : null}
 
       </SessionProvider>
@@ -7285,9 +7301,15 @@ function App() {
         onClose={() => setShowCloseDialog(false)}
       />
 
-      <div style={{ display: tutor.assistantChatOpen ? undefined : 'none' }}>
-        <TutorChatPanel tutor={tutor} settings={settings as TutorSettingsFields} setSettings={setSettings as unknown as Dispatch<SetStateAction<TutorSettingsFields>>} cancelAssistantSpeech={voice.cancelAssistantSpeech} />
-      </div>
+      {tutor.tutorPanelOpen ? (
+        <TutorPanel
+          tutor={tutor}
+          scenarioTutor={scenarioTutor}
+          settings={settings as TutorSettingsFields}
+          setSettings={setSettings as unknown as Dispatch<SetStateAction<TutorSettingsFields>>}
+          cancelAssistantSpeech={voice.cancelAssistantSpeech}
+        />
+      ) : null}
 
       {cursor.cursorMode === 'animated' && createPortal(<CursorFollower {...cursor} />, document.body)}
 

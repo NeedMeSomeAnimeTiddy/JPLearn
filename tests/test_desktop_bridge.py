@@ -786,6 +786,173 @@ def test_card_note_bridge_commands_reject_invalid_keys_and_notes(
     assert "at most 2000" in str(oversized["error"])
 
 
+def _write_json_payload(tmp_path: Path, name: str, payload: dict) -> str:
+    path = tmp_path / name
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return str(path)
+
+
+def test_scenario_session_bridge_commands_round_trip(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    session_payload = {
+        "session_id": "11111111-1111-1111-1111-111111111111",
+        "scenario_id": "cafe-order",
+        "scenario_version": 1,
+        "learner_level": "beginner",
+        "started_at_utc": "2026-07-21T00:00:00+00:00",
+        "transcript": [{"turnIndex": 0, "learnerInput": "こんにちは", "outcome": "correct"}],
+        "summary": {"objectives": [], "corrections": [], "vocabularyPractised": []},
+    }
+    payload_path = _write_json_payload(tmp_path, "session.json", session_payload)
+
+    save_code, saved = desktop_bridge._run_command(["scenario-session-save", payload_path])
+    list_code, listed = desktop_bridge._run_command(["scenario-session-list"])
+    get_code, fetched = desktop_bridge._run_command(
+        ["scenario-session-get", "11111111-1111-1111-1111-111111111111"]
+    )
+    missing_code, missing = desktop_bridge._run_command(
+        ["scenario-session-get", "99999999-9999-9999-9999-999999999999"]
+    )
+    delete_code, deleted = desktop_bridge._run_command(
+        ["scenario-session-delete", "11111111-1111-1111-1111-111111111111"]
+    )
+    repeat_delete_code, repeated = desktop_bridge._run_command(
+        ["scenario-session-delete", "11111111-1111-1111-1111-111111111111"]
+    )
+
+    assert save_code == list_code == get_code == missing_code == 0
+    assert delete_code == repeat_delete_code == 0
+    assert saved["id"] == "11111111-1111-1111-1111-111111111111"
+    assert saved["scenario_id"] == "cafe-order"
+    assert saved["transcript"] == session_payload["transcript"]
+    assert saved["summary"] == session_payload["summary"]
+    assert listed == {"sessions": [saved]}
+    assert fetched == {"session": saved}
+    assert missing == {"session": None}
+    assert deleted == {"id": "11111111-1111-1111-1111-111111111111", "deleted": True}
+    assert repeated == {"id": "11111111-1111-1111-1111-111111111111", "deleted": False}
+
+
+def test_scenario_sessions_clear_removes_everything(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    payload_path = _write_json_payload(tmp_path, "session.json", {
+        "session_id": "11111111-1111-1111-1111-111111111111",
+        "scenario_id": "cafe-order",
+        "scenario_version": 1,
+        "learner_level": "beginner",
+        "started_at_utc": "2026-07-21T00:00:00+00:00",
+        "transcript": [],
+        "summary": {},
+    })
+    desktop_bridge._run_command(["scenario-session-save", payload_path])
+
+    clear_code, cleared = desktop_bridge._run_command(["scenario-sessions-clear"])
+    list_code, listed = desktop_bridge._run_command(["scenario-session-list"])
+
+    assert clear_code == list_code == 0
+    assert cleared == {"cleared": 1}
+    assert listed == {"sessions": []}
+
+
+def test_scenario_session_save_rejects_malformed_payload(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    payload_path = _write_json_payload(tmp_path, "session.json", {
+        "session_id": "11111111-1111-1111-1111-111111111111",
+        "scenario_id": "NOT-A-VALID-SCENARIO-ID",
+        "scenario_version": 1,
+        "learner_level": "beginner",
+        "started_at_utc": "2026-07-21T00:00:00+00:00",
+        "transcript": [],
+        "summary": {},
+    })
+
+    code, payload = desktop_bridge._run_command(["scenario-session-save", payload_path])
+
+    assert code == 2
+    assert "scenario_id" in str(payload["error"])
+
+
+def test_scenario_session_save_rejects_missing_file(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    code, payload = desktop_bridge._run_command(
+        ["scenario-session-save", str(tmp_path / "does-not-exist.json")]
+    )
+
+    assert code == 2
+    assert "error" in payload
+
+
+def test_scenario_srs_card_bridge_command_requires_existing_session(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    payload_path = _write_json_payload(tmp_path, "srs.json", {
+        "id": "srs-1",
+        "session_id": "11111111-1111-1111-1111-111111111111",
+        "scenario_id": "cafe-order",
+        "front": "コーヒー",
+        "back": "coffee",
+        "reading": "こーひー",
+        "notes": "",
+    })
+
+    code, payload = desktop_bridge._run_command(["scenario-srs-save", payload_path])
+
+    assert code == 2
+    assert "Unknown scenario session" in str(payload["error"])
+
+
+def test_scenario_srs_card_bridge_command_saves_after_session_exists(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    session_path = _write_json_payload(tmp_path, "session.json", {
+        "session_id": "11111111-1111-1111-1111-111111111111",
+        "scenario_id": "cafe-order",
+        "scenario_version": 1,
+        "learner_level": "beginner",
+        "started_at_utc": "2026-07-21T00:00:00+00:00",
+        "transcript": [],
+        "summary": {},
+    })
+    desktop_bridge._run_command(["scenario-session-save", session_path])
+    srs_path = _write_json_payload(tmp_path, "srs.json", {
+        "id": "srs-1",
+        "session_id": "11111111-1111-1111-1111-111111111111",
+        "scenario_id": "cafe-order",
+        "front": "コーヒー",
+        "back": "coffee",
+        "reading": "こーひー",
+        "notes": "",
+    })
+
+    code, payload = desktop_bridge._run_command(["scenario-srs-save", srs_path])
+
+    assert code == 0
+    assert payload["id"] == "srs-1"
+    assert payload["front"] == "コーヒー"
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["scenario-session-save"],
+        ["scenario-session-save", "a", "b"],
+        ["scenario-session-list", "extra"],
+        ["scenario-session-get"],
+        ["scenario-session-get", "id", "extra"],
+        ["scenario-session-delete"],
+        ["scenario-sessions-clear", "extra"],
+        ["scenario-srs-save"],
+    ],
+)
+def test_scenario_bridge_commands_reject_wrong_argument_counts(argv: list[str]) -> None:
+    code, payload = desktop_bridge._run_command(argv)
+
+    assert code == 2
+    assert str(payload["error"]).startswith("Usage: scenario-")
+
+
 def test_build_kanji_detail_payload_uses_indexed_compounds_and_verified_examples(
     tmp_path: Path,
     monkeypatch,

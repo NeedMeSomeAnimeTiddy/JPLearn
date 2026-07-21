@@ -68,6 +68,11 @@ from data.card_notes_repository import (  # noqa: E402
     validate_jmdict_source_id,
     validate_note_key,
 )
+from data.scenario_repository import (  # noqa: E402
+    ScenarioRepository,
+    ScenarioSessionRecord,
+    ScenarioSrsCardRecord,
+)
 from data.text_normalization import (  # noqa: E402
     normalize_japanese_text,
     normalize_storage_text,
@@ -3198,6 +3203,145 @@ def delete_card_note(note_key: str) -> dict[str, object]:
 
 
 @dataclass(frozen=True)
+class ScenarioSessionPayload:
+    id: str
+    scenario_id: str
+    scenario_version: int
+    learner_level: str
+    started_at_utc: str
+    completed_at_utc: str
+    transcript: list[object]
+    summary: dict[str, object]
+
+
+@dataclass(frozen=True)
+class ScenarioSessionListPayload:
+    sessions: list[ScenarioSessionPayload]
+
+
+@dataclass(frozen=True)
+class ScenarioSessionLookupPayload:
+    session: ScenarioSessionPayload | None
+
+
+@dataclass(frozen=True)
+class ScenarioSessionDeletePayload:
+    id: str
+    deleted: bool
+
+
+@dataclass(frozen=True)
+class ScenarioSessionsClearPayload:
+    cleared: int
+
+
+@dataclass(frozen=True)
+class ScenarioSrsCardPayload:
+    id: str
+    session_id: str
+    scenario_id: str
+    front: str
+    back: str
+    reading: str
+    notes: str
+    created_at_utc: str
+
+
+def _scenario_session_payload(record: ScenarioSessionRecord) -> ScenarioSessionPayload:
+    return ScenarioSessionPayload(
+        id=record.id,
+        scenario_id=record.scenario_id,
+        scenario_version=record.scenario_version,
+        learner_level=record.learner_level,
+        started_at_utc=record.started_at_utc,
+        completed_at_utc=record.completed_at_utc,
+        transcript=json.loads(record.transcript_json),
+        summary=json.loads(record.summary_json),
+    )
+
+
+def _scenario_srs_card_payload(record: ScenarioSrsCardRecord) -> ScenarioSrsCardPayload:
+    return ScenarioSrsCardPayload(
+        id=record.id,
+        session_id=record.session_id,
+        scenario_id=record.scenario_id,
+        front=record.front,
+        back=record.back,
+        reading=record.reading,
+        notes=record.notes,
+        created_at_utc=record.created_at_utc,
+    )
+
+
+def save_scenario_session(payload_path: str) -> dict[str, object]:
+    """Persist a completed scenario session from a JSON file written by the
+    Electron main process (large transcripts are handed off via a temp file,
+    the same pattern used for OCR image payloads)."""
+    with open(payload_path, "r", encoding="utf-8") as handle:
+        raw = json.load(handle)
+    if not isinstance(raw, dict):
+        raise ValueError("Scenario session payload must be a JSON object")
+    record = ScenarioRepository().save_session(
+        session_id=str(raw.get("session_id", "")),
+        scenario_id=str(raw.get("scenario_id", "")),
+        scenario_version=int(raw.get("scenario_version", 0)),
+        learner_level=str(raw.get("learner_level", "")),
+        started_at_utc=str(raw.get("started_at_utc", "")),
+        transcript_json=json.dumps(raw.get("transcript", [])),
+        summary_json=json.dumps(raw.get("summary", {})),
+    )
+    return asdict(_scenario_session_payload(record))
+
+
+def list_scenario_sessions() -> dict[str, object]:
+    """List completed scenario sessions, most recently completed first."""
+    records = ScenarioRepository().list_sessions()
+    return asdict(ScenarioSessionListPayload(
+        sessions=[_scenario_session_payload(record) for record in records],
+    ))
+
+
+def get_scenario_session(session_id: str) -> dict[str, object]:
+    """Look up one completed scenario session by id."""
+    record = ScenarioRepository().get_session(session_id)
+    payload = ScenarioSessionLookupPayload(
+        session=_scenario_session_payload(record) if record is not None else None,
+    )
+    return asdict(payload)
+
+
+def delete_scenario_session(session_id: str) -> dict[str, object]:
+    """Delete one completed scenario session and its SRS drafts."""
+    deleted = ScenarioRepository().delete_session(session_id)
+    return asdict(ScenarioSessionDeletePayload(id=session_id, deleted=deleted))
+
+
+def clear_scenario_sessions() -> dict[str, object]:
+    """Delete every completed scenario session and SRS draft."""
+    cleared = ScenarioRepository().clear_sessions()
+    return asdict(ScenarioSessionsClearPayload(cleared=cleared))
+
+
+def save_scenario_srs_card(payload_path: str) -> dict[str, object]:
+    """Persist one learner-accepted SRS draft from a JSON file (same temp-file
+    handoff pattern as save_scenario_session)."""
+    with open(payload_path, "r", encoding="utf-8") as handle:
+        raw = json.load(handle)
+    if not isinstance(raw, dict):
+        raise ValueError("Scenario SRS card payload must be a JSON object")
+    record = ScenarioRepository().save_srs_card(
+        card_id=str(raw.get("id", "")),
+        session_id=str(raw.get("session_id", "")),
+        scenario_id=str(raw.get("scenario_id", "")),
+        front=str(raw.get("front", "")),
+        back=str(raw.get("back", "")),
+        reading=str(raw.get("reading", "")),
+        notes=str(raw.get("notes", "")),
+    )
+    return asdict(_scenario_srs_card_payload(record))
+
+
+@dataclass(frozen=True)
 class GameCard:
     id: int
     note_key: str
@@ -5339,6 +5483,54 @@ def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
         try:
             return 0, delete_card_note(argv[1])
         except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "scenario-session-save":
+        if len(argv) != 2:
+            return 2, {"error": "Usage: scenario-session-save <payload_path>"}
+        try:
+            return 0, save_scenario_session(argv[1])
+        except (FileNotFoundError, ValueError, OSError) as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "scenario-session-list":
+        if len(argv) != 1:
+            return 2, {"error": "Usage: scenario-session-list"}
+        try:
+            return 0, list_scenario_sessions()
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "scenario-session-get":
+        if len(argv) != 2:
+            return 2, {"error": "Usage: scenario-session-get <session_id>"}
+        try:
+            return 0, get_scenario_session(argv[1])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "scenario-session-delete":
+        if len(argv) != 2:
+            return 2, {"error": "Usage: scenario-session-delete <session_id>"}
+        try:
+            return 0, delete_scenario_session(argv[1])
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "scenario-sessions-clear":
+        if len(argv) != 1:
+            return 2, {"error": "Usage: scenario-sessions-clear"}
+        try:
+            return 0, clear_scenario_sessions()
+        except ValueError as exc:
+            return 2, {"error": str(exc)}
+
+    if command == "scenario-srs-save":
+        if len(argv) != 2:
+            return 2, {"error": "Usage: scenario-srs-save <payload_path>"}
+        try:
+            return 0, save_scenario_srs_card(argv[1])
+        except (FileNotFoundError, ValueError, OSError) as exc:
             return 2, {"error": str(exc)}
 
     if command == "dictionary-search":

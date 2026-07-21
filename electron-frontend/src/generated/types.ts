@@ -94,6 +94,45 @@ export interface CardNoteDeletePayload {
   deleted: boolean
 }
 
+export interface ScenarioSessionPayload {
+  id: string
+  scenario_id: string
+  scenario_version: number
+  learner_level: string
+  started_at_utc: string
+  completed_at_utc: string
+  transcript: unknown[]
+  summary: Record<string, unknown>
+}
+
+export interface ScenarioSessionListPayload {
+  sessions: ScenarioSessionPayload[]
+}
+
+export interface ScenarioSessionLookupPayload {
+  session: ScenarioSessionPayload | null
+}
+
+export interface ScenarioSessionDeletePayload {
+  id: string
+  deleted: boolean
+}
+
+export interface ScenarioSessionsClearPayload {
+  cleared: number
+}
+
+export interface ScenarioSrsCardPayload {
+  id: string
+  session_id: string
+  scenario_id: string
+  front: string
+  back: string
+  reading: string
+  notes: string
+  created_at_utc: string
+}
+
 export interface GameCard {
   id: number
   note_key: string

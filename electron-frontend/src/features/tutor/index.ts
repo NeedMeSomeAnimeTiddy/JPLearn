@@ -1,5 +1,8 @@
 export { useTutor } from './useTutor'
 export type { UseTutorReturn } from './useTutor'
+export { TutorPanel } from './components/TutorPanel'
+export { TutorPanelShell } from './components/TutorPanelShell'
+export { TutorMenu } from './components/TutorMenu'
 export { TutorChatPanel } from './components/TutorChatPanel'
 export { OcrWorkbench } from './components/OcrWorkbench'
 export { TutorToast } from './components/TutorToast'

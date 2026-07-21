@@ -57,6 +57,7 @@ function createRegisteredHandlers(overrides = {}) {
       unload: vi.fn(async () => ({ ok: true, reason: 'manual' })),
       cancelActiveInference: vi.fn(async () => ({ ok: true, cancelled: false, reason: 'renderer-cancel' })),
       generateCrosswordClues: vi.fn(async () => ({ ok: false, text: '' })),
+      evaluateScenarioResponse: vi.fn(async () => ({ ok: false, text: '' })),
     },
     localVoiceRuntime: {
       getStatus: vi.fn(() => ({ available: false, modelReady: false, downloading: false, downloadProgress: 0, modelName: 'voicevox:unavailable', lastError: null })),
@@ -241,6 +242,184 @@ describe('ipc runtime contract', () => {
     await expect(
       handlers.get('study:get-card-note')(createValidEvent(), noteKey),
     ).rejects.toThrow(/Failed to load card note: database locked/)
+  })
+
+  it('saves a scenario session via a temp-file handoff and cleans up the temp file', async () => {
+    const fs = require('node:fs')
+    let capturedPath: string | null = null
+    const sessionResponse = {
+      id: '11111111-1111-1111-1111-111111111111',
+      scenario_id: 'cafe-order',
+      scenario_version: 1,
+      learner_level: 'beginner',
+      started_at_utc: '2026-07-21T00:00:00.000Z',
+      completed_at_utc: '2026-07-21T00:05:00.000Z',
+      transcript: [{ turnIndex: 0 }],
+      summary: { objectives: [] },
+    }
+    const { handlers } = createRegisteredHandlers({
+      runPythonBridgeWithArgs: vi.fn(async (args: string[]) => {
+        expect(args[0]).toBe('scenario-session-save')
+        capturedPath = args[1]
+        // The temp file must exist and contain the validated payload while the bridge call is in flight.
+        const written = JSON.parse(fs.readFileSync(capturedPath, 'utf8'))
+        expect(written).toEqual({
+          session_id: '11111111-1111-1111-1111-111111111111',
+          scenario_id: 'cafe-order',
+          scenario_version: 1,
+          learner_level: 'beginner',
+          started_at_utc: '2026-07-21T00:00:00.000Z',
+          transcript: [{ turnIndex: 0 }],
+          summary: { objectives: [] },
+        })
+        return sessionResponse
+      }),
+    })
+
+    const result = await handlers.get('scenario:save-session')(createValidEvent(), {
+      sessionId: '11111111-1111-1111-1111-111111111111',
+      scenarioId: 'cafe-order',
+      scenarioVersion: 1,
+      learnerLevel: 'beginner',
+      startedAtUtc: '2026-07-21T00:00:00.000Z',
+      transcript: [{ turnIndex: 0 }],
+      summary: { objectives: [] },
+    })
+
+    expect(result).toEqual(sessionResponse)
+    expect(capturedPath).toBeTruthy()
+    expect(fs.existsSync(capturedPath)).toBe(false) // cleaned up in the handler's finally block
+  })
+
+  it('rejects an invalid scenario session save payload before writing any temp file', async () => {
+    const { handlers, options } = createRegisteredHandlers({
+      runPythonBridgeWithArgs: vi.fn(),
+    })
+
+    await expect(
+      handlers.get('scenario:save-session')(createValidEvent(), {
+        sessionId: 'not valid',
+        scenarioId: 'cafe-order',
+        scenarioVersion: 1,
+        learnerLevel: 'beginner',
+        startedAtUtc: '2026-07-21T00:00:00.000Z',
+        transcript: [],
+        summary: {},
+      }),
+    ).rejects.toThrow(/Invalid scenario session id/i)
+    expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
+  })
+
+  it('lists, fetches, deletes, and clears scenario sessions', async () => {
+    const { handlers, options } = createRegisteredHandlers({
+      runPythonBridgeWithArgs: vi.fn()
+        .mockResolvedValueOnce({ sessions: [] })
+        .mockResolvedValueOnce({ session: null })
+        .mockResolvedValueOnce({ id: '11111111-1111-1111-1111-111111111111', deleted: true })
+        .mockResolvedValueOnce({ cleared: 2 }),
+    })
+
+    await expect(handlers.get('scenario:list-sessions')(createValidEvent())).resolves.toEqual({ sessions: [] })
+    await expect(
+      handlers.get('scenario:get-session')(createValidEvent(), '11111111-1111-1111-1111-111111111111'),
+    ).resolves.toEqual({ session: null })
+    await expect(
+      handlers.get('scenario:delete-session')(createValidEvent(), '11111111-1111-1111-1111-111111111111'),
+    ).resolves.toEqual({ id: '11111111-1111-1111-1111-111111111111', deleted: true })
+    await expect(handlers.get('scenario:clear-sessions')(createValidEvent())).resolves.toEqual({ cleared: 2 })
+
+    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(1, ['scenario-session-list'])
+    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(2, [
+      'scenario-session-get', '11111111-1111-1111-1111-111111111111',
+    ])
+    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(3, [
+      'scenario-session-delete', '11111111-1111-1111-1111-111111111111',
+    ])
+    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(4, ['scenario-sessions-clear'])
+  })
+
+  it('saves a scenario SRS card via a temp-file handoff and wraps bridge failures', async () => {
+    const fs = require('node:fs')
+    const { handlers } = createRegisteredHandlers({
+      runPythonBridgeWithArgs: vi.fn(async (args: string[]) => {
+        const written = JSON.parse(fs.readFileSync(args[1], 'utf8'))
+        expect(written).toEqual({
+          id: 'srs-1',
+          session_id: '11111111-1111-1111-1111-111111111111',
+          scenario_id: 'cafe-order',
+          front: 'コーヒー',
+          back: 'coffee',
+          reading: 'こーひー',
+          notes: '',
+        })
+        return { id: 'srs-1', session_id: '11111111-1111-1111-1111-111111111111', scenario_id: 'cafe-order', front: 'コーヒー', back: 'coffee', reading: 'こーひー', notes: '', created_at_utc: '2026-07-21T00:05:00.000Z' }
+      }),
+    })
+
+    await expect(handlers.get('scenario:save-srs-card')(createValidEvent(), {
+      id: 'srs-1',
+      sessionId: '11111111-1111-1111-1111-111111111111',
+      scenarioId: 'cafe-order',
+      front: 'コーヒー',
+      back: 'coffee',
+      reading: 'こーひー',
+      notes: '',
+    })).resolves.toMatchObject({ id: 'srs-1', front: 'コーヒー' })
+
+    const failing = createRegisteredHandlers({
+      runPythonBridgeWithArgs: vi.fn().mockRejectedValue(new Error('unknown scenario session')),
+    })
+    await expect(
+      failing.handlers.get('scenario:save-srs-card')(createValidEvent(), {
+        id: 'srs-1', sessionId: '11111111-1111-1111-1111-111111111111', scenarioId: 'cafe-order', front: 'x', back: 'y',
+      }),
+    ).rejects.toThrow(/Failed to save scenario SRS card: unknown scenario session/)
+  })
+
+  it('forwards a bounded scenario evaluation request to the tutor runtime', async () => {
+    const { handlers, options } = createRegisteredHandlers()
+    options.localTutorRuntime.evaluateScenarioResponse.mockResolvedValue({
+      ok: true,
+      text: '{"outcome":"correct","matchedIntentId":"intent-order","missingInfo":[],"confidence":0.8}',
+    })
+    const request = {
+      scenarioTitle: 'Order at a Cafe',
+      npcLine: 'いらっしゃいませ',
+      objectiveDescription: 'Order a drink',
+      expectedIntents: [{ id: 'intent-order', description: 'Order a drink politely', examplePhrases: ['コーヒーをください'] }],
+      requiredSlotIds: ['drink'],
+      learnerResponse: 'ホットのコーヒーをひとつ',
+      learnerLevel: 'beginner',
+    }
+
+    await expect(handlers.get('scenario:evaluate-response')(createValidEvent(), request)).resolves.toMatchObject({ ok: true })
+    expect(options.localTutorRuntime.evaluateScenarioResponse).toHaveBeenCalledWith(request)
+  })
+
+  it('rejects an unbounded scenario evaluation request and degrades a runtime failure to ok:false', async () => {
+    const { handlers, options } = createRegisteredHandlers()
+    await expect(
+      handlers.get('scenario:evaluate-response')(createValidEvent(), {
+        scenarioTitle: 'Order at a Cafe',
+        npcLine: 'いらっしゃいませ',
+        objectiveDescription: '',
+        expectedIntents: [],
+        requiredSlotIds: [],
+        learnerResponse: 'x',
+        learnerLevel: 'beginner',
+      }),
+    ).rejects.toThrow(/expectedIntents must hold/)
+
+    options.localTutorRuntime.evaluateScenarioResponse.mockRejectedValue(new Error('runtime exploded'))
+    await expect(handlers.get('scenario:evaluate-response')(createValidEvent(), {
+      scenarioTitle: 'Order at a Cafe',
+      npcLine: 'いらっしゃいませ',
+      objectiveDescription: '',
+      expectedIntents: [{ id: 'intent-order', description: 'Order a drink', examplePhrases: [] }],
+      requiredSlotIds: [],
+      learnerResponse: 'x',
+      learnerLevel: 'beginner',
+    })).resolves.toEqual({ ok: false, text: '' })
   })
 
   it('maps cached crossword clue fields to the renderer contract and never calls the tutor on cache reads', async () => {

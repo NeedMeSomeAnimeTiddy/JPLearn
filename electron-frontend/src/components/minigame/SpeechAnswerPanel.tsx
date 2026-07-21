@@ -3,6 +3,7 @@ import { TypeAnimation } from 'react-type-animation'
 import { Mic, Square } from 'lucide-react'
 import { useMicRecorder } from '../../hooks/useMicRecorder'
 import { assessTypedAnswer } from '../../lib/answerAssessment'
+import { blobToBase64, normalizeSpeechMimeType } from '../../lib/audioEncoding'
 import type { TypedAnswerState } from '../../lib/answerAssessment'
 
 interface SpeechAnswerResult {
@@ -18,19 +19,6 @@ interface SpeechAnswerPanelProps {
   maxDurationMs?: number
   onResult: (result: SpeechAnswerResult) => void
   onFallbackToTyped?: () => void
-}
-
-const MIME_TO_ALLOWED = new Set(['audio/webm', 'audio/ogg', 'audio/wav', 'audio/wave', 'audio/x-wav'])
-
-async function blobToBase64(blob: Blob): Promise<string> {
-  const buffer = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  const chunkSize = 0x8000
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
-  }
-  return btoa(binary)
 }
 
 /**
@@ -58,12 +46,12 @@ export function SpeechAnswerPanel({
       setProcessingError('Speech recognition is unavailable in this build.')
       return
     }
-    const safeMimeType = MIME_TO_ALLOWED.has(mimeType) ? mimeType : 'audio/webm'
+    const safeMimeType = normalizeSpeechMimeType(mimeType)
     try {
       const audioBase64 = await blobToBase64(blob)
       const result = await transcribeSpeech({
         audioBase64,
-        mimeType: safeMimeType as 'audio/webm' | 'audio/ogg' | 'audio/wav',
+        mimeType: safeMimeType,
         language,
       })
       setLastTranscript(result.text)

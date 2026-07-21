@@ -4,7 +4,7 @@
  * Zero violations is the pass threshold.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 // axe-core ships as a CJS export = module; Vite handles interop at runtime.
 import axe from 'axe-core'
 import App from './App'
@@ -157,6 +157,151 @@ describe('Accessibility — zero axe violations', () => {
       throw new Error(`axe violations in home view:\n${formatViolations(results.violations)}`)
     }
     expect(results.violations).toHaveLength(0)
+  })
+
+  it('the Tutor menu has no violations', async () => {
+    window.localStorage.setItem('onboarding_complete', 'true')
+    window.jplearnDesktop = baseDesktopApi
+    const { container } = render(<App />)
+    await act(async () => {})
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Tutor' }))
+    await screen.findByRole('dialog', { name: 'Tutor menu' })
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const results = await (axe as { run: (el: Element) => Promise<{ violations: Array<{ id: string; description: string; nodes: unknown[] }> }> }).run(container)
+    if (results.violations.length > 0) {
+      throw new Error(`axe violations in Tutor menu:\n${formatViolations(results.violations)}`)
+    }
+    expect(results.violations).toHaveLength(0)
+  })
+
+  it('the Scenario Practice intro and player screens have no violations', async () => {
+    window.localStorage.setItem('onboarding_complete', 'true')
+    window.jplearnDesktop = baseDesktopApi
+    const { container } = render(<App />)
+    await act(async () => {})
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Tutor' }))
+    const menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
+    fireEvent.click(within(menu).getByRole('button', { name: 'Scenario Practice' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Scenario practice panel' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /order at a cafe/i }))
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    let results = await (axe as { run: (el: Element) => Promise<{ violations: Array<{ id: string; description: string; nodes: unknown[] }> }> }).run(container)
+    if (results.violations.length > 0) {
+      throw new Error(`axe violations in Scenario Practice intro:\n${formatViolations(results.violations)}`)
+    }
+    expect(results.violations).toHaveLength(0)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Beginner' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Start scenario' }))
+    await within(dialog).findByRole('textbox', { name: 'Your response' })
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    results = await (axe as { run: (el: Element) => Promise<{ violations: Array<{ id: string; description: string; nodes: unknown[] }> }> }).run(container)
+    if (results.violations.length > 0) {
+      throw new Error(`axe violations in Scenario Practice player:\n${formatViolations(results.violations)}`)
+    }
+    expect(results.violations).toHaveLength(0)
+  })
+
+  it('every other shared-popup activity has no violations', async () => {
+    window.localStorage.setItem('onboarding_complete', 'true')
+    window.jplearnDesktop = baseDesktopApi
+    const { container } = render(<App />)
+    await act(async () => {})
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Tutor' }))
+
+    const runAxe = async (label: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const results = await (axe as { run: (el: Element) => Promise<{ violations: Array<{ id: string; description: string; nodes: unknown[] }> }> }).run(container)
+      if (results.violations.length > 0) {
+        throw new Error(`axe violations in ${label}:\n${formatViolations(results.violations)}`)
+      }
+      expect(results.violations).toHaveLength(0)
+    }
+
+    let menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
+    fireEvent.click(within(menu).getByRole('button', { name: 'Chat with Tutor' }))
+    await screen.findByRole('dialog', { name: 'Tutor chat panel' })
+    await runAxe('the Tutor chat panel')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Tutor menu' }))
+    menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
+    fireEvent.click(within(menu).getByRole('button', { name: 'Image Translation' }))
+    await screen.findByRole('dialog', { name: 'OCR translator panel' })
+    await runAxe('the Image Translation panel')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Tutor menu' }))
+    menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
+    fireEvent.click(within(menu).getByRole('button', { name: 'Scenario Practice' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Scenario practice panel' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Past sessions' }))
+    await within(dialog).findByRole('button', { name: 'Back to scenario list' })
+    await runAxe('the Scenario Practice history screen')
+  })
+
+  it('the Scenario Practice summary, SRS review, and voice controls have no violations', async () => {
+    window.localStorage.setItem('onboarding_complete', 'true')
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      // With the speech runtime available the player also renders its mic
+      // control and live status region.
+      getSpeechStatus: async () => ({ available: true, running: true, lastError: null }),
+      transcribeSpeech: async () => ({ text: '', confidence: 0, durationMs: 0 }),
+      saveScenarioSession: async (payload: { sessionId: string; scenarioId: string; scenarioVersion: number; learnerLevel: string; startedAtUtc: string; transcript: unknown[]; summary: Record<string, unknown> }) => ({
+        id: payload.sessionId,
+        scenario_id: payload.scenarioId,
+        scenario_version: payload.scenarioVersion,
+        learner_level: payload.learnerLevel,
+        started_at_utc: payload.startedAtUtc,
+        completed_at_utc: '2026-07-21T00:05:00.000Z',
+        transcript: payload.transcript,
+        summary: payload.summary,
+      }),
+      saveScenarioSrsCard: async (payload: { id: string }) => ({
+        id: payload.id, session_id: 's', scenario_id: 'cafe-order', front: 'f', back: 'b', reading: '', notes: '', created_at_utc: '2026-07-21T00:06:00.000Z',
+      }),
+    } as unknown as typeof window.jplearnDesktop
+    const { container } = render(<App />)
+    await act(async () => {})
+
+    const runAxe = async (label: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const results = await (axe as { run: (el: Element) => Promise<{ violations: Array<{ id: string; description: string; nodes: unknown[] }> }> }).run(container)
+      if (results.violations.length > 0) {
+        throw new Error(`axe violations in ${label}:\n${formatViolations(results.violations)}`)
+      }
+      expect(results.violations).toHaveLength(0)
+    }
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Tutor' }))
+    const menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
+    fireEvent.click(within(menu).getByRole('button', { name: 'Scenario Practice' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Scenario practice panel' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /order at a cafe/i }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Beginner' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Start scenario' }))
+    await within(dialog).findByRole('button', { name: 'Start recording your response' })
+    await runAxe('the Scenario Practice player with voice controls')
+
+    const respond = (text: string) => {
+      fireEvent.input(within(dialog).getByRole('textbox', { name: 'Your response' }), { target: { value: text } })
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Submit response' }))
+    }
+    respond('こんにちは')
+    respond('コーヒーをください')
+    respond('レギュラーでお願いします')
+    respond('ここで食べます')
+    respond('はい、お願いします')
+    respond('ありがとうございます')
+
+    await within(dialog).findByText('Session complete!')
+    await runAxe('the Scenario Practice summary')
+
+    fireEvent.click(await within(dialog).findByRole('button', { name: /review \d+ suggested card/i }))
+    await within(dialog).findByText('Review suggested SRS cards')
+    await runAxe('the SRS draft review screen')
   })
 
   it('kanji detail panel opened from Study Overview has no violations', async () => {

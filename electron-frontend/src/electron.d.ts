@@ -4,6 +4,12 @@ import type {
   CardNoteDeletePayload,
   CardNoteLookupPayload,
   CardNotePayload,
+  ScenarioSessionPayload,
+  ScenarioSessionListPayload,
+  ScenarioSessionLookupPayload,
+  ScenarioSessionDeletePayload,
+  ScenarioSessionsClearPayload,
+  ScenarioSrsCardPayload,
   DeckSummary,
   DailyGamesPracticeSeedPayload,
   DailyGamesStatePayload,
@@ -247,6 +253,48 @@ interface DailyGamesAttemptOutcomeInput {
 interface CardNoteSaveRequest {
   noteKey: string
   noteText: string
+}
+
+interface ScenarioSessionSaveRequest {
+  sessionId: string
+  scenarioId: string
+  scenarioVersion: number
+  learnerLevel: 'beginner' | 'intermediate'
+  startedAtUtc: string
+  transcript: unknown[]
+  summary: Record<string, unknown>
+}
+
+interface ScenarioSrsCardSaveRequest {
+  id: string
+  sessionId: string
+  scenarioId: string
+  front: string
+  back: string
+  reading?: string
+  notes?: string
+}
+
+/** Single-turn context for an uncertain learner response. No transcript, no
+ * node ids, no scenario graph — the local model only judges this one utterance
+ * against the authored intent list. */
+interface ScenarioEvaluationRequest {
+  scenarioTitle: string
+  npcLine: string
+  objectiveDescription: string
+  expectedIntents: Array<{ id: string; description: string; examplePhrases: string[] }>
+  requiredSlotIds: string[]
+  learnerResponse: string
+  learnerLevel: 'beginner' | 'intermediate'
+}
+
+/** Raw model output plus an ok flag; every failure mode (no model, busy,
+ * timeout, abort, stub adapter) arrives as ok:false and is treated by the
+ * renderer as "stay uncertain". */
+interface ScenarioEvaluationResponse {
+  ok: boolean
+  text: string
+  coldStart?: boolean
 }
 
 interface DailyGamesPracticeSeedRequest {
@@ -631,6 +679,14 @@ interface DesktopApi {
   getCardNote: (noteKey: string) => Promise<CardNoteLookupPayload>
   saveCardNote: (payload: CardNoteSaveRequest) => Promise<CardNotePayload>
   deleteCardNote: (noteKey: string) => Promise<CardNoteDeletePayload>
+  // ─ Scenario Conversation Tutor persistence ───────────────────────────
+  saveScenarioSession?: (payload: ScenarioSessionSaveRequest) => Promise<ScenarioSessionPayload>
+  listScenarioSessions?: () => Promise<ScenarioSessionListPayload>
+  getScenarioSession?: (sessionId: string) => Promise<ScenarioSessionLookupPayload>
+  deleteScenarioSession?: (sessionId: string) => Promise<ScenarioSessionDeletePayload>
+  clearScenarioSessions?: () => Promise<ScenarioSessionsClearPayload>
+  saveScenarioSrsCard?: (payload: ScenarioSrsCardSaveRequest) => Promise<ScenarioSrsCardPayload>
+  evaluateScenarioResponse?: (payload: ScenarioEvaluationRequest) => Promise<ScenarioEvaluationResponse>
   getKanjiDetail?: (character: string) => Promise<KanjiDetailPayload>
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>

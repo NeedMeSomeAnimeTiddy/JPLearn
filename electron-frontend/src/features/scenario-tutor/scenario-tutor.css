@@ -1,0 +1,738 @@
+/* Scenario Practice — feature-local styles. Reuses the shared Tutor popup
+   shell (assistant-chat-* classes) for chrome/log/composer and adds only
+   what's specific to scenario content. */
+
+/* Every scenario screen fills the shared popup body and scrolls inside it, so
+   the window is the same size for Scenario Practice as it is for Chat and
+   Image Translation (see TutorPanelShell — there is only one window size). */
+.scenario-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-border) transparent;
+}
+
+/* The player manages its own internal scrolling (the conversation log grows,
+   the composer stays pinned), so it must not scroll as a whole. */
+.scenario-activity.scenario-player {
+  overflow: hidden;
+}
+
+/* --- Select ------------------------------------------------------------ */
+
+.scenario-select-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scenario-select-item {
+  display: flex;
+  width: 100%;
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  background: var(--bg-main);
+  color: var(--text-main);
+  padding: 14px 16px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+  transition: border-color 140ms ease, transform 80ms ease;
+}
+
+.scenario-select-item:hover {
+  border-color: var(--accent);
+}
+
+.scenario-select-item:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.scenario-select-item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scenario-select-item-title {
+  font-family: var(--display-font);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.scenario-select-item-title-ja {
+  font-size: 0.82rem;
+  color: var(--accent-soft);
+}
+
+.scenario-select-item-description {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+/* --- Intro -------------------------------------------------------------- */
+
+.scenario-intro-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 4px 0;
+}
+
+.scenario-intro-back:hover {
+  color: var(--text-main);
+}
+
+.scenario-intro-title {
+  font-family: var(--display-font);
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.scenario-intro-title-ja {
+  color: var(--accent-soft);
+  margin: 0;
+}
+
+.scenario-intro-description {
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.scenario-intro-heading {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+  margin: 0 0 6px;
+}
+
+.scenario-intro-objectives {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.scenario-intro-optional-tag {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.scenario-intro-level-options {
+  display: flex;
+  gap: 10px;
+}
+
+.scenario-intro-level-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  background: var(--bg-main);
+  color: var(--text-main);
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.scenario-intro-level-option.is-active {
+  border-color: color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
+  background: color-mix(in oklab, var(--bg-main) 92%, var(--tone-ocean));
+}
+
+.scenario-intro-level-label {
+  font-weight: 600;
+}
+
+.scenario-intro-level-description {
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+.scenario-intro-privacy {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  border-top: 1px solid var(--panel-border);
+  padding-top: 10px;
+}
+
+.scenario-intro-start {
+  align-self: flex-start;
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--bg-main) 88%, var(--accent));
+  color: var(--text-main);
+  padding: 10px 20px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.scenario-intro-start:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* --- Player -------------------------------------------------------------- */
+
+.scenario-player {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  gap: 12px;
+}
+
+.scenario-player-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px 0;
+}
+
+.scenario-player-title {
+  font-weight: 600;
+}
+
+.scenario-player-progress {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.scenario-conversation-log {
+  flex: 1;
+  /* Overrides the shared chat log's 180px floor: in the single-size popup the
+     log must be free to shrink so the composer, hints, and controls stay on
+     screen without the panel growing. */
+  min-height: 0;
+}
+
+.scenario-npc-reading,
+.scenario-npc-translation {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  margin: 2px 0 0;
+}
+
+.scenario-outcome-badge {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  padding: 1px 6px;
+}
+
+.scenario-outcome-correct { color: var(--tone-teal); }
+.scenario-outcome-partial { color: var(--tone-amber); }
+.scenario-outcome-incorrect,
+.scenario-outcome-unclear { color: var(--tone-rose); }
+
+/* Corrections and assisted answers live inline on their transcript turn —
+   compact, single-line-ish, never a separate floating box. */
+.scenario-turn-correction,
+.scenario-turn-assist {
+  font-size: 0.76rem;
+  color: var(--tone-amber);
+  margin: 4px 0 0;
+}
+
+.scenario-turn-assist-label {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+.scenario-turn-romaji {
+  color: var(--accent-soft);
+  font-family: var(--mono);
+}
+
+/* Voice input/playback — every element here is supplementary; the typed
+   composer below it renders identically whether or not audio works. */
+.scenario-npc-speaking {
+  margin: 0 16px;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  font-family: var(--mono);
+}
+
+.scenario-voice-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  padding: 0 2px 4px;
+}
+
+.scenario-heard-transcript {
+  color: var(--text-main);
+}
+
+.scenario-voice-error {
+  margin: 0 0 4px;
+  font-size: 0.74rem;
+  color: var(--tone-rose);
+}
+
+.scenario-mic-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  background: var(--bg-main);
+  color: var(--text-soft);
+  width: 30px;
+  height: 30px;
+  align-self: flex-end;
+  cursor: pointer;
+}
+
+.scenario-mic-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.scenario-mic-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scenario-mic-button.is-recording {
+  border-color: var(--tone-rose);
+  color: var(--tone-rose);
+}
+
+/* Restart/Leave sit as icon buttons directly in the input toolbar, next to
+   send/mic, instead of a separate full-width row above it. */
+.scenario-input-toolbar {
+  align-items: flex-end;
+}
+
+.scenario-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  background: var(--bg-main);
+  color: var(--text-soft);
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.scenario-toolbar-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.scenario-toolbar-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scenario-toolbar-button.is-danger:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--tone-rose) 60%, var(--panel-border));
+  color: var(--tone-rose);
+}
+
+.scenario-confirm-banner {
+  margin: 0 16px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--tone-rose) 50%, var(--panel-border));
+  background: color-mix(in oklab, var(--bg-main) 90%, var(--tone-rose));
+}
+
+.scenario-confirm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.scenario-confirm-yes {
+  border: 1px solid var(--tone-rose);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--tone-rose);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.scenario-confirm-no {
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  background: var(--bg-main);
+  color: var(--text-main);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+/* --- Summary -------------------------------------------------------------- */
+
+.scenario-summary-heading {
+  font-family: var(--display-font);
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.scenario-summary-subheading {
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.scenario-summary-objectives,
+.scenario-summary-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.scenario-summary-objective-met { color: var(--tone-teal); }
+.scenario-summary-objective-assisted { color: var(--tone-amber); }
+.scenario-summary-objective-missed { color: var(--text-soft); }
+
+.scenario-summary-tags {
+  color: var(--text-soft);
+}
+
+.scenario-summary-transcript-toggle {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--accent-soft);
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 0;
+}
+
+.scenario-summary-transcript {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.scenario-summary-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.scenario-summary-replay,
+.scenario-summary-exit {
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.scenario-summary-replay,
+.scenario-summary-srs-review {
+  background: color-mix(in oklab, var(--bg-main) 88%, var(--accent));
+  color: var(--text-main);
+}
+
+.scenario-summary-exit {
+  background: var(--bg-main);
+  color: var(--text-soft);
+}
+
+.scenario-persistence-note {
+  font-size: 0.76rem;
+  color: var(--tone-amber);
+}
+
+/* --- SRS draft review ------------------------------------------------------ */
+
+.scenario-srs-draft-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scenario-srs-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  padding: 12px;
+  background: var(--bg-main);
+}
+
+.scenario-srs-draft-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.scenario-srs-draft-field input {
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--panel-bg) 94%, black);
+  color: var(--text-main);
+  padding: 6px 8px;
+  font-size: 0.86rem;
+}
+
+.scenario-srs-draft-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.scenario-srs-draft-accept,
+.scenario-srs-draft-dismiss {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  cursor: pointer;
+  background: var(--bg-main);
+}
+
+.scenario-srs-draft-accept {
+  color: var(--tone-teal);
+  border-color: color-mix(in oklab, var(--tone-teal) 50%, var(--panel-border));
+}
+
+.scenario-srs-draft-dismiss {
+  color: var(--tone-rose);
+  border-color: color-mix(in oklab, var(--tone-rose) 50%, var(--panel-border));
+}
+
+.scenario-srs-skip-all {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+/* --- History ---------------------------------------------------------------- */
+
+.scenario-history-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-end;
+  border: none;
+  background: none;
+  color: var(--accent-soft);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.scenario-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scenario-history-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scenario-history-entry-open {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  background: var(--bg-main);
+  color: var(--text-main);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.scenario-history-entry-meta {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.scenario-history-entry-delete {
+  border: 1px solid var(--panel-border);
+  border-radius: 2px;
+  background: var(--bg-main);
+  color: var(--tone-rose);
+  padding: 8px;
+  cursor: pointer;
+}
+
+.scenario-history-clear-all {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--tone-rose);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.scenario-history-detail {
+  border-top: 1px solid var(--panel-border);
+  padding-top: 12px;
+}
+
+.scenario-evaluating {
+  margin: 0 16px;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  font-family: var(--mono);
+}
+
+.scenario-intro-evaluation-mode {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+/* --- Hints: icon trigger + a small floating popover (portal to body), never
+   inline in the layout and never opened automatically — see
+   ScenarioHintPanel. ------------------------------------------------------ */
+
+.scenario-hint-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--tone-amber) 40%, var(--panel-border));
+  border-radius: 2px;
+  background: var(--bg-main);
+  color: var(--text-soft);
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.scenario-hint-trigger:hover:not(:disabled),
+.scenario-hint-trigger.is-open {
+  border-color: var(--tone-amber);
+  color: var(--tone-amber);
+}
+
+.scenario-hint-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scenario-hint-trigger-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--tone-amber);
+  color: var(--bg-main);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  line-height: 14px;
+  text-align: center;
+}
+
+.scenario-hint-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in oklab, var(--tone-amber) 40%, var(--panel-border));
+  border-radius: 2px;
+  background: var(--panel-bg-alt);
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+}
+
+.scenario-hint-popover-empty {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
+.scenario-hint-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.scenario-hint-step {
+  padding: 6px 8px;
+  border-left: 2px solid color-mix(in oklab, var(--tone-amber) 60%, transparent);
+  background: color-mix(in oklab, var(--bg-main) 94%, var(--tone-amber));
+}
+
+.scenario-hint-step-en {
+  margin: 0;
+  font-size: 0.76rem;
+}
+
+.scenario-hint-step-ja {
+  margin: 2px 0 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.scenario-hint-step-romaji {
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--accent-soft);
+}
+
+.scenario-hint-popover-more {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--accent-soft);
+  cursor: pointer;
+  font-size: 0.74rem;
+  padding: 0;
+}
+
+.scenario-hint-popover-more:disabled {
+  color: var(--text-soft);
+  cursor: default;
+}

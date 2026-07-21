@@ -7,6 +7,7 @@ import type {
   AssistantToast,
   OcrWorkbenchResult,
   TutorDeps,
+  TutorPanelMode,
   TutorSettingsFields,
 } from './types'
 import {
@@ -26,8 +27,24 @@ import {
 } from './utils'
 
 export interface UseTutorReturn {
+  // Shared Tutor popup: open/closed + active mode. Replaces the old
+  // independent assistantChatOpen/ocrWorkbenchOpen booleans and their manual
+  // mutual exclusion — there is exactly one popup with one active mode.
+  tutorPanelOpen: boolean
+  tutorPanelMode: TutorPanelMode
+  /** Which menu item to restore focus to when navigating back to 'menu'. */
+  tutorPanelReturnFocusMode: TutorPanelMode | null
+  /** Opens the popup. Omit `mode` (or pass 'menu') to land on the menu; a
+   * specific mode opens that activity directly, with Back still available. */
+  openTutorPanel: (mode?: TutorPanelMode) => void
+  /** Hides the popup. Chat/OCR/scenario state is preserved, not reset. */
+  closeTutorPanel: () => void
+  /** Switches the visible activity without closing the popup. */
+  setTutorPanelMode: (mode: TutorPanelMode) => void
+  /** Convenience for setTutorPanelMode('menu'). */
+  returnToTutorMenu: () => void
+
   assistantChatOpen: boolean
-  setAssistantChatOpen: Dispatch<SetStateAction<boolean>>
   assistantChatMessages: AssistantChatTurn[]
   assistantChatLoading: boolean
   assistantChatError: string | null
@@ -35,16 +52,13 @@ export interface UseTutorReturn {
   setAssistantChatInput: Dispatch<SetStateAction<string>>
   assistantSpeakingTurnKey: string | null
   assistantChatStatus: AssistantChatRuntimeStatus | null
-  closeAssistantChat: () => void
   clearAssistantChat: () => Promise<void>
   sendAssistantChat: (forcedMessage?: string) => Promise<void>
   replayAssistantTurn: (content: string, turnKey: string) => void
   ocrWorkbenchOpen: boolean
-  setOcrWorkbenchOpen: Dispatch<SetStateAction<boolean>>
   ocrWorkbenchBusy: boolean
   ocrWorkbenchError: string | null
   ocrWorkbenchResult: OcrWorkbenchResult | null
-  closeOcrWorkbench: () => void
   handleOcrWorkbenchImageSelected: (file: File) => Promise<void>
   clearOcrWorkbenchResult: () => void
   ocrWorkbenchImageInputRef: RefObject<HTMLInputElement | null>
@@ -60,7 +74,9 @@ export function useTutor(
   deps: TutorDeps,
 ): UseTutorReturn {
   const [assistantToasts, setAssistantToasts] = useState<AssistantToast[]>([])
-  const [assistantChatOpen, setAssistantChatOpen] = useState(false)
+  const [tutorPanelOpen, setTutorPanelOpenState] = useState(false)
+  const [tutorPanelMode, setTutorPanelModeState] = useState<TutorPanelMode>('menu')
+  const [tutorPanelReturnFocusMode, setTutorPanelReturnFocusMode] = useState<TutorPanelMode | null>(null)
   const [assistantChatInput, setAssistantChatInput] = useState('')
   const [assistantChatMessages, setAssistantChatMessages] = useState<AssistantChatTurn[]>([])
   const [assistantChatLoading, setAssistantChatLoading] = useState(false)
@@ -69,18 +85,46 @@ export function useTutor(
   const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
   const [, setAssistantChatWarmup] = useState(false)
   const [, setAssistantChatFallbackNote] = useState<string | null>(null)
-  const [ocrWorkbenchOpen, setOcrWorkbenchOpen] = useState(false)
   const [ocrWorkbenchBusy, setOcrWorkbenchBusy] = useState(false)
   const [ocrWorkbenchError, setOcrWorkbenchError] = useState<string | null>(null)
   const [ocrWorkbenchResult, setOcrWorkbenchResult] = useState<OcrWorkbenchResult | null>(null)
+
+  // Derived, not independent state: the popup has exactly one active mode,
+  // so "is chat/OCR visible" is simply "is the popup open at that mode" —
+  // this replaces the old independently-toggled booleans and their manual
+  // mutual exclusion in App.tsx.
+  const assistantChatOpen = tutorPanelOpen && tutorPanelMode === 'chat'
+  const ocrWorkbenchOpen = tutorPanelOpen && tutorPanelMode === 'ocr'
 
   const assistantChatHistoryHydratedRef = useRef(false)
   const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
   const ocrWorkbenchImageInputRef = useRef<HTMLInputElement | null>(null)
   const assistantChatClearTokenRef = useRef(0)
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
+  const ocrRequestTokenRef = useRef(0)
 
   const { voice } = deps
+
+  const openTutorPanel = useCallback((mode: TutorPanelMode = 'menu') => {
+    setTutorPanelOpenState(true)
+    setTutorPanelModeState(mode)
+    if (mode !== 'menu') setTutorPanelReturnFocusMode(mode)
+  }, [])
+
+  const setTutorPanelMode = useCallback((mode: TutorPanelMode) => {
+    setTutorPanelModeState(mode)
+    if (mode !== 'menu') setTutorPanelReturnFocusMode(mode)
+  }, [])
+
+  const returnToTutorMenu = useCallback(() => {
+    setTutorPanelModeState('menu')
+  }, [])
+
+  const closeTutorPanel = useCallback(() => {
+    // Hides the popup only. Chat messages/input, OCR result/error, and any
+    // active scenario session are preserved — nothing here resets them.
+    setTutorPanelOpenState(false)
+  }, [])
 
   const speakAssistantReply = useCallback(async (text: string, turnKey?: string): Promise<void> => {
     if (!settings.assistantChatAudioEnabled) {
@@ -229,14 +273,6 @@ export function useTutor(
     return hydrated
   }, [isAssistantServerActive, refreshAssistantChatHistory, refreshAssistantChatStatus])
 
-  const closeAssistantChat = useCallback(() => {
-    voice.cancelAssistantSpeech()
-    setAssistantChatOpen(false)
-    setAssistantChatError(null)
-    setAssistantChatWarmup(false)
-    setAssistantChatFallbackNote(null)
-  }, [voice])
-
   const clearAssistantChat = useCallback(async () => {
     assistantChatClearTokenRef.current += 1
     assistantChatHistoryHydratedRef.current = true
@@ -313,13 +349,6 @@ export function useTutor(
     }
   }, [assistantChatInput, assistantChatStatus?.loaded, deps.activeSessionId, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
 
-  const closeOcrWorkbench = useCallback(() => {
-    setOcrWorkbenchOpen(false)
-    setOcrWorkbenchError(null)
-    setOcrWorkbenchResult(null)
-    setOcrWorkbenchBusy(false)
-  }, [])
-
   const clearOcrWorkbenchResult = useCallback(() => {
     setOcrWorkbenchResult(null)
     setOcrWorkbenchError(null)
@@ -350,14 +379,23 @@ export function useTutor(
       return
     }
 
+    // Guards against an older in-flight OCR request (multi-step: extract then
+    // translate) resolving after a newer one has already been started —
+    // whichever image was selected most recently is the only one allowed to
+    // update ocrWorkbenchResult/Error/Busy.
+    const requestToken = ++ocrRequestTokenRef.current
+    const isStale = () => ocrRequestTokenRef.current !== requestToken
+
     setOcrWorkbenchBusy(true)
     setOcrWorkbenchError(null)
     try {
       const payload = await prepareAssistantChatImagePayload(file)
+      if (isStale()) return
       const ocrResponse = await extractAssistantChatImageText({
         ...payload,
         minConfidence: settings.assistantChatOcrMinConfidence,
       })
+      if (isStale()) return
       const extractedText = typeof ocrResponse?.text === 'string' ? ocrResponse.text.trim() : ''
       if (!extractedText) {
         setOcrWorkbenchError('No readable text was found in that image.')
@@ -370,6 +408,7 @@ export function useTutor(
         targetLang: 'en',
         fastMode: true,
       })
+      if (isStale()) return
       const rawEnglishText = (translationResponse?.text ?? '').trim()
       const finalEnglishText = normalizeTranslationWhitespace(sanitizeOcrTranslationText(rawEnglishText))
 
@@ -389,10 +428,11 @@ export function useTutor(
         englishText: finalEnglishText,
       })
     } catch (error: unknown) {
+      if (isStale()) return
       const detail = error instanceof Error && error.message ? error.message : 'Unable to extract text from this image.'
       setOcrWorkbenchError(detail)
     } finally {
-      setOcrWorkbenchBusy(false)
+      if (!isStale()) setOcrWorkbenchBusy(false)
     }
   }, [deps.ocrInstalled, settings.assistantChatOcrMinConfidence])
 
@@ -441,6 +481,17 @@ export function useTutor(
     voice.cancelAssistantSpeech()
   }, [assistantChatOpen, settings.assistantChatAudioEnabled, voice.cancelAssistantSpeech])
 
+  // Clears transient chat feedback (error/warmup/fallback banners) whenever
+  // chat stops being the visible activity, for any reason — popup closed,
+  // switched to another mode, or back to the menu. Chat messages and the
+  // draft input are NOT cleared here; they persist across all of these.
+  useEffect(() => {
+    if (assistantChatOpen) return
+    setAssistantChatError(null)
+    setAssistantChatWarmup(false)
+    setAssistantChatFallbackNote(null)
+  }, [assistantChatOpen])
+
   useEffect(() => {
     if (!settings.assistantChatEnabled || !assistantChatOpen) {
       return
@@ -473,7 +524,9 @@ export function useTutor(
     }
 
     assistantChatHistoryHydratedRef.current = false
-    setAssistantChatOpen(false)
+    // Chat was just disabled in settings — if it's the visible activity,
+    // fall back to the menu (where the now-hidden Chat item won't reopen it).
+    setTutorPanelModeState((currentMode) => (currentMode === 'chat' ? 'menu' : currentMode))
     setAssistantChatLoading(false)
     setAssistantChatWarmup(false)
     setAssistantChatError(null)
@@ -619,8 +672,15 @@ export function useTutor(
   const activeAssistantToast = useMemo(() => assistantToasts[0] ?? null, [assistantToasts])
 
   return {
+    tutorPanelOpen,
+    tutorPanelMode,
+    tutorPanelReturnFocusMode,
+    openTutorPanel,
+    closeTutorPanel,
+    setTutorPanelMode,
+    returnToTutorMenu,
+
     assistantChatOpen,
-    setAssistantChatOpen,
     assistantChatMessages,
     assistantChatLoading,
     assistantChatError,
@@ -628,16 +688,13 @@ export function useTutor(
     setAssistantChatInput,
     assistantSpeakingTurnKey,
     assistantChatStatus,
-    closeAssistantChat,
     clearAssistantChat,
     sendAssistantChat,
     replayAssistantTurn,
     ocrWorkbenchOpen,
-    setOcrWorkbenchOpen,
     ocrWorkbenchBusy,
     ocrWorkbenchError,
     ocrWorkbenchResult,
-    closeOcrWorkbench,
     handleOcrWorkbenchImageSelected,
     clearOcrWorkbenchResult,
     ocrWorkbenchImageInputRef,
