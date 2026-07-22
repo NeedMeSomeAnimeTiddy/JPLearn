@@ -14,6 +14,10 @@ Deeper reference docs (read the relevant one before nontrivial work in that area
   model, renderer state, content pipeline, and a ranked list of known structural issues. Written
   as a design reference, not a task list — read it before designing anything touching mastery
   tracking, the Python bridge, or deck/card-id allocation.
+- `ISSUE-69-PHASE4.md` — live handoff for the in-progress `App.tsx` decomposition
+  (branch `refactor/issue-69-app-decomposition`). Read it before touching session/round
+  state in `App.tsx`; it carries the ref-ownership map and the test gate. Delete when #69
+  closes.
 - `FEATURES.md` — product-level feature list.
 - `ROADMAP.md` — planned work (has some known-stale entries; ARCHITECTURE.md §8 "F" findings
   list which ones).

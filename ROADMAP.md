@@ -10,6 +10,16 @@ remains to be built.
 
 ## Now / Next (Highest Priority)
 
+- [ ] **(High) App.tsx decomposition — issue #69, Phase 4b** (in progress on `refactor/issue-69-app-decomposition`)
+  - Phases 1–3 + 4a done: App.tsx 7,451 → 4,060 lines. Pure helpers are in `src/lib/`,
+    titlebar + settings modal are in `src/components/`, round builders are in
+    `src/features/study-session/`.
+  - **Remaining**: 44 `useState` + ~18 refs + ~1,236 lines of session logic → a
+    `useStudySession` hook. `useState` is still 111 because no state has moved yet.
+  - **Read [ISSUE-69-PHASE4.md](ISSUE-69-PHASE4.md) before starting** — it has the ref
+    ownership map, the two refs that straddle the session boundary, and the
+    characterization-test gate to run after every step.
+
 - [ ] **(High) One-tap retry for missed items from session summary** ⬆️ promoted from Medium
   - Requeue wrong answers and near-misses into a short recovery run after a session ends
   - Make it easy to fix weak spots immediately after a session ends
