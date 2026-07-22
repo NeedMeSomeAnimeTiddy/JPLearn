@@ -1,5 +1,5 @@
 import type {
-  AppSettings, CardScores, ExpertiseLevel, MinigameStats, MinigameStatsByScript,
+  AppSettings, CardScores, ExpertiseLevel, LastSessionPrefs, MinigameStats, MinigameStatsByScript,
   ScriptKey, ScriptStats, StatsByScript, StudySummaryPayload,
 } from '../types'
 import type { CustomTheme, ThemeScope } from '../features/theme/types'
@@ -24,6 +24,21 @@ export const SESSION_STORAGE_KEY = 'jplearn-desktop-session-v1'
 export const PREFS_STORAGE_KEY = 'jplearn-desktop-session-prefs-v1'
 
 export const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
+
+/**
+ * Last-used deck/minigame and session toggles. Read by both App (activeScript,
+ * activeGame) and useStudySession (lives/leech/confidence/target), so it lives
+ * here rather than in either one.
+ */
+export function loadSessionPrefs(): LastSessionPrefs | null {
+  try {
+    const raw = localStorage.getItem(PREFS_STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as LastSessionPrefs
+  } catch {
+    return null
+  }
+}
 
 
 export const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
