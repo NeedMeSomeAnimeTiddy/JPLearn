@@ -140,23 +140,32 @@ lookups will silently miss.
 
 ### The central problem: `App.tsx`
 
-| Metric | Value |
-|---|---|
-| Total lines | 7,451 |
-| `App()` function body | lines 1587–7448 (~5,860) |
-| `useState` | 112 |
-| `useCallback` | 60 |
-| `useMemo` | 27 |
-| `useEffect` | 34 |
+| Metric | Value | At issue #69 filing |
+|---|---|---|
+| Total lines | 4,859 | 7,451 |
+| `App()` function body | lines 175–4,856 | 1587–7448 |
+| `useState` | 111 | 112 |
+| `useCallback` | 73 | 60 |
+| `useMemo` | 27 | 27 |
+| `useEffect` | 34 | 34 |
 
-Lines 111–1586 are module-level constants and pure helpers — study-plan building, JLPT
-progress aggregation, cloze/story text generation, assembly chunking, round scoring,
-coach-toast copy. Per AGENTS.md these belong in `src/lib/`; per AGENTS.md App.tsx should
-be "orchestrator only". Neither currently holds.
+Issue #69 moved the module-level pure helpers and the two largest JSX blocks out:
 
-Routing is a flat `view` string with inline conditional JSX from ~line 5998 onward
-(`home`, `script_hub`, `minigame`, `jlpt_prep`, `passage_hub`, `daily_games`), plus a
-settings modal rendered inline.
+- `src/lib/` — `studyPlan`, `progressAggregation`, `roundContent`, `roundScoring`,
+  `appStorage`, `deckUtils` (the former lines 111–1586).
+- `src/components/AppTitlebar.tsx` (430 lines) and `src/components/AppSettingsModal.tsx`
+  (913 lines), both presentational: App still owns their state and passes it down.
+- Types and constants that App.tsx had been redeclaring now come from `src/types.ts` and
+  `src/constants.tsx`.
+
+`useCallback` rose because inline JSX closures were lifted to named handlers — a
+deliberate prerequisite for extracting the JSX safely.
+
+**Still outstanding:** the `useState` count barely moved, because none of the above
+relocated state. Session/round/scoring state is still owned directly by `App()` and is
+the remaining work on #69. Routing is likewise still a flat `view` string with inline
+conditional JSX (`home`, `script_hub`, `minigame`, `jlpt_prep`, `passage_hub`,
+`daily_games`).
 
 **Design rule for new work:** anything with its own state goes in
 `src/features/<name>/` (`types.ts` → `constants.ts` → `utils.ts` → `use<Name>.ts` →
@@ -332,7 +341,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 
 | # | Finding | Issue |
 |---|---|---|
-| D1 | `App.tsx` at 7,451 lines / 112 `useState` violates the project's own "orchestrator only" rule. ~1,400 lines of module-level pure helpers should move to `src/lib/`; session/round/scoring state should become a feature module. | partially #6 (closed, handler boilerplate only) |
+| D1 | `App.tsx` at 4,859 lines / 111 `useState` still violates the "orchestrator only" rule. The pure helpers (now `src/lib/`) and the titlebar + settings JSX (now `src/components/`) are done; session/round/scoring state still needs to become a feature module, which is what the `useState` count reflects. | #69 (partial), #6 (closed, handler boilerplate only) |
 | D2 | `desktop_bridge.py` at 6,122 lines mixes OCR, MT, dictionary, and deck logic in `scripts/` — a directory `arch_check.py` does not inspect. | none |
 | D3 | `arch_check.py` covers only `src`/`domain`/`data`/`ui`; extend `RULES` to `scripts/`. | none |
 | D4 | `data/app.db` + `SRSRepository` are unused by any runtime path but documented in FEATURES.md as live persistence. Either wire or reclassify. | none |
