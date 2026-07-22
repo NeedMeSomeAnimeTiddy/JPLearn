@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react'
-import type { CardNoteController } from './useCardNote'
+import type { CardNoteController } from '../useCardNote'
 import './card-notes.css'
 
 export interface CardNoteEditorProps {

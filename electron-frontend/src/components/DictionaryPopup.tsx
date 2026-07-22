@@ -3,13 +3,13 @@ import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { BookText, Check, ClipboardCopy, History, NotebookPen, ScanText, TriangleAlert, Volume2, X } from 'lucide-react'
 import { toHiragana } from 'wanakana'
 import type { PitchAccent } from '../generated/types'
-import { CardNoteEditor } from '../features/card-notes/CardNoteEditor'
-import { useCardNote } from '../features/card-notes/useCardNote'
 import {
+  CardNoteEditor,
+  useCardNote,
   dedupeDictionaryCards,
   dictionaryItemRenderKey,
   isValidCardNoteKey,
-} from '../features/card-notes/utils'
+} from '../features/card-notes'
 import { extractKanjiCharacters } from '../features/kanji-detail'
 import { DictionaryPitchAccent } from './DictionaryPitchAccent'
 
