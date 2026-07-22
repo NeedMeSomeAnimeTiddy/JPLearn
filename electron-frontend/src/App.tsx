@@ -2115,114 +2115,11 @@ function App() {
     </>
   }
 
-  return (
-    <main className="app-shell">
-      <AppTitlebar
-        windowDrag={windowDrag}
-        shortcutMenuRef={shortcutMenuRef}
-        shortcutMenuOpen={shortcutMenuOpen}
-        toggleShortcutMenu={toggleShortcutMenu}
-        activeShortcutFlyout={activeShortcutFlyout}
-        setActiveShortcutFlyout={setActiveShortcutFlyout}
-        jumpToMainMenu={jumpToMainMenu}
-        jumpToOverview={jumpToOverview}
-        jumpToJlptPrep={jumpToJlptPrep}
-        jumpToPassageHub={jumpToPassageHub}
-        openDailyGames={openDailyGames}
-        toggleAllMapsFlyout={toggleAllMapsFlyout}
-        jumpToScriptHub={jumpToScriptHub}
-        jumpToScriptHubMinigame={jumpToScriptHubMinigame}
-        toggleDevToolsFlyout={toggleDevToolsFlyout}
-        toggleDevChecksFlyout={toggleDevChecksFlyout}
-        openSettingsFromMenu={openSettingsFromMenu}
-        refreshDataFromMenu={refreshDataFromMenu}
-        inspectElementFromMenu={inspectElementFromMenu}
-        openDevDashboard={openDevDashboard}
-        runCheckFromMenu={runCheckFromMenu}
-        restartBridgeFromMenu={restartBridgeFromMenu}
-        clearCachesFromMenu={clearCachesFromMenu}
-        openDictionaryForCurrentRound={openDictionaryForCurrentRound}
-        canTitlebarBack={nav.canHistoryBack}
-        canTitlebarForward={nav.canHistoryForward}
-        titlebarHistoryBack={nav.historyBack}
-        titlebarHistoryForward={nav.historyForward}
-        settings={settings}
-        pomodoro={pomodoro}
-        tutor={tutor}
-        tutorTitlebarButtonRef={tutorTitlebarButtonRef}
-        toggleTutorPanelFromTitlebar={toggleTutorPanelFromTitlebar}
-        streak={streak}
-        streakDetailsOpen={streakDetailsOpen}
-        streakDetailsRef={streakDetailsRef}
-        toggleStreakDetails={toggleStreakDetails}
-        xpProgress={xpProgress}
-        xpDetailsOpen={xpDetailsOpen}
-        xpDetailsRef={xpDetailsRef}
-        toggleXpDetails={toggleXpDetails}
-        xpInLevel={xpInLevel}
-        xpLevelCap={xpLevelCap}
-        xpPercent={xpPercent}
-        isWindowMaximized={isWindowMaximized}
-        minimizeWindow={minimizeWindow}
-        toggleMaximizeWindow={toggleMaximizeWindow}
-        handleCloseRequest={handleCloseRequest}
-      />
-      <div className="atmosphere atmosphere-left" aria-hidden="true" />
-      <div className="atmosphere atmosphere-right" aria-hidden="true" />
-      <div className="atmosphere atmosphere-top" aria-hidden="true" />
-      {showPetalLayer ? (
-        <div className="petal-layer" aria-hidden="true">
-          {activePetalStream.map((petal, index) => (
-            <span
-              key={`petal-${index}`}
-              className="petal"
-              style={{
-                left: petal.x,
-                '--petal-drift': petal.drift,
-                '--petal-duration': petal.duration,
-                '--petal-delay': petal.delay,
-                '--petal-size': petal.size,
-                opacity: petal.opacity,
-              } as CSSProperties}
-            />
-          ))}
-        </div>
-      ) : null}
-
-      {pageLoading ? (
-        <div className="page-loading-overlay" role="status" aria-label={pageLoadingLabel}>
-          <div className="page-loading-crt" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
-          <div className="page-loading-widget">
-            <span
-              className="page-loading-label page-loading-glitch"
-              data-text={pageLoadingLabel}
-            >
-              {pageLoadingLabel}
-            </span>
-            <div className="page-loading-track">
-              <div className="page-loading-fill" />
-            </div>
-            <div className="page-loading-eq" aria-hidden="true">
-              <span /><span /><span /><span />
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="app-shell-scroll">
-      {/* Session state comes from useStudySession; voice and blockSessionComplete
-          are App's, and are merged in here rather than pulled into the hook. */}
-      <SessionProvider value={{
-        ...session.slice,
-        blockSessionComplete,
-        voiceBusy: voice.voiceBusy,
-        voiceUnavailable: voice.voiceUnavailable,
-        playAudio: (text) => { void voice.playQuestionAudio(text) },
-      }}>
+  // Renders the active top-level screen. Extracted from the JSX tree so the
+  // return reads as <SessionProvider>{renderView()}{overlays}</SessionProvider>;
+  // the branches stay mutually exclusive on `view`.
+  const renderView = () => (
+    <>
       {/* Home is the main landing surface; keep it mounted only for home view. */}
       {view === 'home' ? (
         <HomeView
@@ -2586,6 +2483,118 @@ function App() {
           </div>
         </div>
       ) : null}
+    </>
+  )
+
+  return (
+    <main className="app-shell">
+      <AppTitlebar
+        windowDrag={windowDrag}
+        shortcutMenuRef={shortcutMenuRef}
+        shortcutMenuOpen={shortcutMenuOpen}
+        toggleShortcutMenu={toggleShortcutMenu}
+        activeShortcutFlyout={activeShortcutFlyout}
+        setActiveShortcutFlyout={setActiveShortcutFlyout}
+        jumpToMainMenu={jumpToMainMenu}
+        jumpToOverview={jumpToOverview}
+        jumpToJlptPrep={jumpToJlptPrep}
+        jumpToPassageHub={jumpToPassageHub}
+        openDailyGames={openDailyGames}
+        toggleAllMapsFlyout={toggleAllMapsFlyout}
+        jumpToScriptHub={jumpToScriptHub}
+        jumpToScriptHubMinigame={jumpToScriptHubMinigame}
+        toggleDevToolsFlyout={toggleDevToolsFlyout}
+        toggleDevChecksFlyout={toggleDevChecksFlyout}
+        openSettingsFromMenu={openSettingsFromMenu}
+        refreshDataFromMenu={refreshDataFromMenu}
+        inspectElementFromMenu={inspectElementFromMenu}
+        openDevDashboard={openDevDashboard}
+        runCheckFromMenu={runCheckFromMenu}
+        restartBridgeFromMenu={restartBridgeFromMenu}
+        clearCachesFromMenu={clearCachesFromMenu}
+        openDictionaryForCurrentRound={openDictionaryForCurrentRound}
+        canTitlebarBack={nav.canHistoryBack}
+        canTitlebarForward={nav.canHistoryForward}
+        titlebarHistoryBack={nav.historyBack}
+        titlebarHistoryForward={nav.historyForward}
+        settings={settings}
+        pomodoro={pomodoro}
+        tutor={tutor}
+        tutorTitlebarButtonRef={tutorTitlebarButtonRef}
+        toggleTutorPanelFromTitlebar={toggleTutorPanelFromTitlebar}
+        streak={streak}
+        streakDetailsOpen={streakDetailsOpen}
+        streakDetailsRef={streakDetailsRef}
+        toggleStreakDetails={toggleStreakDetails}
+        xpProgress={xpProgress}
+        xpDetailsOpen={xpDetailsOpen}
+        xpDetailsRef={xpDetailsRef}
+        toggleXpDetails={toggleXpDetails}
+        xpInLevel={xpInLevel}
+        xpLevelCap={xpLevelCap}
+        xpPercent={xpPercent}
+        isWindowMaximized={isWindowMaximized}
+        minimizeWindow={minimizeWindow}
+        toggleMaximizeWindow={toggleMaximizeWindow}
+        handleCloseRequest={handleCloseRequest}
+      />
+      <div className="atmosphere atmosphere-left" aria-hidden="true" />
+      <div className="atmosphere atmosphere-right" aria-hidden="true" />
+      <div className="atmosphere atmosphere-top" aria-hidden="true" />
+      {showPetalLayer ? (
+        <div className="petal-layer" aria-hidden="true">
+          {activePetalStream.map((petal, index) => (
+            <span
+              key={`petal-${index}`}
+              className="petal"
+              style={{
+                left: petal.x,
+                '--petal-drift': petal.drift,
+                '--petal-duration': petal.duration,
+                '--petal-delay': petal.delay,
+                '--petal-size': petal.size,
+                opacity: petal.opacity,
+              } as CSSProperties}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {pageLoading ? (
+        <div className="page-loading-overlay" role="status" aria-label={pageLoadingLabel}>
+          <div className="page-loading-crt" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
+          <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
+          <div className="page-loading-widget">
+            <span
+              className="page-loading-label page-loading-glitch"
+              data-text={pageLoadingLabel}
+            >
+              {pageLoadingLabel}
+            </span>
+            <div className="page-loading-track">
+              <div className="page-loading-fill" />
+            </div>
+            <div className="page-loading-eq" aria-hidden="true">
+              <span /><span /><span /><span />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="app-shell-scroll">
+      {/* Session state comes from useStudySession; voice and blockSessionComplete
+          are App's, and are merged in here rather than pulled into the hook. */}
+      <SessionProvider value={{
+        ...session.slice,
+        blockSessionComplete,
+        voiceBusy: voice.voiceBusy,
+        voiceUnavailable: voice.voiceUnavailable,
+        playAudio: (text) => { void voice.playQuestionAudio(text) },
+      }}>
+      {renderView()}
 
       {/* Study Overview popup — accessible on top of any view */}
       {showOverview ? (
