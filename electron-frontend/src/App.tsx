@@ -7,21 +7,16 @@ import type {
   BlockInfo,
   BlockProgressPayload,
   CardScores,
-  CategoryProgress,
   DeckSlugInput,
-  ExpertiseLevel,
   ExplicitReviewItem,
   FeedbackTone,
   GrammarMinigameResponse,
   InterleaveWeights,
   JlptLevel,
-  JlptLevelProgress,
-  JlptProgressCard,
   KanjiCategory,
   LastSessionPrefs,
   LearningPathStatus,
   MinigameKey,
-  MinigameStats,
   MinigameStatsByScript,
   NavDirection,
   OverviewCategoryBlocks,
@@ -34,7 +29,6 @@ import type {
   RoundState,
   ScriptDeck,
   ScriptKey,
-  ScriptStats,
   SectionReadiness,
   SessionGoalStartResponse,
   SessionRunReport,
@@ -43,8 +37,6 @@ import type {
   ShortcutSubmenuKey,
   StatsByScript,
   StudyPlanCoverageRow,
-  StudyPlanSnapshot,
-  StudyPlanStage,
   StudyQueueResponse,
   StudySummaryPayload,
   VocabCategory,
@@ -81,23 +73,75 @@ import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode, blankOutWordInSentence } from './utils'
 import { KANJI_MEANINGS } from './lib/kanjiMeanings'
 import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, Gamepad2, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, PlayCircle, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Trophy, Upload, X } from 'lucide-react'
+import {
+  PERFORMANCE_GOOD_MS,
+  calculateAwardedPoints,
+  classifyRoundPerformance,
+  buildRoundCoachToast,
+} from './lib/roundScoring'
+import {
+  STATS_STORAGE_KEY,
+  SETTINGS_STORAGE_KEY,
+  CARD_SCORES_STORAGE_KEY,
+  SUMMARY_SNAPSHOT_STORAGE_KEY,
+  SESSION_STORAGE_KEY,
+  PREFS_STORAGE_KEY,
+  EXPERTISE_LEVEL_TO_SCRIPT_KEYS,
+  deriveExpertiseLevelFromChecked,
+  EMPTY_SCRIPT_STATS,
+  defaultMinigameStatsByScript,
+  loadSavedStats,
+  loadSettings,
+  loadCardScores,
+  loadSummarySnapshot,
+  saveSummarySnapshot,
+} from './lib/appStorage'
+import {
+  normalizeDeckCards,
+  limitRuntimeDeckCards,
+  normalizeBlockList,
+  normalizeText,
+  chooseUniqueIndices,
+  shuffleArray,
+  buildInterleaveSequence,
+} from './lib/deckUtils'
+import {
+  isParticleClozeMode,
+  PARTICLE_EXPLANATIONS,
+  isVibeCheckMode,
+  isImposterMode,
+  isSentenceAssemblyMode,
+  pickSurprisePrompt,
+  curriculumStageFromScore,
+  normalizeCurriculumStage,
+  splitSentenceIntoAssemblyChunks,
+  buildClozeLine,
+  buildStoryChapter,
+  buildRoundDictionaryNote,
+  narrativePriorityCards,
+} from './lib/roundContent'
+import {
+  buildJlptLevelProgress,
+  buildJlptLevelProgressFromLevelDecks,
+  buildCategoryProgress,
+} from './lib/progressAggregation'
+import {
+  buildStudyPlan,
+} from './lib/studyPlan'
+import { CARD_MASTERY_MAX } from './constants'
 import './App.css'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
-import type { ThemeScope, CustomTheme } from './features/theme/types'
-import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme, resolveThemeMode } from './features/theme/utils'
-import { useVoice, splitSpeechSegments, VoiceSettingsTab, DEFAULT_VOICE_SPEED, type VoiceSettingsFields } from './features/voice'
+import { useVoice, splitSpeechSegments, VoiceSettingsTab, type VoiceSettingsFields } from './features/voice'
 import { useModels } from './features/models'
-import { useTutor, TutorPanel, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, isAssistantToastLimit, type TutorSettingsFields } from './features/tutor'
+import { useTutor, TutorPanel, TutorToast, TutorSettingsTab, TutorTitlebarButton, clampAssistantChatOcrMinConfidence, type TutorSettingsFields } from './features/tutor'
 import { useScenarioTutor } from './features/scenario-tutor'
-import type { AssistantToast } from './features/tutor'
 import { useCursor, CursorFollower, CursorSettingsTab, type CursorSettings } from './features/cursor'
 import { useWindowDrag } from './features/window-drag'
 import { usePomodoro, BreakOverlay, PomodoroSettingsTab, type PomodoroSettingsFields } from './features/pomodoro'
 import { DevDashboard } from './features/devtools'
 import type { HandwritingOutcome } from './features/handwriting'
 import { formatHandwritingAttemptValue, isHandwritingEligibleCharacter, isHandwritingOutcomeCorrect } from './features/handwriting'
-import { SURPRISE_PROMPTS, SCRIPT_MODE_PROMPT_PACKS, TAG_PROMPT_PACKS, CLOZE_TEMPLATES, STORY_CHAPTERS } from './lib/contentTemplates'
 import type { RoundDictionaryNote } from './types'
 import {
   SECTION_META,
@@ -109,10 +153,6 @@ import {
   DEFAULT_LIVES,
   SESSION_LENGTH_PRESETS,
   DEFAULT_SESSION_LENGTH_PRESET,
-  POINT_COMBO_THRESHOLDS,
-  JLPT_LEVEL_ORDER,
-  JLPT_LEVEL_LABELS,
-  CATEGORY_UNLOCK_THRESHOLD,
   VOCAB_CATEGORY_ORDER,
   VOCAB_CATEGORY_LABELS,
   VOCAB_CATEGORY_TO_DECK_SLUG,
@@ -132,1118 +172,12 @@ import {
   MOTION_STYLE_LABEL,
 } from './constants'
 
-const PERFORMANCE_PERFECT_MS = 700
-const PERFORMANCE_GOOD_MS = 2200
 const ROUND_QUEUE_TIMEOUT_MS = 1200
 const STUDY_QUEUE_CACHE_TTL_MS = 45000
 const DECK_LOAD_TIMEOUT_MS = 15000
 const STARTUP_WARMUP_INITIAL_DELAY_MS = 900
 const STARTUP_WARMUP_YIELD_DEADLINE_MS = 45
 const DailyGamesHub = lazy(() => import('./features/daily-games/components/GamesHub'))
-
-const STATS_STORAGE_KEY = 'jplearn-desktop-script-stats-v1'
-const SETTINGS_STORAGE_KEY = 'jplearn-desktop-settings-v1'
-const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
-const SUMMARY_SNAPSHOT_STORAGE_KEY = 'jplearn-desktop-summary-snapshot-v1'
-const SESSION_STORAGE_KEY = 'jplearn-desktop-session-v1'
-const PREFS_STORAGE_KEY = 'jplearn-desktop-session-prefs-v1'
-
-const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
-const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
-
-
-const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
-  total_beginner:       [],
-  know_hiragana:        ['hiragana'],
-  know_kana:            ['hiragana', 'katakana'],
-  jlpt_n5_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-  jlpt_n4_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-  jlpt_n3_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-  jlpt_n2_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-  jlpt_n1_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-}
-
-function deriveExpertiseLevelFromChecked(checked: Set<string>): ExpertiseLevel {
-  if (checked.has('kanji_n1') || checked.has('vocab_n1')) return 'jlpt_n1_foundation'
-  if (checked.has('kanji_n2') || checked.has('vocab_n2')) return 'jlpt_n2_foundation'
-  if (checked.has('kanji_n3') || checked.has('vocab_n3')) return 'jlpt_n3_foundation'
-  if (checked.has('kanji_n4') || checked.has('vocab_n4')) return 'jlpt_n4_foundation'
-  if (checked.has('kanji_n5') || checked.has('vocab_n5')) return 'jlpt_n5_foundation'
-  if (checked.has('katakana')) return 'know_kana'
-  if (checked.has('hiragana')) return 'know_hiragana'
-  return 'total_beginner'
-}
-
-const EMPTY_SCRIPT_STATS: ScriptStats = {
-  attempted: 0,
-  correct: 0,
-  currentStreak: 0,
-  bestStreak: 0,
-}
-
-const EMPTY_MINIGAME_STATS: MinigameStats = {
-  attempted: 0,
-  correct: 0,
-  currentStreak: 0,
-  bestStreak: 0,
-  points: 0,
-}
-
-function defaultStatsByScript(): StatsByScript {
-  return {
-    hiragana: { ...EMPTY_SCRIPT_STATS },
-    katakana: { ...EMPTY_SCRIPT_STATS },
-    kanji_n5: { ...EMPTY_SCRIPT_STATS },
-    vocab_n5: { ...EMPTY_SCRIPT_STATS },
-    grammar_patterns: { ...EMPTY_SCRIPT_STATS },
-    sentence_examples: { ...EMPTY_SCRIPT_STATS },
-  }
-}
-
-function defaultMinigameStatsByScript(): MinigameStatsByScript {
-  return {
-    hiragana: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    katakana: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    kanji_n5: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    vocab_n5: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    grammar_patterns: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    sentence_examples: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-  }
-}
-
-function loadSavedStats(): StatsByScript {
-  try {
-    const raw = window.localStorage.getItem(STATS_STORAGE_KEY)
-    if (!raw) return defaultStatsByScript()
-
-    const parsed = JSON.parse(raw) as Partial<StatsByScript>
-    return {
-      hiragana: { ...EMPTY_SCRIPT_STATS, ...(parsed.hiragana ?? {}) },
-      katakana: { ...EMPTY_SCRIPT_STATS, ...(parsed.katakana ?? {}) },
-      kanji_n5: { ...EMPTY_SCRIPT_STATS, ...(parsed.kanji_n5 ?? {}) },
-      vocab_n5: { ...EMPTY_SCRIPT_STATS, ...(parsed.vocab_n5 ?? {}) },
-      grammar_patterns: { ...EMPTY_SCRIPT_STATS, ...(parsed.grammar_patterns ?? {}) },
-      sentence_examples: { ...EMPTY_SCRIPT_STATS, ...(parsed.sentence_examples ?? {}) },
-    }
-  } catch {
-    return defaultStatsByScript()
-  }
-}
-
-function defaultSettings(): AppSettings {
-  return {
-    reducedMotion:
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    fontSize: 'medium',
-    appFont: 'system_ui',
-    themeMode: 'dark',
-    theme: 'lofi_dusk',
-    themeScope: 'preset',
-    activeCustomThemeId: null,
-    customThemes: [],
-    motionStyle: 'glide',
-    assistantToastLimit: 1,
-    assistantChatEnabled: true,
-    assistantChatAudioEnabled: true,
-    assistantChatOcrMinConfidence: 0.3,
-    scenarioAiEvaluationEnabled: true,
-    romajiConversionEnabled: true,
-    showKeyboardPrompts: false,
-    furiganaEnabled: false,
-    furiganaAutoHideMastered: false,
-    voiceEnabled: true,
-    voiceSpeaker: 'zundamon_normal',
-    voiceSpeed: DEFAULT_VOICE_SPEED,
-    ambientAudioEnabled: false,
-    cursor: { mode: 'system', theme: 'classic', size: 1, color: null },
-    pomodoroEnabled: false,
-    pomodoroWorkMinutes: 25,
-    pomodoroBreakMinutes: 5,
-    pomodoroLongBreakMinutes: 15,
-    pomodoroSessionsBeforeLongBreak: 4,
-    pomodoroShowTimerInHud: true,
-  }
-}
-
-
-
-
-function loadSettings(): AppSettings {
-  try {
-    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
-    if (!raw) return defaultSettings()
-    const parsed = JSON.parse(raw) as Partial<AppSettings>
-    const defaults = defaultSettings()
-    const parsedMode = isThemeMode(parsed.themeMode) ? parsed.themeMode : null
-    const parsedTheme = isThemeKey(parsed.theme) ? parsed.theme : null
-    const normalizedMode = parsedMode ?? (parsedTheme ? getThemeModeForTheme(parsedTheme) : defaults.themeMode)
-    const normalizedTheme = parsedTheme && getThemeModeForTheme(parsedTheme) === normalizedMode
-      ? parsedTheme
-      : getFallbackThemeForMode(normalizedMode)
-
-    const customThemes = Array.isArray(parsed.customThemes)
-      ? parsed.customThemes
-        .map((item) => normalizeCustomTheme(item))
-        .filter((item): item is CustomTheme => item !== null)
-      : []
-
-    const parsedThemeScope = isThemeScope(parsed.themeScope) ? parsed.themeScope : 'preset'
-    const parsedActiveCustomThemeId = typeof parsed.activeCustomThemeId === 'string'
-      ? parsed.activeCustomThemeId
-      : null
-    const hasSelectedCustomTheme = parsedActiveCustomThemeId
-      ? customThemes.some((theme) => theme.id === parsedActiveCustomThemeId)
-      : false
-    const normalizedThemeScope: ThemeScope =
-      parsedThemeScope === 'custom' && hasSelectedCustomTheme ? 'custom' : 'preset'
-    const normalizedActiveCustomThemeId = normalizedThemeScope === 'custom' ? parsedActiveCustomThemeId : null
-
-    let resolvedTheme = normalizedTheme
-    if (normalizedThemeScope === 'custom' && normalizedActiveCustomThemeId) {
-      const activeCustomTheme = customThemes.find((theme) => theme.id === normalizedActiveCustomThemeId)
-      if (activeCustomTheme) {
-        resolvedTheme = activeCustomTheme.baseThemeByMode[resolveThemeMode(normalizedMode)]
-      }
-    }
-
-    // One-time migration to the Lofi Dusk restyle: move users still sitting on
-    // the previous default (harbor_mist) onto the new default. Runs once and
-    // never overrides a theme the user deliberately picked afterwards.
-    if (normalizedThemeScope === 'preset') {
-      const THEME_MIGRATION_KEY = 'jplearn-desktop-theme-migration-v1'
-      if (window.localStorage.getItem(THEME_MIGRATION_KEY) !== 'done') {
-        if (resolvedTheme === 'harbor_mist') {
-          resolvedTheme = 'lofi_dusk'
-        } else if (resolvedTheme === 'harbor_mist_light') {
-          resolvedTheme = 'lofi_dusk_light'
-        }
-        window.localStorage.setItem(THEME_MIGRATION_KEY, 'done')
-      }
-    }
-
-    return {
-      ...defaults,
-      ...parsed,
-      appFont: isAppFontPreset(parsed.appFont) ? parsed.appFont : defaults.appFont,
-      themeMode: normalizedMode,
-      theme: resolvedTheme,
-      themeScope: normalizedThemeScope,
-      activeCustomThemeId: normalizedActiveCustomThemeId,
-      customThemes,
-      assistantToastLimit: isAssistantToastLimit(parsed.assistantToastLimit)
-        ? parsed.assistantToastLimit
-        : defaults.assistantToastLimit,
-      assistantChatEnabled:
-        typeof parsed.assistantChatEnabled === 'boolean'
-          ? parsed.assistantChatEnabled
-          : defaults.assistantChatEnabled,
-      assistantChatAudioEnabled:
-        typeof parsed.assistantChatAudioEnabled === 'boolean'
-          ? parsed.assistantChatAudioEnabled
-          : defaults.assistantChatAudioEnabled,
-      assistantChatOcrMinConfidence:
-        typeof parsed.assistantChatOcrMinConfidence === 'number'
-          ? clampAssistantChatOcrMinConfidence(parsed.assistantChatOcrMinConfidence)
-          : defaults.assistantChatOcrMinConfidence,
-      scenarioAiEvaluationEnabled:
-        typeof parsed.scenarioAiEvaluationEnabled === 'boolean'
-          ? parsed.scenarioAiEvaluationEnabled
-          : defaults.scenarioAiEvaluationEnabled,
-      romajiConversionEnabled:
-        typeof parsed.romajiConversionEnabled === 'boolean'
-          ? parsed.romajiConversionEnabled
-          : defaults.romajiConversionEnabled,
-      showKeyboardPrompts:
-        typeof parsed.showKeyboardPrompts === 'boolean'
-          ? parsed.showKeyboardPrompts
-          : defaults.showKeyboardPrompts,
-      furiganaEnabled:
-        typeof parsed.furiganaEnabled === 'boolean'
-          ? parsed.furiganaEnabled
-          : defaults.furiganaEnabled,
-      furiganaAutoHideMastered:
-        typeof parsed.furiganaAutoHideMastered === 'boolean'
-          ? parsed.furiganaAutoHideMastered
-          : defaults.furiganaAutoHideMastered,
-      voiceEnabled:
-        typeof parsed.voiceEnabled === 'boolean' ? parsed.voiceEnabled : defaults.voiceEnabled,
-      voiceSpeaker:
-        typeof parsed.voiceSpeaker === 'string' ? parsed.voiceSpeaker : defaults.voiceSpeaker,
-      voiceSpeed:
-        typeof parsed.voiceSpeed === 'number' && parsed.voiceSpeed >= 0.5 && parsed.voiceSpeed <= 2
-          ? parsed.voiceSpeed
-          : defaults.voiceSpeed,
-      ambientAudioEnabled:
-        typeof parsed.ambientAudioEnabled === 'boolean'
-          ? parsed.ambientAudioEnabled
-          : defaults.ambientAudioEnabled,
-    }
-  } catch {
-    return defaultSettings()
-  }
-}
-
-function loadCardScores(): CardScores {
-  try {
-    const raw = window.localStorage.getItem(CARD_SCORES_STORAGE_KEY)
-    if (!raw) return { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} }
-    const parsed = JSON.parse(raw) as Partial<CardScores>
-    return {
-      hiragana: parsed.hiragana ?? {},
-      katakana: parsed.katakana ?? {},
-      kanji_n5: parsed.kanji_n5 ?? {},
-      vocab_n5: parsed.vocab_n5 ?? {},
-      grammar_patterns: parsed.grammar_patterns ?? {},
-      sentence_examples: parsed.sentence_examples ?? {},
-    }
-  } catch {
-    return { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} }
-  }
-}
-
-function loadSummarySnapshot(): StudySummaryPayload | null {
-  try {
-    const raw = window.localStorage.getItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
-    if (!raw) return null
-
-    const parsed = JSON.parse(raw) as {
-      capturedAtUtc?: string
-      payload?: unknown
-    }
-
-    if (typeof parsed.capturedAtUtc !== 'string') {
-      return null
-    }
-
-    const capturedMs = Date.parse(parsed.capturedAtUtc)
-    if (!Number.isFinite(capturedMs) || Date.now() - capturedMs > SUMMARY_SNAPSHOT_MAX_AGE_MS) {
-      window.localStorage.removeItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
-      return null
-    }
-
-    if (!parsed.payload || typeof parsed.payload !== 'object') {
-      return null
-    }
-
-    const payload = parsed.payload as { decks?: unknown }
-    if (!Array.isArray(payload.decks)) {
-      return null
-    }
-
-    return parsed.payload as StudySummaryPayload
-  } catch {
-    return null
-  }
-}
-
-function saveSummarySnapshot(payload: StudySummaryPayload): void {
-  try {
-    window.localStorage.setItem(
-      SUMMARY_SNAPSHOT_STORAGE_KEY,
-      JSON.stringify({
-        capturedAtUtc: new Date().toISOString(),
-        payload,
-      }),
-    )
-  } catch {
-    // Non-fatal: startup can continue even if local snapshot writes fail.
-  }
-}
-
-function normalizeDeckCards(cards: unknown): ScriptDeck['cards'] {
-  return Array.isArray(cards) ? cards as ScriptDeck['cards'] : []
-}
-
-const SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT = 1200
-
-function limitRuntimeDeckCards(script: ScriptKey, cards: ScriptDeck['cards']): ScriptDeck['cards'] {
-  if (script !== 'sentence_examples') {
-    return cards
-  }
-  if (cards.length <= SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT) {
-    return cards
-  }
-  return cards.slice(0, SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT)
-}
-
-function normalizeBlockList(blocks: unknown): BlockInfo[] {
-  return Array.isArray(blocks) ? blocks as BlockInfo[] : []
-}
-
-function normalizeText(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, ' ')
-}
-
-function chooseUniqueIndices(length: number, count: number, exclude: number): number[] {
-  const picks = new Set<number>()
-  while (picks.size < Math.min(count, Math.max(0, length - 1))) {
-    const candidate = Math.floor(Math.random() * length)
-    if (candidate !== exclude) picks.add(candidate)
-  }
-  return [...picks]
-}
-
-function shuffleArray<T>(items: T[]): T[] {
-  const clone = [...items]
-  for (let index = clone.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1))
-    ;[clone[index], clone[swapIndex]] = [clone[swapIndex], clone[index]]
-  }
-  return clone
-}
-
-function clampWeight(value: number): number {
-  return Math.max(1, Math.min(5, Math.floor(value)))
-}
-
-function buildInterleaveSequence(
-  weights: InterleaveWeights,
-  allowedModes: Array<keyof InterleaveWeights>,
-): PlayableMinigame[] {
-  const sequence: PlayableMinigame[] = []
-  for (const mode of allowedModes) {
-    const count = clampWeight(weights[mode])
-    for (let i = 0; i < count; i += 1) {
-      sequence.push(mode)
-    }
-  }
-  return sequence.length > 0 ? sequence : allowedModes
-}
-
-function isParticleClozeMode(mode: MinigameKey): mode is 'particle_cloze' {
-  return mode === 'particle_cloze'
-}
-
-const PARTICLE_EXPLANATIONS: Record<string, { romaji: string; explanation: string }> = {
-  'は': { romaji: 'wa', explanation: 'Topic marker — sets the topic of the sentence' },
-  'が': { romaji: 'ga', explanation: 'Subject marker — marks the subject or adds emphasis' },
-  'を': { romaji: 'wo', explanation: 'Direct object marker — marks what the verb acts on' },
-  'に': { romaji: 'ni', explanation: 'Location/direction/time — marks existence, destination, or when' },
-  'で': { romaji: 'de', explanation: 'Location/means — marks where an action happens or how' },
-  'へ': { romaji: 'e', explanation: 'Direction — marks the direction of movement' },
-  'と': { romaji: 'to', explanation: 'And/with — connects nouns or marks a companion' },
-  'の': { romaji: 'no', explanation: 'Possession/genitive — links nouns together' },
-  'も': { romaji: 'mo', explanation: 'Also/even — adds emphasis or inclusion' },
-  'から': { romaji: 'kara', explanation: 'From/because — marks origin or reason' },
-  'まで': { romaji: 'made', explanation: 'Until/up to — marks endpoint in time or space' },
-}
-
-function isVibeCheckMode(mode: MinigameKey): mode is 'vibe_check' {
-  return mode === 'vibe_check'
-}
-
-function isImposterMode(mode: MinigameKey): mode is 'imposter' {
-  return mode === 'imposter'
-}
-
-function isSentenceAssemblyMode(mode: MinigameKey): mode is 'sentence_assembly' {
-  return mode === 'sentence_assembly'
-}
-
-function pickSurprisePrompt(
-  script: ScriptKey,
-  mode: PlayableMinigame,
-  tags: string[],
-  seed: number,
-): string {
-  const scriptPool = SCRIPT_MODE_PROMPT_PACKS[script][mode] ?? []
-  const tagPool = tags
-    .map((tag) => TAG_PROMPT_PACKS[tag.toLowerCase()])
-    .filter((pack): pack is string[] => Boolean(pack))
-    .flat()
-  const combined = [...tagPool, ...scriptPool, ...SURPRISE_PROMPTS]
-  return combined[Math.abs(seed) % combined.length]
-}
-
-function curriculumStageFromScore(score: number): 1 | 2 | 3 {
-  if (score >= 3) return 3
-  if (score >= 1) return 2
-  return 1
-}
-
-function normalizeCurriculumStage(stage: number): 1 | 2 | 3 {
-  if (stage >= 3) return 3
-  if (stage >= 2) return 2
-  return 1
-}
-
-function applyCardTemplate(template: string, card: ScriptDeck['cards'][number]): string {
-  return template
-    .replaceAll('{character}', card.character)
-    .replaceAll('{romaji}', card.romaji)
-    .replaceAll('{meaning}', card.meaning)
-}
-
-function splitSentenceIntoAssemblyChunks(sentence: string): string[] {
-  const chunks: string[] = []
-  let buffer = ''
-  const particleBreaks = new Set(['は', 'が', 'を', 'に', 'で', 'と', 'へ', 'も', 'の'])
-  const punctuationBreaks = new Set(['、', '。', '！', '？'])
-
-  for (const character of sentence) {
-    if (character.trim().length === 0) {
-      if (buffer.trim().length > 0) {
-        chunks.push(buffer.trim())
-        buffer = ''
-      }
-      continue
-    }
-
-    buffer += character
-    if (particleBreaks.has(character) || punctuationBreaks.has(character)) {
-      chunks.push(buffer)
-      buffer = ''
-    }
-  }
-
-  if (buffer.length > 0) {
-    chunks.push(buffer)
-  }
-
-  return chunks.filter((chunk) => chunk.trim().length > 0)
-}
-
-function buildClozeLine(script: ScriptKey, stage: 1 | 2 | 3, seed: number, card: ScriptDeck['cards'][number]): string {
-  const templates = CLOZE_TEMPLATES[script][stage]
-  return applyCardTemplate(templates[Math.abs(seed) % templates.length], card)
-}
-
-function buildStoryChapter(script: ScriptKey, stage: 1 | 2 | 3, seed: number, card: ScriptDeck['cards'][number]): { title: string; line: string } {
-  const chapter = STORY_CHAPTERS[script][stage]
-  return {
-    title: chapter.title,
-    line: applyCardTemplate(chapter.lines[Math.abs(seed) % chapter.lines.length], card),
-  }
-}
-
-function buildRoundDictionaryNote(card: ScriptDeck['cards'][number], mode: PlayableMinigame): RoundDictionaryNote | null {
-  const summary = card.dictionary_summary
-  if (!summary) return null
-
-  const secondaryGlosses = summary.glosses.filter((gloss) => gloss !== summary.primary_gloss).slice(0, 2)
-  const glossList = [summary.primary_gloss, ...secondaryGlosses]
-  let title = 'Dictionary note'
-  let copy = `${summary.character} (${summary.reading}) is commonly glossed as ${summary.primary_gloss}.`
-
-  if (mode === 'romaji_sprint') {
-    title = 'Reading clue'
-    copy = `${summary.character} is read ${summary.reading} in the dictionary.`
-  } else if (mode === 'sentence_assembly') {
-    title = 'Assembly clue'
-    copy = `Rebuild the sentence in natural order around ${summary.character} (${summary.reading}).`
-  } else if (mode === 'typed_recall') {
-    title = 'Dictionary recall'
-    copy = secondaryGlosses.length > 0
-      ? `${summary.character} (${summary.reading}) is commonly translated as ${glossList.join(', ')}.`
-      : `${summary.character} (${summary.reading}) is commonly translated as ${summary.primary_gloss}.`
-  } else if (mode === 'speech_recall') {
-    title = 'Dictionary recall'
-    copy = secondaryGlosses.length > 0
-      ? `${summary.character} (${summary.reading}) is commonly translated as ${glossList.join(', ')}. Say it aloud clearly.`
-      : `${summary.character} (${summary.reading}) is commonly translated as ${summary.primary_gloss}. Say it aloud clearly.`
-  } else if (mode === 'stroke_order') {
-    title = 'Writing clue'
-    copy = `${summary.character} is read ${summary.reading} and is usually glossed as ${summary.primary_gloss}.`
-  } else if (mode === 'meaning_match') {
-    title = 'Dictionary sense'
-    copy = secondaryGlosses.length > 0
-      ? `${summary.character} is read ${summary.reading} and can carry senses like ${glossList.join(', ')}.`
-      : `${summary.character} is read ${summary.reading} and often points to ${summary.primary_gloss}.`
-  } else if (mode === 'character_match') {
-    title = 'Meaning clue'
-    copy = secondaryGlosses.length > 0
-      ? `Look for the character read ${summary.reading} with meanings like ${glossList.join(', ')}.`
-      : `Look for the character read ${summary.reading} that matches ${summary.primary_gloss}.`
-  } else if (isParticleClozeMode(mode)) {
-    title = 'Context clue'
-    copy = secondaryGlosses.length > 0
-      ? `${summary.character} (${summary.reading}) fits sentence meanings like ${glossList.join(', ')}.`
-      : `${summary.character} (${summary.reading}) fits this kind of sentence as ${summary.primary_gloss}.`
-  } else if (isImposterMode(mode)) {
-    title = 'Reading note'
-    copy = secondaryGlosses.length > 0
-      ? `In passages, ${summary.character} is read ${summary.reading} and can suggest ${glossList.join(', ')}.`
-      : `In passages, ${summary.character} is read ${summary.reading} and usually suggests ${summary.primary_gloss}.`
-  } else if (mode === 'listening_audio_first' || mode === 'dictation') {
-    title = 'Listening clue'
-    copy = secondaryGlosses.length > 0
-      ? `The audio term is ${summary.character}, read ${summary.reading}, with senses like ${glossList.join(', ')}.`
-      : `The audio term is ${summary.character}, read ${summary.reading}, and usually means ${summary.primary_gloss}.`
-  } else if (mode === 'kanji_compound_builder') {
-    title = 'Compound clue'
-    copy = secondaryGlosses.length > 0
-      ? `${summary.character} (${summary.reading}) is built from kanji with senses like ${glossList.join(', ')}.`
-      : `${summary.character} (${summary.reading}) is built from kanji that each carry distinct meaning.`
-  } else if (mode === 'context_cloze') {
-    title = 'Sentence clue'
-    copy = secondaryGlosses.length > 0
-      ? `Use context to choose the right word. ${summary.character} (${summary.reading}) can mean ${glossList.join(', ')}.`
-      : `Use context to choose the right word. ${summary.character} (${summary.reading}) fits this sentence.`
-  }
-
-  return {
-    title,
-    copy,
-    character: summary.character,
-    reading: summary.reading,
-    primaryGloss: summary.primary_gloss,
-    secondaryGlosses,
-    source: summary.source,
-  }
-}
-
-
-function narrativePriorityCards(cards: ScriptDeck['cards']): ScriptDeck['cards'] {
-  const stage3 = cards.filter((card) => normalizeCurriculumStage(card.curriculum_stage) === 3)
-  if (stage3.length > 0) return stage3
-  const stage2 = cards.filter((card) => normalizeCurriculumStage(card.curriculum_stage) === 2)
-  if (stage2.length > 0) return stage2
-  return cards
-}
-
-function jlptTagFromCard(card: Pick<ScriptDeck['cards'][number], 'tags'>): JlptLevel {
-  for (const tag of card.tags) {
-    const normalized = tag.trim().toLowerCase()
-    if (normalized === 'n5' || normalized === 'n4' || normalized === 'n3' || normalized === 'n2' || normalized === 'n1') {
-      return normalized
-    }
-  }
-  return 'n5'
-}
-
-function buildJlptLevelProgress(cards: JlptProgressCard[], scores: Record<number, number>): JlptLevelProgress[] {
-  let canUnlockNext = true
-  return JLPT_LEVEL_ORDER.map((level) => {
-    const levelCards = cards.filter((card) => jlptTagFromCard(card) === level)
-    const total = levelCards.length
-    const totalScore = levelCards.reduce((sum, card) => sum + (scores[card.id] ?? 0), 0)
-    const mastery = total > 0 ? totalScore / (CARD_MASTERY_MAX * total) : 0
-    const unlocked = total > 0 && canUnlockNext
-    if (total > 0 && mastery < 0.8) {
-      canUnlockNext = false
-    }
-    return {
-      key: level,
-      label: JLPT_LEVEL_LABELS[level],
-      cardIds: levelCards.map((card) => card.id),
-      sampleChars: levelCards.slice(0, 3).map((card) => card.character),
-      mastery,
-      unlocked,
-      total,
-    }
-  })
-}
-
-function buildJlptLevelProgressFromLevelDecks(
-  levelDecks: Record<JlptLevel, ScriptDeck['cards']>,
-  scores: Record<number, number>,
-): JlptLevelProgress[] {
-  let canUnlockNext = true
-  return JLPT_LEVEL_ORDER.map((level) => {
-    const levelCards = levelDecks[level]
-    const total = levelCards.length
-    const totalScore = levelCards.reduce((sum, card) => sum + (scores[card.id] ?? 0), 0)
-    const mastery = total > 0 ? totalScore / (CARD_MASTERY_MAX * total) : 0
-    const unlocked = total > 0 && canUnlockNext
-    if (total > 0 && mastery < 0.8) {
-      canUnlockNext = false
-    }
-    return {
-      key: level,
-      label: JLPT_LEVEL_LABELS[level],
-      cardIds: levelCards.map((card) => card.id),
-      sampleChars: levelCards.slice(0, 3).map((card) => card.character),
-      mastery,
-      unlocked,
-      total,
-    }
-  })
-}
-
-/** Build thematic category progress for vocab or kanji sections.
- *  First category is always unlocked; subsequent categories unlock when
- *  the previous reaches CATEGORY_UNLOCK_THRESHOLD (70%). */
-function buildCategoryProgress<T extends string>(
-  categoryOrder: T[],
-  categoryLabels: Record<T, string>,
-  categoryToSlug: Record<T, string>,
-  categoryDecks: Record<T, ScriptDeck['cards']>,
-  scores: Record<number, number>,
-): CategoryProgress[] {
-  let canUnlockNext = true
-  return categoryOrder.map((category) => {
-    const categoryCards = categoryDecks[category] ?? []
-    const total = categoryCards.length
-    const totalScore = categoryCards.reduce((sum, card) => sum + (scores[card.id] ?? 0), 0)
-    const mastery = total > 0 ? totalScore / (CARD_MASTERY_MAX * total) : 0
-    const unlocked = canUnlockNext  // first category always unlocked; rest need prior
-    if (total > 0 && mastery < CATEGORY_UNLOCK_THRESHOLD) {
-      canUnlockNext = false
-    }
-    return {
-      key: category,
-      label: categoryLabels[category],
-      slug: categoryToSlug[category],
-      cardIds: categoryCards.map((card) => card.id),
-      sampleChars: categoryCards.slice(0, 3).map((card) => card.character),
-      mastery,
-      unlocked,
-      total,
-    }
-  })
-}
-
-function getStudyPlanStage(overallMastery: number, trackedCards: number, currentStreak: number): StudyPlanStage {
-  if (trackedCards < 12 || currentStreak < 2 || overallMastery < 0.25) return 'starter'
-  if (overallMastery < 0.65) return 'building'
-  return 'advanced'
-}
-
-function getStudyPlanShortcutMinigame(row: StudyPlanCoverageRow, stage: StudyPlanStage, index: number): MinigameKey {
-  if (row.key === 'hiragana' || row.key === 'katakana') {
-    if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
-    if (stage === 'building') return index === 0 ? 'character_match' : 'romaji_sprint'
-    return index === 0 ? 'interleave_mix' : 'character_match'
-  }
-
-  if (row.key === 'kanji_n5') {
-    if (stage === 'starter') return index === 0 ? 'character_match' : 'meaning_match'
-    if (stage === 'building') return index === 0 ? 'character_match' : 'typed_recall'
-    return index === 0 ? 'typed_recall' : 'stroke_order'
-  }
-
-  if (row.key === 'vocab_n5') {
-    if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
-    if (stage === 'building') return index === 0 ? 'typed_recall' : 'particle_cloze'
-    return index === 0 ? 'particle_cloze' : 'imposter'
-  }
-
-  if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
-  if (stage === 'building') return index === 0 ? 'particle_cloze' : 'typed_recall'
-  return index === 0 ? 'imposter' : 'particle_cloze'
-}
-
-function getStudyPlanTargetMastery(script: ScriptKey): number {
-  if (script === 'hiragana') return 0.9
-  if (script === 'katakana') return 0.85
-  if (script === 'kanji_n5') return 0.72
-  if (script === 'vocab_n5') return 0.72
-  if (script === 'sentence_examples') return 0.68
-  return 0.68
-}
-
-function aggregateDeckMastery(
-  decks: StudySummaryPayload['decks'],
-  predicate: (slug: string) => boolean,
-): { mastery: number; total: number } {
-  const matchingDecks = decks.filter((deck) => predicate(deck.slug))
-  const total = matchingDecks.reduce((sum, deck) => sum + deck.total, 0)
-  if (total <= 0) {
-    return { mastery: 0, total: 0 }
-  }
-  const mastered = matchingDecks.reduce((sum, deck) => sum + deck.mastered, 0)
-  return {
-    mastery: mastered / total,
-    total,
-  }
-}
-
-function aggregateJlptMastery(levels: JlptLevelProgress[]): { mastery: number; total: number } {
-  const total = levels.reduce((sum, row) => sum + row.total, 0)
-  if (total <= 0) {
-    return { mastery: 0, total: 0 }
-  }
-  const weighted = levels.reduce((sum, row) => sum + (row.mastery * row.total), 0)
-  return {
-    mastery: weighted / total,
-    total,
-  }
-}
-
-function buildStudyPlan(
-  decks: StudySummaryPayload['decks'],
-  kanjiLevels: JlptLevelProgress[],
-  vocabLevels: JlptLevelProgress[],
-  weeklyActivity: StudySummaryPayload['activity'],
-  currentStreak: number,
-): StudyPlanSnapshot {
-  const hiragana = aggregateDeckMastery(decks, (slug) => slug === 'hiragana')
-  const katakana = aggregateDeckMastery(decks, (slug) => slug === 'katakana')
-  const grammar = aggregateDeckMastery(decks, (slug) => slug === 'grammar_patterns')
-  const sentences = aggregateDeckMastery(decks, (slug) => slug === 'sentence_examples')
-
-  const kanjiFromDecks = aggregateDeckMastery(decks, (slug) => slug.startsWith('kanji_'))
-  const vocabFromDecks = aggregateDeckMastery(decks, (slug) => slug.startsWith('vocab_'))
-  const kanjiFallback = aggregateJlptMastery(kanjiLevels)
-  const vocabFallback = aggregateJlptMastery(vocabLevels)
-
-  const kanji = kanjiFromDecks.total > 0 ? kanjiFromDecks : kanjiFallback
-  const vocab = vocabFromDecks.total > 0 ? vocabFromDecks : vocabFallback
-
-  const hiraganaReady = hiragana.mastery >= 0.35
-  const kanjiReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.45
-  const vocabReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.55
-  const grammarReady = vocab.mastery >= 0.45
-  const sentencesReady = grammar.mastery >= 0.45
-
-  const coverageRows: StudyPlanCoverageRow[] = [
-    {
-      key: 'hiragana',
-      label: SCRIPT_LABELS.hiragana,
-      mastery: hiragana.mastery,
-      total: hiragana.total,
-      unlocked: true,
-      difficulty: 0,
-    },
-    {
-      key: 'katakana',
-      label: SCRIPT_LABELS.katakana,
-      mastery: katakana.mastery,
-      total: katakana.total,
-      unlocked: hiraganaReady,
-      difficulty: 1,
-    },
-    {
-      key: 'kanji_n5',
-      label: SCRIPT_LABELS.kanji_n5,
-      mastery: kanji.mastery,
-      total: kanji.total,
-      unlocked: kanjiReady,
-      difficulty: 2,
-    },
-    {
-      key: 'vocab_n5',
-      label: SCRIPT_LABELS.vocab_n5,
-      mastery: vocab.mastery,
-      total: vocab.total,
-      unlocked: vocabReady,
-      difficulty: 3,
-    },
-    {
-      key: 'grammar_patterns',
-      label: SCRIPT_LABELS.grammar_patterns,
-      mastery: grammar.mastery,
-      total: grammar.total,
-      unlocked: grammarReady,
-      difficulty: 4,
-    },
-    {
-      key: 'sentence_examples',
-      label: SCRIPT_LABELS.sentence_examples,
-      mastery: sentences.mastery,
-      total: sentences.total,
-      unlocked: sentencesReady,
-      difficulty: 5,
-    },
-  ]
-
-  const unlockedRows = coverageRows.filter((row) => row.unlocked)
-  const needsWorkRows = unlockedRows.filter((row) => row.mastery < getStudyPlanTargetMastery(row.key))
-
-  const focusRows = (needsWorkRows.length > 0 ? needsWorkRows : unlockedRows)
-    .sort((left, right) => {
-      if (Math.abs(left.mastery - right.mastery) > 0.06) {
-        return left.mastery - right.mastery
-      }
-      return left.difficulty - right.difficulty
-    })
-    .slice(0, 3)
-
-  const totalCards = coverageRows.reduce((sum, row) => sum + row.total, 0)
-  const overallMastery = totalCards > 0
-    ? coverageRows.reduce((sum, row) => sum + (row.mastery * row.total), 0) / totalCards
-    : 0
-  const learnerStage = getStudyPlanStage(overallMastery, totalCards, currentStreak)
-  const recommendedMinutes = weeklyActivity.week.reviewed >= 24
-    ? 20
-    : weeklyActivity.week.reviewed >= 10
-      ? 15
-      : 10
-
-  const sessionNote = focusRows.length > 0
-    ? `Start with ${focusRows[0].label} and move to harder tracks after this block feels steady.`
-    : currentStreak > 0
-      ? `Keep the streak alive with a short mixed review.`
-      : 'Build the plan after your first few rounds and it will highlight your weakest active track.'
-
-  const shortcutRows = focusRows.slice(0, 3).map((row, index) => {
-    const minigame = getStudyPlanShortcutMinigame(row, learnerStage, index)
-    const script: ScriptKey = row.key
-    const title = MINIGAMES.find((game) => game.key === minigame)?.title ?? minigame
-    const stageLabel = learnerStage === 'starter'
-      ? 'Starter-safe'
-      : learnerStage === 'building'
-        ? 'Build-up'
-        : 'Advanced'
-
-    return {
-      key: `${row.key}-${minigame}-${index}`,
-      label: title,
-      note: `${row.label} · ${stageLabel} route`,
-      script,
-      minigame,
-    }
-  })
-
-  return {
-    coverageRows,
-    focusRows,
-    overallMastery,
-    recommendedMinutes,
-    sessionNote,
-    learnerStage,
-    shortcutRows,
-  }
-}
-
-function calculateAwardedPoints(streakAfterCorrect: number): number {
-  const comboBonus = POINT_COMBO_THRESHOLDS.reduce(
-    (count, threshold) => count + (streakAfterCorrect >= threshold ? 1 : 0),
-    0,
-  )
-  return 1 + comboBonus
-}
-
-function classifyRoundPerformance(isCorrect: boolean, responseMs: number): 'PERFECT' | 'GOOD' | 'SLOW' | 'MISS' {
-  if (!isCorrect) return 'MISS'
-  if (responseMs <= PERFORMANCE_PERFECT_MS) return 'PERFECT'
-  if (responseMs <= PERFORMANCE_GOOD_MS) return 'GOOD'
-  return 'SLOW'
-}
-
-
-
-function getRoundRecoveryTip(mode: PlayableMinigame): string {
-  if (mode === 'romaji_sprint') return 'Take a breath and try the next reading.'
-  if (mode === 'meaning_match') return 'You are close. Trust your first clear meaning.'
-  if (mode === 'character_match') return 'You are building pattern memory one step at a time.'
-  if (mode === 'stroke_order') return 'Nice attempt. Visual memory gets stronger with reps.'
-  if (mode === 'handwriting') return 'Nice attempt. Stroke order becomes clearer with each careful repetition.'
-  if (mode === 'typed_recall') return 'Great effort. Keep the next answer short and clear.'
-  if (mode === 'speech_recall') return 'Great effort. Speak the next answer clearly and confidently.'
-  if (mode === 'sentence_assembly') return 'Good try. Keep the chunk order natural and grammatically smooth.'
-  if (mode === 'particle_cloze') return 'Good try. Follow the sentence flow and particle role.'
-  if (mode === 'vibe_check') return 'Good try. Read the sentence ending and tone cues before deciding register.'
-  if (mode === 'imposter') return 'Good attempt. Scan for the token that breaks grammar flow.'
-  if (mode === 'listening_audio_first') return 'Keep listening. Audio recognition builds over time.'
-  if (mode === 'dictation') return 'Listen carefully and type the romaji for what you hear.'
-  if (mode === 'kanji_compound_builder') return 'Good try. Think about what each kanji contributes to the meaning.'
-  if (mode === 'context_cloze') return 'Good try. Use the surrounding sentence context to infer the missing word.'
-  return 'Good attempt. Keep the next answer short and clear.'
-}
-
-function buildRoundCoachToast(
-  id: number,
-  payload: {
-    isCorrect: boolean
-    mode: PlayableMinigame
-    nextStreak: number
-    answer: string
-    completedRoundsAfterAnswer: number
-    targetRounds: number
-    typedAssessment: TypedAnswerState | null
-  },
-): AssistantToast | null {
-  if (!payload.isCorrect) {
-    return {
-      id,
-      priority: 'coaching',
-      eventType: 'round_feedback',
-      messageKey: 'coach.round_recovery',
-      title: 'You are still doing great',
-      body: getRoundRecoveryTip(payload.mode),
-      targetMode: null,
-      focusArea: null,
-      actionType: null,
-      actionLabel: 'Keep going',
-    }
-  }
-
-  if (payload.mode === 'typed_recall' && payload.typedAssessment === 'near_miss') {
-    return {
-      id,
-      priority: 'coaching',
-      eventType: 'round_feedback',
-      messageKey: 'coach.round_near_miss',
-      title: 'Nice save',
-      body: 'That was close and you handled it well.',
-      targetMode: null,
-      focusArea: null,
-      actionType: null,
-      actionLabel: 'Got it',
-    }
-  }
-
-  if (payload.mode === 'speech_recall' && payload.typedAssessment === 'near_miss') {
-    return {
-      id,
-      priority: 'coaching',
-      eventType: 'round_feedback',
-      messageKey: 'coach.round_near_miss',
-      title: 'Nice save',
-      body: 'Close call on the transcript, but that counts.',
-      targetMode: null,
-      focusArea: null,
-      actionType: null,
-      actionLabel: 'Got it',
-    }
-  }
-
-  if (payload.nextStreak === 3 || payload.nextStreak === 6 || payload.nextStreak === 9) {
-    return {
-      id,
-      priority: 'celebration',
-      eventType: 'round_feedback',
-      messageKey: 'coach.round_streak',
-      title: `Streak x${payload.nextStreak}`,
-      body: `Lovely rhythm. ${formatRoundModeLabel(payload.mode)} is clicking for you.`,
-      targetMode: null,
-      focusArea: null,
-      actionType: null,
-      actionLabel: 'Nice',
-    }
-  }
-
-  if (payload.completedRoundsAfterAnswer === payload.targetRounds - 1) {
-    return {
-      id,
-      priority: 'coaching',
-      eventType: 'round_feedback',
-      messageKey: 'coach.round_final_push',
-      title: 'Almost there',
-      body: 'One more card. You have got this.',
-      targetMode: null,
-      focusArea: null,
-      actionType: null,
-      actionLabel: 'Finish run',
-    }
-  }
-
-  if (payload.nextStreak > 0 && payload.nextStreak % 2 === 0) {
-    return {
-      id,
-      priority: 'info',
-      eventType: 'round_feedback',
-      messageKey: 'coach.round_encouragement',
-      title: 'Nice one',
-      body: 'Clean answer. Keep this gentle pace.',
-      targetMode: null,
-      focusArea: null,
-      actionType: null,
-      actionLabel: 'Yay',
-    }
-  }
-
-  return null
-}
-
-
-
-
-
 
 function App() {
   // First-run setup wizard check — must be the first hooks so the conditional

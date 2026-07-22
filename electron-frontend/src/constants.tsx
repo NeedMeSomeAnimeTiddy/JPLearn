@@ -640,3 +640,5 @@ export const MOTION_STYLE_LABEL: Record<AnimationStyle, string> = {
   glide: 'Glide',
   lively: 'Lively',
 }
+
+export const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
