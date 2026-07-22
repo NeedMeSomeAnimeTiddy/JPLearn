@@ -691,6 +691,92 @@ function App() {
 
 
 
+  // ── Deck/round inputs the study-session hook depends on ────────────────────
+  // These are declared ahead of `useStudySession` below because the hook takes
+  // them as arguments — `activeBlockCards` in particular is a render-time value,
+  // so it cannot be late-bound through a ref.
+
+  const activeDeckSlug = useMemo(() => {
+    if (activeScript === 'kanji_n5') return KANJI_CATEGORY_TO_DECK_SLUG[activeKanjiCategory]
+    if (activeScript === 'vocab_n5') return VOCAB_CATEGORY_TO_DECK_SLUG[activeVocabCategory]
+    return activeScript
+  }, [activeKanjiCategory, activeScript, activeVocabCategory])
+
+  const getStudyQueueDeduped = useCallback(
+    (slug: DeckSlugInput, options?: { preferCache?: boolean }): Promise<StudyQueueResponse> => {
+      if (typeof window === 'undefined' || !window.jplearnDesktop?.getStudyQueue) {
+        return Promise.reject(new Error('Study queue API unavailable'))
+      }
+
+      const cacheKey = slug
+      const preferCache = options?.preferCache ?? true
+      if (preferCache) {
+        const cached = studyQueueCacheRef.current.get(cacheKey)
+        if (cached && performance.now() - cached.cachedAtMs <= STUDY_QUEUE_CACHE_TTL_MS) {
+          return Promise.resolve(cached.payload)
+        }
+      }
+
+      const inFlight = studyQueueInFlightRef.current.get(cacheKey)
+      if (inFlight) return inFlight
+
+      const fetchQueue = async (): Promise<StudyQueueResponse> => {
+        try {
+          const payload = await window.jplearnDesktop.getStudyQueue(slug)
+          studyQueueCacheRef.current.set(cacheKey, {
+            payload,
+            cachedAtMs: performance.now(),
+          })
+          return payload
+        } finally {
+          if (studyQueueInFlightRef.current.get(cacheKey) === request) {
+            studyQueueInFlightRef.current.delete(cacheKey)
+          }
+        }
+      }
+      const request = fetchQueue()
+      studyQueueInFlightRef.current.set(cacheKey, request)
+      return request
+    },
+    [],
+  )
+
+  const buildRound = useCallback(
+    (
+      cards: ScriptDeck['cards'],
+      minigame: PlayableMinigame,
+      cardIndex: number,
+      surprisePrompt: boolean,
+      promptSeed: number,
+    ): RoundState | null => buildRoundImpl(
+      activeScript, cardScores, cards, minigame, cardIndex, surprisePrompt, promptSeed,
+    ),
+    [activeScript, cardScores],
+  )
+
+  const buildRoundWithBridge = useCallback(async (
+    cards: ScriptDeck['cards'],
+    minigame: PlayableMinigame,
+    cardIndex: number,
+    surprisePrompt: boolean,
+    promptSeed: number,
+  ): Promise<RoundState | null> => buildRoundWithBridgeImpl(
+    activeScript, cardScores, cards, minigame, cardIndex, surprisePrompt, promptSeed,
+  ), [activeScript, cardScores])
+
+  // Cards restricted to the active block when block progression is available.
+  const activeBlockCards = useMemo(() => {
+    if (blockProgress.length === 0) {
+      return deckCards
+    }
+    const block = blockProgress.find((entry) => entry.index === activeBlockIndex)
+    if (!block) return deckCards
+    const idSet = new Set(block.card_ids)
+    const matchingCards = deckCards.filter((c) => idSet.has(c.id))
+    // Fallback to full deck when block metadata does not map to loaded card IDs.
+    return matchingCards.length > 0 ? matchingCards : deckCards
+  }, [deckCards, blockProgress, activeBlockIndex])
+
   const models = useModels()
 
   const voice = useVoice(
@@ -702,8 +788,6 @@ function App() {
     },
   )
 
-  const isInMinigameSession = view === 'minigame' && sessionActive && roundState !== null
-
   const cursor = useCursor(
     settings as unknown as { cursor: CursorSettings },
     setSettings as unknown as Dispatch<SetStateAction<{ cursor: CursorSettings }>>,
@@ -714,6 +798,8 @@ function App() {
     settings as PomodoroSettingsFields,
     setSettings as unknown as Dispatch<SetStateAction<PomodoroSettingsFields>>,
   )
+
+  const isInMinigameSession = view === 'minigame' && sessionActive && roundState !== null
 
   const tutor = useTutor(
     settings as TutorSettingsFields,
@@ -820,12 +906,6 @@ function App() {
   }, [])
 
 
-  const activeDeckSlug = useMemo(() => {
-    if (activeScript === 'kanji_n5') return KANJI_CATEGORY_TO_DECK_SLUG[activeKanjiCategory]
-    if (activeScript === 'vocab_n5') return VOCAB_CATEGORY_TO_DECK_SLUG[activeVocabCategory]
-    return activeScript
-  }, [activeKanjiCategory, activeScript, activeVocabCategory])
-
   const getDeckCardsDeduped = useCallback((slug: DeckSlugInput): Promise<ScriptDeck> => {
     if (typeof window === 'undefined' || !window.jplearnDesktop?.getDeckCards) {
       return Promise.reject(new Error('Deck cards API unavailable'))
@@ -869,45 +949,6 @@ function App() {
     blockProgressInFlightRef.current.set(slug, request)
     return request
   }, [])
-
-  const getStudyQueueDeduped = useCallback(
-    (slug: DeckSlugInput, options?: { preferCache?: boolean }): Promise<StudyQueueResponse> => {
-      if (typeof window === 'undefined' || !window.jplearnDesktop?.getStudyQueue) {
-        return Promise.reject(new Error('Study queue API unavailable'))
-      }
-
-      const cacheKey = slug
-      const preferCache = options?.preferCache ?? true
-      if (preferCache) {
-        const cached = studyQueueCacheRef.current.get(cacheKey)
-        if (cached && performance.now() - cached.cachedAtMs <= STUDY_QUEUE_CACHE_TTL_MS) {
-          return Promise.resolve(cached.payload)
-        }
-      }
-
-      const inFlight = studyQueueInFlightRef.current.get(cacheKey)
-      if (inFlight) return inFlight
-
-      const fetchQueue = async (): Promise<StudyQueueResponse> => {
-        try {
-          const payload = await window.jplearnDesktop.getStudyQueue(slug)
-          studyQueueCacheRef.current.set(cacheKey, {
-            payload,
-            cachedAtMs: performance.now(),
-          })
-          return payload
-        } finally {
-          if (studyQueueInFlightRef.current.get(cacheKey) === request) {
-            studyQueueInFlightRef.current.delete(cacheKey)
-          }
-        }
-      }
-      const request = fetchQueue()
-      studyQueueInFlightRef.current.set(cacheKey, request)
-      return request
-    },
-    [],
-  )
 
   const buildQueueCycle = useCallback((queue: StudyQueueResponse, sourceCards: ScriptDeck['cards']): number[] => {
     const idToIndex = new Map<number, number>()
@@ -1554,29 +1595,6 @@ function App() {
     void loadScriptCards(activeScript, activeKanjiCategory, activeVocabCategory)
   }, [activeScript, activeKanjiCategory, activeVocabCategory, loadScriptCards])
 
-  const buildRound = useCallback(
-    (
-      cards: ScriptDeck['cards'],
-      minigame: PlayableMinigame,
-      cardIndex: number,
-      surprisePrompt: boolean,
-      promptSeed: number,
-    ): RoundState | null => buildRoundImpl(
-      activeScript, cardScores, cards, minigame, cardIndex, surprisePrompt, promptSeed,
-    ),
-    [activeScript, cardScores],
-  )
-
-  const buildRoundWithBridge = useCallback(async (
-    cards: ScriptDeck['cards'],
-    minigame: PlayableMinigame,
-    cardIndex: number,
-    surprisePrompt: boolean,
-    promptSeed: number,
-  ): Promise<RoundState | null> => buildRoundWithBridgeImpl(
-    activeScript, cardScores, cards, minigame, cardIndex, surprisePrompt, promptSeed,
-  ), [activeScript, cardScores])
-
   const nextRoundMode = useCallback((selectedMode: MinigameKey): { mode: PlayableMinigame; surprisePrompt: boolean; promptSeed: number } => {
     if (selectedMode !== 'interleave_mix') {
       return { mode: selectedMode, surprisePrompt: false, promptSeed: 0 }
@@ -1626,19 +1644,6 @@ function App() {
     () => buildJlptLevelProgress(overviewKanjiDeck, cardScores.kanji_n5),
     [overviewKanjiDeck, cardScores.kanji_n5],
   )
-
-  // Cards restricted to the active block when block progression is available.
-  const activeBlockCards = useMemo(() => {
-    if (blockProgress.length === 0) {
-      return deckCards
-    }
-    const block = blockProgress.find((entry) => entry.index === activeBlockIndex)
-    if (!block) return deckCards
-    const idSet = new Set(block.card_ids)
-    const matchingCards = deckCards.filter((c) => idSet.has(c.id))
-    // Fallback to full deck when block metadata does not map to loaded card IDs.
-    return matchingCards.length > 0 ? matchingCards : deckCards
-  }, [deckCards, blockProgress, activeBlockIndex])
 
   const upcomingCards = useMemo((): GameCard[] => {
     if (!sessionActive) return []
