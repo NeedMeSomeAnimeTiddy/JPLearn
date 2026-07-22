@@ -2,20 +2,24 @@
 
 Working handoff document. Delete it when #69 closes.
 
-Branch: `refactor/issue-69-app-decomposition` (10 commits, branched from `main` at `d437b87`).
+Branch: `refactor/issue-69-phase4b` (2 commits, branched from `main` at `9888cc0`).
+Phases 1–3 and 4a are merged into `main`.
 
 ## Where things stand
 
-| Metric | At filing | Now | Note |
-|---|---|---|---|
-| `App.tsx` lines | 7,451 | **4,060** | −46% |
-| `useState` | 112 | **111** | *unchanged by design* — no state has moved yet |
-| `useCallback` | 60 | 73 | rose deliberately: inline JSX closures were lifted to named handlers |
-| Frontend tests | 561 | 605 | |
+| Metric | At filing | After 4a | **After 4b** | Note |
+|---|---|---|---|---|
+| `App.tsx` lines | 7,451 | 4,060 | **2,880** | −61% from filing |
+| `useState` | 112 | 111 | **67** | 44 moved to `useStudySession` |
+| `useRef` | — | 43 | **27** | 17 moved, 1 added (`queueAssistantToastRef`) |
+| `useCallback` | 60 | 73 | 58 | |
+| `useMemo` | 27 | 27 | 23 | |
+| `useEffect` | 34 | 34 | 28 | |
+| Frontend tests | 561 | 605 | 605 | |
 
-The line count is past target, but **the issue's actual complaint — 112 `useState` in an
-"orchestrator only" component — is still open.** Everything so far moved pure logic and
-JSX. State moves in Phase 4b, and that is the remaining work.
+**The issue's original complaint — 112 `useState` in an "orchestrator only" component — is
+now addressed.** The session state machine lives in
+`src/features/study-session/useStudySession.ts` (1,460 lines).
 
 ### Done
 
@@ -30,10 +34,11 @@ JSX. State moves in Phase 4b, and that is the remaining work.
 | — | Docs metrics refresh (`ARCHITECTURE.md` §4, D1) | `acad9e7` |
 | 4-gate | Session state machine characterization tests | `ab2319f` |
 | 4a | Round builders → `features/study-session/` (814 lines) | `d52ac5a` |
+| 4b-prep | Hoist hook dependencies above their consumers | `ee52eb0` |
+| 4b | Session state → `useStudySession` (44 useState, 17 refs) | `caa4b35` |
 
 ### Not done
 
-- **4b** — session state → `useStudySession` (the bulk of the issue; planned below)
 - **4c** — routing: still a flat `view` string with inline conditional JSX
 - Feature-module conformance: `card-notes`, `heatmap`, `models`, `window-drag`
 
@@ -44,96 +49,83 @@ instead of `components/`. Fix that one; leave the rest unless there's a reason.
 
 ---
 
-## Phase 4b — the plan
+## Phase 4b — what was done
 
-### The good news: the interface already exists
+`useStudySession` now lives in `src/features/study-session/useStudySession.ts`. The move was
+two commits: `ee52eb0` reorders App.tsx so the hook's dependencies precede its call site
+(pure reordering, no behaviour change), `caa4b35` moves the state.
 
-`src/context/SessionContext.tsx` already defines `SessionContextValue` — 40 state fields
-+ 12 actions. `App.tsx` builds that object inline and hands it to `SessionProvider`;
-`MinigameView` and `ScriptHubView` consume it via `useSession()` and take no session props
-directly.
+### Decision 1 — the hook returns a *slice*, not the whole `SessionContextValue`
 
-So the seam is already drawn, already the thing consumers depend on, and already enforced
-by tsc. `useStudySession` should produce (or feed) that value. This is real encapsulation,
-not a "god hook" that just relocates the coupling.
+`SessionContextValue` is a composite. Four of its fields are not session state: `voiceBusy`,
+`voiceUnavailable`, `playAudio` (owned by `useVoice`) and `blockSessionComplete` (derived
+from `cardScores` + `activeBlockCards`). Pulling them in would have made the hook own voice
+and mastery — the "god hook" outcome this document warned against.
 
-**But `SessionContextValue` is a composite, not a mirror of the state cluster.** It also
-folds in voice (`voiceBusy`, `voiceUnavailable`, `playAudio`), derived memos
-(`blockSessionComplete`, `upcomingCards`, `activeSessionLengthPreset`) and refs
-(`answerInputRef`). Decide deliberately whether the hook returns the whole value or just
-the session slice that App merges with voice/derived state. **Do not pull voice into the
-hook just so it can "own" the interface.**
+```ts
+export type StudySessionSlice = Omit<
+  SessionContextValue,
+  'blockSessionComplete' | 'voiceBusy' | 'voiceUnavailable' | 'playAudio'
+>
+```
 
-### Scope
+Deriving it by `Omit` rather than restating the fields keeps tsc enforcing both halves: the
+hook cannot drop a field (it is the return type), and App cannot forget to supply one (the
+`SessionProvider value` is still checked against the full `SessionContextValue`).
 
-44 `useState` (of App's 111), ~18 refs, and ~1,236 lines across these:
+`upcomingCards`, `activeSessionLengthPreset` and `answerInputRef` *did* move into the hook —
+they are session-derived, unlike voice and mastery.
 
-| Function | Lines | Function | Lines |
-|---|---|---|---|
-| `submitAnswer` | 391 | `handleResume` | 35 |
-| `submitHandwritingOutcome` | 171 | `hydrateRoundCycle` | 33 |
-| `startSession` | 109 | `continueLastSession` | 30 |
-| `clearPersistedSession` | 106 | `nextCardIndex` | 30 |
-| `nextRound` | 72 | `buildQueueCycle` | 23 |
-| `startMissedWordReview` | 63 | `resetSessionCore` / `Full` / `End` / `WithLives` | 62 |
-| `saveSessionPrefs` | 22 | `upcomingCards` | 20 |
-| `returnToDailyGamesHub` | 16 | `nextRoundMode` | 14 |
-| `activeSessionLengthPreset` | 10 | `handleRetry` / `handleDismissResume` / `skipFeedback` | 22 |
+### Decision 2 — the straddling refs
 
-### The real risk: refs, not props
+**`localToastIdRef` moved wholesale.** This document guessed it wanted an injected
+`pushToast()`; that was wrong. Its only two readers in the entire tree were both inside
+`submitAnswer` — it is a private monotonic counter, not a shared channel. The real injected
+dependency is `tutor.queueAssistantToast`.
 
-Phases 1–3 leaned on `tsc`. **4b cannot.** The failure mode is behavioural: if a ref moves
-into the hook while any *other* reader stays in App, you get two distinct ref objects.
-Both typecheck. Cross-round state silently desyncs.
+**`studyQueueCacheRef` stayed in App.** Two of its three readers (`getStudyQueueDeduped`,
+`refreshDeckProgressAfterSeedChange`) are deck loading, not session; only `submitAnswer` is.
+The hook takes injected `getStudyQueue(slug, opts)` and `invalidateStudyQueue(slug)`.
 
-**Rule: a ref and every one of its readers/writers move together, or neither moves.**
+**Two more straddlers this document did not list**, found by reading call sites:
 
-Enumeration of session refs and their owning functions (regenerate with the script in the
-"Reproducing the analysis" section below):
+- `explicitReviewItemsRef` is read imperatively by the Escape handler and `MinigameView`'s
+  `onBack`, both of which stayed in App. The hook returns the **ref object itself**, so both
+  sides share one object. (`answerInputRef` was already exposed this way.)
+- `queueBucketCountsRef` was read in the provider value. It moved; App now takes the exposed
+  `queueBucketCounts` *value* and no longer names the ref.
 
-| Ref | Owners |
-|---|---|
-| `seenCardIdsRef` | `startSession`, `submitAnswer`, `clearPersistedSession`, `activeSessionLengthPreset` |
-| `wrongCardIdsRef` | `startSession`, `submitAnswer`, `clearPersistedSession`, `activeSessionLengthPreset` |
-| `nearMissCardIdsRef` | `startSession`, `submitAnswer`, `clearPersistedSession`, `activeSessionLengthPreset` |
-| `retryCardsRef` | `handleRetry`, `nextRound`, `resetSessionCore`, `returnToDailyGamesHub`, `startSession` |
-| `retryTargetItemsRef` | + `submitAnswer`, `activeSessionLengthPreset` |
-| `explicitReviewItemsRef` | `nextRound`, `resetSessionCore`, `returnToDailyGamesHub`, `submitAnswer`, `submitHandwritingOutcome`, `upcomingCards` |
-| `explicitReviewCursorRef` | `nextRound`, `resetSessionCore`, `returnToDailyGamesHub`, `upcomingCards` |
-| `explicitReviewPersistenceRequestRef` | `resetSessionCore`, `returnToDailyGamesHub`, `submitAnswer` |
-| `feedbackAdvanceRef` | `resetSessionCore`, `returnToDailyGamesHub`, `skipFeedback`, `submitAnswer` |
-| `roundCycleRef`, `roundCursorRef` | `hydrateRoundCycle`, `nextCardIndex`, `resetRoundCycle`, `upcomingCards` |
-| `roundPresentedAtRef` | `nextRound`, `startSession`, `submitAnswer`, `activeSessionLengthPreset` |
-| `interleaveCursorRef` | `nextRoundMode`, `resetRoundCycle` |
-| `queueBucketCountsRef` | `hydrateRoundCycle`, JSX (feeds `SessionContextValue`) |
+Net: **no ref is split across the boundary.** Verified by grep — the only session-ref names
+remaining in App.tsx are the `explicitReviewItemsRef` destructured from `session`.
 
-**Two refs genuinely straddle the boundary — decide these explicitly before starting:**
+### The wiring order problem, and the one backwards edge
 
-1. **`studyQueueCacheRef`** — owned by `getStudyQueueDeduped` (deck loading, *not* session)
-   but invalidated by `submitAnswer` (session). Either the session gets an injected
-   `invalidateStudyQueue()` callback, or queue caching moves too.
-2. **`localToastIdRef`** — shared between `submitAnswer` and toast rendering. Likely wants
-   an injected `pushToast()`.
+`useStudySession` must sit *below* everything it takes by value (`activeBlockCards` is a
+render-time memo and cannot be late-bound through a ref) and *above* everything that reads
+session state (`isInMinigameSession`, `showPetalLayer`, `blockSessionComplete`,
+`activeRunCards`, the provider value). That ordering is what `ee52eb0` establishes.
 
-### `submitAnswer` also needs injected dependencies
+One edge does not fit: `useTutor` consumes session state (`isInMinigameSession`,
+`activeSessionId`, and an `onToastNavigate` that calls `startSession`), so it is constructed
+*after* the session hook — but `submitAnswer` needs `tutor.queueAssistantToast`. Resolved
+with a latest-value ref box assigned during render right after `useTutor` returns. An effect
+would be wrong here: the tutor hook's functions are not stable, so an effect keyed on its
+identity can hold a stale reference between renders.
 
-It is the "review recorded" path, so it writes a lot that is *not* session state:
-`setCardScores`, `setScriptStats`, `setMinigameStats`, `setXpProgress`, `setXpToasts`,
-`setMilestoneToasts`, `setDeckCards`, `tutor`, plus `loadSummary`. Pass these in as
-explicit callbacks rather than letting the hook reach for App state.
+`pomodoro.onSessionStart` / `onSessionEnd` go through the same ref box, matching how App
+called them before (neither appeared in the original dependency arrays).
 
-### Suggested order
+### Verification
 
-1. Draw the seam: decide hook-returns-full-`SessionContextValue` vs. session-slice-only.
-2. Resolve `studyQueueCacheRef` and `localToastIdRef`.
-3. Move state + refs + functions **in one commit** — they don't subdivide well; a partial
-   move is what creates the split-ref bug.
-4. `useStudySession.ts` in `src/features/study-session/` next to the existing builders.
-
-A smaller optional warm-up: the round-cycle cluster (`roundCycleRef`, `roundCursorRef`,
-`hydrateRoundCycle`, `nextCardIndex`, `resetRoundCycle`, `buildQueueCycle`, `upcomingCards`)
-has a closed owner set, ~96 lines. It needs `getStudyQueueDeduped` injected. Low value for
-the effort, but safe if you want to validate the approach first.
+- Gate (`App.session-state.test.tsx`) 6/6, full suite 605/605, `tsc -b`, oxlint 0 warnings,
+  `vite build`, and the built Electron app launches clean.
+- The gate only covers `submitAnswer` scoring/lives. The riskier ref-heavy cluster —
+  explicit/missed-word review, its persistence sequencing, and `returnToDailyGamesHub` — is
+  covered by `App.daily-games.test.tsx` (5 tests), which a split ref would fail immediately.
+- Still uncovered by any test: the resume-toast flow (`handleResume` / `handleDismissResume`)
+  and `handleRetry`. Neither involves a cross-boundary ref, so the residual risk there is
+  transcription, not desync — and a normalized diff of all 1,064 moved lines against the
+  pre-move file shows no body logic changed. **If you touch these, test them first.**
 
 ---
 
