@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CardNotePayload } from '../../generated/types'
+import type { CardNotePayload } from '../../../generated/types'
 import { CardNoteEditor } from './CardNoteEditor'
-import type { CardNoteController } from './useCardNote'
+import type { CardNoteController } from '../useCardNote'
 
 const NOTE: CardNotePayload = {
   note_key: `note:v1:builtin:${'a'.repeat(64)}`,

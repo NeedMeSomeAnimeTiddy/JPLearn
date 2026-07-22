@@ -14,9 +14,9 @@ future feature design — not a task list.
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ Renderer (React 19 + Vite)                                   │
-│   App.tsx (orchestrator + most study state)                  │
+│   App.tsx (orchestrator: routing, deck loading, settings)    │
 │   src/views/*        6 top-level screens                     │
-│   src/features/*     19 self-contained hook-first modules    │
+│   src/features/*     21 self-contained hook-first modules    │
 │   src/components/*   shared presentational components        │
 │   src/lib/*          pure helpers + static content data      │
 └───────────────── window.jplearnDesktop (preload) ────────────┘
@@ -142,12 +142,12 @@ lookups will silently miss.
 
 | Metric | Value | At issue #69 filing |
 |---|---|---|
-| Total lines | 4,859 | 7,451 |
-| `App()` function body | lines 175–4,856 | 1587–7448 |
-| `useState` | 111 | 112 |
-| `useCallback` | 73 | 60 |
-| `useMemo` | 27 | 27 |
-| `useEffect` | 34 | 34 |
+| Total lines | 2,802 | 7,451 |
+| `useState` | 65 | 112 |
+| `useRef` | 24 | 43 |
+| `useCallback` | 56 | 60 |
+| `useMemo` | 23 | 27 |
+| `useEffect` | 27 | 34 |
 
 Issue #69 moved the module-level pure helpers and the two largest JSX blocks out:
 
@@ -157,29 +157,56 @@ Issue #69 moved the module-level pure helpers and the two largest JSX blocks out
   (913 lines), both presentational: App still owns their state and passes it down.
 - Types and constants that App.tsx had been redeclaring now come from `src/types.ts` and
   `src/constants.tsx`.
+- `src/features/study-session/` — round builders (phase 4a) and `useStudySession`
+  (phase 4b): 44 `useState` and 17 refs covering the live round, session counters, lives,
+  combo/streak, confidence capture, the round queue cycle, explicit (missed-word) review,
+  and session persistence/resume.
 
-`useCallback` rose because inline JSX closures were lifted to named handlers — a
-deliberate prerequisite for extracting the JSX safely.
+`useStudySession` returns a `StudySessionSlice` (`SessionContextValue` minus voice and
+`blockSessionComplete`), which App merges at the `SessionProvider` call site rather than
+letting the hook own voice and mastery. Its collaborators arrive through
+`StudySessionDeps`; notably `studyQueueCacheRef` stays in App because deck loading owns it,
+and the session invalidates through an injected callback instead of holding a second
+reference. `useStudySession` must be called below the values it takes by argument and above
+everything that reads session state — `useTutor` is the one exception, constructed after it
+and reached through a ref box.
+- `src/features/navigation/` — `useAppNavigation` (phase 4c): the active `view`, the
+  `navDirection` animation hint, and the order-of-visit history stack behind the titlebar
+  back/forward buttons. Every navigation goes through `navigate(view, direction?)`, so a
+  view change and its direction can no longer be set out of sync. Two orthogonal pieces sit
+  beside the hook rather than inside it: `VIEW_PARENT` (the Escape "up one level" map, was a
+  five-branch `if` chain) is a plain constant, and `view → component` rendering stays in App
+  as a `renderView()` closure because each screen needs App-owned props.
 
-**Still outstanding:** the `useState` count barely moved, because none of the above
-relocated state. Session/round/scoring state is still owned directly by `App()` and is
-the remaining work on #69. Routing is likewise still a flat `view` string with inline
-conditional JSX (`home`, `script_hub`, `minigame`, `jlpt_prep`, `passage_hub`,
-`daily_games`).
+**Routing is three distinct mappings**, deliberately kept separate: `view → component`
+(render, in App), `view → parent` (Escape, `VIEW_PARENT`), and the history stack (order of
+visit, in the hook). They have different cardinality and semantics; folding them into one
+"router" abstraction fits none of them.
 
 **Design rule for new work:** anything with its own state goes in
 `src/features/<name>/` (`types.ts` → `constants.ts` → `utils.ts` → `use<Name>.ts` →
-`components/` → `index.ts`). 19 modules already follow this and it works well. The
-extraction backlog is App.tsx's *existing* session/round/scoring state, which is the one
-thing no feature module owns.
+`components/` → `index.ts`). 16 modules follow it in full and it works well. App.tsx's
+former session and routing state now live in `features/study-session/` and
+`features/navigation/` — see the conformance note below for why `study-session` does not
+carry every file in the pattern.
 
 ### Feature-module conformance
 
-Full pattern: achievements, command-palette, cursor, daily-games, handwriting,
-kanji-detail, keyboard, onboarding, passages, pomodoro, scenario-tutor, theme, tutor,
-voice, devtools.
-Partial (missing `index.ts`/`types.ts`/`constants.ts`): **card-notes**, **heatmap**,
-**models**, **window-drag**.
+Full pattern: achievements, card-notes, command-palette, cursor, daily-games, handwriting,
+kanji-detail, keyboard, navigation, onboarding, passages, pomodoro, scenario-tutor, theme,
+tutor, voice, devtools.
+Partial (missing `index.ts`/`types.ts`/`constants.ts`): **heatmap**, **models**,
+**window-drag**.
+
+These three are left partial on purpose (issue #69 declined them): `window-drag` is a bare
+hook, and inventing `types.ts`/`constants.ts` for it adds files, not clarity. `card-notes`
+used to be the real outlier and was brought into line (barrel + `components/`) in phase 4c.
+
+`study-session` is deliberately partial: `index.ts` + `types.ts` + `useStudySession.ts`,
+with `roundBuilder.ts`/`grammarRound.ts` in place of a `utils.ts`. It has no `constants.ts`
+(its constants — `SESSION_LENGTH_PRESETS`, `DEFAULT_LIVES`, the category→slug maps — are
+shared with App and the views, so they belong in `src/constants.tsx`) and no `components/`
+(its UI is `views/MinigameView.tsx`, which reads the session through `useSession()`).
 
 ### Dual source of truth for mastery
 
@@ -194,7 +221,7 @@ localStorage          ──►  cardScores        ──►  JLPT progress, cat
 `CardScores = Record<ScriptKey, Record<cardId, number>>` with `CARD_MASTERY_MAX = 4`.
 The two can disagree; clearing browser storage silently resets visible mastery while
 FSRS state survives, and a DB reset that misses localStorage does the reverse
-(`App.tsx:5094`, `5252` try to keep them in sync by hand).
+(`App.tsx:803` persists it, `1762` clears it on DB reset — kept in sync by hand).
 
 Six localStorage keys hold renderer-side truth: `jplearn-desktop-script-stats-v1`,
 `jplearn-desktop-settings-v1`, `jplearn-card-scores-v2`,
@@ -211,7 +238,7 @@ type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5'
 But `domain/decks.ALL_DECKS` registers 45+ decks including `kanji_n1..n4`, `vocab_n1..n4`
 and 12 N4–N1 kanji category decks. Consequence: **all kanji mastery across N5–N1 is
 stored in the single `cardScores.kanji_n5` bucket**, keyed by numeric card id
-(`App.tsx:3812`). It works only because `domain/decks.py` hand-allocates disjoint id
+(`features/study-session/useStudySession.ts:1070`, `1118`). It works only because `domain/decks.py` hand-allocates disjoint id
 ranges.
 
 `ScriptKey` is also **defined twice** — `src/types.ts:23` and
@@ -341,7 +368,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 
 | # | Finding | Issue |
 |---|---|---|
-| D1 | `App.tsx` at 4,859 lines / 111 `useState` still violates the "orchestrator only" rule. The pure helpers (now `src/lib/`) and the titlebar + settings JSX (now `src/components/`) are done; session/round/scoring state still needs to become a feature module, which is what the `useState` count reflects. | #69 (partial), #6 (closed, handler boilerplate only) |
+| D1 | `App.tsx` is down to 2,880 lines / 67 `useState` — the pure helpers (`src/lib/`), the titlebar + settings JSX (`src/components/`) and the session state machine (`features/study-session/useStudySession.ts`) are all extracted. What remains is routing: a flat `view` string with inline conditional JSX. | #69 (phase 4c outstanding), #6 (closed, handler boilerplate only) |
 | D2 | `desktop_bridge.py` at 6,122 lines mixes OCR, MT, dictionary, and deck logic in `scripts/` — a directory `arch_check.py` does not inspect. | none |
 | D3 | `arch_check.py` covers only `src`/`domain`/`data`/`ui`; extend `RULES` to `scripts/`. | none |
 | D4 | `data/app.db` + `SRSRepository` are unused by any runtime path but documented in FEATURES.md as live persistence. Either wire or reclassify. | none |
