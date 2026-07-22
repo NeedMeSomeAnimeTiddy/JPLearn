@@ -82,8 +82,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     deckCards,
     scriptStats,
     gameLoading,
-    setView,
-    setNavDirection,
+    navigate,
     setActiveScript,
     setActiveGame,
     setGameError,
@@ -621,8 +620,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       setRoundAdvanceError(false)
       setGameError(null)
       setRoundConfidenceScore(3)
-      setNavDirection('forward')
-      setView('minigame')
+      navigate('minigame', 'forward')
     } finally {
       setSessionStartPending(false)
     }
@@ -640,9 +638,8 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     retryCardsRef.current = null
     retryTargetItemsRef.current = null
     setRetryTargetItems(null)
-    setNavDirection('back')
-    setView('daily_games')
-  }, [resetSessionEnd, setNavDirection, setView])
+    navigate('daily_games', 'back')
+  }, [resetSessionEnd, navigate])
 
   const startSession = useCallback(async (selectedGame: MinigameKey = activeGame, customCards?: GameCard[], customTargetItems?: number, restore?: PersistedSessionRestore) => {
     setSessionStartPending(true)
@@ -768,8 +765,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     const minigame = resolveScriptMinigame(script, sessionRunReport.minigame)
 
     setActiveGame(minigame)
-    setNavDirection('forward')
-    setView('minigame')
+    navigate('minigame', 'forward')
     resetSessionWithLives()
 
     if (script !== activeScript) {
@@ -787,8 +783,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     startSession,
     setActiveGame,
     setActiveScript,
-    setNavDirection,
-    setView,
+    navigate,
   ])
 
   useEffect(() => {
@@ -821,8 +816,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       const targetItems = Math.max(1, remainingCards.length)
       setSessionTargetItems(targetItems)
 
-      setNavDirection('forward')
-      setView('minigame')
+      navigate('minigame', 'forward')
 
       if (targetItems > 0) {
         setTimeout(() => {
@@ -830,8 +824,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         }, 100)
       }
     } catch {
-      setNavDirection('forward')
-      setView('minigame')
+      navigate('minigame', 'forward')
       startSession(data.activeGame)
     }
   }, [
@@ -840,8 +833,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     clearPersistedSession,
     setActiveGame,
     setActiveScript,
-    setNavDirection,
-    setView,
+    navigate,
   ])
 
   const handleDismissResume = useCallback(() => {

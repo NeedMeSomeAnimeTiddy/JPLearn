@@ -62,8 +62,8 @@ export interface StudySessionDeps {
   gameLoading: boolean
 
   // ── Navigation / deck state the session writes ───────────────────────────
-  setView: Dispatch<SetStateAction<AppView>>
-  setNavDirection: Dispatch<SetStateAction<NavDirection>>
+  /** From useAppNavigation — sets view (and optionally direction) in one call. */
+  navigate: (next: AppView, direction?: NavDirection) => void
   setActiveScript: Dispatch<SetStateAction<ScriptKey>>
   setActiveGame: Dispatch<SetStateAction<MinigameKey>>
   setGameError: Dispatch<SetStateAction<string | null>>

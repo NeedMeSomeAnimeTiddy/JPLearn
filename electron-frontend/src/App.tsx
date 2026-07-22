@@ -3,7 +3,6 @@ import type { CSSProperties, Dispatch, SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
 import type {
   AppSettings,
-  AppView,
   BlockInfo,
   BlockProgressPayload,
   CardScores,
@@ -13,7 +12,6 @@ import type {
   LearningPathStatus,
   MinigameKey,
   MinigameStatsByScript,
-  NavDirection,
   OverviewCategoryBlocks,
   OverviewKanjiCard,
   OverviewSectionKey,
@@ -55,6 +53,7 @@ import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
+import { useAppNavigation, VIEW_PARENT } from './features/navigation'
 import { KANJI_MEANINGS } from './lib/kanjiMeanings'
 import { ArrowLeft, Trophy } from 'lucide-react'
 import {
@@ -150,13 +149,10 @@ function App() {
     void check()
   }, [])
 
-  const [view, setView] = useState<AppView>('home')
-  const [navDirection, setNavDirection] = useState<NavDirection>('forward')
+  const nav = useAppNavigation()
+  const { view, navDirection, navigate } = nav
   const [summary, setSummary] = useState<StudySummaryPayload | null>(() => loadSummarySnapshot())
   const [error, setError] = useState<string | null>(null)
-  const viewHistoryRef = useRef<AppView[]>(['home'])
-  const viewHistoryIndexRef = useRef(0)
-  const isHistoryNavigationRef = useRef(false)
   const [loading, setLoading] = useState<boolean>(() => loadSummarySnapshot() === null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
@@ -312,8 +308,7 @@ function App() {
     setShowOverview(false)
     setShowSettings(false)
     tutor.closeTutorPanel()
-    setNavDirection('forward')
-    setView('daily_games')
+    navigate('daily_games', 'forward')
     setShortcutMenuOpen(false)
     setActiveShortcutFlyout(null)
   }
@@ -321,13 +316,13 @@ function App() {
   useEffect(() => {
     const scripts: ScriptKey[] = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples']
     const commands: Command[] = [
-      { id: 'nav-home', label: 'Go to Home', category: 'navigation', action: () => { setNavDirection('back'); setView('home') } },
-      { id: 'nav-script-hub', label: 'Go to Script Hub', category: 'navigation', action: () => { setNavDirection('forward'); setView('script_hub') } },
-      { id: 'nav-jlpt', label: 'Go to JLPT Prep', category: 'navigation', action: () => { setNavDirection('forward'); setView('jlpt_prep') } },
+      { id: 'nav-home', label: 'Go to Home', category: 'navigation', action: () => { navigate('home', 'back') } },
+      { id: 'nav-script-hub', label: 'Go to Script Hub', category: 'navigation', action: () => { navigate('script_hub', 'forward') } },
+      { id: 'nav-jlpt', label: 'Go to JLPT Prep', category: 'navigation', action: () => { navigate('jlpt_prep', 'forward') } },
       { id: 'nav-daily-games', label: DAILY_GAMES_COPY.title, category: 'navigation', keywords: ['daily', 'games', 'practice'], action: openDailyGames },
       { id: 'nav-overview', label: 'Open Study Overview', category: 'navigation', action: () => { closeKanjiDetail(); setShowOverview(true); void loadSummary() } },
-      { id: 'script-hiragana', label: 'Hiragana', category: 'navigation', keywords: ['hiragana', 'script'], action: () => { setNavDirection('forward'); setActiveScript('hiragana'); setView('script_hub') } },
-      { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { setNavDirection('forward'); setActiveScript('katakana'); setView('script_hub') } },
+      { id: 'script-hiragana', label: 'Hiragana', category: 'navigation', keywords: ['hiragana', 'script'], action: () => { setActiveScript('hiragana'); navigate('script_hub', 'forward') } },
+      { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { setActiveScript('katakana'); navigate('script_hub', 'forward') } },
       { id: 'open-settings', label: 'Open Settings', category: 'settings', shortcut: 'Ctrl+,', action: () => { closeKanjiDetail(); setShowSettings(true) } },
       { id: 'open-keyboard-cheatsheet', label: 'Keyboard Shortcuts', category: 'settings', action: () => { closeKeyboardCheatsheet(); setTimeout(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })) }, 50) } },
       { id: 'tutor-open-menu', label: 'Open Tutor', category: 'navigation', keywords: ['tutor', 'menu'], action: () => tutor.openTutorPanel() },
@@ -348,18 +343,17 @@ function App() {
           keywords: ['minigame', game, script, SCRIPT_LABELS[script]],
           action: () => {
             setActiveGame(game)
-            setNavDirection('forward')
             setShowOverview(false)
             setShowSettings(false)
             session.clearLastRunReport()
             resetSessionWithLives()
             if (script === activeScript) {
-              setView('minigame')
+              navigate('minigame', 'forward')
               void startSession(game)
             } else {
               setActiveScript(script)
               session.requestResumeSession({ script, minigame: game })
-              setView('minigame')
+              navigate('minigame', 'forward')
             }
           },
         })
@@ -373,8 +367,7 @@ function App() {
   useEffect(() => {
     const cleanup = window.jplearnDesktop?.onTrayAction?.((action: string) => {
       if (action === 'start-session') {
-        setNavDirection('forward')
-        setView('script_hub')
+        navigate('script_hub', 'forward')
       } else if (action === 'view-overview') {
         closeKanjiDetail()
         setShowOverview(true)
@@ -601,8 +594,7 @@ function App() {
     deckCards,
     scriptStats,
     gameLoading,
-    setView,
-    setNavDirection,
+    navigate,
     setActiveScript,
     setActiveGame,
     setGameError,
@@ -657,8 +649,7 @@ function App() {
       onToastNavigate: (script, game, differentScript) => {
         const minigame = resolveScriptMinigame(script, game)
         setActiveGame(minigame)
-        setNavDirection('forward')
-        setView('minigame')
+        navigate('minigame', 'forward')
         resetSessionWithLives()
         if (differentScript) {
           setActiveScript(script)
@@ -1359,37 +1350,16 @@ function App() {
           return
         }
 
-        if (view === 'minigame') {
-          if (explicitReviewItemsRef.current) {
-            returnToDailyGamesHub()
-            return
-          }
-          setNavDirection('back')
-          setView('script_hub')
+        // An in-progress missed-word review returns to the Daily Games hub
+        // before Escape is allowed to leave the minigame view at all.
+        if (view === 'minigame' && explicitReviewItemsRef.current) {
+          returnToDailyGamesHub()
           return
         }
 
-        if (view === 'script_hub') {
-          setNavDirection('back')
-          setView('home')
-          return
-        }
-
-        if (view === 'jlpt_prep') {
-          setNavDirection('back')
-          setView('home')
-          return
-        }
-
-        if (view === 'passage_hub') {
-          setNavDirection('back')
-          setView('home')
-          return
-        }
-
-        if (view === 'daily_games') {
-          setNavDirection('back')
-          setView('home')
+        const parentView = VIEW_PARENT[view]
+        if (parentView) {
+          navigate(parentView, 'back')
           return
         }
 
@@ -1413,34 +1383,28 @@ function App() {
 
       if (view === 'home') {
         if (event.key === '1') {
-          setNavDirection('forward')
           setActiveScript('hiragana')
-          setView('script_hub')
+          navigate('script_hub', 'forward')
         }
         if (event.key === '2') {
-          setNavDirection('forward')
           setActiveScript('katakana')
-          setView('script_hub')
+          navigate('script_hub', 'forward')
         }
         if (event.key === '3') {
-          setNavDirection('forward')
           setActiveScript('kanji_n5')
-          setView('script_hub')
+          navigate('script_hub', 'forward')
         }
         if (event.key === '4') {
-          setNavDirection('forward')
           setActiveScript('vocab_n5')
-          setView('script_hub')
+          navigate('script_hub', 'forward')
         }
         if (event.key === '5') {
-          setNavDirection('forward')
           setActiveScript('grammar_patterns')
-          setView('script_hub')
+          navigate('script_hub', 'forward')
         }
         if (event.key === '7') {
-          setNavDirection('forward')
           setActiveScript('sentence_examples')
-          setView('script_hub')
+          navigate('script_hub', 'forward')
         }
       }
     }
@@ -1601,26 +1565,9 @@ function App() {
     void fetchMastery()
   }, [showOverview])
 
-  useEffect(() => {
-    if (isHistoryNavigationRef.current) {
-      isHistoryNavigationRef.current = false
-      return
-    }
-
-    const currentHistory = viewHistoryRef.current
-    const currentIndex = viewHistoryIndexRef.current
-    if (currentHistory[currentIndex] === view) return
-
-    const nextHistory = currentHistory.slice(0, currentIndex + 1)
-    nextHistory.push(view)
-    viewHistoryRef.current = nextHistory
-    viewHistoryIndexRef.current = nextHistory.length - 1
-  }, [view])
-
   const goHome = useCallback(() => {
     closeKanjiDetail()
-    setNavDirection('back')
-    setView('home')
+    navigate('home', 'back')
     resetSessionCore()
     setShowSettings(false)
     tutor.closeTutorPanel()
@@ -1650,22 +1597,20 @@ function App() {
 
   const jumpToScriptHub = useCallback((script: ScriptKey) => {
     closeKanjiDetail()
-    setNavDirection('forward')
     setActiveScript(script)
-    setView('script_hub')
+    navigate('script_hub', 'forward')
     resetSessionCore()
     closeShortcutMenu()
-  }, [closeKanjiDetail, closeShortcutMenu, resetSessionCore])
+  }, [closeKanjiDetail, closeShortcutMenu, navigate, resetSessionCore])
 
   const jumpToScriptHubMinigame = useCallback((script: ScriptKey, minigame: MinigameKey) => {
     closeKanjiDetail()
     const resolvedMinigame = resolveScriptMinigame(script, minigame)
-    setNavDirection('forward')
     setShowOverview(false)
     setShowSettings(false)
     session.clearLastRunReport()
     setActiveGame(resolvedMinigame)
-    setView('minigame')
+    navigate('minigame', 'forward')
     resetSessionWithLives()
 
     if (script !== activeScript) {
@@ -1683,13 +1628,12 @@ function App() {
   const jumpToScriptHubSetup = useCallback((script: ScriptKey, minigame: MinigameKey) => {
     closeKanjiDetail()
     const resolvedMinigame = resolveScriptMinigame(script, minigame)
-    setNavDirection('forward')
     setActiveScript(script)
     setActiveGame(resolvedMinigame)
-    setView('script_hub')
+    navigate('script_hub', 'forward')
     resetSessionWithLives()
     closeShortcutMenu()
-  }, [closeKanjiDetail, closeShortcutMenu, resetSessionWithLives, resolveScriptMinigame])
+  }, [closeKanjiDetail, closeShortcutMenu, navigate, resetSessionWithLives, resolveScriptMinigame])
 
   const openSettingsFromMenu = useCallback(() => {
     closeKanjiDetail()
@@ -1783,8 +1727,7 @@ function App() {
           steps: [],
         }
       })
-      setNavDirection('back')
-      setView('home')
+      navigate('home', 'back')
       setResetConfirmStep(0)
       refreshDeckProgressAfterSeedChange()
       await loadSummary()
@@ -1941,28 +1884,6 @@ function App() {
   }, [getDeckCardsDeduped, refreshDeckProgressAfterSeedChange])
 
 
-  const titlebarHistoryBack = useCallback(() => {
-    const currentIndex = viewHistoryIndexRef.current
-    if (currentIndex <= 0) return
-
-    const nextIndex = currentIndex - 1
-    viewHistoryIndexRef.current = nextIndex
-    isHistoryNavigationRef.current = true
-    setNavDirection('back')
-    setView(viewHistoryRef.current[nextIndex])
-  }, [])
-
-  const titlebarHistoryForward = useCallback(() => {
-    const currentIndex = viewHistoryIndexRef.current
-    const nextIndex = currentIndex + 1
-    if (nextIndex >= viewHistoryRef.current.length) return
-
-    viewHistoryIndexRef.current = nextIndex
-    isHistoryNavigationRef.current = true
-    setNavDirection('forward')
-    setView(viewHistoryRef.current[nextIndex])
-  }, [])
-
   // Titlebar callbacks: named here rather than inlined in the titlebar JSX so the
   // titlebar component receives bare handlers instead of raw state setters.
   const toggleShortcutMenu = useCallback(() => {
@@ -1971,14 +1892,16 @@ function App() {
   }, [])
 
   const jumpToJlptPrep = useCallback(() => {
-    setView('jlpt_prep')
+    // No direction argument: these titlebar jumps preserve the prior
+    // navDirection, exactly as the bare setView calls did.
+    navigate('jlpt_prep')
     setShortcutMenuOpen(false)
-  }, [])
+  }, [navigate])
 
   const jumpToPassageHub = useCallback(() => {
-    setView('passage_hub')
+    navigate('passage_hub')
     setShortcutMenuOpen(false)
-  }, [])
+  }, [navigate])
 
   const toggleAllMapsFlyout = useCallback(() => {
     setActiveShortcutFlyout((current) => (
@@ -2067,8 +1990,6 @@ function App() {
     }
   }, [setDictionaryOpen, tutor])
 
-  const canTitlebarBack = viewHistoryIndexRef.current > 0
-  const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
   const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
   const xpLevelCap = xpProgress?.xp_for_current_level ?? 0
   const xpPercent = xpLevelCap > 0 ? Math.round((xpInLevel / xpLevelCap) * 100) : 0
@@ -2221,10 +2142,10 @@ function App() {
         restartBridgeFromMenu={restartBridgeFromMenu}
         clearCachesFromMenu={clearCachesFromMenu}
         openDictionaryForCurrentRound={openDictionaryForCurrentRound}
-        canTitlebarBack={canTitlebarBack}
-        canTitlebarForward={canTitlebarForward}
-        titlebarHistoryBack={titlebarHistoryBack}
-        titlebarHistoryForward={titlebarHistoryForward}
+        canTitlebarBack={nav.canHistoryBack}
+        canTitlebarForward={nav.canHistoryForward}
+        titlebarHistoryBack={nav.historyBack}
+        titlebarHistoryForward={nav.historyForward}
         settings={settings}
         pomodoro={pomodoro}
         tutor={tutor}
@@ -2325,9 +2246,8 @@ function App() {
           }}
           onContinuePath={(sectionId) => {
             const script = sectionId as ScriptKey
-            setNavDirection('forward')
             setActiveScript(script)
-            setView('script_hub')
+            navigate('script_hub', 'forward')
           }}
           onChangePath={() => {
             // Re-open onboarding by resetting onboarding_complete in local state
@@ -2351,9 +2271,8 @@ function App() {
                   : 'Prerequisites are still in progress.',
               })
             } else {
-              setNavDirection('forward')
               setActiveScript(script)
-              setView('script_hub')
+              navigate('script_hub', 'forward')
             }
           }}
           onOpenJlptPrep={() => {
@@ -2373,15 +2292,13 @@ function App() {
             setShowOverview(false)
             setShowSettings(false)
             tutor.closeTutorPanel()
-            setNavDirection('forward')
-            setView('jlpt_prep')
+            navigate('jlpt_prep', 'forward')
           }}
           onOpenPassages={() => {
             setDictionaryOpen(false)
             setShowOverview(false)
             setShowSettings(false)
-            setNavDirection('forward')
-            setView('passage_hub')
+            navigate('passage_hub', 'forward')
           }}
           onOpenDailyGames={openDailyGames}
           onJumpToSetup={jumpToScriptHubSetup}
@@ -2501,15 +2418,14 @@ function App() {
             setShowOverview(false)
             setShowSettings(false)
             tutor.closeTutorPanel()
-            setNavDirection('forward')
 
             if (sectionId === 'jlpt_prep') {
-              setView('jlpt_prep')
+              navigate('jlpt_prep', 'forward')
               return
             }
 
             setActiveScript(sectionId)
-            setView('script_hub')
+            navigate('script_hub', 'forward')
           }}
         />
       )}
@@ -2567,8 +2483,7 @@ function App() {
           }}
           onPlayGame={(game) => {
             setActiveGame(game)
-            setNavDirection('forward')
-            setView('minigame')
+            navigate('minigame', 'forward')
             resetSessionWithLives()
             void startSession(game)
           }}
@@ -2597,8 +2512,7 @@ function App() {
               returnToDailyGamesHub()
               return
             }
-            setNavDirection('back')
-            setView('script_hub')
+            navigate('script_hub', 'back')
           }}
           onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
           onOpenSettings={openSettingsFromMenu}
@@ -2610,8 +2524,7 @@ function App() {
       {view === 'jlpt_prep' ? (
         <JLPTPrepView
           onBack={() => {
-            setNavDirection('back')
-            setView('home')
+            navigate('home', 'back')
           }}
         />
       ) : null}
@@ -2619,8 +2532,7 @@ function App() {
       {view === 'passage_hub' ? (
         <PassageHubView
           onBack={() => {
-            setNavDirection('back')
-            setView('home')
+            navigate('home', 'back')
           }}
           onOpenDictionary={(query) => openDictionary(query ?? '')}
           onPlayAudio={(text) => { void voice.playQuestionAudio(text) }}
@@ -2645,7 +2557,7 @@ function App() {
             <button
               type="button"
               className="back-button back-button-icon-only"
-              onClick={() => { setNavDirection('back'); setView('home'); }}
+              onClick={() => { navigate('home', 'back'); }}
               aria-label="Back to main menu"
             >
               <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
