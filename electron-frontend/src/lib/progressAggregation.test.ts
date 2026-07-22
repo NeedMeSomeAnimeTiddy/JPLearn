@@ -75,7 +75,8 @@ describe('buildCategoryProgress', () => {
   const order: Cat[] = ['first', 'second', 'third']
   const labels: Record<Cat, string> = { first: 'First', second: 'Second', third: 'Third' }
   const slugs: Record<Cat, string> = { first: 'c_first', second: 'c_second', third: 'c_third' }
-  const deck = (ids: number[]) => ids.map((id) => ({ id, character: 'x', tags: [] })) as ScriptDeck['cards']
+  const deck = (ids: number[]) =>
+    ids.map((id) => ({ id, character: 'x', tags: [] })) as unknown as ScriptDeck['cards']
 
   it('unlocks categories sequentially behind the 70% threshold', () => {
     const decks: Record<Cat, ScriptDeck['cards']> = {

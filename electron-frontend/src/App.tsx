@@ -3903,6 +3903,64 @@ function App() {
     setView(viewHistoryRef.current[nextIndex])
   }, [])
 
+  // Titlebar callbacks: named here rather than inlined in the titlebar JSX so the
+  // titlebar component receives bare handlers instead of raw state setters.
+  const toggleShortcutMenu = useCallback(() => {
+    setShortcutMenuOpen((open) => !open)
+    setActiveShortcutFlyout(null)
+  }, [])
+
+  const jumpToJlptPrep = useCallback(() => {
+    setView('jlpt_prep')
+    setShortcutMenuOpen(false)
+  }, [])
+
+  const jumpToPassageHub = useCallback(() => {
+    setView('passage_hub')
+    setShortcutMenuOpen(false)
+  }, [])
+
+  const toggleAllMapsFlyout = useCallback(() => {
+    setActiveShortcutFlyout((current) => (
+      current === null || current === 'dev_tools' || current === 'dev_checks'
+        ? 'all_maps'
+        : null
+    ))
+  }, [])
+
+  const toggleDevToolsFlyout = useCallback(() => {
+    setActiveShortcutFlyout((current) => (current === 'dev_tools' || current === 'dev_checks' ? null : 'dev_tools'))
+  }, [])
+
+  const toggleDevChecksFlyout = useCallback(() => {
+    setActiveShortcutFlyout((current) => (current === 'dev_checks' ? 'dev_tools' : 'dev_checks'))
+  }, [])
+
+  const toggleStreakDetails = useCallback(() => {
+    setStreakDetailsOpen((open) => !open)
+  }, [])
+
+  const toggleXpDetails = useCallback(() => {
+    setXpDetailsOpen((open) => !open)
+  }, [])
+
+  const openDictionaryForCurrentRound = useCallback(() => {
+    openDictionary(roundState?.focusText ?? roundState?.answer ?? '')
+  }, [openDictionary, roundState])
+
+  const toggleTutorPanelFromTitlebar = useCallback(() => {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+    if (tutor.tutorPanelOpen) {
+      tutor.closeTutorPanel()
+    } else {
+      tutor.openTutorPanel()
+    }
+  }, [setDictionaryOpen, tutor])
+
   const canTitlebarBack = viewHistoryIndexRef.current > 0
   const canTitlebarForward = viewHistoryIndexRef.current < viewHistoryRef.current.length - 1
   const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
@@ -4043,10 +4101,7 @@ function App() {
                 title="Shortcuts"
                 aria-haspopup="menu"
                 aria-expanded={shortcutMenuOpen}
-                onClick={() => {
-                  setShortcutMenuOpen((open) => !open)
-                  setActiveShortcutFlyout(null)
-                }}
+                onClick={toggleShortcutMenu}
               >
                 <Menu className="window-nav-icon" strokeWidth={2.2} />
               </button>
@@ -4066,7 +4121,7 @@ function App() {
                     type="button"
                     role="menuitem"
                     className="titlebar-shortcut-item"
-                    onClick={() => { setView('jlpt_prep'); setShortcutMenuOpen(false) }}
+                    onClick={jumpToJlptPrep}
                     title="JLPT Prep"
                   >
                     <Languages className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
@@ -4088,7 +4143,7 @@ function App() {
                     type="button"
                     role="menuitem"
                     className="titlebar-shortcut-item"
-                    onClick={() => { setView('passage_hub'); setShortcutMenuOpen(false) }}
+                    onClick={jumpToPassageHub}
                     title="Passages"
                   >
                     <BookText className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
@@ -4102,13 +4157,7 @@ function App() {
                       className="titlebar-shortcut-item titlebar-shortcut-parent"
                       aria-haspopup="true"
                       aria-expanded={activeShortcutFlyout !== null && activeShortcutFlyout !== 'dev_tools' && activeShortcutFlyout !== 'dev_checks'}
-                      onClick={() => {
-                        setActiveShortcutFlyout((current) => (
-                          current === null || current === 'dev_tools' || current === 'dev_checks'
-                            ? 'all_maps'
-                            : null
-                        ))
-                      }}
+                      onClick={toggleAllMapsFlyout}
                     >
                       <ListChecks className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
                       All Maps
@@ -4191,9 +4240,7 @@ function App() {
                       className="titlebar-shortcut-item titlebar-shortcut-parent"
                       aria-haspopup="true"
                       aria-expanded={activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks'}
-                      onClick={() => {
-                        setActiveShortcutFlyout((current) => (current === 'dev_tools' || current === 'dev_checks' ? null : 'dev_tools'))
-                      }}
+                      onClick={toggleDevToolsFlyout}
                     >
                       <Code2 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
                       Developer Tools
@@ -4229,9 +4276,7 @@ function App() {
                             className="titlebar-shortcut-item titlebar-shortcut-parent"
                             aria-haspopup="true"
                             aria-expanded={activeShortcutFlyout === 'dev_checks'}
-                            onClick={() => {
-                              setActiveShortcutFlyout((current) => (current === 'dev_checks' ? 'dev_tools' : 'dev_checks'))
-                            }}
+                            onClick={toggleDevChecksFlyout}
                           >
                             <PlayCircle className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
                             Run Checks
@@ -4325,7 +4370,7 @@ function App() {
             <button
               type="button"
               className="window-nav-button"
-              onClick={() => openDictionary(roundState?.focusText ?? roundState?.answer ?? '')}
+              onClick={openDictionaryForCurrentRound}
               aria-label="Open dictionary"
               title="Dictionary"
             >
@@ -4343,18 +4388,7 @@ function App() {
             <TutorTitlebarButton
               ref={tutorTitlebarButtonRef}
               tutorPanelOpen={tutor.tutorPanelOpen}
-              onClick={() => {
-                setDictionaryOpen(false)
-                setShowOverview(false)
-                setShowSettings(false)
-                setShortcutMenuOpen(false)
-                setActiveShortcutFlyout(null)
-                if (tutor.tutorPanelOpen) {
-                  tutor.closeTutorPanel()
-                } else {
-                  tutor.openTutorPanel()
-                }
-              }}
+              onClick={toggleTutorPanelFromTitlebar}
             />
           </div>
         </div>
@@ -4377,7 +4411,7 @@ function App() {
             <button
               type="button"
               className="titlebar-streak-chip"
-              onClick={() => setStreakDetailsOpen((open) => !open)}
+              onClick={toggleStreakDetails}
               title="View streak details"
               aria-label={`${streak.current_days} day streak`}
               aria-expanded={streakDetailsOpen}
@@ -4389,7 +4423,7 @@ function App() {
             <button
               type="button"
               className="titlebar-streak-chip titlebar-streak-freeze-chip"
-              onClick={() => setStreakDetailsOpen((open) => !open)}
+              onClick={toggleStreakDetails}
               title={`${streak.freezes_available} streak freeze${streak.freezes_available === 1 ? '' : 's'}`}
               aria-label={`${streak.freezes_available} streak freeze${streak.freezes_available === 1 ? '' : 's'}`}
               aria-expanded={streakDetailsOpen}
@@ -4435,7 +4469,7 @@ function App() {
                 aria-label={`Level ${xpProgress.level}. ${xpPercent}% to next level.`}
                 aria-expanded={xpDetailsOpen}
                 aria-controls="titlebar-xp-details"
-                onClick={() => setXpDetailsOpen((open) => !open)}
+                onClick={toggleXpDetails}
               >
                 <span className="titlebar-xp-badge" aria-hidden="true">{xpProgress.level}</span>
                 <div

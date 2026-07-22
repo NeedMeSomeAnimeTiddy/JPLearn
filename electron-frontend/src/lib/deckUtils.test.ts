@@ -13,7 +13,7 @@ import {
 import type { InterleaveWeights, ScriptDeck } from '../types'
 
 const deckOf = (count: number) =>
-  Array.from({ length: count }, (_, i) => ({ id: i, character: 'x', tags: [] })) as ScriptDeck['cards']
+  Array.from({ length: count }, (_, i) => ({ id: i, character: 'x', tags: [] })) as unknown as ScriptDeck['cards']
 
 describe('normalizeDeckCards / normalizeBlockList', () => {
   it('passes arrays through and coerces anything else to empty', () => {
