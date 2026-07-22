@@ -1,6 +1,6 @@
 # JPLearn Roadmap
 
-Updated: 2026-07-07
+Updated: 2026-07-22
 
 This document tracks delivery status and planned improvements. Completed items are
 kept in a changelog section at the bottom; the main sections below focus on what
@@ -9,13 +9,6 @@ remains to be built.
 ---
 
 ## Now / Next (Highest Priority)
-
-- [ ] **(High) Session persistence and quick resume**
-  - Restore the last deck, study mode, and prompt settings after restart
-  - Offer a one-click "resume" action from the home screen that restores previous round state
-  - Remember audio, hint, lives, and confidence preferences per mode
-  - Reduce setup friction for short daily study sessions
-  - **Status**: 0% — building blocks exist (user_settings table, config_store, localStorage pattern) but nothing is wired for cross-restart persistence
 
 - [ ] **(High) One-tap retry for missed items from session summary** ⬆️ promoted from Medium
   - Requeue wrong answers and near-misses into a short recovery run after a session ends
@@ -78,18 +71,9 @@ remains to be built.
   - Milestone events (3/7/14/30/100 days) already have `streak_milestone` assistant events
   - Keep effects tasteful and easy to disable for distraction-free study
 
-- [ ] **(Medium) Shortcut cheat sheet and command palette**
-  - Surface common keys and actions without leaving the study flow
-  - Make keyboard-driven navigation easier to discover for new users
-
 - [ ] **(Medium) Weekly/monthly progress reports**
   - Automated report generation with accuracy trends, streak highlights, and weak-area recommendations
   - Optionally surfaced via the tutor banner system
-
-- [ ] **(Medium) Activity heatmap**
-  - GitHub-style contribution heatmap showing daily review activity
-  - Motivational visual for maintaining study streaks
-  - Common in competitors (NihongoMaster, Bunpro)
 
 - [ ] **(Low) Quick dictionary lookup from answer reveals and summaries**
   - Let users jump from a missed item to a lookup without losing session context
@@ -144,7 +128,6 @@ remains to be built.
 ## Audio & Voice
 
 - [ ] **(Low) Listening mode polish and expansion**
-  - Fix `constants.tsx` vs `App.tsx` `SCRIPT_MINIGAMES` mismatch: audio modes are missing for hiragana/katakana in constants (runtime works, ScriptHubView doesn't show them)
   - Add dictation mode (hear Japanese → type Japanese text) as a new minigame
   - Add sentence-level listening mode (play full sentence via VOICEVOX → comprehend or transcribe)
 
@@ -222,6 +205,13 @@ remains to be built.
 ## Changelog (Completed)
 
 ### Shipped: Q3 2026
+- **Session persistence and quick resume** — `SESSION_STORAGE_KEY`/`PREFS_STORAGE_KEY` restore the
+  last deck, study mode, and prompt settings after restart; `components/ResumeToast.tsx` offers a
+  one-click resume from the home screen
+- **Activity heatmap** — `src/features/heatmap/` + `react-activity-calendar`, backed by the
+  `daily-activity` bridge command
+- **Shortcut cheat sheet and command palette** — `src/features/keyboard/` (`?` key cheatsheet) and
+  `src/features/command-palette/` (Ctrl+K)
 - **Listening comprehension study modes** — `listening_audio_first` and `listening_prompt_first` fully implemented end-to-end: round generation, VOICEVOX auto-play, character hide/show, multiple-choice grading, keyboard shortcuts, locking when VOICEVOX unavailable, stats tracking, tests
 - **JLPT Dashboard** — full stack wired: domain readiness computation, 4 exam queue builders, score projection, exam results persistence, 4 IPC commands, JLPTPrepView.tsx (dashboard + exam runner + results panel + history), feature unlock gate
 - **Kanji writing and stroke-order practice** — N5 characters support recognition vs. recall vs. writing

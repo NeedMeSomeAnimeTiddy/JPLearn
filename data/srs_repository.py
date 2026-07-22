@@ -1,4 +1,10 @@
-"""SQLite-backed SRS item repository (app.db persistence flow)."""
+"""SQLite-backed SRS item repository (app.db persistence flow).
+
+Dev/replay fixture store only — no runtime Electron/bridge path reads or writes
+app.db. It backs scripts/srs_apply.py, srs_check.py, srs_replay.py, db_check.py
+and tests/test_database_migrations.py. Live SRS state is data/jplearn.db
+`review_states`, read/written via data/database.py.
+"""
 
 from __future__ import annotations
 

@@ -288,8 +288,11 @@ Each script deck has a tailored set of available minigames (`electron-frontend/s
 - user_settings key/value table
 - Schema migration framework (11 migrations, deterministic rollback-safe strategy)
 
-### SQLite Persistence (app.db)
+### Dev/Replay Fixture Store (app.db)
+- Not live app persistence — used only by `scripts/srs_apply.py`, `srs_check.py`, `srs_replay.py`,
+  `db_check.py`, and `tests/test_database_migrations.py`
 - SRS items repository via SRSRepository (id, last_interval, ease_factor, due, updated_at)
+- Real runtime SRS state lives in `data/jplearn.db` `review_states` via `data/database.py`
 
 ### Text Normalization
 - Japanese normalization: NFC + prolonged sound mark unification + punctuation variants
