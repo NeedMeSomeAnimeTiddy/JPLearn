@@ -1,5 +1,7 @@
 // Shared primitive types extracted from App.tsx for use across components and views.
 
+import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/theme/types'
+
 export type MinigameKey =
   | 'romaji_sprint'
   | 'meaning_match'
@@ -124,7 +126,7 @@ export type FeedbackTone = 'success' | 'error' | null
 
 export type NavDirection = 'forward' | 'back'
 
-export type AppView = 'home' | 'script_hub' | 'minigame' | 'overview'
+export type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep' | 'passage_hub' | 'daily_games'
 
 export interface RoundOption {
   id: string
@@ -143,6 +145,7 @@ export interface RoundDictionaryNote {
 
 export interface RoundState {
   cardId: number
+  deckSlug?: DeckSlugInput
   mode: PlayableMinigame
   audioText: string
   exampleSentenceAudioText: string | null
@@ -276,4 +279,129 @@ export interface StudyPlanSnapshot {
   sessionNote: string
   learnerStage: StudyPlanStage
   shortcutRows: StudyPlanShortcut[]
+}
+
+// ── Bridge payload aliases ────────────────────────────────────────────────
+// Derived from the desktop API surface (src/electron.d.ts) rather than
+// hand-written, so they track scripts/generate_ts_types.py output automatically.
+
+export type StudySummaryPayload = Awaited<ReturnType<typeof window.jplearnDesktop.getStudySummary>>
+export type DeckSlugInput = Parameters<typeof window.jplearnDesktop.getDeckCards>[0]
+export type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
+export type BlockProgressPayload = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>
+export type BlockInfo = BlockProgressPayload['blocks'][number]
+export type StudyQueueResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getStudyQueue>>
+export type OverviewCharacterMasteryPayload = Awaited<
+  ReturnType<typeof window.jplearnDesktop.getOverviewCharacterMastery>
+>
+export type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
+export type OverviewCategoryBlocks = OverviewCharacterMasteryPayload['category_blocks']
+export type GrammarMinigameResponse = Awaited<
+  ReturnType<NonNullable<typeof window.jplearnDesktop.getGrammarMinigameData>>
+>
+export type SessionGoalStartResponse = Awaited<ReturnType<typeof window.jplearnDesktop.startSessionGoal>>
+export type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getSessionSummary>>
+export type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
+export type XPProgress = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getXpProgress>>>
+export type RecommendationItem =
+  Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getRecommendations>>>['recommendations'][number]
+export type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
+
+// ── App shell / settings ──────────────────────────────────────────────────
+
+export type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools' | 'dev_checks'
+export type InterleaveWeights = Record<
+  'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze',
+  number
+>
+export type FontSize = 'small' | 'medium' | 'large'
+export type AppFontPreset =
+  | 'kiwi_maru'
+  | 'bizin_gothic'
+  | 'kaisei_decol'
+  | 'noto_sans_jp'
+  | 'shippori_mincho'
+  | 'zen_old_mincho'
+  | 'reggae_one'
+  | 'system_ui'
+export type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
+export type ExpertiseLevel =
+  | 'total_beginner'
+  | 'know_hiragana'
+  | 'know_kana'
+  | 'jlpt_n5_foundation'
+  | 'jlpt_n4_foundation'
+  | 'jlpt_n3_foundation'
+  | 'jlpt_n2_foundation'
+  | 'jlpt_n1_foundation'
+export type SettingsTabKey = 'appearance' | 'assistant' | 'system'
+export type OverviewSectionKey =
+  | 'studyActivity'
+  | 'sessionHistory'
+  | 'mistakeBreakdown'
+  | 'minigamePerformance'
+  | 'deckSnapshot'
+  | 'achievements'
+
+export interface AppSettings {
+  reducedMotion: boolean
+  fontSize: FontSize
+  appFont: AppFontPreset
+  themeMode: ThemeMode
+  theme: ThemeKey
+  themeScope: ThemeScope
+  activeCustomThemeId: string | null
+  customThemes: CustomTheme[]
+  motionStyle: AnimationStyle
+  assistantToastLimit: 0 | 1
+  assistantChatEnabled: boolean
+  assistantChatAudioEnabled: boolean
+  assistantChatOcrMinConfidence: number
+  scenarioAiEvaluationEnabled: boolean
+  romajiConversionEnabled: boolean
+  showKeyboardPrompts: boolean
+  furiganaEnabled: boolean
+  furiganaAutoHideMastered: boolean
+  voiceEnabled: boolean
+  voiceSpeaker: string
+  voiceSpeed: number
+  ambientAudioEnabled: boolean
+  cursor: { mode: string; theme: string; size: number; color: string | null }
+  pomodoroEnabled: boolean
+  pomodoroWorkMinutes: number
+  pomodoroBreakMinutes: number
+  pomodoroLongBreakMinutes: number
+  pomodoroSessionsBeforeLongBreak: number
+  pomodoroShowTimerInHud: boolean
+}
+
+// ── Session persistence ───────────────────────────────────────────────────
+
+export interface ExplicitReviewItem {
+  deckSlug: DeckSlugInput
+  cardId: number
+  card: ScriptDeck['cards'][number]
+}
+
+export interface PersistedSessionRestore {
+  sessionScore: number
+  sessionRounds: number
+  sessionPoints: number
+  sessionStreak: number
+  sessionBestStreak: number
+  sessionConfidenceCount: number
+  sessionConfidenceTotal: number
+  livesRemaining: number
+}
+
+export interface PersistedSession {
+  activeScript: ScriptKey
+  activeGame: MinigameKey
+  livesEnabled: boolean
+  leechFocusEnabled: boolean
+  confidenceCaptureEnabled: boolean
+  sessionTargetItems: number
+  seenCardIds: number[]
+  sessionStartedAt: string
+  restore: PersistedSessionRestore
 }

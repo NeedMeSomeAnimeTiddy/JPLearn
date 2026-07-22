@@ -17,8 +17,10 @@ import {
   MessageCircle,
   Mic,
   Minus,
+  Palette,
   PenLine,
   Plus,
+  Settings,
   Shuffle,
   Square,
   Target,
@@ -26,6 +28,10 @@ import {
   Volume2,
 } from 'lucide-react'
 import type {
+  AnimationStyle,
+  AppFontPreset,
+  FontSize,
+  InterleaveWeights,
   JlptLevel,
   KanjiCategory,
   KanjiCategorySlug,
@@ -33,6 +39,7 @@ import type {
   MinigameKey,
   PlayableMinigame,
   ScriptKey,
+  SettingsTabKey,
   VocabCategory,
   VocabCategorySlug,
   VocabDeckSlug,
@@ -523,6 +530,8 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'imposter') return 'Imposter'
   if (mode === 'listening_audio_first') return 'Recognition'
   if (mode === 'dictation') return 'Dictation'
+  if (mode === 'kanji_compound_builder') return 'Compound Builder'
+  if (mode === 'context_cloze') return 'Context Cloze'
   return 'Interleave Mix'
 }
 
@@ -540,4 +549,94 @@ export function formatExpectedAnswer(rawAnswer: string): string {
   if (parts.length <= 1) return compact
   if (parts.length === 2) return `${parts[0]} or ${parts[1]}`
   return `${parts.slice(0, -1).join(', ')}, or ${parts[parts.length - 1]}`
+}
+
+
+// ── App shell / appearance ────────────────────────────────────
+
+export const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
+  { key: 'appearance', label: 'Appearance', icon: Palette },
+  { key: 'assistant', label: 'Assistant', icon: MessageCircle },
+  { key: 'system', label: 'System', icon: Settings },
+]
+
+export const DEFAULT_INTERLEAVE_WEIGHTS: InterleaveWeights = {
+  romaji_sprint: 1,
+  meaning_match: 1,
+  character_match: 1,
+  particle_cloze: 1,
+}
+
+export const PETAL_STREAM = [
+  { x: '6%', drift: '9vw', duration: '11.8s', delay: '-2.1s', size: '14px', opacity: 0.72 },
+  { x: '12%', drift: '-8vw', duration: '13.2s', delay: '-5.4s', size: '12px', opacity: 0.66 },
+  { x: '18%', drift: '11vw', duration: '14.6s', delay: '-3.6s', size: '16px', opacity: 0.7 },
+  { x: '25%', drift: '-9vw', duration: '12.7s', delay: '-8.1s', size: '13px', opacity: 0.64 },
+  { x: '32%', drift: '8vw', duration: '15.3s', delay: '-1.8s', size: '15px', opacity: 0.75 },
+  { x: '39%', drift: '-7vw', duration: '13.9s', delay: '-6.7s', size: '11px', opacity: 0.62 },
+  { x: '47%', drift: '10vw', duration: '16.1s', delay: '-10.4s', size: '14px', opacity: 0.68 },
+  { x: '54%', drift: '-11vw', duration: '12.3s', delay: '-7.2s', size: '12px', opacity: 0.65 },
+  { x: '61%', drift: '9vw', duration: '14.8s', delay: '-4.8s', size: '16px', opacity: 0.73 },
+  { x: '68%', drift: '-8vw', duration: '13.5s', delay: '-9.9s', size: '13px', opacity: 0.64 },
+  { x: '74%', drift: '11vw', duration: '15.7s', delay: '-11.1s', size: '15px', opacity: 0.71 },
+  { x: '80%', drift: '-9vw', duration: '12.9s', delay: '-6.1s', size: '12px', opacity: 0.66 },
+  { x: '87%', drift: '8vw', duration: '14.2s', delay: '-8.6s', size: '14px', opacity: 0.7 },
+  { x: '93%', drift: '-7vw', duration: '16.4s', delay: '-12.7s', size: '11px', opacity: 0.6 },
+  { x: '9%', drift: '-10vw', duration: '15.6s', delay: '-9.5s', size: '10px', opacity: 0.58 },
+  { x: '21%', drift: '7vw', duration: '12.1s', delay: '-1.2s', size: '13px', opacity: 0.63 },
+  { x: '35%', drift: '-12vw', duration: '17.3s', delay: '-13.4s', size: '15px', opacity: 0.69 },
+  { x: '50%', drift: '9vw', duration: '11.4s', delay: '-4.2s', size: '12px', opacity: 0.61 },
+  { x: '65%', drift: '-6vw', duration: '13.8s', delay: '-7.8s', size: '14px', opacity: 0.67 },
+  { x: '76%', drift: '10vw', duration: '16.6s', delay: '-14.9s', size: '13px', opacity: 0.65 },
+  { x: '89%', drift: '-8vw', duration: '12.6s', delay: '-3.3s', size: '10px', opacity: 0.57 },
+] as const
+
+export const FONT_SIZE_ORDER: FontSize[] = ['small', 'medium', 'large']
+
+export const FONT_SIZE_ICON: Record<FontSize, LucideIcon> = {
+  small: Minus,
+  medium: Square,
+  large: Plus,
+}
+
+export const FONT_SIZE_LABEL: Record<FontSize, string> = {
+  small: 'Small',
+  medium: 'Medium',
+  large: 'Large',
+}
+
+export const APP_FONT_OPTIONS: Array<{ key: AppFontPreset; label: string }> = [
+  { key: 'kiwi_maru', label: 'Kiwi Maru' },
+  { key: 'bizin_gothic', label: 'BIZ UDPGothic' },
+  { key: 'kaisei_decol', label: 'Kaisei Decol' },
+  { key: 'noto_sans_jp', label: 'Noto Sans JP' },
+  { key: 'shippori_mincho', label: 'Shippori Mincho' },
+  { key: 'zen_old_mincho', label: 'Zen Old Mincho' },
+  { key: 'reggae_one', label: 'Reggae One' },
+  { key: 'system_ui', label: 'System UI' },
+]
+
+export function isAppFontPreset(value: unknown): value is AppFontPreset {
+  return (
+    value === 'kiwi_maru'
+    || value === 'bizin_gothic'
+    || value === 'kaisei_decol'
+    || value === 'noto_sans_jp'
+    || value === 'shippori_mincho'
+    || value === 'zen_old_mincho'
+    || value === 'reggae_one'
+    || value === 'system_ui'
+  )
+}
+
+export const MOTION_STYLE_OPTIONS: Array<{ key: AnimationStyle; label: string }> = [
+  { key: 'calm_fade', label: 'Calm Fade' },
+  { key: 'glide', label: 'Glide' },
+  { key: 'lively', label: 'Lively' },
+]
+
+export const MOTION_STYLE_LABEL: Record<AnimationStyle, string> = {
+  calm_fade: 'Calm Fade',
+  glide: 'Glide',
+  lively: 'Lively',
 }

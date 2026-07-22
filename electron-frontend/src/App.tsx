@@ -1,8 +1,55 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, Dispatch, SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
-import type { LucideIcon } from 'lucide-react'
-import type { LastSessionPrefs, LearningPathStatus, SectionReadiness, SessionRunReport } from './types'
+import type {
+  AppSettings,
+  AppView,
+  BlockInfo,
+  BlockProgressPayload,
+  CardScores,
+  CategoryProgress,
+  DeckSlugInput,
+  ExpertiseLevel,
+  ExplicitReviewItem,
+  FeedbackTone,
+  GrammarMinigameResponse,
+  InterleaveWeights,
+  JlptLevel,
+  JlptLevelProgress,
+  JlptProgressCard,
+  KanjiCategory,
+  LastSessionPrefs,
+  LearningPathStatus,
+  MinigameKey,
+  MinigameStats,
+  MinigameStatsByScript,
+  NavDirection,
+  OverviewCategoryBlocks,
+  OverviewKanjiCard,
+  OverviewSectionKey,
+  PersistedSession,
+  PersistedSessionRestore,
+  PlayableMinigame,
+  RecommendationItem,
+  RoundState,
+  ScriptDeck,
+  ScriptKey,
+  ScriptStats,
+  SectionReadiness,
+  SessionGoalStartResponse,
+  SessionRunReport,
+  SessionSummaryPayload,
+  SettingsTabKey,
+  ShortcutSubmenuKey,
+  StatsByScript,
+  StudyPlanCoverageRow,
+  StudyPlanSnapshot,
+  StudyPlanStage,
+  StudyQueueResponse,
+  StudySummaryPayload,
+  VocabCategory,
+  XPProgress,
+} from './types'
 import type { DailyGamesMissedWordPayload, GameCard } from './generated/types'
 import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
@@ -33,11 +80,11 @@ import { assessTypedRecallAnswer } from './lib/typedRecallAssessment'
 import { toHiragana } from 'wanakana'
 import { isGrammarCurriculumMode, blankOutWordInSentence } from './utils'
 import { KANJI_MEANINGS } from './lib/kanjiMeanings'
-import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, Gamepad2, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, Palette, PlayCircle, Plus, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Trophy, Upload, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, BarChart3, BookText, BrainCircuit, Bug, CheckCircle2, Circle, Clock, Code2, Copy, Download, Flame, Gamepad2, House, Keyboard, Languages, ListChecks, Menu, MessageCircle, Minimize2, Minus, PlayCircle, Power, RefreshCw, RotateCcw, Search, Settings, Snowflake, Square, Trash2, Trophy, Upload, X } from 'lucide-react'
 import './App.css'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { ThemeSettingsTab } from './features/theme/components/ThemeSettingsTab'
-import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/theme/types'
+import type { ThemeScope, CustomTheme } from './features/theme/types'
 import { isThemeMode, isThemeKey, isThemeScope, getThemeModeForTheme, getFallbackThemeForMode, normalizeCustomTheme, resolveThemeMode } from './features/theme/utils'
 import { useVoice, splitSpeechSegments, VoiceSettingsTab, DEFAULT_VOICE_SPEED, type VoiceSettingsFields } from './features/voice'
 import { useModels } from './features/models'
@@ -58,55 +105,32 @@ import {
   SCRIPT_MINIGAMES,
   SCRIPT_INTERLEAVE_MODES,
   SCRIPT_LABELS,
+  ALL_SCRIPT_KEYS,
+  DEFAULT_LIVES,
+  SESSION_LENGTH_PRESETS,
+  DEFAULT_SESSION_LENGTH_PRESET,
+  POINT_COMBO_THRESHOLDS,
+  JLPT_LEVEL_ORDER,
+  JLPT_LEVEL_LABELS,
+  CATEGORY_UNLOCK_THRESHOLD,
+  VOCAB_CATEGORY_ORDER,
+  VOCAB_CATEGORY_LABELS,
+  VOCAB_CATEGORY_TO_DECK_SLUG,
+  KANJI_CATEGORY_ORDER,
+  KANJI_CATEGORY_LABELS,
+  KANJI_CATEGORY_TO_DECK_SLUG,
+  formatRoundModeLabel,
+  SETTINGS_TABS,
+  DEFAULT_INTERLEAVE_WEIGHTS,
+  PETAL_STREAM,
+  FONT_SIZE_ORDER,
+  FONT_SIZE_ICON,
+  FONT_SIZE_LABEL,
+  APP_FONT_OPTIONS,
+  isAppFontPreset,
+  MOTION_STYLE_OPTIONS,
+  MOTION_STYLE_LABEL,
 } from './constants'
-
-type StudySummaryPayload = Awaited<
-  ReturnType<typeof window.jplearnDesktop.getStudySummary>
->
-type DeckSlugInput = Parameters<typeof window.jplearnDesktop.getDeckCards>[0]
-type OverviewCharacterMasteryPayload = Awaited<
-  ReturnType<typeof window.jplearnDesktop.getOverviewCharacterMastery>
->
-type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
-type BlockProgressPayload = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>
-type StudyQueueResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getStudyQueue>>
-type GrammarMinigameResponse = Awaited<
-  ReturnType<NonNullable<typeof window.jplearnDesktop.getGrammarMinigameData>>
->
-type SessionGoalStartResponse = Awaited<ReturnType<typeof window.jplearnDesktop.startSessionGoal>>
-type SessionSummaryResponse = Awaited<ReturnType<typeof window.jplearnDesktop.getSessionSummary>>
-type SessionSummaryPayload = NonNullable<SessionSummaryResponse['summary']>
-type XPProgress = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getXpProgress>>>
-type RecommendationItem = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getRecommendations>>>['recommendations'][number]
-type BlockInfo = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>['blocks'][number]
-type JlptProgressCard = Pick<ScriptDeck['cards'][number], 'id' | 'character' | 'tags'>
-type OverviewKanjiCard = OverviewCharacterMasteryPayload['kanji_cards'][number]
-type OverviewCategoryBlocks = OverviewCharacterMasteryPayload['category_blocks']
-type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns' | 'sentence_examples'
-type VocabCategory = 'greetings' | 'numbers' | 'time_days' | 'family' | 'body' | 'food_drink' | 'school_study' | 'places' | 'transport' | 'adjectives' | 'verbs' | 'nouns'
-type VocabCategorySlug = 'vocab_greetings' | 'vocab_numbers' | 'vocab_time_days' | 'vocab_family' | 'vocab_body' | 'vocab_food_drink' | 'vocab_school_study' | 'vocab_places' | 'vocab_transport' | 'vocab_adjectives' | 'vocab_verbs' | 'vocab_nouns'
-type KanjiCategory = 'numbers_time' | 'nature_world' | 'people_body' | 'study_language' | 'actions_travel' | 'n4_society_roles' | 'n4_mind_thought' | 'n4_daily_life' | 'n4_time_action' | 'n3_governance' | 'n3_communication' | 'n3_movement' | 'n3_achievement' | 'n2_professionalism' | 'n2_economics' | 'n2_analysis' | 'n1_law_order' | 'n1_ideology' | 'n1_literary'
-type KanjiCategorySlug = 'kanji_numbers_time' | 'kanji_nature_world' | 'kanji_people_body' | 'kanji_study_language' | 'kanji_actions_travel' | 'kanji_n4_society_roles' | 'kanji_n4_mind_thought' | 'kanji_n4_daily_life' | 'kanji_n4_time_action' | 'kanji_n3_governance' | 'kanji_n3_communication' | 'kanji_n3_movement' | 'kanji_n3_achievement' | 'kanji_n2_professionalism' | 'kanji_n2_economics' | 'kanji_n2_analysis' | 'kanji_n1_law_order' | 'kanji_n1_ideology' | 'kanji_n1_literary'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'handwriting' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'kanji_compound_builder' | 'context_cloze' | 'interleave_mix'
-type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
-type ShortcutSubmenuKey = 'all_maps' | ScriptKey | 'dev_tools' | 'dev_checks'
-type InterleaveWeights = Record<'romaji_sprint' | 'meaning_match' | 'character_match' | 'particle_cloze', number>
-type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep' | 'passage_hub' | 'daily_games'
-type NavDirection = 'forward' | 'back'
-type FontSize = 'small' | 'medium' | 'large'
-type AppFontPreset =
-  | 'kiwi_maru'
-  | 'bizin_gothic'
-  | 'kaisei_decol'
-  | 'noto_sans_jp'
-  | 'shippori_mincho'
-  | 'zen_old_mincho'
-  | 'reggae_one'
-  | 'system_ui'
-type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
-type FeedbackTone = 'success' | 'error' | null
-type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation'
-type SettingsTabKey = 'appearance' | 'assistant' | 'system'
 
 const PERFORMANCE_PERFECT_MS = 700
 const PERFORMANCE_GOOD_MS = 2200
@@ -117,354 +141,12 @@ const STARTUP_WARMUP_INITIAL_DELAY_MS = 900
 const STARTUP_WARMUP_YIELD_DEADLINE_MS = 45
 const DailyGamesHub = lazy(() => import('./features/daily-games/components/GamesHub'))
 
-const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: LucideIcon }> = [
-  { key: 'appearance', label: 'Appearance', icon: Palette },
-  { key: 'assistant', label: 'Assistant', icon: MessageCircle },
-  { key: 'system', label: 'System', icon: Settings },
-]
-const DEFAULT_LIVES = 3
-const SESSION_LENGTH_PRESETS = [
-  { key: 'short', label: 'Short', items: 8, icon: Minus },
-  { key: 'medium', label: 'Medium', items: 12, icon: Square },
-  { key: 'long', label: 'Long', items: 20, icon: Plus },
-] as const
-const DEFAULT_SESSION_LENGTH_PRESET = SESSION_LENGTH_PRESETS[1]
-const DEFAULT_INTERLEAVE_WEIGHTS: InterleaveWeights = {
-  romaji_sprint: 1,
-  meaning_match: 1,
-  character_match: 1,
-  particle_cloze: 1,
-}
-const POINT_COMBO_THRESHOLDS = [3, 6, 9] as const
-
-
-
-
-interface AppSettings {
-  reducedMotion: boolean
-  fontSize: FontSize
-  appFont: AppFontPreset
-  themeMode: ThemeMode
-  theme: ThemeKey
-  themeScope: ThemeScope
-  activeCustomThemeId: string | null
-  customThemes: CustomTheme[]
-  motionStyle: AnimationStyle
-  assistantToastLimit: 0 | 1
-  assistantChatEnabled: boolean
-  assistantChatAudioEnabled: boolean
-  assistantChatOcrMinConfidence: number
-  scenarioAiEvaluationEnabled: boolean
-  romajiConversionEnabled: boolean
-  showKeyboardPrompts: boolean
-  furiganaEnabled: boolean
-  furiganaAutoHideMastered: boolean
-  voiceEnabled: boolean
-  voiceSpeaker: string
-  voiceSpeed: number
-  ambientAudioEnabled: boolean
-  cursor: { mode: string; theme: string; size: number; color: string | null }
-  pomodoroEnabled: boolean
-  pomodoroWorkMinutes: number
-  pomodoroBreakMinutes: number
-  pomodoroLongBreakMinutes: number
-  pomodoroSessionsBeforeLongBreak: number
-  pomodoroShowTimerInHud: boolean
-}
-
-
-
-interface RoundOption {
-  id: string
-  label: string
-}
-
-interface RoundState {
-  cardId: number
-  deckSlug?: DeckSlugInput
-  mode: PlayableMinigame
-  audioText: string
-  exampleSentenceAudioText: string | null
-  surprisePrompt: boolean
-  curriculumStage: 1 | 2 | 3
-  chapterNumber: 1 | 2 | 3 | null
-  chapterLabel: string | null
-  hintText: string | null
-  dictionarySeedQuery: string | null
-  dictionaryNote: RoundDictionaryNote | null
-  promptLabel: string
-  focusText: string
-  answer: string
-  answerDisplay?: string | null
-  options: RoundOption[]
-  isMastered?: boolean
-}
-
-interface ExplicitReviewItem {
-  deckSlug: DeckSlugInput
-  cardId: number
-  card: ScriptDeck['cards'][number]
-}
-
-interface ScriptStats {
-  attempted: number
-  correct: number
-  currentStreak: number
-  bestStreak: number
-}
-
-interface MinigameStats {
-  attempted: number
-  correct: number
-  currentStreak: number
-  bestStreak: number
-  points: number
-}
-
-type JlptLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
-
-interface JlptLevelProgress {
-  key: JlptLevel
-  label: string
-  cardIds: number[]
-  sampleChars: string[]
-  mastery: number
-  unlocked: boolean
-  total: number
-}
-
-interface CategoryProgress {
-  key: string
-  label: string
-  slug: string
-  cardIds: number[]
-  sampleChars: string[]
-  mastery: number
-  unlocked: boolean
-  total: number
-}
-
-interface StudyPlanCoverageRow {
-  key: ScriptKey
-  label: string
-  mastery: number
-  total: number
-  unlocked: boolean
-  difficulty: number
-}
-
-type StudyPlanStage = 'starter' | 'building' | 'advanced'
-
-interface StudyPlanShortcut {
-  key: string
-  label: string
-  note: string
-  script: ScriptKey
-  minigame: MinigameKey
-}
-
-interface StudyPlanSnapshot {
-  coverageRows: StudyPlanCoverageRow[]
-  focusRows: StudyPlanCoverageRow[]
-  overallMastery: number
-  recommendedMinutes: number
-  sessionNote: string
-  learnerStage: StudyPlanStage
-  shortcutRows: StudyPlanShortcut[]
-}
-
-type StatsByScript = Record<ScriptKey, ScriptStats>
-type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
-type OverviewSectionKey = 'studyActivity' | 'sessionHistory' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot' | 'achievements'
-
-const ALL_SCRIPT_KEYS = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples'] as const
-
-const PETAL_STREAM = [
-  { x: '6%', drift: '9vw', duration: '11.8s', delay: '-2.1s', size: '14px', opacity: 0.72 },
-  { x: '12%', drift: '-8vw', duration: '13.2s', delay: '-5.4s', size: '12px', opacity: 0.66 },
-  { x: '18%', drift: '11vw', duration: '14.6s', delay: '-3.6s', size: '16px', opacity: 0.7 },
-  { x: '25%', drift: '-9vw', duration: '12.7s', delay: '-8.1s', size: '13px', opacity: 0.64 },
-  { x: '32%', drift: '8vw', duration: '15.3s', delay: '-1.8s', size: '15px', opacity: 0.75 },
-  { x: '39%', drift: '-7vw', duration: '13.9s', delay: '-6.7s', size: '11px', opacity: 0.62 },
-  { x: '47%', drift: '10vw', duration: '16.1s', delay: '-10.4s', size: '14px', opacity: 0.68 },
-  { x: '54%', drift: '-11vw', duration: '12.3s', delay: '-7.2s', size: '12px', opacity: 0.65 },
-  { x: '61%', drift: '9vw', duration: '14.8s', delay: '-4.8s', size: '16px', opacity: 0.73 },
-  { x: '68%', drift: '-8vw', duration: '13.5s', delay: '-9.9s', size: '13px', opacity: 0.64 },
-  { x: '74%', drift: '11vw', duration: '15.7s', delay: '-11.1s', size: '15px', opacity: 0.71 },
-  { x: '80%', drift: '-9vw', duration: '12.9s', delay: '-6.1s', size: '12px', opacity: 0.66 },
-  { x: '87%', drift: '8vw', duration: '14.2s', delay: '-8.6s', size: '14px', opacity: 0.7 },
-  { x: '93%', drift: '-7vw', duration: '16.4s', delay: '-12.7s', size: '11px', opacity: 0.6 },
-  { x: '9%', drift: '-10vw', duration: '15.6s', delay: '-9.5s', size: '10px', opacity: 0.58 },
-  { x: '21%', drift: '7vw', duration: '12.1s', delay: '-1.2s', size: '13px', opacity: 0.63 },
-  { x: '35%', drift: '-12vw', duration: '17.3s', delay: '-13.4s', size: '15px', opacity: 0.69 },
-  { x: '50%', drift: '9vw', duration: '11.4s', delay: '-4.2s', size: '12px', opacity: 0.61 },
-  { x: '65%', drift: '-6vw', duration: '13.8s', delay: '-7.8s', size: '14px', opacity: 0.67 },
-  { x: '76%', drift: '10vw', duration: '16.6s', delay: '-14.9s', size: '13px', opacity: 0.65 },
-  { x: '89%', drift: '-8vw', duration: '12.6s', delay: '-3.3s', size: '10px', opacity: 0.57 },
-] as const
-
-
-const FONT_SIZE_ORDER: FontSize[] = ['small', 'medium', 'large']
-const FONT_SIZE_ICON: Record<FontSize, LucideIcon> = {
-  small: Minus,
-  medium: Square,
-  large: Plus,
-}
-const FONT_SIZE_LABEL: Record<FontSize, string> = {
-  small: 'Small',
-  medium: 'Medium',
-  large: 'Large',
-}
-
-const APP_FONT_OPTIONS: Array<{ key: AppFontPreset; label: string }> = [
-  { key: 'kiwi_maru', label: 'Kiwi Maru' },
-  { key: 'bizin_gothic', label: 'BIZ UDPGothic' },
-  { key: 'kaisei_decol', label: 'Kaisei Decol' },
-  { key: 'noto_sans_jp', label: 'Noto Sans JP' },
-  { key: 'shippori_mincho', label: 'Shippori Mincho' },
-  { key: 'zen_old_mincho', label: 'Zen Old Mincho' },
-  { key: 'reggae_one', label: 'Reggae One' },
-  { key: 'system_ui', label: 'System UI' },
-]
-
-function isAppFontPreset(value: unknown): value is AppFontPreset {
-  return (
-    value === 'kiwi_maru'
-    || value === 'bizin_gothic'
-    || value === 'kaisei_decol'
-    || value === 'noto_sans_jp'
-    || value === 'shippori_mincho'
-    || value === 'zen_old_mincho'
-    || value === 'reggae_one'
-    || value === 'system_ui'
-  )
-}
-
-const MOTION_STYLE_OPTIONS: Array<{ key: AnimationStyle; label: string }> = [
-  { key: 'calm_fade', label: 'Calm Fade' },
-  { key: 'glide', label: 'Glide' },
-  { key: 'lively', label: 'Lively' },
-]
-
-const MOTION_STYLE_LABEL: Record<AnimationStyle, string> = {
-  calm_fade: 'Calm Fade',
-  glide: 'Glide',
-  lively: 'Lively',
-}
-
-
-const JLPT_LEVEL_ORDER: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
-const JLPT_LEVEL_LABELS: Record<JlptLevel, string> = {
-  n5: 'JLPT N5',
-  n4: 'JLPT N4',
-  n3: 'JLPT N3',
-  n2: 'JLPT N2',
-  n1: 'JLPT N1',
-}
-
-// ── Thematic category constants ───────────────────────────────────────────────
-const CATEGORY_UNLOCK_THRESHOLD = 0.7  // 70% mastery unlocks next category
-
-const VOCAB_CATEGORY_ORDER: VocabCategory[] = [
-  'greetings', 'numbers', 'time_days', 'family', 'body',
-  'food_drink', 'school_study', 'places', 'transport', 'adjectives', 'verbs', 'nouns',
-]
-
-const VOCAB_CATEGORY_LABELS: Record<VocabCategory, string> = {
-  greetings: 'Greetings', numbers: 'Numbers', time_days: 'Time & Days',
-  family: 'Family', body: 'Body', food_drink: 'Food & Drink',
-  school_study: 'School & Study', places: 'Places', transport: 'Transport',
-  adjectives: 'Adjectives', verbs: 'Verbs', nouns: 'Common Nouns',
-}
-
-const VOCAB_CATEGORY_TO_DECK_SLUG: Record<VocabCategory, VocabCategorySlug> = {
-  greetings: 'vocab_greetings', numbers: 'vocab_numbers', time_days: 'vocab_time_days',
-  family: 'vocab_family', body: 'vocab_body', food_drink: 'vocab_food_drink',
-  school_study: 'vocab_school_study', places: 'vocab_places', transport: 'vocab_transport',
-  adjectives: 'vocab_adjectives', verbs: 'vocab_verbs', nouns: 'vocab_nouns',
-}
-
-const KANJI_CATEGORY_ORDER: KanjiCategory[] = [
-  'numbers_time', 'nature_world', 'people_body', 'study_language', 'actions_travel',
-  'n4_society_roles', 'n4_mind_thought', 'n4_daily_life', 'n4_time_action',
-  'n3_governance', 'n3_communication', 'n3_movement', 'n3_achievement',
-  'n2_professionalism', 'n2_economics', 'n2_analysis',
-  'n1_law_order', 'n1_ideology', 'n1_literary',
-]
-
-const KANJI_CATEGORY_LABELS: Record<KanjiCategory, string> = {
-  numbers_time:      'N5 · Numbers & Time',
-  nature_world:      'N5 · Nature & World',
-  people_body:       'N5 · People & Body',
-  study_language:    'N5 · Study & Language',
-  actions_travel:    'N5 · Actions & Travel',
-  n4_society_roles:  'N4 · Society & Roles',
-  n4_mind_thought:   'N4 · Mind & Thought',
-  n4_daily_life:     'N4 · Daily Life',
-  n4_time_action:    'N4 · Time & Action',
-  n3_governance:     'N3 · Governance',
-  n3_communication:  'N3 · Communication',
-  n3_movement:       'N3 · Movement',
-  n3_achievement:    'N3 · Achievement',
-  n2_professionalism:'N2 · Professionalism',
-  n2_economics:      'N2 · Economics',
-  n2_analysis:       'N2 · Analysis',
-  n1_law_order:      'N1 · Law & Order',
-  n1_ideology:       'N1 · Society & Power',
-  n1_literary:       'N1 · Literary Arts',
-}
-
-const KANJI_CATEGORY_TO_DECK_SLUG: Record<KanjiCategory, KanjiCategorySlug> = {
-  numbers_time:      'kanji_numbers_time',
-  nature_world:      'kanji_nature_world',
-  people_body:       'kanji_people_body',
-  study_language:    'kanji_study_language',
-  actions_travel:    'kanji_actions_travel',
-  n4_society_roles:  'kanji_n4_society_roles',
-  n4_mind_thought:   'kanji_n4_mind_thought',
-  n4_daily_life:     'kanji_n4_daily_life',
-  n4_time_action:    'kanji_n4_time_action',
-  n3_governance:     'kanji_n3_governance',
-  n3_communication:  'kanji_n3_communication',
-  n3_movement:       'kanji_n3_movement',
-  n3_achievement:    'kanji_n3_achievement',
-  n2_professionalism:'kanji_n2_professionalism',
-  n2_economics:      'kanji_n2_economics',
-  n2_analysis:       'kanji_n2_analysis',
-  n1_law_order:      'kanji_n1_law_order',
-  n1_ideology:       'kanji_n1_ideology',
-  n1_literary:       'kanji_n1_literary',
-}
-
 const STATS_STORAGE_KEY = 'jplearn-desktop-script-stats-v1'
 const SETTINGS_STORAGE_KEY = 'jplearn-desktop-settings-v1'
 const CARD_SCORES_STORAGE_KEY = 'jplearn-card-scores-v2'
 const SUMMARY_SNAPSHOT_STORAGE_KEY = 'jplearn-desktop-summary-snapshot-v1'
 const SESSION_STORAGE_KEY = 'jplearn-desktop-session-v1'
 const PREFS_STORAGE_KEY = 'jplearn-desktop-session-prefs-v1'
-
-interface PersistedSessionRestore {
-  sessionScore: number
-  sessionRounds: number
-  sessionPoints: number
-  sessionStreak: number
-  sessionBestStreak: number
-  sessionConfidenceCount: number
-  sessionConfidenceTotal: number
-  livesRemaining: number
-}
-
-interface PersistedSession {
-  activeScript: ScriptKey
-  activeGame: MinigameKey
-  livesEnabled: boolean
-  leechFocusEnabled: boolean
-  confidenceCaptureEnabled: boolean
-  sessionTargetItems: number
-  seenCardIds: number[]
-  sessionStartedAt: string
-  restore: PersistedSessionRestore
-}
 
 const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
 const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
@@ -803,8 +485,6 @@ function loadSettings(): AppSettings {
     return defaultSettings()
   }
 }
-
-type CardScores = Record<ScriptKey, Record<number, number>>
 
 function loadCardScores(): CardScores {
   try {
@@ -1435,25 +1115,6 @@ function classifyRoundPerformance(isCorrect: boolean, responseMs: number): 'PERF
 }
 
 
-
-function formatRoundModeLabel(mode: PlayableMinigame): string {
-  if (mode === 'romaji_sprint') return 'Romaji Sprint'
-  if (mode === 'meaning_match') return 'Meaning Match'
-  if (mode === 'character_match') return 'Character Match'
-  if (mode === 'stroke_order') return 'Stroke Order'
-  if (mode === 'handwriting') return 'Handwriting'
-  if (mode === 'typed_recall') return 'Typed Recall'
-  if (mode === 'speech_recall') return 'Speech Recall'
-  if (mode === 'sentence_assembly') return 'Sentence Assembly'
-  if (mode === 'particle_cloze') return 'Particle Cloze'
-  if (mode === 'vibe_check') return 'Vibe Check'
-  if (mode === 'imposter') return 'Imposter'
-  if (mode === 'listening_audio_first') return 'Recognition'
-  if (mode === 'dictation') return 'Dictation'
-  if (mode === 'kanji_compound_builder') return 'Compound Builder'
-  if (mode === 'context_cloze') return 'Context Cloze'
-  return 'Interleave Mix'
-}
 
 function getRoundRecoveryTip(mode: PlayableMinigame): string {
   if (mode === 'romaji_sprint') return 'Take a breath and try the next reading.'
