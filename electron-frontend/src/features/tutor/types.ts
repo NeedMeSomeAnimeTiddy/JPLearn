@@ -1,7 +1,8 @@
 import type { LucideIcon } from 'lucide-react'
+import type { ScriptKey } from '../../types'
 
+export type { ScriptKey }
 export type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'interleave_mix'
-export type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns' | 'sentence_examples'
 
 export interface SpeechSegment {
   text: string
