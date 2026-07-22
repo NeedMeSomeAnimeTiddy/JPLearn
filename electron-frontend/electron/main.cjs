@@ -292,6 +292,7 @@ const bridgeWorkerState = {
   buffer: '',
   pending: new Map(),
   stderr: '',
+  consecutiveTimeouts: 0,
 }
 const THEME_STATE_FILENAME = 'jplearn-startup-theme.json'
 const STARTUP_TELEMETRY_FILENAME = 'startup-telemetry.json'
@@ -305,6 +306,11 @@ const BRIDGE_READ_CACHE_TTLS_MS = {
   'study-queue': 12000,
 }
 const BRIDGE_REQUEST_TIMEOUT_MS = 30000
+// A single slow request (fsrs-optimize, OCR) timing out should not tear down
+// the worker and collaterally reject every unrelated in-flight request. Only
+// restart the worker once several requests in a row have timed out with no
+// successful response in between -- a real sign the child is wedged.
+const BRIDGE_MAX_CONSECUTIVE_TIMEOUTS = 3
 const bridgeTelemetry = {
   startedAtUtc: new Date().toISOString(),
   workerStarts: 0,
@@ -1098,6 +1104,8 @@ function getOrStartPythonBridgeWorker() {
   const pythonCmd = resolvePythonCommand(bridgeContext.projectRoot)
   const bridgeScript = bridgeContext.bridgeScript
 
+  bridgeWorkerState.consecutiveTimeouts = 0
+
   const child = spawn(pythonCmd, [bridgeScript, '--server'], {
     cwd: bridgeContext.projectRoot,
     windowsHide: true,
@@ -1134,6 +1142,9 @@ function getOrStartPythonBridgeWorker() {
 
         bridgeWorkerState.pending.delete(requestId)
         clearTimeout(request.timeoutId)
+        // Any response -- success or command-level failure -- proves the
+        // worker is alive and responsive, not wedged.
+        bridgeWorkerState.consecutiveTimeouts = 0
 
         if (envelope.code !== 0) {
           bridgeTelemetry.workerFailureCount += 1
@@ -1210,8 +1221,15 @@ function runPythonBridgeWorkerRequest(args) {
       bridgeTelemetry.workerFailureCount += 1
       bridgeTelemetry.lastWorkerError = `Bridge worker request timed out after ${BRIDGE_REQUEST_TIMEOUT_MS}ms`
       bridgeWorkerState.pending.delete(requestId)
-      stopPythonBridgeWorker()
+      bridgeWorkerState.consecutiveTimeouts += 1
       pending.reject(new Error(`Bridge worker request timed out after ${BRIDGE_REQUEST_TIMEOUT_MS}ms`))
+
+      // Only tear down the shared worker -- which rejects every other
+      // unrelated in-flight request via the 'close' handler -- once it looks
+      // genuinely unresponsive rather than just slow on this one request.
+      if (bridgeWorkerState.consecutiveTimeouts >= BRIDGE_MAX_CONSECUTIVE_TIMEOUTS) {
+        stopPythonBridgeWorker()
+      }
     }, BRIDGE_REQUEST_TIMEOUT_MS)
 
     bridgeWorkerState.pending.set(requestId, {
@@ -1248,6 +1266,16 @@ function runPythonBridgeWithArgs(args) {
     bridgeTelemetry.oneShotCount += 1
     return runPythonBridgeWithArgsOneShot(args)
   })
+}
+
+// For commands known to be slow (OCR, fsrs-optimize): always run as a fresh
+// one-shot process instead of the shared serial worker, so they can't
+// head-of-line-block unrelated study queries (summary, deck-cards, ...)
+// queued behind them on the single worker. Pays one-shot interpreter/import
+// cost every call -- acceptable since these commands are already slow.
+function runPythonBridgeIsolated(args) {
+  bridgeTelemetry.oneShotCount += 1
+  return runPythonBridgeWithArgsOneShot(args)
 }
 
 function getBridgeCacheKey(commandOrArgs) {
@@ -1401,6 +1429,7 @@ registerIpcHandlers({
   getWindowFromSender: BrowserWindow.fromWebContents,
   runPythonBridge,
   runPythonBridgeWithArgs,
+  runPythonBridgeIsolated,
   runPythonBridgeCached,
   runPythonBridgeWithArgsCached,
   clearBridgeReadCaches,

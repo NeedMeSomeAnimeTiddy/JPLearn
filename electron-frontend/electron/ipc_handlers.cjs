@@ -732,7 +732,7 @@ function registerIpcHandlers(options) {
 
     try {
       fs.writeFileSync(tempFile, Buffer.from(validatedPayload.imageBase64, 'base64'))
-      return await options.runPythonBridgeWithArgs([
+      return await options.runPythonBridgeIsolated([
         'assistant-chat-ocr',
         tempFile,
         String(validatedPayload.minConfidence),
@@ -1807,7 +1807,7 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('fsrs:optimize', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    return await options.runPythonBridgeWithArgs(['fsrs-optimize'])
+    return await options.runPythonBridgeIsolated(['fsrs-optimize'])
   })
 
   options.ipcMain.handle('fsrs:reset-weights', async (event) => {
