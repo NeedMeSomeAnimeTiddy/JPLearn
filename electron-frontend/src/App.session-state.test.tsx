@@ -203,7 +203,7 @@ async function answerRound(correct: boolean): Promise<void> {
 
   // The round then holds on a feedback card until the learner continues; advance
   // it so the next call sees a fresh round rather than the feedback state.
-  const next = screen.queryByRole('button', { name: /continue immediately/i })
+  const next = screen.queryByRole('button', { name: /continue immediately/i }) as HTMLButtonElement | null
   if (next && !next.disabled) {
     fireEvent.click(next)
   }
