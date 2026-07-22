@@ -762,22 +762,29 @@ def get_vocab_n1_deck() -> Deck:
 # Thematic Vocabulary Categories
 #
 # Derived from _VOCAB_N5_DATA (topic-grouped sections) plus a new Greetings
-# category.  Card IDs are sequential across all categories so they can share
-# the same cardScores['vocab_n5'] map in the frontend without collision.
+# category. IMPORTANT: these are built from the hardcoded _VOCAB_N5_DATA
+# fallback list, while get_vocab_n5_deck() sources from VOCAB_N5_EXTERNAL_DATA
+# whenever it's present (it is, in the shipped app) — the two lists have
+# different order/content. IDs here therefore CANNOT share vocab_n5's id
+# space (0–49 today, up to len(VOCAB_N5_EXTERNAL_DATA) if the level cap is
+# ever lifted): doing so previously produced silent id collisions where the
+# same numeric card id meant two different words depending on which deck was
+# reviewed. This block is a disjoint id range instead (base 1000), matching
+# the pattern already used for N4–N1 thematic kanji categories.
 #
-# ID allocation:
-#   Greetings   0–14   (15 items, new data)
-#   Numbers     15–20  (_VOCAB_N5_DATA[0:6])
-#   Time & Days 21–32  (_VOCAB_N5_DATA[6:18])
-#   Family      33–40  (_VOCAB_N5_DATA[18:26])
-#   Body        41–46  (_VOCAB_N5_DATA[26:32])
-#   Food&Drink  47–59  (_VOCAB_N5_DATA[32:45])
-#   School&Study 60–71 (_VOCAB_N5_DATA[45:57])
-#   Places      72–79  (_VOCAB_N5_DATA[57:65])
-#   Transport   80–86  (_VOCAB_N5_DATA[65:72])
-#   Adjectives  87–103 (_VOCAB_N5_DATA[72:89])
-#   Verbs       104–123(_VOCAB_N5_DATA[89:109])
-#   Common Nouns 124–144(_VOCAB_N5_DATA[109:130])
+# ID allocation (offsets shown are id_offset + local index):
+#   Greetings   1000–1014 (15 items, new data)
+#   Numbers     1015–1020 (_VOCAB_N5_DATA[0:6])
+#   Time & Days 1021–1032 (_VOCAB_N5_DATA[6:18])
+#   Family      1033–1040 (_VOCAB_N5_DATA[18:26])
+#   Body        1041–1046 (_VOCAB_N5_DATA[26:32])
+#   Food&Drink  1047–1059 (_VOCAB_N5_DATA[32:45])
+#   School&Study 1060–1071 (_VOCAB_N5_DATA[45:57])
+#   Places      1072–1079 (_VOCAB_N5_DATA[57:65])
+#   Transport   1080–1086 (_VOCAB_N5_DATA[65:72])
+#   Adjectives  1087–1103 (_VOCAB_N5_DATA[72:89])
+#   Verbs       1104–1123 (_VOCAB_N5_DATA[89:109])
+#   Common Nouns 1124–1144 (_VOCAB_N5_DATA[109:130])
 # ---------------------------------------------------------------------------
 
 _VOCAB_GREETINGS_DATA: list[tuple[str, str, str]] = [
@@ -800,90 +807,97 @@ _VOCAB_GREETINGS_DATA: list[tuple[str, str, str]] = [
 
 
 def get_vocab_greetings_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Greetings", _VOCAB_GREETINGS_DATA, "vocab_greetings", id_offset=0)
+    return _build_vocab_deck("Vocabulary: Greetings", _VOCAB_GREETINGS_DATA, "vocab_greetings", id_offset=1000)
 
 
 def get_vocab_numbers_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Numbers", _VOCAB_N5_DATA[0:6], "vocab_numbers", id_offset=15)
+    return _build_vocab_deck("Vocabulary: Numbers", _VOCAB_N5_DATA[0:6], "vocab_numbers", id_offset=1015)
 
 
 def get_vocab_time_days_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Time & Days", _VOCAB_N5_DATA[6:18], "vocab_time_days", id_offset=21)
+    return _build_vocab_deck("Vocabulary: Time & Days", _VOCAB_N5_DATA[6:18], "vocab_time_days", id_offset=1021)
 
 
 def get_vocab_family_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Family", _VOCAB_N5_DATA[18:26], "vocab_family", id_offset=33)
+    return _build_vocab_deck("Vocabulary: Family", _VOCAB_N5_DATA[18:26], "vocab_family", id_offset=1033)
 
 
 def get_vocab_body_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Body", _VOCAB_N5_DATA[26:32], "vocab_body", id_offset=41)
+    return _build_vocab_deck("Vocabulary: Body", _VOCAB_N5_DATA[26:32], "vocab_body", id_offset=1041)
 
 
 def get_vocab_food_drink_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Food & Drink", _VOCAB_N5_DATA[32:45], "vocab_food_drink", id_offset=47)
+    return _build_vocab_deck("Vocabulary: Food & Drink", _VOCAB_N5_DATA[32:45], "vocab_food_drink", id_offset=1047)
 
 
 def get_vocab_school_study_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: School & Study", _VOCAB_N5_DATA[45:57], "vocab_school_study", id_offset=60)
+    return _build_vocab_deck("Vocabulary: School & Study", _VOCAB_N5_DATA[45:57], "vocab_school_study", id_offset=1060)
 
 
 def get_vocab_places_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Places", _VOCAB_N5_DATA[57:65], "vocab_places", id_offset=72)
+    return _build_vocab_deck("Vocabulary: Places", _VOCAB_N5_DATA[57:65], "vocab_places", id_offset=1072)
 
 
 def get_vocab_transport_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Transport", _VOCAB_N5_DATA[65:72], "vocab_transport", id_offset=80)
+    return _build_vocab_deck("Vocabulary: Transport", _VOCAB_N5_DATA[65:72], "vocab_transport", id_offset=1080)
 
 
 def get_vocab_adjectives_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Adjectives", _VOCAB_N5_DATA[72:89], "vocab_adjectives", id_offset=87)
+    return _build_vocab_deck("Vocabulary: Adjectives", _VOCAB_N5_DATA[72:89], "vocab_adjectives", id_offset=1087)
 
 
 def get_vocab_verbs_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Verbs", _VOCAB_N5_DATA[89:109], "vocab_verbs", id_offset=104)
+    return _build_vocab_deck("Vocabulary: Verbs", _VOCAB_N5_DATA[89:109], "vocab_verbs", id_offset=1104)
 
 
 def get_vocab_nouns_deck() -> Deck:
-    return _build_vocab_deck("Vocabulary: Common Nouns", _VOCAB_N5_DATA[109:130], "vocab_nouns", id_offset=124)
+    return _build_vocab_deck("Vocabulary: Common Nouns", _VOCAB_N5_DATA[109:130], "vocab_nouns", id_offset=1124)
 
 
 # ---------------------------------------------------------------------------
 # Thematic Kanji Categories
 #
-# Derived from _KANJI_N5_DATA (already topic-grouped).  IDs match the
-# original list indices so existing SRS data for kanji_n5 cards is preserved.
+# Derived from _KANJI_N5_DATA (already topic-grouped). IMPORTANT: these are
+# built from the hardcoded _KANJI_N5_DATA fallback list, while
+# get_kanji_n5_deck() sources from KANJI_N5_EXTERNAL_DATA whenever it's
+# present (it is, in the shipped app) — the two lists have different
+# order/content. IDs here therefore CANNOT match kanji_n5's own id space:
+# doing so previously produced silent id collisions where the same numeric
+# card id meant two different kanji depending on which deck was reviewed.
+# This block is a disjoint id range instead (base 500), matching the pattern
+# already used for N4–N1 thematic kanji categories (200/400/600/800).
 #
 # ID allocation (contiguous, matching _KANJI_N5_DATA order):
-#   Numbers & Time  0–23  (13 Numbers + 6 Time + 5 Calendar)
-#   Nature & World  24–52 (6 Nature + 13 Directions + 10 Size/Desc)
-#   People & Body   53–66 (7 People/Family + 7 Body)
-#   Study & Language 67–75 (9 School/Language)
-#   Actions & Travel 76–90 (13 Actions + 2 Transport)
+#   Numbers & Time  500–523 (13 Numbers + 6 Time + 5 Calendar)
+#   Nature & World  524–552 (6 Nature + 13 Directions + 10 Size/Desc)
+#   People & Body   553–566 (7 People/Family + 7 Body)
+#   Study & Language 567–575 (9 School/Language)
+#   Actions & Travel 576–590 (13 Actions + 2 Transport)
 # ---------------------------------------------------------------------------
 
 def get_kanji_numbers_time_deck() -> Deck:
     data = _KANJI_N5_DATA[0:24]
-    return _build_kanji_deck("Kanji: N5 · Numbers & Time", data, "kanji_numbers_time", id_offset=0)
+    return _build_kanji_deck("Kanji: N5 · Numbers & Time", data, "kanji_numbers_time", id_offset=500)
 
 
 def get_kanji_nature_world_deck() -> Deck:
     data = _KANJI_N5_DATA[24:53]
-    return _build_kanji_deck("Kanji: N5 · Nature & World", data, "kanji_nature_world", id_offset=24)
+    return _build_kanji_deck("Kanji: N5 · Nature & World", data, "kanji_nature_world", id_offset=524)
 
 
 def get_kanji_people_body_deck() -> Deck:
     data = _KANJI_N5_DATA[53:67]
-    return _build_kanji_deck("Kanji: N5 · People & Body", data, "kanji_people_body", id_offset=53)
+    return _build_kanji_deck("Kanji: N5 · People & Body", data, "kanji_people_body", id_offset=553)
 
 
 def get_kanji_study_language_deck() -> Deck:
     data = _KANJI_N5_DATA[67:76]
-    return _build_kanji_deck("Kanji: N5 · Study & Language", data, "kanji_study_language", id_offset=67)
+    return _build_kanji_deck("Kanji: N5 · Study & Language", data, "kanji_study_language", id_offset=567)
 
 
 def get_kanji_actions_travel_deck() -> Deck:
     data = _KANJI_N5_DATA[76:91]
-    return _build_kanji_deck("Kanji: N5 · Actions & Travel", data, "kanji_actions_travel", id_offset=76)
+    return _build_kanji_deck("Kanji: N5 · Actions & Travel", data, "kanji_actions_travel", id_offset=576)
 
 
 # ---------------------------------------------------------------------------
