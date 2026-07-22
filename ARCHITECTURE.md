@@ -16,7 +16,7 @@ future feature design — not a task list.
 │ Renderer (React 19 + Vite)                                   │
 │   App.tsx (orchestrator: routing, deck loading, settings)    │
 │   src/views/*        6 top-level screens                     │
-│   src/features/*     20 self-contained hook-first modules    │
+│   src/features/*     21 self-contained hook-first modules    │
 │   src/components/*   shared presentational components        │
 │   src/lib/*          pure helpers + static content data      │
 └───────────────── window.jplearnDesktop (preload) ────────────┘
@@ -142,12 +142,12 @@ lookups will silently miss.
 
 | Metric | Value | At issue #69 filing |
 |---|---|---|
-| Total lines | 2,880 | 7,451 |
-| `useState` | 67 | 112 |
-| `useRef` | 27 | 43 |
-| `useCallback` | 58 | 60 |
+| Total lines | 2,802 | 7,451 |
+| `useState` | 65 | 112 |
+| `useRef` | 24 | 43 |
+| `useCallback` | 56 | 60 |
 | `useMemo` | 23 | 27 |
-| `useEffect` | 28 | 34 |
+| `useEffect` | 27 | 34 |
 
 Issue #69 moved the module-level pure helpers and the two largest JSX blocks out:
 
@@ -170,23 +170,37 @@ and the session invalidates through an injected callback instead of holding a se
 reference. `useStudySession` must be called below the values it takes by argument and above
 everything that reads session state — `useTutor` is the one exception, constructed after it
 and reached through a ref box.
+- `src/features/navigation/` — `useAppNavigation` (phase 4c): the active `view`, the
+  `navDirection` animation hint, and the order-of-visit history stack behind the titlebar
+  back/forward buttons. Every navigation goes through `navigate(view, direction?)`, so a
+  view change and its direction can no longer be set out of sync. Two orthogonal pieces sit
+  beside the hook rather than inside it: `VIEW_PARENT` (the Escape "up one level" map, was a
+  five-branch `if` chain) is a plain constant, and `view → component` rendering stays in App
+  as a `renderView()` closure because each screen needs App-owned props.
 
-**Still outstanding:** routing is still a flat `view` string with inline conditional JSX
-(`home`, `script_hub`, `minigame`, `jlpt_prep`, `passage_hub`, `daily_games`) — phase 4c.
+**Routing is three distinct mappings**, deliberately kept separate: `view → component`
+(render, in App), `view → parent` (Escape, `VIEW_PARENT`), and the history stack (order of
+visit, in the hook). They have different cardinality and semantics; folding them into one
+"router" abstraction fits none of them.
 
 **Design rule for new work:** anything with its own state goes in
 `src/features/<name>/` (`types.ts` → `constants.ts` → `utils.ts` → `use<Name>.ts` →
-`components/` → `index.ts`). 15 modules follow it in full and it works well. App.tsx's
-former session/round/scoring state now lives in `features/study-session/` — see the
-conformance note below for why that one does not carry every file in the pattern.
+`components/` → `index.ts`). 16 modules follow it in full and it works well. App.tsx's
+former session and routing state now live in `features/study-session/` and
+`features/navigation/` — see the conformance note below for why `study-session` does not
+carry every file in the pattern.
 
 ### Feature-module conformance
 
-Full pattern: achievements, command-palette, cursor, daily-games, handwriting,
-kanji-detail, keyboard, onboarding, passages, pomodoro, scenario-tutor, theme, tutor,
-voice, devtools.
-Partial (missing `index.ts`/`types.ts`/`constants.ts`): **card-notes**, **heatmap**,
-**models**, **window-drag**.
+Full pattern: achievements, card-notes, command-palette, cursor, daily-games, handwriting,
+kanji-detail, keyboard, navigation, onboarding, passages, pomodoro, scenario-tutor, theme,
+tutor, voice, devtools.
+Partial (missing `index.ts`/`types.ts`/`constants.ts`): **heatmap**, **models**,
+**window-drag**.
+
+These three are left partial on purpose (issue #69 declined them): `window-drag` is a bare
+hook, and inventing `types.ts`/`constants.ts` for it adds files, not clarity. `card-notes`
+used to be the real outlier and was brought into line (barrel + `components/`) in phase 4c.
 
 `study-session` is deliberately partial: `index.ts` + `types.ts` + `useStudySession.ts`,
 with `roundBuilder.ts`/`grammarRound.ts` in place of a `utils.ts`. It has no `constants.ts`

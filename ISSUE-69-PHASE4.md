@@ -2,24 +2,25 @@
 
 Working handoff document. Delete it when #69 closes.
 
-Branch: `refactor/issue-69-phase4b` (2 commits, branched from `main` at `9888cc0`).
-Phases 1–3 and 4a are merged into `main`.
+Branch: `refactor/issue-69-phase4b` (branched from `main` at `9888cc0`).
+Phases 1–3 and 4a are merged into `main`; 4b and 4c are on this branch.
 
 ## Where things stand
 
-| Metric | At filing | After 4a | **After 4b** | Note |
-|---|---|---|---|---|
-| `App.tsx` lines | 7,451 | 4,060 | **2,880** | −61% from filing |
-| `useState` | 112 | 111 | **67** | 44 moved to `useStudySession` |
-| `useRef` | — | 43 | **27** | 17 moved, 1 added (`queueAssistantToastRef`) |
-| `useCallback` | 60 | 73 | 58 | |
-| `useMemo` | 27 | 27 | 23 | |
-| `useEffect` | 34 | 34 | 28 | |
-| Frontend tests | 561 | 605 | 605 | |
+| Metric | At filing | After 4a | After 4b | **After 4c** | Note |
+|---|---|---|---|---|---|
+| `App.tsx` lines | 7,451 | 4,060 | 2,880 | **2,802** | −62% from filing |
+| `useState` | 112 | 111 | 67 | **65** | 44 → `useStudySession`, 2 → `useAppNavigation` |
+| `useRef` | — | 43 | 27 | **24** | 3 more → `useAppNavigation` |
+| `useCallback` | 60 | 73 | 58 | 56 | |
+| `useMemo` | 27 | 27 | 23 | 23 | |
+| `useEffect` | 34 | 34 | 28 | 27 | |
+| Frontend tests | 561 | 605 | 605 | **616** | +11 routing gate |
 
 **The issue's original complaint — 112 `useState` in an "orchestrator only" component — is
-now addressed.** The session state machine lives in
-`src/features/study-session/useStudySession.ts` (1,460 lines).
+resolved.** Session state lives in `src/features/study-session/useStudySession.ts`; routing
+state in `src/features/navigation/useAppNavigation.ts`. What's left in `App()` is genuine
+orchestration: deck/summary loading, settings, and wiring the feature hooks together.
 
 ### Done
 
@@ -36,16 +37,21 @@ now addressed.** The session state machine lives in
 | 4a | Round builders → `features/study-session/` (814 lines) | `d52ac5a` |
 | 4b-prep | Hoist hook dependencies above their consumers | `ee52eb0` |
 | 4b | Session state → `useStudySession` (44 useState, 17 refs) | `caa4b35` |
+| 4c-gate | Routing characterization tests (11, mutation-verified) | `eda0103` |
+| 4c | Routing state → `useAppNavigation` + `VIEW_PARENT` | `f0f72e3` |
+| 4c | View branches → `renderView()` closure | `cd2299b` |
+| — | `card-notes` conformance: `index.ts` barrel, editor → `components/` | `57c8c2f` |
 
-### Not done
+### Not done — nothing blocking; the rest is deliberately declined
 
-- **4c** — routing: still a flat `view` string with inline conditional JSX
-- Feature-module conformance: `card-notes`, `heatmap`, `models`, `window-drag`
+- **Feature-module conformance for `heatmap`, `models`, `window-drag`.** Left as-is on
+  purpose: the checklist is not applied mechanically — inventing `types.ts`/`constants.ts`
+  for a small hook adds files, not clarity. `card-notes` was the real outlier (done above).
+- **Coverage gaps carried over from 4b:** the resume-toast flow (`handleResume` /
+  `handleDismissResume`) and `handleRetry` still have no test. Neither crosses a hook
+  boundary, so the risk is transcription, not desync. Test them first if you touch them.
 
-On that last item: **don't apply the checklist mechanically.** `window-drag` is a small
-hook; inventing `types.ts`/`constants.ts` for it adds files, not clarity. `card-notes` is
-the real outlier — no `index.ts` barrel, and `CardNoteEditor.tsx` sits at the module root
-instead of `components/`. Fix that one; leave the rest unless there's a reason.
+When #69 closes, delete this file.
 
 ---
 
@@ -129,6 +135,47 @@ called them before (neither appeared in the original dependency arrays).
 
 ---
 
+## Phase 4c — what was done
+
+Routing was "a flat `view` string with inline conditional JSX." It turned out to be *three*
+separate mappings, not one duplicated graph, and they were handled distinctly:
+
+1. **`view → component`** — the six render branches. Stayed in App (each screen needs
+   App-owned props; a `<ViewRouter>` would just mint a huge new prop interface, the
+   transposable-props trap again). Lifted verbatim into a `renderView()` closure so the
+   return reads `<SessionProvider>{renderView()}{overlays}</SessionProvider>`.
+2. **`view → parent`** (Escape) — was a five-branch `if (view === …)` chain. Now the
+   `VIEW_PARENT` constant + a lookup. The minigame/explicit-review guard stays in App because
+   it reads session state.
+3. **history stack** (titlebar back/forward) — the cohesive win, and the hook's real content:
+   `viewHistoryRef` + `viewHistoryIndexRef` + `isHistoryNavigationRef` + the maintenance
+   effect + back/forward + can-back/can-forward, moved as one unit into `useAppNavigation`.
+
+`view` and `navDirection` came along into the hook. Every `setNavDirection(d); setView(v)`
+pair collapsed to `navigate(v, d)` — a view change and its direction can no longer disagree.
+The two titlebar jumps that set the view without a direction call `navigate(v)` (direction
+optional, not defaulted), preserving that they leave `navDirection` untouched.
+
+**`navDirection` has no accessible output, so no test can catch a transposed direction** —
+every call site's direction was checked by eye during the conversion.
+
+`useStudySession` now takes an injected `navigate` instead of `setView` + `setNavDirection`;
+the session shouldn't hold two setters that must fire together.
+
+`canHistoryBack`/`canHistoryForward` still read the history refs *during render* — a latent
+stale-read that works only because a `view` state change re-renders alongside. Preserved
+deliberately; the routing gate pins that timing. Do not "upgrade" history to `useState`.
+
+### Verification (4c)
+
+- Routing gate (`App.routing.test.tsx`) 11/11, mutation-verified: redirecting minigame's
+  Escape parent, dropping the jlpt_prep branch, removing forward-trail truncation, and
+  ungating the number keys each fail exactly one test.
+- Session gate 6/6, full suite 616/616, `tsc -b`, oxlint 0 warnings, `vite build`, built app
+  launches clean.
+
+---
+
 ## The gate — run this after every step
 
 `src/App.session-state.test.tsx` (6 tests) pins the behaviour that breaks silently: score
@@ -140,11 +187,13 @@ increment fails 2. **If you extend it, re-verify that way** — a characterizati
 cannot fail is worse than none.
 
 ```bash
-npx vitest run src/App.session-state.test.tsx
+npx vitest run src/App.session-state.test.tsx   # session state machine (6)
+npx vitest run src/App.routing.test.tsx          # view routing (11), added for 4c
 ```
 
-Note `MinigameView.test.tsx` hand-builds a `SessionContextValue`, so it exercises the
-view's rendering and will keep passing even if the state machine breaks. Don't count it.
+Both are mutation-verified; re-verify that way if you extend either. Note
+`MinigameView.test.tsx` hand-builds a `SessionContextValue`, so it exercises the view's
+rendering and will keep passing even if the state machine breaks. Don't count it.
 
 Full validation (from `electron-frontend/`):
 
