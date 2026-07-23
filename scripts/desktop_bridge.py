@@ -3497,639 +3497,783 @@ def build_jlpt_exam_queue_payload(
     return {"level": level, "mode": mode, "questions": enriched}
 
 
-def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
-    if not argv:
-        return 2, {"error": "Missing command"}
+CommandHandler = Callable[[list[str]], tuple[int, dict[str, object]]]
 
-    command = argv[0]
 
-    if command == "summary":
-        return 0, build_summary()
+def _cmd_summary(argv: list[str]) -> tuple[int, dict[str, object]]:
+    return 0, build_summary()
 
-    if command == "daily-activity":
-        days = int(argv[1]) if len(argv) > 1 else 365
-        try:
-            from dataclasses import asdict
-            counts = load_daily_counts(days)
-            return 0, {"ok": True, "days": [asdict(c) for c in counts]}
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "deck-cards":
-        if len(argv) < 2:
-            return 2, {"error": "Missing deck slug"}
-        slug = argv[1]
-        try:
-            return 0, build_deck_cards(slug)
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
+def _cmd_daily_activity(argv: list[str]) -> tuple[int, dict[str, object]]:
+    days = int(argv[1]) if len(argv) > 1 else 365
+    try:
+        from dataclasses import asdict
+        counts = load_daily_counts(days)
+        return 0, {"ok": True, "days": [asdict(c) for c in counts]}
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "block-progress":
-        if len(argv) < 2:
-            return 2, {"error": "Missing deck slug"}
-        slug = argv[1]
-        try:
-            return 0, build_block_progress(slug)
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "overview-character-mastery":
-        return 0, build_overview_character_mastery()
+def _cmd_deck_cards(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Missing deck slug"}
+    slug = argv[1]
+    try:
+        return 0, build_deck_cards(slug)
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "reset-db":
-        return 0, reset_progress()
 
-    if command == "record-result":
-        if len(argv) < 4:
-            return 2, {
-                "error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage] [session_id] [confidence_score]"
-            }
-        slug = argv[1]
-        try:
-            card_id = int(argv[2])
-            is_correct = _parse_bool_flag(argv[3])
-            minigame = argv[4] if len(argv) > 4 else ""
-            curriculum_stage = int(argv[5]) if len(argv) > 5 and argv[5].strip() else None
-            session_id = argv[6] if len(argv) > 6 else ""
-            confidence_score = int(argv[7]) if len(argv) > 7 and argv[7].strip() else None
-            payload = record_game_result(
-                slug,
-                card_id,
-                is_correct,
-                minigame=minigame,
-                curriculum_stage=curriculum_stage,
-                session_id=session_id,
-                confidence_score=confidence_score,
+def _cmd_block_progress(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Missing deck slug"}
+    slug = argv[1]
+    try:
+        return 0, build_block_progress(slug)
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_overview_character_mastery(argv: list[str]) -> tuple[int, dict[str, object]]:
+    return 0, build_overview_character_mastery()
+
+
+def _cmd_reset_db(argv: list[str]) -> tuple[int, dict[str, object]]:
+    return 0, reset_progress()
+
+
+def _cmd_record_result(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 4:
+        return 2, {
+            "error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage] [session_id] [confidence_score]"
+        }
+    slug = argv[1]
+    try:
+        card_id = int(argv[2])
+        is_correct = _parse_bool_flag(argv[3])
+        minigame = argv[4] if len(argv) > 4 else ""
+        curriculum_stage = int(argv[5]) if len(argv) > 5 and argv[5].strip() else None
+        session_id = argv[6] if len(argv) > 6 else ""
+        confidence_score = int(argv[7]) if len(argv) > 7 and argv[7].strip() else None
+        payload = record_game_result(
+            slug,
+            card_id,
+            is_correct,
+            minigame=minigame,
+            curriculum_stage=curriculum_stage,
+            session_id=session_id,
+            confidence_score=confidence_score,
+        )
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
+def _cmd_session_start(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: session-start <target_items> [target_minutes] [target_accuracy] [session_id]"}
+    try:
+        target_items = int(argv[1])
+        target_minutes = int(argv[2]) if len(argv) > 2 and argv[2].strip() else None
+        target_accuracy = int(argv[3]) if len(argv) > 3 and argv[3].strip() else None
+        session_goal_id = argv[4] if len(argv) > 4 else None
+        payload = start_session_goal(
+            target_items=target_items,
+            target_minutes=target_minutes,
+            target_accuracy=target_accuracy,
+            session_id=session_goal_id,
+        )
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
+def _cmd_session_summary(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: session-summary <session_id>"}
+    return 0, get_session_goal_summary(argv[1])
+
+
+def _cmd_daily_goal(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        return 0, build_daily_goal()
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_daily_games_state(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 2:
+        return 2, {"error": "Usage: daily-games-state <YYYY-MM-DD>"}
+    try:
+        return 0, build_daily_games_state(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_daily_games_practice_seed(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 3:
+        return 2, {
+            "error": "Usage: daily-games-practice-seed <YYYY-MM-DD> <game_type>"
+        }
+    try:
+        return 0, build_daily_games_practice_seed(argv[1], argv[2])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_daily_games_crossword_clues(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 2:
+        return 2, {"error": "Usage: daily-games-crossword-clues <YYYY-MM-DD>"}
+    try:
+        return 0, get_daily_games_crossword_clues(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_daily_games_save_crossword_clues(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 3:
+        return 2, {
+            "error": (
+                "Usage: daily-games-save-crossword-clues <YYYY-MM-DD> <clues_json>"
             )
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
-        return 0, payload
+        }
+    try:
+        clues = _parse_daily_games_crossword_clues_json(argv[2])
+        return 0, save_daily_games_crossword_clues(argv[1], clues)
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "session-start":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: session-start <target_items> [target_minutes] [target_accuracy] [session_id]"}
-        try:
-            target_items = int(argv[1])
-            target_minutes = int(argv[2]) if len(argv) > 2 and argv[2].strip() else None
-            target_accuracy = int(argv[3]) if len(argv) > 3 and argv[3].strip() else None
-            session_goal_id = argv[4] if len(argv) > 4 else None
-            payload = start_session_goal(
-                target_items=target_items,
-                target_minutes=target_minutes,
-                target_accuracy=target_accuracy,
-                session_id=session_goal_id,
+
+def _cmd_daily_games_record_attempt(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 8:
+        return 2, {
+            "error": (
+                "Usage: daily-games-record-attempt <YYYY-MM-DD> <game_type> "
+                "<mode> <score> <completed_flag> <duration_seconds_or_empty> "
+                "<outcomes_json>"
             )
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
-        return 0, payload
+        }
+    try:
+        score = int(argv[4])
+        completed = _parse_bool_flag(argv[5])
+        duration_seconds = int(argv[6]) if argv[6] else None
+        outcomes = _parse_daily_games_outcomes_json(argv[7])
+        return 0, record_daily_games_attempt(
+            argv[1],
+            argv[2],
+            argv[3],
+            score,
+            completed,
+            duration_seconds,
+            outcomes,
+        )
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "session-summary":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: session-summary <session_id>"}
-        return 0, get_session_goal_summary(argv[1])
 
-    if command == "daily-goal":
+def _cmd_word_of_the_day(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        return 0, build_word_of_the_day()
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_daily_goal_set(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: daily-goal-set <target_items>"}
+    try:
+        target = int(argv[1])
+        set_setting("daily_goal_items", str(target))
+        return 0, build_daily_goal()
+    except ValueError as exc:
+        return 2, {"error": f"Invalid target: {exc}"}
+
+
+def _cmd_apply_expertise_level(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: apply-expertise-level <level>"}
+    try:
+        payload = apply_expertise_level(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
+def _cmd_study_queue(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: study-queue <slug>"}
+    try:
+        payload = build_study_queue_payload(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
+def _cmd_grammar_minigame_data(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {
+            "error": "Usage: grammar-minigame-data <game_type> [sentence] [seed]"
+        }
+    try:
+        game_type = argv[1]
+        sentence = argv[2] if len(argv) > 2 and argv[2].strip() else None
+        seed = int(argv[3]) if len(argv) > 3 and argv[3].strip() else 0
+        payload = build_grammar_minigame_data(game_type, sentence, seed=seed)
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
+def _cmd_card_note_get(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 2:
+        return 2, {"error": "Usage: card-note-get <note_key>"}
+    try:
+        return 0, load_card_note(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_card_note_save(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 3:
+        return 2, {"error": "Usage: card-note-save <note_key> <note_text>"}
+    try:
+        return 0, save_card_note(argv[1], argv[2])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_card_note_delete(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 2:
+        return 2, {"error": "Usage: card-note-delete <note_key>"}
+    try:
+        return 0, delete_card_note(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_scenario_session_save(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 2:
+        return 2, {"error": "Usage: scenario-session-save <payload_path>"}
+    try:
+        return 0, save_scenario_session(argv[1])
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_scenario_session_list(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 1:
+        return 2, {"error": "Usage: scenario-session-list"}
+    try:
+        return 0, list_scenario_sessions()
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_scenario_session_get(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 2:
+        return 2, {"error": "Usage: scenario-session-get <session_id>"}
+    try:
+        return 0, get_scenario_session(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_scenario_session_delete(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 2:
+        return 2, {"error": "Usage: scenario-session-delete <session_id>"}
+    try:
+        return 0, delete_scenario_session(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_scenario_sessions_clear(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 1:
+        return 2, {"error": "Usage: scenario-sessions-clear"}
+    try:
+        return 0, clear_scenario_sessions()
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_scenario_srs_save(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 2:
+        return 2, {"error": "Usage: scenario-srs-save <payload_path>"}
+    try:
+        return 0, save_scenario_srs_card(argv[1])
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_dictionary_search(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: dictionary-search <query>"}
+    try:
+        return 0, _repo_build_dictionary_search_payload(
+            argv[1],
+            semantic_embed=_resolve_dictionary_semantic_embedder(),
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_kanji_detail(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) != 2:
+        return 2, {"error": "Usage: kanji-detail <character>"}
+    try:
+        return 0, build_kanji_detail_payload(argv[1])
+    except (FileNotFoundError, ValueError) as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_lookup_sentence(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: lookup-sentence <query>"}
+    return 0, lookup_sentence(argv[1])
+
+
+def _cmd_assistant_snapshot(argv: list[str]) -> tuple[int, dict[str, object]]:
+    session_id = argv[1] if len(argv) > 1 and argv[1].strip() else None
+    return 0, build_assistant_snapshot(session_id=session_id)
+
+
+def _cmd_assistant_events(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        limit = int(argv[1]) if len(argv) > 1 and argv[1].strip() else 8
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, get_pending_assistant_events(limit=limit)
+
+
+def _cmd_assistant_events_consume(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: assistant-events-consume <id_csv>"}
+    try:
+        event_ids = [
+            int(value)
+            for value in argv[1].split(",")
+            if value.strip()
+        ]
+        payload = consume_pending_assistant_events(event_ids)
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
+def _cmd_assistant_events_track(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 3:
+        return 2, {"error": "Usage: assistant-events-track <event_id> <interaction_type> [metadata_json]"}
+    try:
+        event_id = int(argv[1])
+        interaction_type = argv[2]
+        metadata: Mapping[str, str] | None = None
+        if len(argv) > 3 and argv[3].strip():
+            decoded = json.loads(argv[3])
+            if not isinstance(decoded, dict):
+                raise ValueError("metadata_json must decode to object")
+            metadata = {str(key): str(value) for key, value in decoded.items()}
+        payload = track_assistant_event(event_id, interaction_type, metadata)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
+def _cmd_assistant_chat_append(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 3:
+        return 2, {"error": "Usage: assistant-chat-append <role> <content>"}
+    try:
+        payload = append_chat_turn(argv[1], argv[2])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
+def _cmd_assistant_chat_history(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        limit = int(argv[1]) if len(argv) > 1 and argv[1].strip() else 20
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, get_recent_chat_turns(limit=limit)
+
+
+def _cmd_assistant_chat_clear(argv: list[str]) -> tuple[int, dict[str, object]]:
+    return 0, clear_chat_history()
+
+
+def _cmd_assistant_chat_context(argv: list[str]) -> tuple[int, dict[str, object]]:
+    session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
+    user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
+    return 0, get_assistant_chat_context(session_id=session_id, user_message=user_message)
+
+
+def _cmd_assistant_chat_context_v2(argv: list[str]) -> tuple[int, dict[str, object]]:
+    session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
+    user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
+    return 0, get_assistant_chat_context_v2(session_id=session_id, user_message=user_message)
+
+
+def _cmd_assistant_chat_ocr(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: assistant-chat-ocr <image_path> [min_confidence]"}
+    min_confidence = 0.30
+    if len(argv) > 2:
         try:
-            return 0, build_daily_goal()
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+            min_confidence = float(argv[2])
+        except ValueError:
+            return 2, {"error": "min_confidence must be a number between 0 and 1"}
+        if min_confidence < 0 or min_confidence > 1:
+            return 2, {"error": "min_confidence must be between 0 and 1"}
+    try:
+        return 0, extract_assistant_chat_ocr_payload(argv[1], min_confidence=min_confidence)
+    except (FileNotFoundError, RuntimeError, ValueError) as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "daily-games-state":
-        if len(argv) != 2:
-            return 2, {"error": "Usage: daily-games-state <YYYY-MM-DD>"}
-        try:
-            return 0, build_daily_games_state(argv[1])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "daily-games-practice-seed":
-        if len(argv) != 3:
-            return 2, {
-                "error": "Usage: daily-games-practice-seed <YYYY-MM-DD> <game_type>"
-            }
-        try:
-            return 0, build_daily_games_practice_seed(argv[1], argv[2])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
+def _cmd_progression(argv: list[str]) -> tuple[int, dict[str, object]]:
+    return 0, build_progression_status()
 
-    if command == "daily-games-crossword-clues":
-        if len(argv) != 2:
-            return 2, {"error": "Usage: daily-games-crossword-clues <YYYY-MM-DD>"}
-        try:
-            return 0, get_daily_games_crossword_clues(argv[1])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "daily-games-save-crossword-clues":
-        if len(argv) != 3:
-            return 2, {
-                "error": (
-                    "Usage: daily-games-save-crossword-clues <YYYY-MM-DD> <clues_json>"
-                )
-            }
-        try:
-            clues = _parse_daily_games_crossword_clues_json(argv[2])
-            return 0, save_daily_games_crossword_clues(argv[1], clues)
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
+def _cmd_feature_unlocks(argv: list[str]) -> tuple[int, dict[str, object]]:
+    return 0, build_feature_unlock_status()
 
-    if command == "daily-games-record-attempt":
-        if len(argv) != 8:
-            return 2, {
-                "error": (
-                    "Usage: daily-games-record-attempt <YYYY-MM-DD> <game_type> "
-                    "<mode> <score> <completed_flag> <duration_seconds_or_empty> "
-                    "<outcomes_json>"
-                )
-            }
-        try:
-            score = int(argv[4])
-            completed = _parse_bool_flag(argv[5])
-            duration_seconds = int(argv[6]) if argv[6] else None
-            outcomes = _parse_daily_games_outcomes_json(argv[7])
-            return 0, record_daily_games_attempt(
-                argv[1],
-                argv[2],
-                argv[3],
-                score,
-                completed,
-                duration_seconds,
-                outcomes,
-            )
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "word-of-the-day":
-        try:
-            return 0, build_word_of_the_day()
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+def _cmd_achievement_milestones(argv: list[str]) -> tuple[int, dict[str, object]]:
+    return 0, build_achievement_milestones_status()
 
-    if command == "daily-goal-set":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: daily-goal-set <target_items>"}
-        try:
-            target = int(argv[1])
-            set_setting("daily_goal_items", str(target))
-            return 0, build_daily_goal()
-        except ValueError as exc:
-            return 2, {"error": f"Invalid target: {exc}"}
 
-    if command == "apply-expertise-level":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: apply-expertise-level <level>"}
-        try:
-            payload = apply_expertise_level(argv[1])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
-        return 0, payload
+def _cmd_passages_list(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        from pathlib import Path
+        passages_path = Path("data/external_sources/passages/aozora/passages.json")
+        if not passages_path.exists():
+            return 2, {"error": "Passages data not found. Run build_passages_db.py first."}
+        passages = json.loads(passages_path.read_text(encoding="utf-8"))
+        return 0, {"passages": passages}
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "study-queue":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: study-queue <slug>"}
-        try:
-            payload = build_study_queue_payload(argv[1])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
-        return 0, payload
 
-    if command == "grammar-minigame-data":
-        if len(argv) < 2:
-            return 2, {
-                "error": "Usage: grammar-minigame-data <game_type> [sentence] [seed]"
-            }
-        try:
-            game_type = argv[1]
-            sentence = argv[2] if len(argv) > 2 and argv[2].strip() else None
-            seed = int(argv[3]) if len(argv) > 3 and argv[3].strip() else 0
-            payload = build_grammar_minigame_data(game_type, sentence, seed=seed)
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
-        return 0, payload
+def _cmd_xp_progress(argv: list[str]) -> tuple[int, dict[str, object]]:
+    return 0, build_xp_progress()
 
-    if command == "card-note-get":
-        if len(argv) != 2:
-            return 2, {"error": "Usage: card-note-get <note_key>"}
-        try:
-            return 0, load_card_note(argv[1])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "card-note-save":
-        if len(argv) != 3:
-            return 2, {"error": "Usage: card-note-save <note_key> <note_text>"}
-        try:
-            return 0, save_card_note(argv[1], argv[2])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
+def _cmd_recommendations(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        return 0, build_recommendations_payload()
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "card-note-delete":
-        if len(argv) != 2:
-            return 2, {"error": "Usage: card-note-delete <note_key>"}
-        try:
-            return 0, delete_card_note(argv[1])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "scenario-session-save":
-        if len(argv) != 2:
-            return 2, {"error": "Usage: scenario-session-save <payload_path>"}
-        try:
-            return 0, save_scenario_session(argv[1])
-        except (FileNotFoundError, ValueError, OSError) as exc:
-            return 2, {"error": str(exc)}
+def _cmd_tutor_reactions(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        return 0, build_tutor_reactions_payload()
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "scenario-session-list":
-        if len(argv) != 1:
-            return 2, {"error": "Usage: scenario-session-list"}
-        try:
-            return 0, list_scenario_sessions()
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "scenario-session-get":
-        if len(argv) != 2:
-            return 2, {"error": "Usage: scenario-session-get <session_id>"}
-        try:
-            return 0, get_scenario_session(argv[1])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
+def _cmd_tutor_dismiss(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: tutor-dismiss <dedup_key>"}
+    return 0, dismiss_tutor_reaction_key(argv[1])
 
-    if command == "scenario-session-delete":
-        if len(argv) != 2:
-            return 2, {"error": "Usage: scenario-session-delete <session_id>"}
-        try:
-            return 0, delete_scenario_session(argv[1])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "scenario-sessions-clear":
-        if len(argv) != 1:
-            return 2, {"error": "Usage: scenario-sessions-clear"}
-        try:
-            return 0, clear_scenario_sessions()
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
+def _cmd_jlpt_readiness(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        return 0, build_jlpt_readiness_payload()
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "scenario-srs-save":
-        if len(argv) != 2:
-            return 2, {"error": "Usage: scenario-srs-save <payload_path>"}
-        try:
-            return 0, save_scenario_srs_card(argv[1])
-        except (FileNotFoundError, ValueError, OSError) as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "dictionary-search":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: dictionary-search <query>"}
-        try:
-            return 0, _repo_build_dictionary_search_payload(
-                argv[1],
-                semantic_embed=_resolve_dictionary_semantic_embedder(),
-            )
-        except (FileNotFoundError, ValueError) as exc:
-            return 2, {"error": str(exc)}
+def _cmd_jlpt_exam_queue(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 3:
+        return 2, {"error": "Usage: jlpt-exam-queue <level> <mode> [count]"}
+    lv = argv[1].lower()
+    md = argv[2].lower()
+    if lv not in _VALID_JLPT_LEVELS:
+        return 2, {"error": f"Invalid JLPT level: {lv}"}
+    if md not in _VALID_JLPT_MODES:
+        return 2, {"error": f"Invalid JLPT mode: {md}"}
+    try:
+        cnt = int(argv[3]) if len(argv) > 3 and argv[3].strip() else 30
+        return 0, build_jlpt_exam_queue_payload(lv, md, cnt)
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "kanji-detail":
-        if len(argv) != 2:
-            return 2, {"error": "Usage: kanji-detail <character>"}
-        try:
-            return 0, build_kanji_detail_payload(argv[1])
-        except (FileNotFoundError, ValueError) as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "lookup-sentence":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: lookup-sentence <query>"}
-        return 0, lookup_sentence(argv[1])
-
-    if command == "assistant-snapshot":
-        session_id = argv[1] if len(argv) > 1 and argv[1].strip() else None
-        return 0, build_assistant_snapshot(session_id=session_id)
-
-    if command == "assistant-events":
-        try:
-            limit = int(argv[1]) if len(argv) > 1 and argv[1].strip() else 8
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
-        return 0, get_pending_assistant_events(limit=limit)
-
-    if command == "assistant-events-consume":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: assistant-events-consume <id_csv>"}
-        try:
-            event_ids = [
-                int(value)
-                for value in argv[1].split(",")
-                if value.strip()
-            ]
-            payload = consume_pending_assistant_events(event_ids)
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
-        return 0, payload
-
-    if command == "assistant-events-track":
-        if len(argv) < 3:
-            return 2, {"error": "Usage: assistant-events-track <event_id> <interaction_type> [metadata_json]"}
-        try:
-            event_id = int(argv[1])
-            interaction_type = argv[2]
-            metadata: Mapping[str, str] | None = None
-            if len(argv) > 3 and argv[3].strip():
-                decoded = json.loads(argv[3])
-                if not isinstance(decoded, dict):
-                    raise ValueError("metadata_json must decode to object")
-                metadata = {str(key): str(value) for key, value in decoded.items()}
-            payload = track_assistant_event(event_id, interaction_type, metadata)
-        except (ValueError, json.JSONDecodeError) as exc:
-            return 2, {"error": str(exc)}
-        return 0, payload
-
-    if command == "assistant-chat-append":
-        if len(argv) < 3:
-            return 2, {"error": "Usage: assistant-chat-append <role> <content>"}
-        try:
-            payload = append_chat_turn(argv[1], argv[2])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
-        return 0, payload
-
-    if command == "assistant-chat-history":
-        try:
-            limit = int(argv[1]) if len(argv) > 1 and argv[1].strip() else 20
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
-        return 0, get_recent_chat_turns(limit=limit)
-
-    if command == "assistant-chat-clear":
-        return 0, clear_chat_history()
-
-    if command == "assistant-chat-context":
-        session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
-        user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
-        return 0, get_assistant_chat_context(session_id=session_id, user_message=user_message)
-
-    if command == "assistant-chat-context-v2":
-        session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
-        user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
-        return 0, get_assistant_chat_context_v2(session_id=session_id, user_message=user_message)
-
-    if command == "assistant-chat-ocr":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: assistant-chat-ocr <image_path> [min_confidence]"}
-        min_confidence = 0.30
-        if len(argv) > 2:
-            try:
-                min_confidence = float(argv[2])
-            except ValueError:
-                return 2, {"error": "min_confidence must be a number between 0 and 1"}
-            if min_confidence < 0 or min_confidence > 1:
-                return 2, {"error": "min_confidence must be between 0 and 1"}
-        try:
-            return 0, extract_assistant_chat_ocr_payload(argv[1], min_confidence=min_confidence)
-        except (FileNotFoundError, RuntimeError, ValueError) as exc:
-            return 2, {"error": str(exc)}
-
-    if command == "progression":
-        return 0, build_progression_status()
-
-    if command == "feature-unlocks":
-        return 0, build_feature_unlock_status()
-
-    if command == "achievement-milestones":
-        return 0, build_achievement_milestones_status()
-
-    if command == "passages:list":
-        try:
-            from pathlib import Path
-            passages_path = Path("data/external_sources/passages/aozora/passages.json")
-            if not passages_path.exists():
-                return 2, {"error": "Passages data not found. Run build_passages_db.py first."}
-            passages = json.loads(passages_path.read_text(encoding="utf-8"))
-            return 0, {"passages": passages}
-        except Exception as exc:
-            return 2, {"error": str(exc)}
-
-    if command == "xp-progress":
-        return 0, build_xp_progress()
-
-    if command == "recommendations":
-        try:
-            return 0, build_recommendations_payload()
-        except Exception as exc:
-            return 2, {"error": str(exc)}
-
-    if command == "tutor-reactions":
-        try:
-            return 0, build_tutor_reactions_payload()
-        except Exception as exc:
-            return 2, {"error": str(exc)}
-
-    if command == "tutor-dismiss":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: tutor-dismiss <dedup_key>"}
-        return 0, dismiss_tutor_reaction_key(argv[1])
-
-    if command == "jlpt-readiness":
-        try:
-            return 0, build_jlpt_readiness_payload()
-        except Exception as exc:
-            return 2, {"error": str(exc)}
-
-    if command == "jlpt-exam-queue":
-        if len(argv) < 3:
-            return 2, {"error": "Usage: jlpt-exam-queue <level> <mode> [count]"}
+def _cmd_jlpt_save_result(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 6:
+        return 2, {"error": "Usage: jlpt-save-result <level> <mode> <questions_answered> <correct> <accuracy> [projected_score]"}
+    try:
         lv = argv[1].lower()
         md = argv[2].lower()
         if lv not in _VALID_JLPT_LEVELS:
             return 2, {"error": f"Invalid JLPT level: {lv}"}
         if md not in _VALID_JLPT_MODES:
             return 2, {"error": f"Invalid JLPT mode: {md}"}
-        try:
-            cnt = int(argv[3]) if len(argv) > 3 and argv[3].strip() else 30
-            return 0, build_jlpt_exam_queue_payload(lv, md, cnt)
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+        qa = int(argv[3])
+        correct = int(argv[4])
+        accuracy = float(argv[5])
+        projected: int | None = int(argv[6]) if len(argv) > 6 and argv[6].strip() else None
+        row_id = save_jlpt_exam_result(lv, md, qa, correct, accuracy, projected)
+        return 0, {"ok": True, "id": row_id}
+    except (ValueError, IndexError) as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "jlpt-save-result":
-        if len(argv) < 6:
-            return 2, {"error": "Usage: jlpt-save-result <level> <mode> <questions_answered> <correct> <accuracy> [projected_score]"}
-        try:
-            lv = argv[1].lower()
-            md = argv[2].lower()
-            if lv not in _VALID_JLPT_LEVELS:
-                return 2, {"error": f"Invalid JLPT level: {lv}"}
-            if md not in _VALID_JLPT_MODES:
-                return 2, {"error": f"Invalid JLPT mode: {md}"}
-            qa = int(argv[3])
-            correct = int(argv[4])
-            accuracy = float(argv[5])
-            projected: int | None = int(argv[6]) if len(argv) > 6 and argv[6].strip() else None
-            row_id = save_jlpt_exam_result(lv, md, qa, correct, accuracy, projected)
-            return 0, {"ok": True, "id": row_id}
-        except (ValueError, IndexError) as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "jlpt-exam-history":
-        try:
-            lv = argv[1].lower() if len(argv) > 1 and argv[1].strip() else None
-            md = argv[2].lower() if len(argv) > 2 and argv[2].strip() else None
-            if lv and lv not in _VALID_JLPT_LEVELS:
-                return 2, {"error": f"Invalid JLPT level: {lv}"}
-            if md and md not in _VALID_JLPT_MODES:
-                return 2, {"error": f"Invalid JLPT mode: {md}"}
-            results = load_jlpt_exam_history(level=lv, mode=md)
-            return 0, {"results": results}
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+def _cmd_jlpt_exam_history(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        lv = argv[1].lower() if len(argv) > 1 and argv[1].strip() else None
+        md = argv[2].lower() if len(argv) > 2 and argv[2].strip() else None
+        if lv and lv not in _VALID_JLPT_LEVELS:
+            return 2, {"error": f"Invalid JLPT level: {lv}"}
+        if md and md not in _VALID_JLPT_MODES:
+            return 2, {"error": f"Invalid JLPT mode: {md}"}
+        results = load_jlpt_exam_history(level=lv, mode=md)
+        return 0, {"results": results}
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "learning-path-status":
-        try:
-            return 0, build_learning_path_status_payload()
-        except Exception as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "set-learning-path":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: set-learning-path <path_id>"}
-        try:
-            return 0, set_learning_path_handler(argv[1])
-        except ValueError as exc:
-            return 2, {"error": str(exc)}
+def _cmd_learning_path_status(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        return 0, build_learning_path_status_payload()
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "complete-onboarding":
-        try:
-            goal = argv[1] if len(argv) > 1 and argv[1].strip() else None
-            daily_minutes = argv[2] if len(argv) > 2 and argv[2].strip() else None
-            target_level = argv[3] if len(argv) > 3 and argv[3].strip() else None
-            return 0, complete_onboarding_handler(goal, daily_minutes, target_level)
-        except Exception as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "mark-onboarding-pending":
-        try:
-            return 0, mark_onboarding_pending_handler()
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+def _cmd_set_learning_path(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: set-learning-path <path_id>"}
+    try:
+        return 0, set_learning_path_handler(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "analytics-export":
-        if len(argv) < 2:
-            return 2, {"error": "Missing analytics export type"}
-        export_type = argv[1]
-        try:
-            if export_type == "review_history":
-                return 0, {"csv": deck_portability.export_review_history_csv(), "type": export_type}
-            if export_type == "accuracy_trends":
-                return 0, {"csv": deck_portability.export_accuracy_trends_csv(), "type": export_type}
-            if export_type == "mastery_snapshot":
-                return 0, {"csv": deck_portability.export_mastery_snapshot_csv(), "type": export_type}
-            return 2, {"error": f"Unknown analytics export type: {export_type}"}
-        except Exception as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "analytics-export-json":
-        try:
-            snapshot = deck_portability.export_progress_snapshot()
-            return 0, {"json": snapshot}
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+def _cmd_complete_onboarding(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        goal = argv[1] if len(argv) > 1 and argv[1].strip() else None
+        daily_minutes = argv[2] if len(argv) > 2 and argv[2].strip() else None
+        target_level = argv[3] if len(argv) > 3 and argv[3].strip() else None
+        return 0, complete_onboarding_handler(goal, daily_minutes, target_level)
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "analytics-import-json":
-        if len(argv) < 2:
-            return 2, {"error": "Usage: analytics-import-json <file_path> [merge|overwrite]"}
-        file_path = argv[1]
-        conflict_mode = argv[2] if len(argv) > 2 else "merge"
-        if conflict_mode not in ("merge", "overwrite"):
-            return 2, {"error": f"Invalid conflict_mode: {conflict_mode}. Use 'merge' or 'overwrite'."}
-        try:
-            import json as _json
-            with open(file_path, "r", encoding="utf-8") as f:
-                snapshot = _json.load(f)
-            result = deck_portability.import_progress_snapshot(snapshot, conflict_mode=conflict_mode)
-            return 0, {"ok": True, "imported": result, "conflict_mode": conflict_mode}
-        except Exception as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "diagnostics":
-        try:
-            return 0, build_diagnostics_report()
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+def _cmd_mark_onboarding_pending(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        return 0, mark_onboarding_pending_handler()
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "snapshot":
-        try:
-            return 0, build_snapshot(max_files=50)
-        except Exception as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "run-check":
-        if len(argv) < 2:
-            return 2, {"error": "Missing check name (arch, db, or srs)"}
-        check_name = argv[1]
-        valid_checks = {"arch", "db", "srs"}
-        if check_name not in valid_checks:
-            return 2, {"error": f"Unknown check: {check_name}. Valid: arch, db, srs"}
-        try:
-            result = subprocess.run(
-                [sys.executable, f"scripts/{check_name}_check.py"],
-                cwd=PROJECT_ROOT,
-                text=True,
-                capture_output=True,
-                timeout=30,
-                check=False,
-            )
-            output = (result.stdout or "") + (result.stderr or "")
-            return 0, {
-                "check": check_name,
-                "passed": result.returncode == 0,
-                "exitCode": result.returncode,
-                "output": output[:20000],
-            }
-        except subprocess.TimeoutExpired:
-            return 0, {
-                "check": check_name,
-                "passed": False,
-                "exitCode": -1,
-                "output": "Check timed out after 30 seconds.",
-                "error": "timeout",
-            }
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+def _cmd_analytics_export(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Missing analytics export type"}
+    export_type = argv[1]
+    try:
+        if export_type == "review_history":
+            return 0, {"csv": deck_portability.export_review_history_csv(), "type": export_type}
+        if export_type == "accuracy_trends":
+            return 0, {"csv": deck_portability.export_accuracy_trends_csv(), "type": export_type}
+        if export_type == "mastery_snapshot":
+            return 0, {"csv": deck_portability.export_mastery_snapshot_csv(), "type": export_type}
+        return 2, {"error": f"Unknown analytics export type: {export_type}"}
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "fsrs-get-weights":
-        try:
-            saved = load_fsrs_weights()
-            current = list(saved) if saved is not None else list(get_weights())
-            return 0, {
-                "weights": current,
-                "is_custom": saved is not None,
-            }
-        except Exception as exc:
-            return 2, {"error": str(exc)}
 
-    if command == "fsrs-optimize":
-        try:
-            result = run_fsrs_optimization()
-            if result is None:
-                return 0, {"ok": False, "error": "Insufficient review data (need 5+ cards with 2+ reviews)."}
-            return 0, {
-                "ok": True,
-                "previous_weights": list(result["previous_weights"]),
-                "new_weights": list(result["new_weights"]),
-                "loss_before": result["loss_before"],
-                "loss_after": result["loss_after"],
-                "log_count": result["log_count"],
-                "card_count": result["card_count"],
-            }
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+def _cmd_analytics_export_json(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        snapshot = deck_portability.export_progress_snapshot()
+        return 0, {"json": snapshot}
+    except Exception as exc:
+        return 2, {"error": str(exc)}
 
-    if command == "fsrs-reset-weights":
-        try:
-            reset_fsrs_saved_weights()
-            return 0, {"ok": True, "weights": list(get_weights())}
-        except Exception as exc:
-            return 2, {"error": str(exc)}
+
+def _cmd_analytics_import_json(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: analytics-import-json <file_path> [merge|overwrite]"}
+    file_path = argv[1]
+    conflict_mode = argv[2] if len(argv) > 2 else "merge"
+    if conflict_mode not in ("merge", "overwrite"):
+        return 2, {"error": f"Invalid conflict_mode: {conflict_mode}. Use 'merge' or 'overwrite'."}
+    try:
+        import json as _json
+        with open(file_path, "r", encoding="utf-8") as f:
+            snapshot = _json.load(f)
+        result = deck_portability.import_progress_snapshot(snapshot, conflict_mode=conflict_mode)
+        return 0, {"ok": True, "imported": result, "conflict_mode": conflict_mode}
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_diagnostics(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        return 0, build_diagnostics_report()
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_snapshot(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        return 0, build_snapshot(max_files=50)
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_run_check(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Missing check name (arch, db, or srs)"}
+    check_name = argv[1]
+    valid_checks = {"arch", "db", "srs"}
+    if check_name not in valid_checks:
+        return 2, {"error": f"Unknown check: {check_name}. Valid: arch, db, srs"}
+    try:
+        result = subprocess.run(
+            [sys.executable, f"scripts/{check_name}_check.py"],
+            cwd=PROJECT_ROOT,
+            text=True,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        return 0, {
+            "check": check_name,
+            "passed": result.returncode == 0,
+            "exitCode": result.returncode,
+            "output": output[:20000],
+        }
+    except subprocess.TimeoutExpired:
+        return 0, {
+            "check": check_name,
+            "passed": False,
+            "exitCode": -1,
+            "output": "Check timed out after 30 seconds.",
+            "error": "timeout",
+        }
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_fsrs_get_weights(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        saved = load_fsrs_weights()
+        current = list(saved) if saved is not None else list(get_weights())
+        return 0, {
+            "weights": current,
+            "is_custom": saved is not None,
+        }
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_fsrs_optimize(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        result = run_fsrs_optimization()
+        if result is None:
+            return 0, {"ok": False, "error": "Insufficient review data (need 5+ cards with 2+ reviews)."}
+        return 0, {
+            "ok": True,
+            "previous_weights": list(result["previous_weights"]),
+            "new_weights": list(result["new_weights"]),
+            "loss_before": result["loss_before"],
+            "loss_after": result["loss_after"],
+            "log_count": result["log_count"],
+            "card_count": result["card_count"],
+        }
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_fsrs_reset_weights(argv: list[str]) -> tuple[int, dict[str, object]]:
+    try:
+        reset_fsrs_saved_weights()
+        return 0, {"ok": True, "weights": list(get_weights())}
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+_COMMAND_HANDLERS: dict[str, CommandHandler] = {
+    "summary": _cmd_summary,
+    "daily-activity": _cmd_daily_activity,
+    "deck-cards": _cmd_deck_cards,
+    "block-progress": _cmd_block_progress,
+    "overview-character-mastery": _cmd_overview_character_mastery,
+    "reset-db": _cmd_reset_db,
+    "record-result": _cmd_record_result,
+    "session-start": _cmd_session_start,
+    "session-summary": _cmd_session_summary,
+    "daily-goal": _cmd_daily_goal,
+    "daily-games-state": _cmd_daily_games_state,
+    "daily-games-practice-seed": _cmd_daily_games_practice_seed,
+    "daily-games-crossword-clues": _cmd_daily_games_crossword_clues,
+    "daily-games-save-crossword-clues": _cmd_daily_games_save_crossword_clues,
+    "daily-games-record-attempt": _cmd_daily_games_record_attempt,
+    "word-of-the-day": _cmd_word_of_the_day,
+    "daily-goal-set": _cmd_daily_goal_set,
+    "apply-expertise-level": _cmd_apply_expertise_level,
+    "study-queue": _cmd_study_queue,
+    "grammar-minigame-data": _cmd_grammar_minigame_data,
+    "card-note-get": _cmd_card_note_get,
+    "card-note-save": _cmd_card_note_save,
+    "card-note-delete": _cmd_card_note_delete,
+    "scenario-session-save": _cmd_scenario_session_save,
+    "scenario-session-list": _cmd_scenario_session_list,
+    "scenario-session-get": _cmd_scenario_session_get,
+    "scenario-session-delete": _cmd_scenario_session_delete,
+    "scenario-sessions-clear": _cmd_scenario_sessions_clear,
+    "scenario-srs-save": _cmd_scenario_srs_save,
+    "dictionary-search": _cmd_dictionary_search,
+    "kanji-detail": _cmd_kanji_detail,
+    "lookup-sentence": _cmd_lookup_sentence,
+    "assistant-snapshot": _cmd_assistant_snapshot,
+    "assistant-events": _cmd_assistant_events,
+    "assistant-events-consume": _cmd_assistant_events_consume,
+    "assistant-events-track": _cmd_assistant_events_track,
+    "assistant-chat-append": _cmd_assistant_chat_append,
+    "assistant-chat-history": _cmd_assistant_chat_history,
+    "assistant-chat-clear": _cmd_assistant_chat_clear,
+    "assistant-chat-context": _cmd_assistant_chat_context,
+    "assistant-chat-context-v2": _cmd_assistant_chat_context_v2,
+    "assistant-chat-ocr": _cmd_assistant_chat_ocr,
+    "progression": _cmd_progression,
+    "feature-unlocks": _cmd_feature_unlocks,
+    "achievement-milestones": _cmd_achievement_milestones,
+    "passages:list": _cmd_passages_list,
+    "xp-progress": _cmd_xp_progress,
+    "recommendations": _cmd_recommendations,
+    "tutor-reactions": _cmd_tutor_reactions,
+    "tutor-dismiss": _cmd_tutor_dismiss,
+    "jlpt-readiness": _cmd_jlpt_readiness,
+    "jlpt-exam-queue": _cmd_jlpt_exam_queue,
+    "jlpt-save-result": _cmd_jlpt_save_result,
+    "jlpt-exam-history": _cmd_jlpt_exam_history,
+    "learning-path-status": _cmd_learning_path_status,
+    "set-learning-path": _cmd_set_learning_path,
+    "complete-onboarding": _cmd_complete_onboarding,
+    "mark-onboarding-pending": _cmd_mark_onboarding_pending,
+    "analytics-export": _cmd_analytics_export,
+    "analytics-export-json": _cmd_analytics_export_json,
+    "analytics-import-json": _cmd_analytics_import_json,
+    "diagnostics": _cmd_diagnostics,
+    "snapshot": _cmd_snapshot,
+    "run-check": _cmd_run_check,
+    "fsrs-get-weights": _cmd_fsrs_get_weights,
+    "fsrs-optimize": _cmd_fsrs_optimize,
+    "fsrs-reset-weights": _cmd_fsrs_reset_weights,
+}
+
+
+def _run_command(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if not argv:
+        return 2, {"error": "Missing command"}
+
+    command = argv[0]
+    handler = _COMMAND_HANDLERS.get(command)
+    if handler is not None:
+        return handler(argv)
 
     return 2, {"error": f"Unknown command: {command}"}
 
