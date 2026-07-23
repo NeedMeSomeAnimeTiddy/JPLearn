@@ -40,9 +40,12 @@ future feature design — not a task list.
 ```
 
 **Enforced boundary:** `scripts/arch_check.py` forbids `domain → data`, `domain → ui`,
-`data → ui`. Note it only inspects the top-level packages `src`, `domain`, `data`, `ui` —
-**`scripts/` is unchecked**, which is how the bridge accumulated logic that arguably
-belongs in `domain/`.
+`data → ui`, `scripts → ui`. It inspects `src`, `domain`, `data`, `ui`, and `scripts`, and
+prints a non-fatal size warning for any hand-written file over 2,000 lines (files whose first
+line is an "Auto-generated" marker, like `domain/external_deck_data.py`, are exempt) —
+currently `desktop_bridge.py` and `data/database.py`. The import-boundary check alone doesn't
+stop `desktop_bridge.py` from mixing OCR, MT, dictionary, and deck-assembly concerns in one
+file (#70 step 2 — splitting those concerns into their proper layers — is still open).
 
 ---
 
@@ -369,8 +372,8 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 | # | Finding | Issue |
 |---|---|---|
 | D1 | `App.tsx` is down to 2,880 lines / 67 `useState` — the pure helpers (`src/lib/`), the titlebar + settings JSX (`src/components/`) and the session state machine (`features/study-session/useStudySession.ts`) are all extracted. What remains is routing: a flat `view` string with inline conditional JSX. | #69 (phase 4c outstanding), #6 (closed, handler boilerplate only) |
-| D2 | `desktop_bridge.py` at 6,122 lines mixes OCR, MT, dictionary, and deck logic in `scripts/` — a directory `arch_check.py` does not inspect. | none |
-| D3 | `arch_check.py` covers only `src`/`domain`/`data`/`ui`; extend `RULES` to `scripts/`. | none |
+| D2 | `desktop_bridge.py` at 6,122 lines mixes OCR, MT, dictionary, and deck logic in `scripts/`. `arch_check.py` now inspects the directory (#70 step 1) and flags the file's size, but the concerns themselves are still unsplit. | #70 (step 1 closed, step 2 open) |
+| D3 | ~~`arch_check.py` covers only `src`/`domain`/`data`/`ui`; extend `RULES` to `scripts/`.~~ Done — `scripts` is now a checked layer (forbids `→ ui`) with a non-fatal size-warning threshold. | #70 (step 1) |
 | D4 | `data/app.db` + `SRSRepository` are unused by any runtime path but documented in FEATURES.md as live persistence. Either wire or reclassify. | none |
 | D5 | Empty legacy packages `src/` and `ui/` (only `__pycache__`); stray zero-byte `nul` file at repo root. | none |
 | D6 | 4 feature modules incomplete vs the checklist: card-notes, heatmap, models, window-drag. | none |
@@ -416,7 +419,7 @@ None of the following duplicate them.
 5. Vocabulary thematic categories for N4–N1 (C2), mirroring the kanji category structure.
 6. `App.tsx` decomposition (D1): extract module-level helpers to `src/lib/`, then a
    `features/study-session/` module for round/scoring state.
-7. Extend `arch_check.py` to `scripts/` (D3), then split `desktop_bridge.py` (D2).
+7. ~~Extend `arch_check.py` to `scripts/` (D3)~~ done; split `desktop_bridge.py`'s mixed concerns (D2).
 8. Retire or wire `app.db` (D4) and delete `src/`, `ui/`, `nul` (D5).
 9. View-component tests (E1) and `ipc_security.cjs` tests (E2).
 10. ROADMAP/FEATURES accuracy pass (F1–F5).

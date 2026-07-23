@@ -29,7 +29,7 @@ Deeper reference docs (read the relevant one before nontrivial work in that area
 python -m pytest -q                          # All tests
 python -m pytest tests/path/to/file.py -q    # Single file
 python scripts/dev.py                        # Full aggregate check (6 steps + frontend)
-python scripts/arch_check.py                 # Layer boundary check (domain/data/ui/src only — NOT scripts/)
+python scripts/arch_check.py                 # Layer boundary check (domain/data/ui/src/scripts)
 
 # Frontend (run from electron-frontend/)
 npm run dev              # Vite dev server + Electron, hot reload
@@ -64,9 +64,10 @@ electron-frontend/
 tests/                pytest suite
 ```
 
-Enforced boundary: `scripts/arch_check.py` forbids `domain → data`, `domain → ui`, `data → ui`.
-It only inspects `src`, `domain`, `data`, `ui` — `scripts/` (including `desktop_bridge.py`) is
-unchecked.
+Enforced boundary: `scripts/arch_check.py` forbids `domain → data`, `domain → ui`, `data → ui`,
+`scripts → ui`. It inspects `src`, `domain`, `data`, `ui`, `scripts`, and prints a non-fatal
+size warning for any hand-written file over 2,000 lines (currently `desktop_bridge.py` and
+`database.py`; auto-generated files like `domain/external_deck_data.py` are exempt).
 
 **Two SQLite DBs, not equivalent**: `data/jplearn.db` (via `database.py`) is the real,
 live-written database — review/progress/gamification/assistant state. `data/app.db` (via

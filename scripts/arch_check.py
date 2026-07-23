@@ -8,7 +8,12 @@ RULES: dict[str, dict[str, list[str]]] = {
     "domain": {"forbid": ["data", "ui"]},
     "data": {"forbid": ["ui"]},
     "ui": {"forbid": []},
+    "scripts": {"forbid": ["ui"]},
 }
+
+# Files above this line count get flagged as a warning (not a failure) so
+# growth in size/complexity is visible without blocking builds.
+SIZE_WARNING_LINES = 2000
 
 
 def get_layer(path: Path) -> str | None:
@@ -53,15 +58,41 @@ def check_file(file_path: Path) -> list[str]:
     return violations
 
 
+def check_size(file_path: Path) -> str | None:
+    layer = get_layer(file_path)
+    if not layer or layer not in RULES:
+        return None
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    if lines and "auto-generated" in lines[0].lower():
+        return None
+
+    if len(lines) > SIZE_WARNING_LINES:
+        return f"{file_path}: {len(lines)} lines (warning threshold: {SIZE_WARNING_LINES})"
+
+    return None
+
+
 def main():
     root = Path(".")
     errors = []
+    size_warnings = []
 
     for py_file in root.rglob("*.py"):
         if any(part in {"venv", ".venv", "__pycache__"} for part in py_file.parts):
             continue
 
         errors.extend(check_file(py_file))
+
+        warning = check_size(py_file)
+        if warning:
+            size_warnings.append(warning)
+
+    if size_warnings:
+        print("Size warnings (non-fatal):")
+        print("\n".join(size_warnings))
 
     if errors:
         print("\n".join(errors))
