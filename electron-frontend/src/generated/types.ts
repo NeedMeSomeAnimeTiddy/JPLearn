@@ -1,9 +1,10 @@
 // AUTO-GENERATED — do not edit manually.
 // Run: python scripts/generate_ts_types.py
-// Source: scripts/desktop_bridge.py
+// Source: scripts/desktop_bridge.py, data/dictionary_repository.py
 //
-// These interfaces mirror the Python @dataclass types in desktop_bridge.py.
-// Any field-type change in Python should result in a changed file here.
+// These interfaces mirror the Python @dataclass types declared in the source
+// files above. Any field-type change in Python should result in a changed
+// file here.
 export interface DeckSummary {
   slug: string
   name: string
@@ -17,65 +18,6 @@ export interface StudyStreak {
   current_days: number
   best_days: number
   freezes_available: number
-}
-
-export interface PitchAccent {
-  reading: string
-  pitch_positions: number[]
-  mora_count: number
-  source: string
-}
-
-export interface DictionaryCardSummary {
-  character: string
-  reading: string
-  primary_gloss: string
-  glosses: string[]
-  source: string
-  pitch_accents: PitchAccent[]
-}
-
-export interface KanjiRadical {
-  position: number
-  radical: string
-  stroke_count: number | null
-  code: string | null
-}
-
-export interface KanjiReadingExample {
-  word: string
-  reading: string
-  meanings: string[]
-  is_common: boolean
-}
-
-export interface KanjiReading {
-  reading: string
-  examples: KanjiReadingExample[]
-}
-
-export interface KanjiCompound {
-  word: string
-  reading: string
-  meanings: string[]
-  is_common: boolean
-}
-
-export interface KanjiDetailPayload {
-  character: string
-  meanings: string[]
-  on_readings: KanjiReading[]
-  kun_readings: KanjiReading[]
-  radicals: KanjiRadical[]
-  jlpt_level: string | null
-  jlpt_level_source: string | null
-  stroke_count: number | null
-  classical_radical_number: number | null
-  tags: string[]
-  categories: string[]
-  compounds: KanjiCompound[]
-  has_more_compounds: boolean
-  source: string
 }
 
 export interface CardNotePayload {
@@ -293,4 +235,63 @@ export interface DailyGamesPracticeSeedPayload {
   pool_day: string
   game_type: string
   seed: number
+}
+
+export interface PitchAccent {
+  reading: string
+  pitch_positions: number[]
+  mora_count: number
+  source: string
+}
+
+export interface DictionaryCardSummary {
+  character: string
+  reading: string
+  primary_gloss: string
+  glosses: string[]
+  source: string
+  pitch_accents: PitchAccent[]
+}
+
+export interface KanjiRadical {
+  position: number
+  radical: string
+  stroke_count: number | null
+  code: string | null
+}
+
+export interface KanjiReadingExample {
+  word: string
+  reading: string
+  meanings: string[]
+  is_common: boolean
+}
+
+export interface KanjiReading {
+  reading: string
+  examples: KanjiReadingExample[]
+}
+
+export interface KanjiCompound {
+  word: string
+  reading: string
+  meanings: string[]
+  is_common: boolean
+}
+
+export interface KanjiDetailPayload {
+  character: string
+  meanings: string[]
+  on_readings: KanjiReading[]
+  kun_readings: KanjiReading[]
+  radicals: KanjiRadical[]
+  jlpt_level: string | null
+  jlpt_level_source: string | null
+  stroke_count: number | null
+  classical_radical_number: number | null
+  tags: string[]
+  categories: string[]
+  compounds: KanjiCompound[]
+  has_more_compounds: boolean
+  source: string
 }

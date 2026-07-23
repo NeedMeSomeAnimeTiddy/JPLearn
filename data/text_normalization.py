@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from dataclasses import dataclass
 
 from fugashi import Tagger
+
+_JAPANESE_SCRIPT_RE = re.compile(r"[぀-ヿ㐀-䶿一-鿿]")
+
+
+def contains_japanese_script(value: str) -> bool:
+    """Return True if *value* contains Hiragana, Katakana, or CJK ideographs."""
+    return bool(_JAPANESE_SCRIPT_RE.search(value))
+
 
 _PROLONGED_SOUND_VARIANTS = str.maketrans(
     {

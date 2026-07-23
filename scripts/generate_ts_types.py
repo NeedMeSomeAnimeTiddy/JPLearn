@@ -13,7 +13,10 @@ import textwrap
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-BRIDGE_FILE = PROJECT_ROOT / "scripts" / "desktop_bridge.py"
+SOURCE_FILES: tuple[Path, ...] = (
+    PROJECT_ROOT / "scripts" / "desktop_bridge.py",
+    PROJECT_ROOT / "data" / "dictionary_repository.py",
+)
 OUTPUT_FILE = PROJECT_ROOT / "electron-frontend" / "src" / "generated" / "types.ts"
 
 PYTHON_TO_TS: dict[str, str] = {
@@ -132,22 +135,27 @@ def _generate_interface(class_def: ast.ClassDef) -> str:
 
 
 def generate() -> str:
-    source = BRIDGE_FILE.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(BRIDGE_FILE))
-
-    header = textwrap.dedent("""\
+    source_labels = ", ".join(
+        str(source_file.relative_to(PROJECT_ROOT)).replace("\\", "/")
+        for source_file in SOURCE_FILES
+    )
+    header = textwrap.dedent(f"""\
         // AUTO-GENERATED — do not edit manually.
         // Run: python scripts/generate_ts_types.py
-        // Source: scripts/desktop_bridge.py
+        // Source: {source_labels}
         //
-        // These interfaces mirror the Python @dataclass types in desktop_bridge.py.
-        // Any field-type change in Python should result in a changed file here.
+        // These interfaces mirror the Python @dataclass types declared in the source
+        // files above. Any field-type change in Python should result in a changed
+        // file here.
         """)
 
     interfaces: list[str] = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef) and _is_dataclass(node):
-            interfaces.append(_generate_interface(node))
+    for source_file in SOURCE_FILES:
+        source = source_file.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(source_file))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and _is_dataclass(node):
+                interfaces.append(_generate_interface(node))
 
     return header + "\n\n".join(interfaces) + "\n"
 

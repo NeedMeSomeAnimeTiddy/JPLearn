@@ -44,8 +44,10 @@ future feature design — not a task list.
 prints a non-fatal size warning for any hand-written file over 2,000 lines (files whose first
 line is an "Auto-generated" marker, like `domain/external_deck_data.py`, are exempt) —
 currently `desktop_bridge.py` and `data/database.py`. The import-boundary check alone doesn't
-stop `desktop_bridge.py` from mixing OCR, MT, dictionary, and deck-assembly concerns in one
-file (#70 step 2 — splitting those concerns into their proper layers — is still open).
+stop a file from mixing concerns that belong in different layers; #70 step 2 is peeling those
+apart from `desktop_bridge.py` one concern at a time (dictionary/kanji/pitch-accent queries
+moved to `data/dictionary_repository.py`; the dead OCR-translation path was deleted outright;
+OCR itself and the `_run_command` dispatch table are still open — see §2).
 
 ---
 
@@ -67,9 +69,13 @@ full interpreter + import cost.
 1. **Strictly serial execution.** `_run_server()` is a plain `for raw_line in sys.stdin`
    loop. The renderer can pipeline N requests, but the backend handles them one at a
    time. Any slow command head-of-line-blocks every other query.
-   Known slow commands routed through this same worker: `fsrs-optimize` (full review
-   history), OCR extraction, and OCR translation (`assistant-chat:translate-ocr-text`,
-   which can shell out to `llama.cpp`).
+   `fsrs-optimize` and OCR extraction are the known-slow commands; both are already routed
+   through `runPythonBridgeIsolated` (a fresh one-shot process per call) rather than this
+   shared worker, which avoids head-of-line blocking at the cost of paying full interpreter
+   + PaddleOCR-import startup on every OCR call (#70's deferred OCR-runtime follow-up would
+   fix that). OCR translation (`assistant-chat:translate-ocr-text`) never touches the Python
+   bridge at all — it calls `llm_runtime.cjs::translateText` directly; the bridge's own
+   translation path was dead code and has been deleted (#70 step 2).
 
 2. **Timeout kills shared state.** On `BRIDGE_REQUEST_TIMEOUT_MS` the handler calls
    `stopPythonBridgeWorker()`, and the resulting `close` event runs
@@ -86,22 +92,24 @@ Either give it a dedicated child process (the pattern `llm_runtime.cjs` /
 
 ### desktop_bridge.py composition
 
-6,122 lines, 246 module-level defs, dispatched by a ~700-line `if command == ...` chain
-in `_run_command`. Roughly:
+Was 6,122 lines / 246 module-level defs at the start of #70; down to ~4,180 lines after
+step 2's first two moves. Status per concern:
 
-| Concern | Approx. lines | Belongs in |
-|---|---|---|
-| OCR (PaddleOCR, image preprocessing, dual-pass fusion) | ~800 | its own module/runtime |
-| Machine translation (OPUS-MT, llama.cpp, fastText LID, quality scoring) | ~700 | its own module/runtime |
-| Offline dictionary + kanji detail + pitch accent (FTS5 queries) | ~800 | `data/dictionary_repository.py` |
-| Deck/JLPT/progression assembly | ~1,500 | `domain/` |
-| Dataclasses (the TS type source) | ~400 | fine where it is |
-| Command dispatch | ~700 | a route table |
+| Concern | Status |
+|---|---|
+| OCR (PaddleOCR, image preprocessing, dual-pass fusion) | Still in the bridge, still one-shot-per-call (see §1's worker note). A dedicated persistent OCR runtime is real scope but deliberately deferred to a follow-up issue — it overlaps the now-closed #64 and is the single largest, riskiest piece. |
+| Machine translation (llama.cpp, fastText LID, quality scoring) | **Deleted.** `translate_assistant_chat_ocr_payload` and ~25 helpers were dead code — the live `assistant-chat:translate-ocr-text` IPC handler calls `llm_runtime.cjs::translateText` directly and has no bridge fallback. Confirmed via whole-repo grep (only self-references, zero tests) before removal. |
+| Offline dictionary + kanji detail + pitch accent (FTS5 queries) | **Moved** to `data/dictionary_repository.py`, including its 7 payload dataclasses. Semantic reranking is dependency-injected: the repo's `build_dictionary_search_payload(query, semantic_embed=...)` defaults to a pure hashed embedder (`domain.retrieval`); the bridge injects the real ONNX embedder when `embedder_runtime` + an active tier are available, else passes nothing and the default applies — behavior-preserving either way. Note-key builders (`build_builtin_note_key`, `build_offline_note_key`, `canonical_jmdict_source_id`) went to `data/card_notes_repository.py` instead (they're used for every card, not just dictionary-enriched ones, and the repository already owns the matching key validators); the shared Japanese-script predicate they both need went to `data/text_normalization.py` to keep the two repositories acyclic. |
+| Deck/JLPT/progression assembly | **Not moved — the original framing was wrong.** These `build_*` functions (`build_deck_cards`, `build_progression_status`, `build_jlpt_readiness_payload`, etc.) are impure orchestrators: they call `data.database`/`data.study_pipeline` loaders and, for progression, write to the DB. The *pure* logic they delegate to already lives in `domain/` (`blocks`, `jlpt_readiness`, `jlpt_sessions`, `progression_service`). Moving the orchestrators themselves into `domain/` would violate the no-I/O rule; they stay in `scripts/`. |
+| Dataclasses (the TS type source) | Split: the 7 dictionary/kanji/pitch payloads moved with their query code to `data/dictionary_repository.py`; the rest (deck/progression/XP/daily-games/etc.) stay in `desktop_bridge.py`. `scripts/generate_ts_types.py` now walks both files (`SOURCE_FILES`) — see below. |
+| Command dispatch (`_run_command`) | Still a ~700-line flat `if command == "...":` chain (67 branches minus the deleted MT one). Converting it to a `dict[str, Callable]` route table is the last piece of #70 step 2 and hasn't landed yet. |
 
-The dataclasses here are the single source of truth for renderer types:
-`scripts/generate_ts_types.py` emits `electron-frontend/src/generated/types.ts`, with a
-`--check` mode for drift. **Any new bridge payload should be a `@dataclass` so the TS
-type is generated rather than hand-written.**
+`scripts/generate_ts_types.py` AST-walks every file in its `SOURCE_FILES` tuple
+(`desktop_bridge.py`, `data/dictionary_repository.py`) and emits one TS interface per
+`@dataclass` found, concatenated in file order, into `electron-frontend/src/generated/types.ts`
+(`--check` mode detects drift). **Any new bridge payload should be a `@dataclass`, in
+`desktop_bridge.py` or a repository module already in `SOURCE_FILES` (add the file to that
+tuple if it's new), so the TS type is generated rather than hand-written.**
 
 ---
 
@@ -372,7 +380,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 | # | Finding | Issue |
 |---|---|---|
 | D1 | `App.tsx` is down to 2,880 lines / 67 `useState` — the pure helpers (`src/lib/`), the titlebar + settings JSX (`src/components/`) and the session state machine (`features/study-session/useStudySession.ts`) are all extracted. What remains is routing: a flat `view` string with inline conditional JSX. | #69 (phase 4c outstanding), #6 (closed, handler boilerplate only) |
-| D2 | `desktop_bridge.py` at 6,122 lines mixes OCR, MT, dictionary, and deck logic in `scripts/`. `arch_check.py` now inspects the directory (#70 step 1) and flags the file's size, but the concerns themselves are still unsplit. | #70 (step 1 closed, step 2 open) |
+| D2 | `desktop_bridge.py` was 6,122 lines mixing OCR, MT, dictionary, and deck logic in `scripts/`; now ~4,180. MT deleted (was dead code), dictionary moved to `data/dictionary_repository.py`. Still open: OCR (deferred to a follow-up issue — needs a persistent runtime, out of scope for a same-process move) and the `_run_command` dispatch table (§2). | #70 (step 1 closed; step 2 partial — dictionary + MT done, OCR + dispatch table open) |
 | D3 | ~~`arch_check.py` covers only `src`/`domain`/`data`/`ui`; extend `RULES` to `scripts/`.~~ Done — `scripts` is now a checked layer (forbids `→ ui`) with a non-fatal size-warning threshold. | #70 (step 1) |
 | D4 | `data/app.db` + `SRSRepository` are unused by any runtime path but documented in FEATURES.md as live persistence. Either wire or reclassify. | none |
 | D5 | Empty legacy packages `src/` and `ui/` (only `__pycache__`); stray zero-byte `nul` file at repo root. | none |
@@ -419,7 +427,7 @@ None of the following duplicate them.
 5. Vocabulary thematic categories for N4–N1 (C2), mirroring the kanji category structure.
 6. `App.tsx` decomposition (D1): extract module-level helpers to `src/lib/`, then a
    `features/study-session/` module for round/scoring state.
-7. ~~Extend `arch_check.py` to `scripts/` (D3)~~ done; split `desktop_bridge.py`'s mixed concerns (D2).
+7. ~~Extend `arch_check.py` to `scripts/` (D3)~~ done; ~~delete dead MT code, move dictionary to `data/`~~ done; remaining: `_run_command` route table, and a follow-up issue for a persistent OCR runtime (D2).
 8. Retire or wire `app.db` (D4) and delete `src/`, `ui/`, `nul` (D5).
 9. View-component tests (E1) and `ipc_security.cjs` tests (E2).
 10. ROADMAP/FEATURES accuracy pass (F1–F5).

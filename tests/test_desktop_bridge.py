@@ -10,6 +10,7 @@ from typing import Any, cast
 import pytest
 
 from data import database
+from data import dictionary_repository
 from data.daily_games_repository import DailyGameAttempt, DailyGameWordOutcome, DailyGamesRepository
 from domain.cards import Card, Deck
 from domain.decks import ALL_DECKS
@@ -705,7 +706,7 @@ def test_builtin_note_keys_share_across_decks_and_allow_empty_readings(
 ) -> None:
     _use_temp_db(tmp_path, monkeypatch)
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (tmp_path / "missing-dictionary.sqlite",),
     )
@@ -759,7 +760,7 @@ def test_build_deck_cards_includes_dictionary_summary_when_available(tmp_path: P
         mora_count=2,
     )
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (dictionary_db_path,),
     )
@@ -800,12 +801,12 @@ def test_dictionary_search_includes_pitch_accent_when_available(tmp_path: Path, 
         mora_count=2,
     )
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (dictionary_db_path,),
     )
 
-    payload = desktop_bridge.build_dictionary_search_payload("箸")
+    payload = dictionary_repository.build_dictionary_search_payload("箸")
     results = cast(list[dict[str, object]], payload["results"])
 
     assert results[0]["source_id"] == "test-entry"
@@ -825,8 +826,8 @@ def test_offline_note_keys_prefer_source_id_and_ignore_local_entry_id(
     monkeypatch,
 ) -> None:
     def _search(path: Path) -> dict[str, object]:
-        monkeypatch.setattr(desktop_bridge, "OFFLINE_DICTIONARY_DB_CANDIDATES", (path,))
-        payload = desktop_bridge.build_dictionary_search_payload("箸")
+        monkeypatch.setattr(dictionary_repository, "OFFLINE_DICTIONARY_DB_CANDIDATES", (path,))
+        payload = dictionary_repository.build_dictionary_search_payload("箸")
         return cast(list[dict[str, object]], payload["results"])[0]
 
     first_path = tmp_path / "first.sqlite"
@@ -862,8 +863,8 @@ def test_offline_note_key_uses_marked_fallback_only_for_missing_source_id(
     monkeypatch,
 ) -> None:
     def _search(path: Path) -> dict[str, object]:
-        monkeypatch.setattr(desktop_bridge, "OFFLINE_DICTIONARY_DB_CANDIDATES", (path,))
-        payload = desktop_bridge.build_dictionary_search_payload("箸")
+        monkeypatch.setattr(dictionary_repository, "OFFLINE_DICTIONARY_DB_CANDIDATES", (path,))
+        payload = dictionary_repository.build_dictionary_search_payload("箸")
         return cast(list[dict[str, object]], payload["results"])[0]
 
     first_path = tmp_path / "missing-source-first.sqlite"
@@ -901,7 +902,7 @@ def test_card_note_bridge_commands_round_trip_unicode_crud(
     monkeypatch,
 ) -> None:
     _use_temp_db(tmp_path, monkeypatch)
-    note_key = desktop_bridge._build_builtin_note_key("学ぶ", "manabu")
+    note_key = desktop_bridge.build_builtin_note_key("学ぶ", "manabu")
 
     missing_code, missing = desktop_bridge._run_command(["card-note-get", note_key])
     save_code, saved = desktop_bridge._run_command(
@@ -951,7 +952,7 @@ def test_card_note_bridge_commands_reject_invalid_keys_and_notes(
     monkeypatch,
 ) -> None:
     _use_temp_db(tmp_path, monkeypatch)
-    note_key = desktop_bridge._build_builtin_note_key("学ぶ", "manabu")
+    note_key = desktop_bridge.build_builtin_note_key("学ぶ", "manabu")
 
     malformed_key_code, malformed_key = desktop_bridge._run_command(
         ["card-note-get", "note:v1:builtin:not-a-digest"]
@@ -1143,7 +1144,7 @@ def test_build_kanji_detail_payload_uses_indexed_compounds_and_verified_examples
     dictionary_db_path = tmp_path / "dictionary.sqlite"
     _build_kanji_detail_db(dictionary_db_path)
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (dictionary_db_path,),
     )
@@ -1199,7 +1200,7 @@ def test_build_kanji_detail_payload_uses_deck_level_fallback(tmp_path: Path, mon
     dictionary_db_path = tmp_path / "dictionary.sqlite"
     _build_kanji_detail_db(dictionary_db_path, jlpt_level=None)
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (dictionary_db_path,),
     )
@@ -1222,7 +1223,7 @@ def test_build_kanji_detail_payload_preserves_missing_optional_fields(
         jlpt_level=None,
     )
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (dictionary_db_path,),
     )
@@ -1253,14 +1254,14 @@ def test_build_kanji_detail_payload_rejects_old_or_malformed_v4_index(
         conn.execute(
             "UPDATE dictionary_metadata SET value = '3' WHERE key = 'schema_version'"
         )
-    monkeypatch.setattr(desktop_bridge, "OFFLINE_DICTIONARY_DB_CANDIDATES", (old_db_path,))
+    monkeypatch.setattr(dictionary_repository, "OFFLINE_DICTIONARY_DB_CANDIDATES", (old_db_path,))
     with pytest.raises(FileNotFoundError, match="outdated.*re-download"):
         desktop_bridge.build_kanji_detail_payload("日")
 
     malformed_db_path = tmp_path / "malformed.sqlite"
     _build_kanji_detail_db(malformed_db_path, meanings_json="not-json")
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (malformed_db_path,),
     )
@@ -1275,7 +1276,7 @@ def test_kanji_detail_bridge_command_validates_single_han_character(
     dictionary_db_path = tmp_path / "dictionary.sqlite"
     _build_kanji_detail_db(dictionary_db_path)
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (dictionary_db_path,),
     )
@@ -1301,12 +1302,12 @@ def test_dictionary_hello_prefers_konnichiwa_over_katakana_hello(tmp_path: Path,
         ],
     )
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (dictionary_db_path,),
     )
 
-    payload = desktop_bridge.build_dictionary_search_payload("hello")
+    payload = dictionary_repository.build_dictionary_search_payload("hello")
     results = cast(list[dict[str, object]], payload["results"])
 
     assert len(results) > 0
@@ -1328,7 +1329,7 @@ def test_dictionary_semantic_rerank_can_change_lexical_order(tmp_path: Path, mon
         ],
     )
     monkeypatch.setattr(
-        desktop_bridge,
+        dictionary_repository,
         "OFFLINE_DICTIONARY_DB_CANDIDATES",
         (dictionary_db_path,),
     )
@@ -1337,9 +1338,9 @@ def test_dictionary_semantic_rerank_can_change_lexical_order(tmp_path: Path, mon
         assert query == "hello"
         return [0.1 if candidate == "hello" else 0.9 for candidate in candidates]
 
-    monkeypatch.setattr(desktop_bridge, "_resolve_dictionary_semantic_embedder", lambda: fake_semantic_embedder)
-
-    payload = desktop_bridge.build_dictionary_search_payload("hello")
+    payload = dictionary_repository.build_dictionary_search_payload(
+        "hello", semantic_embed=fake_semantic_embedder
+    )
     results = cast(list[dict[str, object]], payload["results"])
 
     assert len(results) >= 2

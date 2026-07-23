@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import sqlite3
 import unicodedata
@@ -11,6 +13,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from data import database
+from data.text_normalization import (
+    contains_japanese_script,
+    normalize_japanese_text,
+    normalize_storage_text,
+)
 
 
 MAX_NOTE_LENGTH = 2000
@@ -72,6 +79,64 @@ def validate_jmdict_source_id(value: str) -> str:
     if not _JMDICT_SOURCE_ID_PATTERN.fullmatch(value):
         raise ValueError("source_id must use canonical lowercase letters, digits, and hyphens")
     return value
+
+
+def _normalize_note_identity_part(value: str, *, japanese: bool) -> str:
+    """Return one canonical identity component with Unicode whitespace collapsed."""
+    if not isinstance(value, str):
+        raise ValueError("Note identity values must be strings")
+    normalized = (
+        normalize_japanese_text(value) if japanese else normalize_storage_text(value)
+    )
+    return " ".join(normalized.split()).casefold()
+
+
+def _note_identity_digest(source_kind: str, character: str, reading: str) -> str:
+    normalized_character = _normalize_note_identity_part(character, japanese=True)
+    if not normalized_character:
+        raise ValueError("Note identity written form must not be empty")
+    normalized_reading = _normalize_note_identity_part(
+        reading,
+        japanese=contains_japanese_script(reading),
+    )
+    canonical = json.dumps(
+        [1, source_kind, normalized_character, normalized_reading],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def build_builtin_note_key(character: str, reading: str) -> str:
+    """Build a deck-independent learning-item note identity."""
+    digest = _note_identity_digest("builtin", character, reading)
+    return validate_note_key(f"note:v1:builtin:{digest}")
+
+
+def canonical_jmdict_source_id(source_id: str | None) -> str | None:
+    if source_id is None:
+        return None
+    if not isinstance(source_id, str):
+        raise ValueError("source_id must be a string or null")
+    normalized = normalize_storage_text(source_id).casefold()
+    if not normalized:
+        return None
+    return validate_jmdict_source_id(normalized)
+
+
+def build_offline_note_key(
+    source_id: str | None,
+    character: str,
+    reading: str,
+) -> str:
+    """Build a source-backed key, falling back only for a missing source ID."""
+    canonical_source_id = canonical_jmdict_source_id(source_id)
+    if canonical_source_id is not None:
+        return validate_note_key(
+            f"note:v1:offline_dictionary:jmdict:{canonical_source_id}"
+        )
+    digest = _note_identity_digest("offline_dictionary_fallback", character, reading)
+    return validate_note_key(f"note:v1:offline_dictionary:fallback:{digest}")
 
 
 def normalize_note_text(value: str) -> str:

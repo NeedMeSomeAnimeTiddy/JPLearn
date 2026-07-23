@@ -100,9 +100,13 @@ so a collision silently corrupts SRS/mastery state rather than erroring.
 - Mastered threshold: `repetitions >= 3` AND `interval >= 21` (days).
 - `data/database.load_states()` may fabricate a default `ReviewState` for unseen cards — only
   persist after an actual review, not on load.
-- Any new bridge payload should be a `@dataclass` in `desktop_bridge.py`; `scripts/generate_ts_types.py`
-  generates `electron-frontend/src/generated/types.ts` from these (`--check` mode detects drift).
-  Don't hand-write renderer types that duplicate a bridge dataclass.
+- Any new bridge payload should be a `@dataclass`, either in `desktop_bridge.py` or in a `data/`
+  repository module the bridge imports from (e.g. `data/dictionary_repository.py`) — never
+  duplicated in both. `scripts/generate_ts_types.py` AST-walks the files listed in its
+  `SOURCE_FILES` tuple and generates `electron-frontend/src/generated/types.ts` from every
+  `@dataclass` it finds (`--check` mode detects drift). Adding a payload dataclass to a new
+  source file means adding that file to `SOURCE_FILES` too. Don't hand-write renderer types that
+  duplicate one of these dataclasses.
 - Read the matching `.github/instructions/<layer>.instructions.md` before editing inside
   `domain/`, `data/`, or `electron-frontend/` — each has more detail than the summary above
   (the electron one in particular covers accessibility, performance, and forbidden patterns).
