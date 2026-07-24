@@ -4,6 +4,10 @@ import pytest
 
 from domain.decks import (
     ALL_DECKS,
+    _VOCAB_CATEGORY_ID_SPACING,
+    _VOCAB_CATEGORY_LEVEL_BASE,
+    _VOCAB_LEVEL_CATEGORY_SPECS,
+    unresolved_vocab_category_words,
     VOCAB_N1_EXTERNAL_DATA,
     VOCAB_N2_EXTERNAL_DATA,
     VOCAB_N3_EXTERNAL_DATA,
@@ -81,6 +85,26 @@ class TestAllDecksRegistry:
             "vocab_adjectives",
             "vocab_verbs",
             "vocab_nouns",
+            # Vocabulary — N4 thematic categories
+            "vocab_n4_school_work",
+            "vocab_n4_home_living",
+            "vocab_n4_travel_places",
+            "vocab_n4_feelings_character",
+            # Vocabulary — N3 thematic categories
+            "vocab_n3_work_business",
+            "vocab_n3_emotion_mind",
+            "vocab_n3_society_people",
+            "vocab_n3_nature_science",
+            # Vocabulary — N2 thematic categories
+            "vocab_n2_economy_trade",
+            "vocab_n2_government_society",
+            "vocab_n2_measure_analysis",
+            "vocab_n2_land_construction",
+            # Vocabulary — N1 thematic categories
+            "vocab_n1_law_justice",
+            "vocab_n1_thought_reason",
+            "vocab_n1_conflict_crisis",
+            "vocab_n1_arts_expression",
             # Grammar / Conversational
             "grammar_patterns",
             "sentence_examples",
@@ -234,6 +258,85 @@ class TestVocabDecks:
     def test_spot_check_key_n5_words_present(self, word: str) -> None:
         chars = {c.character for c in get_vocab_n5_deck().cards}
         assert word in chars, f"Expected N5 word '{word}' not found in deck"
+
+
+class TestVocabThematicCategoriesN4toN1:
+    """Curated N4–N1 thematic vocabulary decks (issue #68).
+
+    These are selected by character string against a CSV-generated corpus, so
+    the corpus can drift out from under them. That drift is invisible at
+    runtime — the deck just builds smaller — which is exactly what these
+    tests exist to catch.
+    """
+
+    SLUGS = tuple(_VOCAB_LEVEL_CATEGORY_SPECS)
+
+    def test_every_level_has_four_categories(self) -> None:
+        per_level: dict[str, int] = {}
+        for _name, level, _slot, _words in _VOCAB_LEVEL_CATEGORY_SPECS.values():
+            per_level[level] = per_level.get(level, 0) + 1
+        assert per_level == {"n4": 4, "n3": 4, "n2": 4, "n1": 4}
+
+    @pytest.mark.parametrize("slug", SLUGS)
+    def test_every_curated_word_resolves_against_the_corpus(self, slug: str) -> None:
+        missing = unresolved_vocab_category_words(slug)
+        assert not missing, (
+            f"Category '{slug}' curates words that are no longer in its level "
+            f"corpus: {missing}. Either the CSV import changed or the curated "
+            f"list drifted — the deck silently shrinks otherwise."
+        )
+
+    @pytest.mark.parametrize("slug", SLUGS)
+    def test_deck_matches_its_curated_list(self, slug: str) -> None:
+        _name, level, _slot, words = _VOCAB_LEVEL_CATEGORY_SPECS[slug]
+        deck = ALL_DECKS[slug]()
+        assert [card.character for card in deck.cards] == list(words)
+        for card in deck.cards:
+            assert card.romaji, f"Card {card.id} missing romaji"
+            assert card.meaning, f"Card {card.id} missing meaning"
+            assert card.tags == ["vocab", level]
+
+    @pytest.mark.parametrize("slug", SLUGS)
+    def test_card_ids_follow_curated_position(self, slug: str) -> None:
+        """Ids come from position in the curated tuple, not the resolved list.
+
+        That is what lets a word drop out of the corpus without shifting every
+        later card onto a different word's SRS history.
+        """
+        _name, level, slot, words = _VOCAB_LEVEL_CATEGORY_SPECS[slug]
+        base = _VOCAB_CATEGORY_LEVEL_BASE[level] + slot * _VOCAB_CATEGORY_ID_SPACING
+        deck = ALL_DECKS[slug]()
+        for card in deck.cards:
+            assert card.id == base + words.index(card.character)
+
+    def test_categories_within_a_level_do_not_share_words(self) -> None:
+        for level in ("n4", "n3", "n2", "n1"):
+            seen: dict[str, str] = {}
+            for slug, (_name, lv, _slot, words) in _VOCAB_LEVEL_CATEGORY_SPECS.items():
+                if lv != level:
+                    continue
+                for word in words:
+                    assert word not in seen, (
+                        f"{level}: '{word}' appears in both '{seen[word]}' and '{slug}'"
+                    )
+                    seen[word] = slug
+
+    def test_every_category_word_also_lives_in_its_level_deck(self) -> None:
+        """Categories curate from the level corpus, so the level deck is a superset."""
+        level_decks = {
+            "n4": get_vocab_n4_deck(),
+            "n3": get_vocab_n3_deck(),
+            "n2": get_vocab_n2_deck(),
+            "n1": get_vocab_n1_deck(),
+        }
+        level_chars = {lv: {c.character for c in deck.cards} for lv, deck in level_decks.items()}
+        for slug, (_name, level, _slot, words) in _VOCAB_LEVEL_CATEGORY_SPECS.items():
+            missing = [w for w in words if w not in level_chars[level]]
+            assert not missing, f"'{slug}' has words absent from vocab_{level}: {missing}"
+
+    def test_curated_lists_fit_their_id_slot(self) -> None:
+        for slug, (_name, _level, _slot, words) in _VOCAB_LEVEL_CATEGORY_SPECS.items():
+            assert len(words) <= _VOCAB_CATEGORY_ID_SPACING, slug
 
 
 class TestGrammarPatternsDeck:

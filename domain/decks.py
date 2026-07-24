@@ -289,6 +289,23 @@ def _build_kanji_deck(
     return Deck(name=name, cards=cards)
 
 
+def _vocab_card(card_id: int, char: str, reading: str, meaning: str, level_tag: str) -> Card:
+    """Build one vocabulary card.
+
+    Shared by the level-deck and thematic-category builders, which differ only
+    in how they allocate ``card_id`` — keeping card shape in one place so the
+    two cannot drift apart.
+    """
+    return Card(
+        id=card_id,
+        character=char,
+        romaji=reading,
+        meaning=meaning,
+        tags=["vocab", level_tag],
+        example_sentence=f"会話で「{char}」をよく使います。",
+    )
+
+
 def _build_vocab_deck(
     name: str,
     data: list[tuple[str, str, str]],
@@ -318,14 +335,7 @@ def _build_vocab_deck(
             f"overflowing the slot silently corrupts SRS/mastery state."
         )
     cards = [
-        Card(
-            id=id_offset + i,
-            character=char,
-            romaji=reading,
-            meaning=meaning,
-            tags=["vocab", level_tag],
-            example_sentence=f"会話で「{char}」をよく使います。",
-        )
+        _vocab_card(id_offset + i, char, reading, meaning, level_tag)
         for i, (char, reading, meaning) in enumerate(data)
     ]
     return Deck(name=name, cards=cards)
@@ -905,6 +915,305 @@ def get_vocab_nouns_deck() -> Deck:
 
 
 # ---------------------------------------------------------------------------
+# Thematic Vocabulary Categories — N4→N1  (issue #68)
+#
+# Mirrors the kanji thematic categories, which exist for every JLPT level while
+# vocabulary previously had them only for N5. Like the kanji ones, these are a
+# curated selection rather than a partition: the flat level decks remain the
+# way to reach the rest of the corpus.
+#
+# The N5 vocab categories above slice `_VOCAB_N5_DATA` by index. These cannot —
+# they draw from `VOCAB_N*_EXTERNAL_DATA`, which is generated from CSV, so an
+# index would quietly point at a different word after a re-import. Each category
+# is therefore a tuple of *characters* resolved against its level corpus at
+# build time.
+#
+# A card's id comes from the word's position in the curated tuple, not from its
+# position among the resolved rows. A word that disappears from the corpus then
+# leaves a hole instead of shifting every later id onto a different word, which
+# would silently misattribute that word's SRS history.
+# `tests/test_decks.py` asserts every curated word still resolves.
+#
+# ID allocation — 1,000 ids per level, 250 per category slot:
+#   N4 50000 | N3 51000 | N2 52000 | N1 53000
+# Nothing else is allocated at or above 50000 (level decks top out at 42698).
+# ---------------------------------------------------------------------------
+
+_VOCAB_CATEGORY_LEVEL_BASE: dict[str, int] = {
+    "n4": 50000,
+    "n3": 51000,
+    "n2": 52000,
+    "n1": 53000,
+}
+
+# Ids reserved per category slot. Curated categories hold ~25 words, so this is
+# deliberately generous — widening a category never needs an id reshuffle.
+_VOCAB_CATEGORY_ID_SPACING = 250
+
+# slug -> (display name, JLPT level, slot index within the level, curated words)
+_VOCAB_LEVEL_CATEGORY_SPECS: dict[str, tuple[str, str, int, tuple[str, ...]]] = {
+    # --- N4 ---------------------------------------------------------------
+    "vocab_n4_school_work": (
+        "Vocabulary: N4 · School & Work", "n4", 0,
+        (
+            "医学", "大学生", "予習", "~学部", "中学校", "小学校", "文法", "試験",
+            "校長", "科学", "入学", "高校生", "復習", "研究", "課長", "社長",
+            "会議室", "事務所", "出席", "店員", "公務員", "数学", "会話", "発音",
+            "アルバイト",
+        ),
+    ),
+    "vocab_n4_home_living": (
+        "Vocabulary: N4 · Home & Living", "n4", 1,
+        (
+            "床屋", "お宅", "ごみ", "布団", "畳", "品物", "壁", "水道", "下宿",
+            "鏡", "冷房", "留守", "湯", "売り場", "消しゴム", "手袋", "味噌",
+            "食料品", "ジャム", "サラダ", "ステーキ", "サンドイッチ", "ぶどう",
+            "石", "火",
+        ),
+    ),
+    "vocab_n4_travel_places": (
+        "Vocabulary: N4 · Travel & Places", "n4", 2,
+        (
+            "郊外", "動物園", "地理", "林", "坂", "飛行場", "美術館", "森",
+            "お土産", "旅館", "海岸", "乗り物", "案内", "交通", "急行", "空港",
+            "港", "予約", "特急", "汽車", "乗り換える", "運ぶ", "世界", "場所",
+            "住所",
+        ),
+    ),
+    "vocab_n4_feelings_character": (
+        "Vocabulary: N4 · Feelings & Character", "n4", 3,
+        (
+            "苦い", "怒る", "心配", "気", "失礼", "厳しい", "深い", "悲しい",
+            "浅い", "残念", "丁寧", "怖い", "無理", "恥ずかしい", "気分", "美しい",
+            "素晴らしい", "親切", "熱心", "おかしい", "変", "驚く", "心", "珍しい",
+            "寂しい",
+        ),
+    ),
+    # --- N3 ---------------------------------------------------------------
+    "vocab_n3_work_business": (
+        "Vocabulary: N3 · Work & Business", "n3", 0,
+        (
+            "失業", "支店", "就職", "商売", "職", "職業", "営業", "オフィス",
+            "家事", "管理", "企業", "経営", "景気", "作業", "作品", "名刺",
+            "雇う", "労働", "通勤", "勤め", "同僚", "仲間", "働き", "操作",
+            "使用",
+        ),
+    ),
+    "vocab_n3_emotion_mind": (
+        "Vocabulary: N3 · Emotion & Mind", "n3", 1,
+        (
+            "沈む", "集中", "心臓", "精神", "暗記", "恐れる", "がっかり", "悲しむ",
+            "感じ", "感情", "感じる", "機嫌", "恐怖", "さっぱり", "愉快", "喜び",
+            "怒り", "歓声", "苦", "辛い", "触れる", "雰囲気", "情", "ほっと",
+            "恋人",
+        ),
+    ),
+    "vocab_n3_society_people": (
+        "Vocabulary: N3 · Society & People", "n3", 2,
+        (
+            "氏", "集団", "出版", "姓", "世間", "委員", "一家", "会員", "関連",
+            "議員", "グループ", "後輩", "国民", "メンバー", "世の中", "縁",
+            "慣行", "全員", "宣伝", "地位", "付き合い", "仲", "農家", "農業",
+            "世",
+        ),
+    ),
+    "vocab_n3_nature_science": (
+        "Vocabulary: N3 · Nature & Science", "n3", 3,
+        (
+            "自然", "質", "植物", "性質", "稲", "宇宙", "エネルギー", "温度",
+            "観察", "気温", "機械", "工場", "要素", "体温", "地", "地球", "土",
+            "天候", "天然", "実験", "注目", "澄む", "体育", "医師", "スター",
+        ),
+    ),
+    # --- N2 ---------------------------------------------------------------
+    "vocab_n2_economy_trade": (
+        "Vocabulary: N2 · Economy & Trade", "n2", 0,
+        (
+            "~費", "売り上げ", "売行き", "課税", "為替", "漁業", "工芸", "小遣い",
+            "作製", "紙幣", "集金", "商業", "消耗", "水産", "製作", "創作",
+            "定価", "特売", "売買", "発売", "名物", "免税", "儲かる", "省~",
+            "こしらえる",
+        ),
+    ),
+    "vocab_n2_government_society": (
+        "Vocabulary: N2 · Government & Society", "n2", 1,
+        (
+            "~国", "~省", "~団", "改める", "官庁", "規律", "交代", "自治",
+            "国立", "祭日", "祝日", "政党", "総理大臣", "当番", "方針", "法則",
+            "役所", "役人", "役目", "こくせき", "指定", "合同", "体制", "定員",
+            "区域",
+        ),
+    ),
+    "vocab_n2_measure_analysis": (
+        "Vocabulary: N2 · Measurement & Analysis", "n2", 2,
+        (
+            "~論", "基準", "規準", "原理", "資料", "寸法", "測定", "測量",
+            "対策", "例える", "断定", "採る", "比較的", "標準", "分解", "目安",
+            "物差し", "割合に", "割と", "面積", "体積", "容積", "直角", "地質",
+            "目印",
+        ),
+    ),
+    "vocab_n2_land_construction": (
+        "Vocabulary: N2 · Land & Construction", "n2", 3,
+        (
+            "~館", "~器", "~圏", "~丁目", "~島", "~道", "~領", "家屋",
+            "組み立てる", "工事", "構造", "耕地", "交通機関", "産地", "下町",
+            "線路", "造船", "地帯", "鉄橋", "都心", "並木", "ビルディング",
+            "故郷", "方面", "牧場",
+        ),
+    ),
+    # --- N1 ---------------------------------------------------------------
+    "vocab_n1_law_justice": (
+        "Vocabulary: N1 · Law & Justice", "n1", 0,
+        (
+            "権力", "公用", "権威", "権限", "検事", "元首", "内閣", "威力",
+            "訴え", "規定", "刑罰", "統制", "統治", "死刑", "正義", "訴訟",
+            "長官", "司る", "司法", "主権", "不当", "法案", "法学", "法廷",
+            "立法",
+        ),
+    ),
+    "vocab_n1_thought_reason": (
+        "Vocabulary: N1 · Thought & Reason", "n1", 1,
+        (
+            "原則", "構想", "自覚", "内心", "概念", "学説", "教訓", "軽率",
+            "思考", "ありのまま", "真実", "真相", "粋", "推理", "それゆえ",
+            "建前", "魂", "論理", "実態", "本気", "本質", "誠", "理屈", "理性",
+            "理論",
+        ),
+    ),
+    "vocab_n1_conflict_crisis": (
+        "Vocabulary: N1 · Conflict & Crisis", "n1", 2,
+        (
+            "国防", "災害", "作戦", "内乱", "敗戦", "応急", "侵す", "襲う",
+            "脅す", "脅かす", "危機", "脅迫", "緊急", "軍艦", "軍事", "軍備",
+            "軍服", "警戒", "天災", "争い", "守備", "陣", "攻め", "戦災",
+            "戦闘",
+        ),
+    ),
+    "vocab_n1_arts_expression": (
+        "Vocabulary: N1 · Arts & Expression", "n1", 3,
+        (
+            "語源", "エレガント", "演じる", "学芸", "片言", "漢語", "戯曲", "芸",
+            "気品", "脚色", "掲載", "創刊", "現像", "光沢", "細工", "さえずる",
+            "しきたり", "劇団", "ネガ", "楽譜", "合唱", "油絵", "展示", "伝説",
+            "上演",
+        ),
+    ),
+}
+
+
+def _vocab_level_corpus(level: str) -> list[_ExternalRow]:
+    """Return the imported corpus rows for one JLPT vocabulary level."""
+    return {
+        "n4": VOCAB_N4_EXTERNAL_DATA,
+        "n3": VOCAB_N3_EXTERNAL_DATA,
+        "n2": VOCAB_N2_EXTERNAL_DATA,
+        "n1": VOCAB_N1_EXTERNAL_DATA,
+    }[level]
+
+
+def unresolved_vocab_category_words(slug: str) -> list[str]:
+    """Return curated words for ``slug`` that are missing from its level corpus.
+
+    An empty list means the category is intact. A non-empty one means the
+    corpus drifted away from the curated selection — the deck still builds
+    (those words are simply absent) but it is quietly smaller than intended,
+    so ``tests/test_decks.py`` fails on it.
+
+    Public rather than underscore-private because it is a drift *accessor*, not
+    a deck builder: it reads the private ``_VOCAB_LEVEL_CATEGORY_SPECS`` table
+    on behalf of the test suite and any future content-lint tooling.
+    """
+    _, level, _, words = _VOCAB_LEVEL_CATEGORY_SPECS[slug]
+    available = {char for char, _reading, _meaning in _vocab_level_corpus(level)}
+    return [word for word in words if word not in available]
+
+
+def _build_vocab_category_deck(slug: str) -> Deck:
+    """Build one N4–N1 thematic vocabulary deck from its curated word list."""
+    name, level, slot, words = _VOCAB_LEVEL_CATEGORY_SPECS[slug]
+    if len(words) > _VOCAB_CATEGORY_ID_SPACING:
+        raise ValueError(
+            f"Vocabulary category {slug!r} curates {len(words)} words but only "
+            f"{_VOCAB_CATEGORY_ID_SPACING} card ids are reserved per category slot. "
+            f"Widen _VOCAB_CATEGORY_ID_SPACING in domain/decks.py — overflowing the "
+            f"slot silently corrupts SRS/mastery state."
+        )
+    by_character = {char: (char, reading, meaning) for char, reading, meaning in _vocab_level_corpus(level)}
+    id_offset = _VOCAB_CATEGORY_LEVEL_BASE[level] + slot * _VOCAB_CATEGORY_ID_SPACING
+    cards = [
+        _vocab_card(id_offset + index, *by_character[word], level)
+        for index, word in enumerate(words)
+        if word in by_character
+    ]
+    return Deck(name=name, cards=cards)
+
+
+def get_vocab_n4_school_work_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n4_school_work")
+
+
+def get_vocab_n4_home_living_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n4_home_living")
+
+
+def get_vocab_n4_travel_places_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n4_travel_places")
+
+
+def get_vocab_n4_feelings_character_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n4_feelings_character")
+
+
+def get_vocab_n3_work_business_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n3_work_business")
+
+
+def get_vocab_n3_emotion_mind_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n3_emotion_mind")
+
+
+def get_vocab_n3_society_people_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n3_society_people")
+
+
+def get_vocab_n3_nature_science_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n3_nature_science")
+
+
+def get_vocab_n2_economy_trade_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n2_economy_trade")
+
+
+def get_vocab_n2_government_society_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n2_government_society")
+
+
+def get_vocab_n2_measure_analysis_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n2_measure_analysis")
+
+
+def get_vocab_n2_land_construction_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n2_land_construction")
+
+
+def get_vocab_n1_law_justice_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n1_law_justice")
+
+
+def get_vocab_n1_thought_reason_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n1_thought_reason")
+
+
+def get_vocab_n1_conflict_crisis_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n1_conflict_crisis")
+
+
+def get_vocab_n1_arts_expression_deck() -> Deck:
+    return _build_vocab_category_deck("vocab_n1_arts_expression")
+
+
+# ---------------------------------------------------------------------------
 # Thematic Kanji Categories
 #
 # Derived from _KANJI_N5_DATA (already topic-grouped). IMPORTANT: these are
@@ -1248,6 +1557,26 @@ ALL_DECKS = {
     "vocab_adjectives": get_vocab_adjectives_deck,
     "vocab_verbs": get_vocab_verbs_deck,
     "vocab_nouns": get_vocab_nouns_deck,
+    # Vocabulary — N4 thematic categories
+    "vocab_n4_school_work":        get_vocab_n4_school_work_deck,
+    "vocab_n4_home_living":        get_vocab_n4_home_living_deck,
+    "vocab_n4_travel_places":      get_vocab_n4_travel_places_deck,
+    "vocab_n4_feelings_character": get_vocab_n4_feelings_character_deck,
+    # Vocabulary — N3 thematic categories
+    "vocab_n3_work_business":  get_vocab_n3_work_business_deck,
+    "vocab_n3_emotion_mind":   get_vocab_n3_emotion_mind_deck,
+    "vocab_n3_society_people": get_vocab_n3_society_people_deck,
+    "vocab_n3_nature_science": get_vocab_n3_nature_science_deck,
+    # Vocabulary — N2 thematic categories
+    "vocab_n2_economy_trade":      get_vocab_n2_economy_trade_deck,
+    "vocab_n2_government_society": get_vocab_n2_government_society_deck,
+    "vocab_n2_measure_analysis":   get_vocab_n2_measure_analysis_deck,
+    "vocab_n2_land_construction":  get_vocab_n2_land_construction_deck,
+    # Vocabulary — N1 thematic categories
+    "vocab_n1_law_justice":      get_vocab_n1_law_justice_deck,
+    "vocab_n1_thought_reason":   get_vocab_n1_thought_reason_deck,
+    "vocab_n1_conflict_crisis":  get_vocab_n1_conflict_crisis_deck,
+    "vocab_n1_arts_expression":  get_vocab_n1_arts_expression_deck,
     # Grammar / Conversational
     "grammar_patterns": get_grammar_patterns_deck,
     "sentence_examples": get_sentence_examples_deck,

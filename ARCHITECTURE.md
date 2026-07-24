@@ -308,9 +308,50 @@ denominators and deck-total labels, not how much a learner faces per session.
 Kanji has no equivalent cap and no capacity guard — kanji_n1 already overflows its
 nominal 1,000-slot spacing (§5, A1).
 
-The remaining asymmetry: thematic category decks exist for kanji N5→N1 but for
-vocabulary only N5 (145 words across 12 categories), so N4–N1 vocabulary is reachable
-only through the flat level decks. Tracked as C2 / issue #68.
+### Thematic category decks
+
+Both content families now have thematic categories at every JLPT level (#68): kanji has
+19, vocabulary has 28 (12 N5 + 4 each for N4–N1).
+
+They are a **curated selection, not a partition** — in both families. The kanji N4–N1
+categories slice `_KANJI_N4_DATA`–`_KANJI_N1_DATA`, which are hardcoded 30-row *fallback*
+lists rather than the CSVs, so the N1 categories cover 30 of 1,190 kanji. The vocabulary
+N4–N1 categories curate 25 words each from corpora of 666–2,699. In both cases the flat
+level deck remains the way to reach everything else.
+
+The two families differ in how a category selects its rows, and it matters:
+
+| | Selects by | Breaks how |
+|---|---|---|
+| Kanji N4–N1 | index into a hardcoded list | can't drift — the list is in the file |
+| Vocab N5 | index into `_VOCAB_N5_DATA` (hardcoded) | can't drift |
+| Vocab N4–N1 | **character string**, resolved against the CSV corpus | corpus re-import silently drops words |
+
+Vocabulary N4–N1 categories cannot use indices, because `VOCAB_N*_EXTERNAL_DATA` is
+generated from CSV and an index would quietly point at a different word after a
+re-import. Two consequences follow, both in `domain/decks.py`:
+
+- A card's id comes from the word's position in the **curated tuple**, not among the
+  resolved rows, so a word that vanishes from the corpus leaves an id hole rather than
+  shifting every later card onto a different word's SRS history.
+- `unresolved_vocab_category_words()` reports curated words missing from the corpus, and
+  `tests/test_decks.py` fails on any. Without that, drift is invisible — the deck simply
+  builds smaller.
+
+Category ids live at 50000–53774 (1,000 per level, 250 per category slot), clear of the
+level decks which top out at 42698.
+
+**Unlock is sequential across the whole ordered list.** `buildCategoryProgress`
+(`src/lib/progressAggregation.ts`) walks `VOCAB_CATEGORY_ORDER` / `KANJI_CATEGORY_ORDER`
+in order and stops unlocking at the first category below `CATEGORY_UNLOCK_THRESHOLD`
+(0.7). Both families work this way, but the vocabulary chain is **longer**: N4 kanji
+opens after 5 N5 categories, N4 vocabulary after 12 (145 cards at ~2.8 average score,
+given `CARD_MASTERY_MAX` 4). That is the existing design applied to a longer list, not
+a decision made in #68 — worth revisiting if the N4–N1 vocabulary categories turn out
+to be effectively out of reach in practice.
+
+Mastery for every one of these decks lands in the `cardScores.vocab_n5` /
+`cardScores.kanji_n5` bucket, correct only because the id ranges are disjoint (§4, A2/A4).
 
 ---
 
@@ -380,7 +421,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 | # | Finding | Issue |
 |---|---|---|
 | ~~C1~~ | ~~`_VOCAB_LEVEL_LIMITS` silently truncates vocabulary to 7–31% of the imported corpus~~ — fixed: level decks expose the full corpus, capped only by card-id capacity. | #67 |
-| C2 | Thematic category decks exist for kanji N5→N1 but for vocabulary **only N5** — so N4–N1 vocab is reachable only via the flat level decks. | #68 |
+| ~~C2~~ | ~~Thematic category decks exist for kanji N5→N1 but for vocabulary **only N5**~~ — fixed: 4 curated categories added per level for vocab N4–N1. | #68 |
 
 ### Structure
 
@@ -431,7 +472,8 @@ None of the following duplicate them.
 
 **Also worth filing**
 
-5. Vocabulary thematic categories for N4–N1 (C2), mirroring the kanji category structure.
+5. ~~Vocabulary thematic categories for N4–N1 (C2)~~ done (#68) — 4 curated categories per
+   level, selected by character against the CSV corpus with a drift test.
 6. `App.tsx` decomposition (D1): extract module-level helpers to `src/lib/`, then a
    `features/study-session/` module for round/scoring state.
 7. ~~Extend `arch_check.py` to `scripts/` (D3)~~ done; ~~delete dead MT code, move dictionary to `data/`, convert `_run_command` to a route table~~ done; remaining: file a follow-up issue for a persistent OCR runtime (D2).

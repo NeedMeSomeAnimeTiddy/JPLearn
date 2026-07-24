@@ -50,6 +50,26 @@ const VALID_DECK_SLUGS = new Set([
   'vocab_adjectives',
   'vocab_verbs',
   'vocab_nouns',
+  // Vocabulary — N4 thematic categories
+  'vocab_n4_school_work',
+  'vocab_n4_home_living',
+  'vocab_n4_travel_places',
+  'vocab_n4_feelings_character',
+  // Vocabulary — N3 thematic categories
+  'vocab_n3_work_business',
+  'vocab_n3_emotion_mind',
+  'vocab_n3_society_people',
+  'vocab_n3_nature_science',
+  // Vocabulary — N2 thematic categories
+  'vocab_n2_economy_trade',
+  'vocab_n2_government_society',
+  'vocab_n2_measure_analysis',
+  'vocab_n2_land_construction',
+  // Vocabulary — N1 thematic categories
+  'vocab_n1_law_justice',
+  'vocab_n1_thought_reason',
+  'vocab_n1_conflict_crisis',
+  'vocab_n1_arts_expression',
   // Grammar / Conversational
   'grammar_patterns',
   'sentence_examples',

@@ -194,6 +194,10 @@ function App() {
     greetings: [], numbers: [], time_days: [], family: [], body: [],
     food_drink: [], school_study: [], places: [], transport: [],
     adjectives: [], verbs: [], nouns: [],
+    n4_school_work: [], n4_home_living: [], n4_travel_places: [], n4_feelings_character: [],
+    n3_work_business: [], n3_emotion_mind: [], n3_society_people: [], n3_nature_science: [],
+    n2_economy_trade: [], n2_government_society: [], n2_measure_analysis: [], n2_land_construction: [],
+    n1_law_justice: [], n1_thought_reason: [], n1_conflict_crisis: [], n1_arts_expression: [],
   })
   const [kanjiOverviewPage, setKanjiOverviewPage] = useState<Partial<Record<JlptLevel, number>>>({})
   const [overviewBlocksLoading, setOverviewBlocksLoading] = useState(false)

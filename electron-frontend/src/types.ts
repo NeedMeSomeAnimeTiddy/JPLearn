@@ -50,6 +50,26 @@ export type VocabCategory =
   | 'adjectives'
   | 'verbs'
   | 'nouns'
+  // N4 thematic categories
+  | 'n4_school_work'
+  | 'n4_home_living'
+  | 'n4_travel_places'
+  | 'n4_feelings_character'
+  // N3 thematic categories
+  | 'n3_work_business'
+  | 'n3_emotion_mind'
+  | 'n3_society_people'
+  | 'n3_nature_science'
+  // N2 thematic categories
+  | 'n2_economy_trade'
+  | 'n2_government_society'
+  | 'n2_measure_analysis'
+  | 'n2_land_construction'
+  // N1 thematic categories
+  | 'n1_law_justice'
+  | 'n1_thought_reason'
+  | 'n1_conflict_crisis'
+  | 'n1_arts_expression'
 
 export type KanjiCategory =
   | 'numbers_time'
@@ -89,6 +109,26 @@ export type VocabCategorySlug =
   | 'vocab_adjectives'
   | 'vocab_verbs'
   | 'vocab_nouns'
+  // N4 thematic categories
+  | 'vocab_n4_school_work'
+  | 'vocab_n4_home_living'
+  | 'vocab_n4_travel_places'
+  | 'vocab_n4_feelings_character'
+  // N3 thematic categories
+  | 'vocab_n3_work_business'
+  | 'vocab_n3_emotion_mind'
+  | 'vocab_n3_society_people'
+  | 'vocab_n3_nature_science'
+  // N2 thematic categories
+  | 'vocab_n2_economy_trade'
+  | 'vocab_n2_government_society'
+  | 'vocab_n2_measure_analysis'
+  | 'vocab_n2_land_construction'
+  // N1 thematic categories
+  | 'vocab_n1_law_justice'
+  | 'vocab_n1_thought_reason'
+  | 'vocab_n1_conflict_crisis'
+  | 'vocab_n1_arts_expression'
 
 export type KanjiCategorySlug =
   | 'kanji_numbers_time'
