@@ -4,6 +4,11 @@ import pytest
 
 from domain.decks import (
     ALL_DECKS,
+    VOCAB_N1_EXTERNAL_DATA,
+    VOCAB_N2_EXTERNAL_DATA,
+    VOCAB_N3_EXTERNAL_DATA,
+    VOCAB_N4_EXTERNAL_DATA,
+    VOCAB_N5_EXTERNAL_DATA,
     get_conjugation_training_deck,
     get_grammar_patterns_deck,
     get_hiragana_deck,
@@ -188,18 +193,27 @@ class TestKanjiDecks:
 
 class TestVocabDecks:
     @pytest.mark.parametrize(
-        ("loader", "expected_cards", "name", "level"),
+        ("loader", "corpus", "min_cards", "name", "level"),
         [
-            (get_vocab_n5_deck, 50, "Vocabulary N5", "n5"),
-            (get_vocab_n4_deck, 150, "Vocabulary N4", "n4"),
-            (get_vocab_n3_deck, 300, "Vocabulary N3", "n3"),
-            (get_vocab_n2_deck, 600, "Vocabulary N2", "n2"),
-            (get_vocab_n1_deck, 800, "Vocabulary N1", "n1"),
+            (get_vocab_n5_deck, VOCAB_N5_EXTERNAL_DATA, 700, "Vocabulary N5", "n5"),
+            (get_vocab_n4_deck, VOCAB_N4_EXTERNAL_DATA, 600, "Vocabulary N4", "n4"),
+            (get_vocab_n3_deck, VOCAB_N3_EXTERNAL_DATA, 2000, "Vocabulary N3", "n3"),
+            (get_vocab_n2_deck, VOCAB_N2_EXTERNAL_DATA, 1700, "Vocabulary N2", "n2"),
+            (get_vocab_n1_deck, VOCAB_N1_EXTERNAL_DATA, 2500, "Vocabulary N1", "n1"),
         ],
     )
-    def test_vocab_deck_structure(self, loader, expected_cards: int, name: str, level: str) -> None:
+    def test_vocab_deck_structure(
+        self, loader, corpus: list, min_cards: int, name: str, level: str
+    ) -> None:
+        """Level decks expose the entire imported corpus (issue #67).
+
+        The deck size is asserted against the corpus rather than a literal so
+        a re-import doesn't need a test edit; ``min_cards`` is the separate
+        guard that catches a corpus that went missing or got truncated again.
+        """
         deck = loader()
-        assert len(deck) == expected_cards
+        assert len(deck) == len(corpus)
+        assert len(deck) >= min_cards
         assert deck.name == name
         for card in deck.cards:
             assert card.character, f"Card {card.id} missing character"

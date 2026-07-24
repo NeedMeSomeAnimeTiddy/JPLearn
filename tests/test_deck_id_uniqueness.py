@@ -17,7 +17,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from domain.decks import ALL_DECKS
+import pytest
+
+from domain.decks import _VOCAB_ID_CAPACITY, ALL_DECKS, _build_vocab_deck
 
 
 def _family_for(slug: str) -> str:
@@ -84,6 +86,48 @@ def test_kanji_n1_overflow_does_not_collide_with_siblings() -> None:
             f"kanji_n1 (max id {max_kanji_n1_id}) collides with '{slug}' "
             f"at ids {sorted(overlap)}"
         )
+
+
+def test_vocab_n5_stays_below_the_category_deck_offset() -> None:
+    """Regression guard for issue #67.
+
+    Lifting `_VOCAB_LEVEL_LIMITS` grew vocab_n5 from 50 cards to the full
+    imported corpus, so its ids now run 0..~717 against the vocab category
+    decks that begin at 1000. That is the tightest vocab allocation in the
+    file — this test fails before a further import crosses the boundary.
+    """
+    level_ids = {c.id for c in ALL_DECKS["vocab_n5"]().cards}
+    assert level_ids, "vocab_n5 deck unexpectedly empty"
+
+    category_slugs = [
+        slug
+        for slug in ALL_DECKS
+        if slug.startswith("vocab_") and slug not in {"vocab_n5", "vocab_n4", "vocab_n3", "vocab_n2", "vocab_n1"}
+    ]
+    assert category_slugs, "expected vocab category decks to be registered"
+
+    lowest_category_id = min(
+        c.id for slug in category_slugs for c in ALL_DECKS[slug]().cards
+    )
+    assert max(level_ids) < lowest_category_id, (
+        f"vocab_n5 reaches id {max(level_ids)} but the vocab category decks "
+        f"start at {lowest_category_id}. Widen _VOCAB_ID_CAPACITY['n5'] and "
+        f"move the category offsets in domain/decks.py."
+    )
+    assert len(level_ids) <= _VOCAB_ID_CAPACITY["n5"]
+
+
+def test_build_vocab_deck_rejects_a_corpus_that_outgrows_its_slot() -> None:
+    """The capacity guard must raise rather than silently overflow (issue #63)."""
+    rows = [(f"語{i}", f"go{i}", f"word {i}") for i in range(11)]
+    with pytest.raises(ValueError, match="card ids are reserved"):
+        _build_vocab_deck("Overflow", rows, "n5", id_offset=0, id_capacity=10)
+
+
+def test_build_vocab_deck_allows_a_corpus_that_exactly_fills_its_slot() -> None:
+    rows = [(f"語{i}", f"go{i}", f"word {i}") for i in range(10)]
+    deck = _build_vocab_deck("Exact", rows, "n5", id_offset=0, id_capacity=10)
+    assert len(deck.cards) == 10
 
 
 def test_all_decks_still_build_after_id_reallocation() -> None:

@@ -282,28 +282,35 @@ because nothing is allocated above 4000. A future N4/N3/N2 import crossing 1,000
 would silently collide ids and corrupt SRS/mastery state with no error. Vocab is
 protected by caps rather than by design (below).
 
-### Undocumented vocabulary truncation
+### Vocabulary deck sizing
 
-`domain/decks.py:18`:
+Vocabulary level decks expose the **whole** imported corpus (8,031 words). The former
+`_VOCAB_LEVEL_LIMITS` slice — which discarded 69–93% of each level — was removed in #67;
+`_VOCAB_ID_CAPACITY` replaces it and constrains deck size for a different reason:
 
-```python
-_VOCAB_LEVEL_LIMITS = {"n5": 50, "n4": 150, "n3": 300, "n2": 600, "n1": 800}
-```
+| Level | Corpus | `id_offset` | Ids reserved | Next allocation |
+|---|---|---|---|---|
+| N5 | 718 | 0 | 1,000 | vocab category decks at 1000 |
+| N4 | 666 | 10,000 | 10,000 | vocab_n3 at 20000 |
+| N3 | 2,139 | 20,000 | 10,000 | vocab_n2 at 30000 |
+| N2 | 1,809 | 30,000 | 10,000 | vocab_n1 at 40000 |
+| N1 | 2,699 | 40,000 | 10,000 | — |
 
-Against the imported corpus that discards most of it:
+`_build_vocab_deck` raises `ValueError` when a corpus outgrows its slot, so a future
+import fails at deck-build time instead of silently colliding card ids (§5, A1). N5 is
+the tight one — 718 of 1,000 — and `tests/test_deck_id_uniqueness.py` guards the boundary.
 
-| Level | CSV rows | Exposed | Reachable |
-|---|---|---|---|
-| N5 | 719 | 50 | 7% |
-| N4 | 667 | 150 | 22% |
-| N3 | 2,140 | 300 | 14% |
-| N2 | 1,906 | 600 | 31% |
-| N1 | 2,700 | 800 | 30% |
+Pacing is **not** a deck-sizing concern: vocab decks have no block progression
+(`blocks_for_slug` returns `[]` for every `vocab_n*`), but a study session draws only
+8–20 items (`SESSION_LENGTH_PRESETS`) from an SRS-ordered queue, so corpus size affects
+denominators and deck-total labels, not how much a learner faces per session.
 
-No comment explains the constant. Kanji has no equivalent cap. N5 is partly compensated
-by the thematic category decks (145 words across 12 categories) — but those exist
-**only for N5**, while kanji has thematic categories all the way to N1. That asymmetry
-means N4–N1 vocabulary is reachable only through the truncated level decks.
+Kanji has no equivalent cap and no capacity guard — kanji_n1 already overflows its
+nominal 1,000-slot spacing (§5, A1).
+
+The remaining asymmetry: thematic category decks exist for kanji N5→N1 but for
+vocabulary only N5 (145 words across 12 categories), so N4–N1 vocabulary is reachable
+only through the flat level decks. Tracked as C2 / issue #68.
 
 ---
 
@@ -372,8 +379,8 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 
 | # | Finding | Issue |
 |---|---|---|
-| C1 | `_VOCAB_LEVEL_LIMITS` silently truncates vocabulary to 7–31% of the imported corpus, with no comment explaining why. N5 exposes 50 of 719 words. | none |
-| C2 | Thematic category decks exist for kanji N5→N1 but for vocabulary **only N5** — so N4–N1 vocab is reachable only via the truncated level decks. | none |
+| ~~C1~~ | ~~`_VOCAB_LEVEL_LIMITS` silently truncates vocabulary to 7–31% of the imported corpus~~ — fixed: level decks expose the full corpus, capped only by card-id capacity. | #67 |
+| C2 | Thematic category decks exist for kanji N5→N1 but for vocabulary **only N5** — so N4–N1 vocab is reachable only via the flat level decks. | #68 |
 
 ### Structure
 
@@ -419,8 +426,8 @@ None of the following duplicate them.
    off the shared worker; stop rejecting unrelated pending requests on timeout.
 3. **Unify mastery on SQLite** (A2/A4) — make `cardScores` a cache derived from
    `review_states` rather than a parallel truth. Blocks clean multi-profile (#51) too.
-4. **Lift `_VOCAB_LEVEL_LIMITS`** (C1) — expose the full imported corpus behind
-   block/category progression instead of a hard slice, or document the constant.
+4. ~~**Lift `_VOCAB_LEVEL_LIMITS`** (C1)~~ done (#67) — level decks now expose the full
+   imported corpus; `_VOCAB_ID_CAPACITY` documents the real constraint (card-id slots).
 
 **Also worth filing**
 

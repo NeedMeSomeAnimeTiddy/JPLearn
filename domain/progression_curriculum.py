@@ -88,7 +88,13 @@ _NODES: list[ProgressionNode] = [
         name="Vocabulary N5",
         category="vocabulary",
         unlock_requirement=_requires_mastered("katakana"),
-        mastery_requirement=MasteryRequirement(mastered_ratio=0.8),
+        # Absolute floor, not a ratio: this node gates the grammar path on
+        # "knows enough N5 words to start", which is a fixed quantity. It used
+        # to read `mastered_ratio=0.8` against a vocab_n5 deck truncated to 50
+        # cards — i.e. 40 words. Lifting that truncation (#67) grew the deck to
+        # the full 718-word corpus, which would have silently turned the same
+        # ratio into a 575-word gate. Keep the gate decoupled from corpus size.
+        mastery_requirement=MasteryRequirement(mastered_ratio=0.0, min_mastered=40),
         children=("grammar_n5",),
         rewards=_content("n5_vocabulary_unlocked"),
     ),

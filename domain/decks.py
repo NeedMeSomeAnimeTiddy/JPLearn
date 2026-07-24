@@ -15,12 +15,30 @@ except ImportError:
 
 _ExternalRow = tuple[str, str, str]
 _EMPTY_EXTERNAL_DATA: list[_ExternalRow] = []
-_VOCAB_LEVEL_LIMITS: dict[str, int] = {
-    "n5": 50,
-    "n4": 150,
-    "n3": 300,
-    "n2": 600,
-    "n1": 800,
+
+# Vocabulary level decks expose the *whole* imported corpus (issue #67). Pacing
+# is handled by the session queue (8–20 items per session, `SESSION_LENGTH_PRESETS`)
+# and by SRS scheduling, not by discarding rows at the domain layer.
+#
+# What does constrain deck size is card-id allocation: each level starts at a
+# hand-picked `id_offset` and grows upward, so a level may not reach the next
+# allocated offset or two different words silently share a card id — which
+# corrupts SRS/mastery state instead of erroring (issue #63).
+#
+#   vocab_n5   offset      0 → capacity  1,000 (vocab category decks start at 1000)
+#   vocab_n4   offset 10,000 → capacity 10,000 (vocab_n3 starts at 20000)
+#   vocab_n3   offset 20,000 → capacity 10,000
+#   vocab_n2   offset 30,000 → capacity 10,000
+#   vocab_n1   offset 40,000 → capacity 10,000 (nothing allocated above)
+#
+# `_build_vocab_deck` raises if a corpus outgrows its slot, so a future import
+# fails loudly at deck-build time rather than silently colliding ids.
+_VOCAB_ID_CAPACITY: dict[str, int] = {
+    "n5": 1000,
+    "n4": 10000,
+    "n3": 10000,
+    "n2": 10000,
+    "n1": 10000,
 }
 
 if _external_deck_data is None:
@@ -276,7 +294,29 @@ def _build_vocab_deck(
     data: list[tuple[str, str, str]],
     level_tag: str,
     id_offset: int,
+    id_capacity: int | None = None,
 ) -> Deck:
+    """Build a vocabulary deck, optionally guarding its card-id allocation.
+
+    Args:
+        name: Human-readable deck name.
+        data: ``(character, reading, meaning)`` rows, in deck order.
+        level_tag: Tag applied to every card alongside ``"vocab"``.
+        id_offset: Card id of the first row; ids increment from there.
+        id_capacity: Ids reserved for this deck before the next allocation.
+            Passing it turns an outgrown slot into a build-time error instead
+            of a silent card-id collision (see ``_VOCAB_ID_CAPACITY``).
+
+    Raises:
+        ValueError: If ``data`` has more rows than ``id_capacity`` allows.
+    """
+    if id_capacity is not None and len(data) > id_capacity:
+        raise ValueError(
+            f"Vocabulary deck {name!r} has {len(data)} rows but only {id_capacity} "
+            f"card ids are reserved at offset {id_offset}. Widen the id allocation "
+            f"in domain/decks.py (_VOCAB_ID_CAPACITY) before importing more rows — "
+            f"overflowing the slot silently corrupts SRS/mastery state."
+        )
     cards = [
         Card(
             id=id_offset + i,
@@ -735,27 +775,37 @@ _VOCAB_N5_DATA: list[tuple[str, str, str]] = [
 
 def get_vocab_n5_deck() -> Deck:
     data = VOCAB_N5_EXTERNAL_DATA if VOCAB_N5_EXTERNAL_DATA else _VOCAB_N5_DATA
-    return _build_vocab_deck("Vocabulary N5", data[:_VOCAB_LEVEL_LIMITS["n5"]], "n5", id_offset=0)
+    return _build_vocab_deck(
+        "Vocabulary N5", data, "n5", id_offset=0, id_capacity=_VOCAB_ID_CAPACITY["n5"]
+    )
 
 
 def get_vocab_n4_deck() -> Deck:
     rows = VOCAB_N4_EXTERNAL_DATA
-    return _build_vocab_deck("Vocabulary N4", rows[:_VOCAB_LEVEL_LIMITS["n4"]], "n4", id_offset=10000)
+    return _build_vocab_deck(
+        "Vocabulary N4", rows, "n4", id_offset=10000, id_capacity=_VOCAB_ID_CAPACITY["n4"]
+    )
 
 
 def get_vocab_n3_deck() -> Deck:
     rows = VOCAB_N3_EXTERNAL_DATA
-    return _build_vocab_deck("Vocabulary N3", rows[:_VOCAB_LEVEL_LIMITS["n3"]], "n3", id_offset=20000)
+    return _build_vocab_deck(
+        "Vocabulary N3", rows, "n3", id_offset=20000, id_capacity=_VOCAB_ID_CAPACITY["n3"]
+    )
 
 
 def get_vocab_n2_deck() -> Deck:
     rows = VOCAB_N2_EXTERNAL_DATA
-    return _build_vocab_deck("Vocabulary N2", rows[:_VOCAB_LEVEL_LIMITS["n2"]], "n2", id_offset=30000)
+    return _build_vocab_deck(
+        "Vocabulary N2", rows, "n2", id_offset=30000, id_capacity=_VOCAB_ID_CAPACITY["n2"]
+    )
 
 
 def get_vocab_n1_deck() -> Deck:
     rows = VOCAB_N1_EXTERNAL_DATA
-    return _build_vocab_deck("Vocabulary N1", rows[:_VOCAB_LEVEL_LIMITS["n1"]], "n1", id_offset=40000)
+    return _build_vocab_deck(
+        "Vocabulary N1", rows, "n1", id_offset=40000, id_capacity=_VOCAB_ID_CAPACITY["n1"]
+    )
 
 
 # ---------------------------------------------------------------------------

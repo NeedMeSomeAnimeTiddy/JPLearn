@@ -531,6 +531,23 @@ class TestJPLearnGraph:
         node = JPLEARN_GRAPH.nodes["kanji_n5"]
         assert node.mastery_requirement.min_mastered == 80
 
+    def test_vocabulary_n5_gate_is_an_absolute_floor_not_a_corpus_ratio(self):
+        """Regression guard for issue #67.
+
+        vocab_n5 grew from 50 cards to the full 718-word corpus. A ratio-based
+        gate would have quietly gone from "40 words" to "575 words" and blocked
+        the whole grammar path, so this node gates on an absolute count.
+        """
+        node = JPLEARN_GRAPH.nodes["vocabulary_n5"]
+        assert node.mastery_requirement.min_mastered == 40
+        assert node.mastery_requirement.mastered_ratio == 0.0
+
+    def test_vocabulary_n5_gate_is_independent_of_deck_size(self):
+        node = JPLEARN_GRAPH.nodes["vocabulary_n5"]
+        for total in (50, 718, 5000):
+            assert is_mastered(node, 39, total) is False
+            assert is_mastered(node, 40, total) is True
+
     def test_parent_index_is_complete(self):
         # Every node referenced as child/branch should appear in parent_index
         # with the referencing node listed.

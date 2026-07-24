@@ -91,10 +91,17 @@ export function buildStudyPlan(
   const kanji = kanjiFromDecks.total > 0 ? kanjiFromDecks : kanjiFallback
   const vocab = vocabFromDecks.total > 0 ? vocabFromDecks : vocabFallback
 
+  // N5 grammar readiness depends on N5 vocabulary, so it is measured against
+  // vocab_n5 alone rather than the all-levels `vocab` aggregate — which spans
+  // N5→N1 and would make N5 grammar wait on N1 words. The distinction became
+  // load-bearing once vocab level decks stopped being truncated (issue #67)
+  // and the aggregate denominator grew from ~2,000 cards to ~8,200.
+  const vocabN5 = aggregateDeckMastery(decks, (slug) => slug === 'vocab_n5')
+
   const hiraganaReady = hiragana.mastery >= 0.35
   const kanjiReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.45
   const vocabReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.55
-  const grammarReady = vocab.mastery >= 0.45
+  const grammarReady = (vocabN5.total > 0 ? vocabN5 : vocab).mastery >= 0.45
   const sentencesReady = grammar.mastery >= 0.45
 
   const coverageRows: StudyPlanCoverageRow[] = [
