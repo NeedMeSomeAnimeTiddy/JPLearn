@@ -86,6 +86,7 @@ import {
 import {
   buildStudyPlan,
 } from './lib/studyPlan'
+import { categoryLevelOf } from './lib/categoryLevels'
 import { CARD_MASTERY_MAX } from './constants'
 import {
   buildRound as buildRoundImpl,
@@ -2371,10 +2372,14 @@ function App() {
           }}
           onSelectKanjiCategory={(cat) => {
             setActiveKanjiCategory(cat)
+            // Keep the hub's level tab on the level that owns this category,
+            // so the highlight follows selections made from anywhere else.
+            setActiveKanjiLevel(categoryLevelOf(cat))
             resetSessionWithLives()
           }}
           onSelectVocabCategory={(cat) => {
             setActiveVocabCategory(cat)
+            setActiveVocabLevel(categoryLevelOf(cat))
             resetSessionWithLives()
           }}
           onToggleLearningPath={() => setLearningPathExpanded((expanded) => !expanded)}

@@ -34,6 +34,12 @@ import { MinigameCassetteCarousel } from '../components/MinigameCassetteCarousel
 import type { GroupedSlide } from '../components/MinigameCassetteCarousel'
 import type { MinigameSkillGroupKey } from '../constants'
 import { useSession } from '../context/SessionContext'
+import {
+  categoryShortLabel,
+  levelsPresentIn,
+  resolveVisibleLevel,
+  rowsForLevel,
+} from '../lib/categoryLevels'
 
 interface BlockInfo {
   index: number
@@ -129,8 +135,8 @@ export function ScriptHubView({
   activeBlockCards,
   kanjiLevelProgress: _kanjiLevelProgress,
   vocabLevelProgress: _vocabLevelProgress,
-  activeKanjiLevel: _activeKanjiLevel,
-  activeVocabLevel: _activeVocabLevel,
+  activeKanjiLevel,
+  activeVocabLevel,
   kanjiCategoryProgress,
   vocabCategoryProgress,
   activeKanjiCategory,
@@ -144,8 +150,8 @@ export function ScriptHubView({
   isSheet = false,
   onBack,
   onSelectBlock,
-  onSelectKanjiLevel: _onSelectKanjiLevel,
-  onSelectVocabLevel: _onSelectVocabLevel,
+  onSelectKanjiLevel,
+  onSelectVocabLevel,
   onSelectKanjiCategory,
   onSelectVocabCategory,
   onToggleLearningPath: _onToggleLearningPath,
@@ -169,6 +175,16 @@ export function ScriptHubView({
     toggleConfidence,
   } = useSession()
   const activeBlock = blockProgressWithMastery.find((block) => block.index === activeBlockIndex)
+
+  // Tracklist strip: blocks take precedence, categories otherwise. Categories
+  // are split by JLPT level so a 28-entry list never renders as one long row.
+  const isKanjiTrack = activeScript === 'kanji_n5'
+  const showsBlocks = blockProgressWithMastery.length > 0
+  const showsCategories = !showsBlocks && (isKanjiTrack || activeScript === 'vocab_n5')
+  const categoryRows = isKanjiTrack ? kanjiCategoryProgress : vocabCategoryProgress
+  const categoryLevels = levelsPresentIn(categoryRows)
+  const visibleLevel = resolveVisibleLevel(categoryRows, isKanjiTrack ? activeKanjiLevel : activeVocabLevel)
+  const visibleCategories = rowsForLevel(categoryRows, visibleLevel)
 
   const groupedSlides = useMemo<GroupedSlide[]>(() => {
     // Group available minigames by skill group
@@ -402,59 +418,91 @@ export function ScriptHubView({
               </div>
               </div>
 
-              {/* Horizontal tracklist strip */}
+              {/* Tracklist strip — level tabs above a wrapped chip grid, so no
+                  track's sections can run off-screen (vocab has 28 categories,
+                  kanji 19). Blocks have no JLPT levels, so they just wrap. */}
               {!gameLoading ? (
                 <div className="hub-tracklist-strip">
                   <span className="hub-tracklist-label">
-                    {blockProgressWithMastery.length > 0
+                    {showsBlocks
                       ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length}/${blockProgressWithMastery.length} mastered`
-                      : activeScript === 'kanji_n5'
-                        ? `${kanjiCategoryProgress.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${kanjiCategoryProgress.filter((c) => c.total > 0).length}`
-                        : activeScript === 'vocab_n5'
-                          ? `${vocabCategoryProgress.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${vocabCategoryProgress.filter((c) => c.total > 0).length}`
-                          : ''}
+                      : showsCategories
+                        ? `${visibleCategories.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${visibleCategories.filter((c) => c.total > 0).length}`
+                        : ''}
                   </span>
-                  {blockProgressWithMastery.length > 0 ? (
-                    <div className="hub-block-row-strip">
-                      {blockProgressWithMastery.map((block) => {
-                        const isActive = activeBlockIndex === block.index
-                        const masteryPct = Math.round(block.mastery * 100)
-                        return (
-                          <button
-                            key={block.index}
-                            type="button"
-                            className={`hub-block-chip${isActive ? ' is-active' : ''}${!block.unlocked ? ' is-locked' : ''}`}
-                            disabled={!block.unlocked}
-                            onClick={() => { if (block.unlocked) onSelectBlock(block.index) }}
-                            title={!block.unlocked ? 'Locked' : `${block.name} ${masteryPct}%`}
-                          >
-                            {block.name}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ) : activeScript === 'kanji_n5' || activeScript === 'vocab_n5' ? (
-                    <div className="hub-block-row-strip">
-                      {(activeScript === 'kanji_n5' ? kanjiCategoryProgress : vocabCategoryProgress).map((cat) => {
-                        const isActive = activeScript === 'kanji_n5' ? activeKanjiCategory === cat.key : activeVocabCategory === cat.key
-                        const unavailable = cat.total === 0
-                        return (
-                          <button
-                            key={cat.key}
-                            type="button"
-                            className={`hub-block-chip${isActive ? ' is-active' : ''}${(!cat.unlocked || unavailable) ? ' is-locked' : ''}`}
-                            disabled={!cat.unlocked || unavailable}
-                            onClick={() => {
-                              if (activeScript === 'kanji_n5') onSelectKanjiCategory(cat.key as KanjiCategory)
-                              else onSelectVocabCategory(cat.key as VocabCategory)
-                            }}
-                          >
-                            {cat.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ) : null}
+                  <div className="hub-tracklist-groups">
+                    {showsCategories && categoryLevels.length > 1 ? (
+                      <div className="hub-level-row" role="group" aria-label="JLPT level">
+                        {categoryLevels.map((level) => {
+                          const levelName = level.toUpperCase()
+                          const unlockedCount = rowsForLevel(categoryRows, level)
+                            .filter((row) => row.unlocked && row.total > 0).length
+                          return (
+                            <button
+                              key={level}
+                              type="button"
+                              className={`hub-level-chip${level === visibleLevel ? ' is-active' : ''}`}
+                              aria-pressed={level === visibleLevel}
+                              aria-label={`Show ${levelName} sections (${unlockedCount} unlocked)`}
+                              title={`${levelName} — ${unlockedCount} unlocked`}
+                              onClick={() => {
+                                if (isKanjiTrack) onSelectKanjiLevel(level)
+                                else onSelectVocabLevel(level)
+                              }}
+                            >
+                              {levelName}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+
+                    {showsBlocks ? (
+                      <div className="hub-block-row-strip">
+                        {blockProgressWithMastery.map((block) => {
+                          const isActive = activeBlockIndex === block.index
+                          const masteryPct = Math.round(block.mastery * 100)
+                          return (
+                            <button
+                              key={block.index}
+                              type="button"
+                              className={`hub-block-chip${isActive ? ' is-active' : ''}${!block.unlocked ? ' is-locked' : ''}`}
+                              disabled={!block.unlocked}
+                              aria-pressed={isActive}
+                              onClick={() => { if (block.unlocked) onSelectBlock(block.index) }}
+                              title={!block.unlocked ? 'Locked' : `${block.name} ${masteryPct}%`}
+                            >
+                              {block.name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : showsCategories ? (
+                      <div className="hub-block-row-strip">
+                        {visibleCategories.map((cat) => {
+                          const isActive = isKanjiTrack ? activeKanjiCategory === cat.key : activeVocabCategory === cat.key
+                          const unavailable = cat.total === 0
+                          const masteryPct = Math.round(cat.mastery * 100)
+                          return (
+                            <button
+                              key={cat.key}
+                              type="button"
+                              className={`hub-block-chip${isActive ? ' is-active' : ''}${(!cat.unlocked || unavailable) ? ' is-locked' : ''}`}
+                              disabled={!cat.unlocked || unavailable}
+                              aria-pressed={isActive}
+                              title={unavailable ? 'No cards' : !cat.unlocked ? 'Locked' : `${cat.label} ${masteryPct}%`}
+                              onClick={() => {
+                                if (isKanjiTrack) onSelectKanjiCategory(cat.key as KanjiCategory)
+                                else onSelectVocabCategory(cat.key as VocabCategory)
+                              }}
+                            >
+                              {categoryShortLabel(cat.label)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
 

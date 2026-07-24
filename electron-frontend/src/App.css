@@ -2904,17 +2904,62 @@ html[data-reduced-motion='true'] .home-hero-steam {
 }
 
 /* ── Horizontal tracklist strip (bottom of player) ───────────── */
+/* Sections wrap instead of scrolling: the strip used to be one nowrap row with
+   a hidden scrollbar, so a track's later sections were both off-screen and
+   un-hinted (vocab has 28 categories, kanji 19). `justify-content: center` on
+   an overflowing flex row also clipped the leading chips where scrolling
+   couldn't reach them. */
 .hub-tracklist-strip {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: 8px;
   padding: 6px 0 0;
   border-top: 1px solid var(--panel-border);
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.hub-tracklist-strip::-webkit-scrollbar { display: none; }
+
+.hub-tracklist-groups {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hub-level-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hub-level-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: color-mix(in oklab, var(--accent-soft) 50%, var(--text-soft));
+  font-size: 0.56rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.hub-level-chip:hover {
+  color: var(--text-main);
+  border-color: var(--panel-border);
+}
+
+.hub-level-chip.is-active {
+  border-color: var(--accent);
+  color: var(--text-main);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
 
 .hub-tracklist-label {
   font-family: var(--mono);
@@ -2930,7 +2975,8 @@ html[data-reduced-motion='true'] .home-hero-steam {
 .hub-block-row-strip {
   display: flex;
   gap: 5px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .hub-block-chip {
