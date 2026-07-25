@@ -13,7 +13,6 @@ const http = require('node:http')
 const os = require('node:os')
 const path = require('node:path')
 const { spawn, spawnSync } = require('node:child_process')
-const NetworkSpeed = require('network-speed')
 
 // ── Model catalogue ──────────────────────────────────────────────────────────
 
@@ -191,7 +190,6 @@ const SPEED_TEST_TARGETS = [
   { url: 'https://proof.ovh.net/files/10Mb.dat', bytes: 10485760 },
   { url: 'https://proof.ovh.net/files/100Mb.dat', bytes: 20971520 },
 ]
-const networkSpeed = new NetworkSpeed()
 const REMOTE_SIZE_CACHE = new Map()
 const LLAMA_BACKEND_LABELS = {
   cuda: 'CUDA (NVIDIA)',
@@ -1113,48 +1111,80 @@ async function ensureOcrPythonRuntime(scriptRoot, base) {
 
 // ── System info ──────────────────────────────────────────────────────────────
 
-function withTimeout(promise, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs)
-    promise
-      .then((value) => {
-        clearTimeout(timer)
-        resolve(value)
-      })
-      .catch((error) => {
-        clearTimeout(timer)
-        reject(error)
-      })
-  })
-}
+/**
+ * Measure download throughput in Mbps, resolving null on any failure.
+ *
+ * Hand-rolled rather than delegating to `network-speed`, because that library
+ * left socket-level `error` events unlistened. Those are emitter errors, not
+ * promise rejections, so `await`/`try` around the call could not catch them —
+ * they reached Electron's default handler and popped a modal "A JavaScript error
+ * occurred in the main process" dialog on every launch for anyone whose DNS
+ * cannot resolve the probe host (`read ECONNRESET` at `TLSWrap.onStreamRead`,
+ * `getaddrinfo ENOTFOUND proof.ovh.net`). This is a cosmetic download-time
+ * estimate for the setup screen, so it must never be able to interrupt startup.
+ *
+ * Every stream that can emit `error` gets a listener, and the request is
+ * destroyed once settled so a late event cannot arrive after resolution.
+ */
+function measureDownloadMbps(url, byteLimit, timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false
+    let request = null
+    let timer = null
 
-function coerceMbps(result) {
-  if (!result || typeof result !== 'object') {
-    return null
-  }
-  const candidates = [result.mbs, result.mbps, result.mb]
-  for (const value of candidates) {
-    const numeric = typeof value === 'number' ? value : Number(value)
-    if (Number.isFinite(numeric) && numeric > 0) {
-      return numeric
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      try {
+        request?.destroy()
+      } catch {
+        // Already torn down.
+      }
+      resolve(value)
     }
-  }
-  return null
+
+    timer = setTimeout(() => finish(null), timeoutMs)
+    const startedAt = Date.now()
+    let received = 0
+
+    const throughput = () => {
+      const seconds = (Date.now() - startedAt) / 1000
+      if (seconds <= 0 || received <= 0) return null
+      return (received * 8) / (seconds * 1_000_000)
+    }
+
+    try {
+      request = https.get(url, (response) => {
+        if (response.statusCode !== 200) {
+          response.destroy()
+          finish(null)
+          return
+        }
+        response.on('data', (chunk) => {
+          received += chunk.length
+          if (received >= byteLimit) {
+            const mbps = throughput()
+            response.destroy()
+            finish(mbps)
+          }
+        })
+        response.on('end', () => finish(throughput()))
+        response.on('error', () => finish(null))
+      })
+      request.on('error', () => finish(null))
+      request.setTimeout(timeoutMs, () => finish(null))
+    } catch {
+      finish(null)
+    }
+  })
 }
 
 async function measureNetworkMbps() {
   for (const target of SPEED_TEST_TARGETS) {
-    try {
-      const result = await withTimeout(
-        networkSpeed.checkDownloadSpeed(target.url, target.bytes),
-        SPEED_TEST_TIMEOUT_MS,
-      )
-      const mbps = coerceMbps(result)
-      if (mbps && Number.isFinite(mbps)) {
-        return mbps
-      }
-    } catch {
-      // Try next endpoint.
+    const mbps = await measureDownloadMbps(target.url, target.bytes, SPEED_TEST_TIMEOUT_MS)
+    if (mbps && Number.isFinite(mbps)) {
+      return mbps
     }
   }
   return null
