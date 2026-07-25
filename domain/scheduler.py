@@ -22,7 +22,14 @@ class ReviewState:
             ``difficulty`` (min 1.3, max 2.8). Retained so schema/UI code that
             reads an "ease factor" keeps working; FSRS itself does not use it.
         interval: Days until the next scheduled review (derived from stability).
-        repetitions: Number of reviews since the last "forgot" (Again) outcome.
+        repetitions: Number of distinct days carrying a successful review since
+            the last "forgot" (Again) outcome — not a count of reviews. Repeats
+            within one day do not advance it, so it stays dimensionally
+            comparable to ``interval`` in the app's mastered rule
+            (``repetitions >= 3 AND interval >= 21``). A successful review
+            always leaves this at 1 or more, including one that recovers a card
+            in the same session it lapsed, because code elsewhere reads
+            ``repetitions > 0`` as "this card has been seen".
         next_review: Date on which this card is next due.
         stability: FSRS memory stability in days. ``0.0`` means "never reviewed".
         difficulty: FSRS difficulty on a 1 (easiest) to 10 (hardest) scale.
@@ -206,9 +213,9 @@ def update(
 
     A successful review on the same calendar day as the previous one is scored
     against :data:`SAME_DAY_ELAPSED_DAYS` of elapsed time rather than zero, so
-    in-session repeats earn diminishing credit instead of none. Lapses are
-    unaffected — they already respond to same-day reviews via the post-lapse
-    formula.
+    in-session repeats earn diminishing credit instead of none, and does not
+    advance ``repetitions`` past the day's first success. Lapses are unaffected
+    — they already respond to same-day reviews via the post-lapse formula.
     """
     effective_quality = (
         round(quality * 0.7 + confidence * 0.3) if confidence is not None else quality
@@ -216,12 +223,17 @@ def update(
     rating = _quality_to_fsrs_rating(effective_quality)
     review_day = today if today is not None else date.today()
 
+    # Both same-day rules below derive from this one flag, so the scheduling
+    # half and the repetitions half cannot drift apart.
+    previous_review = state.last_review
+    is_same_day = previous_review is not None and previous_review == review_day
+
     if state.stability <= 0:
         # First review for this card: seed stability/difficulty from the rating.
         state.stability = _initial_stability(rating)
         state.difficulty = _initial_difficulty(rating)
     else:
-        elapsed_days = float(max(0, (review_day - (state.last_review or review_day)).days))
+        elapsed_days = float(max(0, (review_day - (previous_review or review_day)).days))
         if rating != 1:
             elapsed_days = max(SAME_DAY_ELAPSED_DAYS, elapsed_days)
         retrievability = _retrievability(elapsed_days, state.stability)
@@ -230,7 +242,13 @@ def update(
         )
         state.difficulty = _next_difficulty(state.difficulty, rating)
 
-    state.repetitions = 0 if rating == 1 else state.repetitions + 1
+    if rating == 1:
+        state.repetitions = 0
+    elif not is_same_day or state.repetitions == 0:
+        # The `repetitions == 0` clause keeps a successful review always worth
+        # at least one count, so a card recovered in the same session it lapsed
+        # still reads as seen to the `repetitions > 0` checks elsewhere.
+        state.repetitions += 1
     state.interval = _interval_for_stability(state.stability)
     state.ease_factor = _ease_factor_for_difficulty(state.difficulty)
     state.last_review = review_day

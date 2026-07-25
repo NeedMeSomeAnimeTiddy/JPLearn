@@ -138,9 +138,9 @@ class TestSameDayReviews:
                 assert drilled < waited
 
     def test_same_day_drilling_cannot_reach_the_mastered_interval(self) -> None:
-        """Mastered is repetitions >= 3 AND interval >= 21; reps hits 3 within a
-        few answers, so the interval half is what keeps in-session drilling from
-        minting mastery.
+        """Mastered is repetitions >= 3 AND interval >= 21. Same-day drilling is
+        now blocked at both halves — repetitions stops at 1 — but the interval
+        half is the one this floor governs, so pin it independently.
 
         Pins the exact repeat count that crosses the threshold rather than just
         asserting "not yet", so raising SAME_DAY_ELAPSED_DAYS cannot quietly
@@ -156,6 +156,53 @@ class TestSameDayReviews:
                     crossed_at = n
 
             assert crossed_at == expected_crossing
+
+    def test_same_day_repeats_do_not_advance_repetitions(self) -> None:
+        """`repetitions` counts distinct successful days, so drilling cannot
+        inflate the `repetitions >= 3` half of the mastered rule."""
+        state = ReviewState(card_id=1)
+        for _ in range(10):
+            state = update(state, quality=GOOD, today=self.DAY)
+
+        assert state.repetitions == 1
+
+    def test_repetitions_advance_on_each_new_day(self) -> None:
+        state = ReviewState(card_id=1)
+        counts = []
+        for offset in range(4):
+            # Two answers per day: the second must not count again.
+            day = self.DAY + timedelta(days=offset)
+            state = update(state, quality=GOOD, today=day)
+            state = update(state, quality=GOOD, today=day)
+            counts.append(state.repetitions)
+
+        assert counts == [1, 2, 3, 4]
+
+    def test_same_day_recovery_after_lapse_still_reads_as_seen(self) -> None:
+        """Several call sites treat `repetitions > 0` as "this card has been
+        seen", so a successful review must never leave it at zero."""
+        state = update(ReviewState(card_id=1), quality=GOOD, today=self.DAY)
+        state = update(state, quality=AGAIN, today=self.DAY)
+        assert state.repetitions == 0
+
+        state = update(state, quality=GOOD, today=self.DAY)
+
+        assert state.repetitions == 1
+
+    def test_spaced_learner_reaches_mastery_unchanged(self) -> None:
+        """The desync fix must only bite drilling. Someone reviewing on due
+        dates still crosses both halves of the mastered rule on review 3."""
+        for quality in (GOOD, EASY):
+            state = ReviewState(card_id=1)
+            day = self.DAY
+            mastered_on = None
+            for n in range(1, 6):
+                state = update(state, quality=quality, today=day)
+                if mastered_on is None and state.repetitions >= 3 and state.interval >= 21:
+                    mastered_on = n
+                day = day + timedelta(days=state.interval)
+
+            assert mastered_on == 3
 
     def test_same_day_again_still_resets_and_is_not_floored(self) -> None:
         """Lapses already respond to same-day reviews via the post-lapse
