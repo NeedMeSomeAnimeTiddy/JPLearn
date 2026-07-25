@@ -6,6 +6,13 @@ import { SessionProvider } from '../context/SessionContext'
 import type { SessionContextValue } from '../context/SessionContext'
 import type { RoundState } from '../types'
 
+// The feedback panel types its message out with react-type-animation, which keeps scheduling
+// animation frames after the test environment tears down. None of the assertions here depend
+// on the animation, so render the text directly.
+vi.mock('react-type-animation', () => ({
+  TypeAnimation: ({ sequence }: { sequence: (string | number)[] }) => <>{String(sequence[0] ?? '')}</>,
+}))
+
 if (typeof document.documentElement.requestFullscreen !== 'function') {
   document.documentElement.requestFullscreen = vi.fn(() => Promise.resolve())
 }
@@ -211,5 +218,58 @@ describe('MinigameView', () => {
     renderView({ sessionActive: false, roundState: null, submitAnswer })
     fireEvent.keyDown(window, { key: '1' })
     expect(submitAnswer).not.toHaveBeenCalled()
+  })
+
+  describe('grammar explanations (issue #25)', () => {
+    const grammarCard = {
+      id: 8,
+      character: '〜を',
+      romaji: '〜 wo',
+      meaning: 'Direct object marker',
+      tags: ['grammar', 'n5'],
+    }
+
+    function renderGrammarRound(
+      cardOverrides: Partial<typeof grammarCard> = {},
+      sessionOverrides: Partial<SessionContextValue> = {},
+    ) {
+      return renderView(
+        {
+          sessionActive: true,
+          roundState: roundState({ cardId: 8 }),
+          roundFeedback: 'Not quite.',
+          roundFeedbackTone: 'error',
+          ...sessionOverrides,
+        },
+        { activeRoundCard: { ...grammarCard, ...cardOverrides } },
+      )
+    }
+
+    it('explains the pattern after a wrong answer on a grammar card', () => {
+      renderGrammarRound()
+
+      expect(screen.getByRole('region', { name: /Grammar explanation/ })).toBeTruthy()
+      expect(screen.getByText('〜を — direct object marker')).toBeTruthy()
+      expect(screen.getByText(/Marks the thing the verb acts on/)).toBeTruthy()
+      expect(screen.getByText('ごはんを たべます。')).toBeTruthy()
+      expect(screen.getByText(/Intransitive verbs take が/)).toBeTruthy()
+    })
+
+    it('stays hidden when the answer was correct', () => {
+      renderGrammarRound({}, { roundFeedback: 'Nice.', roundFeedbackTone: 'success' })
+      expect(screen.queryByRole('region', { name: /Grammar explanation/ })).toBeNull()
+    })
+
+    it('stays hidden for cards that are not tagged grammar', () => {
+      renderGrammarRound({ tags: ['kanji', 'n5'] })
+      expect(screen.queryByRole('region', { name: /Grammar explanation/ })).toBeNull()
+    })
+
+    it('stays hidden for grammar-tagged cards that are not patterns', () => {
+      // `sentence_examples` cards also carry the `grammar` tag, but their character is a
+      // whole sentence, so no explanation exists for them.
+      renderGrammarRound({ id: 900, character: 'これは ほんです。', romaji: 'kore wa hon desu.' })
+      expect(screen.queryByRole('region', { name: /Grammar explanation/ })).toBeNull()
+    })
   })
 })
