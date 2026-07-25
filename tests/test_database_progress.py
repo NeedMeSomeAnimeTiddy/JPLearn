@@ -189,6 +189,52 @@ def test_review_card_updates_streak_by_local_day(tmp_path: Path, monkeypatch) ->
     assert next_day.best_streak_days == 2
 
 
+def test_review_card_schedules_from_the_supplied_local_day(tmp_path: Path, monkeypatch) -> None:
+    """Scheduling state must follow reviewed_on_local, not the wall clock, so a
+    backfilled or replayed review agrees with the event it logs."""
+    _use_temp_db(tmp_path, monkeypatch)
+    review_day = date(2026, 3, 1)
+
+    updated = study_pipeline.review_card(
+        "Hiragana",
+        ReviewState(card_id=7),
+        quality=4,
+        reviewed_on_local=review_day,
+        reviewed_on_utc=review_day,
+    )
+
+    assert updated.last_review == review_day
+    assert updated.next_review == review_day + timedelta(days=updated.interval)
+
+    persisted = database.load_states("Hiragana", [7])[7]
+    assert persisted.last_review == review_day
+
+
+def test_review_card_same_local_day_does_not_double_count_repetitions(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """With the local day threaded through, the scheduler's same-day rules apply
+    to the day the review is recorded on rather than to today's date."""
+    _use_temp_db(tmp_path, monkeypatch)
+    day_one = date(2026, 3, 1)
+    state = ReviewState(card_id=8)
+
+    for _ in range(3):
+        state = study_pipeline.review_card(
+            "Hiragana", state, quality=4,
+            reviewed_on_local=day_one, reviewed_on_utc=day_one,
+        )
+    assert state.repetitions == 1
+
+    state = study_pipeline.review_card(
+        "Hiragana", state, quality=4,
+        reviewed_on_local=day_one + timedelta(days=1),
+        reviewed_on_utc=day_one + timedelta(days=1),
+    )
+    assert state.repetitions == 2
+
+
 def test_load_activity_summary_aggregates_window_metrics(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

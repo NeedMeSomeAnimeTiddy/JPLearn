@@ -388,7 +388,16 @@ def review_card(
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
 ) -> ReviewState:
-    """Apply one review outcome, persist state/event, and return updated state."""
+    """Apply one review outcome, persist state/event, and return updated state.
+
+    The review is scheduled from ``review_day_local``, the same day the event is
+    logged against, so a caller supplying an explicit ``reviewed_on_local``
+    (backfill, replay, a client sending its own local day) gets scheduling state
+    that agrees with its review log rather than with the server's wall clock.
+    With no explicit date the day is resolved once here instead of separately
+    inside ``update()``, so a review spanning midnight cannot log against one
+    day and schedule from the next.
+    """
     review_day_local = reviewed_on_local or date.today()
     review_day_utc = reviewed_on_utc or datetime.now(timezone.utc).date()
     review_timestamp_utc = (
@@ -400,7 +409,9 @@ def review_card(
     if not normalized_script_tag:
         normalized_script_tag = normalize_storage_text(deck_name).lower().replace(" ", "_")
 
-    updated_state = update(state, quality, confidence=confidence_score)
+    updated_state = update(
+        state, quality, confidence=confidence_score, today=review_day_local
+    )
     database.save_state(deck_name, updated_state)
     database.log_review(
         deck_name,
