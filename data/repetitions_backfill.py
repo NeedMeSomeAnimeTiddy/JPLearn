@@ -1,7 +1,7 @@
 """Correct historical ``review_states.repetitions`` totals from the review log.
 
 Plans and optionally applies the one-time correction described in
-:mod:`domain.repetitions_replay`. Planning is read-only and always runs first,
+:mod:`domain.review_replay`. Planning is read-only and always runs first,
 so the effect can be inspected before anything is written.
 
 Deliberately not a schema migration: the ``schema_version`` counter is already
@@ -20,7 +20,7 @@ from datetime import date
 from pathlib import Path
 
 from data import database
-from domain.repetitions_replay import ReplayedReview, recount_repetitions
+from domain.review_replay import ReplayedReview, recount_repetitions
 
 
 @dataclass(frozen=True)
@@ -121,7 +121,7 @@ def plan_backfill(conn: sqlite3.Connection) -> BackfillPlan:
             plan.already_correct += 1
         elif recount.under_old_rule != stored:
             # The log does not explain this row, so it cannot be trusted to
-            # rewrite it. See domain/repetitions_replay.py.
+            # rewrite it. See domain/review_replay.py.
             plan.skipped_unexplained += 1
         else:
             plan.corrections.append(

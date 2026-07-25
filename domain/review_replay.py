@@ -1,6 +1,15 @@
-"""Recount a card's ``repetitions`` from its stored review log.
+"""Replay a card's stored review log to recover scheduling state.
 
-Pure domain logic: takes review outcomes, returns counts. No I/O, no DB.
+Pure domain logic: takes review outcomes, returns counts and state. No I/O,
+no DB.
+
+Two operations, used by different corrections:
+
+- :func:`recount_repetitions` recounts ``repetitions`` alone, leaving
+  scheduling untouched.
+- :func:`rebuild_review_state` replays the whole FSRS state, for rows whose
+  scheduling was overwritten wholesale (expertise seeding writes a synthetic
+  mastered state over whatever the learner had actually done).
 
 ``repetitions`` used to increment once per review, so a card drilled repeatedly
 inside one session accumulated a count that the ``interval >= 21`` half of the
@@ -22,7 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from domain.scheduler import effective_rating, next_repetitions
+from domain.scheduler import ReviewState, effective_rating, next_repetitions, update
 
 
 @dataclass(frozen=True)
@@ -82,3 +91,24 @@ def recount_repetitions(reviews: list[ReplayedReview]) -> RepetitionsRecount:
         under_new_rule=new_total,
         reviews=len(reviews),
     )
+
+
+def rebuild_review_state(card_id: int, reviews: list[ReplayedReview]) -> ReviewState:
+    """Rebuild a card's full FSRS state by replaying its log from scratch.
+
+    ``reviews`` must be in chronological order. Each review is applied on the
+    day it was recorded against, so intervals and ``next_review`` land where the
+    scheduler would have put them had the state never been overwritten.
+
+    This is a *re-derivation*, not a restoration of a previous value. It applies
+    the scheduler as it exists now — current weights, current same-day handling
+    — so the result is what the learner's history is worth today, which is the
+    only self-consistent answer available once the original state is gone.
+
+    A card whose last review is far in the past comes back due, correctly:
+    ``next_review`` is that day plus the rebuilt interval.
+    """
+    state = ReviewState(card_id=card_id)
+    for review in reviews:
+        update(state, review.quality, confidence=review.confidence, today=review.day)
+    return state

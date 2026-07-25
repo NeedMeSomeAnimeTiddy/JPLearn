@@ -7,7 +7,7 @@ from pathlib import Path
 
 from data import database
 from data.repetitions_backfill import plan_backfill, run_backfill
-from domain.repetitions_replay import ReplayedReview, recount_repetitions
+from domain.review_replay import ReplayedReview, recount_repetitions
 from domain.scheduler import ReviewState
 
 

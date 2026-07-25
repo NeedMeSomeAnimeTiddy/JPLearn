@@ -6,7 +6,7 @@ Reports what would change and exits without writing. Pass ``--apply`` to write.
     python scripts/backfill_repetitions.py --apply    # write the corrections
 
 Only rows the review log fully accounts for are touched; see
-``domain/repetitions_replay.py`` for why the rest are deliberately left alone.
+``domain/review_replay.py`` for why the rest are deliberately left alone.
 Re-running is harmless: a corrected row no longer matches the old-rule checksum
 and is skipped.
 """
