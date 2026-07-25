@@ -357,7 +357,76 @@ def test_jplearn_db_v19_creates_scenario_tables(tmp_path: Path, monkeypatch) -> 
         ).fetchone()
 
     assert version_row is not None
-    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION == 19
+    # This test is about the scenario tables; pinning the exact latest version here
+    # made every later migration edit it. The latest version is pinned once, in
+    # test_jplearn_db_v20_creates_card_mastery_scores.
+    assert int(version_row[0]) >= 19
+
+
+def test_jplearn_db_v20_creates_card_mastery_scores(tmp_path: Path, monkeypatch) -> None:
+    """Per-card mastery counters get their own table (issue #66)."""
+    db_path = tmp_path / "jplearn-mastery-fresh.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+
+    database.init_db()
+
+    assert _column_names(db_path, "card_mastery_scores") == {"deck", "card_id", "score"}
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        version_row = conn.execute(
+            "SELECT version FROM schema_version WHERE id = 1"
+        ).fetchone()
+
+    assert version_row is not None
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION == 20
+
+
+def test_jplearn_db_upgrade_from_v19_preserves_rows_and_adds_mastery_table(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """The upgrade path real users take. A dropped table here would zero mastery."""
+    db_path = tmp_path / "jplearn-mastery-upgrade.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+
+    database.init_db()
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute(
+            "INSERT INTO review_states (deck, card_id, interval, repetitions, next_review)"
+            " VALUES ('Hiragana', 1, 21, 3, '2026-01-01')"
+        )
+        conn.execute("UPDATE schema_version SET version = 19 WHERE id = 1")
+        conn.execute("DROP TABLE card_mastery_scores")
+        conn.commit()
+
+    database.init_db()
+
+    assert _column_names(db_path, "card_mastery_scores") == {"deck", "card_id", "score"}
+    with closing(sqlite3.connect(db_path)) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM review_states WHERE deck = 'Hiragana'"
+        ).fetchone()[0] == 1
+        assert int(
+            conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
+        ) == 20
+
+
+def test_card_mastery_score_range_is_enforced_by_the_schema(tmp_path: Path, monkeypatch) -> None:
+    """The renderer clamps too, but the table must not depend on it."""
+    db_path = tmp_path / "jplearn-mastery-check.db"
+    monkeypatch.setattr(database, "DB_PATH", db_path)
+    database.init_db()
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        for bad_score in (-1, 5):
+            try:
+                conn.execute(
+                    "INSERT INTO card_mastery_scores (deck, card_id, score) VALUES ('hiragana', 1, ?)",
+                    (bad_score,),
+                )
+            except sqlite3.IntegrityError:
+                continue
+            raise AssertionError(f"score {bad_score} should violate the CHECK constraint")
 
 
 def test_jplearn_db_upgrade_from_v18_preserves_existing_rows_and_adds_scenario_tables(

@@ -68,9 +68,10 @@ MIGRATION_V16 = 16
 MIGRATION_V17 = 17
 MIGRATION_V18 = 18
 MIGRATION_V19 = 19
+MIGRATION_V20 = 20
 
 
-LATEST_SCHEMA_VERSION = 19
+LATEST_SCHEMA_VERSION = 20
 _SQLITE_IN_CHUNK_SIZE = 900
 
 StageDistribution: TypeAlias = dict[int, int]
@@ -756,6 +757,33 @@ def _migration_0019(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_0020(conn: sqlite3.Connection) -> None:
+    """Move the per-card mastery counter out of renderer storage (issue #66).
+
+    Keyed ``(deck, card_id)`` to match ``review_states``, which also settles the
+    old ``cardScores.kanji_n5`` bucket that held every N5–N1 kanji score and was
+    correct only because ``domain/decks.py`` hand-allocates disjoint id ranges.
+
+    Deliberately its own table rather than a column on ``review_states``:
+    onboarding seeds a full score for every card in a deck without any review
+    having happened, and writing that into ``review_states`` would fabricate FSRS
+    rows for thousands of unreviewed cards.
+
+    The counter is not derivable from FSRS state — see ``domain/mastery.py`` for
+    why — so existing renderer values must be imported rather than recomputed.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS card_mastery_scores (
+            deck    TEXT    NOT NULL CHECK (length(deck) BETWEEN 1 AND 128),
+            card_id INTEGER NOT NULL,
+            score   INTEGER NOT NULL DEFAULT 0 CHECK (score BETWEEN 0 AND 4),
+            PRIMARY KEY (deck, card_id)
+        )
+        """
+    )
+
+
 MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V1: _migration_0001,
     MIGRATION_V2: _migration_0002,
@@ -776,6 +804,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V17: _migration_0017,
     MIGRATION_V18: _migration_0018,
     MIGRATION_V19: _migration_0019,
+    MIGRATION_V20: _migration_0020,
 }
 
 
@@ -816,6 +845,11 @@ def reset_db() -> None:
     with _connect() as conn:
         conn.execute("DELETE FROM review_events")
         conn.execute("DELETE FROM review_states")
+        # Cleared in the same transaction as review_states on purpose: while the
+        # mastery counter lived in localStorage these two were reconciled by hand,
+        # so a DB reset that missed the renderer left visible mastery intact with
+        # no scheduling behind it (issue #66).
+        conn.execute("DELETE FROM card_mastery_scores")
         conn.execute("DELETE FROM streak_state")
         conn.execute("DELETE FROM leech_items")
         conn.execute("DELETE FROM curriculum_stages")
