@@ -4,8 +4,13 @@ import type {
 } from '../types'
 import { MINIGAMES, SCRIPT_LABELS } from '../constants'
 
-export function getStudyPlanStage(overallMastery: number, trackedCards: number, currentStreak: number): StudyPlanStage {
-  if (trackedCards < 12 || currentStreak < 2 || overallMastery < 0.25) return 'starter'
+// No minimum-tracked-cards condition on purpose. The one that used to live here was
+// fed `buildStudyPlan`'s summed deck `total` — installed corpus size, not a reviewed
+// count — so it never fired. Restoring it would need a reviewed-card count that
+// `buildStudyPlan` is not given; until then `currentStreak >= 2` carries the intent,
+// since a learner cannot hold a two-day streak without having reviewed anything. (#75)
+export function getStudyPlanStage(overallMastery: number, currentStreak: number): StudyPlanStage {
+  if (currentStreak < 2 || overallMastery < 0.25) return 'starter'
   if (overallMastery < 0.65) return 'building'
   return 'advanced'
 }
@@ -232,7 +237,7 @@ export function buildStudyPlan(
   const overallMastery = coverageRows.length > 0
     ? coverageRows.reduce((sum, row) => sum + row.mastery, 0) / coverageRows.length
     : 0
-  const learnerStage = getStudyPlanStage(overallMastery, totalCards, currentStreak)
+  const learnerStage = getStudyPlanStage(overallMastery, currentStreak)
   const recommendedMinutes = weeklyActivity.week.reviewed >= 24
     ? 20
     : weeklyActivity.week.reviewed >= 10

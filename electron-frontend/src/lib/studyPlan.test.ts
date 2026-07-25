@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildStudyPlan } from './studyPlan'
+import { buildStudyPlan, getStudyPlanStage } from './studyPlan'
 import type { ScriptKey, StudyPlanSnapshot, StudyPlanStage, StudySummaryPayload } from '../types'
 
 type Deck = StudySummaryPayload['decks'][number]
@@ -291,5 +291,79 @@ describe('buildStudyPlan learner stage', () => {
     const snapshot = buildStudyPlan([...masteredTracks, deck('vocab_greetings', 40, 40)], [], [], ACTIVITY, 1)
     expect(snapshot.overallMastery).toBe(1)
     expect(snapshot.learnerStage).toBe('starter')
+  })
+})
+
+describe('getStudyPlanStage', () => {
+  it('holds a learner at starter until the streak reaches two days', () => {
+    expect(getStudyPlanStage(0.9, 0)).toBe('starter')
+    expect(getStudyPlanStage(0.9, 1)).toBe('starter')
+    expect(getStudyPlanStage(0.9, 2)).toBe('advanced')
+  })
+
+  it('holds a learner at starter below 25% mastery however long the streak', () => {
+    expect(getStudyPlanStage(0, 40)).toBe('starter')
+    expect(getStudyPlanStage(0.24, 40)).toBe('starter')
+  })
+
+  it('promotes to building at 25% mastery and to advanced at 65%', () => {
+    expect(getStudyPlanStage(0.25, 2)).toBe('building')
+    expect(getStudyPlanStage(0.64, 2)).toBe('building')
+    expect(getStudyPlanStage(0.65, 2)).toBe('advanced')
+  })
+})
+
+// Guards the intent behind the removed `trackedCards < 12` gate — keeping a
+// brand-new learner at 'starter' — now carried by mastery and streak alone.
+describe('buildStudyPlan learner stage without the trackedCards gate', () => {
+  // Mirrors real deck sizes so the corpus-scale reasoning above stays honest.
+  // Category slugs, not level slugs: per #76 the level decks are excluded from the
+  // kanji/vocab aggregates, so a fixture built on them would hold those two rows at
+  // 0 and never reach `advanced` however high the ratio went.
+  function corpus(masteredRatio: number, extraDecks: Deck[] = []): Deck[] {
+    const sizes: Array<[string, number]> = [
+      ['hiragana', 104], ['katakana', 104], ['kanji_numbers_time', 45],
+      ['vocab_greetings', 40], ['grammar_patterns', 88], ['sentence_examples', 64],
+    ]
+    return [
+      ...sizes.map(([slug, total]) => deck(slug, total, Math.round(total * masteredRatio))),
+      ...extraDecks,
+    ]
+  }
+
+  function stage(decks: Deck[], streak = 4) {
+    return buildStudyPlan(decks, [], [], ACTIVITY, streak).learnerStage
+  }
+
+  it('reports starter for a full corpus the learner has never touched', () => {
+    expect(stage(corpus(0))).toBe('starter')
+  })
+
+  it('reports starter for a full corpus with only a handful of cards mastered', () => {
+    const decks = [
+      deck('hiragana', 104, 8), deck('katakana', 104, 0), deck('kanji_numbers_time', 45, 0),
+      deck('vocab_greetings', 40, 0), deck('grammar_patterns', 88, 0), deck('sentence_examples', 64, 0),
+    ]
+    expect(stage(decks)).toBe('starter')
+  })
+
+  it('progresses through building to advanced as mastery grows', () => {
+    expect(stage(corpus(0.4))).toBe('building')
+    expect(stage(corpus(0.8))).toBe('advanced')
+  })
+
+  // The regression guard: stage keys off the mastery ratio, not the number of cards
+  // installed. Since 89208f7 each row also carries equal weight regardless of its
+  // size, so adding same-ratio decks to a track cannot move the stage at all.
+  it('does not depend on corpus size at a fixed mastery ratio', () => {
+    const higherLevels = [
+      deck('vocab_n4_school_work', 666, 533), deck('vocab_n3_media_arts', 2139, 1711),
+      deck('kanji_n1_abstract', 1259, 1007),
+    ]
+    expect(stage(corpus(0.8, higherLevels))).toBe(stage(corpus(0.8)))
+  })
+
+  it('reports starter without a streak no matter how high mastery is', () => {
+    expect(stage(corpus(0.8), 1)).toBe('starter')
   })
 })
