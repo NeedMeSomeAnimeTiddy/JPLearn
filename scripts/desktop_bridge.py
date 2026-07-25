@@ -67,6 +67,7 @@ from data.card_notes_repository import (  # noqa: E402
     build_builtin_note_key,
     validate_note_key,
 )
+from data.mastery_repository import CardMasteryRepository  # noqa: E402
 from data.dictionary_repository import (  # noqa: E402
     DictionaryCardSummary,
     build_dictionary_search_payload as _repo_build_dictionary_search_payload,
@@ -2971,6 +2972,142 @@ def _parse_bool_flag(value: str) -> bool:
     raise ValueError(f"Invalid boolean flag: {value}")
 
 
+_CARD_MASTERY_REPOSITORY: CardMasteryRepository | None = None
+
+
+def _card_mastery_repository() -> CardMasteryRepository:
+    """Return a process-wide mastery repository.
+
+    Cached rather than constructed per call because ``__init__`` runs the schema
+    migration check and this sits on the answer path, which the long-lived bridge
+    worker hits once per review.
+    """
+    global _CARD_MASTERY_REPOSITORY
+    if _CARD_MASTERY_REPOSITORY is None:
+        _CARD_MASTERY_REPOSITORY = CardMasteryRepository()
+    return _CARD_MASTERY_REPOSITORY
+
+
+@dataclass
+class CardMasteryScoresPayload:
+    """Every stored per-card mastery counter, grouped by deck slug.
+
+    Rows exist only for cards that have been answered or seeded, so this is far
+    smaller than the card corpus and cheap to send in one call.
+    """
+
+    scores: dict[str, dict[int, int]]
+
+
+@dataclass
+class CardMasteryImportPayload:
+    """Outcome of adopting legacy renderer mastery counters (issue #66)."""
+
+    imported: bool
+    cards_imported: int
+    cards_unresolved: int
+    decks_written: int
+
+
+# Which deck slugs each legacy `ScriptKey` bucket covered. The kanji and vocab
+# sections fanned out across every level and category deck, which is why all
+# N5–N1 kanji scores shared one bucket (findings A3/A4).
+_LEGACY_SECTION_PREFIXES: dict[str, tuple[str, ...]] = {
+    "hiragana": ("hiragana",),
+    "katakana": ("katakana",),
+    "grammar_patterns": ("grammar_patterns",),
+    "sentence_examples": ("sentence_examples",),
+    "kanji_n5": ("kanji_",),
+    "vocab_n5": ("vocab_",),
+}
+
+
+def build_card_mastery_scores() -> dict[str, object]:
+    """Return all per-card mastery counters for the renderer to hydrate from."""
+    init_study_db()
+    payload = CardMasteryScoresPayload(scores=_card_mastery_repository().load_all_scores())
+    return asdict(payload)
+
+
+def _slugs_for_legacy_section(section: str) -> list[str]:
+    prefixes = _LEGACY_SECTION_PREFIXES.get(section)
+    if prefixes is None:
+        return []
+    return [
+        slug
+        for slug in ALL_DECKS
+        if any(slug == prefix or slug.startswith(prefix) for prefix in prefixes)
+    ]
+
+
+def import_legacy_card_scores(legacy_scores: dict[str, dict[str, int]]) -> dict[str, object]:
+    """Adopt renderer-held mastery counters into SQLite, once (issue #66).
+
+    The counter cannot be recomputed from FSRS state (see ``domain/mastery.py``),
+    so an existing learner's visible mastery only survives the move if it is
+    imported. Skipping this would zero every bar — the exact failure the issue was
+    filed about.
+
+    Legacy data was keyed by ``ScriptKey`` section, and a section spans many decks,
+    so each card id has to be resolved to its owning deck. Only Python knows that
+    mapping, which is why the import runs here rather than in the renderer.
+
+    Adopting is gated on the table being empty, so replaying the import can never
+    overwrite progress recorded since.
+
+    Args:
+        legacy_scores: ``section → {card_id → score}`` as held in localStorage.
+    """
+    init_study_db()
+    repository = _card_mastery_repository()
+    if repository.has_any_scores():
+        return asdict(
+            CardMasteryImportPayload(
+                imported=False, cards_imported=0, cards_unresolved=0, decks_written=0
+            )
+        )
+
+    by_deck: dict[str, dict[int, int]] = {}
+    unresolved = 0
+    for section, entries in legacy_scores.items():
+        if not isinstance(entries, dict):
+            continue
+        card_to_slug: dict[int, str] = {}
+        for slug in _slugs_for_legacy_section(section):
+            factory = ALL_DECKS.get(slug)
+            if factory is None:
+                continue
+            for card in factory().cards:
+                # First writer wins. Ids are disjoint by hand-allocation, so a
+                # collision here means the id ranges in domain/decks.py have
+                # overlapped — see finding A1.
+                card_to_slug.setdefault(card.id, slug)
+        for raw_card_id, raw_score in entries.items():
+            try:
+                card_id = int(raw_card_id)
+                score = int(raw_score)
+            except (TypeError, ValueError):
+                unresolved += 1
+                continue
+            slug = card_to_slug.get(card_id)
+            if slug is None:
+                unresolved += 1
+                continue
+            by_deck.setdefault(slug, {})[card_id] = score
+
+    cards_imported = sum(
+        repository.set_deck_scores(slug, scores) for slug, scores in by_deck.items()
+    )
+    return asdict(
+        CardMasteryImportPayload(
+            imported=True,
+            cards_imported=cards_imported,
+            cards_unresolved=unresolved,
+            decks_written=len(by_deck),
+        )
+    )
+
+
 def record_game_result(
     slug: str,
     card_id: int,
@@ -3042,6 +3179,14 @@ def record_game_result(
         xp_gained = XP_CORRECT_ANSWER if dedup not in progress.applied_dedup_keys else 0
         level_after = new_progress.level
 
+    # Step the per-card mastery counter on the same call that persisted the review
+    # (issue #66). It rides here rather than in its own command because the bridge
+    # is strictly serial — a second round-trip would cost latency on every answer,
+    # and a counter written independently of the review is the drift the issue is
+    # about. The new value goes back in the payload so the renderer displays stored
+    # state instead of recomputing its own.
+    mastery_score = _card_mastery_repository().apply_result(slug, card_id, is_correct=is_correct)
+
     # review_minigame_result() above logs exactly one review_events row, so
     # the pre-review total is always one less than the post-review total.
     total_reviews_after = count_total_reviews()
@@ -3061,6 +3206,7 @@ def record_game_result(
         "interval": updated_state.interval,
         "next_review": updated_state.next_review.isoformat(),
         "ease_factor": updated_state.ease_factor,
+        "mastery_score": mastery_score,
         "confidence_score": None if confidence_score is None else max(1, min(5, int(confidence_score))),
         "curriculum_stage": load_curriculum_stages(deck.name, stage_mode, [card_id]).get(card_id, 1)
         if stage_mode
@@ -3567,6 +3713,23 @@ def _cmd_record_result(argv: list[str]) -> tuple[int, dict[str, object]]:
     except ValueError as exc:
         return 2, {"error": str(exc)}
     return 0, payload
+
+
+def _cmd_card_scores(argv: list[str]) -> tuple[int, dict[str, object]]:
+    del argv
+    return 0, build_card_mastery_scores()
+
+
+def _cmd_import_card_scores(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: import-card-scores <legacy_scores_json>"}
+    try:
+        parsed = json.loads(argv[1])
+    except (TypeError, ValueError) as exc:
+        return 2, {"error": f"Invalid legacy scores JSON: {exc}"}
+    if not isinstance(parsed, dict):
+        return 2, {"error": "Legacy scores JSON must be an object keyed by section"}
+    return 0, import_legacy_card_scores(parsed)
 
 
 def _cmd_session_start(argv: list[str]) -> tuple[int, dict[str, object]]:
@@ -4203,6 +4366,8 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "overview-character-mastery": _cmd_overview_character_mastery,
     "reset-db": _cmd_reset_db,
     "record-result": _cmd_record_result,
+    "card-scores": _cmd_card_scores,
+    "import-card-scores": _cmd_import_card_scores,
     "session-start": _cmd_session_start,
     "session-summary": _cmd_session_summary,
     "daily-goal": _cmd_daily_goal,

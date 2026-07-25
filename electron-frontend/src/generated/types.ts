@@ -237,6 +237,17 @@ export interface DailyGamesPracticeSeedPayload {
   seed: number
 }
 
+export interface CardMasteryScoresPayload {
+  scores: Record<string, Record<number, number>>
+}
+
+export interface CardMasteryImportPayload {
+  imported: boolean
+  cards_imported: number
+  cards_unresolved: number
+  decks_written: number
+}
+
 export interface PitchAccent {
   reading: string
   pitch_positions: number[]
