@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from data import database
 from data.fsrs_optimization import (
     load_review_sequences,
@@ -22,6 +24,18 @@ from domain.fsrs_optimizer import (
     optimize_weights,
 )
 from domain.scheduler import ReviewState, reset_weights as reset_active_weights
+
+
+@pytest.fixture(autouse=True)
+def _restore_active_weights():
+    """Keep this module's weight mutations from leaking into other tests.
+
+    ``save_weights`` and ``run_optimization`` install their weights as the
+    scheduler's module-global active set, so without this any later test that
+    depends on the default FSRS weights sees whatever this file left behind.
+    """
+    yield
+    reset_active_weights()
 
 
 def _use_temp_db(tmp_path: Path, monkeypatch) -> None:
