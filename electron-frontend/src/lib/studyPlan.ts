@@ -168,8 +168,21 @@ export function buildStudyPlan(
     .slice(0, 3)
 
   const totalCards = coverageRows.reduce((sum, row) => sum + row.total, 0)
-  const overallMastery = totalCards > 0
-    ? coverageRows.reduce((sum, row) => sum + (row.mastery * row.total), 0) / totalCards
+  // `learnerStage` means "how far through the six tracks", so every row counts
+  // equally instead of in proportion to its deck size. Card-count weighting let a
+  // track's influence be decided by how much content happened to ship: lifting the
+  // vocabulary caps (#67) grew the `vocab_*` aggregate from ~2,000 to ~8,200 cards,
+  // which handed vocab ~76% of the weight at near-zero mastery and pushed
+  // `overallMastery` back under the 0.25 `building` threshold — demoting learners
+  // who had not lost any progress, and re-routing their study-plan shortcuts to
+  // starter minigames (#75).
+  //
+  // The denominator is every coverage row, locked ones included, so it is fixed.
+  // Averaging only the unlocked rows would reproduce the same bug from the other
+  // direction: katakana unlocks at 35% hiragana, so crossing that line would add a
+  // 0%-mastery row to the mean and demote the learner for making progress.
+  const overallMastery = coverageRows.length > 0
+    ? coverageRows.reduce((sum, row) => sum + row.mastery, 0) / coverageRows.length
     : 0
   const learnerStage = getStudyPlanStage(overallMastery, totalCards, currentStreak)
   const recommendedMinutes = weeklyActivity.week.reviewed >= 24
