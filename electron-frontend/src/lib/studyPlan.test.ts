@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildStudyPlan, getStudyPlanStage } from './studyPlan'
-import type { ScriptKey, StudyPlanSnapshot, StudyPlanStage, StudySummaryPayload } from '../types'
+import {
+  buildStudyPlan, getStudyPlanRecallFloor, getStudyPlanShortcutMinigame, getStudyPlanStage,
+  getStudyPlanTargetMastery,
+} from './studyPlan'
+import type {
+  ScriptKey, StudyPlanCoverageRow, StudyPlanSnapshot, StudyPlanStage, StudySummaryPayload,
+} from '../types'
 
 type Deck = StudySummaryPayload['decks'][number]
 
@@ -265,14 +270,12 @@ describe('buildStudyPlan learner stage', () => {
     expect(snapshot.shortcutRows.map((shortcut) => shortcut.minigame)).not.toContain('typed_recall')
   })
 
-  it('can route an untouched vocabulary track to typed recall at building', () => {
-    // Documents a consequence of the #75 fix rather than endorsing it. The old
-    // card-weighted average put this learner at 0.027 — `starter`, routing to
-    // `meaning_match` — so the `building`/`advanced` branches of
-    // `getStudyPlanShortcutMinigame` were effectively unreachable. Now that
-    // kana mastery alone reaches `building`, `vocab_n5` at index 0 resolves to
-    // `typed_recall` even at 0% mastery. Whether the routing table needs a
-    // per-row mastery floor is a separate question from the weighting.
+  it('holds an untouched vocabulary track on recognition even at building', () => {
+    // The #75 fix made `building` reachable from kana mastery alone, which exposed
+    // the routing table's `building` branch for the first time and sent `vocab_n5`
+    // at index 0 to `typed_recall` at 0% mastery — a production drill on unseen
+    // cards. The per-row recall floor is what now catches that: the stage still
+    // says `building`, but the shortcut falls back to recognition.
     const snapshot = plan([
       deck('hiragana', 104, 104),
       deck('katakana', 104, 104),
@@ -284,7 +287,7 @@ describe('buildStudyPlan learner stage', () => {
 
     expect(snapshot.learnerStage).toBe('building')
     expect(snapshot.shortcutRows[0].script).toBe('vocab_n5')
-    expect(snapshot.shortcutRows[0].minigame).toBe('typed_recall')
+    expect(snapshot.shortcutRows[0].minigame).toBe('meaning_match')
   })
 
   it('stays at starter without a streak regardless of mastery', () => {
@@ -365,5 +368,135 @@ describe('buildStudyPlan learner stage without the trackedCards gate', () => {
 
   it('reports starter without a streak no matter how high mastery is', () => {
     expect(stage(corpus(0.8), 1)).toBe('starter')
+  })
+})
+
+function coverageRow(key: ScriptKey, mastery: number): StudyPlanCoverageRow {
+  return { key, label: key, mastery, total: 100, unlocked: true, difficulty: 0 }
+}
+
+const SCRIPTS: ScriptKey[] = [
+  'hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples',
+]
+
+describe('getStudyPlanShortcutMinigame recall floor', () => {
+  // `learnerStage` is a whole-account average, so a learner can reach `building` or
+  // `advanced` on the strength of tracks other than the one being routed. Without a
+  // per-track floor that sends them into a production drill on a track they have
+  // never opened.
+  it('routes an untouched vocabulary track to recognition at building', () => {
+    expect(getStudyPlanShortcutMinigame(coverageRow('vocab_n5', 0), 'building', 0)).toBe('meaning_match')
+  })
+
+  it('routes an untouched kanji track to recognition at advanced', () => {
+    expect(getStudyPlanShortcutMinigame(coverageRow('kanji_n5', 0), 'advanced', 0)).toBe('meaning_match')
+    expect(getStudyPlanShortcutMinigame(coverageRow('kanji_n5', 0), 'advanced', 1)).toBe('character_match')
+  })
+
+  it('gates grammar and sentence tracks off particle cloze while untouched', () => {
+    expect(getStudyPlanShortcutMinigame(coverageRow('grammar_patterns', 0), 'building', 0)).toBe('meaning_match')
+    expect(getStudyPlanShortcutMinigame(coverageRow('sentence_examples', 0), 'advanced', 1)).toBe('character_match')
+  })
+
+  // The floor must sit strictly below the target mastery that decides which rows
+  // become shortcuts in the first place. Shortcut rows are drawn from `focusRows`,
+  // which — whenever any unlocked row is below target — contains only rows with
+  // `mastery < target`. A floor equal to the target would make every gated drill
+  // dead code on this path.
+  it('leaves every gated drill reachable below its track target', () => {
+    const reachable = (key: ScriptKey) => {
+      const mastery = (getStudyPlanRecallFloor(key) + getStudyPlanTargetMastery(key)) / 2
+      expect(mastery).toBeLessThan(getStudyPlanTargetMastery(key))
+      return mastery
+    }
+
+    expect(getStudyPlanShortcutMinigame(coverageRow('kanji_n5', reachable('kanji_n5')), 'building', 1)).toBe('typed_recall')
+    expect(getStudyPlanShortcutMinigame(coverageRow('kanji_n5', reachable('kanji_n5')), 'advanced', 1)).toBe('stroke_order')
+    expect(getStudyPlanShortcutMinigame(coverageRow('vocab_n5', reachable('vocab_n5')), 'building', 0)).toBe('typed_recall')
+    expect(getStudyPlanShortcutMinigame(coverageRow('vocab_n5', reachable('vocab_n5')), 'advanced', 0)).toBe('particle_cloze')
+  })
+
+  it('keeps the floor below the target for every track', () => {
+    for (const key of SCRIPTS) {
+      expect(getStudyPlanRecallFloor(key)).toBeLessThan(getStudyPlanTargetMastery(key))
+      expect(getStudyPlanRecallFloor(key)).toBeGreaterThan(0)
+    }
+  })
+
+  // Regression guard: the coverage row keyed `vocab_n5` actually carries the
+  // all-levels vocab aggregate, so gating on `row.mastery` would measure N5
+  // progress against a ~8,200-card N5→N1 denominator. A learner who has mastered
+  // the entire N5 deck reads as ~9% there and would be pinned to recognition
+  // drills forever. Same defect class as the #67 grammar-readiness fix above.
+  it('gates the vocabulary shortcut on N5 progress, not the N5→N1 aggregate', () => {
+    // Proportions mirror the real corpus: the N5 vocabulary categories are 145 of
+    // the 545 reachable cards, so a learner who has mastered every N5 word reads as
+    // 0.266 whole-track — under the 0.36 floor. Scoping to N5 is what keeps them
+    // from being stranded on recognition drills.
+    const decks = [
+      deck('hiragana', 104, 104),
+      deck('katakana', 104, 104),
+      deck('vocab_greetings', 40, 40),
+      deck('vocab_numbers', 35, 35),
+      deck('vocab_family', 40, 40),
+      deck('vocab_body', 30, 30),
+      deck('vocab_n4_school_work', 100, 0),
+      deck('vocab_n3_media_arts', 150, 0),
+      deck('vocab_n1_law_justice', 150, 0),
+    ]
+    const plan = buildStudyPlan(decks, [], [], ACTIVITY, 4)
+    expect(plan.learnerStage).toBe('building')
+
+    const vocabRow = plan.coverageRows.find((entry) => entry.key === 'vocab_n5')
+    if (!vocabRow) throw new Error('vocab_n5 coverage row missing')
+    const vocabShortcut = plan.shortcutRows.find((entry) => entry.script === 'vocab_n5')
+    if (!vocabShortcut) throw new Error('vocab_n5 shortcut missing')
+
+    // The row itself still reports the diluted aggregate — that is the display
+    // contract, and this test is not trying to change it.
+    expect(vocabRow.mastery).toBeLessThan(getStudyPlanRecallFloor('vocab_n5'))
+
+    // ...but the shortcut must not be gated by it, because N5 is fully mastered.
+    // Gating on `row.mastery` would downgrade this to a recognition drill.
+    expect(vocabShortcut.minigame).toBe('particle_cloze')
+  })
+
+  // The floor is target/2, so clearing it takes a specific share of the track. Pins
+  // that full N5 actually clears it on both tracks against the real proportions —
+  // a future content import that shifts the N5 share back under the floor would
+  // strand learners on recognition drills, and this is what would catch it.
+  // Kanji has only 0.07 of margin: 91 of 211 cards is 0.431 against a 0.36 floor.
+  it('lets a learner who has finished N5 out of recognition drills on both tracks', () => {
+    const plan = buildStudyPlan([
+      deck('hiragana', 104, 104),
+      deck('katakana', 104, 104),
+      deck('vocab_greetings', 40, 40),
+      deck('vocab_numbers', 35, 35),
+      deck('vocab_family', 40, 40),
+      deck('vocab_body', 30, 30),
+      deck('vocab_n4_school_work', 100, 0),
+      deck('vocab_n3_media_arts', 150, 0),
+      deck('vocab_n1_law_justice', 150, 0),
+      deck('kanji_numbers_time', 30, 30),
+      deck('kanji_nature_world', 31, 31),
+      deck('kanji_people_body', 30, 30),
+      deck('kanji_n4_society_roles', 60, 0),
+      deck('kanji_n3_governance', 60, 0),
+    ], [], [], ACTIVITY, 4)
+
+    for (const key of ['kanji_n5', 'vocab_n5'] as const) {
+      const shortcut = plan.shortcutRows.find((entry) => entry.script === key)
+      if (!shortcut) throw new Error(`${key} shortcut missing`)
+      expect(['meaning_match', 'character_match']).not.toContain(shortcut.minigame)
+    }
+  })
+
+  it('leaves the starter routes and the kana tracks untouched', () => {
+    for (const key of SCRIPTS) {
+      expect(getStudyPlanShortcutMinigame(coverageRow(key, 0), 'starter', 0))
+        .toBe(key === 'kanji_n5' ? 'character_match' : 'meaning_match')
+    }
+    expect(getStudyPlanShortcutMinigame(coverageRow('hiragana', 0), 'building', 1)).toBe('romaji_sprint')
+    expect(getStudyPlanShortcutMinigame(coverageRow('katakana', 0), 'advanced', 0)).toBe('interleave_mix')
   })
 })

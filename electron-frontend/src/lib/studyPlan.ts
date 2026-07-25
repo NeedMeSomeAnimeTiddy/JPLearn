@@ -15,20 +15,54 @@ export function getStudyPlanStage(overallMastery: number, currentStreak: number)
   return 'advanced'
 }
 
-export function getStudyPlanShortcutMinigame(row: StudyPlanCoverageRow, stage: StudyPlanStage, index: number): MinigameKey {
-  if (row.key === 'hiragana' || row.key === 'katakana') {
+// Drills that ask the learner to *produce* an item from memory rather than pick it
+// out of a lineup. They are only useful on a track that is already underway.
+const RECALL_DRILLS: ReadonlySet<MinigameKey> = new Set<MinigameKey>([
+  'typed_recall',
+  'stroke_order',
+  'particle_cloze',
+])
+
+// `learnerStage` is a whole-account average, so on its own it will happily route a
+// learner into production drills on a track they have never opened — two mastered
+// kana tracks are enough to reach `building`. Each track therefore carries its own
+// floor: half of the mastery the plan is steering that track toward. Below it the
+// shortcut drops back to recognition.
+export function getStudyPlanRecallFloor(script: ScriptKey): number {
+  return getStudyPlanTargetMastery(script) / 2
+}
+
+// `trackMastery` defaults to the row's own mastery, but callers should pass an
+// N5-scoped figure for the kanji/vocab rows — see the note at the call site in
+// `buildStudyPlan`, where `row.mastery` spans N5→N1 rather than the N5 the row is
+// labelled with.
+export function getStudyPlanShortcutMinigame(
+  row: StudyPlanCoverageRow,
+  stage: StudyPlanStage,
+  index: number,
+  trackMastery: number = row.mastery,
+): MinigameKey {
+  const minigame = getStudyPlanStageMinigame(row.key, stage, index)
+  if (RECALL_DRILLS.has(minigame) && trackMastery < getStudyPlanRecallFloor(row.key)) {
+    return index === 0 ? 'meaning_match' : 'character_match'
+  }
+  return minigame
+}
+
+function getStudyPlanStageMinigame(key: ScriptKey, stage: StudyPlanStage, index: number): MinigameKey {
+  if (key === 'hiragana' || key === 'katakana') {
     if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
     if (stage === 'building') return index === 0 ? 'character_match' : 'romaji_sprint'
     return index === 0 ? 'interleave_mix' : 'character_match'
   }
 
-  if (row.key === 'kanji_n5') {
+  if (key === 'kanji_n5') {
     if (stage === 'starter') return index === 0 ? 'character_match' : 'meaning_match'
     if (stage === 'building') return index === 0 ? 'character_match' : 'typed_recall'
     return index === 0 ? 'typed_recall' : 'stroke_order'
   }
 
-  if (row.key === 'vocab_n5') {
+  if (key === 'vocab_n5') {
     if (stage === 'starter') return index === 0 ? 'meaning_match' : 'character_match'
     if (stage === 'building') return index === 0 ? 'typed_recall' : 'particle_cloze'
     return index === 0 ? 'particle_cloze' : 'imposter'
@@ -73,10 +107,17 @@ export function getStudyPlanTargetMastery(script: ScriptKey): number {
 const KANJI_STUDY_DECK = /^kanji_(?!n[1-5]$)/
 const VOCAB_STUDY_DECK = /^vocab_(?!n[1-5]$)/
 
-// The N5 slice of the same category decks — the twelve whose slug carries no
-// level infix (`vocab_greetings`, not `vocab_n4_home_living`). Only the grammar
-// gate needs this scope, so there is no kanji counterpart.
+// The N5 slice of the same category decks — those whose slug carries no level
+// infix (`vocab_greetings`, not `vocab_n4_home_living`). Two gates need this
+// narrower scope, because both ask an N5-shaped question that the whole-track
+// aggregate answers wrongly: `grammarReady` (N5 grammar must not wait on N1
+// words) and the recall floor in `getStudyPlanShortcutMinigame` (the N5
+// categories are only 145 of 545 vocabulary cards and 91 of 211 kanji, so a
+// learner who has mastered all of N5 reads as 0.27 / 0.43 whole-track — below
+// the vocabulary floor of 0.36, which would strand them on recognition drills
+// forever).
 const VOCAB_N5_STUDY_DECK = /^vocab_(?!n[1-5](?:_|$))/
+const KANJI_N5_STUDY_DECK = /^kanji_(?!n[1-5](?:_|$))/
 
 export function aggregateDeckMastery(
   decks: StudySummaryPayload['decks'],
@@ -138,6 +179,7 @@ export function buildStudyPlan(
   // `grammarReady` permanently false and grammar unreachable in the shipped app.
   // Matching the N5 category decks is what the gate was always meant to measure.
   const vocabN5 = aggregateDeckMastery(decks, (slug) => VOCAB_N5_STUDY_DECK.test(slug))
+  const kanjiN5 = aggregateDeckMastery(decks, (slug) => KANJI_N5_STUDY_DECK.test(slug))
 
   const hiraganaReady = hiragana.mastery >= 0.35
   const kanjiReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.45
@@ -220,7 +262,6 @@ export function buildStudyPlan(
     })
     .slice(0, 3)
 
-  const totalCards = coverageRows.reduce((sum, row) => sum + row.total, 0)
   // `learnerStage` means "how far through the six tracks", so every row counts
   // equally instead of in proportion to its deck size. Card-count weighting let a
   // track's influence be decided by how much content happened to ship: lifting the
@@ -250,8 +291,24 @@ export function buildStudyPlan(
       ? `Keep the streak alive with a short mixed review.`
       : 'Build the plan after your first few rounds and it will highlight your weakest active track.'
 
+  // The kanji_n5/vocab_n5 rows carry the whole-track aggregates, so `row.mastery`
+  // there answers "how far through N5→N1". The recall floor wants the N5-scoped
+  // figure instead, for the same reason `grammarReady` does above: the N5 categories
+  // are 145 of 545 vocabulary cards, so a learner who has mastered every N5 word
+  // reads as 0.27 against the track — under the 0.36 floor, which would hold them on
+  // recognition drills indefinitely.
+  //
+  // The `.total === 0` fallback means "no N5 category deck was reported at all", and
+  // deliberately mirrors `grammarReady`'s permissive shape: fall back to the
+  // whole-track figure rather than to 0, so an incomplete summary degrades to the
+  // pre-floor behaviour instead of silently locking recall drills off.
+  const recallMastery: Partial<Record<ScriptKey, number>> = {
+    kanji_n5: (kanjiN5.total > 0 ? kanjiN5 : kanji).mastery,
+    vocab_n5: (vocabN5.total > 0 ? vocabN5 : vocab).mastery,
+  }
+
   const shortcutRows = focusRows.slice(0, 3).map((row, index) => {
-    const minigame = getStudyPlanShortcutMinigame(row, learnerStage, index)
+    const minigame = getStudyPlanShortcutMinigame(row, learnerStage, index, recallMastery[row.key] ?? row.mastery)
     const script: ScriptKey = row.key
     const title = MINIGAMES.find((game) => game.key === minigame)?.title ?? minigame
     const stageLabel = learnerStage === 'starter'
