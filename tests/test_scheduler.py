@@ -138,14 +138,24 @@ class TestSameDayReviews:
                 assert drilled < waited
 
     def test_same_day_drilling_cannot_reach_the_mastered_interval(self) -> None:
-        """Mastered is repetitions >= 3 AND interval >= 21; reps hits 3 quickly,
-        so the interval half must stay out of reach within a single session."""
-        state = ReviewState(card_id=1)
-        for _ in range(25):
-            state = update(state, quality=EASY, today=self.DAY)
+        """Mastered is repetitions >= 3 AND interval >= 21; reps hits 3 within a
+        few answers, so the interval half is what keeps in-session drilling from
+        minting mastery.
 
-        assert state.repetitions == 25
-        assert state.interval < 21
+        Pins the exact repeat count that crosses the threshold rather than just
+        asserting "not yet", so raising SAME_DAY_ELAPSED_DAYS cannot quietly
+        bring mastery within reach while leaving the documented figures in
+        domain/scheduler.py stale and the suite green.
+        """
+        for quality, expected_crossing in ((EASY, 37), (GOOD, 167)):
+            state = ReviewState(card_id=1)
+            crossed_at = None
+            for n in range(1, expected_crossing + 1):
+                state = update(state, quality=quality, today=self.DAY)
+                if crossed_at is None and state.interval >= 21:
+                    crossed_at = n
+
+            assert crossed_at == expected_crossing
 
     def test_same_day_again_still_resets_and_is_not_floored(self) -> None:
         """Lapses already respond to same-day reviews via the post-lapse

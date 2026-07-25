@@ -168,10 +168,15 @@ def compute_loss(
                 difficulty = _init_difficulty(weights, r)
             else:
                 # Mirror the scheduler's same-day floor so replayed state
-                # advances the way the live scheduler would. The loss term
-                # above deliberately keeps the raw elapsed time: it scores a
-                # prediction about actual recall, and is already guarded
-                # against the degenerate elapsed == 0 case by _EPS_R.
+                # advances the way the live scheduler would.
+                #
+                # The loss term above deliberately keeps the raw elapsed time,
+                # and the asymmetry is intentional rather than an oversight:
+                # _retrievability(0, S) is 1 / (1 + 0) == 1 regardless of the
+                # weights, so a same-day review's loss contribution is a
+                # constant that cancels in the finite-difference gradient in
+                # optimize_weights. Flooring it there would shift the reported
+                # loss without changing a single fitted weight.
                 elapsed_for_update = (
                     max(SAME_DAY_ELAPSED_DAYS, elapsed) if r > 1 else elapsed
                 )
