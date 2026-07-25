@@ -8,13 +8,20 @@ while the counter tracks how the learner is doing on it right now.
 Measured against :mod:`domain.scheduler`, FSRS state cannot produce a gradual
 0..4 scale in either direction:
 
-* Six correct answers inside one session leave ``interval`` unchanged at 6 and
-  ``stability`` at 5.80. Same-day reviews see ``elapsed_days == 0``, so
-  retrievability is ~1 and the stability-increase term vanishes.
-* Spaced reviews across due dates jump ``interval`` 6 → 43 → 271 → 1500, so
-  there is no region where intermediate thresholds would mean anything.
+* ``repetitions`` counts distinct successful *days*, so it stays pinned at 1
+  through an entire session however many times a card is answered — it cannot
+  express within-session progress at all.
+* Six correct answers inside one session move ``interval`` only 6 → 8
+  (``stability`` 5.80 → 7.80) via the short-term path for same-day reviews.
+  Spaced reviews then jump ``interval`` 6 → 43 → 271 → 1500, so no fixed set of
+  intermediate thresholds means the same thing at both scales.
 * ``repetitions`` resets to 0 on any *Again* rating, so a single lapse would
   empty a bar that this counter steps down by one.
+
+(Before same-day reviews were given a short-term path, ``interval`` and
+``stability`` did not move within a session at all. The conclusion is unchanged:
+the counter still cannot be derived, and ``repetitions`` became *less* usable for
+it, not more.)
 
 So the counter is stored in its own right rather than recomputed. It lives in
 one place — ``card_mastery_scores`` in SQLite, keyed by ``(deck, card_id)`` —

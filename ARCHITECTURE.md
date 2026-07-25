@@ -241,13 +241,14 @@ interchangeable — each answers its own question:
 | Block passed | `repetitions >= 1` (`domain/blocks.py`) | block unlock gating |
 
 The counter is deliberately **not derived** from FSRS state. Measured against
-`domain/scheduler.py`: six correct answers inside one session leave `interval` at 6 and
-`stability` at 5.80 (same-day reviews see `elapsed_days == 0`, so retrievability is ~1
-and the stability-increase term vanishes), while spaced reviews jump `interval`
-6 → 43 → 271 → 1500. `repetitions` resets to 0 on any *Again* rating. So FSRS state
-cannot express a gradual 0..4 scale in either direction, and a bar derived from it would
-sit frozen for a whole session and then jump. #66's original suggested fix ("make
-`cardScores` a derived cache") was abandoned for this reason.
+`domain/scheduler.py`: `repetitions` counts distinct successful *days*, so it stays
+pinned at 1 through a whole session however many answers it takes; six same-day correct
+answers move `interval` only 6 → 8 (`stability` 5.80 → 7.80) through the short-term
+path; spaced reviews then jump `interval` 6 → 43 → 271 → 1500; and `repetitions` resets
+to 0 on any *Again* rating. So FSRS state cannot express a gradual 0..4 scale in either
+direction, and a bar derived from it would barely move within a session and then jump.
+#66's original suggested fix ("make `cardScores` a derived cache") was abandoned for
+this reason.
 
 The counter is written on the same bridge call that persists the review
 (`record-result` returns the new value), and `reset_db` clears it in the same

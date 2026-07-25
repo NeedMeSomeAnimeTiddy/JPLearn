@@ -31,9 +31,10 @@ def test_score_is_floored_at_zero() -> None:
 def test_four_correct_answers_reach_mastery_from_scratch() -> None:
     """The in-session progression the counter exists to provide.
 
-    FSRS cannot express this: six correct answers in one day leave ``interval``
-    pinned at 6, so a bar derived from scheduling state would not move at all
-    during a session. See the module docstring in ``domain/mastery.py``.
+    FSRS cannot express this: ``repetitions`` counts distinct successful days, so
+    it stays at 1 for the whole session, and six same-day answers move
+    ``interval`` only 6 → 8. A bar derived from scheduling state would barely
+    move. See the module docstring in ``domain/mastery.py``.
     """
     score = 0
     for _ in range(CARD_MASTERY_MAX):
