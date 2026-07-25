@@ -138,6 +138,37 @@ def _quality_to_fsrs_rating(quality: int) -> int:
     return 4
 
 
+def effective_rating(quality: int, confidence: int | None = None) -> int:
+    """Return the FSRS rating (1=Again..4=Easy) one review outcome produces.
+
+    Public because replaying a stored review log has to derive exactly the
+    rating the live scheduler derived, blending included; duplicating the blend
+    at the call site is how a replay silently diverges from production.
+    """
+    effective_quality = (
+        round(quality * 0.7 + confidence * 0.3) if confidence is not None else quality
+    )
+    return _quality_to_fsrs_rating(effective_quality)
+
+
+def next_repetitions(repetitions: int, rating: int, *, is_same_day: bool) -> int:
+    """Return the repetitions count after one review.
+
+    Counts distinct days carrying a successful review since the last lapse. The
+    ``repetitions > 0`` guard keeps a successful review always worth at least
+    one count, so a card recovered in the same session it lapsed still reads as
+    seen to the ``repetitions > 0`` checks elsewhere in the app.
+
+    Shared by :func:`update` and by log replay so the two cannot disagree about
+    what a review is worth.
+    """
+    if rating == 1:
+        return 0
+    if is_same_day and repetitions > 0:
+        return repetitions
+    return repetitions + 1
+
+
 def _initial_stability(rating: int) -> float:
     return max(0.1, _W[rating - 1])
 
@@ -217,10 +248,7 @@ def update(
     advance ``repetitions`` past the day's first success. Lapses are unaffected
     — they already respond to same-day reviews via the post-lapse formula.
     """
-    effective_quality = (
-        round(quality * 0.7 + confidence * 0.3) if confidence is not None else quality
-    )
-    rating = _quality_to_fsrs_rating(effective_quality)
+    rating = effective_rating(quality, confidence)
     review_day = today if today is not None else date.today()
 
     # Both same-day rules below derive from this one flag, so the scheduling
@@ -242,13 +270,7 @@ def update(
         )
         state.difficulty = _next_difficulty(state.difficulty, rating)
 
-    if rating == 1:
-        state.repetitions = 0
-    elif not is_same_day or state.repetitions == 0:
-        # The `repetitions == 0` clause keeps a successful review always worth
-        # at least one count, so a card recovered in the same session it lapsed
-        # still reads as seen to the `repetitions > 0` checks elsewhere.
-        state.repetitions += 1
+    state.repetitions = next_repetitions(state.repetitions, rating, is_same_day=is_same_day)
     state.interval = _interval_for_stability(state.stability)
     state.ease_factor = _ease_factor_for_difficulty(state.difficulty)
     state.last_review = review_day
