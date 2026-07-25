@@ -12,6 +12,12 @@ from __future__ import annotations
 import math
 from typing import TypedDict
 
+# The one value that is imported rather than duplicated: it is a plain constant
+# with none of the module-global weight state the duplication above avoids, and
+# the optimizer must advance replayed state exactly as the live scheduler does
+# or it fits weights against a model that is not the one scheduling cards.
+from domain.scheduler import SAME_DAY_ELAPSED_DAYS
+
 
 class ReviewLog(TypedDict):
     """One review event within a card's sequence.
@@ -161,7 +167,15 @@ def compute_loss(
                 stability = _init_stability(weights, r)
                 difficulty = _init_difficulty(weights, r)
             else:
-                r_for_update = _retrievability(elapsed, stability)
+                # Mirror the scheduler's same-day floor so replayed state
+                # advances the way the live scheduler would. The loss term
+                # above deliberately keeps the raw elapsed time: it scores a
+                # prediction about actual recall, and is already guarded
+                # against the degenerate elapsed == 0 case by _EPS_R.
+                elapsed_for_update = (
+                    max(SAME_DAY_ELAPSED_DAYS, elapsed) if r > 1 else elapsed
+                )
+                r_for_update = _retrievability(elapsed_for_update, stability)
                 stability = max(0.1, _next_stability(weights, stability, difficulty, r_for_update, r))
                 difficulty = _next_difficulty(weights, difficulty, r)
     return total_loss / max(1, count)
