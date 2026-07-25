@@ -43,6 +43,36 @@ export function getStudyPlanTargetMastery(script: ScriptKey): number {
   return 0.68
 }
 
+// `decks` is the bridge `summary` payload, which walks the whole `ALL_DECKS`
+// registry in domain/decks.py. That registry holds two parallel corpora per
+// track: the five JLPT *level* decks (`vocab_n5`..`vocab_n1`) and the *thematic
+// category* decks from issue #68 (`vocab_greetings`, `vocab_n4_school_work`, …).
+// Their card ids are disjoint — nothing is double-counted — but only the
+// category decks are ever studied. `resultSlug` in
+// features/study-session/useStudySession.ts:1159-1164 routes every review from
+// the kanji/vocab sections through KANJI_/VOCAB_CATEGORY_TO_DECK_SLUG, so no
+// review is ever recorded against a level deck; the level decks are marked
+// "kept for backward compatibility" in decks.py and are loaded only to seed
+// onboarding scores. Confirmed against data/jplearn.db: every deck holding
+// review rows is a category deck or hiragana/grammar, never a level deck.
+//
+// So a level-deck denominator can never move — it would peg these rows at
+// exactly 0 over 8,031 vocab / 2,196 kanji cards forever. Aggregating the
+// category decks (545 vocab / 211 kanji cards) measures the content the learner
+// can actually reach, which is what `focusRows`/`needsWorkRows` need. Both sets
+// still span N5→N1, so these stay whole-track rows.
+//
+// The negative lookahead excludes only an exact level slug. `vocab_numbers` and
+// `vocab_nouns` begin `vocab_n` but are N5 categories, so matching on a bare
+// `_n` prefix would silently drop them.
+const KANJI_STUDY_DECK = /^kanji_(?!n[1-5]$)/
+const VOCAB_STUDY_DECK = /^vocab_(?!n[1-5]$)/
+
+// The N5 slice of the same category decks — the twelve whose slug carries no
+// level infix (`vocab_greetings`, not `vocab_n4_home_living`). Only the grammar
+// gate needs this scope, so there is no kanji counterpart.
+const VOCAB_N5_STUDY_DECK = /^vocab_(?!n[1-5](?:_|$))/
+
 export function aggregateDeckMastery(
   decks: StudySummaryPayload['decks'],
   predicate: (slug: string) => boolean,
@@ -83,20 +113,26 @@ export function buildStudyPlan(
   const grammar = aggregateDeckMastery(decks, (slug) => slug === 'grammar_patterns')
   const sentences = aggregateDeckMastery(decks, (slug) => slug === 'sentence_examples')
 
-  const kanjiFromDecks = aggregateDeckMastery(decks, (slug) => slug.startsWith('kanji_'))
-  const vocabFromDecks = aggregateDeckMastery(decks, (slug) => slug.startsWith('vocab_'))
+  const kanjiFromDecks = aggregateDeckMastery(decks, (slug) => KANJI_STUDY_DECK.test(slug))
+  const vocabFromDecks = aggregateDeckMastery(decks, (slug) => VOCAB_STUDY_DECK.test(slug))
   const kanjiFallback = aggregateJlptMastery(kanjiLevels)
   const vocabFallback = aggregateJlptMastery(vocabLevels)
 
   const kanji = kanjiFromDecks.total > 0 ? kanjiFromDecks : kanjiFallback
   const vocab = vocabFromDecks.total > 0 ? vocabFromDecks : vocabFallback
 
-  // N5 grammar readiness depends on N5 vocabulary, so it is measured against
-  // vocab_n5 alone rather than the all-levels `vocab` aggregate — which spans
+  // N5 grammar readiness depends on N5 vocabulary, so it is measured against the
+  // N5 decks alone rather than the whole-track `vocab` aggregate — which spans
   // N5→N1 and would make N5 grammar wait on N1 words. The distinction became
-  // load-bearing once vocab level decks stopped being truncated (issue #67)
-  // and the aggregate denominator grew from ~2,000 cards to ~8,200.
-  const vocabN5 = aggregateDeckMastery(decks, (slug) => slug === 'vocab_n5')
+  // load-bearing once vocab decks stopped being truncated (issue #67).
+  //
+  // This previously matched `slug === 'vocab_n5'`, the level deck. That deck is
+  // reported by `summary` with a nonzero `total` but never receives a review (see
+  // the note on VOCAB_STUDY_DECK), so its mastery was pinned at 0 while its
+  // nonzero total kept the `.total > 0` branch below selecting it — leaving
+  // `grammarReady` permanently false and grammar unreachable in the shipped app.
+  // Matching the N5 category decks is what the gate was always meant to measure.
+  const vocabN5 = aggregateDeckMastery(decks, (slug) => VOCAB_N5_STUDY_DECK.test(slug))
 
   const hiraganaReady = hiragana.mastery >= 0.35
   const kanjiReady = hiragana.mastery >= 0.7 && katakana.mastery >= 0.45
@@ -104,6 +140,18 @@ export function buildStudyPlan(
   const grammarReady = (vocabN5.total > 0 ? vocabN5 : vocab).mastery >= 0.45
   const sentencesReady = grammar.mastery >= 0.45
 
+  // Scope of the `kanji_n5` / `vocab_n5` rows: the whole track, N5→N1 — not N5.
+  // The `_n5` in the key is vestigial. `ScriptKey` is the app's six *section*
+  // ids, not deck slugs (issue #66: six ScriptKey values against 45+ decks
+  // registered in domain/decks.py), and the section these two keys name spans
+  // every level — `activeDeckSlug` in App.tsx resolves `vocab_n5` through
+  // `VOCAB_CATEGORY_TO_DECK_SLUG`, whose entries reach `vocab_n1_law_justice`.
+  // `SCRIPT_LABELS` already reflects that: 'Kanji' and 'Vocabulary', no level.
+  // So these rows stay track-wide, and no label rename is needed.
+  //
+  // Deliberately NOT `vocabN5`: an N5-scoped row whose shortcut launches N1
+  // categories would misreport, and `grammarReady` above is the one consumer
+  // that genuinely wants N5 alone.
   const coverageRows: StudyPlanCoverageRow[] = [
     {
       key: 'hiragana',

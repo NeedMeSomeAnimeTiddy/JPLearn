@@ -13,44 +13,171 @@ const ACTIVITY = {
   month: { reviewed: 90, correct: 75, sessions: 15, minutes: 180 },
 } as unknown as StudySummaryPayload['activity']
 
-function grammarRow(decks: Deck[]) {
+function planRow(decks: Deck[], key: ScriptKey) {
   const plan = buildStudyPlan(decks, [], [], ACTIVITY, 4)
-  const row = plan.coverageRows.find((entry) => entry.key === 'grammar_patterns')
-  if (!row) throw new Error('grammar_patterns coverage row missing')
+  const row = plan.coverageRows.find((entry) => entry.key === key)
+  if (!row) throw new Error(`${key} coverage row missing`)
   return row
 }
 
-describe('buildStudyPlan grammar readiness', () => {
-  // Regression guard for issue #67: vocab level decks stopped being truncated,
-  // so the all-levels `vocab_*` aggregate grew from ~2,000 to ~8,200 cards.
-  // Gating N5 grammar on that aggregate would have quietly required N2/N1
-  // vocabulary before N5 grammar was ever suggested.
-  const higherLevels = [
-    deck('vocab_n4', 666, 0),
-    deck('vocab_n3', 2139, 0),
-    deck('vocab_n2', 1809, 0),
-    deck('vocab_n1', 2699, 0),
-  ]
+function grammarRow(decks: Deck[]) {
+  return planRow(decks, 'grammar_patterns')
+}
 
+// The JLPT level decks (`vocab_n5`..`vocab_n1`) are registered and reported by
+// the bridge `summary` command, but never studied — every review from the
+// kanji/vocab sections is recorded against a thematic category deck. They appear
+// in these fixtures with `mastered: 0`, which is the only state they can hold.
+const VOCAB_LEVEL_DECKS = [
+  deck('vocab_n5', 718, 0),
+  deck('vocab_n4', 666, 0),
+  deck('vocab_n1', 2699, 0),
+]
+const KANJI_LEVEL_DECKS = [
+  deck('kanji_n5', 103, 0),
+  deck('kanji_n1', 1136, 0),
+]
+
+// N5 vocab categories carry no level infix; `vocab_numbers` and `vocab_nouns`
+// begin `vocab_n` without being level decks, so they double as parser traps.
+const VOCAB_N5_CATEGORIES = (mastered: [number, number, number]) => [
+  deck('vocab_greetings', 20, mastered[0]),
+  deck('vocab_numbers', 15, mastered[1]),
+  deck('vocab_nouns', 12, mastered[2]),
+]
+const VOCAB_HIGHER_CATEGORIES = [
+  deck('vocab_n4_school_work', 45, 0),
+  deck('vocab_n3_work_business', 30, 0),
+  deck('vocab_n1_law_justice', 25, 0),
+]
+
+describe('buildStudyPlan grammar readiness', () => {
+  // Regression guard for issue #67: gating N5 grammar on the whole-track vocab
+  // aggregate would quietly require N2/N1 vocabulary before N5 grammar was ever
+  // suggested. The gate is scoped to the N5 category decks instead.
   it('unlocks grammar from N5 vocabulary alone', () => {
-    const decks = [deck('vocab_n5', 718, 400), ...higherLevels]
+    const decks = [...VOCAB_N5_CATEGORIES([20, 10, 0]), ...VOCAB_HIGHER_CATEGORIES, ...VOCAB_LEVEL_DECKS]
     expect(grammarRow(decks).unlocked).toBe(true)
   })
 
   it('is unaffected by the size of the untouched higher-level decks', () => {
-    const withoutHigher = grammarRow([deck('vocab_n5', 718, 400)])
-    const withHigher = grammarRow([deck('vocab_n5', 718, 400), ...higherLevels])
-    expect(withHigher.unlocked).toBe(withoutHigher.unlocked)
+    const n5Only = VOCAB_N5_CATEGORIES([20, 10, 0])
+    const withHigher = grammarRow([...n5Only, ...VOCAB_HIGHER_CATEGORIES, ...VOCAB_LEVEL_DECKS])
+    expect(withHigher.unlocked).toBe(grammarRow(n5Only).unlocked)
   })
 
   it('keeps grammar locked while N5 vocabulary is below the threshold', () => {
-    const decks = [deck('vocab_n5', 718, 100), ...higherLevels]
+    const decks = [...VOCAB_N5_CATEGORIES([5, 0, 0]), ...VOCAB_HIGHER_CATEGORIES, ...VOCAB_LEVEL_DECKS]
     expect(grammarRow(decks).unlocked).toBe(false)
   })
 
-  it('falls back to the aggregate when no vocab_n5 deck is reported', () => {
-    expect(grammarRow([deck('vocab_n4', 666, 500)]).unlocked).toBe(true)
-    expect(grammarRow([deck('vocab_n4', 666, 10)]).unlocked).toBe(false)
+  it('falls back to the whole-track aggregate when no N5 category deck is reported', () => {
+    expect(grammarRow([deck('vocab_n4_school_work', 45, 40)]).unlocked).toBe(true)
+    expect(grammarRow([deck('vocab_n4_school_work', 45, 2)]).unlocked).toBe(false)
+  })
+
+  // The live bug this scoping fixes: `vocab_n5` is reported with a nonzero total
+  // and permanently zero mastered, so gating on it selected the `.total > 0`
+  // branch and pinned `grammarReady` to false no matter how much the learner
+  // studied. Grammar was unreachable in the shipped app.
+  it('is not pinned false by the never-reviewed vocab_n5 level deck', () => {
+    const decks = [...VOCAB_N5_CATEGORIES([20, 15, 12]), ...VOCAB_LEVEL_DECKS]
+    expect(grammarRow(decks).unlocked).toBe(true)
+  })
+})
+
+// The `kanji_n5` / `vocab_n5` coverage rows are whole-track (N5→N1), not N5:
+// `ScriptKey` names the app's six sections, not deck slugs (issue #66), and the
+// section `vocab_n5` names reaches N1 decks via VOCAB_CATEGORY_TO_DECK_SLUG.
+describe('buildStudyPlan track coverage rows', () => {
+  const vocabCategories = [...VOCAB_N5_CATEGORIES([20, 15, 12]), ...VOCAB_HIGHER_CATEGORIES]
+  const kanjiCategories = [
+    deck('kanji_numbers_time', 30, 30),
+    deck('kanji_nature_world', 25, 0),
+    deck('kanji_n4_daily_life', 20, 0),
+    deck('kanji_n3_governance', 15, 0),
+  ]
+
+  it('pools every vocabulary category, N5 through N1, into the vocab_n5 row', () => {
+    const row = planRow([...vocabCategories, ...VOCAB_LEVEL_DECKS], 'vocab_n5')
+    expect(row.total).toBe(147)
+    expect(row.mastery).toBeCloseTo(47 / 147, 6)
+  })
+
+  it('pools every kanji category, N5 through N1, into the kanji_n5 row', () => {
+    const row = planRow([...kanjiCategories, ...KANJI_LEVEL_DECKS], 'kanji_n5')
+    expect(row.total).toBe(90)
+    expect(row.mastery).toBeCloseTo(30 / 90, 6)
+  })
+
+  // Guards the intent against a "fix" that rescopes the row to the N5 decks to
+  // match its key: the row is whole-track, the grammar gate stays N5-only.
+  it('reports whole-track mastery on the row while grammar gates on N5 alone', () => {
+    const decks = [...VOCAB_N5_CATEGORIES([20, 15, 12]), ...VOCAB_HIGHER_CATEGORIES]
+    const plan = buildStudyPlan(decks, [], [], ACTIVITY, 4)
+    const vocabRow = plan.coverageRows.find((row) => row.key === 'vocab_n5')!
+    const grammar = plan.coverageRows.find((row) => row.key === 'grammar_patterns')!
+
+    // N5 is fully mastered (47/47) but only ~32% of the track is.
+    expect(vocabRow.mastery).toBeCloseTo(47 / 147, 6)
+    expect(grammar.unlocked).toBe(true)
+  })
+})
+
+// The level decks are registered in ALL_DECKS and reported by `summary`, but
+// `resultSlug` (useStudySession.ts:1159-1164) routes every review through the
+// category maps, so a level deck can never accumulate mastery. Including them
+// would peg both rows at 0 over ~8,031 vocab / ~2,196 kanji cards forever.
+describe('buildStudyPlan excludes the never-reviewed level decks', () => {
+  const vocabCategories = VOCAB_N5_CATEGORIES([20, 15, 12])
+  const kanjiCategories = [deck('kanji_numbers_time', 30, 30)]
+
+  it('leaves the vocabulary row untouched by level decks', () => {
+    const withLevels = planRow([...vocabCategories, ...VOCAB_LEVEL_DECKS], 'vocab_n5')
+    const categoriesOnly = planRow(vocabCategories, 'vocab_n5')
+
+    expect(withLevels.total).toBe(categoriesOnly.total)
+    expect(withLevels.mastery).toBe(categoriesOnly.mastery)
+    expect(withLevels.total).toBe(47)
+    expect(withLevels.mastery).toBe(1)
+  })
+
+  it('leaves the kanji row untouched by level decks', () => {
+    const withLevels = planRow([...kanjiCategories, ...KANJI_LEVEL_DECKS], 'kanji_n5')
+    const categoriesOnly = planRow(kanjiCategories, 'kanji_n5')
+
+    expect(withLevels.total).toBe(categoriesOnly.total)
+    expect(withLevels.mastery).toBe(categoriesOnly.mastery)
+    expect(withLevels.mastery).toBe(1)
+  })
+
+  it('reports zero rather than a level-deck denominator when nothing is studied', () => {
+    const row = planRow(VOCAB_LEVEL_DECKS, 'vocab_n5')
+    expect(row.total).toBe(0)
+    expect(row.mastery).toBe(0)
+  })
+
+  // The point of the change: under a level-deck denominator the row was a
+  // constant near zero, so it sorted first in `focusRows` permanently and could
+  // never clear its 0.72 target. It must now be able to leave `needsWorkRows`.
+  it('lets a fully-mastered vocabulary row drop out of the focus list', () => {
+    const plan = buildStudyPlan(
+      [
+        deck('hiragana', 104, 100),
+        deck('katakana', 104, 80),
+        ...VOCAB_N5_CATEGORIES([20, 15, 12]),
+        deck('kanji_numbers_time', 90, 30),
+        ...VOCAB_LEVEL_DECKS,
+        ...KANJI_LEVEL_DECKS,
+      ],
+      [], [], ACTIVITY, 4,
+    )
+    const vocabRow = plan.coverageRows.find((row) => row.key === 'vocab_n5')!
+
+    expect(vocabRow.unlocked).toBe(true)
+    expect(vocabRow.mastery).toBe(1)
+    expect(plan.focusRows.map((row) => row.key)).not.toContain('vocab_n5')
+    expect(plan.focusRows.map((row) => row.key)).toContain('kanji_n5')
   })
 })
 
@@ -67,28 +194,34 @@ describe('buildStudyPlan learner stage', () => {
     return found
   }
 
-  // Issue #75: the stage used to be a card-count-weighted average, so a track's
-  // influence was its deck size. Everything except vocabulary is mastered here;
-  // padding the untouched vocabulary decks (#67 grew them from ~2,000 to ~8,031
-  // cards) used to drag the average from 0.405 down to 0.057 and demote the
-  // learner from `building` to `starter` without any progress being lost.
+  // Fixtures use *category* slugs throughout: #76 established that the JLPT level
+  // decks never receive a review, so they no longer feed the kanji/vocab rows at
+  // all. Padding a level deck is therefore ignored for a different reason than the
+  // one under test here — see the "excludes the never-reviewed level decks" block
+  // above for that. What this block pins is that among the decks that *do* count,
+  // deck size still carries no weight.
   const masteredTracks = [
     deck('hiragana', 104, 104),
     deck('katakana', 104, 104),
-    deck('kanji_n5', 80, 80),
-    deck('grammar_patterns', 100, 100),
-    deck('sentence_examples', 100, 100),
+    deck('kanji_numbers_time', 45, 45),
+    deck('grammar_patterns', 88, 88),
+    deck('sentence_examples', 64, 64),
   ]
 
+  // Issue #75: the stage used to be a card-count-weighted average, so a track's
+  // influence was its deck size. Everything except vocabulary is mastered here, so
+  // growing the untouched vocabulary track used to drag the average from 0.447 down
+  // to 0.052 and demote the learner from `building` to `starter` without any
+  // progress being lost.
   it('is unaffected by the size of an untouched track', () => {
-    const compact = plan([...masteredTracks, deck('vocab_n5', 718, 0)])
+    const compact = plan([...masteredTracks, deck('vocab_greetings', 40, 0)])
     const expanded = plan([
       ...masteredTracks,
-      deck('vocab_n5', 718, 0),
-      deck('vocab_n4', 666, 0),
-      deck('vocab_n3', 2139, 0),
-      deck('vocab_n2', 1809, 0),
-      deck('vocab_n1', 2699, 0),
+      deck('vocab_greetings', 40, 0),
+      deck('vocab_n4_school_work', 666, 0),
+      deck('vocab_n3_media_arts', 2139, 0),
+      deck('vocab_n2_business', 1809, 0),
+      deck('vocab_n1_law_justice', 2699, 0),
     ])
 
     expect(compact.learnerStage).toBe('advanced')
@@ -119,10 +252,10 @@ describe('buildStudyPlan learner stage', () => {
     const snapshot = plan([
       deck('hiragana', 104, 104),
       deck('katakana', 104, 104),
-      deck('kanji_n5', 80, 0),
-      deck('vocab_n5', 718, 0),
-      deck('grammar_patterns', 100, 0),
-      deck('sentence_examples', 100, 0),
+      deck('kanji_numbers_time', 45, 0),
+      deck('vocab_greetings', 40, 0),
+      deck('grammar_patterns', 88, 0),
+      deck('sentence_examples', 64, 0),
     ])
 
     expect(snapshot.learnerStage).toBe('building')
@@ -143,10 +276,10 @@ describe('buildStudyPlan learner stage', () => {
     const snapshot = plan([
       deck('hiragana', 104, 104),
       deck('katakana', 104, 104),
-      deck('kanji_n5', 80, 24),
-      deck('vocab_n5', 718, 0),
-      deck('grammar_patterns', 100, 0),
-      deck('sentence_examples', 100, 0),
+      deck('kanji_numbers_time', 45, 14),
+      deck('vocab_greetings', 40, 0),
+      deck('grammar_patterns', 88, 0),
+      deck('sentence_examples', 64, 0),
     ])
 
     expect(snapshot.learnerStage).toBe('building')
@@ -155,7 +288,7 @@ describe('buildStudyPlan learner stage', () => {
   })
 
   it('stays at starter without a streak regardless of mastery', () => {
-    const snapshot = buildStudyPlan([...masteredTracks, deck('vocab_n5', 718, 718)], [], [], ACTIVITY, 1)
+    const snapshot = buildStudyPlan([...masteredTracks, deck('vocab_greetings', 40, 40)], [], [], ACTIVITY, 1)
     expect(snapshot.overallMastery).toBe(1)
     expect(snapshot.learnerStage).toBe('starter')
   })
