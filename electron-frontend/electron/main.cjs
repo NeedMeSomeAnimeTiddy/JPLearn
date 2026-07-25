@@ -8,6 +8,7 @@ const { createTutorChatRuntime } = require('./llm_runtime.cjs')
 const { createVoiceRuntime, isVoiceRuntimeInstalled } = require('./voice_runtime.cjs')
 const { createSetupRuntime } = require('./setup_runtime.cjs')
 const { createSpeechRuntime } = require('./speech_runtime.cjs')
+const { createOcrRuntime } = require('./ocr_runtime.cjs')
 const { loadFontCSS } = require('./font_loader.cjs')
 const { initAutoUpdater } = require('./updater.cjs')
 const { getConfigValue } = require('./config_store.cjs')
@@ -276,6 +277,7 @@ function createSelectedVoiceRuntime() {
 const localVoiceRuntime = createSelectedVoiceRuntime()
 const localSetupRuntime = createSetupRuntime()
 const localSpeechRuntime = createSpeechRuntime({ repoRoot })
+const localOcrRuntime = createOcrRuntime({ repoRoot })
 let tutorRuntimePreloadTriggered = false
 let tutorRuntimePreloadPromise = null
 let preloadedAssistantChatHistory = {
@@ -306,7 +308,7 @@ const BRIDGE_READ_CACHE_TTLS_MS = {
   'study-queue': 12000,
 }
 const BRIDGE_REQUEST_TIMEOUT_MS = 30000
-// A single slow request (fsrs-optimize, OCR) timing out should not tear down
+// A single slow request (fsrs-optimize) timing out should not tear down
 // the worker and collaterally reject every unrelated in-flight request. Only
 // restart the worker once several requests in a row have timed out with no
 // successful response in between -- a real sign the child is wedged.
@@ -368,6 +370,18 @@ async function refreshTutorRuntimeAfterSetup() {
 async function refreshVoiceRuntimeAfterSetup() {
   try {
     await localVoiceRuntime.unload()
+  } catch {
+    // Best effort only.
+  }
+}
+
+// Setup can install or uninstall the OCR model underneath a warm server
+// process, which resolved its model directories when it started. Stopping it is
+// enough -- the next extraction spawns a fresh process against whatever is
+// installed then.
+function refreshOcrRuntimeAfterSetup() {
+  try {
+    localOcrRuntime.unload()
   } catch {
     // Best effort only.
   }
@@ -1268,11 +1282,13 @@ function runPythonBridgeWithArgs(args) {
   })
 }
 
-// For commands known to be slow (OCR, fsrs-optimize): always run as a fresh
+// For commands known to be slow (fsrs-optimize): always run as a fresh
 // one-shot process instead of the shared serial worker, so they can't
 // head-of-line-block unrelated study queries (summary, deck-cards, ...)
 // queued behind them on the single worker. Pays one-shot interpreter/import
 // cost every call -- acceptable since these commands are already slow.
+// OCR used to come through here too; it now has a dedicated persistent
+// process (ocr_runtime.cjs) because it was paying that cost per image (#74).
 function runPythonBridgeIsolated(args) {
   bridgeTelemetry.oneShotCount += 1
   return runPythonBridgeWithArgsOneShot(args)
@@ -1443,10 +1459,12 @@ registerIpcHandlers({
   localTutorRuntime,
   localVoiceRuntime,
   speechRuntime: localSpeechRuntime,
+  ocrRuntime: localOcrRuntime,
   setupRuntime: localSetupRuntime,
   repoRoot,
   refreshTutorChatRuntime: refreshTutorRuntimeAfterSetup,
   refreshVoiceRuntime: refreshVoiceRuntimeAfterSetup,
+  refreshOcrRuntime: refreshOcrRuntimeAfterSetup,
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
   reloadLocalFontsForContents,
   getBridgeTelemetrySnapshot,
@@ -2477,6 +2495,7 @@ app.on('before-quit', () => {
   void localTutorRuntime.unload('before-quit').catch(() => undefined)
   void localVoiceRuntime.unload().catch(() => undefined)
   void Promise.resolve(localSpeechRuntime.unload()).catch(() => undefined)
+  void Promise.resolve(localOcrRuntime.unload()).catch(() => undefined)
   writeBridgeTelemetry()
   stopPythonBridgeWorker()
 })

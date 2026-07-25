@@ -65,6 +65,11 @@ function createRegisteredHandlers(overrides = {}) {
       preload: vi.fn(async () => ({ ok: true, ready: true })),
       unload: vi.fn(async () => ({ ok: true })),
     },
+    ocrRuntime: {
+      extractText: vi.fn(async () => ({ ok: true, text: '日本語', lineCount: 1, lines: [] })),
+      getStatus: vi.fn(() => ({ running: false, loadedAtUtc: null, lastUsedAtUtc: null, extractionCount: 0, inactivityUnloadMs: 300000, lastError: null })),
+      unload: vi.fn(() => ({ ok: true })),
+    },
     isWindowExpanded: vi.fn(() => false),
     getSafeRestoreBounds: vi.fn(() => ({ x: 0, y: 0, width: 800, height: 600 })),
     windowRestoreBoundsById: new Map(),
@@ -612,6 +617,70 @@ describe('ipc runtime contract', () => {
         () => handlers.get('window:drag-start')(createValidEvent('https://evil.example')),
       ).toThrow(/untrusted URL/i)
       expect(windowMock.setBounds).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('assistant chat OCR', () => {
+    const pngBase64 = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex').toString('base64')
+
+    it('routes extraction through the persistent OCR runtime, never the one-shot bridge', async () => {
+      const fs = require('node:fs')
+      let capturedPath: string | null = null
+      const { handlers, options } = createRegisteredHandlers({
+        runPythonBridgeIsolated: vi.fn(),
+      })
+      options.ocrRuntime.extractText.mockImplementation(async (imagePath: string, minConfidence: number) => {
+        capturedPath = imagePath
+        // The temp image must still exist while the runtime is reading it.
+        expect(fs.existsSync(imagePath)).toBe(true)
+        expect(minConfidence).toBe(0.42)
+        return { ok: true, text: 'こんにちは', lineCount: 1, lines: [] }
+      })
+
+      await expect(handlers.get('assistant-chat:extract-image-text')(createValidEvent(), {
+        imageBase64: pngBase64,
+        mimeType: 'image/png',
+        minConfidence: 0.42,
+      })).resolves.toEqual({ ok: true, text: 'こんにちは', lineCount: 1, lines: [] })
+
+      expect(options.runPythonBridgeIsolated).not.toHaveBeenCalled()
+      expect(capturedPath).toBeTruthy()
+      expect(fs.existsSync(capturedPath)).toBe(false) // cleaned up in the handler's finally block
+    })
+
+    it('surfaces a runtime failure instead of silently falling back to the bridge', async () => {
+      const { handlers, options } = createRegisteredHandlers({
+        runPythonBridgeIsolated: vi.fn(),
+      })
+      options.ocrRuntime.extractText.mockRejectedValue(new Error('OCR runtime exited unexpectedly'))
+
+      await expect(handlers.get('assistant-chat:extract-image-text')(createValidEvent(), {
+        imageBase64: pngBase64,
+        mimeType: 'image/png',
+      })).rejects.toThrow(/Failed to extract image text: OCR runtime exited unexpectedly/)
+
+      expect(options.runPythonBridgeIsolated).not.toHaveBeenCalled()
+    })
+
+    it('drops the warm OCR engine on every path that installs or removes an OCR model', async () => {
+      const refreshOcrRuntime = vi.fn()
+      const { handlers } = createRegisteredHandlers({
+        refreshOcrRuntime,
+        setupRuntime: {
+          downloadOcrModel: vi.fn(async () => ({ ok: true, tier: 'standard' })),
+          setActiveOcrModelTier: vi.fn(() => ({ ok: true, tier: 'standard' })),
+          uninstallOcrModel: vi.fn(() => ({ ok: true, tier: 'standard' })),
+          // Installs the standard OCR model as one of its steps.
+          applyTranslationProfile: vi.fn(async () => ({ ok: true, profile: 'ocr_qwen_local' })),
+        },
+      })
+
+      await handlers.get('setup:download-ocr-model')(createValidEvent(), 'standard', {})
+      handlers.get('setup:set-active-ocr-model')(createValidEvent(), 'standard')
+      handlers.get('setup:uninstall-ocr-model')(createValidEvent(), 'standard')
+      await handlers.get('setup:apply-translation-profile')(createValidEvent(), 'ocr_qwen_local', {})
+
+      expect(refreshOcrRuntime).toHaveBeenCalledTimes(4)
     })
   })
 

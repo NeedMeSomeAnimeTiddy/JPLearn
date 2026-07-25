@@ -54,9 +54,11 @@ domain/              Pure SRS/learning logic, no I/O (24 modules)
 data/                SQLite persistence, row↔domain mapping, Japanese text normalization
 scripts/desktop_bridge.py   68-command dispatcher the Electron main process spawns as a
                             single long-lived child process (JSON-lines over stdin/stdout)
+scripts/ocr_server.py       Persistent PaddleOCR process (own lifecycle, not the bridge)
+scripts/ocr_extraction.py   The OCR logic it runs; keeps one engine warm across calls
 electron-frontend/
   electron/*.cjs      Main process: window lifecycle, IPC routes, bridge worker pool,
-                       llama.cpp/VOICEVOX/Whisper child-process management
+                       llama.cpp/VOICEVOX/Whisper/PaddleOCR child-process management
   src/App.tsx          Orchestrator + most study session state (large — see caveat below)
   src/features/<name>/ Self-contained feature modules (hook-over-context pattern)
   src/views/           6 top-level screens
@@ -83,7 +85,11 @@ See `ARCHITECTURE.md` §4 before touching either.
 **Bridge is strictly serial**: the Python child process handles one request at a time, and a
 timed-out request tears down and rejects *every* other in-flight request. Never route a new
 long-running backend operation through the shared worker — give it a dedicated child process
-(pattern: `llm_runtime.cjs`, `voice_runtime.cjs`) or a poll/progress channel instead.
+or a poll/progress channel instead. Four dedicated runtimes already exist to copy from:
+`llm_runtime.cjs` and `voice_runtime.cjs` (HTTP to a spawned server), `speech_runtime.cjs` and
+`ocr_runtime.cjs` (newline-JSON over stdin/stdout to `scripts/speech_recognition_server.py` /
+`scripts/ocr_server.py`). See ARCHITECTURE.md §2 "Dedicated runtimes" for the lifecycle rules
+these share (single-flight queue, kill-on-timeout, unload only between requests).
 
 **Card ids are hand-allocated by offset** (`domain/decks.py`, e.g. kanji N5→N1 at 0/1000/2000/…).
 Adding a deck means picking a verified-disjoint `id_offset` — there's no uniqueness assertion,

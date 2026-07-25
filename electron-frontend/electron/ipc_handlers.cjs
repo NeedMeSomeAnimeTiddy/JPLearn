@@ -90,6 +90,13 @@ function registerIpcHandlers(options) {
       options.clearBridgeReadCaches()
     }
   }
+  // Installing, switching, or removing an OCR model invalidates the warm
+  // PaddleOCR engine held by the persistent OCR process.
+  const refreshOcrRuntime = () => {
+    if (typeof options.refreshOcrRuntime === 'function') {
+      options.refreshOcrRuntime()
+    }
+  }
 
   options.ipcMain.handle('study:get-summary', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
@@ -759,11 +766,15 @@ function registerIpcHandlers(options) {
 
     try {
       fs.writeFileSync(tempFile, Buffer.from(validatedPayload.imageBase64, 'base64'))
-      return await options.runPythonBridgeIsolated([
-        'assistant-chat-ocr',
-        tempFile,
-        String(validatedPayload.minConfidence),
-      ])
+      // Routed through the dedicated persistent OCR process (ocr_runtime.cjs),
+      // not the bridge: the engine stays warm between extractions. There is
+      // deliberately no one-shot bridge fallback -- it would pay exactly the
+      // cold-start cost this path exists to avoid, and would make a broken
+      // runtime look like nothing worse than slow OCR.
+      if (!options.ocrRuntime || typeof options.ocrRuntime.extractText !== 'function') {
+        throw new Error('OCR runtime is unavailable')
+      }
+      return await options.ocrRuntime.extractText(tempFile, validatedPayload.minConfidence)
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to extract image text: ${detail}`)
@@ -1604,7 +1615,9 @@ function registerIpcHandlers(options) {
       }
       const force = Boolean(downloadOptions && typeof downloadOptions === 'object' && downloadOptions.force)
       try {
-        return await setupRuntime.downloadOcrModel(tier, event.sender, options.repoRoot, { force })
+        const result = await setupRuntime.downloadOcrModel(tier, event.sender, options.repoRoot, { force })
+        refreshOcrRuntime()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`OCR model download failed: ${detail}`)
@@ -1617,7 +1630,9 @@ function registerIpcHandlers(options) {
         throw new Error('Invalid OCR model tier')
       }
       try {
-        return setupRuntime.setActiveOcrModelTier(tier)
+        const result = setupRuntime.setActiveOcrModelTier(tier)
+        refreshOcrRuntime()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Failed to select OCR model: ${detail}`)
@@ -1630,7 +1645,9 @@ function registerIpcHandlers(options) {
         throw new Error('Invalid OCR model tier')
       }
       try {
-        return setupRuntime.uninstallOcrModel(tier)
+        const result = setupRuntime.uninstallOcrModel(tier)
+        refreshOcrRuntime()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Failed to uninstall OCR model: ${detail}`)
@@ -1684,7 +1701,12 @@ function registerIpcHandlers(options) {
       }
       const force = Boolean(applyOptions && typeof applyOptions === 'object' && applyOptions.force)
       try {
-        return await setupRuntime.applyTranslationProfile(tier, event.sender, options.repoRoot, { force })
+        // The ocr_qwen_local profile installs the standard OCR model as one of
+        // its steps, so it invalidates a warm engine just like the dedicated
+        // OCR handlers above.
+        const result = await setupRuntime.applyTranslationProfile(tier, event.sender, options.repoRoot, { force })
+        refreshOcrRuntime()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Translation profile apply failed: ${detail}`)

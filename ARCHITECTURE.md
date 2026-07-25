@@ -44,10 +44,11 @@ future feature design — not a task list.
 prints a non-fatal size warning for any hand-written file over 2,000 lines (files whose first
 line is an "Auto-generated" marker, like `domain/external_deck_data.py`, are exempt) —
 currently `desktop_bridge.py` and `data/database.py`. The import-boundary check alone doesn't
-stop a file from mixing concerns that belong in different layers; #70 step 2 is peeling those
+stop a file from mixing concerns that belong in different layers; #70 step 2 peeled those
 apart from `desktop_bridge.py` one concern at a time (dictionary/kanji/pitch-accent queries
 moved to `data/dictionary_repository.py`; the dead OCR-translation path was deleted outright;
-OCR itself and the `_run_command` dispatch table are still open — see §2).
+the `_run_command` dispatch table became a route table) and #74 finished the job by moving OCR
+into `scripts/ocr_extraction.py` behind its own process — see §2.
 
 ---
 
@@ -69,11 +70,12 @@ full interpreter + import cost.
 1. **Strictly serial execution.** `_run_server()` is a plain `for raw_line in sys.stdin`
    loop. The renderer can pipeline N requests, but the backend handles them one at a
    time. Any slow command head-of-line-blocks every other query.
-   `fsrs-optimize` and OCR extraction are the known-slow commands; both are already routed
-   through `runPythonBridgeIsolated` (a fresh one-shot process per call) rather than this
-   shared worker, which avoids head-of-line blocking at the cost of paying full interpreter
-   + PaddleOCR-import startup on every OCR call (#70's deferred OCR-runtime follow-up would
-   fix that). OCR translation (`assistant-chat:translate-ocr-text`) never touches the Python
+   `fsrs-optimize` is the remaining known-slow command; it is routed through
+   `runPythonBridgeIsolated` (a fresh one-shot process per call) rather than this shared
+   worker, which avoids head-of-line blocking at the cost of paying full interpreter startup
+   per call — acceptable for something invoked rarely and manually. OCR used to take the same
+   route and paid that cost per image; it now has a dedicated persistent runtime (#74, see
+   below). OCR translation (`assistant-chat:translate-ocr-text`) never touches the Python
    bridge at all — it calls `llm_runtime.cjs::translateText` directly; the bridge's own
    translation path was dead code and has been deleted (#70 step 2).
 
@@ -87,17 +89,56 @@ full interpreter + import cost.
    boundary — validation lives entirely in `ipc_security.cjs` on the Electron side.
 
 If you add a long-running backend operation, do **not** put it on the shared worker.
-Either give it a dedicated child process (the pattern `llm_runtime.cjs` /
-`voice_runtime.cjs` already use) or make it a job with a poll/progress channel.
+Either give it a dedicated child process (the pattern `llm_runtime.cjs`,
+`voice_runtime.cjs`, `speech_runtime.cjs`, and `ocr_runtime.cjs` already use) or make it a
+job with a poll/progress channel.
+
+### Dedicated runtimes
+
+Four Electron-side modules own a long-lived child process each, so a slow model load is paid
+once per app session instead of per request. Two shapes:
+
+- **HTTP** — `llm_runtime.cjs` (spawns `llama-server`), `voice_runtime.cjs` (VOICEVOX engine).
+- **Newline-JSON over stdin/stdout** — `speech_runtime.cjs` ↔ `scripts/speech_recognition_server.py`,
+  `ocr_runtime.cjs` ↔ `scripts/ocr_server.py`. Same envelope shape as the bridge worker, but
+  one dedicated process per concern rather than one shared one.
+
+`ocr_runtime.cjs` (#74) is the newest. Notes that apply to any future runtime of this shape:
+
+- Requests are **single-flight and queued** in the JS runtime, because the Python loop is
+  serial. Without the queue, a request's timeout would count time spent waiting behind another.
+- A **timeout kills and respawns** the child. The alternative — dropping the late response and
+  reusing the process — starts the next request's clock against a still-busy engine.
+- Inactivity unload is scheduled only **after a request settles**, so it cannot fire mid-inference.
+- The child inherits `process.env` unchanged: `scripts/ocr_extraction.py` resolves its model-root
+  candidates from `JPLEARN_ASSETS_DIR` / `JPLEARN_USER_DATA_DIR` / `JPLEARN_DOCUMENTS_DIR` at
+  import, exactly as the old isolated spawn did.
+- Setup handlers that install/select/uninstall an OCR model call `refreshOcrRuntime`, which just
+  unloads: the next extraction spawns fresh against whatever is installed then. That includes
+  `setup:apply-translation-profile` — the `ocr_qwen_local` profile installs the OCR model as one
+  of its steps.
+- The **first** request on a fresh process gets a much larger timeout budget than later ones
+  (15 min vs 2 min), because engine init can involve downloading PP-OCRv6 weights from BOS when
+  the paddlex cache is cold. The old one-shot path had no timeout at all; the budget exists to
+  stop a wedged process, not to bound honest work.
+- Path resolution in the packaged app: `forge.config.cjs` ships `../scripts` as an `extraResource`
+  directory, and `repoRoot` (`path.join(__dirname, '..', '..')` from inside `app.asar`) lands on
+  `resources/`, so `resources/scripts/ocr_server.py` resolves. `ocr_server.py`'s
+  `from scripts.ocr_extraction import ...` relies on the same `__init__.py`-free namespace-package
+  import that `desktop_bridge.py` already uses for `scripts.debug_tools`.
+
+Measured on this repo's sample images (PP-OCRv6 medium, ONNX, CPU): one-shot 8.51s per image
+vs. 8.17s cold / **0.19s warm** through the persistent server — the interpreter + `paddleocr`
+import + engine init was ~98% of a warm call's old cost.
 
 ### desktop_bridge.py composition
 
-Was 6,122 lines / 246 module-level defs at the start of #70; down to ~4,180 lines after
-step 2's first two moves. Status per concern:
+Was 6,122 lines / 246 module-level defs at the start of #70; down to ~3,690 lines after #74.
+Status per concern:
 
 | Concern | Status |
 |---|---|
-| OCR (PaddleOCR, image preprocessing, dual-pass fusion) | Still in the bridge, still one-shot-per-call (see §1's worker note). A dedicated persistent OCR runtime is real scope but deliberately deferred to a follow-up issue — it overlaps the now-closed #64 and is the single largest, riskiest piece. |
+| OCR (PaddleOCR) | **Moved** to `scripts/ocr_extraction.py`, driven by `scripts/ocr_server.py` in its own persistent process (#74). The bridge keeps `assistant-chat-ocr` as a thin CLI delegation; no desktop path routes OCR through the bridge any more. The image-preprocessing / dual-pass-fusion cluster (`_extract_dual_pass_ocr_payload` + 14 helpers, ~400 lines) was **not** ported — a whole-repo grep found it entirely self-referential with zero live callers and zero tests, the same finding as the MT row below, so it was deleted rather than carefully preserved. |
 | Machine translation (llama.cpp, fastText LID, quality scoring) | **Deleted.** `translate_assistant_chat_ocr_payload` and ~25 helpers were dead code — the live `assistant-chat:translate-ocr-text` IPC handler calls `llm_runtime.cjs::translateText` directly and has no bridge fallback. Confirmed via whole-repo grep (only self-references, zero tests) before removal. |
 | Offline dictionary + kanji detail + pitch accent (FTS5 queries) | **Moved** to `data/dictionary_repository.py`, including its 7 payload dataclasses. Semantic reranking is dependency-injected: the repo's `build_dictionary_search_payload(query, semantic_embed=...)` defaults to a pure hashed embedder (`domain.retrieval`); the bridge injects the real ONNX embedder when `embedder_runtime` + an active tier are available, else passes nothing and the default applies — behavior-preserving either way. Note-key builders (`build_builtin_note_key`, `build_offline_note_key`, `canonical_jmdict_source_id`) went to `data/card_notes_repository.py` instead (they're used for every card, not just dictionary-enriched ones, and the repository already owns the matching key validators); the shared Japanese-script predicate they both need went to `data/text_normalization.py` to keep the two repositories acyclic. |
 | Deck/JLPT/progression assembly | **Not moved — the original framing was wrong.** These `build_*` functions (`build_deck_cards`, `build_progression_status`, `build_jlpt_readiness_payload`, etc.) are impure orchestrators: they call `data.database`/`data.study_pipeline` loaders and, for progression, write to the DB. The *pure* logic they delegate to already lives in `domain/` (`blocks`, `jlpt_readiness`, `jlpt_sessions`, `progression_service`). Moving the orchestrators themselves into `domain/` would violate the no-I/O rule; they stay in `scripts/`. |
@@ -451,7 +492,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 
 | # | Finding | Issue |
 |---|---|---|
-| B1 | Bridge worker is strictly serial; `fsrs-optimize`, OCR, and OCR translation block all study queries behind them. | none |
+| B1 | Bridge worker is strictly serial; anything slow blocks every study query behind it. Largely defused: OCR translation never used the bridge, OCR now has its own persistent runtime (#74), and `fsrs-optimize` runs one-shot off-worker. The serial property itself still stands as a constraint on new work. | #74 (OCR) |
 | B2 | A single request timeout calls `stopPythonBridgeWorker()`, which rejects **all** pending unrelated requests and forces a cold restart. | none |
 | B3 | Worker-failure fallback re-spawns a one-shot Python process per request — full interpreter + import cost on the degraded path. | none |
 
@@ -467,7 +508,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 | # | Finding | Issue |
 |---|---|---|
 | D1 | `App.tsx` is down to 2,880 lines / 67 `useState` — the pure helpers (`src/lib/`), the titlebar + settings JSX (`src/components/`) and the session state machine (`features/study-session/useStudySession.ts`) are all extracted. What remains is routing: a flat `view` string with inline conditional JSX. | #69 (phase 4c outstanding), #6 (closed, handler boilerplate only) |
-| D2 | `desktop_bridge.py` was 6,122 lines mixing OCR, MT, dictionary, deck, and dispatch logic in `scripts/`; now ~4,330. MT deleted (was dead code), dictionary moved to `data/dictionary_repository.py`, dispatch converted to a route table. Still open: OCR — deferred to a follow-up issue, needs a persistent runtime (overlaps closed #64), out of scope for a same-process move. | #70 (step 1 closed; step 2 — dictionary, MT, and dispatch table done; only the OCR runtime remains, tracked as a new follow-up issue) |
+| ~~D2~~ | ~~`desktop_bridge.py` was 6,122 lines mixing OCR, MT, dictionary, deck, and dispatch logic in `scripts/`~~ — now ~3,690. MT deleted (was dead code), dictionary moved to `data/dictionary_repository.py`, dispatch converted to a route table, OCR moved to `scripts/ocr_extraction.py` behind its own process. What remains is deck/JLPT/progression assembly, which belongs in `scripts/` (see §2). | #70, #74 |
 | D3 | ~~`arch_check.py` covers only `src`/`domain`/`data`/`ui`; extend `RULES` to `scripts/`.~~ Done — `scripts` is now a checked layer (forbids `→ ui`) with a non-fatal size-warning threshold. | #70 (step 1) |
 | D4 | `data/app.db` + `SRSRepository` are unused by any runtime path but documented in FEATURES.md as live persistence. Either wire or reclassify. | none |
 | D5 | Empty legacy packages `src/` and `ui/` (only `__pycache__`); stray zero-byte `nul` file at repo root. | none |
@@ -502,8 +543,9 @@ None of the following duplicate them.
 
 1. **Card-id collision guard** (A1) — a `tests/test_deck_id_uniqueness.py` asserting every
    id across `ALL_DECKS` is unique per family. Cheap, prevents silent corruption.
-2. **Unblock the bridge worker** (B1/B2) — move `fsrs-optimize`, OCR, and OCR translation
-   off the shared worker; stop rejecting unrelated pending requests on timeout.
+2. **Unblock the bridge worker** (B1/B2) — every known-slow command is now off the shared
+   worker (OCR via its own persistent runtime, #74; `fsrs-optimize` one-shot). What remains
+   is B2: stop rejecting unrelated pending requests on timeout.
 3. **Unify mastery on SQLite** (A2/A4) — make `cardScores` a cache derived from
    `review_states` rather than a parallel truth. Blocks clean multi-profile (#51) too.
 4. ~~**Lift `_VOCAB_LEVEL_LIMITS`** (C1)~~ done (#67) — level decks now expose the full
@@ -515,7 +557,7 @@ None of the following duplicate them.
    level, selected by character against the CSV corpus with a drift test.
 6. `App.tsx` decomposition (D1): extract module-level helpers to `src/lib/`, then a
    `features/study-session/` module for round/scoring state.
-7. ~~Extend `arch_check.py` to `scripts/` (D3)~~ done; ~~delete dead MT code, move dictionary to `data/`, convert `_run_command` to a route table~~ done; remaining: file a follow-up issue for a persistent OCR runtime (D2).
+7. ~~Extend `arch_check.py` to `scripts/` (D3)~~ done; ~~delete dead MT code, move dictionary to `data/`, convert `_run_command` to a route table~~ done; ~~persistent OCR runtime (D2)~~ done (#74).
 8. Retire or wire `app.db` (D4) and delete `src/`, `ui/`, `nul` (D5).
 9. View-component tests (E1) and `ipc_security.cjs` tests (E2).
 10. ROADMAP/FEATURES accuracy pass (F1–F5).
