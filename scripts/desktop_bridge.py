@@ -200,13 +200,22 @@ from domain.jlpt_sessions import (  # noqa: E402
 
 from scripts.debug_tools import build_diagnostics_report, build_snapshot  # noqa: E402
 
-# ── Load persisted FSRS weights on backend startup ─────────────────────────
-try:
-    _saved = load_fsrs_weights()
-    if _saved is not None:
-        set_scheduler_weights(_saved)
-except Exception:
-    pass
+def _apply_persisted_fsrs_weights() -> None:
+    """Load persisted FSRS weights on backend startup.
+
+    Called from main() rather than at import time: reading the weights opens
+    data/jplearn.db, so doing it on import gave merely importing this module a
+    side effect on the real database — it created the file when absent, and
+    when present it pushed the machine's saved weights into the scheduler's
+    module global for every importer, including the test suite.
+    """
+    try:
+        saved = load_fsrs_weights()
+        if saved is not None:
+            set_scheduler_weights(saved)
+    except Exception:
+        pass
+
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -4312,6 +4321,7 @@ def _run_server() -> int:
 
 
 def main() -> int:
+    _apply_persisted_fsrs_weights()
     args = sys.argv[1:]
     if args and args[0] == "--server":
         return _run_server()
