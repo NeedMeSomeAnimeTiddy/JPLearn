@@ -44,7 +44,12 @@ export function getStudyPlanShortcutMinigame(
 ): MinigameKey {
   const minigame = getStudyPlanStageMinigame(row.key, stage, index)
   if (RECALL_DRILLS.has(minigame) && trackMastery < getStudyPlanRecallFloor(row.key)) {
-    return index === 0 ? 'meaning_match' : 'character_match'
+    // Fall back to the track's own `starter` route rather than a fixed pair. Every
+    // `starter` branch below is recognition-only, so this is always a safe landing
+    // spot, and it keeps each track's preference: kanji leads with `character_match`
+    // because recognising the glyph is the apter first drill there, where the other
+    // tracks lead with `meaning_match`. A hardcoded pair contradicted that.
+    return getStudyPlanStageMinigame(row.key, 'starter', index)
   }
   return minigame
 }

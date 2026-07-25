@@ -388,9 +388,34 @@ describe('getStudyPlanShortcutMinigame recall floor', () => {
     expect(getStudyPlanShortcutMinigame(coverageRow('vocab_n5', 0), 'building', 0)).toBe('meaning_match')
   })
 
-  it('routes an untouched kanji track to recognition at advanced', () => {
-    expect(getStudyPlanShortcutMinigame(coverageRow('kanji_n5', 0), 'advanced', 0)).toBe('meaning_match')
-    expect(getStudyPlanShortcutMinigame(coverageRow('kanji_n5', 0), 'advanced', 1)).toBe('character_match')
+  // Kanji leads with `character_match` where the other tracks lead with
+  // `meaning_match`, because recognising the glyph is the apter first drill there.
+  // The fallback honours that by reusing the track's own `starter` route instead of
+  // a fixed pair, so it agrees with the routing table rather than contradicting it.
+  it('routes an untouched kanji track to its own recognition drill at advanced', () => {
+    expect(getStudyPlanShortcutMinigame(coverageRow('kanji_n5', 0), 'advanced', 0)).toBe('character_match')
+    expect(getStudyPlanShortcutMinigame(coverageRow('kanji_n5', 0), 'advanced', 1)).toBe('meaning_match')
+  })
+
+  it('falls back to exactly the starter route of the same track and index', () => {
+    let gatedCount = 0
+    for (const key of SCRIPTS) {
+      for (const stage of ['building', 'advanced'] as const) {
+        for (const index of [0, 1]) {
+          const gated = getStudyPlanShortcutMinigame(coverageRow(key, 0), stage, index)
+          // Only asserts where the floor actually fires — the kana tracks reach
+          // `romaji_sprint`/`interleave_mix`, which are not recall drills, so an
+          // untouched track routes the same as a mastered one there.
+          if (gated === getStudyPlanShortcutMinigame(coverageRow(key, 1), stage, index)) continue
+          gatedCount += 1
+          expect(gated).toBe(getStudyPlanShortcutMinigame(coverageRow(key, 0), 'starter', index))
+        }
+      }
+    }
+    // Guards the loop against passing vacuously if the floor ever stops firing. 12 of
+    // the 24 (6 tracks × 2 stages × 2 indices) combinations reach a recall drill:
+    // none of the 8 kana ones, and 3 of 4 on each of the other four tracks.
+    expect(gatedCount).toBe(12)
   })
 
   it('gates grammar and sentence tracks off particle cloze while untouched', () => {
