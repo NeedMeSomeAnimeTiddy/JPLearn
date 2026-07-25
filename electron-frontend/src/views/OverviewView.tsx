@@ -17,14 +17,12 @@ import {
   X,
 } from 'lucide-react'
 import type { CardScores, JlptLevel, JlptLevelProgress } from '../types'
-import { KANJI_OVERVIEW_PAGE_SIZE } from '../constants'
+import { CARD_MASTERY_MAX, KANJI_OVERVIEW_PAGE_SIZE } from '../constants'
 import { jlptTagFromCard } from '../utils'
 import { formatTagLabel } from '../utils'
 import { useHeatmap } from '../features/heatmap'
 import { useAchievements, AchievementsPanel } from '../features/achievements'
 import { ActivityCalendar } from 'react-activity-calendar'
-
-const CARD_MASTERY_MAX = 4
 
 export type OverviewSectionKey = 'studyActivity' | 'sessionHistory' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot' | 'achievements'
 

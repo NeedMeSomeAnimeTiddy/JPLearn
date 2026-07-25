@@ -1248,6 +1248,20 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
               ease_factor: result.ease_factor,
             })
           }
+          // Reconcile the optimistic ±1 step above against the stored counter
+          // (issue #66). The two agree in the normal case; they diverge when a
+          // write was lost or replayed, and SQLite is the source of truth now.
+          if (typeof result.mastery_score === 'number') {
+            const storedScore = result.mastery_score
+            setCardScores((prev) => (
+              prev[activeScript][roundState.cardId] === storedScore
+                ? prev
+                : {
+                    ...prev,
+                    [activeScript]: { ...prev[activeScript], [roundState.cardId]: storedScore },
+                  }
+            ))
+          }
           if (typeof result.xp_gained === 'number' && result.xp_gained > 0) {
             const leveledUp = typeof result.level_after === 'number'
               && typeof result.level_before === 'number'

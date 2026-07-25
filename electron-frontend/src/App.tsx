@@ -73,6 +73,7 @@ import {
   loadSummarySnapshot,
   saveSummarySnapshot,
 } from './lib/appStorage'
+import { emptyCardScores, hasAnyCardScore, toSectionScores } from './lib/cardScores'
 import {
   normalizeDeckCards,
   limitRuntimeDeckCards,
@@ -795,9 +796,46 @@ function App() {
     window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(scriptStats))
   }, [scriptStats])
 
+  // Mastery counters live in SQLite since issue #66. localStorage is written only
+  // as a warm-start snapshot so the first paint after launch is not empty — it is
+  // no longer a source of truth, and `hydrateCardScoresFromDb` below overwrites
+  // whatever it held once the bridge answers.
   useEffect(() => {
     window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(cardScores))
   }, [cardScores])
+
+  // One-time adoption of pre-#66 counters, then hydrate from the database.
+  //
+  // The counter cannot be recomputed from FSRS state (see domain/mastery.py), so
+  // an existing learner's mastery survives the move only if it is imported. The
+  // bridge refuses to import into a non-empty table, so a stale snapshot replayed
+  // later cannot roll progress backwards.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const desktop = window.jplearnDesktop
+      if (!desktop?.getCardScores) return
+      try {
+        const legacy = loadCardScores()
+        if (desktop.importCardScores && hasAnyCardScore(legacy)) {
+          await desktop.importCardScores(legacy)
+        }
+        const payload = await desktop.getCardScores()
+        if (cancelled) return
+        const stored = toSectionScores(payload?.scores ?? {})
+        // Only adopt the database view if it has something in it. A learner mid-way
+        // through their first session has scores in memory that are already stored,
+        // and an empty payload from a transient bridge failure must not blank them.
+        if (hasAnyCardScore(stored)) {
+          setCardScores(stored)
+        }
+      } catch {
+        // Hydration is best-effort: the in-memory snapshot stays, and every answer
+        // still writes through to SQLite via record-result.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
@@ -1699,7 +1737,10 @@ function App() {
     setError(null)
     try {
       await window.jplearnDesktop?.resetStudyDb()
-      const emptyScores: CardScores = { hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} }
+      // resetStudyDb clears card_mastery_scores in the same transaction as
+      // review_states, so this only has to drop the renderer's snapshot — the two
+      // are no longer reconciled by hand (issue #66).
+      const emptyScores: CardScores = emptyCardScores()
       const emptyStats: StatsByScript = {
         hiragana: { ...EMPTY_SCRIPT_STATS },
         katakana: { ...EMPTY_SCRIPT_STATS },

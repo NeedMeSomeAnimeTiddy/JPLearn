@@ -112,6 +112,33 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('study:get-card-scores', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeWithArgsRead(['card-scores'])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch card mastery scores: ${detail}`)
+    }
+  })
+
+  // One-time adoption of mastery counters that predate issue #66, when they lived
+  // in renderer localStorage. The bridge refuses to overwrite existing rows, so
+  // this is safe to call on every launch; the renderer only calls it while a
+  // legacy blob is still present.
+  options.ipcMain.handle('study:import-card-scores', async (event, legacyScores) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    if (legacyScores === null || typeof legacyScores !== 'object' || Array.isArray(legacyScores)) {
+      throw new Error('Legacy card scores must be an object keyed by section')
+    }
+    try {
+      return await runPythonBridgeWithArgsRead(['import-card-scores', JSON.stringify(legacyScores)])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to import card mastery scores: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('study:get-block-progress', async (event, slug) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedSlug = validateDeckSlug(slug)

@@ -1,8 +1,11 @@
 import type { LucideIcon } from 'lucide-react'
-import type { ScriptKey } from '../../types'
+import type { MinigameKey, ScriptKey } from '../../types'
 
-export type { ScriptKey }
-export type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'interleave_mix'
+// Re-exported, never redeclared. This module used to declare `MinigameKey`
+// inline and it had drifted three members behind the shared union — missing
+// 'handwriting', 'kanji_compound_builder' and 'context_cloze'. ARCHITECTURE.md
+// finding A3 predicted exactly this, naming `ScriptKey` (already a re-export).
+export type { MinigameKey, ScriptKey }
 
 export interface SpeechSegment {
   text: string

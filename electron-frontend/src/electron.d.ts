@@ -1,6 +1,8 @@
 // Core payload types are generated from Python dataclasses in desktop_bridge.py.
 // Run: python scripts/generate_ts_types.py
 import type {
+  CardMasteryImportPayload,
+  CardMasteryScoresPayload,
   CardNoteDeletePayload,
   CardNoteLookupPayload,
   CardNotePayload,
@@ -536,6 +538,10 @@ interface DesktopApi {
     days: Array<{ date: string; count: number; accuracy: number }>
   }>
   getBlockProgress: (slug: DeckSlug) => Promise<BlockProgressPayload>
+  // Per-card mastery counters, keyed by deck slug (issue #66). Optional so a
+  // renderer running against an older bridge falls back rather than throwing.
+  getCardScores?: () => Promise<CardMasteryScoresPayload>
+  importCardScores?: (legacyScores: Record<string, Record<number, number>>) => Promise<CardMasteryImportPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>
   getGrammarMinigameData?: (payload: GrammarMinigameRequest) => Promise<GrammarMinigameResponse>
@@ -581,6 +587,9 @@ interface DesktopApi {
     interval: number
     next_review: string
     ease_factor: number
+    // Stored per-card mastery counter after this answer (issue #66). Optional so
+    // a renderer running against an older bridge keeps its local step.
+    mastery_score?: number
     confidence_score?: number | null
     curriculum_stage?: number | null
     xp_gained?: number
