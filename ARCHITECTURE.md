@@ -117,12 +117,13 @@ tuple if it's new), so the TS type is generated rather than hand-written.**
 
 ### `data/jplearn.db` — the real database
 
-`LATEST_SCHEMA_VERSION = 19`, forward-only migrations applied in `_apply_migrations`.
-31 tables, grouped:
+`LATEST_SCHEMA_VERSION = 20`, forward-only migrations applied in `_apply_migrations`.
+32 tables, grouped:
 
 - **SRS core** — `review_states` (FSRS stability/difficulty/interval/ease/next_review),
   `review_events` (full history with `session_id`, `confidence_score`), `leech_items`,
-  `curriculum_stages`
+  `curriculum_stages`, `card_mastery_scores` (the 0..4 per-card counter behind the
+  progress bars, keyed `(deck_slug, card_id)` — see §4)
 - **Progress/gamification** — `streak_state`, `user_xp`, `user_progression`,
   `user_feature_unlocks`, `user_badges`, `session_goals`, `jlpt_exam_results`
 - **Assistant** — `assistant_profile`, `assistant_events`, `assistant_state_snapshots`,
@@ -219,25 +220,51 @@ with `roundBuilder.ts`/`grammarRound.ts` in place of a `utils.ts`. It has no `co
 shared with App and the views, so they belong in `src/constants.tsx`) and no `components/`
 (its UI is `views/MinigameView.tsx`, which reads the session through `useSession()`).
 
-### Dual source of truth for mastery
+### Three mastery notions, one store (was: dual source of truth)
 
-This is the most important thing to know before designing anything progress-related.
+Still the most important thing to know before designing anything progress-related, but
+the shape changed with issue #66. Mastery now lives in SQLite only:
 
 ```
-SQLite review_states  ──►  bridge `summary` ──►  deck stats (total/mastered/due)
-localStorage          ──►  cardScores        ──►  JLPT progress, category unlocks,
-  'jplearn-card-scores-v2'                        study plan, per-card mastery bars
+review_states       ──► bridge `summary`     ──► deck stats (total/mastered/due)
+card_mastery_scores ──► `card-scores` cmd    ──► JLPT progress, category unlocks,
+  (deck_slug, card_id)  `record-result` reply     study plan, per-card mastery bars
 ```
 
-`CardScores = Record<ScriptKey, Record<cardId, number>>` with `CARD_MASTERY_MAX = 4`.
-The two can disagree; clearing browser storage silently resets visible mastery while
-FSRS state survives, and a DB reset that misses localStorage does the reverse
-(`App.tsx:803` persists it, `1762` clears it on DB reset — kept in sync by hand).
+There are **three distinct definitions** of "mastered", and they are not
+interchangeable — each answers its own question:
 
-Six localStorage keys hold renderer-side truth: `jplearn-desktop-script-stats-v1`,
-`jplearn-desktop-settings-v1`, `jplearn-card-scores-v2`,
+| Notion | Rule | Used for |
+|---|---|---|
+| Counter | `card_mastery_scores.score >= 4` (`domain/mastery.py`) | progress bars, JLPT %, category unlocks |
+| FSRS mastered | `repetitions >= 3 AND interval >= 21` | deck stats, `summary` |
+| Block passed | `repetitions >= 1` (`domain/blocks.py`) | block unlock gating |
+
+The counter is deliberately **not derived** from FSRS state. Measured against
+`domain/scheduler.py`: six correct answers inside one session leave `interval` at 6 and
+`stability` at 5.80 (same-day reviews see `elapsed_days == 0`, so retrievability is ~1
+and the stability-increase term vanishes), while spaced reviews jump `interval`
+6 → 43 → 271 → 1500. `repetitions` resets to 0 on any *Again* rating. So FSRS state
+cannot express a gradual 0..4 scale in either direction, and a bar derived from it would
+sit frozen for a whole session and then jump. #66's original suggested fix ("make
+`cardScores` a derived cache") was abandoned for this reason.
+
+The counter is written on the same bridge call that persists the review
+(`record-result` returns the new value), and `reset_db` clears it in the same
+transaction as `review_states` — so the two can no longer drift. `localStorage`
+`jplearn-card-scores-v2` survives only as a warm-start snapshot for first paint, plus a
+one-time `import-card-scores` adoption of pre-#66 values, gated on the table being empty.
+That import runs in Python because resolving a legacy `ScriptKey` bucket to the deck that
+owns a card id needs `ALL_DECKS`.
+
+Five localStorage keys still hold renderer-side truth:
+`jplearn-desktop-script-stats-v1`, `jplearn-desktop-settings-v1`,
 `jplearn-desktop-summary-snapshot-v1`, `jplearn-desktop-session-v1`,
 `jplearn-desktop-session-prefs-v1`.
+
+Residual worth knowing: `buildStudyPlan` reads deck stats from `summary` (FSRS
+`mastered`) while JLPT progress comes from counter aggregates. Those are two metrics
+answering different questions, not drift — they will never be the same number.
 
 ### `ScriptKey` is narrower than the content
 
@@ -247,13 +274,24 @@ type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5'
 ```
 
 But `domain/decks.ALL_DECKS` registers 45+ decks including `kanji_n1..n4`, `vocab_n1..n4`
-and 12 N4–N1 kanji category decks. Consequence: **all kanji mastery across N5–N1 is
-stored in the single `cardScores.kanji_n5` bucket**, keyed by numeric card id
-(`features/study-session/useStudySession.ts:1070`, `1118`). It works only because `domain/decks.py` hand-allocates disjoint id
-ranges.
+and 12 N4–N1 kanji category decks. `ScriptKey` names the app's six *sections*, not deck
+slugs, and a section spans many decks — the vocabulary section reaches
+`vocab_n1_law_justice`.
 
-`ScriptKey` is also **defined twice** — `src/types.ts:23` and
-`src/features/tutor/types.ts:4`. They agree today; nothing enforces that.
+**Storage is no longer bucketed by section.** Since #66 mastery is keyed
+`(deck_slug, card_id)`, so N5–N1 kanji no longer share one bucket.
+`src/lib/cardScores.ts` collapses the stored rows into the six sections the views
+consume. That merge keys by raw card id, which is safe because
+`tests/test_deck_id_uniqueness.py` enforces that a repeated id within an id-sharing
+family always refers to the same card — a checked invariant, not the id-range luck this
+section previously described.
+
+`ScriptKey` is **not** defined twice (an earlier revision of this document said it was).
+`src/features/tutor/types.ts` imports and re-exports it, so it cannot drift. `MinigameKey`
+in that same file *was* declared inline and had already drifted three members behind
+`src/types.ts` — missing `handwriting`, `kanji_compound_builder` and `context_cloze` — and
+is now re-exported too. The lesson generalises: check whether a feature module re-exports
+or redeclares before assuming either.
 
 ---
 
@@ -403,10 +441,10 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 
 | # | Finding | Issue |
 |---|---|---|
-| A1 | Card-id `id_offset` spacing (1,000 for kanji) is already exceeded by `kanji_n1` (1,246 rows). No assertion guards uniqueness; a future import collides ids and corrupts SRS state silently. Add a startup/test-time uniqueness check across `ALL_DECKS`. | none |
-| A2 | Mastery has two sources of truth (SQLite `review_states` vs localStorage `cardScores`) reconciled by hand in two places. Any progress feature built on `cardScores` inherits the drift. | none |
-| A3 | `ScriptKey` defined twice (`src/types.ts`, `features/tutor/types.ts`) with nothing enforcing agreement. | none |
-| A4 | All N5–N1 kanji mastery shares the `cardScores.kanji_n5` bucket — correct only by id-range luck (see A1). | none |
+| ~~A1~~ | ~~Card-id `id_offset` spacing is exceeded by `kanji_n1`; no assertion guards uniqueness~~ — the guard exists: `tests/test_deck_id_uniqueness.py` fails if a repeated id within an id-sharing family refers to two different cards. Vocabulary decks additionally assert against `_VOCAB_ID_CAPACITY` at build time. | #63 |
+| ~~A2~~ | ~~Mastery has two sources of truth (SQLite `review_states` vs localStorage `cardScores`) reconciled by hand~~ — fixed: the counter lives in `card_mastery_scores`, written on the same bridge call as the review and cleared in the same transaction on reset. localStorage is a warm-start snapshot only. Note the issue's suggested fix (derive the counter from FSRS) was *not* taken — see §4 for the measurements that ruled it out. | #66 |
+| ~~A3~~ | ~~`ScriptKey` defined twice~~ — was already wrong: `features/tutor/types.ts` re-exports it. `MinigameKey` in that file was the real duplicate and had drifted three members; now re-exported. | #66 |
+| ~~A4~~ | ~~All N5–N1 kanji mastery shares the `cardScores.kanji_n5` bucket — correct only by id-range luck~~ — fixed: storage is keyed `(deck_slug, card_id)`. The renderer still merges into sections for display, but over the invariant A1 enforces rather than luck. | #66 |
 
 ### Reliability / performance
 
