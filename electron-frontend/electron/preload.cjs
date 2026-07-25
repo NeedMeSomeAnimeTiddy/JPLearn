@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   },
   // ─ Setup wizard ──────────────────────────────────────────────────────
   isFirstRun: () => ipcRenderer.invoke('setup:is-first-run'),
-  getSetupSystemInfo: () => ipcRenderer.invoke('setup:system-info'),
+  getSetupSystemInfo: (options) => ipcRenderer.invoke('setup:system-info', options),
   downloadModel: (tier) => ipcRenderer.invoke('setup:download-model', tier),
   setActiveTutorModel: (tier) => ipcRenderer.invoke('setup:set-active-model', tier),
   uninstallTutorModel: (tier) => ipcRenderer.invoke('setup:uninstall-model', tier),

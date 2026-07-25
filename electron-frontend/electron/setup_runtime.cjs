@@ -186,10 +186,12 @@ const PADDLEPADDLE_VERSION = '3.2.0'
 const ACTIVE_OCR_MODEL_STATE_FILENAME = 'active-ocr-model.json'
 const ACTIVE_TRANSLATION_MODEL_STATE_FILENAME = 'active-translation-model.json'
 const SPEED_TEST_TIMEOUT_MS = 12000
+const REMOTE_SIZE_PROBE_TIMEOUT_MS = 8000
 const SPEED_TEST_TARGETS = [
   { url: 'https://proof.ovh.net/files/10Mb.dat', bytes: 10485760 },
   { url: 'https://proof.ovh.net/files/100Mb.dat', bytes: 20971520 },
 ]
+// url -> createDeferredValue holding the asset's exact byte size.
 const REMOTE_SIZE_CACHE = new Map()
 const LLAMA_BACKEND_LABELS = {
   cuda: 'CUDA (NVIDIA)',
@@ -1190,6 +1192,53 @@ async function measureNetworkMbps() {
   return null
 }
 
+/**
+ * A value that is slow to compute and that most callers can do without.
+ *
+ * `get(false)` returns whatever has already been computed -- null on a cold
+ * cache -- and starts the computation in the background, so the caller is never
+ * blocked. `get(true)` awaits it. Concurrent callers share one computation, and
+ * a computation that fails or yields null is retried on the next call rather
+ * than caching the failure forever.
+ *
+ * Both network probes behind the setup screen use this. They exist only for the
+ * cosmetic "about N minutes to download" hints and exact byte sizes, but
+ * `getSystemInfo` also carries the install flags the renderer gates features on
+ * (Image Translation checks `ocrInstalled`), and awaiting the probes meant those
+ * flags read false for as long as the network took -- up to ~20 seconds after
+ * launch, or forever on a stalled connection.
+ */
+function createDeferredValue(compute) {
+  let value = null
+  let inFlight = null
+
+  return {
+    async get(wait = false) {
+      if (value !== null) {
+        return value
+      }
+      if (!inFlight) {
+        inFlight = Promise.resolve()
+          .then(compute)
+          .catch(() => null)
+          .then((result) => {
+            value = result
+            inFlight = null
+            return result
+          })
+      }
+      const pending = inFlight
+      return wait ? await pending : null
+    },
+    reset() {
+      value = null
+      inFlight = null
+    },
+  }
+}
+
+const networkMbpsValue = createDeferredValue(measureNetworkMbps)
+
 function estimateDownloadMinutes(sizeMb, networkMbps) {
   if (!networkMbps || !Number.isFinite(networkMbps) || networkMbps <= 0) {
     return null
@@ -1299,7 +1348,18 @@ function detectLlamaBackend(gpuNames) {
   return 'cpu'
 }
 
-async function getSystemInfo() {
+/**
+ * Snapshot of what is installed, what is recommended, and (when available) how
+ * long downloads would take.
+ *
+ * `waitForNetworkEstimate` exists because the two callers want opposite things:
+ * the setup wizard is choosing what to download and shows its own spinner, so it
+ * waits for a real estimate; the running app only wants the install flags that
+ * gate features like Image Translation, and used to spend up to ~20s reporting
+ * everything as uninstalled while a speed probe ran.
+ */
+async function getSystemInfo(options = {}) {
+  const waitForNetworkEstimate = Boolean(options && options.waitForNetworkEstimate)
   const base = ensureJPLearnDirs()
   const totalRamGb = os.totalmem() / (1024 ** 3)
   const llamaCppDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
@@ -1308,7 +1368,7 @@ async function getSystemInfo() {
   const gpuVramGb = detectGpuVramGb()
   const recommendedTier = recommendTutorTier(totalRamGb, gpuVramGb || 0)
   const llamaCppBackend = detectLlamaBackend(gpuAdapters)
-  const networkMbpsRaw = await measureNetworkMbps()
+  const networkMbpsRaw = await networkMbpsValue.get(waitForNetworkEstimate)
   const networkMbps = typeof networkMbpsRaw === 'number' && Number.isFinite(networkMbpsRaw)
     ? Math.round(networkMbpsRaw * 10) / 10
     : null
@@ -1317,7 +1377,7 @@ async function getSystemInfo() {
   const fontsInstalled = fontInstallState.installed
   const dictionaryInstalled = isOfflineDictionaryInstalled(base)
   const speechModels = await Promise.all(Object.entries(SPEECH_MODELS).map(async ([tier, m]) => {
-    const exactSizeMb = await getSpeechModelSizeMb(m)
+    const exactSizeMb = await getSpeechModelSizeMb(m, waitForNetworkEstimate)
     return {
       tier,
       label: m.label,
@@ -1358,7 +1418,7 @@ async function getSystemInfo() {
   try { isPackaged = require('electron').app.isPackaged } catch { /* dev mode */ }
 
   const models = await Promise.all(Object.entries(MODELS).map(async ([tier, m]) => {
-    const exactModelSizeMb = await getTutorModelSizeMb(m)
+    const exactModelSizeMb = await getTutorModelSizeMb(m, waitForNetworkEstimate)
     const embedderTier = CHATBOT_TIER_TO_EMBEDDER_TIER[tier]
     const embedder = embedderTier ? EMBEDDERS[embedderTier] : null
     const embedderSizeMb = embedder ? embedder.sizeMb : 0
@@ -1572,10 +1632,29 @@ const PARALLEL_CONNECTIONS = 8
  */
 function probeUrl(url) {
   return new Promise((resolve, reject) => {
+    // Without this the request can hang indefinitely on a stalled connection,
+    // and anything awaiting it (getSystemInfo, and so every install flag the
+    // renderer gates features on) hangs with it.
+    let activeRequest = null
+    const timer = setTimeout(() => {
+      try {
+        activeRequest?.destroy()
+      } catch {
+        // Already gone.
+      }
+      reject(new Error(`Size probe timed out: ${url}`))
+    }, REMOTE_SIZE_PROBE_TIMEOUT_MS)
+    const settle = (fn) => (value) => {
+      clearTimeout(timer)
+      fn(value)
+    }
+    resolve = settle(resolve)
+    reject = settle(reject)
+
     function follow(redirectUrl, hops) {
       if (hops > 8) { reject(new Error('Too many redirects')); return }
       const mod = redirectUrl.startsWith('https') ? https : http
-      const req = mod.get(redirectUrl, {
+      activeRequest = mod.get(redirectUrl, {
         headers: { 'User-Agent': 'JPLearn/1.0', 'Range': 'bytes=0-0' },
       }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
@@ -1595,7 +1674,7 @@ function probeUrl(url) {
         }
         resolve({ finalUrl: redirectUrl, total, supportsRanges })
       })
-      req.on('error', reject)
+      activeRequest.on('error', reject)
     }
     follow(url, 0)
   })
@@ -1605,34 +1684,40 @@ function toHfResolveUrl(repo, filename, revision = 'main') {
   return `https://huggingface.co/${repo}/resolve/${revision}/${filename}`
 }
 
-async function getCachedUrlSizeBytes(url) {
-  if (REMOTE_SIZE_CACHE.has(url)) {
-    return REMOTE_SIZE_CACHE.get(url)
+/**
+ * Exact download size for a remote asset, or null when it isn't known yet.
+ *
+ * Same opt-in shape as the throughput probe: with `wait: false` this returns
+ * only what has already been fetched and warms the rest in the background, so
+ * callers that just want install flags are never held up by huggingface.co.
+ */
+async function getCachedUrlSizeBytes(url, wait = false) {
+  let entry = REMOTE_SIZE_CACHE.get(url)
+  if (!entry) {
+    entry = createDeferredValue(async () => {
+      const { total } = await probeUrl(url)
+      return total > 0 ? total : null
+    })
+    REMOTE_SIZE_CACHE.set(url, entry)
   }
-  try {
-    const { total } = await probeUrl(url)
-    const size = total > 0 ? total : null
-    REMOTE_SIZE_CACHE.set(url, size)
-    return size
-  } catch {
-    REMOTE_SIZE_CACHE.set(url, null)
-    return null
-  }
+  return await entry.get(wait)
 }
 
-async function getTutorModelSizeMb(model) {
-  const sizeBytes = await getCachedUrlSizeBytes(toHfResolveUrl(model.repo, model.filename))
+// A null exact size falls back to the hardcoded model.sizeMb, so the setup
+// screen shows an approximate number rather than nothing.
+async function getTutorModelSizeMb(model, wait = false) {
+  const sizeBytes = await getCachedUrlSizeBytes(toHfResolveUrl(model.repo, model.filename), wait)
   if (!sizeBytes || sizeBytes <= 0) return model.sizeMb
   return Math.max(1, Math.round(sizeBytes / (1024 * 1024)))
 }
 
-async function getSpeechModelSizeMb(model) {
+async function getSpeechModelSizeMb(model, wait = false) {
   if (!model.repo || !Array.isArray(model.files) || model.files.length === 0) {
     return model.sizeMb
   }
 
   const sizes = await Promise.all(
-    model.files.map((filename) => getCachedUrlSizeBytes(toHfResolveUrl(model.repo, filename))),
+    model.files.map((filename) => getCachedUrlSizeBytes(toHfResolveUrl(model.repo, filename), wait)),
   )
 
   if (sizes.some((value) => !value || value <= 0)) {
@@ -2823,7 +2908,13 @@ function createSetupRuntime() {
   }
 }
 
-module.exports = { createSetupRuntime, isOfflineDictionaryInstalled }
+module.exports = {
+  createSetupRuntime,
+  isOfflineDictionaryInstalled,
+  // Exported for tests. This is the primitive that keeps the setup screen's
+  // network probes off the path that reports what is installed.
+  createDeferredValue,
+}
 
 
 

@@ -684,6 +684,33 @@ describe('ipc runtime contract', () => {
     })
   })
 
+  describe('setup system info', () => {
+    // The renderer gates Image Translation on `ocrInstalled` from this payload,
+    // so it must not be served behind the setup screen's network probes.
+    it('does not wait on the network probes unless the caller opts in', async () => {
+      const getSystemInfo = vi.fn(async () => ({ ocrInstalled: true }))
+      const { handlers } = createRegisteredHandlers({ setupRuntime: { getSystemInfo } })
+      const handler = handlers.get('setup:system-info')
+
+      await handler(createValidEvent())
+      await handler(createValidEvent(), {})
+      await handler(createValidEvent(), { waitForNetworkEstimate: true })
+
+      expect(getSystemInfo).toHaveBeenNthCalledWith(1, { waitForNetworkEstimate: false })
+      expect(getSystemInfo).toHaveBeenNthCalledWith(2, { waitForNetworkEstimate: false })
+      expect(getSystemInfo).toHaveBeenNthCalledWith(3, { waitForNetworkEstimate: true })
+    })
+
+    it('ignores a non-object options argument rather than trusting it', async () => {
+      const getSystemInfo = vi.fn(async () => ({ ocrInstalled: true }))
+      const { handlers } = createRegisteredHandlers({ setupRuntime: { getSystemInfo } })
+
+      await handlers.get('setup:system-info')(createValidEvent(), 'waitForNetworkEstimate')
+
+      expect(getSystemInfo).toHaveBeenCalledWith({ waitForNetworkEstimate: false })
+    })
+  })
+
   it('wraps bridge failures with handler-specific study summary context', async () => {
     const { handlers } = createRegisteredHandlers({
       runPythonBridge: vi.fn().mockRejectedValue(new Error('bridge exploded')),

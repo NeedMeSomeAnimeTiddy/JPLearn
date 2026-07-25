@@ -721,7 +721,10 @@ interface DesktopApi {
   getKanjiDetail?: (character: string) => Promise<KanjiDetailPayload>
   // ─ Setup wizard ────────────────────────────────────────────────────
   isFirstRun?: () => Promise<boolean>
-  getSetupSystemInfo?: () => Promise<SetupSystemInfo>
+  // `waitForNetworkEstimate` blocks on the download-throughput and remote-size
+  // probes so `estimatedDownloadMinutes` / exact sizes are populated. Omit it
+  // when you only need the install flags — those come back without any network.
+  getSetupSystemInfo?: (options?: { waitForNetworkEstimate?: boolean }) => Promise<SetupSystemInfo>
   downloadModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ alreadyInstalled?: boolean }>
   setActiveTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>
   uninstallTutorModel?: (tier: 'low' | 'medium' | 'high' | 'ultra') => Promise<{ ok: boolean; tier: string }>

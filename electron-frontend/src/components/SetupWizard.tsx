@@ -87,7 +87,9 @@ export function SetupWizard({ onComplete }: Props) {
     if (!api?.getSetupSystemInfo) return
     setSystemInfoLoading(true)
     try {
-      const info = await api.getSetupSystemInfo()
+      // The wizard is where download sizes and time estimates are the point,
+      // and it renders its own loading state while this resolves.
+      const info = await api.getSetupSystemInfo({ waitForNetworkEstimate: true })
       setSysInfo(info)
       setSelectedTier((prev) => {
         if (prev && prev !== 'skip' && info.models.some((model) => model.tier === prev)) return prev

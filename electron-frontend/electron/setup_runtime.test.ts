@@ -2,9 +2,9 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const { isOfflineDictionaryInstalled } = require('./setup_runtime.cjs')
+const { isOfflineDictionaryInstalled, createDeferredValue } = require('./setup_runtime.cjs')
 
 const temporaryDirectories: string[] = []
 
@@ -57,5 +57,69 @@ describe('offline dictionary installation readiness', () => {
     ))
 
     expect(isOfflineDictionaryInstalled(base)).toBe(false)
+  })
+})
+
+describe('deferred network probes', () => {
+  // Regression: getSystemInfo used to await a 10 MB throughput probe and an
+  // unbounded huggingface.co size probe before returning anything, including
+  // the install flags the renderer gates features on. A drop into Image
+  // Translation during that window was told OCR "is not installed".
+  it('does not make a non-waiting caller wait for the computation', async () => {
+    let release: (value: number) => void = () => {}
+    const compute = vi.fn(() => new Promise<number>((resolve) => { release = resolve }))
+    const deferred = createDeferredValue(compute)
+
+    // Cold cache: returns immediately even though nothing has resolved.
+    await expect(deferred.get(false)).resolves.toBeNull()
+    expect(compute).toHaveBeenCalledTimes(1)
+
+    release(42)
+    await vi.waitFor(async () => expect(await deferred.get(false)).toBe(42))
+    expect(compute).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits and returns the value when the caller opts in', async () => {
+    const deferred = createDeferredValue(async () => 7)
+
+    await expect(deferred.get(true)).resolves.toBe(7)
+    await expect(deferred.get(false)).resolves.toBe(7)
+  })
+
+  it('shares one computation across concurrent callers', async () => {
+    let release: (value: number) => void = () => {}
+    const compute = vi.fn(() => new Promise<number>((resolve) => { release = resolve }))
+    const deferred = createDeferredValue(compute)
+
+    const waiting = deferred.get(true)
+    await deferred.get(false)
+    const alsoWaiting = deferred.get(true)
+
+    release(3)
+    await expect(waiting).resolves.toBe(3)
+    await expect(alsoWaiting).resolves.toBe(3)
+    expect(compute).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries rather than caching a failure, and never rejects', async () => {
+    const compute = vi.fn()
+      .mockRejectedValueOnce(new Error('getaddrinfo ENOTFOUND proof.ovh.net'))
+      .mockResolvedValueOnce(99)
+    const deferred = createDeferredValue(compute)
+
+    await expect(deferred.get(true)).resolves.toBeNull()
+    await expect(deferred.get(true)).resolves.toBe(99)
+    expect(compute).toHaveBeenCalledTimes(2)
+  })
+
+  it('recomputes after a reset', async () => {
+    const compute = vi.fn().mockResolvedValue(5)
+    const deferred = createDeferredValue(compute)
+
+    await deferred.get(true)
+    deferred.reset()
+    await deferred.get(true)
+
+    expect(compute).toHaveBeenCalledTimes(2)
   })
 })

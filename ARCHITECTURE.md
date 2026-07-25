@@ -495,6 +495,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 | B1 | Bridge worker is strictly serial; anything slow blocks every study query behind it. Largely defused: OCR translation never used the bridge, OCR now has its own persistent runtime (#74), and `fsrs-optimize` runs one-shot off-worker. The serial property itself still stands as a constraint on new work. | #74 (OCR) |
 | B2 | A single request timeout calls `stopPythonBridgeWorker()`, which rejects **all** pending unrelated requests and forces a cold restart. | none |
 | B3 | Worker-failure fallback re-spawns a one-shot Python process per request — full interpreter + import cost on the degraded path. | none |
+| ~~B4~~ | ~~`setup:system-info` served install flags from behind two network probes~~ — a 10 MB throughput measurement and untimed `huggingface.co` size probes. The renderer gates features on those flags (`ocrInstalled` decides whether an image drop is accepted), so for ~9s after launch Image Translation reported itself uninstalled, and indefinitely if a probe socket hung. Probes are now deferred (`createDeferredValue`): flags return in ~600ms, and only the setup wizard — which shows a spinner and actually needs download estimates — opts into waiting. **Rule this establishes: nothing that reports what is installed may sit behind a network call.** | #74 follow-up |
 
 ### Content
 

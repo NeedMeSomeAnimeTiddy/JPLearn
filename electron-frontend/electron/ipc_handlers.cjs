@@ -1419,9 +1419,16 @@ function registerIpcHandlers(options) {
       return setupRuntime.isFirstRun()
     })
 
-    options.ipcMain.handle('setup:system-info', (event) => {
+    options.ipcMain.handle('setup:system-info', (event, infoOptions) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      return setupRuntime.getSystemInfo()
+      // Only the setup wizard opts into waiting for the network probes; the
+      // running app needs the install flags promptly, since features like
+      // Image Translation are gated on them and would otherwise report
+      // themselves uninstalled for as long as the probes take.
+      const waitForNetworkEstimate = Boolean(
+        infoOptions && typeof infoOptions === 'object' && infoOptions.waitForNetworkEstimate,
+      )
+      return setupRuntime.getSystemInfo({ waitForNetworkEstimate })
     })
 
     options.ipcMain.handle('setup:download-model', async (event, tier) => {
