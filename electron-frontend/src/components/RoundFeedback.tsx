@@ -1,5 +1,7 @@
 import type { PlayableMinigame, RoundDictionaryNote } from '../types'
+import type { GrammarExplanation } from '../lib/grammarExplanations'
 import { FEEDBACK_COPY, formatExpectedAnswer } from '../constants'
+import { GrammarExplanationCard } from './GrammarExplanationCard'
 import { Calendar, Timer } from 'lucide-react'
 import { TypeAnimation } from 'react-type-animation'
 
@@ -33,6 +35,8 @@ interface RoundFeedbackProps {
   cardMeaning: string
   cardRomaji: string
   dictionaryNote: RoundDictionaryNote | null
+  /** Shown only on a wrong answer; null when the card isn't grammar or has no entry. */
+  grammarExplanation?: GrammarExplanation | null
 }
 
 const SENTENCE_MODES = ['sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter'] as const
@@ -77,6 +81,7 @@ export function RoundFeedback({
   cardMeaning,
   cardRomaji,
   dictionaryNote,
+  grammarExplanation = null,
 }: RoundFeedbackProps) {
   return (
     <div
@@ -161,6 +166,9 @@ export function RoundFeedback({
           <span className="round-feedback-detail-label">{dictionaryNote.title}</span>
           <p className="round-feedback-dictionary-copy">{dictionaryNote.copy}</p>
         </div>
+      ) : null}
+      {tone === 'error' && grammarExplanation ? (
+        <GrammarExplanationCard explanation={grammarExplanation} />
       ) : null}
       {mode === 'imposter' ? (
         <p className="round-feedback-note">Story progress updates chapter access based on stage transitions.</p>

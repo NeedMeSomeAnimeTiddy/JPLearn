@@ -7687,6 +7687,61 @@ html[data-reduced-motion='true'] .cassette-reel {
   margin: 0;
 }
 
+.round-feedback-grammar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklab, var(--panel-border) 25%, transparent);
+}
+
+.round-feedback-grammar-name {
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.round-feedback-grammar-formation {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.round-feedback-grammar-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+}
+
+.round-feedback-grammar-example {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in oklab, var(--panel-border) 40%, transparent);
+}
+
+.round-feedback-grammar-mistake {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 2px 0 0;
+}
+
+.round-feedback-grammar-mistake-label {
+  color: color-mix(in oklab, var(--text-soft) 75%, transparent);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 8px;
+}
+
 .round-feedback-toast {
   position: fixed;
   top: 22px;

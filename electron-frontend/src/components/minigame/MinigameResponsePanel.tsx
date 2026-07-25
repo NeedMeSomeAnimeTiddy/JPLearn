@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { CONFIDENCE_LEVEL_LABELS, CONFIDENCE_SCORES, FEEDBACK_COPY } from '../../constants'
 import { RoundFeedback } from '../RoundFeedback'
 import type { PlayableMinigame, RoundDictionaryNote } from '../../types'
+import type { GrammarExplanation } from '../../lib/grammarExplanations'
 
 interface MinigameResponsePanelProps {
   isRoundResolving: boolean
@@ -39,6 +40,7 @@ interface MinigameResponsePanelProps {
   cardMeaning: string
   cardRomaji: string
   dictionaryNote: RoundDictionaryNote | null
+  grammarExplanation?: GrammarExplanation | null
   children: ReactNode
 }
 
@@ -69,6 +71,7 @@ export function MinigameResponsePanel({
   cardMeaning,
   cardRomaji,
   dictionaryNote,
+  grammarExplanation = null,
   children,
 }: MinigameResponsePanelProps) {
   const isChoiceMode =
@@ -111,6 +114,7 @@ export function MinigameResponsePanel({
             cardMeaning={cardMeaning}
             cardRomaji={cardRomaji}
             dictionaryNote={dictionaryNote}
+            grammarExplanation={grammarExplanation}
           />
           {feedbackAdvancePending ? <p className="status-line" role="status">{FEEDBACK_COPY.REVIEW_SAVING}</p> : null}
           {feedbackAdvanceError ? <p className="status-line status-error" role="alert">{FEEDBACK_COPY.REVIEW_SAVE_FAILURE}</p> : null}

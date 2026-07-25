@@ -30,6 +30,7 @@ import {
   formatExpectedAnswer,
   formatFeedbackAnswerLabel,
 } from '../constants'
+import { lookupGrammarExplanation } from '../lib/grammarExplanations'
 import { isGrammarCurriculumMode, sanitizeRomajiInput } from '../utils'
 import { useSession } from '../context/SessionContext'
 
@@ -123,6 +124,12 @@ export function MinigameView({
       ? (MINIGAMES.find((game) => game.key === roundState?.mode)?.title ?? 'Mixed Round')
       : (selectedGameMeta?.title ?? 'Minigame')
   const displayedRoundCard = activeRoundCard ?? activeBlockCards.find((card) => card.id === roundState?.cardId) ?? null
+  // Grammar cards get drilled through every mode, so gate on the card's tag rather than the
+  // minigame. `roundState.focusText` is the sentence for grammar modes — the pattern the
+  // explanation is keyed on lives on the card itself.
+  const roundGrammarExplanation = displayedRoundCard?.tags?.includes('grammar')
+    ? lookupGrammarExplanation(displayedRoundCard.character)
+    : null
   const roundProgressValue = effectiveTargetItems > 0 ? Math.min(sessionRounds / effectiveTargetItems, 1) : 0
   const remainingRounds = Math.max(effectiveTargetItems - sessionRounds, 0)
   const sessionStatusCopy = sessionActive
@@ -626,6 +633,7 @@ export function MinigameView({
                       cardMeaning={!isGrammarCurriculumMode(roundState.mode) ? (displayedRoundCard?.meaning ?? '') : ''}
                       cardRomaji={!isGrammarCurriculumMode(roundState.mode) ? (displayedRoundCard?.romaji ?? '') : ''}
                       dictionaryNote={roundState.dictionaryNote}
+                      grammarExplanation={roundGrammarExplanation}
                     >
                         {roundState.mode === 'handwriting' ? (
                           <HandwritingAnswerPanel
