@@ -154,6 +154,37 @@ class TestRunBackfill:
         assert second.skipped_unexplained == 0
         assert database.load_states("Hiragana", [6])[6].repetitions == 1
 
+    def test_db_path_override_targets_that_database_and_restores(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
+        """The --db override is how this runs against another checkout's data,
+        so it must write to the target and leave the module path as it found it."""
+        default_db = tmp_path / "default.db"
+        target_db = tmp_path / "target.db"
+
+        monkeypatch.setattr(database, "DB_PATH", target_db)
+        database.init_db()
+        for _ in range(4):
+            database.log_review("Hiragana", 9, 4, reviewed_on=DAY)
+        database.save_state("Hiragana", ReviewState(card_id=9, repetitions=4, interval=6))
+
+        # Point the module elsewhere; only the explicit db_path should be hit.
+        monkeypatch.setattr(database, "DB_PATH", default_db)
+        database.init_db()
+
+        plan = run_backfill(apply=True, db_path=target_db)
+
+        assert len(plan.corrections) == 1
+        assert database.DB_PATH == default_db, "module path must be restored"
+
+        monkeypatch.setattr(database, "DB_PATH", target_db)
+        assert database.load_states("Hiragana", [9])[9].repetitions == 1
+
+        monkeypatch.setattr(database, "DB_PATH", default_db)
+        with database._connect() as conn:  # type: ignore[attr-defined]
+            untouched = conn.execute("SELECT COUNT(*) n FROM review_states").fetchone()
+        assert untouched["n"] == 0, "the default database must not be written"
+
     def test_other_state_columns_are_untouched(self, tmp_path: Path, monkeypatch) -> None:
         """The correction is repetitions-only; intervals must not move under
         the learner, since replaying FSRS would reschedule every card."""
