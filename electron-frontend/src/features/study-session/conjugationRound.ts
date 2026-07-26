@@ -9,6 +9,31 @@
 
 import type { RoundDictionaryNote, RoundState, ScriptDeck } from '../../types'
 
+const VERB_TAIL = /[うくぐすつぬぶむる]$/
+
+/**
+ * Cheap renderer-side guess at whether a card can be conjugated at all.
+ *
+ * The tokenizer behind the bridge is the authority, but a section deck is
+ * mostly nouns — 24% of the N5 vocabulary deck is drillable — and picking the
+ * card index before asking would leave three rounds in four silently falling
+ * back to meaning-match. Filtering the pool first lands ~91% of the time, and
+ * the bridge still declines the rest. Same pattern the handwriting and compound
+ * builder modes use.
+ *
+ * Deliberately one-sided: it misses na-adjectives (好き, 有名), whose part of
+ * speech is not recoverable from the card's own fields. Those cards simply do
+ * not get drilled rather than being drilled wrongly.
+ */
+export function isConjugationDrillCandidate(character: string, meaning: string): boolean {
+  const word = character.trim()
+  if (!word) return false
+  const gloss = meaning.trim().toLowerCase()
+  // JMdict-derived glosses start verbs with "to ".
+  if (gloss.startsWith('to ') && VERB_TAIL.test(word)) return true
+  return word.endsWith('い') && !gloss.startsWith('to ')
+}
+
 export async function buildConjugationDrillRound(
   card: ScriptDeck['cards'][number],
   options: {

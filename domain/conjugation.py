@@ -164,7 +164,7 @@ _IKU_READINGS = ("いく", "ゆく")
 
 #: Verbs whose meaning makes the advanced voices useless or ungrammatical to
 #: drill. Keyed on reading so a kanji or kana surface both match.
-_STATIVE_READINGS = frozenset({"ある", "いる", "できる", "わかる", "みえる", "きこえる", "いる"})
+_STATIVE_READINGS = frozenset({"ある", "いる", "できる", "わかる", "みえる", "きこえる"})
 
 #: Honorific irregulars (くださる → くださいます) whose masu-stem breaks the
 #: godan rule. Excluded outright rather than special-cased.

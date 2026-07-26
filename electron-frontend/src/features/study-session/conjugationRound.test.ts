@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildConjugationDrillRound } from './conjugationRound'
+import { buildConjugationDrillRound, isConjugationDrillCandidate } from './conjugationRound'
 import type { ScriptDeck } from '../../types'
 
 type Card = ScriptDeck['cards'][number]
@@ -127,5 +127,28 @@ describe('buildConjugationDrillRound', () => {
 
     const blank = { ...CARD, character: '   ' } as Card
     expect(await buildConjugationDrillRound(blank, OPTIONS)).toBeNull()
+  })
+})
+
+describe('isConjugationDrillCandidate', () => {
+  it('keeps verbs, identified by their gloss and tail', () => {
+    expect(isConjugationDrillCandidate('会う', 'to meet, to see')).toBe(true)
+    expect(isConjugationDrillCandidate('食べる', 'to eat')).toBe(true)
+    expect(isConjugationDrillCandidate('勉強する', 'to study')).toBe(true)
+  })
+
+  it('keeps i-adjectives', () => {
+    expect(isConjugationDrillCandidate('高い', 'expensive, tall')).toBe(true)
+  })
+
+  it('drops the nouns that make up most of a vocabulary deck', () => {
+    expect(isConjugationDrillCandidate('青', 'blue')).toBe(false)
+    expect(isConjugationDrillCandidate('電車', 'train')).toBe(false)
+    expect(isConjugationDrillCandidate('', 'to eat')).toBe(false)
+  })
+
+  it('does not mistake a "to"-glossed noun for a verb', () => {
+    // No verb tail, so the gloss alone is not enough.
+    expect(isConjugationDrillCandidate('あちら', 'to that side')).toBe(false)
   })
 })

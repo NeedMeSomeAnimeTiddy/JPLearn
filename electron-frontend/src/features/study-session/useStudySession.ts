@@ -37,6 +37,7 @@ import {
 } from '../handwriting'
 import type { StudySessionApi, StudySessionDeps, StudySessionSlice } from './types'
 import { assessConjugationAnswer, assessTypedAnswer } from '../../lib/answerAssessment'
+import { isConjugationDrillCandidate } from './conjugationRound'
 import type { TypedAnswerState } from '../../lib/answerAssessment'
 import { assessTypedRecallAnswer } from '../../lib/typedRecallAssessment'
 import { isGrammarCurriculumMode } from '../../utils'
@@ -685,6 +686,9 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       if (modeSelection.mode === 'handwriting') {
         modeCards = modeCards.filter((card) => isHandwritingEligibleCharacter(card.character))
       }
+      if (modeSelection.mode === 'conjugation_drill') {
+        modeCards = modeCards.filter((card) => isConjugationDrillCandidate(card.character, card.meaning))
+      }
       const goalTargetItems = Math.max(1, Math.floor(customTargetItems ?? sessionTargetItems))
 
       const goalRequest = window.jplearnDesktop?.startSessionGoal({
@@ -898,6 +902,9 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     }
     if (modeSelection.mode === 'handwriting') {
       modeCards = modeCards.filter((card) => isHandwritingEligibleCharacter(card.character))
+    }
+    if (modeSelection.mode === 'conjugation_drill') {
+      modeCards = modeCards.filter((card) => isConjugationDrillCandidate(card.character, card.meaning))
     }
     let index = nextCardIndex(modeCards.length)
     if (index === null) {

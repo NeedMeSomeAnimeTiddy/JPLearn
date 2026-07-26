@@ -58,6 +58,9 @@ class TestKanaOnlyClassification:
     def test_unknown_kana_ru_verbs_are_refused_rather_than_guessed(self) -> None:
         assert classify_word("しゃべる") is None
 
+    def test_ii_is_curated_because_the_tokenizer_mis_tags_it(self) -> None:
+        assert classify_word("いい") == ("i_adjective", "いい")
+
 
 class TestPayload:
     def test_payload_carries_both_spellings(self) -> None:

@@ -37,12 +37,15 @@ _KANA_SHIFT = 0x60
 #: ichidan, so it needs no tokenizer evidence to classify.
 _UNAMBIGUOUS_GODAN_TAILS = ("う", "く", "ぐ", "す", "つ", "ぬ", "ぶ", "む")
 
-#: る-final verbs written in kana are genuinely ambiguous (かえる is 帰る godan
-#: or 変える ichidan), and the tokenizer's pick for a bare word is a coin flip.
-#: These are the kana-only verbs the built-in N5 fallback deck ships, resolved
-#: to the sense that deck teaches. Anything else る-final and kana-only is
-#: refused rather than guessed.
-_KANA_RU_VERB_CLASSES: dict[str, WordClass] = {
+#: Kana-only words the tokenizer gets wrong on its own. る-final verbs are
+#: genuinely ambiguous (かえる is 帰る godan or 変える ichidan) and its pick for a
+#: bare word is a coin flip; いい and a bare ある it mis-tags outright (形容詞 vs
+#: the adnominal 或る). These are the ones the built-in N5 fallback deck ships,
+#: resolved to the sense that deck teaches. Anything else kana-only and る-final
+#: is refused rather than guessed.
+_CURATED_KANA_CLASSES: dict[str, WordClass] = {
+    "いい": "i_adjective",
+    "かっこいい": "i_adjective",
     "ある": "godan",
     "いる": "ichidan",
     "うる": "godan",
@@ -156,7 +159,7 @@ def _class_from_kana_shape(word: str) -> WordClass | None:
     if word in {"くる", "来る"}:
         return "kuru"
     if word.endswith("る"):
-        return _KANA_RU_VERB_CLASSES.get(word)
+        return _CURATED_KANA_CLASSES.get(word)
     if word.endswith(_UNAMBIGUOUS_GODAN_TAILS):
         return "godan"
     return None
@@ -176,7 +179,7 @@ def classify_word(word: str) -> tuple[WordClass, str] | None:
     # The curated table wins outright for kana-only words: the tokenizer reads a
     # bare ある as the adnominal 或る, and みる/かえる as whichever homograph it
     # ranks first, so its answer is worth less here than the deck's own sense.
-    curated = _KANA_RU_VERB_CLASSES.get(normalized) if not _has_kanji(normalized) else None
+    curated = _CURATED_KANA_CLASSES.get(normalized) if not _has_kanji(normalized) else None
     if curated is not None:
         return curated, normalized
 
