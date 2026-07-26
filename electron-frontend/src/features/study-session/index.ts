@@ -13,5 +13,6 @@
 
 export { buildBridgeGrammarRound } from './grammarRound'
 export { buildRound, buildRoundWithBridge } from './roundBuilder'
+export { buildConjugationPool, isConjugationDrillCandidate } from './conjugationRound'
 export { useStudySession } from './useStudySession'
 export type { StudySessionApi, StudySessionDeps, StudySessionSlice } from './types'

@@ -37,7 +37,7 @@ import {
 } from '../handwriting'
 import type { StudySessionApi, StudySessionDeps, StudySessionSlice } from './types'
 import { assessConjugationAnswer, assessTypedAnswer } from '../../lib/answerAssessment'
-import { isConjugationDrillCandidate } from './conjugationRound'
+import { buildConjugationPool } from './conjugationRound'
 import type { TypedAnswerState } from '../../lib/answerAssessment'
 import { assessTypedRecallAnswer } from '../../lib/typedRecallAssessment'
 import { isGrammarCurriculumMode } from '../../utils'
@@ -185,6 +185,8 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   const roundCursorRef = useRef<number>(0)
   const queueBucketCountsRef = useRef<{ due: number; leech: number; new: number; review: number } | null>(null)
   const interleaveCursorRef = useRef<number>(0)
+  /** Monotonic per-round seed; see nextRoundMode. */
+  const promptSeedRef = useRef<number>(0)
 
   // ── Resume detection ───────────────────────────────────────────────────────
 
@@ -209,6 +211,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     roundCycleRef.current = []
     roundCursorRef.current = 0
     interleaveCursorRef.current = 0
+    promptSeedRef.current = 0
   }, [])
 
   const availableInterleaveModes = useMemo(() => SCRIPT_INTERLEAVE_MODES[activeScript], [activeScript])
@@ -219,7 +222,12 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
   const nextRoundMode = useCallback((selectedMode: MinigameKey): { mode: PlayableMinigame; surprisePrompt: boolean; promptSeed: number } => {
     if (selectedMode !== 'interleave_mix') {
-      return { mode: selectedMode, surprisePrompt: false, promptSeed: 0 }
+      // The seed picks which variant a generated round asks for — which
+      // conjugation form, which particle gets blanked. A constant 0 meant a
+      // card was asked the identical question every time it came round again.
+      const seed = promptSeedRef.current
+      promptSeedRef.current += 1
+      return { mode: selectedMode, surprisePrompt: false, promptSeed: seed }
     }
 
     const cursor = interleaveCursorRef.current
@@ -687,7 +695,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         modeCards = modeCards.filter((card) => isHandwritingEligibleCharacter(card.character))
       }
       if (modeSelection.mode === 'conjugation_drill') {
-        modeCards = modeCards.filter((card) => isConjugationDrillCandidate(card.character, card.meaning))
+        modeCards = buildConjugationPool(modeCards, deckCards)
       }
       const goalTargetItems = Math.max(1, Math.floor(customTargetItems ?? sessionTargetItems))
 
@@ -904,7 +912,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       modeCards = modeCards.filter((card) => isHandwritingEligibleCharacter(card.character))
     }
     if (modeSelection.mode === 'conjugation_drill') {
-      modeCards = modeCards.filter((card) => isConjugationDrillCandidate(card.character, card.meaning))
+      modeCards = buildConjugationPool(modeCards, deckCards)
     }
     let index = nextCardIndex(modeCards.length)
     if (index === null) {
@@ -934,6 +942,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     activeGame,
     buildRound,
     buildRoundWithBridge,
+    deckCards,
     hydrateRoundCycle,
     leechFocusEnabled,
     nextCardIndex,

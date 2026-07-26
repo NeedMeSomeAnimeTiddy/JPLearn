@@ -92,6 +92,7 @@ import { CARD_MASTERY_MAX } from './constants'
 import {
   buildRound as buildRoundImpl,
   buildRoundWithBridge as buildRoundWithBridgeImpl,
+  buildConjugationPool,
   useStudySession,
 } from './features/study-session'
 import './App.css'
@@ -1543,6 +1544,11 @@ function App() {
       })
       if (!hasCompounds) {
         reasons.kanji_compound_builder = 'No compound words in this block'
+      }
+      // The pool tops up from the wider deck, so this only locks when the whole
+      // section has nothing conjugatable — not merely this block.
+      if (buildConjugationPool(activeBlockCards, deckCards).length === 0) {
+        reasons.conjugation_drill = 'No verbs or adjectives to conjugate here'
       }
     }
     if (leechFocusEnabled && activeBlockCards.length > 0 && activeBlockCards.filter((c) => c.is_leech).length === 0) {

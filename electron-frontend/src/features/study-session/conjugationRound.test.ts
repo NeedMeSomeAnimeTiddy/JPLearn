@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildConjugationDrillRound, isConjugationDrillCandidate } from './conjugationRound'
+import {
+  CONJUGATION_POOL_FLOOR,
+  buildConjugationDrillRound,
+  buildConjugationPool,
+  isConjugationDrillCandidate,
+} from './conjugationRound'
 import type { ScriptDeck } from '../../types'
 
 type Card = ScriptDeck['cards'][number]
@@ -131,24 +136,62 @@ describe('buildConjugationDrillRound', () => {
 })
 
 describe('isConjugationDrillCandidate', () => {
-  it('keeps verbs, identified by their gloss and tail', () => {
-    expect(isConjugationDrillCandidate('会う', 'to meet, to see')).toBe(true)
-    expect(isConjugationDrillCandidate('食べる', 'to eat')).toBe(true)
-    expect(isConjugationDrillCandidate('勉強する', 'to study')).toBe(true)
+  it('accepts verbs and adjectives that the classifier confirmed', () => {
+    expect(isConjugationDrillCandidate('会う')).toBe(true)
+    expect(isConjugationDrillCandidate('食べる')).toBe(true)
+    expect(isConjugationDrillCandidate('高い')).toBe(true)
   })
 
-  it('keeps i-adjectives', () => {
-    expect(isConjugationDrillCandidate('高い', 'expensive, tall')).toBe(true)
+  it('rejects nouns', () => {
+    expect(isConjugationDrillCandidate('青')).toBe(false)
+    expect(isConjugationDrillCandidate('電車')).toBe(false)
+    expect(isConjugationDrillCandidate('')).toBe(false)
   })
 
-  it('drops the nouns that make up most of a vocabulary deck', () => {
-    expect(isConjugationDrillCandidate('青', 'blue')).toBe(false)
-    expect(isConjugationDrillCandidate('電車', 'train')).toBe(false)
-    expect(isConjugationDrillCandidate('', 'to eat')).toBe(false)
+  it('rejects the い-final non-adjectives a spelling heuristic accepted', () => {
+    // These two were the entire Greetings-block pool, and neither is drillable.
+    expect(isConjugationDrillCandidate('おやすみなさい')).toBe(false)
+    expect(isConjugationDrillCandidate('ごめんなさい')).toBe(false)
+  })
+})
+
+describe('buildConjugationPool', () => {
+  const card = (character: string) => ({ id: character.length, character, meaning: '', romaji: '' } as unknown as Card)
+  const deck = [card('会う'), card('食べる'), card('読む'), card('高い'), card('飲む'),
+    card('書く'), card('話す'), card('待つ'), card('泳ぐ'), card('遊ぶ')]
+
+  it('keeps only eligible cards from the block', () => {
+    const block = [card('会う'), card('青'), card('電車')]
+    const pool = buildConjugationPool(block, [], 1)
+    expect(pool.map((c) => c.character)).toEqual(['会う'])
   })
 
-  it('does not mistake a "to"-glossed noun for a verb', () => {
-    // No verb tail, so the gloss alone is not enough.
-    expect(isConjugationDrillCandidate('あちら', 'to that side')).toBe(false)
+  it('tops up a thin block from the parent deck', () => {
+    const block = [card('おやすみなさい'), card('ごめんなさい')]
+    const pool = buildConjugationPool(block, deck)
+    expect(pool.length).toBe(CONJUGATION_POOL_FLOOR)
+  })
+
+  it('keeps the block cards ahead of the top-up', () => {
+    const block = [card('走る'), card('青')]
+    const pool = buildConjugationPool(block, deck)
+    expect(pool[0].character).toBe('走る')
+    expect(pool.length).toBe(CONJUGATION_POOL_FLOOR)
+  })
+
+  it('does not duplicate a card present in both block and deck', () => {
+    const block = [card('会う')]
+    const pool = buildConjugationPool(block, deck)
+    const characters = pool.map((c) => c.character)
+    expect(new Set(characters).size).toBe(characters.length)
+  })
+
+  it('leaves a healthy block untouched', () => {
+    const pool = buildConjugationPool(deck, [])
+    expect(pool.length).toBe(deck.length)
+  })
+
+  it('returns empty when nothing anywhere is eligible, so the mode can lock', () => {
+    expect(buildConjugationPool([card('青')], [card('電車')])).toEqual([])
   })
 })
