@@ -2157,3 +2157,32 @@ def test_record_game_result_contract_shape(tmp_path: Path, monkeypatch) -> None:
 
 
 
+
+
+def test_build_conjugation_drill_data_returns_both_spellings() -> None:
+    payload = desktop_bridge.build_conjugation_drill_data("食べる", stage=1, seed=0)
+
+    assert payload["ok"] is True
+    assert payload["game_type"] == "conjugation_drill"
+    data = cast(dict[str, Any], payload["data"])
+    assert data["word"] == "食べる"
+    assert data["word_class"] == "ichidan"
+    assert data["expected"] in data["accepted"]
+    assert data["expected_reading"] in data["accepted"]
+
+
+def test_run_command_conjugation_drill_data_parses_stage_and_seed() -> None:
+    code, payload = desktop_bridge._run_command(["conjugation-drill-data", "会う", "1", "2"])
+
+    assert code == 0
+    assert payload["seed"] == 2
+    data = cast(dict[str, Any], payload["data"])
+    assert data["stage"] == 1
+
+
+def test_run_command_conjugation_drill_data_rejects_a_non_conjugatable_word() -> None:
+    """The renderer reads this failure as "use a different minigame for this card"."""
+    code, payload = desktop_bridge._run_command(["conjugation-drill-data", "本"])
+
+    assert code == 2
+    assert "not a conjugatable dictionary form" in str(payload["error"])

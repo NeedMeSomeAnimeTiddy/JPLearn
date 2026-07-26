@@ -1,9 +1,9 @@
 // Content templates extracted from App.tsx (Phase 7)
 // Static data for round-building functions
 
-type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns' | 'sentence_examples'
-type MinigameKey = 'romaji_sprint' | 'meaning_match' | 'character_match' | 'stroke_order' | 'handwriting' | 'typed_recall' | 'speech_recall' | 'sentence_assembly' | 'particle_cloze' | 'vibe_check' | 'imposter' | 'listening_audio_first' | 'dictation' | 'kanji_compound_builder' | 'context_cloze' | 'interleave_mix'
-type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
+// These were hand-copied unions until #22 added a minigame and only this file
+// went stale. Import the shared types instead — src/types.ts is the one source.
+import type { PlayableMinigame, ScriptKey } from '../types'
 
 export const SURPRISE_PROMPTS = [
   'Surprise Drill: trust your first instinct.',

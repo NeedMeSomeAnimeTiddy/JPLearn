@@ -8,7 +8,7 @@ import type {
 } from '../../types'
 import {
   buildClozeLine, buildRoundDictionaryNote, buildStoryChapter, curriculumStageFromScore,
-  isImposterMode, isParticleClozeMode, isSentenceAssemblyMode, isVibeCheckMode,
+  isConjugationDrillMode, isImposterMode, isParticleClozeMode, isSentenceAssemblyMode, isVibeCheckMode,
   normalizeCurriculumStage, pickSurprisePrompt, splitSentenceIntoAssemblyChunks,
 } from '../../lib/roundContent'
 import { chooseUniqueIndices, shuffleArray } from '../../lib/deckUtils'
@@ -16,6 +16,7 @@ import { KANJI_MEANINGS } from '../../lib/kanjiMeanings'
 import { CARD_MASTERY_MAX } from '../../constants'
 import { blankOutWordInSentence, isGrammarCurriculumMode } from '../../utils'
 import { buildBridgeGrammarRound } from './grammarRound'
+import { buildConjugationDrillRound } from './conjugationRound'
 
 export function buildRound(
   script: ScriptKey,
@@ -588,6 +589,19 @@ cards: ScriptDeck['cards'],
     : null
   const dictionaryNote = buildRoundDictionaryNote(card, minigame)
   const dictionarySeedQuery = card.character || card.romaji || null
+
+  if (isConjugationDrillMode(minigame)) {
+    const drillRound = await buildConjugationDrillRound(card, {
+      curriculumStage,
+      surprisePrompt,
+      surpriseLabel,
+      promptSeed,
+      dictionarySeedQuery,
+      dictionaryNote,
+    })
+    if (drillRound) return { ...drillRound, isMastered: currentScore >= CARD_MASTERY_MAX }
+    return buildRound(script, cardScores, cards, minigame, cardIndex, surprisePrompt, promptSeed)
+  }
 
   const bridgeRound = await buildBridgeGrammarRound(card, minigame, {
     curriculumStage,

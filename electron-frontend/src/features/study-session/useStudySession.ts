@@ -36,7 +36,7 @@ import {
   isHandwritingOutcomeCorrect,
 } from '../handwriting'
 import type { StudySessionApi, StudySessionDeps, StudySessionSlice } from './types'
-import { assessTypedAnswer } from '../../lib/answerAssessment'
+import { assessConjugationAnswer, assessTypedAnswer } from '../../lib/answerAssessment'
 import type { TypedAnswerState } from '../../lib/answerAssessment'
 import { assessTypedRecallAnswer } from '../../lib/typedRecallAssessment'
 import { isGrammarCurriculumMode } from '../../utils'
@@ -983,7 +983,12 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
                     const variants = roundState.answer.split('/').map(v => normalizeText(v.trim()))
                     return variants.some(v => normalizeText(answer) === v) ? 'exact' : 'incorrect'
                   })()
-                : null
+                : roundState.mode === 'conjugation_drill'
+                  ? assessConjugationAnswer(
+                    roundState.acceptedAnswers ?? [roundState.answer],
+                    answer,
+                  )
+                  : null
       const isCorrect = correctnessOverride
         ?? (typedAssessment !== null
           ? typedAssessment !== 'incorrect'

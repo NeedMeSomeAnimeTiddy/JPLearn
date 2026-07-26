@@ -107,6 +107,7 @@ export function defaultMinigameStatsByScript(): MinigameStatsByScript {
       dictation: { ...EMPTY_MINIGAME_STATS },
       kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
+      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     katakana: {
@@ -125,6 +126,7 @@ export function defaultMinigameStatsByScript(): MinigameStatsByScript {
       dictation: { ...EMPTY_MINIGAME_STATS },
       kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
+      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     kanji_n5: {
@@ -143,6 +145,7 @@ export function defaultMinigameStatsByScript(): MinigameStatsByScript {
       dictation: { ...EMPTY_MINIGAME_STATS },
       kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
+      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     vocab_n5: {
@@ -161,6 +164,7 @@ export function defaultMinigameStatsByScript(): MinigameStatsByScript {
       dictation: { ...EMPTY_MINIGAME_STATS },
       kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
+      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     grammar_patterns: {
@@ -179,6 +183,7 @@ export function defaultMinigameStatsByScript(): MinigameStatsByScript {
       dictation: { ...EMPTY_MINIGAME_STATS },
       kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
+      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
     sentence_examples: {
@@ -197,6 +202,7 @@ export function defaultMinigameStatsByScript(): MinigameStatsByScript {
       dictation: { ...EMPTY_MINIGAME_STATS },
       kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
       context_cloze: { ...EMPTY_MINIGAME_STATS },
+      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
       interleave_mix: { ...EMPTY_MINIGAME_STATS },
     },
   }

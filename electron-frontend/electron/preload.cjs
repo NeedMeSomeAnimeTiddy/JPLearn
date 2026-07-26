@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),
   getStudyQueue: (slug) => ipcRenderer.invoke('study:get-study-queue', slug),
   getGrammarMinigameData: (payload) => ipcRenderer.invoke('study:get-grammar-minigame-data', payload),
+  getConjugationDrillData: (payload) => ipcRenderer.invoke('study:get-conjugation-drill-data', payload),
   getDailyGamesState: (day) => ipcRenderer.invoke('daily-games:get-state', day),
   createDailyGamesPracticeSeed: (payload) => ipcRenderer.invoke('daily-games:create-practice-seed', payload),
   recordDailyGamesAttempt: (payload) => ipcRenderer.invoke('daily-games:record-attempt', payload),
