@@ -1,7 +1,8 @@
 # Learning Progression Rework — Plan
 
 Status: **proposal, not started.** Written 2026-07-26 as the planning artefact for a
-dedicated session. Tracking issue: see "Rethink the learning progression model" on GitHub.
+dedicated session. Tracking issue:
+[#78](https://github.com/NeedMeSomeAnimeTiddy/JPLearn/issues/78).
 
 This document is the reference for that session. It records what exists today (measured,
 not assumed), what is wrong with it, the routes considered, the recommended route, and a
