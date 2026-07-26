@@ -18,6 +18,7 @@ export type MinigameKey =
   | 'dictation'
   | 'kanji_compound_builder'
   | 'context_cloze'
+  | 'conjugation_drill'
   | 'interleave_mix'
 
 export type PlayableMinigame = Exclude<MinigameKey, 'interleave_mix'>
@@ -200,6 +201,12 @@ export interface RoundState {
   focusText: string
   answer: string
   answerDisplay?: string | null
+  /**
+   * Every spelling a typed answer may match. Set only by modes where one
+   * question has several correct written forms — a conjugation drill accepts
+   * both 食べて and たべて — and graded by exact match, not near-miss.
+   */
+  acceptedAnswers?: string[]
   options: RoundOption[]
   isMastered?: boolean
 }

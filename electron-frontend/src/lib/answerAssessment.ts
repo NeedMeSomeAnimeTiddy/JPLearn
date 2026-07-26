@@ -63,3 +63,23 @@ export function assessTypedAnswer(expected: string, given: string): TypedAnswerS
 
   return nearMiss ? 'near_miss' : 'incorrect'
 }
+
+/**
+ * Grade a conjugation drill answer against every accepted spelling.
+ *
+ * Exact match only, and deliberately so: assessTypedAnswer's near-miss
+ * tolerance treats a one-character difference as almost-right, but 食べた and
+ * 食べて differ by exactly one character and are different forms — the one the
+ * drill exists to separate. Multiple spellings are accepted instead (kanji and
+ * kana, 〜じゃない and 〜ではない), which is the correct axis of leniency here.
+ */
+export function assessConjugationAnswer(
+  acceptedAnswers: readonly string[],
+  given: string,
+): TypedAnswerState {
+  const normalizedGiven = normalizeTypedText(given)
+  if (!normalizedGiven) return 'incorrect'
+  return acceptedAnswers.some((candidate) => normalizeTypedText(candidate) === normalizedGiven)
+    ? 'exact'
+    : 'incorrect'
+}

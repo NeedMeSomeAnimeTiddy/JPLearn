@@ -1,6 +1,6 @@
 // AUTO-GENERATED — do not edit manually.
 // Run: python scripts/generate_ts_types.py
-// Source: scripts/desktop_bridge.py, data/dictionary_repository.py
+// Source: scripts/desktop_bridge.py, data/dictionary_repository.py, data/conjugation_drill.py
 //
 // These interfaces mirror the Python @dataclass types declared in the source
 // files above. Any field-type change in Python should result in a changed
@@ -305,4 +305,19 @@ export interface KanjiDetailPayload {
   compounds: KanjiCompound[]
   has_more_compounds: boolean
   source: string
+}
+
+export interface ConjugationDrillPayload {
+  game_type: string
+  word: string
+  reading: string
+  word_class: string
+  form: string
+  form_label: string
+  prompt: string
+  expected: string
+  expected_reading: string
+  accepted: string[]
+  rule_hint: string
+  stage: number
 }

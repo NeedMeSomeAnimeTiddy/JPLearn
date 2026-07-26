@@ -19,6 +19,7 @@ import {
   Minus,
   Palette,
   PenLine,
+  Repeat2,
   Plus,
   Settings,
   Shuffle,
@@ -184,6 +185,11 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
     description: 'Fill the missing word in a sentence from vocabulary options.',
   },
   {
+    key: 'conjugation_drill',
+    title: 'Conjugation Drill',
+    description: 'Produce a verb or adjective in the form the round asks for.',
+  },
+  {
     key: 'interleave_mix',
     title: 'Interleave Mix',
     description: 'Cycle reading, meaning, and character rounds in one run.',
@@ -209,6 +215,7 @@ export const SCRIPT_MINIGAMES: Record<ScriptKey, MinigameKey[]> = {
   ],
   vocab_n5: [
     'meaning_match',
+    'conjugation_drill',
     'character_match',
     'typed_recall',
     'kanji_compound_builder',
@@ -262,6 +269,7 @@ export const MINIGAME_ICONS: Record<MinigameKey, LucideIcon> = {
   dictation: Ear,
   kanji_compound_builder: Combine,
   context_cloze: FileText,
+  conjugation_drill: Repeat2,
   interleave_mix: Shuffle,
 }
 
@@ -319,6 +327,7 @@ export const MINIGAME_SKILL_GROUP: Record<MinigameKey, MinigameSkillGroupKey> = 
   dictation: 'listening',
   kanji_compound_builder: 'recognition',
   context_cloze: 'challenge',
+  conjugation_drill: 'recall',
   interleave_mix: 'mixed',
 }
 
@@ -580,6 +589,7 @@ export function formatRoundModeLabel(mode: PlayableMinigame): string {
   if (mode === 'dictation') return 'Dictation'
   if (mode === 'kanji_compound_builder') return 'Compound Builder'
   if (mode === 'context_cloze') return 'Context Cloze'
+  if (mode === 'conjugation_drill') return 'Conjugation Drill'
   return 'Interleave Mix'
 }
 

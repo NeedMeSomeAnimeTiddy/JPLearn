@@ -538,6 +538,40 @@ function validateGrammarMinigameRequest(payload) {
   }
 }
 
+const MAX_CONJUGATION_DRILL_WORD_LENGTH = 32
+
+function validateConjugationDrillRequest(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid conjugation drill request payload: expected object')
+  }
+
+  if (typeof payload.word !== 'string') {
+    throw new Error(`Invalid conjugation drill word: ${String(payload.word)}`)
+  }
+  const word = payload.word.trim().slice(0, MAX_CONJUGATION_DRILL_WORD_LENGTH)
+  if (!word) {
+    throw new Error('Invalid conjugation drill request payload: word must not be empty')
+  }
+
+  let stage = 1
+  if (payload.stage != null) {
+    if (!Number.isInteger(payload.stage) || payload.stage < 1 || payload.stage > 3) {
+      throw new Error(`Invalid conjugation drill stage: ${String(payload.stage)}`)
+    }
+    stage = payload.stage
+  }
+
+  let seed = 0
+  if (payload.seed != null) {
+    if (!Number.isInteger(payload.seed) || payload.seed < 0) {
+      throw new Error(`Invalid conjugation drill seed: ${String(payload.seed)}`)
+    }
+    seed = payload.seed
+  }
+
+  return { word, stage, seed }
+}
+
 const VALID_DAILY_GAMES_TYPES = new Set(['crossword', 'word_search', 'match_pairs', 'typing_blitz'])
 const VALID_DAILY_GAMES_MODES = new Set(['daily', 'practice'])
 const VALID_DAILY_GAMES_OUTCOMES = new Set(['correct', 'incorrect'])
@@ -986,6 +1020,7 @@ module.exports = {
   validateKanjiDetailCharacter,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,
+  validateConjugationDrillRequest,
   validateDailyGamesDay,
   validateDailyGamesPracticeSeedPayload,
   validateDailyGamesAttemptPayload,

@@ -159,6 +159,7 @@ from data.grammar_minigame_generator import (  # noqa: E402
     generate_particle_cloze_data,
     generate_vibe_check_data,
 )
+from data.conjugation_drill import generate_conjugation_drill_data  # noqa: E402
 from data.settings_repository import get_setting, set_setting  # noqa: E402
 from data.daily_games_repository import (  # noqa: E402
     DailyGameAttempt,
@@ -2568,6 +2569,26 @@ def build_grammar_minigame_data(
     }
 
 
+def build_conjugation_drill_data(
+    word: str,
+    *,
+    stage: int = 1,
+    seed: int = 0,
+) -> dict[str, object]:
+    """Generate one conjugation drill round for a dictionary-form word.
+
+    Raises ``ValueError`` for anything not confidently conjugatable; the
+    renderer treats that as "use a different minigame for this card".
+    """
+    payload = generate_conjugation_drill_data(word, stage=stage, seed=seed)
+    return {
+        "ok": True,
+        "game_type": payload.game_type,
+        "seed": seed,
+        "data": asdict(payload),
+    }
+
+
 def build_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
     init_study_db()
     return {
@@ -3086,6 +3107,19 @@ def _cmd_grammar_minigame_data(argv: list[str]) -> tuple[int, dict[str, object]]
     return 0, payload
 
 
+def _cmd_conjugation_drill_data(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: conjugation-drill-data <word> [stage] [seed]"}
+    try:
+        word = argv[1]
+        stage = int(argv[2]) if len(argv) > 2 and argv[2].strip() else 1
+        seed = int(argv[3]) if len(argv) > 3 and argv[3].strip() else 0
+        payload = build_conjugation_drill_data(word, stage=stage, seed=seed)
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
 def _cmd_card_note_get(argv: list[str]) -> tuple[int, dict[str, object]]:
     if len(argv) != 2:
         return 2, {"error": "Usage: card-note-get <note_key>"}
@@ -3580,6 +3614,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "apply-expertise-level": _cmd_apply_expertise_level,
     "study-queue": _cmd_study_queue,
     "grammar-minigame-data": _cmd_grammar_minigame_data,
+    "conjugation-drill-data": _cmd_conjugation_drill_data,
     "card-note-get": _cmd_card_note_get,
     "card-note-save": _cmd_card_note_save,
     "card-note-delete": _cmd_card_note_delete,

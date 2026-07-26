@@ -6,6 +6,7 @@ import type {
   CardNoteDeletePayload,
   CardNoteLookupPayload,
   CardNotePayload,
+  ConjugationDrillPayload,
   ScenarioSessionPayload,
   ScenarioSessionListPayload,
   ScenarioSessionLookupPayload,
@@ -357,6 +358,19 @@ interface GrammarMinigameResponse {
   data: Record<string, unknown>
 }
 
+interface ConjugationDrillRequest {
+  word: string
+  stage?: 1 | 2 | 3
+  seed?: number
+}
+
+interface ConjugationDrillResponse {
+  ok: boolean
+  game_type: 'conjugation_drill'
+  seed: number
+  data: ConjugationDrillPayload
+}
+
 interface BlockInfo {
   index: number
   name: string
@@ -545,6 +559,7 @@ interface DesktopApi {
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>
   getGrammarMinigameData?: (payload: GrammarMinigameRequest) => Promise<GrammarMinigameResponse>
+  getConjugationDrillData?: (payload: ConjugationDrillRequest) => Promise<ConjugationDrillResponse>
   getDailyGamesState?: (day: string) => Promise<DailyGamesStatePayload>
   createDailyGamesPracticeSeed?: (payload: DailyGamesPracticeSeedRequest) => Promise<DailyGamesPracticeSeedPayload>
   recordDailyGamesAttempt?: (payload: DailyGamesAttemptRequest) => Promise<DailyGamesStatePayload>

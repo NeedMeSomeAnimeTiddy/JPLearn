@@ -16,6 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_FILES: tuple[Path, ...] = (
     PROJECT_ROOT / "scripts" / "desktop_bridge.py",
     PROJECT_ROOT / "data" / "dictionary_repository.py",
+    PROJECT_ROOT / "data" / "conjugation_drill.py",
 )
 OUTPUT_FILE = PROJECT_ROOT / "electron-frontend" / "src" / "generated" / "types.ts"
 

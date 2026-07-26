@@ -32,6 +32,7 @@ const {
   validateKanjiDetailCharacter,
   validateLookupSentencePayload,
   validateGrammarMinigameRequest,
+  validateConjugationDrillRequest,
   validateDailyGamesDay,
   validateDailyGamesPracticeSeedPayload,
   validateDailyGamesAttemptPayload,
@@ -392,6 +393,22 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch grammar minigame data: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:get-conjugation-drill-data', async (event, payload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedPayload = validateConjugationDrillRequest(payload)
+    try {
+      return await runPythonBridgeWithArgsRead([
+        'conjugation-drill-data',
+        validatedPayload.word,
+        String(validatedPayload.stage),
+        String(validatedPayload.seed),
+      ])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch conjugation drill data: ${detail}`)
     }
   })
 

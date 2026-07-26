@@ -17,7 +17,7 @@ JPLearn is a desktop Japanese learning app focused on daily retention, fast revi
 - **Sentence Examples** — Structured example sentences for grammar-in-context learning
 
 ### Deeper Content Tracks
-- **Conjugation Pattern Reference** — A flashcard deck (`conjugation_training`) covering verb/adjective conjugation pattern names and usage (e.g. "〜ています" / ongoing action), with staged block progression. This is recognition content, not an interactive conjugation drill — there's no mode where the learner produces a conjugated form of an arbitrary verb (te-form, potential, passive, etc.). It also isn't exposed anywhere in the frontend UI today (no `ScriptKey`/minigame wiring) — it exists only as backend deck + block-progress data. See [issue #22](https://github.com/NeedMeSomeAnimeTiddy/JPLearn/issues/22) for the still-open ask.
+- **Conjugation Pattern Reference** — A flashcard deck (`conjugation_training`) covering verb/adjective conjugation pattern names and usage (e.g. "〜ています" / ongoing action), with staged block progression. This is recognition content; the interactive counterpart where the learner *produces* a conjugated form is the **Conjugation Drill** minigame (see Grammar Modes below). The reference deck itself still isn't exposed anywhere in the frontend UI today (no `ScriptKey`/minigame wiring) — it exists only as backend deck + block-progress data.
 - **Reading Practice** — Narrative story rounds that surface example sentences as reading passages with comprehension tracking
 - **Kanji Handwriting** — Canvas-based stroke-order writing minigame (mouse/touch/stylus) using `hanzi-writer`, validating stroke order/direction/completeness; currently scoped to N5 characters
 
@@ -49,6 +49,7 @@ JPLearn is a desktop Japanese learning app focused on daily retention, fast revi
 | **Kanji Compound Builder** | Pick the correct multi-kanji word, hinted by each component kanji's individual meaning |
 | **Vibe Check** | Read social register/tone and classify sentence as polite, casual, formal request, or context-dependent |
 | **Imposter** | Find the deliberate grammar error injected into a sentence (particle swaps, conjugation mutations) |
+| **Conjugation Drill** | Type a verb or adjective in a requested form (te-form, potential, passive, causative-passive, …); forms unlock by curriculum stage |
 
 ### Listening Modes
 | Mode | Description |

@@ -664,14 +664,14 @@ export function MinigameView({
                             onResult={({ transcript }) => submitAnswer(transcript)}
                             onFallbackToTyped={() => setSpeechFallbackToTyped(true)}
                           />
-                        ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' || roundState.mode === 'dictation' ? (
+                        ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' || roundState.mode === 'dictation' || roundState.mode === 'conjugation_drill' ? (
                           <TypedAnswerPanel
                             answerInputRef={answerInputRef}
                             value={roundInput}
                             placeholder={
                               roundState.mode === 'romaji_sprint'
                                 ? 'Enter romaji'
-                                : roundState.mode === 'dictation'
+                                : roundState.mode === 'dictation' || roundState.mode === 'conjugation_drill'
                                   ? 'Type here (auto-converts to kana)'
                                   : 'Type meaning'
                             }
@@ -690,7 +690,7 @@ export function MinigameView({
                                   : v,
                               )
                             }
-                            wanakanaMode={roundState.mode === 'dictation' ? (activeScript === 'katakana' ? 'katakana' : 'hiragana') : undefined}
+                            wanakanaMode={roundState.mode === 'conjugation_drill' ? 'hiragana' : roundState.mode === 'dictation' ? (activeScript === 'katakana' ? 'katakana' : 'hiragana') : undefined}
                           />
                         ) : (
                           <ChoiceAnswerPanel

@@ -35,6 +35,10 @@ export function isSentenceAssemblyMode(mode: MinigameKey): mode is 'sentence_ass
   return mode === 'sentence_assembly'
 }
 
+export function isConjugationDrillMode(mode: MinigameKey): mode is 'conjugation_drill' {
+  return mode === 'conjugation_drill'
+}
+
 export function pickSurprisePrompt(
   script: ScriptKey,
   mode: PlayableMinigame,
