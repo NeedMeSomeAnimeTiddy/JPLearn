@@ -380,10 +380,15 @@ Vocabulary level decks expose the **whole** imported corpus (8,031 words). The f
 import fails at deck-build time instead of silently colliding card ids (§5, A1). N5 is
 the tight one — 718 of 1,000 — and `tests/test_deck_id_uniqueness.py` guards the boundary.
 
-Pacing is **not** a deck-sizing concern: vocab decks have no block progression
-(`blocks_for_slug` returns `[]` for every `vocab_n*`), but a study session draws only
-8–20 items (`SESSION_LENGTH_PRESETS`) from an SRS-ordered queue, so corpus size affects
+Pacing is **not** a deck-sizing concern: a study session draws only 8–20 items
+(`SESSION_LENGTH_PRESETS`) from an SRS-ordered queue, so corpus size affects
 denominators and deck-total labels, not how much a learner faces per session.
+
+Since #78 every `vocab_n*` and `kanji_n*` deck does have blocks — `blocks_for_slug`
+generates them (it used to return `[]` for both families). The authored thematic
+categories come first as named blocks, then `GENERATED_BLOCK_SIZE` (20) blocks cover the
+remainder, so the blocks partition the deck exactly. Large corpora therefore yield a lot
+of blocks: 42 for N5, 106 for N3, 134 for N1.
 
 Kanji has no equivalent cap and no capacity guard — kanji_n1 already overflows its
 nominal 1,000-slot spacing (§5, A1).
@@ -392,6 +397,27 @@ nominal 1,000-slot spacing (§5, A1).
 
 Both content families now have thematic categories at every JLPT level (#68): kanji has
 19, vocabulary has 28 (12 N5 + 4 each for N4–N1).
+
+**They are views over their parent level deck, not decks of their own (#78).** The
+builders described below still exist and are still what curation is checked against, but
+they are now *source data for matching* — reachable as `CATEGORY_SOURCE_DECKS`, not
+through `ALL_DECKS`. `ALL_DECKS["vocab_verbs"]()` returns a `Deck` carrying
+**`Vocabulary N5`'s name and `Vocabulary N5`'s card ids**, filtered to that category's
+words. Both halves are load-bearing: `review_states` is keyed `(deck_name, card_id)`, so
+a view that kept its own name would relocate the duplicate-identity problem rather than
+close it.
+
+`domain/block_mapping.py` resolves the mapping — by surface form, then (vocabulary only)
+by reading plus overlapping meaning, restricted to the category's own JLPT level and
+tie-broken on the lowest card id. Kanji never match on reading: 三, 賛, 算 and 傘 are all
+`san`. Words no parent corpus carried are appended to the parent by
+`domain/deck_supplements.py` so that collapsing a category loses no content — 30 words,
+mostly greetings and the basic numerals `Kanji N5` never had.
+
+Before this, a category was a separate deck with its own `id_offset`, so one word held
+two ids, two FSRS schedules and two mastery values: `見る`/647 in `vocab_n5` and
+`みる`/1104 in `vocab_verbs`. `data/category_identity_migration.py` collapses progress
+already stored that way, keeping the further-along row.
 
 They are a **curated selection, not a partition** — in both families. The kanji N4–N1
 categories slice `_KANJI_N4_DATA`–`_KANJI_N1_DATA`, which are hardcoded 30-row *fallback*
@@ -419,7 +445,9 @@ re-import. Two consequences follow, both in `domain/decks.py`:
   builds smaller.
 
 Category ids live at 50000–53774 (1,000 per level, 250 per category slot), clear of the
-level decks which top out at 42698.
+level decks which top out at 42698. Since #78 those ids are internal to the source
+builders — nothing studies them, and no `review_states` row should be written against
+one again.
 
 **Unlock is sequential across the whole ordered list.** `buildCategoryProgress`
 (`src/lib/progressAggregation.ts`) walks `VOCAB_CATEGORY_ORDER` / `KANJI_CATEGORY_ORDER`
@@ -431,7 +459,9 @@ a decision made in #68 — worth revisiting if the N4–N1 vocabulary categories
 to be effectively out of reach in practice.
 
 Mastery for every one of these decks lands in the `cardScores.vocab_n5` /
-`cardScores.kanji_n5` bucket, correct only because the id ranges are disjoint (§4, A2/A4).
+`cardScores.kanji_n5` bucket. That used to be correct only because the id ranges were
+disjoint (§4, A2/A4); since #78 a category resolves to its parent's id, so the bucket
+holds one entry per word rather than one per (deck, word) pair.
 
 ---
 

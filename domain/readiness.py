@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from domain.progression import ProgressionState
+from domain.progression_curriculum import JPLEARN_GRAPH
 
 
 # ---------------------------------------------------------------------------
@@ -29,9 +30,6 @@ SectionReadiness = Literal[
     "advanced",        # Prerequisites not yet started
 ]
 
-PathId = Literal["complete_beginner"]
-
-
 @dataclass(frozen=True)
 class LearningPathStep:
     """One step in a learning path, with runtime readiness attached."""
@@ -43,8 +41,13 @@ class LearningPathStep:
 
 @dataclass(frozen=True)
 class LearningPathStatus:
-    path_id: PathId | None
-    path_name: str | None
+    """The single curriculum plus the learner's readiness for each section.
+
+    Carried no ``path_id``/``path_name`` since issue #78 Phase 5: there is one
+    curriculum, defined by ``JPLEARN_GRAPH``, so there is nothing to name or
+    choose between.
+    """
+
     onboarding_complete: bool
     suggested_next: str | None
     steps: tuple[LearningPathStep, ...]
@@ -85,13 +88,28 @@ SECTION_LABELS: dict[str, str] = {
     "sentence_examples": "Sentences",
 }
 
-# Ordered steps for each learning path
-LEARNING_PATHS: dict[str, dict] = {
-    "complete_beginner": {
-        "name": "Complete Beginner",
-        "steps": ["hiragana", "katakana", "vocab_n5", "grammar_patterns", "sentence_examples", "kanji_n5"],
-    },
-}
+def _curriculum_section_order() -> tuple[str, ...]:
+    """Studiable sections in the order :data:`JPLEARN_GRAPH` teaches them.
+
+    This used to be a hardcoded list inside a ``LEARNING_PATHS`` dict — a second,
+    flatter model of the same curriculum, holding one path and free to disagree
+    with the graph (issue #78 Phase 5, and the reason #20 asked for "more
+    paths"). Deriving it means the order can only ever have one definition.
+
+    Graph order is a breadth-first walk from the root, so a section appears
+    after everything it depends on.
+    """
+    node_to_section = {node_id: section for section, node_id in SECTION_TO_NODE.items()}
+    ordered: list[str] = []
+    for node_id in JPLEARN_GRAPH.nodes:
+        section = node_to_section.get(node_id)
+        if section is not None and section not in ordered:
+            ordered.append(section)
+    return tuple(ordered)
+
+
+#: The single curriculum, derived rather than declared.
+CURRICULUM_SECTION_ORDER: tuple[str, ...] = _curriculum_section_order()
 
 
 # ---------------------------------------------------------------------------
@@ -155,45 +173,24 @@ def compute_section_readiness(
     return "advanced"
 
 
-def get_suggested_next_step(
-    path_id: PathId,
-    state: ProgressionState,
-) -> str | None:
-    """Return the section_id of the first incomplete step in the path."""
-    path = LEARNING_PATHS.get(path_id)
-    if path is None:
-        return None
-    for section_id in path["steps"]:
+def get_suggested_next_step(state: ProgressionState) -> str | None:
+    """Return the section_id of the first section not yet mastered."""
+    for section_id in CURRICULUM_SECTION_ORDER:
         status = _node_status(section_id, state)
         if status != "mastered":
             return section_id
-    return None  # All steps mastered
+    return None  # Everything mastered
 
 
 def build_learning_path_status(
-    path_id: PathId | None,
     onboarding_complete: bool,
     state: ProgressionState,
 ) -> LearningPathStatus:
-    """Build the full ``LearningPathStatus`` for the frontend.
-
-    If ``path_id`` is None, returns a status with empty steps and
-    ``onboarding_complete=False`` so the UI can show the onboarding screen.
-    """
-    if path_id is None or path_id not in LEARNING_PATHS:
-        return LearningPathStatus(
-            path_id=None,
-            path_name=None,
-            onboarding_complete=onboarding_complete,
-            suggested_next=None,
-            steps=(),
-        )
-
-    path = LEARNING_PATHS[path_id]
-    suggested = get_suggested_next_step(path_id, state)
+    """Build the full ``LearningPathStatus`` for the frontend."""
+    suggested = get_suggested_next_step(state)
 
     steps: list[LearningPathStep] = []
-    for section_id in path["steps"]:
+    for section_id in CURRICULUM_SECTION_ORDER:
         readiness = compute_section_readiness(section_id, state)
         # Promote the suggested step's label (only if not already completed)
         if section_id == suggested and readiness != "completed":
@@ -206,8 +203,6 @@ def build_learning_path_status(
         ))
 
     return LearningPathStatus(
-        path_id=path_id,
-        path_name=path["name"],
         onboarding_complete=onboarding_complete,
         suggested_next=suggested,
         steps=tuple(steps),

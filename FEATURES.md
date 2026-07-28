@@ -118,12 +118,14 @@ Each script deck has a tailored set of available minigames (`electron-frontend/s
 - Node-mastery badges (tutorial, hiragana, katakana, scripted conversation, free conversation, reading, JLPT N5-N1) tied to the progression graph's "milestone"-type rewards; silent (no toast) since node mastery already has its own tutor-reaction celebration
 - Sticky once earned (persisted in `user_badges`); review-count and streak milestones fire a celebratory toast the moment a threshold is crossed
 - Shown alongside feature-unlock badges in the Achievements panel on the Overview page
-- Progression-node mastery (hiragana/katakana/vocabulary_n5/grammar_n5, gated behind tutorial completion) is synced from live review data on each read; deeper nodes (scripted conversation, listening, kanji, free conversation, reading, JLPT) aren't wired to live data yet
+- Progression-node mastery is synced from live review data on each read for the six deck-backed nodes (tutorial, hiragana, katakana, vocabulary_n5, grammar_n5, kanji_n5). The other ten report `is_tracked: false` and no ratio: a signal exists for some of them (`review_events.tags_csv`, `scenario_sessions`, `jlpt_exam_results`) but none carries a denominator, and a fabricated 0% cannot be recognised as wrong. `sentence_examples` is excluded on purpose — the bridge serves the full ~60k sentence corpus, so its 80% requirement is unreachable
+- Tutorial completion accepts existing review history as well as the onboarding flag, because onboarding is skippable and every other node chains off it
 
-### Learning Path System
-- Guided "complete_beginner" path with readiness labels (completed, suggested_next, recommended, challenging, advanced)
-- Section-to-node mapping for soft readiness guidance
-- Per-step mastery percentage tracking
+### Curriculum Map
+- The 16-node `JPLEARN_GRAPH` rendered on Home (`src/features/progression/`): position, what is finished, what is next
+- **Soft gating** — a gated node is never unreachable. Clicking one opens the same confirmation the readiness warning uses, and the choice is remembered per node
+- Readiness labels (completed, suggested_next, recommended, challenging, advanced) with per-step mastery percentages
+- Section order is *derived* from the graph. The `LEARNING_PATHS` dict, its `complete_beginner` path, the `active_learning_path` setting and the path-selection command were removed in #78 Phase 5 — one curriculum, one definition
 
 ---
 

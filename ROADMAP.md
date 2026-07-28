@@ -48,7 +48,9 @@ remains to be built.
   - Useful for quick lookup, content audit, and finding specific items
 
 - [ ] **(Medium) Custom study plans and adaptive learning paths**
-  - Build on the existing learning path infrastructure
+  - Note: the `LEARNING_PATHS` dict this once referred to is gone (#78 Phase 5). Section
+    order now derives from `JPLEARN_GRAPH`, so alternate tracks belong in the graph —
+    `ProgressionNode.branches` already models them
   - Let users choose between JLPT-focused, conversational, or mixed-study tracks
   - Dynamically adjust pacing based on accuracy and streak data
   - Generate daily plans based on target exam, timeline, and weak areas (partially shipped)

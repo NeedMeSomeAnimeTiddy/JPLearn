@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { TypeAnimation } from 'react-type-animation'
 import {
   AlertTriangle,
@@ -16,7 +16,6 @@ import {
   SECTION_META,
 } from '../constants'
 import { RecommendationCard } from '../components/RecommendationCard'
-import { LearningPathPanel } from '../components/LearningPathPanel'
 import { ScriptCassetteCarousel } from '../components/ScriptCassetteCarousel'
 import { DailyGoalWidget } from '../components/DailyGoalWidget'
 import { WordOfDayWidget } from '../components/WordOfDayWidget'
@@ -50,8 +49,8 @@ interface HomeViewProps {
   onOpenDailyGames: () => void
   onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
   onStartRecommendation?: (nodeId: string) => void
-  onContinuePath?: (sectionId: string) => void
-  onChangePath?: () => void
+  /** The curriculum map (issue #78 Phase 4). Omitted while it is loading. */
+  progressionMap?: ReactNode
 }
 
 const SCRIPT_ORDER: readonly ScriptKey[] = [
@@ -74,8 +73,7 @@ export function HomeView({
   onOpenDailyGames,
   onJumpToSetup,
   onStartRecommendation,
-  onContinuePath,
-  onChangePath,
+  progressionMap,
 }: HomeViewProps) {
   const [selectedScript, setSelectedScript] = useState<ScriptKey>('hiragana')
 
@@ -262,13 +260,10 @@ export function HomeView({
             </div>
           )}
 
-          {learningPathStatus && onContinuePath && onChangePath && learningPathStatus.path_id && (
-            <LearningPathPanel
-              status={learningPathStatus}
-              onContinue={onContinuePath}
-              onChangePath={onChangePath}
-            />
-          )}
+          {/* The curriculum, rendered from JPLEARN_GRAPH. Replaced the
+              learning-path panel, which showed a second, flatter model of the
+              same course (issue #78 Phase 5). */}
+          {progressionMap}
 
           {recommendations && recommendations.length > 0 && onStartRecommendation ? (
             <section className="home-recommendations" aria-label="Study recommendations">

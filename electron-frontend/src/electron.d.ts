@@ -699,7 +699,6 @@ interface DesktopApi {
   saveJLPTExamResult?: (payload: JLPTSaveResultPayload) => Promise<{ ok: boolean; id: number }>
   getJLPTExamHistory?: (level?: JLPTLevel | '', mode?: JLPTExamMode | '') => Promise<JLPTExamHistoryPayload>
   getLearningPathStatus?: () => Promise<LearningPathStatusPayload>
-  setLearningPath?: (pathId: string) => Promise<LearningPathStatusPayload>
   completeOnboarding?: (payload: OnboardingCompletionPayload) => Promise<LearningPathStatusPayload>
   getDailyGoal?: () => Promise<{ target: number; current: number; goal_met: boolean; presets: number[] }>
   setDailyGoal?: (target: number) => Promise<{ target: number; current: number; goal_met: boolean; presets: number[] }>
@@ -1088,8 +1087,6 @@ interface LearningPathStep {
 }
 
 interface LearningPathStatusPayload {
-  path_id: string | null
-  path_name: string | null
   onboarding_complete: boolean
   suggested_next: string | null
   steps: LearningPathStep[]
