@@ -60,7 +60,10 @@ interface ScriptHubViewProps {
   navDirection: NavDirection
   activeScript: ScriptKey
   activeGame: MinigameKey
-  activeBlockIndex: number
+  /** Blocks currently selected; empty means the whole deck. */
+  selectedBlockIndices: number[]
+  /** Pre-rendered "n/m selected · k cards" label for the strip. */
+  blockSelectionSummary: string
   gameLoading: boolean
   gameError: string | null
   blockProgressWithMastery: BlockInfo[]
@@ -82,7 +85,9 @@ interface ScriptHubViewProps {
   isSheet?: boolean
   // callbacks (navigation / deck selection only)
   onBack: () => void
-  onSelectBlock: (index: number) => void
+  onToggleBlock: (index: number) => void
+  onSelectAllBlocks: () => void
+  onClearBlocks: () => void
   onSelectKanjiLevel: (level: JlptLevel) => void
   onSelectVocabLevel: (level: JlptLevel) => void
   onSelectKanjiCategory: (cat: KanjiCategory) => void
@@ -129,7 +134,8 @@ export function ScriptHubView({
   navDirection,
   activeScript,
   activeGame,
-  activeBlockIndex,
+  selectedBlockIndices,
+  blockSelectionSummary,
   gameLoading,
   gameError,
   blockProgressWithMastery,
@@ -150,7 +156,9 @@ export function ScriptHubView({
   minigameLockReasons,
   isSheet = false,
   onBack,
-  onSelectBlock,
+  onToggleBlock,
+  onSelectAllBlocks,
+  onClearBlocks,
   onSelectKanjiLevel,
   onSelectVocabLevel,
   onSelectKanjiCategory,
@@ -175,13 +183,30 @@ export function ScriptHubView({
     toggleLeechFocus,
     toggleConfidence,
   } = useSession()
-  const activeBlock = blockProgressWithMastery.find((block) => block.index === activeBlockIndex)
+  // Multi-select (issue #78): the pool is the union of the selected blocks, so
+  // there is no single "active block". The selection only ever holds unlocked
+  // indices — useBlockSelection filters it — so the console opens whenever the
+  // deck has anything unlocked at all.
+  const selectedBlocks = blockProgressWithMastery.filter(
+    (block) => selectedBlockIndices.includes(block.index),
+  )
+  const hasUnlockedBlock = blockProgressWithMastery.some((block) => block.unlocked)
+  const selectedBlockLabel = selectedBlocks.length === 1
+    ? selectedBlocks[0].name
+    : selectedBlocks.length === 0
+      ? 'Whole deck'
+      : `${selectedBlocks.length} blocks`
 
   // Tracklist strip: blocks take precedence, categories otherwise. Categories
   // are split by JLPT level so a 28-entry list never renders as one long row.
   const isKanjiTrack = activeScript === 'kanji_n5'
   const showsBlocks = blockProgressWithMastery.length > 0
-  const showsCategories = !showsBlocks && (isKanjiTrack || activeScript === 'vocab_n5')
+  // The two levelled sections span five JLPT decks. Since issue #78 they render
+  // blocks rather than categories, so the level row can no longer hang off
+  // `showsCategories` — losing it would strand a learner on N5 with no way to
+  // reach N4–N1.
+  const isLevelledTrack = isKanjiTrack || activeScript === 'vocab_n5'
+  const showsCategories = !showsBlocks && isLevelledTrack
   const categoryRows = isKanjiTrack ? kanjiCategoryProgress : vocabCategoryProgress
   const categoryLevels = levelsPresentIn(categoryRows)
   const visibleLevel = resolveVisibleLevel(categoryRows, isKanjiTrack ? activeKanjiLevel : activeVocabLevel)
@@ -312,13 +337,13 @@ export function ScriptHubView({
           <div className="hub-particle hub-particle--3" aria-hidden="true" />
           <div className="hub-particle hub-particle--4" aria-hidden="true" />
 
-          {!gameLoading && (blockProgressWithMastery.length === 0 || activeBlock?.unlocked) ? (
+          {!gameLoading && (blockProgressWithMastery.length === 0 || hasUnlockedBlock) ? (
             <>
               <div className="hub-player-header">
                 <p className="hero-kicker">
                   <span className="hub-rec-dot" aria-hidden="true" />{' '}
                   {blockProgressWithMastery.length > 0
-                    ? `${activeBlock?.name ?? ''} · ${activeBlockCards.length} cards`
+                    ? `${selectedBlockLabel} · ${activeBlockCards.length} cards`
                     : activeScript === 'kanji_n5' || activeScript === 'vocab_n5'
                       ? `${activeSectionName ?? 'Category'} · ${activeBlockCards.length} cards`
                       : 'Pick a minigame'}
@@ -426,13 +451,13 @@ export function ScriptHubView({
                 <div className="hub-tracklist-strip">
                   <span className="hub-tracklist-label">
                     {showsBlocks
-                      ? `${blockProgressWithMastery.filter((b) => b.mastery >= 0.8).length}/${blockProgressWithMastery.length} mastered`
+                      ? blockSelectionSummary
                       : showsCategories
                         ? `${visibleCategories.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${visibleCategories.filter((c) => c.total > 0).length}`
                         : ''}
                   </span>
                   <div className="hub-tracklist-groups">
-                    {showsCategories && categoryLevels.length > 1 ? (
+                    {isLevelledTrack && categoryLevels.length > 1 ? (
                       <div className="hub-level-row" role="group" aria-label="JLPT level">
                         {categoryLevels.map((level) => {
                           const levelName = level.toUpperCase()
@@ -459,18 +484,39 @@ export function ScriptHubView({
                     ) : null}
 
                     {showsBlocks ? (
-                      <div className="hub-block-row-strip">
+                      <div
+                        className="hub-block-row-strip"
+                        role="group"
+                        aria-label="Blocks to study"
+                      >
+                        <button
+                          type="button"
+                          className="hub-block-chip hub-block-chip--action"
+                          onClick={onSelectAllBlocks}
+                          title="Study every unlocked block"
+                        >
+                          All
+                        </button>
+                        <button
+                          type="button"
+                          className="hub-block-chip hub-block-chip--action"
+                          onClick={onClearBlocks}
+                          disabled={selectedBlockIndices.length === 0}
+                          title="Clear the selection and study the whole deck"
+                        >
+                          None
+                        </button>
                         {blockProgressWithMastery.map((block) => {
-                          const isActive = activeBlockIndex === block.index
+                          const isSelected = selectedBlockIndices.includes(block.index)
                           const masteryPct = Math.round(block.mastery * 100)
                           return (
                             <button
                               key={block.index}
                               type="button"
-                              className={`hub-block-chip${isActive ? ' is-active' : ''}${!block.unlocked ? ' is-locked' : ''}`}
+                              className={`hub-block-chip${isSelected ? ' is-active' : ''}${!block.unlocked ? ' is-locked' : ''}`}
                               disabled={!block.unlocked}
-                              aria-pressed={isActive}
-                              onClick={() => { if (block.unlocked) onSelectBlock(block.index) }}
+                              aria-pressed={isSelected}
+                              onClick={() => { if (block.unlocked) onToggleBlock(block.index) }}
                               title={!block.unlocked ? 'Locked' : `${block.name} ${masteryPct}%`}
                             >
                               {block.name}

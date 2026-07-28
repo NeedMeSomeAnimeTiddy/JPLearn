@@ -40,6 +40,22 @@ export function loadSessionPrefs(): LastSessionPrefs | null {
   }
 }
 
+/**
+ * Merge a partial update into the stored prefs.
+ *
+ * Two independent owners write this blob — `useStudySession` (deck, minigame,
+ * session toggles) and block selection — and each knows only its own fields.
+ * Writing a freshly built object from either would drop the other's, so both go
+ * through here.
+ */
+export function mergeSessionPrefs(update: Partial<LastSessionPrefs>): void {
+  try {
+    const existing = loadSessionPrefs() ?? {}
+    const merged = { ...existing, ...update, updatedAt: new Date().toISOString() }
+    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(merged))
+  } catch { /* ignore — persistence is best-effort */ }
+}
+
 
 export const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
   total_beginner:       [],

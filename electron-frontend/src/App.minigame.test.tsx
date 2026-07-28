@@ -483,7 +483,10 @@ describe('Minigame menu', () => {
       randomSpy.mockRestore()
     }
 
-    expect(getStudyQueue).toHaveBeenCalledWith('vocab_greetings')
+    // The JLPT level deck, not a category. Since issue #78 the categories are
+    // blocks over this deck, and a selection can hold blocks no category covers —
+    // queueing a category slug would rank a narrower pool than the one on screen.
+    expect(getStudyQueue).toHaveBeenCalledWith('vocab_n5')
   })
 
   it('exits the minigame and shows onboarding after resetting data from settings', async () => {

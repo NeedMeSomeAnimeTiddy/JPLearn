@@ -8,7 +8,6 @@ import type {
   CardScores,
   DeckSlugInput,
   ExplicitReviewItem,
-  KanjiCategory,
   MinigameKey,
   MinigameStatsByScript,
   NavDirection,
@@ -18,7 +17,6 @@ import type {
   ScriptKey,
   StatsByScript,
   StudyQueueResponse,
-  VocabCategory,
   XPProgress,
 } from '../../types'
 
@@ -51,8 +49,6 @@ export interface StudySessionDeps {
   view: AppView
   activeScript: ScriptKey
   activeGame: MinigameKey
-  activeKanjiCategory: KanjiCategory
-  activeVocabCategory: VocabCategory
   activeDeckSlug: DeckSlugInput
   /** Cards for the active block — the pool a normal (non-explicit-review) run draws from. */
   activeBlockCards: ScriptDeck['cards']

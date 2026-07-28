@@ -7,6 +7,8 @@ import type {
   BlockProgressPayload,
   CardScores,
   DeckSlugInput,
+  KanjiDeckSlug,
+  VocabDeckSlug,
   JlptLevel,
   KanjiCategory,
   LearningPathStatus,
@@ -96,6 +98,10 @@ import {
   useStudySession,
 } from './features/study-session'
 import './App.css'
+import { useBlockSelection, describeSelection } from './features/block-selection'
+import { useProgression, ProgressionMap, LOCKED_NODE_REASON } from './features/progression'
+import type { ProgressionNodeView } from './features/progression'
+import { computeMinigameLockReasons } from './lib/minigameAvailability'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { useVoice, splitSpeechSegments, type VoiceSettingsFields } from './features/voice'
 import { useModels } from './features/models'
@@ -163,7 +169,6 @@ function App() {
   const [activeGame, setActiveGame] = useState<MinigameKey>(() => loadSessionPrefs()?.game ?? 'romaji_sprint')
   const [deckCards, setDeckCards] = useState<ScriptDeck['cards']>([])
   const [blockProgress, setBlockProgress] = useState<BlockInfo[]>([])
-  const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0)
   const [gameLoading, setGameLoading] = useState<boolean>(false)
   const [gameError, setGameError] = useState<string | null>(null)
 
@@ -411,8 +416,10 @@ function App() {
   const vocabCategoryDeckCacheRef = useRef<Partial<Record<VocabCategory, ScriptDeck['cards']>>>({})
   const kanjiCategoryBlockCacheRef = useRef<Partial<Record<KanjiCategory, BlockInfo[]>>>({})
   const vocabCategoryBlockCacheRef = useRef<Partial<Record<VocabCategory, BlockInfo[]>>>({})
-  const scriptDeckCacheRef = useRef<Partial<Record<ScriptKey, ScriptDeck['cards']>>>({})
-  const scriptBlockCacheRef = useRef<Partial<Record<ScriptKey, BlockInfo[]>>>({})
+  // Keyed by deck slug, not ScriptKey: the kanji and vocabulary sections each
+  // span five JLPT level decks, and since #78 they load the level deck directly.
+  const scriptDeckCacheRef = useRef<Partial<Record<string, ScriptDeck['cards']>>>({})
+  const scriptBlockCacheRef = useRef<Partial<Record<string, BlockInfo[]>>>({})
   const deckCardsInFlightRef = useRef<Map<string, Promise<ScriptDeck>>>(new Map())
   const blockProgressInFlightRef = useRef<Map<string, Promise<BlockProgressPayload>>>(new Map())
   const studyQueueInFlightRef = useRef<Map<string, Promise<StudyQueueResponse>>>(new Map())
@@ -467,11 +474,15 @@ function App() {
   // them as arguments — `activeBlockCards` in particular is a render-time value,
   // so it cannot be late-bound through a ref.
 
-  const activeDeckSlug = useMemo(() => {
-    if (activeScript === 'kanji_n5') return KANJI_CATEGORY_TO_DECK_SLUG[activeKanjiCategory]
-    if (activeScript === 'vocab_n5') return VOCAB_CATEGORY_TO_DECK_SLUG[activeVocabCategory]
+  // The deck a session studies. For the two levelled sections this is the JLPT
+  // *level* deck, not a category: since issue #78 the categories are blocks over
+  // that deck, and a selection may hold blocks no category covers. Deriving the
+  // slug from a category would then resolve to the wrong (or a stale) deck.
+  const activeDeckSlug = useMemo<DeckSlugInput>(() => {
+    if (activeScript === 'kanji_n5') return `kanji_${activeKanjiLevel}` as KanjiDeckSlug
+    if (activeScript === 'vocab_n5') return `vocab_${activeVocabLevel}` as VocabDeckSlug
     return activeScript
-  }, [activeKanjiCategory, activeScript, activeVocabCategory])
+  }, [activeScript, activeKanjiLevel, activeVocabLevel])
 
   const getStudyQueueDeduped = useCallback(
     (slug: DeckSlugInput, options?: { preferCache?: boolean }): Promise<StudyQueueResponse> => {
@@ -546,18 +557,11 @@ function App() {
     activeScript, cardScores, cards, minigame, cardIndex, surprisePrompt, promptSeed,
   ), [activeScript, cardScores])
 
-  // Cards restricted to the active block when block progression is available.
-  const activeBlockCards = useMemo(() => {
-    if (blockProgress.length === 0) {
-      return deckCards
-    }
-    const block = blockProgress.find((entry) => entry.index === activeBlockIndex)
-    if (!block) return deckCards
-    const idSet = new Set(block.card_ids)
-    const matchingCards = deckCards.filter((c) => idSet.has(c.id))
-    // Fallback to full deck when block metadata does not map to loaded card IDs.
-    return matchingCards.length > 0 ? matchingCards : deckCards
-  }, [deckCards, blockProgress, activeBlockIndex])
+  // Which blocks are being studied, and the cards that union to. Selection is
+  // derived from stored prefs rather than held here, so blocks arriving from the
+  // bridge cannot race it — see features/block-selection.
+  const blockSelection = useBlockSelection(activeDeckSlug, blockProgress, deckCards)
+  const activeBlockCards = blockSelection.cards
 
   const models = useModels()
 
@@ -569,6 +573,10 @@ function App() {
       refreshTutorInstallInfo: models.refreshTutorInstallInfo,
     },
   )
+
+  // The 16-node curriculum graph (issue #78 Phase 4). Fetched only while Home is
+  // on screen — it is the only consumer, and the bridge is strictly serial.
+  const progression = useProgression(view === 'home')
 
   const cursor = useCursor(
     settings as unknown as { cursor: CursorSettings },
@@ -588,14 +596,14 @@ function App() {
   // is `tutor.queueAssistantToast`: the tutor hook consumes session state, so it
   // has to be constructed *after* this call. It is passed through a latest-value
   // ref box, assigned during render immediately after `useTutor` returns.
+
+
   const queueAssistantToastRef = useRef<(toast: AssistantToast | null) => void>(() => {})
 
   const session = useStudySession({
     view,
     activeScript,
     activeGame,
-    activeKanjiCategory,
-    activeVocabCategory,
     activeDeckSlug,
     activeBlockCards,
     deckCards,
@@ -672,6 +680,39 @@ function App() {
   // render rather than in an effect: `tutor`'s functions are not stable, so an
   // effect keyed on its identity could hold a stale reference between renders.
   queueAssistantToastRef.current = tutor.queueAssistantToast
+
+  const openProgressionNode = useCallback((node: ProgressionNodeView) => {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+
+    const destination = node.destination
+    switch (destination.kind) {
+      case 'script':
+        tutor.closeTutorPanel()
+        setActiveScript(destination.script)
+        if (destination.minigame) setActiveGame(destination.minigame)
+        navigate('script_hub', 'forward')
+        return
+      case 'jlpt':
+        tutor.closeTutorPanel()
+        navigate('jlpt_prep', 'forward')
+        return
+      case 'passages':
+        tutor.closeTutorPanel()
+        navigate('passage_hub', 'forward')
+        return
+      case 'scenarios':
+        tutor.openTutorPanel('scenarios')
+        return
+      case 'tutor':
+        tutor.openTutorPanel('chat')
+        return
+      case 'none':
+        // `tutorial` — a one-time, skippable flow with nothing to re-enter.
+        return
+    }
+  }, [navigate, setActiveGame, setActiveScript, tutor])
 
   // Scenario Practice shares the tutor's single audio channel (same run-id ref
   // and the same coach-audio toggle), so NPC playback and chat replies can
@@ -1052,10 +1093,41 @@ function App() {
     }
   }, [getBlockProgressDeduped, getDeckCardsDeduped, notifyStartupReady])
 
+  // Category cards, fetched only to feed the per-category mastery rows behind the
+  // JLPT level tabs and the overview. Nothing studies them: since issue #78 a
+  // category deck is a view over its parent, so these are the same cards under
+  // the same ids as the level deck the session actually loads.
+  const preloadKanjiCategoryCards = useCallback(() => {
+    for (const cat of KANJI_CATEGORY_ORDER) {
+      if (kanjiCategoryDeckCacheRef.current[cat]) continue
+      void (async () => {
+        try {
+          const payload = await getDeckCardsDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat])
+          const cards = normalizeDeckCards(payload.cards)
+          kanjiCategoryDeckCacheRef.current[cat] = cards
+          setKanjiDeckCardsByCategory((previous) => ({ ...previous, [cat]: cards }))
+        } catch { /* ignore preload failure — progress rows degrade, study does not */ }
+      })()
+    }
+  }, [getDeckCardsDeduped])
+
+  const preloadVocabCategoryCards = useCallback(() => {
+    for (const cat of VOCAB_CATEGORY_ORDER) {
+      if (vocabCategoryDeckCacheRef.current[cat]) continue
+      void (async () => {
+        try {
+          const payload = await getDeckCardsDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat])
+          const cards = normalizeDeckCards(payload.cards)
+          vocabCategoryDeckCacheRef.current[cat] = cards
+          setVocabDeckCardsByCategory((previous) => ({ ...previous, [cat]: cards }))
+        } catch { /* ignore preload failure — progress rows degrade, study does not */ }
+      })()
+    }
+  }, [getDeckCardsDeduped])
+
   const loadScriptCards = useCallback(async (
     script: ScriptKey,
-    kanjiCategory: KanjiCategory = activeKanjiCategory,
-    vocabCategory: VocabCategory = activeVocabCategory,
+    deckSlug: DeckSlugInput,
   ) => {
     const requestId = scriptLoadRequestIdRef.current + 1
     scriptLoadRequestIdRef.current = requestId
@@ -1065,177 +1137,50 @@ function App() {
     resetSessionFull()
 
     try {
+      // One path for every section since issue #78. The kanji and vocabulary
+      // sections used to load a *category* deck here, which is why their blocks
+      // were never read: a category carries no blocks of its own, it *is* one.
+      // They now load the JLPT level deck, whose blocks are the categories
+      // followed by generated sets covering the rest of the corpus.
+      const cachedDeck = scriptDeckCacheRef.current[deckSlug]
+      const cachedBlocks = scriptBlockCacheRef.current[deckSlug]
+
+      let resolvedCards = cachedDeck
+      let resolvedBlocks = cachedBlocks
+
+      if (!resolvedCards || !resolvedBlocks) {
+        const [deckPayload, blockPayload] = await Promise.all([
+          resolvedCards ? Promise.resolve({ cards: resolvedCards }) : getDeckCardsDeduped(deckSlug),
+          resolvedBlocks ? Promise.resolve({ blocks: resolvedBlocks }) : getBlockProgressDeduped(deckSlug),
+        ])
+        if (scriptLoadRequestIdRef.current !== requestId) {
+          return
+        }
+
+        if (!resolvedCards) {
+          resolvedCards = limitRuntimeDeckCards(script, normalizeDeckCards(deckPayload.cards))
+          scriptDeckCacheRef.current[deckSlug] = resolvedCards
+        }
+        if (!resolvedBlocks) {
+          resolvedBlocks = normalizeBlockList(blockPayload.blocks)
+          scriptBlockCacheRef.current[deckSlug] = resolvedBlocks
+        }
+      }
+
+      setDeckCards(resolvedCards ?? [])
+
+      // No index to reset: useBlockSelection derives the default from these
+      // blocks (furthest unlocked, as single-select used to land).
+      setBlockProgress(resolvedBlocks ?? [])
+
+      // Category decks are still fetched, but only to feed the per-category
+      // mastery rows that drive the JLPT level tabs and the overview. They are
+      // views over this same parent deck now, so they cost little and their
+      // numbers agree with it by construction.
       if (script === 'kanji_n5') {
-        const selectedKanjiSlug = KANJI_CATEGORY_TO_DECK_SLUG[kanjiCategory]
-        const cachedCards = kanjiCategoryDeckCacheRef.current[kanjiCategory]
-        const cachedBlocks = kanjiCategoryBlockCacheRef.current[kanjiCategory]
-
-        let selectedCards = cachedCards
-        let selectedBlocks = cachedBlocks
-
-        if (!selectedCards || !selectedBlocks) {
-          const [selectedDeckPayload, blockPayload] = await Promise.all([
-            getDeckCardsDeduped(selectedKanjiSlug),
-            getBlockProgressDeduped(selectedKanjiSlug),
-          ])
-
-          if (scriptLoadRequestIdRef.current !== requestId) {
-            return
-          }
-
-          selectedCards = normalizeDeckCards(selectedDeckPayload.cards)
-          selectedBlocks = normalizeBlockList(blockPayload.blocks)
-          kanjiCategoryDeckCacheRef.current[kanjiCategory] = selectedCards
-          kanjiCategoryBlockCacheRef.current[kanjiCategory] = selectedBlocks
-          setKanjiDeckCardsByCategory((previous) => ({
-            ...previous,
-            [kanjiCategory]: selectedCards,
-          }))
-        }
-
-        const resolvedKanjiCards = selectedCards ?? []
-        const resolvedKanjiBlocks = selectedBlocks ?? []
-
-        setDeckCards(resolvedKanjiCards)
-
-        // Preload remaining kanji categories in background
-        for (const cat of KANJI_CATEGORY_ORDER) {
-          if (cat === kanjiCategory || kanjiCategoryDeckCacheRef.current[cat]) continue
-          void (async () => {
-            try {
-              const payload = await getDeckCardsDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat])
-              const normalizedCards = normalizeDeckCards(payload.cards)
-              kanjiCategoryDeckCacheRef.current[cat] = normalizedCards
-              setKanjiDeckCardsByCategory((previous) => ({
-                ...previous,
-                [cat]: normalizedCards,
-              }))
-            } catch { /* ignore preload failure */ }
-          })()
-          void (async () => {
-            try {
-              const payload = await getBlockProgressDeduped(KANJI_CATEGORY_TO_DECK_SLUG[cat])
-              kanjiCategoryBlockCacheRef.current[cat] = normalizeBlockList(payload.blocks)
-            } catch { /* ignore preload failure */ }
-          })()
-        }
-
-        const blocks = resolvedKanjiBlocks
-        setBlockProgress(blocks)
-        if (blocks.length > 0) {
-          const lastUnlocked = blocks.reduce(
-            (best, b) => (b.unlocked ? b.index : best),
-            0,
-          )
-          setActiveBlockIndex(lastUnlocked)
-        } else {
-          setActiveBlockIndex(0)
-        }
+        preloadKanjiCategoryCards()
       } else if (script === 'vocab_n5') {
-        const selectedVocabSlug = VOCAB_CATEGORY_TO_DECK_SLUG[vocabCategory]
-        const cachedCards = vocabCategoryDeckCacheRef.current[vocabCategory]
-        const cachedBlocks = vocabCategoryBlockCacheRef.current[vocabCategory]
-
-        let selectedCards = cachedCards
-        let selectedBlocks = cachedBlocks
-
-        if (!selectedCards || !selectedBlocks) {
-          const [selectedDeckPayload, blockPayload] = await Promise.all([
-            getDeckCardsDeduped(selectedVocabSlug),
-            getBlockProgressDeduped(selectedVocabSlug),
-          ])
-
-          if (scriptLoadRequestIdRef.current !== requestId) {
-            return
-          }
-
-          selectedCards = normalizeDeckCards(selectedDeckPayload.cards)
-          selectedBlocks = normalizeBlockList(blockPayload.blocks)
-          vocabCategoryDeckCacheRef.current[vocabCategory] = selectedCards
-          vocabCategoryBlockCacheRef.current[vocabCategory] = selectedBlocks
-          setVocabDeckCardsByCategory((previous) => ({
-            ...previous,
-            [vocabCategory]: selectedCards,
-          }))
-        }
-
-        const resolvedVocabCards = selectedCards ?? []
-        const resolvedVocabBlocks = selectedBlocks ?? []
-
-        setDeckCards(resolvedVocabCards)
-
-        // Preload remaining vocab categories in background
-        for (const cat of VOCAB_CATEGORY_ORDER) {
-          if (cat === vocabCategory || vocabCategoryDeckCacheRef.current[cat]) continue
-          void (async () => {
-            try {
-              const payload = await getDeckCardsDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat])
-              const normalizedCards = normalizeDeckCards(payload.cards)
-              vocabCategoryDeckCacheRef.current[cat] = normalizedCards
-              setVocabDeckCardsByCategory((previous) => ({
-                ...previous,
-                [cat]: normalizedCards,
-              }))
-            } catch { /* ignore preload failure */ }
-          })()
-          void (async () => {
-            try {
-              const payload = await getBlockProgressDeduped(VOCAB_CATEGORY_TO_DECK_SLUG[cat])
-              vocabCategoryBlockCacheRef.current[cat] = normalizeBlockList(payload.blocks)
-            } catch { /* ignore preload failure */ }
-          })()
-        }
-
-        const blocks = resolvedVocabBlocks
-        setBlockProgress(blocks)
-        if (blocks.length > 0) {
-          const lastUnlocked = blocks.reduce(
-            (best, b) => (b.unlocked ? b.index : best),
-            0,
-          )
-          setActiveBlockIndex(lastUnlocked)
-        } else {
-          setActiveBlockIndex(0)
-        }
-      } else {
-        const cachedDeck = scriptDeckCacheRef.current[script]
-        const cachedBlocks = scriptBlockCacheRef.current[script]
-
-        let resolvedCards = cachedDeck
-        let resolvedBlocks = cachedBlocks
-
-        if (!resolvedCards || !resolvedBlocks) {
-          const [deckPayload, blockPayload] = await Promise.all([
-            resolvedCards ? Promise.resolve({ cards: resolvedCards }) : getDeckCardsDeduped(script),
-            resolvedBlocks ? Promise.resolve({ blocks: resolvedBlocks }) : getBlockProgressDeduped(script),
-          ])
-          if (scriptLoadRequestIdRef.current !== requestId) {
-            return
-          }
-
-          if (!resolvedCards) {
-            resolvedCards = limitRuntimeDeckCards(script, normalizeDeckCards(deckPayload.cards))
-            scriptDeckCacheRef.current[script] = resolvedCards
-          }
-          if (!resolvedBlocks) {
-            resolvedBlocks = normalizeBlockList(blockPayload.blocks)
-            scriptBlockCacheRef.current[script] = resolvedBlocks
-          }
-        }
-
-        setDeckCards(resolvedCards ?? [])
-
-        const blocks = resolvedBlocks ?? []
-        setBlockProgress(blocks)
-        if (blocks.length > 0) {
-          const lastUnlocked = blocks.reduce(
-            (best, b) => (b.unlocked ? b.index : best),
-            0,
-          )
-          setActiveBlockIndex(lastUnlocked)
-        } else {
-          setActiveBlockIndex(0)
-        }
+        preloadVocabCategoryCards()
       }
 
       lastLoadedScriptRef.current = script
@@ -1245,14 +1190,13 @@ function App() {
       }
       setDeckCards([])
       setBlockProgress([])
-      setActiveBlockIndex(0)
       setGameError(err instanceof Error ? err.message : 'Could not load deck data. Restart the app if this persists.')
     } finally {
       if (scriptLoadRequestIdRef.current === requestId) {
         setGameLoading(false)
       }
     }
-  }, [activeKanjiCategory, activeVocabCategory, getBlockProgressDeduped, getDeckCardsDeduped, resetSessionFull])
+  }, [getBlockProgressDeduped, getDeckCardsDeduped, resetSessionFull, preloadKanjiCategoryCards, preloadVocabCategoryCards])
 
   // After the backend SRS states change wholesale (onboarding seeding or a reset),
   // the cached deck/block progress no longer matches the database. Drop every cache
@@ -1267,7 +1211,7 @@ function App() {
     vocabCategoryBlockCacheRef.current = {}
     studyQueueCacheRef.current.clear()
 
-    void loadScriptCards(activeScript, activeKanjiCategory, activeVocabCategory)
+    void loadScriptCards(activeScript, activeDeckSlug)
     void (async () => {
       try {
         const payload = await window.jplearnDesktop?.getOverviewCharacterMastery()
@@ -1277,11 +1221,14 @@ function App() {
         setOverviewKanjiDeck(payload.kanji_cards)
       } catch { /* ignore */ }
     })()
-  }, [activeScript, activeKanjiCategory, activeVocabCategory, loadScriptCards])
+  }, [activeScript, activeDeckSlug, loadScriptCards])
 
+  // Reloads on the *slug*, so switching JLPT level swaps the deck (and its
+  // blocks) the way switching section always has. Category changes no longer
+  // reload anything — they move the level tabs, not the deck under study.
   useEffect(() => {
-    void loadScriptCards(activeScript, activeKanjiCategory, activeVocabCategory)
-  }, [activeScript, activeKanjiCategory, activeVocabCategory, loadScriptCards])
+    void loadScriptCards(activeScript, activeDeckSlug)
+  }, [activeScript, activeDeckSlug, loadScriptCards])
 
   const leechCards = useMemo(
     () => deckCards.filter((card) => card.is_leech),
@@ -1495,26 +1442,19 @@ function App() {
     return blockProgress
   }, [blockProgress])
 
-  useEffect(() => {
-    if (blockProgressWithMastery.length === 0) return
-
-    const current = blockProgressWithMastery.find((block) => block.index === activeBlockIndex)
-    if (current?.unlocked) return
-
-    const firstUnlocked = blockProgressWithMastery.find((block) => block.unlocked)
-    if (firstUnlocked) {
-      setActiveBlockIndex(firstUnlocked.index)
-      return
-    }
-
-    if (activeBlockIndex !== 0) {
-      setActiveBlockIndex(0)
-    }
-  }, [blockProgressWithMastery, activeBlockIndex])
+  // No "snap off a locked block" effect: useBlockSelection filters the selection
+  // against the current blocks every render, so a locked or out-of-range index
+  // can never be live in the first place.
 
   const activeSectionName = useMemo(() => {
     if (blockProgressWithMastery.length > 0) {
-      return blockProgressWithMastery.find((block) => block.index === activeBlockIndex)?.name ?? null
+      const selected = blockSelection.selected
+      if (selected.length === 1) {
+        return blockProgressWithMastery.find((block) => block.index === selected[0])?.name ?? null
+      }
+      return selected.length === 0
+        ? 'Whole deck'
+        : `${selected.length} blocks`
     }
     if (activeScript === 'kanji_n5') {
       return kanjiCategoryProgress.find((cat) => cat.key === activeKanjiCategory)?.label ?? null
@@ -1523,7 +1463,7 @@ function App() {
       return vocabCategoryProgress.find((cat) => cat.key === activeVocabCategory)?.label ?? null
     }
     return null
-  }, [blockProgressWithMastery, activeBlockIndex, activeScript, kanjiCategoryProgress, activeKanjiCategory, vocabCategoryProgress, activeVocabCategory])
+  }, [blockProgressWithMastery, blockSelection.selected, activeScript, kanjiCategoryProgress, activeKanjiCategory, vocabCategoryProgress, activeVocabCategory])
 
 
 
@@ -1537,38 +1477,35 @@ function App() {
       reasons.listening_audio_first = voice.listeningLockReason
       reasons.dictation = voice.listeningLockReason
     }
-    if (activeScript === 'vocab_n5' && activeBlockCards.length > 0) {
-      const hasCompounds = activeBlockCards.some((c) => {
-        const kanjiChars = [...c.character].filter((ch) => /\p{Script=Han}/u.test(ch))
-        return kanjiChars.length >= 2 && !kanjiChars.some((ch) => !(ch in KANJI_MEANINGS))
-      })
-      if (!hasCompounds) {
-        reasons.kanji_compound_builder = 'No compound words in this block'
-      }
-      // The pool tops up from the wider deck, so this only locks when the whole
-      // section has nothing conjugatable — not merely this block.
-      if (buildConjugationPool(activeBlockCards, deckCards).length === 0) {
-        reasons.conjugation_drill = 'No verbs or adjectives to conjugate here'
-      }
+    // Everything else follows from what the live pool holds, evaluated by a
+    // shared rule table rather than mode-by-mode here. It is no longer gated on
+    // the section: the pool is the union of the selected blocks, so a section's
+    // name says very little about what a round can draw.
+    return {
+      ...computeMinigameLockReasons(
+        {
+          size: activeBlockCards.length,
+          hasCompoundWords: activeBlockCards.some((c) => {
+            const kanjiChars = [...c.character].filter((ch) => /\p{Script=Han}/u.test(ch))
+            return kanjiChars.length >= 2 && !kanjiChars.some((ch) => !(ch in KANJI_MEANINGS))
+          }),
+          // Counted after the top-up from the wider deck, so this locks only when
+          // the whole section has nothing conjugatable — not merely this block.
+          conjugatableCount: buildConjugationPool(activeBlockCards, deckCards).length,
+          leechCount: activeBlockCards.filter((c) => c.is_leech).length,
+        },
+        { leechFocusEnabled },
+      ),
+      ...reasons,
     }
-    if (leechFocusEnabled && activeBlockCards.length > 0 && activeBlockCards.filter((c) => c.is_leech).length === 0) {
-      const leechModes: MinigameKey[] = ['romaji_sprint', 'meaning_match', 'character_match', 'stroke_order', 'typed_recall', 'speech_recall', 'sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter', 'listening_audio_first', 'dictation', 'kanji_compound_builder', 'context_cloze', 'interleave_mix']
-      for (const mode of leechModes) {
-        if (!reasons[mode]) reasons[mode] = 'No leech cards in this block'
-      }
-    }
-    if (activeBlockCards.length > 0 && activeBlockCards.length < 2) {
-      const mcModes: MinigameKey[] = ['meaning_match', 'character_match', 'particle_cloze', 'vibe_check', 'imposter', 'listening_audio_first', 'kanji_compound_builder', 'context_cloze']
-      for (const mode of mcModes) {
-        if (!reasons[mode]) reasons[mode] = 'Not enough cards for this mode'
-      }
-    }
-    return reasons
   // oxlint-disable react-hooks/exhaustive-deps — voice.speechRecognitionLockReason is a constant string, voice hook return is not stable
-  }, [voice.listeningLockReason, voice.speechRecognitionModelEnabled, activeScript, activeBlockCards, leechFocusEnabled])
+  }, [voice.listeningLockReason, voice.speechRecognitionModelEnabled, activeBlockCards, deckCards, leechFocusEnabled])
 
-  // Block session is complete when every card in the active block has reached max score.
-  // sessionRounds > 0 ensures we don't trigger on a pre-mastered block before answering.
+  // Complete when every card in the *pool* has reached max score. With one block
+  // selected that is the block, as before. Selecting many, or clearing to study
+  // the whole deck, makes it correspondingly rarer — the check stays honest, it
+  // just fires less often the more a learner takes on at once.
+  // sessionRounds > 0 ensures we don't trigger on a pre-mastered pool before answering.
   const blockSessionComplete = useMemo(() => {
     if (!sessionActive || sessionRounds === 0 || activeBlockCards.length === 0) return false
     const scores = cardScores[activeScript]
@@ -1772,8 +1709,6 @@ function App() {
           return { ...prev, onboarding_complete: false }
         }
         return {
-          path_id: null,
-          path_name: null,
           onboarding_complete: false,
           suggested_next: null,
           steps: [],
@@ -1889,9 +1824,10 @@ function App() {
     }
   }, [])
 
-  // Handles completion of the onboarding form: seeds deck expertise, persists answers, sets path.
+  // Handles completion of the onboarding form: seeds deck expertise and records
+  // that onboarding finished. No path is chosen — there is one curriculum, and
+  // it comes from JPLEARN_GRAPH (issue #78 Phase 5).
   const handleOnboardingComplete = useCallback(async (
-    pathId: string | null,
     checkedItems: Set<string>,
     answers: { goal?: string; dailyMinutes?: number; targetLevel?: string },
   ) => {
@@ -1926,13 +1862,10 @@ function App() {
       // Expertise seeding is best-effort; proceed to mark onboarding complete.
     }
 
-    if (pathId) {
-      const result = await window.jplearnDesktop?.setLearningPath?.(pathId).catch(() => undefined)
-      if (result) setLearningPathStatus(result as LearningPathStatus)
-    } else {
-      const result = await window.jplearnDesktop?.completeOnboarding?.(answers).catch(() => undefined)
-      if (result) setLearningPathStatus(result as LearningPathStatus)
-    }
+    // One curriculum since issue #78 Phase 5, so onboarding no longer picks a
+    // path — it just records that it finished.
+    const result = await window.jplearnDesktop?.completeOnboarding?.(answers).catch(() => undefined)
+    if (result) setLearningPathStatus(result as LearningPathStatus)
   }, [getDeckCardsDeduped, refreshDeckProgressAfterSeedChange])
 
 
@@ -2157,11 +2090,11 @@ function App() {
         onFontSizeSelect={(key) => {
           setSettings((prev) => ({ ...prev, fontSize: key }))
         }}
-        onComplete={(pathId, checkedItems, answers) => {
-          void handleOnboardingComplete(pathId, checkedItems, answers)
+        onComplete={(_pathId, checkedItems, answers) => {
+          void handleOnboardingComplete(checkedItems, answers)
         }}
         onSkip={(checkedItems, answers) => {
-          void handleOnboardingComplete(null, checkedItems, answers)
+          void handleOnboardingComplete(checkedItems, answers)
         }}
       />
     </>
@@ -2192,15 +2125,6 @@ function App() {
             }
             const script = scriptMap[nodeId] as ScriptKey | undefined
             if (script) jumpToScriptHub(script)
-          }}
-          onContinuePath={(sectionId) => {
-            const script = sectionId as ScriptKey
-            setActiveScript(script)
-            navigate('script_hub', 'forward')
-          }}
-          onChangePath={() => {
-            // Re-open onboarding by resetting onboarding_complete in local state
-            setLearningPathStatus((prev) => prev ? { ...prev, onboarding_complete: false } : prev)
           }}
           onSelectScript={(script) => {
             // Check readiness before navigating — show modal for challenging/advanced
@@ -2251,6 +2175,18 @@ function App() {
           }}
           onOpenDailyGames={openDailyGames}
           onJumpToSetup={jumpToScriptHubSetup}
+          progressionMap={
+            <ProgressionMap
+              nodes={progression.nodes}
+              current={progression.current}
+              onOpenNode={(nodeId) => {
+                // Soft gating: an open node goes straight through, a gated one
+                // raises the confirmation handled below.
+                const node = progression.requestOpen(nodeId)
+                if (node) openProgressionNode(node)
+              }}
+            />
+          }
         />
       ) : null}
 
@@ -2352,6 +2288,22 @@ function App() {
         </div>
       ) : null}
 
+      {/* Gated-node confirmation. Same component and shape as the readiness
+          warning below, because it is the same promise to the learner: this is
+          advice, not a wall. Confirming is remembered per node. */}
+      {progression.pending && (
+        <ReadinessWarningModal
+          sectionLabel={progression.pending.name}
+          readiness="advanced"
+          reason={LOCKED_NODE_REASON}
+          onCancel={progression.cancelOpen}
+          onContinue={() => {
+            const node = progression.confirmOpen()
+            if (node) openProgressionNode(node)
+          }}
+        />
+      )}
+
       {/* Readiness warning modal — shown before navigating to a non-recommended section */}
       {warningModal && (
         <ReadinessWarningModal
@@ -2385,7 +2337,10 @@ function App() {
           navDirection={navDirection}
           activeScript={activeScript}
           activeGame={activeGame}
-          activeBlockIndex={activeBlockIndex}
+          selectedBlockIndices={blockSelection.selected}
+          blockSelectionSummary={describeSelection(
+            blockProgressWithMastery, blockSelection.selected, activeBlockCards.length,
+          )}
           gameLoading={gameLoading}
           gameError={gameError}
           blockProgressWithMastery={blockProgressWithMastery}
@@ -2405,8 +2360,16 @@ function App() {
           activeSectionName={activeSectionName}
           minigameLockReasons={minigameLockReasons}
           onBack={goHome}
-          onSelectBlock={(index) => {
-            setActiveBlockIndex(index)
+          onToggleBlock={(index) => {
+            blockSelection.toggle(index)
+            resetSessionWithLives()
+          }}
+          onSelectAllBlocks={() => {
+            blockSelection.selectAll()
+            resetSessionWithLives()
+          }}
+          onClearBlocks={() => {
+            blockSelection.clear()
             resetSessionWithLives()
           }}
           onSelectKanjiLevel={(level) => {

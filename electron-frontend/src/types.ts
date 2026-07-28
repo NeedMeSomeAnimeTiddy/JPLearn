@@ -243,6 +243,12 @@ export interface LastSessionPrefs {
   confidenceCaptureEnabled: boolean
   sessionTargetItems: number
   updatedAt: string
+  /**
+   * Selected block indices per deck slug (issue #78). Optional because prefs
+   * written before multi-select existed do not carry it, and a deck with no
+   * stored entry falls back to the furthest unlocked block.
+   */
+  blockSelection?: Record<string, number[]>
 }
 
 export interface ScriptStats {
@@ -280,8 +286,6 @@ export interface LearningPathStep {
 }
 
 export interface LearningPathStatus {
-  path_id: string | null
-  path_name: string | null
   onboarding_complete: boolean
   suggested_next: string | null
   steps: LearningPathStep[]

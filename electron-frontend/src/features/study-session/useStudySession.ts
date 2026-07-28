@@ -15,7 +15,6 @@ import type {
   ExplicitReviewItem,
   FeedbackTone,
   InterleaveWeights,
-  LastSessionPrefs,
   MinigameKey,
   PersistedSession,
   PersistedSessionRestore,
@@ -48,7 +47,7 @@ import {
   calculateAwardedPoints,
   classifyRoundPerformance,
 } from '../../lib/roundScoring'
-import { PREFS_STORAGE_KEY, SESSION_STORAGE_KEY, loadSessionPrefs } from '../../lib/appStorage'
+import { SESSION_STORAGE_KEY, loadSessionPrefs, mergeSessionPrefs } from '../../lib/appStorage'
 import { buildInterleaveSequence, normalizeText, shuffleArray } from '../../lib/deckUtils'
 import {
   PARTICLE_EXPLANATIONS,
@@ -62,10 +61,8 @@ import {
   DEFAULT_INTERLEAVE_WEIGHTS,
   DEFAULT_LIVES,
   DEFAULT_SESSION_LENGTH_PRESET,
-  KANJI_CATEGORY_TO_DECK_SLUG,
   SCRIPT_INTERLEAVE_MODES,
   SESSION_LENGTH_PRESETS,
-  VOCAB_CATEGORY_TO_DECK_SLUG,
 } from '../../constants'
 
 /** Round startup stays responsive even if queue IPC is temporarily slow. */
@@ -76,8 +73,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     view,
     activeScript,
     activeGame,
-    activeKanjiCategory,
-    activeVocabCategory,
     activeDeckSlug,
     activeBlockCards,
     deckCards,
@@ -392,18 +387,16 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   }, [])
 
   function saveSessionPrefs(): void {
-    try {
-      const prefs: LastSessionPrefs = {
-        script: activeScript,
-        game: activeGame,
-        livesEnabled,
-        leechFocusEnabled,
-        confidenceCaptureEnabled,
-        sessionTargetItems,
-        updatedAt: new Date().toISOString(),
-      }
-      localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs))
-    } catch { /* ignore */ }
+    // Merged rather than written whole: block selection shares this blob and is
+    // owned by a different hook, so rebuilding the object here would drop it.
+    mergeSessionPrefs({
+      script: activeScript,
+      game: activeGame,
+      livesEnabled,
+      leechFocusEnabled,
+      confidenceCaptureEnabled,
+      sessionTargetItems,
+    })
   }
 
   useEffect(() => {
@@ -1177,12 +1170,11 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         } catch { /* ignore storage errors */ }
       }
 
-      const resultSlug: DeckSlugInput = roundState.deckSlug
-        ?? (activeScript === 'kanji_n5'
-          ? KANJI_CATEGORY_TO_DECK_SLUG[activeKanjiCategory]
-          : activeScript === 'vocab_n5'
-            ? VOCAB_CATEGORY_TO_DECK_SLUG[activeVocabCategory]
-            : activeScript)
+      // App already resolves this once, including the JLPT level for the two
+      // levelled sections. Re-deriving it from a category here used to agree by
+      // accident; since issue #78 a selection can hold blocks no category covers,
+      // and it would resolve the wrong deck.
+      const resultSlug: DeckSlugInput = roundState.deckSlug ?? activeDeckSlug
       invalidateStudyQueue(resultSlug)
 
       const isExplicitReview = explicitReviewItemsRef.current !== null
@@ -1359,10 +1351,9 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     },
     [
       activeGame,
-      activeKanjiCategory,
+      activeDeckSlug,
       activeScript,
       activeSessionId,
-      activeVocabCategory,
       confidenceCaptureEnabled,
       invalidateStudyQueue,
       isRoundResolving,
