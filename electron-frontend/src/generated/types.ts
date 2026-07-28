@@ -132,9 +132,13 @@ export interface StudyQueuePayload {
 export interface ProgressionNodeStatusPayload {
   node_id: string
   name: string
+  category: string
   status: string
   mastered_ratio: number
   is_reachable: boolean
+  mastered_count: number
+  total_count: number
+  is_tracked: boolean
 }
 
 export interface FeatureStatusPayload {

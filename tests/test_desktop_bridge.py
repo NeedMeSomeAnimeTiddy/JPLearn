@@ -472,6 +472,12 @@ def test_record_game_result_streak_milestones_reached_empty_when_streak_unchange
     assert payload["milestones_reached"] == []
 
 
+
+def _progression_nodes(status: dict[str, object]) -> list[dict[str, Any]]:
+    """The node list from `build_progression_status`, typed for indexing."""
+    return cast("list[dict[str, Any]]", status["nodes"])
+
+
 def test_sync_progression_state_masters_tutorial_and_hiragana_after_reviews(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -493,16 +499,34 @@ def test_sync_progression_state_masters_tutorial_and_hiragana_after_reviews(
     assert {"tutorial", "hiragana"} <= event_node_ids
 
 
-def test_sync_progression_state_leaves_hiragana_locked_without_onboarding(
+def test_existing_review_history_counts_as_finishing_the_tutorial(
     tmp_path: Path, monkeypatch,
 ) -> None:
+    """Onboarding is skippable, so the stored flag cannot be the only proof.
+
+    Every other node chains off ``tutorial``. Requiring the flag alone locked
+    the whole curriculum for anyone who skipped onboarding, however long they
+    had been studying — this asserts the replacement rule (issue #78 Phase 4).
+    """
     _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.init_study_db()
+    assert desktop_bridge.get_setting("onboarding_complete") != "1"
 
     hiragana_deck = ALL_DECKS["hiragana"]()
     for card in hiragana_deck.cards:
         desktop_bridge.record_game_result(
             slug="hiragana", card_id=card.id, is_correct=True, minigame="meaning_match",
         )
+
+    state, _events = desktop_bridge.sync_progression_state()
+
+    assert state.node_states["tutorial"].status == "mastered"
+    assert state.node_states["hiragana"].status == "mastered"
+
+
+def test_a_fresh_install_still_starts_at_the_tutorial(tmp_path: Path, monkeypatch) -> None:
+    """The flip side: no review history and no flag means nothing is unlocked yet."""
+    _use_temp_db(tmp_path, monkeypatch)
 
     state, _events = desktop_bridge.sync_progression_state()
 
@@ -548,9 +572,67 @@ def test_build_progression_status_reflects_synced_node_state(
 
     status = desktop_bridge.build_progression_status()
 
-    nodes_by_id = {n["node_id"]: n for n in status["nodes"]}
+    nodes_by_id = {n["node_id"]: n for n in _progression_nodes(status)}
     assert nodes_by_id["hiragana"]["status"] == "mastered"
     assert nodes_by_id["katakana"]["status"] == "unlocked"
+    assert nodes_by_id["hiragana"]["mastered_count"] == len(hiragana_deck.cards)
+    assert nodes_by_id["hiragana"]["total_count"] == len(hiragana_deck.cards)
+
+
+def test_every_graph_node_appears_with_a_category(tmp_path: Path, monkeypatch) -> None:
+    """The map renders the whole graph, so nothing may be missing from the payload."""
+    _use_temp_db(tmp_path, monkeypatch)
+
+    status = desktop_bridge.build_progression_status()
+    nodes_by_id = {n["node_id"]: n for n in _progression_nodes(status)}
+
+    assert set(nodes_by_id) == set(desktop_bridge.JPLEARN_GRAPH.nodes)
+    assert all(node["category"] for node in _progression_nodes(status))
+
+
+def test_untracked_nodes_report_no_progress_rather_than_zero_percent(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """A fabricated 0% reads as "you have done none of this" — and cannot be spotted as wrong.
+
+    Nine nodes have no defensible denominator. A signal exists for some of them
+    (`review_events.tags_csv`, `scenario_sessions`, `jlpt_exam_results`) but
+    none answers "N out of how many?", so they carry `is_tracked=False` and the
+    renderer shows no ratio at all.
+    """
+    _use_temp_db(tmp_path, monkeypatch)
+
+    status = desktop_bridge.build_progression_status()
+    nodes_by_id = {n["node_id"]: n for n in _progression_nodes(status)}
+
+    assert desktop_bridge.UNTRACKED_PROGRESSION_NODES, "expected some nodes to be untracked"
+    for node_id in desktop_bridge.UNTRACKED_PROGRESSION_NODES:
+        node = nodes_by_id[node_id]
+        assert node["is_tracked"] is False, node_id
+        assert node["total_count"] == 0, node_id
+        assert node["mastered_count"] == 0, node_id
+        assert node["mastered_ratio"] == 0.0, node_id
+
+    for node_id in desktop_bridge._PROGRESSION_SYNC_ORDER:
+        assert nodes_by_id[node_id]["is_tracked"] is True, node_id
+
+
+def test_sentence_examples_is_untracked_because_its_corpus_is_the_whole_sentence_bank(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Regression guard for a denominator that is large enough to be meaningless.
+
+    The bridge replaces the 64-card domain deck with the full sentence corpus
+    (~60k rows). Syncing the node against that asks for 80% of 60,000 sentences,
+    which no learner reaches — the progress bar would sit at 0% forever.
+    """
+    _use_temp_db(tmp_path, monkeypatch)
+
+    assert "sentence_examples" in desktop_bridge.UNTRACKED_PROGRESSION_NODES
+    assert "sentence_examples" not in desktop_bridge._PROGRESSION_SYNC_DECK_SLUGS
+    assert len(ALL_DECKS["sentence_examples"]().cards) > 1000, (
+        "the bridge override is gone — re-check whether this node can now be tracked"
+    )
 
 
 def test_start_session_goal_and_load_summary(tmp_path: Path, monkeypatch) -> None:

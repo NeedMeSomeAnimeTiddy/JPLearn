@@ -173,7 +173,6 @@ from data.fsrs_optimization import (  # noqa: E402
     reset_saved_weights as reset_fsrs_saved_weights,
 )
 from domain.readiness import (  # noqa: E402
-    LEARNING_PATHS,
     build_learning_path_status,
 )
 from domain.daily_games import (  # noqa: E402
@@ -727,9 +726,17 @@ class StudyQueuePayload:
 class ProgressionNodeStatusPayload:
     node_id: str
     name: str
+    category: str
     status: str
     mastered_ratio: float
     is_reachable: bool
+    #: Items counted toward this node's mastery. Both zero when untracked.
+    mastered_count: int = 0
+    total_count: int = 0
+    #: False when nothing in the backend can measure this node's progress, so
+    #: the renderer shows no ratio at all rather than a 0% that reads as "you
+    #: have done none of this". See _PROGRESSION_SYNC_DECK_SLUGS.
+    is_tracked: bool = True
 
 
 @dataclass(frozen=True)
@@ -1637,25 +1644,22 @@ def _save_user_progress(progress: UserProgress) -> None:
 # Learning path bridge helpers
 # ---------------------------------------------------------------------------
 
-_VALID_LEARNING_PATH_IDS: frozenset[str] = frozenset(LEARNING_PATHS.keys())
-
-
 def build_learning_path_status_payload() -> dict[str, object]:
-    """Return the learner's current learning path status."""
+    """Return the learner's readiness across the curriculum.
+
+    There is one curriculum and it is derived from ``JPLEARN_GRAPH``, so nothing
+    is selected here any more — the ``active_learning_path`` setting and the
+    ``set-learning-path`` command went with issue #78 Phase 5.
+    """
     init_study_db()
-    path_id_raw = get_setting("active_learning_path")
-    path_id = path_id_raw if path_id_raw in _VALID_LEARNING_PATH_IDS else None
     onboarding_raw = get_setting("onboarding_complete")
     onboarding_complete = onboarding_raw == "1"
     prog_state = _load_progression_state()
     status = build_learning_path_status(
-        path_id=path_id,  # type: ignore[arg-type]
         onboarding_complete=onboarding_complete,
         state=prog_state,
     )
     return {
-        "path_id": status.path_id,
-        "path_name": status.path_name,
         "onboarding_complete": status.onboarding_complete,
         "suggested_next": status.suggested_next,
         "steps": [
@@ -1670,37 +1674,71 @@ def build_learning_path_status_payload() -> dict[str, object]:
     }
 
 
-def set_learning_path_handler(path_id: str) -> dict[str, object]:
-    """Persist the learner's chosen path and return the updated status."""
-    if path_id not in _VALID_LEARNING_PATH_IDS:
-        raise ValueError(f"Unknown learning path: {path_id!r}")
-    init_study_db()
-    set_setting("active_learning_path", path_id)
-    set_setting("onboarding_complete", "1")
-    return build_learning_path_status_payload()
-
-
 # ---------------------------------------------------------------------------
 # Progression sync
 # ---------------------------------------------------------------------------
 #
-# Only a subset of the progression graph is wired to live mastery data below.
-# The remaining nodes (scripted_conv, listening, kanji_n5, free_conv, reading,
-# jlpt_n5..jlpt_n1) would need completion-tracking that doesn't exist yet in
-# the Python backend (scenario/tutor-chat/reading-passage completion isn't
-# persisted here). Those nodes are simply left unsynced — same "locked"
-# status as before this module existed — rather than guessed at.
-
-_PROGRESSION_SYNC_ORDER: tuple[str, ...] = (
-    "tutorial", "hiragana", "katakana", "vocabulary_n5", "grammar_n5",
-)
-
+# A node is synced only when something in the backend can actually measure it.
+#
+# Every node below is backed by a deck, so "mastered" means the same thing
+# everywhere: cards answered correctly at least once, the definition
+# build_block_progress() already uses.
+#
+# The other nine nodes (scripted_conv, listening, free_conv, reading,
+# jlpt_n5..jlpt_n1) are deliberately *not* here. A signal exists for some of
+# them — `review_events.tags_csv` records `minigame,<key>`, `scenario_sessions`
+# records conversation runs, `jlpt_exam_results` records mock exams — but none
+# of them carries a defensible denominator. There is no answer to "listening is
+# N of how many?", and inventing one renders a progress bar derived from
+# nothing, which is worse than showing no progress: a wrong number cannot be
+# recognised as wrong. They report `is_tracked=False` and no ratio instead.
 _PROGRESSION_SYNC_DECK_SLUGS: dict[str, str] = {
     "hiragana": "hiragana",
     "katakana": "katakana",
     "vocabulary_n5": "vocab_n5",
     "grammar_n5": "grammar_patterns",
+    # An omission rather than a decision — kanji_n5 has had a deck all along,
+    # and its 0.8-of-99 requirement is a gate a learner actually reaches.
+    "kanji_n5": "kanji_n5",
 }
+
+# `sentence_examples` is deliberately absent despite having a deck: this module
+# replaces it with the full 60,000-sentence corpus (see
+# `_sentence_examples_deck_factory` above, and `limitRuntimeDeckCards` on the
+# renderer side, which caps what a session draws from). Its node asks for 80%
+# mastery, which against 60,000 sentences is not a threshold anyone crosses.
+# A denominator that large is the same failure as no denominator at all.
+
+_PROGRESSION_SYNC_ORDER: tuple[str, ...] = ("tutorial", *_PROGRESSION_SYNC_DECK_SLUGS)
+
+#: Nodes the graph defines but nothing can measure yet.
+UNTRACKED_PROGRESSION_NODES: frozenset[str] = frozenset(
+    node_id for node_id in JPLEARN_GRAPH.nodes if node_id not in _PROGRESSION_SYNC_ORDER
+)
+
+
+def _tutorial_is_complete() -> bool:
+    """Whether the learner is past the tutorial.
+
+    Onboarding is skippable, so the stored flag alone would strand anyone who
+    skipped it behind a locked tutorial — and because every other node chains
+    off this one, that locks the entire curriculum for someone who has been
+    studying for months.
+
+    Existing review *states* are therefore also accepted as proof. Deliberately
+    not review *events*: a seeded development database carries thousands of
+    those, which would mark the tutorial complete on a fresh install.
+    """
+    if get_setting("onboarding_complete") == "1":
+        return True
+    # Counted, not merely fetched: `load_review_states` fabricates a default
+    # state for cards that have never been seen, so a non-empty result proves
+    # nothing. `repetitions > 0` is the same "has actually been studied" test
+    # node mastery uses.
+    return any(
+        _compute_node_mastery_counts(node_id)[0] > 0
+        for node_id in _PROGRESSION_SYNC_DECK_SLUGS
+    )
 
 
 def _compute_node_mastery_counts(node_id: str) -> tuple[int, int]:
@@ -1711,7 +1749,7 @@ def _compute_node_mastery_counts(node_id: str) -> tuple[int, int]:
     mastery in build_block_progress().
     """
     if node_id == "tutorial":
-        return (1, 1) if get_setting("onboarding_complete") == "1" else (0, 1)
+        return (1, 1) if _tutorial_is_complete() else (0, 1)
 
     slug = _PROGRESSION_SYNC_DECK_SLUGS[node_id]
     deck = ALL_DECKS[slug]()
@@ -1764,20 +1802,23 @@ def build_progression_status() -> dict[str, object]:
     result = []
     for node_id, node in JPLEARN_GRAPH.nodes.items():
         ns = prog_state.node_states.get(node_id)
+        tracked = node_id not in UNTRACKED_PROGRESSION_NODES
         status = ns.status if ns else "locked"
-        mastered_ratio = (
-            ns.mastered_item_count / ns.total_item_count
-            if ns and ns.total_item_count > 0
-            else 0.0
-        )
+        mastered_count = ns.mastered_item_count if ns and tracked else 0
+        total_count = ns.total_item_count if ns and tracked else 0
+        mastered_ratio = mastered_count / total_count if total_count > 0 else 0.0
         result.append(
             asdict(
                 ProgressionNodeStatusPayload(
                     node_id=node_id,
                     name=node.name,
+                    category=node.category,
                     status=status,
                     mastered_ratio=round(mastered_ratio, 3),
                     is_reachable=node_id in reachable,
+                    mastered_count=mastered_count,
+                    total_count=total_count,
+                    is_tracked=tracked,
                 )
             )
         )
@@ -3437,15 +3478,6 @@ def _cmd_learning_path_status(argv: list[str]) -> tuple[int, dict[str, object]]:
         return 2, {"error": str(exc)}
 
 
-def _cmd_set_learning_path(argv: list[str]) -> tuple[int, dict[str, object]]:
-    if len(argv) < 2:
-        return 2, {"error": "Usage: set-learning-path <path_id>"}
-    try:
-        return 0, set_learning_path_handler(argv[1])
-    except ValueError as exc:
-        return 2, {"error": str(exc)}
-
-
 def _cmd_complete_onboarding(argv: list[str]) -> tuple[int, dict[str, object]]:
     try:
         goal = argv[1] if len(argv) > 1 and argv[1].strip() else None
@@ -3650,7 +3682,6 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "jlpt-save-result": _cmd_jlpt_save_result,
     "jlpt-exam-history": _cmd_jlpt_exam_history,
     "learning-path-status": _cmd_learning_path_status,
-    "set-learning-path": _cmd_set_learning_path,
     "complete-onboarding": _cmd_complete_onboarding,
     "mark-onboarding-pending": _cmd_mark_onboarding_pending,
     "analytics-export": _cmd_analytics_export,
