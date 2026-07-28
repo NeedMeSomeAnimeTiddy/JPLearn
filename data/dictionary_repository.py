@@ -602,27 +602,53 @@ def _lookup_card_dictionary_summary(
     )
 
 
-def _search_dictionary_japanese(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
-    base_sql = (
-        "SELECT entry_id, source_id, japanese, reading, gloss "
-        "FROM dictionary_entries "
-        "WHERE (japanese = ? OR japanese LIKE ? OR reading = ? OR reading LIKE ?) AND is_common = ? "
-        "ORDER BY LENGTH(japanese), entry_id "
-        "LIMIT ?"
-    )
+# Upper bound for a prefix range. U+FFFF is a permanent noncharacter, so no
+# dictionary headword can sort between "<prefix>" and "<prefix>￿".
+_PREFIX_RANGE_SENTINEL = "￿"
 
+# Prefix search as an explicit half-open range over each indexed column,
+# unioned, rather than one `OR` chain of `=`/`LIKE`.
+#
+# The `OR` across two columns made SQLite fall back to the two-valued
+# `idx_dictionary_entries_common`, scanning ~half of 217k rows and then sorting
+# through a temp B-tree — 12ms per lookup, which is 40 seconds across a
+# 744-card vocabulary deck (issue #78 made the whole level deck load at once,
+# which is what surfaced it). Splitting into a UNION lets each branch use its
+# own index, and `>= ? AND < ?` is range-optimisable where `LIKE ?` is not:
+# SQLite only converts `LIKE 'x%'` into a range when `case_sensitive_like` is
+# on, which it is not by default. Measured at 0.18ms, and `+is_common`
+# keeps the planner off the low-cardinality index. The range subsumes the
+# equality case, so the `=` branches are gone.
+#
+# One deliberate narrowing: this is now case-sensitive where `LIKE` was not.
+# Callers reach here only for queries containing Japanese script, where case
+# does not apply; a mixed headword like "Tシャツ" now needs matching case.
+_DICTIONARY_PREFIX_SQL = (
+    "SELECT entry_id, source_id, japanese, reading, gloss FROM ("
+    "SELECT entry_id, source_id, japanese, reading, gloss FROM dictionary_entries "
+    "WHERE japanese >= ? AND japanese < ? AND +is_common = ? "
+    "UNION "
+    "SELECT entry_id, source_id, japanese, reading, gloss FROM dictionary_entries "
+    "WHERE reading >= ? AND reading < ? AND +is_common = ?"
+    ") ORDER BY LENGTH(japanese), entry_id "
+    "LIMIT ?"
+)
+
+
+def _search_dictionary_japanese(conn: sqlite3.Connection, normalized_query: str) -> list[tuple]:
     def _run_search(query: str) -> list[tuple]:
-        match_params = [
-            query,
-            f"{query}%",
-            query,
-            f"{query}%",
-        ]
-        rows = conn.execute(base_sql, [*match_params, 1, _DICTIONARY_RESULT_LIMIT]).fetchall()
+        upper = f"{query}{_PREFIX_RANGE_SENTINEL}"
+
+        def _params(is_common: int, limit: int) -> list[object]:
+            return [query, upper, is_common, query, upper, is_common, limit]
+
+        rows = conn.execute(
+            _DICTIONARY_PREFIX_SQL, _params(1, _DICTIONARY_RESULT_LIMIT)
+        ).fetchall()
         if len(rows) < _DICTIONARY_COMMON_FALLBACK_THRESHOLD:
             seen_ids = {row[0] for row in rows}
             remaining = _DICTIONARY_RESULT_LIMIT - len(rows)
-            extra_rows = conn.execute(base_sql, [*match_params, 0, remaining]).fetchall()
+            extra_rows = conn.execute(_DICTIONARY_PREFIX_SQL, _params(0, remaining)).fetchall()
             rows.extend(row for row in extra_rows if row[0] not in seen_ids)
         return rows
 
