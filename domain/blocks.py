@@ -3,11 +3,24 @@
 Each deck is split into ordered blocks of related characters.  The first block
 is always unlocked.  Subsequent blocks unlock once the previous block reaches
 the mastery threshold (80% of cards answered correctly at least once).
+
+Blocks are a *filter over one deck*: a block holds card ids belonging to a single
+deck, never ids from elsewhere.  The hiragana, katakana, grammar and conjugation
+sequences below are hand-authored ranges.  Vocabulary and kanji are generated
+instead (issue #78) — their thematic "categories" used to be separate decks with
+their own ``id_offset``, which gave one word two ids and two SRS schedules.  They
+are now views over the parent level deck, resolved by :mod:`domain.block_mapping`,
+followed by generated blocks covering whatever the categories do not reach.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from functools import lru_cache
+
+from domain.block_mapping import category_slugs_for_parent, resolve_category_card_ids
+from domain.decks import ALL_DECKS, CATEGORY_SOURCE_DECKS
 
 # Fraction of a block's cards that must have repetitions >= 1 before the
 # following block becomes available.
@@ -16,6 +29,21 @@ UNLOCK_THRESHOLD = 0.8
 # Lower threshold used for thematic category blocks (vocab/kanji/grammar
 # categories) so users can progress without mastering every card first.
 CATEGORY_UNLOCK_THRESHOLD = 0.7
+
+# Cards per generated block, for the part of a vocabulary or kanji deck that no
+# thematic category covers. The authored categories run 6–29 cards; 20 keeps a
+# generated block a comparable study unit without turning a 2,700-word level deck
+# into hundreds of entries.
+GENERATED_BLOCK_SIZE = 20
+
+# The "N5" in "Kanji: N5 · Numbers & Time" — a level marker, not part of the name.
+_LEVEL_LABEL = re.compile(r"[Nn][1-5]")
+
+# Decks whose blocks are generated from the parent deck rather than hand-listed.
+_GENERATED_BLOCK_SLUGS: tuple[str, ...] = (
+    "vocab_n5", "vocab_n4", "vocab_n3", "vocab_n2", "vocab_n1",
+    "kanji_n5", "kanji_n4", "kanji_n3", "kanji_n2", "kanji_n1",
+)
 
 
 @dataclass(frozen=True)
@@ -104,11 +132,75 @@ _GRAMMAR_PATTERNS_BLOCKS: list[Block] = [
 ]
 
 
+def _display_name(deck_name: str) -> str:
+    """Strip the family and level prefix from a category deck's display name.
+
+    ``"Vocabulary: Greetings"`` → ``"Greetings"``;
+    ``"Kanji: N5 · Numbers & Time"`` → ``"Numbers & Time"``. The block already
+    sits under its parent section, so repeating the family in every label is
+    noise.
+    """
+    name = deck_name.split(":", 1)[-1].strip() if ":" in deck_name else deck_name
+    # Level-marked category names carry an extra "N5 · " segment. Matched on the
+    # level itself rather than on "a short leading word", so a name that simply
+    # contains the separator keeps all of itself.
+    head, separator, tail = name.partition("·")
+    if separator and _LEVEL_LABEL.fullmatch(head.strip()):
+        return tail.strip()
+    return name
+
+
+@lru_cache(maxsize=None)
+def _generated_blocks(slug: str) -> tuple[Block, ...]:
+    """Build the block sequence for a vocabulary or kanji level deck.
+
+    Authored thematic categories come first, in registration order, each as a
+    view over the parent's card ids. Whatever they do not cover follows in
+    fixed-size generated blocks, so every card in the deck belongs to exactly one
+    block and none is unreachable.
+    """
+    deck = ALL_DECKS[slug]()
+    by_id = {card.id: card for card in deck.cards}
+    label = "Kanji" if slug.startswith("kanji") else "Words"
+
+    blocks: list[Block] = []
+    claimed: set[int] = set()
+    for category_slug in category_slugs_for_parent(slug):
+        card_ids = [cid for cid in resolve_category_card_ids(category_slug) if cid not in claimed]
+        if not card_ids:
+            continue
+        claimed.update(card_ids)
+        blocks.append(
+            Block(
+                index=len(blocks),
+                # The registered deck is a view carrying the *parent's* name, so
+                # the authored label has to come from the source builder.
+                name=_display_name(CATEGORY_SOURCE_DECKS[category_slug]().name),
+                card_ids=card_ids,
+                sample_chars=[by_id[cid].character for cid in card_ids[:3]],
+            )
+        )
+
+    remaining = [card.id for card in deck.cards if card.id not in claimed]
+    for offset in range(0, len(remaining), GENERATED_BLOCK_SIZE):
+        card_ids = remaining[offset : offset + GENERATED_BLOCK_SIZE]
+        blocks.append(
+            Block(
+                index=len(blocks),
+                name=f"{label} {offset // GENERATED_BLOCK_SIZE + 1}",
+                card_ids=card_ids,
+                sample_chars=[by_id[cid].character for cid in card_ids[:3]],
+            )
+        )
+    return tuple(blocks)
+
+
 def blocks_for_slug(slug: str) -> list[Block]:
     """Return the ordered block sequence for a deck slug.
 
-    Returns an empty list for decks that do not use block progression
-    (e.g. ``"kanji_n5"``).
+    Returns an empty list for decks that do not use block progression — the
+    thematic category decks themselves, which are now views over a parent rather
+    than block-bearing decks of their own.
     """
     if slug == "hiragana":
         return _HIRAGANA_BLOCKS
@@ -120,6 +212,8 @@ def blocks_for_slug(slug: str) -> list[Block]:
         return _SENTENCE_EXAMPLES_BLOCKS
     if slug == "conjugation_training":
         return _CONJUGATION_TRAINING_BLOCKS
+    if slug in _GENERATED_BLOCK_SLUGS:
+        return list(_generated_blocks(slug))
     return []
 
 
@@ -128,8 +222,14 @@ def unlock_threshold_for_slug(slug: str) -> float:
 
     Grammar patterns and other category-based sections use a lower threshold
     so learners can progress after mastering 70 % instead of 80 %.
+
+    Vocabulary and kanji levels are included: their blocks are the thematic
+    categories that already used this threshold when they were separate decks,
+    and a 0.80 gate over a 2,000-word level deck would stall almost everyone.
     """
     if slug in ("grammar_patterns", "sentence_examples", "conjugation_training"):
+        return CATEGORY_UNLOCK_THRESHOLD
+    if slug in _GENERATED_BLOCK_SLUGS:
         return CATEGORY_UNLOCK_THRESHOLD
     return UNLOCK_THRESHOLD
 
@@ -152,6 +252,13 @@ def compute_unlocked_count(blocks: list[Block], repetitions_map: dict[int, int],
 
     Blocks unlock sequentially: block *i* is unlocked once block *i − 1*
     reaches *threshold*.
+
+    Anything the learner has already studied stays reachable, even when the
+    sequential rule alone would not reach it. Under steady state that floor never
+    binds — you can only study an unlocked block. It matters when a deck's blocks
+    change shape underneath existing review history: vocabulary and kanji had no
+    blocks at all before issue #78, so their whole deck was one pool, and without
+    this a learner would come back to find studied cards locked away.
     """
     unlocked = 1
     for i in range(1, len(blocks)):
@@ -160,4 +267,8 @@ def compute_unlocked_count(blocks: list[Block], repetitions_map: dict[int, int],
             unlocked = i + 1
         else:
             break
+
+    for block in reversed(blocks):
+        if any(repetitions_map.get(cid, 0) >= 1 for cid in block.card_ids):
+            return max(unlocked, block.index + 1)
     return unlocked

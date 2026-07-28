@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 from data import database
 from domain.decks import ALL_DECKS
@@ -58,12 +59,16 @@ def test_import_resolves_legacy_sections_to_owning_decks(tmp_path: Path, monkeyp
     Legacy data was keyed by ``ScriptKey`` section, so every kanji score N5–N1 sat
     in one ``kanji_n5`` bucket. Each card id has to be resolved to the deck that
     actually owns it, which only Python can do.
+
+    A card reached through a thematic category resolves to the *level* deck that
+    owns it, not the category: since issue #78 the categories are views over their
+    parent, so ``kanji_numbers_time`` and ``kanji_n5`` name the same card ids.
+    That single owner is the point — it is what stops one word carrying two
+    independent mastery values.
     """
     _use_temp_db(tmp_path, monkeypatch)
-    kanji_slug = "kanji_numbers_time"
-    vocab_slug = "vocab_greetings"
-    kanji_card = _first_card_id(kanji_slug)
-    vocab_card = _first_card_id(vocab_slug)
+    kanji_card = _first_card_id("kanji_numbers_time")
+    vocab_card = _first_card_id("vocab_greetings")
 
     result = desktop_bridge.import_legacy_card_scores(
         {
@@ -76,9 +81,13 @@ def test_import_resolves_legacy_sections_to_owning_decks(tmp_path: Path, monkeyp
     assert result["cards_imported"] == 2
     assert result["cards_unresolved"] == 0
 
-    stored = desktop_bridge.build_card_mastery_scores()["scores"]
-    assert stored[kanji_slug][kanji_card] == 3
-    assert stored[vocab_slug][vocab_card] == CARD_MASTERY_MAX
+    stored = cast(
+        dict[str, dict[int, int]], desktop_bridge.build_card_mastery_scores()["scores"]
+    )
+    assert stored["kanji_n5"][kanji_card] == 3
+    assert stored["vocab_n5"][vocab_card] == CARD_MASTERY_MAX
+    assert "kanji_numbers_time" not in stored
+    assert "vocab_greetings" not in stored
 
 
 def test_import_counts_unresolvable_card_ids_instead_of_failing(tmp_path: Path, monkeypatch) -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import Any, cast
 
 from domain import decks
 from scripts.build_handwriting_assets import repack_assets
@@ -36,14 +37,27 @@ def _manifest() -> dict[str, object]:
 
 
 def test_offline_handwriting_data_covers_every_eligible_character_once() -> None:
+    """Every single-character deck entry either has stroke data or is listed as lacking it.
+
+    Upstream has no stroke data for a handful of deck characters — mostly the
+    basic numerals that joined ``Kanji N5`` with issue #78's deck supplements.
+    The renderer already gates on ``manifest.characters[character]``
+    (``features/handwriting/utils.ts``), so those are simply not offered for
+    practice. Asserting the partition rather than total coverage keeps the gap
+    explicit: a character may be missing data, but it may not go unaccounted for.
+    """
     manifest = _manifest()
     expected = _eligible_characters()
-    characters = manifest["characters"]
+    coverage = cast(dict[str, Any], manifest["coverage"])
+    characters = cast(dict[str, dict[str, str]], manifest["characters"])
+    all_eligible = set().union(*map(set, expected.values()))
+    missing_data = set(coverage["excludedMissingData"])
 
     assert manifest["formatVersion"] == 2
-    assert manifest["coverage"]["decks"] == expected
-    assert manifest["coverage"]["eligibleCharacters"] == len(set().union(*map(set, expected.values())))
-    assert set(characters) == set().union(*map(set, expected.values()))
+    assert coverage["decks"] == expected
+    assert missing_data <= all_eligible
+    assert set(characters) == all_eligible - missing_data
+    assert coverage["eligibleCharacters"] == len(characters)
     assert all(set(entry) == {"chunk"} and entry["chunk"] in manifest["chunks"] for entry in characters.values())
 
 

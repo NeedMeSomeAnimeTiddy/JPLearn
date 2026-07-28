@@ -1,9 +1,12 @@
 """Built-in decks: Hiragana, Katakana, JLPT Kanji, JLPT Vocabulary, Grammar Patterns, Sentence Examples, Conjugation Training."""
 
+from collections.abc import Callable
+from dataclasses import replace
 from types import ModuleType
 from typing import cast
 
 from domain.cards import Card, Deck
+from domain.deck_supplements import KANJI_SUPPLEMENT, VOCAB_SUPPLEMENT, with_supplement
 
 _external_deck_data: ModuleType | None
 try:
@@ -267,6 +270,16 @@ def _natural_grammar_example(pattern: str) -> str:
         return "それ、会話でよく使う言い方ですね。"
 
     return f"「{pattern}」は会話でよく使います。"
+
+
+def _supplemented_kanji(rows: list[tuple[str, str, str]], level: str) -> list[tuple[str, str, str]]:
+    """Return ``rows`` plus any category-only kanji recovered for this level."""
+    return with_supplement(rows, KANJI_SUPPLEMENT.get(level, ()))
+
+
+def _supplemented_vocab(rows: list[tuple[str, str, str]], level: str) -> list[tuple[str, str, str]]:
+    """Return ``rows`` plus any category-only vocabulary recovered for this level."""
+    return with_supplement(rows, VOCAB_SUPPLEMENT.get(level, ()))
 
 
 def _build_kanji_deck(
@@ -611,27 +624,27 @@ _KANJI_N1_DATA: list[tuple[str, str, str]] = [
 
 def get_kanji_n5_deck() -> Deck:
     rows = KANJI_N5_EXTERNAL_DATA if KANJI_N5_EXTERNAL_DATA else _KANJI_N5_DATA
-    return _build_kanji_deck("Kanji N5", rows, "n5", id_offset=0)
+    return _build_kanji_deck("Kanji N5", _supplemented_kanji(rows, "n5"), "n5", id_offset=0)
 
 
 def get_kanji_n4_deck() -> Deck:
     rows = KANJI_N4_EXTERNAL_DATA if KANJI_N4_EXTERNAL_DATA else _KANJI_N4_DATA
-    return _build_kanji_deck("Kanji N4", rows, "n4", id_offset=1000)
+    return _build_kanji_deck("Kanji N4", _supplemented_kanji(rows, "n4"), "n4", id_offset=1000)
 
 
 def get_kanji_n3_deck() -> Deck:
     rows = KANJI_N3_EXTERNAL_DATA if KANJI_N3_EXTERNAL_DATA else _KANJI_N3_DATA
-    return _build_kanji_deck("Kanji N3", rows, "n3", id_offset=2000)
+    return _build_kanji_deck("Kanji N3", _supplemented_kanji(rows, "n3"), "n3", id_offset=2000)
 
 
 def get_kanji_n2_deck() -> Deck:
     rows = KANJI_N2_EXTERNAL_DATA if KANJI_N2_EXTERNAL_DATA else _KANJI_N2_DATA
-    return _build_kanji_deck("Kanji N2", rows, "n2", id_offset=3000)
+    return _build_kanji_deck("Kanji N2", _supplemented_kanji(rows, "n2"), "n2", id_offset=3000)
 
 
 def get_kanji_n1_deck() -> Deck:
     rows = KANJI_N1_EXTERNAL_DATA if KANJI_N1_EXTERNAL_DATA else _KANJI_N1_DATA
-    return _build_kanji_deck("Kanji N1", rows, "n1", id_offset=4000)
+    return _build_kanji_deck("Kanji N1", _supplemented_kanji(rows, "n1"), "n1", id_offset=4000)
 
 
 # ---------------------------------------------------------------------------
@@ -786,7 +799,8 @@ _VOCAB_N5_DATA: list[tuple[str, str, str]] = [
 def get_vocab_n5_deck() -> Deck:
     data = VOCAB_N5_EXTERNAL_DATA if VOCAB_N5_EXTERNAL_DATA else _VOCAB_N5_DATA
     return _build_vocab_deck(
-        "Vocabulary N5", data, "n5", id_offset=0, id_capacity=_VOCAB_ID_CAPACITY["n5"]
+        "Vocabulary N5", _supplemented_vocab(data, "n5"), "n5",
+        id_offset=0, id_capacity=_VOCAB_ID_CAPACITY["n5"],
     )
 
 
@@ -1505,7 +1519,7 @@ def get_conjugation_training_deck() -> Deck:
 
 
 #: Registry mapping deck slug → factory function for all built-in decks.
-ALL_DECKS = {
+_DECK_BUILDERS = {
     "hiragana": get_hiragana_deck,
     "katakana": get_katakana_deck,
     # Kanji — JLPT levels (kept for backward compatibility)
@@ -1581,4 +1595,73 @@ ALL_DECKS = {
     "grammar_patterns": get_grammar_patterns_deck,
     "sentence_examples": get_sentence_examples_deck,
     "conjugation_training": get_conjugation_training_deck,
+}
+
+
+# ---------------------------------------------------------------------------
+# Thematic categories as views over their parent level deck (issue #78)
+# ---------------------------------------------------------------------------
+#
+# The category builders above allocate their own `id_offset`, which gave one word
+# two card ids, two `review_states` rows and two FSRS schedules — 見る/647 in
+# `vocab_n5` and みる/1104 in `vocab_verbs` were the same word learned twice.
+#
+# Those builders are now *source data for matching* rather than decks anyone
+# studies. `ALL_DECKS` serves a view instead: the same slug, but the parent
+# deck's name and the parent's own cards. Keeping the parent's name matters as
+# much as keeping its ids, because `review_states` is keyed `(deck_name, card_id)`
+# — a view with its own name would just relocate the split rather than close it.
+#
+# Slugs are unchanged, so `VOCAB_CATEGORY_TO_DECK_SLUG` and every other consumer
+# keeps working; a category request simply returns that slice of the parent.
+
+_LEVEL_SUFFIXES: tuple[str, ...] = ("n5", "n4", "n3", "n2", "n1")
+
+
+def _is_category_slug(slug: str) -> bool:
+    """Return whether a slug names a thematic category rather than a level deck."""
+    for family in ("vocab", "kanji"):
+        if slug.startswith(f"{family}_") and slug not in {f"{family}_{lv}" for lv in _LEVEL_SUFFIXES}:
+            return True
+    return False
+
+
+#: The authored category builders, keyed by slug. These still emit the original
+#: standalone ids; :mod:`domain.block_mapping` reads them to work out which
+#: parent card each one refers to. Nothing else should build decks from here.
+CATEGORY_SOURCE_DECKS: dict[str, Callable[[], Deck]] = {
+    slug: builder for slug, builder in _DECK_BUILDERS.items() if _is_category_slug(slug)
+}
+
+
+def _category_view(slug: str) -> Callable[[], Deck]:
+    """Return a loader yielding the parent deck's cards for one category."""
+
+    def build() -> Deck:
+        # Imported lazily: block_mapping imports this module, and it reads
+        # CATEGORY_SOURCE_DECKS, which is only populated once this module has
+        # finished executing.
+        from domain.block_mapping import parent_slug_for_category, resolve_category_card_ids
+
+        parent_slug = parent_slug_for_category(slug)
+        assert parent_slug is not None, f"{slug!r} is registered as a category but has no parent"
+        parent = _DECK_BUILDERS[parent_slug]()
+        wanted = set(resolve_category_card_ids(slug))
+        # The category slug rides along as a tag so callers can still tell which
+        # category a card was served under — the id and deck name no longer say.
+        return Deck(
+            name=parent.name,
+            cards=[
+                replace(card, tags=[*card.tags, slug]) if slug not in card.tags else card
+                for card in parent.cards
+                if card.id in wanted
+            ],
+        )
+
+    return build
+
+
+ALL_DECKS: dict[str, Callable[[], Deck]] = {
+    slug: (_category_view(slug) if _is_category_slug(slug) else builder)
+    for slug, builder in _DECK_BUILDERS.items()
 }

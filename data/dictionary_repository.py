@@ -19,7 +19,7 @@ from pathlib import Path
 
 from data.card_notes_repository import build_offline_note_key, canonical_jmdict_source_id
 from data.text_normalization import contains_japanese_script
-from domain.decks import ALL_DECKS
+from domain.decks import ALL_DECKS, CATEGORY_SOURCE_DECKS
 from domain.retrieval import cosine_similarity, embed_text
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -344,8 +344,14 @@ def _deck_metadata_for_kanji(character: str) -> tuple[list[str], list[str], str 
         matching_cards = [card for card in deck.cards if card.character == character]
         if not matching_cards:
             continue
-        if deck.name not in categories:
-            categories.append(deck.name)
+        # Thematic categories are views over their parent level deck since issue
+        # #78, so they report the parent's name. The authored label ("Kanji: N5 ·
+        # Numbers & Time") is what belongs in a detail panel, so read it from the
+        # source builder rather than the view.
+        source = CATEGORY_SOURCE_DECKS.get(slug)
+        display_name = source().name if source is not None else deck.name
+        if display_name not in categories:
+            categories.append(display_name)
         for card in matching_cards:
             for tag in card.tags:
                 if tag not in tags:

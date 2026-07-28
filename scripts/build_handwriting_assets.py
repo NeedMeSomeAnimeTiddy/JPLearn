@@ -83,16 +83,25 @@ def _source_path(source_data_dir: Path, character: str) -> Path | None:
     return None
 
 
-def _assign_chunks(characters_by_deck: dict[str, list[str]]) -> dict[str, str]:
+def _assign_chunks(characters_by_deck: dict[str, list[str]], available: set[str]) -> dict[str, str]:
+    """Map each deck character with stroke data onto the chunk that carries it.
+
+    Characters absent from *available* are skipped: upstream has no stroke data
+    for them, so the handwriting minigame cannot draw them. They are recorded in
+    the manifest under ``excludedMissingData`` instead of being dropped silently.
+    """
     assignments: dict[str, str] = {}
     for deck_name, chunk in (("Hiragana", "hiragana"), ("Katakana", "katakana")):
         for character in characters_by_deck[deck_name]:
-            assignments[character] = chunk
+            if character in available:
+                assignments[character] = chunk
     for deck_name, chunk in zip(("Kanji N5", "Kanji N4", "Kanji N3", "Kanji N2"), KANJI_CHUNKS, strict=True):
         for character in characters_by_deck[deck_name]:
-            assignments.setdefault(character, chunk)
+            if character in available:
+                assignments.setdefault(character, chunk)
     for character in characters_by_deck["Kanji N1"]:
-        assignments.setdefault(character, N1_SHARDS[ord(character) % len(N1_SHARDS)])
+        if character in available:
+            assignments.setdefault(character, N1_SHARDS[ord(character) % len(N1_SHARDS)])
     return assignments
 
 
@@ -140,13 +149,15 @@ def _write_assets(
 ) -> dict[str, Any]:
     if destination.exists():
         raise ValueError(f"Refusing to overwrite existing destination: {destination}")
-    assignments = _assign_chunks(characters_by_deck)
-    if set(assignments) != set(data_by_character):
+    assignments = _assign_chunks(characters_by_deck, set(data_by_character))
+    eligible = {character for values in characters_by_deck.values() for character in values if len(character) == 1}
+    if set(assignments) != set(data_by_character) & eligible:
         raise ValueError("Chunk assignments do not exactly match verified character data")
+    missing_data = sorted(eligible - set(assignments))
 
     chunk_data: dict[str, dict[str, dict[str, Any]]] = {}
-    for character, data in data_by_character.items():
-        chunk_data.setdefault(assignments[character], {})[character] = data
+    for character in assignments:
+        chunk_data.setdefault(assignments[character], {})[character] = data_by_character[character]
 
     chunks_dir = destination / "chunks"
     chunks_dir.mkdir(parents=True)
@@ -170,9 +181,15 @@ def _write_assets(
             "japaneseDataRevision": JAPANESE_DATA_REVISION,
         },
         "coverage": {
-            "eligibleCharacters": len(data_by_character),
+            "eligibleCharacters": len(assignments),
             "decks": characters_by_deck,
             "excludedMultiCharacterCards": excluded_by_deck,
+            # Single-character deck entries upstream has no stroke data for. The
+            # renderer already gates on `manifest.characters[character]`
+            # (features/handwriting/utils.ts), so these are simply not offered
+            # for handwriting practice — they are listed rather than dropped so
+            # the gap is visible instead of inferred.
+            "excludedMissingData": missing_data,
         },
         "chunks": chunks,
         "characters": {character: {"chunk": assignments[character]} for character in sorted(assignments)},
@@ -193,21 +210,21 @@ def build_assets(source_dir: Path, destination: Path, manifest_module: Path) -> 
         raise ValueError("source_dir must contain data/ and initialised ThirdParty/hanzi-writer-data-jp/")
     characters_by_deck, excluded_by_deck = _eligible_characters(factory() for factory in DECK_FACTORIES)
     data_by_character: dict[str, dict[str, Any]] = {}
-    missing: list[str] = []
     for character in sorted({character for values in characters_by_deck.values() for character in values}):
         source_path = _source_path(source_data_dir, character)
-        if source_path is None:
-            missing.append(character)
-        else:
+        if source_path is not None:
             data_by_character[character] = _read_character_data(source_path)
-    if missing:
-        missing_points = ", ".join(f"U+{ord(character):04X}" for character in missing)
-        raise ValueError(f"Missing handwriting data for eligible characters: {missing_points}")
     return _write_assets(destination, manifest_module, characters_by_deck, excluded_by_deck, data_by_character, source_dir)
 
 
 def repack_assets(source_assets: Path, destination: Path, manifest_module: Path) -> dict[str, Any]:
-    """Repackage an already verified asset directory without upstream access."""
+    """Repackage an already verified asset directory without upstream access.
+
+    Coverage is recomputed from the current decks rather than copied from the
+    source manifest, so a deck-composition change is picked up here without
+    needing the pinned upstream checkout. Characters the source assets have no
+    stroke data for are recorded as ``excludedMissingData``.
+    """
     source_manifest = json.loads((source_assets / "manifest.json").read_text(encoding="utf-8"))
     if source_manifest["formatVersion"] == 1:
         data_by_character = {
@@ -223,11 +240,12 @@ def repack_assets(source_assets: Path, destination: Path, manifest_module: Path)
             character: _read_character_data_from_value(chunk_payloads[entry["chunk"]][character], character)
             for character, entry in source_manifest["characters"].items()
         }
+    characters_by_deck, excluded_by_deck = _eligible_characters(factory() for factory in DECK_FACTORIES)
     return _write_assets(
         destination,
         manifest_module,
-        source_manifest["coverage"]["decks"],
-        source_manifest["coverage"]["excludedMultiCharacterCards"],
+        characters_by_deck,
+        excluded_by_deck,
         data_by_character,
         source_assets,
     )

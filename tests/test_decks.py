@@ -2,8 +2,10 @@
 
 import pytest
 
+from domain.deck_supplements import VOCAB_SUPPLEMENT, with_supplement
 from domain.decks import (
     ALL_DECKS,
+    CATEGORY_SOURCE_DECKS,
     _VOCAB_CATEGORY_ID_SPACING,
     _VOCAB_CATEGORY_LEVEL_BASE,
     _VOCAB_LEVEL_CATEGORY_SPECS,
@@ -234,9 +236,13 @@ class TestVocabDecks:
         The deck size is asserted against the corpus rather than a literal so
         a re-import doesn't need a test edit; ``min_cards`` is the separate
         guard that catches a corpus that went missing or got truncated again.
+
+        The corpus is the imported data plus the category words it never carried
+        (``VOCAB_SUPPLEMENT``, issue #78), which the deck appends so that
+        collapsing the category decks into blocks loses no content.
         """
         deck = loader()
-        assert len(deck) == len(corpus)
+        assert len(deck) == len(with_supplement(list(corpus), VOCAB_SUPPLEMENT.get(level, ())))
         assert len(deck) >= min_cards
         assert deck.name == name
         for card in deck.cards:
@@ -288,8 +294,15 @@ class TestVocabThematicCategoriesN4toN1:
 
     @pytest.mark.parametrize("slug", SLUGS)
     def test_deck_matches_its_curated_list(self, slug: str) -> None:
+        """Asserted against the authored builder, not ``ALL_DECKS``.
+
+        Since issue #78 ``ALL_DECKS[slug]`` serves a *view* over the parent level
+        deck. The curation these tests guard — that every curated word is still
+        in the corpus, in order — is a property of the source builder, which is
+        what the view is derived from.
+        """
         _name, level, _slot, words = _VOCAB_LEVEL_CATEGORY_SPECS[slug]
-        deck = ALL_DECKS[slug]()
+        deck = CATEGORY_SOURCE_DECKS[slug]()
         assert [card.character for card in deck.cards] == list(words)
         for card in deck.cards:
             assert card.romaji, f"Card {card.id} missing romaji"
@@ -301,13 +314,32 @@ class TestVocabThematicCategoriesN4toN1:
         """Ids come from position in the curated tuple, not the resolved list.
 
         That is what lets a word drop out of the corpus without shifting every
-        later card onto a different word's SRS history.
+        later card onto a different word's SRS history. These are the source
+        builder's own ids — what the view exposes are the parent's, and
+        ``tests/test_block_mapping.py`` covers the translation between them.
         """
         _name, level, slot, words = _VOCAB_LEVEL_CATEGORY_SPECS[slug]
         base = _VOCAB_CATEGORY_LEVEL_BASE[level] + slot * _VOCAB_CATEGORY_ID_SPACING
-        deck = ALL_DECKS[slug]()
+        deck = CATEGORY_SOURCE_DECKS[slug]()
         for card in deck.cards:
             assert card.id == base + words.index(card.character)
+
+    @pytest.mark.parametrize("slug", SLUGS)
+    def test_registered_deck_is_a_view_over_its_parent(self, slug: str) -> None:
+        """The registered deck carries the parent's name and the parent's ids.
+
+        Both halves matter. ``review_states`` is keyed ``(deck_name, card_id)``,
+        so a view that kept its own name would move the duplicate-identity
+        problem rather than fix it.
+        """
+        _name, level, _slot, words = _VOCAB_LEVEL_CATEGORY_SPECS[slug]
+        parent = ALL_DECKS[f"vocab_{level}"]()
+        view = ALL_DECKS[slug]()
+        parent_ids = {card.id for card in parent.cards}
+
+        assert view.name == parent.name
+        assert len(view.cards) == len(words)
+        assert {card.id for card in view.cards} <= parent_ids
 
     def test_categories_within_a_level_do_not_share_words(self) -> None:
         for level in ("n4", "n3", "n2", "n1"):
