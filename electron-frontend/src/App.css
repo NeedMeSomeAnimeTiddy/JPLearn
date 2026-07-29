@@ -2588,7 +2588,11 @@ html[data-reduced-motion='true'] .home-hero-steam {
   align-items: center;
   gap: 16px;
   padding: 5px 20px;
-  min-height: 0;
+  /* Fixed so every surface's bar is the same height. Without it the height is
+     set by whatever the tallest child happens to be — the back button on
+     ScriptHubView, MinigameHud and Daily Games, which Home does not have — so
+     Home sat 9px shorter and the bar appeared to jump on navigation. */
+  min-height: 47px;
   position: relative;
   background: var(--bg-main);
   border-bottom: 1px solid var(--panel-border);
