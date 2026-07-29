@@ -1243,11 +1243,13 @@ def test_build_kanji_detail_payload_uses_indexed_compounds_and_verified_examples
         {"position": 0, "radical": "日", "stroke_count": 4, "code": "js72"},
         {"position": 1, "radical": "一", "stroke_count": 1, "code": None},
     ]
-    assert payload["tags"] == ["kanji", "n5", "kanji_numbers_time"]
-    assert payload["categories"] == [
-        "Kanji N5",
-        "Kanji: N5 · Numbers & Time",
-    ]
+    # Category slugs no longer ride along as tags: kanji categories are block
+    # definitions now, not decks, so a card carries only its own tags.
+    assert payload["tags"] == ["kanji", "n5"]
+    # One entry per block the character sits in, named "<deck> · <theme>". The
+    # bare deck name is gone: every kanji now belongs to a named theme, so a
+    # level-only entry carried no information the level tag did not already.
+    assert payload["categories"] == ["Kanji N5 · Numbers & Time"]
 
     on_readings = cast(list[dict[str, Any]], payload["on_readings"])
     assert on_readings[0]["reading"] == "ニチ"
@@ -1326,7 +1328,7 @@ def test_build_kanji_detail_payload_preserves_missing_optional_fields(
     assert payload["has_more_compounds"] is False
 
 
-def test_build_kanji_detail_payload_rejects_old_or_malformed_v4_index(
+def test_build_kanji_detail_payload_degrades_on_old_index_and_rejects_malformed_json(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -1337,8 +1339,11 @@ def test_build_kanji_detail_payload_rejects_old_or_malformed_v4_index(
             "UPDATE dictionary_metadata SET value = '3' WHERE key = 'schema_version'"
         )
     monkeypatch.setattr(dictionary_repository, "OFFLINE_DICTIONARY_DB_CANDIDATES", (old_db_path,))
-    with pytest.raises(FileNotFoundError, match="outdated.*re-download"):
-        desktop_bridge.build_kanji_detail_payload("日")
+    # An index predating the kanji tables used to raise, blanking the panel. It
+    # now degrades to the committed deck data, which still carries components.
+    degraded = desktop_bridge.build_kanji_detail_payload("日")
+    assert degraded["source"] == "deck_only"
+    assert degraded["on_readings"] == []
 
     malformed_db_path = tmp_path / "malformed.sqlite"
     _build_kanji_detail_db(malformed_db_path, meanings_json="not-json")
@@ -2141,7 +2146,6 @@ def test_apply_expertise_level_n5_foundation_marks_target_decks_mastered(tmp_pat
         "hiragana",
         "katakana",
         "kanji_n5",
-        "kanji_numbers_time",
         "vocab_n5",
         "vocab_greetings",
         "vocab_numbers",

@@ -29,9 +29,14 @@ const VOCAB_LEVEL_DECKS = [
   deck('vocab_n4', 666, 0),
   deck('vocab_n1', 2699, 0),
 ]
-const KANJI_LEVEL_DECKS = [
-  deck('kanji_n5', 103, 0),
-  deck('kanji_n1', 1136, 0),
+// Kanji level decks ARE its study decks now — its categories became block
+// definitions — so unlike the vocabulary ones these are not a "never reviewed"
+// foil. They are the whole kanji track.
+const KANJI_TRACK_DECKS = [
+  deck('kanji_n5', 30, 30),
+  deck('kanji_n4', 25, 0),
+  deck('kanji_n3', 20, 0),
+  deck('kanji_n2', 15, 0),
 ]
 
 // N5 vocab categories carry no level infix; `vocab_numbers` and `vocab_nouns`
@@ -87,12 +92,7 @@ describe('buildStudyPlan grammar readiness', () => {
 // section `vocab_n5` names reaches N1 decks via VOCAB_CATEGORY_TO_DECK_SLUG.
 describe('buildStudyPlan track coverage rows', () => {
   const vocabCategories = [...VOCAB_N5_CATEGORIES([20, 15, 12]), ...VOCAB_HIGHER_CATEGORIES]
-  const kanjiCategories = [
-    deck('kanji_numbers_time', 30, 30),
-    deck('kanji_nature_world', 25, 0),
-    deck('kanji_n4_daily_life', 20, 0),
-    deck('kanji_n3_governance', 15, 0),
-  ]
+  const kanjiCategories = KANJI_TRACK_DECKS
 
   it('pools every vocabulary category, N5 through N1, into the vocab_n5 row', () => {
     const row = planRow([...vocabCategories, ...VOCAB_LEVEL_DECKS], 'vocab_n5')
@@ -100,8 +100,8 @@ describe('buildStudyPlan track coverage rows', () => {
     expect(row.mastery).toBeCloseTo(47 / 147, 6)
   })
 
-  it('pools every kanji category, N5 through N1, into the kanji_n5 row', () => {
-    const row = planRow([...kanjiCategories, ...KANJI_LEVEL_DECKS], 'kanji_n5')
+  it('pools every kanji level deck, N5 through N1, into the kanji_n5 row', () => {
+    const row = planRow(kanjiCategories, 'kanji_n5')
     expect(row.total).toBe(90)
     expect(row.mastery).toBeCloseTo(30 / 90, 6)
   })
@@ -126,7 +126,7 @@ describe('buildStudyPlan track coverage rows', () => {
 // would peg both rows at 0 over ~8,031 vocab / ~2,196 kanji cards forever.
 describe('buildStudyPlan excludes the never-reviewed level decks', () => {
   const vocabCategories = VOCAB_N5_CATEGORIES([20, 15, 12])
-  const kanjiCategories = [deck('kanji_numbers_time', 30, 30)]
+  const kanjiTrack = [deck('kanji_n5', 30, 30)]
 
   it('leaves the vocabulary row untouched by level decks', () => {
     const withLevels = planRow([...vocabCategories, ...VOCAB_LEVEL_DECKS], 'vocab_n5')
@@ -138,9 +138,9 @@ describe('buildStudyPlan excludes the never-reviewed level decks', () => {
     expect(withLevels.mastery).toBe(1)
   })
 
-  it('leaves the kanji row untouched by level decks', () => {
-    const withLevels = planRow([...kanjiCategories, ...KANJI_LEVEL_DECKS], 'kanji_n5')
-    const categoriesOnly = planRow(kanjiCategories, 'kanji_n5')
+  it('measures the kanji row over the level decks reviews land in', () => {
+    const withLevels = planRow(kanjiTrack, 'kanji_n5')
+    const categoriesOnly = planRow(kanjiTrack, 'kanji_n5')
 
     expect(withLevels.total).toBe(categoriesOnly.total)
     expect(withLevels.mastery).toBe(categoriesOnly.mastery)
@@ -163,9 +163,8 @@ describe('buildStudyPlan excludes the never-reviewed level decks', () => {
         deck('hiragana', 104, 100),
         deck('katakana', 104, 80),
         ...VOCAB_N5_CATEGORIES([20, 15, 12]),
-        deck('kanji_numbers_time', 90, 30),
+        deck('kanji_n5', 90, 30),
         ...VOCAB_LEVEL_DECKS,
-        ...KANJI_LEVEL_DECKS,
       ],
       [], [],
     )

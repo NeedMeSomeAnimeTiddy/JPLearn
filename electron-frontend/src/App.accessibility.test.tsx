@@ -236,6 +236,7 @@ describe('Accessibility — zero axe violations', () => {
             meaning: 'sun',
             tags: ['kanji', 'jlpt_n5'],
             example_sentence: null,
+            theme: 'Numbers & Time',
           },
         ],
       }),

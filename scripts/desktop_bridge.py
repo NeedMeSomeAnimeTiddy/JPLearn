@@ -358,40 +358,6 @@ VOCAB_N5_CATEGORY_SLUGS: tuple[str, ...] = tuple(
     slug for _, slug in OVERVIEW_WORDS_CATEGORY_SPECS
 )
 
-KANJI_N5_CATEGORY_SLUGS: tuple[str, ...] = (
-    "kanji_numbers_time",
-    "kanji_nature_world",
-    "kanji_people_body",
-    "kanji_study_language",
-    "kanji_actions_travel",
-)
-
-KANJI_N4_CATEGORY_SLUGS: tuple[str, ...] = (
-    "kanji_n4_society_roles",
-    "kanji_n4_mind_thought",
-    "kanji_n4_daily_life",
-    "kanji_n4_time_action",
-)
-
-KANJI_N3_CATEGORY_SLUGS: tuple[str, ...] = (
-    "kanji_n3_governance",
-    "kanji_n3_communication",
-    "kanji_n3_movement",
-    "kanji_n3_achievement",
-)
-
-KANJI_N2_CATEGORY_SLUGS: tuple[str, ...] = (
-    "kanji_n2_professionalism",
-    "kanji_n2_economics",
-    "kanji_n2_analysis",
-)
-
-KANJI_N1_CATEGORY_SLUGS: tuple[str, ...] = (
-    "kanji_n1_law_order",
-    "kanji_n1_ideology",
-    "kanji_n1_literary",
-)
-
 EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
     "total_beginner": (),
     "know_hiragana": ("hiragana",),
@@ -400,7 +366,6 @@ EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
         "hiragana",
         "katakana",
         "kanji_n5",
-        *KANJI_N5_CATEGORY_SLUGS,
         "vocab_n5",
         *VOCAB_N5_CATEGORY_SLUGS,
     ),
@@ -408,62 +373,48 @@ EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
         "hiragana",
         "katakana",
         "kanji_n5",
-        *KANJI_N5_CATEGORY_SLUGS,
         "vocab_n5",
         *VOCAB_N5_CATEGORY_SLUGS,
         "kanji_n4",
-        *KANJI_N4_CATEGORY_SLUGS,
         "vocab_n4",
     ),
     "jlpt_n3_foundation": (
         "hiragana",
         "katakana",
         "kanji_n5",
-        *KANJI_N5_CATEGORY_SLUGS,
         "vocab_n5",
         *VOCAB_N5_CATEGORY_SLUGS,
         "kanji_n4",
-        *KANJI_N4_CATEGORY_SLUGS,
         "vocab_n4",
         "kanji_n3",
-        *KANJI_N3_CATEGORY_SLUGS,
         "vocab_n3",
     ),
     "jlpt_n2_foundation": (
         "hiragana",
         "katakana",
         "kanji_n5",
-        *KANJI_N5_CATEGORY_SLUGS,
         "vocab_n5",
         *VOCAB_N5_CATEGORY_SLUGS,
         "kanji_n4",
-        *KANJI_N4_CATEGORY_SLUGS,
         "vocab_n4",
         "kanji_n3",
-        *KANJI_N3_CATEGORY_SLUGS,
         "vocab_n3",
         "kanji_n2",
-        *KANJI_N2_CATEGORY_SLUGS,
         "vocab_n2",
     ),
     "jlpt_n1_foundation": (
         "hiragana",
         "katakana",
         "kanji_n5",
-        *KANJI_N5_CATEGORY_SLUGS,
         "vocab_n5",
         *VOCAB_N5_CATEGORY_SLUGS,
         "kanji_n4",
-        *KANJI_N4_CATEGORY_SLUGS,
         "vocab_n4",
         "kanji_n3",
-        *KANJI_N3_CATEGORY_SLUGS,
         "vocab_n3",
         "kanji_n2",
-        *KANJI_N2_CATEGORY_SLUGS,
         "vocab_n2",
         "kanji_n1",
-        *KANJI_N1_CATEGORY_SLUGS,
         "vocab_n1",
     ),
 }
@@ -699,6 +650,10 @@ class OverviewCharacterCard:
     meaning: str
     tags: list[str]
     example_sentence: str | None
+    # The block this card sits in — an authored category or a theme. Kanji cards
+    # carry only ["kanji", "<level>"] as tags, so without this the Study Overview
+    # has nothing to group 2,218 characters by beyond their JLPT level.
+    theme: str
 
 
 @dataclass(frozen=True)
@@ -1517,6 +1472,13 @@ def build_overview_character_mastery() -> dict[str, object]:
         if factory is None:
             raise ValueError(f"Unknown deck slug: {slug}")
         deck = factory()
+        # Read the label off the block rather than the theme table: that is the
+        # name the hub shows, so the browser filters by what the learner picked.
+        theme_by_id = {
+            card_id: block.name
+            for block in blocks_for_slug(slug)
+            for card_id in block.card_ids
+        }
         kanji_cards.extend(
             OverviewCharacterCard(
                 id=card.id,
@@ -1526,6 +1488,7 @@ def build_overview_character_mastery() -> dict[str, object]:
                 meaning=card.meaning,
                 tags=card.tags,
                 example_sentence=card.example_sentence,
+                theme=theme_by_id.get(card.id, ""),
             )
             for card in deck.cards
         )
@@ -1650,17 +1613,27 @@ _LEVEL_DECK_SLUGS = frozenset(
 def _section_deck_slugs(section: str, *, n5_only: bool = False) -> list[str]:
     """Return the deck slugs *section* is measured over, sorted for determinism.
 
-    With *n5_only*, narrows the kanji/vocabulary sections to the categories that
-    carry no level infix (`vocab_greetings`, not `vocab_n4_home_living`).  The
-    recall floor needs that narrower scope: the N5 categories are a minority of
-    each track, so a learner who has mastered all of N5 reads as well under the
-    floor against the whole N5-to-N1 track and would be stranded on recognition
-    drills.
+    With *n5_only*, narrows the section to its N5 scope.  The recall floor needs
+    that: N5 is a minority of each track, so a learner who has mastered all of N5
+    reads as well under the floor against the whole N5-to-N1 track and would be
+    stranded on recognition drills.
+
+    Vocabulary is measured over its thematic category decks, narrowed by *n5_only*
+    to the ones carrying no level infix (`vocab_greetings`, not
+    `vocab_n4_home_living`).  Kanji has no category decks — its themes became
+    block definitions in :mod:`domain.kanji_themes` and allocate no ids — so it is
+    measured over its five level decks instead.
     """
     if section not in ("kanji_n5", "vocab_n5"):
         return [section] if section in ALL_DECKS else []
 
-    prefix = "kanji_" if section == "kanji_n5" else "vocab_"
+    if section == "kanji_n5":
+        levels = ("kanji_n5",) if n5_only else tuple(sorted(
+            slug for slug in ALL_DECKS if slug.startswith("kanji_") and slug in _LEVEL_DECK_SLUGS
+        ))
+        return [slug for slug in levels if slug in ALL_DECKS]
+
+    prefix = "vocab_"
     slugs = []
     for slug in ALL_DECKS:
         if not slug.startswith(prefix) or slug in _LEVEL_DECK_SLUGS:

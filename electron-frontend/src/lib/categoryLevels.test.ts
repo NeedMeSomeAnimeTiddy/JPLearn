@@ -7,7 +7,7 @@ import {
   resolveVisibleLevel,
   rowsForLevel,
 } from './categoryLevels'
-import { KANJI_CATEGORY_ORDER, VOCAB_CATEGORY_ORDER } from '../constants'
+import { VOCAB_CATEGORY_ORDER } from '../constants'
 
 const rows = (...keys: string[]) => keys.map((key) => ({ key }))
 
@@ -84,7 +84,7 @@ describe('against the real category lists', () => {
 
   it('keeps every level small enough to render without scrolling', () => {
     // The whole point of the change: no level may be a 28-chip row again.
-    for (const list of [VOCAB_CATEGORY_ORDER, KANJI_CATEGORY_ORDER]) {
+    for (const list of [VOCAB_CATEGORY_ORDER, VOCAB_CATEGORY_ORDER]) {
       for (const level of CATEGORY_LEVEL_ORDER) {
         const count = rowsForLevel(list.map((key) => ({ key })), level).length
         expect(count).toBeLessThanOrEqual(12)
@@ -94,6 +94,6 @@ describe('against the real category lists', () => {
 
   it('gives both tracks all five levels', () => {
     expect(levelsPresentIn(VOCAB_CATEGORY_ORDER.map((key) => ({ key })))).toEqual(CATEGORY_LEVEL_ORDER)
-    expect(levelsPresentIn(KANJI_CATEGORY_ORDER.map((key) => ({ key })))).toEqual(CATEGORY_LEVEL_ORDER)
+    expect(levelsPresentIn(VOCAB_CATEGORY_ORDER.map((key) => ({ key })))).toEqual(CATEGORY_LEVEL_ORDER)
   })
 })

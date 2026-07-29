@@ -206,6 +206,46 @@
   list-style: none;
 }
 
+/* Components ship with the app, so this row is present even with no dictionary
+   installed — it carries the section on its own in that case. */
+.kanji-detail-components {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.5rem;
+}
+
+.kanji-detail-components-label {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 0.15rem;
+}
+
+.kanji-detail-component {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.7rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--card-border);
+  border-radius: 2px;
+  background: var(--panel-bg);
+  font-family: var(--display-font);
+  font-size: 1.05rem;
+}
+
+.kanji-detail-notice {
+  margin: 0 0 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
 .kanji-detail-chip-groups {
   display: grid;
   gap: 0.35rem;

@@ -21,6 +21,9 @@ from functools import lru_cache
 
 from domain.block_mapping import category_slugs_for_parent, resolve_category_card_ids
 from domain.decks import ALL_DECKS, CATEGORY_SOURCE_DECKS
+from domain.kanji_components import KANJI_COMPONENTS
+from domain.kanji_ordering import order_by_components
+from domain.kanji_themes import KANJI_THEMES
 
 # Fraction of a block's cards that must have repetitions >= 1 before the
 # following block becomes available.
@@ -150,14 +153,34 @@ def _display_name(deck_name: str) -> str:
     return name
 
 
+def _component_ordered(card_ids: list[int], characters: dict[int, str]) -> list[int]:
+    """Sort kanji card ids so a character follows the components it is built from.
+
+    Ordering runs over characters, not ids, because a level deck can carry the
+    same character twice; the ids are re-expanded afterwards so nothing is lost.
+    """
+    ids_by_char: dict[str, list[int]] = {}
+    for card_id in card_ids:
+        ids_by_char.setdefault(characters[card_id], []).append(card_id)
+
+    ordered: list[int] = []
+    for char in order_by_components(list(ids_by_char), KANJI_COMPONENTS):
+        ordered.extend(ids_by_char[char])
+    return ordered
+
+
 @lru_cache(maxsize=None)
 def _generated_blocks(slug: str) -> tuple[Block, ...]:
     """Build the block sequence for a vocabulary or kanji level deck.
 
     Authored thematic categories come first, in registration order, each as a
-    view over the parent's card ids. Whatever they do not cover follows in
-    fixed-size generated blocks, so every card in the deck belongs to exactly one
-    block and none is unreachable.
+    view over the parent's card ids. Kanji levels then draw their authored themes
+    (:mod:`domain.kanji_themes`) from what is left. Whatever neither covers
+    follows in fixed-size generated blocks, so every card in the deck belongs to
+    exactly one block and none is unreachable.
+
+    Within a kanji block the cards keep component order, so a character still
+    follows the parts it is built from among its own block-mates.
     """
     deck = ALL_DECKS[slug]()
     by_id = {card.id: card for card in deck.cards}
@@ -182,6 +205,28 @@ def _generated_blocks(slug: str) -> tuple[Block, ...]:
         )
 
     remaining = [card.id for card in deck.cards if card.id not in claimed]
+    is_kanji = slug.startswith("kanji")
+    characters = {card.id: card.character for card in deck.cards}
+    if is_kanji:
+        # Components only describe kanji, so vocabulary keeps its deck order.
+        remaining = _component_ordered(remaining, characters)
+
+    for name, theme_chars in KANJI_THEMES.get(slug, ()):
+        wanted = set(theme_chars)
+        card_ids = [cid for cid in remaining if characters[cid] in wanted]
+        if not card_ids:
+            continue
+        claimed.update(card_ids)
+        remaining = [cid for cid in remaining if cid not in claimed]
+        blocks.append(
+            Block(
+                index=len(blocks),
+                name=name,
+                card_ids=card_ids,
+                sample_chars=[characters[cid] for cid in card_ids[:3]],
+            )
+        )
+
     for offset in range(0, len(remaining), GENERATED_BLOCK_SIZE):
         card_ids = remaining[offset : offset + GENERATED_BLOCK_SIZE]
         blocks.append(

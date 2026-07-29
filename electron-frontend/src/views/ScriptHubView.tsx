@@ -4,13 +4,13 @@ import {
   AlertTriangle,
   ArrowLeft,
   Heart,
+  Lock,
   Target,
 } from 'lucide-react'
 import type {
   CategoryProgress,
   JlptLevel,
   JlptLevelProgress,
-  KanjiCategory,
   MinigameKey,
   MinigameStatsByScript,
   NavDirection,
@@ -35,6 +35,7 @@ import type { GroupedSlide } from '../components/MinigameCassetteCarousel'
 import type { MinigameSkillGroupKey } from '../constants'
 import { useSession } from '../context/SessionContext'
 import {
+  CATEGORY_LEVEL_ORDER,
   categoryShortLabel,
   levelsPresentIn,
   resolveVisibleLevel,
@@ -72,9 +73,9 @@ interface ScriptHubViewProps {
   vocabLevelProgress: JlptLevelProgress[]
   activeKanjiLevel: JlptLevel
   activeVocabLevel: JlptLevel
+  /** Empty for kanji: its themes are block definitions, not category decks. */
   kanjiCategoryProgress: CategoryProgress[]
   vocabCategoryProgress: CategoryProgress[]
-  activeKanjiCategory: KanjiCategory
   activeVocabCategory: VocabCategory
   learningPathExpanded: boolean
   learningPathTrackRows: StudyPlanCoverageRow[]
@@ -82,7 +83,6 @@ interface ScriptHubViewProps {
   availableMinigames: MinigameKey[]
   activeSectionName: string | null
   minigameLockReasons: Partial<Record<MinigameKey, string>>
-  isSheet?: boolean
   // callbacks (navigation / deck selection only)
   onBack: () => void
   onToggleBlock: (index: number) => void
@@ -90,7 +90,6 @@ interface ScriptHubViewProps {
   onClearBlocks: () => void
   onSelectKanjiLevel: (level: JlptLevel) => void
   onSelectVocabLevel: (level: JlptLevel) => void
-  onSelectKanjiCategory: (cat: KanjiCategory) => void
   onSelectVocabCategory: (cat: VocabCategory) => void
   onToggleLearningPath: () => void
   onSelectGame: (game: MinigameKey) => void
@@ -146,7 +145,6 @@ export function ScriptHubView({
   activeVocabLevel,
   kanjiCategoryProgress,
   vocabCategoryProgress,
-  activeKanjiCategory,
   activeVocabCategory,
   learningPathExpanded: _learningPathExpanded,
   learningPathTrackRows: _learningPathTrackRows,
@@ -154,14 +152,12 @@ export function ScriptHubView({
   availableMinigames,
   activeSectionName,
   minigameLockReasons,
-  isSheet = false,
   onBack,
   onToggleBlock,
   onSelectAllBlocks,
   onClearBlocks,
   onSelectKanjiLevel,
   onSelectVocabLevel,
-  onSelectKanjiCategory,
   onSelectVocabCategory,
   onToggleLearningPath: _onToggleLearningPath,
   onSelectGame,
@@ -197,6 +193,10 @@ export function ScriptHubView({
       ? 'Whole deck'
       : `${selectedBlocks.length} blocks`
 
+  // The tracklist is always open. It was collapsed behind a "Change" button when
+  // blocks were a wrapped chip cloud that grew unboundedly; as a scrolling list
+  // it costs a fixed amount of room however many blocks a deck has.
+
   // Tracklist strip: blocks take precedence, categories otherwise. Categories
   // are split by JLPT level so a 28-entry list never renders as one long row.
   const isKanjiTrack = activeScript === 'kanji_n5'
@@ -208,7 +208,9 @@ export function ScriptHubView({
   const isLevelledTrack = isKanjiTrack || activeScript === 'vocab_n5'
   const showsCategories = !showsBlocks && isLevelledTrack
   const categoryRows = isKanjiTrack ? kanjiCategoryProgress : vocabCategoryProgress
-  const categoryLevels = levelsPresentIn(categoryRows)
+  // Kanji has no category decks — its themes became block definitions — so its
+  // level row is the fixed JLPT ladder rather than whatever categories exist.
+  const categoryLevels = isKanjiTrack ? CATEGORY_LEVEL_ORDER : levelsPresentIn(categoryRows)
   const visibleLevel = resolveVisibleLevel(categoryRows, isKanjiTrack ? activeKanjiLevel : activeVocabLevel)
   const visibleCategories = rowsForLevel(categoryRows, visibleLevel)
 
@@ -287,21 +289,17 @@ export function ScriptHubView({
   }, [groupedSlides, activeGame])
 
   return (
-    <div className={isSheet ? 'script-hub-sheet-content' : `view-shell view-${navDirection}`}>
-      {!isSheet ? (
-        <>
-          <div className="hub-crt-surface" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
-          <div className="hub-vhs-line" aria-hidden="true" />
-          {/* Floating crystalline accents */}
-          <div className="hub-crystal hub-crystal--a" aria-hidden="true" />
-          <div className="hub-crystal hub-crystal--b" aria-hidden="true" />
-          <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
-        </>
-      ) : null}
+    <div className={`view-shell view-${navDirection}`}>
+      <div className="hub-crt-surface" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
+      <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
+      <div className="hub-vhs-line" aria-hidden="true" />
+      {/* Floating crystalline accents */}
+      <div className="hub-crystal hub-crystal--a" aria-hidden="true" />
+      <div className="hub-crystal hub-crystal--b" aria-hidden="true" />
+      <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
 
       {/* ── Bold lofi header ──────────────────────────────────── */}
       <header className="hub-topbar">
@@ -326,8 +324,143 @@ export function ScriptHubView({
         <span className="hub-topbar-sub">CASSETTE TAPE · カセット · SIDE A</span>
       </header>
 
-      {/* ── Single-zone cassette console ────────────────────────── */}
-      <div className="hub-studio">
+      {/* ── Cassette console: study pool rail, then the deck ───── */}
+      <div className="hub-studio hub-studio--rail">
+
+        {/* Study pool rail. The live pool gates which minigames unlock, so it
+            sits upstream of the deck: left to right is cause to effect. A full
+            column shows about 24 rows, so only N1's 69 blocks scroll. */}
+        <aside className="hub-rail" aria-label="Study pool">
+          <div className="hub-rail-head">
+            <span className="hub-tracklist-label">
+              {showsBlocks
+                ? blockSelectionSummary
+                : showsCategories
+                  ? `${visibleCategories.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${visibleCategories.filter((c) => c.total > 0).length}`
+                  : ''}
+            </span>
+            {isLevelledTrack && categoryLevels.length > 1 ? (
+              <div className="hub-level-row" role="group" aria-label="JLPT level">
+                {categoryLevels.map((level) => {
+                  const levelName = level.toUpperCase()
+                  // Only meaningful for tracks with category rows. Kanji knows
+                  // its blocks for the *active* level only, so it cannot count
+                  // another level's unlocks and does not pretend to.
+                  const levelRows = rowsForLevel(categoryRows, level)
+                  const unlockedCount = levelRows.filter((row) => row.unlocked && row.total > 0).length
+                  const countSuffix = levelRows.length > 0 ? ` (${unlockedCount} unlocked)` : ''
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      className={`hub-level-chip${level === visibleLevel ? ' is-active' : ''}`}
+                      aria-pressed={level === visibleLevel}
+                      aria-label={`Show ${levelName} kanji${countSuffix}`}
+                      title={levelName + (countSuffix || '')}
+                      onClick={() => {
+                        if (isKanjiTrack) onSelectKanjiLevel(level)
+                        else onSelectVocabLevel(level)
+                      }}
+                    >
+                      {levelName}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
+          </div>
+
+          {gameLoading ? null : showsBlocks ? (
+            <div
+              className="hub-tracklist"
+              role="group"
+              aria-label="Blocks to study"
+            >
+              <div className="hub-tracklist-actions">
+                <button
+                  type="button"
+                  className="hub-block-chip hub-block-chip--action"
+                  onClick={onSelectAllBlocks}
+                  title="Study every unlocked block"
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className="hub-block-chip hub-block-chip--action"
+                  onClick={onClearBlocks}
+                  disabled={selectedBlockIndices.length === 0}
+                  title="Clear the selection and study the whole deck"
+                >
+                  None
+                </button>
+              </div>
+              <div className="hub-tracklist-rows">
+                  {blockProgressWithMastery.map((block, position) => {
+                    const isSelected = selectedBlockIndices.includes(block.index)
+                    const masteryPct = Math.round(block.mastery * 100)
+                    return (
+                      <button
+                        key={block.index}
+                        type="button"
+                        className={`hub-track${isSelected ? ' is-active' : ''}${!block.unlocked ? ' is-locked' : ''}`}
+                        disabled={!block.unlocked}
+                        aria-pressed={isSelected}
+                        onClick={() => { if (block.unlocked) onToggleBlock(block.index) }}
+                        title={!block.unlocked ? 'Locked' : `${block.name} — ${masteryPct}% of ${block.card_ids.length} cards`}
+                      >
+                        <span className="hub-track-no" aria-hidden="true">
+                          {String(position + 1).padStart(2, '0')}
+                        </span>
+                        <span className="hub-track-name">{block.name}</span>
+                        {/* Mastery is on the row itself rather than in a
+                            tooltip, which a keyboard user never sees. */}
+                        <span className="hub-track-bar" aria-hidden="true">
+                          <span
+                            className={`hub-track-fill${block.mastery >= 0.7 ? ' is-high' : ''}`}
+                            style={{ '--track-pct': `${masteryPct}%` } as CSSProperties}
+                          />
+                        </span>
+                        {/* The bar already carries the percentage, so
+                            the column shows the card count instead. */}
+                        <span className="hub-track-meta" aria-hidden="true">
+                          {block.unlocked
+                            ? block.card_ids.length
+                            : <Lock size={11} strokeWidth={2.2} />}
+                        </span>
+                        <span className="sr-only">
+                          {block.unlocked
+                            ? `${masteryPct}% mastered, ${block.card_ids.length} cards`
+                            : 'Locked'}
+                        </span>
+                      </button>
+                    )
+                  })}
+              </div>
+            </div>
+          ) : showsCategories ? (
+            <div className="hub-block-row-strip">
+              {visibleCategories.map((cat) => {
+                const isActive = activeVocabCategory === cat.key
+                const unavailable = cat.total === 0
+                const masteryPct = Math.round(cat.mastery * 100)
+                return (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    className={`hub-block-chip${isActive ? ' is-active' : ''}${(!cat.unlocked || unavailable) ? ' is-locked' : ''}`}
+                    disabled={!cat.unlocked || unavailable}
+                    aria-pressed={isActive}
+                    title={unavailable ? 'No cards' : !cat.unlocked ? 'Locked' : `${cat.label} ${masteryPct}%`}
+                    onClick={() => onSelectVocabCategory(cat.key as VocabCategory)}
+                  >
+                    {categoryShortLabel(cat.label)}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+        </aside>
 
         <div className="hub-player">
           {/* Animated atmospheric elements */}
@@ -444,114 +577,6 @@ export function ScriptHubView({
               </div>
               </div>
 
-              {/* Tracklist strip — level tabs above a wrapped chip grid, so no
-                  track's sections can run off-screen (vocab has 28 categories,
-                  kanji 19). Blocks have no JLPT levels, so they just wrap. */}
-              {!gameLoading ? (
-                <div className="hub-tracklist-strip">
-                  <span className="hub-tracklist-label">
-                    {showsBlocks
-                      ? blockSelectionSummary
-                      : showsCategories
-                        ? `${visibleCategories.filter((c) => c.mastery >= 0.7 && c.total > 0).length}/${visibleCategories.filter((c) => c.total > 0).length}`
-                        : ''}
-                  </span>
-                  <div className="hub-tracklist-groups">
-                    {isLevelledTrack && categoryLevels.length > 1 ? (
-                      <div className="hub-level-row" role="group" aria-label="JLPT level">
-                        {categoryLevels.map((level) => {
-                          const levelName = level.toUpperCase()
-                          const unlockedCount = rowsForLevel(categoryRows, level)
-                            .filter((row) => row.unlocked && row.total > 0).length
-                          return (
-                            <button
-                              key={level}
-                              type="button"
-                              className={`hub-level-chip${level === visibleLevel ? ' is-active' : ''}`}
-                              aria-pressed={level === visibleLevel}
-                              aria-label={`Show ${levelName} sections (${unlockedCount} unlocked)`}
-                              title={`${levelName} — ${unlockedCount} unlocked`}
-                              onClick={() => {
-                                if (isKanjiTrack) onSelectKanjiLevel(level)
-                                else onSelectVocabLevel(level)
-                              }}
-                            >
-                              {levelName}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    ) : null}
-
-                    {showsBlocks ? (
-                      <div
-                        className="hub-block-row-strip"
-                        role="group"
-                        aria-label="Blocks to study"
-                      >
-                        <button
-                          type="button"
-                          className="hub-block-chip hub-block-chip--action"
-                          onClick={onSelectAllBlocks}
-                          title="Study every unlocked block"
-                        >
-                          All
-                        </button>
-                        <button
-                          type="button"
-                          className="hub-block-chip hub-block-chip--action"
-                          onClick={onClearBlocks}
-                          disabled={selectedBlockIndices.length === 0}
-                          title="Clear the selection and study the whole deck"
-                        >
-                          None
-                        </button>
-                        {blockProgressWithMastery.map((block) => {
-                          const isSelected = selectedBlockIndices.includes(block.index)
-                          const masteryPct = Math.round(block.mastery * 100)
-                          return (
-                            <button
-                              key={block.index}
-                              type="button"
-                              className={`hub-block-chip${isSelected ? ' is-active' : ''}${!block.unlocked ? ' is-locked' : ''}`}
-                              disabled={!block.unlocked}
-                              aria-pressed={isSelected}
-                              onClick={() => { if (block.unlocked) onToggleBlock(block.index) }}
-                              title={!block.unlocked ? 'Locked' : `${block.name} ${masteryPct}%`}
-                            >
-                              {block.name}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    ) : showsCategories ? (
-                      <div className="hub-block-row-strip">
-                        {visibleCategories.map((cat) => {
-                          const isActive = isKanjiTrack ? activeKanjiCategory === cat.key : activeVocabCategory === cat.key
-                          const unavailable = cat.total === 0
-                          const masteryPct = Math.round(cat.mastery * 100)
-                          return (
-                            <button
-                              key={cat.key}
-                              type="button"
-                              className={`hub-block-chip${isActive ? ' is-active' : ''}${(!cat.unlocked || unavailable) ? ' is-locked' : ''}`}
-                              disabled={!cat.unlocked || unavailable}
-                              aria-pressed={isActive}
-                              title={unavailable ? 'No cards' : !cat.unlocked ? 'Locked' : `${cat.label} ${masteryPct}%`}
-                              onClick={() => {
-                                if (isKanjiTrack) onSelectKanjiCategory(cat.key as KanjiCategory)
-                                else onSelectVocabCategory(cat.key as VocabCategory)
-                              }}
-                            >
-                              {categoryShortLabel(cat.label)}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
 
             </>
           ) : gameLoading ? (

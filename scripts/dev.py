@@ -18,6 +18,10 @@ COMMANDS = [
         [sys.executable, "scripts/generate_ts_types.py", "--check"],
     ),
     Command(
+        "kanji_components_codegen",
+        [sys.executable, "scripts/generate_kanji_components.py", "--check"],
+    ),
+    Command(
         "mypy",
         [
             sys.executable,

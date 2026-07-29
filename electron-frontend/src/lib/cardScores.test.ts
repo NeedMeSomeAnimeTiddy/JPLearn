@@ -10,7 +10,7 @@ describe('sectionForDeckSlug', () => {
   })
 
   it('folds every kanji and vocabulary deck into its section', () => {
-    for (const slug of ['kanji_n5', 'kanji_numbers_time', 'kanji_n4_society_roles']) {
+    for (const slug of ['kanji_n5', 'kanji_n3', 'kanji_n1']) {
       expect(sectionForDeckSlug(slug)).toBe('kanji_n5')
     }
     for (const slug of ['vocab_n5', 'vocab_greetings', 'vocab_n1_law_justice']) {
@@ -27,8 +27,8 @@ describe('toSectionScores', () => {
   it('merges deck-keyed rows into the six sections', () => {
     const sectioned = toSectionScores({
       hiragana: { 1: 4 },
-      kanji_numbers_time: { 10: 2 },
-      kanji_n4_society_roles: { 1200: 1 },
+      kanji_n3: { 10: 2 },
+      kanji_n1: { 1200: 1 },
       vocab_greetings: { 1000: 3 },
     })
 

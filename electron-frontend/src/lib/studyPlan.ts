@@ -39,7 +39,13 @@ import { SCRIPT_LABELS } from '../constants'
 // The negative lookahead excludes only an exact level slug. `vocab_numbers` and
 // `vocab_nouns` begin `vocab_n` but are N5 categories, so matching on a bare
 // `_n` prefix would silently drop them.
-const KANJI_STUDY_DECK = /^kanji_(?!n[1-5]$)/
+//
+// Kanji is the exception now. Its categories became block definitions that
+// allocate no ids, so no kanji deck but the five level decks exists, and
+// `resultSlug` records kanji reviews against those level decks. The level decks
+// are therefore exactly where kanji mastery accumulates — the opposite of the
+// vocabulary case above — so kanji matches its level slugs instead.
+const KANJI_STUDY_DECK = /^kanji_n[1-5]$/
 const VOCAB_STUDY_DECK = /^vocab_(?!n[1-5]$)/
 
 // The N5 slice of the same category decks — those whose slug carries no level

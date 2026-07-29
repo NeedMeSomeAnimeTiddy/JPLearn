@@ -13,6 +13,6 @@ describe('kanji-detail utilities', () => {
   it('formats displayed readings and deck tags without changing their meaning', () => {
     expect(formatKanjiReading('た.べる')).toBe('た・べる')
     expect(formatKanjiReading('-び')).toBe('-び')
-    expect(formatKanjiDetailTag('kanji_numbers_time')).toBe('Numbers & Time')
+    expect(formatKanjiDetailTag('vocab_greetings')).toBe('Greetings')
   })
 })

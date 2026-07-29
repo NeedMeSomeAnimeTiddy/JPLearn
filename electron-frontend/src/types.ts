@@ -72,31 +72,6 @@ export type VocabCategory =
   | 'n1_conflict_crisis'
   | 'n1_arts_expression'
 
-export type KanjiCategory =
-  | 'numbers_time'
-  | 'nature_world'
-  | 'people_body'
-  | 'study_language'
-  | 'actions_travel'
-  // N4 thematic categories
-  | 'n4_society_roles'
-  | 'n4_mind_thought'
-  | 'n4_daily_life'
-  | 'n4_time_action'
-  // N3 thematic categories
-  | 'n3_governance'
-  | 'n3_communication'
-  | 'n3_movement'
-  | 'n3_achievement'
-  // N2 thematic categories
-  | 'n2_professionalism'
-  | 'n2_economics'
-  | 'n2_analysis'
-  // N1 thematic categories
-  | 'n1_law_order'
-  | 'n1_ideology'
-  | 'n1_literary'
-
 export type VocabCategorySlug =
   | 'vocab_greetings'
   | 'vocab_numbers'
@@ -130,27 +105,6 @@ export type VocabCategorySlug =
   | 'vocab_n1_thought_reason'
   | 'vocab_n1_conflict_crisis'
   | 'vocab_n1_arts_expression'
-
-export type KanjiCategorySlug =
-  | 'kanji_numbers_time'
-  | 'kanji_nature_world'
-  | 'kanji_people_body'
-  | 'kanji_study_language'
-  | 'kanji_actions_travel'
-  | 'kanji_n4_society_roles'
-  | 'kanji_n4_mind_thought'
-  | 'kanji_n4_daily_life'
-  | 'kanji_n4_time_action'
-  | 'kanji_n3_governance'
-  | 'kanji_n3_communication'
-  | 'kanji_n3_movement'
-  | 'kanji_n3_achievement'
-  | 'kanji_n2_professionalism'
-  | 'kanji_n2_economics'
-  | 'kanji_n2_analysis'
-  | 'kanji_n1_law_order'
-  | 'kanji_n1_ideology'
-  | 'kanji_n1_literary'
 
 export interface CategoryProgress {
   key: string
@@ -247,8 +201,16 @@ export interface LastSessionPrefs {
    * Selected block indices per deck slug (issue #78). Optional because prefs
    * written before multi-select existed do not carry it, and a deck with no
    * stored entry falls back to the furthest unlocked block.
+   *
+   * Versioned in the field name rather than the storage key, which the other
+   * session prefs share. A selection is a list of *indices*, so it only means
+   * anything against the block list it was made against — authoring the kanji
+   * themes renumbered and recomposed every kanji deck, and index 3 went from
+   * "Kanji 1" to "State & Monarchy". Bumping the suffix drops selections made
+   * against the old layout instead of silently studying different cards. The
+   * unsuffixed `blockSelection` is deliberately never read.
    */
-  blockSelection?: Record<string, number[]>
+  blockSelectionV2?: Record<string, number[]>
 }
 
 export interface ScriptStats {

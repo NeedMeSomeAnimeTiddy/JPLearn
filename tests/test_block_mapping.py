@@ -134,6 +134,47 @@ class TestGeneratedBlocks:
         for block in generated[:-1]:
             assert len(block.card_ids) == GENERATED_BLOCK_SIZE
 
+    @pytest.mark.parametrize("slug", ["kanji_n5", "kanji_n4", "kanji_n3", "kanji_n2", "kanji_n1"])
+    def test_kanji_blocks_follow_the_component_graph_internally(self, slug: str) -> None:
+        """Within a block, no kanji precedes a component it is built from.
+
+        Themes group by subject, so the graph can no longer order the deck end to
+        end — a component may well sit in a different theme. What survives, and
+        what a learner actually meets in one sitting, is the order *inside* each
+        block: the themed ids are drawn from a component-ordered remainder, so
+        each block is a subsequence of that order.
+
+        Authored category blocks are exempt: they keep their curated membership
+        from before components existed.
+        """
+        from domain.block_mapping import category_slugs_for_parent, resolve_category_card_ids
+        from domain.kanji_components import KANJI_COMPONENTS
+
+        categorised: set[int] = set()
+        for category_slug in category_slugs_for_parent(slug):
+            categorised.update(resolve_category_card_ids(category_slug))
+
+        by_id = {card.id: card.character for card in ALL_DECKS[slug]().cards}
+        for block in blocks_for_slug(slug):
+            if any(cid in categorised for cid in block.card_ids):
+                continue
+            chars = [by_id[cid] for cid in block.card_ids]
+            position = {char: index for index, char in enumerate(chars)}
+            for char in chars:
+                for component in KANJI_COMPONENTS.get(char, ()):
+                    if component in position and component != char:
+                        assert position[component] < position[char], (
+                            f"'{slug}' block '{block.name}': "
+                            f"{char} arrives before its component {component}"
+                        )
+
+    @pytest.mark.parametrize("slug", ["vocab_n5", "vocab_n3", "vocab_n1"])
+    def test_vocabulary_blocks_keep_deck_order(self, slug: str) -> None:
+        """Components describe kanji only, so vocabulary must be left alone."""
+        generated = [b for b in blocks_for_slug(slug) if b.name.split()[-1].isdigit()]
+        remainder = [cid for block in generated for cid in block.card_ids]
+        assert remainder == sorted(remainder), f"'{slug}' vocabulary was reordered"
+
     def test_authored_categories_come_first_and_keep_their_names(self) -> None:
         names = [block.name for block in blocks_for_slug("vocab_n5")]
         assert names[:4] == ["Greetings", "Numbers", "Time & Days", "Family"]

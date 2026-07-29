@@ -41,7 +41,7 @@ export function useBlockSelection(
   deckCards: ScriptDeck['cards'],
 ): BlockSelection {
   const [stored, setStored] = useState<BlockSelectionBySlug>(
-    () => loadSessionPrefs()?.blockSelection ?? {},
+    () => loadSessionPrefs()?.blockSelectionV2 ?? {},
   )
 
   const selected = useMemo(() => {
@@ -66,7 +66,7 @@ export function useBlockSelection(
       // Copied into plain arrays: the state type is readonly, but what goes to
       // storage is JSON and must not alias the state.
       mergeSessionPrefs({
-        blockSelection: Object.fromEntries(
+        blockSelectionV2: Object.fromEntries(
           Object.entries(merged).map(([slug, indices]) => [slug, [...indices]]),
         ),
       })

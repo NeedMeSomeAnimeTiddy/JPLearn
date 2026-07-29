@@ -64,16 +64,24 @@ class TestSectionResolution:
 
 
 class TestDeckScoping:
-    # The level decks (`vocab_n5`..`vocab_n1`) are registered but never receive a
-    # review, so measuring a section over them pinned `mastered_ratio` at 0 and
-    # `new_count` at the full deck size forever. The section is measured over the
-    # category decks the app actually routes reviews to.
-    @pytest.mark.parametrize("section", ["vocab_n5", "kanji_n5"])
-    def test_sections_exclude_the_never_reviewed_level_decks(self, section: str) -> None:
-        slugs = desktop_bridge._section_deck_slugs(section)
-        track = section.split("_")[0]
+    # Vocabulary is still measured over its category decks: the level decks are
+    # registered but receive no reviews under that routing, which pinned
+    # `mastered_ratio` at 0 and `new_count` at the deck size forever.
+    def test_the_vocabulary_section_excludes_its_level_decks(self) -> None:
+        slugs = desktop_bridge._section_deck_slugs("vocab_n5")
         for level in range(1, 6):
-            assert f"{track}_n{level}" not in slugs
+            assert f"vocab_n{level}" not in slugs
+
+    # Kanji is the opposite, and deliberately so. Its categories became block
+    # definitions that allocate no ids, and `useStudySession` records every
+    # review against `activeDeckSlug` — `kanji_n5`..`kanji_n1`. The level decks
+    # are exactly where kanji reviews land, so that is what the section measures.
+    def test_the_kanji_section_is_measured_over_the_decks_reviews_land_in(self) -> None:
+        slugs = desktop_bridge._section_deck_slugs("kanji_n5")
+        assert slugs == ["kanji_n1", "kanji_n2", "kanji_n3", "kanji_n4", "kanji_n5"]
+
+    def test_the_kanji_n5_scope_is_just_the_n5_deck(self) -> None:
+        assert desktop_bridge._section_deck_slugs("kanji_n5", n5_only=True) == ["kanji_n5"]
 
     # `vocab_numbers` and `vocab_nouns` begin `vocab_n` without being levelled,
     # so an N5 scope that matched a bare prefix would silently drop them.
@@ -83,12 +91,12 @@ class TestDeckScoping:
             if slug in ALL_DECKS:
                 assert slug in n5
 
-    def test_the_n5_scope_is_a_strict_subset_of_the_whole_track(self) -> None:
-        for section in ("vocab_n5", "kanji_n5"):
-            whole = set(desktop_bridge._section_deck_slugs(section))
-            n5 = set(desktop_bridge._section_deck_slugs(section, n5_only=True))
-            assert n5 < whole
-            assert not any("_n1_" in slug or "_n4_" in slug for slug in n5)
+    @pytest.mark.parametrize("section", ["vocab_n5", "kanji_n5"])
+    def test_the_n5_scope_is_a_strict_subset_of_the_whole_track(self, section: str) -> None:
+        whole = set(desktop_bridge._section_deck_slugs(section))
+        n5 = set(desktop_bridge._section_deck_slugs(section, n5_only=True))
+        assert n5 < whole
+        assert not any("_n1_" in slug or "_n4_" in slug for slug in n5)
 
 
 class TestColdStart:

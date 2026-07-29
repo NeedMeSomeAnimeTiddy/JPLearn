@@ -2,9 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { createRequire } from 'node:module'
 import {
   CARD_MASTERY_MAX,
-  KANJI_CATEGORY_LABELS,
-  KANJI_CATEGORY_ORDER,
-  KANJI_CATEGORY_TO_DECK_SLUG,
   VOCAB_CATEGORY_LABELS,
   VOCAB_CATEGORY_ORDER,
   VOCAB_CATEGORY_TO_DECK_SLUG,
@@ -54,14 +51,6 @@ describe('vocabulary category maps', () => {
     }
     // N5 categories predate the level prefix convention and stay unprefixed.
     expect(slugs).toContain('vocab_greetings')
-  })
-})
-
-describe('kanji category maps', () => {
-  it('orders every declared category exactly once', () => {
-    const labelled = Object.keys(KANJI_CATEGORY_LABELS).sort()
-    expect([...KANJI_CATEGORY_ORDER].sort()).toEqual(labelled)
-    expect(new Set(KANJI_CATEGORY_ORDER).size).toBe(KANJI_CATEGORY_ORDER.length)
   })
 })
 
@@ -120,10 +109,9 @@ describe('N4-N1 vocabulary categories are reachable', () => {
 
 describe('main-process deck slug allowlist', () => {
   it('accepts every category deck the renderer can ask for', () => {
-    const slugs = [
-      ...VOCAB_CATEGORY_ORDER.map((key) => VOCAB_CATEGORY_TO_DECK_SLUG[key]),
-      ...KANJI_CATEGORY_ORDER.map((key) => KANJI_CATEGORY_TO_DECK_SLUG[key]),
-    ]
+    // Kanji categories are gone — its themes are block definitions that name no
+    // deck, so vocabulary is the only family with category slugs left.
+    const slugs = VOCAB_CATEGORY_ORDER.map((key) => VOCAB_CATEGORY_TO_DECK_SLUG[key])
     for (const slug of slugs) {
       expect(() => validateDeckSlug(slug), `${slug} rejected by ipc_security`).not.toThrow()
     }

@@ -61,13 +61,14 @@ def test_import_resolves_legacy_sections_to_owning_decks(tmp_path: Path, monkeyp
     actually owns it, which only Python can do.
 
     A card reached through a thematic category resolves to the *level* deck that
-    owns it, not the category: since issue #78 the categories are views over their
-    parent, so ``kanji_numbers_time`` and ``kanji_n5`` name the same card ids.
-    That single owner is the point — it is what stops one word carrying two
-    independent mastery values.
+    owns it: since issue #78 vocabulary categories are views over their parent, so
+    ``vocab_greetings`` and ``vocab_n5`` name the same card ids. That single owner
+    is the point — it is what stops one word carrying two independent mastery
+    values. Kanji no longer has category decks at all; its themes are block
+    definitions that allocate no ids, so the level deck is the only owner there.
     """
     _use_temp_db(tmp_path, monkeypatch)
-    kanji_card = _first_card_id("kanji_numbers_time")
+    kanji_card = _first_card_id("kanji_n5")
     vocab_card = _first_card_id("vocab_greetings")
 
     result = desktop_bridge.import_legacy_card_scores(
@@ -86,7 +87,6 @@ def test_import_resolves_legacy_sections_to_owning_decks(tmp_path: Path, monkeyp
     )
     assert stored["kanji_n5"][kanji_card] == 3
     assert stored["vocab_n5"][vocab_card] == CARD_MASTERY_MAX
-    assert "kanji_numbers_time" not in stored
     assert "vocab_greetings" not in stored
 
 

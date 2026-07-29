@@ -68,6 +68,12 @@ function CompoundList({ compounds, hasMore }: { compounds: KanjiCompound[]; hasM
 function ReadyDetail({ detail }: { detail: KanjiDetailPayload }) {
   return (
     <div className="kanji-detail-content">
+      {/* The bridge degrades to committed deck data when the optional
+          dictionary is absent or predates the kanji tables. Saying so beats
+          leaving three sections reading "not available" with no reason. */}
+      {detail.source === 'deck_only' ? (
+        <p className="kanji-detail-notice" role="status">{KANJI_DETAIL_COPY.deckOnly}</p>
+      ) : null}
       <section className="kanji-detail-section kanji-detail-summary" aria-labelledby="kanji-detail-summary-heading">
         <div className="kanji-detail-glyph" lang="ja" aria-hidden="true">{detail.character}</div>
         <div className="kanji-detail-summary-main">
@@ -113,7 +119,20 @@ function ReadyDetail({ detail }: { detail: KanjiDetailPayload }) {
 
         <section className="kanji-detail-section" aria-labelledby="kanji-detail-radicals-heading">
           <h2 id="kanji-detail-radicals-heading">Radicals and components</h2>
-          {detail.radicals.length === 0 ? <MissingData /> : (
+          {/* `components` ships with the app; `radicals` needs the optional
+              dictionary. Showing the components first means this section says
+              something useful even when nothing was downloaded. */}
+          {detail.components.length > 0 ? (
+            <p className="kanji-detail-components">
+              <span className="kanji-detail-components-label">{KANJI_DETAIL_COPY.componentsHeading}</span>
+              {detail.components.map((component) => (
+                <span key={component} className="kanji-detail-component" lang="ja">{component}</span>
+              ))}
+            </p>
+          ) : null}
+          {detail.radicals.length === 0 ? (
+            detail.components.length === 0 ? <MissingData /> : null
+          ) : (
             <ol className="kanji-detail-radical-list">
               {detail.radicals.map((radical) => (
                 <li key={`${radical.position}-${radical.radical}`}>

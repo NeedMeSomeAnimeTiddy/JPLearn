@@ -19,7 +19,9 @@ from pathlib import Path
 
 from data.card_notes_repository import build_offline_note_key, canonical_jmdict_source_id
 from data.text_normalization import contains_japanese_script
-from domain.decks import ALL_DECKS, CATEGORY_SOURCE_DECKS
+from domain.blocks import blocks_for_slug
+from domain.decks import ALL_DECKS
+from domain.kanji_components import KANJI_COMPONENTS
 from domain.retrieval import cosine_similarity, embed_text
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -141,6 +143,10 @@ class KanjiDetailPayload:
     on_readings: list[KanjiReading]
     kun_readings: list[KanjiReading]
     radicals: list[KanjiRadical]
+    # The app's own decomposition, from the committed KRADFILE extract. Unlike
+    # `radicals` this needs no download, so it is the one structural fact the
+    # panel can always show.
+    components: list[str]
     jlpt_level: str | None
     jlpt_level_source: str | None
     stroke_count: int | None
@@ -344,14 +350,16 @@ def _deck_metadata_for_kanji(character: str) -> tuple[list[str], list[str], str 
         matching_cards = [card for card in deck.cards if card.character == character]
         if not matching_cards:
             continue
-        # Thematic categories are views over their parent level deck since issue
-        # #78, so they report the parent's name. The authored label ("Kanji: N5 ·
-        # Numbers & Time") is what belongs in a detail panel, so read it from the
-        # source builder rather than the view.
-        source = CATEGORY_SOURCE_DECKS.get(slug)
-        display_name = source().name if source is not None else deck.name
-        if display_name not in categories:
-            categories.append(display_name)
+        # The theme is what the hub labels this card, so it is what belongs in a
+        # detail panel. Read off the block rather than a category deck: kanji
+        # categories became block definitions and no longer exist as decks.
+        wanted = {card.id for card in matching_cards}
+        for block in blocks_for_slug(slug):
+            if wanted.isdisjoint(block.card_ids):
+                continue
+            label = f"{deck.name} · {block.name}"
+            if label not in categories:
+                categories.append(label)
         for card in matching_cards:
             for tag in card.tags:
                 if tag not in tags:
@@ -824,19 +832,48 @@ def build_dictionary_search_payload(
     }
 
 
+def _deck_only_kanji_detail(character: str) -> dict[str, object]:
+    """The payload we can build with no offline dictionary installed.
+
+    Readings, compounds and stroke counts all live in the optional download, but
+    components, tags, categories and the JLPT level do not — they come from the
+    committed data. Returning those beats raising, which blanked the whole panel
+    for anyone who had not fetched a 170 MB dictionary.
+    """
+    tags, categories, deck_jlpt_level = _deck_metadata_for_kanji(character)
+    payload = KanjiDetailPayload(
+        character=character,
+        meanings=[],
+        on_readings=[],
+        kun_readings=[],
+        radicals=[],
+        components=list(KANJI_COMPONENTS.get(character, ())),
+        jlpt_level=deck_jlpt_level,
+        jlpt_level_source="deck" if deck_jlpt_level else None,
+        stroke_count=None,
+        classical_radical_number=None,
+        tags=tags,
+        categories=categories,
+        compounds=[],
+        has_more_compounds=False,
+        source="deck_only",
+    )
+    return asdict(payload)
+
+
 def build_kanji_detail_payload(character: str) -> dict[str, object]:
     validated_character = _validate_kanji_detail_character(character)
     db_path = _dictionary_db_path()
     if db_path is None:
-        raise FileNotFoundError("Offline dictionary index is not installed")
+        return _deck_only_kanji_detail(validated_character)
 
     database_uri = f"{db_path.resolve().as_uri()}?mode=ro"
     conn = sqlite3.connect(database_uri, uri=True)
     try:
         if not _dictionary_has_kanji_detail_schema(conn):
-            raise FileNotFoundError(
-                "Offline dictionary kanji detail index is outdated; please re-download it"
-            )
+            # An index predating the kanji detail tables. Same outcome for the
+            # reader as no index at all, so degrade rather than blank the panel.
+            return _deck_only_kanji_detail(validated_character)
 
         detail_row = conn.execute(
             """
@@ -900,6 +937,7 @@ def build_kanji_detail_payload(character: str) -> dict[str, object]:
         on_readings=_build_kanji_readings(on_reading_values, examples_by_reading),
         kun_readings=_build_kanji_readings(kun_reading_values, examples_by_reading),
         radicals=radicals,
+        components=list(KANJI_COMPONENTS.get(validated_character, ())),
         jlpt_level=jlpt_level,
         jlpt_level_source=jlpt_level_source,
         stroke_count=stroke_count,

@@ -24,6 +24,7 @@ const detail: KanjiDetailPayload = {
   ],
   kun_readings: [{ reading: 'ひ', examples: [] }],
   radicals: [{ position: 0, radical: '日', stroke_count: 4, code: 'js72' }],
+  components: ['日'],
   jlpt_level: 'N5',
   jlpt_level_source: 'kanjidic',
   stroke_count: 4,
@@ -38,6 +39,30 @@ const detail: KanjiDetailPayload = {
 function request(state: KanjiDetailRequestState): KanjiDetailRequest {
   return { ...state, retry: vi.fn() }
 }
+
+describe('degraded payload', () => {
+  it('shows components and says what the offline dictionary would add', () => {
+    useKanjiDetail.mockReturnValue(request({
+      status: 'ready',
+      detail: { ...detail, source: 'deck_only', radicals: [], components: ['日', '月'] },
+    }))
+
+    render(<KanjiDetailPanel character="明" onClose={vi.fn()} />)
+
+    // With no radicals the components row is what carries the section.
+    const section = screen.getByRole('heading', { name: /radicals and components/i })
+      .closest('section') as HTMLElement
+    expect(section.textContent).toContain('日')
+    expect(section.textContent).toContain('月')
+    expect(screen.getByText(/need the offline dictionary/i)).toBeTruthy()
+  })
+
+  it('stays quiet when the dictionary did answer', () => {
+    useKanjiDetail.mockReturnValue(request({ status: 'ready', detail }))
+    render(<KanjiDetailPanel character="日" onClose={vi.fn()} />)
+    expect(screen.queryByText(/need the offline dictionary/i)).toBeNull()
+  })
+})
 
 afterEach(() => {
   cleanup()
@@ -83,6 +108,7 @@ describe('KanjiDetailPanel', () => {
       detail: {
         ...detail,
         radicals: [],
+        components: [],
         compounds: [],
         on_readings: [{ reading: 'ニチ', examples: [] }],
         kun_readings: [],

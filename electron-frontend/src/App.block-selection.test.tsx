@@ -121,16 +121,37 @@ function clickTopMenuCard(label: string): void {
   fireEvent.click(button)
 }
 
-function blockChip(name: string): HTMLButtonElement {
+/** A block row in the tracklist. Named by its own cell, not the whole row —
+ *  the row also carries a track number, a mastery figure and a screen-reader
+ *  summary. */
+function blockRow(name: string): HTMLButtonElement {
+  const rows = Array.from(document.querySelectorAll('.hub-track')) as HTMLButtonElement[]
+  const row = rows.find((r) => r.querySelector('.hub-track-name')?.textContent?.trim() === name)
+  if (!row) throw new Error(`Block row not found: ${name}. Have: ${blockNames().join(', ')}`)
+  return row
+}
+
+function blockNames(): string[] {
+  return (Array.from(document.querySelectorAll('.hub-track-name')) as HTMLElement[])
+    .map((n) => n.textContent?.trim() ?? '')
+}
+
+function selectedBlockNames(): string[] {
+  return (Array.from(document.querySelectorAll('.hub-track')) as HTMLButtonElement[])
+    .filter((r) => r.getAttribute('aria-pressed') === 'true')
+    .map((r) => r.querySelector('.hub-track-name')?.textContent?.trim() ?? '')
+}
+
+/** All / None / Change / Done — the actions above the tracklist. */
+function actionChip(name: string): HTMLButtonElement {
   const chips = Array.from(document.querySelectorAll('.hub-block-chip')) as HTMLButtonElement[]
   const chip = chips.find((c) => c.textContent?.trim() === name)
-  if (!chip) throw new Error(`Block chip not found: ${name}. Have: ${chips.map((c) => c.textContent).join(', ')}`)
+  if (!chip) throw new Error(`Action not found: ${name}. Have: ${actionNames().join(', ')}`)
   return chip
 }
 
-function selectedChipNames(): string[] {
+function actionNames(): string[] {
   return (Array.from(document.querySelectorAll('.hub-block-chip')) as HTMLButtonElement[])
-    .filter((c) => c.getAttribute('aria-pressed') === 'true')
     .map((c) => c.textContent?.trim() ?? '')
 }
 
@@ -149,51 +170,51 @@ async function openHiraganaHub(): Promise<void> {
 describe('block multi-select', () => {
   it('defaults to the furthest unlocked block, as single-select did', async () => {
     await openHiraganaHub()
-    expect(selectedChipNames()).toEqual(['K-row'])
+    expect(selectedBlockNames()).toEqual(['K-row'])
     expect(poolLabel()).toContain('2 cards')
   })
 
   it('adds a second block and unions the pool', async () => {
     await openHiraganaHub()
-    fireEvent.click(blockChip('Vowels'))
+    fireEvent.click(blockRow('Vowels'))
 
-    await waitFor(() => expect(selectedChipNames()).toEqual(['Vowels', 'K-row']))
+    await waitFor(() => expect(selectedBlockNames()).toEqual(['Vowels', 'K-row']))
     expect(poolLabel()).toContain('4 cards')
     expect(poolLabel()).toContain('2 blocks')
   })
 
   it('deselects a block that is clicked again', async () => {
     await openHiraganaHub()
-    fireEvent.click(blockChip('Vowels'))
-    await waitFor(() => expect(selectedChipNames()).toHaveLength(2))
+    fireEvent.click(blockRow('Vowels'))
+    await waitFor(() => expect(selectedBlockNames()).toHaveLength(2))
 
-    fireEvent.click(blockChip('K-row'))
-    await waitFor(() => expect(selectedChipNames()).toEqual(['Vowels']))
+    fireEvent.click(blockRow('K-row'))
+    await waitFor(() => expect(selectedBlockNames()).toEqual(['Vowels']))
     expect(poolLabel()).toContain('2 cards')
   })
 
   it('renders a locked block as a disabled chip that cannot be selected', async () => {
     await openHiraganaHub()
-    const locked = blockChip('S-row')
+    const locked = blockRow('S-row')
 
     expect(locked.disabled).toBe(true)
     fireEvent.click(locked)
-    await waitFor(() => expect(selectedChipNames()).toEqual(['K-row']))
+    await waitFor(() => expect(selectedBlockNames()).toEqual(['K-row']))
   })
 
   it('selects every unlocked block but never a locked one', async () => {
     await openHiraganaHub()
-    fireEvent.click(blockChip('All'))
+    fireEvent.click(actionChip('All'))
 
-    await waitFor(() => expect(selectedChipNames()).toEqual(['Vowels', 'K-row']))
+    await waitFor(() => expect(selectedBlockNames()).toEqual(['Vowels', 'K-row']))
     expect(poolLabel()).toContain('4 cards')
   })
 
   it('clearing the selection studies the whole deck', async () => {
     await openHiraganaHub()
-    fireEvent.click(blockChip('None'))
+    fireEvent.click(actionChip('None'))
 
-    await waitFor(() => expect(selectedChipNames()).toEqual([]))
+    await waitFor(() => expect(selectedBlockNames()).toEqual([]))
     // All six cards, including the two behind the locked block: an empty
     // selection means "no block filter", not "no cards".
     expect(poolLabel()).toContain('6 cards')
@@ -202,23 +223,23 @@ describe('block multi-select', () => {
 
   it('persists the selection across a remount', async () => {
     await openHiraganaHub()
-    fireEvent.click(blockChip('Vowels'))
-    await waitFor(() => expect(selectedChipNames()).toHaveLength(2))
+    fireEvent.click(blockRow('Vowels'))
+    await waitFor(() => expect(selectedBlockNames()).toHaveLength(2))
 
     cleanup()
     await openHiraganaHub()
 
-    await waitFor(() => expect(selectedChipNames()).toEqual(['Vowels', 'K-row']))
+    await waitFor(() => expect(selectedBlockNames()).toEqual(['Vowels', 'K-row']))
   })
 
   it('keeps the selection out of the way of the other session prefs', async () => {
     await openHiraganaHub()
-    fireEvent.click(blockChip('Vowels'))
+    fireEvent.click(blockRow('Vowels'))
 
     await waitFor(() => {
       const prefs = JSON.parse(window.localStorage.getItem(PREFS_STORAGE_KEY) ?? '{}')
       // Both owners write this blob; neither may drop the other's fields.
-      expect(prefs.blockSelection).toEqual({ hiragana: [0, 1] })
+      expect(prefs.blockSelectionV2).toEqual({ hiragana: [0, 1] })
       expect(prefs.script).toBe('hiragana')
     })
   })
@@ -241,15 +262,91 @@ describe('block multi-select', () => {
     expect(getDeckCards).toHaveBeenCalledWith('vocab_n5')
   })
 
-  it('ignores a stored selection the deck no longer has room for', async () => {
-    // Issue #78 changed how many blocks these decks have, so a stored index can
-    // outlive the deck it was made against.
+  it('renders every row inline while the deck is short', async () => {
+    // Three blocks are legible at a glance, so the picker must not cost a click.
+    await openHiraganaHub()
+
+    expect(actionNames()).toEqual(['All', 'None'])
+    expect(blockNames()).toEqual(['Vowels', 'K-row', 'S-row'])
+    expect(document.querySelector('.hub-block-strip-summary')).toBeNull()
+  })
+
+  it('ignores a selection stored against the pre-theme block layout', async () => {
+    // Selections are indices, so they only mean anything against the block list
+    // they were made against. `blockSelectionV2` is the post-theme namespace;
+    // anything under the old `blockSelection` key is never read at all.
     window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({
-      script: 'hiragana', blockSelection: { hiragana: [7, 8, 9] },
+      script: 'hiragana', blockSelectionV2: { hiragana: [7, 8, 9] },
     }))
 
     await openHiraganaHub()
 
-    expect(selectedChipNames()).toEqual(['K-row'])
+    expect(selectedBlockNames()).toEqual(['K-row'])
+  })
+})
+
+/**
+ * Kanji N1 carries 69 blocks and N3/N2 ~22 each. As a wrapped chip cloud that was
+ * a wall, and the picker had to collapse behind a "Change" button to stay usable.
+ * As a scrolling tracklist it costs a fixed amount of room whatever the deck size,
+ * so every row is present from the start — nothing is behind a disclosure.
+ */
+describe('block tracklist on a long deck', () => {
+  const manyCards = Array.from({ length: 20 }, (_, id) => ({
+    id,
+    character: `char${id}`,
+    romaji: `r${id}`,
+    meaning: `m${id}`,
+    tags: ['hiragana'],
+    example_sentence: null,
+    dictionary_summary: null,
+    is_leech: false,
+    curriculum_stage: 1,
+    meaning_distractor_ids: [0, 1, 2, 3].filter((i) => i !== id),
+    character_distractor_ids: [0, 1, 2, 3].filter((i) => i !== id),
+    note_key: `note:v1:builtin:${id.toString(16).padStart(64, '0')}`,
+  }))
+
+  const manyBlocks = Array.from({ length: 10 }, (_, index) => ({
+    index,
+    name: `Block ${index + 1}`,
+    card_ids: [index * 2, index * 2 + 1],
+    sample_chars: [], characters: [], meanings: [], romajis: [],
+    mastery: 1,
+    unlocked: true,
+  }))
+
+  beforeEach(() => {
+    window.jplearnDesktop = {
+      ...makeApi(),
+      getDeckCards: async () => ({ cards: manyCards }),
+      getBlockProgress: async () => ({ blocks: manyBlocks }),
+    } as unknown as typeof window.jplearnDesktop
+  })
+
+  it('shows every row straight away, with no disclosure to open', async () => {
+    await openHiraganaHub()
+
+    expect(blockNames()).toHaveLength(10)
+    expect(blockNames()[0]).toBe('Block 1')
+    // "Change"/"Done" are gone; only the two bulk actions remain.
+    expect(actionNames()).toEqual(['All', 'None'])
+  })
+
+  it('selects from a long deck without opening anything first', async () => {
+    await openHiraganaHub()
+
+    fireEvent.click(blockRow('Block 1'))
+    await waitFor(() => expect(selectedBlockNames()).toEqual(['Block 1', 'Block 10']))
+    expect(poolLabel()).toContain('4 cards')
+  })
+
+  it('puts every row in one scroll container', async () => {
+    await openHiraganaHub()
+    const rows = document.querySelector('.hub-tracklist-rows')
+
+    // The height cap on this element is what lets the list stay open at 69
+    // blocks — see App.tracklist.css.test.ts for the cap itself.
+    expect(rows?.querySelectorAll('.hub-track')).toHaveLength(10)
   })
 })

@@ -8,9 +8,9 @@ const LEVEL_PREFIX = /^n([1-5])_/
  * Return the JLPT level a category key belongs to.
  *
  * The level is read from the key's prefix rather than a parallel lookup map:
- * `VOCAB_CATEGORY_ORDER` and `KANJI_CATEGORY_ORDER` are already the source of
- * truth for which categories exist, and a second map would be one more list to
- * keep in sync. N5 categories predate the prefix convention and are unprefixed
+ * `VOCAB_CATEGORY_ORDER` is already the source of truth for which categories
+ * exist, and a second map would be one more list to keep in sync. Kanji has no
+ * categories: its themes are block definitions and carry no level prefix. N5 categories predate the prefix convention and are unprefixed
  * (`greetings`, `numbers_time`), so an unprefixed key is N5.
  */
 export function categoryLevelOf(key: string): JlptLevel {

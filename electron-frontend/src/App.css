@@ -2930,28 +2930,44 @@ html[data-reduced-motion='true'] .home-hero-steam {
    un-hinted (vocab has 28 categories, kanji 19). `justify-content: center` on
    an overflowing flex row also clipped the leading chips where scrolling
    couldn't reach them. */
-.hub-tracklist-strip {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 8px;
-  padding: 6px 0 0;
-  border-top: 1px solid var(--panel-border);
+/* Only the section hub carries a rail. `.hub-studio` is shared with HomeView and
+   MinigameView, which have a single child — widening the base rule would leave
+   them a 268px hole where the rail would be. */
+.hub-studio--rail {
+  /* The window is fixed at 1280x820 and not resizable, so this is the only
+     layout there is — no narrow fallback to maintain. */
+  grid-template-columns: 268px minmax(0, 1fr);
 }
 
-.hub-tracklist-groups {
+/* ── Study pool rail ──────────────────────────────────────────────────────────
+   Blocks used to sit under the deck, where the fixed 820px height left room for
+   about nine rows. Given its own column the list gets roughly 24, so only N1's
+   69 blocks scroll at all. It also puts the pool upstream of the cassettes it
+   gates, rather than below them. */
+.hub-rail {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
+  min-height: 0;
   min-width: 0;
+  border-right: 1px solid var(--panel-border);
+  background: color-mix(in oklab, var(--bg-main) 80%, var(--bg-subtle));
+  /* Above .hub-studio::before, which paints a warm glow across the whole grid. */
+  position: relative;
+  z-index: 1;
+}
+
+.hub-rail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 12px 9px;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .hub-level-row {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
-  justify-content: center;
 }
 
 .hub-level-chip {
@@ -2989,15 +3005,150 @@ html[data-reduced-motion='true'] .home-hero-steam {
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-weight: 700;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
+/* Category chips, for the tracks that show categories instead of blocks. In the
+   rail they wrap down the column rather than across the deck. */
 .hub-block-row-strip {
   display: flex;
   gap: 5px;
   flex-wrap: wrap;
-  justify-content: center;
+  align-content: flex-start;
+  padding: 10px 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ── Block tracklist ──────────────────────────────────────────────────────────
+   The console is a cassette deck, so blocks read as a track listing rather than
+   a wrapped chip cloud. Fixed columns stop a long theme name ("Government &
+   Administration") from distorting the row, and mastery sits on the row instead
+   of hiding in a title attribute a keyboard user never sees. */
+.hub-tracklist {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.hub-tracklist-actions {
+  display: flex;
+  gap: 5px;
+  padding: 8px 12px;
+}
+
+.hub-tracklist-rows {
+  flex: 1;
+  /* Without this a flex child refuses to shrink below its content, and the
+     rail would push the studio taller than the fixed window. */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-top: 1px solid color-mix(in oklab, var(--panel-border) 55%, transparent);
+  /* Firefox and Chromium 121+; the ::-webkit rules below cover older Electron. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--accent) 40%, var(--panel-border)) transparent;
+}
+
+/* Square and inset, so the bar reads as part of the deck chrome rather than the
+   OS default sitting on top of it. */
+.hub-tracklist-rows::-webkit-scrollbar {
+  width: 8px;
+}
+
+.hub-tracklist-rows::-webkit-scrollbar-track {
+  background: color-mix(in oklab, var(--bg-main) 70%, transparent);
+  border-left: 1px solid color-mix(in oklab, var(--panel-border) 50%, transparent);
+}
+
+.hub-tracklist-rows::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  background: color-mix(in oklab, var(--accent) 34%, var(--panel-border));
+}
+
+.hub-tracklist-rows::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--accent) 62%, var(--panel-border));
+}
+
+.hub-track {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 56px 34px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--panel-border) 45%, transparent);
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--text-main);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.hub-track:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 6%, transparent);
+}
+
+.hub-track.is-active {
+  background: var(--bg-subtle);
+  border-left-color: var(--accent);
+}
+
+.hub-track.is-locked {
+  color: color-mix(in oklab, var(--text-soft) 45%, transparent);
+  cursor: not-allowed;
+}
+
+.hub-track-no {
+  color: var(--text-soft);
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-track.is-active .hub-track-no {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.hub-track-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.hub-track-bar {
+  display: block;
+  height: 3px;
+  background: color-mix(in oklab, var(--panel-border) 60%, transparent);
+}
+
+.hub-track-fill {
+  display: block;
+  height: 3px;
+  width: var(--track-pct, 0%);
+  background: var(--tone-ocean);
+  transition: width 200ms ease;
+}
+
+.hub-track-fill.is-high {
+  background: var(--tone-teal);
+}
+
+.hub-track-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.6rem;
 }
 
 .hub-block-chip {
@@ -5401,12 +5552,122 @@ html[data-reduced-motion='true'] .home-hero-steam {
   color: var(--text-muted);
 }
 
+/* Search + mastery filters above the kanji chips. Narrowing the level here is
+   what makes N1's 1,192 kanji reachable without paging through 27 screens. */
+.kanji-browse-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 0;
+}
+
+.kanji-browse-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.kanji-browse-search-icon {
+  position: absolute;
+  left: 9px;
+  width: 15px;
+  height: 15px;
+  color: var(--text-soft);
+  pointer-events: none;
+}
+
+.kanji-browse-search input {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px 6px 29px;
+  border: 1px solid var(--button-border);
+  border-radius: 2px;
+  background: var(--panel-bg);
+  color: var(--text-main);
+  font-size: 0.82rem;
+}
+
+.kanji-browse-search input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+/* A select rather than chips: N1 carries 66 themes, which as buttons would be
+   the wall this whole exercise removed. */
+.kanji-browse-theme {
+  min-height: 32px;
+  max-width: 200px;
+  padding: 6px 8px;
+  border: 1px solid var(--button-border);
+  border-radius: 2px;
+  background: var(--panel-bg);
+  color: var(--text-main);
+  font-size: 0.8rem;
+}
+
+.kanji-browse-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kanji-browse-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--button-border);
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.kanji-browse-filter:hover {
+  color: var(--text-main);
+}
+
+.kanji-browse-filter.is-active {
+  border-color: color-mix(in oklab, var(--tone-ocean) 70%, var(--card-border));
+  color: var(--text-main);
+}
+
+.kanji-browse-filter-count {
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+}
+
+.kanji-browse-filter.is-active .kanji-browse-filter-count {
+  color: var(--tone-ocean);
+}
+
+.kanji-browse-empty {
+  margin: 0;
+  padding: 18px 14px;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.kanji-browse-count {
+  margin-right: auto;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .kanji-chip-pagination {
-  margin-top: 10px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  /* Aligns the row with the chip grid above it, which carries the same inset. */
+  padding: 0 14px 14px;
 }
 
 .kanji-chip-pagination button {
@@ -5705,13 +5966,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
 }
 
 .side-sheet-right::-webkit-scrollbar { width: 0; }
-
-.script-hub-sheet-content {
-  display: grid;
-  gap: 16px;
-  padding: 24px 22px 42px;
-  min-height: 100%;
-}
 
 @keyframes slideInRight {
   from { transform: translateX(100%); }

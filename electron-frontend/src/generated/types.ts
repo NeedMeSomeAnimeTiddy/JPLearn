@@ -98,6 +98,7 @@ export interface OverviewCharacterCard {
   meaning: string
   tags: string[]
   example_sentence: string | null
+  theme: string
 }
 
 export interface SessionGoalPayload {
@@ -312,6 +313,7 @@ export interface KanjiDetailPayload {
   on_readings: KanjiReading[]
   kun_readings: KanjiReading[]
   radicals: KanjiRadical[]
+  components: string[]
   jlpt_level: string | null
   jlpt_level_source: string | null
   stroke_count: number | null
