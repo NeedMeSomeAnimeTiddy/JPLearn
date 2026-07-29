@@ -338,6 +338,29 @@ const baseDesktopApi = {
 function buildStudyPlanDesktopApi() {
   return {
     ...baseDesktopApi,
+    // The "Up next" block is the Python engine's output now, not derived from
+    // the summary — see domain/study_route.py. A fixture that omits this
+    // renders no block at all.
+    getRecommendations: async () => ({
+      recommendations: [
+        {
+          node_id: 'vocabulary_n5',
+          display_label: 'Start studying Vocabulary',
+          review_count: 15,
+          difficulty: 'normal',
+          reason: 'new_content_ready',
+          priority: 1,
+          section: 'vocab_n5',
+          minigame: 'meaning_match',
+          section_label: 'Vocabulary',
+          leech_focus_enabled: null,
+        },
+      ],
+      learner_stage: 'starter',
+      stage_label: 'Starter-safe',
+      session_minutes: 10,
+      session_note: 'Start with Vocabulary and move on once it feels steady.',
+    }),
     getStudySummary: async () => ({
       decks: [],
       streak: { current_days: 0, best_days: 0, freezes_available: 0 },
@@ -546,7 +569,7 @@ describe('Minigame menu', () => {
     }))
   })
 
-  it('shows a starter-safe study plan strip on the main menu and opens the suggested setup page', async () => {
+  it('shows the Up next block on the main menu and opens the suggested setup page', async () => {
     window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify({
       hiragana: {},
       katakana: {},
@@ -566,11 +589,13 @@ describe('Minigame menu', () => {
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
 
-    expect(await screen.findByText(/Study Plan/i)).toBeTruthy()
-    expect(screen.getByText(/starter-safe session/i)).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: /Up next/i })).toBeTruthy()
+    expect(screen.getByText(/10 min · Starter-safe/i)).toBeTruthy()
 
-    const shortcutButton = await screen.findByRole('button', { name: /meaning match/i })
-    fireEvent.click(shortcutButton)
+    // The row launches the drill the engine chose, rather than landing on the
+    // hub for the learner to pick one.
+    const rowButton = await screen.findByRole('button', { name: /Vocabulary · Meaning Match/i })
+    fireEvent.click(rowButton)
 
     expect(await screen.findByRole('heading', { name: /Mini Game Map/i })).toBeTruthy()
     expect((await screen.findAllByText(/Meaning Match/i)).length).toBeGreaterThan(0)

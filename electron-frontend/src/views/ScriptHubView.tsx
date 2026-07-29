@@ -316,14 +316,14 @@ export function ScriptHubView({
           <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
         </button>
 
-        <div className="hub-topbar-center">
-          <span className="hub-topbar-catalog">JPL-{activeScript === 'kanji_n5' ? 'KNJ' : activeScript === 'vocab_n5' ? 'VCB' : 'SCR'}-A</span>
+        <span className="hub-nameplate">
+          <span className="hub-nameplate-mark" aria-hidden="true">
+            JPL-{activeScript === 'kanji_n5' ? 'KNJ' : activeScript === 'vocab_n5' ? 'VCB' : 'SCR'}-A
+          </span>
           <strong className="hub-topbar-title"><span className="hub-glitch-text">{SCRIPT_LABELS[activeScript]}</span></strong>
-          <span className="hub-topbar-catalog hub-topbar-catalog--sub">CASSETTE TAPE · カセット · SIDE A</span>
-          <span className="hub-topbar-stripe" aria-hidden="true" />
-        </div>
+        </span>
 
-        <span aria-hidden="true" />
+        <span className="hub-topbar-sub">CASSETTE TAPE · カセット · SIDE A</span>
       </header>
 
       {/* ── Single-zone cassette console ────────────────────────── */}

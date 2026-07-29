@@ -23,6 +23,7 @@ import type {
   PitchAccent,
   ProgressionNodeStatusPayload,
   RecommendationPayload,
+  StudyBlockPayload,
   SessionGoalPayload,
   SessionSummaryPayload,
   TutorReactionPayload,
@@ -1057,9 +1058,8 @@ interface WordOfDayPayload {
   example_sentence: string | null
 }
 
-interface RecommendationsPayload {
-  recommendations: RecommendationItem[]
-}
+// The Home "Up next" block: ranked rows plus the session they add up to.
+type RecommendationsPayload = StudyBlockPayload
 
 // TutorReactionItem keeps narrow priority/message_type unions; the generated type uses string.
 interface TutorReactionItem extends Omit<TutorReactionPayload, 'priority' | 'message_type'> {

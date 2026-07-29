@@ -123,8 +123,19 @@ from domain.level_service import (  # noqa: E402
     xp_for_level_up,
     xp_to_next_level as xp_left,
 )
-from domain.recommendation import CategoryMetrics, StudySnapshot  # noqa: E402
+from domain.recommendation import (  # noqa: E402
+    CategoryMetrics,
+    StudyRecommendation,
+    StudySnapshot,
+)
 from domain.recommendation_service import generate_recommendations  # noqa: E402
+from domain.study_route import (  # noqa: E402
+    choose_route,
+    learner_stage,
+    session_minutes,
+    session_note,
+    stage_label,
+)
 from domain.tutor_service import (  # noqa: E402
     active_reactions,
     from_feature_event,
@@ -764,6 +775,24 @@ class RecommendationPayload:
     difficulty: str
     reason: str
     priority: int
+    # Everything the renderer needs to launch the row without deciding anything
+    # itself: which section, which drill, and any session preference the reason
+    # implies (`leech_focus_enabled` on a "problem items" row).
+    section: str
+    minigame: str
+    section_label: str
+    leech_focus_enabled: bool | None
+
+
+@dataclass(frozen=True)
+class StudyBlockPayload:
+    """The Home "Up next" block: ranked rows plus the session they add up to."""
+
+    recommendations: list[RecommendationPayload]
+    learner_stage: str
+    stage_label: str
+    session_minutes: int
+    session_note: str
 
 
 @dataclass(frozen=True)
@@ -1577,16 +1606,74 @@ def mark_onboarding_pending_handler() -> dict[str, object]:
 
 
 # ---------------------------------------------------------------------------
-# Node → deck slug mapping for recommendations
+# Node → section mapping for recommendations
 # ---------------------------------------------------------------------------
 
-_NODE_TO_DECK_SLUG: dict[str, str] = {
+# Graph node id → the renderer's section id (`ScriptKey`).  A recommendation for
+# a node absent from this map has nowhere to launch, so it is filtered out
+# before ranking rather than rendered as a row whose Start button does nothing.
+#
+# The nine remaining graph nodes (tutorial, scripted_conv, listening, free_conv,
+# reading, jlpt_n5..jlpt_n1) have no deck behind them — the same nodes
+# `_PROGRESSION_SYNC_DECK_SLUGS` leaves out, for the same reason.
+_NODE_TO_SECTION: dict[str, str] = {
     "hiragana": "hiragana",
     "katakana": "katakana",
     "vocabulary_n5": "vocab_n5",
     "grammar_n5": "grammar_patterns",
     "kanji_n5": "kanji_n5",
+    "sentence_examples": "sentence_examples",
 }
+
+# Which decks a section is measured over.
+#
+# The kanji and vocabulary sections span many decks, and *which* many matters.
+# `ALL_DECKS` holds two parallel corpora per track: the five JLPT level decks
+# (`vocab_n5`..`vocab_n1`) and the thematic category decks from issue #68
+# (`vocab_greetings`, `vocab_n4_school_work`, ...).  Only the category decks are
+# ever studied — `resultSlug` in useStudySession.ts routes every review through
+# the category maps — so a level deck can never accumulate a review.
+#
+# This used to load the single level deck `vocab_n5` / `kanji_n5`, which meant
+# the recommender measured 744 vocabulary cards that are structurally incapable
+# of being reviewed: `mastered_ratio` was pinned at 0 and `new_count` at the
+# full deck size forever, so `_rule_new_content_ready` fired for vocabulary and
+# kanji no matter how much the learner had actually studied.  The renderer's
+# coverage bars meanwhile aggregated the category decks, so the two halves of
+# the app disagreed about the same section.  Matching the renderer is what makes
+# one engine possible.
+_LEVEL_DECK_SLUGS = frozenset(
+    f"{track}_n{level}" for track in ("vocab", "kanji") for level in range(1, 6)
+)
+
+
+def _section_deck_slugs(section: str, *, n5_only: bool = False) -> list[str]:
+    """Return the deck slugs *section* is measured over, sorted for determinism.
+
+    With *n5_only*, narrows the kanji/vocabulary sections to the categories that
+    carry no level infix (`vocab_greetings`, not `vocab_n4_home_living`).  The
+    recall floor needs that narrower scope: the N5 categories are a minority of
+    each track, so a learner who has mastered all of N5 reads as well under the
+    floor against the whole N5-to-N1 track and would be stranded on recognition
+    drills.
+    """
+    if section not in ("kanji_n5", "vocab_n5"):
+        return [section] if section in ALL_DECKS else []
+
+    prefix = "kanji_" if section == "kanji_n5" else "vocab_"
+    slugs = []
+    for slug in ALL_DECKS:
+        if not slug.startswith(prefix) or slug in _LEVEL_DECK_SLUGS:
+            continue
+        if n5_only:
+            # `vocab_numbers` and `vocab_nouns` begin `vocab_n` without being
+            # levelled, so the check is on a level *segment*, not a bare prefix.
+            rest = slug[len(prefix):]
+            head = rest.split("_", 1)[0]
+            if len(head) == 2 and head[0] == "n" and head[1].isdigit():
+                continue
+        slugs.append(slug)
+    return sorted(slugs)
 
 _NOW_UTC = lambda: datetime.now(timezone.utc).isoformat()  # noqa: E731
 
@@ -1938,71 +2025,88 @@ def build_xp_progress() -> dict[str, object]:
     )
 
 
-def _build_category_metrics_for_node(node_id: str) -> CategoryMetrics:
-    """Aggregate SRS metrics for a single progression node."""
-    deck_slug = _NODE_TO_DECK_SLUG.get(node_id)
-    if deck_slug is None:
-        return CategoryMetrics(
-            node_id=node_id,
-            due_count=0,
-            overdue_count=0,
-            new_count=0,
-            leech_count=0,
-            accuracy_7d=1.0,
-            mastered_ratio=0.0,
-            total_items=0,
-        )
-    factory = ALL_DECKS.get(deck_slug)
-    if factory is None:
-        return CategoryMetrics(
-            node_id=node_id,
-            due_count=0,
-            overdue_count=0,
-            new_count=0,
-            leech_count=0,
-            accuracy_7d=1.0,
-            mastered_ratio=0.0,
-            total_items=0,
-        )
-    deck = factory()
-    card_ids = [card.id for card in deck.cards]
-    states = load_review_states(deck.name, card_ids)
+def _empty_metrics(node_id: str) -> CategoryMetrics:
+    return CategoryMetrics(
+        node_id=node_id,
+        due_count=0,
+        overdue_count=0,
+        new_count=0,
+        leech_count=0,
+        accuracy_7d=1.0,
+        mastered_ratio=0.0,
+        total_items=0,
+    )
+
+
+def _build_category_metrics_for_node(node_id: str, *, n5_only: bool = False) -> CategoryMetrics:
+    """Aggregate SRS metrics for a single progression node.
+
+    Sums across every deck the node's section is measured over — see
+    `_section_deck_slugs`, which is where the kanji and vocabulary sections fan
+    out to their category decks.
+    """
+    section = _NODE_TO_SECTION.get(node_id)
+    if section is None:
+        return _empty_metrics(node_id)
+
+    slugs = _section_deck_slugs(section, n5_only=n5_only)
+    if not slugs:
+        return _empty_metrics(node_id)
 
     from datetime import date as _date
+    from data.database import _connect, init_db
+    from data.study_pipeline import load_active_leech_card_ids
+
     today = _date.today()
     due_count = 0
     overdue_count = 0
     new_count = 0
     mastered_count = 0
-    for cid, state in states.items():
-        if state.repetitions <= 0:
-            new_count += 1
-        elif state.next_review <= today:
-            if state.next_review < today:
-                overdue_count += 1
-            else:
-                due_count += 1
-        if state.repetitions >= 3 and state.interval >= 21:
-            mastered_count += 1
+    leech_count = 0
+    total_items = 0
+    deck_keys: list[str] = []
 
-    from data.study_pipeline import load_active_leech_card_ids
-    leech_ids = load_active_leech_card_ids(deck.name)
-    leech_count = len(leech_ids)
+    for slug in slugs:
+        factory = ALL_DECKS.get(slug)
+        if factory is None:
+            continue
+        deck = factory()
+        card_ids = [card.id for card in deck.cards]
+        if not card_ids:
+            continue
+        total_items += len(card_ids)
+        deck_keys.append(_normalize_deck_key(deck.name))
 
-    # 7-day accuracy from review events
-    from data.database import _connect, init_db
+        for state in load_review_states(deck.name, card_ids).values():
+            if state.repetitions <= 0:
+                new_count += 1
+            elif state.next_review <= today:
+                if state.next_review < today:
+                    overdue_count += 1
+                else:
+                    due_count += 1
+            if state.repetitions >= 3 and state.interval >= 21:
+                mastered_count += 1
+
+        leech_count += len(load_active_leech_card_ids(deck.name))
+
+    if total_items == 0:
+        return _empty_metrics(node_id)
+
+    # 7-day accuracy across every deck in the section, in one query.
     init_db()
+    placeholders = ",".join("?" for _ in deck_keys)
     with _connect() as conn:
         row = conn.execute(
-            """
+            f"""
             SELECT
                 SUM(CASE WHEN quality >= 3 THEN 1 ELSE 0 END) AS correct,
                 COUNT(*) AS total
             FROM review_events
-            WHERE deck = ?
+            WHERE deck IN ({placeholders})
               AND reviewed_on >= date('now', '-7 days')
             """,
-            (_normalize_deck_key(deck.name),),
+            deck_keys,
         ).fetchone()
     correct = row["correct"] or 0
     total_reviews = row["total"] or 0
@@ -2015,25 +2119,55 @@ def _build_category_metrics_for_node(node_id: str) -> CategoryMetrics:
         new_count=new_count,
         leech_count=leech_count,
         accuracy_7d=round(accuracy_7d, 3),
-        mastered_ratio=round(mastered_count / len(card_ids), 3) if card_ids else 0.0,
-        total_items=len(card_ids),
+        mastered_ratio=round(mastered_count / total_items, 3),
+        total_items=total_items,
     )
 
 
+_SECTION_LABELS: dict[str, str] = {
+    "hiragana": "Hiragana",
+    "katakana": "Katakana",
+    "kanji_n5": "Kanji",
+    "vocab_n5": "Vocabulary",
+    "grammar_patterns": "N5 Grammar",
+    "sentence_examples": "Sentences",
+}
+
+#: Section a brand-new learner is pointed at when there is no history to rank.
+_COLD_START_SECTION = "hiragana"
+
+
 def build_recommendations_payload() -> dict[str, object]:
-    """Return prioritised study recommendations for the current learner state."""
+    """Return the Home "Up next" block: ranked rows and the session they form.
+
+    This is the whole "what should I study now" decision.  It used to be made
+    twice — here, from SRS metrics, and again in the renderer's `buildStudyPlan`
+    from deck-mastery aggregates — and the two could name different sections on
+    the same screen with buttons that behaved differently.  The renderer now
+    only renders; `studyPlan.ts` keeps the coverage bars and nothing else.
+    """
     init_study_db()
     prog_state = _load_progression_state()
     streak = load_streak_state()
     activity = load_activity_summary(7)
 
-    # Build CategoryMetrics for mapped nodes only
-    metrics = [
-        _build_category_metrics_for_node(node_id)
-        for node_id in _NODE_TO_DECK_SLUG
-    ]
-    # Filter to nodes that have items
-    metrics = [m for m in metrics if m.total_items > 0]
+    metrics_by_node = {
+        node_id: _build_category_metrics_for_node(node_id)
+        for node_id in _NODE_TO_SECTION
+    }
+    metrics = [m for m in metrics_by_node.values() if m.total_items > 0]
+
+    # Stage is "how far through the six sections", so every section counts
+    # equally and the denominator is fixed at all six — including ones with no
+    # deck data yet.  Weighting by card count would let a section's influence be
+    # decided by how much content happened to ship, and averaging only the
+    # started sections would demote a learner the moment a new one opened (#75).
+    overall_mastery = (
+        sum(m.mastered_ratio for m in metrics_by_node.values()) / len(_NODE_TO_SECTION)
+        if _NODE_TO_SECTION
+        else 0.0
+    )
+    stage = learner_stage(overall_mastery, streak.current_streak_days)
 
     from datetime import date as _date
     snapshot = StudySnapshot(
@@ -2048,20 +2182,74 @@ def build_recommendations_payload() -> dict[str, object]:
         current_streak=streak.current_streak_days,
         xp_last_7_days=activity.points_earned,
     )
-    recs = generate_recommendations(snapshot, JPLEARN_GRAPH)
-    return {
-        "recommendations": [
-            asdict(RecommendationPayload(
-                node_id=r.node_id,
-                display_label=r.display_label,
-                review_count=r.review_count,
-                difficulty=r.difficulty,
-                reason=r.reason,
-                priority=r.priority,
-            ))
-            for r in recs
-        ]
-    }
+    recs = list(generate_recommendations(snapshot, JPLEARN_GRAPH))
+
+    # Cold start: a fresh account has every node but the root locked, so nothing
+    # is rankable and the block would render empty on the one screen a new
+    # learner has just arrived at.  Point them at the first section instead.
+    if not recs:
+        recs = [_cold_start_recommendation()]
+
+    rows: list[RecommendationPayload] = []
+    for index, rec in enumerate(recs):
+        section = _NODE_TO_SECTION.get(rec.node_id)
+        if section is None:
+            continue
+        # The recall floor wants the N5-scoped figure for the kanji and
+        # vocabulary sections: their N5 categories are a minority of the whole
+        # N5-to-N1 track, so the track figure would hold a learner who has
+        # finished N5 on recognition drills indefinitely.  A missing N5 scope
+        # falls back to the wider figure rather than to zero, so an incomplete
+        # read degrades to the pre-floor behaviour instead of silently locking
+        # recall drills off.
+        track = metrics_by_node.get(rec.node_id)
+        track_mastery = track.mastered_ratio if track else 0.0
+        if section in ("kanji_n5", "vocab_n5"):
+            n5 = _build_category_metrics_for_node(rec.node_id, n5_only=True)
+            if n5.total_items > 0:
+                track_mastery = n5.mastered_ratio
+
+        route = choose_route(section, stage, index, track_mastery, rec.reason)
+        rows.append(RecommendationPayload(
+            node_id=rec.node_id,
+            display_label=rec.display_label,
+            review_count=rec.review_count,
+            difficulty=rec.difficulty,
+            reason=rec.reason,
+            priority=rec.priority,
+            section=route.section,
+            minigame=route.minigame,
+            section_label=_SECTION_LABELS.get(section, section),
+            leech_focus_enabled=route.overrides.leech_focus_enabled,
+        ))
+
+    top_label = rows[0].section_label if rows else None
+    payload = StudyBlockPayload(
+        recommendations=rows,
+        learner_stage=stage,
+        stage_label=stage_label(stage),
+        session_minutes=session_minutes(sum(row.review_count for row in rows)),
+        session_note=session_note(top_label, stage, streak.current_streak_days),
+    )
+    return asdict(payload)
+
+
+def _cold_start_recommendation() -> StudyRecommendation:
+    """The row shown when there is no history to rank."""
+    node_id = next(
+        (node for node, section in _NODE_TO_SECTION.items() if section == _COLD_START_SECTION),
+        _COLD_START_SECTION,
+    )
+    name = _SECTION_LABELS.get(_COLD_START_SECTION, _COLD_START_SECTION)
+    return StudyRecommendation(
+        node_id=node_id,
+        display_label=f"Start studying {name}",
+        review_count=10,
+        difficulty="easy",
+        focus_areas=("introduction",),
+        reason="new_content_ready",
+        priority=1,
+    )
 
 
 def build_tutor_reactions_payload() -> dict[str, object]:

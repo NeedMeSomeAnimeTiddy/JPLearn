@@ -163,6 +163,18 @@ export interface RecommendationPayload {
   difficulty: string
   reason: string
   priority: number
+  section: string
+  minigame: string
+  section_label: string
+  leech_focus_enabled: boolean | null
+}
+
+export interface StudyBlockPayload {
+  recommendations: RecommendationPayload[]
+  learner_stage: string
+  stage_label: string
+  session_minutes: number
+  session_note: string
 }
 
 export interface TutorReactionPayload {

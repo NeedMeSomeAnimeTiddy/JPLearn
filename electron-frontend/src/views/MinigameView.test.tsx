@@ -111,6 +111,7 @@ function sessionValue(overrides: Partial<SessionContextValue> = {}): SessionCont
     setSessionLength: vi.fn(),
     toggleLives: vi.fn(),
     toggleLeechFocus: vi.fn(),
+    setLeechFocus: vi.fn(),
     toggleConfidence: vi.fn(),
     playAudio: vi.fn(),
     ...overrides,

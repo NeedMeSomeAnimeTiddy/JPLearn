@@ -2303,7 +2303,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
 .home-deck-info {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 14px;
   padding: 6px 24px;
   border: 1px solid var(--panel-border);
@@ -2320,6 +2319,15 @@ html[data-reduced-motion='true'] .home-hero-steam {
   display: grid;
   gap: 2px;
   min-width: 0;
+  margin-right: auto;
+}
+
+/* The three destinations, huddled at the right edge as one group. */
+.home-deck-info-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .home-deck-info-title-row {
@@ -2558,26 +2566,28 @@ html[data-reduced-motion='true'] .home-hero-steam {
 }
 
 /* ── Chromatic aberration on title ────────────────────────────── */
+/* Compact across every surface that uses this bar — Home, ScriptHubView,
+   MinigameHud and Daily Games. The chromatic aberration is retuned to match:
+   the old 1px offsets and 20px glow were set for a 1.38rem title and read as
+   blur at this size rather than as VHS colour bleed. */
 .hub-topbar-title {
   font-family: var(--display-font);
-  font-size: 1.38rem;
+  font-size: 1.02rem;
   letter-spacing: 0.08em;
   color: var(--text-main);
-  padding: 2px 0 1px;
+  padding: 1px 0 0;
   text-shadow:
-    1px 0 1px color-mix(in oklab, var(--tone-rose) 30%, transparent),
-    -1px 0 1px color-mix(in oklab, var(--tone-teal) 30%, transparent),
-    0 0 20px color-mix(in oklab, var(--accent-soft) 20%, transparent),
-    0 2px 4px rgba(0,0,0,0.6);
+    0.5px 0 0 color-mix(in oklab, var(--tone-rose) 22%, transparent),
+    -0.5px 0 0 color-mix(in oklab, var(--tone-teal) 22%, transparent),
+    0 1px 3px rgba(0,0,0,0.45);
 }
 
 /* ── Topbar: Bold Record Header ───────────────────────────────── */
 .hub-topbar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
   gap: 16px;
-  padding: 14px 24px 10px;
+  padding: 5px 20px;
   min-height: 0;
   position: relative;
   background: var(--bg-main);
@@ -2599,51 +2609,58 @@ html[data-reduced-motion='true'] .home-hero-steam {
   pointer-events: none;
 }
 
-.hub-topbar-center {
+/* The title as a hardware label plate, echoing the `.hub-deck-badge` plates
+   ("DOLBY NR", "TYPE II · HIGH BIAS") already on these screens. Square, like
+   everything else in the app.
+
+   Shared by all four surfaces that use this bar — Home, ScriptHubView,
+   MinigameHud and Daily Games — because each already carries the same three
+   pieces: a catalog code for the plate segment, a title, and a sub-line. They
+   used to stack those centred over a decorative stripe, four lines deep. */
+.hub-nameplate {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  align-items: stretch;
+  border: 1px solid color-mix(in oklab, var(--panel-border) 160%, transparent);
+  background: var(--panel-bg);
 }
 
-.hub-topbar-catalog {
+.hub-nameplate-mark {
+  display: flex;
+  align-items: center;
+  padding: 0 7px;
+  border-right: 1px solid color-mix(in oklab, var(--panel-border) 160%, transparent);
   font-family: var(--mono);
   font-size: 0.5rem;
-  letter-spacing: 0.34em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--accent-soft) 70%, var(--text-soft));
   font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  letter-spacing: 0.22em;
+  color: var(--accent);
 }
 
-.hub-topbar-catalog--sub {
-  font-size: 0.46rem;
-  letter-spacing: 0.28em;
+/* Inset so the title sits inside the plate rather than against its edge. */
+.hub-nameplate .hub-topbar-title {
+  padding: 2px 10px;
+}
+
+/* The sub-line, pushed to the right edge. On Home that is the greeting; on the
+   others it is the tape/run descriptor that used to sit under the title. */
+.hub-topbar-sub {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
   color: color-mix(in oklab, var(--accent) 35%, var(--text-soft));
-  opacity: 0.7;
-}
-
-/* Decorative stripe under the title */
-.hub-topbar-stripe {
-  display: block;
-  width: 60px;
-  height: 2px;
-  margin-top: 4px;
-  background: linear-gradient(90deg,
-    transparent,
-    var(--accent-soft) 30%,
-    var(--accent) 70%,
-    transparent);
-  opacity: 0.7;
+  font-weight: 700;
+  text-align: right;
 }
 
 .hub-topbar .back-button {
-  justify-self: start;
+  flex-shrink: 0;
 }
 
 .hub-topbar-end {
-  justify-self: end;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 8px;
 }
@@ -3749,65 +3766,12 @@ html[data-reduced-motion='true'] .home-hero-steam {
   font-weight: 600;
 }
 
-.home-study-plan-strip {
-  margin-top: -6px;
-  margin-left: -14px;
-  margin-right: -14px;
-  border-radius: 0;
-  border-left: 0;
-  border-right: 0;
-  border: 1px solid var(--panel-border);
-  background: var(--bg-main);
-  padding: 11px 24px;
-}
-
-.home-study-plan-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.home-study-plan-heading {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  flex: 1;
-}
-
-.home-study-plan-heading strong {
-  font-size: clamp(1rem, 1.8vw, 1.2rem);
-  letter-spacing: -0.01em;
-}
-
-.home-study-plan-heading span {
-  color: var(--text-soft);
-  font-size: 0.84rem;
-  max-width: 74ch;
-}
-
-.home-study-plan-shortcuts {
-  display: flex;
-  gap: 9px;
-  flex-shrink: 0;
-}
-
-.study-plan-shortcut-button-inline {
-  min-height: 96px;
-  min-width: 180px;
-  padding: 10px 12px;
-  flex-shrink: 0;
-}
-
-/* ── Home widgets (Daily Goal + Word of the Day) ──── */
-.home-widgets {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  min-height: 96px;
-  min-width: 180px;
-  flex-shrink: 0;
-}
+/* ── Daily Goal ────────────────────────────────────────────────────────────
+   No longer a row of its own. `.home-bar` still carries the base look for the
+   widget elsewhere; inside the "Up next" heading it sheds its chrome and reads
+   as one more piece of that line. Word of the Day was removed from Home in the
+   same pass — it was the only element on the screen that could not be acted
+   on. The component and its `getWordOfDay` bridge command are untouched. */
 
 .home-bar {
   display: flex;
@@ -4842,21 +4806,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
 @media (max-width: 980px) {
   .study-plan-grid {
     grid-template-columns: 1fr;
-  }
-
-  .home-study-plan-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .home-study-plan-shortcuts {
-    flex-wrap: wrap;
-    width: 100%;
-  }
-
-  .study-plan-shortcut-button-inline {
-    min-width: 0;
-    flex: 1 1 calc(50% - 5px);
   }
 }
 
@@ -6201,7 +6150,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
   margin-top: 10px;
   padding: 9px 11px 8px;
   border: 1px solid var(--panel-border);
-  border-radius: var(--radius-card);
+  border-radius: 0;
   background: color-mix(in oklab, var(--panel-bg) 60%, transparent);
 }
 
@@ -6448,104 +6397,220 @@ html[data-reduced-motion='true'] .home-hero-steam {
   }
 }
 
-.home-recommendations {
+/* ── "Up next" — the merged study block ────────────────────────────────────
+   Replaced .home-recommendations (backend recommendation cards) and
+   .home-study-plan-strip (client-derived shortcuts), which stacked two
+   rankings of the same six sections one above the other. Shares the panel
+   vernacular of .course directly below it, deliberately: same mono micro-caps
+   heading, same tinted surface. It does not share the playhead cue — .course
+   already owns that mark for "where you are in the curriculum", and a second
+   one here read as two now-playing rows. */
+.up-next {
   margin-top: 10px;
-}
-
-.home-recommendations-heading {
-  margin: 0 0 7px;
-}
-
-.home-recommendations-list {
-  display: grid;
-  gap: 6px;
-}
-
-.recommendation-card {
-  display: grid;
-  grid-template-rows: auto auto auto;
-  gap: 4px;
-  padding: 10px 24px;
-  border: 1px solid var(--card-border);
-  border-left: 0;
-  border-right: 0;
+  padding: 9px 11px 10px;
+  border: 1px solid var(--panel-border);
   border-radius: 0;
-  margin-left: -14px;
-  margin-right: -14px;
-  background: linear-gradient(150deg, var(--card-bg-top), var(--card-bg-bottom));
-  animation: enterUp 300ms ease both;
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  background: color-mix(in oklab, var(--panel-bg) 60%, transparent);
 }
 
-.recommendation-card:hover {
-  border-color: color-mix(in oklab, var(--accent) 45%, var(--card-border));
-  box-shadow: 0 6px 16px -10px color-mix(in oklab, var(--accent) 30%, transparent);
-}
-
-.recommendation-card-meta {
+.up-next-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 
-.recommendation-card-reason {
-  font-size: 0.67rem;
-  font-weight: 700;
+/* The Daily Goal widget, stripped of its standalone-row chrome. Its picker
+   still needs `position: relative` to anchor to. */
+.up-next-head .daily-goal-widget {
+  position: relative;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.up-next-head .home-bar-clickable {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.up-next-head .home-bar-clickable:hover {
+  border-color: var(--panel-border);
+  color: var(--text-main);
+}
+
+.up-next-head .home-bar-clickable:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.up-next-head .home-bar-label {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.up-next-head .home-bar-meter {
+  width: 44px;
+  height: 3px;
+  border-radius: 0;
+  background: color-mix(in oklab, var(--text-soft) 22%, transparent);
+  overflow: hidden;
+}
+
+.up-next-head .home-bar-meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.up-next-head .home-bar-count {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+}
+
+/* Title left, session shape and today's count pushed right — the same split as
+   `.course-head` directly above it. */
+.up-next-title {
+  margin: 0 auto 0 0;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.up-next-session {
+  font-family: var(--mono);
+  font-size: 0.6rem;
   letter-spacing: 0.06em;
   color: var(--text-soft);
+  opacity: 0.75;
 }
 
-.recommendation-card-difficulty {
-  font-size: 0.72rem;
-  color: var(--tone-ocean);
-  letter-spacing: 0.04em;
-}
-
-.recommendation-card-label {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text-main);
-  line-height: 1.3;
-}
-
-.recommendation-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.recommendation-card-count {
-  font-size: 0.74rem;
+.up-next-note {
+  margin: 4px 0 0;
+  font-size: 0.76rem;
   color: var(--text-soft);
 }
 
-.recommendation-card-start {
-  display: inline-flex;
+.up-next-list {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.up-next-row {
+  display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 4px 10px;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 50%, var(--card-border));
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--tone-ocean) 12%, transparent);
-  color: color-mix(in oklab, var(--tone-ocean) 90%, var(--text-main));
-  font-size: 0.74rem;
-  font-weight: 700;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-main);
+  text-align: left;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 140ms ease, border-color 140ms ease;
 }
 
-.recommendation-card-start:hover {
-  background: color-mix(in oklab, var(--tone-ocean) 24%, transparent);
-  border-color: var(--tone-ocean);
+.up-next-row:hover {
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
 }
 
-.recommendation-card-arrow {
-  width: 11px;
-  height: 11px;
+.up-next-row:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The engine already ranked these, so the first row carries the weight and the
+   rest stay quiet. Tint alone, no cue glyph. */
+.up-next-row.is-top {
+  border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+
+.up-next-row.is-top:hover {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+}
+
+.up-next-row-main {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.up-next-row-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.up-next-row-meta {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: var(--text-soft);
+}
+
+.up-next-row-reason {
   flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 0;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: color-mix(in oklab, var(--text-soft) 16%, transparent);
+  color: var(--text-soft);
+}
+
+/* Only the reasons that mean "something is wrong" get their own colour; the
+   rest stay neutral so the accent keeps meaning "start here". */
+.up-next-row-reason.reason-leeches_detected,
+.up-next-row-reason.reason-high_error_rate {
+  background: color-mix(in oklab, #e04444 18%, transparent);
+  color: color-mix(in oklab, #e04444 55%, var(--text-main));
+}
+
+.up-next-row-reason.reason-new_content_ready,
+.up-next-row-reason.reason-progression_milestone {
+  background: color-mix(in oklab, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.up-next-row-arrow {
+  flex-shrink: 0;
+  color: var(--text-soft);
+}
+
+.up-next-row.is-top .up-next-row-arrow {
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .up-next-row {
+    transition: none;
+  }
 }
 
 .home-stats-icon {

@@ -8,17 +8,22 @@ import {
   Languages,
   Zap,
 } from 'lucide-react'
-import type { LearningPathStatus, MinigameKey, NavDirection, ScriptKey, SectionReadiness, StudyPlanSnapshot } from '../types'
+import type {
+  LearningPathStatus, MinigameKey, NavDirection, ScriptKey, SectionReadiness,
+  SessionPrefOverrides, StudyPlanSnapshot,
+} from '../types'
+import type { StudyBlockPayload } from '../generated/types'
 import {
+  DIFFICULTY_DOTS,
+  MINIGAMES,
+  RECOMMENDATION_REASON_LABELS,
   SCRIPT_DIFFICULTY_META,
   SCRIPT_LABELS,
   SCRIPT_MENU_LINES,
   SECTION_META,
 } from '../constants'
-import { RecommendationCard } from '../components/RecommendationCard'
 import { ScriptCassetteCarousel } from '../components/ScriptCassetteCarousel'
 import { DailyGoalWidget } from '../components/DailyGoalWidget'
-import { WordOfDayWidget } from '../components/WordOfDayWidget'
 import type { ScriptCassetteItem } from '../components/ScriptCassetteCarousel'
 import { DAILY_GAMES_COPY } from '../features/daily-games/constants'
 
@@ -30,25 +35,17 @@ const READINESS_BADGE: Record<SectionReadiness, { label: string; className: stri
   advanced: { label: 'Advanced', className: 'badge-advanced' },
 }
 
-interface RecommendationData {
-  nodeId: string
-  displayLabel: string
-  reviewCount: number
-  difficulty: string
-  reason: string
-}
-
 interface HomeViewProps {
   navDirection: NavDirection
   studyPlan: StudyPlanSnapshot
-  recommendations?: RecommendationData[]
+  /** The "Up next" block, from the `recommendations` bridge command. */
+  studyBlock?: StudyBlockPayload | null
   learningPathStatus?: LearningPathStatus | null
   onSelectScript: (script: ScriptKey) => void
   onOpenJlptPrep: () => void
   onOpenPassages?: () => void
   onOpenDailyGames: () => void
-  onJumpToSetup: (script: ScriptKey, minigame: MinigameKey) => void
-  onStartRecommendation?: (nodeId: string) => void
+  onJumpToSetup: (script: ScriptKey, minigame: MinigameKey, overrides?: SessionPrefOverrides) => void
   /** The curriculum map (issue #78 Phase 4). Omitted while it is loading. */
   progressionMap?: ReactNode
 }
@@ -65,14 +62,13 @@ const SCRIPT_ORDER: readonly ScriptKey[] = [
 export function HomeView({
   navDirection,
   studyPlan,
-  recommendations,
+  studyBlock,
   learningPathStatus,
   onSelectScript,
   onOpenJlptPrep,
   onOpenPassages,
   onOpenDailyGames,
   onJumpToSetup,
-  onStartRecommendation,
   progressionMap,
 }: HomeViewProps) {
   const [selectedScript, setSelectedScript] = useState<ScriptKey>('hiragana')
@@ -95,10 +91,13 @@ export function HomeView({
           : hourOfDay < 21 ? 'Good evening'
             : 'Winding down'
 
+  // Stage is decided by the Python engine and displayed here. The deck badge
+  // wants the bare noun where the block heading wants the adjectival form
+  // ("Build-up session"), so only this one is derived locally.
   const stageLabel =
-    studyPlan.learnerStage === 'starter' ? 'Starter'
-      : studyPlan.learnerStage === 'building' ? 'Building'
-        : 'Advanced'
+    studyBlock?.learner_stage === 'building' ? 'Building'
+      : studyBlock?.learner_stage === 'advanced' ? 'Advanced'
+        : 'Starter'
 
   const jlptCoverageRows = studyPlan.coverageRows.filter((row) => (
     row.key === 'kanji_n5' || row.key === 'vocab_n5' || row.key === 'grammar_patterns'
@@ -149,10 +148,12 @@ export function HomeView({
       <header className="hub-topbar">
         <h1 className="sr-only">Main Menu</h1>
 
-        <span aria-hidden="true" />
-
-        <div className="hub-topbar-center">
-          <span className="hub-topbar-catalog">JP-LEARN</span>
+        {/* A nameplate at the left edge instead of a centred four-line stack.
+            The old kicker read "JP-LEARN" directly beside "JPLearn" — the same
+            word twice at two sizes on one baseline — so the plate's segment is
+            just "JP" and the wordmark stands alone. */}
+        <span className="hub-nameplate">
+          <span className="hub-nameplate-mark" aria-hidden="true">JP</span>
           <strong className="hub-topbar-title">
             <TypeAnimation
               sequence={['JPLearn', 1000]}
@@ -162,11 +163,9 @@ export function HomeView({
               style={{ display: 'inline-block' }}
             />
           </strong>
-          <span className="hub-topbar-catalog hub-topbar-catalog--sub">{greeting} · 日本語学習</span>
-          <span className="hub-topbar-stripe" aria-hidden="true" />
-        </div>
+        </span>
 
-        <span aria-hidden="true" />
+        <span className="hub-topbar-sub">{greeting} · 日本語学習</span>
       </header>
 
       <div className="hub-studio">
@@ -222,6 +221,10 @@ export function HomeView({
                 </span>
               </div>
 
+              {/* Grouped rather than spread by `justify-content: space-between`
+                  — three destinations spaced across the full width read as
+                  three unrelated things. */}
+              <div className="home-deck-info-actions">
               <button
                 type="button"
                 className="home-jlpt-button"
@@ -257,6 +260,7 @@ export function HomeView({
                 <span>{DAILY_GAMES_COPY.title}</span>
                 <ArrowRight size={13} strokeWidth={2.2} aria-hidden="true" />
               </button>
+              </div>
             </div>
           )}
 
@@ -265,60 +269,61 @@ export function HomeView({
               same course (issue #78 Phase 5). */}
           {progressionMap}
 
-          {recommendations && recommendations.length > 0 && onStartRecommendation ? (
-            <section className="home-recommendations" aria-label="Study recommendations">
-              <div className="home-recommendations-list">
-                {recommendations.slice(0, 2).map((rec) => (
-                  <RecommendationCard
-                    key={rec.nodeId}
-                    displayLabel={rec.displayLabel}
-                    reviewCount={rec.reviewCount}
-                    difficulty={rec.difficulty}
-                    reason={rec.reason}
-                    onStart={() => onStartRecommendation(rec.nodeId)}
-                  />
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {studyPlan.coverageRows.length > 0 ? (
-            <section className="home-study-plan-strip panel-glass" aria-label="Study plan">
-              <div className="home-study-plan-row">
-                <div className="home-study-plan-heading">
-                  <p className="hero-kicker">Study Plan</p>
-                  <strong>
-                    {studyPlan.recommendedMinutes}-minute{' '}
-                    {studyPlan.learnerStage === 'starter'
-                      ? 'starter-safe'
-                      : studyPlan.learnerStage === 'building'
-                        ? 'build-up'
-                        : 'advanced'}{' '}
-                    session
-                  </strong>
-                  <span>{studyPlan.sessionNote}</span>
-                </div>
-
-              <div className="home-widgets">
-                <WordOfDayWidget />
+          {/* One block, replacing the study-plan strip and the separate
+              recommendation cards. Those were two independent engines ranking
+              the same six sections from different inputs, rendered one above the
+              other with buttons that behaved differently — one landed on the
+              script hub, the other launched a configured round. */}
+          {studyBlock && studyBlock.recommendations.length > 0 ? (
+            <section className="up-next" aria-labelledby="up-next-title">
+              <div className="up-next-head">
+                <h2 id="up-next-title" className="up-next-title">Up next</h2>
+                <span className="up-next-session">
+                  {studyBlock.session_minutes} min · {studyBlock.stage_label}
+                </span>
+                {/* Today's count belongs to the same question this block asks —
+                    how much am I doing now — so it rides in the heading rather
+                    than occupying a row of its own. The target picker still
+                    opens on click. */}
                 <DailyGoalWidget />
               </div>
 
-                <div className="home-study-plan-shortcuts" aria-label="Study plan shortcuts">
-                  {studyPlan.shortcutRows.map((shortcut) => (
-                    <button
-                      key={shortcut.key}
-                      type="button"
-                      className="study-plan-shortcut-button study-plan-shortcut-button-inline"
-                      onClick={() => onJumpToSetup(shortcut.script, shortcut.minigame)}
-                    >
-                      <span className="study-plan-shortcut-kicker">Quick shortcut</span>
-                      <strong>{shortcut.label}</strong>
-                      <p>{shortcut.note}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <p className="up-next-note">{studyBlock.session_note}</p>
+
+              <ol className="up-next-list">
+                {studyBlock.recommendations.map((row, index) => {
+                  const badge = RECOMMENDATION_REASON_LABELS[row.reason] ?? row.reason
+                  const drill = MINIGAMES.find((game) => game.key === row.minigame)?.title ?? row.minigame
+                  return (
+                    <li key={row.node_id}>
+                      <button
+                        type="button"
+                        className={`up-next-row${index === 0 ? ' is-top' : ''}`}
+                        onClick={() => onJumpToSetup(
+                          row.section as ScriptKey,
+                          row.minigame as MinigameKey,
+                          row.leech_focus_enabled === null
+                            ? undefined
+                            : { leechFocusEnabled: row.leech_focus_enabled },
+                        )}
+                      >
+                        <span className="up-next-row-main">
+                          <strong className="up-next-row-name">
+                            {row.section_label} · {drill}
+                          </strong>
+                          <span className="up-next-row-meta">
+                            {row.review_count} {row.review_count === 1 ? 'item' : 'items'}
+                            {' · '}
+                            {DIFFICULTY_DOTS[row.difficulty] ?? row.difficulty}
+                          </span>
+                        </span>
+                        <span className={`up-next-row-reason reason-${row.reason}`}>{badge}</span>
+                        <ArrowRight size={15} strokeWidth={2.2} aria-hidden="true" className="up-next-row-arrow" />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
             </section>
           ) : null}
 

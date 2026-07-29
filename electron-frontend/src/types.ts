@@ -303,16 +303,6 @@ export interface JlptLevelProgress {
   total: number
 }
 
-export interface StudyPlanShortcut {
-  key: string
-  label: string
-  note: string
-  script: ScriptKey
-  minigame: MinigameKey
-}
-
-export type StudyPlanStage = 'starter' | 'building' | 'advanced'
-
 export interface StudyPlanCoverageRow {
   key: ScriptKey
   label: string
@@ -322,14 +312,15 @@ export interface StudyPlanCoverageRow {
   difficulty: number
 }
 
+// Coverage only. What to study next comes from the `recommendations` bridge
+// command — see the note at the top of lib/studyPlan.ts.
 export interface StudyPlanSnapshot {
   coverageRows: StudyPlanCoverageRow[]
-  focusRows: StudyPlanCoverageRow[]
-  overallMastery: number
-  recommendedMinutes: number
-  sessionNote: string
-  learnerStage: StudyPlanStage
-  shortcutRows: StudyPlanShortcut[]
+}
+
+/** Session preferences a recommendation row applies before the round starts. */
+export interface SessionPrefOverrides {
+  leechFocusEnabled?: boolean
 }
 
 // ── Bridge payload aliases ────────────────────────────────────────────────

@@ -86,12 +86,12 @@ export function MinigameHud({
         ) : null}
       </div>
 
-      <div className="hub-topbar-center">
-        <span className="hub-topbar-catalog">{catalogCode}</span>
+      <span className="hub-nameplate">
+        <span className="hub-nameplate-mark" aria-hidden="true">{catalogCode}</span>
         <strong className="hub-topbar-title"><span className="hub-glitch-text">{title}</span></strong>
-        <span className="hub-topbar-catalog hub-topbar-catalog--sub">{subCatalog}</span>
-        <span className="hub-topbar-stripe" aria-hidden="true" />
-      </div>
+      </span>
+
+      <span className="hub-topbar-sub">{subCatalog}</span>
 
       <div className="hub-topbar-end">
         {sessionActive && livesEnabled ? (

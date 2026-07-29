@@ -18,11 +18,11 @@ import type {
   OverviewKanjiCard,
   OverviewSectionKey,
   PlayableMinigame,
-  RecommendationItem,
   RoundState,
   ScriptDeck,
   ScriptKey,
   SectionReadiness,
+  SessionPrefOverrides,
   SettingsTabKey,
   ShortcutSubmenuKey,
   StatsByScript,
@@ -32,6 +32,7 @@ import type {
   VocabCategory,
   XPProgress,
 } from './types'
+import type { StudyBlockPayload } from './generated/types'
 import { SetupWizard } from './components/SetupWizard'
 import { DictionaryPopup } from './components/DictionaryPopup'
 import { ResumeToast } from './components/ResumeToast'
@@ -217,7 +218,7 @@ function App() {
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
   const [xpToasts, setXpToasts] = useState<Array<{ id: number; xp: number; levelBefore?: number; levelAfter?: number }>>([])
   const [milestoneToasts, setMilestoneToasts] = useState<Array<{ id: number; descriptor: string }>>([])
-  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([])
+  const [studyBlock, setStudyBlock] = useState<StudyBlockPayload | null>(null)
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
   const [warningModal, setWarningModal] = useState<{
     sectionId: ScriptKey | 'jlpt_prep'
@@ -971,7 +972,7 @@ function App() {
       ])
       if (!mounted) return
       if (xp) setXpProgress(xp)
-      if (recs) setRecommendations(recs.recommendations)
+      if (recs) setStudyBlock(recs)
       if (path) setLearningPathStatus(path as LearningPathStatus)
     }
     void doFetch()
@@ -1422,8 +1423,8 @@ function App() {
   const minigamePerf = useMemo(() => summary?.minigame_performance ?? [], [summary])
   const sessionHistory = useMemo(() => summary?.session_history ?? [], [summary])
   const studyPlan = useMemo(
-    () => buildStudyPlan(decks, kanjiLevelProgress, vocabLevelProgress, activity, streak.current_days),
-    [activity, decks, kanjiLevelProgress, streak.current_days, vocabLevelProgress],
+    () => buildStudyPlan(decks, kanjiLevelProgress, vocabLevelProgress),
+    [decks, kanjiLevelProgress, vocabLevelProgress],
   )
   const learningPathTrackRows = useMemo(
     () => {
@@ -1611,14 +1612,25 @@ function App() {
   // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
   }, [activeScript, closeKanjiDetail, closeShortcutMenu, resetSessionWithLives, resolveScriptMinigame, startSession])
 
-  const jumpToScriptHubSetup = useCallback((script: ScriptKey, minigame: MinigameKey) => {
+  // `overrides` lets a caller set session preferences the destination implies —
+  // an "Up next" row raised by `leeches_detected` arrives with leech focus on.
+  // Anything left unset keeps whatever the learner last chose.
+  const jumpToScriptHubSetup = useCallback((
+    script: ScriptKey,
+    minigame: MinigameKey,
+    overrides?: SessionPrefOverrides,
+  ) => {
     closeKanjiDetail()
     const resolvedMinigame = resolveScriptMinigame(script, minigame)
     setActiveScript(script)
     setActiveGame(resolvedMinigame)
+    if (overrides?.leechFocusEnabled !== undefined) {
+      session.setLeechFocus(overrides.leechFocusEnabled)
+    }
     navigate('script_hub', 'forward')
     resetSessionWithLives()
     closeShortcutMenu()
+  // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
   }, [closeKanjiDetail, closeShortcutMenu, navigate, resetSessionWithLives, resolveScriptMinigame])
 
   const openSettingsFromMenu = useCallback(() => {
@@ -2111,21 +2123,7 @@ function App() {
           navDirection={navDirection}
           studyPlan={studyPlan}
           learningPathStatus={learningPathStatus}
-          recommendations={recommendations.map((r) => ({
-            nodeId: r.node_id,
-            displayLabel: r.display_label,
-            reviewCount: r.review_count,
-            difficulty: r.difficulty,
-            reason: r.reason,
-          }))}
-          onStartRecommendation={(nodeId) => {
-            const scriptMap: Record<string, string> = {
-              hiragana: 'hiragana', katakana: 'katakana',
-              vocabulary_n5: 'vocab_n5', grammar_n5: 'grammar_patterns', kanji_n5: 'kanji_n5',
-            }
-            const script = scriptMap[nodeId] as ScriptKey | undefined
-            if (script) jumpToScriptHub(script)
-          }}
+          studyBlock={studyBlock}
           onSelectScript={(script) => {
             // Check readiness before navigating — show modal for challenging/advanced
             const readiness = learningPathStatus?.steps.find((s) => s.section_id === script)?.readiness
@@ -2479,16 +2477,14 @@ function App() {
               <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
             </button>
 
-            <div className="hub-topbar-center">
-              <span className="hub-topbar-catalog">JPL-DLY-A</span>
+            <span className="hub-nameplate">
+              <span className="hub-nameplate-mark" aria-hidden="true">JPL-DLY-A</span>
               <strong className="hub-topbar-title">
                 <span className="hub-glitch-text">{DAILY_GAMES_COPY.title}</span>
               </strong>
-              <span className="hub-topbar-catalog hub-topbar-catalog--sub">DAILY GAMES · 毎日</span>
-              <span className="hub-topbar-stripe" aria-hidden="true" />
-            </div>
+            </span>
 
-            <span aria-hidden="true" />
+            <span className="hub-topbar-sub">DAILY GAMES · 毎日</span>
           </header>
 
           <div className="hub-studio">

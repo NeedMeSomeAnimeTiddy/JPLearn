@@ -1444,6 +1444,10 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       setLivesRemaining(DEFAULT_LIVES)
     },
     toggleLeechFocus: () => setLeechFocusEnabled((previous) => !previous),
+    // Set outright rather than toggled, for callers that know the value they
+    // want: an "Up next" row raised by `leeches_detected` turns leech focus on
+    // before navigating, so a row labelled "problem items" studies them.
+    setLeechFocus: (value: boolean) => setLeechFocusEnabled(value),
     toggleConfidence: () => setConfidenceCaptureEnabled((previous) => !previous),
   }
 
@@ -1474,5 +1478,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     resetSessionForDbReset,
     clearLastRunReport,
     requestResumeSession,
+    setLeechFocus: setLeechFocusEnabled,
   }
 }

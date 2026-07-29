@@ -700,3 +700,23 @@ export const MOTION_STYLE_LABEL: Record<AnimationStyle, string> = {
 }
 
 export const CARD_MASTERY_MAX = 4 // Max score per card; reach this to fully master a card.
+
+// Reason codes from domain/recommendation.py, as the badge on an "Up next" row.
+// Each says why the engine raised the row, which is also what decides the drill
+// it launches — see domain/study_route.choose_route.
+export const RECOMMENDATION_REASON_LABELS: Record<string, string> = {
+  high_error_rate: 'Needs work',
+  leeches_detected: 'Problem items',
+  new_content_ready: 'New content',
+  overdue_reviews: 'Overdue',
+  streak_recovery: 'Warm-up',
+  progression_milestone: 'Just unlocked',
+  weak_retention: 'Fading',
+  balanced_review: 'Review',
+}
+
+export const DIFFICULTY_DOTS: Record<string, string> = {
+  easy: '●○○',
+  normal: '●●○',
+  challenging: '●●●',
+}

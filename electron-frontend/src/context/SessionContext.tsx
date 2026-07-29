@@ -113,6 +113,7 @@ export interface SessionContextValue {
   setSessionLength: (items: number) => void
   toggleLives: () => void
   toggleLeechFocus: () => void
+  setLeechFocus: (value: boolean) => void
   toggleConfidence: () => void
   playAudio: (text: string) => void
 }

@@ -150,4 +150,10 @@ export interface StudySessionApi {
   clearLastRunReport: () => void
   /** Queues a session start that waits for `activeScript` to catch up. */
   requestResumeSession: (request: { script: ScriptKey; minigame: MinigameKey }) => void
+  /**
+   * Sets leech focus outright, for callers that know the value they want — an
+   * "Up next" row raised by `leeches_detected` turns it on before navigating.
+   * `slice.toggleLeechFocus` remains the control the learner drives.
+   */
+  setLeechFocus: (value: boolean) => void
 }
