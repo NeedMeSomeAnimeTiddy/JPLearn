@@ -24,6 +24,7 @@ from domain.decks import ALL_DECKS, CATEGORY_SOURCE_DECKS
 from domain.kanji_components import KANJI_COMPONENTS
 from domain.kanji_ordering import order_by_components
 from domain.kanji_themes import KANJI_THEMES
+from domain.vocab_themes import VOCAB_THEMES
 
 # Fraction of a block's cards that must have repetitions >= 1 before the
 # following block becomes available.
@@ -211,8 +212,12 @@ def _generated_blocks(slug: str) -> tuple[Block, ...]:
         # Components only describe kanji, so vocabulary keeps its deck order.
         remaining = _component_ordered(remaining, characters)
 
-    for name, theme_chars in KANJI_THEMES.get(slug, ()):
-        wanted = set(theme_chars)
+    # Kanji themes pack one character per position; vocabulary themes are tuples
+    # of word surfaces. Both resolve the same way — by surface, against whatever
+    # the authored categories left over.
+    themes = KANJI_THEMES.get(slug) or VOCAB_THEMES.get(slug, ())
+    for name, theme_entries in themes:
+        wanted = set(theme_entries)
         card_ids = [cid for cid in remaining if characters[cid] in wanted]
         if not card_ids:
             continue
