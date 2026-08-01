@@ -1025,7 +1025,7 @@ const camera = new THREE.PerspectiveCamera(42, W() / H(), 1, 60000);
 const backScene = new THREE.Scene();
 /* scaled to a real landscape: the near ground stays clear, the foothills soften, and the far
    ranges dissolve into the night rather than ending at a visible edge */
-backScene.fog = new THREE.Fog(NIGHT, 5000, 38000);
+backScene.fog = new THREE.Fog(0xbfc0c6, 9000, 44000);   /* dawn haze — pulled back hard: at 4200 it bleached the whole valley */
 const backRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 backRenderer.setSize(W(), H());
 backRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -1374,30 +1374,35 @@ function paintSky() {
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d');
-  /* v = 0 is the zenith on a sphere's UVs, v = 1 the nadir */
+  /* DAWN. v = 0 is the zenith on a sphere's UVs, v = 1 the nadir. The gradient stays purely
+     vertical and keeps the upper sky deep — that is what holds the cream type legible, since
+     the menu sits high-left. The warm sunrise is a separate glow placed in the world near
+     Fuji rather than baked in here, so it can be aimed. */
   const sky = g.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0.00, '#080b16');
-  sky.addColorStop(0.32, '#141a2e');
-  sky.addColorStop(0.52, '#243052');
-  sky.addColorStop(0.60, '#33406a');   /* the glow that sits just above the horizon */
-  sky.addColorStop(0.66, '#1b2238');
-  sky.addColorStop(1.00, '#0a0d16');
+  sky.addColorStop(0.00, '#16213f');
+  sky.addColorStop(0.26, '#2c4068');
+  sky.addColorStop(0.44, '#5d7ba4');
+  sky.addColorStop(0.54, '#9db2c8');
+  sky.addColorStop(0.60, '#dcc0a4');   /* the warm band just above the ridgeline */
+  sky.addColorStop(0.635, '#f2d5ac');
+  sky.addColorStop(0.68, '#b9b3b2');
+  sky.addColorStop(1.00, '#6e7276');
   g.fillStyle = sky;
   g.fillRect(0, 0, W, H);
-  /* stars thin out toward the horizon */
-  for (let i = 0; i < 1400; i++) {
-    const y = Math.pow(Math.random(), 1.5) * H * 0.56;
-    const a = 0.25 + Math.random() * 0.6 * (1 - y / (H * 0.56));
+  /* a last few stars, high up only — anything near the horizon is washed out by now */
+  for (let i = 0; i < 260; i++) {
+    const y = Math.pow(Math.random(), 2.1) * H * 0.26;
+    const a = 0.10 + Math.random() * 0.35 * (1 - y / (H * 0.26));
     g.fillStyle = `rgba(226,236,255,${a.toFixed(2)})`;
-    const s = Math.random() < 0.06 ? 3 : 2;
-    g.fillRect(Math.random() * W, y, s, s);
+    g.fillRect(Math.random() * W, y, 2, 2);
   }
-  /* a few thin cloud bands, low and wide */
-  for (let i = 0; i < 14; i++) {
-    const y = H * (0.40 + Math.random() * 0.18);
-    g.fillStyle = `rgba(150,172,214,${(0.03 + Math.random() * 0.05).toFixed(3)})`;
+  /* morning cloud: long thin bands catching the light from underneath */
+  for (let i = 0; i < 26; i++) {
+    const y = H * (0.40 + Math.random() * 0.16);
+    const warm = (y / H - 0.40) / 0.16;
+    g.fillStyle = `rgba(${Math.round(210 + warm * 40)},${Math.round(190 + warm * 30)},${Math.round(190 - warm * 20)},${(0.05 + Math.random() * 0.11).toFixed(3)})`;
     g.beginPath();
-    g.ellipse(Math.random() * W, y, 200 + Math.random() * 420, 12 + Math.random() * 22, 0, 0, 7);
+    g.ellipse(Math.random() * W, y, 240 + Math.random() * 520, 9 + Math.random() * 20, 0, 0, 7);
     g.fill();
   }
   return new THREE.CanvasTexture(c);
@@ -1433,7 +1438,7 @@ function paintSky() {
   /* lifted off black: at 0x1e2a33 the whole lower half of the frame read as a void rather
      than as land the moonlight is falling on */
   const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-    color: 0x364655, emissive: 0x141d27, flatShading: true,
+    color: 0x41503c, emissive: 0x151d14, flatShading: true,
   }));
   ground.position.set(EYE.x, GROUND_Y, EYE.y);
   backScene.add(ground);
@@ -1445,21 +1450,40 @@ function paintSky() {
    so the temptation to make it steep is the thing to resist. */
 function makeFuji(dist, side, R, Hh) {
   const grp = new THREE.Group();
+  /* ONE radius function for both shells. Deriving them separately is what broke the summit:
+     the cap sat only 40 units outside the rock — sub-pixel at 13,500 away, so they z-fought —
+     and the two floors (210 vs 200) left the rock *wider* than the cap at the very top, so
+     bare rock punched through the snow. The cap is now a proportional offset of the same curve
+     and cannot cross it. */
+  const rAt = (t) => Math.max(R * Math.pow(1 - t, 1.4), R * 0.052);
   const prof = [];
-  for (let i = 0; i <= 14; i++) {
-    const t = i / 14;
-    prof.push(new THREE.Vector2(Math.max(R * Math.pow(1 - t, 1.4), 210), t * Hh));
-  }
-  const rock = new THREE.MeshLambertMaterial({ color: 0x1a2338, emissive: 0x090d18, flatShading: true });
-  grp.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 56), rock));
-  /* the snow cap: the same profile, re-sampled over the top fifth and nudged outward */
+  for (let i = 0; i <= 16; i++) { const t = i / 16; prof.push(new THREE.Vector2(rAt(t), t * Hh)); }
+  grp.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 64), new THREE.MeshLambertMaterial({
+    color: 0x5b6788, emissive: 0x171d2e, flatShading: true,
+  })));
+  /* the crater lip, so the flat top reads as a summit rather than a cut-off cone */
+  const lip = new THREE.Mesh(
+    new THREE.TorusGeometry(R * 0.052, R * 0.016, 6, 40),
+    new THREE.MeshLambertMaterial({ color: 0x4a5470, flatShading: true }));
+  lip.rotation.x = -Math.PI / 2; lip.position.y = Hh; grp.add(lip);
+  /* the snow cap: same curve, offset outward, with a ragged snowline rather than a drawn circle */
+  const capLo = 0.58, off = R * 0.02;
   const cap = [];
-  for (let i = 0; i <= 8; i++) {
-    const t = 0.64 + (i / 8) * 0.36;
-    cap.push(new THREE.Vector2(Math.max(R * Math.pow(1 - t, 1.4) + 40, 200), t * Hh));
+  for (let i = 0; i <= 9; i++) {
+    const t = capLo + (i / 9) * (1 - capLo);
+    cap.push(new THREE.Vector2(rAt(t) + off, t * Hh));
   }
-  grp.add(new THREE.Mesh(new THREE.LatheGeometry(cap, 56), new THREE.MeshLambertMaterial({
-    color: 0xdce6f7, emissive: 0x2a3550, flatShading: true,
+  const capGeo = new THREE.LatheGeometry(cap, 64);
+  const cp = capGeo.attributes.position;
+  for (let i = 0; i < cp.count; i++) {
+    const y = cp.getY(i);
+    const k = 1 - THREE.MathUtils.clamp((y / Hh - capLo) / (1 - capLo), 0, 1);   /* only the hem */
+    const a = Math.atan2(cp.getZ(i), cp.getX(i));
+    cp.setY(i, y + Math.sin(a * 7) * Math.sin(a * 3 + 1.2) * Hh * 0.052 * k * k);
+  }
+  capGeo.computeVertexNormals();
+  grp.add(new THREE.Mesh(capGeo, new THREE.MeshLambertMaterial({
+    color: 0xf7dcd2, emissive: 0x4a3038, flatShading: true,   /* alpenglow: dawn catches the snow first */
   })));
   grp.position.copy(at(dist, side, GROUND_Y - 120));
   backScene.add(grp);
@@ -1474,7 +1498,7 @@ makeFuji(13500, 2600, 6000, 3500);
 function foothill(dist, side, w, h, tone) {
   const geo = new THREE.ConeGeometry(w, h, 5 + (Math.floor(w) % 3));
   const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-    color: tone, emissive: 0x080b12, flatShading: true,
+    color: tone, emissive: 0x161d28, flatShading: true,
   }));
   m.position.copy(at(dist, side, GROUND_Y + h / 2 - 160));
   m.rotation.y = (side + dist) * 0.0007;
@@ -1482,9 +1506,9 @@ function foothill(dist, side, w, h, tone) {
 }
 /* two layers between the eye and Fuji, so the valley reads as having depth rather than a backdrop */
 [[5200, -4200, 1900, 900], [6100, 2900, 2300, 760], [8200, -1400, 2800, 1250], [8900, 5400, 2200, 880]]
-  .forEach(([d, s, w, h]) => foothill(d, s, w, h, 0x223040));
+  .forEach(([d, s, w, h]) => foothill(d, s, w, h, 0x54637a));
 [[11500, -8000, 4200, 2000], [12500, 8200, 3800, 1750]]
-  .forEach(([d, s, w, h]) => foothill(d, s, w, h, 0x1a2431));
+  .forEach(([d, s, w, h]) => foothill(d, s, w, h, 0x6b7a92));
 /* and a rim all the way round, so turning the camera never finds an edge of the world */
 for (let k = 0; k < 22; k++) {
   const a = (k / 22) * Math.PI * 2 + 0.3;
@@ -1493,11 +1517,114 @@ for (let k = 0; k < 22; k++) {
   const h = 1600 + ((k * 397) % 1900);
   const m = new THREE.Mesh(
     new THREE.ConeGeometry(3200 + ((k * 233) % 2600), h, 5),
-    new THREE.MeshLambertMaterial({ color: 0x111726, emissive: 0x070a12, flatShading: true }));
+    new THREE.MeshLambertMaterial({ color: 0x7d8aa2, emissive: 0x2a3242, flatShading: true }));
   m.position.set(p.x, GROUND_Y + h / 2 - 300, p.z);
   m.rotation.y = k * 0.7;
   backScene.add(m);
 }
+
+/* ---- lighting: the sun coming up behind the ranges, low and warm ---- */
+{
+  const sun = new THREE.DirectionalLight(0xffd9b0, 2.4);
+  sun.position.copy(at(9000, 5200, 2600));
+  backScene.add(sun, sun.target);
+  /* the cold side, so the shadowed flanks read blue rather than black */
+  const bounce = new THREE.DirectionalLight(0x93b0dc, 1.0);
+  bounce.position.copy(at(-3000, -6000, 3400));
+  backScene.add(bounce, bounce.target);
+  backScene.add(new THREE.HemisphereLight(0xcfd8e6, 0x3d4a3e, 1.35));
+}
+
+/* ---- the sunrise itself: a disc and a wide bloom, aimed rather than baked into the dome ---- */
+function radialTex(inner, outer, stops) {
+  const S = 256;
+  const c = document.createElement('canvas'); c.width = S; c.height = S;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(S / 2, S / 2, inner, S / 2, S / 2, outer);
+  stops.forEach(([o, col]) => rg.addColorStop(o, col));
+  g.fillStyle = rg; g.fillRect(0, 0, S, S);
+  return new THREE.CanvasTexture(c);
+}
+{
+  const bloom = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: radialTex(0, 128, [[0, 'rgba(255,226,182,0.85)'], [0.28, 'rgba(255,196,136,0.34)'],
+      [0.62, 'rgba(232,158,120,0.10)'], [1, 'rgba(232,158,120,0)']]),
+    transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+  }));
+  bloom.position.copy(at(15000, 6400, 300));
+  bloom.scale.set(13000, 13000, 1);
+  backScene.add(bloom);
+  const disc = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: radialTex(0, 90, [[0, 'rgba(255,248,232,1)'], [0.5, 'rgba(255,226,178,0.9)'], [1, 'rgba(255,210,150,0)']]),
+    transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+  }));
+  disc.position.copy(at(15000, 6400, 520));
+  disc.scale.set(1500, 1500, 1);
+  backScene.add(disc);
+}
+
+/* ---- valley fog: flat banks lying in the low ground, which is what sells a dawn ---- */
+{
+  const bank = new THREE.MeshBasicMaterial({
+    color: 0xf2eeea, transparent: true, opacity: 0.15, depthWrite: false, fog: true,
+  });
+  for (let k = 0; k < 14; k++) {
+    const d = 3400 + ((k * 1607) % 11000);
+    const s = -9000 + ((k * 3571) % 18000);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1500 + ((k * 311) % 1900), 14, 8), bank);
+    m.position.copy(at(d, s, GROUND_Y + 60 + ((k * 97) % 220)));
+    m.scale.set(2.3, 0.055 + ((k % 4) * 0.012), 1.5);
+    m.renderOrder = 2;
+    backScene.add(m);
+  }
+}
+
+/* ---- trees: instanced, so a wooded valley costs one draw call ---- */
+{
+  const N = 420;
+  const geo = new THREE.ConeGeometry(70, 260, 5);
+  geo.translate(0, 130, 0);
+  const trees = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({
+    color: 0x2c3f30, emissive: 0x0e1610, flatShading: true,
+  }), N);
+  const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  for (let i = 0; i < N; i++) {
+    /* scattered through the mid ground, thinning toward the camera so the type stays clear */
+    /* held back from the camera and leaned right, so the woods never crowd the type stack */
+    const d = 3000 + Math.pow((i * 977) % 1000 / 1000, 0.7) * 9500;
+    const s = -4200 + ((i * 4111) % 15000);
+    const h = 0.7 + ((i * 53) % 100) / 100 * 1.9;
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i % 17) * 0.37);
+    sc.set(h, h * (0.8 + ((i * 31) % 60) / 100), h);
+    mx.compose(at(d, s, GROUND_Y - 20), q, sc);
+    trees.setMatrixAt(i, mx);
+  }
+  trees.instanceMatrix.needsUpdate = true;
+  backScene.add(trees);
+}
+
+/* ---- sakura: a few close enough to read as blossom rather than as pink dots ---- */
+function blossomTree(dist, side, s) {
+  const g2 = new THREE.Group();
+  g2.position.copy(at(dist, side, GROUND_Y - 30));
+  g2.scale.setScalar(s);
+  const bark = new THREE.MeshLambertMaterial({ color: 0x3a2c28, flatShading: true });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(16, 30, 300, 7), bark);
+  trunk.position.y = 150; g2.add(trunk);
+  [[-70, 250, 0.5], [80, 270, -0.6], [0, 300, 0.1]].forEach(([bx, by, rz]) => {
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(8, 15, 190, 5), bark);
+    b.position.set(bx, by, 0); b.rotation.z = rz; g2.add(b);
+  });
+  const petal = new THREE.MeshLambertMaterial({ color: 0xf2c2ce, emissive: 0x5a2f3c, flatShading: true });
+  [[0, 400, 0, 200], [-110, 360, 40, 145], [120, 375, -30, 155], [20, 460, -60, 120], [-60, 440, 70, 110]]
+    .forEach(([bx, by, bz, r]) => {
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), petal);
+      m.position.set(bx, by, bz); m.scale.set(1.25, 0.78, 1.15); g2.add(m);
+    });
+  backScene.add(g2);
+}
+[[1750, -1500, 1.5], [2100, 1900, 1.25], [3100, -3000, 1.9], [3600, 3300, 1.6], [5000, -5200, 2.3]]
+  .forEach(([d, s, k]) => blossomTree(d, s, k));
 
 /* gold ink drops + rings + stains */
 const stains = [];
@@ -1773,6 +1900,7 @@ moonEl.innerHTML = `<div class="moon-core"></div>
   <div class="moon-ring"></div>
   <div class="moon-disc"><span class="moon-mare a"></span><span class="moon-mare b"></span><span class="moon-mare c"></span></div>
   <div class="moon-cloud"></div>`;
+moonEl.style.opacity = 0.35;   /* a pale setting moon — it must not outshine the sunrise */
 cssPlane(moonEl, 430, 430, -2450, -6 * D2R);
 
 /* sumi-e mountain ridges with a far pagoda */
