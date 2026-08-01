@@ -767,9 +767,9 @@
   #typeShade {
     position: fixed; inset: 0; z-index: 1; pointer-events: none;
     background:
-      linear-gradient(100deg, rgba(10,14,22,0.82) 0%, rgba(10,14,22,0.66) 26%,
-        rgba(10,14,22,0.30) 48%, rgba(10,14,22,0) 68%),
-      linear-gradient(0deg, rgba(8,11,18,0.55) 0%, rgba(8,11,18,0) 34%);
+      linear-gradient(100deg, rgba(10,14,22,0.52) 0%, rgba(10,14,22,0.38) 26%,
+        rgba(10,14,22,0.16) 46%, rgba(10,14,22,0) 62%),
+      linear-gradient(0deg, rgba(8,11,18,0.30) 0%, rgba(8,11,18,0) 28%);
     opacity: 0; transition: opacity 0.5s ease;
   }
   body.at-menu #typeShade { opacity: 1; }
@@ -1040,7 +1040,7 @@ const camera = new THREE.PerspectiveCamera(42, W() / H(), 1, 60000);
 const backScene = new THREE.Scene();
 /* scaled to a real landscape: the near ground stays clear, the foothills soften, and the far
    ranges dissolve into the night rather than ending at a visible edge */
-backScene.fog = new THREE.Fog(0xbfc0c6, 9000, 44000);   /* dawn haze — pulled back hard: at 4200 it bleached the whole valley */
+backScene.fog = new THREE.Fog(0xd8c1ab, 9000, 44000);   /* dawn haze — pulled back hard: at 4200 it bleached the whole valley */
 const backRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 backRenderer.setSize(W(), H());
 backRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -1393,14 +1393,15 @@ function paintSky() {
      the menu sits high-left. The warm sunrise is a separate glow placed in the world near
      Fuji rather than baked in here, so it can be aimed. */
   const sky = g.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0.00, '#16213f');
-  sky.addColorStop(0.26, '#2c4068');
-  sky.addColorStop(0.44, '#5d7ba4');
-  sky.addColorStop(0.54, '#9db2c8');
-  sky.addColorStop(0.60, '#dcc0a4');   /* the warm band just above the ridgeline */
-  sky.addColorStop(0.635, '#f2d5ac');
-  sky.addColorStop(0.68, '#b9b3b2');
-  sky.addColorStop(1.00, '#6e7276');
+  sky.addColorStop(0.00, '#2b3a66');
+  sky.addColorStop(0.20, '#4d5d90');
+  sky.addColorStop(0.34, '#7d7fa4');
+  sky.addColorStop(0.44, '#b18d9b');   /* the mauve where night hands over to morning */
+  sky.addColorStop(0.52, '#e0a279');
+  sky.addColorStop(0.585, '#f9c184');
+  sky.addColorStop(0.625, '#ffdca6');  /* the burn along the ridgeline */
+  sky.addColorStop(0.68, '#dcc0a4');
+  sky.addColorStop(1.00, '#8f8478');
   g.fillStyle = sky;
   g.fillRect(0, 0, W, H);
   /* a last few stars, high up only — anything near the horizon is washed out by now */
@@ -1472,7 +1473,7 @@ function makeFuji(dist, side, R, Hh) {
   /* A floored radius is what produced the wine-bottle neck: above t=0.88 the floor won and
      the top eighth of the mountain ran straight up as a cylinder. Interpolating to a real
      summit radius instead means it tapers all the way and only goes flat at the very top. */
-  const rTop = R * 0.028;
+  const rTop = R * 0.016;
   const rAt = (t) => rTop + (R - rTop) * Math.pow(1 - t, 1.7);
   const prof = [];
   for (let i = 0; i <= 16; i++) { const t = i / 16; prof.push(new THREE.Vector2(rAt(t), t * Hh)); }
@@ -1480,16 +1481,15 @@ function makeFuji(dist, side, R, Hh) {
     color: 0x5b6788, emissive: 0x171d2e, flatShading: true,
   })));
   /* the crater lip, so the flat top reads as a summit rather than a cut-off cone */
-  const lip = new THREE.Mesh(
-    new THREE.TorusGeometry(R * 0.028, R * 0.009, 6, 40),
-    new THREE.MeshLambertMaterial({ color: 0x4a5470, flatShading: true }));
-  lip.rotation.x = -Math.PI / 2; lip.position.y = Hh; grp.add(lip);
+  /* the torus crater lip is gone — at 13,500 away it read as a bead stuck on the summit */
   /* the snow cap: same curve, offset outward, with a ragged snowline rather than a drawn circle */
   const capLo = 0.58, off = R * 0.02;
   const cap = [];
   for (let i = 0; i <= 9; i++) {
     const t = capLo + (i / 9) * (1 - capLo);
-    cap.push(new THREE.Vector2(rAt(t) + off, t * Hh));
+    /* the offset tapers to nothing at the top, so the snow meets the rock at the summit
+       instead of flaring out past it like a mushroom cap */
+    cap.push(new THREE.Vector2(rAt(t) + off * (1 - t), t * Hh));
   }
   const capGeo = new THREE.LatheGeometry(cap, 64);
   const cp = capGeo.attributes.position;
@@ -1503,6 +1503,11 @@ function makeFuji(dist, side, R, Hh) {
   grp.add(new THREE.Mesh(capGeo, new THREE.MeshLambertMaterial({
     color: 0xf7dcd2, emissive: 0x4a3038, flatShading: true,   /* alpenglow: dawn catches the snow first */
   })));
+  /* the lathe leaves the summit open — without this you look straight down the inside of the
+     mountain, which is what kept the tip looking wrong */
+  const top = new THREE.Mesh(new THREE.CircleGeometry(rTop + off * 0.0, 24),
+    new THREE.MeshLambertMaterial({ color: 0xf7dcd2, emissive: 0x4a3038, flatShading: true }));
+  top.rotation.x = -Math.PI / 2; top.position.y = Hh; grp.add(top);
   grp.position.copy(at(dist, side, GROUND_Y - 120));
   backScene.add(grp);
   return grp;
@@ -1512,15 +1517,26 @@ function makeFuji(dist, side, R, Hh) {
    putting it on the sight line. Offset right so it sits clear of the type stack. */
 makeFuji(13500, 2600, 6000, 3500);
 
-/* ---- the ranges: foothills layered in front of Fuji, and a rim closing the horizon ---- */
+/* A ridge is never one cone. Each of these is a cluster — a main mass with two smaller
+   shoulders offset around it — and anything tall enough gets snow, which is what makes the
+   far ranges read as mountains rather than as cardboard triangles. */
 function foothill(dist, side, w, h, tone) {
-  const geo = new THREE.ConeGeometry(w, h, 5 + (Math.floor(w) % 3));
-  const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-    color: tone, emissive: 0x161d28, flatShading: true,
-  }));
-  m.position.copy(at(dist, side, GROUND_Y + h / 2 - 160));
-  m.rotation.y = (side + dist) * 0.0007;
-  backScene.add(m);
+  const rock = new THREE.MeshLambertMaterial({ color: tone, emissive: 0x161d28, flatShading: true });
+  const snow = new THREE.MeshLambertMaterial({ color: 0xe8d8d4, emissive: 0x4a3f42, flatShading: true });
+  const parts = [[0, 0, 1, 1], [w * 0.78, dist * 0.06, 0.62, 0.7], [-w * 0.7, -dist * 0.05, 0.5, 0.55]];
+  parts.forEach(([dx, dz, sw, sh], k) => {
+    const cw = w * sw, ch = h * sh;
+    const m = new THREE.Mesh(new THREE.ConeGeometry(cw, ch, 5 + ((Math.floor(w) + k) % 3)), rock);
+    m.position.copy(at(dist + dz, side + dx, GROUND_Y + ch / 2 - 160));
+    m.rotation.y = (side + dist + k * 900) * 0.0007;
+    backScene.add(m);
+    if (ch > 1200) {
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(cw * 0.34, ch * 0.3, 5), snow);
+      cap.position.copy(at(dist + dz, side + dx, GROUND_Y + ch - ch * 0.15 - 160));
+      cap.rotation.y = m.rotation.y;
+      backScene.add(cap);
+    }
+  });
 }
 /* two layers between the eye and Fuji, so the valley reads as having depth rather than a backdrop */
 [[5200, -4200, 1900, 900], [6100, 2900, 2300, 760], [8200, -1400, 2800, 1250], [8900, 5400, 2200, 880]]
@@ -1597,28 +1613,31 @@ function radialTex(inner, outer, stops) {
   }
 }
 
-/* ---- trees: instanced, so a wooded valley costs one draw call ---- */
+/* ---- trees: three silhouettes, because one repeated cone reads as a pattern not a wood ---- */
 {
-  const N = 420;
-  const geo = new THREE.ConeGeometry(70, 260, 5);
-  geo.translate(0, 130, 0);
-  const trees = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({
-    color: 0x2c3f30, emissive: 0x0e1610, flatShading: true,
-  }), N);
-  const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
-  for (let i = 0; i < N; i++) {
-    /* scattered through the mid ground, thinning toward the camera so the type stays clear */
-    /* held back from the camera and leaned right, so the woods never crowd the type stack */
-    const d = 3000 + Math.pow((i * 977) % 1000 / 1000, 0.7) * 9500;
-    const s = -4200 + ((i * 4111) % 15000);
-    const h = 0.7 + ((i * 53) % 100) / 100 * 1.9;
-    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i % 17) * 0.37);
-    sc.set(h, h * (0.8 + ((i * 31) % 60) / 100), h);
-    mx.compose(at(d, s, GROUND_Y - 20), q, sc);
-    trees.setMatrixAt(i, mx);
-  }
-  trees.instanceMatrix.needsUpdate = true;
-  backScene.add(trees);
+  /* held back from the camera and leaned right, so the woods never crowd the type stack */
+  const place = (seed, near, far) => (i) => {
+    const p = scatter(i, seed, near, far, 15000);
+    const k = 0.7 + p.r * 1.9;
+    return { pos: at(p.d, p.s + 1800, GROUND_Y - 20), rot: p.r * 6.28,
+      scale: new THREE.Vector3(k, k * (0.75 + p.r * 0.7), k) };
+  };
+  /* tall conifers */
+  const conifer = new THREE.ConeGeometry(58, 320, 6);
+  conifer.translate(0, 160, 0);
+  instanced(conifer, new THREE.MeshLambertMaterial({
+    color: 0x2c4030, emissive: 0x0d1510, flatShading: true }), 240, place(41, 3000, 12500));
+  /* squat ones, a different profile at the same distance */
+  const squat = new THREE.ConeGeometry(95, 175, 5);
+  squat.translate(0, 88, 0);
+  instanced(squat, new THREE.MeshLambertMaterial({
+    color: 0x354a34, emissive: 0x101810, flatShading: true }), 190, place(97, 2600, 10000));
+  /* broadleaf: a round canopy — no trunk needed, nothing is close enough to miss it */
+  const round = new THREE.IcosahedronGeometry(115, 1);
+  round.scale(1.15, 0.95, 1.15);
+  round.translate(0, 130, 0);
+  instanced(round, new THREE.MeshLambertMaterial({
+    color: 0x4a5c38, emissive: 0x161d12, flatShading: true }), 170, place(151, 2400, 9500));
 }
 
 /* ---- sakura: a few close enough to read as blossom rather than as pink dots ---- */
@@ -1669,25 +1688,25 @@ function instanced(geo, mat, n, place) {
   return im;
 }
 
-/* grass: crossed blades, dense near the eye and thinning out into the meadow */
+/* the meadow: clumps, not blades. Individual grass is hopeless at this framing — true-scale
+   blades are sub-pixel and anything big enough to see reads as scenery, which is what the
+   plane-based first pass did. Tufts of varied size and tone give texture that survives. */
 {
-  /* 22x34, not 110x150: at the first size a single blade was 165 units across and the ones
-     420 units from the eye covered half the screen. Grass has to be small enough that a
-     thousand of them read as texture. */
-  const blade = new THREE.PlaneGeometry(22, 34);
-  blade.translate(0, 17, 0);
-  const b2 = blade.clone(); b2.rotateY(Math.PI / 2);
-  const geo = THREE.BufferGeometryUtils
-    ? THREE.BufferGeometryUtils.mergeGeometries([blade, b2])
-    : blade;
-  const mat = new THREE.MeshLambertMaterial({
-    color: 0x63784c, emissive: 0x1b2416, side: THREE.DoubleSide,
-    transparent: true, opacity: 0.95, alphaTest: 0.2,
-  });
-  instanced(geo, mat, 2600, (i) => {
-    const p = scatter(i, 3, 900, 7200, 11000);
-    const k = 0.55 + p.r * 1.5;
-    return { pos: at(p.d, p.s, GROUND_Y - 10), rot: p.r * 6.28, scale: new THREE.Vector3(k, k * (0.7 + p.r), k) };
+  /* small and close to the ground tone. At radius 30 with a light palette these read as a
+     field of pebbles; grass has to sit only just above the surface it grows out of. */
+  const geo = new THREE.IcosahedronGeometry(14, 0);
+  const tone = [0x4a5a3e, 0x445238, 0x51603f, 0x3d4a34];
+  tone.forEach((col, t) => {
+    const mat = new THREE.MeshLambertMaterial({ color: col, emissive: 0x0d1309, flatShading: true });
+    instanced(geo, mat, 900, (i) => {
+      const p = scatter(i, 3 + t * 13, 1400, 8200, 12500);
+      const k = 0.4 + p.r * 0.9;
+      return {
+        pos: at(p.d, p.s, GROUND_Y + 4),
+        rot: p.r * 6.28,
+        scale: new THREE.Vector3(k * 1.6, k * 0.35, k * 1.4),
+      };
+    });
   });
 }
 
