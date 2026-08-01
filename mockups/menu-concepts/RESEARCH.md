@@ -620,6 +620,35 @@ camera had turned away. It is now camera-driven — `homeIsOffScreen()` compares
 against the direction to what the menu is composed around, using the real horizontal half-cone,
 and the dressing drops the frame it actually clears (with a 1.6s fallback).
 
+## v20 — the scenery is real geometry (first pass)
+
+The six rooms moved out of the DOM and into WebGL: procedural meshes in `backScene`, lit, with a
+real depth buffer. The interface stays in CSS3D on the layer above, which makes "the world never
+occludes the UI" a property of the architecture rather than something to fight — and that is how
+the reference behaves anyway.
+
+Room-local axes are unchanged (group parked at `d.sub`, looking at `d.rest`, +z toward the
+viewer), so all the placement knowledge carried over. Lights are parented to their own room:
+three.js skips invisible subtrees when gathering lights, so only the room you are standing in
+contributes any and the shader's light count stays constant.
+
+Two things caught me out, both about **scale**:
+
+- **Real geometry needs real distance.** Dropping meshes at the depths the CSS cut-outs used made
+  the shoji wall into wallpaper again — worse than before, because a flat plane at least implied
+  distance through its art. It has to sit far enough back, and be *bounded*, that the veranda
+  floor reads below it and the head beam above it. Sizing against the cone (half-width
+  `0.614·(D − z)`) matters more here than it did for the DOM version.
+- **Point lights fall off with the square of the distance, and this world is thousands of units
+  across.** Anything more than a room's width from the lamp goes black — the torii, 3000 units
+  out, simply vanished. Point lights are for close pools of lantern light only; a room that needs
+  lifting wants a directional, which does not attenuate.
+
+Where it stands: READING (real bamboo receding), JLPT (cloud sea and lit peaks), DRILLS (a timber
+hall with beams and a taiko) and STUDY (a bounded shoji wall over veranda boards) all read better
+than the cut-outs did. REVIEW's raked gravel and set stones are still too dark to read, and
+RECORDS' gates need more light on them — both are lighting passes, not structural.
+
 Next build steps: the React port (R3F + drei + GSAP), or a fourth level (individual cards
 inside a block).
 - Per-frame depth dressing: distance → opacity/blur on menu planes (fog for DOM).
