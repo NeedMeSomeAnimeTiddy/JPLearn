@@ -594,6 +594,32 @@ figures a side rather than running a diagonal through it. And the home mountain 
 units wide — in the enlarged world their far edge reached into REVIEW and covered its back tab;
 they belong to `homeScenery` and are now switched off on leaving the menu.
 
+## v19 — spines, dead clicks, and the vanishing menu
+
+**READING is bound books now.** Cloth spines with foil bands top and bottom, four different
+heights, each leaning its own way, feet on a common receding line. `at` rows gained an optional
+roll and height so a row of spines reads as separate books rather than one object repeated — the
+per-item variation is the whole tell.
+
+**The two rearmost options in every section were unclickable, and the cause is worth knowing:**
+`CSS3DObject`'s constructor writes `style.pointerEvents = 'auto'` **inline** on every element it
+wraps. An inline declaration beats any selector, so the existing `#cssStage * { pointer-events:
+none }` never applied to a single 3D plane — all the scenery was hit-testable, and the enormous
+ghost watermark sitting dead centre was swallowing whole options (READING and JLPT items 3 and 4
+scored 0/24 and 4/24 on a hit-test grid). Fixed with `decorPlane()`, called from the three plane
+factories, which switches decoration off per object. It has to run *after* construction — setting
+it first just gets overwritten by the constructor.
+
+**The menu was dissolving before it left the screen.** `depthDress` fades and blurs menu items by
+camera distance to give the settled menu depth. Since v17 the camera dollies 1900 units outward on
+every transition, which drove every item to minimum opacity and maximum blur within a few frames.
+It is a *resting* effect, so it now returns early unless `state === 'menu'` — the menu holds its
+look and the camera simply carries it out of frame. The backdrop had the same problem from the
+other direction: `homeScenery.visible = false` fired on a fixed 0.4s timer, well before the
+camera had turned away. It is now camera-driven — `homeIsOffScreen()` compares the view axis
+against the direction to what the menu is composed around, using the real horizontal half-cone,
+and the dressing drops the frame it actually clears (with a 1.6s fallback).
+
 Next build steps: the React port (R3F + drei + GSAP), or a fourth level (individual cards
 inside a block).
 - Per-frame depth dressing: distance → opacity/blur on menu planes (fog for DOM).
@@ -644,6 +670,13 @@ inside a block).
 - Animate a CSS3D item by moving its `Object3D`, not its DOM. The plane root's transform is
   rewritten every frame by the renderer, and any inner transform is usually owned by a CSS
   hover transition.
+- **`CSS3DObject` writes `pointer-events: auto` inline on every element it wraps**, so no
+  stylesheet rule can make a 3D plane click-through. Undo it per object, *after* construction.
+  Until you do, every piece of scenery is an invisible click target.
+- A distance-driven "depth" effect on UI becomes a bug the moment the camera dollies. Gate it to
+  the resting state.
+- Don't switch scenery off on a timer during a camera move — test whether it has actually left
+  the frustum.
 - Never splice a file by a line range derived from a scan — locate the exact boundary content and
   splice between those. A range that drifts silently eats neighbouring functions, and an
   untracked file has no undo.

@@ -40,6 +40,10 @@
   #cssStage { z-index: 2; pointer-events: none; }
   #cssStage * { pointer-events: none; }
   #cssStage button { pointer-events: auto; }
+  /* NB: neither rule above can govern a CSS3D plane. CSS3DObject's constructor writes
+     `style.pointerEvents = 'auto'` *inline* on every element it wraps, and an inline
+     declaration beats any selector. Decoration is therefore switched off in JS at the point
+     the object is made — see decorPlane(). */
   #glFront { z-index: 3; pointer-events: none; }
 
   /* ---------- 3D planes: menu items — type IS the button (Persona grammar) ---------- */
@@ -528,28 +532,40 @@
     -webkit-text-stroke: 3px rgba(227,74,51,0.4);
   }
 
-  /* ── READING · naked tategaki at poster scale, no container at all ───────────── */
-  .w-column { width: 200px; height: 560px; }
-  .w-column .w-in::before {
-    content: ""; position: absolute; right: 116px; top: -34px; bottom: -34px; width: 7px;
-    background: var(--sec);
+  /* ── READING · cloth-bound spines standing on the shelf, each a different book ─── */
+  .w-spine { width: 214px; height: 560px; }
+  .w-spine .w-in {
+    background:
+      linear-gradient(100deg, rgba(255,255,255,0.10) 0 9px, transparent 9px 26px),
+      linear-gradient(100deg, #235438 0%, #163824 44%, #0c2116 100%);
+    border-left: 6px solid rgba(0,0,0,0.55);
+    border-right: 5px solid rgba(255,255,255,0.07);
+    box-shadow: 20px 18px 0 rgba(0,0,0,0.42), inset 0 0 48px rgba(0,0,0,0.55);
+    align-items: center; justify-content: flex-start; padding-top: 92px;
   }
-  .w-column .w-jp {
-    position: absolute; top: -44px; right: 0;
-    writing-mode: vertical-rl; font-size: 94px; line-height: 1; letter-spacing: 0.02em;
-    color: var(--washi); text-shadow: 7px 7px 0 rgba(16,26,18,0.9); white-space: nowrap;
+  /* the foil bands a bound spine carries top and bottom */
+  .w-spine .w-in::before, .w-spine .w-in::after {
+    content: ""; position: absolute; left: 0; right: 0; height: 9px;
+    background: linear-gradient(90deg, var(--sec-lo), var(--sec-hi) 45%, var(--sec-lo));
+    box-shadow: 0 0 14px rgba(111,193,137,0.5);
   }
-  .w-column .w-en {
-    position: absolute; left: 4px; top: 26px; writing-mode: vertical-rl;
-    font-size: 12px; letter-spacing: 0.34em; color: var(--sec-hi);
+  .w-spine .w-in::before { top: 58px; }
+  .w-spine .w-in::after { bottom: 74px; }
+  .w-spine .w-jp {
+    writing-mode: vertical-rl; font-size: 58px; letter-spacing: 0.14em;
+    color: #f4eeda; text-shadow: 3px 3px 0 rgba(0,0,0,0.65); white-space: nowrap;
   }
-  .w-column .w-meta {
-    position: absolute; left: 4px; bottom: 0; writing-mode: vertical-rl;
-    font-size: 13px; letter-spacing: 0.14em; color: var(--washi-dim);
+  .w-spine .w-en {
+    position: absolute; bottom: 22px; left: 0; right: 0; text-align: center;
+    font-size: 10.5px; letter-spacing: 0.26em; color: var(--sec-hi);
   }
-  .w-column .w-no {
-    position: absolute; left: -34px; bottom: -78px; font-size: 136px; line-height: 1;
-    -webkit-text-stroke: 3px rgba(111,193,137,0.3);
+  .w-spine .w-meta {
+    position: absolute; top: 22px; left: 0; right: 0; text-align: center;
+    font-size: 11px; letter-spacing: 0.1em; color: rgba(244,238,218,0.5);
+  }
+  .w-spine .w-no {
+    position: absolute; top: -84px; left: 50%; transform: translateX(-50%);
+    font-size: 128px; line-height: 1; -webkit-text-stroke: 3px rgba(111,193,137,0.3);
   }
 
   /* ── DRILLS · impact shards, the Latin word swung hard on the diagonal ───────── */
@@ -1513,8 +1529,21 @@ function swanTick(dt, t) {
 }
 
 /* ================= css scene ================= */
+/* CSS3DObject writes `pointer-events: auto` inline on every element it wraps, so no stylesheet
+   rule can make scenery click-through — it has to be undone per object. Anything that is not a
+   control is decoration and gets switched off here; the giant ghost watermark alone was covering
+   the two rearmost options outright in READING and JLPT.
+   Must run AFTER the object is constructed: the constructor is what writes 'auto', so setting
+   it beforehand simply gets overwritten. */
+function decorPlane(el) {
+  if (el.tagName !== 'BUTTON' && !el.classList.contains('type-item') && !el.classList.contains('plane-sub')) {
+    el.style.pointerEvents = 'none';
+  }
+  return el;
+}
 function cssPlane(el, x, y, z, ry = 0, rz = 0) {
   const obj = new CSS3DObject(el);
+  decorPlane(el);
   obj.position.set(x, y, z);
   obj.rotation.y = ry;
   obj.rotation.z = rz;
@@ -1740,6 +1769,7 @@ cssScene.add(destEnv);
 ENVS[0] = destEnv;
 function envPlane(el, x, y, z, rx = 0, ry = 0, rz = 0) {
   const o = new CSS3DObject(el);
+  decorPlane(el);
   o.position.set(x, y, z);
   o.rotation.set(rx, ry, rz);
   destEnv.add(o);
@@ -1787,6 +1817,7 @@ function makeEnv(idx) {
   return {
     add(el, x, y, z, rx = 0, ry = 0, rz = 0, scale = 1) {
       const o = new CSS3DObject(el);
+      decorPlane(el);
       o.position.set(x, y, z);
       o.rotation.set(rx, ry, rz);
       o.scale.setScalar(scale);
@@ -1946,6 +1977,12 @@ function applyCamera() {
 
 const _wp = new THREE.Vector3();
 function depthDress() {
+  /* This is a *resting* effect: it gives the settled menu its near/far falloff. It must not run
+     during a transition — the camera now dollies 1900 units outward on the way to a room, which
+     drove every item to minimum opacity and maximum blur within a few frames, so the menu
+     visibly dissolved while still on screen. Hold the resting look and let the camera carry it
+     out of frame instead. */
+  if (state !== 'menu') return;
   itemObjs.forEach((obj, i) => {
     obj.getWorldPosition(_wp);
     const d = camera.position.distanceTo(_wp);
@@ -2048,10 +2085,12 @@ const L2_WORLD = {
     at: [[-120, 230, 60, 0.06, 1.1], [-60, 40, -180, 0.03, 0.95], [10, -150, -420, -0.02, 0.82], [80, -330, -650, -0.05, 0.7]],
     sign: [-470, 400, -200, 0.07, 1], back: [-470, -330, 210, 0.08, 1],
   },
-  READING: { /* tategaki columns hung through the bamboo at four depths */
-    cls: 'w-column',
+  READING: { /* cloth-bound spines shelved through the bamboo — four different books, each
+                its own height and leaning its own way, feet on a common line */
+    cls: 'w-spine',
     tpl: (jp, en, meta, j) => `<span class="w-no">${NO[j]}</span><span class="w-jp">${jp}</span><span class="w-en">${en}</span><span class="w-meta">${meta}</span>`,
-    at: [[-430, 40, 120, 0.14, 1.05], [-120, -10, -160, 0.05, 0.92], [200, 30, -450, -0.05, 0.8], [520, -20, -720, -0.14, 0.7]],
+    at: [[-430, 20, 120, 0.14, 1.0, -0.055, 600], [-140, -46, -160, 0.05, 0.94, 0.03, 500],
+         [190, 6, -450, -0.05, 0.84, -0.075, 570], [510, -40, -720, -0.14, 0.74, 0.05, 470]],
     sign: [-180, 400, -520, 0.04, 1], back: [-430, -320, 220, 0.08, 1],
   },
   DRILLS: {  /* impact shards swung across the dojo wall */
@@ -2064,7 +2103,9 @@ const L2_WORLD = {
     cls: 'w-stencil',
     tpl: (jp, en, meta, j) => `<span class="w-no">N${5 - j}</span><span class="w-jp">${jp}</span><span class="w-en">${en}</span><span class="w-meta">${meta}</span>`,
     at: [[-450, -240, 170, 0.16, 0.85], [-160, -60, -100, 0.06, 0.95], [180, 130, -380, -0.05, 1.05], [540, 320, -660, -0.14, 1.15]],
-    sign: [-480, 330, -420, 0.08, 1], back: [-460, -320, 250, 0.08, 1],
+    /* the path starts bottom-left, so the usual left placement put the tab on the first marker;
+       centre-bottom then landed it on the screen-space transition picker. Centre, lifted. */
+    sign: [-480, 330, -420, 0.08, 1], back: [-120, -260, 300, 0, 1],
   },
   RECORDS: { /* the figure is the hero, thrown across the torii */
     cls: 'w-figure',
@@ -2082,13 +2123,17 @@ const L2_WORLD = {
    transition — animating either from GSAP fights something. Moving the object is also simply
    more truthful here, since these are meant to be things in a room. */
 const L2_PLANES = {};
-function wPlane(grp, cls, html, [x, y, z, ry, s = 1]) {
+/* `at` is [x, y, z, yaw, scale, roll, height] — roll and height are optional and exist so books
+   can lean at their own angles and stand at their own heights, which is what makes a row of
+   spines read as separate books rather than one repeated object */
+function wPlane(grp, cls, html, [x, y, z, ry, s = 1, rz = 0, h = 0]) {
   const el = document.createElement('div');
   el.className = 'w-plane ' + cls;
   el.innerHTML = '<div class="w-in">' + html + '</div>';
+  if (h) el.style.height = h + 'px';
   const obj = new CSS3DObject(el);
   obj.position.set(x, y, z);
-  obj.rotation.set(0, ry, 0);
+  obj.rotation.set(0, ry, rz);
   obj.scale.setScalar(s);
   grp.add(obj);
   return { el, obj, base: obj.position.clone(), phase: Math.random() * 6.28, spin: 0.5 + Math.random() * 0.6 };
@@ -2623,9 +2668,12 @@ function select(i) {
     state = 'sub'; busy = false;
     return;
   }
-  /* drop the home dressing once the camera is well into its turn — invisible at speed —
-     and light up only the room we are travelling to */
-  gsap.delayedCall(0.4, () => { homeScenery.visible = false; showOnlyEnv(i); });
+  /* Light the destination room early — it is off-axis, so nobody sees it arrive. The home
+     dressing is a different matter: switching it off on a fixed 0.4s timer killed it while it
+     was still in shot. Drop it the frame it actually clears the frustum instead. */
+  gsap.delayedCall(0.4, () => showOnlyEnv(i));
+  dropHomeWhenClear = true;
+  gsap.delayedCall(1.6, () => { dropHomeWhenClear = false; homeScenery.visible = false; });
   [null, selectWhip, selectOrbit][activeMode](i);
 }
 function goBack() {
@@ -2703,11 +2751,31 @@ addEventListener('keydown', (e) => {
   } else if (state === 'sub' && (e.key === 'Escape' || e.key === 'Backspace')) goBack();
 });
 
+/* Is the menu's own composition still in shot? Measured as the angle between the camera's view
+   axis and the direction to what the menu is framed around, against the real horizontal half-cone
+   plus a margin for the backdrop's own width. */
+const HOME_LOOK = new THREE.Vector3(-240, 30, -160);
+const _hv1 = new THREE.Vector3(), _hv2 = new THREE.Vector3(), _hv3 = new THREE.Vector3();
+let dropHomeWhenClear = false;
+function homeIsOffScreen() {
+  _hv1.set(cam.px, cam.py, cam.pz);
+  _hv2.copy(HOME_LOOK).sub(_hv1).setY(0);
+  _hv3.set(cam.tx, cam.ty, cam.tz).sub(_hv1).setY(0);
+  if (_hv2.lengthSq() < 1 || _hv3.lengthSq() < 1) return false;
+  const halfH = Math.atan(Math.tan((cam.fov / 2) * D2R) * (innerWidth / innerHeight));
+  return _hv2.angleTo(_hv3) > halfH + 0.38;
+}
+
 /* ================= frame loop ================= */
 const clock = new THREE.Clock();
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
+
+  if (dropHomeWhenClear && homeIsOffScreen()) {
+    dropHomeWhenClear = false;
+    homeScenery.visible = false;
+  }
 
   /* nothing rests: a settled level two keeps drifting and canting. Applied to the object, not
      the DOM, so it never collides with the hover transform — and only once the entrance has
