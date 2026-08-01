@@ -1022,7 +1022,9 @@ const NIGHT = 0x151928;
 const camera = new THREE.PerspectiveCamera(42, W() / H(), 1, 18000);
 
 const backScene = new THREE.Scene();
-backScene.fog = new THREE.Fog(NIGHT, 2600, 9000);
+/* pushed out so nothing inside the room you are standing in is dulled, while the rooms across
+   the valley still sink away — this is what separates "one landscape" from "a cluttered set" */
+backScene.fog = new THREE.Fog(NIGHT, 3400, 12000);
 const backRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 backRenderer.setSize(W(), H());
 backRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -1842,7 +1844,9 @@ function meshRoom(idx) {
   return g;
 }
 const lam = (color, o = {}) => new THREE.MeshLambertMaterial({ color, ...o });
-const flat = (color, o = {}) => new THREE.MeshBasicMaterial({ color, fog: false, ...o });
+/* fog-aware on purpose: in one continuous world the lit paper and lanterns of a room three
+   thousand units away have to sink into the night like everything else */
+const flat = (color, o = {}) => new THREE.MeshBasicMaterial({ color, ...o });
 function box(g, w, h, dp, m, x, y, z, rx = 0, ry = 0, rz = 0) {
   const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, dp), m);
   b.position.set(x, y, z); b.rotation.set(rx, ry, rz); g.add(b); return b;
@@ -2543,11 +2547,13 @@ placeSubDefault();
 /* Rooms fade rather than pop. `?envs=all` keeps every room permanently lit, which is how the
    "always visible in a bigger world" option was evaluated against this one. */
 const ENV_ALWAYS = new URLSearchParams(location.search).get('envs') === 'all';
+/* THE SCENERY NEVER UNLOADS. Switching rooms on and off was only ever a workaround for CSS3D
+   having neither frustum culling nor a depth buffer — a hidden room's cut-outs would paint
+   through the menu. Real meshes have both, so the six rooms are simply left standing and the
+   world is one continuous landscape the camera moves around inside. Distance and fog do the
+   rest: from the menu the other rooms read as far-off structures, which is what a place looks
+   like. Only the CSS3D interface still switches, because that layer still has no culling. */
 function showOnlyEnv(i, fade = true) {
-  /* the geometry has no cross-fade to do — it is switched while the camera is mid-turn and
-     pointed elsewhere, and a depth-buffered room cannot bleed into the menu the way stacked
-     CSS planes could */
-  MESH_ENVS.forEach((g, k) => { if (g) g.visible = ENV_ALWAYS || k === i; });
   if (ENV_ALWAYS) { ENVS.forEach((g) => { if (g) g.visible = true; }); return; }
   ENVS.forEach((g, k) => {
     if (!g) return;

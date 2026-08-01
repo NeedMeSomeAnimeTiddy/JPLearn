@@ -649,6 +649,21 @@ hall with beams and a taiko) and STUDY (a bounded shoji wall over veranda boards
 than the cut-outs did. REVIEW's raked gravel and set stones are still too dark to read, and
 RECORDS' gates need more light on them — both are lighting passes, not structural.
 
+**And then the rooms stopped unloading.** Every `showOnlyEnv` mechanism in this file — the
+visibility switching, the cross-fade, the pop it caused, the whole forbidden-bearing analysis —
+existed for one reason: CSS3D has neither frustum culling nor a depth buffer, so a room that was
+merely *elsewhere* would paint through the menu. Real meshes have both. So the six rooms are now
+simply left standing and the world is a single continuous landscape the camera moves around
+inside. Distance and fog do the work that visibility switching used to: from the menu the other
+rooms are far-off silhouettes sunk into the night, which is what a place looks like, and arriving
+somewhere no longer involves anything appearing — the torii is already there as you come round to
+it. `flat()` had to become fog-aware for this (a lit paper screen three thousand units away must
+recede like everything else) and fog moved out to 3400/12000 so nothing in the room you occupy is
+dulled.
+
+Only the CSS3D interface still switches, because that layer still has no culling — which is the
+honest statement of where the two-layer split earns its keep.
+
 Next build steps: the React port (R3F + drei + GSAP), or a fourth level (individual cards
 inside a block).
 - Per-frame depth dressing: distance → opacity/blur on menu planes (fog for DOM).
