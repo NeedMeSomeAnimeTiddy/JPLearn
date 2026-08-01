@@ -759,6 +759,20 @@
      .desc-line was silently eating half the back button. Blanket-enabling every button then put
      the up-next ticker back over it: opacity is a look, not a state, and an invisible button
      still catches clicks. So menu-only chrome goes inert the moment we leave the menu. */
+  /* A dawn sky is bright and the menu type is cream, so the world has to be pushed down behind
+     it. Anchored to the left edge where the stack lives and falling off well before centre, so
+     it reads as depth rather than as a panel. Sits under the 3D stage, never over it. */
+  /* z-index 1 and placed after #glBack in the DOM, so it darkens the world but is still under
+     #cssStage at 2 — the type itself must never be touched by it */
+  #typeShade {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      linear-gradient(100deg, rgba(10,14,22,0.82) 0%, rgba(10,14,22,0.66) 26%,
+        rgba(10,14,22,0.30) 48%, rgba(10,14,22,0) 68%),
+      linear-gradient(0deg, rgba(8,11,18,0.55) 0%, rgba(8,11,18,0) 34%);
+    opacity: 0; transition: opacity 0.5s ease;
+  }
+  body.at-menu #typeShade { opacity: 1; }
   .chrome { position: fixed; z-index: 5; pointer-events: none; }
   .chrome a, .chrome button { pointer-events: auto; }
   body:not(.at-menu) .menu-only, body:not(.at-menu) .menu-only * { pointer-events: none; }
@@ -941,6 +955,7 @@
 </svg>
 
 <div id="glBack"></div>
+<div id="typeShade"></div>
 <div id="cssStage"></div>
 <div id="glFront"></div>
 
@@ -1110,7 +1125,7 @@ const points = new THREE.Points(pGeo, new THREE.PointsMaterial({
   size: 13, map: softDot(214, 224, 240), transparent: true, opacity: 0.4,
   depthWrite: false, sizeAttenuation: true,
 }));
-backScene.add(points);
+/* removed: 2D foreground stylisation — the world carries the scene now */
 /* a scattering of gold embers among the mist */
 const E_COUNT = 90;
 const eGeo = new THREE.BufferGeometry();
@@ -1125,7 +1140,7 @@ const embers = new THREE.Points(eGeo, new THREE.PointsMaterial({
   size: 10, map: softDot(232, 196, 124), transparent: true, opacity: 0.5,
   depthWrite: false, sizeAttenuation: true,
 }));
-backScene.add(embers);
+/* removed: 2D foreground stylisation — the world carries the scene now */
 
 const clouds = [];
 const darkCloudTex = blotTexture(512, 7, 8, 10, 18);
@@ -1141,7 +1156,6 @@ for (let i = 0; i < 7; i++) {
   s.position.set(-1100 + Math.random() * 3800, dark ? -650 + Math.random() * 500 : 100 + Math.random() * 700, -2000 + Math.random() * 1000);
   s.userData = { rot: (Math.random() - 0.5) * 0.0005, breathe: 0.7 + Math.random() * 0.9, base: scale };
   clouds.push(s);
-  backScene.add(s);
 }
 
 /* ---- the surrounding world: a painted 360° night panorama ----
@@ -1455,7 +1469,11 @@ function makeFuji(dist, side, R, Hh) {
      and the two floors (210 vs 200) left the rock *wider* than the cap at the very top, so
      bare rock punched through the snow. The cap is now a proportional offset of the same curve
      and cannot cross it. */
-  const rAt = (t) => Math.max(R * Math.pow(1 - t, 1.4), R * 0.052);
+  /* A floored radius is what produced the wine-bottle neck: above t=0.88 the floor won and
+     the top eighth of the mountain ran straight up as a cylinder. Interpolating to a real
+     summit radius instead means it tapers all the way and only goes flat at the very top. */
+  const rTop = R * 0.028;
+  const rAt = (t) => rTop + (R - rTop) * Math.pow(1 - t, 1.7);
   const prof = [];
   for (let i = 0; i <= 16; i++) { const t = i / 16; prof.push(new THREE.Vector2(rAt(t), t * Hh)); }
   grp.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 64), new THREE.MeshLambertMaterial({
@@ -1463,7 +1481,7 @@ function makeFuji(dist, side, R, Hh) {
   })));
   /* the crater lip, so the flat top reads as a summit rather than a cut-off cone */
   const lip = new THREE.Mesh(
-    new THREE.TorusGeometry(R * 0.052, R * 0.016, 6, 40),
+    new THREE.TorusGeometry(R * 0.028, R * 0.009, 6, 40),
     new THREE.MeshLambertMaterial({ color: 0x4a5470, flatShading: true }));
   lip.rotation.x = -Math.PI / 2; lip.position.y = Hh; grp.add(lip);
   /* the snow cap: same curve, offset outward, with a ragged snowline rather than a drawn circle */
@@ -1626,6 +1644,106 @@ function blossomTree(dist, side, s) {
 [[1750, -1500, 1.5], [2100, 1900, 1.25], [3100, -3000, 1.9], [3600, 3300, 1.6], [5000, -5200, 2.3]]
   .forEach(([d, s, k]) => blossomTree(d, s, k));
 
+/* ---- ground cover: everything below is instanced, so the whole valley floor is 4 draw calls ---- */
+/* one shared scatter so grass, rocks and stones agree about where the ground is busy */
+function scatter(i, seed, near, far, spread) {
+  const a = (i * 9301 + seed * 49297) % 233280 / 233280;
+  const b = (i * 4271 + seed * 15731) % 233280 / 233280;
+  const c = (i * 7919 + seed * 30011) % 233280 / 233280;
+  return { d: near + Math.pow(a, 0.62) * (far - near), s: (b - 0.42) * spread, r: c };
+}
+function instanced(geo, mat, n, place) {
+  const im = new THREE.InstancedMesh(geo, mat, n);
+  const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < n; i++) {
+    const p = place(i);
+    if (!p) { sc.set(0, 0, 0); mx.compose(new THREE.Vector3(), q, sc); im.setMatrixAt(i, mx); continue; }
+    q.setFromAxisAngle(up, p.rot || 0);
+    sc.copy(p.scale);
+    mx.compose(p.pos, q, sc);
+    im.setMatrixAt(i, mx);
+  }
+  im.instanceMatrix.needsUpdate = true;
+  backScene.add(im);
+  return im;
+}
+
+/* grass: crossed blades, dense near the eye and thinning out into the meadow */
+{
+  /* 22x34, not 110x150: at the first size a single blade was 165 units across and the ones
+     420 units from the eye covered half the screen. Grass has to be small enough that a
+     thousand of them read as texture. */
+  const blade = new THREE.PlaneGeometry(22, 34);
+  blade.translate(0, 17, 0);
+  const b2 = blade.clone(); b2.rotateY(Math.PI / 2);
+  const geo = THREE.BufferGeometryUtils
+    ? THREE.BufferGeometryUtils.mergeGeometries([blade, b2])
+    : blade;
+  const mat = new THREE.MeshLambertMaterial({
+    color: 0x63784c, emissive: 0x1b2416, side: THREE.DoubleSide,
+    transparent: true, opacity: 0.95, alphaTest: 0.2,
+  });
+  instanced(geo, mat, 2600, (i) => {
+    const p = scatter(i, 3, 900, 7200, 11000);
+    const k = 0.55 + p.r * 1.5;
+    return { pos: at(p.d, p.s, GROUND_Y - 10), rot: p.r * 6.28, scale: new THREE.Vector3(k, k * (0.7 + p.r), k) };
+  });
+}
+
+/* low scrub, a darker second layer so the meadow is not one flat tone */
+{
+  const geo = new THREE.IcosahedronGeometry(34, 0);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x3d5236, emissive: 0x121a10, flatShading: true });
+  instanced(geo, mat, 900, (i) => {
+    const p = scatter(i, 11, 700, 9000, 13000);
+    const k = 0.5 + p.r * 1.3;
+    return { pos: at(p.d, p.s, GROUND_Y + 20), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.5, k * 0.5, k * 1.4) };
+  });
+}
+
+/* stones scattered through the grass, catching the low sun on one side */
+{
+  const geo = new THREE.DodecahedronGeometry(26, 0);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x6d6f68, emissive: 0x232520, flatShading: true });
+  instanced(geo, mat, 260, (i) => {
+    const p = scatter(i, 29, 500, 8000, 12000);
+    const k = 0.35 + p.r * 1.4;
+    return { pos: at(p.d, p.s, GROUND_Y + 6), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.4, k * 0.75, k) };
+  });
+}
+
+/* a handful of real boulders for scale near the eye */
+{
+  const geo = new THREE.DodecahedronGeometry(95, 0);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x6a6c64, emissive: 0x232520, flatShading: true });
+  instanced(geo, mat, 14, (i) => {
+    const p = scatter(i, 71, 900, 5200, 9000);
+    const k = 0.7 + p.r * 1.6;
+    return { pos: at(p.d, p.s, GROUND_Y + 40), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.3, k * 0.85, k * 1.1) };
+  });
+}
+
+/* the river: a ribbon crossing the valley, mirroring the dawn sky */
+{
+  const pts = [];
+  for (let i = 0; i <= 40; i++) {
+    const t = i / 40;
+    const d = 1400 + t * 11000;
+    const s = Math.sin(t * 4.1) * 2400 + 1800 - t * 2600;
+    pts.push(at(d, s, GROUND_Y + 14));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.TubeGeometry(curve, 90, 260, 4, false);
+  geo.scale(1, 0.04, 1);
+  const water = new THREE.MeshLambertMaterial({
+    color: 0x9fb6c9, emissive: 0x4a5c72, flatShading: true, transparent: true, opacity: 0.9,
+  });
+  const river = new THREE.Mesh(geo, water);
+  river.position.y = GROUND_Y + 30;
+  backScene.add(river);
+}
+
 /* gold ink drops + rings + stains */
 const stains = [];
 const ringTex = ringTexture(256);
@@ -1634,7 +1752,7 @@ function spawnDropLanding(x, z) {
   const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: ringTex, transparent: true, opacity: 0.5, depthWrite: false }));
   ring.position.set(x, -560, z);
   ring.scale.set(10, 10, 1);
-  backScene.add(ring);
+  /* removed: 2D foreground stylisation — the world carries the scene now */
   gsap.to(ring.scale, { x: 320, y: 320, duration: 1.1, ease: 'power2.out' });
   gsap.to(ring.material, { opacity: 0, duration: 1.1, ease: 'power1.out', onComplete: () => backScene.remove(ring) });
   const stain = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -1644,7 +1762,7 @@ function spawnDropLanding(x, z) {
   stain.position.set(x, -580, z);
   const sc = 120 + Math.random() * 160;
   stain.scale.set(sc, sc * 0.8, 1);
-  backScene.add(stain);
+  /* removed: 2D foreground stylisation — the world carries the scene now */
   gsap.to(stain.material, { opacity: 0.14, duration: 0.7 });
   stains.push(stain);
   if (stains.length > 6) {
@@ -1669,7 +1787,7 @@ mGeo.setAttribute('position', new THREE.BufferAttribute(mPos, 3));
 const motes = new THREE.Points(mGeo, new THREE.PointsMaterial({
   size: 6, map: softDot(242, 234, 216, 32), transparent: true, opacity: 0.5, depthWrite: false, sizeAttenuation: true,
 }));
-frontScene.add(motes);
+/* removed: 2D foreground stylisation — the world carries the scene now */
 
 function fallDrop() {
   if (document.hidden || reduced || state !== 'menu') return;
@@ -1900,8 +2018,7 @@ moonEl.innerHTML = `<div class="moon-core"></div>
   <div class="moon-ring"></div>
   <div class="moon-disc"><span class="moon-mare a"></span><span class="moon-mare b"></span><span class="moon-mare c"></span></div>
   <div class="moon-cloud"></div>`;
-moonEl.style.opacity = 0.35;   /* a pale setting moon — it must not outshine the sunrise */
-cssPlane(moonEl, 430, 430, -2450, -6 * D2R);
+/* removed: the moon — the world carries the scene now */
 
 /* sumi-e mountain ridges with a far pagoda */
 function ridge(fill, pts, extra = '') {
@@ -1949,7 +2066,9 @@ const MISTS = [];
 /* scenery that belongs to the home view only — from other bearings it drifts into frame
    and can physically occlude a destination's UI (the ensō was eating READING's back button) */
 const homeScenery = new THREE.Group();
-cssScene.add(homeScenery);
+/* removed: 2D foreground stylisation — the world carries the scene now */
+/* the enso, watermark kanji, brush stroke, floating sheets, thought-kanji and mist bands all
+   hang off homeScenery — leaving it out of the scene retires the whole 2D overlay at once */
 const sheetObjs = [];
 
 /* ghost practice sheets */
