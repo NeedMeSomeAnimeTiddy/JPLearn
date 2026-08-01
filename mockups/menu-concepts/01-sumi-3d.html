@@ -1019,12 +1019,13 @@ const SECTION_ACCENT = {
 const W = () => innerWidth, H = () => innerHeight;
 const NIGHT = 0x151928;
 
-const camera = new THREE.PerspectiveCamera(42, W() / H(), 1, 18000);
+/* far plane out to 60k: Fuji stands 17,000 away and the horizon rim another 30,000 behind it */
+const camera = new THREE.PerspectiveCamera(42, W() / H(), 1, 60000);
 
 const backScene = new THREE.Scene();
-/* pushed out so nothing inside the room you are standing in is dulled, while the rooms across
-   the valley still sink away — this is what separates "one landscape" from "a cluttered set" */
-backScene.fog = new THREE.Fog(NIGHT, 3400, 12000);
+/* scaled to a real landscape: the near ground stays clear, the foothills soften, and the far
+   ranges dissolve into the night rather than ending at a visible edge */
+backScene.fog = new THREE.Fog(NIGHT, 5000, 38000);
 const backRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 backRenderer.setSize(W(), H());
 backRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -1343,7 +1344,160 @@ const pano = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ map: panoTex, side: THREE.BackSide, fog: false })
 );
 pano.position.set(150, 600, 150);
-backScene.add(pano);
+/* the painted panorama is retired — the horizon is real geometry now */
+
+/* ================= THE LANDSCAPE =================
+   Step one of the rebuild: terrain, sky, Fuji and the home composition, and nothing else.
+
+   The painted panorama cylinder is gone — the horizon is real geometry now. The home camera is
+   deliberately left where it was, because its framing of the menu type is the one composition
+   that works; instead the world is built *around* its sight line. Home looks along −112.5°, so
+   that bearing is "0°" as far as the design brief is concerned, and Fuji stands on it.
+
+   Everything is placed against that axis:
+       axis  = (cos −112.5°, sin −112.5°) = (−0.3827, −0.9239)
+       right = (0.9239, −0.3827)                    · perpendicular, camera's right
+   so `at(dist, side, y)` puts a thing `dist` down the sight line and `side` to the right of it. */
+const AXIS = new THREE.Vector2(-0.3827, -0.9239);
+const SIDE = new THREE.Vector2(0.9239, -0.3827);
+const EYE = new THREE.Vector2(170, 830);
+const GROUND_Y = -300;
+function at(dist, side = 0, y = GROUND_Y) {
+  return new THREE.Vector3(
+    EYE.x + AXIS.x * dist + SIDE.x * side, y,
+    EYE.y + AXIS.y * dist + SIDE.y * side);
+}
+
+/* ---- sky: one painted dome, unfogged, drawn behind everything ---- */
+function paintSky() {
+  const W = 2048, H = 1024;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  /* v = 0 is the zenith on a sphere's UVs, v = 1 the nadir */
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0.00, '#080b16');
+  sky.addColorStop(0.32, '#141a2e');
+  sky.addColorStop(0.52, '#243052');
+  sky.addColorStop(0.60, '#33406a');   /* the glow that sits just above the horizon */
+  sky.addColorStop(0.66, '#1b2238');
+  sky.addColorStop(1.00, '#0a0d16');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, W, H);
+  /* stars thin out toward the horizon */
+  for (let i = 0; i < 1400; i++) {
+    const y = Math.pow(Math.random(), 1.5) * H * 0.56;
+    const a = 0.25 + Math.random() * 0.6 * (1 - y / (H * 0.56));
+    g.fillStyle = `rgba(226,236,255,${a.toFixed(2)})`;
+    const s = Math.random() < 0.06 ? 3 : 2;
+    g.fillRect(Math.random() * W, y, s, s);
+  }
+  /* a few thin cloud bands, low and wide */
+  for (let i = 0; i < 14; i++) {
+    const y = H * (0.40 + Math.random() * 0.18);
+    g.fillStyle = `rgba(150,172,214,${(0.03 + Math.random() * 0.05).toFixed(3)})`;
+    g.beginPath();
+    g.ellipse(Math.random() * W, y, 200 + Math.random() * 420, 12 + Math.random() * 22, 0, 0, 7);
+    g.fill();
+  }
+  return new THREE.CanvasTexture(c);
+}
+{
+  const tex = paintSky();
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(46000, 48, 24),
+    new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false }));
+  dome.renderOrder = -10;
+  backScene.add(dome);
+}
+
+/* ---- terrain: a calm bowl under the menu, rising into foothills further out ---- */
+{
+  const geo = new THREE.PlaneGeometry(70000, 70000, 150, 150);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const d = Math.hypot(x, z);
+    let h = Math.sin(x * 0.00016) * Math.cos(z * 0.00013) * 430
+          + Math.sin(x * 0.00043 + 1.7) * Math.cos(z * 0.00039) * 190
+          + Math.sin(x * 0.00097 + 4.1) * Math.cos(z * 0.00088) * 70;
+    /* flat immediately around the camera, so the near ground stays quiet under the type */
+    h *= THREE.MathUtils.smoothstep(d, 1400, 9000);
+    /* and lifting into high ground far out, so the valley has sides */
+    h += THREE.MathUtils.smoothstep(d, 13000, 31000) * 1700;
+    pos.setY(i, h);
+  }
+  geo.computeVertexNormals();
+  /* lifted off black: at 0x1e2a33 the whole lower half of the frame read as a void rather
+     than as land the moonlight is falling on */
+  const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+    color: 0x364655, emissive: 0x141d27, flatShading: true,
+  }));
+  ground.position.set(EYE.x, GROUND_Y, EYE.y);
+  backScene.add(ground);
+}
+
+/* ---- Fuji, standing on the sight line ---- */
+/* A lathe, not a cone: the flanks have to bow inward (r falls as (1−t)^1.4) or it reads as a
+   volcano rather than as Fuji. Broad and low — the real thing is 40km across and under 4km high,
+   so the temptation to make it steep is the thing to resist. */
+function makeFuji(dist, side, R, Hh) {
+  const grp = new THREE.Group();
+  const prof = [];
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14;
+    prof.push(new THREE.Vector2(Math.max(R * Math.pow(1 - t, 1.4), 210), t * Hh));
+  }
+  const rock = new THREE.MeshLambertMaterial({ color: 0x1a2338, emissive: 0x090d18, flatShading: true });
+  grp.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 56), rock));
+  /* the snow cap: the same profile, re-sampled over the top fifth and nudged outward */
+  const cap = [];
+  for (let i = 0; i <= 8; i++) {
+    const t = 0.64 + (i / 8) * 0.36;
+    cap.push(new THREE.Vector2(Math.max(R * Math.pow(1 - t, 1.4) + 40, 200), t * Hh));
+  }
+  grp.add(new THREE.Mesh(new THREE.LatheGeometry(cap, 56), new THREE.MeshLambertMaterial({
+    color: 0xdce6f7, emissive: 0x2a3550, flatShading: true,
+  })));
+  grp.position.copy(at(dist, side, GROUND_Y - 120));
+  backScene.add(grp);
+  return grp;
+}
+/* 13,000 out and 4,200 tall: at the first values (17,000 / 2,700) it subtended barely 7° and
+   read as a bump on the horizon. This fills most of the upper frame — which is the point of
+   putting it on the sight line. Offset right so it sits clear of the type stack. */
+makeFuji(13500, 2600, 6000, 3500);
+
+/* ---- the ranges: foothills layered in front of Fuji, and a rim closing the horizon ---- */
+function foothill(dist, side, w, h, tone) {
+  const geo = new THREE.ConeGeometry(w, h, 5 + (Math.floor(w) % 3));
+  const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+    color: tone, emissive: 0x080b12, flatShading: true,
+  }));
+  m.position.copy(at(dist, side, GROUND_Y + h / 2 - 160));
+  m.rotation.y = (side + dist) * 0.0007;
+  backScene.add(m);
+}
+/* two layers between the eye and Fuji, so the valley reads as having depth rather than a backdrop */
+[[5200, -4200, 1900, 900], [6100, 2900, 2300, 760], [8200, -1400, 2800, 1250], [8900, 5400, 2200, 880]]
+  .forEach(([d, s, w, h]) => foothill(d, s, w, h, 0x223040));
+[[11500, -8000, 4200, 2000], [12500, 8200, 3800, 1750]]
+  .forEach(([d, s, w, h]) => foothill(d, s, w, h, 0x1a2431));
+/* and a rim all the way round, so turning the camera never finds an edge of the world */
+for (let k = 0; k < 22; k++) {
+  const a = (k / 22) * Math.PI * 2 + 0.3;
+  const r = 26000 + ((k * 811) % 5000);
+  const p = new THREE.Vector3(EYE.x + Math.cos(a) * r, 0, EYE.y + Math.sin(a) * r);
+  const h = 1600 + ((k * 397) % 1900);
+  const m = new THREE.Mesh(
+    new THREE.ConeGeometry(3200 + ((k * 233) % 2600), h, 5),
+    new THREE.MeshLambertMaterial({ color: 0x111726, emissive: 0x070a12, flatShading: true }));
+  m.position.set(p.x, GROUND_Y + h / 2 - 300, p.z);
+  m.rotation.y = k * 0.7;
+  backScene.add(m);
+}
 
 /* gold ink drops + rings + stains */
 const stains = [];
@@ -1640,7 +1794,8 @@ MTN.forEach((m, i) => {
   const el = document.createElement('div');
   el.className = 'plane-mtn';
   el.innerHTML = ridge(m.fill, m.pts, m.extra || '');
-  mtnObjs.push(cssPlane(el, -100 + i * 260, m.y, m.z));
+  /* the CSS ridges are retired: the horizon is real geometry now */
+  void el;
 });
 
 /* floating thought-kanji — mid-depth band only, away from screen corners */
@@ -1838,13 +1993,17 @@ for (let i = 1; i <= 5; i++) makeEnv(i);
 const MESH_ENVS = [];
 /* the drifting toro on the water — rebuilt as meshes, same shape the frame loop expects */
 const toriiToro = [];
+/* STEP ONE of the landscape rebuild: the six rooms are stood down while the terrain, sky and
+   Fuji are judged on their own. The geometry still builds into orphan groups so nothing else
+   has to change; flip this back on when the locations are rebuilt against the new world. */
+const BUILD_ROOMS = false;
 function meshRoom(idx) {
   const d = DESTS[idx];
   const g = new THREE.Group();
   g.position.copy(d.sub);
   g.lookAt(d.rest);
   g.visible = false;
-  backScene.add(g);
+  if (BUILD_ROOMS) backScene.add(g);
   MESH_ENVS[idx] = g;
   g.add(new THREE.AmbientLight(0x46567e, 1.3));
   const moon = new THREE.DirectionalLight(0xc3d8f5, 0.95);
@@ -1908,24 +2067,30 @@ function keyLight(g, color, intensity, x, y, z) {
 /* REVIEW — karesansui: raked gravel, three set stones, the low wall behind */
 {
   const g = meshRoom(1);
-  slab(g, 6000, 4600, lam(0x3a3d4c), 0, -700, 200, -Math.PI / 2);
-  /* the rake: flat rings cut into the gravel, which only reads as circles in real 3D */
-  const rake = lam(0x4a4e60);
+  /* Moonlit gravel is pale — the first pass had it darker than the night sky behind it, so the
+     whole garden read as a hole. Every surface here carries a little emissive as well, so the
+     forms survive however the lighting is tuned. */
+  slab(g, 6000, 4600, lam(0x5a5f74, { emissive: 0x161a26 }), 0, -700, 200, -Math.PI / 2);
+  /* the rake: rings cut into the gravel, which only read as circles in real 3D. Thicker than
+     the first pass — an 11-unit tube is invisible from 1500 units away. */
+  const rake = lam(0x8990a8, { emissive: 0x20242f });
   [[-520, 260, 520], [420, -140, 700], [1100, 420, 380]].forEach(([x, z, r]) => {
     for (let k = 0; k < 3; k++) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(r + k * 130, 11, 6, 64), rake);
-      ring.position.set(x, -694, z); ring.rotation.x = -Math.PI / 2; g.add(ring);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r + k * 130, 24, 6, 64), rake);
+      ring.position.set(x, -690, z); ring.rotation.x = -Math.PI / 2; g.add(ring);
     }
   });
-  const stone = lam(0x191c2a, { flatShading: true });
+  const stone = lam(0x333950, { flatShading: true, emissive: 0x0e1018 });
   [[-620, -300, 200, 1.0], [260, -520, 140, 0.72], [900, 120, 230, 1.25]].forEach(([x, z, r, s]) => {
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), stone);
     m.position.set(x, -700 + r * 0.55 * s, z); m.scale.set(s * 1.3, s * 0.8, s);
     m.rotation.set(0.4, x * 0.01, 0.2); g.add(m);
   });
-  box(g, 6400, 420, 200, lam(0x171522), 0, -520, -1500);
-  box(g, 6400, 60, 300, lam(0x241f30), 0, -300, -1500);
-  lamp(g, 0x8fa8d8, -400, 300, 400, 1.4, 3200);
+  box(g, 6400, 420, 200, lam(0x272337, { emissive: 0x0d0b14 }), 0, -520, -1500);
+  box(g, 6400, 60, 300, lam(0x3b3550), 0, -300, -1500);
+  /* directional, not a point light: the garden runs out 1500 units and 1/d² kills a lamp */
+  keyLight(g, 0xcfe0ff, 2.6, -900, 1500, 1400);
+  keyLight(g, 0xe34a33, 0.7, 1400, 500, 800);
 }
 
 /* READING — the bamboo grove: real stalks at real depths, a lantern to read by */
@@ -2005,7 +2170,12 @@ function keyLight(g, color, intensity, x, y, z) {
 function makeTorii(g, s, x, y, z, ry) {
   const t = new THREE.Group();
   t.position.set(x, y, z); t.rotation.y = ry; t.scale.setScalar(s); g.add(t);
-  const red = lam(0xc23a20), dk = lam(0x8f2818), gold = lam(0xe8c47c);
+  /* The gates are the one thing in this world that must read as vermillion, and they stand
+     2700+ units out where no lamp reaches and even a strong emissive stayed muddy. So they are
+     unlit outright — three flat tones standing in for the shading, which is honest to a flat
+     art direction and guarantees the colour survives whatever the lighting does. Still
+     fog-aware, so seen from across the valley they sink into the night like everything else. */
+  const red = flat(0xd2452a), dk = flat(0x8f2818), gold = flat(0xe8c47c);
   tube(t, 62, 78, 1560, red, -560, 0, 0, 12);
   tube(t, 62, 78, 1560, red, 560, 0, 0, 12);
   box(t, 1500, 90, 150, dk, 0, 690, 0);            /* nuki, the lower tie beam */
@@ -2022,10 +2192,11 @@ function makeTorii(g, s, x, y, z, ry) {
   makeTorii(g, 0.92, 0, WATER_Y + 780 * 0.92, -2700, 0);
   makeTorii(g, 0.60, 70, WATER_Y + 780 * 0.60, -3900, 0.06);
   makeTorii(g, 0.38, -60, WATER_Y + 780 * 0.38, -5000, -0.05);
-  /* still water, lifted off black so the gates have something to stand in */
-  slab(g, 14000, 11000, lam(0x1b2740), 0, WATER_Y, -1200, -Math.PI / 2);
+  /* still water, lifted well off black so the gates have something to stand in and the shore
+     line reads at all */
+  slab(g, 14000, 11000, lam(0x2a3a5c, { emissive: 0x0e1526 }), 0, WATER_Y, -1200, -Math.PI / 2);
   /* the far shore and its treeline, closing the lake off */
-  box(g, 14000, 260, 400, lam(0x141a2a), 0, WATER_Y + 130, -6200);
+  box(g, 14000, 260, 400, lam(0x1d2740), 0, WATER_Y + 130, -6200);
   [[-1500, -300], [1560, -420]].forEach(([x, z]) => {
     box(g, 150, 60, 150, lam(0x0b0d16), x, WATER_Y + 30, z);
     box(g, 110, 150, 110, flat(0xe8c47c), x, WATER_Y + 130, z);
@@ -2037,9 +2208,10 @@ function makeTorii(g, s, x, y, z, ry) {
     const t = box(g, 90, 90, 90, flat(0xffb867), x, WATER_Y + 60, z);
     toriiToro.push({ obj: t, bx: x, by: WATER_Y + 60, phase: i * 2.4 });
   });
-  /* the gates stand 3000 units out, so they need a light that does not attenuate */
-  keyLight(g, 0xffb46a, 1.15, 900, 700, 1600);
-  keyLight(g, 0x5b86c4, 0.5, -1200, 400, -900);
+  /* the gates stand 2700 units out, so they need light that does not attenuate — and more of
+     it than the first pass gave them */
+  keyLight(g, 0xffc48a, 2.8, 1100, 900, 1900);
+  keyLight(g, 0x6f9bd8, 1.1, -1400, 500, -1100);
 }
 
 /* ================= camera ================= */
