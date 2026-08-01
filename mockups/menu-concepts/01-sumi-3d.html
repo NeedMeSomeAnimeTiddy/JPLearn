@@ -1201,13 +1201,8 @@ function paintPanorama() {
     g.closePath();
     g.fill();
   }
-  /* the menu's own backdrop — the one wide sector, and the only thing home ever sees */
-  sector(247, 1500, (x0, w) => {
-    ridgeAt(x0, w, H * 0.66, 210, '#1a2033');
-    ridgeAt(x0 + w * 0.18, w * 0.7, H * 0.7, 150, '#151a29');
-  });
   /* bamboo grove — READING */
-  sector(43, 500, (x0, w) => {
+  sector(150, 500, (x0, w) => {
     for (let k = 0; k < 16; k++) {
       const x = x0 + (k / 16) * w + Math.sin(k * 7) * 9;
       const top = H * (0.2 + ((k * 37) % 23) / 23 * 0.22);
@@ -1223,7 +1218,7 @@ function paintPanorama() {
     }
   });
   /* the lit engawa — STUDY */
-  sector(359, 500, (x0, w) => {
+  sector(30, 500, (x0, w) => {
     g.fillStyle = '#0b0d16';
     g.fillRect(x0, H * 0.3, w, H * 0.05);
     g.fillRect(x0, H * 0.82, w, H * 0.18);
@@ -1244,7 +1239,7 @@ function paintPanorama() {
     }
   });
   /* the summit — twin peaks above a sea of clouds (JLPT's ascent) */
-  sector(87, 500, (x0, w) => {
+  sector(90, 500, (x0, w) => {
     g.fillStyle = '#1c2338';
     g.beginPath();
     g.moveTo(x0, H * 0.72);
@@ -1275,7 +1270,7 @@ function paintPanorama() {
     }
   });
   /* the garden wall (REVIEW's rock garden sits before it) */
-  sector(315, 500, (x0, w) => {
+  sector(330, 500, (x0, w) => {
     g.fillStyle = '#100f1c';
     g.fillRect(x0, H * 0.64, w, H * 0.1);
     g.fillStyle = '#1a1626';
@@ -1292,7 +1287,7 @@ function paintPanorama() {
     }
   });
   /* the dojo facade — dark hall, white maku curtain */
-  sector(131, 500, (x0, w) => {
+  sector(210, 500, (x0, w) => {
     g.fillStyle = '#0c0e19';
     g.beginPath();
     g.moveTo(x0 + w * 0.06, H * 0.5);
@@ -1314,7 +1309,7 @@ function paintPanorama() {
     }
   });
   /* torii over still water */
-  sector(175, 500, (x0, w) => {
+  sector(270, 500, (x0, w) => {
     for (let k = 0; k < 40; k++) {
       g.fillStyle = `rgba(159,184,216,${0.04 + Math.random() * 0.07})`;
       g.fillRect(x0 + Math.random() * w, H * (0.72 + Math.random() * 0.24), 30 + Math.random() * 90, 3);
@@ -1327,6 +1322,13 @@ function paintPanorama() {
     g.fillRect(cx - tw / 2 - 20, ty + 60, tw + 40, 18);
     g.fillStyle = 'rgba(10,12,21,0.3)';
     g.fillRect(cx - tw / 2 - 46, H * 0.72, tw + 92, 60);
+  });
+  /* The menu backdrop is painted LAST so it wins its own sight line. With the rooms spread
+     over the full circle DRILLS (210) and RECORDS (270) now flank where the menu looks, and
+     their painted facades are redundant anyway — both are real geometry now. */
+  sector(247, 1500, (x0, w) => {
+    ridgeAt(x0, w, H * 0.66, 210, '#1a2033');
+    ridgeAt(x0 + w * 0.18, w * 0.7, H * 0.7, 150, '#151a29');
   });
   return new THREE.CanvasTexture(c);
 }
@@ -1723,15 +1725,22 @@ const R_SUB = ORBIT_R + SUB_GAP;
 const AZ_HOME = 1.5414;
 function restAt(az, y = 0) { return new THREE.Vector3(150 + Math.cos(az) * ORBIT_R, y, 150 + Math.sin(az) * ORBIT_R); }
 function subAt(az, y = 0) { const r = restAt(az, y); return r.add(new THREE.Vector3(Math.cos(az) * SUB_GAP, -10, Math.sin(az) * SUB_GAP)); }
-/* Six rooms, one even 44° step, the run centred in the arc the menu cannot see
-   (forbidden az ∈ [189°, 301°]) with ~14° of margin at each end. */
+/* THE FULL CIRCLE. The rooms used to be crammed into 226° of arc because CSS3D planes could not
+   be culled and a room merely standing *elsewhere* would paint through the menu. Now that the
+   scenery is depth-buffered geometry that constraint is gone, so the six sit at an even 60°
+   and the world closes into a real ring you travel around.
+
+   The phase is chosen so no room sits on the menu's own sight line (which runs out at ~240°) —
+   210° and 270° flank it, and at 4300 units with fog they read as far-off structures across the
+   valley rather than clutter. JLPT takes 90°, the one bearing that would otherwise give almost
+   no orbit travel, because its journey is a 620-unit climb rather than a slide. */
 const DESTS = [
-  { az: 6.2657, y: 0,   dir: -1 },   /* STUDY   — 359° · the engawa veranda   (θ  −25°, 87 clear) */
-  { az: 5.4978, y: 0,   dir: -1 },   /* REVIEW  — 315° · karesansui garden    (θ  −52°, 61 clear) */
-  { az: 0.7505, y: 0,   dir: -1 },   /* READING —  43° · the bamboo grove     (θ  +19°, 132 clear)*/
-  { az: 2.2864, y: 0,   dir: 1  },   /* DRILLS  — 131° · the dojo             (θ +144°, 104 clear)*/
-  { az: 1.5184, y: 620, dir: -1 },   /* JLPT    —  87° · the rise to the peak (θ  +87°, 160 clear)*/
-  { az: 3.0543, y: 0,   dir: 1  },   /* RECORDS — 175° · the torii shore      (θ −173°, 61 clear) */
+  { az: 0.5236, y: 0,   dir: -1 },   /* STUDY   —  30° · the engawa veranda      (sweep  −58°) */
+  { az: 5.7596, y: 0,   dir: -1 },   /* REVIEW  — 330° · the karesansui garden   (sweep −118°) */
+  { az: 2.6180, y: 0,   dir: 1  },   /* READING — 150° · the bamboo grove        (sweep  +62°) */
+  { az: 3.6652, y: 0,   dir: 1  },   /* DRILLS  — 210° · the dojo                (sweep +122°) */
+  { az: 1.5708, y: 620, dir: 1  },   /* JLPT    —  90° · the climb to the peak   (sweep   +2°) */
+  { az: 4.7124, y: 0,   dir: -1 },   /* RECORDS — 270° · the torii shore         (sweep −178°) */
 ].map((d) => ({ ...d, rest: restAt(d.az, d.y), sub: subAt(d.az, d.y) }));
 const ENGAWA_REST = DESTS[0].rest, ENGAWA_SUB = DESTS[0].sub;
 const TORII_REST = DESTS[5].rest, TORII_SUB = DESTS[5].sub;
@@ -2037,20 +2046,12 @@ function makeTorii(g, s, x, y, z, ry) {
 const HOME = { px: 170, py: 60, pz: 830, tx: -240, ty: 30, tz: -160, fov: 42, roll: 0 };
 const cam = { ...HOME };
 
-/* Guard rail, because eyeballing bearings got this wrong twice. Every room must sit outside the
-   menu's frustum by more than its own angular half-width, or it paints over the landscape the
-   moment it is lit — CSS3DRenderer culls nothing, so "behind the camera" is not a defence. */
-{
-  const eye = new THREE.Vector3(HOME.px, HOME.py, HOME.pz);
-  const axis = new THREE.Vector3(HOME.tx, HOME.ty, HOME.tz).sub(eye).normalize();
-  const halfV = (HOME.fov / 2) * D2R;
-  const halfH = Math.atan(Math.tan(halfV) * (innerWidth / innerHeight));
-  const need = (halfH + 13 * D2R) / D2R;
-  DESTS.forEach((d, i) => {
-    const sep = Math.acos(THREE.MathUtils.clamp(d.sub.clone().sub(eye).normalize().dot(axis), -1, 1)) / D2R;
-    if (sep < need) console.warn(`[world] ${ITEMS[i].en} is ${sep.toFixed(1)}° off the menu axis — needs > ${need.toFixed(1)}°`);
-  });
-}
+/* The guard that used to live here enforced "no room may fall inside the menu's frustum", and it
+   earned its keep for as long as the scenery was CSS3D — an unculled plane really did paint
+   through the menu. With depth-buffered geometry a room in shot is just a building in the
+   distance, which is the point of a continuous world, so the rule is retired rather than
+   silenced. (`?envs=all` still exists but only affects the CSS3D interface groups now — the
+   scenery is unconditionally lit.) */
 const breath = { y: 0, x: 0 };
 const shake = { x: 0, y: 0 };
 let parX = 0, parY = 0, parTX = 0, parTY = 0;
