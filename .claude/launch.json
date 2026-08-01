@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "menu-concepts",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5230", "--directory", "mockups/menu-concepts"],
+      "port": 5230
+    }
+  ]
+}

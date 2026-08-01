@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>03 祭 MATSURI — JPLearn menu concept</title>
+<style>
+  :root {
+    --lacquer: #180d09;
+    --lacquer-2: #241209;
+    --red: #e03227;
+    --red-deep: #a31d15;
+    --gold: #ffb300;
+    --gold-soft: #f0c66c;
+    --paper: #fff3dd;
+    --teal: #19b5ae;
+    --jp: "Yu Gothic UI", "Yu Gothic", "Meiryo", sans-serif;
+    --jpm: "Yu Mincho", "YuMincho", serif;
+    --lat: "Arial Black", "Segoe UI Black", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(120% 90% at 50% 110%, var(--lacquer-2) 0%, var(--lacquer) 55%, #0d0603 100%);
+    color: var(--paper);
+    font-family: var(--jp);
+    -webkit-user-select: none; user-select: none;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  .screen { position: fixed; inset: 0; visibility: hidden; }
+  body.state-menu #menuScreen { visibility: visible; }
+  body.state-sub #subScreen { visibility: visible; }
+
+  /* ---------- halftone & fireworks ---------- */
+  .halftone {
+    position: absolute; inset: -30%;
+    background-image:
+      radial-gradient(circle, rgba(255,179,0,0.13) 1.4px, transparent 1.5px),
+      radial-gradient(circle, rgba(224,50,39,0.10) 1.2px, transparent 1.3px);
+    background-size: 22px 22px, 34px 34px;
+    background-position: 0 0, 11px 17px;
+    animation: htDrift 36s linear infinite;
+  }
+  @keyframes htDrift { from { transform: translate(0,0); } to { transform: translate(66px, 66px); } }
+
+  .fw { position: absolute; pointer-events: none; z-index: 1; }
+  .fw i {
+    position: absolute; left: 0; top: 0; width: 4px; height: 4px;
+    background: var(--gold);
+    opacity: 0;
+    animation: spark 1.15s cubic-bezier(0.15, 0.6, 0.4, 1) forwards;
+    animation-delay: inherit;
+  }
+  @keyframes spark {
+    0% { transform: translate(0,0) scale(1.4); opacity: 1; }
+    70% { opacity: 0.9; }
+    100% { transform: translate(var(--sx), calc(var(--sy) + 26px)) scale(0.2); opacity: 0; }
+  }
+
+  /* ---------- lantern string ---------- */
+  .rope { position: absolute; top: 0; left: 0; right: 0; height: 24vh; z-index: 2; pointer-events: none; }
+  .rope svg { width: 100%; height: 100%; }
+  .lantern {
+    position: absolute;
+    width: 7.2vmin; height: 10vmin;
+    transform-origin: top center;
+    animation: sway ease-in-out infinite alternate;
+  }
+  @keyframes sway { from { transform: rotate(-4.5deg); } to { transform: rotate(4.5deg); } }
+  .lantern svg { width: 100%; height: 100%; overflow: visible; }
+  .lantern .body { fill: var(--red); }
+  .lantern .glowc { fill: #ff7a3c; opacity: 0.55; }
+  .lantern .rib { stroke: rgba(24,13,9,0.5); stroke-width: 1; fill: none; }
+  .lantern .cap { fill: #2c1a10; }
+  .lantern .glyph { font-family: var(--jpm); font-size: 26px; fill: var(--paper); font-weight: 700; }
+  .lantern { filter: drop-shadow(0 0 18px rgba(255, 122, 60, 0.45)); }
+  .lantern.lit { filter: drop-shadow(0 0 34px rgba(255, 160, 60, 0.85)); }
+  .lantern.lit .glowc { opacity: 0.9; }
+
+  /* ---------- brand & HUD ---------- */
+  .brand {
+    position: absolute; top: 30px; left: 40px; z-index: 6;
+    background: linear-gradient(160deg, #6b4a2a, #4a3018);
+    border: 3px solid #2c1a10;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,214,140,0.35);
+    padding: 10px 18px;
+    transform: rotate(-2deg);
+  }
+  .brand-jp { font-family: var(--jpm); font-weight: 700; font-size: 21px; letter-spacing: 0.26em; color: var(--paper); }
+  .brand-en { font-family: var(--lat); font-size: 9px; letter-spacing: 0.5em; color: var(--gold-soft); margin-top: 4px; }
+
+  .hud { position: absolute; top: 26px; right: 40px; display: flex; gap: 12px; z-index: 6; }
+  .tanzaku {
+    background: var(--paper); color: var(--lacquer);
+    font-weight: 700; font-size: 12.5px; letter-spacing: 0.12em;
+    padding: 14px 10px 12px;
+    writing-mode: vertical-rl;
+    min-height: 118px;
+    transform: rotate(2.4deg);
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+    position: relative;
+  }
+  .tanzaku::before {
+    content: ""; position: absolute; top: 4px; left: 50%;
+    width: 6px; height: 6px; margin-left: -3px;
+    background: var(--red);
+    clip-path: circle(50%);
+  }
+  .tanzaku:nth-child(2) { transform: rotate(-2deg); background: var(--gold); }
+  .tanzaku:nth-child(3) { transform: rotate(1.4deg); background: var(--teal); color: var(--paper); }
+  .tanzaku b { color: var(--red-deep); }
+  .tanzaku:nth-child(3) b { color: #fff; }
+
+  /* ---------- kanji cut-in ---------- */
+  .cutin {
+    position: absolute; left: 50%; top: 44%;
+    transform: translate(-50%, -50%);
+    font-family: var(--jpm); font-weight: 700;
+    font-size: 46vh; line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 3px rgba(255, 179, 0, 0.22);
+    pointer-events: none; z-index: 2;
+    opacity: 0;
+  }
+  .cutin.flash { animation: cutin 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  @keyframes cutin {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(2.6) rotate(6deg); }
+    30% { opacity: 1; }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  }
+
+  /* ---------- hanafuda card fan ---------- */
+  .fan {
+    position: absolute; left: 50%; top: 52%;
+    transform: translateX(-50%);
+    display: flex; gap: 1.2vw;
+    z-index: 4;
+  }
+  .hcard {
+    --lean: 0deg; --lift: 0px;
+    position: relative;
+    width: 12.5vw; min-width: 132px; max-width: 170px;
+    height: 34vh; min-height: 228px;
+    background: linear-gradient(170deg, #22110a 0%, #180d09 100%);
+    border: 3px solid var(--gold);
+    box-shadow: 0 0 0 3px var(--lacquer), 0 18px 30px -14px rgba(0,0,0,0.85), inset 0 0 34px rgba(255,179,0,0.07);
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: 3.4vh;
+    transform: translateY(calc(var(--lift) + var(--entryY, 0px))) rotate(calc(var(--tilt) + var(--lean)));
+    transition: transform 0.3s cubic-bezier(0.2, 1.5, 0.35, 1), border-color 0.2s, box-shadow 0.25s;
+    opacity: 0;
+    animation: deal 0.55s cubic-bezier(0.2, 1.3, 0.35, 1) forwards;
+    animation-delay: calc(0.1s + var(--i) * 0.075s);
+  }
+  @keyframes deal {
+    0% { opacity: 0; transform: translateY(50vh) rotate(calc(var(--tilt) + 24deg)); }
+    100% { opacity: 1; transform: translateY(0) rotate(var(--tilt)); }
+  }
+  /* once dealt in, drop the animation so hover lift/lean transforms apply */
+  .hcard.entered { animation: none; opacity: 1; }
+  .hcard:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
+
+  .hc-kanji {
+    writing-mode: vertical-rl;
+    font-family: var(--jpm); font-weight: 700;
+    font-size: clamp(34px, 6.4vh, 58px);
+    letter-spacing: 0.14em;
+    color: var(--paper);
+    text-shadow: 0 3px 0 rgba(0,0,0,0.6);
+    transition: color 0.2s, text-shadow 0.2s;
+  }
+  .hc-motif { margin-top: auto; width: 46%; opacity: 0.9; }
+  .hc-motif svg { width: 100%; }
+  .hc-en {
+    font-family: var(--lat); font-size: 10.5px; letter-spacing: 0.32em;
+    color: var(--gold-soft);
+    margin: 1.6vh 0 1.8vh;
+    transition: color 0.2s;
+  }
+  .hc-meta {
+    position: absolute; top: 8px; right: 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--lacquer);
+    background: var(--gold);
+    padding: 3px 7px;
+    opacity: 0; transform: translateY(-6px);
+    transition: opacity 0.2s, transform 0.25s cubic-bezier(0.2,1.5,0.35,1);
+  }
+
+  .hcard.is-active {
+    --lift: -4.6vh;
+    border-color: var(--paper);
+    box-shadow: 0 0 0 3px var(--red), 0 34px 44px -18px rgba(0,0,0,0.9), 0 0 44px rgba(255,179,0,0.3), inset 0 0 34px rgba(255,179,0,0.14);
+    z-index: 5;
+  }
+  .hcard.is-active .hc-kanji { color: var(--gold); text-shadow: 0 0 24px rgba(255,179,0,0.6), 0 3px 0 rgba(0,0,0,0.6); }
+  .hcard.is-active .hc-en { color: var(--paper); }
+  .hcard.is-active .hc-meta { opacity: 1; transform: translateY(0); }
+  .fan.dimmed .hcard:not(.is-active) { opacity: 0.62; }
+
+  .desc-band {
+    position: absolute; left: 50%; bottom: 4vh;
+    transform: translateX(-50%) rotate(-1deg);
+    background: var(--red);
+    color: var(--paper);
+    font-weight: 700; font-size: 15px; letter-spacing: 0.3em;
+    padding: 12px 34px;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
+    z-index: 5;
+    white-space: nowrap;
+  }
+  .desc-band::before, .desc-band::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 10px; background: inherit;
+  }
+  .desc-band::before { left: -10px; clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+  .desc-band::after { right: -10px; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+
+  .hints {
+    position: absolute; left: 40px; bottom: 28px; z-index: 6;
+    display: flex; gap: 16px;
+    font-weight: 700; font-size: 12px; letter-spacing: 0.14em; color: rgba(255,243,221,0.75);
+  }
+  .hints b {
+    font-family: var(--lat); font-size: 10px;
+    background: var(--gold); color: var(--lacquer);
+    padding: 3px 8px; margin-right: 6px;
+    transform: skewX(-6deg); display: inline-block;
+  }
+
+  /* ---------- noren transition ---------- */
+  #veil { position: fixed; inset: 0; z-index: 60; pointer-events: none; visibility: hidden; overflow: hidden; }
+  #veil.on { visibility: visible; }
+  .noren { position: absolute; inset: 0; display: flex; }
+  .noren i {
+    flex: 1;
+    background: linear-gradient(180deg, var(--red-deep) 0%, var(--red) 18%, var(--red) 100%);
+    border-left: 1px solid rgba(0,0,0,0.28);
+    transform: translateY(-102%);
+    position: relative;
+  }
+  .noren i::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 34%;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.24));
+  }
+  #veil.drop .noren i { animation: norenDrop 0.4s cubic-bezier(0.5, 0, 0.35, 1.12) forwards; animation-delay: calc(var(--i) * 0.045s); }
+  @keyframes norenDrop { to { transform: translateY(0); } }
+  #veil.part .noren i { transform: translateY(0); animation: norenLift 0.5s cubic-bezier(0.6, 0, 0.5, 1) forwards; animation-delay: calc(var(--i) * 0.05s); }
+  @keyframes norenLift { to { transform: translateY(-102%); } }
+
+  .veil-title {
+    position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; z-index: 2;
+  }
+  #veil.title .veil-title { animation: titlePop 0.75s cubic-bezier(0.16, 1.3, 0.3, 1) 0.34s forwards; }
+  @keyframes titlePop {
+    0% { opacity: 0; transform: scale(2) rotate(-5deg); }
+    22% { opacity: 1; transform: scale(1) rotate(-2deg); }
+    80% { opacity: 1; transform: scale(0.99) rotate(-2deg); }
+    100% { opacity: 0; transform: scale(0.95) rotate(-2deg); }
+  }
+  .veil-title-jp {
+    font-family: var(--jpm); font-weight: 700; font-size: 13vw; line-height: 1;
+    color: var(--paper);
+    text-shadow: 0.5vw 0.5vw 0 var(--lacquer), 0 0 60px rgba(255,179,0,0.5);
+  }
+  .veil-title-en {
+    text-align: center; font-family: var(--lat); font-size: 1.3vw; letter-spacing: 0.9em; text-indent: 0.9em;
+    color: var(--gold); margin-top: 2vh;
+  }
+
+  /* ---------- submenu (festival stalls / ema) ---------- */
+  #subScreen { background: radial-gradient(120% 90% at 50% 115%, #2a150a 0%, var(--lacquer) 60%, #0d0603 100%); }
+  .sub-head { position: absolute; left: 6vw; top: 8vh; z-index: 4; display: flex; align-items: center; gap: 2.4vw; }
+  .sub-head-kanji {
+    font-family: var(--jpm); font-weight: 700; font-size: 9vw; line-height: 1;
+    color: var(--paper);
+    text-shadow: 0.4vw 0.4vw 0 var(--red-deep);
+    transform: rotate(-2deg);
+  }
+  .sub-head-side .en { font-family: var(--lat); font-size: 1.1vw; letter-spacing: 0.5em; color: var(--gold); }
+  .sub-head-side .desc { margin-top: 1.4vh; font-weight: 700; font-size: 14px; letter-spacing: 0.22em; color: rgba(255,243,221,0.8); }
+
+  .ema-rail { position: absolute; left: 4vw; right: 4vw; top: 34vh; height: 4px; background: #4a3018; box-shadow: 0 2px 0 rgba(0,0,0,0.6); }
+  .sub-grid {
+    position: absolute; left: 6vw; right: 6vw; top: 36vh;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 2.6vw;
+  }
+  .ema {
+    position: relative;
+    height: 38vh;
+    background:
+      repeating-linear-gradient(94deg, rgba(0,0,0,0.07) 0 3px, transparent 3px 11px),
+      linear-gradient(168deg, #7a5732 0%, #5d3f20 100%);
+    clip-path: polygon(0 16%, 50% 0, 100% 16%, 100% 100%, 0 100%);
+    box-shadow: inset 0 0 0 3px rgba(44,26,16,0.8);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.6vh;
+    transform-origin: 50% -6vh;
+    opacity: 0;
+    animation: emaHang 0.7s cubic-bezier(0.2, 1.4, 0.35, 1) forwards;
+    animation-delay: calc(var(--i) * 0.09s);
+    transition: transform 0.25s cubic-bezier(0.2, 1.5, 0.35, 1), filter 0.2s;
+  }
+  @keyframes emaHang {
+    0% { opacity: 0; transform: rotate(8deg) translateY(-30px); }
+    60% { opacity: 1; transform: rotate(-3.5deg); }
+    100% { opacity: 1; transform: rotate(var(--hang)); }
+  }
+  .ema::before {
+    content: ""; position: absolute; top: -6vh; left: 50%; width: 3px; height: calc(6vh + 12%);
+    background: #a9743d; margin-left: -1.5px;
+  }
+  .ema::after {
+    content: ""; position: absolute; top: 12%; left: 50%; width: 12px; height: 12px; margin-left: -6px;
+    background: var(--red); clip-path: circle(50%);
+  }
+  .ema:hover, .ema:focus-visible { transform: rotate(0deg) scale(1.06) !important; filter: brightness(1.18); outline: none; z-index: 3; }
+  .ema-jp { font-family: var(--jpm); font-weight: 700; font-size: 2.2vw; letter-spacing: 0.16em; color: var(--paper); text-shadow: 0 2px 0 rgba(0,0,0,0.5); }
+  .ema-en { font-family: var(--lat); font-size: 10px; letter-spacing: 0.3em; color: var(--gold-soft); }
+  .ema-meta { font-weight: 700; font-size: 13px; letter-spacing: 0.1em; color: var(--gold); background: rgba(0,0,0,0.35); padding: 4px 12px; }
+
+  .back-chip {
+    position: absolute; left: 6vw; bottom: 6vh; z-index: 5;
+    background: var(--gold); color: var(--lacquer);
+    font-weight: 700; font-size: 14px; letter-spacing: 0.26em;
+    padding: 13px 30px;
+    transform: rotate(-1.4deg);
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
+    transition: transform 0.2s cubic-bezier(0.2,1.5,0.35,1), background 0.15s;
+  }
+  .back-chip:hover, .back-chip:focus-visible { background: var(--paper); transform: rotate(0.6deg) scale(1.07); outline: none; }
+
+  .concept-back {
+    position: fixed; left: 12px; bottom: 4px; z-index: 90;
+    font-family: var(--lat); font-size: 9px; letter-spacing: 0.2em;
+    color: rgba(255,243,221,0.3); text-decoration: none;
+  }
+  .concept-back:hover { color: var(--gold); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001s !important; animation-delay: 0s !important; transition-duration: 0.001s !important; }
+  }
+</style>
+</head>
+<body class="state-menu">
+
+<a class="concept-back" href="index.html">◂ CONCEPTS</a>
+
+<!-- ======== MAIN MENU ======== -->
+<section class="screen" id="menuScreen" aria-label="メインメニュー">
+  <div class="halftone"></div>
+  <div class="cutin" id="cutin">学</div>
+
+  <div class="rope">
+    <svg preserveAspectRatio="none" viewBox="0 0 100 20"><path d="M -2 4 Q 50 13 102 4" fill="none" stroke="#3a2414" stroke-width="0.55"/></svg>
+  </div>
+  <div id="lanterns"></div>
+
+  <header class="brand">
+    <div class="brand-jp">日本語祭</div>
+    <div class="brand-en">JPLEARN MATSURI</div>
+  </header>
+
+  <div class="hud">
+    <div class="tanzaku" id="hudDate">八月一日・土</div>
+    <div class="tanzaku">連続 <b>十二</b> 日</div>
+    <div class="tanzaku">七 <b>級</b></div>
+  </div>
+
+  <nav class="fan" id="fan" aria-label="セクション"></nav>
+
+  <div class="desc-band" id="descBand">かな・漢字・語彙のセクション学習</div>
+
+  <div class="hints">
+    <span><b>← →</b>選択</span>
+    <span><b>ENTER</b>決定</span>
+    <span><b>ESC</b>戻る</span>
+  </div>
+</section>
+
+<!-- ======== SUBMENU ======== -->
+<section class="screen" id="subScreen" aria-label="サブメニュー">
+  <div class="halftone"></div>
+  <div class="sub-head">
+    <div class="sub-head-kanji" id="subKanji">学習</div>
+    <div class="sub-head-side">
+      <div class="en" id="subEn">STUDY</div>
+      <div class="desc" id="subDesc"></div>
+    </div>
+  </div>
+  <div class="ema-rail"></div>
+  <div class="sub-grid" id="subGrid"></div>
+  <button class="back-chip" id="backBtn">← 戻る BACK</button>
+</section>
+
+<!-- ======== TRANSITION ======== -->
+<div id="veil">
+  <div class="noren" id="noren"></div>
+  <div class="veil-title">
+    <div>
+      <div class="veil-title-jp" id="veilJp">学習</div>
+      <div class="veil-title-en" id="veilEn">STUDY</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ITEMS = [
+  { jp: '学習', en: 'STUDY',   kanji: '学', meta: '3 部門',  desc: 'かな・漢字・語彙のセクション学習', motif: 'pine' },
+  { jp: '復習', en: 'REVIEW',  kanji: '復', meta: '24 枚',   desc: '期限が来たカード ─ 今日は24枚', motif: 'wave' },
+  { jp: '読解', en: 'READING', kanji: '読', meta: '41 本',   desc: 'レベル別の読みもの', motif: 'scroll' },
+  { jp: '特訓', en: 'DRILLS',  kanji: '特', meta: '毎日',    desc: '毎日のミニゲームで腕試し', motif: 'drum' },
+  { jp: '検定', en: 'JLPT',    kanji: '検', meta: 'N3',      desc: 'JLPT 模擬試験と対策', motif: 'torii' },
+  { jp: '記録', en: 'RECORDS', kanji: '記', meta: 'LV 7',    desc: '進捗・統計・連続記録', motif: 'crane' },
+];
+const MOTIFS = {
+  pine:   '<svg viewBox="0 0 60 40"><path d="M30 4 L44 20 H36 L48 34 H12 L24 20 H16 Z" fill="#19b5ae"/><rect x="27" y="34" width="6" height="6" fill="#7a5732"/></svg>',
+  wave:   '<svg viewBox="0 0 60 40"><path d="M4 30 Q 12 14 24 22 Q 20 10 34 12 Q 46 14 42 26 Q 54 20 56 32 Q 40 40 22 38 Q 8 36 4 30 Z" fill="none" stroke="#59d9ff" stroke-width="3"/></svg>',
+  scroll: '<svg viewBox="0 0 60 40"><rect x="14" y="6" width="32" height="28" fill="#fff3dd"/><rect x="10" y="2" width="40" height="6" fill="#e03227"/><rect x="10" y="32" width="40" height="6" fill="#e03227"/><path d="M20 14 H40 M20 20 H40 M20 26 H34" stroke="#180d09" stroke-width="2"/></svg>',
+  drum:   '<svg viewBox="0 0 60 40"><path d="M14 8 Q 30 2 46 8 V 32 Q 30 38 14 32 Z" fill="#e03227"/><path d="M14 8 Q 30 14 46 8" fill="none" stroke="#180d09" stroke-width="2"/><circle cx="24" cy="21" r="3" fill="#ffb300"/><circle cx="37" cy="21" r="3" fill="#ffb300"/></svg>',
+  torii:  '<svg viewBox="0 0 60 40"><path d="M6 10 Q 30 4 54 10 L 52 16 H 8 Z" fill="#e03227"/><rect x="12" y="16" width="5" height="20" fill="#e03227"/><rect x="43" y="16" width="5" height="20" fill="#e03227"/><rect x="10" y="22" width="40" height="4" fill="#e03227"/></svg>',
+  crane:  '<svg viewBox="0 0 60 40"><path d="M8 30 L26 12 L34 20 L52 8 L44 24 L34 34 L20 32 Z" fill="#fff3dd"/><path d="M26 12 L22 6 L30 10 Z" fill="#e03227"/></svg>',
+};
+const SUBTILES = {
+  STUDY:   [['ひらがな','HIRAGANA','92%'], ['カタカナ','KATAKANA','71%'], ['漢字','KANJI','2136字'], ['語彙','VOCAB','8000語']],
+  REVIEW:  [['今日の分','DUE','24枚'], ['苦手札','WEAK','7枚'], ['先取り','AHEAD','12枚'], ['総復習','ALL','341枚']],
+  READING: [['短文','SHORT','N5'], ['物語','STORIES','N4'], ['記事','ARTICLES','N3'], ['随筆','ESSAYS','N2']],
+  DRILLS:  [['聞き取り','LISTEN','毎日'], ['書き取り','WRITE','毎日'], ['速読','SPEED','42'], ['対戦','VERSUS','週末']],
+  JLPT:    [['文字語彙','VOCAB','3回'], ['文法','GRAMMAR','3回'], ['読解','READING','2回'], ['聴解','LISTEN','2回']],
+  RECORDS: [['連続記録','STREAK','12日'], ['正答率','ACC','86%'], ['学習時間','TIME','42h'], ['級位','RANK','七級']],
+};
+
+const fan = document.getElementById('fan');
+const cutin = document.getElementById('cutin');
+const descBand = document.getElementById('descBand');
+const veil = document.getElementById('veil');
+const noren = document.getElementById('noren');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let active = 0, busy = false;
+
+const tilts = [-7, -4.2, -1.4, 1.4, 4.2, 7];
+ITEMS.forEach((it, i) => {
+  const b = document.createElement('button');
+  b.className = 'hcard';
+  b.style.setProperty('--i', i);
+  b.style.setProperty('--tilt', tilts[i] + 'deg');
+  b.innerHTML = `
+    <span class="hc-meta">${it.meta}</span>
+    <span class="hc-kanji">${it.jp}</span>
+    <span class="hc-motif">${MOTIFS[it.motif]}</span>
+    <span class="hc-en">${it.en}</span>`;
+  b.addEventListener('mouseenter', () => setActive(i));
+  b.addEventListener('focus', () => setActive(i));
+  b.addEventListener('click', () => select(i));
+  b.addEventListener('animationend', (e) => { if (e.target === b) b.classList.add('entered'); });
+  fan.appendChild(b);
+});
+const cards = [...fan.children];
+
+/* lanterns along the sagging rope */
+const lanternGlyphs = ['日','本','語','祭','学','習','心'];
+const lanternHost = document.getElementById('lanterns');
+const lants = [];
+lanternGlyphs.forEach((g, i) => {
+  const x = 15 + i * 11.5;
+  const sag = Math.sin(((x - 15) / 69) * Math.PI) * 9.5;
+  const el = document.createElement('div');
+  el.className = 'lantern';
+  el.style.left = x + 'vw';
+  el.style.top = (2 + sag) + 'vh';
+  el.style.animationDuration = (2.6 + (i % 3) * 0.7) + 's';
+  el.style.animationDelay = (i * -0.9) + 's';
+  el.innerHTML = `<svg viewBox="0 0 60 84">
+    <rect class="cap" x="22" y="0" width="16" height="7"/>
+    <path class="body" d="M30 6 C 52 6 58 22 58 42 C 58 62 52 78 30 78 C 8 78 2 62 2 42 C 2 22 8 6 30 6 Z"/>
+    <ellipse class="glowc" cx="30" cy="42" rx="20" ry="28"/>
+    <path class="rib" d="M6 26 Q 30 32 54 26 M4 42 Q 30 48 56 42 M6 58 Q 30 64 54 58"/>
+    <text class="glyph" x="30" y="52" text-anchor="middle">${g}</text>
+    <rect class="cap" x="22" y="77" width="16" height="6"/>
+  </svg>`;
+  lanternHost.appendChild(el);
+  lants.push(el);
+});
+setInterval(() => {
+  const l = lants[Math.floor(Math.random() * lants.length)];
+  l.classList.add('lit');
+  setTimeout(() => l.classList.remove('lit'), 900);
+}, 1700);
+
+/* opening cut-in so the stage isn't empty before the first hover */
+setTimeout(() => { if (!fan.classList.contains('dimmed')) { cutin.textContent = '祭'; cutin.classList.add('flash'); } }, 900);
+
+/* fireworks */
+function firework(x, y, big) {
+  const fw = document.createElement('div');
+  fw.className = 'fw';
+  fw.style.left = x + 'px'; fw.style.top = y + 'px';
+  const n = big ? 26 : 14;
+  const colors = ['#ffb300', '#e03227', '#19b5ae', '#fff3dd'];
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('i');
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.3;
+    const d = (big ? 90 : 52) * (0.72 + Math.random() * 0.5);
+    s.style.setProperty('--sx', Math.cos(a) * d + 'px');
+    s.style.setProperty('--sy', Math.sin(a) * d + 'px');
+    s.style.background = colors[i % colors.length];
+    s.style.animationDelay = (Math.random() * 0.06) + 's';
+    fw.appendChild(s);
+  }
+  document.getElementById('menuScreen').appendChild(fw);
+  setTimeout(() => fw.remove(), 1500);
+}
+setInterval(() => {
+  if (document.body.className === 'state-menu' && !document.hidden)
+    firework(innerWidth * (0.15 + Math.random() * 0.7), innerHeight * (0.1 + Math.random() * 0.25), false);
+}, 4200);
+
+function setActive(i) {
+  if (busy) return;
+  active = i;
+  fan.classList.add('dimmed');
+  cards.forEach((el, j) => {
+    el.classList.toggle('is-active', j === i);
+    el.style.setProperty('--lean', j === i ? '0deg' : (j < i ? '-2.4deg' : '2.4deg'));
+    if (j !== i) el.style.setProperty('--lift', '6px');
+  });
+  cutin.textContent = ITEMS[i].kanji;
+  cutin.classList.remove('flash'); void cutin.offsetWidth;
+  cutin.classList.add('flash');
+  descBand.textContent = ITEMS[i].desc;
+  const r = cards[i].getBoundingClientRect();
+  if (!reduced) firework(r.left + r.width / 2, r.top - 30, false);
+}
+fan.addEventListener('mouseleave', () => {
+  if (busy) return;
+  fan.classList.remove('dimmed');
+  cards.forEach(el => { el.style.setProperty('--lean', '0deg'); el.style.setProperty('--lift', '0px'); });
+});
+
+for (let i = 0; i < 9; i++) {
+  const strip = document.createElement('i');
+  strip.style.setProperty('--i', i);
+  noren.appendChild(strip);
+}
+
+function buildSub(i) {
+  const it = ITEMS[i];
+  document.getElementById('subKanji').textContent = it.jp;
+  document.getElementById('subEn').textContent = it.en;
+  document.getElementById('subDesc').textContent = it.desc;
+  const grid = document.getElementById('subGrid');
+  grid.innerHTML = '';
+  const hangs = ['-2deg', '1.6deg', '-1.2deg', '2.2deg'];
+  SUBTILES[it.en].forEach(([jp, en, meta], j) => {
+    const t = document.createElement('button');
+    t.className = 'ema';
+    t.style.setProperty('--i', j);
+    t.style.setProperty('--hang', hangs[j]);
+    t.innerHTML = `<span class="ema-jp">${jp}</span><span class="ema-en">${en}</span><span class="ema-meta">${meta}</span>`;
+    grid.appendChild(t);
+  });
+}
+
+function select(i) {
+  if (busy) return;
+  busy = true;
+  setActive(i);
+  buildSub(i);
+  document.getElementById('veilJp').textContent = ITEMS[i].jp;
+  document.getElementById('veilEn').textContent = ITEMS[i].en + ' — ' + ITEMS[i].meta;
+  const r = cards[i].getBoundingClientRect();
+  if (!reduced) firework(r.left + r.width / 2, r.top + 20, true);
+  if (reduced) { document.body.className = 'state-sub'; busy = false; return; }
+  setTimeout(() => { veil.className = 'on drop title'; }, 140);
+  setTimeout(() => { document.body.className = 'state-sub'; }, 900);
+  setTimeout(() => { veil.className = 'on part'; }, 1250);
+  setTimeout(() => { veil.className = ''; busy = false; }, 2000);
+}
+
+function goBack() {
+  if (busy || document.body.className !== 'state-sub') return;
+  busy = true;
+  if (reduced) { document.body.className = 'state-menu'; busy = false; return; }
+  veil.className = 'on drop';
+  setTimeout(() => {
+    document.body.className = 'state-menu';
+    fan.classList.remove('dimmed');
+    cards.forEach(el => { el.classList.remove('is-active'); el.style.setProperty('--lean', '0deg'); el.style.setProperty('--lift', '0px'); });
+  }, 620);
+  setTimeout(() => { veil.className = 'on part'; }, 700);
+  setTimeout(() => { veil.className = ''; busy = false; }, 1450);
+}
+document.getElementById('backBtn').addEventListener('click', goBack);
+
+/* date in kanji numerals */
+const kd = ['','一','二','三','四','五','六','七','八','九','十'];
+function kanjiNum(n) { return n <= 10 ? kd[n] : (n < 20 ? '十' + (kd[n - 10] || '') : kd[Math.floor(n / 10)] + '十' + (kd[n % 10] || '')); }
+const now = new Date();
+document.getElementById('hudDate').textContent =
+  kanjiNum(now.getMonth() + 1) + '月' + kanjiNum(now.getDate()) + '日・' + '日月火水木金土'[now.getDay()];
+
+addEventListener('keydown', (e) => {
+  if (document.body.className === 'state-menu') {
+    if (e.key === 'ArrowRight') { setActive((active + 1) % ITEMS.length); cards[active].focus(); }
+    else if (e.key === 'ArrowLeft') { setActive((active + ITEMS.length - 1) % ITEMS.length); cards[active].focus(); }
+    else if (e.key === 'Enter') select(active);
+    else if (e.key >= '1' && e.key <= '6') { const i = +e.key - 1; setActive(i); cards[i].focus(); }
+  } else if (e.key === 'Escape' || e.key === 'Backspace') goBack();
+});
+</script>
+</body>
+</html>

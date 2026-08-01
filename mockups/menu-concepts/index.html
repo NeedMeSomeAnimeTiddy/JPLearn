@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JPLearn — Main Menu Concepts</title>
+<style>
+  :root {
+    --bg: #101014;
+    --panel: #17171c;
+    --line: #2a2a32;
+    --text: #e8e6e1;
+    --dim: #8a8894;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Yu Gothic UI", "Meiryo", sans-serif;
+    display: grid; place-items: center;
+    overflow: hidden;
+  }
+  .wrap { width: min(1180px, 92vw); }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 34px; }
+  h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.5em; }
+  h1 span { color: var(--dim); font-weight: 400; letter-spacing: 0.24em; font-size: 12px; margin-left: 16px; }
+  .meta { font-size: 11px; letter-spacing: 0.3em; color: var(--dim); }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 26px 22px 22px;
+    min-height: 380px;
+    position: relative;
+    transition: transform 0.22s cubic-bezier(0.2, 1.2, 0.35, 1), border-color 0.2s, background 0.2s;
+    overflow: hidden;
+  }
+  a.card:hover { transform: translateY(-8px); border-color: var(--accent); }
+  a.card::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px;
+    background: var(--accent);
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.3s cubic-bezier(0.2, 1, 0.3, 1);
+  }
+  a.card:hover::after { transform: scaleX(1); }
+
+  .num { font-family: Consolas, monospace; font-size: 11px; letter-spacing: 0.3em; color: var(--dim); }
+  .kanji {
+    font-family: "Yu Mincho", serif; font-weight: 700;
+    font-size: 88px; line-height: 1.1; margin: 18px 0 4px;
+    color: var(--accent);
+  }
+  .name { font-size: 17px; font-weight: 700; letter-spacing: 0.34em; }
+  .base { margin-top: 6px; font-size: 10.5px; letter-spacing: 0.2em; color: var(--dim); }
+  .pitch { margin-top: 16px; font-size: 12.5px; line-height: 1.9; letter-spacing: 0.06em; color: #b9b7c0; }
+  .chips { position: absolute; bottom: 22px; left: 22px; display: flex; gap: 6px; }
+  .chips i { width: 22px; height: 10px; display: block; }
+
+  .foot { margin-top: 30px; font-size: 11px; letter-spacing: 0.24em; color: var(--dim); }
+  kbd { border: 1px solid var(--line); padding: 1px 7px; font-family: Consolas, monospace; font-size: 10px; color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>MAIN MENU CONCEPTS<span>メインメニュー案 × 4</span></h1>
+    <div class="meta">JPLEARN · PERSONA-STYLE UI STUDY</div>
+  </header>
+
+  <div class="grid">
+    <a class="card" href="01-sumi-3d.html" style="--accent:#cfa45c">
+      <div class="num">CONCEPT 01 — V3 · 月夜 3D</div>
+      <div class="kanji">墨</div>
+      <div class="name">SUMI 月夜</div>
+      <div class="base">AFTER — PERSONA 5 ROYAL · three.js + GSAP</div>
+      <p class="pitch">月夜の墨世界。和紙の札が夜気に揺れ、金の折鶴がカーソルを追って飛ぶ。山なみ・月・漂う漢字。遷移は振向きと軸回しの二種。</p>
+      <div class="chips"><i style="background:#171c2c"></i><i style="background:#f2ead8"></i><i style="background:#e34a33"></i><i style="background:#cfa45c"></i></div>
+    </a>
+
+    <a class="card" href="02-shinya.html" style="--accent:#59d9ff">
+      <div class="num">CONCEPT 02</div>
+      <div class="kanji">深夜</div>
+      <div class="name">SHIN'YA</div>
+      <div class="base">AFTER — PERSONA 3 RELOAD</div>
+      <p class="pitch">真夜中の海と月。すりガラスのメニューが水面に映り込む。青海波が流れ、鯉が泳ぐ。遷移は波のスイープ。</p>
+      <div class="chips"><i style="background:#050d1f"></i><i style="background:#12275c"></i><i style="background:#e9eef7"></i><i style="background:#59d9ff"></i></div>
+    </a>
+
+    <a class="card" href="03-matsuri.html" style="--accent:#ffb300">
+      <div class="num">CONCEPT 03</div>
+      <div class="kanji">祭</div>
+      <div class="name">MATSURI</div>
+      <div class="base">AFTER — PERSONA 4 GOLDEN</div>
+      <p class="pitch">夏祭りのポップ。提灯が揺れ、花火が上がる。花札の扇からカードを選ぶと周りが身を引く。遷移は暖簾くぐり。</p>
+      <div class="chips"><i style="background:#180d09"></i><i style="background:#e03227"></i><i style="background:#ffb300"></i><i style="background:#19b5ae"></i></div>
+    </a>
+
+    <a class="card" href="04-shuden.html" style="--accent:#7fbe26">
+      <div class="num">CONCEPT 04</div>
+      <div class="kanji">終電</div>
+      <div class="name">SHUDEN</div>
+      <div class="base">AFTER — PERSONA 5 / TOKYO TRANSIT</div>
+      <p class="pitch">深夜のホーム。発車標がパタパタとめくれ、行き先を選ぶと電車が轟音で通過する。乗車したら車内LCDが次の駅を告げる。</p>
+      <div class="chips"><i style="background:#0c0e12"></i><i style="background:#ffb52e"></i><i style="background:#7fbe26"></i><i style="background:#f5c400"></i></div>
+    </a>
+  </div>
+
+  <p class="foot">クリックで各案へ · 各案とも <kbd>↑↓/←→</kbd> 選択 · <kbd>ENTER</kbd> 決定 · <kbd>ESC</kbd> 戻る · メニュー項目は実アプリの6セクション · <a href="01-sumi.html" style="color:inherit">SUMI v1（平面版）はこちら</a></p>
+</div>
+</body>
+</html>

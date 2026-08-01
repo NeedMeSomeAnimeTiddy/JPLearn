@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>02 深夜 SHIN'YA — JPLearn menu concept</title>
+<style>
+  :root {
+    --abyss: #050d1f;
+    --deep: #0b1a38;
+    --indigo: #12275c;
+    --moon: #e9eef7;
+    --cyan: #59d9ff;
+    --silver: #8fa3c7;
+    --jp: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
+    --lat: "Segoe UI", "Yu Gothic UI", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--abyss);
+    color: var(--moon);
+    font-family: var(--lat);
+    -webkit-user-select: none; user-select: none;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  .screen { position: fixed; inset: 0; visibility: hidden; }
+  body.state-menu #menuScreen { visibility: visible; }
+  body.state-sub #subScreen { visibility: visible; }
+
+  /* ---------- night sky & sea ---------- */
+  .sky {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, #030816 0%, var(--abyss) 34%, #0a1a3c 58%, #0d2148 62%, #071229 63%, #04091a 100%);
+  }
+  .stars { position: absolute; inset: 0 0 38% 0; }
+  .stars i {
+    position: absolute; width: 2px; height: 2px; background: var(--moon);
+    opacity: 0.5;
+    animation: twinkle 3.4s ease-in-out infinite;
+  }
+  @keyframes twinkle { 0%,100% { opacity: 0.12; } 50% { opacity: 0.75; } }
+
+  .moon-wrap { position: absolute; right: 11vw; top: 8vh; width: 17vmin; height: 17vmin; }
+  .moon {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 42% 38%, #ffffff 0%, var(--moon) 46%, #b9c6de 78%, #97a8c9 100%);
+    clip-path: circle(50%);
+    box-shadow: 0 0 90px 22px rgba(233, 238, 247, 0.28);
+    animation: moonBreath 7s ease-in-out infinite;
+  }
+  @keyframes moonBreath {
+    0%,100% { box-shadow: 0 0 90px 22px rgba(233,238,247,0.28); }
+    50% { box-shadow: 0 0 130px 40px rgba(233,238,247,0.4); }
+  }
+
+  .moonpath {
+    position: absolute; right: calc(11vw + 3.5vmin); top: 62vh; bottom: 0; width: 10vmin;
+    background: linear-gradient(180deg, rgba(233,238,247,0.22), rgba(233,238,247,0.03) 70%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 35% 65%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 35% 65%, transparent);
+    filter: blur(3px);
+    animation: pathShimmer 4.5s ease-in-out infinite;
+  }
+  @keyframes pathShimmer { 0%,100% { opacity: 0.65; transform: scaleX(1); } 50% { opacity: 1; transform: scaleX(1.3); } }
+
+  .caustic {
+    position: absolute; left: 0; right: 0; top: 62vh; bottom: 0;
+    background:
+      radial-gradient(60% 30% at 30% 20%, rgba(89, 217, 255, 0.10), transparent 70%),
+      radial-gradient(50% 26% at 75% 45%, rgba(89, 217, 255, 0.07), transparent 70%);
+    animation: causticDrift 14s ease-in-out infinite alternate;
+  }
+  @keyframes causticDrift { from { transform: translateX(-2%); } to { transform: translateX(2%); } }
+
+  .seigaiha { position: absolute; left: -10%; right: -10%; height: 24vh; bottom: -4vh; opacity: 0.5; }
+  .seigaiha.far { bottom: 6vh; opacity: 0.22; height: 18vh; }
+  .seigaiha svg { width: 300%; height: 100%; animation: waveScroll 70s linear infinite; }
+  .seigaiha.far svg { animation-duration: 110s; animation-direction: reverse; }
+  @keyframes waveScroll { from { transform: translateX(0); } to { transform: translateX(-33.34%); } }
+
+  .koi {
+    position: absolute; top: 74vh; left: -12vw;
+    width: 9vmin; height: 4vmin;
+    opacity: 0;
+    animation: koiSwim 16s cubic-bezier(0.4, 0, 0.6, 1) 5s infinite;
+  }
+  .koi svg { width: 100%; height: 100%; fill: rgba(143, 163, 199, 0.35); }
+  @keyframes koiSwim {
+    0% { transform: translateX(0) rotate(4deg); opacity: 0; }
+    6% { opacity: 0.7; }
+    46% { transform: translateX(60vw) translateY(3vh) rotate(-3deg); opacity: 0.7; }
+    56% { opacity: 0; transform: translateX(75vw) translateY(4vh) rotate(-4deg); }
+    100% { opacity: 0; transform: translateX(75vw); }
+  }
+
+  /* ---------- brand & HUD ---------- */
+  .brand { position: absolute; top: 36px; left: 44px; z-index: 5; }
+  .brand-en { font-size: 15px; font-weight: 300; letter-spacing: 0.68em; color: var(--moon); }
+  .brand-jp { font-family: var(--jp); font-size: 12.5px; letter-spacing: 0.5em; color: var(--silver); margin-top: 8px; }
+  .brand::after { content: ""; display: block; width: 52px; height: 1px; background: var(--cyan); margin-top: 12px; opacity: 0.7; }
+
+  .hud { position: absolute; top: 36px; right: 44px; display: flex; align-items: center; gap: 22px; z-index: 5; }
+  .hud-date { text-align: right; }
+  .hud-date b { display: block; font-size: 21px; font-weight: 200; letter-spacing: 0.24em; }
+  .hud-date span { font-size: 10.5px; letter-spacing: 0.4em; color: var(--silver); }
+  .hud-sep { width: 1px; height: 34px; background: rgba(143,163,199,0.35); }
+  .hud-stat { text-align: right; }
+  .hud-stat b { display: block; font-size: 21px; font-weight: 200; color: var(--cyan); letter-spacing: 0.1em; }
+  .hud-stat span { font-size: 10.5px; letter-spacing: 0.34em; color: var(--silver); }
+
+  /* ---------- glass menu ---------- */
+  .menu-zone { position: absolute; left: 6vw; top: 13vh; z-index: 4; }
+  .menu-title { font-size: 11px; font-weight: 300; letter-spacing: 0.62em; color: var(--silver); margin-bottom: 3.4vh; }
+  .glass-menu { display: flex; flex-direction: column; gap: 1.5vh; }
+
+  .glass-item {
+    position: relative;
+    width: 34vw; min-width: 400px;
+    height: 6.6vh; min-height: 48px;
+    display: flex; align-items: center; gap: 1.6vw;
+    padding-left: 1.4vw;
+    background: rgba(233, 238, 247, 0.035);
+    border-left: 2px solid rgba(143, 163, 199, 0.25);
+    backdrop-filter: blur(5px);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-46px);
+    transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s, border-color 0.25s;
+    animation: slideIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: calc(0.15s + var(--i) * 0.09s);
+  }
+  @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+  /* once the entry animation ends, drop it so hover slide/dim can take over */
+  .glass-item.entered { animation: none; opacity: 1; transform: none; }
+  .glass-item:focus-visible { outline: 1px solid var(--cyan); outline-offset: 3px; }
+
+  .g-jp {
+    font-family: var(--jp); font-size: clamp(21px, 3.3vh, 30px); font-weight: 600;
+    letter-spacing: 0.3em; color: var(--moon);
+    transition: color 0.25s, text-shadow 0.25s;
+  }
+  .g-en {
+    font-size: clamp(10px, 1.5vh, 13px); font-weight: 300;
+    letter-spacing: 0.56em; color: var(--silver);
+    transition: color 0.25s, letter-spacing 0.4s cubic-bezier(0.16,1,0.3,1);
+  }
+  .g-meta {
+    margin-left: auto; margin-right: 1.6vw;
+    font-size: 11px; font-weight: 300; letter-spacing: 0.2em; color: rgba(143,163,199,0.55);
+    transition: color 0.25s;
+  }
+  .g-streak {
+    position: absolute; inset: 0;
+    background: linear-gradient(105deg, transparent 30%, rgba(233,238,247,0.16) 48%, rgba(89,217,255,0.20) 52%, transparent 70%);
+    transform: translateX(-110%);
+    pointer-events: none;
+  }
+  .g-under {
+    position: absolute; left: 0; bottom: 0; height: 1px; width: 100%;
+    background: linear-gradient(90deg, var(--cyan), transparent 85%);
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .g-ring {
+    position: absolute; left: 0.7vw; top: 50%;
+    width: 8px; height: 8px;
+    border: 1px solid var(--cyan);
+    clip-path: circle(50%);
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .glass-item.is-active {
+    transform: translateX(26px);
+    background: rgba(89, 217, 255, 0.07);
+    border-left-color: var(--cyan);
+  }
+  .glass-item.is-active .g-jp { color: #ffffff; text-shadow: 0 0 22px rgba(89,217,255,0.65); }
+  .glass-item.is-active .g-en { color: var(--cyan); letter-spacing: 0.72em; }
+  .glass-item.is-active .g-meta { color: var(--moon); }
+  .glass-item.is-active .g-streak { animation: streak 0.7s cubic-bezier(0.3, 0, 0.3, 1); }
+  @keyframes streak { to { transform: translateX(110%); } }
+  .glass-item.is-active .g-under { transform: scaleX(1); }
+  .glass-item.is-active .g-ring { animation: ring 0.9s ease-out; }
+  @keyframes ring {
+    0% { transform: translate(-50%,-50%) scale(0.4); opacity: 0.9; }
+    100% { transform: translate(-50%,-50%) scale(7); opacity: 0; }
+  }
+  .menu-dimmed .glass-item:not(.is-active) { opacity: 0.38; }
+  .menu-dimmed .glass-item:not(.is-active) .g-jp { color: var(--silver); }
+
+  /* water reflection of the menu — anchored at the horizon, mirrored downward */
+  .reflection {
+    position: absolute; left: 6vw; bottom: 37.5vh; z-index: 2;
+    width: 34vw; min-width: 400px;
+    transform: scaleY(-0.72);
+    transform-origin: bottom;
+    filter: blur(3px);
+    opacity: 0.24;
+    pointer-events: none;
+    mask-image: linear-gradient(0deg, #000 25%, transparent 96%);
+    -webkit-mask-image: linear-gradient(0deg, #000 25%, transparent 96%);
+    animation: waterWobble 5.5s ease-in-out infinite;
+  }
+  @keyframes waterWobble {
+    0%,100% { transform: scaleY(-0.72) skewX(0.6deg); }
+    50% { transform: scaleY(-0.70) skewX(-0.8deg); }
+  }
+  .reflection .glass-item { animation: none; opacity: 1; transform: none; backdrop-filter: none; }
+  .reflection .glass-item.is-active { transform: translateX(26px); }
+  .reflection .g-streak, .reflection .g-ring { display: none; }
+
+  .desc-line {
+    position: absolute; left: 6vw; bottom: 7vh; z-index: 5;
+    font-size: 13px; font-weight: 300; letter-spacing: 0.34em; color: var(--silver);
+    padding-left: 16px;
+    border-left: 1px solid var(--cyan);
+  }
+
+  .hints {
+    position: absolute; right: 44px; bottom: 30px; z-index: 5;
+    display: flex; gap: 20px;
+    font-size: 11px; font-weight: 300; letter-spacing: 0.22em; color: var(--silver);
+  }
+  .hints b {
+    font-weight: 400; font-size: 10px;
+    border: 1px solid rgba(143,163,199,0.5);
+    padding: 2px 7px; margin-right: 7px;
+    color: var(--moon);
+  }
+
+  /* ---------- wave transition ---------- */
+  #veil { position: fixed; inset: 0; z-index: 60; pointer-events: none; visibility: hidden; overflow: hidden; }
+  #veil.on { visibility: visible; }
+  .wave-layer { position: absolute; top: 0; bottom: 0; left: 0; width: 300%; transform: translateX(-100%); }
+  .wave-layer svg { width: 100%; height: 100%; }
+  #veil.sweep .wave-back { animation: sweep 1.15s cubic-bezier(0.5, 0, 0.4, 1) forwards; }
+  #veil.sweep .wave-front { animation: sweep 1.15s cubic-bezier(0.5, 0, 0.4, 1) 0.09s forwards; }
+  @keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(33.4%); } }
+  .veil-word {
+    position: absolute; inset: 0; display: grid; place-items: center; opacity: 0;
+    text-align: center;
+  }
+  #veil.sweep .veil-word { animation: wordGlow 0.9s ease 0.36s forwards; }
+  @keyframes wordGlow {
+    0% { opacity: 0; transform: translateY(14px); }
+    30% { opacity: 1; transform: translateY(0); }
+    75% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-10px); }
+  }
+  .veil-word-jp {
+    font-family: var(--jp); font-size: 7vw; font-weight: 600;
+    letter-spacing: 0.6em; text-indent: 0.6em; color: var(--moon);
+    text-shadow: 0 0 22px rgba(89, 217, 255, 0.5), 0 0 90px rgba(89, 217, 255, 0.35);
+  }
+  .veil-word-en { font-size: 1vw; font-weight: 300; letter-spacing: 1.2em; text-indent: 1.2em; color: var(--cyan); margin-top: 2.4vh; }
+
+  /* ---------- submenu (underwater) ---------- */
+  #subScreen { background: linear-gradient(180deg, #071229 0%, #0a1c40 45%, #050d1f 100%); }
+  .rays {
+    position: absolute; inset: -20% 0 0 0;
+    background:
+      linear-gradient(103deg, transparent 30%, rgba(89,217,255,0.06) 34%, transparent 39%),
+      linear-gradient(99deg, transparent 55%, rgba(233,238,247,0.05) 60%, transparent 66%),
+      linear-gradient(107deg, transparent 72%, rgba(89,217,255,0.045) 77%, transparent 82%);
+    animation: raysDrift 11s ease-in-out infinite alternate;
+  }
+  @keyframes raysDrift { from { transform: translateX(-2.5%); } to { transform: translateX(2.5%); } }
+  .bubbles { position: absolute; inset: 0; overflow: hidden; }
+  .bubbles i {
+    position: absolute; bottom: -3vh;
+    width: 5px; height: 5px;
+    border: 1px solid rgba(143, 163, 199, 0.4);
+    clip-path: circle(50%);
+    animation: rise linear infinite;
+  }
+  @keyframes rise { to { transform: translateY(-108vh); opacity: 0; } }
+
+  .sub-head { position: absolute; left: 7vw; top: 11vh; }
+  .sub-head-jp {
+    font-family: var(--jp); font-size: 6.4vw; font-weight: 600;
+    letter-spacing: 0.4em; color: var(--moon);
+    text-shadow: 0 0 60px rgba(89,217,255,0.5);
+  }
+  .sub-head-en { font-size: 13px; font-weight: 300; letter-spacing: 0.9em; color: var(--cyan); margin-top: 1.2vh; }
+  .sub-head-desc { margin-top: 2.6vh; font-size: 13px; font-weight: 300; letter-spacing: 0.3em; color: var(--silver); }
+
+  .sub-grid {
+    position: absolute; left: 7vw; right: 7vw; top: 44vh;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.8vw;
+  }
+  .deep-card {
+    position: relative;
+    height: 36vh;
+    background: rgba(233, 238, 247, 0.04);
+    border: 1px solid rgba(143, 163, 199, 0.22);
+    border-top: 1px solid rgba(89, 217, 255, 0.4);
+    backdrop-filter: blur(6px);
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
+    padding: 2vh 1.4vw;
+    opacity: 0;
+    animation: cardFloat 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards, bob 6s ease-in-out infinite;
+    animation-delay: calc(var(--i) * 0.1s), calc(var(--i) * 0.7s);
+    transition: background 0.3s, border-color 0.3s, transform 0.3s cubic-bezier(0.16,1,0.3,1);
+  }
+  @keyframes cardFloat { from { opacity: 0; transform: translateY(46px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes bob { 0%,100% { margin-top: 0; } 50% { margin-top: -5px; } }
+  .deep-card:hover, .deep-card:focus-visible {
+    background: rgba(89, 217, 255, 0.09);
+    border-color: var(--cyan);
+    transform: translateY(-8px);
+    outline: none;
+  }
+  .dc-jp { font-family: var(--jp); font-size: 2vw; font-weight: 600; letter-spacing: 0.2em; color: var(--moon); }
+  .dc-en { font-size: 10px; font-weight: 300; letter-spacing: 0.5em; color: var(--cyan); margin-top: 1vh; }
+  .dc-meta { font-size: 12px; font-weight: 300; letter-spacing: 0.18em; color: var(--silver); margin-top: 2vh; }
+  .dc-glyph {
+    position: absolute; top: 1.6vh; right: 1vw;
+    font-family: var(--jp); font-size: 3.4vw; color: rgba(143,163,199,0.14); font-weight: 600;
+  }
+
+  .back-chip {
+    position: absolute; left: 7vw; bottom: 7vh;
+    font-size: 12px; font-weight: 300; letter-spacing: 0.5em; color: var(--silver);
+    border: 1px solid rgba(143,163,199,0.4);
+    padding: 12px 30px;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+  .back-chip:hover, .back-chip:focus-visible { color: var(--abyss); background: var(--cyan); border-color: var(--cyan); outline: none; }
+
+  .concept-back {
+    position: fixed; left: 12px; bottom: 12px; z-index: 90;
+    font-size: 10px; letter-spacing: 0.2em; color: rgba(143,163,199,0.4); text-decoration: none;
+  }
+  .concept-back:hover { color: var(--cyan); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001s !important; animation-delay: 0s !important; transition-duration: 0.001s !important; }
+    .reflection { animation: none; }
+  }
+</style>
+</head>
+<body class="state-menu">
+
+<a class="concept-back" href="index.html">◂ CONCEPTS</a>
+
+<!-- ======== MAIN MENU ======== -->
+<section class="screen" id="menuScreen" aria-label="メインメニュー">
+  <div class="sky"></div>
+  <div class="stars" id="stars"></div>
+  <div class="moon-wrap"><div class="moon"></div></div>
+  <div class="moonpath"></div>
+  <div class="caustic"></div>
+
+  <div class="seigaiha far"><svg id="sgFar" preserveAspectRatio="none"></svg></div>
+  <div class="seigaiha near"><svg id="sgNear" preserveAspectRatio="none"></svg></div>
+
+  <div class="koi"><svg viewBox="0 0 90 40"><path d="M4 20 C 18 4 40 2 58 12 L 72 4 L 68 20 L 72 36 L 58 28 C 40 38 18 36 4 20 Z M 62 16 a 2.4 2.4 0 1 1 0 4.8 a 2.4 2.4 0 1 1 0 -4.8"/></svg></div>
+
+  <header class="brand">
+    <div class="brand-en">JPLEARN</div>
+    <div class="brand-jp">深夜の学習室</div>
+  </header>
+
+  <div class="hud">
+    <div class="hud-date"><b id="hudDate">8/1</b><span id="hudDay">SAT — 土曜日</span></div>
+    <div class="hud-sep"></div>
+    <div class="hud-stat"><b>12</b><span>連続日数</span></div>
+    <div class="hud-sep"></div>
+    <div class="hud-stat"><b id="hudMoon">満月</b><span>月相</span></div>
+  </div>
+
+  <div class="menu-zone">
+    <div class="menu-title">MAIN MENU — 静かな夜に、静かに学ぶ</div>
+    <nav class="glass-menu" id="glassMenu" aria-label="セクション"></nav>
+  </div>
+  <div class="reflection" id="reflection" aria-hidden="true"></div>
+
+  <div class="desc-line" id="descLine">かな・漢字・語彙のセクション学習</div>
+
+  <div class="hints">
+    <span><b>↑ ↓</b>SELECT</span>
+    <span><b>ENTER</b>CONFIRM</span>
+    <span><b>ESC</b>BACK</span>
+  </div>
+</section>
+
+<!-- ======== SUBMENU ======== -->
+<section class="screen" id="subScreen" aria-label="サブメニュー">
+  <div class="rays"></div>
+  <div class="bubbles" id="bubbles"></div>
+  <div class="sub-head">
+    <div class="sub-head-jp" id="subJp">学習</div>
+    <div class="sub-head-en" id="subEn">STUDY</div>
+    <div class="sub-head-desc" id="subDesc"></div>
+  </div>
+  <div class="sub-grid" id="subGrid"></div>
+  <button class="back-chip" id="backBtn">← 浮上する — BACK</button>
+</section>
+
+<!-- ======== TRANSITION ======== -->
+<div id="veil">
+  <div class="wave-layer wave-back"><svg id="waveBack" preserveAspectRatio="none"></svg></div>
+  <div class="wave-layer wave-front"><svg id="waveFront" preserveAspectRatio="none"></svg></div>
+  <div class="veil-word">
+    <div>
+      <div class="veil-word-jp" id="veilJp">学習</div>
+      <div class="veil-word-en" id="veilEn">STUDY</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ITEMS = [
+  { jp: '学習', en: 'STUDY',   meta: '3 セクション',  desc: 'かな・漢字・語彙のセクション学習' },
+  { jp: '復習', en: 'REVIEW',  meta: '24 枚 due',     desc: '期限が来たカード ─ 今日は24枚' },
+  { jp: '読解', en: 'READING', meta: '41 本',         desc: 'レベル別の読みもの' },
+  { jp: '特訓', en: 'DRILLS',  meta: '毎日更新',      desc: '毎日のミニゲームで腕試し' },
+  { jp: '検定', en: 'JLPT',    meta: 'N3 対策中',     desc: 'JLPT 模擬試験と対策' },
+  { jp: '記録', en: 'RECORDS', meta: 'LV 7',          desc: '進捗・統計・連続記録' },
+];
+const SUBTILES = {
+  STUDY:   [['ひらがな','HIRAGANA','46字 · 92%','あ'], ['カタカナ','KATAKANA','46字 · 71%','ア'], ['漢字','KANJI','2136字','漢'], ['語彙','VOCAB','8000語','語']],
+  REVIEW:  [['今日の分','DUE TODAY','24枚','今'], ['苦手札','WEAK','7枚','苦'], ['先取り','AHEAD','12枚','先'], ['総復習','ALL','341枚','総']],
+  READING: [['短文','SHORT','N5 · 12本','短'], ['物語','STORIES','N4 · 8本','物'], ['記事','ARTICLES','N3 · 15本','記'], ['随筆','ESSAYS','N2 · 6本','随']],
+  DRILLS:  [['聞き取り','LISTENING','毎日','聞'], ['書き取り','WRITING','毎日','書'], ['速読','SPEED','ベスト42','速'], ['対戦','VERSUS','週末','対']],
+  JLPT:    [['文字語彙','VOCAB','模試 3回','字'], ['文法','GRAMMAR','模試 3回','文'], ['読解','READING','模試 2回','読'], ['聴解','LISTENING','模試 2回','聴']],
+  RECORDS: [['連続記録','STREAK','12日','連'], ['正答率','ACCURACY','86%','正'], ['学習時間','TIME','42時間','時'], ['級位','RANK','七級','級']],
+};
+
+const menu = document.getElementById('glassMenu');
+const reflection = document.getElementById('reflection');
+const descLine = document.getElementById('descLine');
+const veil = document.getElementById('veil');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let active = 0, busy = false;
+
+ITEMS.forEach((it, i) => {
+  const b = document.createElement('button');
+  b.className = 'glass-item';
+  b.style.setProperty('--i', i);
+  b.innerHTML = `
+    <span class="g-ring"></span>
+    <span class="g-jp">${it.jp}</span>
+    <span class="g-en">${it.en}</span>
+    <span class="g-meta">${it.meta}</span>
+    <span class="g-under"></span>
+    <span class="g-streak"></span>`;
+  b.addEventListener('mouseenter', () => setActive(i));
+  b.addEventListener('focus', () => setActive(i));
+  b.addEventListener('click', () => select(i));
+  b.addEventListener('animationend', (e) => { if (e.target === b) b.classList.add('entered'); });
+  menu.appendChild(b);
+});
+const itemEls = [...menu.children];
+reflection.innerHTML = '<div class="glass-menu">' + menu.innerHTML + '</div>';
+const reflEls = [...reflection.querySelectorAll('.glass-item')];
+
+function setActive(i) {
+  if (busy) return;
+  active = i;
+  menu.classList.add('menu-dimmed');
+  itemEls.forEach((el, j) => el.classList.toggle('is-active', j === i));
+  reflEls.forEach((el, j) => el.classList.toggle('is-active', j === i));
+  descLine.textContent = ITEMS[i].desc;
+}
+menu.addEventListener('mouseleave', () => { if (!busy) menu.classList.remove('menu-dimmed'); });
+
+/* stars */
+const stars = document.getElementById('stars');
+for (let i = 0; i < 70; i++) {
+  const s = document.createElement('i');
+  s.style.left = Math.random() * 100 + '%';
+  s.style.top = Math.random() * 100 + '%';
+  s.style.animationDelay = (Math.random() * 4) + 's';
+  if (Math.random() < 0.2) { s.style.width = s.style.height = '3px'; }
+  stars.appendChild(s);
+}
+
+/* seigaiha pattern */
+function seigaiha(svgId, rows, r, color, width) {
+  const svg = document.getElementById(svgId);
+  const unit = r * 2, half = r;
+  let paths = '';
+  const cols = 46;
+  for (let row = 0; row < rows; row++) {
+    const off = (row % 2) ? half : 0;
+    for (let c = -1; c < cols; c++) {
+      const cx = c * unit + off, cy = row * (r * 0.62);
+      for (let k = 0; k < 4; k++) {
+        const rr = r - k * (r / 4.4);
+        paths += `<path d="M ${cx - rr} ${cy} A ${rr} ${rr} 0 0 1 ${cx + rr} ${cy}" fill="none" stroke="${color}" stroke-width="${width}"/>`;
+      }
+    }
+  }
+  svg.setAttribute('viewBox', `0 0 ${cols * unit / 3} ${rows * r * 0.62 + r}`);
+  svg.innerHTML = paths;
+}
+seigaiha('sgNear', 5, 42, 'rgba(89,217,255,0.34)', 1.6);
+seigaiha('sgFar', 4, 58, 'rgba(143,163,199,0.4)', 1.2);
+
+/* transition waves */
+function waveShape(svgId, fill, amp) {
+  const svg = document.getElementById(svgId);
+  svg.setAttribute('viewBox', '0 0 300 100');
+  let d = 'M 100 0 ';
+  for (let y = 0; y <= 100; y += 10) d += `Q ${100 - amp} ${y + 5} 100 ${y + 10} `;
+  d += 'L 300 100 L 300 0 Z';
+  const d2 = d.replace(/Q 9\d/g, m => m);
+  svg.innerHTML = `<path d="${d}" fill="${fill}" transform="translate(-98 0)"/><rect x="100" y="0" width="200" height="100" fill="${fill}"/>`;
+}
+waveShape('waveBack', '#0a1c40', 7);
+waveShape('waveFront', '#050d1f', 11);
+
+/* bubbles */
+const bubbles = document.getElementById('bubbles');
+for (let i = 0; i < 16; i++) {
+  const b = document.createElement('i');
+  b.style.left = Math.random() * 100 + '%';
+  b.style.animationDuration = (7 + Math.random() * 9) + 's';
+  b.style.animationDelay = (Math.random() * 8) + 's';
+  const s = 3 + Math.random() * 5;
+  b.style.width = b.style.height = s + 'px';
+  bubbles.appendChild(b);
+}
+
+function buildSub(i) {
+  const it = ITEMS[i];
+  document.getElementById('subJp').textContent = it.jp;
+  document.getElementById('subEn').textContent = it.en;
+  document.getElementById('subDesc').textContent = it.desc;
+  const grid = document.getElementById('subGrid');
+  grid.innerHTML = '';
+  SUBTILES[it.en].forEach(([jp, en, meta, glyph], j) => {
+    const t = document.createElement('button');
+    t.className = 'deep-card';
+    t.style.setProperty('--i', j);
+    t.innerHTML = `<span class="dc-glyph">${glyph}</span><span class="dc-jp">${jp}</span><span class="dc-en">${en}</span><span class="dc-meta">${meta}</span>`;
+    grid.appendChild(t);
+  });
+}
+
+function select(i) {
+  if (busy) return;
+  busy = true;
+  setActive(i);
+  buildSub(i);
+  document.getElementById('veilJp').textContent = ITEMS[i].jp;
+  document.getElementById('veilEn').textContent = ITEMS[i].en;
+  if (reduced) { document.body.className = 'state-sub'; busy = false; return; }
+  veil.className = 'on sweep';
+  setTimeout(() => { document.body.className = 'state-sub'; }, 620);
+  setTimeout(() => { veil.className = ''; busy = false; }, 1500);
+}
+
+function goBack() {
+  if (busy || document.body.className !== 'state-sub') return;
+  busy = true;
+  if (reduced) { document.body.className = 'state-menu'; busy = false; return; }
+  document.getElementById('veilJp').textContent = '';
+  document.getElementById('veilEn').textContent = '';
+  veil.className = 'on sweep';
+  setTimeout(() => {
+    document.body.className = 'state-menu';
+    menu.classList.remove('menu-dimmed');
+    itemEls.forEach(el => el.classList.remove('is-active'));
+    reflEls.forEach(el => el.classList.remove('is-active'));
+  }, 620);
+  setTimeout(() => { veil.className = ''; busy = false; }, 1500);
+}
+document.getElementById('backBtn').addEventListener('click', goBack);
+
+/* real date + moon phase */
+const now = new Date();
+document.getElementById('hudDate').textContent = `${now.getMonth() + 1}/${now.getDate()}`;
+document.getElementById('hudDay').textContent =
+  ['SUN — 日曜日','MON — 月曜日','TUE — 火曜日','WED — 水曜日','THU — 木曜日','FRI — 金曜日','SAT — 土曜日'][now.getDay()];
+const synodic = 29.53058867;
+const ref = new Date('2000-01-06T18:14:00Z');
+const age = ((now - ref) / 86400000) % synodic;
+const phases = [['新月',1.85],['三日月',5.54],['上弦',9.23],['十三夜',12.92],['満月',16.61],['十六夜',20.30],['下弦',23.99],['有明月',27.68],['新月',29.54]];
+document.getElementById('hudMoon').textContent = phases.find(p => age <= p[1])[0];
+
+addEventListener('keydown', (e) => {
+  if (document.body.className === 'state-menu') {
+    if (e.key === 'ArrowDown') { setActive((active + 1) % ITEMS.length); itemEls[active].focus(); }
+    else if (e.key === 'ArrowUp') { setActive((active + ITEMS.length - 1) % ITEMS.length); itemEls[active].focus(); }
+    else if (e.key === 'Enter') select(active);
+    else if (e.key >= '1' && e.key <= '6') { const i = +e.key - 1; setActive(i); itemEls[i].focus(); }
+  } else if (e.key === 'Escape' || e.key === 'Backspace') goBack();
+});
+</script>
+</body>
+</html>

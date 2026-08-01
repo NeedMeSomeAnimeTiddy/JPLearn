@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>04 終電 SHUDEN — JPLearn menu concept</title>
+<style>
+  :root {
+    --night: #0c0e12;
+    --platform: #16181e;
+    --steel: #2a2e38;
+    --white: #f2f4f5;
+    --led: #ffb52e;
+    --led-dim: #6b4c15;
+    --green: #7fbe26;
+    --orange: #e9532f;
+    --red: #e0322c;
+    --caution: #f5c400;
+    --board: #101216;
+    --jp: "Yu Gothic UI", "Yu Gothic", "Meiryo", sans-serif;
+    --mono: "Consolas", "Courier New", monospace;
+    --lat: "Segoe UI", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--night);
+    color: var(--white);
+    font-family: var(--jp);
+    -webkit-user-select: none; user-select: none;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  .screen { position: fixed; inset: 0; visibility: hidden; }
+  body.state-menu #menuScreen { visibility: visible; }
+  body.state-sub #subScreen { visibility: visible; }
+
+  #stage { position: fixed; inset: 0; }
+  #stage.shake { animation: shake 0.5s linear; }
+  @keyframes shake {
+    0%,100% { transform: translate(0,0); }
+    20% { transform: translate(-3px, 2px); }
+    40% { transform: translate(3px, -2px); }
+    60% { transform: translate(-2px, -1px); }
+    80% { transform: translate(2px, 1px); }
+  }
+
+  /* ---------- platform ambience ---------- */
+  .wall {
+    position: absolute; inset: 0 0 24vh 0;
+    background: linear-gradient(180deg, #08090c 0%, var(--night) 60%, #14161c 100%);
+  }
+  .wall-sign {
+    position: absolute; top: 9vh; right: 6vw;
+    background: #1c2027;
+    border: 1px solid #343a46;
+    padding: 12px 22px;
+    font-size: 12px; letter-spacing: 0.3em; color: #9aa3b2;
+    opacity: 0.75;
+  }
+  .wall-sign b { color: var(--white); }
+  .lightstreak {
+    position: absolute; top: 12vh; left: -30%;
+    width: 24%; height: 3px;
+    background: linear-gradient(90deg, transparent, rgba(242,244,245,0.5), transparent);
+    animation: streakBy 9s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+    animation-delay: 3.5s;
+    opacity: 0.5;
+  }
+  @keyframes streakBy {
+    0% { transform: translateX(0); opacity: 0; }
+    4% { opacity: 0.5; }
+    16% { transform: translateX(560%); opacity: 0; }
+    100% { transform: translateX(560%); opacity: 0; }
+  }
+
+  .floor {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 24vh;
+    background: linear-gradient(180deg, #1d2027 0%, #14161b 30%, #0e1014 100%);
+  }
+  .tactile {
+    position: absolute; left: 0; right: 0; bottom: 17.4vh; height: 2.6vh;
+    background-image: radial-gradient(circle, rgba(245,196,0,0.85) 24%, transparent 27%);
+    background-size: 1.5vh 1.3vh;
+    background-color: rgba(245, 196, 0, 0.14);
+    box-shadow: 0 0 18px rgba(245,196,0,0.12);
+  }
+  .tactile.alarm { animation: tactileAlarm 0.42s steps(2) 4; }
+  @keyframes tactileAlarm { 50% { background-color: rgba(245,196,0,0.6); box-shadow: 0 0 34px rgba(245,196,0,0.5); } }
+  .platform-edge {
+    position: absolute; left: 0; right: 0; bottom: 16.9vh; height: 0.4vh;
+    background: repeating-linear-gradient(90deg, rgba(242,244,245,0.35) 0 3vw, transparent 3vw 6vw);
+  }
+
+  /* ---------- station sign ---------- */
+  .station-sign {
+    position: absolute; top: 6vh; left: 50%;
+    transform: translateX(-50%);
+    width: min(50vw, 620px);
+    background: var(--white);
+    color: #14161b;
+    text-align: center;
+    padding: 2vh 3vw 0;
+    box-shadow: 0 20px 40px -18px rgba(0,0,0,0.9), 0 0 0 4px #23262e;
+    opacity: 0;
+    animation: signDrop 0.55s cubic-bezier(0.2, 1.3, 0.35, 1) 0.1s forwards;
+    z-index: 3;
+  }
+  @keyframes signDrop { from { opacity: 0; transform: translateX(-50%) translateY(-40px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+  .ss-kana { font-size: 13px; letter-spacing: 0.6em; color: #4a4f58; }
+  .ss-name { font-family: var(--lat); font-weight: 700; font-size: clamp(30px, 4.6vh, 46px); letter-spacing: 0.18em; margin: 0.4vh 0 0.2vh; }
+  .ss-sub { font-size: 11px; letter-spacing: 0.34em; color: #4a4f58; }
+  .ss-strip {
+    margin: 1.4vh -3vw 0;
+    height: 1.6vh;
+    background: var(--green);
+    position: relative;
+  }
+  .ss-strip::after {
+    content: "JY 07"; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 10px; font-weight: 700; color: #14161b;
+    background: var(--white); padding: 0 6px;
+  }
+  .ss-neighbors {
+    position: absolute; top: 100%; left: 0; right: 0;
+    display: flex; justify-content: space-between;
+    background: #23262e; color: #9aa3b2;
+    font-size: 11px; letter-spacing: 0.2em;
+    padding: 6px 14px;
+  }
+  .ss-neighbors b { color: var(--white); }
+
+  /* ---------- departure board ---------- */
+  .board {
+    position: absolute; top: 27vh; left: 50%;
+    transform: translateX(-50%);
+    width: min(78vw, 1060px);
+    background: var(--board);
+    border: 2px solid #2c313c;
+    box-shadow: 0 34px 60px -20px rgba(0,0,0,0.95), inset 0 0 60px rgba(0,0,0,0.6);
+    padding: 1.2vh 1.4vw 1.6vh;
+    z-index: 3;
+  }
+  .board-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 2px solid #2c313c;
+    padding-bottom: 0.9vh; margin-bottom: 0.6vh;
+  }
+  .bh-title { font-weight: 700; font-size: 15px; letter-spacing: 0.5em; color: var(--white); }
+  .bh-title span { color: var(--led); font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em; margin-left: 14px; }
+  .bh-clock { font-family: var(--mono); font-size: clamp(18px, 2.8vh, 26px); font-weight: 700; color: var(--led); letter-spacing: 0.12em; text-shadow: 0 0 14px rgba(255,181,46,0.55); }
+  .bh-clock .tick { animation: colonBlink 1s steps(1) infinite; }
+  @keyframes colonBlink { 50% { opacity: 0.15; } }
+
+  .cols {
+    display: grid;
+    grid-template-columns: 9ch 6ch 1fr 7ch 12ch;
+    gap: 0 1.2vw;
+    font-size: 10.5px; letter-spacing: 0.3em; color: #6d7686;
+    padding: 0.5vh 0.6vw;
+  }
+  .row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 9ch 6ch 1fr 7ch 12ch;
+    gap: 0 1.2vw;
+    align-items: center;
+    padding: 1.05vh 0.6vw;
+    border-top: 1px solid #1a1d24;
+    font-family: var(--mono);
+    color: var(--led);
+    text-align: left;
+    width: 100%;
+    transition: background 0.12s, transform 0.16s;
+  }
+  .row:focus-visible { outline: 2px solid var(--led); outline-offset: -2px; }
+  .cell { font-size: clamp(14px, 2.2vh, 20px); font-weight: 700; letter-spacing: 0.1em; white-space: nowrap; text-shadow: 0 0 10px rgba(255,181,46,0.4); }
+  .cell.time { color: var(--led); }
+  .cell.type { font-size: clamp(11px, 1.7vh, 15px); }
+  .type-loc { color: #9adf5a; } .type-rap { color: #6fd3ff; } .type-exp { color: #ff8a5f; } .type-ltd { color: #ff5f6b; }
+  .cell.dest { display: flex; align-items: baseline; gap: 1vw; }
+  .dest-jp { font-family: var(--jp); font-weight: 700; font-size: clamp(17px, 2.7vh, 24px); letter-spacing: 0.24em; }
+  .dest-en { font-size: clamp(11px, 1.7vh, 15px); letter-spacing: 0.26em; color: #d8dfe8; text-shadow: none; }
+  .cell.track { text-align: center; }
+  .cell.remark { font-size: clamp(11px, 1.7vh, 15px); }
+  .remark-due { color: var(--red); animation: ledPulse 1.4s ease-in-out infinite; }
+  @keyframes ledPulse { 50% { opacity: 0.45; } }
+
+  .row .traindot {
+    position: absolute; left: -3ch; bottom: 4px;
+    font-size: 11px; color: var(--white);
+    opacity: 0;
+  }
+  .row.is-active { background: var(--led); transform: scaleX(1.008); }
+  .row.is-active .cell, .row.is-active .dest-jp, .row.is-active .dest-en,
+  .row.is-active .type-loc, .row.is-active .type-rap, .row.is-active .type-exp, .row.is-active .type-ltd,
+  .row.is-active .remark-due { color: var(--board); text-shadow: none; animation: none; }
+  .row.is-active .traindot { animation: dotRun 0.55s cubic-bezier(0.3, 0, 0.3, 1) forwards; }
+  @keyframes dotRun {
+    0% { opacity: 0; transform: translateX(0); }
+    15% { opacity: 1; }
+    100% { opacity: 0; transform: translateX(78vw); }
+  }
+  .board.dimmed .row:not(.is-active) { opacity: 0.4; }
+
+  .board-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 2px solid #2c313c;
+    margin-top: 0.6vh; padding-top: 1vh;
+  }
+  .marquee { overflow: hidden; flex: 1; margin-right: 2vw; }
+  .marquee span {
+    display: inline-block; white-space: nowrap;
+    font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.2em; color: var(--led);
+    animation: marquee 21s linear infinite;
+  }
+  @keyframes marquee { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+  .board-foot .ic {
+    font-size: 11px; letter-spacing: 0.2em; color: #6d7686; white-space: nowrap;
+  }
+
+  /* commuter pass HUD */
+  .pass {
+    position: absolute; top: 7vh; left: 2.4vw;
+    background: linear-gradient(135deg, #1b3f2a 0%, #14161b 70%);
+    border: 1px solid #35543f;
+    padding: 12px 16px;
+    z-index: 3;
+    font-size: 11px; letter-spacing: 0.22em; color: #9aa3b2;
+    box-shadow: 0 14px 30px -14px rgba(0,0,0,0.8);
+    transform: rotate(-1.6deg);
+  }
+  .pass b { display: block; font-family: var(--mono); font-size: 15px; color: var(--white); letter-spacing: 0.12em; margin-top: 5px; }
+  .pass .green { color: var(--green); }
+
+  .hints {
+    position: absolute; right: 4vw; bottom: 4.4vh; z-index: 4;
+    display: flex; gap: 18px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.18em; color: #7d8695;
+  }
+  .hints b {
+    font-family: var(--mono); font-size: 10.5px;
+    border: 1px solid #3a404d; background: #1a1d24;
+    padding: 3px 8px; margin-right: 7px; color: var(--white);
+  }
+
+  .announce {
+    position: absolute; left: 4vw; bottom: 4.4vh; z-index: 4;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 0.3em; color: var(--caution);
+    opacity: 0;
+  }
+  .announce.on { animation: annBlink 0.5s steps(2) 5; }
+  @keyframes annBlink { 50% { opacity: 1; } }
+
+  /* ---------- train transition ---------- */
+  #train {
+    position: fixed; top: 20vh; left: 0; height: 44vh; width: 240vw;
+    z-index: 70;
+    transform: translateX(110vw);
+    visibility: hidden;
+    pointer-events: none;
+  }
+  #train.rush { visibility: visible; animation: rush 1.05s cubic-bezier(0.65, 0, 0.25, 1) forwards; }
+  @keyframes rush {
+    0% { transform: translateX(110vw); filter: blur(0); }
+    18% { filter: blur(5px); }
+    82% { filter: blur(5px); }
+    100% { transform: translateX(-240vw); filter: blur(0); }
+  }
+  .train-body {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, #22262e 0%, #171a20 28%, #22262e 30%, #14161b 100%);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.9);
+  }
+  .train-body::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 30%; height: 26%;
+    background: repeating-linear-gradient(90deg,
+      rgba(255,229,160,0.9) 0 7vw, #0e1014 7vw 8.4vw);
+    box-shadow: 0 0 44px rgba(255,229,160,0.5);
+  }
+  .train-body::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 62%; height: 5%;
+    background: repeating-linear-gradient(90deg, var(--green) 0 30vw, #0e1014 30vw 30.5vw);
+  }
+  .windline {
+    position: fixed; height: 2px; left: 0; right: 0;
+    background: linear-gradient(90deg, transparent, rgba(242,244,245,0.7), transparent);
+    z-index: 69; visibility: hidden;
+  }
+  .windline.on { visibility: visible; animation: wind 0.6s linear forwards; }
+  @keyframes wind { from { transform: translateX(60vw); opacity: 1; } to { transform: translateX(-70vw); opacity: 0; } }
+
+  /* ---------- submenu: in-train LCD ---------- */
+  #subScreen { background: linear-gradient(180deg, #14161b 0%, #191c22 55%, #101216 100%); }
+  .car-frame {
+    position: absolute; inset: 5vh 6vw;
+    background: #1e222a;
+    border: 1px solid #2f3540;
+    box-shadow: inset 0 0 80px rgba(0,0,0,0.55), 0 30px 70px -30px rgba(0,0,0,0.95);
+  }
+  .lcd {
+    position: absolute; top: 9vh; left: 10vw; right: 10vw;
+    background: var(--board);
+    border: 3px solid #060708;
+    padding: 2.2vh 2vw;
+    box-shadow: 0 0 0 1px #2c313c, 0 24px 46px -18px rgba(0,0,0,0.9);
+  }
+  .lcd-head { display: flex; align-items: baseline; gap: 2vw; }
+  .lcd-next { font-size: 13px; letter-spacing: 0.5em; color: #8de6ff; }
+  .lcd-station { font-weight: 700; font-size: clamp(30px, 5.4vh, 52px); letter-spacing: 0.3em; color: var(--white); }
+  .lcd-station-en { font-family: var(--lat); font-size: 14px; letter-spacing: 0.5em; color: #9aa3b2; }
+  .lcd-line {
+    position: relative; margin-top: 3.4vh; height: 8px; background: var(--green);
+  }
+  .lcd-line .stop {
+    position: absolute; top: 50%; width: 18px; height: 18px;
+    background: var(--white); border: 4px solid var(--green);
+    transform: translate(-50%, -50%);
+    clip-path: circle(50%);
+  }
+  .lcd-line .train-pos {
+    position: absolute; top: 50%; left: 0;
+    width: 26px; height: 14px;
+    background: var(--white);
+    transform: translate(-50%, -50%);
+    clip-path: polygon(0 20%, 70% 20%, 100% 50%, 70% 80%, 0 80%);
+    animation: trainCrawl 7s linear infinite;
+    box-shadow: 0 0 14px rgba(242,244,245,0.8);
+  }
+  @keyframes trainCrawl { from { left: 2%; } to { left: 98%; } }
+  .lcd-stops { position: relative; margin-top: 1.6vh; height: 8vh; }
+  .lcd-stop-label {
+    position: absolute; transform: translateX(-50%);
+    text-align: center;
+    font-size: clamp(11px, 1.7vh, 15px); font-weight: 700; letter-spacing: 0.14em; color: #cfd6df;
+  }
+  .lcd-stop-label small { display: block; font-family: var(--lat); font-size: 9.5px; letter-spacing: 0.2em; color: #6d7686; margin-top: 4px; }
+
+  .ads { position: absolute; left: 10vw; right: 10vw; top: 46vh; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.6vw; }
+  .ad {
+    position: relative;
+    height: 30vh;
+    background: linear-gradient(170deg, #f2f4f5 0%, #dde2e6 100%);
+    color: #14161b;
+    padding: 2vh 1.2vw;
+    display: flex; flex-direction: column;
+    box-shadow: 0 16px 30px -14px rgba(0,0,0,0.8);
+    transform-origin: top center;
+    opacity: 0;
+    animation: adSwing 0.7s cubic-bezier(0.2, 1.4, 0.35, 1) forwards;
+    animation-delay: calc(0.18s + var(--i) * 0.09s);
+    transition: transform 0.22s cubic-bezier(0.2, 1.4, 0.35, 1), box-shadow 0.2s;
+  }
+  @keyframes adSwing {
+    0% { opacity: 0; transform: rotate(4deg) translateY(-24px); }
+    100% { opacity: 1; transform: rotate(0) translateY(0); }
+  }
+  .ad::before {
+    content: ""; position: absolute; top: -5vh; left: 18%; width: 2px; height: 5vh; background: #4a4f58;
+  }
+  .ad::after {
+    content: ""; position: absolute; top: -5vh; right: 18%; width: 2px; height: 5vh; background: #4a4f58;
+  }
+  .ad:hover, .ad:focus-visible { transform: translateY(-8px) rotate(-1deg); box-shadow: 0 28px 40px -16px rgba(0,0,0,0.9); outline: none; }
+  .ad-badge { align-self: flex-start; background: var(--red); color: var(--white); font-weight: 700; font-size: 10.5px; letter-spacing: 0.24em; padding: 4px 10px; }
+  .ad-jp { font-weight: 700; font-size: clamp(20px, 3.4vh, 30px); letter-spacing: 0.18em; margin-top: 2vh; }
+  .ad-en { font-family: var(--lat); font-size: 10.5px; letter-spacing: 0.34em; color: #5b626e; margin-top: 0.8vh; }
+  .ad-meta { margin-top: auto; font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--orange); letter-spacing: 0.1em; }
+  .ad-wm {
+    position: absolute; right: 0.5vw; bottom: 0.4vh;
+    font-weight: 700; font-size: 5.4vw; line-height: 1;
+    color: rgba(20, 22, 27, 0.06);
+    pointer-events: none;
+  }
+
+  .back-chip {
+    position: absolute; left: 10vw; bottom: 7vh;
+    background: var(--white); color: #14161b;
+    font-weight: 700; font-size: 13.5px; letter-spacing: 0.3em;
+    padding: 13px 28px;
+    box-shadow: 0 10px 24px -10px rgba(0,0,0,0.8);
+    transition: background 0.15s, transform 0.18s cubic-bezier(0.2,1.4,0.35,1);
+  }
+  .back-chip:hover, .back-chip:focus-visible { background: var(--caution); transform: scale(1.06); outline: none; }
+  .doors-hint { position: absolute; right: 10vw; bottom: 7.6vh; font-size: 11.5px; letter-spacing: 0.34em; color: #6d7686; }
+
+  .concept-back {
+    position: fixed; left: 12px; bottom: 12px; z-index: 90;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.2em;
+    color: rgba(154,163,178,0.4); text-decoration: none;
+  }
+  .concept-back:hover { color: var(--led); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001s !important; animation-delay: 0s !important; transition-duration: 0.001s !important; }
+  }
+</style>
+</head>
+<body class="state-menu">
+
+<a class="concept-back" href="index.html">◂ CONCEPTS</a>
+
+<div id="stage">
+
+<!-- ======== MAIN MENU (platform) ======== -->
+<section class="screen" id="menuScreen" aria-label="メインメニュー">
+  <div class="wall"></div>
+  <div class="lightstreak"></div>
+  <div class="wall-sign">ようこそ <b>日本語学習駅</b> へ</div>
+  <div class="floor"></div>
+  <div class="platform-edge"></div>
+  <div class="tactile" id="tactile"></div>
+
+  <div class="pass">
+    定期券 COMMUTER PASS
+    <b><span id="passDate">08/01 SAT</span> · 連続<span class="green">12</span>日 · LV<span class="green">7</span></b>
+  </div>
+
+  <header class="station-sign">
+    <div class="ss-kana">じぇいぴーらーん</div>
+    <div class="ss-name">JPLEARN</div>
+    <div class="ss-sub">Japanese Learning Station</div>
+    <div class="ss-strip"></div>
+    <div class="ss-neighbors"><span>◀ <b>昨日</b> Yesterday</span><span><b>明日</b> Tomorrow ▶</span></div>
+  </header>
+
+  <div class="board" id="board">
+    <div class="board-head">
+      <div class="bh-title">発車標<span>DEPARTURES</span></div>
+      <div class="bh-clock" id="clock">--<span class="tick">:</span>--<span class="tick">:</span>--</div>
+    </div>
+    <div class="cols"><span>時刻 TIME</span><span>種別</span><span>行先 DESTINATION</span><span>番線</span><span>備考 REMARKS</span></div>
+    <nav id="rows" aria-label="セクション"></nav>
+    <div class="board-foot">
+      <div class="marquee"><span id="marquee">本日も 日本語学習線 をご利用くださいまして ありがとうございます。 復習 24枚が到着しております。 駆け込み学習は おやめください。</span></div>
+      <div class="ic">IC 学習カード対応</div>
+    </div>
+  </div>
+
+  <div class="announce" id="announce">🔔 まもなく発車します — DEPARTING SOON</div>
+
+  <div class="hints">
+    <span><b>↑↓</b>選択</span>
+    <span><b>ENTER</b>乗車</span>
+    <span><b>ESC</b>下車</span>
+  </div>
+</section>
+
+<!-- ======== SUBMENU (in-train LCD) ======== -->
+<section class="screen" id="subScreen" aria-label="車内案内">
+  <div class="car-frame"></div>
+  <div class="lcd">
+    <div class="lcd-head">
+      <span class="lcd-next">次は NEXT</span>
+      <span class="lcd-station" id="subJp">学習</span>
+      <span class="lcd-station-en" id="subEn">STUDY</span>
+    </div>
+    <div class="lcd-line" id="lcdLine"><span class="train-pos"></span></div>
+    <div class="lcd-stops" id="lcdStops"></div>
+  </div>
+  <div class="ads" id="subGrid"></div>
+  <button class="back-chip" id="backBtn">← 下車する GET OFF</button>
+  <div class="doors-hint">ドアが閉まります ご注意ください</div>
+</section>
+
+</div>
+
+<!-- ======== TRAIN ======== -->
+<div id="train"><div class="train-body"></div></div>
+<div class="windline" id="wind1" style="top: 30vh"></div>
+<div class="windline" id="wind2" style="top: 52vh"></div>
+
+<script>
+const ITEMS = [
+  { jp: '学習', en: 'STUDY',   type: '各停', typeCls: 'type-loc', track: '1', remark: '定刻 ON TIME',  remarkCls: '' },
+  { jp: '復習', en: 'REVIEW',  type: '特急', typeCls: 'type-ltd', track: '2', remark: '24枚 待機中',   remarkCls: 'remark-due' },
+  { jp: '読解', en: 'READING', type: '快速', typeCls: 'type-rap', track: '3', remark: '定刻 ON TIME',  remarkCls: '' },
+  { jp: '特訓', en: 'DRILLS',  type: '臨時', typeCls: 'type-exp', track: '4', remark: '毎日運行',      remarkCls: '' },
+  { jp: '検定', en: 'JLPT',    type: '急行', typeCls: 'type-exp', track: '5', remark: '12月 N3',      remarkCls: '' },
+  { jp: '記録', en: 'RECORDS', type: '各停', typeCls: 'type-loc', track: '6', remark: '見放題',        remarkCls: '' },
+];
+const SUBSTOPS = {
+  STUDY:   [['ひらがな','HIRAGANA','92%'], ['カタカナ','KATAKANA','71%'], ['漢字','KANJI','2136字'], ['語彙','VOCAB','8000語']],
+  REVIEW:  [['今日の分','DUE','24枚'], ['苦手札','WEAK','7枚'], ['先取り','AHEAD','12枚'], ['総復習','ALL','341枚']],
+  READING: [['短文','SHORT','N5·12本'], ['物語','STORIES','N4·8本'], ['記事','ARTICLES','N3·15本'], ['随筆','ESSAYS','N2·6本']],
+  DRILLS:  [['聞き取り','LISTENING','毎日'], ['書き取り','WRITING','毎日'], ['速読','SPEED','BEST 42'], ['対戦','VERSUS','週末']],
+  JLPT:    [['文字語彙','VOCAB','模試3回'], ['文法','GRAMMAR','模試3回'], ['読解','READING','模試2回'], ['聴解','LISTENING','模試2回']],
+  RECORDS: [['連続記録','STREAK','12日'], ['正答率','ACCURACY','86%'], ['学習時間','TIME','42時間'], ['級位','RANK','七級']],
+};
+const FLAPPOOL = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEFGHJKLMNPRSTUVWXY・';
+
+const rowsHost = document.getElementById('rows');
+const board = document.getElementById('board');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let active = 0, busy = false;
+
+const base = new Date();
+function depTime(i) {
+  const t = new Date(base.getTime() + (i + 1) * 4 * 60000 + 3 * 60000);
+  return String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+}
+
+ITEMS.forEach((it, i) => {
+  const b = document.createElement('button');
+  b.className = 'row';
+  b.innerHTML = `
+    <span class="cell time flap" data-final="${depTime(i)}"></span>
+    <span class="cell type ${it.typeCls} flap" data-final="${it.type}"></span>
+    <span class="cell dest">
+      <span class="dest-jp flap" data-final="${it.jp}"></span>
+      <span class="dest-en flap" data-final="${it.en}"></span>
+    </span>
+    <span class="cell track flap" data-final="${it.track}"></span>
+    <span class="cell remark ${it.remarkCls} flap" data-final="${it.remark}"></span>
+    <span class="traindot">■■■▶</span>`;
+  b.addEventListener('mouseenter', () => setActive(i));
+  b.addEventListener('focus', () => setActive(i));
+  b.addEventListener('click', () => select(i));
+  rowsHost.appendChild(b);
+});
+const rowEls = [...rowsHost.children];
+
+/* split-flap settle */
+function flapIn(scope, baseDelay) {
+  scope.querySelectorAll('.flap').forEach((el) => {
+    const final = el.dataset.final;
+    if (reduced) { el.textContent = final; return; }
+    let ticks = 0;
+    const total = 5 + Math.floor(Math.random() * 8);
+    el.textContent = '';
+    setTimeout(() => {
+      const iv = setInterval(() => {
+        ticks++;
+        if (ticks >= total) {
+          clearInterval(iv);
+          el.textContent = final;
+          return;
+        }
+        el.textContent = [...final].map((ch, k) =>
+          (ticks / total) * final.length > k ? ch : FLAPPOOL[Math.floor(Math.random() * FLAPPOOL.length)]
+        ).join('');
+      }, 55);
+    }, baseDelay + Math.random() * 240);
+  });
+}
+flapIn(rowsHost, 350);
+/* an idle cell re-flaps occasionally, like a real Solari board */
+setInterval(() => {
+  if (document.body.className !== 'state-menu' || busy || document.hidden) return;
+  const cells = rowsHost.querySelectorAll('.flap');
+  const el = cells[Math.floor(Math.random() * cells.length)];
+  const final = el.dataset.final;
+  let ticks = 0;
+  const iv = setInterval(() => {
+    ticks++;
+    if (ticks >= 4) { clearInterval(iv); el.textContent = final; return; }
+    el.textContent = [...final].map((ch, k) => Math.random() < 0.4 ? FLAPPOOL[Math.floor(Math.random() * FLAPPOOL.length)] : ch).join('');
+  }, 60);
+}, 6000);
+
+function setActive(i) {
+  if (busy) return;
+  active = i;
+  board.classList.add('dimmed');
+  rowEls.forEach((el, j) => el.classList.toggle('is-active', j === i));
+}
+rowsHost.addEventListener('mouseleave', () => { if (!busy) board.classList.remove('dimmed'); });
+
+/* live clock */
+function tickClock() {
+  const n = new Date();
+  document.getElementById('clock').innerHTML =
+    String(n.getHours()).padStart(2,'0') + '<span class="tick">:</span>' +
+    String(n.getMinutes()).padStart(2,'0') + '<span class="tick">:</span>' +
+    String(n.getSeconds()).padStart(2,'0');
+}
+tickClock(); setInterval(tickClock, 1000);
+
+const now = new Date();
+document.getElementById('passDate').textContent =
+  String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0') + ' ' +
+  ['SUN','MON','TUE','WED','THU','FRI','SAT'][now.getDay()];
+
+function buildSub(i) {
+  const it = ITEMS[i];
+  document.getElementById('subJp').textContent = it.jp;
+  document.getElementById('subEn').textContent = it.en;
+  const stops = SUBSTOPS[it.en];
+  const line = document.getElementById('lcdLine');
+  line.querySelectorAll('.stop').forEach(s => s.remove());
+  const labels = document.getElementById('lcdStops');
+  labels.innerHTML = '';
+  stops.forEach(([jp, en], j) => {
+    const pos = 8 + (j / (stops.length - 1)) * 84;
+    const dot = document.createElement('span');
+    dot.className = 'stop'; dot.style.left = pos + '%';
+    line.appendChild(dot);
+    const lb = document.createElement('span');
+    lb.className = 'lcd-stop-label'; lb.style.left = pos + '%';
+    lb.innerHTML = `${jp}<small>${en}</small>`;
+    labels.appendChild(lb);
+  });
+  const grid = document.getElementById('subGrid');
+  grid.innerHTML = '';
+  const badges = ['本日', '人気', '新着', 'おすすめ'];
+  stops.forEach(([jp, en, meta], j) => {
+    const t = document.createElement('button');
+    t.className = 'ad';
+    t.style.setProperty('--i', j);
+    t.innerHTML = `<span class="ad-badge">${badges[j]}</span><span class="ad-jp">${jp}</span><span class="ad-en">${en}</span><span class="ad-meta">${meta}</span><span class="ad-wm">${jp[0]}</span>`;
+    grid.appendChild(t);
+  });
+}
+
+const train = document.getElementById('train');
+function select(i) {
+  if (busy) return;
+  busy = true;
+  setActive(i);
+  buildSub(i);
+  if (reduced) { document.body.className = 'state-sub'; busy = false; return; }
+  document.getElementById('announce').classList.add('on');
+  document.getElementById('tactile').classList.add('alarm');
+  setTimeout(() => {
+    train.classList.add('rush');
+    document.getElementById('stage').classList.add('shake');
+    document.getElementById('wind1').classList.add('on');
+    setTimeout(() => document.getElementById('wind2').classList.add('on'), 180);
+  }, 1000);
+  setTimeout(() => { document.body.className = 'state-sub'; }, 1520);
+  setTimeout(() => {
+    train.classList.remove('rush');
+    document.getElementById('stage').classList.remove('shake');
+    document.getElementById('announce').classList.remove('on');
+    document.getElementById('tactile').classList.remove('alarm');
+    document.getElementById('wind1').classList.remove('on');
+    document.getElementById('wind2').classList.remove('on');
+    busy = false;
+  }, 2200);
+}
+
+function goBack() {
+  if (busy || document.body.className !== 'state-sub') return;
+  busy = true;
+  if (reduced) { document.body.className = 'state-menu'; busy = false; return; }
+  train.classList.add('rush');
+  setTimeout(() => {
+    document.body.className = 'state-menu';
+    board.classList.remove('dimmed');
+    rowEls.forEach(el => el.classList.remove('is-active'));
+    flapIn(rowsHost, 150);
+  }, 520);
+  setTimeout(() => { train.classList.remove('rush'); busy = false; }, 1150);
+}
+document.getElementById('backBtn').addEventListener('click', goBack);
+
+addEventListener('keydown', (e) => {
+  if (document.body.className === 'state-menu') {
+    if (e.key === 'ArrowDown') { setActive((active + 1) % ITEMS.length); rowEls[active].focus(); }
+    else if (e.key === 'ArrowUp') { setActive((active + ITEMS.length - 1) % ITEMS.length); rowEls[active].focus(); }
+    else if (e.key === 'Enter') select(active);
+    else if (e.key >= '1' && e.key <= '6') { const i = +e.key - 1; setActive(i); rowEls[i].focus(); }
+  } else if (e.key === 'Escape' || e.key === 'Backspace') goBack();
+});
+</script>
+</body>
+</html>
