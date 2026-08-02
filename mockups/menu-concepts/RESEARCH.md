@@ -857,6 +857,48 @@ is `amt·exp(−426/H)`, and a horizontal look across the valley gives `1 − ex
 first guess came out 81% opaque at 8,000 units and swallowed the reflection; solving for 30%
 gave the value directly.
 
+## v26 — the coast, the outline's reach, and one sun
+
+**Build a branch from its base, not its middle.** A rotated cylinder placed by its centre puts
+its inner end wherever the trigonometry lands it — seven units clear of the trunk, in the
+sakura's case, so the branches hung in the air beside it. Translating the cylinder so its base
+sits at the origin *before* rotating means the base stays put at any angle and can be dropped on
+the trunk axis, where it is guaranteed to be buried in the wood. The blossom then goes on the
+tip each branch actually reached rather than on a hand-typed coordinate that has to be
+re-guessed whenever an angle changes.
+
+**Sample a coastline off the shore, not off the nominal radius.** The lake's edge wobbles ±29%
+with bearing. Taking the planting ring at 1.0–1.34 × the *nominal* radius while testing against
+the *wobbled* shoreline meant whole bearings had their entire band on the wrong side: where the
+shore bulged, every sample was still in the water; where it pulled in, every sample was a third
+of a radius inland. The lake came out planted on one side only.
+
+Two more things had to change before the coast planted evenly:
+
+- **A bank.** Without one the valley's own relief dips below the water level in places outside
+  the basin, so stretches of "coast" were land that merely happened to be lower than the lake.
+  Low ground near the shore is now lifted toward the waterline without touching ground already
+  higher, so the lake sits in a bowl.
+- **Water culls, not low ground.** A global "below the waterline" test looked equivalent to a
+  water test and was not: the terrain drops below the lake's level in plenty of places nowhere
+  near it, and those were being cleared of trees for no reason.
+
+**Outlines needed a distance policy per class of object.** The extrusion stops growing past
+4,000 units, so beyond that it is effectively a fixed world width — and the tree value of 0.0016
+comes to six units, sub-pixel on something 13,500 away. Fuji, the ranges and the rim get roughly
+three times that, which is what puts a line on them at all.
+
+**One sun, two consumers.** The key light and the visible disc had been placed independently and
+disagreed. The disc sat 3,800 units from Fuji's axis on a mountain 6,000 wide — inside the
+silhouette — so all you ever saw was a glow leaking round the flank. Both are now derived from a
+single `SUN_AT`, 4,600 clear of the axis at 11° of elevation, and the shading agrees with where
+the sun visibly is.
+
+**A mirrored camera breaks height fog.** The reflection pass renders from a camera below the
+water — 446 units under the mist reference plane — and `exp(+446/380)` put the base density at
+3.2×, so the reflected world dissolved and left only the outline hulls. Reflections looked like
+skeletons of the trees above them. Clamping the camera's height to the mist plane fixes it.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -968,6 +1010,14 @@ gave the value directly.
   that looks expensive.
 - When a metric collapses after a change, bisect it by hiding candidates at runtime — one pass
   named the mist as four times the rest of the frame combined.
+
+- **Place rotated parts by the joint, not by the centre.** Translate so the join is at the
+  origin, then rotate, then move the join where it belongs — otherwise every angle change needs
+  its position re-derived by hand, and the parts drift apart.
+- **Sample against the same field you test against.** Taking positions off a nominal radius and
+  accepting them against a wobbled one silently empties whole bearings.
+- Any shader term that depends on the camera's height needs a second look the moment a
+  reflection pass exists — the mirrored camera is below the world.
 
 ## Sources
 

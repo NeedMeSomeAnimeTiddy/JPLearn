@@ -1511,7 +1511,11 @@ function cloudy(mat) {
           vec3 mv = vCloudPos - cameraPosition;
           float md = length( mv );
           float mk = 1.0 / uMistH;
-          float mbase = uMistAmt * exp( - ( cameraPosition.y - uMistY ) * mk );
+          /* CLAMPED AT THE MIST PLANE. The reflection pass renders from a camera mirrored
+             below the water — 446 units under the mist reference — and exp(+446/380) put the
+             base density at 3.2x, so the reflected world dissolved into mist and left only the
+             outline hulls behind. Reflections looked like skeletons of the trees above them. */
+          float mbase = uMistAmt * exp( - max( cameraPosition.y - uMistY, 0.0 ) * mk );
           float mdy = mv.y * mk;
           float mint = abs( mdy ) < 1e-4 ? md : md * ( 1.0 - exp( - mdy ) ) / mdy;
           float mf = 1.0 - exp( - max( mbase * mint, 0.0 ) );
@@ -1630,12 +1634,13 @@ function riverSideAt(d) { return 2400 + Math.sin(d * 0.00038 + 0.6) * 2100 - d *
 
 /* > 0 inside the lake, 0 at the shore, negative outside. The radius wobbles with bearing so the
    shoreline is a coast and not a drawn circle. */
+function lakeRadiusAt(a) {
+  return LAKE.r * (1 + Math.sin(a * 3 + 0.7) * 0.13 + Math.sin(a * 5 - 1.9) * 0.07
+                     + Math.sin(a * 2 + 2.4) * 0.09);
+}
 function lakeField(x, z) {
   const lx = x - LAKE_C.x, lz = z - LAKE_C.z;
-  const a = Math.atan2(lz, lx);
-  const r = LAKE.r * (1 + Math.sin(a * 3 + 0.7) * 0.13 + Math.sin(a * 5 - 1.9) * 0.07
-                        + Math.sin(a * 2 + 2.4) * 0.09);
-  return 1 - Math.hypot(lx, lz) / r;
+  return 1 - Math.hypot(lx, lz) / lakeRadiusAt(Math.atan2(lz, lx));
 }
 
 function landAt(x, z) {
@@ -1674,6 +1679,14 @@ function landAt(x, z) {
   if (L > -0.09) {
     const bed = LAKE.level - 30 - 300 * THREE.MathUtils.smoothstep(L, 0, 0.65);
     h = THREE.MathUtils.lerp(h, bed, THREE.MathUtils.smoothstep(L, -0.09, 0.10));
+  } else if (L > -0.62) {
+    /* A BANK. Without one the surrounding relief dips below the water level in places well
+       outside the basin, so whole stretches of "coast" were land that happened to be lower than
+       the lake — nothing would plant there and the shoreline had no rim. This lifts low ground
+       near the shore without touching ground that is already higher, so the lake sits in a bowl
+       rather than stopping at an arbitrary contour. */
+    const near = 1 - THREE.MathUtils.smoothstep(-L, 0.03, 0.62);
+    h = Math.max(h, THREE.MathUtils.lerp(h, LAKE.level + 75, near));
   }
   return h;
 }
@@ -1883,6 +1896,19 @@ function hash01(a, b) {
    rippled 768² image of the far shore, and they were being drawn twice a frame for it. */
 const NO_REFLECT = [];
 
+/* the same hull for a single mesh. Mountains need a much larger `w` than trees: the extrusion
+   stops growing past 4,000 units, so beyond that it is effectively a fixed world width, and
+   the tree value of 0.0016 comes to six units — sub-pixel on something 13,500 away. */
+function addOutline(mesh, w) {
+  const o = new THREE.Mesh(outlineGeom(mesh.geometry), outlineMaterial(w));
+  o.position.copy(mesh.position);
+  o.rotation.copy(mesh.rotation);
+  o.scale.copy(mesh.scale);
+  o.frustumCulled = false;
+  (mesh.parent || backScene).add(o);
+  return o;
+}
+
 /* one shared scatter so trees, rocks and grass agree about where the ground is busy */
 function scatter(i, seed, near, far, spread) {
   const a = hash01(i, seed);
@@ -1919,7 +1945,11 @@ function blockHeight(x, z) {
    folded into the same gate: nothing scatters below it, so the lake and the river bed clear
    themselves of trees, tufts and stones without any of them knowing the lake exists. */
 function blocked(x, z) {
-  if (groundAt(x, z) < LAKE_Y + 25) return true;
+  /* WATER CULLS, NOT MERELY LOW GROUND. A global height test looked equivalent and was not: the
+     valley's own relief drops below the lake's level in plenty of places that are nowhere near
+     it, and those were being cleared of trees for no reason. Only ground that is actually
+     inside the basin and under the surface counts. */
+  if (lakeField(x - EYE.x, z - EYE.y) > -0.03 && groundAt(x, z) < LAKE_Y + 25) return true;
   return blockHeight(x, z) > 120;
 }
 /* `outline` is a width, or 0 for none. The twin shares the instance matrices, so it can never
@@ -1993,7 +2023,9 @@ function makeFuji(dist, side, R, Hh) {
     col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  grp.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+  const shell = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  grp.add(shell);
+  addOutline(shell, 0.0052);
   grp.position.copy(at(dist, side, GROUND_Y - 120));
   backScene.add(grp);
   blockAdd(grp.position.x, grp.position.z, R * 0.94, Hh);
@@ -2045,6 +2077,7 @@ function mountainRidge(dist, side, w, h, palette) {
   const b = onGround(dist, side, -140);
   m.position.copy(b);
   backScene.add(m);
+  addOutline(m, 0.0048);
   /* the cluster reaches the furthest shoulder offset plus its radius: 0.74w + 0.60w */
   blockAdd(b.x, b.z, w * 1.34, h);
 }
@@ -2079,6 +2112,7 @@ for (let k = 0; k < 26; k++) {
   const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   m.position.set(EYE.x + Math.cos(a) * r, GROUND_Y - 300, EYE.y + Math.sin(a) * r);
   backScene.add(m);
+  addOutline(m, 0.0045);
   blockAdd(m.position.x, m.position.z, cw * 1.1, h);
 }
 
@@ -2089,9 +2123,20 @@ for (let k = 0; k < 26; k++) {
    when the shadows were fine. Trading one against the other is a false choice: a third light
    — a directional bounce that casts nothing — lifts shadowed surfaces while still SHAPING
    them, which lets the key dominate and the hemisphere drop to a tint. */
+/* ONE SUN POSITION, TWO CONSUMERS. The light and the visible disc were placed independently and
+   disagreed: the disc sat at at(15000, 6400, 300), which is 3,800 units from Fuji's axis on a
+   mountain 6,000 wide — so it was *inside the silhouette*, and the only trace of it was a glow
+   leaking round the flank. It now sits 4,600 clear of the axis where the skyline drops to about
+   200 units, well below it, and the key light is derived from the same vector so the shading
+   agrees with where you can see the sun. 14° of elevation: low enough to be a sunrise, high
+   enough that the ground still takes a majority of its light from the key. */
+const SUN_AT = at(15000, 7200, 0);
+SUN_AT.y = GROUND_Y + Math.hypot(SUN_AT.x - EYE.x, SUN_AT.z - EYE.y) * Math.tan(11 * Math.PI / 180);
 {
-  const sun = new THREE.DirectionalLight(0xffd9b0, 3.2);
-  sun.position.copy(at(9000, 5200, 2600));
+  /* raised from 3.2 with the sun: dropping the elevation from 20° to 14° cuts cos(incidence) on
+     flat ground by a third, and the meadow went with it */
+  const sun = new THREE.DirectionalLight(0xffd9b0, 4.6);
+  sun.position.copy(SUN_AT);
   sun.castShadow = true;
   sun.shadow.mapSize.set(4096, 4096);
   /* SIZE THE BOX, THEN COUNT ITS TEXELS. There is no point covering a 70,000-unit valley: at
@@ -2132,15 +2177,16 @@ function radialTex(inner, outer, stops) {
       [0.62, 'rgba(232,158,120,0.10)'], [1, 'rgba(232,158,120,0)']]),
     transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
   }));
-  bloom.position.copy(at(15000, 6400, 300));
-  bloom.scale.set(13000, 13000, 1);
+  /* both driven off SUN_AT, so the glow can never drift away from the light again */
+  bloom.position.copy(SUN_AT);
+  bloom.scale.set(7600, 7600, 1);
   backScene.add(bloom);
   const disc = new THREE.Sprite(new THREE.SpriteMaterial({
     map: radialTex(0, 90, [[0, 'rgba(255,248,232,1)'], [0.5, 'rgba(255,226,178,0.9)'], [1, 'rgba(255,210,150,0)']]),
     transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
   }));
-  disc.position.copy(at(15000, 6400, 520));
-  disc.scale.set(1500, 1500, 1);
+  disc.position.copy(SUN_AT).multiplyScalar(0.995);
+  disc.scale.set(820, 820, 1);
   backScene.add(disc);
 }
 
@@ -2228,7 +2274,7 @@ const lakeWater = (() => {
            it too instead of staying sharp while the land around it softens */
         vec3 mv2 = vWorld - cameraPosition;
         float mk = 1.0 / uMistH;
-        float mbase = uMistAmt * exp( - ( cameraPosition.y - uMistY ) * mk );
+        float mbase = uMistAmt * exp( - max( cameraPosition.y - uMistY, 0.0 ) * mk );
         float mdy = mv2.y * mk;
         float mint = abs( mdy ) < 1e-4 ? length( mv2 ) : length( mv2 ) * ( 1.0 - exp( - mdy ) ) / mdy;
         col = mix( col, uMistColor, clamp( 1.0 - exp( - max( mbase * mint, 0.0 ) ), 0.0, 1.0 ) );
@@ -2324,24 +2370,34 @@ function broadleafGeo() {
    for the near ground where a tree is big enough to be read as a tree and not as a colour. */
 function sakuraGeo() {
   const parts = [];
-  const trunk = new THREE.CylinderGeometry(8, 17, 140, 7);
-  trunk.rotateZ(0.07);
-  trunk.translate(0, 70, 0);
+  const trunk = new THREE.CylinderGeometry(8, 17, 150, 7);
+  trunk.translate(0, 75, 0);
   parts.push({ geo: trunk, color: 0x3d2e29 });
-  [[-46, 150, 0.62, 100], [52, 162, -0.55, 92]].forEach(([x, y, rz, len]) => {
-    const g = new THREE.CylinderGeometry(4, 8, len, 5);
+  /* BUILD A BRANCH FROM ITS BASE, NOT FROM ITS MIDDLE. Placing a rotated cylinder by its centre
+     means its inner end lands wherever the trigonometry puts it — for the first pass, seven
+     units clear of the trunk, so the branches hung in the air beside it. Translating the
+     cylinder so its base is at the origin BEFORE rotating means the base stays put whatever the
+     angle, and can then be dropped straight onto the trunk axis where it is guaranteed to be
+     buried inside the wood. */
+  const tips = [];
+  [[0.66, 118, 128], [-0.58, 132, 116], [0.30, 150, 92]].forEach(([rz, atY, len]) => {
+    const g = new THREE.CylinderGeometry(4, 9, len, 5);
+    g.translate(0, len / 2, 0);
     g.rotateZ(rz);
-    g.translate(x, y, 0);
+    g.translate(0, atY, 0);
     parts.push({ geo: g, color: 0x3d2e29 });
+    tips.push([-Math.sin(rz) * len, atY + Math.cos(rz) * len]);
   });
-  [[0, 232, 0, 68, 0xeeb3c3], [-78, 200, 22, 52, 0xe5a2b5], [80, 210, -18, 55, 0xf3c3cf],
-    [14, 282, -26, 42, 0xe9adbe]]
-    .forEach(([x, y, z, r, c]) => {
-      const g = new THREE.IcosahedronGeometry(r, 1);
-      g.scale(1.2, 0.82, 1.1);
-      g.translate(x, y, z);
-      parts.push({ geo: g, color: c });
-    });
+  /* and the blossom sits ON the tip each branch actually reached, rather than at a hand-typed
+     coordinate that has to be re-guessed every time a branch angle changes */
+  const blossom = [[tips[0][0], tips[0][1], 18, 58, 0xe5a2b5], [tips[1][0], tips[1][1], -20, 54, 0xf3c3cf],
+    [tips[2][0], tips[2][1], 24, 48, 0xeeb3c3], [6, 268, -14, 46, 0xe9adbe]];
+  blossom.forEach(([x, y, z, r, c]) => {
+    const g = new THREE.IcosahedronGeometry(r, 1);
+    g.scale(1.2, 0.82, 1.1);
+    g.translate(x, y, z);
+    parts.push({ geo: g, color: c });
+  });
   return mergeParts(parts);
 }
 
@@ -2409,16 +2465,26 @@ function ringSpot(seed, near, far, lo, hi) {
      including the river mouth, without knowing anything about how either was authored. */
   const coastSpot = (seed, lo, hi) => (i) => {
     const a = hash01(i, seed) * Math.PI * 2;
-    /* a narrow band hugging the shore. At 0.98-1.40 the ring was 1,100 units deep and, with the
-       camera standing on the near shore, it closed over the eye — the first frame was a thicket
-       with a glimpse of lake through it. */
-    const rr = LAKE.r * (1.0 + hash01(i, seed + 13) * 0.22);
+    /* SAMPLE OFF THE WOBBLED RADIUS, NOT THE NOMINAL ONE. Taking the ring at 1.0–1.34 × LAKE.r
+       while testing against a shoreline that wobbles ±29% meant whole bearings had their entire
+       sampled band on the wrong side of the coast: where the shore bulged out, every sample was
+       still in the water; where it pulled in, every sample was a third of a radius inland. The
+       lake came out planted on one side only. */
+    const rr = lakeRadiusAt(a) * (1.03 + hash01(i, seed + 13) * 0.28);
     const x = EYE.x + LAKE_C.x + Math.cos(a) * rr;
     const z = EYE.y + LAKE_C.z + Math.sin(a) * rr;
-    /* and nothing within arm's reach of the camera, whichever shore it is standing on */
+    /* nothing within arm's reach of the camera, whichever shore it is standing on */
     if (Math.hypot(x - EYE.x, z - EYE.y) < 1300) return null;
+    /* THE BAND IS MEASURED FROM THE SHORE, NOT FROM THE WATER LEVEL. Keeping only ground within
+       210 units of the waterline sounded like "the coast" and was not: past the shore the
+       terrain's own relief climbs several hundred units within a few thousand, so whole
+       stretches — the far side under Fuji, and the whole left — failed the height test and came
+       out bare. `lakeField` already knows where the shoreline is, wobble and all, so the band is
+       a distance out from it and the coast plants evenly the whole way round. */
+    const L = lakeField(x - EYE.x, z - EYE.y);
+    if (L > -0.02 || L < -0.34) return null;
     const gy = groundAt(x, z);
-    if (gy < LAKE_Y + 22 || gy > LAKE_Y + 210) return null;
+    if (gy < LAKE_Y + 18) return null;
     if (blockHeight(x, z) > 120) return null;
     const c = hash01(i, seed + 104729);
     const k = lo + c * (hi - lo);
@@ -2461,8 +2527,12 @@ function ringSpot(seed, near, far, lo, hi) {
     return m;
   };
   /* unlit on purpose: cloud is its own light source as far as the eye is concerned, and letting
-     the directional key rake across it just made one side go grey */
-  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: true });
+     the directional key rake across it just made one side go grey. Part-transparent so it reads
+     as vapour rather than as painted card — and so its reflection in the lake stops looking
+     like patches of foam floating on the water. */
+  const mat = new THREE.MeshBasicMaterial({
+    vertexColors: true, fog: true, transparent: true, opacity: 0.62, depthWrite: false,
+  });
   [0, 1, 2].forEach((v) => {
     instanced(puffGeo(6 + v, 91 + v * 7), mat, 16, (i) => {
       const a = hash01(i, 611 + v) * Math.PI * 2;
