@@ -991,6 +991,38 @@ over each tablet and clears off them.
   58 gap the rack came out 925 across at 980 away: posts off both edges, and it buried the gate
   it is meant to stand in front of.
 
+## v30 — the threshold is part of the landmark, and it never leaves
+
+Two complaints about the ema rack, one root cause each, and both were mine rather than the
+idea's.
+
+**It was 974 units wide against a gate 781 wide and cedars 800 tall** — a fifteen-metre timber
+structure standing in front of the landmark and out-massing it. The furniture cannot be bigger
+than the thing it belongs to. The fix was not to shrink the rack but to delete it: the tablets
+hang from the gate's own tie beam, which removes the competing structure outright and makes the
+threshold part of the architecture rather than an object parked in front of it.
+
+**And it faded in on arrival and out on leaving** — the same mistake the scenery made before the
+single-landscape rebuild, re-introduced in the UI layer because that is how the CSS3D level two
+had always worked. Nothing in this world appears or vanishes. The tablets are permanent: from
+the menu they are a detail hanging in the shrine across the lake, close enough to read the due
+count off, and the fly-in is the only entrance there needs to be. Shedworks reached the same
+conclusion from the other end on Sable — objects that simply appeared were *"ugly and a real
+problem"*.
+
+- **An object that assembles itself on arrival is an object you watch being born every visit.**
+  Removing the intro animation made the arrival better, not poorer, because the camera move was
+  always the entrance.
+- **A thing that hangs must move.** A permanent object with no motion reads as scenery; a slow
+  per-tablet sway on its own phase is what says these are objects on a cord. It also fills the
+  role the entrance animation was pretending to serve.
+- **Stand-off is per place, not global.** The gate's tablets are hand-sized objects on a
+  620-unit structure and want approaching; a hillside wants to be seen whole.
+- **The type is deliberately oversized** — signage, not ema. A real votive tablet is written
+  small in a hand, edge to edge; this carries type far larger than the object would, because the
+  camera stops far enough back to keep the shrine and the valley in frame and legibility has to
+  survive that. Games oversize signage constantly and nobody notices.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1119,6 +1151,10 @@ over each tablet and clears off them.
   Budget for the parallel focus layer up front — transparent buttons with `pointer-events: none`,
   positioned by projecting the object each frame, keep Tab and Enter working and cost almost
   nothing. Retrofitting accessibility to a raycast-only picker is much harder.
+
+- **Apply the no-unloading rule to UI as well as to scenery.** It is easy to fix pop-in in the
+  world and then reintroduce it in the interface, because interface code has always worked that
+  way. If nothing else in the scene may appear or vanish, neither may the menu.
 
 ## Sources
 

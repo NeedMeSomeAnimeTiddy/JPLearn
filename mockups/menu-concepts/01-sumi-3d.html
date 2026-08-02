@@ -2353,8 +2353,9 @@ const HOME_EYE = new THREE.Vector3(170, 60, 830);
 /* how high the camera rides above whatever it is standing on — taken from home so the eye
    keeps a consistent height wherever it goes rather than flying at a fixed altitude */
 const EYE_LIFT = HOME_EYE.y - Math.max(groundAt(HOME_EYE.x, HOME_EYE.z), LAKE_Y);
-/* how far short of a place the camera stops. Level two is furniture spread around the place, so
-   the frame has to hold objects either side of centre: at 1,500 the cone is ±920 wide. */
+/* how far short of a place the camera stops. It is per-place because the threshold's scale is
+   per-place: the gate's tablets are hand-sized objects on a 620-unit structure and want to be
+   approached, while a distant hillside wants to be seen whole. */
 const STAND_OFF = 1500;
 
 /* OVER WATER, THE SURFACE IS THE GROUND. `groundAt` returns the lake BED, which is 330 units
@@ -2370,10 +2371,10 @@ function destPlace(bearingDeg, dist, lift = 0) {
 }
 /* the camera's standing point: on the line from home to the place, STAND_OFF short of it, at
    eye height above whatever ground is there */
-function standOff(place) {
+function standOff(place, off = STAND_OFF) {
   const v = place.clone().sub(HOME_EYE).setY(0);
   const len = v.length();
-  const e = v.multiplyScalar(Math.max(len - STAND_OFF, 400) / len).add(HOME_EYE);
+  const e = v.multiplyScalar(Math.max(len - off, 400) / len).add(HOME_EYE);
   e.y = surfaceAt(e.x, e.z) + EYE_LIFT;
   return e;
 }
@@ -2384,7 +2385,7 @@ function standOff(place) {
    turn: two ahead of the shoulders, two abeam, two behind. */
 const DEST_SPECS = [
   { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
-  { bearing: 20, dist: 4000, lift: 270 }, /* REVIEW  — the torii standing in the water    */
+  { bearing: 20, dist: 4000, lift: 270, stand: 1420 }, /* REVIEW — the torii in the water */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
   { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
@@ -2445,6 +2446,7 @@ function toriiGeo(H) {
   }
   return mergeParts(parts);
 }
+let TORII = null;
 {
   const H = 620;
   const at2 = DEST_SPECS[1].place;
@@ -2459,6 +2461,7 @@ function toriiGeo(H) {
   backScene.add(gate);
   addOutline(gate, 0.0026);
   blockAdd(gate.position.x, gate.position.z, 520, 700);
+  TORII = { gate, H };
 }
 
 
@@ -2509,20 +2512,24 @@ function emaTexture(jp, en, meta, accent) {
   const num = (meta.match(/[\d,]+/) || [''])[0];
   const unit = meta.replace(/[\d,]+\s*/, '');
   g.textAlign = 'center';
+  /* THE DELIBERATE CHEAT. A real ema is written small, in a hand, edge to edge. This is
+     signage: the type is far larger than the object would carry, because the camera stops far
+     enough back to keep the shrine and the valley in frame and legibility has to survive that.
+     Games oversize signage for the same reason and nobody notices. */
   g.fillStyle = '#3b2a1c';
-  g.font = '700 62px "Yu Mincho", "Hiragino Mincho ProN", serif';
-  g.fillText(jp, W / 2, GAB + 92);
-  g.fillStyle = 'rgba(59,42,28,0.62)';
-  g.font = '700 21px "Arial Black", Arial, sans-serif';
-  g.letterSpacing = '6px';
-  g.fillText(en, W / 2, GAB + 132);
+  g.font = '700 88px "Yu Mincho", "Hiragino Mincho ProN", serif';
+  g.fillText(jp, W / 2, GAB + 112);
+  g.fillStyle = 'rgba(59,42,28,0.6)';
+  g.font = '700 23px "Arial Black", Arial, sans-serif';
+  g.letterSpacing = '5px';
+  g.fillText(en, W / 2, GAB + 152);
   g.letterSpacing = '0px';
   g.fillStyle = accent;
-  g.font = '900 104px "Arial Black", Arial, sans-serif';
-  g.fillText(num, W / 2, H - 96);
+  g.font = '900 122px "Arial Black", Arial, sans-serif';
+  g.fillText(num, W / 2, H - 84);
   g.fillStyle = 'rgba(59,42,28,0.55)';
-  g.font = '700 24px "Yu Gothic UI", sans-serif';
-  g.fillText(unit, W / 2, H - 56);
+  g.font = '700 26px "Yu Gothic UI", sans-serif';
+  g.fillText(unit, W / 2, H - 44);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
@@ -2545,80 +2552,65 @@ function worldPickEl(label, onPick) {
 }
 
 const WORLD_L2 = {};
-function buildEmaRack(sec, spec) {
-  const place = spec.place;
-  const grp = new THREE.Group();
-  /* stood between the camera and the gate, so the gate frames the tablets rather than fighting
-     them, and low enough that the lintel still reads above */
-  const toEye = new THREE.Vector3().copy(HOME_EYE).sub(place).setY(0).normalize();
-  grp.position.copy(place).addScaledVector(toEye, 190);
-  grp.position.y = LAKE_Y;
-  grp.lookAt(grp.position.x + toEye.x, LAKE_Y, grp.position.z + toEye.z);
-  grp.visible = false;
-  backScene.add(grp);
+const WORLD_SWAY = [];
+/* THE RACK IS GONE. It was 974 units wide against a gate 781 wide and cedars 800 tall — a
+   fifteen-metre timber structure standing in front of the landmark and out-massing it, which
+   inverts the hierarchy: the furniture cannot be bigger than the thing it belongs to. Hanging
+   the tablets from the gate's own tie beam removes the competing structure outright and makes
+   the threshold part of the architecture rather than an object parked in front of it.
 
+   And they are PERMANENT. Fading them in on arrival and out on leaving was the same mistake the
+   scenery made before the single-landscape rebuild — nothing in this world appears or vanishes,
+   you only ever get closer to it. From the menu they are a detail on the shrine; the fly-in is
+   the only animation there needs to be. */
+function hangEma(sec, gate, H) {
   const tiles = SUBTILES[sec];
   const accent = SECTION_ACCENT[sec][0];
-  /* sized so the rack fills about two-thirds of the frame at the standing distance and its
-     beam sits BELOW the gate's lintel — at the first pass it was 925 wide at 980 away, which
-     put the posts off both edges and buried the thing it is meant to stand in front of */
-  const TW = 170, TH = 206, GAB = 43, TTH = 10;
-  const GAP = 46, span = tiles.length * TW + (tiles.length - 1) * GAP;
-  const beamY = 412, hang = 74;
-
-  /* the frame, merged so it is one draw and one outline */
-  const frame = [];
-  [-1, 1].forEach((sx) => {
-    const x = sx * (span / 2 + 78);
-    const g = new THREE.CylinderGeometry(15, 20, beamY + 40, 8);
-    g.translate(x, (beamY + 40) / 2, 0);
-    frame.push({ geo: g, color: 0x4a3a2b });
-  });
-  frame.push({ geo: beamSeg(span + 250, 30, 40, 0, beamY, 0), color: 0x54422f });
-  frame.push({ geo: beamSeg(span + 200, 18, 28, 0, beamY - 44, 0), color: 0x46372a });
-  const frameMesh = new THREE.Mesh(mergeParts(frame), new THREE.MeshToonMaterial({
-    vertexColors: true, gradientMap: RAMP, flatShading: true,
-  }));
-  grp.add(frameMesh);
+  /* proportioned off the gate: the four sit inside the span between its pillars, hanging from
+     the tie beam, and stop well short of the lintel */
+  const span = H * 0.84, nuki = H * 0.60;
+  const TW = span / tiles.length * 0.94, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.05;
+  const GAP = (span - TW * tiles.length) / (tiles.length - 1);
+  const hang = H * 0.075;
 
   const picks = tiles.map(([jp, en, meta], j) => {
     const root = new THREE.Group();
-    root.position.set(-span / 2 + TW / 2 + j * (TW + GAP), beamY - hang - TH / 2, 0);
-    grp.add(root);
-    const cord = new THREE.Mesh(new THREE.BoxGeometry(7, hang, 7),
+    root.position.set(-span / 2 + TW / 2 + j * (TW + GAP), nuki - hang - TH / 2, 0);
+    gate.add(root);
+    const cord = new THREE.Mesh(new THREE.BoxGeometry(TW * 0.045, hang, TW * 0.045),
       new THREE.MeshToonMaterial({ color: 0x3d3128, gradientMap: RAMP }));
     cord.position.y = TH / 2 + hang / 2;
     root.add(cord);
     /* the emissive is not decoration: writing has to stay readable in shade, and a four-step
-       ramp at a grazing sun angle puts the whole rack in its darkest band. This lifts the floor
-       without flattening the shading that ties it to everything around it. */
+       ramp at a grazing sun angle puts the whole gate in its darkest band */
     const body = new THREE.Mesh(emaGeo(TW, TH, GAB, TTH), new THREE.MeshToonMaterial({
-      color: 0xc9b68f, emissive: 0x3a3125, gradientMap: RAMP, flatShading: true,
+      color: 0xd6c39c, emissive: 0x4d4232, gradientMap: RAMP, flatShading: true,
     }));
     root.add(body);
-    /* lit, not emissive: an unlit face at full brightness reads as a sticker pasted over the
-       scene, which is the exact complaint that moved level two into the world in the first place */
     const face = new THREE.Mesh(new THREE.PlaneGeometry(TW, TH), new THREE.MeshToonMaterial({
-      map: emaTexture(jp, en, meta, accent), emissive: 0x453b2c,
+      map: emaTexture(jp, en, meta, accent), emissive: 0x5c503c,
       gradientMap: RAMP, transparent: true,
     }));
-    face.position.z = TTH / 2 + 0.5;
+    face.position.z = TTH / 2 + 0.4;
     root.add(face);
+    const o = new THREE.Mesh(outlineGeom(body.geometry), outlineMaterial(0.0026));
+    o.frustumCulled = false;
+    root.add(o);
     const el = worldPickEl(`${jp} — ${en}, ${meta}`, () => pickWorldTile(sec, jp));
-    return { root, body, face, el, jp, base: root.position.clone(), hot: false };
+    const q = { root, body, face, el, jp, base: root.position.clone(), swayP: j * 1.9, swayR: 0.7 + j * 0.11 };
+    /* a thing that hangs moves. The sway is what says these are objects on a cord rather than
+       panels pinned to the air — and it runs always, so arriving needs no entrance at all. */
+    WORLD_SWAY.push(q);
+    return q;
   });
-
-  const outline = new THREE.Mesh(outlineGeom(picks[0].body.geometry), outlineMaterial(0.0026));
-  outline.frustumCulled = false;
-  picks.forEach((q) => { const o = outline.clone(); q.root.add(o); });
-  addOutline(frameMesh, 0.0024);
-  WORLD_L2[sec] = { grp, picks };
+  WORLD_L2[sec] = { picks };
 }
 function pickWorldTile(sec, jp) {
   if (busy || state !== 'sub') return;
   if (L3DATA[sec] && L3DATA[sec][jp]) enterL3(sec, jp);
 }
-buildEmaRack('REVIEW', DEST_SPECS[1]);
+
+hangEma('REVIEW', TORII.gate, TORII.H);
 
 /* ---- the woods ----
    Three species, each a merged multi-part model rather than a repeated primitive. A repeated
@@ -3368,7 +3360,7 @@ setTimeout(redrawStroke, 4000);
 
 /* the places themselves are landscape — see WHERE THE SIX PLACES ARE, up with the lake. Only
    the camera's standing point belongs here, because it is a fact about navigation. */
-const DESTS = DEST_SPECS.map((d) => ({ ...d, eye: standOff(d.place) }));
+const DESTS = DEST_SPECS.map((d) => ({ ...d, eye: standOff(d.place, d.stand) }));
 const HOME_SUB = DESTS[0];
 
 const subEl = document.createElement('div');
@@ -3947,15 +3939,9 @@ function buildSub(i) {
   (L2_PLANES[it.en] || []).forEach((p) => { p.el.style.opacity = 0; p.obj.position.copy(p.base); });
   /* a section either has its level two in the world or in front of it; nothing has both */
   worldL2 = WORLD_L2[it.en] || null;
+  /* the class only governs whether the focus twins are tabbable — the tablets themselves are
+     always there, so there is nothing to show or reset */
   document.body.classList.toggle('world-l2', !!worldL2);
-  if (worldL2) {
-    worldL2.grp.visible = true;
-    worldL2.picks.forEach((q) => {
-      q.root.position.copy(q.base);
-      q.root.scale.setScalar(1);
-      q.root.rotation.set(0, 0, 0);
-    });
-  }
 }
 
 /* ---- level three: every study-shaped tile drills into its own list ---- */
@@ -4259,31 +4245,13 @@ const L2_INTRO = {
   RECORDS: (ps, p) => ps.forEach((q, i) => l2Arrive(q, i, p, { z: 520 }, 'power4.out', 0.07)),
 };
 
-/* the tablets swing down onto the rack one after another, each on its own cord — the entrance
-   is rotation about the hanging point rather than the slam the DOM shards use, because a thing
-   that hangs has a pivot and the eye knows where it is */
-function openWorldSub(g, pace = 1) {
-  g.grp.visible = true;
-  if (reduced) {
-    g.picks.forEach((q) => { q.root.rotation.z = 0; q.root.position.copy(q.base); });
-    return;
-  }
-  g.picks.forEach((q, i) => {
-    gsap.killTweensOf(q.root.rotation);
-    gsap.killTweensOf(q.root.position);
-    gsap.fromTo(q.root.rotation, { z: (i % 2 ? -1 : 1) * 1.15 },
-      { z: 0, duration: 0.72 * pace, delay: i * 0.075 * pace, ease: 'back.out(1.9)' });
-    gsap.fromTo(q.root.position, { y: q.base.y + 190 },
-      { y: q.base.y, duration: 0.6 * pace, delay: i * 0.075 * pace, ease: 'power3.out' });
-  });
-}
-
 function openSub(pace = 1) {
   const sec = subEl.dataset.sec;
   if (WORLD_L2[sec]) {
-    openWorldSub(WORLD_L2[sec], pace);
-    /* the section title and the back button stay in the DOM: they are chrome, not options, and
-       they want to be legible and clickable rather than to belong to the place */
+    /* nothing opens. The tablets have been hanging there the whole time and the fly-in is the
+       entrance — an object that assembles itself on arrival is an object you have to watch
+       being born every time you visit. Only the DOM chrome (title, back) animates, because it
+       genuinely does arrive with you. */
     (L2_INTRO[sec] || L2_INTRO.STUDY)(L2_PLANES[sec] || [], pace);
     return;
   }
@@ -4503,9 +4471,6 @@ function goBack() {
   });
   if (worldL2) {
     setHot(null);
-    const g = worldL2;
-    gsap.to(g.grp.scale, { x: 0.9, y: 0.9, z: 0.9, duration: 0.4, ease: 'power2.in' });
-    gsap.delayedCall(0.42, () => { g.grp.visible = false; g.grp.scale.setScalar(1); });
     worldL2 = null;
     document.body.classList.remove('world-l2');
   }
@@ -4729,6 +4694,7 @@ function tick() {
 
   applyCamera();
   depthDress();
+  for (const q of WORLD_SWAY) q.root.rotation.z = Math.sin(t * q.swayR + q.swayP) * 0.045;
   placeWorldPicks();
   backRenderer.render(backScene, camera);
   cssRenderer.render(cssScene, camera);
