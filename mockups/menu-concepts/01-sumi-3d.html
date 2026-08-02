@@ -1040,10 +1040,25 @@ const camera = new THREE.PerspectiveCamera(42, W() / H(), 1, 60000);
 const backScene = new THREE.Scene();
 /* scaled to a real landscape: the near ground stays clear, the foothills soften, and the far
    ranges dissolve into the night rather than ending at a visible edge */
-backScene.fog = new THREE.Fog(0xd8c1ab, 9000, 44000);   /* dawn haze — pulled back hard: at 4200 it bleached the whole valley */
+/* EXPONENTIAL, not linear. Linear fog has a C1 kink at its `near` plane, and on ground seen at
+   a grazing angle a whole ring of world compresses into a few pixels, so that kink is a
+   candidate for a straight seam across the meadow. Exp² has no near plane at all — it starts at
+   zero and builds quadratically, so the near ground stays clear and the distance still
+   dissolves. At 4.0e-5 that is ~2% haze at 3,500 units, 25% on Fuji at 13,500, 78% on the rim.
+   (This is prophylactic, not the fix for the seam that was actually there — see the valley fog
+   banks below, which is where that came from.) */
+backScene.fog = new THREE.FogExp2(0xd8c1ab, 4.0e-5);
 const backRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 backRenderer.setSize(W(), H());
 backRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/* Filmic tone mapping + real shadows, proven in lab-shading.html. Without tone mapping the raw
+   framebuffer is what you see, which is a large part of why untreated three.js reads flat.
+   The painted sky and the sunrise sprites opt OUT of it further down — they are art, not
+   radiance, and ACES would just wash the dawn gradient out. */
+backRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+backRenderer.toneMappingExposure = 1.0;
+backRenderer.shadowMap.enabled = true;
+backRenderer.shadowMap.type = THREE.PCFShadowMap;   /* PCFSoft is deprecated in this build */
 document.getElementById('glBack').appendChild(backRenderer.domElement);
 
 const frontScene = new THREE.Scene();
@@ -1360,6 +1375,102 @@ const pano = new THREE.Mesh(
 pano.position.set(150, 600, 150);
 /* the painted panorama is retired — the horizon is real geometry now */
 
+/* ================= CLOUD SHADOWS =================
+   Ported from lab-shading.html. A single directional light on smooth landform always gives the
+   same plain diagonal terminator; the fault is that there is only one occluder. Cloud cover is
+   the second, and the cheapest large-scale variation available — one texture lookup.
+
+   It multiplies DIRECT light only, so shaded ground falls to the cold fill rather than merely
+   going grey, and the lookup is projected along the light onto y = 0 so the cover stays put on
+   a hillside instead of sliding up the slope as the ground rises. */
+function cloudTexture(S = 512) {
+  const hash = (x, y, p) => {
+    const xi = ((x % p) + p) % p, yi = ((y % p) + p) % p;
+    const n = Math.sin(xi * 127.1 + yi * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  const sm = (t) => t * t * (3 - 2 * t);
+  const noise = (x, y, p) => {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const u = sm(x - xi), v = sm(y - yi);
+    return hash(xi, yi, p) * (1 - u) * (1 - v) + hash(xi + 1, yi, p) * u * (1 - v)
+         + hash(xi, yi + 1, p) * (1 - u) * v + hash(xi + 1, yi + 1, p) * u * v;
+  };
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  const img = g.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      let v = 0, amp = 0.55, f = 3;
+      for (let o = 0; o < 5; o++) { v += noise(x / S * f, y / S * f, f) * amp; amp *= 0.5; f *= 2; }
+      /* capped at 0.85 so even a cloud's core still passes light — uncapped reads as a hole */
+      const lit = Math.round(255 * (1 - THREE.MathUtils.smoothstep(v, 0.40, 0.74) * 0.85));
+      const i = (y * S + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = lit; img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+const CLOUD = {
+  uCloudMap: { value: cloudTexture() },
+  uCloudOff: { value: new THREE.Vector2() },
+  uCloudProj: { value: new THREE.Vector2() },
+  /* the tile holds ~3 blobs, so this is a ~1700-unit cloud. At 4000 the whole near meadow sat
+     inside a single blob and the effect read as a uniform dimmer rather than as weather. */
+  uCloudScale: { value: 1 / 5000 },
+  uCloudAmt: { value: 0.72 },
+};
+
+/* THE UNIFORM TRAP: three.js uploads a built-in material's uniforms only when that material's
+   `version` changes, so a custom uniform added through onBeforeCompile is written to the GPU
+   exactly once and never again — mutating `.value` per frame does nothing, silently.
+   `needsUpdate` is only `version++` (it disposes nothing), so bumping it on the cloud-lit
+   materials each frame is the cheap, supported way through. */
+const CLOUD_MATS = [];
+function cloudy(mat) {
+  if (mat.userData.cloudy) return mat;
+  mat.userData.cloudy = true;
+  mat.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, CLOUD);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCloudPos;')
+      /* after project_vertex so `transformed` is final; the instancing branch matters because
+         the trees, grass and stones are all InstancedMesh */
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vec4 cwp = vec4( transformed, 1.0 );
+        #ifdef USE_INSTANCING
+          cwp = instanceMatrix * cwp;
+        #endif
+        vCloudPos = ( modelMatrix * cwp ).xyz;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vCloudPos;
+        uniform sampler2D uCloudMap;
+        uniform vec2 uCloudOff;
+        uniform vec2 uCloudProj;
+        uniform float uCloudScale;
+        uniform float uCloudAmt;`)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        {
+          vec2 cuv = ( vCloudPos.xz - vCloudPos.y * uCloudProj ) * uCloudScale + uCloudOff;
+          float cs = texture2D( uCloudMap, cuv ).r;
+          reflectedLight.directDiffuse *= mix( 1.0, cs, uCloudAmt );
+        }`);
+    /* a String.replace on a chunk name that moved is a silent no-op, and the result looks
+       exactly like a working feature with its strength set to zero. Never let it fail quietly */
+    if (!shader.vertexShader.includes('vCloudPos = (') || !shader.fragmentShader.includes('texture2D( uCloudMap')) {
+      console.error('CLOUD PATCH FAILED', mat.type);
+    }
+  };
+  mat.needsUpdate = true;
+  CLOUD_MATS.push(mat);
+  return mat;
+}
+
 /* ================= THE LANDSCAPE =================
    Step one of the rebuild: terrain, sky, Fuji and the home composition, and nothing else.
 
@@ -1432,30 +1543,99 @@ function paintSky() {
   backScene.add(dome);
 }
 
-/* ---- terrain: a calm bowl under the menu, rising into foothills further out ---- */
+/* ---- terrain ----
+   Rebuilt against lab-shading.html. The old version was one flat hex value on a flat-shaded
+   plane, which is why the near ground read as a sheet of dark green rather than as land. What
+   replaces it costs nothing at runtime — every bit of it is baked into the vertices at build:
+
+     slope/height ramp   grass low, pale dry grass high, rock on anything steep
+     coherent mottle     a large expanse of one interpolated green is a smear however well it
+                         is lit; this is the cheapest thing that gives it grain
+     baked vertex AO     measured as concavity relative to the local tangent plane, so a
+                         tilted slope comes out unoccluded and only real hollows darken
+     smooth shading      the lab's finding: a toon ramp across a large curved surface quantises
+                         into contour blotches. Toon is for objects; terrain gets this. */
+function landAt(x, z) {
+  const d = Math.hypot(x, z);
+  /* the valley's shape. Long wavelengths only, and flattened near the camera so the ground
+     under the type stays calm and the horizon does not heave about. */
+  const broad = Math.sin(x * 0.00016) * Math.cos(z * 0.00013) * 430
+              + Math.sin(x * 0.00043 + 1.7) * Math.cos(z * 0.00039) * 190
+              + Math.sin(x * 0.00097 + 4.1) * Math.cos(z * 0.00088) * 70;
+  /* near-field texture, NOT flattened. Scaling the whole heightfield down near the camera is
+     what left a mirror-flat meadow; these two octaves are small enough to leave the
+     composition alone and big enough that the ground catches light unevenly. Wavelengths of
+     2400 and 890 against a 206-unit quad, so both survive the tessellation. */
+  const fine = Math.sin(x * 0.0026 + 2.3) * Math.cos(z * 0.0022) * 34
+             + Math.sin(x * 0.0071 + 5.1) * Math.cos(z * 0.0063 + 1.2) * 13;
+  return broad * THREE.MathUtils.smoothstep(d, 1400, 9000)
+       + fine
+       + THREE.MathUtils.smoothstep(d, 13000, 31000) * 1700;        /* the valley's sides */
+}
 {
-  const geo = new THREE.PlaneGeometry(70000, 70000, 150, 150);
+  /* 340 segments over 70,000 units is a 206-unit quad. Vertex colour and vertex AO can only
+     vary as fast as the mesh does, so this is the floor for the ramp reading as terrain
+     rather than as bands — and the cost is a one-off bake, not per frame. */
+  const SEG = 340;
+  const geo = new THREE.PlaneGeometry(70000, 70000, SEG, SEG);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i);
-    const d = Math.hypot(x, z);
-    let h = Math.sin(x * 0.00016) * Math.cos(z * 0.00013) * 430
-          + Math.sin(x * 0.00043 + 1.7) * Math.cos(z * 0.00039) * 190
-          + Math.sin(x * 0.00097 + 4.1) * Math.cos(z * 0.00088) * 70;
-    /* flat immediately around the camera, so the near ground stays quiet under the type */
-    h *= THREE.MathUtils.smoothstep(d, 1400, 9000);
-    /* and lifting into high ground far out, so the valley has sides */
-    h += THREE.MathUtils.smoothstep(d, 13000, 31000) * 1700;
-    pos.setY(i, h);
-  }
+  for (let i = 0; i < pos.count; i++) pos.setY(i, landAt(pos.getX(i), pos.getZ(i)));
   geo.computeVertexNormals();
-  /* lifted off black: at 0x1e2a33 the whole lower half of the frame read as a void rather
-     than as land the moonlight is falling on */
-  const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-    color: 0x41503c, emissive: 0x151d14, flatShading: true,
-  }));
+  const nrm = geo.attributes.normal;
+
+  /* AO measures CONCAVITY, not "some neighbours are higher" — summing every uphill sample
+     darkens whole hillsides in proportion to their steepness, which is mud, not shade. Taking
+     the horizon relative to the local tangent plane makes any planar surface come out at zero. */
+  const DIRS = 6, RADII = [260, 900, 2600];
+  const ao = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const nx = nrm.getX(i), ny = Math.max(nrm.getY(i), 0.25), nz = nrm.getZ(i);
+    let occ = 0;
+    for (let d = 0; d < DIRS; d++) {
+      const th = (d / DIRS) * Math.PI * 2 + (i % 4) * 0.26;   /* staggered off the quad grid */
+      const cx = Math.cos(th), cz = Math.sin(th);
+      let horizon = 0;
+      for (const r of RADII) {
+        const plane = -(nx * cx * r + nz * cz * r) / ny;
+        const rise = (landAt(x + cx * r, z + cz * r) - y - plane) / r;
+        if (rise > horizon) horizon = rise;
+      }
+      occ += Math.min(horizon, 1);
+    }
+    ao[i] = 1 - (occ / DIRS) * 1.15;
+  }
+
+  const GRASS = new THREE.Color(0x66803f), GRASS_D = new THREE.Color(0x4e6733);
+  const DRY = new THREE.Color(0x9a9a6c), ROCK = new THREE.Color(0x6e6f68);
+  const col = new Float32Array(pos.count * 3);
+  const tmp = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const slope = 1 - nrm.getY(i);
+    /* the +260 offset matters more than it looks. With `y / 1500` the near ground — which sits
+       at h ≈ 0 by design — was pinned at the very bottom of the ramp, so the ring where the
+       flattening released read as a hard edge across the foreground. Landing h = 0 a seventh
+       of the way up gives the ramp somewhere to move on both sides of it. */
+    const alt = THREE.MathUtils.clamp((y + 260) / 1900, 0, 1);
+    tmp.copy(GRASS_D).lerp(GRASS, THREE.MathUtils.smoothstep(alt, 0, 0.5));
+    tmp.lerp(DRY, THREE.MathUtils.smoothstep(alt, 0.45, 0.95) * 0.7);
+    tmp.lerp(ROCK, THREE.MathUtils.smoothstep(slope, 0.10, 0.34));
+    /* three octaves, 6500 / 1450 / 535 units. The shortest is only two and a half quads, which
+       is the resolution floor — under it the mesh cannot carry the variation at all. */
+    tmp.multiplyScalar(1
+      + Math.sin(x * 0.00097 + z * 0.00054) * Math.cos(z * 0.00078 - x * 0.00035) * 0.055
+      + Math.sin(x * 0.0034 - z * 0.0029 + 1.1) * Math.cos(z * 0.0031 + x * 0.0012) * 0.045
+      + Math.sin(x * 0.0089 + z * 0.0076 + 3.4) * 0.022);
+    tmp.multiplyScalar(THREE.MathUtils.clamp(ao[i], 0.45, 1.1));
+    col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+
+  const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
   ground.position.set(EYE.x, GROUND_Y, EYE.y);
+  ground.receiveShadow = true;
   backScene.add(ground);
 }
 
@@ -1557,16 +1737,38 @@ for (let k = 0; k < 22; k++) {
   backScene.add(m);
 }
 
-/* ---- lighting: the sun coming up behind the ranges, low and warm ---- */
+/* ---- lighting: the sun coming up behind the ranges, low and warm ----
+   KEY-TO-FILL RATIO IS THE WHOLE GAME (lab-shading.html). At sun 2.4 against hemisphere 1.35
+   direct sunlight was barely a majority of the ground's light, so cast shadows and cloud
+   shadows both moved the final pixel by a percent or two and read as "the shadows are weak"
+   when the shadows were fine. Trading one against the other is a false choice: a third light
+   — a directional bounce that casts nothing — lifts shadowed surfaces while still SHAPING
+   them, which lets the key dominate and the hemisphere drop to a tint. */
 {
-  const sun = new THREE.DirectionalLight(0xffd9b0, 2.4);
+  const sun = new THREE.DirectionalLight(0xffd9b0, 3.2);
   sun.position.copy(at(9000, 5200, 2600));
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(4096, 4096);
+  /* SIZE THE BOX, THEN COUNT ITS TEXELS. There is no point covering a 70,000-unit valley: at
+     4096 that is a 17-unit texel and nothing reads. The shadow box covers the near and middle
+     ground the camera actually stands in — ±9000 around a point out along the sight line —
+     which is a 4.4-unit texel, and the far ranges simply go unshadowed, where nobody looks
+     for contact anyway. */
+  sun.target.position.copy(at(3000, 0, GROUND_Y));
+  const sc = sun.shadow.camera;
+  sc.left = -9000; sc.right = 9000; sc.top = 9000; sc.bottom = -9000;
+  sc.near = 500; sc.far = 26000;
+  /* the blur must be smaller than what it shadows: at a 4.4-unit texel, radius 2 is ~9 units */
+  sun.shadow.radius = 2;
+  sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 12;
   backScene.add(sun, sun.target);
-  /* the cold side, so the shadowed flanks read blue rather than black */
-  const bounce = new THREE.DirectionalLight(0x93b0dc, 1.0);
+
+  /* the cold side, so the shadowed flanks read blue rather than black. Casts nothing. */
+  const bounce = new THREE.DirectionalLight(0x93b0dc, 0.95);
   bounce.position.copy(at(-3000, -6000, 3400));
   backScene.add(bounce, bounce.target);
-  backScene.add(new THREE.HemisphereLight(0xcfd8e6, 0x3d4a3e, 1.35));
+  backScene.add(new THREE.HemisphereLight(0xcfd8e6, 0x4a4436, 0.75));
 }
 
 /* ---- the sunrise itself: a disc and a wide bloom, aimed rather than baked into the dome ---- */
@@ -1602,12 +1804,23 @@ function radialTex(inner, outer, stops) {
   const bank = new THREE.MeshBasicMaterial({
     color: 0xf2eeea, transparent: true, opacity: 0.15, depthWrite: false, fog: true,
   });
-  for (let k = 0; k < 14; k++) {
-    const d = 3400 + ((k * 1607) % 11000);
+  /* A BANK IS AN ELLIPSOID, AND ITS EXTENT IS IN WORLD AXES, NOT ALONG THE SIGHT LINE. One
+     placed 3,400 out with a 3,400 radius scaled ×2.3 reached 7,800 units — back past the eye —
+     and its top sat above eye height, so the camera was INSIDE it. Looking out through the
+     inside of a fog bank is what laid a hard straight edge across the whole foreground, and it
+     survived every terrain change because it was never the terrain. So: hold them at arm's
+     length, and keep their tops below the eye, which is what valley fog looks like from a
+     slope anyway — you look down onto it. */
+  const eyeAt = new THREE.Vector3(EYE.x, 0, EYE.y);
+  for (let k = 0; k < 16; k++) {
+    const d = 5200 + ((k * 1607) % 12000);
     const s = -9000 + ((k * 3571) % 18000);
-    const m = new THREE.Mesh(new THREE.SphereGeometry(1500 + ((k * 311) % 1900), 14, 8), bank);
-    m.position.copy(at(d, s, GROUND_Y + 60 + ((k * 97) % 220)));
-    m.scale.set(2.3, 0.055 + ((k % 4) * 0.012), 1.5);
+    const r = 1500 + ((k * 311) % 1900);
+    const p = at(d, s, GROUND_Y + 10 + ((k * 97) % 70));
+    if (new THREE.Vector3(p.x, 0, p.z).distanceTo(eyeAt) < r * 2.3 + 2600) continue;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 8), bank);
+    m.position.copy(p);
+    m.scale.set(2.3, 0.035 + ((k % 4) * 0.008), 1.5);
     m.renderOrder = 2;
     backScene.add(m);
   }
@@ -1761,6 +1974,33 @@ function instanced(geo, mat, n, place) {
   const river = new THREE.Mesh(geo, water);
   river.position.y = GROUND_Y + 30;
   backScene.add(river);
+}
+
+/* ---- one pass over the finished landscape ----
+   Done as a sweep rather than at each construction site so nothing can be forgotten: every lit
+   surface takes cloud shadows and casts, and everything painted takes neither. */
+{
+  /* project along the light: from a point P, travelling toward the sun until y = 0 lands at
+     P.xz − P.y · (L.xz / L.y) */
+  const L = at(9000, 5200, 2600).sub(at(3000, 0, GROUND_Y)).normalize();
+  CLOUD.uCloudProj.value.set(L.x / L.y, L.z / L.y);
+
+  backScene.traverse((o) => {
+    const m = o.material;
+    if (!m) return;
+    /* the sky dome, the valley fog banks and the sunrise sprites are ART: they are already the
+       colour they should end up, so tone mapping would only wash the dawn gradient out */
+    if (m.isMeshBasicMaterial || m.isSpriteMaterial) { m.toneMapped = false; return; }
+    if (!o.isMesh) return;
+    cloudy(m);
+    /* the river is a flat ribbon lying in the ground — it has nothing to cast */
+    if (!m.transparent) o.castShadow = true;
+    o.receiveShadow = true;
+  });
+
+  /* a handle for headless verification — the same reason lab-shading.html has one. Without it
+     the only way to check whether an effect is on is to squint at a screenshot. */
+  window.WORLD = { THREE, backScene, camera, backRenderer, CLOUD, CLOUD_MATS, sunDir: L };
 }
 
 /* gold ink drops + rings + stains */
@@ -3317,6 +3557,12 @@ const clock = new THREE.Clock();
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
+
+  /* weather drifts across the valley — slow enough to read as cloud, not as a scrolling
+     texture. The needsUpdate sweep is what actually gets the offset to the GPU; see the
+     uniform trap above. */
+  CLOUD.uCloudOff.value.set(t * 0.0075, t * -0.0028);
+  for (const m of CLOUD_MATS) m.needsUpdate = true;
 
   if (dropHomeWhenClear && homeIsOffScreen()) {
     dropHomeWhenClear = false;

@@ -713,6 +713,40 @@ projected along the light onto y = 0 (`P.xz − P.y · L.xz/L.y`) so the cover s
 hillside instead of sliding up the slope. (It dims the bounce light too, which is not physical
 — a cloud only occludes the sun — but it reads well and costs nothing to leave.)
 
+## v22 — the lab's terrain, ported into the mockup
+
+`01-sumi-3d.html` now carries the lab's stack: ACES tone mapping, real shadows, a dominant key
+with a non-casting directional bounce, slope/height ramp colour, baked concavity AO, coherent
+mottle and drifting cloud shadows. The terrain was one flat hex value on a flat-shaded plane
+before, which is exactly why the near ground read as a sheet of dark green.
+
+Things that only showed up at landscape scale:
+
+- **The sky and the sunrise sprites have to opt out of tone mapping.** They are painted art that
+  is already the colour it should end up; ACES only washes the dawn gradient out. One sweep over
+  the finished scene sets `toneMapped = false` on every basic/sprite material and turns cloud
+  shadows and shadow casting on for everything else — done as a sweep rather than at each
+  construction site so nothing gets forgotten.
+- **Vertex colour and vertex AO can only vary as fast as the mesh does.** At 150 segments over
+  70,000 units a quad is 466 units, and no amount of ramp detail survives that. 340 segments
+  (206-unit quads) is the floor for the mottle reading as grain instead of as bands, and the
+  cost is a one-off bake, not per frame — page load is unchanged at ~880 ms.
+- **Do not flatten the whole heightfield near the camera.** The old `h *= smoothstep(d, 1400,
+  9000)` bought a calm foreground at the price of a mirror-flat one. Splitting it — flatten the
+  long wavelengths, leave two short ones (2400 and 890 units) at full strength — keeps the
+  composition quiet while giving the ground something to catch light on.
+- **Cloud blobs have to be smaller than the thing you want them to vary.** At a 4,000-unit blob
+  the entire near meadow sat inside one and the effect read as a uniform dimmer.
+
+**The hard straight seam across the foreground was never the terrain.** It survived swapping the
+vertex colours out, turning shadows off, and changing the fog, and the baked colours along a row
+of vertices were provably smooth. A raycast through pixels either side of it found the answer in
+one shot: above the line the first hit was a *valley fog bank*, below it the ground. Those banks
+are ellipsoids scaled ×2.3 in world x — one placed 3,400 units out with a 3,400 radius reaches
+7,800, back past the eye — and their tops sat above eye height, so the camera was inside one and
+looking out through it. They are now held at arm's length and kept below the eye, which is what
+valley fog looks like from a slope anyway.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -785,6 +819,17 @@ hillside instead of sliding up the slope. (It dims the bounce light too, which i
   under-extruded and the gap merely narrows instead of closing.
 - When an effect "doesn't work", check whether the thing it multiplies is non-zero *before*
   re-deriving the maths. Two rounds went into a cloud shader that was correct all along.
+- **AO must measure concavity, not "some neighbours are higher".** Summing every uphill sample
+  darkens whole hillsides in proportion to their steepness, which is mud, not shade. Take the
+  horizon in each direction *relative to the local tangent plane* — then a planar surface, flat
+  or steeply tilted, comes out at exactly zero and only real hollows darken.
+- **A volumetric prop's extent is in world axes, not along the sight line.** An ellipsoid scaled
+  ×2.3 in x, placed "far away" down a diagonal sight line, can reach back past the camera; if
+  its top is also above eye height you end up rendering its inside across the whole frame. The
+  symptom is a dead-straight seam that survives every change to the thing it appears to be on.
+- **When a seam survives every change to the surface it appears to be on, stop changing the
+  surface.** One raycast through pixels either side of it names the object in a single run —
+  a screenshot cannot, because a veil and a shade look identical.
 
 ## Sources
 

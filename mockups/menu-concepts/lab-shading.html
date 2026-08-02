@@ -275,62 +275,76 @@ for (let i = 0; i < pos.count; i++) pos.setY(i, heightAt(pos.getX(i), pos.getZ(i
 geo.computeVertexNormals();
 
 /* ---- 1. VERTEX AO, baked at build time ----
-   For a heightfield this is nearly free: a vertex sitting lower than the ground
-   around it is in a hollow and should be darker. Sampling a ring of neighbours
-   at two radii gives both the wide concavity and the local crease. This is the
-   thing that makes objects look *attached* — it was completely absent before. */
+   AO must measure CONCAVITY, not "some neighbours are higher". The first version summed
+   every uphill sample, so on any uniform slope half the ring counted as occlusion and the
+   whole hillside darkened in proportion to its steepness — which is what made the near
+   ground read as mud rather than as grass in shade.
+
+   The fix is to measure the horizon in each direction RELATIVE TO THE LOCAL TANGENT PLANE:
+   take the highest rise over several radii, then subtract the height the tangent plane
+   would have had there. A planar surface — flat or steeply tilted — comes out at exactly
+   zero, and only ground that genuinely closes in above the tangent plane darkens. */
 const aoAttr = new Float32Array(pos.count);
-for (let i = 0; i < pos.count; i++) {
-  const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-  let occ = 0, n = 0;
-  for (const r of [34, 96, 210]) {
-    for (let a = 0; a < 6; a++) {
-      const th = (a / 6) * Math.PI * 2 + r;
-      const hn = heightAt(x + Math.cos(th) * r, z + Math.sin(th) * r);
-      occ += Math.max(0, Math.min(1, (hn - y) / (r * 0.55)));
-      n++;
+{
+  const norm = geo.attributes.normal;
+  const DIRS = 8, RADII = [38, 105, 240, 470];
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const nx = norm.getX(i), ny = Math.max(norm.getY(i), 0.25), nz = norm.getZ(i);
+    let occ = 0;
+    for (let d = 0; d < DIRS; d++) {
+      const th = (d / DIRS) * Math.PI * 2 + (i % 4) * 0.19;   /* stagger to avoid a grid pattern */
+      const cx = Math.cos(th), cz = Math.sin(th);
+      let horizon = 0;
+      for (const r of RADII) {
+        const hn = heightAt(x + cx * r, z + cz * r);
+        const plane = -(nx * cx * r + nz * cz * r) / ny;      /* tangent plane height at that offset */
+        const rise = (hn - y - plane) / r;
+        if (rise > horizon) horizon = rise;
+      }
+      occ += Math.min(horizon, 1);
     }
+    aoAttr[i] = 1 - (occ / DIRS) * 1.15;
   }
-  aoAttr[i] = 1 - (occ / n) * 1.5;
 }
 
 /* ---- 2. RAMP COLOUR from slope and height ----
    Faces pointing up take grass, steep faces take rock, altitude pushes toward
    pale dry grass. This is what replaces "the ground is one hex value". */
 const nrm = geo.attributes.normal;
-const GRASS = new THREE.Color(0x6f8a45), GRASS_D = new THREE.Color(0x445b2c);
+/* the low tone is a SHADE of the grass, not a different, darker green. GRASS_D at 0x445b2c
+   was dark enough that low ground went olive before any light touched it, and AO on top of
+   that is what turned the near slope to mud. */
+const GRASS = new THREE.Color(0x7b9450), GRASS_D = new THREE.Color(0x5e7a3c);
 const ROCK = new THREE.Color(0x7d7466), DRY = new THREE.Color(0xb2ad76);
 const FLAT = new THREE.Color(0x6f7a52);
 const col = new Float32Array(pos.count * 3);
 const tmp = new THREE.Color();
-for (let i = 0; i < pos.count; i++) {
-  const slope = 1 - nrm.getY(i);                      /* 0 flat, 1 vertical */
-  const alt = THREE.MathUtils.clamp(pos.getY(i) / 700, 0, 1);
-  tmp.copy(GRASS_D).lerp(GRASS, THREE.MathUtils.smoothstep(alt, 0.02, 0.4));
-  tmp.lerp(DRY, THREE.MathUtils.smoothstep(alt, 0.5, 0.95) * 0.75);
-  tmp.lerp(ROCK, THREE.MathUtils.smoothstep(slope, 0.14, 0.42));
-  const ao = state.ao ? aoAttr[i] : 1;
-  const base = state.ramp ? tmp : FLAT;
-  tmp.copy(base).multiplyScalar(THREE.MathUtils.clamp(ao, 0.35, 1.12));
-  col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-}
-geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
 
 function repaintTerrain() {
   const a = geo.attributes.color.array;
   for (let i = 0; i < pos.count; i++) {
-    const slope = 1 - nrm.getY(i);
-    const alt = THREE.MathUtils.clamp(pos.getY(i) / 700, 0, 1);
-    tmp.copy(GRASS_D).lerp(GRASS, THREE.MathUtils.smoothstep(alt, 0.02, 0.4));
-    tmp.lerp(DRY, THREE.MathUtils.smoothstep(alt, 0.5, 0.95) * 0.75);
-    tmp.lerp(ROCK, THREE.MathUtils.smoothstep(slope, 0.14, 0.42));
-    const ao = state.ao ? aoAttr[i] : 1;
-    if (!state.ramp) tmp.copy(FLAT);
-    tmp.multiplyScalar(THREE.MathUtils.clamp(ao, 0.35, 1.12));
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const slope = 1 - nrm.getY(i);                      /* 0 flat, 1 vertical */
+    const alt = THREE.MathUtils.clamp(y / 700, 0, 1);
+    if (state.ramp) {
+      tmp.copy(GRASS_D).lerp(GRASS, THREE.MathUtils.smoothstep(alt, -0.05, 0.55));
+      tmp.lerp(DRY, THREE.MathUtils.smoothstep(alt, 0.5, 0.95) * 0.75);
+      tmp.lerp(ROCK, THREE.MathUtils.smoothstep(slope, 0.14, 0.42));
+      /* coherent patchiness. A large expanse of one interpolated green reads as a smear
+         however well it is lit — this is the cheapest thing that gives it grain */
+      tmp.multiplyScalar(1 + Math.sin(x * 0.0131 + z * 0.0073) * Math.cos(z * 0.0106 - x * 0.0047) * 0.06
+                           + Math.sin(x * 0.041 - z * 0.036) * 0.022);
+    } else {
+      tmp.copy(FLAT);
+    }
+    tmp.multiplyScalar(THREE.MathUtils.clamp(state.ao ? aoAttr[i] : 1, 0.45, 1.1));
     a[i * 3] = tmp.r; a[i * 3 + 1] = tmp.g; a[i * 3 + 2] = tmp.b;
   }
   geo.attributes.color.needsUpdate = true;
 }
+geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+repaintTerrain();
 
 const matToon = cloudy(new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP }));
 const matPlain = cloudy(new THREE.MeshLambertMaterial({ vertexColors: true }));
