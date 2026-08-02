@@ -2586,7 +2586,32 @@ function emaGeo(w, h, gable, th) {
 }
 /* the writing, drawn to a canvas. System fonts throughout this file, so there is no webfont to
    wait on — the one thing that would otherwise have to be redrawn on `document.fonts.ready`. */
-function emaTexture(jp, en, meta, accent) {
+/* A word is broken across two lines where it has a space, because two short lines beat one
+   condensed one at every size. */
+function emaLines(en) {
+  const words = en.split(' ');
+  const half = Math.ceil(words.length / 2);
+  return words.length > 1 ? [words.slice(0, half).join(' '), words.slice(half).join(' ')] : words;
+}
+/* ONE SIZE FOR THE WHOLE ROW. Sized per tablet, ALL came out at 112 next to WEAK CARDS at 84 and
+   the row read as if something was being emphasised — four labels of the same kind have to share
+   a type size, so the wall asks for the largest that every one of its tiles can carry.
+
+   And it is MEASURED, not assumed: `measureText` scales linearly with the font size for a given
+   string, so one measurement gives the size that exactly fills the width. These labels come from
+   a table that will grow, where LISTENING is nine characters and ALL is three. */
+const _measure = document.createElement('canvas').getContext('2d');
+function emaEnSize(en, maxW) {
+  const lines = emaLines(en);
+  const cap = lines.length > 1 ? 84 : 112;
+  _measure.letterSpacing = '3px';
+  _measure.font = `900 ${cap}px "Arial Black", Arial, sans-serif`;
+  return Math.min(...lines.map((t) => {
+    const w = _measure.measureText(t).width;
+    return w > maxW ? Math.floor(cap * maxW / w) : cap;
+  }));
+}
+function emaTexture(jp, en, meta, accent, size) {
   const W = 384, H = 460, GAB = 96;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
@@ -2614,27 +2639,38 @@ function emaTexture(jp, en, meta, accent) {
      signage: the type is far larger than the object would carry, because the camera stops far
      enough back to keep the shrine and the valley in frame and legibility has to survive that.
      Games oversize signage for the same reason and nobody notices. */
-  /* `maxWidth` is the fifth argument to fillText and it condenses rather than shrinks — the
-     glyphs keep their height and lose width, which is exactly the trade a label wants. Without
-     it the size here is governed by the longest string any section might have (今日の分 at four
-     characters), so every other tablet pays for it. */
+  /* ENGLISH LEADS ON THE TABLET. Kanji carry far more detail per glyph than Latin capitals do,
+     so at the size this thing actually renders — about seventy pixels of screen — 今日の分 is a
+     grey texture while DUE TODAY is a word. Making the Japanese bigger was the wrong lever
+     applied twice; the right one is to stop asking the harder script to do the reading. It stays
+     underneath at a size a learner can grow into, which is the same call the main menu's
+     description line already makes.
+
+     The size is MEASURED, not assumed. `measureText` scales linearly with the font size for a
+     given string, so one measurement gives the size that exactly fills the width — and these
+     labels come from a table that will grow, where LISTENING is nine characters and ALL is
+     three. A word is broken across two lines where it has a space, because two short lines beat
+     one condensed one at every size. */
+  const lines = emaLines(en);
+  g.letterSpacing = '3px';
+  g.font = `900 ${size}px "Arial Black", Arial, sans-serif`;
   g.fillStyle = '#2b1c10';
-  g.font = '700 112px "Yu Mincho", "Hiragino Mincho ProN", serif';
-  g.fillText(jp, W / 2, GAB + 122, W - 26);
-  g.fillStyle = 'rgba(43,28,16,0.78)';
-  g.font = '700 27px "Arial Black", Arial, sans-serif';
-  g.letterSpacing = '5px';
-  g.fillText(en, W / 2, GAB + 158, W - 40);
+  const y0 = lines.length > 1 ? GAB + 10 + size * 0.78 : GAB + 84 + size * 0.36;
+  lines.forEach((t, k) => g.fillText(t, W / 2, y0 + k * size * 1.04, W - 46));
   g.letterSpacing = '0px';
+  /* and the Japanese under it, quiet */
+  g.fillStyle = 'rgba(43,28,16,0.62)';
+  g.font = '700 38px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif';
+  g.fillText(jp, W / 2, 290, W - 56);
   /* THE DARK ACCENT, NOT THE BRIGHT ONE. Section colours are chosen to sit on near-black
      backgrounds, where the light end is the readable one; on cream it is the light end that
      disappears. REVIEW's #e34a33 on paper is a 2.4:1 contrast, its #b23320 is 4.4:1. */
   g.fillStyle = accent;
-  g.font = '900 168px "Arial Black", Arial, sans-serif';
-  g.fillText(num, W / 2, H - 66, W - 64);
+  g.font = '900 138px "Arial Black", Arial, sans-serif';
+  g.fillText(num, W / 2, H - 48, W - 64);
   g.fillStyle = 'rgba(43,28,16,0.7)';
-  g.font = '700 30px "Yu Gothic UI", sans-serif';
-  g.fillText(unit, W / 2, H - 26, W - 60);
+  g.font = '700 28px "Yu Gothic UI", sans-serif';
+  g.fillText(unit, W / 2, H - 14, W - 60);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   /* the tablet is 384 texels wide and lands on about seventy pixels, so it is read four or five
@@ -2833,6 +2869,8 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
      of a row of four tiles, on no principle beyond looking tidy in the first draft — and it was
      costing a sixth of every glyph. The board's own posts already frame the row. */
   const TW = (W - W * 0.10) / tiles.length * 0.93, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.06;
+  /* the largest label size every tile in this section can carry — the row shares it */
+  const EN_SIZE = Math.min(...tiles.map(([, en]) => emaEnSize(en, 384 - 46)));
   const GAP = (W - W * 0.10 - TW * tiles.length) / (tiles.length - 1);
   const CORD = TH * 0.3;
   /* raycast target only: material.visible skips the draw, object.visible would skip the ray too */
@@ -2859,7 +2897,7 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
        it lifts the paper — the writing was being washed off the tablet by the thing meant to
        make it visible. Multiplying it by the face's own texture lights the paper and leaves the
        glyphs alone, which is both more legible and physically closer to true. */
-    const tex = emaTexture(jp, en, meta, accent);
+    const tex = emaTexture(jp, en, meta, accent, EN_SIZE);
     const face = new THREE.Mesh(new THREE.PlaneGeometry(TW, TH), new THREE.MeshToonMaterial({
       map: tex, emissive: 0x8d8069, emissiveMap: tex,
       gradientMap: RAMP, transparent: true,

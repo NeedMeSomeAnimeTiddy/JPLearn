@@ -1284,6 +1284,26 @@ something different.
   vertical jitter pushed one row's lower edge through the next row's rail, which reads as
   over-stuffed rather than as a crowd. Smaller, one more per row, less jitter.
 
+## v38 — English leads on the tablet
+
+- **Stop asking the harder script to do the reading.** Three rounds went into making 今日の分
+  bigger — a wider tile, a taller glyph, `maxWidth`, sixteen-times anisotropy — and it was still
+  the hardest thing on the wall to read, because kanji carry far more detail per glyph than Latin
+  capitals do and the tablet renders at about seventy pixels whatever is on it. Swapping them put
+  DUE TODAY where the effort had been going and settled it in one change. The Japanese stays
+  underneath, small, to be grown into rather than relied on — the same call the main menu's
+  description line already makes. **When repeated increases of a quantity are not fixing a
+  legibility problem, the quantity is not what is wrong.**
+- **Two short lines beat one condensed line at every size.** Breaking a label at its space costs
+  nothing and buys back everything `maxWidth` was taking.
+- **A row of labels shares a type size.** Sized per tablet, ALL came out at 112 next to WEAK
+  CARDS at 84 and the row read as though something were being emphasised. The wall now asks for
+  the largest size every one of its tiles can carry, which makes the set the unit rather than the
+  tile.
+- **`measureText` scales linearly with font size for a given string,** so one measurement gives
+  the size that exactly fills a width. Nothing has to be guessed and nothing breaks when the
+  label table grows a nine-character entry.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1467,6 +1487,10 @@ something different.
 - **When something you built is invisible, ask whether it was built, whether it is where you
   think, and whether something else is in front of it** — in that order. Three attempts at one
   plinth were three different answers to that question.
+
+- **If turning a dial up repeatedly does not fix the problem, the dial is not the problem.**
+  Four increases of the kanji's size did less than swapping it for the Latin gloss.
+- **A set of labels is the unit, not a label.** Size, weight and colour belong to the row.
 
 ## Sources
 
