@@ -818,6 +818,45 @@ whichever canopy highlight drifted into frame that run, and two consecutive runs
 more than the change I was trying to measure. A 95th percentile is stable to ±0.02 and every item
 now sits at 4.2–10.7 against the cream.
 
+## v25 — the lake, and mist that is weather rather than an object
+
+**The river floated 285 units above the ground, and the cause is a one-liner.**
+`TubeGeometry(...); geo.scale(1, 0.05, 1)` scales about the geometry's ORIGIN, not about the
+curve it was built around. The control points sat near y = −300, so flattening the tube
+multiplied that by 0.05 and lifted the whole river to y ≈ −15. It looked like a ribbon because
+it *was* the right shape — it was simply in the wrong place, and an earlier version had been
+hiding it with a compensating `river.position.y` that did not survive the rebuild. It is now a
+strip of quads built directly from ground samples, sitting in a channel cut into the heightfield
+itself. Verified by raycasting the terrain under nine points along its length: 5–21 units of
+clearance, and the nearest tree instance is 942 units away.
+
+**The lake is cut into the terrain, not laid on it.** Both it and the river are authored in
+sight-line coordinates — two dot products against the AXIS/SIDE pair, which matters because the
+AO bake calls `landAt` two million times and a distance-to-polyline test there would have cost
+minutes. Because the water is part of the heightfield, every prop gets the shoreline for free:
+`blocked()` gained one line testing the waterline, and the lake, the river bed and the shallows
+cleared themselves of trees, tufts and stones without any of them knowing water exists.
+
+**The reflection is real.** The scene is rendered again from the camera mirrored about the water
+plane, clipped to everything above it, and sampled in screen space through a texture matrix.
+Two things needed care: 768² rather than 512², because at 512 a reflected trunk is under two
+pixels wide and the ripple smeared them into scribbles — *the distortion has to stay smaller
+than the features it distorts* — and the ground cover is hidden during the pass, because
+thousands of 15-unit tufts contribute nothing to a rippled reflection of the far shore.
+
+**Valley mist is atmosphere, not geometry.** Flattened ellipsoids gave a lid to look down on and
+a rim to see under. Sprites fixed the geometry problem and created a worse one: 260 large
+alpha-blended quads cost four times the entire rest of the frame. The answer was to stop making
+mist out of objects. It is now the analytic integral of an exponential height-density field
+along the view ray, injected into every lit material's fragment shader — thick along the valley
+floor, thin as you look up out of it, pooling in whatever is low, with no surface to see the
+underside of and no draw calls at all.
+
+**Tune fog against the arithmetic.** With the camera 426 units above the water the base density
+is `amt·exp(−426/H)`, and a horizontal look across the valley gives `1 − exp(−base·dist)`. The
+first guess came out 81% opaque at 8,000 units and swallowed the reflection; solving for 30%
+gave the value directly.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -917,6 +956,18 @@ now sits at 4.2–10.7 against the cream.
   mountain's base deletes forest for hundreds of units around a hill that is barely raised there.
 - **Tune against a percentile.** Any metric taken from a single extreme pixel of a live 3D scene
   is noise; consecutive runs will disagree by more than the change being measured.
+
+- **`geometry.scale()` scales about the origin, not about your content.** Flattening a tube
+  whose points sit far from y = 0 moves it as well as squashing it. The symptom is an object of
+  exactly the right shape in exactly the wrong place.
+- **Shadow maps are re-rendered on every `render()` call.** A static sun over a static landscape
+  needs one build ever: `shadowMap.autoUpdate = false` plus a single `needsUpdate`. With a second
+  scene pass for water it was costing two 4096² depth renders a frame for nothing.
+- **Large alpha-blended sprites are a fill-rate trap.** Overdraw, not geometry, is what kills
+  frames; measure by hiding things and timing, because the expensive thing is rarely the thing
+  that looks expensive.
+- When a metric collapses after a change, bisect it by hiding candidates at runtime — one pass
+  named the mist as four times the rest of the frame combined.
 
 ## Sources
 

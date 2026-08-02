@@ -1079,6 +1079,12 @@ backRenderer.toneMapping = THREE.ACESFilmicToneMapping;
 backRenderer.toneMappingExposure = 1.0;
 backRenderer.shadowMap.enabled = true;
 backRenderer.shadowMap.type = THREE.PCFShadowMap;   /* PCFSoft is deprecated in this build */
+/* THE SHADOW MAP IS RENDERED ONCE, EVER. The sun does not move and neither does the landscape,
+   so re-rendering 4096² of depth on every frame was pure waste — and once the water added a
+   second scene render it became waste twice over, because three rebuilds the shadow map per
+   render() call. Turning autoUpdate off and asking for a single build took headless from
+   0.5 fps back to double digits. */
+backRenderer.shadowMap.autoUpdate = false;
 document.getElementById('glBack').appendChild(backRenderer.domElement);
 
 const frontScene = new THREE.Scene();
@@ -1443,6 +1449,16 @@ const CLOUD = {
      inside a single blob and the effect read as a uniform dimmer rather than as weather. */
   uCloudScale: { value: 1 / 5000 },
   uCloudAmt: { value: 0.72 },
+  /* the valley mist. uMistY is set to the water surface once the lake exists; 300 units of
+     scale height puts the bulk of it below the treetops, which is where dawn mist sits. */
+  uMistColor: { value: new THREE.Color(0xe4dfe0) },
+  uMistY: { value: 0 },
+  uMistH: { value: 380 },
+  /* tuned against the arithmetic, not by eye: with the camera 426 units above the water the
+     base density is amt*exp(-426/380) = 0.33*amt, and a horizontal look across the 8,000-unit
+     valley gives 1-exp(-0.33*amt*8000). At the first value that came out 81% opaque and the
+     reflection had vanished; this lands near 30%. */
+  uMistAmt: { value: 0.00013 },
 };
 
 /* THE UNIFORM TRAP: three.js uploads a built-in material's uniforms only when that material's
@@ -1473,13 +1489,35 @@ function cloudy(mat) {
         uniform vec2 uCloudOff;
         uniform vec2 uCloudProj;
         uniform float uCloudScale;
-        uniform float uCloudAmt;`)
+        uniform float uCloudAmt;
+        uniform vec3 uMistColor;
+        uniform float uMistY, uMistH, uMistAmt;`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         {
           vec2 cuv = ( vCloudPos.xz - vCloudPos.y * uCloudProj ) * uCloudScale + uCloudOff;
           float cs = texture2D( uCloudMap, cuv ).r;
           reflectedLight.directDiffuse *= mix( 1.0, cs, uCloudAmt );
-        }`);
+        }`)
+      /* VALLEY MIST AS ATMOSPHERE, NOT AS OBJECTS. Flattened ellipsoids gave you a lid to look
+         down on; sprites fixed that but 260 huge alpha-blended quads cost four times the rest
+         of the frame put together. Neither is what mist is. This is the analytic integral of an
+         exponential height-density field along the view ray: thick when you look the length of
+         the valley floor, thin when you look up out of it, automatically pooling in whatever is
+         low. It has no geometry, so there is nothing to see the underside of, and it costs a
+         handful of instructions on shading that was already happening. */
+      .replace('#include <fog_fragment>', `#include <fog_fragment>
+        #ifdef USE_FOG
+        {
+          vec3 mv = vCloudPos - cameraPosition;
+          float md = length( mv );
+          float mk = 1.0 / uMistH;
+          float mbase = uMistAmt * exp( - ( cameraPosition.y - uMistY ) * mk );
+          float mdy = mv.y * mk;
+          float mint = abs( mdy ) < 1e-4 ? md : md * ( 1.0 - exp( - mdy ) ) / mdy;
+          float mf = 1.0 - exp( - max( mbase * mint, 0.0 ) );
+          gl_FragColor.rgb = mix( gl_FragColor.rgb, uMistColor, clamp( mf, 0.0, 1.0 ) );
+        }
+        #endif`);
     /* a String.replace on a chunk name that moved is a silent no-op, and the result looks
        exactly like a working feature with its strength set to zero. Never let it fail quietly */
     if (!shader.vertexShader.includes('vCloudPos = (') || !shader.fragmentShader.includes('texture2D( uCloudMap')) {
@@ -1575,8 +1613,33 @@ function paintSky() {
                          tilted slope comes out unoccluded and only real hollows darken
      smooth shading      the lab's finding: a toon ramp across a large curved surface quantises
                          into contour blotches. Toon is for objects; terrain gets this. */
+/* ---- the lake, and the river that feeds it ----
+   Both are authored in SIGHT-LINE coordinates (d down the axis, s across it) and both are cut
+   into the heightfield itself, not laid on top of it. That is the only way a body of water sits
+   in the land rather than floating over it — and it means every prop, which is already placed
+   from the heightfield, gets the shoreline for free. */
+/* Sized so BOTH shores are in the picture. At r 4000 centred 3,600 out the near edge sat behind
+   the camera and the far edge 7,600 ahead — the frame was nothing but water, and the coast
+   planting was too distant and too deep in the mist to read as trees. 300 units of bank in
+   front of the eye and a far shore at 5,700 keeps the reflection and gives it a setting. */
+const LAKE = { d: 3000, s: 400, r: 2700, level: -70 };
+const LAKE_C = { x: AXIS.x * LAKE.d + SIDE.x * LAKE.s, z: AXIS.y * LAKE.d + SIDE.y * LAKE.s };
+const LAKE_Y = GROUND_Y + LAKE.level;             /* the water surface, in world space */
+const RIVER_FROM = 7200, RIVER_TO = 21000;
+function riverSideAt(d) { return 2400 + Math.sin(d * 0.00038 + 0.6) * 2100 - d * 0.055; }
+
+/* > 0 inside the lake, 0 at the shore, negative outside. The radius wobbles with bearing so the
+   shoreline is a coast and not a drawn circle. */
+function lakeField(x, z) {
+  const lx = x - LAKE_C.x, lz = z - LAKE_C.z;
+  const a = Math.atan2(lz, lx);
+  const r = LAKE.r * (1 + Math.sin(a * 3 + 0.7) * 0.13 + Math.sin(a * 5 - 1.9) * 0.07
+                        + Math.sin(a * 2 + 2.4) * 0.09);
+  return 1 - Math.hypot(lx, lz) / r;
+}
+
 function landAt(x, z) {
-  const d = Math.hypot(x, z);
+  const rad = Math.hypot(x, z);
   /* the valley's shape. Long wavelengths only, and flattened near the camera so the ground
      under the type stays calm and the horizon does not heave about. */
   const broad = Math.sin(x * 0.00016) * Math.cos(z * 0.00013) * 430
@@ -1588,9 +1651,31 @@ function landAt(x, z) {
      2400 and 890 against a 206-unit quad, so both survive the tessellation. */
   const fine = Math.sin(x * 0.0026 + 2.3) * Math.cos(z * 0.0022) * 34
              + Math.sin(x * 0.0071 + 5.1) * Math.cos(z * 0.0063 + 1.2) * 13;
-  return broad * THREE.MathUtils.smoothstep(d, 1400, 9000)
-       + fine
-       + THREE.MathUtils.smoothstep(d, 13000, 31000) * 1700;        /* the valley's sides */
+  let h = broad * THREE.MathUtils.smoothstep(rad, 1400, 9000)
+        + fine
+        + THREE.MathUtils.smoothstep(rad, 13000, 31000) * 1700;     /* the valley's sides */
+
+  /* sight-line coordinates. AXIS and SIDE are an orthonormal pair, so this is two dot products
+     rather than anything expensive — which matters, because the AO bake calls this two million
+     times and a distance-to-polyline test here would have cost minutes. */
+  const dd = x * AXIS.x + z * AXIS.y;
+  const ss = x * SIDE.x + z * SIDE.y;
+
+  /* the river's channel. Cut BEFORE the lake is filled, so the two meet at the mouth instead of
+     the river running along at bank height and stopping dead at the water. */
+  const across = Math.max(0, 1 - Math.abs(ss - riverSideAt(dd)) / 430);
+  const along = THREE.MathUtils.smoothstep(dd, RIVER_FROM - 1400, RIVER_FROM + 600)
+              * (1 - THREE.MathUtils.smoothstep(dd, RIVER_TO - 3000, RIVER_TO));
+  h -= across * across * (3 - 2 * across) * 155 * along;
+
+  /* the lake basin: shallows at the rim dishing to a flat bed, with the transition starting
+     just OUTSIDE the nominal shore so the waterline lands on a slope and not on a cliff */
+  const L = lakeField(x, z);
+  if (L > -0.09) {
+    const bed = LAKE.level - 30 - 300 * THREE.MathUtils.smoothstep(L, 0, 0.65);
+    h = THREE.MathUtils.lerp(h, bed, THREE.MathUtils.smoothstep(L, -0.09, 0.10));
+  }
+  return h;
 }
 {
   /* 340 segments over 70,000 units is a 206-unit quad. Vertex colour and vertex AO can only
@@ -1794,6 +1879,10 @@ function hash01(a, b) {
   return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
 }
 
+/* Ground detail is not worth reflecting: thousands of 15-unit tufts contribute nothing to a
+   rippled 768² image of the far shore, and they were being drawn twice a frame for it. */
+const NO_REFLECT = [];
+
 /* one shared scatter so trees, rocks and grass agree about where the ground is busy */
 function scatter(i, seed, near, far, spread) {
   const a = hash01(i, seed);
@@ -1826,8 +1915,13 @@ function blockHeight(x, z) {
   return m;
 }
 /* 120 units of rise is about the base flare of a cone at this scale — under it a prop reads as
-   standing at the mountain's foot, over it as standing inside the mountain */
-function blocked(x, z) { return blockHeight(x, z) > 120; }
+   standing at the mountain's foot, over it as standing inside the mountain. The waterline is
+   folded into the same gate: nothing scatters below it, so the lake and the river bed clear
+   themselves of trees, tufts and stones without any of them knowing the lake exists. */
+function blocked(x, z) {
+  if (groundAt(x, z) < LAKE_Y + 25) return true;
+  return blockHeight(x, z) > 120;
+}
 /* `outline` is a width, or 0 for none. The twin shares the instance matrices, so it can never
    drift out of register with what it is outlining. */
 function instanced(geo, mat, n, place, outline = 0) {
@@ -2050,55 +2144,140 @@ function radialTex(inner, outer, stops) {
   backScene.add(disc);
 }
 
-/* ---- valley fog: flat banks lying in the low ground, which is what sells a dawn ---- */
-{
-  const bank = new THREE.MeshBasicMaterial({
-    color: 0xf2eeea, transparent: true, opacity: 0.15, depthWrite: false, fog: true,
-  });
-  /* A BANK IS AN ELLIPSOID, AND ITS EXTENT IS IN WORLD AXES, NOT ALONG THE SIGHT LINE. One
-     placed 3,400 out with a 3,400 radius scaled ×2.3 reached 7,800 units — back past the eye —
-     and its top sat above eye height, so the camera was INSIDE it. Looking out through the
-     inside of a fog bank is what laid a hard straight edge across the whole foreground, and it
-     survived every terrain change because it was never the terrain. So: hold them at arm's
-     length, and keep their tops below the eye, which is what valley fog looks like from a
-     slope anyway — you look down onto it. */
-  const eyeAt = new THREE.Vector3(EYE.x, 0, EYE.y);
-  for (let k = 0; k < 16; k++) {
-    const d = 5200 + hash01(k, 3) * 12000;
-    const s = -9000 + hash01(k, 29) * 18000;
-    const r = 1500 + hash01(k, 53) * 1900;
-    const p = at(d, s, GROUND_Y + 10 + hash01(k, 71) * 70);
-    if (new THREE.Vector3(p.x, 0, p.z).distanceTo(eyeAt) < r * 2.3 + 2600) continue;
-    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 8), bank);
-    m.position.copy(p);
-    m.scale.set(2.3, 0.035 + hash01(k, 97) * 0.03, 1.5);
-    m.renderOrder = 2;
-    backScene.add(m);
-  }
-}
+/* ---- valley mist ----
+   There is no geometry here on purpose. The mist is an exponential height-density field
+   integrated along the view ray inside every lit material's shader (see `cloudy`), so it pools
+   in low ground, thins as you look up out of the valley, and has no surface to see the
+   underside of. All that is left to do is tell it where the valley floor is. */
+CLOUD.uMistY.value = LAKE_Y + 10;
 
-/* the river: a ribbon following the ground rather than a flat plank laid across it. Sampling
-   the terrain per control point is the whole difference — a straight-and-level river through
-   rolling ground is the single most diorama-like thing you can put in a valley. */
+/* ================= WATER =================
+   THE OLD RIVER FLOATED 285 UNITS ABOVE THE GROUND, and the reason is worth writing down:
+   `TubeGeometry(...); geo.scale(1, 0.05, 1)` scales about the geometry's ORIGIN, not about the
+   curve. The control points sat near y = −300, so flattening the tube multiplied that by 0.05
+   and lifted the whole river to y ≈ −15. It looked like a ribbon because it *was* the right
+   shape — it was simply in the wrong place, and the earlier version had been hiding it with a
+   compensating `river.position.y` that did not survive the rebuild.
+
+   Nothing is scaled here. The river is a strip built from ground samples, and the lake is a
+   flat plane at the level the basin was cut to. */
+
+/* the lake surface, with a real planar reflection. The scene is rendered a second time from the
+   camera mirrored about the water plane, clipped to everything above it, and the result is
+   sampled in screen space — which is what puts Fuji in the water rather than a painted hint of
+   it. 768 rather than 512: at 512 a reflected tree trunk is under two pixels wide and the ripple
+   smeared them into scribbles on the water — the distortion has to stay smaller than the
+   features it is distorting. */
+const reflectRT = new THREE.WebGLRenderTarget(768, 768, {
+  minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false,
+});
+const reflectCam = new THREE.PerspectiveCamera();
+const reflectTexM = new THREE.Matrix4();
+const lakeWater = (() => {
+  const geo = new THREE.PlaneGeometry(LAKE.r * 2.6, LAKE.r * 2.6, 1, 1);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      tReflect: { value: reflectRT.texture },
+      texMatrix: { value: reflectTexM },
+      uTime: { value: 0 },
+      uDeep: { value: new THREE.Color(0x2c3b4e) },
+      uShallow: { value: new THREE.Color(0x5c7385) },
+      fogColor: { value: backScene.fog.color },
+      fogDensity: { value: backScene.fog.density },
+      uMistColor: CLOUD.uMistColor,
+      uMistY: CLOUD.uMistY,
+      uMistH: CLOUD.uMistH,
+      uMistAmt: CLOUD.uMistAmt,
+    },
+    vertexShader: `
+      uniform mat4 texMatrix;
+      varying vec4 vProj;
+      varying vec3 vWorld;
+      varying float vDepth;
+      void main() {
+        vec4 wp = modelMatrix * vec4( position, 1.0 );
+        vWorld = wp.xyz;
+        vProj = texMatrix * wp;
+        vec4 mv = viewMatrix * wp;
+        vDepth = -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform sampler2D tReflect;
+      uniform float uTime;
+      uniform vec3 uDeep, uShallow, fogColor, uMistColor;
+      uniform float fogDensity, uMistY, uMistH, uMistAmt;
+      varying vec4 vProj;
+      varying vec3 vWorld;
+      varying float vDepth;
+      void main() {
+        /* a slow chop, large enough to read at this scale and small enough not to smear the
+           mountain into nothing. Two crossed waves, not noise — a still dawn lake is glassy. */
+        float w = sin( vWorld.x * 0.0032 + uTime * 0.55 ) * cos( vWorld.z * 0.0027 - uTime * 0.41 )
+                + sin( vWorld.z * 0.0071 - uTime * 0.7 ) * 0.4;
+        vec2 uv = vProj.xy / vProj.w + vec2( w * 0.0021, w * 0.0008 );
+        vec3 refl = texture2D( tReflect, uv ).rgb;
+        /* grazing angles reflect almost everything, steep ones show the water's own colour —
+           and the camera IS at a grazing angle here, which is why the reflection carries */
+        vec3 v = normalize( cameraPosition - vWorld );
+        float f = pow( 1.0 - clamp( v.y, 0.0, 1.0 ), 2.4 );
+        vec3 body = mix( uDeep, uShallow, clamp( w * 0.25 + 0.5, 0.0, 1.0 ) );
+        vec3 col = mix( body, refl, clamp( f * 1.05, 0.12, 0.94 ) );
+        /* the same valley mist every other surface takes, so the far shore of the lake sits in
+           it too instead of staying sharp while the land around it softens */
+        vec3 mv2 = vWorld - cameraPosition;
+        float mk = 1.0 / uMistH;
+        float mbase = uMistAmt * exp( - ( cameraPosition.y - uMistY ) * mk );
+        float mdy = mv2.y * mk;
+        float mint = abs( mdy ) < 1e-4 ? length( mv2 ) : length( mv2 ) * ( 1.0 - exp( - mdy ) ) / mdy;
+        col = mix( col, uMistColor, clamp( 1.0 - exp( - max( mbase * mint, 0.0 ) ), 0.0, 1.0 ) );
+        float fg = 1.0 - exp( - fogDensity * fogDensity * vDepth * vDepth );
+        gl_FragColor = vec4( mix( col, fogColor, clamp( fg, 0.0, 1.0 ) ), 1.0 );
+      }`,
+  });
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(EYE.x + LAKE_C.x, LAKE_Y, EYE.y + LAKE_C.z);
+  m.renderOrder = 1;
+  backScene.add(m);
+  return m;
+})();
+
+/* the river: a strip of quads built from ground samples, sitting in the channel the heightfield
+   already cut for it. Width widens toward the mouth so it spills into the lake. */
 {
-  const pts = [];
-  for (let i = 0; i <= 56; i++) {
-    const t = i / 56;
-    const d = 1200 + t * 12000;
-    const s = Math.sin(t * 4.1) * 2600 + 1900 - t * 3000;
-    const p = at(d, s, 0);
-    p.y = groundAt(p.x, p.z) + 10;
-    pts.push(p);
+  const N = 90, verts = [], idx = [];
+  for (let i = 0; i <= N; i++) {
+    const d = RIVER_TO - (i / N) * (RIVER_TO - RIVER_FROM + 900);
+    const s = riverSideAt(d);
+    const half = 150 + 170 * (i / N);
+    for (const o of [-half, half]) {
+      const p = at(d, s + o, 0);
+      /* 8 units proud of the bed, so it reads as a surface and never z-fights the channel */
+      p.y = groundAt(p.x, p.z) + 8;
+      verts.push(p.x, p.y, p.z);
+    }
+    if (i > 0) {
+      const b = (i - 1) * 2;
+      idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
+    }
   }
-  const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 120, 230, 4, false);
-  geo.scale(1, 0.05, 1);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
   const river = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-    color: 0xa9c0d2, emissive: 0x2e4055, transparent: true, opacity: 0.88,
+    color: 0x8fa8bd, emissive: 0x22303f, side: THREE.DoubleSide,
   }));
   backScene.add(river);
-  /* built before the woods purely so it can claim its bed first — a tree standing in the middle
-     of the water is the same class of mistake as one standing inside a mountain */
-  pts.forEach((p) => blockAdd(p.x, p.z, 340, 3000));
+  /* registered before the woods purely so it can claim its bed first — a tree standing in the
+     middle of the water is the same class of mistake as one standing inside a mountain. The
+     lake needs no such registration: its bed is below the waterline, which `blocked()` tests. */
+  for (let i = 0; i <= 40; i++) {
+    const d = RIVER_FROM - 900 + (i / 40) * (RIVER_TO - RIVER_FROM + 900);
+    const p = at(d, riverSideAt(d), 0);
+    blockAdd(p.x, p.z, 430, 3000);
+  }
 }
 
 /* ---- the woods ----
@@ -2221,6 +2400,82 @@ function ringSpot(seed, near, far, lo, hi) {
     const k = 1.0 + p.r * 0.9;
     return { pos, rot: hash01(i, 401) * 6.28, scale: new THREE.Vector3(k, k, k) };
   }, 0.0020);
+
+  /* ---- the coast ----
+     A shoreline wants its own planting, not whatever the valley scatter happens to leave there:
+     trees crowd the water's edge and thin out inland. Rather than describe the coast
+     geometrically, this samples a ring around the lake and keeps only what lands in the narrow
+     height band just above the waterline — so the planting follows the shore's real wobble,
+     including the river mouth, without knowing anything about how either was authored. */
+  const coastSpot = (seed, lo, hi) => (i) => {
+    const a = hash01(i, seed) * Math.PI * 2;
+    /* a narrow band hugging the shore. At 0.98-1.40 the ring was 1,100 units deep and, with the
+       camera standing on the near shore, it closed over the eye — the first frame was a thicket
+       with a glimpse of lake through it. */
+    const rr = LAKE.r * (1.0 + hash01(i, seed + 13) * 0.22);
+    const x = EYE.x + LAKE_C.x + Math.cos(a) * rr;
+    const z = EYE.y + LAKE_C.z + Math.sin(a) * rr;
+    /* and nothing within arm's reach of the camera, whichever shore it is standing on */
+    if (Math.hypot(x - EYE.x, z - EYE.y) < 1300) return null;
+    const gy = groundAt(x, z);
+    if (gy < LAKE_Y + 22 || gy > LAKE_Y + 210) return null;
+    if (blockHeight(x, z) > 120) return null;
+    const c = hash01(i, seed + 104729);
+    const k = lo + c * (hi - lo);
+    return {
+      pos: new THREE.Vector3(x, gy - 14, z),
+      rot: hash01(i, seed + 331) * 6.28,
+      scale: new THREE.Vector3(k, k * (0.82 + hash01(i, seed + 617) * 0.42), k),
+    };
+  };
+  instanced(cedar, woodMat(), 170, coastSpot(457, 0.8, 1.7), 0.0016);
+  instanced(broad, woodMat(), 130, coastSpot(521, 0.85, 1.8), 0.0018);
+  instanced(sakura, woodMat(), 30, coastSpot(587, 0.9, 1.6), 0.0020);
+}
+
+/* ---- clouds ----
+   Low-poly clusters rather than more paint on the dome, so they hold their own parallax when
+   the camera turns and take the same light as everything else. Lit from underneath: at this
+   sun angle the undersides catch the warm and the tops stay cool, which is the whole reason a
+   dawn sky reads as dawn. */
+{
+  const puffGeo = (n, seed) => {
+    const parts = [];
+    for (let k = 0; k < n; k++) {
+      const g = new THREE.IcosahedronGeometry(180 + hash01(seed, k) * 220, 1);
+      g.scale(1.5 + hash01(seed, k + 40) * 0.7, 0.62, 1.25 + hash01(seed, k + 80) * 0.5);
+      g.translate((hash01(seed, k + 5) - 0.5) * 900, (hash01(seed, k + 9) - 0.5) * 130,
+        (hash01(seed, k + 17) - 0.5) * 620);
+      parts.push({ geo: g, color: 0xffffff });
+    }
+    const m = mergeParts(parts);
+    /* vertex colour by height within the cluster: warm shadow below, cool light above */
+    const p = m.attributes.position, col = m.attributes.color, tmp = new THREE.Color();
+    const LO = new THREE.Color(0xb49aa6), HI = new THREE.Color(0xfbeee4);
+    let min = Infinity, max = -Infinity;
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y < min) min = y; if (y > max) max = y; }
+    for (let i = 0; i < p.count; i++) {
+      tmp.copy(LO).lerp(HI, THREE.MathUtils.smoothstep((p.getY(i) - min) / (max - min), 0.1, 0.8));
+      col.setXYZ(i, tmp.r, tmp.g, tmp.b);
+    }
+    return m;
+  };
+  /* unlit on purpose: cloud is its own light source as far as the eye is concerned, and letting
+     the directional key rake across it just made one side go grey */
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: true });
+  [0, 1, 2].forEach((v) => {
+    instanced(puffGeo(6 + v, 91 + v * 7), mat, 16, (i) => {
+      const a = hash01(i, 611 + v) * Math.PI * 2;
+      const r = 9000 + hash01(i, 733 + v) * 17000;
+      const k = 3.2 + hash01(i, 811 + v) * 4.4;
+      return {
+        pos: new THREE.Vector3(EYE.x + Math.cos(a) * r, 4200 + hash01(i, 907 + v) * 4200,
+          EYE.y + Math.sin(a) * r),
+        rot: hash01(i, 1009 + v) * 6.28,
+        scale: new THREE.Vector3(k, k * 0.8, k),
+      };
+    });
+  });
 }
 
 /* ---- ground cover ---- */
@@ -2241,13 +2496,13 @@ function patchAt(x, z) {
   const geo = new THREE.IcosahedronGeometry(15, 0);
   [0x4c5c3f, 0x455339, 0x536241, 0x3e4b35].forEach((c, t) => {
     const mat = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
-    instanced(geo, mat, 780, (i) => {
+    NO_REFLECT.push(instanced(geo, mat, 780, (i) => {
       const p = scatter(i, 3 + t * 13, 1800, 9000, 13500);
       const pos = onGround(p.d, p.s, 3);
       if (patchAt(pos.x, pos.z) < 0.05 || blocked(pos.x, pos.z)) return null;
       const k = 0.5 + Math.pow(p.r, 1.4) * 1.9;
       return { pos, rot: hash01(i, 811 + t) * 6.28, scale: new THREE.Vector3(k * 1.7, k * 0.36, k * 1.5) };
-    });
+    }));
   });
 }
 
@@ -2263,13 +2518,13 @@ function patchAt(x, z) {
   const geo = new THREE.IcosahedronGeometry(12, 0);
   [0x51633f, 0x3f4d33, 0x5c6c44, 0x35422c].forEach((c, t) => {
     const mat = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
-    instanced(geo, mat, 300, (i) => {
+    NO_REFLECT.push(instanced(geo, mat, 300, (i) => {
       const p = scatter(i, 211 + t * 7, 350, 2800, 5600);
       const pos = onGround(p.d, p.s, 1);
       if (patchAt(pos.x, pos.z) < 0.2 || blocked(pos.x, pos.z)) return null;
       const k = 0.45 + Math.pow(p.r, 1.6) * 2.6;
       return { pos, rot: hash01(i, 907 + t) * 6.28, scale: new THREE.Vector3(k * 1.8, k * 0.3, k * 1.6) };
-    });
+    }));
   });
   const stone = new THREE.DodecahedronGeometry(20, 0);
   instanced(stone, new THREE.MeshToonMaterial({ color: 0x776f63, gradientMap: RAMP, flatShading: true }),
@@ -2286,28 +2541,28 @@ function patchAt(x, z) {
 {
   const geo = new THREE.IcosahedronGeometry(38, 0);
   const mat = new THREE.MeshToonMaterial({ color: 0x3c5135, gradientMap: RAMP, flatShading: true });
-  instanced(geo, mat, 700, (i) => {
+  NO_REFLECT.push(instanced(geo, mat, 700, (i) => {
     const p = scatter(i, 11, 1200, 11000, 15000);
     const pos = onGround(p.d, p.s, 14);
     /* scrub takes the ground the grass patches leave, so the two interlock instead of stacking */
     if (patchAt(pos.x, pos.z) > 0.35 || blocked(pos.x, pos.z)) return null;
     const k = 0.6 + p.r * 1.5;
     return { pos, rot: hash01(i, 1117) * 6.28, scale: new THREE.Vector3(k * 1.5, k * 0.52, k * 1.4) };
-  });
+  }));
 }
 
 /* stones through the grass, and a handful of real boulders near the eye for scale. The
    boulders get an outline because they are the only ground detail big enough to carry one. */
 {
   const stone = new THREE.DodecahedronGeometry(26, 0);
-  instanced(stone, new THREE.MeshToonMaterial({ color: 0x736f66, gradientMap: RAMP, flatShading: true }),
+  NO_REFLECT.push(instanced(stone, new THREE.MeshToonMaterial({ color: 0x736f66, gradientMap: RAMP, flatShading: true }),
     300, (i) => {
       const p = scatter(i, 29, 700, 9000, 13000);
       const pos = onGround(p.d, p.s, 4);
       if (blocked(pos.x, pos.z)) return null;
       const k = 0.35 + p.r * 1.3;
       return { pos, rot: hash01(i, 1223) * 6.28, scale: new THREE.Vector3(k * 1.4, k * 0.7, k) };
-    });
+    }));
   const rock = new THREE.DodecahedronGeometry(105, 0);
   instanced(rock, new THREE.MeshToonMaterial({ color: 0x6f6b61, gradientMap: RAMP, flatShading: true }),
     18, (i) => {
@@ -2346,7 +2601,44 @@ function patchAt(x, z) {
 
   /* a handle for headless verification — the same reason lab-shading.html has one. Without it
      the only way to check whether an effect is on is to squint at a screenshot. */
-  window.WORLD = { THREE, backScene, camera, backRenderer, CLOUD, CLOUD_MATS, sunDir: L };
+  window.WORLD = { THREE, backScene, camera, backRenderer, CLOUD, CLOUD_MATS, sunDir: L, lakeWater };
+  backRenderer.shadowMap.needsUpdate = true;    /* the one build; see autoUpdate above */
+}
+
+/* ---- the reflection pass ----
+   Mirror the camera about the water plane, clip away everything below it, render backScene into
+   the target. The texture matrix maps a world position into that render's clip space, so the
+   water shader can look itself up in screen space. */
+let reflectTick = 0;
+const REFLECT_CLIP = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -LAKE_Y + 4)];
+const _rfwd = new THREE.Vector3(), _rtgt = new THREE.Vector3();
+const BIAS = new THREE.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+function renderReflection() {
+  reflectCam.fov = camera.fov; reflectCam.aspect = camera.aspect;
+  reflectCam.near = camera.near; reflectCam.far = camera.far;
+  reflectCam.position.set(camera.position.x, 2 * LAKE_Y - camera.position.y, camera.position.z);
+  _rfwd.set(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(2000).add(camera.position);
+  _rtgt.set(_rfwd.x, 2 * LAKE_Y - _rfwd.y, _rfwd.z);
+  reflectCam.up.set(0, 1, 0);
+  reflectCam.lookAt(_rtgt);
+  reflectCam.updateMatrixWorld();
+  reflectCam.updateProjectionMatrix();
+
+  reflectTexM.copy(BIAS)
+    .multiply(reflectCam.projectionMatrix)
+    .multiply(reflectCam.matrixWorldInverse);
+
+  lakeWater.visible = false;
+  for (let i = 0; i < NO_REFLECT.length; i++) NO_REFLECT[i].visible = false;
+  const prevClip = backRenderer.clippingPlanes;
+  backRenderer.clippingPlanes = REFLECT_CLIP;
+  backRenderer.setRenderTarget(reflectRT);
+  backRenderer.clear();
+  backRenderer.render(backScene, reflectCam);
+  backRenderer.setRenderTarget(null);
+  backRenderer.clippingPlanes = prevClip;
+  for (let i = 0; i < NO_REFLECT.length; i++) NO_REFLECT[i].visible = true;
+  lakeWater.visible = true;
 }
 
 /* gold ink drops + rings + stains */
@@ -3909,6 +4201,10 @@ function tick() {
      uniform trap above. */
   CLOUD.uCloudOff.value.set(t * 0.0075, t * -0.0028);
   for (const m of CLOUD_MATS) m.needsUpdate = true;
+  lakeWater.material.uniforms.uTime.value = t;
+  /* the lake is only in frame at the menu, and a rippled reflection at half rate is
+     indistinguishable from one at full rate */
+  if ((state === 'menu' || busy) && (reflectTick++ & 1) === 0) renderReflection();
 
   if (dropHomeWhenClear && homeIsOffScreen()) {
     dropHomeWhenClear = false;
