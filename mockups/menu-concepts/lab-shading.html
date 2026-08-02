@@ -63,7 +63,7 @@ scene.fog = new THREE.Fog(0xd9c3a8, 2600, 7200);
 
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 1, 20000);
 camera.position.set(2700, 1450, 0);
-camera.lookAt(0, 240, 0);
+camera.lookAt(0, 620, 0);
 
 /* ---- sky: a gradient dome, so the horizon has somewhere to fade into ---- */
 {
@@ -99,16 +99,23 @@ function toonRamp(steps) {
 const RAMP = toonRamp(4);
 
 /* ---- lights ---- */
-const key = new THREE.DirectionalLight(0xffe6c4, 2.6);
+const key = new THREE.DirectionalLight(0xffe6c4, 2.1);
 key.position.set(-1500, 1900, 900);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
 const sc = key.shadow.camera;
-sc.left = -1800; sc.right = 1800; sc.top = 1800; sc.bottom = -1800; sc.near = 100; sc.far = 6000;
-key.shadow.bias = -0.0012;
-key.shadow.normalBias = 6;
+/* The hard straight edge across the hill was not a shadow — it was the edge of the shadow
+   camera. A 3600-unit ortho box cannot hold a 3000-unit terrain once the light is at 40°,
+   because the terrain projects much longer than itself along the light direction. */
+sc.left = -3200; sc.right = 3200; sc.top = 3200; sc.bottom = -3200; sc.near = 200; sc.far = 9000;
+key.shadow.bias = -0.0006;
+/* normalBias 6 was pushing the caster off its own contact point; radius is what softens PCF */
+key.shadow.normalBias = 2;
+key.shadow.radius = 7;
 scene.add(key, key.target);
-const fill = new THREE.HemisphereLight(0xbcd0ec, 0x4a4433, 1.1);
+/* lifted a long way: a shadow is only ever as dark as the fill light lets it be, and at 1.1
+   everything the key missed fell to near-black */
+const fill = new THREE.HemisphereLight(0xbcd0ec, 0x5a5340, 1.9);
 scene.add(fill);
 
 /* ============================ THE TERRAIN ============================ */
@@ -201,8 +208,11 @@ scene.add(ground);
 function outlineFor(mesh, w) {
   const m = new THREE.Mesh(mesh.geometry, new THREE.ShaderMaterial({
     uniforms: { w: { value: w } },
+    /* scale the extrusion by view distance so the line holds the same weight on screen —
+     a fixed world-space width is ~1px at this camera range, which is why it vanished */
     vertexShader: `uniform float w; void main(){
-      vec3 p = position + normal * w;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vec3 p = position + normal * (w * -mv.z);
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
     fragmentShader: `void main(){ gl_FragColor = vec4(0.055, 0.06, 0.085, 1.0); }`,
     side: THREE.BackSide,
@@ -225,7 +235,7 @@ function tree(x, z, s) {
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(13, 22, 190, 7), bark);
   trunk.position.y = 95; trunk.castShadow = true; trunk.receiveShadow = true;
   g.add(trunk);
-  const ot = outlineFor(trunk, 3); g.add(ot); outlines.push(ot);
+  const ot = outlineFor(trunk, 0.0022); g.add(ot); outlines.push(ot);
 
   [[0, 236, 0, 96], [-52, 200, 26, 66], [58, 208, -20, 72], [8, 292, -30, 58]]
     .forEach(([bx, by, bz, r], i) => {
@@ -237,7 +247,7 @@ function tree(x, z, s) {
       m.scale.set(1.18, 0.92, 1.1);
       m.castShadow = true; m.receiveShadow = true;
       g.add(m);
-      const o = outlineFor(m, 3.4); g.add(o); outlines.push(o);
+      const o = outlineFor(m, 0.0026); g.add(o); outlines.push(o);
     });
   return g;
 }
@@ -251,7 +261,7 @@ tree(-120, 130, 1.9);
   m.rotation.set(0.5, x * 0.01, 0.3);
   m.castShadow = true; m.receiveShadow = true;
   scene.add(m);
-  const o = outlineFor(m, 2.4); scene.add(o); outlines.push(o);
+  const o = outlineFor(m, 0.0024); scene.add(o); outlines.push(o);
 });
 
 /* ============================ TOGGLES ============================ */
@@ -261,8 +271,11 @@ function apply() {
   const toonMats = [];
   scene.traverse((o) => { if (o.isMesh && o.material && o.material.isMeshToonMaterial) toonMats.push(o.material); });
   /* toon off: swap the ramp out so shading goes smooth, which is the Lambert look */
-  toonMats.forEach((m) => { m.gradientMap = state.toon ? RAMP : null; m.needsUpdate = true; });
-  ground.material = state.toon ? matToon : matPlain;
+  toonMats.forEach((m) => { if (m === matToon) return; m.gradientMap = state.toon ? RAMP : null; m.needsUpdate = true; });
+  /* THE FINDING: terrain always takes smooth shading. A 4-step ramp across a large curved
+     surface quantises into contour blotches, while the same ramp reads correctly on the tree
+     and the rocks. Toon is for objects; terrain gets ramp colour + baked AO + shadows. */
+  ground.material = matPlain;
   outlines.forEach((o) => { o.visible = state.toon; });
   renderer.shadowMap.enabled = state.shadow;
   scene.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
@@ -270,7 +283,7 @@ function apply() {
   hud.innerHTML = '<h1>SHADING LAB</h1>'
     + row(state.ao, 1, 'vertex AO (baked)')
     + row(state.ramp, 2, 'slope/height ramp colour')
-    + row(state.toon, 3, 'toon ramp + outline')
+    + row(state.toon, 3, 'toon ramp + outline (objects only)')
     + row(state.shadow, 4, 'shadow map')
     + '<div class="off" style="margin-top:8px">[0] all off &nbsp; [9] all on</div>';
 }
@@ -296,7 +309,7 @@ let t = 0;
 function tick() {
   t += 0.0016;
   camera.position.set(Math.cos(t) * 2700, 1450, Math.sin(t) * 2700);
-  camera.lookAt(0, 240, 0);
+  camera.lookAt(0, 620, 0);
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
