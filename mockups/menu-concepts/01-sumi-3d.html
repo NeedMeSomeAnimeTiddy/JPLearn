@@ -2586,52 +2586,39 @@ function emaGeo(w, h, gable, th) {
 }
 /* the writing, drawn to a canvas. System fonts throughout this file, so there is no webfont to
    wait on — the one thing that would otherwise have to be redrawn on `document.fonts.ready`. */
-/* ---- the tablet face, five ways ----
-   The kanji-led face was clean and unreadable; the English-led one is readable and busy, because
-   swapping the two scripts left four bands of type stacked in a pentagon — label, gloss, figure,
-   unit — and nothing dominant. These are five arrangements of the same information, switchable
-   with `?ema=a..f` so they can be judged in the place they are actually read rather than on a
-   contact sheet. Each one decides what the tablet is FOR, and everything else gets out of the
-   way of that:
+/* ---- the tablet face ----
+   THE LABEL IS THE CHOICE AND THE COUNT IS A FOOTNOTE, which is what a menu item actually is:
+   you pick "weak cards", you do not pick "7". Five other arrangements were built and compared in
+   place (the figure leading, a reversed banner, a rule between label and figure, the figure
+   struck into a block, and the busy one this replaced) — this is the one that reads as something
+   to choose rather than as something to read off.
 
-     a  the figure is the answer; the label names it        (24 · DUE TODAY)
-     b  a banner names it; the figure sits on the paper     (reversed type in the section colour)
-     c  editorial: label, rule, figure                      (one line each, nothing crowded)
-     d  the figure struck into a block; the label under it  (the menu's own chip, on wood)
-     e  the label is the choice; the figure is a footnote   (what a menu item usually is)
-     f  what is there now, for comparison
+   English leads and the Japanese is a gloss beneath it. Kanji carry far more detail per glyph
+   than Latin capitals do, so at the size this renders — about seventy pixels of screen — 今日の分
+   is a grey texture while DUE TODAY is a word. Making the Japanese bigger was tried four times
+   and never worked, because size was not what was wrong. It stays as something to grow into,
+   which is the call the main menu's description line already makes.
 
-   `wrap` decides whether a two-word label breaks across two lines, and `cap` is the largest type
-   size that arrangement can carry — the row still shares one size, taken as the smallest that
-   fits any of its four tiles. */
-const EMA_LAYOUTS = {
-  a: { wrap: false, cap: 50, numCap: 208 },
-  b: { wrap: true, cap: 78, numCap: 148 },
-  c: { wrap: false, cap: 68, numCap: 178 },
-  d: { wrap: false, cap: 52, numCap: 126 },
-  e: { wrap: true, cap: 96, numCap: 62 },
-  f: { wrap: true, cap: 84, numCap: 138 },
-};
-const EMA_V = (() => {
-  const v = (new URLSearchParams(location.search).get('ema') || 'a').toLowerCase();
-  return EMA_LAYOUTS[v] ? v : 'a';
-})();
+   THE DELIBERATE CHEAT: a real ema is written small, in a hand, edge to edge. This is signage —
+   the type is far larger than the object would carry, because the camera stops far enough back
+   to keep the shrine and the valley in frame. Games oversize signage for the same reason and
+   nobody notices. */
 
-/* A word is broken across two lines where it has a space, because two short lines beat one
-   condensed one at every size — for the arrangements that want two lines. */
+/* a label breaks at its space, because two short lines beat one condensed line at every size */
 function emaLines(en) {
-  if (!EMA_LAYOUTS[EMA_V].wrap) return [en];
   const words = en.split(' ');
   const half = Math.ceil(words.length / 2);
   return words.length > 1 ? [words.slice(0, half).join(' '), words.slice(half).join(' ')] : words;
 }
-/* ONE SIZE FOR THE WHOLE ROW. Sized per tablet, ALL came out at 112 next to WEAK CARDS at 84 and
-   the row read as if something was being emphasised — four labels of the same kind have to share
-   a type size, so the wall asks for the largest that every one of its tiles can carry.
+/* THE ROW SHARES ITS SIZES. Sized to fill their own tablets, ALL came out at 112 next to WEAK
+   CARDS at 84 and `341 CARDS` was condensed to two-thirds the letter width of `7 CARDS` beside
+   it — four labels of the same kind read as four different kinds of thing. The wall asks for the
+   largest size every one of its tiles can carry, for the label and for the count separately.
 
    And it is MEASURED, not assumed: `measureText` scales linearly with the font size for a given
-   string, so one measurement gives the size that exactly fills the width. These labels come from
-   a table that will grow, where LISTENING is nine characters and ALL is three. */
+   string, so one measurement gives the size that exactly fills the width. These come from a
+   table that will grow, where LISTENING is nine characters and ALL is three. */
+const EMA_CAP = 96, EMA_META_CAP = 62;
 const _measure = document.createElement('canvas').getContext('2d');
 function emaFit(txt, maxW, cap, sp) {
   _measure.letterSpacing = sp;
@@ -2640,32 +2627,19 @@ function emaFit(txt, maxW, cap, sp) {
   return w > maxW ? Math.floor(cap * maxW / w) : cap;
 }
 function emaEnSize(en, maxW) {
-  return Math.min(...emaLines(en).map((t) => emaFit(t, maxW, EMA_LAYOUTS[EMA_V].cap, '3px')));
+  return Math.min(...emaLines(en).map((t) => emaFit(t, maxW, EMA_CAP, '2px')));
 }
-/* THE FIGURES SHARE A SIZE TOO, and for the same reason the labels do: left to fill its own
-   tablet, 341 came out condensed to two-thirds the width of the digits in 24 beside it, so a row
-   of four counts read as four different kinds of thing. A one- or two-character unit joins the
-   figure rather than taking a line of its own — "86" and "%" are one reading, "24" and "cards"
-   are two. */
-function emaNum(meta) {
-  const num = (meta.match(/[\d,]+/) || [''])[0];
-  const unit = meta.replace(/[\d,]+\s*/, '');
-  return { num, unit, txt: unit.length && unit.length <= 2 ? num + unit : num };
-}
-function emaFigure(meta) { return EMA_V === 'e' ? meta.toUpperCase() : emaNum(meta).txt; }
-function emaNumSize(meta, maxW) {
-  return emaFit(emaFigure(meta), maxW, EMA_LAYOUTS[EMA_V].numCap, '0px');
-}
-function emaTexture(jp, en, meta, accent, size, nsize) {
+function emaMetaSize(meta, maxW) { return emaFit(meta.toUpperCase(), maxW, EMA_META_CAP, '0px'); }
+
+function emaTexture(jp, en, meta, accent, size, msize) {
   const W = 384, H = 460, GAB = 96;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
   g.beginPath();
   g.moveTo(0, H); g.lineTo(W, H); g.lineTo(W, GAB); g.lineTo(W / 2, 6); g.lineTo(0, GAB);
   g.closePath();
-  /* brighter paper. At #dccaa6 the cream sat in the same mid-tone as the red numeral printed
-     on it, so the two had barely a stop between them and the whole face read as one warm blur
-     from any distance. */
+  /* brighter paper. At #dccaa6 the cream sat in the same mid-tone as the figure printed on it,
+     so the two had barely a stop between them and the face read as one warm blur. */
   g.fillStyle = '#f0e5cb'; g.fill();
   /* grain, faint and vertical — enough that the face is not a flat swatch */
   g.save(); g.clip();
@@ -2677,99 +2651,29 @@ function emaTexture(jp, en, meta, accent, size, nsize) {
   }
   g.restore();
   g.strokeStyle = 'rgba(74,54,34,0.6)'; g.lineWidth = 8; g.stroke();
-  const { unit, txt: numTxt } = emaNum(meta);
   g.textAlign = 'center';
-  /* THE DELIBERATE CHEAT. A real ema is written small, in a hand, edge to edge. This is
-     signage: the type is far larger than the object would carry, because the camera stops far
-     enough back to keep the shrine and the valley in frame and legibility has to survive that.
-     Games oversize signage for the same reason and nobody notices.
 
-     ENGLISH LEADS whatever the arrangement. Kanji carry far more detail per glyph than Latin
-     capitals do, so at the size this renders — about seventy pixels of screen — 今日の分 is a
-     grey texture while DUE TODAY is a word. The Japanese stays as a gloss a learner can grow
-     into, which is the call the main menu's description line already makes.
-
-     THE DARK ACCENT, NOT THE BRIGHT ONE, on paper. Section colours are chosen to sit on
-     near-black, where the light end of the ramp is the readable one; on cream it is the light
-     end that disappears. REVIEW's #e34a33 on paper is 2.4:1, its #b23320 is 4.4:1. */
-  const INK = '#2b1c10', DIM = 'rgba(43,28,16,0.6)', PAPER = '#f5ecd8';
   const lines = emaLines(en);
-  /* the figure, anchored by the MIDDLE of its own block rather than by a baseline, so a row that
-     has had to shrink to fit its widest member stays where it was composed */
-  const figure = (mid, colour, w = W - 56) => {
-    g.fillStyle = colour;
-    g.font = `900 ${nsize}px "Arial Black", Arial, sans-serif`;
-    g.fillText(EMA_V === 'e' ? meta.toUpperCase() : numTxt, W / 2, mid + nsize * 0.36, w);
-  };
-  const label = (y, colour, sp) => {
-    g.fillStyle = colour;
-    g.letterSpacing = sp;
-    g.font = `900 ${size}px "Arial Black", Arial, sans-serif`;
-    lines.forEach((t, k) => g.fillText(t, W / 2, y + k * size * 1.02, W - 40));
-    g.letterSpacing = '0px';
-  };
-  const gloss = (y, px, colour) => {
-    g.fillStyle = colour;
-    g.font = `700 ${px}px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif`;
-    g.fillText(jp, W / 2, y, W - 56);
-  };
-
-  if (EMA_V === 'a') {
-    /* the figure is the answer and the label names it — the shape a dashboard tile has */
-    figure(252, accent);
-    label(374, INK, '5px');
-    gloss(422, 32, DIM);
-  } else if (EMA_V === 'b') {
-    /* a banner in the section's colour, type reversed out of it, the figure on the paper below */
-    g.save();
-    g.beginPath();
-    g.moveTo(0, 278); g.lineTo(W, 278); g.lineTo(W, GAB); g.lineTo(W / 2, 6); g.lineTo(0, GAB);
-    g.closePath();
-    g.fillStyle = accent; g.fill();
-    g.restore();
-    label(lines.length > 1 ? 100 + size * 0.78 : 150 + size * 0.4, PAPER, '3px');
-    gloss(258, 28, 'rgba(245,236,216,0.7)');
-    figure(356, INK, W - 66);
-    if (unit.length > 2) {
-      g.fillStyle = DIM;
-      g.font = '700 26px "Yu Gothic UI", sans-serif';
-      g.fillText(unit, W / 2, 448, W - 56);
-    }
-  } else if (EMA_V === 'c') {
-    /* label, rule, figure — one line each and a lot of paper between them */
-    label(178, INK, '4px');
-    gloss(222, 30, DIM);
-    g.fillStyle = accent;
-    g.fillRect(W * 0.22, 250, W * 0.56, 7);
-    figure(348, accent);
-  } else if (EMA_V === 'd') {
-    /* the figure struck into a block, skewed the way the menu's own chips are */
-    g.save();
-    g.translate(W / 2, 232);
-    g.transform(1, 0, -0.1, 1, 0, 0);
-    g.fillStyle = accent;
-    g.fillRect(-W * 0.40, -80, W * 0.80, 160);
-    g.fillStyle = PAPER;
-    g.font = `900 ${nsize}px "Arial Black", Arial, sans-serif`;
-    g.fillText(numTxt, 0, nsize * 0.36, W * 0.70);
-    g.restore();
-    label(370, INK, '4px');
-    gloss(418, 30, DIM);
-  } else if (EMA_V === 'e') {
-    /* the label IS the choice and the count is a footnote — what a menu item usually is */
-    label(lines.length > 1 ? 104 + size * 0.78 : 158 + size * 0.4, INK, '2px');
-    gloss(310, 34, DIM);
-    g.fillStyle = accent;
-    g.fillRect(W * 0.16, 344, W * 0.68, 6);
-    figure(396, accent, W - 40);
-  } else {
-    label(lines.length > 1 ? GAB + 10 + size * 0.78 : GAB + 84 + size * 0.36, INK, '3px');
-    gloss(290, 38, 'rgba(43,28,16,0.62)');
-    figure(362, accent, W - 64);
-    g.fillStyle = 'rgba(43,28,16,0.7)';
-    g.font = '700 28px "Yu Gothic UI", sans-serif';
-    g.fillText(unit, W / 2, H - 14, W - 60);
-  }
+  g.fillStyle = '#2b1c10';
+  g.letterSpacing = '2px';
+  g.font = `900 ${size}px "Arial Black", Arial, sans-serif`;
+  /* a one-line label is centred on where a two-line one sits, so ALL and DUE TODAY are the same
+     object at different lengths rather than two different layouts */
+  const y0 = 104 + size * (lines.length > 1 ? 0.78 : 1.29);
+  lines.forEach((t, k) => g.fillText(t, W / 2, y0 + k * size * 1.02, W - 40));
+  g.letterSpacing = '0px';
+  g.fillStyle = 'rgba(43,28,16,0.6)';
+  g.font = '700 34px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif';
+  g.fillText(jp, W / 2, 310, W - 56);
+  /* THE DARK ACCENT, NOT THE BRIGHT ONE, on paper. Section colours are chosen to sit on
+     near-black, where the light end of the ramp is the readable one; on cream it is the light end
+     that disappears. REVIEW's #e34a33 on paper is 2.4:1, its #b23320 is 4.4:1. */
+  g.fillStyle = accent;
+  g.fillRect(W * 0.16, 344, W * 0.68, 6);
+  /* the count is anchored by the middle of its own block rather than by a baseline, so a row that
+     has had to shrink to fit its longest member stays where it was composed */
+  g.font = `900 ${msize}px "Arial Black", Arial, sans-serif`;
+  g.fillText(meta.toUpperCase(), W / 2, 396 + msize * 0.36, W - 40);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   /* the tablet is 384 texels wide and lands on about seventy pixels, so it is read four or five
@@ -2968,9 +2872,11 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
      of a row of four tiles, on no principle beyond looking tidy in the first draft — and it was
      costing a sixth of every glyph. The board's own posts already frame the row. */
   const TW = (W - W * 0.10) / tiles.length * 0.93, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.06;
-  /* the largest label and figure sizes every tile in this section can carry — the row shares both */
-  const EN_SIZE = Math.min(...tiles.map(([, en]) => emaEnSize(en, 384 - 46)));
-  const NUM_SIZE = Math.min(...tiles.map(([, , meta]) => emaNumSize(meta, 384 - 56)));
+  /* the largest label and count sizes every tile in this section can carry — the row shares both */
+  const EN_SIZE = Math.min(...tiles.map(([, en]) => emaEnSize(en, 384 - 48)));
+  /* a wider margin than the label gets: the count is the quiet line and a quiet line running
+     edge to edge is not quiet */
+  const META_SIZE = Math.min(...tiles.map(([, , meta]) => emaMetaSize(meta, 384 - 76)));
   const GAP = (W - W * 0.10 - TW * tiles.length) / (tiles.length - 1);
   const CORD = TH * 0.3;
   /* raycast target only: material.visible skips the draw, object.visible would skip the ray too */
@@ -2997,7 +2903,7 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
        it lifts the paper — the writing was being washed off the tablet by the thing meant to
        make it visible. Multiplying it by the face's own texture lights the paper and leaves the
        glyphs alone, which is both more legible and physically closer to true. */
-    const tex = emaTexture(jp, en, meta, accent, EN_SIZE, NUM_SIZE);
+    const tex = emaTexture(jp, en, meta, accent, EN_SIZE, META_SIZE);
     const face = new THREE.Mesh(new THREE.PlaneGeometry(TW, TH), new THREE.MeshToonMaterial({
       map: tex, emissive: 0x8d8069, emissiveMap: tex,
       gradientMap: RAMP, transparent: true,

@@ -1318,7 +1318,13 @@ FOR and letting everything else get out of the way of that:
 - **e** the label is the choice and the count a footnote — what a menu item usually is
 - **f** what was there, as a control
 
-Two things worth keeping out of the exercise itself:
+**Chosen: e**, and the other five are deleted rather than left behind a switch. It is the only
+one of the six that treats the tablet as something to *choose* rather than something to read a
+number off — which is what a level-two item is. The count still gets the section's colour and a
+rule of its own, so it is present without competing; the arrangements that led with the figure
+made every tablet answer a question nobody had asked yet.
+
+Three things worth keeping out of the exercise itself:
 
 - **Judge a face in the place it is read, not on a contact sheet.** A switch on the URL costs ten
   lines and shows every candidate lit, angled, at seventy pixels and against the actual
@@ -1328,6 +1334,9 @@ Two things worth keeping out of the exercise itself:
   came out condensed to two-thirds the digit width of `24` beside it, and four counts read as
   four different kinds of thing. Anchoring the figure by the middle of its block rather than by a
   baseline lets the shared size shrink without the composition sliding.
+- **Build the alternatives cheaply and delete them the moment one wins.** Six faces behind a URL
+  switch is a good way to decide and a terrible thing to keep: the branch is dead weight in every
+  future read of the function, and the losing five would go on being maintained by accident.
 
 ## Gotchas learned (worth keeping)
 
