@@ -3072,48 +3072,63 @@ function redrawStroke() {
 setInterval(redrawStroke, 17000);
 setTimeout(redrawStroke, 4000);
 
-/* fixed world anchors: the camera circles the world pivot; every section owns a bearing */
-const WORLD_PIVOT = new THREE.Vector3(150, 0, 150);
-/* The world got bigger to buy the rooms elbow room. What limits their spacing is that the menu
-   *stands* at 88° but *looks across* the pivot along −112°, so it reads the far half of the
-   world and everything there is forbidden. Pushing the rooms out shrinks that dead zone,
-   because as R grows the bearing az and the angle-from-the-eye θ converge:
-       θ(az) = atan2(R_SUB·sin az − 680, R_SUB·cos az − 20)      · home axis = −112.5°
-   At the old R_SUB 1800 the dead zone was 131° wide and six rooms had to crowd into 226°
-   at 34–52° apart. At 3720 it is 113°, so they now sit at an even 44°. (The ceiling is ~54°,
-   set by the frustum itself, so past here the returns vanish and the world just gets emptier.)
-   The camera keeps its old radius at home and dollies out to ORBIT_R on the way to a room —
-   which is why orbitSwing has to be told which radius to end on. */
-const HOME_R = 680;
-const ORBIT_R = 2600;
-/* How far the camera stands off a room. 1400, not 1120: the menu is furniture spread through
-   the room now, so the frame has to hold objects either side of centre as well as the 1150-wide
-   level-three scroll. At 1400 the cone is ±860 wide and ±537 tall at the room's origin. */
-const SUB_GAP = 1400;
-const R_SUB = ORBIT_R + SUB_GAP;
-const AZ_HOME = 1.5414;
-function restAt(az, y = 0) { return new THREE.Vector3(150 + Math.cos(az) * ORBIT_R, y, 150 + Math.sin(az) * ORBIT_R); }
-function subAt(az, y = 0) { const r = restAt(az, y); return r.add(new THREE.Vector3(Math.cos(az) * SUB_GAP, -10, Math.sin(az) * SUB_GAP)); }
-/* THE FULL CIRCLE. The rooms used to be crammed into 226° of arc because CSS3D planes could not
-   be culled and a room merely standing *elsewhere* would paint through the menu. Now that the
-   scenery is depth-buffered geometry that constraint is gone, so the six sit at an even 60°
-   and the world closes into a real ring you travel around.
+/* ================= WHERE THE SIX PLACES ARE =================
+   THE CAMERA NO LONGER ORBITS A PIVOT. It stands on the lake shore and stays there; choosing a
+   section turns it to face a place and then flies it toward that place. That is the model this
+   was always meant to have — the old one put the camera on a 680-unit circle and slid it round
+   to a 2,600-unit one, which meant every "destination" was a bearing rather than somewhere, and
+   the arrival framing was whatever the arc happened to leave you looking at.
 
-   The phase is chosen so no room sits on the menu's own sight line (which runs out at ~240°) —
-   210° and 270° flank it, and at 4300 units with fog they read as far-off structures across the
-   valley rather than clutter. JLPT takes 90°, the one bearing that would otherwise give almost
-   no orbit travel, because its journey is a 620-unit climb rather than a slide. */
+   The consequence worth stating: a destination is now a POINT IN THE LANDSCAPE, authored in the
+   same sight-line frame as the lake, the river and everything else. `bearing` is measured off
+   the home sight line, positive to the right; `dist` is how far out along it. Where the ground
+   is at that point is looked up, not assumed. */
+const HOME_EYE = new THREE.Vector3(170, 60, 830);
+/* how high the camera rides above whatever it is standing on — taken from home so the eye
+   keeps a consistent height wherever it goes rather than flying at a fixed altitude */
+const EYE_LIFT = HOME_EYE.y - Math.max(groundAt(HOME_EYE.x, HOME_EYE.z), LAKE_Y);
+/* how far short of a place the camera stops. Level two is furniture spread around the place, so
+   the frame has to hold objects either side of centre: at 1,500 the cone is ±920 wide. */
+const STAND_OFF = 1500;
+
+/* OVER WATER, THE SURFACE IS THE GROUND. `groundAt` returns the lake BED, which is 330 units
+   down — so a place in the water was authored below the waterline and the camera sent to stand
+   on the bottom of the lake, arriving nine units above the surface and skimming it. Everything
+   here reads whichever is higher. */
+function surfaceAt(x, z) { return Math.max(groundAt(x, z), LAKE_Y); }
+function destPlace(bearingDeg, dist, lift = 0) {
+  const b = bearingDeg * Math.PI / 180;
+  const p = at(Math.cos(b) * dist, Math.sin(b) * dist, 0);
+  p.y = surfaceAt(p.x, p.z) + lift;
+  return p;
+}
+/* the camera's standing point: on the line from home to the place, STAND_OFF short of it, at
+   eye height above whatever ground is there */
+function standOff(place) {
+  const v = place.clone().sub(HOME_EYE).setY(0);
+  const len = v.length();
+  const e = v.multiplyScalar(Math.max(len - STAND_OFF, 400) / len).add(HOME_EYE);
+  e.y = surfaceAt(e.x, e.z) + EYE_LIFT;
+  return e;
+}
+
+/* Six places around the lake. Fuji sits at bearing +11°, so REVIEW is held out to +27° where it
+   has open water and the right half of the frame to itself — it is the one you can see from the
+   menu, and it must not stack on the mountain. The rest spread wide enough that each is a real
+   turn: two ahead of the shoulders, two abeam, two behind. */
 const DESTS = [
-  { az: 0.5236, y: 0,   dir: -1 },   /* STUDY   —  30° · the engawa veranda      (sweep  −58°) */
-  { az: 5.7596, y: 0,   dir: -1 },   /* REVIEW  — 330° · the karesansui garden   (sweep −118°) */
-  { az: 2.6180, y: 0,   dir: 1  },   /* READING — 150° · the bamboo grove        (sweep  +62°) */
-  { az: 3.6652, y: 0,   dir: 1  },   /* DRILLS  — 210° · the dojo                (sweep +122°) */
-  { az: 1.5708, y: 620, dir: 1  },   /* JLPT    —  90° · the climb to the peak   (sweep   +2°) */
-  { az: 4.7124, y: 0,   dir: -1 },   /* RECORDS — 270° · the torii shore         (sweep −178°) */
-].map((d) => ({ ...d, rest: restAt(d.az, d.y), sub: subAt(d.az, d.y) }));
-const ENGAWA_REST = DESTS[0].rest, ENGAWA_SUB = DESTS[0].sub;
-const TORII_REST = DESTS[5].rest, TORII_SUB = DESTS[5].sub;
-const SUB_POS = ENGAWA_SUB;
+  { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
+  { bearing: 27, dist: 4700, lift: 240 }, /* REVIEW  — the torii standing in the water    */
+  { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
+  { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
+  { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
+  { bearing: -164, dist: 4800, lift: 180 }, /* RECORDS — the pagoda on the hill behind      */
+].map((d) => {
+  const place = destPlace(d.bearing, d.dist, d.lift);
+  return { ...d, place, eye: standOff(place) };
+});
+const HOME_SUB = DESTS[0];
+
 const subEl = document.createElement('div');
 subEl.className = 'plane-sub';
 /* the board carries level three only — level two lives in the room itself */
@@ -3131,13 +3146,13 @@ subEl.innerHTML = `
     <div class="l3-grid" id="l3Grid"></div>
     <button class="l3-back" id="l3Back">← BACK <em>戻る</em></button>
   </div>`;
-const subObj = cssPlane(subEl, SUB_POS.x, SUB_POS.y, SUB_POS.z, -24 * D2R, -1.2 * D2R);
+const subObj = cssPlane(subEl, HOME_SUB.place.x, HOME_SUB.place.y, HOME_SUB.place.z, -24 * D2R, -1.2 * D2R);
 
 const subWmEl = document.createElement('div');
 subWmEl.className = 'plane-wm';
 subWmEl.id = 'subWm';
 subWmEl.textContent = '学';
-const subWmObj = cssPlane(subWmEl, SUB_POS.x + 340, SUB_POS.y - 40, SUB_POS.z - 320, -24 * D2R);
+const subWmObj = cssPlane(subWmEl, HOME_SUB.place.x + 340, HOME_SUB.place.y - 40, HOME_SUB.place.z - 320, -24 * D2R);
 
 /* One room per destination. Only the room you are standing in is ever visible — otherwise a
    neighbour's architecture leaks into the main menu and eats the landscape. */
@@ -3157,16 +3172,16 @@ function envPlane(el, x, y, z, rx = 0, ry = 0, rz = 0) {
   return o;
 }
 /* the alcove is world geometry: parked once at the engawa bearing */
-destEnv.position.copy(ENGAWA_SUB);
-destEnv.lookAt(ENGAWA_REST);
+destEnv.position.copy(HOME_SUB.place);
+destEnv.lookAt(HOME_SUB.eye);
 
 /* ---- destination set-dressing: one little world per section ---- */
 function makeEnv(idx) {
   const d = DESTS[idx];
   const grp = new THREE.Group();
   cssScene.add(grp);
-  grp.position.copy(d.sub);
-  grp.lookAt(d.rest);
+  grp.position.copy(d.place);
+  grp.lookAt(d.eye);
   ENVS[idx] = grp;
   return {
     add(el, x, y, z, rx = 0, ry = 0, rz = 0, scale = 1) {
@@ -3199,7 +3214,7 @@ for (let i = 1; i <= 5; i++) makeEnv(i);
 
    What this buys: a real depth buffer (no more posts painting over type), actual lighting, and
    parallax that comes from geometry rather than stacked cut-outs. Room-local axes are unchanged
-   from the CSS3D version — the group is parked at d.sub looking at d.rest, so +z is toward the
+   from the CSS3D version — the group is parked at d.place looking at d.eye, so +z is toward the
    viewer and a more negative z stands further back.
 
    Lights are parented to their own room. three.js skips invisible subtrees when it gathers
@@ -3214,8 +3229,8 @@ const BUILD_ROOMS = false;
 function meshRoom(idx) {
   const d = DESTS[idx];
   const g = new THREE.Group();
-  g.position.copy(d.sub);
-  g.lookAt(d.rest);
+  g.position.copy(d.place);
+  g.lookAt(d.eye);
   g.visible = false;
   if (BUILD_ROOMS) backScene.add(g);
   MESH_ENVS[idx] = g;
@@ -3492,6 +3507,10 @@ function depthDress() {
 /* ================= interaction ================= */
 let state = 'menu';
 let active = 0, busy = false;
+/* a handle for headless verification: an arrival is a state change, and waiting a fixed number
+   of milliseconds for one is guesswork the moment the frame rate moves */
+window.NAV = { get state() { return state; }, get busy() { return busy; },
+  dests: () => DESTS.map((d) => ({ b: d.bearing, place: d.place.toArray().map(Math.round), eye: d.eye.toArray().map(Math.round) })) };
 
 const flash = document.getElementById('flash');
 const descLine = document.getElementById('descLine');
@@ -3892,7 +3911,7 @@ let tmode = (() => {
   return v >= 1 && v <= 2 ? v : 1;
 })();
 let activeMode = tmode;
-const subRest = { pos: ENGAWA_REST.clone(), tgt: ENGAWA_SUB.clone() };
+const subRest = { pos: HOME_SUB.eye.clone(), tgt: HOME_SUB.place.clone() };
 
 const chips = [...document.querySelectorAll('.trans-chip')];
 function setTmode(n) {
@@ -3925,9 +3944,9 @@ function applySpin() {
 /* every section travels to its own bearing */
 function destFor(i) { return DESTS[i]; }
 function placeSubAt(d) {
-  subRest.pos.copy(d.rest);
-  subRest.tgt.copy(d.sub);
-  placeSub(d.sub, d.rest);
+  subRest.pos.copy(d.eye);
+  subRest.tgt.copy(d.place);
+  placeSub(d.place, d.eye);
 }
 function placeSubDefault() { placeSubAt(destFor(0)); }
 placeSubDefault();
@@ -4063,68 +4082,78 @@ function whipTo(restPos, restTgt, dir, card, done) {
 function selectWhip(i) {
   const d = destFor(i);
   placeSubAt(d);
-  const tl = whipTo(d.rest, d.sub, d.dir, i, arriveSub);
+  const tl = whipTo(d.eye, d.place, turnDirTo(d.place), i, arriveSub);
   tl.add(() => openSub(0.45), 0.5);
 }
 function backWhip() {
   whipTo(new THREE.Vector3(HOME.px, HOME.py, HOME.pz), new THREE.Vector3(HOME.tx, HOME.ty, HOME.tz), -1, null, arriveMenu);
 }
 
-/* ---- ORBIT: swing around the world pivot until the lens faces another part of the panorama ---- */
-/* rEnd is explicit because the menu and the rooms no longer share a radius: home sits close in
-   at HOME_R and every room stands out at ORBIT_R, so each swing also dollies. */
-function orbitSwing(azEnd, yEnd, endTgt, done, openFrac, rEnd = ORBIT_R) {
-  const relx = cam.px - WORLD_PIVOT.x, relz = cam.pz - WORLD_PIVOT.z;
-  const az0 = Math.atan2(relz, relx);
-  const R0 = Math.hypot(relx, relz);
-  let sweep = azEnd - az0;
-  while (sweep > Math.PI) sweep -= Math.PI * 2;
-  while (sweep < -Math.PI) sweep += Math.PI * 2;
-  const y0 = cam.py;
-  const climb = Math.abs(yEnd - y0);
-  const startTgt = new THREE.Vector3(cam.tx, cam.ty, cam.tz);
-  /* How far the camera slides around the pivot is the wrong yardstick on its own. DRILLS slides
-     28° but rotates the *view* 131°, so pacing off the slide alone pinned the biggest turn in
-     the game to the 1.15s floor. Pace off whichever is larger — the eye reads the view swing,
-     discounted a little because a distant target sweeping past feels gentler than orbiting. */
-  const endEye = new THREE.Vector3(WORLD_PIVOT.x + Math.cos(azEnd) * rEnd, yEnd, WORLD_PIVOT.z + Math.sin(azEnd) * rEnd);
-  const v0 = startTgt.clone().sub(new THREE.Vector3(cam.px, cam.py, cam.pz)).setY(0);
-  const v1 = endTgt.clone().sub(endEye).setY(0);
-  const viewTurn = (v0.lengthSq() > 1 && v1.lengthSq() > 1) ? v0.angleTo(v1) : 0;
-  /* constant-ish angular velocity: a 140° journey must not take the same time as a 30° one.
-     A 620-unit climb counts as roughly one radian of travel. */
-  const swing = Math.max(Math.abs(sweep), viewTurn * 0.75);
-  /* the dolly between HOME_R and ORBIT_R is real distance too — a 1900-unit push counts */
-  const travel = swing + climb / 700 + Math.abs(rEnd - R0) / 2600;
-  /* floor raised to 1.15s: short hops (REVIEW's 33°) read as snappy below that */
-  const dur = THREE.MathUtils.clamp(0.72 + travel * 0.46, 1.15, 1.95);
-  /* bank and mid-arc rise scale with how much turning there actually is —
-     a short hop shouldn't heel over like a 140° sweep */
-  const turn = THREE.MathUtils.clamp(swing / 2.4, 0, 1);
-  const bank = 6.5 * turn;
-  const hop = 46 * turn + climb * 0.05;
+/* ---- TURN: yaw to face the place, then fly to it ----
+   The move the brief always described: you look at where you are going before you set off. Yaw
+   and fly overlap rather than running in sequence — the turn leads and is finished by 62% of
+   the way through, the flight starts at 18% and carries on to the end — because a camera that
+   completes its turn, pauses, and only then moves reads as two shots rather than one.
+
+   The look direction is interpolated as YAW AND PITCH, not by lerping the target through space.
+   Lerping a point gives non-constant angular velocity — fast through the middle of a wide turn
+   and slow at its ends — and the eye reads angular velocity, so the old swing had to discount
+   its own pacing to compensate. Rotating at a constant rate needs no such correction. */
+const _tdir = new THREE.Vector3();
+function turnDirTo(place) {
+  const a0 = Math.atan2(cam.tz - cam.pz, cam.tx - cam.px);
+  const a1 = Math.atan2(place.z - cam.pz, place.x - cam.px);
+  let d = a1 - a0;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d >= 0 ? 1 : -1;
+}
+const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
+const easeInOutSine = (x) => -(Math.cos(Math.PI * x) - 1) / 2;
+
+function turnTo(endEye, endTgt, done, openFrac) {
+  const px0 = cam.px, py0 = cam.py, pz0 = cam.pz;
+  const d0x = cam.tx - px0, d0y = cam.ty - py0, d0z = cam.tz - pz0;
+  const r0 = Math.hypot(d0x, d0y, d0z);
+  const d1x = endTgt.x - endEye.x, d1y = endTgt.y - endEye.y, d1z = endTgt.z - endEye.z;
+  const r1 = Math.hypot(d1x, d1y, d1z);
+  const yaw0 = Math.atan2(d0z, d0x), pit0 = Math.asin(d0y / r0);
+  const yaw1 = Math.atan2(d1z, d1x), pit1 = Math.asin(d1y / r1);
+  let dYaw = yaw1 - yaw0;
+  while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+  while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+
+  const travel = Math.hypot(endEye.x - px0, endEye.y - py0, endEye.z - pz0);
+  /* paced off the turn and the distance together: a 160° swing and a 5,000-unit run are both
+     journeys, and one without the other still has to feel like it took the time it took */
+  const dur = THREE.MathUtils.clamp(0.70 + Math.abs(dYaw) * 0.42 + travel / 5200, 1.1, 2.1);
+  const heel = THREE.MathUtils.clamp(Math.abs(dYaw) / 2.4, 0, 1);
   const drive = { p: 0 };
   const tl = gsap.timeline({ onComplete: done });
   tl.to(drive, {
-    p: 1, duration: dur, ease: 'sine.inOut',
+    p: 1, duration: dur, ease: 'none',
     onUpdate: () => {
       const p = drive.p;
-      const bell = Math.sin(p * Math.PI);
-      const a = az0 + sweep * p;
-      const R = R0 + (rEnd - R0) * p;
-      cam.px = WORLD_PIVOT.x + Math.cos(a) * R;
-      cam.pz = WORLD_PIVOT.z + Math.sin(a) * R;
-      cam.py = y0 + (yEnd - y0) * p + bell * hop;
-      cam.roll = -Math.sign(sweep) * bell * bank;
-      cam.tx = startTgt.x + (endTgt.x - startTgt.x) * p;
-      cam.ty = startTgt.y + (endTgt.y - startTgt.y) * p;
-      cam.tz = startTgt.z + (endTgt.z - startTgt.z) * p;
+      const q = easeOutCubic(THREE.MathUtils.clamp(p / 0.62, 0, 1));          /* the turn */
+      const f = easeInOutSine(THREE.MathUtils.clamp((p - 0.18) / 0.82, 0, 1)); /* the flight */
+      cam.px = px0 + (endEye.x - px0) * f;
+      cam.py = py0 + (endEye.y - py0) * f + Math.sin(f * Math.PI) * (54 * heel);
+      cam.pz = pz0 + (endEye.z - pz0) * f;
+      const yaw = yaw0 + dYaw * q, pit = pit0 + (pit1 - pit0) * q;
+      const rr = r0 + (r1 - r0) * q;
+      const ch = Math.cos(pit) * rr;
+      cam.tx = cam.px + Math.cos(yaw) * ch;
+      cam.ty = cam.py + Math.sin(pit) * rr;
+      cam.tz = cam.pz + Math.sin(yaw) * ch;
+      /* the bank belongs to the TURN, so it peaks with the yaw rather than halfway through the
+         whole move — otherwise a long flight after a short turn heels over at nothing */
+      cam.roll = -Math.sign(dYaw) * Math.sin(Math.min(p / 0.62, 1) * Math.PI) * 6.5 * heel;
     },
   }, 0);
   tl.add(() => {
     gsap.fromTo(moonEl, { filter: 'brightness(1)' }, { filter: 'brightness(1.5)', duration: 0.26, yoyo: true, repeat: 1, ease: 'sine.inOut' });
   }, dur * 0.4);
-  /* the destination assembles as a fraction of the swing, so pacing holds at any distance */
+  /* the destination assembles as a fraction of the move, so pacing holds at any distance */
   if (openFrac != null) tl.add(() => openSub(1), dur * openFrac);
   return tl;
 }
@@ -4132,11 +4161,10 @@ function selectOrbit(i) {
   const d = destFor(i);
   placeSubAt(d);
   spawnPetals(itemObjs[i].position);
-  orbitSwing(d.az, d.rest.y, d.sub, arriveSub, 0.82);
+  turnTo(d.eye, d.place, arriveSub, 0.82);
 }
 function backOrbit() {
-  /* HOME_R, not ORBIT_R — the way back pulls in to the menu's close standing point */
-  orbitSwing(AZ_HOME, HOME.py, new THREE.Vector3(HOME.tx, HOME.ty, HOME.tz), arriveMenu, null, HOME_R);
+  turnTo(HOME_EYE, new THREE.Vector3(HOME.tx, HOME.ty, HOME.tz), arriveMenu, null);
 }
 
 function select(i) {

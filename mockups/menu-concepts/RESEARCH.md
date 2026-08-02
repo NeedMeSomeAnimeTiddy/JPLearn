@@ -899,6 +899,38 @@ water — 446 units under the mist reference plane — and `exp(+446/380)` put t
 3.2×, so the reflected world dissolved and left only the outline hulls. Reflections looked like
 skeletons of the trees above them. Clamping the camera's height to the mist plane fixes it.
 
+## v27 — the camera stops orbiting a pivot (stage A of the destination rebuild)
+
+The model the brief always described, and never had: **the camera stands on the lake shore and
+stays there; choosing a section turns it to face a place and flies it toward that place.** The
+old one put the camera on a 680-unit circle around a world pivot and slid it to a 2,600-unit
+one, which had two consequences worth naming. A "destination" was a *bearing*, so there was
+nothing at it — arrivals framed whatever the arc happened to leave in shot, which is why every
+section opened on the same anonymous meadow. And the arrival framing could not be authored,
+because it was a by-product of the sweep.
+
+A destination is now a point in the landscape, authored in the same sight-line frame as the
+lake and the river: a bearing off the home axis and a distance out. Where the ground is at that
+point is looked up rather than assumed. The camera's standing point is derived — on the line
+from home, 1,500 short of the place, at the same height above the ground that home rides at.
+
+- **Interpolate the look direction as yaw and pitch, not by lerping the target through space.**
+  Lerping a point gives non-constant angular velocity — fast through the middle of a wide turn,
+  slow at its ends — and the eye reads angular velocity. The old swing had a hand-tuned discount
+  (`viewTurn * 0.75`) to compensate for exactly this; rotating at a constant rate needs no such
+  correction and the fudge factor went with it.
+- **Yaw and flight overlap.** The turn leads and finishes at 62% of the move; the flight starts
+  at 18% and runs to the end. Sequenced rather than overlapped, it reads as two shots.
+- **The bank belongs to the turn, not to the move.** Peaking it halfway through the whole
+  journey means a long flight after a short turn heels over at nothing.
+- **Over water, the surface is the ground.** `groundAt` returns the lake BED, 330 units down, so
+  a place authored over the lake went under the waterline and the camera was sent to stand on
+  the bottom — it arrived nine units above the surface, skimming it. Anything positional that
+  can fall over water needs `max(ground, waterline)`.
+
+WHIP needed no change beyond being handed the new end points: it always took an explicit
+position and target, and a whip-pan is a yaw, which is what this model is made of.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1018,6 +1050,10 @@ skeletons of the trees above them. Clamping the camera's height to the mist plan
   accepting them against a wobbled one silently empties whole bearings.
 - Any shader term that depends on the camera's height needs a second look the moment a
   reflection pass exists — the mirrored camera is below the world.
+
+- **Wait for a state change, not for a number of milliseconds.** Fixed waits in a headless
+  harness are guesswork the moment the frame rate moves — and it moves whenever the scene does.
+  Expose enough state to await the thing you actually mean.
 
 ## Sources
 
