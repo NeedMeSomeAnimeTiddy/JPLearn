@@ -3706,17 +3706,22 @@ function pickWorldTile(sec, jp) {
      ema wall's mass so neither side wins, and it is open on all four sides so it never becomes a
      second board competing for the eye. */
   {
-    /* SET BACK, not just set aside. At side 258 and only 650 from the eye it was nearer the
-       camera than the ema wall it is meant to answer, so it filled the right third and had its
-       roof cut off by the top edge — the counterpart out-massing the thing it is a counterpart
-       to. Out at the court's edge and half again further down it, it holds its side of the frame
-       at about the wall's apparent size, which is what balance means here. */
+    /* BROUGHT FORWARD TO HOLD THE GROUND THE GUARDIANS LEFT. It sat at f -430 while they stood
+       at -710, in front of it; with the pair moved up to the gate that near-right ground went
+       empty again, so the pavilion takes it. At -660 it is 230 nearer the eye and reads about a
+       fifth larger, which is what "compensate" has to mean when the thing you removed was the
+       nearest object on that side.
+
+       (The first version of this was much nearer still — side 258, 650 from the eye — where it
+       out-massed the ema wall it is meant to answer and had its roof cut by the top edge. -660
+       at side 300 is forward of that station in depth but well outboard of it, which keeps the
+       roof clear and the mass matched.) */
     const ch = new THREE.Mesh(chozuyaGeo(178, 168, 238), new THREE.MeshToonMaterial({
       vertexColors: true, gradientMap: RAMP, flatShading: true,
     }));
-    ch.position.copy(at3(-430, 312));
+    ch.position.copy(at3(-640, 310));
     ch.position.y = CY_TOP;
-    facing(ch, -430, 0);
+    facing(ch, -640, 0);
     backScene.add(ch);
     addOutline(ch, 3.2);
     CHOZUYA = ch;
@@ -3725,30 +3730,31 @@ function pickWorldTile(sec, jp) {
 
   /* ---- 狛犬 — the guardians, on the court in front of the pavilion ----
      STATION CHOSEN BY PROBE, NOT BY EYE. `NAV.probe` projects a whole grid of (f, sd) in one page
-     load: at f -710, sd 320 the foot lands well below the pavilion's base at 843 in a 1920x1080
-     frame and therefore in front of it, and one world unit is worth about 2.4 pixels there. That
-     fixes the size as well as the place — 150 units comes to some 360 pixels, a bit over half the
-     pavilion's height, which is about what a guardian is next to a roof.
+     load, so where a thing lands and how many pixels a world unit is worth there are both
+     answered before anything is built rather than after it is looked at.
 
      The pair sits at the near edge of the court because that is where a pair belongs: they mark
      the point where the approach becomes the precinct, and the camera happens to stand just short
      of it.
 
-     TURNED WELL IN, NOT JUST OFF THE AXIS. Aiming them at (-1800, sd*0.42) pointed them almost
-     straight back down the approach — nine degrees off, which from a camera standing on that same
-     axis is indistinguishable from square-on, and a guardian seen square-on is a lump. Aiming at
-     (-1500, -sd*0.15) crosses the centreline, so each one is turned about twenty-six degrees
-     toward the other: the head comes round into three-quarter view, the chest catches the light
-     down one side, and the pair reads as two animals looking at each other across the way in
-     rather than as two objects that happen to be there. */
+     AT THE GATE, WHICH IS WHERE A PAIR ACTUALLY STANDS. Out on the near court they were the
+     largest thing on that side and they crowded the pavilion they were supposed to be beside.
+     A komainu pair marks a threshold; the threshold here is the torii, and at f -200 they sit on
+     the last of the concrete just short of it, one outside each pillar. Being 500 further off
+     they come down to about two thirds of the size they had, which is the point — they stop
+     competing with the buildings and start belonging to the gate.
+
+     Facing straight down the approach. The three-quarter turn earned its keep when they were the
+     near object and you passed between them; from the gate they are seen head-on from the axis,
+     and a pair square to the way in is what reads as a gate being guarded. */
   {
-    [[320, true], [-320, false]].forEach(([sd, open]) => {
-      const m = new THREE.Mesh(komainuGeo(150, open), new THREE.MeshToonMaterial({
+    [[250, true], [-250, false]].forEach(([sd, open]) => {
+      const m = new THREE.Mesh(komainuGeo(175, open), new THREE.MeshToonMaterial({
         vertexColors: true, gradientMap: RAMP, flatShading: true,
       }));
-      m.position.copy(at3(-710, sd));
+      m.position.copy(at3(-200, sd));
       m.position.y = CY_TOP;
-      facing(m, -1500, -sd * 0.15);
+      facing(m, -3000, sd);
       backScene.add(m);
       addOutline(m, 3.2);
       if (sd > 0) MARKS.komainu = m;
@@ -3777,11 +3783,11 @@ function pickWorldTile(sec, jp) {
      placements: one crowding the pavilion from in front, one shoved so far right it was a green
      smear on the frame edge. */
   {
-    const t = shinbokuGeo(495);
+    const t = shinbokuGeo(560);
     const m = new THREE.Mesh(t, new THREE.MeshToonMaterial({
       vertexColors: true, gradientMap: RAMP, flatShading: true,
     }));
-    m.position.copy(at3(120, 546, -12));
+    m.position.copy(at3(120, 500, -12));
     m.rotation.y = 2.1;
     backScene.add(m);
     addOutline(m, 3.2);
@@ -3799,7 +3805,7 @@ function pickWorldTile(sec, jp) {
      Everything is allocated once and rests at zero scale — the rule that nothing in this world
      appears or vanishes applies to effects too; what an effect may do is start and finish. */
   {
-    const at2 = at3(-430, 312);
+    const at2 = at3(-640, 310);
     const cx = at2.x, cz = at2.z, cy = CY_TOP + 238 * 0.235;
     const ripples = [0, 1, 2].map(() => {
       const m = new THREE.Mesh(new THREE.RingGeometry(1, 1.16, 40), new THREE.MeshBasicMaterial({
@@ -3957,10 +3963,10 @@ function pickWorldTile(sec, jp) {
     };
     /* the built things go in first, so nothing can grow through them either */
     PLANTED.push([-690, -215, 155, 155]);   /* the ema wall */
-    PLANTED.push([-430, 312, 150, 150]);    /* the water pavilion */
-    PLANTED.push([120, 546, 220, 290]);     /* the sacred tree, canopy and all */
-    PLANTED.push([-710, 320, 95, 95]);      /* the guardians */
-    PLANTED.push([-710, -320, 95, 95]);
+    PLANTED.push([-640, 310, 150, 150]);    /* the water pavilion */
+    PLANTED.push([120, 500, 220, 290]);     /* the sacred tree, canopy and all */
+    PLANTED.push([-200, 250, 95, 95]);      /* the guardians */
+    PLANTED.push([-200, -250, 95, 95]);
     PLANTED.push([-2100, 0, 340, 340]);     /* the outer gate */
     [[-1240, 402], [-1240, -402], [-260, 402], [-260, -402], [420, 250], [420, -250]]
       .forEach(([lf, ls]) => PLANTED.push([lf, ls, 78, 78]));
