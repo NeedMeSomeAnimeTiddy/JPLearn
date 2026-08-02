@@ -39,12 +39,14 @@ import * as THREE from './lib/three.module.min.js';
      3  toon + outline the look is authored rather than simulated — which makes
                        simple geometry an asset instead of a liability
      4  shadows        a real shadow map, so things are attached to the ground
+     5  cloud shadows  drifting sky occlusion, which breaks up the terminator a
+                       single directional light otherwise leaves as a plain diagonal
 
-   Press 1-4 to toggle, 0 for all off (which is roughly what the main mockup
+   Press 1-5 to toggle, 0 for all off (which is roughly what the main mockup
    was doing), 9 for all on.
    ============================================================================ */
 
-const state = { ao: true, ramp: true, toon: true, shadow: true };
+const state = { ao: true, ramp: true, toon: true, shadow: true, clouds: true };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
@@ -54,7 +56,10 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+/* PCFSoftShadowMap is deprecated in this three build and silently falls back to PCFShadowMap
+   — asking for it just produced a console warning and shadows that behaved differently than
+   the code claimed. Ask for what actually runs. */
+renderer.shadowMap.type = THREE.PCFShadowMap;
 document.getElementById('stage').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -99,24 +104,156 @@ function toonRamp(steps) {
 const RAMP = toonRamp(4);
 
 /* ---- lights ---- */
-const key = new THREE.DirectionalLight(0xffe6c4, 2.1);
+/* KEY-TO-FILL RATIO IS THE WHOLE GAME. Last round I pushed the fill to 1.9 to stop shadows
+   going black, and that quietly broke everything downstream: with fill nearly matching key,
+   direct sunlight became a minority of the terrain's light, so anything that modulates
+   direct light — cast shadows, cloud shadows — moved the final pixel by ~1%. The fix is
+   not stronger shadows, it is a key that dominates and a fill that only lifts the floor. */
+const key = new THREE.DirectionalLight(0xffe6c4, 3.2);
 key.position.set(-1500, 1900, 900);
 key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
+key.shadow.mapSize.set(4096, 4096);
 const sc = key.shadow.camera;
-/* The hard straight edge across the hill was not a shadow — it was the edge of the shadow
-   camera. A 3600-unit ortho box cannot hold a 3000-unit terrain once the light is at 40°,
-   because the terrain projects much longer than itself along the light direction. */
-sc.left = -3200; sc.right = 3200; sc.top = 3200; sc.bottom = -3200; sc.near = 200; sc.far = 9000;
-key.shadow.bias = -0.0006;
-/* normalBias 6 was pushing the caster off its own contact point; radius is what softens PCF */
-key.shadow.normalBias = 2;
-key.shadow.radius = 7;
+/* SIZE THE BOX, THEN COUNT THE TEXELS. The hard straight edge across the hill was the edge
+   of the shadow camera: a 3600-unit box cannot hold a 3000-unit terrain once the light is
+   at 47°, because the terrain projects much longer than itself along the light direction.
+   Half-diagonal 2121 plus the height shift (760 / tan 47°, halved) lands at ~2470, so 2600
+   covers it with margin — and every unit past that is texel resolution thrown away. */
+sc.left = -2600; sc.right = 2600; sc.top = 2600; sc.bottom = -2600; sc.near = 200; sc.far = 8000;
+
+/* THE BLUR MUST BE SMALLER THAN WHAT IT SHADOWS. At 2048 over a 6400-unit box a texel was
+   3.1 units, so radius 7 meant a ±22-unit PCF kernel — wider than the 54-unit rocks. Every
+   object sampled its own far side and went fully black, which read as "the rocks are unlit"
+   rather than as a shadow bug. 4096 over 5200 units gives a 1.27-unit texel; radius 2.5 is
+   then a ~3-unit blur, soft on the terrain and harmless on a rock. */
+key.shadow.radius = 2.5;
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 3;
 scene.add(key, key.target);
-/* lifted a long way: a shadow is only ever as dark as the fill light lets it be, and at 1.1
-   everything the key missed fell to near-black */
-const fill = new THREE.HemisphereLight(0xbcd0ec, 0x5a5340, 1.9);
+/* THREE LIGHTS, NOT TWO. Trading key against hemisphere is a false choice: raise the fill
+   and shadows stop reading, drop it and everything in shadow crushes to black. The way out
+   is a second DIRECTIONAL light from the opposite side, casting nothing — it lifts shadowed
+   surfaces while still SHAPING them, because it arrives from a different angle. The
+   hemisphere then only has to tint, so it can stay low and the key can stay dominant. */
+const bounce = new THREE.DirectionalLight(0x8fb4e8, 0.95);
+bounce.position.set(1700, 700, -1300);
+scene.add(bounce, bounce.target);
+const fill = new THREE.HemisphereLight(0xa8c4ea, 0x6d6046, 0.7);
 scene.add(fill);
+
+/* ======================= 5. CLOUD SHADOWS =======================
+   One directional light on a smooth landform always gives the same plain diagonal
+   terminator, and no amount of tuning the light fixes that — the fault is that there
+   is only one occluder. Real skies have a second: cloud cover. This is the cheapest
+   large-scale variation available, and it costs one texture lookup.
+
+   Two things make it read as sky rather than as a dirty texture:
+     - it multiplies DIRECT light only, so shaded ground falls to the cold hemisphere
+       fill instead of just going grey — same colour shift as a real cloud shadow
+     - the lookup is projected along the light direction onto y = 0, not taken straight
+       down, so the shadow stays put on a hillside instead of sliding up the slope */
+
+/* tileable fBm on a canvas: wrapping value noise, then shaped so there is open sky
+   between the blobs rather than an even grey mush */
+function cloudTex(S = 512) {
+  const hash = (x, y, p) => {
+    const xi = ((x % p) + p) % p, yi = ((y % p) + p) % p;
+    const n = Math.sin(xi * 127.1 + yi * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const noise = (x, y, p) => {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const u = smooth(x - xi), v = smooth(y - yi);
+    return hash(xi, yi, p) * (1 - u) * (1 - v) + hash(xi + 1, yi, p) * u * (1 - v)
+         + hash(xi, yi + 1, p) * (1 - u) * v + hash(xi + 1, yi + 1, p) * u * v;
+  };
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  const img = g.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      let v = 0, amp = 0.55, f = 3;
+      for (let o = 0; o < 5; o++) { v += noise(x / S * f, y / S * f, f) * amp; amp *= 0.5; f *= 2; }
+      /* smoothstep with a high floor: ~40% coverage, soft edges. Capped at 0.85 so even
+         the core of a cloud still passes light — an uncapped core reads as a hole */
+      const cover = THREE.MathUtils.smoothstep(v, 0.40, 0.74) * 0.85;
+      const lit = Math.round(255 * (1 - cover));
+      const i = (y * S + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = lit; img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+/* one shared set of uniform objects, handed to every patched material by reference,
+   so drifting the offset once in the tick moves the cover across the whole scene */
+const CLOUD = {
+  uCloudMap: { value: cloudTex() },
+  uCloudOff: { value: new THREE.Vector2() },
+  uCloudProj: { value: new THREE.Vector2() },
+  /* the tile repeats every 1/scale world units and holds ~3 blobs across, so this is
+     roughly a 900-unit cloud on a 3000-unit hill — several in frame, none dominating */
+  uCloudScale: { value: 1 / 2600 },
+  uCloudAmt: { value: 0.78 },
+};
+{
+  /* project along the light: from a point P, travelling toward the light until y = 0
+     lands at P.xz - P.y * (L.xz / L.y) */
+  const L = key.position.clone().normalize();
+  CLOUD.uCloudProj.value.set(L.x / L.y, L.z / L.y);
+}
+
+/* THE UNIFORM TRAP. three.js uploads a built-in material's uniforms only when that
+   material's `version` changes — so a custom uniform added through onBeforeCompile is
+   written to the GPU exactly once and then never again. Mutating `.value` per frame does
+   nothing, silently: the shader is correct, the texture is correct, and the effect simply
+   never moves. `needsUpdate` is only `version++` (it disposes nothing), so bumping it on
+   the handful of cloud-lit materials each frame is the cheap, supported way through.
+   Anything animated through onBeforeCompile in the real scene needs this same registry. */
+const CLOUD_MATS = [];
+
+function cloudy(mat) {
+  mat.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, CLOUD);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCloudPos;')
+      /* after project_vertex so `transformed` is final; the instancing branch matters
+         because everything in the real scene will be an InstancedMesh */
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vec4 cwp = vec4( transformed, 1.0 );
+        #ifdef USE_INSTANCING
+          cwp = instanceMatrix * cwp;
+        #endif
+        vCloudPos = ( modelMatrix * cwp ).xyz;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vCloudPos;
+        uniform sampler2D uCloudMap;
+        uniform vec2 uCloudOff;
+        uniform vec2 uCloudProj;
+        uniform float uCloudScale;
+        uniform float uCloudAmt;`)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        {
+          vec2 cuv = ( vCloudPos.xz - vCloudPos.y * uCloudProj ) * uCloudScale + uCloudOff;
+          float cs = texture2D( uCloudMap, cuv ).r;
+          reflectedLight.directDiffuse *= mix( 1.0, cs, uCloudAmt );
+        }`);
+    /* String.replace on a chunk name that moved is a silent no-op — which looks exactly
+       like a working feature with the effect turned off. Never let it fail quietly. */
+    const wroteVarying = shader.vertexShader.includes('vCloudPos = (');
+    const wroteSample = shader.fragmentShader.includes('texture2D( uCloudMap');
+    if (!wroteVarying || !wroteSample) {
+      console.error('CLOUD PATCH FAILED', mat.type, 'vert write:', wroteVarying, 'frag sample:', wroteSample);
+    }
+  };
+  CLOUD_MATS.push(mat);
+  return mat;
+}
 
 /* ============================ THE TERRAIN ============================ */
 const SIZE = 3000, SEG = 190;
@@ -195,8 +332,8 @@ function repaintTerrain() {
   geo.attributes.color.needsUpdate = true;
 }
 
-const matToon = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP });
-const matPlain = new THREE.MeshLambertMaterial({ vertexColors: true });
+const matToon = cloudy(new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP }));
+const matPlain = cloudy(new THREE.MeshLambertMaterial({ vertexColors: true }));
 const ground = new THREE.Mesh(geo, matToon);
 ground.receiveShadow = true;
 ground.castShadow = true;
@@ -205,14 +342,52 @@ scene.add(ground);
 /* ============================ THE TREE ============================ */
 /* ---- 3. OUTLINE: inverted hull, extruded along the normal in a vertex shader.
    Scaling the mesh does not work on anything non-spherical; extruding does. */
+
+/* THE GAP BUG. A flat-shaded polyhedron — DodecahedronGeometry(r, 0), a cylinder's rim —
+   has its vertices DUPLICATED per face, each copy carrying its own face normal. Extruding
+   those sends the two copies of a shared corner in different directions, so the hull tears
+   itself open along every edge and you see through the seam. The mesh looks fine because
+   the seam is exactly where the faces still meet; only the offset hull comes apart.
+
+   So the outline gets its own geometry with normals averaged across coincident vertices —
+   the shaded mesh keeps the original flat normals, which is the whole point of it.
+
+   Averaging alone under-extrudes at corners, though: a smoothed normal sits at an angle
+   to each face it came from, so a width of w only clears w*cos(that angle). Keeping the
+   original normal in `aFlat` lets the shader divide it back out and clear w on every
+   adjacent face — that is what closes the corners rather than merely narrowing the gap. */
+function outlineGeom(src) {
+  const g = src.clone();
+  const p = g.attributes.position, n = g.attributes.normal;
+  g.setAttribute('aFlat', new THREE.BufferAttribute(new Float32Array(n.array), 3));
+  const buckets = new Map();
+  for (let i = 0; i < p.count; i++) {
+    /* quantised so vertices that are meant to be coincident actually collide */
+    const k = `${Math.round(p.getX(i) * 64)},${Math.round(p.getY(i) * 64)},${Math.round(p.getZ(i) * 64)}`;
+    let b = buckets.get(k);
+    if (!b) { b = { x: 0, y: 0, z: 0, at: [] }; buckets.set(k, b); }
+    b.x += n.getX(i); b.y += n.getY(i); b.z += n.getZ(i); b.at.push(i);
+  }
+  const v = new THREE.Vector3();
+  buckets.forEach((b) => {
+    v.set(b.x, b.y, b.z);
+    if (v.lengthSq() < 1e-8) return;            /* opposed normals cancelled — leave them */
+    v.normalize();
+    b.at.forEach((i) => n.setXYZ(i, v.x, v.y, v.z));
+  });
+  n.needsUpdate = true;
+  return g;
+}
+
 function outlineFor(mesh, w) {
-  const m = new THREE.Mesh(mesh.geometry, new THREE.ShaderMaterial({
+  const m = new THREE.Mesh(outlineGeom(mesh.geometry), new THREE.ShaderMaterial({
     uniforms: { w: { value: w } },
     /* scale the extrusion by view distance so the line holds the same weight on screen —
      a fixed world-space width is ~1px at this camera range, which is why it vanished */
-    vertexShader: `uniform float w; void main(){
+    vertexShader: `uniform float w; attribute vec3 aFlat; void main(){
       vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      vec3 p = position + normal * (w * -mv.z);
+      float k = 1.0 / max( dot( normal, aFlat ), 0.30 );
+      vec3 p = position + normal * (w * -mv.z * k);
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
     fragmentShader: `void main(){ gl_FragColor = vec4(0.055, 0.06, 0.085, 1.0); }`,
     side: THREE.BackSide,
@@ -231,7 +406,7 @@ function tree(x, z, s) {
   g.scale.setScalar(s);
   scene.add(g);
 
-  const bark = new THREE.MeshToonMaterial({ color: 0x584234, gradientMap: RAMP });
+  const bark = cloudy(new THREE.MeshToonMaterial({ color: 0x584234, gradientMap: RAMP }));
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(13, 22, 190, 7), bark);
   trunk.position.y = 95; trunk.castShadow = true; trunk.receiveShadow = true;
   g.add(trunk);
@@ -239,9 +414,9 @@ function tree(x, z, s) {
 
   [[0, 236, 0, 96], [-52, 200, 26, 66], [58, 208, -20, 72], [8, 292, -30, 58]]
     .forEach(([bx, by, bz, r], i) => {
-      const leaf = new THREE.MeshToonMaterial({
+      const leaf = cloudy(new THREE.MeshToonMaterial({
         color: [0x5d7d3a, 0x51702f, 0x678a42, 0x4a672c][i], gradientMap: RAMP,
-      });
+      }));
       const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leaf);
       m.position.set(bx, by, bz);
       m.scale.set(1.18, 0.92, 1.1);
@@ -256,7 +431,7 @@ tree(-120, 130, 1.9);
 /* a couple of rocks, so the shadow test has more than one caster */
 [[380, -260, 54], [-520, -420, 38], [190, 420, 30]].forEach(([x, z, r]) => {
   const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0),
-    new THREE.MeshToonMaterial({ color: 0x8a8275, gradientMap: RAMP }));
+    cloudy(new THREE.MeshToonMaterial({ color: 0x8a8275, gradientMap: RAMP })));
   m.position.set(x, heightAt(x, z) + r * 0.45, z);
   m.rotation.set(0.5, x * 0.01, 0.3);
   m.castShadow = true; m.receiveShadow = true;
@@ -278,6 +453,7 @@ function apply() {
   ground.material = matPlain;
   outlines.forEach((o) => { o.visible = state.toon; });
   renderer.shadowMap.enabled = state.shadow;
+  CLOUD.uCloudAmt.value = state.clouds ? 0.78 : 0;
   scene.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
   const row = (on, k, label) => `<div class="${on ? '' : 'off'}">[${k}] ${on ? '<b>on </b>' : 'off'} ${label}</div>`;
   hud.innerHTML = '<h1>SHADING LAB</h1>'
@@ -285,6 +461,7 @@ function apply() {
     + row(state.ramp, 2, 'slope/height ramp colour')
     + row(state.toon, 3, 'toon ramp + outline (objects only)')
     + row(state.shadow, 4, 'shadow map')
+    + row(state.clouds, 5, 'drifting cloud shadows')
     + '<div class="off" style="margin-top:8px">[0] all off &nbsp; [9] all on</div>';
 }
 addEventListener('keydown', (e) => {
@@ -292,6 +469,7 @@ addEventListener('keydown', (e) => {
   else if (e.key === '2') state.ramp = !state.ramp;
   else if (e.key === '3') state.toon = !state.toon;
   else if (e.key === '4') state.shadow = !state.shadow;
+  else if (e.key === '5') state.clouds = !state.clouds;
   else if (e.key === '0') Object.keys(state).forEach((k) => { state[k] = false; });
   else if (e.key === '9') Object.keys(state).forEach((k) => { state[k] = true; });
   else return;
@@ -305,11 +483,30 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-let t = 0;
+/* a lab you cannot take a controlled screenshot of is a worse lab: freeze pins the orbit
+   so two toggle states can be compared from the identical camera */
+let t = 0, ct = 0;
+/* view: [eyeX, eyeY, eyeZ, atX, atY, atZ] pins the camera anywhere — the only way to get
+   close enough to an object to judge an outline seam */
+window.LAB = {
+  state, apply, CLOUD, cloud: CLOUD.uCloudMap.value.image,
+  scene, camera, renderer, key, ground,
+  freeze: false, view: null, at: (v) => { t = v; },
+};
+
 function tick() {
-  t += 0.0016;
-  camera.position.set(Math.cos(t) * 2700, 1450, Math.sin(t) * 2700);
-  camera.lookAt(0, 620, 0);
+  /* the weather clock keeps running while the camera is pinned, so drift can be checked
+     on its own instead of being confounded with the orbit */
+  ct += 0.0016;
+  if (!window.LAB.freeze) t += 0.0016;
+  /* the cover drifts across the valley — slow enough to read as weather, not as a texture
+     being scrolled. Direction is deliberately not the light direction, so the shadow edges
+     cross the terminator rather than sliding along it. */
+  CLOUD.uCloudOff.value.set(ct * 0.22, ct * -0.08);
+  for (const m of CLOUD_MATS) m.needsUpdate = true;   /* see THE UNIFORM TRAP above */
+  const v = window.LAB.view;
+  if (v) { camera.position.set(v[0], v[1], v[2]); camera.lookAt(v[3], v[4], v[5]); }
+  else { camera.position.set(Math.cos(t) * 2700, 1450, Math.sin(t) * 2700); camera.lookAt(0, 620, 0); }
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }

@@ -668,6 +668,51 @@ Next build steps: the React port (R3F + drei + GSAP), or a fourth level (individ
 inside a block).
 - Per-frame depth dressing: distance → opacity/blur on menu planes (fog for DOM).
 
+## v21 — the shading lab (`lab-shading.html`)
+
+The dawn valley was scrapped because it looked bad and I could not say why. The lab is the
+answer to that: one hill, one tree, three rocks, and every technique on a key so its
+contribution is *shown* rather than asserted. Keys 1–5 toggle baked vertex AO, slope/height
+ramp colour, toon ramp + outline, the shadow map, and drifting cloud shadows; 0 and 9 are all
+off / all on. `window.LAB` pins the orbit (`freeze`), pins the camera anywhere
+(`view = [eye…, at…]`) and exposes the scene, because a lab you cannot screenshot under
+controlled conditions is a worse lab.
+
+What the lab actually settled:
+
+- **Terrain takes smooth shading; toon is for objects.** A 4-step ramp across a large curved
+  surface quantises into contour blotches. The same ramp reads correctly on the tree and the
+  rocks. So terrain gets ramp colour + baked AO + shadows, and never a gradient map.
+- **Key-to-fill ratio is the whole game.** Raising the hemisphere to 1.9 to stop shadows going
+  black quietly broke everything downstream: with fill nearly matching key, direct sunlight
+  became a minority of the terrain's light, so cast shadows *and* cloud shadows moved the final
+  pixel by about 1%. It reads as "the shadows are weak" but the shadows were fine. The way out
+  is not trading one against the other but a **third light** — a directional bounce from the
+  opposite side casting nothing, which lifts shadowed surfaces while still shaping them. Key
+  3.2 / bounce 0.95 / hemisphere 0.7. Peak cloud contrast went from 17/255 to 131/255 on that
+  change alone.
+- **Size the shadow box, then count its texels.** The hard black wedge across the hill was the
+  shadow camera's own frustum edge — a 3600-unit box cannot hold a 3000-unit terrain once the
+  light is at 47°, because the terrain projects much longer than itself along the light. Half
+  the diagonal plus the height shift gives the real number (~2470 here, so 2600). Every unit
+  past that is resolution thrown away.
+- **The shadow blur must be smaller than what it shadows.** At 2048 over a 6400-unit box a
+  texel is 3.1 units, so `shadow.radius = 7` is a ±22-unit PCF kernel — wider than a 54-unit
+  rock. Every small object sampled its own far side and went fully black, which looks exactly
+  like "the rocks are unlit" rather than like a shadow bug.
+- **`PCFSoftShadowMap` is deprecated in this three build** and silently falls back to
+  `PCFShadowMap`, so the code was describing behaviour that wasn't running.
+- Outlines need **screen-constant width**: a fixed world-space extrusion is about a pixel at
+  landscape range. Extrude by `normal * (w * -mv.z)` in the vertex shader.
+
+Cloud shadows are the cheapest large-scale variation available and the only thing that breaks
+up the plain diagonal terminator a single directional light always gives a smooth landform.
+Tileable fBm on a canvas, sampled per-fragment from world position, multiplying **direct light
+only** so shaded ground falls to the cold fill rather than just going grey. The lookup is
+projected along the light onto y = 0 (`P.xz − P.y · L.xz/L.y`) so the cover stays put on a
+hillside instead of sliding up the slope. (It dims the bounce light too, which is not physical
+— a cloud only occludes the sun — but it reads well and costs nothing to leave.)
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -724,6 +769,22 @@ inside a block).
 - Never splice a file by a line range derived from a scan — locate the exact boundary content and
   splice between those. A range that drifts silently eats neighbouring functions, and an
   untracked file has no undo.
+- **three.js uploads a built-in material's uniforms only when its `version` changes**, so a
+  custom uniform added through `onBeforeCompile` reaches the GPU exactly once. Mutating `.value`
+  per frame does nothing, silently — correct shader, correct texture, effect never moves.
+  `needsUpdate` is only `version++` (it disposes nothing), so bumping it on the affected
+  materials each frame is the cheap way through. Keep a registry of them.
+- **A `String.replace` on a shader chunk name that moved is a silent no-op**, and the result
+  looks identical to a working feature with its strength set to zero. Assert the injected text
+  is present and `console.error` if it isn't.
+- **An inverted-hull outline tears open on any flat-shaded polyhedron.** Flat shading duplicates
+  each vertex per face with its own face normal, so extruding sends the copies of a shared
+  corner in different directions and the hull comes apart along every edge. Give the outline its
+  own geometry with normals averaged across coincident vertices — and keep the original normal
+  in an attribute so the shader can divide out `dot(smoothN, flatN)`, or corners stay
+  under-extruded and the gap merely narrows instead of closing.
+- When an effect "doesn't work", check whether the thing it multiplies is non-zero *before*
+  re-deriving the maths. Two rounds went into a cloud shader that was correct all along.
 
 ## Sources
 
