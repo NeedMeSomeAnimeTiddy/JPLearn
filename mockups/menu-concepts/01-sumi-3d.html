@@ -2385,7 +2385,7 @@ function standOff(place, off = STAND_OFF) {
    turn: two ahead of the shoulders, two abeam, two behind. */
 const DEST_SPECS = [
   { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
-  { bearing: 20, dist: 4000, lift: 190, stand: 1400 }, /* REVIEW — the torii in the water */
+  { bearing: 26, dist: 6100, lift: 150, stand: 1620 }, /* REVIEW — the shrine approach     */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
   { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
@@ -2448,8 +2448,11 @@ function toriiGeo(H) {
 }
 let TORII = null;
 {
-  const H = 450;
-  const at2 = DEST_SPECS[1].place;
+  /* SCENERY, NOT A DESTINATION. A gate standing in water is the picture you want from the
+     menu, but it can never be the place: there is nothing behind it to walk toward, which is
+     the whole point of a gate. REVIEW's shrine is on land, below. */
+  const H = 430;
+  const at2 = destPlace(17, 3700, 0);
   const gate = new THREE.Mesh(toriiGeo(H), new THREE.MeshToonMaterial({
     vertexColors: true, gradientMap: RAMP, flatShading: true,
   }));
@@ -2693,17 +2696,74 @@ function pickWorldTile(sec, jp) {
   if (L3DATA[sec] && L3DATA[sec][jp]) enterL3(sec, jp);
 }
 
+/* ---- REVIEW's shrine: the approach ----
+   Laid out along the line you arrive on, so it reads as a place you walk INTO rather than a
+   group of objects arranged for a photograph:
+
+       the ema wall, forward and to the left, angled in toward the gate's centre
+       the gate
+       a smaller gate beyond it
+       and the tunnel running away behind that
+
+   Everything is positioned in APPROACH coordinates — `fwd` down the axis, `side` across it —
+   because "in front of and to the left of the gate" is a statement about the approach, not
+   about world x and z, and trying to say it in world terms is what had the wall and the gate
+   growing through one another. */
 {
-  /* on the far shore and off the gate's own bearing, so the arrival frames the WALL with the
-     gate off to one side rather than shooting head-on down the middle of a symmetrical object.
-     Nobody photographs Itsukushima square-on. */
-  /* ON THE WATER, on piles, in line with the gate — which is what Itsukushima's shrine
-     actually is, and it is also the only way to have it near the gate at all: the lake is
-     2,700 across and every point within reach of the torii is in it. Standing it on the far
-     shore put 77° between the two and the gate never made the frame. */
-  const wall = destPlace(25, 4900, 0);
-  DEST_SPECS[1].focus = wall.clone().setY(wall.y + 190);
-  buildEmaWall('REVIEW', wall, HOME_EYE);
+  const base = destPlace(26, 6100, 0);
+  const fwd = new THREE.Vector3().copy(base).sub(HOME_EYE).setY(0).normalize();
+  const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const at3 = (f, sd) => {
+    const v = base.clone().addScaledVector(fwd, f).addScaledVector(side, sd);
+    v.y = groundAt(v.x, v.z);
+    return v;
+  };
+  const H = 470;
+
+  const gate = new THREE.Mesh(toriiGeo(H), new THREE.MeshToonMaterial({
+    vertexColors: true, gradientMap: RAMP, flatShading: true,
+  }));
+  gate.position.copy(at3(0, 0));
+  gate.lookAt(gate.position.x - fwd.x, gate.position.y, gate.position.z - fwd.z);
+  backScene.add(gate);
+  addOutline(gate, 0.0028);
+  DEST_SPECS[1].focus = gate.position.clone().setY(gate.position.y + H * 0.5);
+
+  /* the second gate and then the tunnel. Each is smaller than the last and closer to it, so the
+     approach foreshortens the way a real one does and the far end reads as distance rather than
+     as a row of identical objects. */
+  let f = 640, sc = 0.80;
+  for (let i = 0; i < 9; i++) {
+    const g2 = new THREE.Mesh(toriiGeo(H * sc), gate.material);
+    g2.position.copy(at3(f, 0));
+    g2.rotation.copy(gate.rotation);
+    backScene.add(g2);
+    if (i < 3) addOutline(g2, 0.0028);
+    f += 300 * sc;
+    sc *= 0.93;
+  }
+
+  /* the wall: forward of the gate, to its left, turned IN toward the middle of it. Square-on to
+     the camera it reads as a billboard set up for your benefit; angled in, it belongs to the
+     approach's own geometry. */
+  const wallGrp = buildEmaWall('REVIEW', at3(-430, -235), HOME_EYE);
+  wallGrp.rotateY(-0.30);
+
+  /* A CORRIDOR, NOT A CIRCLE. One blocker at the gate cleared a 678-unit radius around a
+     4,000-unit approach, so the wood grew straight through the tunnel and stood between the
+     camera and the gate. The clearing has to be the shape of the thing it is clearing: a line
+     of blockers from behind the camera's standing point to past the last gate. */
+  for (let k = -1800; k <= 3000; k += 340) {
+    const q = at3(k, 0);
+    blockAdd(q.x, q.z, 820, 520);
+  }
+  /* and a second line down the wall's side. The corridor is measured from the APPROACH axis,
+     but the wall stands 235 off it and reaches another 350 beyond that — so its far edge sat
+     585 out, outside the clearing, and a trunk grew in front of the first tablet. */
+  for (let k = -1100; k <= 300; k += 250) {
+    const q = at3(k, -470);
+    blockAdd(q.x, q.z, 560, 520);
+  }
 }
 
 /* ---- the woods ----

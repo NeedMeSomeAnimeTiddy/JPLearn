@@ -1058,6 +1058,33 @@ The gate itself came down from 620 to 450 (Itsukushima's is 16m against 30m tree
 smaller second gate behind it — which turns a single object into the start of an approach, and
 is the first gate of the senbon-torii tunnel level three will travel down.
 
+## v32 — REVIEW moves onto land: the approach
+
+The gate and the wall were growing through one another, and the reason was that I kept trying to
+put the place in the water. A gate standing in water is the picture you want from the menu, but
+it can never be the destination: **there is nothing behind it to walk toward, which is the whole
+point of a gate.** Everything within reach of the water torii is lake — the lake is 2,700 across
+— so the wall had nowhere to stand but on top of the gate.
+
+REVIEW's shrine is on land now, past the far shore. A water torii stays where it was, as scenery.
+
+- **Author a place in APPROACH coordinates, not world ones.** "In front of the gate and to its
+  left" is a statement about the approach axis; saying it in world x and z is what had two
+  objects occupying the same space. One forward vector, one side vector, and every element is
+  placed with `at3(forward, sideways)`.
+- **A clearing has to be the shape of what it clears.** One blocker at the gate cleared a
+  678-unit circle around a 4,000-unit approach, so the wood grew straight through the tunnel and
+  stood between the camera and the gate. It needs a line of blockers from behind the camera's
+  standing point to past the last gate — and a second line down the wall's side, because the
+  corridor is measured from the axis while the wall reaches 585 off it.
+- **The tunnel foreshortens by design**: each gate smaller than the last and closer to it, so
+  the far end reads as distance rather than as a row of identical objects.
+
+Layout, on the line you arrive along: the ema wall forward-left and turned in toward the gate's
+centre; the gate; a smaller gate beyond; then the tunnel running away. Square-on to the camera
+the wall read as a billboard set up for your benefit — angled in, it belongs to the approach's
+own geometry.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1197,6 +1224,12 @@ is the first gate of the senbon-torii tunnel level three will travel down.
   landmark is not.
 - **Don't put the interface in the part of an object that is meant to be empty.** A gate, an
   archway, a window: the void is the point, and filling it fights the object's own meaning.
+
+- **A gate cannot be a destination unless something is behind it.** Scenery and place are
+  different jobs; the most photogenic spot in a scene is often the worst place to stand.
+- **Place composite scenes in local approach coordinates.** Forward and sideways relative to how
+  the camera arrives, never world axes — otherwise "to the left of" silently means something
+  different for every bearing, and objects grow through each other.
 
 ## Sources
 
