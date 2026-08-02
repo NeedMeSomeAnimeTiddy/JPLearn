@@ -1601,6 +1601,66 @@ the board with red showing through the gap, and no line at all along the bottom 
   diff and kept every tuned number. Rejected because the tuned numbers were the problem: nobody can
   look at 0.0026 and say whether it is a thick line.
 
+## v48 — the outline fix had a bug of its own, and the right side gets a tree
+
+Two things, and the first is a correction. The screen-space offset from v47 was right; the
+"improvement" shipped alongside it was not. Where the corner correction's input went out of range
+it fell back to the FACE normal — and a face turned away from the camera projects to nothing, so
+normalising it gave numerical noise. Those vertices jumped in arbitrary screen directions and
+dragged black flaps of hull over the front of beams, trunks and roofs. That is the "outline face
+floating off the geometry" that came back.
+
+- **Never fall back to a value that has no screen direction.** The whole premise of a screen-space
+  offset is that the normal projects to something. Clamping is the right answer to an out-of-range
+  input here: a bad weld then leans by two pixels instead of spiking (the old 0.30 floor was a
+  3.3x multiplier) or going degenerate. `clamp(1.0 / max(d, 0.5), 1.0, 2.0)`, always along the
+  averaged normal.
+- **Removing the z push removed something that was doing work.** The original offset moved the
+  hull along its view normal, which pushed it away from the eye as a side effect. Taking the whole
+  vector out took that with it. Scaling the view-space position by 1.004 puts it back deliberately
+  and in one direction only: same place on screen, a hair further off. A hull behind the thing it
+  wraps can never cover it, only be covered — that is free insurance and it costs one multiply.
+- **Weld inside a part, not across parts.** Coincident is not continuous: a stile and a rail share
+  a corner but are two solids, and averaging six normals from one with six from the other gives a
+  direction belonging to neither. `mergeParts` now records each part's vertex range and the weld
+  keys on it. Worth doing — but it moved the bad population from 13.43% to 13.38%, which is the
+  interesting part: **it was not the cause.** Most of the sub-0.5 population is cone apexes, where
+  a low `dot(smooth, flat)` is honest geometry and not a broken weld.
+- **Count the thing you are theorising about.** `NAV.outlineAudit()` walks every hull geometry and
+  reports how many vertices fall outside the correction's range and how bad the worst one is
+  (13.43%, worst -0.632 — a "smooth" normal 129° from its own face). Two rounds of reasoning about
+  what the artefact might be were settled by one number, and the number said the fix I had just
+  written was aimed at the wrong population.
+- **A still frame is one sample of something that misbehaves over time.** v47's verification was
+  clean screenshots of a scene that shimmered on a real screen. The reliable control turned out to
+  be much simpler than a flicker harness: check out the previous commit, shoot the same crop, and
+  compare. That is what showed the plinth's detached hook and the tiered-cedar zigzags were
+  PRE-EXISTING and not part of this at all — worth knowing before fixing them.
+
+### 御神木 — the sacred tree
+
+The right of the precinct read as empty. It already had lanterns; they are hidden behind the water
+pavilion, which is the same fact as the emptiness rather than a solution to it.
+
+- **Check what is already there before adding more of it.** The obvious answer to a bare shrine
+  approach is stone lanterns. There were six.
+- **Overlap is decided by bearing, not by distance on the ground.** Two placements were lost to
+  this: at sd 560 the tree stood well outboard of the pavilion in plan and still had its trunk
+  behind the roof on screen; shoving it to sd 860 put it half off the frame edge. What settles it
+  is the angle from the eye, which a screenshot cannot be asked and a projection can.
+- **Measure the frame.** `NAV.rectOf(name)` projects a registered landmark's bounding box. One run
+  gave the pavilion at x 1198..1777 in a 1920 frame — a clear corridor of 143 pixels against a
+  crown four hundred across — and that single measurement said the goal was impossible, not merely
+  unachieved. The free space was the band ABOVE the building. Three guesses had already been spent
+  on the wrong question.
+- **A tree behind a building is what a tree behind a building looks like.** Once the constraint was
+  stated properly the answer stopped being a compromise.
+- **What is behind an open structure shows THROUGH it.** The pavilion is open on all four sides —
+  that is why it can hold its half of the court without becoming a second board. Five paper
+  streamers ringing the trunk therefore appeared inside its bay as a scatter of bright specks
+  against shade. Three at 120° puts one facing the approach and turns the others edge-on, which is
+  what a rope with papers on it looks like from any one viewpoint anyway.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1861,6 +1921,23 @@ the board with red showing through the gap, and no line at all along the bottom 
 - **Expose the thing the test needs to see.** A 3D title cannot be measured with
   `getBoundingClientRect`; projecting its bounding box behind `NAV.titleRect()` keeps the safe-zone
   rule assertable after the title stopped being DOM.
+
+- **Never fall back to a value with no screen direction.** In a screen-space offset, a normal that
+  projects to zero normalises to noise — clamp the out-of-range input instead of substituting a
+  different one.
+- **When you remove a hack, check what it was doing by accident.** A view-normal offset also
+  biases depth; taking the vector out takes the bias with it.
+- **Count the population you are theorising about.** Two rounds of plausible reasoning about an
+  artefact were settled by one number, which said the fix already written was aimed at the wrong
+  vertices.
+- **The previous commit is the control.** Checking it out and shooting the same crop separates
+  "I broke this" from "this was always like that" in one run, and the second answer is common.
+- **Overlap is a question about bearing.** Two things far apart on the ground can sit on top of
+  each other on screen; projecting a bounding box answers it and a screenshot does not.
+- **Measure the frame before deciding what fits in it.** A single projection said the space was
+  143 pixels wide against a four-hundred-pixel object — that is an impossibility, not a near miss,
+  and three attempts had already been spent trying to satisfy it.
+- **Check what is already there before adding more of it.**
 
 ## Sources
 

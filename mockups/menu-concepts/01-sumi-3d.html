@@ -1910,18 +1910,26 @@ function mergeParts(parts) {
   }));
   const total = prepped.reduce((n, p) => n + p.g.attributes.position.count, 0);
   const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3), col = new Float32Array(total * 3);
+  /* WHICH PART EACH VERTEX CAME FROM. The outline welds coincident vertices so a flat-shaded
+     corner can be extruded as one, and merging destroyed the only information that says whether
+     two vertices in the same place belong to the same SURFACE or to two solids that merely touch.
+     A stile meeting a rail is the second kind, and averaging across it produces a direction that
+     belongs to neither. Keeping the ranges lets the weld stay inside a part, where it is right. */
+  const ranges = [];
   let o = 0;
   for (const { g, c } of prepped) {
     const p = g.attributes.position, n = g.attributes.normal;
     pos.set(p.array, o * 3);
     nor.set(n.array, o * 3);
     for (let i = 0; i < p.count; i++) { col[(o + i) * 3] = c.r; col[(o + i) * 3 + 1] = c.g; col[(o + i) * 3 + 2] = c.b; }
+    ranges.push([o, p.count]);
     o += p.count;
   }
   const out = new THREE.BufferGeometry();
   out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  out.userData.partRanges = ranges;
   return out;
 }
 
@@ -1929,14 +1937,28 @@ function mergeParts(parts) {
    so extruding tears the hull open at every corner. The outline gets its own geometry with
    normals averaged across coincident vertices, and keeps the original normal in `aFlat` so the
    shader can divide out dot(smooth, flat) — without that the corners stay under-extruded and
-   the gaps only narrow instead of closing. */
+   the gaps only narrow instead of closing.
+
+   THE WELD STAYS INSIDE A PART. Coincident is not the same as continuous: a stile and a rail
+   share their corner but are two solids, and averaging six normals from one with six from the
+   other gives a direction pointing into the join. Before this, 13% of every hull vertex in the
+   shrine was in that state and the worst was -0.632 — a "smooth" normal 129 degrees from its own
+   face. Each part's hull is correct on its own and the union of correct hulls is correct. */
 function outlineGeom(src) {
   const g = src.clone();
   const p = g.attributes.position, n = g.attributes.normal;
   g.setAttribute('aFlat', new THREE.BufferAttribute(new Float32Array(n.array), 3));
+  const part = new Int32Array(p.count);
+  const ranges = src.userData && src.userData.partRanges;
+  if (ranges) {
+    for (let r = 0; r < ranges.length; r++) {
+      const [start, count] = ranges[r];
+      for (let i = 0; i < count; i++) part[start + i] = r;
+    }
+  }
   const buckets = new Map();
   for (let i = 0; i < p.count; i++) {
-    const k = `${Math.round(p.getX(i) * 16)},${Math.round(p.getY(i) * 16)},${Math.round(p.getZ(i) * 16)}`;
+    const k = `${part[i]}|${Math.round(p.getX(i) * 16)},${Math.round(p.getY(i) * 16)},${Math.round(p.getZ(i) * 16)}`;
     let b = buckets.get(k);
     if (!b) { b = { x: 0, y: 0, z: 0, at: [] }; buckets.set(k, b); }
     b.x += n.getX(i); b.y += n.getY(i); b.z += n.getZ(i); b.at.push(i);
@@ -1998,19 +2020,29 @@ function outlineMaterial(px) {
         #endif
         vec4 mv = modelViewMatrix * lp;
         vDepth = -mv.z;
-        /* Corner correction. A flat-shaded box gives each corner three normals; extruding along
-           the averaged one under-reaches by exactly dot(smooth, flat), so dividing that back out
-           closes the gap. A cube corner is 0.577 and needs 1.73x. Anything BELOW that is not a
-           sharp corner at all — it is a weld that averaged two parts which merely touch, and the
-           old code's 0.30 floor turned those into a 3.3x spike sticking out of the join. Where
-           the average has gone bad, use the face's own normal and do not correct at all. */
-        float d = dot( ln, lf );
-        vec3 n  = d >= 0.5 ? ln : lf;
-        float k = d >= 0.5 ? 1.0 / d : 1.0;
+        /* Corner correction, and it must ALWAYS use the averaged normal.
+           A flat-shaded box gives each corner three normals; extruding along the averaged one
+           under-reaches by exactly dot(smooth, flat), so dividing that back out closes the gap.
+           A cube corner is 0.577 and needs 1.73x, and the old 0.30 floor turned a failed weld
+           into a 3.3x spike — but falling back to the FACE normal there is worse still, because
+           the whole point of a screen-space offset is that it has a screen direction, and a face
+           turned away from the camera projects to nothing. Normalising that gives numerical
+           noise, so those vertices jump in an arbitrary direction and drag a black flap of hull
+           over the front of the object. Clamping is the answer: a bad weld then leans by two
+           pixels instead of spiking or going degenerate. */
+        float k = clamp( 1.0 / max( dot( ln, lf ), 0.5 ), 1.0, 2.0 );
+        /* AWAY FROM THE EYE, ALONG THE VIEW RAY. Scaling the view-space position leaves the hull
+           in exactly the same place on screen and puts it a hair further off, which is free
+           insurance: a hull behind the thing it wraps can never cover it, only be covered. The
+           first version's push along the view normal did this by accident and in both directions;
+           this does it on purpose and in one. */
+        mv.xyz *= 1.004;
         vec4 clip = projectionMatrix * mv;
-        vec2 sn = ( projectionMatrix * vec4( normalize( mat3( modelViewMatrix ) * n ), 0.0 ) ).xy * res;
+        vec2 sn = ( projectionMatrix * vec4( normalize( mat3( modelViewMatrix ) * ln ), 0.0 ) ).xy * res;
         float l = length( sn );
-        if ( l > 1e-6 ) {
+        /* half a pixel of screen direction is the floor — below that the normal is pointing at
+           or away from the eye and contributes no silhouette at all */
+        if ( l > 0.5 ) {
           /* full width out to 4,000 units and then shed with distance, so a tree on the far side
              of the valley loses its line instead of turning into a black lozenge */
           float wpx = px * k * min( 1.0, 4000.0 / max( vDepth, 1.0 ) );
@@ -2965,6 +2997,12 @@ const WORLD_L3 = {};
    to a board hanging in a gate — it is just no longer something the browser can measure for you,
    so the board has to be reachable from outside to be asserted at all. */
 const WORLD_TITLE = {};
+/* LANDMARKS WHOSE PLACE IN THE FRAME IS A DESIGN QUESTION. Whether a tree clears a roof is not
+   decided by how far apart they are on the ground — it is decided by the angle from the eye, and
+   the only way to settle that from a screenshot is to look, guess, move it and look again. These
+   are registered so `NAV.rectOf` can project them instead: one round trip, and the answer is a
+   number rather than an impression. */
+const MARKS = {};
 const WORLD_SWAY = [];
 /* THE RACK IS GONE. It was 974 units wide against a gate 781 wide and cedars 800 tall — a
    fifteen-metre timber structure standing in front of the landmark and out-massing it, which
@@ -3654,6 +3692,7 @@ function pickWorldTile(sec, jp) {
      was put there for people walking past it. 0.62 rad is about 36°, enough to read as addressed
      to the path while still showing the tablets nearly full width (cos 36° = 0.81). */
   wallGrp.rotateY(0.62);
+  MARKS.wall = wallGrp;
 
   /* 手水舎 — the water pavilion, facing the wall across the court. A courtyard with one thing in
      it is a yard with a thing in it; the second structure is what makes the space between them
@@ -3675,6 +3714,42 @@ function pickWorldTile(sec, jp) {
     backScene.add(ch);
     addOutline(ch, 3.2);
     CHOZUYA = ch;
+    MARKS.chozuya = ch;
+  }
+
+  /* OUTSIDE THE COURT, WHICH IS WHY IT IS NOT SET TO CY_TOP. `onCourt` only tests f — it knows
+     nothing about how far across the court reaches — so out here the platform has run out and
+     asking for its height would leave the tree standing on air. It takes the hillside, like the
+     wood it belongs to.
+
+     PAST THE PAVILION AND WELL OUTBOARD OF IT. The first placement put it at f -150, sd 560,
+     which is nearer the eye than the pavilion is: the trunk went behind the roof, the crown ran
+     off the top of the frame, and what was left was a green mass in the corner with a scatter of
+     white papers under it and nothing holding them up. A landmark has to be far enough away to
+     be seen whole — the trunk is most of what says "tree", and it is the first thing a near
+     placement loses.
+
+     IT STANDS BEHIND THE PAVILION, AND THAT IS THE ONLY PLACE IT FITS. Measuring the frame rather
+     than guessing at it settles this in one shot: at 1920x1080 the pavilion occupies x 1198..1777
+     and the frame ends at 1920, so the clear corridor beside it is 143px wide against a crown
+     four hundred across. No tree that is worth putting there can stand clear of the building —
+     what is actually free is the band ABOVE it, which is sky and distant treeline. So the tree
+     goes behind, its crown fills that band, and its trunk is crossed by the roof, which is what
+     a tree behind a building looks like. Trying to satisfy "the trunk must show" cost two
+     placements: one crowding the pavilion from in front, one shoved so far right it was a green
+     smear on the frame edge. */
+  {
+    const t = shinbokuGeo(495);
+    const m = new THREE.Mesh(t, new THREE.MeshToonMaterial({
+      vertexColors: true, gradientMap: RAMP, flatShading: true,
+    }));
+    m.position.copy(at3(120, 546, -12));
+    m.rotation.y = 2.1;
+    backScene.add(m);
+    addOutline(m, 3.2);
+    MARKS.tree = m;
+    /* claim it in the global wood registry too, or the valley's own planting grows through it */
+    treeClaim(m.position.x, m.position.z, 300);
   }
 
   /* ---- 手水 — the one thing here you can touch ----
@@ -3845,6 +3920,7 @@ function pickWorldTile(sec, jp) {
     /* the built things go in first, so nothing can grow through them either */
     PLANTED.push([-690, -215, 155, 155]);   /* the ema wall */
     PLANTED.push([-430, 312, 150, 150]);    /* the water pavilion */
+    PLANTED.push([120, 546, 220, 290]);     /* the sacred tree, canopy and all */
     PLANTED.push([-2100, 0, 340, 340]);     /* the outer gate */
     [[-1240, 402], [-1240, -402], [-260, 402], [-260, -402], [420, 250], [420, -250]]
       .forEach(([lf, ls]) => PLANTED.push([lf, ls, 78, 78]));
@@ -3943,6 +4019,83 @@ function lanternGeo(H) {
   g = new THREE.CylinderGeometry(H * 0.15, H * 0.15, H * 0.22, 6); g.translate(0, H * 0.68, 0); add(g, 0xe8d9b4);
   g = new THREE.CylinderGeometry(H * 0.03, H * 0.27, H * 0.17, 6); g.translate(0, H * 0.855, 0); add(g, D);
   g = new THREE.SphereGeometry(H * 0.055, 6, 4); g.translate(0, H * 0.955, 0); add(g, S);
+  return mergeParts(parts);
+}
+/* 御神木 — the sacred tree, and the only thing on this side of the court that is alive.
+   The right of the precinct had the water pavilion, which is low and wide, and a treeline behind
+   it, which is scenery: mass at knee height and nothing above it. What that side wants is not
+   more furniture — there are already lanterns over there, and they are hidden behind the pavilion
+   for exactly the reason the side reads as empty. It wants the thing a shrine is usually built
+   around.
+
+   IT IS A BROADLEAF AMONG CEDARS ON PURPOSE. A bigger cedar in a cedar wood is a bigger cedar. A
+   different crown at half again the height reads as the one that was left standing, which is what
+   makes a tree a shrine tree — and the rope and the low fence are only the shrine agreeing.
+
+   Tree, rope, papers and fence are one merged geometry, so the whole thing is one draw call and
+   one outline that wraps the lot instead of six that can drift apart. */
+function shinbokuGeo(H) {
+  const parts = [];
+  const add = (g, c) => parts.push({ geo: g, color: c });
+  const BARK = 0x4b3a2c, BARK2 = 0x574334;
+  let g;
+  /* the root flare and two trunk sections. An old tree thickens toward the ground; one evenly
+     tapered cylinder is a telegraph pole however tall you make it. */
+  g = new THREE.CylinderGeometry(H * 0.072, H * 0.125, H * 0.10, 9); g.translate(0, H * 0.05, 0); add(g, BARK);
+  g = new THREE.CylinderGeometry(H * 0.050, H * 0.076, H * 0.30, 9); g.translate(0, H * 0.24, 0); add(g, BARK2);
+  g = new THREE.CylinderGeometry(H * 0.034, H * 0.053, H * 0.24, 9); g.translate(0, H * 0.50, 0); add(g, BARK);
+  /* two limbs, built from the base so they start inside the wood rather than beside it */
+  [[0.62, H * 0.48, H * 0.30], [-0.52, H * 0.56, H * 0.26]].forEach(([rz, atY, len]) => {
+    const b = new THREE.CylinderGeometry(H * 0.014, H * 0.030, len, 6);
+    b.translate(0, len / 2, 0); b.rotateZ(rz); b.translate(0, atY, 0);
+    add(b, BARK2);
+  });
+  /* five canopy masses, none of them centred on the trunk */
+  [[0, 0.80, 0, 0.250, 0x4c6a30], [-0.20, 0.70, 0.08, 0.190, 0x415c2a], [0.22, 0.72, -0.07, 0.180, 0x577535],
+    [0.03, 0.94, -0.04, 0.150, 0x466428], [-0.10, 0.86, -0.13, 0.130, 0x50702f]]
+    .forEach(([x, y, z, r, c]) => {
+      const b = new THREE.IcosahedronGeometry(H * r, 1);
+      b.scale(1.14, 0.88, 1.05);
+      b.translate(H * x, H * y, H * z);
+      add(b, c);
+    });
+  /* 注連縄 — the rope. Twelve-sided rather than round: everything else here is faceted, and a
+     smooth torus in a flat-shaded scene reads as a different material, not a different object. */
+  const ropeY = H * 0.30, ropeR = H * 0.088;
+  g = new THREE.TorusGeometry(ropeR, H * 0.022, 5, 12);
+  g.rotateX(Math.PI / 2); g.translate(0, ropeY, 0); add(g, 0xd6c69a);
+  /* 紙垂 — the papers. Three, not five, and narrow rather than square.
+
+     THE WATER PAVILION IS OPEN ON EVERY SIDE, so everything behind it shows THROUGH it. Five
+     zigzags ringing the trunk, each a stack of square white blobs, read through that opening as
+     litter blowing about inside the bay — the one place in the scene where a bright small thing
+     is guaranteed to be seen against shade. Three at 120° puts one facing the approach and turns
+     the others edge-on, which is what a rope with papers on it actually looks like from any
+     single viewpoint, and a strip clearly taller than it is wide reads as one hanging thing
+     instead of as three dots. */
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + 0.4;
+    const cx = Math.cos(a) * ropeR, cz = Math.sin(a) * ropeR;
+    const ox = -Math.sin(a), oz = Math.cos(a);
+    for (let k = 0; k < 3; k++) {
+      g = new THREE.BoxGeometry(H * 0.021, H * 0.036, H * 0.006);
+      g.rotateY(-a);
+      g.translate(cx + Math.cos(a) * H * 0.004 + ox * (k % 2 ? 1 : -1) * H * 0.010,
+        ropeY - H * 0.042 - k * H * 0.030, cz + Math.sin(a) * H * 0.004 + oz * (k % 2 ? 1 : -1) * H * 0.010);
+      add(g, k === 0 ? 0xf2ece0 : 0xe6dccb);
+    }
+  }
+  /* 瑞垣 — the low fence that makes the ground round the trunk somewhere you do not walk */
+  const fenceR = H * 0.30;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    g = new THREE.BoxGeometry(H * 0.018, H * 0.115, H * 0.018);
+    g.rotateY(-a);
+    g.translate(Math.cos(a) * fenceR, H * 0.055, Math.sin(a) * fenceR);
+    add(g, 0x7d6a4e);
+  }
+  g = new THREE.TorusGeometry(fenceR, H * 0.010, 4, 12);
+  g.rotateX(Math.PI / 2); g.translate(0, H * 0.104, 0); add(g, 0x6d5c42);
   return mergeParts(parts);
 }
 /* 手水舎 — the water pavilion: a roof on four posts over a stone basin, open on every side. The
@@ -5174,23 +5327,51 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   swing: () => (worldL2 || { picks: [] }).picks.map((q) => ({
     jp: q.jp, x: +q.root.rotation.x.toFixed(3), em: +q.face.material.emissive.r.toFixed(3),
   })),
+  /* HOW MUCH OF THE SCENE IS OUTSIDE WHAT THE CORNER CORRECTION CAN HANDLE.
+     `dot(smooth, flat)` is 1 on a flat face and 0.577 at a cube corner. Below 0.5 the weld
+     averaged two parts that only touch, so the direction belongs to neither of them — that is the
+     population which first spiked (a 0.30 floor is a 3.3x multiplier) and then, when it was made
+     to fall back to the face normal, went degenerate in screen space. It cannot be eyeballed and
+     it does not show in a still frame, so count it. */
+  /* the screen box of a registered landmark, and of the name-board */
+  rectOf: (k) => screenRect(MARKS[k]),
+  marks: () => Object.keys(MARKS),
+  outlineAudit: () => {
+    const r = { meshes: 0, verts: 0, under: 0, worst: 1 };
+    backScene.traverse((o) => {
+      const g = o.geometry;
+      if (!g || !g.attributes || !g.attributes.aFlat) return;
+      r.meshes++;
+      const n = g.attributes.normal, f = g.attributes.aFlat;
+      for (let i = 0; i < n.count; i++) {
+        const d = n.getX(i) * f.getX(i) + n.getY(i) * f.getY(i) + n.getZ(i) * f.getZ(i);
+        r.verts++;
+        if (d < 0.5) r.under++;
+        if (d < r.worst) r.worst = d;
+      }
+    });
+    r.pct = +(100 * r.under / Math.max(r.verts, 1)).toFixed(2);
+    r.worst = +r.worst.toFixed(3);
+    return r;
+  },
   /* where the name-board actually lands on screen. A 3D title cannot be measured with
      getBoundingClientRect, and "is the title inside the safe zone" is precisely the question that
      a 1400x880 test window answered wrongly for the DOM version — so project it here. */
-  titleRect: (key) => {
-    const b = WORLD_TITLE[key || 'REVIEW'];
-    if (!b) return null;
-    const box = new THREE.Box3().setFromObject(b);
-    const v = new THREE.Vector3();
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (let i = 0; i < 8; i++) {
-      v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z);
-      v.project(camera);
-      const sx = (v.x * 0.5 + 0.5) * W(), sy = (0.5 - v.y * 0.5) * H();
-      x0 = Math.min(x0, sx); y0 = Math.min(y0, sy); x1 = Math.max(x1, sx); y1 = Math.max(y1, sy);
-    }
-    return [x0, y0, x1, y1].map(Math.round);
-  } };
+  titleRect: (key) => screenRect(WORLD_TITLE[key || 'REVIEW']) };
+
+function screenRect(o) {
+  if (!o) return null;
+  const box = new THREE.Box3().setFromObject(o);
+  const v = new THREE.Vector3();
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < 8; i++) {
+    v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z);
+    v.project(camera);
+    const sx = (v.x * 0.5 + 0.5) * W(), sy = (0.5 - v.y * 0.5) * H();
+    x0 = Math.min(x0, sx); y0 = Math.min(y0, sy); x1 = Math.max(x1, sx); y1 = Math.max(y1, sy);
+  }
+  return [x0, y0, x1, y1].map(Math.round);
+}
 
 const flash = document.getElementById('flash');
 const descLine = document.getElementById('descLine');
