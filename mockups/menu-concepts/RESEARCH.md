@@ -1661,6 +1661,61 @@ pavilion, which is the same fact as the emptiness rather than a solution to it.
   against shade. Three at 120° puts one facing the approach and turns the others edge-on, which is
   what a rope with papers on it looks like from any one viewpoint anyway.
 
+## v49 — STUDY, step zero: the site is a measurement, not a spec line
+
+The plan's first step was "measure before modelling", written after two failures that were both
+*build, then look*. Doing it turned out to be worth more than the argument for it: **the site the
+spec had carried since the destinations were authored is not a site the pavilion can stand on**,
+and nothing short of putting the massing there could have said so.
+
+A stand-in went up first — nine boxes, the intended dimensions, each a separately named mesh. Then
+four questions, each with a number rather than an impression.
+
+- **A landmark intrudes on the menu from further out than its bearing suggests.** STUDY sat at
+  bearing -37, comfortably outside the home camera's 31° half-cone. But a cone is a rule about
+  points and a building is 1,240 units wide: the massing reached in from the left, sliced by the
+  frame edge, and landed directly behind the type column. The shrine learned this at +26 and the
+  lesson did not transfer, because at -37 there had never been anything there big enough to test
+  it. **A destination's bearing is safe only for an object of the size that was there when it was
+  chosen.**
+- **"40% water" is two completely different pictures.** The first site test reported one wetness
+  number for the footprint. At -37 that 46% was the NEAR half — the lake between camera and
+  building, the reflection handed over for free. At -55 the same 40% was the FAR half, and a
+  building hides its own reflection. One number, opposite meanings, and the sweep that used it
+  recommended the wrong site. `NAV.site` now splits near from far and reports how far back along
+  the approach the water still reaches, which is the thing that actually decides whether you stand
+  on the shore looking across or on the bank with the lake behind you.
+- **Clearing the footprint does nothing about the approach.** Two of the four ground-storey bays
+  came back BLOCKED on the first measured shot — by a broadleaf, not by an eave. A claim circle
+  round the building keeps trees out of the building; the camera stands 2,700 units away and
+  everything in between is in shot. The claim has to be a WEDGE that widens from the standing point
+  to the facade. Ground distance is not screen distance — the same sentence the sacred tree cost
+  three attempts to learn, in a new costume.
+- **The danger the plan predicted was real but pointed the other way.** "Do storey two's eaves
+  occlude storey one's veranda?" — no, and they cannot: from a low camera an eave hides what is
+  BEHIND and ABOVE it, so what gets swallowed is the deck of the storey above, never the wall
+  below. All three storeys' fronts raycast clear. The upper decks reading as eave undersides is
+  what a pavilion looks like from the ground, and level three stands on the veranda anyway.
+- **Taper has to be carried by the part with an edge against the sky.** The first massing drew the
+  walls in per storey and held the eave oversail at 190 throughout. The three eaves came out 1000,
+  940 and 870 wide and the silhouette read as a stack of identical trays — the taper existed and
+  was invisible, because the only part of a storey with a hard edge against the sky was not doing
+  any of it.
+- **`entered` is not `arrived`.** A menu-frame reading taken 600ms after the type animates in said
+  the pavilion had come 500px back into frame at 21:9. It had not; the intro camera was still
+  flying. Waiting for `state === 'menu' && !busy` gives 17px of eave at the extreme edge, which the
+  screenshot confirms is invisible against the treeline. **A measurement of a moving camera is a
+  measurement of the clock.**
+- **Reduced motion is the right emulation for a measurement and the wrong one for an arrival.** It
+  stops `breath` drifting the camera between the read and the shot, and it also stops the
+  transition ever completing. The two harnesses want opposite settings.
+
+Settled: bearing -52, dist 4000 — the flattest ground in the whole sweep (114 fall), a 10%-wet
+footprint, water reaching 2,500 back along the approach, and clear of the menu at every aspect
+tested. `stand` 2700, `eyeLift` 180, focus 430 above the platform. The default 1,500 overflowed the
+frame by 900px in height; 2,700 holds all three storeys at 80% of frame height with the ground
+veranda 560px wide, which is 140 per bay — more than the shrine's tablets ever had.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1938,6 +1993,15 @@ pavilion, which is the same fact as the emptiness rather than a solution to it.
   143 pixels wide against a four-hundred-pixel object — that is an impossibility, not a near miss,
   and three attempts had already been spent trying to satisfy it.
 - **Check what is already there before adding more of it.**
+- **A bearing is safe only for the size of thing that was there when it was chosen.** A destination
+  outside the menu's half-cone can still reach into the menu's frame once something wide stands on
+  it.
+- **One number over a region can average away the only thing that mattered.** Near and far, left
+  and right: if the two halves mean opposite things, reporting the mean recommends the wrong answer
+  confidently.
+- **Clearing around a thing is not clearing the way to it.** Everything between the camera and the
+  subject is in shot, and that is a wedge, not a circle.
+- **`entered` is not `arrived`.** Measuring while a camera is still moving measures the clock.
 
 ## Sources
 

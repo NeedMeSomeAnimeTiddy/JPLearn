@@ -61,15 +61,8 @@ shore rather than back from it.
 
 ## Order of work
 
-**0. Measure before modelling.** Both of this session's expensive failures were "build, then look".
-   Before any geometry: probe the terrain at bearing −37° for level and slope, set `stand` and
-   `eyeLift` on `DEST_SPECS[0]` (it is still on the defaults; REVIEW needed overrides), then put a
-   stand-in box at the pavilion's intended size and answer two questions —
-   - does three storeys fit the frame at that stand-off?
-   - do storey two's eaves occlude storey one's veranda from it?
-
-   `NAV.probe` and `NAV.hit` answer both in one page load. If the second answer is bad, the storey
-   spacing changes before anything is built.
+**0. Measure before modelling. — DONE.** See below; it changed the site, and step 1 starts from
+   settled numbers rather than from this section's guesses.
 
 **1. The building.** One `mergeParts` geometry per storey, so each is one draw call and one outline.
 
@@ -97,3 +90,82 @@ shape as `places/study.js`, and the pattern is established rather than invented 
 
 (An inline `<script type="module">` can import from a file but cannot be imported from, which is why
 the core is passed in as a context object rather than exported.)
+
+---
+
+# Step 0 — what the measurement said
+
+A stand-in massing went up first: nine named boxes at the intended dimensions, in
+`places/study.js`. Step 1 replaces it. Everything below is measured, not chosen.
+
+## The site moved
+
+`DEST_SPECS[0]` had carried **bearing −37, dist 4400** since the destinations were authored, and it
+is not a site the pavilion can stand on. Three things had to agree and only ever two did at once:
+
+| bearing / dist | menu | footprint | shore |
+|---|---|---|---|
+| −37 / 4400 | **reaches into the frame**, sliced by the left edge, behind the type column | 46% under water, 195 fall | water on the near side — ideal |
+| −55 / 4400 | clear | 40% wet, 199 fall | water on the **far** side; building hides its own reflection, foreground is wood |
+| **−52 / 4000** | **clear** (17px of eave at 21:9, invisible against the treeline) | **10% wet, 114 fall — flattest in the sweep** | water reaching 2,500 back along the approach |
+
+The two findings worth carrying to the other four places:
+
+- **A bearing outside the menu's 31° half-cone is not automatically safe.** The cone is a rule about
+  points; the pavilion is 1,240 units wide. A landmark intrudes from further out than its bearing
+  suggests, and only something of the final size standing there can say by how much.
+- **Wetness has to be split near from far.** The same "40% water" is the lake between you and the
+  building at one bearing and the lake behind it at another. `NAV.site` now reports `near`, `far`
+  and `reach` (how far back along the approach the water still comes) for exactly this reason.
+
+## The shot
+
+`stand: 2700, eyeLift: 180`, focus **430 above the platform top**. The default 1,500 overflowed the
+frame by 900px in height.
+
+| viewport | building height | % of frame | ground veranda |
+|---|---|---|---|
+| 1920×1080 | 859 | 80% | 560px |
+| 1600×900 | 716 | 80% | 467px |
+| 1400×880 | 626 | 71% | 409px |
+| 1024×768 | 458 | 60% | 299px |
+| 2560×1080 | 859 | 80% | 560px |
+| 900×1000 | 403 | 40% | 263px |
+
+560px of veranda is **140 per bay** — more than the shrine's ema tablets ever had, so level two's
+legibility is not in question. The 900×1000 case is the weak one at 40% of frame height; it is
+still legible and it is the least likely viewport.
+
+## The occlusion question, answered — and it pointed the other way
+
+"Do storey two's eaves occlude storey one's veranda?" **No, and they cannot.** From a low camera an
+eave hides what is behind and above it, so what gets swallowed is the *deck of the storey above*,
+never the wall below. Raycast at the chosen shot: `core1`, `core2`, `core3` and `roof` all report
+themselves; `deck2` and `deck3` report `eave1` and `eave2`, which is what a pavilion looks like from
+the ground. Level three stands on the veranda, so it never needs that view.
+
+**The real occlusion problem was trees.** Two of the four bays came back BLOCKED by a broadleaf.
+A claim circle round the building does nothing about the 2,700 units between it and the camera, so
+the claim is now a wedge widening from the standing point to the facade.
+
+## Constraints step 1 inherits
+
+- **The widest eave must stay near 1,030 units.** At 21:9 the massing clears the menu's left edge by
+  17px. A wider building needs the bearing re-checked, not just the eave.
+- **The taper has to be carried by the eaves.** Drawing the walls in while holding the oversail
+  constant produced a visible stack of identical trays. Current: cores 640/540/430, oversails
+  195/165/135, so the eaves read 1030/870/700.
+- **Storey pitch 250 works** — it is what leaves all three fronts clear at a 180 eye. Changing it
+  reopens the occlusion question.
+- **The platform is level at −296** and the base skirt has to reach 260 below it; the near ground
+  rises enough to bury the plinth's foot, which is correct but means the base's visible height is
+  less than its modelled height.
+
+## Two things step 0 uncovered that steps 2 and 4 own
+
+- **STUDY still has its legacy CSS3D level two** — four black tiles (ひらがな / カタカナ / 漢字 /
+  語彙) stepping diagonally across the facade, plus the 学習 title plane and the env backdrop. They
+  are what step 2 replaces with shoji bays, and the agreed set is **かな / 漢字 / 語彙 / 文法**, not
+  the four currently there.
+- **The base reads as a blank slab** and the ground cuts across its foot. Step 1 gives it a stone
+  edge; step 4 dresses the bank.

@@ -1095,6 +1095,7 @@
 import * as THREE from 'three';
 import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { buildReview } from './places/review.js';
+import { buildStudy } from './places/study.js';
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -2592,7 +2593,25 @@ function standOff(place, off = STAND_OFF, lift = EYE_LIFT) {
    menu, and it must not stack on the mountain. The rest spread wide enough that each is a real
    turn: two ahead of the shoulders, two abeam, two behind. */
 const DEST_SPECS = [
-  { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
+  /* STUDY was at -37/4400 until the massing went up and could be measured. Three things had to
+     agree and only two of them ever did at once:
+       - it must stay OUT of the menu's frame. At -37 the pavilion reached in from the left,
+         sliced by the edge and landing behind the type column. Same lesson the shrine learned
+         at +26: a landmark is wide enough to intrude from further out than its bearing suggests.
+       - its footprint must be dry and near enough level to platform. -37 sat 46% in the lake
+         over a 195 fall; -55/4400 was 40% wet over 199 and put the water BEHIND the building,
+         where the building hides its own reflection.
+       - and the lake has to come between the camera and it, which is the whole reason for
+         putting it on the shore.
+     -52/4000 is where all three hold: an 11%-wet footprint over the flattest ground in the
+     sweep (122), water reaching back 2,500 along the approach so the standing point is at the
+     water's edge, and 160px of clearance from the menu's left edge. */
+  /* and the shot: at the default 1,500 the pavilion overflows the frame by 900px in height.
+     2,700 is the first stand-off that holds all three storeys with margin, and it still leaves
+     the ground veranda 562px wide — 140 per bay, which is more than the shrine's tablets ever
+     had. The low eye keeps the lake in the foreground and looks UP at the building, which is
+     what a three-storey landmark wants. */
+  { bearing: -52, dist: 4000, lift: 0, stand: 2700, eyeLift: 180 }, /* STUDY — the pavilion */
   { bearing: 105, dist: 5200, lift: 150, stand: 855, eyeLift: 182 }, /* REVIEW — the shrine */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
@@ -3262,6 +3281,16 @@ buildReview({
   WORLD_L3, WORLD_TITLE, addOutline, backRenderer, backScene, beamSeg, blockAdd, broadleafGeo,
   buildEmaWall, cedarGeo, destPlace, drawSign, groundAt, hash01, hengaku, instanced, mergeParts,
   outlineGeom, outlineMaterial, signCanvas, standOff, toriiGeo, treeClaim, worldPickEl,
+});
+
+/* ---- STUDY, built from places/study.js ----
+   STEP ZERO ONLY: a stand-in massing at the pavilion's intended size, so `stand`, `eyeLift` and
+   the focus height can be measured against something before the building exists. It registers
+   its approach coordinates in `PROBE`, its parts in `MARKS`, and rewrites `DEST_SPECS[0].focus`,
+   so like the shrine it has to run above where those are read. */
+const STUDY_MASS = buildStudy({
+  DEST_SPECS, HOME_EYE, LAKE_Y, MARKS, PROBE, RAMP,
+  addOutline, backScene, blockAdd, destPlace, groundAt, treeClaim,
 });
 
 /* ---- the woods ----
@@ -4225,11 +4254,31 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
     const r = new THREE.Raycaster();
     r.setFromCamera(new THREE.Vector2((sx / W()) * 2 - 1, -(sy / H()) * 2 + 1), camera);
     return r.intersectObjects(backScene.children, true).slice(0, 5).map((h) => ({
+      /* WHAT IT IS, IF IT SAID. Vertex count and instance-ness were only ever a way of guessing
+         at identity — "864 verts, instanced" meant "a tunnel gate" by inference. A mesh that
+         bothers to name itself gets named back, which turns "is the veranda visible or has the
+         eave above swallowed it" into a one-word answer. */
+      name: h.object.name || '',
       dist: Math.round(h.distance),
       y: Math.round(h.point.y),
       verts: h.object.geometry ? h.object.geometry.attributes.position.count : 0,
       inst: h.object.isInstancedMesh ? 1 : 0,
     }));
+  },
+  /* WHAT A STAND-OFF ACTUALLY FRAMES. `stand`, `eyeLift` and the focus height are the three
+     numbers that decide whether a place fits the screen, and until now the only way to settle
+     them was edit, reload, look — which is how REVIEW's arrived, and how the sacred tree got
+     placed three times. This parks the camera where a candidate set would put it, so a whole
+     sweep is one page load: the trick `probe` plays for placement, applied to the shot. */
+  tryStand: (i, off, lift, focusLift) => {
+    const d = DESTS[i];
+    const f = d.focus.clone();
+    if (focusLift != null) f.y = d.place.y + focusLift;
+    const e = standOff(f, off, lift);
+    cam.px = e.x; cam.py = e.y; cam.pz = e.z;
+    cam.tx = f.x; cam.ty = f.y; cam.tz = f.z;
+    cam.roll = 0;
+    return { eye: e.toArray().map(Math.round), focus: f.toArray().map(Math.round), dist: Math.round(e.distanceTo(f)) };
   },
   /* the screen box of a registered landmark, and of the name-board */
   rectOf: (k) => screenRect(MARKS[k]),
@@ -4245,6 +4294,57 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
     return {
       x: Math.round((q.x * 0.5 + 0.5) * W()), y: Math.round((0.5 - q.y * 0.5) * H()),
       dist: Math.round(d), pxPerUnit: +(((q.y - up.y) * 0.5 * H()) / 100).toFixed(3),
+      /* the ground itself, which is the other question asked of a station: a precinct's platform
+         has to be set above the HIGHEST point it covers, and a site that turns out to be under
+         the waterline is a different building */
+      wy: Math.round(v.y - lift), wet: v.y - lift < LAKE_Y ? 1 : 0,
+    };
+  },
+  /* WHERE A PLACE COULD GO AT ALL. A destination's bearing and distance settle three things at
+     once — what the ground is doing there, whether it stands in the water, and whether it
+     intrudes on the menu's frame — and all three have to agree before any of it is modelled.
+     The shrine's site was found by asking them one reload at a time; this asks the whole shore
+     in one, which is the difference between choosing a site and settling for the first one. */
+  site: (bearing, dist, half = 620) => {
+    const c = destPlace(bearing, dist, 0);
+    const f0 = c.clone().sub(HOME_EYE).setY(0).normalize();
+    const s0 = new THREE.Vector3(-f0.z, 0, f0.x);
+    let top = -Infinity, low = Infinity, wet = 0, n = 0;
+    /* WHICH WAY THE SHORE RUNS, not just how much of the site is under it. A site that is 40%
+       water is two completely different pictures depending on which 40%: water on the near side
+       puts the lake between the camera and the building and hands you the reflection for free,
+       water on the far side puts it behind where the building itself hides it. The first pass
+       reported one number for both and picked the wrong one. */
+    let near = 0, nearN = 0, far = 0, farN = 0;
+    for (let f = -half; f <= half; f += 80) {
+      for (let s = -half; s <= half; s += 80) {
+        const p = c.clone().addScaledVector(f0, f).addScaledVector(s0, s);
+        const y = groundAt(p.x, p.z);
+        top = Math.max(top, Math.max(y, LAKE_Y));
+        low = Math.min(low, y);
+        if (y < LAKE_Y) wet++;
+        if (f < 0) { nearN++; if (y < LAKE_Y) near++; }
+        if (f > 0) { farN++; if (y < LAKE_Y) far++; }
+        n++;
+      }
+    }
+    const q = c.clone().project(camera);
+    const up = c.clone().setY(c.y + 100).project(camera);
+    return {
+      top: Math.round(top), low: Math.round(low), fall: Math.round(top - low),
+      wet: +(wet / n).toFixed(2), near: +(near / nearN).toFixed(2), far: +(far / farN).toFixed(2),
+      /* how far out along the approach the water reaches, which is what decides whether the
+         camera stands on the shore looking across, or on the bank with the lake behind */
+      reach: (() => {
+        for (let f = -half * 5; f <= 0; f += 120) {
+          const p = c.clone().addScaledVector(f0, f);
+          if (groundAt(p.x, p.z) < LAKE_Y) return Math.round(-f);
+        }
+        return 0;
+      })(),
+      sx: Math.round((q.x * 0.5 + 0.5) * W()), sy: Math.round((0.5 - q.y * 0.5) * H()),
+      px: +(((q.y - up.y) * 0.5 * H()) / 100).toFixed(4),
+      behind: q.z > 1 ? 1 : 0,
     };
   },
   marks: () => Object.keys(MARKS),
@@ -4269,6 +4369,9 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* where the name-board actually lands on screen. A 3D title cannot be measured with
      getBoundingClientRect, and "is the title inside the safe zone" is precisely the question that
      a 1400x880 test window answered wrongly for the DOM version — so project it here. */
+  /* the stand-in massing's own numbers, so a measurement can be stated in the building's terms
+     ("the eave is 34 below the deck above") rather than in screen pixels alone */
+  mass: () => STUDY_MASS,
   titleRect: (key) => screenRect(WORLD_TITLE[key || 'REVIEW']) };
 
 function screenRect(o) {
