@@ -1408,6 +1408,39 @@ also what lets them be permanent scenery instead of something that spawns on arr
   gates as a 97% intersection the moment they became an InstancedMesh. A repeated structure with
   deliberate spacing looks identical to a fault if all you measure is bounding boxes.
 
+## v42 — walking it showed what standing still had hidden
+
+Everything in this pass was already wrong before level three existed. Walking down the thing is
+what made it visible, which is the general lesson: **a scene is only tested from the viewpoints
+you have actually been to.**
+
+- **The path was a line of boxes, not a path.** Each 260-unit segment was levelled at the mean of
+  its own two ground samples and rotated to point at the next, so consecutive segments met at
+  different heights AND different angles — a staircase of small steps with slivers of daylight
+  between them. Invisible from the courtyard; it is the floor when you walk down it. A ribbon
+  built from shared vertices cannot step and cannot gap. It is also level ACROSS its width where
+  the hillside is not — a paved way is built up on the low side, it does not tilt — and it ramps
+  onto the court instead of meeting the kerb at whatever height the ground happens to be doing.
+- **`mergeParts` writes one flat colour over every vertex it is handed.** That is what it is for,
+  and exactly wrong for a ribbon carrying its courses in its own colour attribute: merged in, the
+  whole path came out white. Some geometry has to keep its own mesh.
+- **Planting ranges were written when the world was smaller.** They stopped at 4,300 because that
+  was the end of everything; the tunnel now runs to 7,340, so the last third of the walk was a
+  corridor with mown grass either side. Ranges tied to a landmark rather than to a number would
+  not have drifted — and the counts have to go up with the length, because the density was right
+  and the quantity was not.
+- **A dolly wants a sine, and time.** `power2.inOut` over six tenths reads as being shoved from
+  one sign to the next. A sine has no sudden change of acceleration at either end, and 1.25s over
+  1,072 units is about walking pace at this scale.
+- **The keyboard cannot be the only way down a corridor.** The placards are their own controls —
+  raycast, cursor feedback, and a transparent focus twin each — with two steppers in the counter
+  for anyone who would rather not aim. Only the NEXT placard is a reliable target, though: a far
+  one on the same side converges behind its nearer neighbour, which is the same fact about
+  corridors that made the camera move in the first place.
+- **A point behind the camera projects to a flipped, meaningless place.** The sign you have just
+  walked past was putting a 560px focus rectangle in the middle of the screen. `z > 1` after
+  `project()` is the test.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1613,6 +1646,16 @@ also what lets them be permanent scenery instead of something that spawns on arr
   offsets from an axis trade places in the frame as the camera moves back.
 - **A measurement that cannot tell a colonnade from a collision will report a colonnade.** Every
   automatic check needs to know what the scene means, not just where its boxes are.
+
+- **A scene is only tested from the viewpoints you have been to.** Everything the walk exposed —
+  a stepped path, planting that stopped, a camera that lurched — had been wrong for weeks and was
+  invisible from the one place the camera had ever stood.
+- **Ground built from independent pieces will not meet itself.** Anything laid along a heightfield
+  wants shared vertices, not a row of separately levelled boxes.
+- **Tie ranges to landmarks, not to numbers.** A literal that meant "the end of the world" when it
+  was written stops meaning that the moment the world grows.
+- **A dolly wants a sine and about a second per stride.** Snappy eases are for cuts, not for
+  walking.
 
 ## Sources
 

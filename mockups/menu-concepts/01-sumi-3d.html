@@ -491,6 +491,15 @@
   .walk-hud .wh-jp { font-family: var(--jp); font-weight: 700; font-size: 21px; letter-spacing: 0.1em; color: var(--washi); }
   .walk-hud .wh-en { font-family: var(--lat); font-size: 11px; letter-spacing: 0.3em; color: rgba(242,234,216,0.55); }
   .walk-hud .wh-at { font-family: var(--lat); font-size: 13px; letter-spacing: 0.14em; color: var(--sec, var(--hi)); }
+  /* THE KEYBOARD CANNOT BE THE ONLY WAY DOWN A CORRIDOR. Two steppers here and the placards
+     themselves are both pickable, so the walk is navigable with nothing but a pointer. */
+  .walk-hud .wh-step {
+    background: none; border: 0; cursor: pointer; padding: 0 6px;
+    font: 700 22px/1 var(--lat); color: rgba(242, 234, 216, 0.5);
+    transition: color 0.15s;
+  }
+  .walk-hud .wh-step:hover { color: var(--sec, var(--hi)); }
+  .walk-hud .wh-step:disabled { opacity: 0.22; cursor: default; }
   .back-tab { left: 40px; bottom: 62px; opacity: 0; transition: opacity 0.32s ease; }
   body:not(.at-menu) .back-tab { opacity: 1; }
   body.at-menu .back-tab button { pointer-events: none; }
@@ -827,7 +836,8 @@
     pointer-events: none;
   }
   .world-pick:focus-visible { outline: 3px solid var(--hi); outline-offset: 6px; }
-  body.world-l2 .world-pick { display: block; }
+  body.world-l2 .world-pick:not(.walk-pick) { display: block; }
+  body.at-walk .walk-pick { display: block; }
   .chrome { position: fixed; z-index: 5; pointer-events: none; }
   .chrome a, .chrome button { pointer-events: auto; }
   body:not(.at-menu) .menu-only, body:not(.at-menu) .menu-only * { pointer-events: none; }
@@ -1053,7 +1063,9 @@
 </div>
 <div class="chrome desc-line menu-only" id="descLine"><b>Kana, kanji and vocabulary by section</b><i>かな・漢字・語彙のセクション学習</i></div>
 <div class="chrome walk-hud" id="walkHud">
+  <button class="wh-step" data-d="-1" type="button">&#8249;</button>
   <span class="wh-jp"></span><span class="wh-en"></span><b class="wh-at"></b>
+  <button class="wh-step" data-d="1" type="button">&#8250;</button>
 </div>
 <div class="chrome back-tab" id="backTab">
   <button type="button"><span class="bt-ar">&#9666;</span><span class="bt-jp">&#25147;&#12427;</span><span class="bt-en">BACK</span></button>
@@ -3085,21 +3097,58 @@ function pickWorldTile(sec, jp) {
   const onCourt = (f2) => f2 > CY.f0 - 40 && f2 < CY.f1 + 40;
   {
     const pv = [];
-    /* the strip, in two runs — from behind the outer gate up to the court, and out the far side */
-    const strip = (from, to) => {
-      for (let k = from; k < to; k += 260) {
-        const a = at3(k, 0), b = at3(Math.min(k + 260, to), 0);
-        const g = new THREE.BoxGeometry(360, 26, a.distanceTo(b) + 12);
-        const m = new THREE.Mesh(g, null);
-        m.position.copy(a).lerp(b, 0.5);
-        m.position.y = (a.y + b.y) / 2 + 4;
-        m.lookAt(b.x, m.position.y, b.z);
-        m.updateMatrix();
-        pv.push({ geo: g.clone().applyMatrix4(m.matrix), color: k % 520 === 0 ? 0x7b756a : 0x736d63 });
-      }
+    /* ---- THE PATH IS ONE RIBBON, NOT A LINE OF BOXES ----
+       Every 260-unit segment used to be levelled at the mean of its own two ground samples and
+       rotated to point at the next one, so consecutive segments met at different heights AND
+       different angles: a staircase of small steps with slivers of daylight between them. From
+       the courtyard nobody could see it. Walking down the tunnel it is the floor, and it was the
+       first thing you noticed. A ribbon shares its vertices at every join, so it cannot step and
+       it cannot gap.
+
+       It is also level ACROSS its width even where the hillside is not — a paved way is built up
+       on the low side, it does not tilt — and it ramps onto the court instead of meeting the
+       kerb at whatever height the ground happens to be doing there. */
+    const courtBlend = (k, y) => {
+      const d = k < CY.f0 ? CY.f0 - k : (k > CY.f1 ? k - CY.f1 : 0);
+      if (d > 560) return y;
+      const t = 1 - d / 560;
+      return y + (CY_TOP - y) * t * t * (3 - 2 * t);
     };
-    strip(-2560, CY.f0 + 30);
-    strip(CY.f1 - 30, TUN_END + 860);
+    const ribbon = (from, to, halfW, rise, skirt) => {
+      const STEP = 90;
+      const pos = [], col = [], idx = [];
+      const cA = new THREE.Color(0x7d776c), cB = new THREE.Color(0x746e64);
+      let n = 0;
+      for (let k = from; k <= to; k += STEP) {
+        const l = at3(k, -halfW), r = at3(k, halfW), m2 = at3(k, 0);
+        const y = courtBlend(k, Math.max(l.y, r.y, m2.y) + rise);
+        pos.push(l.x, y, l.z, r.x, y, r.z, l.x, y - skirt, l.z, r.x, y - skirt, r.z);
+        const c = (Math.floor(k / 540) % 2) ? cA : cB;
+        for (let v = 0; v < 4; v++) col.push(c.r, c.g, c.b);
+        n++;
+      }
+      for (let i = 0; i < n - 1; i++) {
+        const a = i * 4, b = a + 1, c = a + 2, d = a + 3;
+        const a2 = a + 4, b2 = a + 5, c2 = a + 6, d2 = a + 7;
+        idx.push(a, b, b2, a, b2, a2);       /* the surface */
+        idx.push(a, a2, c2, a, c2, c);       /* the left kerb */
+        idx.push(b, d, d2, b, d2, b2);       /* and the right */
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      /* ITS OWN MESH, NOT MERGED. `mergeParts` writes one flat colour over every vertex of each
+         part it is handed — which is exactly what it is for, and exactly wrong for a ribbon that
+         carries its courses in its own colour attribute. Merged in, the whole path came out
+         white. */
+      backScene.add(new THREE.Mesh(g, new THREE.MeshToonMaterial({
+        vertexColors: true, gradientMap: RAMP, flatShading: true,
+      })));
+    };
+    ribbon(-2560, CY.f0 + 40, 180, PAVE_RISE, 34);
+    ribbon(CY.f1 - 40, TUN_END + 860, 180, PAVE_RISE, 34);
     /* the court: one slab and a kerb course standing just proud of it */
     const slab = (halfW, top, depth, colour, over) => {
       const a = at3(CY.f0 - over, 0), b = at3(CY.f1 + over, 0);
@@ -3282,7 +3331,13 @@ function pickWorldTile(sec, jp) {
       root.add(face);
       face.material.opacity = 0.42;
       /* the sign turns to meet you when you stop beside it, and sits back when you move on */
-      L3_SIGNS.push({ root, face, f: f2, sd, baseRy: root.rotation.y, turn: (k % 2 ? -0.30 : 0.30) });
+      /* the placard is the control. Picking one from across the corridor is how you navigate
+         with the screen rather than with the keyboard, so it carries a transparent twin for
+         focus and Enter exactly as the ema tablets do. */
+      const el = worldPickEl('', () => walkGo(k));
+      el.classList.add('walk-pick');
+      L3_SIGNS.push({ root, face, el, idx: k, f: f2, sd,
+        baseRy: root.rotation.y, turn: (k % 2 ? -0.30 : 0.30) });
     }
     WORLD_L3.REVIEW = {
       signs: L3_SIGNS,
@@ -3297,6 +3352,7 @@ function pickWorldTile(sec, jp) {
           const [jp2, en2] = L3_REVIEW.decks[k];
           const [n, pct] = q[k];
           if (s2.face.material.map) s2.face.material.map.dispose();
+          s2.el.textContent = `${en2} \u2014 ${jp2}, ${n} ${L3_REVIEW.unit}, ${pct}%`;
           const t2 = signTexture(jp2, en2, n, L3_REVIEW.unit, pct, accent);
           s2.face.material.map = t2;
           s2.face.material.emissiveMap = t2;
@@ -3401,7 +3457,7 @@ function pickWorldTile(sec, jp) {
        the verge only has to answer for the things that are not in it. */
     const VERGE = 260;
     /* and the hall, whose plinth is 713 wide — wider than the corridor it stands at the end of */
-    const KEEP = [[3170, 0, 560]];
+    const KEEP = [[TUN_END + 700, 0, 560]];
     /* the court is a rectangle, not a disc, so it gets its own clause: inside its length nothing
        plants closer than its edge plus a verge */
     const clear = (f2, sd) => {
@@ -3470,9 +3526,9 @@ function pickWorldTile(sec, jp) {
        asking a cedar to find a gap gets that backwards. Instanced with a shared outline twin like
        the rest of the wood, so the whole treeline is four draw calls. */
     const woodM = () => new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
-    instanced(broadleafGeo(), woodM(), 62, (i) => {
+    instanced(broadleafGeo(), woodM(), 96, (i) => {
       const k = 1.0 + hash01(i, 19) * 0.5;
-      const q = grow(i, 211, 16, -1100, 4300, 520, 1300, 340, 34 * k, 128 * k);
+      const q = grow(i, 211, 22, -1100, 8700, 520, 1300, 340, 34 * k, 128 * k);
       if (!q) return null;
       const w = at3(q[0], q[1]);
       treeClaim(w.x, w.z, 132 * k);
@@ -3480,9 +3536,9 @@ function pickWorldTile(sec, jp) {
     }, 0.0018);
     /* cedars are 480 tall and the camera stands at f -1290, so they start well forward of it:
        a stand of them beside the eye would be a wall across the frame rather than a treeline */
-    instanced(cedarGeo(), woodM(), 58, (i) => {
+    instanced(cedarGeo(), woodM(), 92, (i) => {
       const k = 0.85 + hash01(i, 23) * 0.5;
-      const q = grow(i, 307, 14, -300, 4400, 640, 1500, 360, 28 * k, 62 * k);
+      const q = grow(i, 307, 20, -300, 8800, 640, 1500, 360, 28 * k, 62 * k);
       if (!q) return null;
       const w = at3(q[0], q[1]);
       treeClaim(w.x, w.z, 64 * k);
@@ -3507,14 +3563,18 @@ function pickWorldTile(sec, jp) {
        two of these, up to 85% of a radius deep, which is not knitting, it is one mound inside
        another. Held just under 1.0 they touch and stop, and the density that costs is bought
        back with more candidates instead. */
-    [[0x4d6338, 260, 520, 0.24, 0.62, 520, 30, 250, 0.95], [0x40592f, 300, 700, 0.5, 1.25, 270, 19, 340, 0.95],
-      [0x4c6636, 360, 730, 0.55, 1.3, 270, 19, 340, 0.95],
-      [0x37502b, 430, 730, 0.85, 1.7, 260, 19, 340, 1.0], [0x556f3c, 470, 730, 0.9, 1.8, 260, 19, 340, 1.0]]
+    /* AND THE RANGES GO TO THE END OF THE TUNNEL. They stopped at 4,300 because that is where
+       the world stopped when they were written; the tunnel now runs to 7,340 and the hall to
+       8,040, so the last third of the walk was down a corridor with mown grass either side. The
+       counts go up with the length — the density is what was right, not the number. */
+    [[0x4d6338, 260, 520, 0.24, 0.62, 760, 44, 250, 0.95], [0x40592f, 300, 700, 0.5, 1.25, 400, 28, 340, 0.95],
+      [0x4c6636, 360, 730, 0.55, 1.3, 400, 28, 340, 0.95],
+      [0x37502b, 430, 730, 0.85, 1.7, 380, 28, 340, 1.0], [0x556f3c, 470, 730, 0.9, 1.8, 380, 28, 340, 1.0]]
       .forEach(([c, sLo, sHi, kLo, kHi, n, cl, rad, sep], t) => {
         const m = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
         NO_REFLECT.push(instanced(shrubGeo, m, n, (i) => {
           const k = kLo + hash01(i, 41 + t) * (kHi - kLo);
-          const q = grow(i, t * 17, cl, -2000, 4300, sLo, sHi, rad, 56 * k * sep, 0);
+          const q = grow(i, t * 17, cl, -2000, 8700, sLo, sHi, rad, 56 * k * sep, 0);
           if (!q) return null;
           return {
             pos: at3(q[0], q[1], -6),
@@ -3530,7 +3590,7 @@ function pickWorldTile(sec, jp) {
   /* 1000, not 760: at 760 the valley's wood resumed 585 out from the axis, which is inside the
      band the shrine plants — so the two were placing trees into each other with neither aware of
      the other. The corridor now clears to 769 and the shrine owns everything inside that. */
-  for (let k = -1700; k <= 4400; k += 320) {
+  for (let k = -1700; k <= TUN_END + 900; k += 320) {
     const q = at3(k, 0);
     blockAdd(q.x, q.z, 1000, 520);
   }
@@ -5122,16 +5182,23 @@ function walkPlace(i) {
   const s = w.signs[Math.max(0, Math.min(i, w.rows - 1))];
   return { eye: w.eyeAt(s), tgt: w.tgtAt(s) };
 }
-function walkGo(i, dur = 0.62) {
+/* SLOW, AND EASED BOTH ENDS BY A SINE. `power2.inOut` over six tenths reads as being shoved
+   from one sign to the next; this is meant to be walking. A sine is the gentlest standard ease
+   there is — no sudden change of acceleration at either end — and 1.25s over 1,072 units is
+   about a brisk walking pace at this scale. */
+function walkGo(i, dur = 1.25) {
   const w = WORLD_L3[walkSec];
   walkAt = Math.max(0, Math.min(i, w.rows - 1));
   const { eye, tgt } = walkPlace(walkAt);
   gsap.to(cam, {
     px: eye.x, py: eye.y, pz: eye.z, tx: tgt.x, ty: tgt.y, tz: tgt.z,
-    fov: 44, roll: 0, duration: dur, ease: 'power2.inOut', overwrite: true,
+    fov: 44, roll: 0, duration: dur, ease: 'sine.inOut', overwrite: true,
   });
   walkLight();
   walkHud.querySelector('.wh-at').textContent = `${walkAt + 1} / ${w.rows}`;
+  walkHud.querySelectorAll('.wh-step').forEach((b) => {
+    b.disabled = walkAt + (+b.dataset.d) < 0 || walkAt + (+b.dataset.d) >= w.rows;
+  });
 }
 /* the placard you are beside is the one you are reading: it takes the ink, its neighbours fade */
 function walkLight() {
@@ -5157,7 +5224,8 @@ function enterWalk(sectionEn, tileJp) {
   walkHud.style.setProperty('--sec', SECTION_ACCENT[sectionEn][0]);
   /* the section's own chrome steps aside — you are past it now */
   gsap.to(L2_PLANES[sectionEn].map((q) => q.el), { opacity: 0, duration: 0.3 });
-  walkGo(0, 1.15);
+  /* the way in is longer still: it is the whole length of the courtyard and the main gate */
+  walkGo(0, 2.1);
   boldStreaks(1);
 }
 function exitWalk() {
@@ -5171,12 +5239,36 @@ function exitWalk() {
   const d = destFor(ITEMS.findIndex((it) => it.en === sec));
   gsap.to(cam, {
     px: d.eye.x, py: d.eye.y, pz: d.eye.z, tx: d.focus.x, ty: d.focus.y, tz: d.focus.z,
-    fov: 42, roll: 0, duration: 0.95, ease: 'power2.inOut', overwrite: true,
+    fov: 42, roll: 0, duration: 1.6, ease: 'sine.inOut', overwrite: true,
   });
 }
+/* the raycast for the walk. The signs turn a little when you stop beside them, but nothing like
+   enough to move the target out from under the cursor, so they are their own hit shape. */
+function walkPickAt(cx, cy) {
+  if (!walkSec) return null;
+  const w = WORLD_L3[walkSec];
+  _pickNdc.set((cx / W()) * 2 - 1, -(cy / H()) * 2 + 1);
+  _pickRay.setFromCamera(_pickNdc, camera);
+  const faces = w.signs.slice(0, w.rows).map((q) => q.face);
+  const hit = _pickRay.intersectObjects(faces, false)[0];
+  return hit ? w.signs.findIndex((q) => q.face === hit.object) : null;
+}
+addEventListener('pointermove', (e) => {
+  if (!walkSec || busy) return;
+  const i = walkPickAt(e.clientX, e.clientY);
+  document.body.style.cursor = i !== null && i !== walkAt ? 'pointer' : '';
+});
+addEventListener('click', (e) => {
+  if (!walkSec || busy) return;
+  const i = walkPickAt(e.clientX, e.clientY);
+  if (i !== null) walkGo(i);
+});
+walkHud.querySelectorAll('.wh-step').forEach((b) => {
+  b.addEventListener('click', () => { if (walkSec) walkGo(walkAt + (+b.dataset.d)); });
+});
 addEventListener('wheel', (e) => {
   if (!walkSec || busy) return;
-  walkGo(walkAt + (e.deltaY > 0 ? 1 : -1), 0.5);
+  walkGo(walkAt + (e.deltaY > 0 ? 1 : -1));
 }, { passive: true });
 
 /* the sub plane is detached until the first CSS3D render — query through subEl, not document */
@@ -5658,6 +5750,26 @@ addEventListener('click', (e) => {
    camera drifts — a fixed screen rectangle would part company the moment anything breathes */
 const _proj = new THREE.Vector3();
 function placeWorldPicks() {
+  if (walkSec) {
+    const w = WORLD_L3[walkSec];
+    w.signs.forEach((q, k) => {
+      if (k >= w.rows) { q.el.style.display = 'none'; return; }
+      q.el.style.display = '';
+      q.face.getWorldPosition(_proj);
+      const d = camera.position.distanceTo(_proj);
+      _proj.project(camera);
+      /* a point behind the camera projects to a flipped, meaningless place — the sign you have
+         just walked past was landing a 560px focus rectangle in the middle of the screen */
+      if (_proj.z > 1) { q.el.style.display = 'none'; return; }
+      const s2 = (H() / 2) / Math.tan((camera.fov / 2) * D2R) / d;
+      const ww = 168 * s2, hh = 102 * s2;
+      q.el.style.left = `${(_proj.x * 0.5 + 0.5) * W() - ww / 2}px`;
+      q.el.style.top = `${(-_proj.y * 0.5 + 0.5) * H() - hh / 2}px`;
+      q.el.style.width = `${ww}px`;
+      q.el.style.height = `${hh}px`;
+    });
+    return;
+  }
   if (!worldL2) return;
   for (const q of worldL2.picks) {
     /* the tablet, not the peg — the group's origin moved up to the rail */
@@ -5724,8 +5836,8 @@ addEventListener('keydown', (e) => {
     else if (e.key === 't' || e.key === 'T') { if (!busy) setTmode(tmode === 1 ? 2 : 1); }
   } else if (state === 'sub' && walkSec) {
     /* moving IS the scrollbar down here */
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') walkGo(walkAt + 1, 0.5);
-    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') walkGo(walkAt - 1, 0.5);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') walkGo(walkAt + 1);
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') walkGo(walkAt - 1);
     else if (e.key === 'Escape' || e.key === 'Backspace') goBack();
   } else if (state === 'sub' && (e.key === 'Escape' || e.key === 'Backspace')) goBack();
 });
