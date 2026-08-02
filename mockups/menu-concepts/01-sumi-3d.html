@@ -2371,11 +2371,13 @@ function destPlace(bearingDeg, dist, lift = 0) {
 }
 /* the camera's standing point: on the line from home to the place, STAND_OFF short of it, at
    eye height above whatever ground is there */
-function standOff(place, off = STAND_OFF) {
+function standOff(place, off = STAND_OFF, lift = EYE_LIFT) {
   const v = place.clone().sub(HOME_EYE).setY(0);
   const len = v.length();
   const e = v.multiplyScalar(Math.max(len - off, 400) / len).add(HOME_EYE);
-  e.y = surfaceAt(e.x, e.z) + EYE_LIFT;
+  /* eye height is per-place too: standing back to look at a valley and standing close to read
+     something hanging at chest height are not the same shot */
+  e.y = surfaceAt(e.x, e.z) + lift;
   return e;
 }
 
@@ -2385,7 +2387,7 @@ function standOff(place, off = STAND_OFF) {
    turn: two ahead of the shoulders, two abeam, two behind. */
 const DEST_SPECS = [
   { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
-  { bearing: 105, dist: 5200, lift: 150, stand: 1000 }, /* REVIEW — the shrine, off-screen  */
+  { bearing: 105, dist: 5200, lift: 150, stand: 940, eyeLift: 215 }, /* REVIEW — the shrine */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
   { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
@@ -2604,6 +2606,12 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
   });
   frame.push({ geo: beamSeg(W + W * 0.11, HH * 0.067, HH * 0.1, 0, HH + HH * 0.13, 0), color: 0x54422f });
   frame.push({ geo: beamSeg(W + W * 0.05, HH * 0.043, HH * 0.073, 0, HH - HH * 0.027, 0), color: 0x46372a });
+  /* THE BOARD THE CROWD HANGS ON. Without it the blanks hung in mid-air behind the posts with
+     nothing behind them, which reads as geometry poking through rather than as tablets on a
+     wall — and a real ema wall is boarded anyway. */
+  frame.push({ geo: beamSeg(W * 0.97, HH * 0.86, HH * 0.05, 0, HH * 0.46, 0), color: 0x59493a });
+  /* and a ridge over the join, because two roof slopes meeting at an angle leave a seam */
+  frame.push({ geo: beamSeg(W * 0.62, HH * 0.07, W * 0.21, 0, HH + HH * 0.3, 0), color: 0x332c25 });
   [-1, 1].forEach((sx) => {
     const g = new THREE.BoxGeometry(W / 2 + W * 0.1, HH * 0.037, W * 0.19);
     g.rotateZ(-sx * 0.20);
@@ -2647,11 +2655,12 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
   for (let i = 0; i < blanks.count; i++) {
     const row = Math.floor(i / PER), k = i % PER;
     const x = -W / 2 + W * 0.065 + (k + (hash01(i, 7) - 0.5) * 0.55) * (W * 0.87) / (PER - 1);
-    const y = HH - HH * 0.2 - row * HH * 0.21 - hash01(i, 19) * HH * 0.07;
+    const y = HH - HH * 0.24 - row * HH * 0.19 - hash01(i, 19) * HH * 0.05;
     qt.setFromAxisAngle(zc, (hash01(i, 31) - 0.5) * 0.7);
     const g = 0.78 + hash01(i, 83) * 0.44;
     sc.set(g, g, 1);
-    mx.compose(new THREE.Vector3(x, y, -W * 0.026 - row * W * 0.015), qt, sc);
+    /* forward of the board rather than behind it, or they vanish into it */
+    mx.compose(new THREE.Vector3(x, y, W * 0.05 - row * W * 0.008), qt, sc);
     blanks.setMatrixAt(i, mx);
     /* weathered across a real range — a narrow one just made the slab evenly tan */
     col.setHSL(0.075 + hash01(i, 43) * 0.05, 0.14 + hash01(i, 51) * 0.16, 0.3 + hash01(i, 67) * 0.3);
@@ -2758,7 +2767,7 @@ function pickWorldTile(sec, jp) {
   addOutline(gate, 0.0028);
   /* the look target sits low on purpose: dropping it pitches the camera down, which lifts the
      wall off the bottom edge and leaves the section title room at the top */
-  DEST_SPECS[1].focus = at3(-430, -60, GATE_H * 0.30);
+  DEST_SPECS[1].focus = at3(-430, -30, GATE_H * 0.36);
 
   /* the tunnel: each gate smaller than the last AND closer to it, so the far end reads as
      distance rather than as a row of identical objects */
@@ -2805,11 +2814,55 @@ function pickWorldTile(sec, jp) {
      It is aimed at the camera's actual standing point, not at HOME_EYE. The eye is derived from
      the focus, so it has to be computed here rather than guessed — pointing the wall at the
      wrong place is what had it presenting its back. */
-  const eye = standOff(DEST_SPECS[1].focus, 1000);
-  const wallGrp = buildEmaWall('REVIEW', at3(-830, -180), eye, WALL_W, WALL_H);
-  /* and then turned a few degrees further in, so it belongs to the approach's geometry rather
-     than being a board set square to you */
-  wallGrp.rotateY(-0.26);
+  const eye = standOff(DEST_SPECS[1].focus, 940, 215);
+  const wallGrp = buildEmaWall('REVIEW', at3(-800, -145), eye, WALL_W, WALL_H);
+  /* and then turned well round toward the path, so it addresses the approach rather than the
+     viewer — a board square to the camera is a poster, a board angled along the way in is
+     something that was put there for people walking past it */
+  wallGrp.rotateY(-0.46);
+
+  /* ---- planting ----
+     The clearing strips the wood out and leaves a lawn, which reads as a golf course. These go
+     back in at a size that cannot block the approach: low shrubs banked along the edge of the
+     paving, taller ones behind them, and a few maples where the wood resumes. Placed in
+     approach coordinates like everything else, and kept clear of the path by construction
+     rather than by a blocker test. */
+  {
+    const shrubGeo = new THREE.IcosahedronGeometry(46, 1);
+    shrubGeo.scale(1.25, 0.82, 1.1);
+    [0x40592f, 0x4c6636, 0x37502b, 0x556f3c].forEach((c, t) => {
+      const m = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
+      const im = new THREE.InstancedMesh(shrubGeo, m, 46);
+      const mx2 = new THREE.Matrix4(), q2 = new THREE.Quaternion(), s2 = new THREE.Vector3();
+      const up = new THREE.Vector3(0, 1, 0);
+      for (let i = 0; i < im.count; i++) {
+        const f2 = -1500 + hash01(i, 3 + t) * 4600;
+        const sd = (hash01(i, 17 + t) < 0.5 ? -1 : 1) * (255 + hash01(i, 29 + t) * 520);
+        const k = 0.5 + hash01(i, 41 + t) * 1.15;
+        q2.setFromAxisAngle(up, hash01(i, 53 + t) * 6.28);
+        s2.set(k, k * (0.6 + hash01(i, 67 + t) * 0.5), k);
+        mx2.compose(at3(f2, sd, -6), q2, s2);
+        im.setMatrixAt(i, mx2);
+      }
+      im.instanceMatrix.needsUpdate = true;
+      backScene.add(im);
+      NO_REFLECT.push(im);
+    });
+    /* a few maples at the edge of the clearing, so the eye has something with height either
+       side of the gate without anything standing in the way of it */
+    const mapleGeo = broadleafGeo();
+    const maple = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
+    [[-1250, -880], [-560, 900], [260, -960], [980, 940], [1750, -900]]
+      .forEach(([f2, sd], i) => {
+        const m = new THREE.Mesh(mapleGeo, maple);
+        m.position.copy(at3(f2, sd, -14));
+        m.rotation.y = hash01(i, 7) * 6.28;
+        const k = 1.15 + hash01(i, 19) * 0.5;
+        m.scale.set(k, k, k);
+        backScene.add(m);
+        addOutline(m, 0.0018);
+      });
+  }
 
   /* a clearing the shape of the thing it clears — a line along the axis, and a second down the
      wall's side, because the corridor is measured from the axis while the wall stands off it */
@@ -2828,12 +2881,16 @@ function lanternGeo(H) {
   const parts = [];
   const S = 0x77736a, D = 0x625f57;
   const add = (g, c) => parts.push({ geo: g, color: c });
-  let g = new THREE.CylinderGeometry(H * 0.17, H * 0.21, H * 0.1, 8); g.translate(0, H * 0.05, 0); add(g, D);
-  g = new THREE.CylinderGeometry(H * 0.075, H * 0.09, H * 0.42, 8); g.translate(0, H * 0.31, 0); add(g, S);
-  g = new THREE.CylinderGeometry(H * 0.17, H * 0.14, H * 0.07, 8); g.translate(0, H * 0.55, 0); add(g, D);
-  g = new THREE.CylinderGeometry(H * 0.15, H * 0.15, H * 0.19, 6); g.translate(0, H * 0.68, 0); add(g, 0xe8d9b4);
-  g = new THREE.CylinderGeometry(H * 0.02, H * 0.26, H * 0.16, 6); g.translate(0, H * 0.85, 0); add(g, D);
-  g = new THREE.SphereGeometry(H * 0.05, 6, 4); g.translate(0, H * 0.95, 0); add(g, S);
+  /* every section overlaps its neighbour rather than meeting it. Butt-jointed low-poly parts
+     show a seam wherever the silhouettes disagree, and a stone lantern is stacked masonry —
+     overlap is what it actually looks like. Segment counts match (8 for the round parts, 6 for
+     the box and its roof) so the facets line up instead of interleaving. */
+  let g = new THREE.CylinderGeometry(H * 0.19, H * 0.235, H * 0.12, 8); g.translate(0, H * 0.055, 0); add(g, D);
+  g = new THREE.CylinderGeometry(H * 0.08, H * 0.095, H * 0.46, 8); g.translate(0, H * 0.32, 0); add(g, S);
+  g = new THREE.CylinderGeometry(H * 0.175, H * 0.145, H * 0.09, 8); g.translate(0, H * 0.55, 0); add(g, D);
+  g = new THREE.CylinderGeometry(H * 0.15, H * 0.15, H * 0.22, 6); g.translate(0, H * 0.68, 0); add(g, 0xe8d9b4);
+  g = new THREE.CylinderGeometry(H * 0.03, H * 0.27, H * 0.17, 6); g.translate(0, H * 0.855, 0); add(g, D);
+  g = new THREE.SphereGeometry(H * 0.055, 6, 4); g.translate(0, H * 0.955, 0); add(g, S);
   return mergeParts(parts);
 }
 /* 本殿 — the hall the approach is an approach TO. Without something at the far end the tunnel
@@ -3610,7 +3667,7 @@ setTimeout(redrawStroke, 4000);
    interface's legibility — the tail wagging the dog in both directions at once. */
 const DESTS = DEST_SPECS.map((d) => {
   const focus = d.focus || d.place;
-  return { ...d, focus, eye: standOff(focus, d.stand) };
+  return { ...d, focus, eye: standOff(focus, d.stand, d.eyeLift) };
 });
 const HOME_SUB = DESTS[0];
 
@@ -4077,7 +4134,7 @@ const L2_WORLD = {
     at: [[-120, 230, 60, 0.06, 1.1], [-60, 40, -180, 0.03, 0.95], [10, -150, -420, -0.02, 0.82], [80, -330, -650, -0.05, 0.7]],
     /* re-placed for the shrine's framing: authored against the old head-on composition the
        title cropped off the top of the frame and the back button off the bottom */
-    sign: [-330, 235, -150, 0.07, 1], back: [-380, -215, 200, 0.08, 1],
+    sign: [-232, 176, -120, 0.07, 1], back: [-330, -232, 230, 0.08, 1],
   },
   READING: { /* cloth-bound spines shelved through the bamboo — four different books, each
                 its own height and leaning its own way, feet on a common line */

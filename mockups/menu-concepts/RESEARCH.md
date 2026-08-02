@@ -1119,6 +1119,26 @@ Two things that only showed up once it was built:
   old head-on composition — the title cropped off the top of the frame and the button off the
   bottom.
 
+## v34 — the precinct dressed
+
+- **Eye height is per place, not global.** Standing back to take in a valley and standing close
+  to read something hanging at chest height are not the same shot; `standOff` takes a lift now
+  and REVIEW rides at 215 rather than 360.
+- **The wall addresses the path, not the viewer.** A board square to the camera is a poster; a
+  board turned along the way in is something that was put there for people walking past it.
+- **Butt-jointed low-poly parts show a seam wherever their silhouettes disagree.** The lantern's
+  sections overlap now rather than meeting, and the segment counts match — 8 for the round
+  parts, 6 for the box and its roof — so the facets line up instead of interleaving. Stacked
+  masonry looks like overlap anyway.
+- **The crowd needed something to hang on.** The blanks were floating behind the posts with
+  nothing behind them, which reads as geometry poking through rather than as tablets on a wall.
+  A backing board fixes it and is what a real ema wall has; a ridge beam covers the join where
+  the two roof slopes meet.
+- **A clearing without planting is a lawn.** Stripping the wood out to make room for the
+  approach left a golf course. Low shrubs bank the edge of the paving, taller ones sit behind
+  them, and maples mark where the wood resumes — all placed in approach coordinates and kept
+  clear of the path by construction rather than by a blocker test.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
