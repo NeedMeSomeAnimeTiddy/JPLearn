@@ -2326,6 +2326,129 @@ const lakeWater = (() => {
   }
 }
 
+/* ================= WHERE THE SIX PLACES ARE =================
+   THE CAMERA NO LONGER ORBITS A PIVOT. It stands on the lake shore and stays there; choosing a
+   section turns it to face a place and then flies it toward that place. That is the model this
+   was always meant to have — the old one put the camera on a 680-unit circle and slid it round
+   to a 2,600-unit one, which meant every "destination" was a bearing rather than somewhere, and
+   the arrival framing was whatever the arc happened to leave you looking at.
+
+   The consequence worth stating: a destination is now a POINT IN THE LANDSCAPE, authored in the
+   same sight-line frame as the lake, the river and everything else. `bearing` is measured off
+   the home sight line, positive to the right; `dist` is how far out along it. Where the ground
+   is at that point is looked up, not assumed. */
+const HOME_EYE = new THREE.Vector3(170, 60, 830);
+/* how high the camera rides above whatever it is standing on — taken from home so the eye
+   keeps a consistent height wherever it goes rather than flying at a fixed altitude */
+const EYE_LIFT = HOME_EYE.y - Math.max(groundAt(HOME_EYE.x, HOME_EYE.z), LAKE_Y);
+/* how far short of a place the camera stops. Level two is furniture spread around the place, so
+   the frame has to hold objects either side of centre: at 1,500 the cone is ±920 wide. */
+const STAND_OFF = 1500;
+
+/* OVER WATER, THE SURFACE IS THE GROUND. `groundAt` returns the lake BED, which is 330 units
+   down — so a place in the water was authored below the waterline and the camera sent to stand
+   on the bottom of the lake, arriving nine units above the surface and skimming it. Everything
+   here reads whichever is higher. */
+function surfaceAt(x, z) { return Math.max(groundAt(x, z), LAKE_Y); }
+function destPlace(bearingDeg, dist, lift = 0) {
+  const b = bearingDeg * Math.PI / 180;
+  const p = at(Math.cos(b) * dist, Math.sin(b) * dist, 0);
+  p.y = surfaceAt(p.x, p.z) + lift;
+  return p;
+}
+/* the camera's standing point: on the line from home to the place, STAND_OFF short of it, at
+   eye height above whatever ground is there */
+function standOff(place) {
+  const v = place.clone().sub(HOME_EYE).setY(0);
+  const len = v.length();
+  const e = v.multiplyScalar(Math.max(len - STAND_OFF, 400) / len).add(HOME_EYE);
+  e.y = surfaceAt(e.x, e.z) + EYE_LIFT;
+  return e;
+}
+
+/* Six places around the lake. Fuji sits at bearing +11°, so REVIEW is held out to +27° where it
+   has open water and the right half of the frame to itself — it is the one you can see from the
+   menu, and it must not stack on the mountain. The rest spread wide enough that each is a real
+   turn: two ahead of the shoulders, two abeam, two behind. */
+const DEST_SPECS = [
+  { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
+  { bearing: 20, dist: 4000, lift: 270 }, /* REVIEW  — the torii standing in the water    */
+  { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
+  { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
+  { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
+  { bearing: -164, dist: 4800, lift: 180 }, /* RECORDS — the pagoda on the hill behind      */
+].map((d) => ({ ...d, place: destPlace(d.bearing, d.dist, d.lift) }));
+
+/* ---- 鳥居 — the gate standing in the water ----
+   REVIEW's place. Myōjin style, which means the top beam (kasagi) sweeps upward at both ends —
+   that single detail is what separates a torii from two posts and a lintel, and it is the first
+   thing to get right. Everything is proportioned off the overall height so the whole gate can
+   be resized with one number.
+
+   Scale is set against the TREES, not against Fuji: the mountain is heavily compressed (3,500
+   units for 3,776 metres) while a cedar is near enough life-size, so a gate sized off Fuji
+   would come out the size of a fence post. At 620 it stands about two-thirds the height of the
+   cedars on the shore behind it, which is roughly Itsukushima's proportion. */
+function beamSeg(len, h, d, x, y, rz) {
+  const g = new THREE.BoxGeometry(len, h, d);
+  g.rotateZ(rz);
+  g.translate(x, y, 0);
+  return g;
+}
+function toriiGeo(H) {
+  const parts = [];
+  const V = 0xbf3b28, V_D = 0xa63020, V_L = 0xcf4a33, STONE = 0x6f6a63;
+  const span = H * 0.42, lean = H * 0.024;
+  [-1, 1].forEach((sx) => {
+    /* tapered and leaning in at the top. Parallel pillars read as goalposts. */
+    const ph = H * 0.80;
+    const g = new THREE.CylinderGeometry(H * 0.037, H * 0.047, ph, 12);
+    g.translate(0, ph / 2, 0);
+    g.rotateZ(-sx * Math.atan(lean / ph));
+    g.translate(sx * span, 0, 0);
+    parts.push({ geo: g, color: V });
+    /* the footing where the pillar enters the water */
+    const b = new THREE.CylinderGeometry(H * 0.072, H * 0.084, H * 0.06, 12);
+    b.translate(sx * span, H * 0.028, 0);
+    parts.push({ geo: b, color: STONE });
+  });
+  /* nuki — the tie beam driven through the pillars, protruding either side */
+  parts.push({ geo: beamSeg(span * 2 + H * 0.20, H * 0.055, H * 0.078, 0, H * 0.60, 0), color: V_D });
+  /* gakuzuka — the central strut between the tie and the lintel */
+  parts.push({ geo: beamSeg(H * 0.05, H * 0.19, H * 0.05, 0, H * 0.705, 0), color: V_D });
+  /* shimaki — the straight beam carrying the curved one */
+  parts.push({ geo: beamSeg(span * 2 + H * 0.30, H * 0.048, H * 0.095, 0, H * 0.818, 0), color: V });
+  /* kasagi — the sweep, as five straight segments along a shallow parabola. A swept surface
+     would cost far more and at this size the facets read as the traditional stepped ends. */
+  const N = 5, half = span + H * 0.21, rise = H * 0.055;
+  for (let i = 0; i < N; i++) {
+    const t0 = -1 + (i / N) * 2, t1 = -1 + ((i + 1) / N) * 2;
+    const x0 = t0 * half, y0 = t0 * t0 * rise;
+    const x1 = t1 * half, y1 = t1 * t1 * rise;
+    parts.push({
+      geo: beamSeg(Math.hypot(x1 - x0, y1 - y0) * 1.08, H * 0.058, H * 0.115,
+        (x0 + x1) / 2, H * 0.878 + (y0 + y1) / 2, Math.atan2(y1 - y0, x1 - x0)),
+      color: V_L,
+    });
+  }
+  return mergeParts(parts);
+}
+{
+  const H = 620;
+  const at2 = DEST_SPECS[1].place;
+  const gate = new THREE.Mesh(toriiGeo(H), new THREE.MeshToonMaterial({
+    vertexColors: true, gradientMap: RAMP, flatShading: true,
+  }));
+  /* stands ON the water, not at its own place marker — the marker is where the camera looks,
+     which is up at the lintel, and a gate whose feet are 240 units into the air is a gate
+     hanging in the sky */
+  gate.position.set(at2.x, LAKE_Y - 26, at2.z);
+  gate.lookAt(HOME_EYE.x, LAKE_Y, HOME_EYE.z);
+  backScene.add(gate);
+  addOutline(gate, 0.0026);
+  blockAdd(gate.position.x, gate.position.z, 520, 700);
+}
+
 /* ---- the woods ----
    Three species, each a merged multi-part model rather than a repeated primitive. A repeated
    cone is a pattern, and the eye reads a pattern as wallpaper however many of them you put
@@ -3072,61 +3195,9 @@ function redrawStroke() {
 setInterval(redrawStroke, 17000);
 setTimeout(redrawStroke, 4000);
 
-/* ================= WHERE THE SIX PLACES ARE =================
-   THE CAMERA NO LONGER ORBITS A PIVOT. It stands on the lake shore and stays there; choosing a
-   section turns it to face a place and then flies it toward that place. That is the model this
-   was always meant to have — the old one put the camera on a 680-unit circle and slid it round
-   to a 2,600-unit one, which meant every "destination" was a bearing rather than somewhere, and
-   the arrival framing was whatever the arc happened to leave you looking at.
-
-   The consequence worth stating: a destination is now a POINT IN THE LANDSCAPE, authored in the
-   same sight-line frame as the lake, the river and everything else. `bearing` is measured off
-   the home sight line, positive to the right; `dist` is how far out along it. Where the ground
-   is at that point is looked up, not assumed. */
-const HOME_EYE = new THREE.Vector3(170, 60, 830);
-/* how high the camera rides above whatever it is standing on — taken from home so the eye
-   keeps a consistent height wherever it goes rather than flying at a fixed altitude */
-const EYE_LIFT = HOME_EYE.y - Math.max(groundAt(HOME_EYE.x, HOME_EYE.z), LAKE_Y);
-/* how far short of a place the camera stops. Level two is furniture spread around the place, so
-   the frame has to hold objects either side of centre: at 1,500 the cone is ±920 wide. */
-const STAND_OFF = 1500;
-
-/* OVER WATER, THE SURFACE IS THE GROUND. `groundAt` returns the lake BED, which is 330 units
-   down — so a place in the water was authored below the waterline and the camera sent to stand
-   on the bottom of the lake, arriving nine units above the surface and skimming it. Everything
-   here reads whichever is higher. */
-function surfaceAt(x, z) { return Math.max(groundAt(x, z), LAKE_Y); }
-function destPlace(bearingDeg, dist, lift = 0) {
-  const b = bearingDeg * Math.PI / 180;
-  const p = at(Math.cos(b) * dist, Math.sin(b) * dist, 0);
-  p.y = surfaceAt(p.x, p.z) + lift;
-  return p;
-}
-/* the camera's standing point: on the line from home to the place, STAND_OFF short of it, at
-   eye height above whatever ground is there */
-function standOff(place) {
-  const v = place.clone().sub(HOME_EYE).setY(0);
-  const len = v.length();
-  const e = v.multiplyScalar(Math.max(len - STAND_OFF, 400) / len).add(HOME_EYE);
-  e.y = surfaceAt(e.x, e.z) + EYE_LIFT;
-  return e;
-}
-
-/* Six places around the lake. Fuji sits at bearing +11°, so REVIEW is held out to +27° where it
-   has open water and the right half of the frame to itself — it is the one you can see from the
-   menu, and it must not stack on the mountain. The rest spread wide enough that each is a real
-   turn: two ahead of the shoulders, two abeam, two behind. */
-const DESTS = [
-  { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
-  { bearing: 27, dist: 4700, lift: 240 }, /* REVIEW  — the torii standing in the water    */
-  { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
-  { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
-  { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
-  { bearing: -164, dist: 4800, lift: 180 }, /* RECORDS — the pagoda on the hill behind      */
-].map((d) => {
-  const place = destPlace(d.bearing, d.dist, d.lift);
-  return { ...d, place, eye: standOff(place) };
-});
+/* the places themselves are landscape — see WHERE THE SIX PLACES ARE, up with the lake. Only
+   the camera's standing point belongs here, because it is a fact about navigation. */
+const DESTS = DEST_SPECS.map((d) => ({ ...d, eye: standOff(d.place) }));
 const HOME_SUB = DESTS[0];
 
 const subEl = document.createElement('div');

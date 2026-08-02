@@ -931,6 +931,34 @@ from home, 1,500 short of the place, at the same height above the ground that ho
 WHIP needed no change beyond being handed the new end points: it always took an explicit
 position and target, and a whip-pan is a yaw, which is what this model is made of.
 
+## v28 — the first place: 鳥居 (stage B)
+
+REVIEW now has somewhere to be. The gate stands in open water off the far shore, vermillion
+against a scene that is otherwise entirely muted — it is the only saturated thing in the frame
+and it does the work a focal point should. From the menu it reads as a silhouette with its own
+reflection; arriving, the camera comes to rest in front of it and you look *through* it at Fuji.
+
+- **The six places moved out of the interaction layer and into the landscape.** A destination is
+  a landscape feature, not a navigation parameter, and putting it with the lake means it takes
+  the world's treatment for free: cloud shadows, shadow casting, and a footprint the coast
+  planting already knows to avoid. Only the camera's standing point stayed behind, because that
+  genuinely is a fact about navigation.
+- **Scale against the trees, not against Fuji.** The world is not at one scale — the mountain is
+  compressed to 3,500 units for 3,776 metres while a cedar is near enough life-size. A torii
+  sized off Fuji comes out the height of a fence post. At 620 it stands about two-thirds of the
+  cedars behind it, which is roughly Itsukushima's proportion.
+- **The place marker is where the camera LOOKS, not where the object's feet go.** REVIEW's marker
+  sits 270 above the water because that is a good thing to aim at; a gate built from it would
+  have its footings 270 units in the air.
+- The curved top beam (kasagi) is the whole difference between a torii and two posts and a
+  lintel. Five straight segments along a shallow parabola are enough — at this size the facets
+  read as the traditional stepped ends, and a swept surface would cost far more.
+
+**What the arrival proves about stage C.** The level-two cards are vermillion DOM panels, so
+against a vermillion gate they merge into it *and* draw straight over its posts — both the
+colour clash and the occlusion. World-geometry tablets in pale wood fix both at once, which is
+the next stage.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
