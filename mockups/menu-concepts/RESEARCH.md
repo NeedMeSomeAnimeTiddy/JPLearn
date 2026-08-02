@@ -1441,6 +1441,32 @@ you have actually been to.**
   walked past was putting a 560px focus rectangle in the middle of the screen. `z > 1` after
   `project()` is the test.
 
+## v43 — a sign is a thing that was already there
+
+The placards started blank and filled in when you picked a queue. Two separate faults wearing one
+coat, and the second is the interesting one.
+
+- **The hitch was a shader rebuild.** Building a fresh `CanvasTexture` per queue meant assigning a
+  new `map` AND a new `emissiveMap` to a material that had been compiled without either, which
+  forces a program rebuild — a dropped frame, and the first frame after it is the sign appearing
+  out of nothing. Each placard owns one canvas and one texture now; lettering redraws the canvas
+  and sets `texture.needsUpdate`. One upload, no recompile.
+- **And the rest was a category error.** Watching a sign fill in is the one thing signage must
+  never do, because **a sign is a thing that was already there.** They are lettered with the whole
+  collection at build time, so the tunnel is a signed corridor from the moment you first see it
+  down the courtyard — and picking a queue only changes the numbers on it.
+- **A full turn hides the swap completely.** The board is edge-on a quarter of the way round and
+  its back is toward you for half of it, so the new face is simply what is there when it comes
+  back. No cross-fade, no pop, and the swap can happen at any point in the middle. The turn is
+  staggered down the corridor, because six boards going at once is a flicker and six going in
+  sequence is a departure board.
+- **Turn the board, not the sign.** A nested group whose origin is the board's own centre is the
+  difference between a sign flipping over and a sign being swung on its cords.
+- **At two frames a second an animation is invisible to a screenshot.** Sampling the rotation on
+  every `requestAnimationFrame` and looking for values strictly between 0 and 2π proved both the
+  turn and its stagger — `[6.26, 6.02, 5.26, 3.68, 1.68, 0.56]` is the wave rolling down the
+  tunnel — where five screenshots at 160ms apart had shown nothing but zeros.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1656,6 +1682,15 @@ you have actually been to.**
   was written stops meaning that the moment the world grows.
 - **A dolly wants a sine and about a second per stride.** Snappy eases are for cuts, not for
   walking.
+
+- **A sign is a thing that was already there.** Anything that reads as signage must never be seen
+  being written; give it content at build time and change the content, not its existence.
+- **Assigning a map to a material that was compiled without one rebuilds its shader.** Own the
+  canvas, redraw it, set `texture.needsUpdate` — and the material never notices.
+- **Hide a swap inside a rotation.** A full turn puts the object edge-on and then back-on, which
+  is a window in which anything at all may be changed unobserved.
+- **Sample per frame, not per screenshot.** A headless renderer at two frames a second cannot
+  photograph an animation, but it can be asked what it is doing on every `requestAnimationFrame`.
 
 ## Sources
 
