@@ -3330,13 +3330,19 @@ function pickWorldTile(sec, jp) {
       const root = new THREE.Group();
       root.position.copy(at3(f2, sd));
       root.position.y = hangY - SH * 0.62 - 34;
-      /* facing back down the corridor and canted inward, the way a shop sign in an alley is:
-         readable from just before it, foreshortened from far off, which is the right order */
-      /* NO HALF-TURN. `facing` already points the gates back down the approach, so the gate's own
-         +Z is the direction a reader comes from — adding pi sent every placard's written face
-         down the tunnel and left the back of the board pointing at the camera, which renders as
-         a plain brown rectangle and looks exactly like a texture that failed to load. */
-      root.rotation.y = gate.rotation.y + (k % 2 ? 0.42 : -0.42);
+      /* SQUARE TO THE CORRIDOR, AND IT STAYS SQUARE. The cant was borrowed from a shop sign in
+         an alley, where it earns its keep because you walk PAST the sign; here you walk toward
+         it down a straight line, so all it did was hold every placard at an angle and then need
+         a second rotation to undo when you arrived. Two moving parts to arrive at the thing it
+         should have been doing all along. The sign is offset to one side of the axis, which at
+         this stand-off already gives it six degrees of obliquity — enough that it reads as an
+         object in the world rather than a decal, and not enough to cost a letter.
+
+         NO HALF-TURN EITHER. `facing` already points the gates back down the approach, so the
+         gate's own +Z is the direction a reader comes from — adding pi sent every placard's
+         written face down the tunnel and left the back of the board toward the camera, which
+         renders as a plain brown rectangle and looks exactly like a texture that failed. */
+      root.rotation.y = gate.rotation.y;
       backScene.add(root);
       /* THE HINGE IS THE TOP EDGE, not the board's middle. `flip` sits up on the cord line and
          `hold` puts the board back below it, so at zero the geometry is exactly where it was and
@@ -3390,8 +3396,7 @@ function pickWorldTile(sec, jp) {
          focus and Enter exactly as the ema tablets do. */
       const el = worldPickEl('', () => walkGo(k));
       el.classList.add('walk-pick');
-      L3_SIGNS.push({ root, flip, hold, face, canvas, tex, el, idx: k, f: f2, sd,
-        baseRy: root.rotation.y, turn: (k % 2 ? -0.30 : 0.30) });
+      L3_SIGNS.push({ root, flip, hold, face, canvas, tex, el, idx: k, f: f2, sd });
     }
     WORLD_L3.REVIEW = {
       signs: L3_SIGNS,
@@ -5074,7 +5079,7 @@ const L2_WORLD = {
        roofline — the one horizontal in that corner of the frame — so the two read as one tangled
        shape. The courtyard camera looks up, which leaves a deep band of empty sky along the top
        that nothing else wants; the title belongs in it. */
-    sign: [-286, 248, -120, 0.07, 1],
+    sign: [-286, 158, -120, 0.07, 1],
   },
   READING: { /* cloth-bound spines shelved through the bamboo — four different books, each
                 its own height and leaning its own way, feet on a common line */
@@ -5351,9 +5356,11 @@ function walkLight() {
   const w = WORLD_L3[walkSec];
   w.signs.forEach((s, k) => {
     const near = Math.abs(k - walkAt);
+    /* the ONLY thing selection changes is how brightly the placard is lit. It used to swing
+       round to face you and swing back when you left, which is a lot of movement to say
+       "this one" about a board that is already facing you. */
     const c = new THREE.Color(_dim[Math.max(0, 2 - near)]);
     gsap.to(s.face.material.emissive, { r: c.r, g: c.g, b: c.b, duration: 0.45, overwrite: true });
-    gsap.to(s.root.rotation, { y: s.baseRy + (near === 0 ? s.turn : 0), duration: 0.5, ease: 'power2.out', overwrite: true });
   });
 }
 function enterWalk(sectionEn, tileJp) {

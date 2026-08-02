@@ -1502,6 +1502,29 @@ coat, and the second is the interesting one.
   roof — the one horizontal in that corner — so the two read as a single shape. The courtyard
   camera looks up, which leaves a deep band of sky along the top that nothing else wants.
 
+## v45 — the test window was flattering everything
+
+- **A cant needs a reason, and this one had somebody else's.** The placards were turned 24° toward
+  the reader because that is what a shop sign in an alley does — and it earns its keep there
+  because you walk PAST the sign. Here you walk toward it down a straight line, so the cant did
+  nothing except hold every board at an angle and then require a second rotation to undo when you
+  arrived: two moving parts to reach the state it should have started in. Square to the corridor,
+  and the six degrees of obliquity its side-offset already gives it is enough that it reads as an
+  object rather than a decal. Selection now changes exactly one thing — how brightly it is lit.
+- **THE TEST VIEWPORT WAS LYING.** Everything through this whole build was checked at 1400×880,
+  which is aspect 1.59 — *narrower* than the 16:9 reference `fitFov` locks to. Below that
+  reference the vertical field OPENS UP, so the test window has been showing about 10% more
+  height than a real monitor for weeks, and anything placed near the top edge was flattered by
+  it. The section title was 17px off the top at 1920×1080 and 28px off at 1600×900 while looking
+  comfortable in every screenshot I took.
+- **The tightest case is the reference aspect, not the extreme one.** I had tested 1920×700 and
+  900×1000 believing those were the hard cases. They are not: below 16:9 the field widens and
+  above it only the horizontal grows. **16:9 exactly is the vertical worst case**, and it is also
+  what most people are looking at. It is first in the harness now.
+- **Measure the safe zone, do not look at it.** Reading the title's own bounding rect at six
+  viewport sizes and asserting a 4% margin turned "looks fine to me" into six numbers, three of
+  which were negative.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1738,6 +1761,16 @@ coat, and the second is the interesting one.
   disguised as "the first one doesn't play".
 - **Give a place one thing that answers.** It is the cheapest possible difference between a set
   and somewhere that exists.
+
+- **Know which way your test window lies.** With a horizontal-FOV lock, any viewport narrower than
+  the reference aspect shows MORE vertically than a real screen — so the habitual test window can
+  flatter every composition near the top edge indefinitely. Test at the reference aspect first.
+- **The reference aspect is the worst case, not the extremes.** Below it the field opens; above it
+  only the other axis grows.
+- **Assert margins numerically.** "Looks fine" cannot see 17 pixels of crop, and a bounding rect
+  against a percentage margin can.
+- **Two rotations that cancel are one rotation too many.** If arriving somewhere requires undoing
+  a transform, ask why the transform is there.
 
 ## Sources
 
