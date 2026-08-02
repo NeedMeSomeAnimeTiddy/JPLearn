@@ -469,16 +469,31 @@
     position: absolute; left: 8px; top: 116px; font-style: italic; font-size: 21px;
     letter-spacing: 0.34em; color: var(--washi); transform: skewX(-10deg);
   }
-  /* back is a struck tab, not a stone */
-  .w-back { width: 250px; height: 82px; }
-  .w-back .w-in {
-    background: var(--washi); color: #14110d;
-    clip-path: polygon(0 0, 100% 7%, 95% 100%, 5% 93%);
-    box-shadow: 9px 9px 0 rgba(0,0,0,0.55);
-    display: flex; align-items: center; justify-content: center; gap: 11px;
+  /* BACK IS A SCREEN ELEMENT, NOT A BILLBOARD IN THE WORLD. As a CSS3D plane it was authored
+     per-place — 250 x 82 at whatever z suited one composition — which at the shrine's standoff
+     came out four hundred pixels of washi filling the corner of the frame and out-shouting the
+     thing you had come to look at. A plane in the world can also be walked into, occluded and
+     cropped, and it has to be re-placed by hand for all six areas. A fixed tab has none of those
+     problems at any viewport, and it belongs with the ESC hint opposite it, which already says
+     the same thing. Small, off to the side, and carrying the section's colour so it still reads
+     as part of the place. */
+  .back-tab { left: 40px; bottom: 62px; opacity: 0; transition: opacity 0.32s ease; }
+  body:not(.at-menu) .back-tab { opacity: 1; }
+  body.at-menu .back-tab button { pointer-events: none; }
+  .back-tab button {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(242, 234, 216, 0.09);
+    border: 0; border-left: 4px solid var(--sec, var(--hi));
+    padding: 7px 15px 7px 11px;
+    transform: skewX(-8deg);
+    color: var(--washi); cursor: pointer;
+    transition: background 0.15s, color 0.15s;
   }
-  .w-back .w-jp { font-size: 23px; letter-spacing: 0.1em; }
-  .w-back .w-en { font-size: 11px; letter-spacing: 0.3em; }
+  .back-tab button:hover { background: var(--sec, var(--hi)); }
+  .back-tab .bt-ar { font-family: var(--lat); font-size: 13px; opacity: 0.6; }
+  .back-tab .bt-jp { font-family: var(--jp-go); font-weight: 700; font-size: 13px; letter-spacing: 0.14em; }
+  .back-tab .bt-en { font-family: var(--lat); font-size: 10px; letter-spacing: 0.3em; color: rgba(242,234,216,0.5); }
+  .back-tab button:hover .bt-en, .back-tab button:hover .bt-ar { color: var(--washi); opacity: 1; }
 
   /* ── STUDY · torn shards, the word knocked out of the black ──────────────────── */
   .w-shard { width: 460px; height: 210px; }
@@ -967,6 +982,21 @@
   .trans-chip.on { background: var(--washi); color: var(--ink); }
   .trans-chip:hover { background: var(--hi); color: var(--washi); }
 
+  /* THE BOTTOM ROW IS THREE SEPARATE FIXED ITEMS and they meet in the middle on a narrow window:
+     back tab left, transition picker centred, key hints right. The camera now widens its field
+     rather than cropping it, so the 3D composition survives any aspect — the chrome has to do
+     the same. The picker is a mockup control rather than part of the design, so it steps up a
+     line first, and below that the hints drop the two that are least load-bearing (Escape is
+     already stated by the back tab in the opposite corner). */
+  @media (max-width: 1180px) {
+    .trans-picker { bottom: 66px; }
+    .hints { gap: 13px; }
+  }
+  @media (max-width: 860px) {
+    .hints span:nth-child(1), .hints span:nth-child(2) { display: none; }
+    .trans-picker b { display: none; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.001s !important; animation-delay: 0s !important; transition-duration: 0.001s !important; }
   }
@@ -1008,6 +1038,9 @@
   <button class="upnext-item" id="upnextBtn"><span id="upnextText">24 cards due for review</span><i>→</i></button>
 </div>
 <div class="chrome desc-line menu-only" id="descLine"><b>Kana, kanji and vocabulary by section</b><i>かな・漢字・語彙のセクション学習</i></div>
+<div class="chrome back-tab" id="backTab">
+  <button type="button"><span class="bt-ar">&#9666;</span><span class="bt-jp">&#25147;&#12427;</span><span class="bt-en">BACK</span></button>
+</div>
 <div class="chrome hints">
   <span><b>↑↓</b>Select<em>選択</em></span>
   <span><b>ENTER</b>Confirm<em>決定</em></span>
@@ -1068,6 +1101,22 @@ const NIGHT = 0x151928;
 
 /* far plane out to 60k: Fuji stands 17,000 away and the horizon rim another 30,000 behind it */
 const camera = new THREE.PerspectiveCamera(42, W() / H(), 1, 60000);
+/* EVERY FRAMING IN THIS FILE WAS COMPOSED AT 16:9, and a vertical field of view crops the SIDES
+   off the moment the window is narrower than that — which is most laptops in a windowed browser
+   and every portrait phone. Below the reference aspect the vertical field opens up instead, so
+   the horizontal field is the thing held constant and nothing composed against the frame's left
+   or right edge can fall out of it. Wider than 16:9 simply gains sky and ground, which costs
+   nothing. Every camera in the file goes through this, so it applies to the menu and to all six
+   arrivals rather than being patched into one of them. */
+const REF_ASPECT = 16 / 9;
+function fitFov(fovY) {
+  const a = W() / H();
+  const half = fovY * 0.5 * Math.PI / 180;
+  camera.aspect = a;
+  camera.fov = a >= REF_ASPECT ? fovY
+    : Math.atan(Math.tan(half) * REF_ASPECT / a) * 2 * 180 / Math.PI;
+  camera.updateProjectionMatrix();
+}
 
 const backScene = new THREE.Scene();
 /* scaled to a real landscape: the near ground stays clear, the foothills soften, and the far
@@ -1111,8 +1160,7 @@ cssRenderer.setSize(W(), H());
 document.getElementById('cssStage').appendChild(cssRenderer.domElement);
 
 addEventListener('resize', () => {
-  camera.aspect = W() / H();
-  camera.updateProjectionMatrix();
+  fitFov(cam ? cam.fov : camera.fov);
   backRenderer.setSize(W(), H());
   frontRenderer.setSize(W(), H());
   cssRenderer.setSize(W(), H());
@@ -2387,7 +2435,7 @@ function standOff(place, off = STAND_OFF, lift = EYE_LIFT) {
    turn: two ahead of the shoulders, two abeam, two behind. */
 const DEST_SPECS = [
   { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
-  { bearing: 105, dist: 5200, lift: 150, stand: 940, eyeLift: 215 }, /* REVIEW — the shrine */
+  { bearing: 105, dist: 5200, lift: 150, stand: 855, eyeLift: 182 }, /* REVIEW — the shrine */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
   { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
@@ -2550,6 +2598,9 @@ function emaTexture(jp, en, meta, accent) {
   return t;
 }
 
+const backTab = document.getElementById('backTab');
+backTab.querySelector('button').addEventListener('click', () => goBack());
+
 /* the transparent twin that carries focus and Enter. Pointer events stay off so the mouse goes
    to the raycast, but Tab still reaches it and a screen reader still reads it. */
 const worldPickLayer = document.createElement('div');
@@ -2609,7 +2660,19 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
   /* THE BOARD THE CROWD HANGS ON. Without it the blanks hung in mid-air behind the posts with
      nothing behind them, which reads as geometry poking through rather than as tablets on a
      wall — and a real ema wall is boarded anyway. */
-  frame.push({ geo: beamSeg(W * 0.97, HH * 0.86, HH * 0.05, 0, HH * 0.46, 0), color: 0x59493a });
+  /* and a shade lighter than it was: the board faces away from the sun at this bearing, and at
+     0x59493a it came out near-black, which is not a surface a weathered tablet reads against */
+  frame.push({ geo: beamSeg(W * 0.97, HH * 0.86, HH * 0.05, 0, HH * 0.46, 0), color: 0x6c5943 });
+  /* THE RAILS THE CROWD HANGS FROM. Without them the blanks are rectangles lying flat on a
+     board, and a board covered in close-packed tilted rectangles is crazy paving — which is what
+     it kept reading as, however the tone was adjusted. One thin bar above each row turns the
+     same rectangles into things that are hanging, and that reading does not depend on being able
+     to make out an individual tablet. */
+  for (let r = 0; r < 3; r++) {
+    const g = new THREE.BoxGeometry(W * 0.93, HH * 0.024, HH * 0.03);
+    g.translate(0, HH * 0.42 - r * HH * 0.155 + W * 0.055, W * 0.05 - r * W * 0.008 + 2);
+    frame.push({ geo: g, color: 0x453828 });
+  }
   /* and a ridge over the join, because two roof slopes meeting at an angle leave a seam */
   frame.push({ geo: beamSeg(W * 0.62, HH * 0.07, W * 0.21, 0, HH + HH * 0.3, 0), color: 0x332c25 });
   [-1, 1].forEach((sx) => {
@@ -2642,60 +2705,108 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
      than the width allows, a wide spread of size and tilt, and a real range of weathering, so
      every tablet has a dark line either side of it and the four live ones sit against texture
      rather than against a panel. */
-  const bw = W * 0.075;
-  const PER = 11, ROWS = 3;
+  /* AND IT HANGS BELOW THE LIVE ROW, NOT BEHIND IT. Three rows starting at 0.76 HH put rows one
+     and two exactly where the four live tablets are, and the live ones are nearer the viewer, so
+     the crowd was invisible and the wall read as a bare brown slab with four cards on it — the
+     board is 162 units tall and only its top third was doing anything. Four rows through the
+     lower two-thirds fills it, and the arrangement is then the true one: the four that are yours
+     hung at eye level on the rail, the rest crowded underneath. */
+  /* AND EACH ONE HAS TO BE READABLE AS A TABLET. Thirteen to a row at 0.075 W is denser than a
+     real ema wall and truer to it, but at this distance they overlap into a field of small brown
+     lozenges and the eye files the whole thing as rubble. Bigger and fewer keeps the gabled
+     silhouette, which is the only thing that says "votive tablet" rather than "stone". */
+  const bw = W * 0.085;
+  const PER = 7, ROWS = 3;
   const blanks = new THREE.InstancedMesh(
     emaGeo(bw, bw * 1.2, bw * 0.25, bw * 0.05),
-    /* the same emissive floor the live tablets needed: without it the crowd renders as a
-       black mass rather than as weathered wood, and reads as a hole in the structure */
-    new THREE.MeshToonMaterial({ vertexColors: true, emissive: 0x3d3428, gradientMap: RAMP, flatShading: true }),
+    /* THE WALL FACES AWAY FROM THE SUN and always will, because it is turned toward the path
+       and the path runs away from the light. Everything on it is therefore lit by fill alone, so
+       the emissive floor is doing most of the work — at 0x3d3428 the crowd came out as dark
+       even blocks and read as coursed masonry rather than as a hundred wooden tablets. */
+    new THREE.MeshToonMaterial({ vertexColors: true, emissive: 0x574c3c, gradientMap: RAMP, flatShading: true }),
     PER * ROWS);
   const mx = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3();
   const zc = new THREE.Vector3(0, 0, 1), col = new THREE.Color();
   for (let i = 0; i < blanks.count; i++) {
     const row = Math.floor(i / PER), k = i % PER;
     const x = -W / 2 + W * 0.065 + (k + (hash01(i, 7) - 0.5) * 0.55) * (W * 0.87) / (PER - 1);
-    const y = HH - HH * 0.24 - row * HH * 0.19 - hash01(i, 19) * HH * 0.05;
-    qt.setFromAxisAngle(zc, (hash01(i, 31) - 0.5) * 0.7);
-    const g = 0.78 + hash01(i, 83) * 0.44;
+    /* and they do not hang level: a row that shares a baseline is a course of bricks */
+    const y = HH * 0.42 - row * HH * 0.155 - hash01(i, 19) * HH * 0.02;
+    /* a tablet on a cord hangs very nearly straight. Swinging them 25 degrees either way was
+       what made a row of them read as rubble rather than as a row of anything. */
+    qt.setFromAxisAngle(zc, (hash01(i, 31) - 0.5) * 0.26);
+    const g = 0.88 + hash01(i, 83) * 0.2;
     sc.set(g, g, 1);
     /* forward of the board rather than behind it, or they vanish into it */
     mx.compose(new THREE.Vector3(x, y, W * 0.05 - row * W * 0.008), qt, sc);
     blanks.setMatrixAt(i, mx);
     /* weathered across a real range — a narrow one just made the slab evenly tan */
-    col.setHSL(0.075 + hash01(i, 43) * 0.05, 0.14 + hash01(i, 51) * 0.16, 0.3 + hash01(i, 67) * 0.3);
+    col.setHSL(0.075 + hash01(i, 43) * 0.05, 0.16 + hash01(i, 51) * 0.16, 0.4 + hash01(i, 67) * 0.26);
     blanks.setColorAt(i, col);
   }
   blanks.instanceMatrix.needsUpdate = true;
   if (blanks.instanceColor) blanks.instanceColor.needsUpdate = true;
   grp.add(blanks);
 
-  /* and the four that are yours: bigger, forward of the crowd, lit, hanging straight */
+  /* and the four that are yours: bigger, forward of the crowd, lit, hanging straight.
+
+     THE ORIGIN IS THE PEG, NOT THE TABLET. With the group's origin at the tablet's own centre,
+     every animation available to it is a translation or a spin about its middle — which is why
+     hover read as the tablet flying off the wall and back into it. Put the origin where the cord
+     meets the rail and hang everything below it, and the identical tween becomes a swing,
+     because a swing is just a rotation about the point an object hangs from. */
   const TW = (W - W * 0.22) / tiles.length * 0.92, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.06;
   const GAP = (W - W * 0.22 - TW * tiles.length) / (tiles.length - 1);
+  const CORD = TH * 0.3;
+  /* raycast target only: material.visible skips the draw, object.visible would skip the ray too */
+  const hitMat = new THREE.MeshBasicMaterial();
+  hitMat.visible = false;
   const picks = tiles.map(([jp, en, meta], j) => {
+    const px = -(W - W * 0.22) / 2 + TW / 2 + j * (TW + GAP);
+    const py = HH - HH * 0.18 + CORD;
+    const pz = W * 0.07;
     const root = new THREE.Group();
-    root.position.set(-(W - W * 0.22) / 2 + TW / 2 + j * (TW + GAP), HH - HH * 0.18 - TH / 2, W * 0.07);
+    root.position.set(px, py, pz);
     grp.add(root);
-    const cord = new THREE.Mesh(new THREE.BoxGeometry(TW * 0.05, TH * 0.3, TW * 0.05),
+    const cord = new THREE.Mesh(new THREE.BoxGeometry(TW * 0.05, CORD, TW * 0.05),
       new THREE.MeshToonMaterial({ color: 0x3d3128, gradientMap: RAMP }));
-    cord.position.y = TH / 2 + TH * 0.15;
+    cord.position.y = -CORD / 2;
     root.add(cord);
     const body = new THREE.Mesh(emaGeo(TW, TH, GAB, TTH), new THREE.MeshToonMaterial({
       color: 0xd6c39c, emissive: 0x4d4232, gradientMap: RAMP, flatShading: true,
     }));
+    body.position.y = -CORD - TH / 2;
     root.add(body);
     const face = new THREE.Mesh(new THREE.PlaneGeometry(TW, TH), new THREE.MeshToonMaterial({
       map: emaTexture(jp, en, meta, accent), emissive: 0x5c503c,
       gradientMap: RAMP, transparent: true,
     }));
-    face.position.z = TTH / 2 + 0.4;
+    face.position.set(0, body.position.y, TTH / 2 + 0.4);
     root.add(face);
     const o = new THREE.Mesh(outlineGeom(body.geometry), outlineMaterial(0.0028));
+    o.position.copy(body.position);
     o.frustumCulled = false;
     root.add(o);
+    /* THE TARGET DOES NOT MOVE WITH THE TABLET. Raycasting the tablet itself meant the hover
+       animation displaced the very thing the test was against, so the cursor fell off what it
+       had just picked and the two states chattered at each other. This proxy hangs in the
+       resting position and stays there: a plain box rather than a gabled pentagon, tall enough
+       to cover the cord and the swung-out bottom edge, deep enough to cover the swing, and
+       padded sideways to just under the gap between neighbours so a near miss still counts
+       while no two of them can ever overlap. */
+    const hitH = CORD + TH * 1.3;
+    const hit = new THREE.Mesh(
+      new THREE.BoxGeometry(TW + GAP * 0.9, hitH, TTH + TH * 0.55), hitMat);
+    hit.position.set(px, py + CORD * 0.12 - hitH / 2, pz + TH * 0.2);
+    grp.add(hit);
     const el = worldPickEl(jp + ' \u2014 ' + en + ', ' + meta, () => pickWorldTile(sec, jp));
-    const qq = { root, body, face, el, jp, base: root.position.clone(),
+    /* READ THE REST VALUE, DO NOT RETYPE IT. Tweening back to a hand-written 0.361 — the sRGB
+       component of 0x5c503c — left every hovered tablet permanently three times brighter than
+       its neighbours, because the renderer works in linear space and had stored 0.107. Cloning
+       what the material actually holds cannot be wrong in either space. */
+    const qq = { root, body, face, hit, el, jp, tw: TW, th: TH + CORD,
+      emRest: face.material.emissive.clone(),
+      emHot: face.material.emissive.clone().multiplyScalar(1.8),
       swayP: j * 1.9, swayR: 0.7 + j * 0.11 };
     WORLD_SWAY.push(qq);
     return qq;
@@ -2720,7 +2831,10 @@ function pickWorldTile(sec, jp) {
 {
   const GATE_H = 470;
   const WALL_W = GATE_H * 0.5;      /* 235 — two-fifths of the gate's width, a third of its height */
-  const WALL_H = GATE_H * 0.32;
+  /* a little taller than before, because the up-pitch pushes everything low in the frame and the
+     tablets hang near the top of the wall. Still well under half the gate: furniture, not a
+     building. */
+  const WALL_H = GATE_H * 0.40;
   const base = destPlace(105, 5200, 0);
   const fwd = new THREE.Vector3().copy(base).sub(HOME_EYE).setY(0).normalize();
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
@@ -2765,9 +2879,13 @@ function pickWorldTile(sec, jp) {
   facing(gate, -1, 0);
   backScene.add(gate);
   addOutline(gate, 0.0028);
-  /* the look target sits low on purpose: dropping it pitches the camera down, which lifts the
-     wall off the bottom edge and leaves the section title room at the top */
-  DEST_SPECS[1].focus = at3(-430, -30, GATE_H * 0.36);
+  /* THE AIM POINT IS THE FRAME'S CENTRE, so it says two things at once: `sd` decides what sits
+     on the middle vertical, and `lift` decides the pitch. Held on the gate's own axis the gate
+     centres; raised to half its height the camera tips UP at it and the horizon drops, which is
+     what makes a gate read as something you stand under rather than something you look at. It
+     cannot go much higher than this — the wall is close and low, and every degree of up-pitch
+     drives it toward the bottom edge twice as fast as it lifts the gate. */
+  DEST_SPECS[1].focus = at3(-430, 18, GATE_H * 0.50);
 
   /* the tunnel: each gate smaller than the last AND closer to it, so the far end reads as
      distance rather than as a row of identical objects */
@@ -2794,10 +2912,9 @@ function pickWorldTile(sec, jp) {
   /* lanterns flanking the way in */
   const lanternMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
   const lg = lanternGeo(190);
-  /* the -820 pair moved to -1220: at -820 the left one stood 10 units in front of the wall
-     and directly over its first tablet. Furniture flanking a path still has to miss the thing
-     the path leads you to read. */
-  [[-1220, 250], [-1220, -250], [-180, 250], [-180, -250], [420, 250], [420, -250]]
+  /* the near pair sits at -980, which is behind the wall and still in front of the camera. At
+     -1220 it was 70 units short of the eye — a lantern you arrive standing inside. */
+  [[-980, 250], [-980, -250], [-180, 250], [-180, -250], [420, 250], [420, -250]]
     .forEach(([lf, ls], i) => {
       const m = new THREE.Mesh(lg, lanternMat);
       m.position.copy(at3(lf, ls));
@@ -2814,54 +2931,106 @@ function pickWorldTile(sec, jp) {
      It is aimed at the camera's actual standing point, not at HOME_EYE. The eye is derived from
      the focus, so it has to be computed here rather than guessed — pointing the wall at the
      wrong place is what had it presenting its back. */
-  const eye = standOff(DEST_SPECS[1].focus, 940, 215);
-  const wallGrp = buildEmaWall('REVIEW', at3(-800, -145), eye, WALL_W, WALL_H);
-  /* and then turned well round toward the path, so it addresses the approach rather than the
-     viewer — a board square to the camera is a poster, a board angled along the way in is
-     something that was put there for people walking past it */
-  wallGrp.rotateY(-0.46);
+  const eye = standOff(DEST_SPECS[1].focus, 855, 182);
+  /* FURTHER DOWN THE APPROACH THAN IT LOOKS. Aiming the camera at the gate swings anything
+     standing beside the eye hard to the left, and at 490 units from a camera 855 short of its
+     focus the wall was both the biggest thing in the frame and cut off by its edge. Moved along
+     to -700 and in to -110 it is 600 away, its tablets still read at 80px, and its far edge
+     clears the frame with room to spare. Distance is the right lever here: scale is not, because
+     the wall's size relative to the gate is the one thing about it that must not move. */
+  const wallGrp = buildEmaWall('REVIEW', at3(-700, -110), eye, WALL_W, WALL_H);
+  /* and then turned toward the PATH, which is the direction the sign was wrong in before: the
+     wall stands to the left of the axis, so facing the way in means turning its face to its own
+     right and letting its left edge come forward. After `lookAt`, the group's local +X is the
+     approach's `side` vector and a positive rotateY carries the face from the camera toward it,
+     so the sign of this number is not a matter of taste — negative turns it out into the empty
+     ground behind, which is exactly what it was doing.
+
+     A board square to the camera is a poster; a board angled along the way in is something that
+     was put there for people walking past it. 0.62 rad is about 36°, enough to read as addressed
+     to the path while still showing the tablets nearly full width (cos 36° = 0.81). */
+  wallGrp.rotateY(0.55);
 
   /* ---- planting ----
-     The clearing strips the wood out and leaves a lawn, which reads as a golf course. These go
-     back in at a size that cannot block the approach: low shrubs banked along the edge of the
-     paving, taller ones behind them, and a few maples where the wood resumes. Placed in
-     approach coordinates like everything else, and kept clear of the path by construction
-     rather than by a blocker test. */
+     The corridor blockers strip the wood out of a 1,500-unit band and leave a lawn, and a lawn
+     reads as a golf course. The first attempt at putting it back failed on two counts, both
+     visible in one glance: it was too THIN — 184 shrubs over four and a half thousand units of
+     approach is one every 160 units, which is dotting rather than planting — and it was
+     UNIFORMLY RANDOM, which is the one distribution that never occurs outdoors. Undergrowth
+     grows in clumps, around whatever seeded it.
+
+     So: clumps. A handful of centres per species, members packed around each with a sqrt falloff
+     so they crowd toward the middle, and enough of them that the ground between the paving and
+     the treeline is covered. Density can then vary freely without any of it wandering onto the
+     approach, because the corridor is a keep-out stated in the same approach coordinates as
+     everything else. Anything landing inside it is REFLECTED back out rather than dropped —
+     dropping thins the very edge you most want planted, which is the join between the clearing
+     and the wood. */
   {
+    /* clear of the paving (+-180), the lanterns (+-250, base 45) and the gates' footings */
+    const VERGE = 312;
+    /* and the hall, whose plinth is 713 wide — wider than the corridor it stands at the end of */
+    const KEEP = [[3170, 0, 560]];
+    const clear = (f2, sd) => {
+      let t = Math.abs(sd) < VERGE ? Math.sign(sd || 1) * (2 * VERGE - Math.abs(sd)) : sd;
+      for (let k = 0; k < KEEP.length; k++) {
+        const dx = f2 - KEEP[k][0], dz = t - KEEP[k][1], d = Math.hypot(dx, dz) || 1;
+        if (d < KEEP[k][2]) { const m = KEEP[k][2] / d; f2 = KEEP[k][0] + dx * m; t = KEEP[k][1] + dz * m; }
+      }
+      return [f2, t];
+    };
+    /* one clump member: `n` centres drawn off the seed, then a point around the chosen centre */
+    const clump = (i, seed, n, fLo, fHi, sLo, sHi, rad) => {
+      const c = i % n;
+      const cf = fLo + hash01(c, 101 + seed) * (fHi - fLo);
+      const cs = (hash01(c, 113 + seed) < 0.5 ? -1 : 1) * (sLo + hash01(c, 127 + seed) * (sHi - sLo));
+      const a = hash01(i, 151 + seed) * 6.283;
+      const r = Math.sqrt(hash01(i, 163 + seed)) * rad;
+      return clear(cf + Math.cos(a) * r, cs + Math.sin(a) * r);
+    };
+
+    /* the undergrowth: four tones, four draw calls, six hundred bushes. Two low tones bank the
+       verge and two taller ones stand behind them, so the planting has a section rather than
+       being one height everywhere. */
     const shrubGeo = new THREE.IcosahedronGeometry(46, 1);
     shrubGeo.scale(1.25, 0.82, 1.1);
-    [0x40592f, 0x4c6636, 0x37502b, 0x556f3c].forEach((c, t) => {
-      const m = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
-      const im = new THREE.InstancedMesh(shrubGeo, m, 46);
-      const mx2 = new THREE.Matrix4(), q2 = new THREE.Quaternion(), s2 = new THREE.Vector3();
-      const up = new THREE.Vector3(0, 1, 0);
-      for (let i = 0; i < im.count; i++) {
-        const f2 = -1500 + hash01(i, 3 + t) * 4600;
-        const sd = (hash01(i, 17 + t) < 0.5 ? -1 : 1) * (255 + hash01(i, 29 + t) * 520);
-        const k = 0.5 + hash01(i, 41 + t) * 1.15;
-        q2.setFromAxisAngle(up, hash01(i, 53 + t) * 6.28);
-        s2.set(k, k * (0.6 + hash01(i, 67 + t) * 0.5), k);
-        mx2.compose(at3(f2, sd, -6), q2, s2);
-        im.setMatrixAt(i, mx2);
-      }
-      im.instanceMatrix.needsUpdate = true;
-      backScene.add(im);
-      NO_REFLECT.push(im);
-    });
-    /* a few maples at the edge of the clearing, so the eye has something with height either
-       side of the gate without anything standing in the way of it */
-    const mapleGeo = broadleafGeo();
-    const maple = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
-    [[-1250, -880], [-560, 900], [260, -960], [980, 940], [1750, -900]]
-      .forEach(([f2, sd], i) => {
-        const m = new THREE.Mesh(mapleGeo, maple);
-        m.position.copy(at3(f2, sd, -14));
-        m.rotation.y = hash01(i, 7) * 6.28;
-        const k = 1.15 + hash01(i, 19) * 0.5;
-        m.scale.set(k, k, k);
-        backScene.add(m);
-        addOutline(m, 0.0018);
+    /* five bands, low and near the path through to tall and back at the treeline, so the
+       planting has a section. The first is deliberately tiny and numerous: the strip between the
+       paving and the first bushes was 130 units of mown lawn, which is the thing this whole
+       block exists to get rid of. */
+    [[0x4d6338, 312, 560, 0.24, 0.62, 230], [0x40592f, 330, 800, 0.5, 1.25, 150],
+      [0x4c6636, 360, 920, 0.55, 1.3, 150],
+      [0x37502b, 430, 1050, 0.85, 2.0, 150], [0x556f3c, 470, 1150, 0.9, 2.1, 150]]
+      .forEach(([c, sLo, sHi, kLo, kHi, n], t) => {
+        const m = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
+        NO_REFLECT.push(instanced(shrubGeo, m, n, (i) => {
+          const [f2, sd] = clump(i, t * 17, t ? 17 : 26, -2000, 4300, sLo, sHi, t ? 330 : 240);
+          const k = kLo + hash01(i, 41 + t) * (kHi - kLo);
+          return {
+            pos: at3(f2, sd, -6),
+            rot: hash01(i, 53 + t) * 6.28,
+            scale: new THREE.Vector3(k, k * (0.62 + hash01(i, 67 + t) * 0.5), k),
+          };
+        }));
       });
+
+    /* maples through the middle distance, and cedars closing the far edge, so the clearing has
+       walls instead of fading into open grass. Instanced with a shared outline twin like the
+       rest of the wood — a dozen hand-placed meshes each with its own outline was a dozen extra
+       draw calls for the same picture. */
+    const woodM = () => new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
+    instanced(broadleafGeo(), woodM(), 34, (i) => {
+      const [f2, sd] = clump(i, 211, 11, -1100, 4300, 620, 1300, 300);
+      const k = 1.0 + hash01(i, 19) * 0.55;
+      return { pos: at3(f2, sd, -14), rot: hash01(i, 7) * 6.28, scale: new THREE.Vector3(k, k, k) };
+    }, 0.0018);
+    /* cedars are 480 tall and the camera stands at f -1290, so they start well forward of it:
+       a stand of them beside the eye would be a wall across the frame rather than a treeline */
+    instanced(cedarGeo(), woodM(), 26, (i) => {
+      const [f2, sd] = clump(i, 307, 9, -300, 4400, 780, 1600, 340);
+      const k = 0.85 + hash01(i, 23) * 0.5;
+      return { pos: at3(f2, sd, -14), rot: hash01(i, 29) * 6.28, scale: new THREE.Vector3(k, k, k) };
+    }, 0.0016);
   }
 
   /* a clearing the shape of the thing it clears — a line along the axis, and a second down the
@@ -3647,9 +3816,23 @@ strokeEl.className = 'plane-stroke';
 strokeEl.innerHTML = '<svg viewBox="0 0 1000 240" width="1000" height="240"><path d="M 40 190 C 240 60 420 40 560 110 C 700 180 830 150 960 60"/></svg>';
 const strokeObj = cssPlane(strokeEl, -520, 640, -1250, 6 * D2R, -3 * D2R);
 
-/* CSS3DRenderer honours Object3D.visible, so one flag hides the whole home dressing */
+/* CSS3DRenderer honours Object3D.visible, so one flag hides the whole home dressing — and
+   `homeScenery` is never added to a scene at all, which is how the 2D overlay stays retired. */
 [wmObj, ensoObj, strokeObj, ...sheetObjs, ...mtnObjs, ...FLOATERS.map((f) => f.obj), ...MISTS.map((m) => m.obj)]
   .forEach((o) => homeScenery.add(o));
+
+/* THE MENU LEAVES WITH THE HOME VIEW. CSS3D has no frustum culling and no depth buffer: a plane
+   behind the camera still gets a transform, and a perspective divide by a negative z is a flip,
+   so the six type items went on being drawn from every destination as large pale sheets lying
+   across the scene. Nothing else in the file does this, because everything else is a mesh.
+
+   They cannot simply join `homeScenery` — that group is deliberately orphaned, so anything put
+   in it stops rendering entirely. They stay in `cssScene` and are switched alongside it, on the
+   same off-screen test, which already holds them while they are still in shot during the turn. */
+function showHome(v) {
+  homeScenery.visible = v;
+  for (const o of itemObjs) o.visible = v;
+}
 function redrawStroke() {
   if (document.hidden || reduced) return;
   strokeEl.classList.remove('draw');
@@ -3695,6 +3878,12 @@ subWmEl.className = 'plane-wm';
 subWmEl.id = 'subWm';
 subWmEl.textContent = '学';
 const subWmObj = cssPlane(subWmEl, HOME_SUB.focus.x + 340, HOME_SUB.focus.y - 40, HOME_SUB.focus.z - 320, -24 * D2R);
+/* THE BOARD AND ITS WATERMARK ARE TWO PLANES AND ONE OBJECT. Only the board was ever switched
+   off, so the watermark kanji — 800px of translucent glyph — stayed standing in the world behind
+   every destination, at level two where the board is not even up. It reads as a big soft sheet
+   lying across the scene at an angle, which is exactly what it is. `placeSub` already moves them
+   together; this makes them hide together too. */
+function showSubBoard(v) { subObj.visible = v; subWmObj.visible = v; }
 
 /* One room per destination. Only the room you are standing in is ever visible — otherwise a
    neighbour's architecture leaks into the main menu and eats the landscape. */
@@ -3987,7 +4176,10 @@ function makeTorii(g, s, x, y, z, ry) {
 
 /* ================= camera ================= */
 const HOME = { px: 170, py: 60, pz: 830, tx: -240, ty: 30, tz: -160, fov: 42, roll: 0 };
-const cam = { ...HOME };
+/* `var`, deliberately: the resize handler is installed with the renderers, hundreds of lines
+   above this, and a `const` would leave it reading a name in its temporal dead zone if the
+   window is resized during the first frames. */
+var cam = { ...HOME };
 
 /* The guard that used to live here enforced "no room may fall inside the menu's frustum", and it
    earned its keep for as long as the scenery was CSS3D — an unculled plane really did paint
@@ -4013,8 +4205,7 @@ function applyCamera() {
   parX += (parTX - parX) * 0.05;
   parY += (parTY - parY) * 0.05;
   camera.position.set(cam.px + breath.x + parX * 26 + shake.x, cam.py + breath.y - parY * 18 + shake.y, cam.pz);
-  camera.fov = cam.fov;
-  camera.updateProjectionMatrix();
+  fitFov(cam.fov);
   _target.set(cam.tx + parX * 10, cam.ty - parY * 7, cam.tz);
   camera.lookAt(_target);
   camera.rotateZ(cam.roll * D2R);
@@ -4052,7 +4243,11 @@ let active = 0, busy = false;
 /* a handle for headless verification: an arrival is a state change, and waiting a fixed number
    of milliseconds for one is guesswork the moment the frame rate moves */
 window.NAV = { get state() { return state; }, get busy() { return busy; },
-  dests: () => DESTS.map((d) => ({ b: d.bearing, place: d.place.toArray().map(Math.round), eye: d.eye.toArray().map(Math.round) })) };
+  dests: () => DESTS.map((d) => ({ b: d.bearing, place: d.place.toArray().map(Math.round), eye: d.eye.toArray().map(Math.round) })),
+  /* the hover state of world level two, so a swing can be measured rather than eyeballed */
+  swing: () => (worldL2 || { picks: [] }).picks.map((q) => ({
+    jp: q.jp, x: +q.root.rotation.x.toFixed(3), em: +q.face.material.emissive.r.toFixed(3),
+  })) };
 
 const flash = document.getElementById('flash');
 const descLine = document.getElementById('descLine');
@@ -4126,7 +4321,7 @@ const L2_WORLD = {
     cls: 'w-shard',
     tpl: (jp, en, meta, j) => `<span class="w-no">${NO[j]}</span><span class="w-jp">${jp}</span><span class="w-en">${en}</span><span class="w-meta">${meta}</span>`,
     at: [[-330, 250, -300, 0.05, 1.15], [-110, 45, -288, 0.03, 1.0], [110, -160, -274, -0.02, 0.88], [330, -350, -262, -0.05, 0.76]],
-    sign: [230, 330, -190, -0.05, 1], back: [-430, -330, 210, 0.08, 1],
+    sign: [230, 330, -190, -0.05, 1],
   },
   REVIEW: {  /* slashes cutting across the garden, receding */
     cls: 'w-slash',
@@ -4134,7 +4329,7 @@ const L2_WORLD = {
     at: [[-120, 230, 60, 0.06, 1.1], [-60, 40, -180, 0.03, 0.95], [10, -150, -420, -0.02, 0.82], [80, -330, -650, -0.05, 0.7]],
     /* re-placed for the shrine's framing: authored against the old head-on composition the
        title cropped off the top of the frame and the back button off the bottom */
-    sign: [-232, 176, -120, 0.07, 1], back: [-330, -232, 230, 0.08, 1],
+    sign: [-232, 176, -120, 0.07, 1],
   },
   READING: { /* cloth-bound spines shelved through the bamboo — four different books, each
                 its own height and leaning its own way, feet on a common line */
@@ -4142,13 +4337,13 @@ const L2_WORLD = {
     tpl: (jp, en, meta, j) => `<span class="w-no">${NO[j]}</span><span class="w-jp">${jp}</span><span class="w-en">${en}</span><span class="w-meta">${meta}</span>`,
     at: [[-430, 20, 120, 0.14, 1.0, -0.055, 600], [-140, -46, -160, 0.05, 0.94, 0.03, 500],
          [190, 6, -450, -0.05, 0.84, -0.075, 570], [510, -40, -720, -0.14, 0.74, 0.05, 470]],
-    sign: [-180, 400, -520, 0.04, 1], back: [-430, -320, 220, 0.08, 1],
+    sign: [-180, 400, -520, 0.04, 1],
   },
   DRILLS: {  /* impact shards swung across the dojo wall */
     cls: 'w-impact',
     tpl: (jp, en, meta, j) => `<span class="w-no">${NO[j]}</span><span class="w-en">${en}</span><span class="w-jp">${jp}</span><span class="w-meta">${meta.toUpperCase()}</span>`,
     at: [[-300, 230, -300, 0.04, 1.12], [-100, 30, -286, 0.02, 0.98], [110, -170, -272, -0.02, 0.86], [320, -355, -258, -0.04, 0.75]],
-    sign: [250, 340, -180, -0.05, 1], back: [-420, -330, 210, 0.08, 1],
+    sign: [250, 340, -180, -0.05, 1],
   },
   JLPT: {    /* stencilled level numerals climbing the path, growing toward the peak */
     cls: 'w-stencil',
@@ -4156,7 +4351,7 @@ const L2_WORLD = {
     at: [[-450, -240, 170, 0.16, 0.85], [-160, -60, -100, 0.06, 0.95], [180, 130, -380, -0.05, 1.05], [540, 320, -660, -0.14, 1.15]],
     /* the path starts bottom-left, so the usual left placement put the tab on the first marker;
        centre-bottom then landed it on the screen-space transition picker. Centre, lifted. */
-    sign: [-480, 330, -420, 0.08, 1], back: [-120, -260, 300, 0, 1],
+    sign: [-480, 330, -420, 0.08, 1],
   },
   RECORDS: { /* the figure is the hero, thrown across the torii */
     cls: 'w-figure',
@@ -4164,7 +4359,7 @@ const L2_WORLD = {
     /* the gate stands dead centre, so the figures flank it two a side rather than running a
        diagonal straight through its posts — depth sorting will not save type from a torii */
     at: [[-420, 190, 140, 0.14, 1.0], [-470, -190, -40, 0.12, 0.9], [560, 150, -180, -0.12, 0.85], [660, -240, -420, -0.15, 0.76]],
-    sign: [-330, 430, -260, 0.06, 1], back: [-60, -350, 240, 0.02, 1],
+    sign: [-330, 430, -260, 0.06, 1],
   },
 };
 
@@ -4219,10 +4414,6 @@ function buildWorldMenus() {
     });
     made.push(wPlane(grp, 'w-sign',
       `<span class="w-jp">${it.jp}</span><span class="w-en">${it.en}</span>`, spec.sign));
-    const back = wPlane(grp, 'w-back',
-      `<span class="w-jp">← 戻る</span><span class="w-en">BACK</span>`, spec.back);
-    back.el.addEventListener('click', goBack);
-    made.push(back);
     /* every plane carries its section's colour so --sec resolves without a shared ancestor */
     made.forEach((p) => {
       p.el.style.setProperty('--sec', sec);
@@ -4241,9 +4432,12 @@ function buildSub(i) {
   subEl.style.setProperty('--sec-lo', lo);
   subEl.style.setProperty('--sec-hi', hi);
   subEl.dataset.sec = it.en;
-  document.getElementById('subWm').textContent = it.kanji;
+  backTab.style.setProperty('--sec', sec);
+  /* the element, not a lookup: CSS3DRenderer only appends a plane's element to the document the
+     first time it renders it, so a plane that starts hidden has no id to find */
+  subWmEl.textContent = it.kanji;
   /* the board is level three's alone now; it stays out of the room until you drill in */
-  subObj.visible = false;
+  showSubBoard(false);
   subEl.style.opacity = 0;
   subLevel = 2;
   (L2_PLANES[it.en] || []).forEach((p) => { p.el.style.opacity = 0; p.obj.position.copy(p.base); });
@@ -4326,7 +4520,7 @@ function enterL3(sectionEn, tileJp) {
   /* THE UNROLL: there is no board to flip any more, so level three arrives as a kakemono
      dropped into the room — it falls from above the frame and unrolls down its own length
      while the room's own objects step back and dim behind it. */
-  subObj.visible = true;
+  showSubBoard(true);
   subEl.style.opacity = 1;
   const face = subEl.querySelector('.sub-l3');
   const tl = gsap.timeline();
@@ -4353,7 +4547,7 @@ function exitL3() {
   if (subLevel !== 3) return;
   subLevel = 2;
   const face = subEl.querySelector('.sub-l3');
-  const tl = gsap.timeline({ onComplete: () => { subObj.visible = false; } });
+  const tl = gsap.timeline({ onComplete: () => { showSubBoard(false); } });
   tl.to(face, { scaleY: 0, transformOrigin: '50% 0%', duration: 0.42, ease: 'power3.in' }, 0);
   tl.to(subObj.position, { y: subRest.tgt.y + 900, duration: 0.38, ease: 'power3.in' }, 0.2);
   /* the room comes forward again as the scroll goes up */
@@ -4530,7 +4724,7 @@ function showOnlyEnv(i, fade = true) {
   });
 }
 buildWorldMenus();
-subObj.visible = false;
+showSubBoard(false);
 showOnlyEnv(-1, false);
 
 /* Entrances slam rather than glide: short, hard-eased, tightly staggered, thrown in along the
@@ -4582,13 +4776,13 @@ function boldStreaks(dir) {
 }
 
 function arriveSub() {
-  state = 'sub'; busy = false; clearActive(); homeScenery.visible = false;
+  state = 'sub'; busy = false; clearActive(); showHome(false);
   retarget(clock.elapsedTime);   /* send the crane out to the margins of the new screen */
 }
 function arriveMenu() {
   state = 'menu'; busy = false; clearActive();
   placeSubDefault();
-  homeScenery.visible = true;
+  showHome(true);
   document.body.classList.add('at-menu');
   gsap.to(descLine, { opacity: 1, duration: 0.35 });
   gsap.to('#upnext', { opacity: 1, duration: 0.35 });
@@ -4744,7 +4938,7 @@ function select(i) {
     openSub(0.01);
     descLine.style.opacity = 0;
     document.getElementById('upnext').style.opacity = 0;
-    homeScenery.visible = false;
+    showHome(false);
     showOnlyEnv(i);
     state = 'sub'; busy = false;
     return;
@@ -4754,7 +4948,7 @@ function select(i) {
      was still in shot. Drop it the frame it actually clears the frustum instead. */
   gsap.delayedCall(0.4, () => showOnlyEnv(i));
   dropHomeWhenClear = true;
-  gsap.delayedCall(1.6, () => { dropHomeWhenClear = false; homeScenery.visible = false; });
+  gsap.delayedCall(1.6, () => { dropHomeWhenClear = false; showHome(false); });
   [null, selectWhip, selectOrbit][activeMode](i);
 }
 function goBack() {
@@ -4768,7 +4962,7 @@ function goBack() {
     clearActive();
     descLine.style.opacity = 1;
     document.getElementById('upnext').style.opacity = 1;
-    homeScenery.visible = true;
+    showHome(true);
     document.body.classList.add('at-menu');
     showOnlyEnv(-1);
     state = 'menu'; busy = false;
@@ -4784,29 +4978,40 @@ function goBack() {
     worldL2 = null;
     document.body.classList.remove('world-l2');
   }
-  gsap.delayedCall(0.45, () => { homeScenery.visible = true; showOnlyEnv(-1); });
+  gsap.delayedCall(0.45, () => { showHome(true); showOnlyEnv(-1); });
   [null, backWhip, backOrbit][activeMode]();
 }
 
 
 /* ---- picking world-geometry level two ----
-   A raycast against the tablet bodies replaces DOM hit-testing. Hover moves the pick toward the
-   camera rather than recolouring it: at this distance a lit tablet and an unlit one are hard to
-   tell apart, but one that has stepped out of the rank is unmistakable. */
+   A raycast against a fixed proxy box replaces DOM hit-testing.
+
+   HOVER IS A SWING, NOT A LUNGE. Translating the tablet toward the camera and scaling it up did
+   read as "picked", but it read as picked by being yanked off its cord — and the return tween
+   went to z 0, which was never where the tablet started (they hang proud of the backing board at
+   z = W·0.07), so letting go filed each one back INSIDE the wall. Rotating about the peg cannot
+   have that bug, because the rest pose is an angle of zero rather than a position that has to be
+   remembered. The gesture is also the true one: the bottom edge comes out toward you and the
+   face tips up, which is what happens when somebody lifts a votive tablet to read it, and it
+   happens to aim the writing at a camera standing above it. */
 const _pickRay = new THREE.Raycaster();
 const _pickNdc = new THREE.Vector2();
 let worldL2 = null, worldHot = null;
-function worldL2Bodies() { return worldL2 ? worldL2.picks.map((q) => q.body) : []; }
+function worldL2Bodies() { return worldL2 ? worldL2.picks.map((q) => q.hit) : []; }
 function setHot(q) {
   if (worldHot === q) return;
   if (worldHot) {
-    gsap.to(worldHot.root.position, { z: 0, duration: 0.3, ease: 'power2.out' });
-    gsap.to(worldHot.root.scale, { x: 1, y: 1, z: 1, duration: 0.3, ease: 'power2.out' });
+    gsap.to(worldHot.root.rotation, { x: 0, duration: 0.5, ease: 'elastic.out(1, 0.7)' });
+    const r = worldHot.emRest;
+    gsap.to(worldHot.face.material.emissive, { r: r.r, g: r.g, b: r.b, duration: 0.28 });
   }
   worldHot = q;
   if (q) {
-    gsap.to(q.root.position, { z: 74, duration: 0.34, ease: 'back.out(2)' });
-    gsap.to(q.root.scale, { x: 1.07, y: 1.07, z: 1.07, duration: 0.34, ease: 'back.out(2)' });
+    gsap.to(q.root.rotation, { x: -0.30, duration: 0.72, ease: 'elastic.out(1, 0.55)' });
+    /* a lift, not a floodlight: at 3x the writing washed off the tablet, which is the opposite
+       of what picking one is for */
+    const h = q.emHot;
+    gsap.to(q.face.material.emissive, { r: h.r, g: h.g, b: h.b, duration: 0.2 });
   }
   document.body.style.cursor = q ? 'pointer' : '';
 }
@@ -4815,7 +5020,7 @@ function worldPickAt(cx, cy) {
   _pickNdc.set((cx / W()) * 2 - 1, -(cy / H()) * 2 + 1);
   _pickRay.setFromCamera(_pickNdc, camera);
   const hit = _pickRay.intersectObjects(worldL2Bodies(), false)[0];
-  return hit ? worldL2.picks.find((q) => q.body === hit.object) : null;
+  return hit ? worldL2.picks.find((q) => q.hit === hit.object) : null;
 }
 addEventListener('pointermove', (e) => {
   if (!worldL2 || state !== 'sub' || busy) { setHot(null); return; }
@@ -4832,14 +5037,19 @@ const _proj = new THREE.Vector3();
 function placeWorldPicks() {
   if (!worldL2) return;
   for (const q of worldL2.picks) {
-    q.root.getWorldPosition(_proj);
+    /* the tablet, not the peg — the group's origin moved up to the rail */
+    q.body.getWorldPosition(_proj);
     const d = camera.position.distanceTo(_proj);
     _proj.project(camera);
-    const hw = 236 / d * (H() / 2) / Math.tan((camera.fov / 2) * D2R);
-    q.el.style.left = `${(_proj.x * 0.5 + 0.5) * W() - hw * 0.42}px`;
-    q.el.style.top = `${(-_proj.y * 0.5 + 0.5) * H() - hw * 0.5}px`;
-    q.el.style.width = `${hw * 0.84}px`;
-    q.el.style.height = `${hw}px`;
+    /* projected from the tablet's own width and height rather than from a constant tuned once
+       against one wall — the constant was 236 units against tablets 42 wide, so every focus
+       rectangle was five times the size of the thing it belonged to and they all overlapped */
+    const k = (H() / 2) / Math.tan((camera.fov / 2) * D2R) / d;
+    const w = q.tw * k, h = q.th * k;
+    q.el.style.left = `${(_proj.x * 0.5 + 0.5) * W() - w / 2}px`;
+    q.el.style.top = `${(-_proj.y * 0.5 + 0.5) * H() - h / 2}px`;
+    q.el.style.width = `${w}px`;
+    q.el.style.height = `${h}px`;
   }
 }
 
@@ -4925,7 +5135,7 @@ function tick() {
 
   if (dropHomeWhenClear && homeIsOffScreen()) {
     dropHomeWhenClear = false;
-    homeScenery.visible = false;
+    showHome(false);
   }
 
   /* nothing rests: a settled level two keeps drifting and canting. Applied to the object, not

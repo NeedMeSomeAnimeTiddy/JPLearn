@@ -1139,6 +1139,72 @@ Two things that only showed up once it was built:
   them, and maples mark where the wood resumes — all placed in approach coordinates and kept
   clear of the path by construction rather than by a blocker test.
 
+## v35 — the swing, the tab, and the frame that fits the window
+
+Five faults, of which three turned out to be the same class of mistake: a value written down by
+hand where the code already knew the answer.
+
+- **The sign of a rotation is not a matter of taste.** The wall had been turned *away* from the
+  path, and the direction is derivable rather than guessable: after `lookAt`, a group's local +X
+  is the approach's `side` vector, and a positive `rotateY` carries the face from the camera
+  toward it. Working that out once beats trying angles until one looks right — and it is now
+  written down next to the number, so nobody has to work it out again. 0.55 rad (32°) reads as
+  addressed to the path while still showing the tablets at 85% of their width.
+- **Hover has to be the gesture the object can actually make.** The tablets flew out of the wall
+  and snapped back into it, because the tween was a translation on a group whose origin sat at
+  the tablet's own centre — at that origin, translation and spin are the only moves available.
+  Moving the origin to the peg the tablet hangs from turns the identical tween into a swing:
+  the bottom edge comes out toward you and the face tips up, which is what someone lifting a
+  votive tablet to read it actually does, and it aims the writing at a camera standing above it.
+- **A rest pose that is an angle cannot be forgotten; a rest pose that is a position can.** The
+  return tween went to `z: 0`, which was never where the tablets started (they hang proud of the
+  backing board at `z = W·0.07`), so letting go filed each one back *inside* the wall. Rotation
+  has no such trap: rest is zero.
+- **Do not raycast the thing the hover animation moves.** Testing against the tablet meant the
+  cursor fell off what it had just picked and the two states chattered. An invisible proxy box
+  standing at the resting position fixes it — `material.visible = false` skips the draw while
+  `object.visible` stays true so the ray still hits. Padded to just under the gap between
+  neighbours, it is a bigger target than the gabled pentagon and no two can overlap.
+- **Read the rest value out of the material; never retype it.** Tweening emissive back to a
+  hand-written `0.361` — the sRGB component of `0x5c503c` — left every hovered tablet permanently
+  three times brighter than its neighbours, because the renderer works in linear space and had
+  stored `0.107`. `material.emissive.clone()` is right in either space. (Emissive *does* reach
+  the GPU without a `needsUpdate` bump; the uniform trap in v18 was specific to custom uniforms.)
+- **Size the focus twin from the object, not from a constant.** The projection used a 236-unit
+  figure tuned once against a different wall, so every focus rectangle was five times the size of
+  its tablet and they all overlapped. Projecting the tablet's own width and height is both
+  simpler and permanently correct.
+- **BACK belongs on the screen, not in the world.** As a CSS3D plane it was authored per place,
+  which at the shrine's standoff came out as four hundred pixels of washi filling the corner and
+  out-shouting what you came to look at — and a plane in the world can be walked into, occluded
+  and cropped, and needs re-placing by hand six times. A small fixed tab has none of those
+  problems at any viewport and belongs with the ESC hint opposite it.
+- **A vertical field of view crops the sides.** Every framing in the file was composed at 16:9,
+  so any narrower window silently cut the composition. Below a reference aspect the camera now
+  opens its *vertical* field instead, holding the horizontal field constant — one function, all
+  six arrivals, and portrait gains sky and ground rather than losing the gate. The 2D chrome
+  needed the same treatment: three separately anchored bottom items meet in the middle at 1024px.
+- **CSS3D has no frustum culling and no depth buffer.** Two planes were being drawn across every
+  destination: the menu's own type stack, still transformed while behind the camera (a
+  perspective divide by a negative z is a flip), and the level-three board's watermark kanji,
+  which is a *separate* CSS3D object from the board and so was never switched off with it. Both
+  had been visible from the beginning; nothing else in the file has the problem because
+  everything else is a mesh with a depth test.
+- **A hidden CSS3D plane has no element in the document.** CSS3DRenderer appends an element the
+  first time it renders it, so `getElementById` on something inside a plane that starts hidden
+  returns null. Hold the element reference.
+- **Density is not the same as reading as a crowd.** Thirteen small tablets to a row is truer to
+  a real ema wall and rendered as crazy paving; the fix was fewer, bigger, hanging nearly
+  straight, and — decisively — a thin rail above each row. The rail is what says "hanging", and
+  that reading survives even when no individual tablet can be made out.
+- **Scatter is not planting.** 184 shrubs over 4,600 units is one every 160 units: dotting.
+  Six hundred, drawn as clumps around a handful of centres, with a low dense band right at the
+  verge and a treeline behind, is planting. Uniform-random is the one distribution that never
+  occurs outdoors — the same lesson as the lattice in v22, arrived at from the opposite side.
+- **Reflect out of a keep-out, don't drop.** Discarding anything that lands on the approach
+  thins the very edge you most want planted. Mirroring it back across the boundary keeps the
+  distribution smooth and gives the clearing a planted edge instead of a fade.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1290,6 +1356,19 @@ Two things that only showed up once it was built:
   site makes the relationship the thing being maintained.
 - **Solve readability with camera distance before reaching for scale.** Standing near the small
   thing and far from the big one keeps both the right size in the world.
+
+- **Put the origin where the object is attached.** A group's origin decides which animations are
+  even expressible: at an object's centre you get translation and spin, at the point it hangs
+  from you get a swing. Choosing it wrongly makes the right motion impossible to tween.
+- **Never retype a value the code already holds** — colour components most of all, because the
+  renderer's working space is not the space you typed the hex in.
+- **Hit-test against something that does not move.** Any hover animation applied to the ray's own
+  target will make the pick chatter.
+- **A vertical FOV crops the sides; lock the horizontal one instead.** Compositions are framed
+  against the frame's edges, so the field that must stay constant is the one those edges are on.
+- **CSS3D planes have no frustum culling, no depth test, and no element until first rendered.**
+  Anything in that layer needs its visibility driven explicitly, and its element held by
+  reference rather than looked up.
 
 ## Sources
 
