@@ -1338,6 +1338,35 @@ Three things worth keeping out of the exercise itself:
   switch is a good way to decide and a terrible thing to keep: the branch is dead weight in every
   future read of the function, and the losing five would go on being maintained by accident.
 
+## v40 — the court, and a gate you go through
+
+- **The wall did not need moving; it needed ground to stand on.** Three rounds went into sliding
+  the ema wall sideways so its posts stopped coming up through a 360-wide path, and each one ran
+  into the frame's left edge instead — there is only about thirty degrees between the gate and the
+  edge of the picture. The path opens into a paved court now and the wall simply stands on it.
+  **When a thing keeps not fitting where you are putting it, the question may be about the place
+  rather than about the thing.**
+- **A level platform replaces a guess with a number.** Everything on the court is placed from one
+  height instead of from `groundAt` at its own station, which is precisely the bug that hid the
+  wall's plinth three builds running. The court is set above the HIGHEST point it covers — an
+  average comes out buried at the high end — and skirted 300 deep so the hill can do what it likes
+  underneath.
+- **A courtyard with one thing in it is a yard with a thing in it.** The 手水舎 opposite is what
+  makes the space between them read as a place, and it is open on all four sides on purpose: it
+  has to hold its half of the frame without becoming a second board competing for the eye.
+- **Set a counterpart BACK, not just aside.** At side 258 it was nearer the camera than the wall
+  it answers, filled the right third and had its roof cut off. Out at the court's edge and half
+  again further down it, it reads at about the wall's apparent size — which is what balance means
+  when perspective is doing the work.
+- **A gate you pass through has to be checked, not eyeballed.** The flight is a straight line from
+  home to the standing point and the standing point is on the approach axis, so a gate on that
+  axis is flown through — but "through" means under the tie beam and between the posts, and those
+  clearances are a calculation. Intersecting the flight line with the gate's plane gives them
+  exactly: 247 above the base against a tie beam at 316, and 12 off-centre against posts at 221.
+- **Headless cannot screenshot a moving camera.** At two frames a second the transition is over
+  before the shot lands. Exposing the camera RIG — not `camera`, which `applyCamera` overwrites
+  every frame from it — lets any point on any flight path be parked on and photographed.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1525,6 +1554,14 @@ Three things worth keeping out of the exercise itself:
 - **If turning a dial up repeatedly does not fix the problem, the dial is not the problem.**
   Four increases of the kanji's size did less than swapping it for the Latin gloss.
 - **A set of labels is the unit, not a label.** Size, weight and colour belong to the row.
+
+- **When something keeps not fitting where you put it, suspect the place, not the thing.** Three
+  rounds of moving a wall were answered by giving it ground to stand on.
+- **A level platform is worth building for the arithmetic alone.** Everything on it is placed from
+  one number instead of from a heightfield sampled at each object's own station.
+- **Expose the camera rig, not the camera.** Anything that rewrites `camera.position` every frame
+  makes the camera unsettable from outside, and every question about a flight path then becomes
+  unanswerable without it.
 
 ## Sources
 

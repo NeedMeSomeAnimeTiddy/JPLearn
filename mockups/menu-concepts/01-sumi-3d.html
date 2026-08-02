@@ -2984,26 +2984,91 @@ function pickWorldTile(sec, jp) {
     o.lookAt(t.x, o.position.y, t.z);
   };
 
-  /* the paving, so the approach is a made thing rather than a line of objects on grass */
+  /* ---- the paving, and the courtyard let into it ----
+     A 360-wide strip is a path, and a path is not somewhere anything can stand: the ema wall had
+     one foot on the stone and one in the grass, and every attempt to fix that by sliding the wall
+     sideways ran into the frame's left edge instead. What was missing was ground. The strip now
+     opens into a level court between the outer gate and the main one — the ema wall on its left
+     side, the water pavilion on its right — and closes again beyond it.
+
+     THE COURT IS LEVEL AND THE PATH IS NOT. A paved court that follows a heightfield is not a
+     paved court; one set to the average of the ground under it comes out buried at the high end.
+     It is set above the HIGHEST point it covers and skirted 300 deep, so it is a made platform
+     whatever the hill is doing, and everything standing on it can be placed from one number
+     instead of from `groundAt` at its own station — which is the bug that hid the wall's plinth
+     three times over. */
+  const CY = { f0: -1400, f1: -170, half: 470 };
+  let CY_TOP = -Infinity;
+  for (let f2 = CY.f0; f2 <= CY.f1; f2 += 110) {
+    for (let sd = -CY.half; sd <= CY.half; sd += 110) CY_TOP = Math.max(CY_TOP, at3(f2, sd).y);
+  }
+  CY_TOP += PAVE_RISE;
+  const onCourt = (f2) => f2 > CY.f0 - 40 && f2 < CY.f1 + 40;
   {
     const pv = [];
-    for (let k = -1500; k < 3400; k += 260) {
-      const a = at3(k, 0), b = at3(k + 260, 0);
-      const g = new THREE.BoxGeometry(360, 26, a.distanceTo(b) + 12);
-      g.translate(0, 0, 0);
+    /* the strip, in two runs — from behind the outer gate up to the court, and out the far side */
+    const strip = (from, to) => {
+      for (let k = from; k < to; k += 260) {
+        const a = at3(k, 0), b = at3(Math.min(k + 260, to), 0);
+        const g = new THREE.BoxGeometry(360, 26, a.distanceTo(b) + 12);
+        const m = new THREE.Mesh(g, null);
+        m.position.copy(a).lerp(b, 0.5);
+        m.position.y = (a.y + b.y) / 2 + 4;
+        m.lookAt(b.x, m.position.y, b.z);
+        m.updateMatrix();
+        pv.push({ geo: g.clone().applyMatrix4(m.matrix), color: k % 520 === 0 ? 0x7b756a : 0x736d63 });
+      }
+    };
+    strip(-2560, CY.f0 + 30);
+    strip(CY.f1 - 30, 3400);
+    /* the court: one slab and a kerb course standing just proud of it */
+    const slab = (halfW, top, depth, colour, over) => {
+      const a = at3(CY.f0 - over, 0), b = at3(CY.f1 + over, 0);
+      const g = new THREE.BoxGeometry(halfW * 2, depth, a.distanceTo(b));
       const m = new THREE.Mesh(g, null);
       m.position.copy(a).lerp(b, 0.5);
-      m.position.y = (a.y + b.y) / 2 + 4;
+      m.position.y = top - depth / 2;
       m.lookAt(b.x, m.position.y, b.z);
       m.updateMatrix();
-      const gg = g.clone().applyMatrix4(m.matrix);
-      pv.push({ geo: gg, color: k % 520 === 0 ? 0x7b756a : 0x736d63 });
+      pv.push({ geo: g.clone().applyMatrix4(m.matrix), color: colour });
+    };
+    slab(CY.half + 26, CY_TOP - 9, 300, 0x6a655c, 26);   /* the kerb, a step down and out */
+    /* and the court in courses rather than as one sheet. Nine hundred by twelve hundred of a
+       single tone is the least convincing surface in the frame; the joints cost nothing, and the
+       segments butt exactly because the approach is a straight line, so there is no seam to
+       z-fight over. */
+    {
+      const N = 9, step = (CY.f1 - CY.f0) / N;
+      for (let i = 0; i < N; i++) {
+        const a = at3(CY.f0 + step * i, 0), b = at3(CY.f0 + step * (i + 1), 0);
+        const g = new THREE.BoxGeometry(CY.half * 2, 290, a.distanceTo(b));
+        const m = new THREE.Mesh(g, null);
+        m.position.copy(a).lerp(b, 0.5);
+        m.position.y = CY_TOP - 145;
+        m.lookAt(b.x, m.position.y, b.z);
+        m.updateMatrix();
+        pv.push({ geo: g.clone().applyMatrix4(m.matrix), color: i % 2 ? 0x7d776c : 0x746e64 });
+      }
     }
     const paving = new THREE.Mesh(mergeParts(pv), new THREE.MeshToonMaterial({
       vertexColors: true, gradientMap: RAMP, flatShading: true,
     }));
-    paving.position.set(0, 0, 0);
     backScene.add(paving);
+  }
+
+  /* 一の鳥居 — the outer gate, and the only one the camera goes THROUGH rather than up to. It
+     stands on the line the flight actually travels (home to the standing point is a straight
+     line, and the standing point is on the approach axis), far enough back that it is behind you
+     on arrival: it is the entrance, not part of the composition. Larger than the main gate, which
+     is how a first torii usually is, and large enough that the camera passes well under its tie
+     beam rather than shaving it. */
+  {
+    const outerMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
+    const o = new THREE.Mesh(toriiGeo(GATE_H * 1.16), outerMat);
+    o.position.copy(at3(-2100, 0));
+    facing(o, -2101, 0);
+    backScene.add(o);
+    addOutline(o, 0.0026);
   }
 
   const gateMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
@@ -3047,10 +3112,13 @@ function pickWorldTile(sec, jp) {
   const lg = lanternGeo(190);
   /* the near pair sits at -980, which is behind the wall and still in front of the camera. At
      -1220 it was 70 units short of the eye — a lantern you arrive standing inside. */
-  [[-980, 250], [-980, -250], [-180, 250], [-180, -250], [420, 250], [420, -250]]
+  [[-1240, 402], [-1240, -402], [-260, 402], [-260, -402], [420, 250], [420, -250]]
     .forEach(([lf, ls], i) => {
       const m = new THREE.Mesh(lg, lanternMat);
       m.position.copy(at3(lf, ls));
+      /* anything inside the court stands on the court — the whole point of a level platform is
+         that nothing on it has to ask the hillside where it is */
+      if (onCourt(lf)) m.position.y = CY_TOP;
       m.rotation.y = hash01(i, 11) * 6.28;
       backScene.add(m);
       if (i < 4) addOutline(m, 0.0024);
@@ -3071,15 +3139,13 @@ function pickWorldTile(sec, jp) {
      to -700 and in to -110 it is 600 away, its tablets still read at 80px, and its far edge
      clears the frame with room to spare. Distance is the right lever here: scale is not, because
      the wall's size relative to the gate is the one thing about it that must not move. */
-  /* THE WALL'S FLOOR IS THE PAVING, NOT THE TERRAIN UNDER IT. The plinth was built, merged and
-     drawn and still invisible, because it was measured from `groundAt` at the wall's own station
-     — 215 units off the axis, where the hillside has fallen far enough that the top of a stone
-     base referenced to it still came out below the top of a path referenced to the axis. Sitting
-     the wall on the higher of the two, with a fixed margin, is exact whatever the ground does
-     between them; the plinth then reaches down 110 units and buries whatever is under it. */
-  const wallStand = at3(-690, 0);      /* what the approach's surface is doing at that station */
+  /* IT STANDS ON THE COURT, and that is the whole reason the court exists. Before there was one,
+     the wall's floor had to be guessed from `groundAt` at its own station — 215 units off the
+     axis, where the hillside has fallen far enough that a plinth referenced to it came out below
+     a path referenced to the axis, which is why the plinth was invisible three builds running. A
+     level platform replaces the guess with a number. */
   const wallPlace = at3(-690, -215);
-  wallPlace.y = Math.max(wallPlace.y, wallStand.y + PAVE_RISE) + WALL_LIFT;
+  wallPlace.y = CY_TOP + WALL_LIFT;
   const wallGrp = buildEmaWall('REVIEW', wallPlace, eye, WALL_W, WALL_H);
   /* and then turned toward the PATH, which is the direction the sign was wrong in before: the
      wall stands to the left of the axis, so facing the way in means turning its face to its own
@@ -3092,6 +3158,27 @@ function pickWorldTile(sec, jp) {
      was put there for people walking past it. 0.62 rad is about 36°, enough to read as addressed
      to the path while still showing the tablets nearly full width (cos 36° = 0.81). */
   wallGrp.rotateY(0.62);
+
+  /* 手水舎 — the water pavilion, facing the wall across the court. A courtyard with one thing in
+     it is a yard with a thing in it; the second structure is what makes the space between them
+     read as a place. It is the shrine's own answer to what belongs there, it carries roughly the
+     ema wall's mass so neither side wins, and it is open on all four sides so it never becomes a
+     second board competing for the eye. */
+  {
+    /* SET BACK, not just set aside. At side 258 and only 650 from the eye it was nearer the
+       camera than the ema wall it is meant to answer, so it filled the right third and had its
+       roof cut off by the top edge — the counterpart out-massing the thing it is a counterpart
+       to. Out at the court's edge and half again further down it, it holds its side of the frame
+       at about the wall's apparent size, which is what balance means here. */
+    const ch = new THREE.Mesh(chozuyaGeo(178, 168, 238), new THREE.MeshToonMaterial({
+      vertexColors: true, gradientMap: RAMP, flatShading: true,
+    }));
+    ch.position.copy(at3(-430, 312));
+    ch.position.y = CY_TOP;
+    facing(ch, -430, 0);
+    backScene.add(ch);
+    addOutline(ch, 0.0024);
+  }
 
   /* ---- planting ----
      The corridor blockers strip the wood out of a 1,500-unit band and leave a lawn, and a lawn
@@ -3116,8 +3203,11 @@ function pickWorldTile(sec, jp) {
     const VERGE = 260;
     /* and the hall, whose plinth is 713 wide — wider than the corridor it stands at the end of */
     const KEEP = [[3170, 0, 560]];
+    /* the court is a rectangle, not a disc, so it gets its own clause: inside its length nothing
+       plants closer than its edge plus a verge */
     const clear = (f2, sd) => {
-      let t = Math.abs(sd) < VERGE ? Math.sign(sd || 1) * (2 * VERGE - Math.abs(sd)) : sd;
+      const min = f2 > CY.f0 - 120 && f2 < CY.f1 + 120 ? CY.half + 90 : VERGE;
+      let t = Math.abs(sd) < min ? Math.sign(sd || 1) * (2 * min - Math.abs(sd)) : sd;
       for (let k = 0; k < KEEP.length; k++) {
         const dx = f2 - KEEP[k][0], dz = t - KEEP[k][1], d = Math.hypot(dx, dz) || 1;
         if (d < KEEP[k][2]) { const m = KEEP[k][2] / d; f2 = KEEP[k][0] + dx * m; t = KEEP[k][1] + dz * m; }
@@ -3170,8 +3260,10 @@ function pickWorldTile(sec, jp) {
       return null;
     };
     /* the built things go in first, so nothing can grow through them either */
-    PLANTED.push([-690, -215, 155, 155]);
-    [[-980, 250], [-980, -250], [-180, 250], [-180, -250], [420, 250], [420, -250]]
+    PLANTED.push([-690, -215, 155, 155]);   /* the ema wall */
+    PLANTED.push([-430, 312, 150, 150]);    /* the water pavilion */
+    PLANTED.push([-2100, 0, 340, 340]);     /* the outer gate */
+    [[-1240, 402], [-1240, -402], [-260, 402], [-260, -402], [420, 250], [420, -250]]
       .forEach(([lf, ls]) => PLANTED.push([lf, ls, 78, 78]));
 
     /* THE TREES GO DOWN FIRST. They are fewer, larger, and their placement is what the eye reads
@@ -3264,6 +3356,33 @@ function lanternGeo(H) {
   g = new THREE.CylinderGeometry(H * 0.15, H * 0.15, H * 0.22, 6); g.translate(0, H * 0.68, 0); add(g, 0xe8d9b4);
   g = new THREE.CylinderGeometry(H * 0.03, H * 0.27, H * 0.17, 6); g.translate(0, H * 0.855, 0); add(g, D);
   g = new THREE.SphereGeometry(H * 0.055, 6, 4); g.translate(0, H * 0.955, 0); add(g, S);
+  return mergeParts(parts);
+}
+/* 手水舎 — the water pavilion: a roof on four posts over a stone basin, open on every side. The
+   openness is the point. It has to hold its half of the court against the ema wall without
+   becoming a second board, and a structure you can see straight through does that — it has mass
+   in silhouette and none in the middle of the frame. */
+function chozuyaGeo(W, D, H) {
+  const parts = [];
+  const add = (g, c) => parts.push({ geo: g, color: c });
+  /* the stone footing, matching the wall's opposite */
+  let g = new THREE.BoxGeometry(W * 1.14, H * 0.07, D * 1.14); g.translate(0, H * 0.035, 0); add(g, 0x6b6459);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    g = new THREE.CylinderGeometry(W * 0.036, W * 0.044, H * 0.60, 7);
+    g.translate(sx * W * 0.43, H * 0.37, sz * D * 0.43); add(g, 0x54422f);
+  }
+  /* the tie beams, both ways, so the four posts read as a frame rather than as four sticks */
+  add(beamSeg(W * 1.0, H * 0.045, D * 0.055, 0, H * 0.63, 0), 0x46372a);
+  g = new THREE.BoxGeometry(W * 0.055, H * 0.045, D * 1.0); g.translate(0, H * 0.63, 0); add(g, 0x46372a);
+  /* two slopes and a ridge — the same roof the hall has, at a quarter the size */
+  for (const sx of [-1, 1]) {
+    g = new THREE.BoxGeometry(W * 0.82, H * 0.055, D * 1.42);
+    g.rotateZ(-sx * 0.46); g.translate(sx * W * 0.35, H * 0.80, 0); add(g, 0x3b332a);
+  }
+  g = new THREE.BoxGeometry(W * 0.075, H * 0.06, D * 1.42); g.translate(0, H * 0.96, 0); add(g, 0x332c25);
+  /* the basin, and the water in it — the one bright thing under all that shade */
+  g = new THREE.BoxGeometry(W * 0.5, H * 0.17, D * 0.5); g.translate(0, H * 0.15, 0); add(g, 0x6f6960);
+  g = new THREE.BoxGeometry(W * 0.4, H * 0.02, D * 0.4); g.translate(0, H * 0.235, 0); add(g, 0x9dbfc2);
   return mergeParts(parts);
 }
 /* 本殿 — the hall the approach is an approach TO. Without something at the far end the tunnel
@@ -4451,6 +4570,10 @@ let active = 0, busy = false;
    of milliseconds for one is guesswork the moment the frame rate moves */
 window.NAV = { get state() { return state; }, get busy() { return busy; },
   dests: () => DESTS.map((d) => ({ b: d.bearing, place: d.place.toArray().map(Math.round), eye: d.eye.toArray().map(Math.round) })),
+  /* the camera rig itself. `applyCamera` rewrites camera.position from this every frame, so
+     setting the camera object directly does nothing — any question about what a point on a
+     flight path looks like has to be asked here. */
+  get cam() { return cam; },
   /* the hover state of world level two, so a swing can be measured rather than eyeballed */
   swing: () => (worldL2 || { picks: [] }).picks.map((q) => ({
     jp: q.jp, x: +q.root.rotation.x.toFixed(3), em: +q.face.material.emissive.r.toFixed(3),
