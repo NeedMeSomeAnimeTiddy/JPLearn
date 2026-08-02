@@ -2614,26 +2614,33 @@ function emaTexture(jp, en, meta, accent) {
      signage: the type is far larger than the object would carry, because the camera stops far
      enough back to keep the shrine and the valley in frame and legibility has to survive that.
      Games oversize signage for the same reason and nobody notices. */
+  /* `maxWidth` is the fifth argument to fillText and it condenses rather than shrinks — the
+     glyphs keep their height and lose width, which is exactly the trade a label wants. Without
+     it the size here is governed by the longest string any section might have (今日の分 at four
+     characters), so every other tablet pays for it. */
   g.fillStyle = '#2b1c10';
-  g.font = '700 88px "Yu Mincho", "Hiragino Mincho ProN", serif';
-  g.fillText(jp, W / 2, GAB + 112);
-  g.fillStyle = 'rgba(43,28,16,0.72)';
-  g.font = '700 23px "Arial Black", Arial, sans-serif';
+  g.font = '700 112px "Yu Mincho", "Hiragino Mincho ProN", serif';
+  g.fillText(jp, W / 2, GAB + 122, W - 26);
+  g.fillStyle = 'rgba(43,28,16,0.78)';
+  g.font = '700 27px "Arial Black", Arial, sans-serif';
   g.letterSpacing = '5px';
-  g.fillText(en, W / 2, GAB + 152);
+  g.fillText(en, W / 2, GAB + 158, W - 40);
   g.letterSpacing = '0px';
   /* THE DARK ACCENT, NOT THE BRIGHT ONE. Section colours are chosen to sit on near-black
      backgrounds, where the light end is the readable one; on cream it is the light end that
      disappears. REVIEW's #e34a33 on paper is a 2.4:1 contrast, its #b23320 is 4.4:1. */
   g.fillStyle = accent;
-  g.font = '900 122px "Arial Black", Arial, sans-serif';
-  g.fillText(num, W / 2, H - 84);
-  g.fillStyle = 'rgba(43,28,16,0.66)';
-  g.font = '700 26px "Yu Gothic UI", sans-serif';
-  g.fillText(unit, W / 2, H - 44);
+  g.font = '900 168px "Arial Black", Arial, sans-serif';
+  g.fillText(num, W / 2, H - 66, W - 64);
+  g.fillStyle = 'rgba(43,28,16,0.7)';
+  g.font = '700 30px "Yu Gothic UI", sans-serif';
+  g.fillText(unit, W / 2, H - 26, W - 60);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  /* the tablet is 384 texels wide and lands on about seventy pixels, so it is read four or five
+     mip levels down and at a slant. Anisotropy is the whole difference between legible and
+     smeared here, and 4 was leaving most of the hardware's capability unused. */
+  t.anisotropy = backRenderer.capabilities.getMaxAnisotropy();
   return t;
 }
 
@@ -2720,20 +2727,31 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
     g.translate(sx * (W / 4 + W * 0.02), HH + HH * 0.26, 0);
     frame.push({ geo: g, color: 0x3f3428 });
   });
-  const frameMesh = new THREE.Mesh(mergeParts(frame), new THREE.MeshToonMaterial({
-    vertexColors: true, gradientMap: RAMP, flatShading: true,
-  }));
-  grp.add(frameMesh);
-  addOutline(frameMesh, 0.0024);
   /* 基壇 — the stone footing. The wall stands at the edge of a 360-wide paved approach, and the
      paving is 26 units proud of the ground it is laid on, so a post planted at ground level
      comes up THROUGH the stone. Every attempt to solve that by moving the wall further out ran
      into the frame's left edge instead, because at this standoff there is only about thirty
      degrees between the gate and the edge of the picture. A footing solves it where it actually
-     happens: the wall now sits on something that is meant to overlap the paving, which is what
-     real ema-kake stand on anyway. */
-  frame.push({ geo: beamSeg(W * 1.14, HH * 0.32, W * 0.36, 0, HH * 0.06, 0), color: 0x6b6459 });
+     happens: the wall sits on something that is MEANT to overlap the paving, which is what real
+     ema-kake stand on anyway.
 
+     It has to go in before the merge. Pushed after `mergeParts(frame)` it is a line of code that
+     runs, allocates a box, and has no effect whatsoever — which is precisely what happened, and
+     is worth remembering: a list you are appending to is only a list until somebody consumes it,
+     and after that an append is silence rather than an error.
+
+     And the wall stands ON it rather than in it. Wrapped around the wall's lower half — which is
+     what a block centred on the base actually is — it rose to within a few units of the bottom
+     course of tablets and swallowed it. A plinth goes UNDERNEATH: the group is lifted clear of
+     the ground by `WALL_LIFT` and the stone fills the gap that opens up beneath, so it can be as
+     deep as the paving needs without taking a single unit away from the board. */
+  frame.push({ geo: beamSeg(W * 1.2, HH * 0.72, W * 0.42, 0, -HH * 0.33, 0), color: 0x6b6459 });
+  frame.push({ geo: beamSeg(W * 1.27, HH * 0.06, W * 0.47, 0, -HH * 0.026, 0), color: 0x7a7368 });
+  const frameMesh = new THREE.Mesh(mergeParts(frame), new THREE.MeshToonMaterial({
+    vertexColors: true, gradientMap: RAMP, flatShading: true,
+  }));
+  grp.add(frameMesh);
+  addOutline(frameMesh, 0.0024);
   /* piles, so it stands in the shallows rather than floating on them */
   const piles = [];
   for (let i = -2; i <= 2; i++) {
@@ -2763,8 +2781,12 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
      real ema wall and truer to it, but at this distance they overlap into a field of small brown
      lozenges and the eye files the whole thing as rubble. Bigger and fewer keeps the gabled
      silhouette, which is the only thing that says "votive tablet" rather than "stone". */
-  const bw = W * 0.085;
-  const PER = 7, ROWS = 3;
+  /* A ROW HAS TO HOLD ITS ROW. At 0.085 W the blanks stood 23 units tall in a 25-unit pitch and
+     the vertical jitter pushed the lower edge of one row through the rail of the next, which
+     reads as the wall being over-stuffed rather than as a crowd. Smaller, one more per row, and
+     the jitter cut to what a hung object actually has. */
+  const bw = W * 0.072;
+  const PER = 8, ROWS = 3;
   const blanks = new THREE.InstancedMesh(
     emaGeo(bw, bw * 1.2, bw * 0.25, bw * 0.05),
     /* THE WALL FACES AWAY FROM THE SUN and always will, because it is turned toward the path
@@ -2777,13 +2799,13 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
   const zc = new THREE.Vector3(0, 0, 1), col = new THREE.Color();
   for (let i = 0; i < blanks.count; i++) {
     const row = Math.floor(i / PER), k = i % PER;
-    const x = -W / 2 + W * 0.065 + (k + (hash01(i, 7) - 0.5) * 0.55) * (W * 0.87) / (PER - 1);
+    const x = -W / 2 + W * 0.065 + (k + (hash01(i, 7) - 0.5) * 0.35) * (W * 0.87) / (PER - 1);
     /* and they do not hang level: a row that shares a baseline is a course of bricks */
-    const y = HH * 0.42 - row * HH * 0.155 - hash01(i, 19) * HH * 0.02;
+    const y = HH * 0.42 - row * HH * 0.155 - hash01(i, 19) * HH * 0.014;
     /* a tablet on a cord hangs very nearly straight. Swinging them 25 degrees either way was
        what made a row of them read as rubble rather than as a row of anything. */
     qt.setFromAxisAngle(zc, (hash01(i, 31) - 0.5) * 0.26);
-    const g = 0.88 + hash01(i, 83) * 0.2;
+    const g = 0.9 + hash01(i, 83) * 0.16;
     sc.set(g, g, 1);
     /* forward of the board rather than behind it, or they vanish into it */
     mx.compose(new THREE.Vector3(x, y, W * 0.05 - row * W * 0.008), qt, sc);
@@ -2807,14 +2829,17 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
      hover read as the tablet flying off the wall and back into it. Put the origin where the cord
      meets the rail and hang everything below it, and the identical tween becomes a swing,
      because a swing is just a rotation about the point an object hangs from. */
-  const TW = (W - W * 0.22) / tiles.length * 0.92, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.06;
-  const GAP = (W - W * 0.22 - TW * tiles.length) / (tiles.length - 1);
+  /* THE MARGIN WAS DOING NOTHING. A fifth of the wall's width was being held back either side
+     of a row of four tiles, on no principle beyond looking tidy in the first draft — and it was
+     costing a sixth of every glyph. The board's own posts already frame the row. */
+  const TW = (W - W * 0.10) / tiles.length * 0.93, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.06;
+  const GAP = (W - W * 0.10 - TW * tiles.length) / (tiles.length - 1);
   const CORD = TH * 0.3;
   /* raycast target only: material.visible skips the draw, object.visible would skip the ray too */
   const hitMat = new THREE.MeshBasicMaterial();
   hitMat.visible = false;
   const picks = tiles.map(([jp, en, meta], j) => {
-    const px = -(W - W * 0.22) / 2 + TW / 2 + j * (TW + GAP);
+    const px = -(W - W * 0.10) / 2 + TW / 2 + j * (TW + GAP);
     const py = HH - HH * 0.18 + CORD;
     const pz = W * 0.07;
     const root = new THREE.Group();
@@ -2895,6 +2920,10 @@ function pickWorldTile(sec, jp) {
      object in the frame. */
   const WALL_W = GATE_H * 0.45;     /* 211 */
   const WALL_H = GATE_H * 0.345;
+  /* how far the paving's surface stands above the ground it is laid on, and how far clear of it
+     the wall then sits */
+  const PAVE_RISE = 17;
+  const WALL_LIFT = 8;
   const base = destPlace(105, 5200, 0);
   const fwd = new THREE.Vector3().copy(base).sub(HOME_EYE).setY(0).normalize();
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
@@ -2998,7 +3027,16 @@ function pickWorldTile(sec, jp) {
      to -700 and in to -110 it is 600 away, its tablets still read at 80px, and its far edge
      clears the frame with room to spare. Distance is the right lever here: scale is not, because
      the wall's size relative to the gate is the one thing about it that must not move. */
-  const wallGrp = buildEmaWall('REVIEW', at3(-690, -215), eye, WALL_W, WALL_H);
+  /* THE WALL'S FLOOR IS THE PAVING, NOT THE TERRAIN UNDER IT. The plinth was built, merged and
+     drawn and still invisible, because it was measured from `groundAt` at the wall's own station
+     — 215 units off the axis, where the hillside has fallen far enough that the top of a stone
+     base referenced to it still came out below the top of a path referenced to the axis. Sitting
+     the wall on the higher of the two, with a fixed margin, is exact whatever the ground does
+     between them; the plinth then reaches down 110 units and buries whatever is under it. */
+  const wallStand = at3(-690, 0);      /* what the approach's surface is doing at that station */
+  const wallPlace = at3(-690, -215);
+  wallPlace.y = Math.max(wallPlace.y, wallStand.y + PAVE_RISE) + WALL_LIFT;
+  const wallGrp = buildEmaWall('REVIEW', wallPlace, eye, WALL_W, WALL_H);
   /* and then turned toward the PATH, which is the direction the sign was wrong in before: the
      wall stands to the left of the axis, so facing the way in means turning its face to its own
      right and letting its left edge come forward. After `lookAt`, the group's local +X is the

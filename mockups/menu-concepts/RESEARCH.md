@@ -1252,6 +1252,38 @@ hand where the code already knew the answer.
   stone footing, which is what real ema-kake stand on, makes the overlap deliberate and costs
   none of the framing.
 
+## v37 — the plinth that was there and could not be seen
+
+Three complaints, and the first one took three attempts because each fix was correct about
+something different.
+
+- **An append after the merge is silence, not an error.** The stone footing was pushed into
+  `frame` two lines *after* `mergeParts(frame)` had already consumed it. The code ran, allocated
+  its box and had no effect whatsoever. A list is only a list until something consumes it.
+- **A plinth goes UNDER, not around.** Built the second time, it was a block centred on the
+  wall's base — which is a block wrapped around the wall's lower half, and it rose far enough to
+  swallow the bottom course of tablets. Lifting the group clear of the ground and filling the gap
+  beneath it costs the board nothing and can be as deep as it likes.
+- **Two things placed from different references do not share a floor.** Built the third time it
+  was still invisible: the plinth measured from `groundAt` at the wall's own station, 215 units
+  off the axis, while the paving measured from the axis. The hillside falls enough over that
+  distance that the top of the stone came out below the top of the path. The wall now stands on
+  `max(its own ground, the approach's surface) + margin`, which is exact whatever the terrain
+  does between them.
+- **`fillText`'s fifth argument condenses rather than shrinks.** Type size on a label is
+  otherwise governed by the longest string any section might ever pass in, and every other tablet
+  pays for it. With `maxWidth` the glyphs keep their height and lose width, which is the trade a
+  label wants.
+- **Check what the margin is for.** A fifth of the wall's width was being held back either side
+  of the row of four tiles on no principle beyond looking tidy in the first draft, and it was
+  costing a sixth of every glyph. The board's own posts already frame the row.
+- **Anisotropy is the difference between legible and smeared** on a small textured quad seen at a
+  slant. The tablet is 384 texels wide and lands on seventy pixels — four or five mip levels
+  down. It had been set to 4 with the hardware offering 16.
+- **A row has to hold its row.** The blanks stood 23 units tall in a 25-unit pitch and the
+  vertical jitter pushed one row's lower edge through the next row's rail, which reads as
+  over-stuffed rather than as a crowd. Smaller, one more per row, less jitter.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1426,6 +1458,15 @@ hand where the code already knew the answer.
 - **Turn a disagreement about a scene into a number.** Walking the instances and counting real
   bounding-box overlaps is a few dozen lines and it both proves the fix and catches the cases
   the eye was misreading.
+
+- **Two objects that must meet have to be placed from the same reference.** "On the ground" is
+  not a shared floor when the ground is a heightfield and the two are measured at different
+  points on it.
+- **An append to a list that has already been consumed fails silently.** Builder code that
+  collects parts and then merges them has an invisible deadline in the middle of it.
+- **When something you built is invisible, ask whether it was built, whether it is where you
+  think, and whether something else is in front of it** — in that order. Three attempts at one
+  plinth were three different answers to that question.
 
 ## Sources
 
