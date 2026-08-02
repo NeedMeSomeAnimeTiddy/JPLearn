@@ -2941,18 +2941,18 @@ function drawSign(c, jp, en, count, unit, pct, accent) {
   g.textAlign = 'left';
   g.fillStyle = INK;
   g.letterSpacing = '2px';
-  const size = emaFit(en, W - 200, 74, '2px');
+  const size = emaFit(en, W - 170, 78, '2px');
   g.font = `900 ${size}px "Arial Black", Arial, sans-serif`;
-  g.fillText(en, 34, 128, W - 200);
+  g.fillText(en, 28, 124, W - 170);
   g.letterSpacing = '0px';
   g.fillStyle = 'rgba(43,28,16,0.6)';
   g.font = '700 34px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif';
-  g.fillText(jp, 36, 176, W - 210);
+  g.fillText(jp, 30, 172, W - 180);
   /* the rule and the count, the same two moves the tablet makes */
   g.fillStyle = accent;
-  g.fillRect(34, 208, W * 0.5, 6);
-  g.font = '900 54px "Arial Black", Arial, sans-serif';
-  g.fillText(`${count} ${unit}`.toUpperCase(), 34, 276, W * 0.52);
+  g.fillRect(28, 204, W * 0.52, 6);
+  g.font = '900 56px "Arial Black", Arial, sans-serif';
+  g.fillText(`${count} ${unit}`.toUpperCase(), 28, 274, W * 0.54);
   /* how far through it you are: five segments, filled */
   const segs = Math.round(pct / 20);
   for (let i = 0; i < 5; i++) {
@@ -3448,7 +3448,7 @@ function pickWorldTile(sec, jp) {
   }), 3.5);
 
   /* the hall at the end of it */
-  const hall = new THREE.Mesh(shrineHallGeo(620, 420, 520), new THREE.MeshToonMaterial({
+  const hall = new THREE.Mesh(shrineHallGeo(1000, 640, 780), new THREE.MeshToonMaterial({
     vertexColors: true, gradientMap: RAMP, flatShading: true,
   }));
   hall.position.copy(at3(TUN_END + 700, 0));
@@ -3497,7 +3497,12 @@ function pickWorldTile(sec, jp) {
   const L3_SLOTS = 6, L3_STEP = 4, L3_STAND = 3.5 * 268 - 134;
   const L3_SIGNS = [];
   {
-    const SW = 168, SH = 102, STH = 7;
+    /* A SIZE DOWN, AND THE TYPE FILLS MORE OF IT. Everything about a placard derives from these
+       three — the rail, the cords, the hinge, the hang height and the outline — so the whole
+       family comes down together. Losing 13% of the board and giving the type 30 more units of
+       line length is the same move made twice: the sign gets smaller and its contents get larger
+       inside it, which is what stops "smaller" reading as "further away". */
+    const SW = 146, SH = 89, STH = 7;
     const board = new THREE.BoxGeometry(SW, SH, STH);
     const woodMat = new THREE.MeshToonMaterial({ color: 0x6b5744, gradientMap: RAMP, flatShading: true });
     for (let k = 0; k < L3_SLOTS; k++) {
@@ -3773,27 +3778,33 @@ function pickWorldTile(sec, jp) {
      be seen whole — the trunk is most of what says "tree", and it is the first thing a near
      placement loses.
 
-     IT STANDS BEHIND THE PAVILION, AND THAT IS THE ONLY PLACE IT FITS. Measuring the frame rather
-     than guessing at it settles this in one shot: at 1920x1080 the pavilion occupies x 1198..1777
-     and the frame ends at 1920, so the clear corridor beside it is 143px wide against a crown
-     four hundred across. No tree that is worth putting there can stand clear of the building —
-     what is actually free is the band ABOVE it, which is sky and distant treeline. So the tree
-     goes behind, its crown fills that band, and its trunk is crossed by the roof, which is what
-     a tree behind a building looks like. Trying to satisfy "the trunk must show" cost two
-     placements: one crowding the pavilion from in front, one shoved so far right it was a green
-     smear on the frame edge. */
+     AT THE FAR END, BEHIND THE HALL. Four stations on the right of the court taught the same
+     lesson — the pavilion owns that side and everything put near it ends up behind it — but the
+     real problem was that the tunnel had nothing to arrive at. Twenty-six gates converging on a
+     pale wash is a corridor to nowhere, and the hall standing there is 520 tall against a tunnel
+     404 tall, so it never clears the last few bays.
+
+     AND IT IS THE REWARD FOR WALKING, NOT A MARK ON THE HORIZON. Three stations at the far end
+     were probed before this was clear: from the standing point the tunnel's far opening is 54
+     pixels wide, and a trunk in it is 25 pixels of dark among the darks of twenty-six sets of
+     posts. Nothing shaped survives that distance — which is why the hall is what changed colour
+     and the tree is what moved BACK. Set behind and outboard of the hall it is hidden at the
+     start and rises over the roof as the walk closes on it.
+
+     It also stops fighting the pavilion for the right of the frame, which is the second thing
+     that side did not need. */
   {
-    const t = shinbokuGeo(560);
+    const t = shinbokuGeo(1250);
     const m = new THREE.Mesh(t, new THREE.MeshToonMaterial({
       vertexColors: true, gradientMap: RAMP, flatShading: true,
     }));
-    m.position.copy(at3(120, 500, -12));
+    m.position.copy(at3(TUN_END + 1320, 300, -12));
     m.rotation.y = 2.1;
     backScene.add(m);
     addOutline(m, 3.2);
     MARKS.tree = m;
     /* claim it in the global wood registry too, or the valley's own planting grows through it */
-    treeClaim(m.position.x, m.position.z, 300);
+    treeClaim(m.position.x, m.position.z, 480);
   }
 
   /* ---- 手水 — the one thing here you can touch ----
@@ -3964,7 +3975,7 @@ function pickWorldTile(sec, jp) {
     /* the built things go in first, so nothing can grow through them either */
     PLANTED.push([-690, -215, 155, 155]);   /* the ema wall */
     PLANTED.push([-640, 310, 150, 150]);    /* the water pavilion */
-    PLANTED.push([120, 500, 220, 290]);     /* the sacred tree, canopy and all */
+    PLANTED.push([TUN_END + 1320, 300, 380, 480]);  /* the sacred tree, canopy and all */
     PLANTED.push([-200, 250, 95, 95]);      /* the guardians */
     PLANTED.push([-200, -250, 95, 95]);
     PLANTED.push([-2100, 0, 340, 340]);     /* the outer gate */
@@ -4236,12 +4247,24 @@ function chozuyaGeo(W, D, H) {
   return mergeParts(parts);
 }
 /* 本殿 — the hall the approach is an approach TO. Without something at the far end the tunnel
-   is a corridor to nowhere, which is what makes an area feel like a set rather than a place. */
+   is a corridor to nowhere, which is what makes an area feel like a set rather than a place.
+
+   AND AT THAT DISTANCE, ONLY COLOUR CARRIES. The far end of the tunnel is not a view, it is a
+   54 x 64 pixel window: the opening of the last gate, 8,645 units off, framed by twenty-six sets
+   of converging posts. Nothing about a shape survives that. A dark trunk in it is twenty-five
+   pixels of dark among the darks of the gate posts; a pale sand wall in it is indistinguishable
+   from the pale lit path leading to it, which is exactly why the end read as a flat wash — the
+   hall was there the whole time and its walls were the same value as the floor.
+
+   Vermilion is the one hue in this scene that means "shrine" and appears nowhere in the ground,
+   so a red mass in that window separates instantly and says what it is. It is also what a honden
+   is actually painted. The lacquer goes on the walls only; the roof stays dark and the plinth
+   stays stone, so it reads as a building and not as a swatch. */
 function shrineHallGeo(W, D, H) {
   const parts = [];
   const add = (g, c) => parts.push({ geo: g, color: c });
   let g = new THREE.BoxGeometry(W * 1.15, H * 0.12, D * 1.15); g.translate(0, H * 0.06, 0); add(g, 0x6c6459);
-  g = new THREE.BoxGeometry(W, H * 0.52, D); g.translate(0, H * 0.38, 0); add(g, 0xb2a184);
+  g = new THREE.BoxGeometry(W, H * 0.52, D); g.translate(0, H * 0.38, 0); add(g, 0xb03a2a);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     g = new THREE.CylinderGeometry(W * 0.035, W * 0.04, H * 0.55, 7);
     g.translate(sx * W * 0.46, H * 0.39, sz * D * 0.46); add(g, 0x8a3626);
@@ -5443,6 +5466,21 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
      population which first spiked (a 0.30 floor is a 3.3x multiplier) and then, when it was made
      to fall back to the face normal, went degenerate in screen space. It cannot be eyeballed and
      it does not show in a still frame, so count it. */
+  /* WHAT IS ACTUALLY UNDER A SCREEN POINT. "The end of the tunnel looks flat" is a question about
+     which object is filling forty pixels at nine thousand units, and looking at a screenshot
+     cannot answer it — four separate guesses at that one window (a tree, a taller tree, a
+     recoloured hall, a bigger hall) all failed because the thing being changed was not the thing
+     in the way. A ray costs nothing and names it. */
+  hit: (sx, sy) => {
+    const r = new THREE.Raycaster();
+    r.setFromCamera(new THREE.Vector2((sx / W()) * 2 - 1, -(sy / H()) * 2 + 1), camera);
+    return r.intersectObjects(backScene.children, true).slice(0, 5).map((h) => ({
+      dist: Math.round(h.distance),
+      y: Math.round(h.point.y),
+      verts: h.object.geometry ? h.object.geometry.attributes.position.count : 0,
+      inst: h.object.isInstancedMesh ? 1 : 0,
+    }));
+  },
   /* the screen box of a registered landmark, and of the name-board */
   rectOf: (k) => screenRect(MARKS[k]),
   /* where a point in a section's approach coordinates lands on screen, and how many pixels one
