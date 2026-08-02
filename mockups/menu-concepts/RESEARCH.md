@@ -1304,6 +1304,31 @@ something different.
   the size that exactly fills a width. Nothing has to be guessed and nothing breaks when the
   label table grows a nine-character entry.
 
+## v39 — six faces for one tablet
+
+Swapping the scripts made the tablet readable and made it busy, because it left four bands of
+type stacked in a pentagon — label, gloss, figure, unit — with nothing dominant. Rather than
+argue about it, six arrangements, switchable with `?ema=a..f`, each deciding what the tablet is
+FOR and letting everything else get out of the way of that:
+
+- **a** the figure is the answer, the label names it — a dashboard tile
+- **b** a banner in the section colour with the type reversed out, the figure on paper below
+- **c** label, rule, figure — one line each and a lot of paper between them
+- **d** the figure struck into a block, the label under it — the menu's own chip language
+- **e** the label is the choice and the count a footnote — what a menu item usually is
+- **f** what was there, as a control
+
+Two things worth keeping out of the exercise itself:
+
+- **Judge a face in the place it is read, not on a contact sheet.** A switch on the URL costs ten
+  lines and shows every candidate lit, angled, at seventy pixels and against the actual
+  background. A contact sheet would have made **b** look like the obvious winner; in place, four
+  red banners in a row fight the gate they are standing in front of.
+- **A row shares its figure size as well as its label size.** Left to fill its own tablet, `341`
+  came out condensed to two-thirds the digit width of `24` beside it, and four counts read as
+  four different kinds of thing. Anchoring the figure by the middle of its block rather than by a
+  baseline lets the shared size shrink without the composition sliding.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
