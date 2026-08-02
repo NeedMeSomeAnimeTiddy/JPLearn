@@ -2385,7 +2385,7 @@ function standOff(place, off = STAND_OFF) {
    turn: two ahead of the shoulders, two abeam, two behind. */
 const DEST_SPECS = [
   { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
-  { bearing: 26, dist: 6100, lift: 150, stand: 1620 }, /* REVIEW — the shrine approach     */
+  { bearing: 105, dist: 5200, lift: 150, stand: 1000 }, /* REVIEW — the shrine, off-screen  */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
   { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
@@ -2582,10 +2582,14 @@ const WORLD_SWAY = [];
    tablets, so the blanks are not padding, they are accuracy — and four live ones standing out
    of a crowd read as CHOSEN rather than as a row of four rectangles, which is the failure this
    design has fallen into at every previous attempt. */
-function buildEmaWall(sec, place, faceTowards) {
+/* W and HH are ARGUMENTS now, and the caller states the ratio it wants. Hard-coded here they
+   drifted upward every time the tablets needed to be more readable, until the wall was 620 wide
+   against a 590-wide gate — the same size as the landmark, which is exactly what it must never
+   be. A rack of votive tablets is a piece of furniture; the gate is a building. */
+function buildEmaWall(sec, place, faceTowards, W, HH) {
   const tiles = SUBTILES[sec];
   const accent = SECTION_ACCENT[sec][0];
-  const W = 620, HH = 300, POST = 26;
+  const POST = W * 0.05;
   const grp = new THREE.Group();
   grp.position.copy(place);
   grp.lookAt(faceTowards.x, place.y, faceTowards.z);
@@ -2594,16 +2598,16 @@ function buildEmaWall(sec, place, faceTowards) {
   /* the structure: two posts, a rail and a shallow roof — small, and read at a glance */
   const frame = [];
   [-1, 1].forEach((sx) => {
-    const g = new THREE.CylinderGeometry(POST * 0.42, POST * 0.5, HH + 60, 8);
-    g.translate(sx * W / 2, (HH + 60) / 2, 0);
+    const g = new THREE.CylinderGeometry(POST * 0.42, POST * 0.5, HH + HH * 0.2, 8);
+    g.translate(sx * W / 2, (HH + HH * 0.2) / 2, 0);
     frame.push({ geo: g, color: 0x4a3a2b });
   });
-  frame.push({ geo: beamSeg(W + 70, 20, 30, 0, HH + 40, 0), color: 0x54422f });
-  frame.push({ geo: beamSeg(W + 30, 13, 22, 0, HH - 8, 0), color: 0x46372a });
+  frame.push({ geo: beamSeg(W + W * 0.11, HH * 0.067, HH * 0.1, 0, HH + HH * 0.13, 0), color: 0x54422f });
+  frame.push({ geo: beamSeg(W + W * 0.05, HH * 0.043, HH * 0.073, 0, HH - HH * 0.027, 0), color: 0x46372a });
   [-1, 1].forEach((sx) => {
-    const g = new THREE.BoxGeometry(W / 2 + 60, 11, 118);
+    const g = new THREE.BoxGeometry(W / 2 + W * 0.1, HH * 0.037, W * 0.19);
     g.rotateZ(-sx * 0.20);
-    g.translate(sx * (W / 4 + 12), HH + 78, 0);
+    g.translate(sx * (W / 4 + W * 0.02), HH + HH * 0.26, 0);
     frame.push({ geo: g, color: 0x3f3428 });
   });
   const frameMesh = new THREE.Mesh(mergeParts(frame), new THREE.MeshToonMaterial({
@@ -2614,8 +2618,8 @@ function buildEmaWall(sec, place, faceTowards) {
   /* piles, so it stands in the shallows rather than floating on them */
   const piles = [];
   for (let i = -2; i <= 2; i++) {
-    const g = new THREE.CylinderGeometry(13, 15, 300, 7);
-    g.translate(i * W / 4.4, -150, hash01(i + 5, 3) * 30 - 15);
+    const g = new THREE.CylinderGeometry(W * 0.021, W * 0.024, HH, 7);
+    g.translate(i * W / 4.4, -HH / 2, hash01(i + 5, 3) * 30 - 15);
     piles.push({ geo: g, color: 0x3b3026 });
   }
   const pileMesh = new THREE.Mesh(mergeParts(piles), new THREE.MeshToonMaterial({
@@ -2630,8 +2634,8 @@ function buildEmaWall(sec, place, faceTowards) {
      than the width allows, a wide spread of size and tilt, and a real range of weathering, so
      every tablet has a dark line either side of it and the four live ones sit against texture
      rather than against a panel. */
-  const bw = 46;
-  const PER = 15, ROWS = 4;
+  const bw = W * 0.075;
+  const PER = 11, ROWS = 3;
   const blanks = new THREE.InstancedMesh(
     emaGeo(bw, bw * 1.2, bw * 0.25, bw * 0.05),
     /* the same emissive floor the live tablets needed: without it the crowd renders as a
@@ -2642,12 +2646,12 @@ function buildEmaWall(sec, place, faceTowards) {
   const zc = new THREE.Vector3(0, 0, 1), col = new THREE.Color();
   for (let i = 0; i < blanks.count; i++) {
     const row = Math.floor(i / PER), k = i % PER;
-    const x = -W / 2 + 40 + (k + (hash01(i, 7) - 0.5) * 0.55) * (W - 80) / (PER - 1);
-    const y = HH - 62 - row * 66 - hash01(i, 19) * 22;
+    const x = -W / 2 + W * 0.065 + (k + (hash01(i, 7) - 0.5) * 0.55) * (W * 0.87) / (PER - 1);
+    const y = HH - HH * 0.2 - row * HH * 0.21 - hash01(i, 19) * HH * 0.07;
     qt.setFromAxisAngle(zc, (hash01(i, 31) - 0.5) * 0.7);
     const g = 0.78 + hash01(i, 83) * 0.44;
     sc.set(g, g, 1);
-    mx.compose(new THREE.Vector3(x, y, -16 - row * 9), qt, sc);
+    mx.compose(new THREE.Vector3(x, y, -W * 0.026 - row * W * 0.015), qt, sc);
     blanks.setMatrixAt(i, mx);
     /* weathered across a real range — a narrow one just made the slab evenly tan */
     col.setHSL(0.075 + hash01(i, 43) * 0.05, 0.14 + hash01(i, 51) * 0.16, 0.3 + hash01(i, 67) * 0.3);
@@ -2658,15 +2662,15 @@ function buildEmaWall(sec, place, faceTowards) {
   grp.add(blanks);
 
   /* and the four that are yours: bigger, forward of the crowd, lit, hanging straight */
-  const TW = 120, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.06;
-  const GAP = (W - 66 - TW * tiles.length) / (tiles.length - 1);
+  const TW = (W - W * 0.22) / tiles.length * 0.92, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.06;
+  const GAP = (W - W * 0.22 - TW * tiles.length) / (tiles.length - 1);
   const picks = tiles.map(([jp, en, meta], j) => {
     const root = new THREE.Group();
-    root.position.set(-(W - 66) / 2 + TW / 2 + j * (TW + GAP), HH - 54 - TH / 2, 42);
+    root.position.set(-(W - W * 0.22) / 2 + TW / 2 + j * (TW + GAP), HH - HH * 0.18 - TH / 2, W * 0.07);
     grp.add(root);
-    const cord = new THREE.Mesh(new THREE.BoxGeometry(5, 46, 5),
+    const cord = new THREE.Mesh(new THREE.BoxGeometry(TW * 0.05, TH * 0.3, TW * 0.05),
       new THREE.MeshToonMaterial({ color: 0x3d3128, gradientMap: RAMP }));
-    cord.position.y = TH / 2 + 23;
+    cord.position.y = TH / 2 + TH * 0.15;
     root.add(cord);
     const body = new THREE.Mesh(emaGeo(TW, TH, GAB, TTH), new THREE.MeshToonMaterial({
       color: 0xd6c39c, emissive: 0x4d4232, gradientMap: RAMP, flatShading: true,
@@ -2695,75 +2699,161 @@ function pickWorldTile(sec, jp) {
   if (busy || state !== 'sub') return;
   if (L3DATA[sec] && L3DATA[sec][jp]) enterL3(sec, jp);
 }
+/* ================= REVIEW: 神社 — the shrine precinct =================
+   A FULL AREA, AND DELIBERATELY OUT OF THE MENU'S SIGHT. At bearing 26° it sat inside the home
+   camera's 31° half-cone and cluttered the one composition that works. Everything here is at
+   105°, well behind the shoulder — you only ever see it by going there.
 
-/* ---- REVIEW's shrine: the approach ----
-   Laid out along the line you arrive on, so it reads as a place you walk INTO rather than a
-   group of objects arranged for a photograph:
-
-       the ema wall, forward and to the left, angled in toward the gate's centre
-       the gate
-       a smaller gate beyond it
-       and the tunnel running away behind that
-
-   Everything is positioned in APPROACH coordinates — `fwd` down the axis, `side` across it —
-   because "in front of and to the left of the gate" is a statement about the approach, not
-   about world x and z, and trying to say it in world terms is what had the wall and the gate
-   growing through one another. */
+   Sizes are stated as ratios of the gate on purpose. The gate is a building; the ema wall is a
+   piece of furniture standing in front of it. Left as absolute numbers the wall crept upward
+   every time the tablets needed to be more readable, until it was 620 wide against a 590-wide
+   gate — the same size as the landmark, which is the one thing it must never be. */
 {
-  const base = destPlace(26, 6100, 0);
+  const GATE_H = 470;
+  const WALL_W = GATE_H * 0.5;      /* 235 — two-fifths of the gate's width, a third of its height */
+  const WALL_H = GATE_H * 0.32;
+  const base = destPlace(105, 5200, 0);
   const fwd = new THREE.Vector3().copy(base).sub(HOME_EYE).setY(0).normalize();
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
-  const at3 = (f, sd) => {
+  /* approach coordinates: f down the axis, sd across it. Saying "forward and to the left of the
+     gate" in world x and z means something different at every bearing, which is what had the
+     wall and the gate growing through one another. */
+  const at3 = (f, sd, lift = 0) => {
     const v = base.clone().addScaledVector(fwd, f).addScaledVector(side, sd);
-    v.y = groundAt(v.x, v.z);
+    v.y = groundAt(v.x, v.z) + lift;
     return v;
   };
-  const H = 470;
+  const facing = (o, f, sd) => {
+    const t = at3(f, sd);
+    o.lookAt(t.x, o.position.y, t.z);
+  };
 
-  const gate = new THREE.Mesh(toriiGeo(H), new THREE.MeshToonMaterial({
-    vertexColors: true, gradientMap: RAMP, flatShading: true,
-  }));
+  /* the paving, so the approach is a made thing rather than a line of objects on grass */
+  {
+    const pv = [];
+    for (let k = -1500; k < 3400; k += 260) {
+      const a = at3(k, 0), b = at3(k + 260, 0);
+      const g = new THREE.BoxGeometry(360, 26, a.distanceTo(b) + 12);
+      g.translate(0, 0, 0);
+      const m = new THREE.Mesh(g, null);
+      m.position.copy(a).lerp(b, 0.5);
+      m.position.y = (a.y + b.y) / 2 + 4;
+      m.lookAt(b.x, m.position.y, b.z);
+      m.updateMatrix();
+      const gg = g.clone().applyMatrix4(m.matrix);
+      pv.push({ geo: gg, color: k % 520 === 0 ? 0x7b756a : 0x736d63 });
+    }
+    const paving = new THREE.Mesh(mergeParts(pv), new THREE.MeshToonMaterial({
+      vertexColors: true, gradientMap: RAMP, flatShading: true,
+    }));
+    paving.position.set(0, 0, 0);
+    backScene.add(paving);
+  }
+
+  const gateMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
+  const gate = new THREE.Mesh(toriiGeo(GATE_H), gateMat);
   gate.position.copy(at3(0, 0));
-  gate.lookAt(gate.position.x - fwd.x, gate.position.y, gate.position.z - fwd.z);
+  facing(gate, -1, 0);
   backScene.add(gate);
   addOutline(gate, 0.0028);
-  DEST_SPECS[1].focus = gate.position.clone().setY(gate.position.y + H * 0.5);
+  /* the look target sits low on purpose: dropping it pitches the camera down, which lifts the
+     wall off the bottom edge and leaves the section title room at the top */
+  DEST_SPECS[1].focus = at3(-430, -60, GATE_H * 0.30);
 
-  /* the second gate and then the tunnel. Each is smaller than the last and closer to it, so the
-     approach foreshortens the way a real one does and the far end reads as distance rather than
-     as a row of identical objects. */
+  /* the tunnel: each gate smaller than the last AND closer to it, so the far end reads as
+     distance rather than as a row of identical objects */
   let f = 640, sc = 0.80;
-  for (let i = 0; i < 9; i++) {
-    const g2 = new THREE.Mesh(toriiGeo(H * sc), gate.material);
-    g2.position.copy(at3(f, 0));
-    g2.rotation.copy(gate.rotation);
-    backScene.add(g2);
-    if (i < 3) addOutline(g2, 0.0028);
-    f += 300 * sc;
-    sc *= 0.93;
+  for (let i = 0; i < 11; i++) {
+    const g = new THREE.Mesh(toriiGeo(GATE_H * sc), gateMat);
+    g.position.copy(at3(f, 0));
+    g.rotation.copy(gate.rotation);
+    backScene.add(g);
+    if (i < 3) addOutline(g, 0.0028);
+    f += 290 * sc;
+    sc *= 0.94;
   }
 
-  /* the wall: forward of the gate, to its left, turned IN toward the middle of it. Square-on to
-     the camera it reads as a billboard set up for your benefit; angled in, it belongs to the
-     approach's own geometry. */
-  const wallGrp = buildEmaWall('REVIEW', at3(-430, -235), HOME_EYE);
-  wallGrp.rotateY(-0.30);
+  /* the hall at the end of it */
+  const hall = new THREE.Mesh(shrineHallGeo(620, 420, 520), new THREE.MeshToonMaterial({
+    vertexColors: true, gradientMap: RAMP, flatShading: true,
+  }));
+  hall.position.copy(at3(f + 620, 0));
+  facing(hall, -1, 0);
+  backScene.add(hall);
+  addOutline(hall, 0.0026);
 
-  /* A CORRIDOR, NOT A CIRCLE. One blocker at the gate cleared a 678-unit radius around a
-     4,000-unit approach, so the wood grew straight through the tunnel and stood between the
-     camera and the gate. The clearing has to be the shape of the thing it is clearing: a line
-     of blockers from behind the camera's standing point to past the last gate. */
-  for (let k = -1800; k <= 3000; k += 340) {
+  /* lanterns flanking the way in */
+  const lanternMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
+  const lg = lanternGeo(190);
+  /* the -820 pair moved to -1220: at -820 the left one stood 10 units in front of the wall
+     and directly over its first tablet. Furniture flanking a path still has to miss the thing
+     the path leads you to read. */
+  [[-1220, 250], [-1220, -250], [-180, 250], [-180, -250], [420, 250], [420, -250]]
+    .forEach(([lf, ls], i) => {
+      const m = new THREE.Mesh(lg, lanternMat);
+      m.position.copy(at3(lf, ls));
+      m.rotation.y = hash01(i, 11) * 6.28;
+      backScene.add(m);
+      if (i < 4) addOutline(m, 0.0024);
+    });
+
+  /* AND THE WALL. Small, and standing much nearer the camera than the gate does — that is the
+     whole trick: perspective gives the tablets the frame they need while the gate stays the
+     larger structure in the world. At 235 wide and 530 from the eye they read at 108px; the
+     gate, 590 wide but 1,430 away, still towers over them.
+
+     It is aimed at the camera's actual standing point, not at HOME_EYE. The eye is derived from
+     the focus, so it has to be computed here rather than guessed — pointing the wall at the
+     wrong place is what had it presenting its back. */
+  const eye = standOff(DEST_SPECS[1].focus, 1000);
+  const wallGrp = buildEmaWall('REVIEW', at3(-830, -180), eye, WALL_W, WALL_H);
+  /* and then turned a few degrees further in, so it belongs to the approach's geometry rather
+     than being a board set square to you */
+  wallGrp.rotateY(-0.26);
+
+  /* a clearing the shape of the thing it clears — a line along the axis, and a second down the
+     wall's side, because the corridor is measured from the axis while the wall stands off it */
+  for (let k = -1700; k <= 4400; k += 320) {
     const q = at3(k, 0);
-    blockAdd(q.x, q.z, 820, 520);
+    blockAdd(q.x, q.z, 760, 520);
   }
-  /* and a second line down the wall's side. The corridor is measured from the APPROACH axis,
-     but the wall stands 235 off it and reaches another 350 beyond that — so its far edge sat
-     585 out, outside the clearing, and a trunk grew in front of the first tablet. */
-  for (let k = -1100; k <= 300; k += 250) {
-    const q = at3(k, -470);
-    blockAdd(q.x, q.z, 560, 520);
+  for (let k = -900; k <= -100; k += 220) {
+    const q = at3(k, -420);
+    blockAdd(q.x, q.z, 460, 520);
   }
+}
+
+/* 灯籠 — a stone lantern. Small, repeated, and the thing that turns a path into an approach. */
+function lanternGeo(H) {
+  const parts = [];
+  const S = 0x77736a, D = 0x625f57;
+  const add = (g, c) => parts.push({ geo: g, color: c });
+  let g = new THREE.CylinderGeometry(H * 0.17, H * 0.21, H * 0.1, 8); g.translate(0, H * 0.05, 0); add(g, D);
+  g = new THREE.CylinderGeometry(H * 0.075, H * 0.09, H * 0.42, 8); g.translate(0, H * 0.31, 0); add(g, S);
+  g = new THREE.CylinderGeometry(H * 0.17, H * 0.14, H * 0.07, 8); g.translate(0, H * 0.55, 0); add(g, D);
+  g = new THREE.CylinderGeometry(H * 0.15, H * 0.15, H * 0.19, 6); g.translate(0, H * 0.68, 0); add(g, 0xe8d9b4);
+  g = new THREE.CylinderGeometry(H * 0.02, H * 0.26, H * 0.16, 6); g.translate(0, H * 0.85, 0); add(g, D);
+  g = new THREE.SphereGeometry(H * 0.05, 6, 4); g.translate(0, H * 0.95, 0); add(g, S);
+  return mergeParts(parts);
+}
+/* 本殿 — the hall the approach is an approach TO. Without something at the far end the tunnel
+   is a corridor to nowhere, which is what makes an area feel like a set rather than a place. */
+function shrineHallGeo(W, D, H) {
+  const parts = [];
+  const add = (g, c) => parts.push({ geo: g, color: c });
+  let g = new THREE.BoxGeometry(W * 1.15, H * 0.12, D * 1.15); g.translate(0, H * 0.06, 0); add(g, 0x6c6459);
+  g = new THREE.BoxGeometry(W, H * 0.52, D); g.translate(0, H * 0.38, 0); add(g, 0xb2a184);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    g = new THREE.CylinderGeometry(W * 0.035, W * 0.04, H * 0.55, 7);
+    g.translate(sx * W * 0.46, H * 0.39, sz * D * 0.46); add(g, 0x8a3626);
+  }
+  g = new THREE.BoxGeometry(W * 1.3, H * 0.05, D * 1.3); g.translate(0, H * 0.66, 0); add(g, 0x4a3d2f);
+  for (const sx of [-1, 1]) {
+    g = new THREE.BoxGeometry(W * 0.78, H * 0.06, D * 1.5);
+    g.rotateZ(-sx * 0.46); g.translate(sx * W * 0.34, H * 0.79, 0); add(g, 0x3b332a);
+  }
+  g = new THREE.BoxGeometry(W * 0.06, H * 0.07, D * 1.5); g.translate(0, H * 0.96, 0); add(g, 0x332c25);
+  return mergeParts(parts);
 }
 
 /* ---- the woods ----
@@ -3985,7 +4075,9 @@ const L2_WORLD = {
     cls: 'w-slash',
     tpl: (jp, en, meta, j) => `<span class="w-no">${NO[j]}</span><span class="w-jp">${jp}</span><span class="w-en">${en}</span><span class="w-meta">${bigNum(meta)}</span>`,
     at: [[-120, 230, 60, 0.06, 1.1], [-60, 40, -180, 0.03, 0.95], [10, -150, -420, -0.02, 0.82], [80, -330, -650, -0.05, 0.7]],
-    sign: [-470, 400, -200, 0.07, 1], back: [-470, -330, 210, 0.08, 1],
+    /* re-placed for the shrine's framing: authored against the old head-on composition the
+       title cropped off the top of the frame and the back button off the bottom */
+    sign: [-330, 235, -150, 0.07, 1], back: [-380, -215, 200, 0.08, 1],
   },
   READING: { /* cloth-bound spines shelved through the bamboo — four different books, each
                 its own height and leaning its own way, feet on a common line */

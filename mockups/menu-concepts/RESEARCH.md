@@ -1085,6 +1085,40 @@ centre; the gate; a smaller gate beyond; then the tunnel running away. Square-on
 the wall read as a billboard set up for your benefit — angled in, it belongs to the approach's
 own geometry.
 
+## v33 — REVIEW becomes a precinct, off-screen
+
+Two instructions I had been failing to follow, and one of them repeatedly.
+
+**The area is off-screen.** At bearing 26° it sat inside the home camera's 31° half-cone and
+cluttered the one composition in this project that works. Everything is at 105° now, behind the
+shoulder — you only ever see the shrine by going to it. A single torii stays out in the water as
+scenery, because that is the picture the menu wants; it is not the destination.
+
+**The wall is a fraction of the gate.** It had been drifting upward every time the tablets
+needed to be more readable until it was 620 wide against a 590-wide gate: the same size as the
+landmark, which is the one thing furniture must never be. `buildEmaWall` takes W and HH as
+ARGUMENTS now and the caller states them as ratios of the gate — half its height, a third of its
+width — so the number cannot creep. Everything inside scales off those two values.
+
+The way to keep the tablets readable at that size is not to grow the wall but to **stand the
+camera close to it and far from the gate**: 530 units to the wall, 1,430 to the gate. The
+tablets read at 108px, and the gate still towers over them, because perspective is doing the
+work instead of the modelling.
+
+It is also a full area rather than three props: a paved approach, stone lanterns flanking it, the
+gate, a tunnel of eleven gates each smaller than the last AND closer to it, and a hall at the end
+of them. Without something at the far end the tunnel is a corridor to nowhere, which is what
+makes a place read as a set.
+
+Two things that only showed up once it was built:
+
+- **Furniture flanking a path still has to miss what the path leads you to read.** The lantern
+  pair at −820 stood ten units in front of the wall and directly over its first tablet.
+- **Chrome authored for one framing does not survive another.** The section title and the back
+  button are CSS3D planes offset from the destination, and the offsets were written against the
+  old head-on composition — the title cropped off the top of the frame and the button off the
+  bottom.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1230,6 +1264,12 @@ own geometry.
 - **Place composite scenes in local approach coordinates.** Forward and sideways relative to how
   the camera arrives, never world axes — otherwise "to the left of" silently means something
   different for every bearing, and objects grow through each other.
+
+- **Pass sizes in, don't hard-code them.** A constant inside a builder drifts every time a
+  downstream requirement pushes on it, and nothing ever pushes back. Stating a ratio at the call
+  site makes the relationship the thing being maintained.
+- **Solve readability with camera distance before reaching for scale.** Standing near the small
+  thing and far from the big one keeps both the right size in the world.
 
 ## Sources
 
