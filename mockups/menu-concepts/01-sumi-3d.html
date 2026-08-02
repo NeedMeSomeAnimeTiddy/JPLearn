@@ -3725,22 +3725,30 @@ function pickWorldTile(sec, jp) {
 
   /* ---- 狛犬 — the guardians, on the court in front of the pavilion ----
      STATION CHOSEN BY PROBE, NOT BY EYE. `NAV.probe` projects a whole grid of (f, sd) in one page
-     load: at f -640, sd 330 the foot lands at 1653,933 in a 1920x1080 frame, which is BELOW the
-     pavilion's base at 843 and therefore in front of it, and one world unit is worth 2.23 pixels
-     there. That fixes the size as well as the place — 150 units comes to 335 pixels, a bit over
-     half the pavilion's height, which is about what a guardian is next to a roof.
+     load: at f -710, sd 320 the foot lands well below the pavilion's base at 843 in a 1920x1080
+     frame and therefore in front of it, and one world unit is worth about 2.4 pixels there. That
+     fixes the size as well as the place — 150 units comes to some 360 pixels, a bit over half the
+     pavilion's height, which is about what a guardian is next to a roof.
 
      The pair sits at the near edge of the court because that is where a pair belongs: they mark
      the point where the approach becomes the precinct, and the camera happens to stand just short
-     of it. Facing back down the way in and turned slightly toward each other. */
+     of it.
+
+     TURNED WELL IN, NOT JUST OFF THE AXIS. Aiming them at (-1800, sd*0.42) pointed them almost
+     straight back down the approach — nine degrees off, which from a camera standing on that same
+     axis is indistinguishable from square-on, and a guardian seen square-on is a lump. Aiming at
+     (-1500, -sd*0.15) crosses the centreline, so each one is turned about twenty-six degrees
+     toward the other: the head comes round into three-quarter view, the chest catches the light
+     down one side, and the pair reads as two animals looking at each other across the way in
+     rather than as two objects that happen to be there. */
   {
-    [[330, true], [-330, false]].forEach(([sd, open]) => {
+    [[320, true], [-320, false]].forEach(([sd, open]) => {
       const m = new THREE.Mesh(komainuGeo(150, open), new THREE.MeshToonMaterial({
         vertexColors: true, gradientMap: RAMP, flatShading: true,
       }));
-      m.position.copy(at3(-640, sd));
+      m.position.copy(at3(-710, sd));
       m.position.y = CY_TOP;
-      facing(m, -1800, sd * 0.42);
+      facing(m, -1500, -sd * 0.15);
       backScene.add(m);
       addOutline(m, 3.2);
       if (sd > 0) MARKS.komainu = m;
@@ -3951,8 +3959,8 @@ function pickWorldTile(sec, jp) {
     PLANTED.push([-690, -215, 155, 155]);   /* the ema wall */
     PLANTED.push([-430, 312, 150, 150]);    /* the water pavilion */
     PLANTED.push([120, 546, 220, 290]);     /* the sacred tree, canopy and all */
-    PLANTED.push([-640, 330, 95, 95]);      /* the guardians */
-    PLANTED.push([-640, -330, 95, 95]);
+    PLANTED.push([-710, 320, 95, 95]);      /* the guardians */
+    PLANTED.push([-710, -320, 95, 95]);
     PLANTED.push([-2100, 0, 340, 340]);     /* the outer gate */
     [[-1240, 402], [-1240, -402], [-260, 402], [-260, -402], [420, 250], [420, -250]]
       .forEach(([lf, ls]) => PLANTED.push([lf, ls, 78, 78]));
@@ -4083,8 +4091,17 @@ function shinbokuGeo(H) {
     add(b, BARK2);
   });
   /* five canopy masses, none of them centred on the trunk */
-  [[0, 0.80, 0, 0.250, 0x4c6a30], [-0.20, 0.70, 0.08, 0.190, 0x415c2a], [0.22, 0.72, -0.07, 0.180, 0x577535],
-    [0.03, 0.94, -0.04, 0.150, 0x466428], [-0.10, 0.86, -0.13, 0.130, 0x50702f]]
+  /* THE CANOPY IS THE REASON IT COULD NOT BE SEEN, AND IT IS NOT A PLACEMENT PROBLEM.
+     Its first five colours were 0x4c6a30, 0x415c2a, 0x577535, 0x466428, 0x50702f — which are, to
+     within a few points each, the four colours of the ordinary broadleaves in the wood behind it.
+     A tree the same green as a wall of trees is invisible however large it is and wherever it
+     stands, and the geometry proves there is nowhere else to put it: the pavilion occupies
+     x 1205..1801 of a 1920 frame, and a crown far enough right to clear it and still fit inside
+     the frame edge works out at under a hundred pixels across. Colour is the only lever left, and
+     it is the right one anyway — an old tree kept when the wood round it was cleared IS a
+     different tree. Yellow-gold catching the last of the light, which also answers the placard. */
+  [[0, 0.80, 0, 0.250, 0x9aa347], [-0.20, 0.70, 0.08, 0.190, 0x8b9440], [0.22, 0.72, -0.07, 0.180, 0xa8ae53],
+    [0.03, 0.94, -0.04, 0.150, 0x7f8a3a], [-0.10, 0.86, -0.13, 0.130, 0x969e46]]
     .forEach(([x, y, z, r, c]) => {
       const b = new THREE.IcosahedronGeometry(H * r, 1);
       b.scale(1.14, 0.88, 1.05);
