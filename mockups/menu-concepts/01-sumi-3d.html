@@ -2808,6 +2808,8 @@ function worldPickEl(label, onPick) {
   return b;
 }
 
+/* things in the world that answer a click without being a menu item at all */
+const AMBIENT = [];
 const WORLD_L2 = {};
 /* a section whose level three is a walk registers it here: the placards, how to letter them, and
    where the camera stands to read each one */
@@ -3336,12 +3338,18 @@ function pickWorldTile(sec, jp) {
          a plain brown rectangle and looks exactly like a texture that failed to load. */
       root.rotation.y = gate.rotation.y + (k % 2 ? 0.42 : -0.42);
       backScene.add(root);
-      /* the board turns, the cords do not: a nested group with its origin at the board's own
-         centre is the difference between a sign flipping over and a sign being swung */
+      /* THE HINGE IS THE TOP EDGE, not the board's middle. `flip` sits up on the cord line and
+         `hold` puts the board back below it, so at zero the geometry is exactly where it was and
+         any rotation about x is the board swinging on its hinge — which is the only motion a
+         board hung from a rail can actually make. */
       const flip = new THREE.Group();
+      flip.position.y = SH / 2;
       root.add(flip);
+      const hold = new THREE.Group();
+      hold.position.y = -SH / 2;
+      flip.add(hold);
       const body = new THREE.Mesh(board, woodMat);
-      flip.add(body);
+      hold.add(body);
       /* the cords it hangs by */
       [-1, 1].forEach((sx) => {
         const c2 = new THREE.Mesh(new THREE.BoxGeometry(5, 40, 5),
@@ -3351,27 +3359,38 @@ function pickWorldTile(sec, jp) {
       });
       const o = new THREE.Mesh(outlineGeom(board), outlineMaterial(0.0024));
       o.frustumCulled = false;
-      flip.add(o);
+      hold.add(o);
       /* lettered NOW, with the whole collection, so the tunnel is never a row of blank boards.
          A queue only changes the numbers on it. */
       const canvas = signCanvas();
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = backRenderer.capabilities.getMaxAnisotropy();
+      /* THE FLICKER WAS Z-FIGHTING, NOT THE SHADER REBUILD. The face sat four tenths of a unit
+         proud of a board seen from between 800 and 4,000 away, in a depth buffer stretched from 1
+         to 60,000 — far below what it can resolve, so the two surfaces traded places from frame
+         to frame. Two units of clearance and a polygon offset settle it outright.
+
+         And it is OPAQUE now. `transparent: true` was there only so the dimming could be done
+         with opacity, and it bought a per-frame depth sort and a second render pass for a surface
+         that has no transparency in it at all. The dimming moves to the emissive, which is what
+         is actually lighting these things in the dark. */
       const face = new THREE.Mesh(new THREE.PlaneGeometry(SW, SH), new THREE.MeshToonMaterial({
-        map: tex, emissiveMap: tex, emissive: new THREE.Color(0xe8dfc8),
-        gradientMap: RAMP, transparent: true,
+        map: tex, emissiveMap: tex, emissive: new THREE.Color(0x6a6459),
+        gradientMap: RAMP,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
       }));
-      face.position.z = STH / 2 + 0.4;
-      flip.add(face);
-      face.material.opacity = 0.42;
+      face.position.z = STH / 2 + 2;
+      hold.add(face);
+      /* raised, and stopped there. Nothing is readable until it is let down. */
+      flip.rotation.x = -Math.PI / 2;
       /* the sign turns to meet you when you stop beside it, and sits back when you move on */
       /* the placard is the control. Picking one from across the corridor is how you navigate
          with the screen rather than with the keyboard, so it carries a transparent twin for
          focus and Enter exactly as the ema tablets do. */
       const el = worldPickEl('', () => walkGo(k));
       el.classList.add('walk-pick');
-      L3_SIGNS.push({ root, flip, face, canvas, tex, el, idx: k, f: f2, sd,
+      L3_SIGNS.push({ root, flip, hold, face, canvas, tex, el, idx: k, f: f2, sd,
         baseRy: root.rotation.y, turn: (k % 2 ? -0.30 : 0.30) });
     }
     WORLD_L3.REVIEW = {
@@ -3394,24 +3413,41 @@ function pickWorldTile(sec, jp) {
          the new face is simply what is there when it comes back. Staggered down the corridor,
          because a departure board turning over in sequence is the reference, and because six of
          them going at once is a flicker rather than an event. */
+      /* THEY ARE LET DOWN, NOT SPUN. A board hung from a rail cannot turn a full circle, and
+         watching six of them do it was the thing that read as a graphical fault rather than as a
+         gesture. Raised, they sit at a quarter turn with their backs to the corridor — nothing
+         readable, so the lettering happens up there unseen. Then each is let down onto its cords
+         in sequence, and settles. It is the motion a hinged sign actually makes, and the swap it
+         hides is now hidden by being ABOVE you rather than by being fast. */
       letter(tileJp, turn = true) {
         this.rows = Math.min(L3_SLOTS, L3_REVIEW.decks.length);
         L3_SIGNS.forEach((s2, k) => {
           if (k >= this.rows) return;
-          if (!turn) { this.write(k, tileJp); return; }
+          this.write(k, tileJp);
+          if (!turn) { s2.flip.rotation.x = -Math.PI / 2; return; }
           gsap.killTweensOf(s2.flip.rotation);
-          s2.flip.rotation.x = 0;
-          let swapped = false;
+          s2.flip.rotation.x = -Math.PI / 2;
           gsap.to(s2.flip.rotation, {
-            x: Math.PI * 2, duration: 0.72, delay: 0.06 + k * 0.09, ease: 'power2.inOut',
-            overwrite: true,
-            onUpdate() {
-              /* swap while the back of the board is toward the camera */
-              if (!swapped && this.progress() > 0.45) { swapped = true; WORLD_L3.REVIEW.write(k, tileJp); }
-            },
-            onComplete: () => { s2.flip.rotation.x = 0; },
+            x: 0, duration: 1.05, delay: 0.12 + k * 0.13,
+            ease: 'back.out(1.5)', overwrite: true,
           });
         });
+      },
+      /* and raised again on the way out, so the corridor is the same corridor you found */
+      raise() {
+        L3_SIGNS.forEach((s2, k) => {
+          gsap.to(s2.flip.rotation, {
+            x: -Math.PI / 2, duration: 0.6, delay: k * 0.05, ease: 'power2.in', overwrite: true,
+          });
+        });
+      },
+      /* a sign you have just chosen sways on its cords and settles — the whole of the feedback,
+         because a hanging thing that has been touched is the only thing it could do */
+      sway(k) {
+        const s2 = L3_SIGNS[k];
+        if (!s2) return;
+        gsap.fromTo(s2.flip.rotation, { x: 0.2 },
+          { x: 0, duration: 1.5, ease: 'elastic.out(1, 0.26)', overwrite: true });
       },
       /* stand short of the placard and look past it down the corridor, so the one you are reading
          is beside you and the rest of the walk is still ahead */
@@ -3481,6 +3517,73 @@ function pickWorldTile(sec, jp) {
     facing(ch, -430, 0);
     backScene.add(ch);
     addOutline(ch, 0.0024);
+  }
+
+  /* ---- 手水 — the one thing here you can touch ----
+     A place you can only look at is a diorama. The basin is the obvious candidate: it is the one
+     object in the courtyard whose whole purpose is to be used, it is on the side away from the
+     interface so playing with it cannot be mistaken for choosing something, and water is the only
+     material in the scene that is supposed to move.
+
+     Everything is allocated once and rests at zero scale — the rule that nothing in this world
+     appears or vanishes applies to effects too; what an effect may do is start and finish. */
+  {
+    const at2 = at3(-430, 312);
+    const cx = at2.x, cz = at2.z, cy = CY_TOP + 238 * 0.235;
+    const ripples = [0, 1, 2].map(() => {
+      const m = new THREE.Mesh(new THREE.RingGeometry(1, 1.16, 40), new THREE.MeshBasicMaterial({
+        color: 0xd8ecf0, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide,
+      }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(cx, cy + 1.5, cz);
+      m.scale.setScalar(0.01);
+      backScene.add(m);
+      NO_REFLECT.push(m);
+      return m;
+    });
+    const dropGeo = new THREE.IcosahedronGeometry(3.4, 0);
+    const dropMat = new THREE.MeshToonMaterial({ color: 0xbfe0e6, emissive: 0x5d8b93, gradientMap: RAMP, flatShading: true });
+    const drops = Array.from({ length: 14 }, () => {
+      const m = new THREE.Mesh(dropGeo, dropMat);
+      m.position.set(cx, cy, cz);
+      m.scale.setScalar(0);
+      backScene.add(m);
+      NO_REFLECT.push(m);
+      return m;
+    });
+    const hitMat2 = new THREE.MeshBasicMaterial();
+    hitMat2.visible = false;
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(120, 86, 116), hitMat2);
+    hit.position.set(cx, cy - 18, cz);
+    backScene.add(hit);
+    AMBIENT.push({
+      hit,
+      /* three rings leaving at a stagger, and a scatter of drops thrown up and pulled back —
+         a stone into water, which is what a ladle sounds like when you cannot hear it */
+      go() {
+        ripples.forEach((m, i) => {
+          gsap.killTweensOf([m.scale, m.material]);
+          m.scale.setScalar(0.01);
+          gsap.to(m.scale, { x: 46 + i * 16, y: 46 + i * 16, z: 46 + i * 16,
+            duration: 1.5 + i * 0.25, delay: i * 0.16, ease: 'power2.out', overwrite: true });
+          gsap.fromTo(m.material, { opacity: 0.62 - i * 0.13 },
+            { opacity: 0, duration: 1.5 + i * 0.25, delay: i * 0.16, ease: 'power1.in', overwrite: true });
+        });
+        drops.forEach((m, i) => {
+          const a = hash01(i, 907) * 6.283, r = 12 + hash01(i, 911) * 26;
+          const up = 46 + hash01(i, 919) * 54, t = 0.62 + hash01(i, 929) * 0.34;
+          gsap.killTweensOf([m.position, m.scale]);
+          m.position.set(cx, cy, cz);
+          m.scale.setScalar(0.55 + hash01(i, 937) * 0.7);
+          gsap.to(m.position, { x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r,
+            duration: t, ease: 'power1.out', overwrite: true });
+          gsap.timeline({ overwrite: true })
+            .to(m.position, { y: cy + up, duration: t * 0.42, ease: 'power2.out' })
+            .to(m.position, { y: cy - 4, duration: t * 0.58, ease: 'power2.in' })
+            .to(m.scale, { x: 0, y: 0, z: 0, duration: 0.14 }, '>-0.1');
+        });
+      },
+    });
   }
 
   /* ---- planting ----
@@ -4967,9 +5070,11 @@ const L2_WORLD = {
     cls: 'w-slash',
     tpl: (jp, en, meta, j) => `<span class="w-no">${NO[j]}</span><span class="w-jp">${jp}</span><span class="w-en">${en}</span><span class="w-meta">${bigNum(meta)}</span>`,
     at: [[-120, 230, 60, 0.06, 1.1], [-60, 40, -180, 0.03, 0.95], [10, -150, -420, -0.02, 0.82], [80, -330, -650, -0.05, 0.7]],
-    /* re-placed for the shrine's framing: authored against the old head-on composition the
-       title cropped off the top of the frame and the back button off the bottom */
-    sign: [-232, 176, -120, 0.07, 1],
+    /* UP INTO THE SKY, CLEAR OF THE ROOF. At 176 the word REVIEW sat exactly on the ema wall's
+       roofline — the one horizontal in that corner of the frame — so the two read as one tangled
+       shape. The courtyard camera looks up, which leaves a deep band of empty sky along the top
+       that nothing else wants; the title belongs in it. */
+    sign: [-286, 248, -120, 0.07, 1],
   },
   READING: { /* cloth-bound spines shelved through the bamboo — four different books, each
                 its own height and leaning its own way, feet on a common line */
@@ -5219,7 +5324,10 @@ function walkPlace(i) {
    from one sign to the next; this is meant to be walking. A sine is the gentlest standard ease
    there is — no sudden change of acceleration at either end — and 1.25s over 1,072 units is
    about a brisk walking pace at this scale. */
-function walkGo(i, dur = 1.25) {
+/* `sway` is off for the arrival, because the boards are still being let down at that moment and
+   the two tweens own the same hinge — a sway fired over the top of a drop cancels it and the
+   first placard simply appears already vertical. Its own overshoot is the sway it needs. */
+function walkGo(i, dur = 1.25, sway = true) {
   const w = WORLD_L3[walkSec];
   walkAt = Math.max(0, Math.min(i, w.rows - 1));
   const { eye, tgt } = walkPlace(walkAt);
@@ -5228,18 +5336,23 @@ function walkGo(i, dur = 1.25) {
     fov: 44, roll: 0, duration: dur, ease: 'sine.inOut', overwrite: true,
   });
   walkLight();
+  if (sway) w.sway(walkAt);
   walkHud.querySelector('.wh-at').textContent = `${walkAt + 1} / ${w.rows}`;
   walkHud.querySelectorAll('.wh-step').forEach((b) => {
     b.disabled = walkAt + (+b.dataset.d) < 0 || walkAt + (+b.dataset.d) >= w.rows;
   });
 }
 /* the placard you are beside is the one you are reading: it takes the ink, its neighbours fade */
+/* DIMMED BY THEIR OWN LIGHT, NOT BY OPACITY. In a tunnel the emissive is most of what you see of
+   a placard, so turning it down reads exactly as "further away, not the one you are reading" —
+   and it leaves the material opaque, which is worth a depth sort and a render pass per frame. */
+const _dim = [0x2c2a26, 0x8f8879, 0xe8dfc8];
 function walkLight() {
   const w = WORLD_L3[walkSec];
   w.signs.forEach((s, k) => {
     const near = Math.abs(k - walkAt);
-    gsap.to(s.face.material, { opacity: k >= w.rows ? 0 : (near === 0 ? 1 : near === 1 ? 0.72 : 0.42),
-      duration: 0.4, overwrite: true });
+    const c = new THREE.Color(_dim[Math.max(0, 2 - near)]);
+    gsap.to(s.face.material.emissive, { r: c.r, g: c.g, b: c.b, duration: 0.45, overwrite: true });
     gsap.to(s.root.rotation, { y: s.baseRy + (near === 0 ? s.turn : 0), duration: 0.5, ease: 'power2.out', overwrite: true });
   });
 }
@@ -5258,7 +5371,7 @@ function enterWalk(sectionEn, tileJp) {
   /* the section's own chrome steps aside — you are past it now */
   gsap.to(L2_PLANES[sectionEn].map((q) => q.el), { opacity: 0, duration: 0.3 });
   /* the way in is longer still: it is the whole length of the courtyard and the main gate */
-  walkGo(0, 2.1);
+  walkGo(0, 2.1, false);
   boldStreaks(1);
 }
 function exitWalk() {
@@ -5268,6 +5381,7 @@ function exitWalk() {
   subLevel = 2;
   document.body.classList.remove('at-walk');
   document.body.classList.add('world-l2');
+  WORLD_L3[sec].raise();
   gsap.to(L2_PLANES[sec].map((q) => q.el), { opacity: 1, duration: 0.4, delay: 0.35 });
   const d = destFor(ITEMS.findIndex((it) => it.en === sec));
   gsap.to(cam, {
@@ -5770,14 +5884,28 @@ function worldPickAt(cx, cy) {
   const hit = _pickRay.intersectObjects(worldL2Bodies(), false)[0];
   return hit ? worldL2.picks.find((q) => q.hit === hit.object) : null;
 }
+/* ---- the scenery that answers ----
+   Tested only after the tablets have said no, so a menu item can never be shadowed by a piece of
+   scenery standing in front of it. */
+function ambientAt(cx, cy) {
+  if (!AMBIENT.length) return null;
+  _pickNdc.set((cx / W()) * 2 - 1, -(cy / H()) * 2 + 1);
+  _pickRay.setFromCamera(_pickNdc, camera);
+  const h = _pickRay.intersectObjects(AMBIENT.map((a) => a.hit), false)[0];
+  return h ? AMBIENT.find((a) => a.hit === h.object) : null;
+}
 addEventListener('pointermove', (e) => {
-  if (!worldL2 || state !== 'sub' || busy) { setHot(null); return; }
-  setHot(worldPickAt(e.clientX, e.clientY));
+  if (!worldL2 || state !== 'sub' || busy || subLevel !== 2) { setHot(null); return; }
+  const q = worldPickAt(e.clientX, e.clientY);
+  setHot(q);
+  if (!q && ambientAt(e.clientX, e.clientY)) document.body.style.cursor = 'pointer';
 });
 addEventListener('click', (e) => {
-  if (!worldL2 || state !== 'sub' || busy) return;
+  if (!worldL2 || state !== 'sub' || busy || subLevel !== 2) return;
   const q = worldPickAt(e.clientX, e.clientY);
-  if (q) pickWorldTile(subEl.dataset.sec, q.jp);
+  if (q) { pickWorldTile(subEl.dataset.sec, q.jp); return; }
+  const a = ambientAt(e.clientX, e.clientY);
+  if (a) a.go();
 });
 /* the focus twins are placed by projecting each tablet, so they track it exactly however the
    camera drifts — a fixed screen rectangle would part company the moment anything breathes */

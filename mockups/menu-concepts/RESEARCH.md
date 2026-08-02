@@ -1467,6 +1467,41 @@ coat, and the second is the interesting one.
   turn and its stagger — `[6.26, 6.02, 5.26, 3.68, 1.68, 0.56]` is the wave rolling down the
   tunnel — where five screenshots at 160ms apart had shown nothing but zeros.
 
+## v44 — the flicker was z-fighting, and I had blamed the shader
+
+- **I fixed the wrong thing last time.** The placards still flashed after the material rebuild was
+  removed, because that was never the cause: the face sat **four tenths of a unit** proud of the
+  board it is printed on, seen from 800 to 4,000 away, in a depth buffer stretched from 1 to
+  60,000. That is far below what the buffer can resolve, so the two surfaces traded places from
+  frame to frame. Two units of clearance and a polygon offset settle it outright. **A hitch and a
+  flicker are different symptoms and I merged them into one diagnosis.**
+- **And the face did not need to be transparent at all.** `transparent: true` was there only so
+  the dimming could be done with opacity, and it bought a per-frame depth sort and a second
+  render pass for a surface with no transparency in it. The dimming moved to the emissive —
+  which in a tunnel is most of what you see of a placard anyway, so turning it down reads
+  precisely as "not the one you are reading".
+- **A board hung from a rail cannot turn a full circle.** The 360° spin was mechanically absurd
+  and that is why it read as a graphical fault rather than as a gesture. They rest at a quarter
+  turn with their backs to the corridor, get lettered up there where nothing is readable, and are
+  then let down onto their cords in sequence. The swap is hidden by being ABOVE you rather than
+  by being fast.
+- **The hinge is the top edge.** A nested group on the cord line with the board hung back below it
+  is the difference between a sign swinging and a sign being spun about its middle — same one
+  line of tween, entirely different object.
+- **Two tweens cannot share a hinge.** The arrival's sway fired over the top of the drop and
+  cancelled it, so the first placard simply appeared already vertical. Its own overshoot was
+  the sway it needed.
+- **A place you can only look at is a diorama.** The basin is the one object in the courtyard
+  whose whole purpose is to be used, it is on the side away from the interface so playing with it
+  cannot be mistaken for choosing something, and water is the only material in the scene that is
+  supposed to move. Rings and droplets are allocated once and rest at zero — the rule that
+  nothing appears or vanishes applies to effects too; what an effect may do is start and finish.
+  Ambient picking is tested only after the menu items have said no, so scenery can never shadow a
+  control.
+- **The title was tangled in a roofline, not badly placed.** REVIEW sat exactly on the ema wall's
+  roof — the one horizontal in that corner — so the two read as a single shape. The courtyard
+  camera looks up, which leaves a deep band of sky along the top that nothing else wants.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1691,6 +1726,18 @@ coat, and the second is the interesting one.
   is a window in which anything at all may be changed unobserved.
 - **Sample per frame, not per screenshot.** A headless renderer at two frames a second cannot
   photograph an animation, but it can be asked what it is doing on every `requestAnimationFrame`.
+
+- **A hitch and a flicker are different symptoms.** Fixing one and assuming the other went with it
+  cost a whole round. Decal surfaces flicker because of depth precision; a fraction of a unit of
+  clearance is nothing at four thousand units out.
+- **Only make a material transparent if something about it is transparent.** Using opacity as a
+  dimmer buys a depth sort and a render pass; on a lit surface, dim the light instead.
+- **Animate what the object could actually do.** A hinged board swings; it does not spin. Motion
+  that contradicts the mechanism reads as a bug however well it is tweened.
+- **Two tweens on one hinge is the same fault as two tweens on one property**, and it arrives
+  disguised as "the first one doesn't play".
+- **Give a place one thing that answers.** It is the cheapest possible difference between a set
+  and somewhere that exists.
 
 ## Sources
 
