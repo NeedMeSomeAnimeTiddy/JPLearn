@@ -3003,6 +3003,11 @@ const WORLD_TITLE = {};
    are registered so `NAV.rectOf` can project them instead: one round trip, and the answer is a
    number rather than an impression. */
 const MARKS = {};
+/* THE APPROACH'S OWN COORDINATES, PROJECTED. Everything in a precinct is placed in (f, sd) and
+   judged in screen pixels, and until now the only bridge between the two was: move it, rebuild,
+   look, guess again. Three placements went that way. A section registers its `at3` here and a
+   whole grid of candidates can be evaluated in one page load. */
+const PROBE = {};
 const WORLD_SWAY = [];
 /* THE RACK IS GONE. It was 974 units wide against a gate 781 wide and cedars 800 tall — a
    fifteen-metre timber structure standing in front of the landmark and out-massing it, which
@@ -3284,6 +3289,7 @@ function pickWorldTile(sec, jp) {
     const t = at3(f, sd);
     o.lookAt(t.x, o.position.y, t.z);
   };
+  PROBE.REVIEW = at3;
 
   /* ---- the paving, and the courtyard let into it ----
      A 360-wide strip is a path, and a path is not somewhere anything can stand: the ema wall had
@@ -3717,6 +3723,30 @@ function pickWorldTile(sec, jp) {
     MARKS.chozuya = ch;
   }
 
+  /* ---- 狛犬 — the guardians, on the court in front of the pavilion ----
+     STATION CHOSEN BY PROBE, NOT BY EYE. `NAV.probe` projects a whole grid of (f, sd) in one page
+     load: at f -640, sd 330 the foot lands at 1653,933 in a 1920x1080 frame, which is BELOW the
+     pavilion's base at 843 and therefore in front of it, and one world unit is worth 2.23 pixels
+     there. That fixes the size as well as the place — 150 units comes to 335 pixels, a bit over
+     half the pavilion's height, which is about what a guardian is next to a roof.
+
+     The pair sits at the near edge of the court because that is where a pair belongs: they mark
+     the point where the approach becomes the precinct, and the camera happens to stand just short
+     of it. Facing back down the way in and turned slightly toward each other. */
+  {
+    [[330, true], [-330, false]].forEach(([sd, open]) => {
+      const m = new THREE.Mesh(komainuGeo(150, open), new THREE.MeshToonMaterial({
+        vertexColors: true, gradientMap: RAMP, flatShading: true,
+      }));
+      m.position.copy(at3(-640, sd));
+      m.position.y = CY_TOP;
+      facing(m, -1800, sd * 0.42);
+      backScene.add(m);
+      addOutline(m, 3.2);
+      if (sd > 0) MARKS.komainu = m;
+    });
+  }
+
   /* OUTSIDE THE COURT, WHICH IS WHY IT IS NOT SET TO CY_TOP. `onCourt` only tests f — it knows
      nothing about how far across the court reaches — so out here the platform has run out and
      asking for its height would leave the tree standing on air. It takes the hillside, like the
@@ -3921,6 +3951,8 @@ function pickWorldTile(sec, jp) {
     PLANTED.push([-690, -215, 155, 155]);   /* the ema wall */
     PLANTED.push([-430, 312, 150, 150]);    /* the water pavilion */
     PLANTED.push([120, 546, 220, 290]);     /* the sacred tree, canopy and all */
+    PLANTED.push([-640, 330, 95, 95]);      /* the guardians */
+    PLANTED.push([-640, -330, 95, 95]);
     PLANTED.push([-2100, 0, 340, 340]);     /* the outer gate */
     [[-1240, 402], [-1240, -402], [-260, 402], [-260, -402], [420, 250], [420, -250]]
       .forEach(([lf, ls]) => PLANTED.push([lf, ls, 78, 78]));
@@ -4096,6 +4128,61 @@ function shinbokuGeo(H) {
   }
   g = new THREE.TorusGeometry(fenceR, H * 0.010, 4, 12);
   g.rotateX(Math.PI / 2); g.translate(0, H * 0.104, 0); add(g, 0x6d5c42);
+  return mergeParts(parts);
+}
+/* 狛犬 — the guardian pair, seated on plinths at the front of the court.
+   The right of the precinct kept reading as empty, and the two things put there to fix it both
+   failed the same way: the lanterns and then the sacred tree were both BEHIND the water pavilion,
+   which is a wide low building sitting across that whole side. Anything behind it is either
+   hidden or, in the tree's case, reduced to a green crown in a frame edged with green crowns.
+   What the side needs is something in FRONT of the pavilion, standing on the court where nothing
+   can occlude it, built rather than grown, and pale rather than green so it cannot be mistaken
+   for more treeline.
+
+   A komainu is also the only thing in this scene with a FACE. Everything else here is
+   architecture — beams, boards, roofs, a tunnel — and a creature reads differently at a glance
+   from any amount of joinery.
+
+   `open` is 阿 and 吽: the right-hand one's mouth is open, the left-hand one's is shut. It is a
+   detail nobody has to notice, and it is the reason there are two of them rather than one. */
+function komainuGeo(T, open) {
+  const parts = [];
+  const add = (g, c) => parts.push({ geo: g, color: c });
+  const STONE = 0x968f80, STONE2 = 0x878071, PLINTH = 0x6f6a5e, PLINTH2 = 0x625d53;
+  const PH = T * 0.30, S = T * 0.70;
+  /* the plinth first: two courses, the lower one proud, so it reads as set rather than dropped */
+  let g = new THREE.BoxGeometry(S * 0.80, PH * 0.30, S * 0.90); g.translate(0, PH * 0.15, 0); add(g, PLINTH2);
+  g = new THREE.BoxGeometry(S * 0.66, PH * 0.72, S * 0.76); g.translate(0, PH * 0.64, 0); add(g, PLINTH);
+  /* everything above is in statue units, lifted onto the plinth */
+  const at = (geo, x, y, z, c) => { geo.translate(S * x, PH + S * y, S * z); add(geo, c); };
+  const blob = (r, det = 1) => new THREE.IcosahedronGeometry(S * r, det);
+  /* haunches at the back, chest at the front — a seated animal is two masses, not one */
+  let b = blob(0.26); b.scale(1.00, 0.95, 1.15); at(b, 0, 0.28, -0.16, STONE);
+  b = blob(0.22); b.scale(1.02, 1.18, 0.92); at(b, 0, 0.44, 0.09, STONE);
+  /* front legs standing straight down, rear paws tucked */
+  for (const sx of [-1, 1]) {
+    at(new THREE.BoxGeometry(S * 0.095, S * 0.42, S * 0.11), sx * 0.135, 0.21, 0.20, STONE2);
+    at(new THREE.BoxGeometry(S * 0.115, S * 0.075, S * 0.18), sx * 0.135, 0.037, 0.255, STONE);
+    at(new THREE.BoxGeometry(S * 0.13, S * 0.09, S * 0.15), sx * 0.185, 0.045, -0.10, STONE2);
+  }
+  /* neck, head, muzzle */
+  at(new THREE.BoxGeometry(S * 0.17, S * 0.15, S * 0.15), 0, 0.60, 0.13, STONE2);
+  b = blob(0.16); b.scale(1.00, 0.94, 1.06); at(b, 0, 0.73, 0.17, STONE);
+  at(new THREE.BoxGeometry(S * 0.115, S * 0.095, S * 0.13), 0, 0.695, 0.29, STONE2);
+  if (open) at(new THREE.BoxGeometry(S * 0.075, S * 0.035, S * 0.05), 0, 0.672, 0.335, 0x3a352d);
+  for (const sx of [-1, 1]) {
+    at(new THREE.BoxGeometry(S * 0.05, S * 0.075, S * 0.045), sx * 0.105, 0.855, 0.13, STONE2);
+  }
+  /* the mane, four lumps round the skull — this is most of what says lion rather than dog */
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + 0.5;
+    b = blob(0.085, 0);
+    at(b, Math.cos(a) * 0.185, 0.72 + Math.sin(a) * 0.10, 0.04, i % 2 ? STONE : STONE2);
+  }
+  /* the tail, standing up behind like a flame */
+  [[0.52, -0.30, 0.105], [0.70, -0.345, 0.095], [0.86, -0.315, 0.075]].forEach(([y, z, r], i) => {
+    at(blob(r, 0), 0, y, z, i % 2 ? STONE2 : STONE);
+  });
   return mergeParts(parts);
 }
 /* 手水舎 — the water pavilion: a roof on four posts over a stone basin, open on every side. The
@@ -5335,6 +5422,20 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
      it does not show in a still frame, so count it. */
   /* the screen box of a registered landmark, and of the name-board */
   rectOf: (k) => screenRect(MARKS[k]),
+  /* where a point in a section's approach coordinates lands on screen, and how many pixels one
+     world unit is worth there — which is the other half of "how big should it be" */
+  probe: (key, f, sd, lift = 0) => {
+    const at = PROBE[key];
+    if (!at) return null;
+    const v = at(f, sd, lift);
+    const d = camera.position.distanceTo(v);
+    const q = v.clone().project(camera);
+    const up = at(f, sd, lift + 100).project(camera);
+    return {
+      x: Math.round((q.x * 0.5 + 0.5) * W()), y: Math.round((0.5 - q.y * 0.5) * H()),
+      dist: Math.round(d), pxPerUnit: +(((q.y - up.y) * 0.5 * H()) / 100).toFixed(3),
+    };
+  },
   marks: () => Object.keys(MARKS),
   outlineAudit: () => {
     const r = { meshes: 0, verts: 0, under: 0, worst: 1 };
