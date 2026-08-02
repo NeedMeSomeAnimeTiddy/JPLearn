@@ -959,6 +959,38 @@ against a vermillion gate they merge into it *and* draw straight over its posts 
 colour clash and the occlusion. World-geometry tablets in pale wood fix both at once, which is
 the next stage.
 
+## v29 — level two moves into the world: 絵馬 (stage C)
+
+REVIEW's four options are votive tablets on a rack standing in the water in front of the gate.
+They are meshes, so the gate can pass in front of them, they take the same light and mist as
+everything else, and they hang in the same reflection. The arrival that ended stage B made the
+case on its own: vermillion DOM panels against a vermillion torii merged into it *and* drew
+straight over its posts, because the CSS3D layer is architecturally in front of the world and
+always will be.
+
+**What DOM was giving away free, and what replaces it.** Hit-testing is a raycast against the
+tablet bodies. Hover moves the pick toward the camera rather than recolouring it — at this
+distance a lit tablet and an unlit one are hard to tell apart, but one that has stepped out of
+the rank is unmistakable. Focus, keyboard and screen-reader access come from a parallel layer of
+transparent buttons, positioned each frame by projecting each tablet, carrying the full label
+(`今日の分 — DUE TODAY, 24 cards`) and taking `pointer-events: none` so the mouse still goes to
+the raycast. Verified: four twins, correctly named, focus ring lands, cursor turns to a pointer
+over each tablet and clears off them.
+
+- **A section has its level two in the world or in front of it, never both.** Building the DOM
+  tiles and then hiding them leaves four invisible click targets floating in front of the scene,
+  so `buildWorldMenus` skips them entirely for a world section — but the section title and the
+  back button stay in the DOM, because they are chrome rather than options and they want to be
+  legible and clickable rather than to belong to the place.
+- **An unlit face reads as a sticker.** The first pass used `MeshBasicMaterial` with
+  `toneMapped: false`, which put the tablets at full brightness over a scene in shadow — exactly
+  the complaint that moved level two into the world to begin with. Lit, they belong; but a
+  four-step toon ramp at a grazing sun angle drops the whole rack into its darkest band, so the
+  faces carry an emissive floor. Writing has to stay readable in shade.
+- **Size a rack against the standing distance, not against the tablet.** At 196 wide with a
+  58 gap the rack came out 925 across at 980 away: posts off both edges, and it buried the gate
+  it is meant to stand in front of.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1082,6 +1114,11 @@ the next stage.
 - **Wait for a state change, not for a number of milliseconds.** Fixed waits in a headless
   harness are guesswork the moment the frame rate moves — and it moves whenever the scene does.
   Expose enough state to await the thing you actually mean.
+
+- **Moving UI into a 3D scene costs hit-testing, hover, focus and keyboard, not just markup.**
+  Budget for the parallel focus layer up front — transparent buttons with `pointer-events: none`,
+  positioned by projecting the object each frame, keep Tab and Enter working and cost almost
+  nothing. Retrofitting accessibility to a raycast-only picker is much harder.
 
 ## Sources
 
