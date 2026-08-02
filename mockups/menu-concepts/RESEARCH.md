@@ -789,6 +789,35 @@ vertex-coloured shading, objects take a toon ramp and an inverted-hull outline.
   almost nothing in the first thousand, because that band is a rounding error of the area — so
   the ground directly under the camera, a third of the frame, came out bare.
 
+## v24 — the scatter was never random
+
+**`(i * 9301 + seed * 49297) % 233280` is linear in `i`.** Consecutive instances step by exactly
+9301/233280 and wrap, so the values land on a regular lattice; using two of them as distance and
+side put every tree, every bush and every stone on a diagonal grid. Every complaint about the
+scatter looking "not like nature at all" was correct and none of it was fixable by tuning counts
+or sizes, because nothing about it was random in the first place. Replaced with a multiply-shift
+hash, salted differently per axis. Rotation gets its own salt too — reusing the size value for it
+meant every tree of a given height faced the same way, which the eye reads as order even when the
+positions do not.
+
+**Props were standing inside mountains** because everything is placed from the heightfield while
+the ranges, Fuji and the river are separate meshes sitting on top of it. Each now registers a
+footprint. The first attempt used a flat exclusion circle and deleted most of the wood: a
+1,900-unit-wide hill only 800 tall carved a 3,000-unit hole. A blocker is stored as a cone and
+the test asks for the *surface height* at that point, so a prop at the foot of a slope survives
+and only one near the axis is culled.
+
+That still was not enough, because the ranges had been placed at 5,200–8,900 — inside the band
+the trees scatter across. Seven overlapping footprints plus Fuji's claimed more of that band than
+existed. **A range is a backdrop; it belongs behind the thing it is a backdrop to.** Moved out to
+10,500–20,000 and the wood came back.
+
+**Measure with a percentile, not a maximum.** Tuning the type shade against the single brightest
+pixel in each item's box was chasing noise — the camera breathes, so `max` is dominated by
+whichever canopy highlight drifted into frame that run, and two consecutive runs disagreed by
+more than the change I was trying to measure. A 95th percentile is stable to ±0.02 and every item
+now sits at 4.2–10.7 against the cream.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -879,6 +908,15 @@ vertex-coloured shading, objects take a toon ramp and an inverted-hull outline.
 - A new top-level `function` in a 3,400-line file will collide sooner or later — `ridge` was
   already taken by an SVG helper 600 lines further down, and the only symptom is a bare
   `Identifier has already been declared` with the whole module dead.
+
+- **A pseudo-random generator that is linear in its index is not a generator, it is a lattice.**
+  `(i * A + seed * B) % M` steps by a constant; two of them used as x and y put everything on a
+  diagonal grid. Use a multiply-shift hash and salt each axis separately — and give rotation its
+  own salt, or objects of equal size all face the same way.
+- **Exclusion zones want a height test, not a containment test.** A footprint circle sized to a
+  mountain's base deletes forest for hundreds of units around a hill that is barely raised there.
+- **Tune against a percentile.** Any metric taken from a single extreme pixel of a live 3D scene
+  is noise; consecutive runs will disagree by more than the change being measured.
 
 ## Sources
 

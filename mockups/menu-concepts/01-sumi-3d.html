@@ -775,11 +775,15 @@
   #typeShade {
     position: fixed; inset: 0; z-index: 1; pointer-events: none;
     background:
-      radial-gradient(118% 88% at 6% 15%, rgba(10,14,22,0.66) 0%, rgba(10,14,22,0.36) 42%,
-        rgba(10,14,22,0) 76%),
-      linear-gradient(100deg, rgba(10,14,22,0.30) 0%, rgba(10,14,22,0.20) 30%,
-        rgba(10,14,22,0) 60%),
-      linear-gradient(0deg, rgba(8,11,18,0.28) 0%, rgba(8,11,18,0) 26%);
+      /* Centred on the middle of the stack, not its top. Anchored at 15% height the ellipse ran
+         out before READING and DRILLS, and once the rebuilt wood put sunlit canopy behind them
+         their worst-case contrast fell to 2.45. Narrow in x on purpose — 75% keeps it off
+         Fuji, which must not be dimmed to make type legible. */
+      radial-gradient(78% 128% at 12% 32%, rgba(10,14,22,0.68) 0%, rgba(10,14,22,0.48) 34%,
+        rgba(10,14,22,0.20) 62%, rgba(10,14,22,0) 86%),
+      linear-gradient(100deg, rgba(10,14,22,0.26) 0%, rgba(10,14,22,0.16) 30%,
+        rgba(10,14,22,0) 58%),
+      linear-gradient(0deg, rgba(8,11,18,0.26) 0%, rgba(8,11,18,0) 24%);
     opacity: 0; transition: opacity 0.5s ease;
   }
   body.at-menu #typeShade { opacity: 1; }
@@ -817,8 +821,14 @@
   .hud-chip.shu b { color: #ffd9a1; }
   .hud-chip .jp { font-family: var(--jp-go); font-weight: 700; letter-spacing: 0.1em; }
 
+  /* Bottom RIGHT, not bottom left. RECORDS is the lowest item in a stack that runs diagonally
+     down the frame, and at 1280×720 its box reached x 281–759 while the ticker sat at 77–399 —
+     so the 記録 subtitle landed on top of the panel. Nudging either one down only trades the
+     collision for one with .desc-line, because the bottom-left corner is already three rows
+     deep. The right half below the horizon is empty at every viewport, and putting the ticker
+     there balances the frame against the stack instead of queueing under it. */
   .upnext {
-    left: 6vw; bottom: 13.5vh;
+    right: 44px; bottom: 88px;
     display: flex; align-items: center; gap: 12px;
     transition: opacity 0.3s;
   }
@@ -1771,13 +1781,53 @@ function outlineMaterial(w) {
   });
 }
 
+/* A REAL HASH, NOT AN ARITHMETIC PROGRESSION.
+   `(i * 9301 + seed * 49297) % 233280` is LINEAR in i — consecutive instances step by exactly
+   9301/233280 and wrap, so the values land on a regular lattice. Using two of them as distance
+   and side put every tree on a diagonal grid, which is precisely why the wood, the scrub and
+   the stones all lined up in rows: nothing about any of it was random. A multiply-shift hash
+   decorrelates properly, and the same call with different salts gives independent axes. */
+function hash01(a, b) {
+  let n = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x165667b1, 0xc2b2ae35);
+  n = Math.imul(n ^ (n >>> 15), 0x2545f491);
+  n = Math.imul(n ^ (n >>> 13), 0x27d4eb2d);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+}
+
 /* one shared scatter so trees, rocks and grass agree about where the ground is busy */
 function scatter(i, seed, near, far, spread) {
-  const a = (i * 9301 + seed * 49297) % 233280 / 233280;
-  const b = (i * 4271 + seed * 15731) % 233280 / 233280;
-  const c = (i * 7919 + seed * 30011) % 233280 / 233280;
+  const a = hash01(i, seed);
+  const b = hash01(i, seed + 7919);
+  const c = hash01(i, seed + 104729);
   return { d: near + Math.pow(a, 0.62) * (far - near), s: (b - 0.42) * spread, r: c };
 }
+
+/* WHAT A PROP MUST NOT STAND INSIDE. Everything is placed from the heightfield, but the ranges,
+   Fuji and the river are separate meshes sitting ON it — so anything scattered where a mountain
+   is ends up buried in it. Each of them registers a footprint here and every scatter tests it.
+
+   A flat exclusion circle is the wrong shape for this: a 1,900-unit-wide hill only 800 tall
+   would carve a 3,000-unit hole in the forest, and the first attempt at it deleted most of the
+   wood. What matters is how high the mountain actually IS at that point, so each blocker is
+   stored as a cone and the test asks for the surface height rather than for containment —
+   a tree at the foot of a slope is fine, one near the axis is buried. */
+const BLOCKERS = [];
+function blockAdd(x, z, r, h) { BLOCKERS.push({ x, z, r, h }); }
+function blockHeight(x, z) {
+  let m = 0;
+  for (let i = 0; i < BLOCKERS.length; i++) {
+    const b = BLOCKERS[i];
+    const dx = x - b.x, dz = z - b.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 >= b.r * b.r) continue;
+    const y = b.h * (1 - Math.sqrt(d2) / b.r);
+    if (y > m) m = y;
+  }
+  return m;
+}
+/* 120 units of rise is about the base flare of a cone at this scale — under it a prop reads as
+   standing at the mountain's foot, over it as standing inside the mountain */
+function blocked(x, z) { return blockHeight(x, z) > 120; }
 /* `outline` is a width, or 0 for none. The twin shares the instance matrices, so it can never
    drift out of register with what it is outlining. */
 function instanced(geo, mat, n, place, outline = 0) {
@@ -1852,6 +1902,7 @@ function makeFuji(dist, side, R, Hh) {
   grp.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
   grp.position.copy(at(dist, side, GROUND_Y - 120));
   backScene.add(grp);
+  blockAdd(grp.position.x, grp.position.z, R * 0.94, Hh);
   return grp;
 }
 /* 13,000 out and 4,200 tall: at the first values (17,000 / 2,700) it subtended barely 7° and
@@ -1867,7 +1918,7 @@ makeFuji(13500, 2600, 6000, 3500);
 function mountainRidge(dist, side, w, h, palette) {
   const [SKIRT, ROCK, SNOW] = palette.map((c) => new THREE.Color(c));
   const seed = Math.abs(Math.floor(dist * 7 + side * 3));
-  const rnd = (n) => ((seed * 9301 + n * 49297) % 233280) / 233280;
+  const rnd = (n) => hash01(seed, n * 7919);
   const parts = [[0, 0, 1, 1], [0.74, 0.10, 0.60, 0.72], [-0.68, -0.09, 0.52, 0.58],
     [0.36, -0.22, 0.40, 0.42], [-0.30, 0.24, 0.34, 0.35]];
   const geos = [];
@@ -1900,22 +1951,28 @@ function mountainRidge(dist, side, w, h, palette) {
   const b = onGround(dist, side, -140);
   m.position.copy(b);
   backScene.add(m);
+  /* the cluster reaches the furthest shoulder offset plus its radius: 0.74w + 0.60w */
+  blockAdd(b.x, b.z, w * 1.34, h);
 }
-/* three layers between the eye and Fuji, so the valley reads as having depth rather than as a
-   backdrop: wooded hills close, bare ranges behind them, snow only on the far ones */
-[[5200, -4200, 1900, 820], [6100, 2900, 2300, 700], [8200, -1400, 2800, 1150], [8900, 5400, 2200, 820]]
+/* Two layers behind the wood, so the valley reads as having depth rather than as a backdrop.
+   HELD BEYOND THE FOREST BELT ON PURPOSE. The first placement put them at 5,200–8,900, right
+   inside the band the trees scatter across — and once props correctly refuse to stand inside a
+   mountain, seven overlapping footprints plus Fuji's claimed more of that band than existed and
+   deleted the wood. A range is a backdrop; it belongs behind the thing it is a backdrop to. */
+[[10500, -5600, 2400, 900], [11800, 4200, 2600, 780], [13000, -2600, 3000, 1250], [12200, 7600, 2400, 900]]
   .forEach(([d, s, w, h]) => mountainRidge(d, s, w, h, [0x33452f, 0x4c5771, 0xdcd2d6]));
-[[11500, -8000, 4200, 2000], [12500, 8200, 3800, 1750], [15000, -2200, 3400, 1500]]
+[[17000, -9500, 4200, 2000], [18000, 9000, 3800, 1750], [20000, -3200, 3400, 1500]]
   .forEach(([d, s, w, h]) => mountainRidge(d, s, w, h, [0x3d4a52, 0x66738c, 0xe6dcdc]));
 /* and a rim all the way round, so turning the camera never finds an edge of the world. Nearly
    dissolved by the haze at this range, so it only has to give the horizon a broken edge. */
 for (let k = 0; k < 26; k++) {
-  const a = (k / 26) * Math.PI * 2 + 0.3;
-  const r = 24000 + ((k * 811) % 6000);
-  const h = 1700 + ((k * 397) % 2200);
-  const cw = 3000 + ((k * 233) % 2800);
+  /* jittered off the exact spoke — 26 peaks at exactly 13.8° apart reads as a picket fence */
+  const a = (k / 26 + (hash01(k, 5) - 0.5) * 0.55 / 26) * Math.PI * 2 + 0.3;
+  const r = 24000 + hash01(k, 11) * 6000;
+  const h = 1700 + hash01(k, 23) * 2200;
+  const cw = 3000 + hash01(k, 37) * 2800;
   const g = new THREE.ConeGeometry(cw, h, 5 + (k % 3));
-  g.rotateY(k * 0.7);
+  g.rotateY(hash01(k, 41) * 6.28);
   g.scale(1, 1, 0.7);
   g.translate(0, h / 2, 0);
   const merged = mergeParts([{ geo: g, color: 0xffffff }]);
@@ -1928,6 +1985,7 @@ for (let k = 0; k < 26; k++) {
   const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   m.position.set(EYE.x + Math.cos(a) * r, GROUND_Y - 300, EYE.y + Math.sin(a) * r);
   backScene.add(m);
+  blockAdd(m.position.x, m.position.z, cw * 1.1, h);
 }
 
 /* ---- lighting: the sun coming up behind the ranges, low and warm ----
@@ -2006,17 +2064,41 @@ function radialTex(inner, outer, stops) {
      slope anyway — you look down onto it. */
   const eyeAt = new THREE.Vector3(EYE.x, 0, EYE.y);
   for (let k = 0; k < 16; k++) {
-    const d = 5200 + ((k * 1607) % 12000);
-    const s = -9000 + ((k * 3571) % 18000);
-    const r = 1500 + ((k * 311) % 1900);
-    const p = at(d, s, GROUND_Y + 10 + ((k * 97) % 70));
+    const d = 5200 + hash01(k, 3) * 12000;
+    const s = -9000 + hash01(k, 29) * 18000;
+    const r = 1500 + hash01(k, 53) * 1900;
+    const p = at(d, s, GROUND_Y + 10 + hash01(k, 71) * 70);
     if (new THREE.Vector3(p.x, 0, p.z).distanceTo(eyeAt) < r * 2.3 + 2600) continue;
     const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 8), bank);
     m.position.copy(p);
-    m.scale.set(2.3, 0.035 + ((k % 4) * 0.008), 1.5);
+    m.scale.set(2.3, 0.035 + hash01(k, 97) * 0.03, 1.5);
     m.renderOrder = 2;
     backScene.add(m);
   }
+}
+
+/* the river: a ribbon following the ground rather than a flat plank laid across it. Sampling
+   the terrain per control point is the whole difference — a straight-and-level river through
+   rolling ground is the single most diorama-like thing you can put in a valley. */
+{
+  const pts = [];
+  for (let i = 0; i <= 56; i++) {
+    const t = i / 56;
+    const d = 1200 + t * 12000;
+    const s = Math.sin(t * 4.1) * 2600 + 1900 - t * 3000;
+    const p = at(d, s, 0);
+    p.y = groundAt(p.x, p.z) + 10;
+    pts.push(p);
+  }
+  const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 120, 230, 4, false);
+  geo.scale(1, 0.05, 1);
+  const river = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+    color: 0xa9c0d2, emissive: 0x2e4055, transparent: true, opacity: 0.88,
+  }));
+  backScene.add(river);
+  /* built before the woods purely so it can claim its bed first — a tree standing in the middle
+     of the water is the same class of mistake as one standing inside a mountain */
+  pts.forEach((p) => blockAdd(p.x, p.z, 340, 3000));
 }
 
 /* ---- the woods ----
@@ -2091,28 +2173,30 @@ const woodMat = () => new THREE.MeshToonMaterial({ vertexColors: true, gradientM
 function standSpot(seed, near, far, spread, off, lo, hi) {
   return (i) => {
     const p = scatter(i, seed, near, far, spread);
+    const pos = onGround(p.d, p.s + off, -14);
+    if (blocked(pos.x, pos.z)) return null;
     const k = lo + p.r * (hi - lo);
-    return {
-      pos: onGround(p.d, p.s + off, -14),
-      rot: p.r * 6.28,
-      scale: new THREE.Vector3(k, k * (0.82 + p.r * 0.42), k),
-    };
+    /* the rotation gets its own hash: reusing the size value for it meant every tree of a given
+       height faced the same way, which the eye reads as order even when the positions are not */
+    const rot = hash01(i, seed + 331) * 6.28;
+    return { pos, rot, scale: new THREE.Vector3(k, k * (0.82 + hash01(i, seed + 617) * 0.42), k) };
   };
 }
 /* and a ring all the way round at mid distance, so turning the camera never finds bare ground
    where a wood should be — the sight-line scatter only covers about 35° of the horizon */
 function ringSpot(seed, near, far, lo, hi) {
   return (i) => {
-    const a = ((i * 9301 + seed * 49297) % 233280) / 233280 * Math.PI * 2;
-    const b = ((i * 4271 + seed * 15731) % 233280) / 233280;
-    const c = ((i * 7919 + seed * 30011) % 233280) / 233280;
+    const a = hash01(i, seed) * Math.PI * 2;
+    const b = hash01(i, seed + 7919);
+    const c = hash01(i, seed + 104729);
     const r = near + Math.pow(b, 0.6) * (far - near);
     const x = EYE.x + Math.cos(a) * r, z = EYE.y + Math.sin(a) * r;
+    if (blocked(x, z)) return null;
     const k = lo + c * (hi - lo);
     return {
       pos: new THREE.Vector3(x, groundAt(x, z) - 14, z),
-      rot: c * 6.28,
-      scale: new THREE.Vector3(k, k * (0.82 + c * 0.42), k),
+      rot: hash01(i, seed + 331) * 6.28,
+      scale: new THREE.Vector3(k, k * (0.82 + hash01(i, seed + 617) * 0.42), k),
     };
   };
 }
@@ -2122,16 +2206,20 @@ function ringSpot(seed, near, far, lo, hi) {
   /* the wood across the valley. Held back and scaled down from the first pass: at 2,600 with a
      2.3 multiplier the near cedars stood 920 units against a 3,500-unit mountain 13,500 away,
      so the wood competed with Fuji instead of sitting under it. */
-  instanced(cedar, woodMat(), 340, standSpot(41, 3000, 13000, 17000, 1200, 0.85, 1.9), 0.0016);
-  instanced(broad, woodMat(), 260, standSpot(97, 2800, 11000, 16000, 900, 0.9, 2.0), 0.0018);
+  instanced(cedar, woodMat(), 420, standSpot(41, 2800, 10500, 17000, 1200, 0.85, 1.9), 0.0016);
+  instanced(broad, woodMat(), 320, standSpot(97, 2600, 9500, 16000, 900, 0.9, 2.0), 0.0018);
   /* the surround */
-  instanced(cedar, woodMat(), 260, ringSpot(151, 7000, 19000, 1.4, 3.0), 0.0016);
-  instanced(broad, woodMat(), 170, ringSpot(199, 6000, 16000, 1.5, 3.0), 0.0018);
-  /* sakura, near enough to read as blossom rather than as pink dots */
-  instanced(sakura, woodMat(), 22, (i) => {
-    const p = scatter(i, 71, 1500, 6200, 9000);
-    const k = 1.5 + p.r * 1.5;
-    return { pos: onGround(p.d, p.s - 700, -10), rot: p.r * 6.28, scale: new THREE.Vector3(k, k, k) };
+  instanced(cedar, woodMat(), 300, ringSpot(151, 6000, 16000, 1.4, 2.8), 0.0016);
+  instanced(broad, woodMat(), 200, ringSpot(199, 5500, 14000, 1.5, 2.8), 0.0018);
+  /* sakura, near enough to read as blossom rather than as pink dots — but at 1.5–3.0 on a
+     250-unit model they stood taller than the cedars while being half the distance away, and
+     four of them filled the frame. Same footprint as everything else now. */
+  instanced(sakura, woodMat(), 26, (i) => {
+    const p = scatter(i, 71, 2200, 8000, 11000);
+    const pos = onGround(p.d, p.s - 700, -10);
+    if (blocked(pos.x, pos.z)) return null;
+    const k = 1.0 + p.r * 0.9;
+    return { pos, rot: hash01(i, 401) * 6.28, scale: new THREE.Vector3(k, k, k) };
   }, 0.0020);
 }
 
@@ -2156,9 +2244,9 @@ function patchAt(x, z) {
     instanced(geo, mat, 780, (i) => {
       const p = scatter(i, 3 + t * 13, 1800, 9000, 13500);
       const pos = onGround(p.d, p.s, 3);
-      if (patchAt(pos.x, pos.z) < 0.05) return null;
+      if (patchAt(pos.x, pos.z) < 0.05 || blocked(pos.x, pos.z)) return null;
       const k = 0.5 + Math.pow(p.r, 1.4) * 1.9;
-      return { pos, rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.7, k * 0.36, k * 1.5) };
+      return { pos, rot: hash01(i, 811 + t) * 6.28, scale: new THREE.Vector3(k * 1.7, k * 0.36, k * 1.5) };
     });
   });
 }
@@ -2178,17 +2266,19 @@ function patchAt(x, z) {
     instanced(geo, mat, 300, (i) => {
       const p = scatter(i, 211 + t * 7, 350, 2800, 5600);
       const pos = onGround(p.d, p.s, 1);
-      if (patchAt(pos.x, pos.z) < 0.2) return null;
+      if (patchAt(pos.x, pos.z) < 0.2 || blocked(pos.x, pos.z)) return null;
       const k = 0.45 + Math.pow(p.r, 1.6) * 2.6;
-      return { pos, rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.8, k * 0.3, k * 1.6) };
+      return { pos, rot: hash01(i, 907 + t) * 6.28, scale: new THREE.Vector3(k * 1.8, k * 0.3, k * 1.6) };
     });
   });
   const stone = new THREE.DodecahedronGeometry(20, 0);
   instanced(stone, new THREE.MeshToonMaterial({ color: 0x776f63, gradientMap: RAMP, flatShading: true }),
     64, (i) => {
       const p = scatter(i, 233, 500, 2800, 5000);
+      const pos = onGround(p.d, p.s, 3);
+      if (blocked(pos.x, pos.z)) return null;
       const k = 0.4 + Math.pow(p.r, 1.4) * 1.7;
-      return { pos: onGround(p.d, p.s, 3), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.4, k * 0.7, k) };
+      return { pos, rot: hash01(i, 1013) * 6.28, scale: new THREE.Vector3(k * 1.4, k * 0.7, k) };
     });
 }
 
@@ -2200,9 +2290,9 @@ function patchAt(x, z) {
     const p = scatter(i, 11, 1200, 11000, 15000);
     const pos = onGround(p.d, p.s, 14);
     /* scrub takes the ground the grass patches leave, so the two interlock instead of stacking */
-    if (patchAt(pos.x, pos.z) > 0.35) return null;
+    if (patchAt(pos.x, pos.z) > 0.35 || blocked(pos.x, pos.z)) return null;
     const k = 0.6 + p.r * 1.5;
-    return { pos, rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.5, k * 0.52, k * 1.4) };
+    return { pos, rot: hash01(i, 1117) * 6.28, scale: new THREE.Vector3(k * 1.5, k * 0.52, k * 1.4) };
   });
 }
 
@@ -2213,37 +2303,20 @@ function patchAt(x, z) {
   instanced(stone, new THREE.MeshToonMaterial({ color: 0x736f66, gradientMap: RAMP, flatShading: true }),
     300, (i) => {
       const p = scatter(i, 29, 700, 9000, 13000);
+      const pos = onGround(p.d, p.s, 4);
+      if (blocked(pos.x, pos.z)) return null;
       const k = 0.35 + p.r * 1.3;
-      return { pos: onGround(p.d, p.s, 4), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.4, k * 0.7, k) };
+      return { pos, rot: hash01(i, 1223) * 6.28, scale: new THREE.Vector3(k * 1.4, k * 0.7, k) };
     });
   const rock = new THREE.DodecahedronGeometry(105, 0);
   instanced(rock, new THREE.MeshToonMaterial({ color: 0x6f6b61, gradientMap: RAMP, flatShading: true }),
     18, (i) => {
       const p = scatter(i, 173, 1100, 6000, 10000);
+      const pos = onGround(p.d, p.s, 24);
+      if (blocked(pos.x, pos.z)) return null;
       const k = 0.7 + p.r * 1.5;
-      return { pos: onGround(p.d, p.s, 24), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.3, k * 0.85, k * 1.1) };
+      return { pos, rot: hash01(i, 1319) * 6.28, scale: new THREE.Vector3(k * 1.3, k * 0.85, k * 1.1) };
     }, 0.0022);
-}
-
-/* the river: a ribbon following the ground rather than a flat plank laid across it. Sampling
-   the terrain per control point is the whole difference — a straight-and-level river through
-   rolling ground is the single most diorama-like thing you can put in a valley. */
-{
-  const pts = [];
-  for (let i = 0; i <= 56; i++) {
-    const t = i / 56;
-    const d = 1200 + t * 12000;
-    const s = Math.sin(t * 4.1) * 2600 + 1900 - t * 3000;
-    const p = at(d, s, 0);
-    p.y = groundAt(p.x, p.z) + 10;
-    pts.push(p);
-  }
-  const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 120, 230, 4, false);
-  geo.scale(1, 0.05, 1);
-  const river = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-    color: 0xa9c0d2, emissive: 0x2e4055, transparent: true, opacity: 0.88,
-  }));
-  backScene.add(river);
 }
 
 /* ---- one pass over the finished landscape ----
