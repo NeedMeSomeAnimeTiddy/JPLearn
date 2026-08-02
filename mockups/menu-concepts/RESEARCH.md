@@ -1205,6 +1205,53 @@ hand where the code already knew the answer.
   thins the very edge you most want planted. Mirroring it back across the boundary keeps the
   distribution smooth and gives the clearing a planted edge instead of a fade.
 
+## v36 — nothing grows through anything
+
+- **Clumping answers "where", not "may two things be here".** The clustered planting fixed the
+  distribution and said nothing about occupancy, so at a hundred and eighty units per bush they
+  simply grew through one another. Every plant registers a footprint now and every candidate is
+  tested against what is already standing — with **two radii, not one**, because clipping is a
+  question about height as much as about plan. A bush beside a cedar is a bush at the foot of a
+  cedar, which is correct; two canopies at the same height are a graft. `rLo` is what occupies
+  the ground, `rHi` what occupies the air, and a shrub has no `rHi` at all so it is free to sit
+  under anything.
+- **A rejected candidate must cost a gap, never a graft.** Retry within the same clump a dozen
+  times, then give up. Loosening the radius to force one in puts the intersection straight back.
+- **The answer to a thin result is more candidates.** Once rejection is safe, doubling the number
+  thrown at the ground is free — and the density you get becomes a property of the ground rather
+  than of the seed.
+- **A local registry cannot see what is planted after it.** The shrine spaced its own planting
+  perfectly and the valley's wood, built later and knowing nothing about the shrine, put cedars
+  straight through it. Registering the shrine's trees as scatter blockers only half-worked,
+  because a blocker's cone has to be sized against the largest tree that might land next to it.
+  One shared registry that every wood in the file goes through is both simpler and correct.
+- **The valley's wood had never had a spacing test at all** — `standSpot` and `ringSpot` checked
+  only that a position was not inside a mountain. Two trees sharing a trunk is invisible at the
+  menu's standoff, which is why it survived this long; the destination cameras stand a few
+  hundred units from the same wood and it is not invisible there. **A tolerance that holds at
+  one camera distance is not a tolerance, it is a coincidence.**
+- **Measure it.** Eyeballing "a lot of clipping" gives you nothing to aim at. An audit that walks
+  every instance near the shrine, takes each one's real bounding box, and counts overlapping
+  pairs turned an argument into a number: 233 → 21 → 1. It also caught two things the eye had
+  not — that most of the "clashes" were bushes standing under canopies (a bad test, not a bad
+  scene) and that the sakura's spacing radius was 78 against a real reach of 148.
+- **Contrast is a pair, not a value.** The blank tablets were lightened twice and still vanished,
+  because the board behind them was lightened with them. Board down, blanks up.
+- **A flat emissive term lifts the ink exactly as much as the paper.** On a surface this far from
+  the key light the emissive is most of what you see, so it was washing the writing off the
+  tablet — the thing meant to make it legible was the thing destroying it. `emissiveMap` set to
+  the face's own texture lights the paper and leaves the glyphs alone.
+- **Section colours are chosen against near-black.** On cream it is the *light* end of the ramp
+  that disappears: REVIEW's `#e34a33` on paper is 2.4:1, its `#b23320` is 4.4:1.
+- **Two tweens on one property do not queue, they race.** An elastic ease of one duration against
+  a shorter one of another can finish in the wrong order and park the object at the losing tween's
+  end value — which is exactly what a fast hover-and-unhover produced. `overwrite: true`.
+- **Solve an overlap where it actually happens.** The wall's posts came up through the paving,
+  and every attempt to fix it by moving the wall further out ran into the frame's left edge
+  instead — there is only about thirty degrees between the gate and the edge of the picture. A
+  stone footing, which is what real ema-kake stand on, makes the overlap deliberate and costs
+  none of the framing.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1369,6 +1416,16 @@ hand where the code already knew the answer.
 - **CSS3D planes have no frustum culling, no depth test, and no element until first rendered.**
   Anything in that layer needs its visibility driven explicitly, and its element held by
   reference rather than looked up.
+
+- **Scatter needs an occupancy test, not just a distribution.** "Where things go" and "may two of
+  them be here" are separate questions, and only the first one is interesting to author.
+- **A tolerance that holds at one camera distance is not a tolerance.** Anything that survives
+  because the camera is far away will fail the moment a destination camera stands next to it.
+- **Two tweens on one property race; they do not queue.** Overwrite, or find the object parked
+  wherever the loser happened to end.
+- **Turn a disagreement about a scene into a number.** Walking the instances and counting real
+  bounding-box overlaps is a few dozen lines and it both proves the fix and catches the cases
+  the eye was misreading.
 
 ## Sources
 

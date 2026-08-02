@@ -2012,6 +2012,39 @@ function blocked(x, z) {
   if (lakeField(x - EYE.x, z - EYE.y) > -0.03 && groundAt(x, z) < LAKE_Y + 25) return true;
   return blockHeight(x, z) > 120;
 }
+/* ---- one tree, one patch of ground ----
+   The valley's wood has never had a spacing test: `standSpot` and `ringSpot` draw a position,
+   check that it is not inside a mountain, and plant. At the menu's standoff two trees sharing a
+   trunk is a texture nobody reads, and it went unnoticed for that reason — but the destination
+   cameras stand a few hundred units from the same wood, and at that range an intersection is not
+   a texture, it is a fault. The shrine's own planting solved this locally; this is the same idea
+   made global, because a local registry cannot see the wood that is planted after it.
+
+   One flat radius per tree rather than the shrine's two, because everything in here is tall:
+   there is no "under the canopy" case to allow. A rejected candidate is simply dropped — the
+   wood is four hundred trees deep and losing a few to spacing costs nothing. */
+const TREE_SPOTS = [];
+function treeClaim(x, z, r) { TREE_SPOTS.push([x, z, r]); }
+function treeFits(x, z, r) {
+  for (let i = 0; i < TREE_SPOTS.length; i++) {
+    const t = TREE_SPOTS[i];
+    const dx = x - t[0], dz = z - t[1], sum = r + t[2];
+    if (dx * dx + dz * dz < sum * sum) return false;
+  }
+  return true;
+}
+/* wraps any placement function: same contract, but it also claims the ground it lands on */
+function spaced(place, radius) {
+  return (i) => {
+    const p = place(i);
+    if (!p) return null;
+    const r = radius * p.scale.x;
+    if (!treeFits(p.pos.x, p.pos.z, r)) return null;
+    treeClaim(p.pos.x, p.pos.z, r);
+    return p;
+  };
+}
+
 /* `outline` is a width, or 0 for none. The twin shares the instance matrices, so it can never
    drift out of register with what it is outlining. */
 function instanced(geo, mat, n, place, outline = 0) {
@@ -2560,7 +2593,10 @@ function emaTexture(jp, en, meta, accent) {
   g.beginPath();
   g.moveTo(0, H); g.lineTo(W, H); g.lineTo(W, GAB); g.lineTo(W / 2, 6); g.lineTo(0, GAB);
   g.closePath();
-  g.fillStyle = '#dccaa6'; g.fill();
+  /* brighter paper. At #dccaa6 the cream sat in the same mid-tone as the red numeral printed
+     on it, so the two had barely a stop between them and the whole face read as one warm blur
+     from any distance. */
+  g.fillStyle = '#f0e5cb'; g.fill();
   /* grain, faint and vertical — enough that the face is not a flat swatch */
   g.save(); g.clip();
   for (let i = 0; i < 26; i++) {
@@ -2578,18 +2614,21 @@ function emaTexture(jp, en, meta, accent) {
      signage: the type is far larger than the object would carry, because the camera stops far
      enough back to keep the shrine and the valley in frame and legibility has to survive that.
      Games oversize signage for the same reason and nobody notices. */
-  g.fillStyle = '#3b2a1c';
+  g.fillStyle = '#2b1c10';
   g.font = '700 88px "Yu Mincho", "Hiragino Mincho ProN", serif';
   g.fillText(jp, W / 2, GAB + 112);
-  g.fillStyle = 'rgba(59,42,28,0.6)';
+  g.fillStyle = 'rgba(43,28,16,0.72)';
   g.font = '700 23px "Arial Black", Arial, sans-serif';
   g.letterSpacing = '5px';
   g.fillText(en, W / 2, GAB + 152);
   g.letterSpacing = '0px';
+  /* THE DARK ACCENT, NOT THE BRIGHT ONE. Section colours are chosen to sit on near-black
+     backgrounds, where the light end is the readable one; on cream it is the light end that
+     disappears. REVIEW's #e34a33 on paper is a 2.4:1 contrast, its #b23320 is 4.4:1. */
   g.fillStyle = accent;
   g.font = '900 122px "Arial Black", Arial, sans-serif';
   g.fillText(num, W / 2, H - 84);
-  g.fillStyle = 'rgba(59,42,28,0.55)';
+  g.fillStyle = 'rgba(43,28,16,0.66)';
   g.font = '700 26px "Yu Gothic UI", sans-serif';
   g.fillText(unit, W / 2, H - 44);
   const t = new THREE.CanvasTexture(c);
@@ -2641,7 +2680,7 @@ const WORLD_SWAY = [];
    be. A rack of votive tablets is a piece of furniture; the gate is a building. */
 function buildEmaWall(sec, place, faceTowards, W, HH) {
   const tiles = SUBTILES[sec];
-  const accent = SECTION_ACCENT[sec][0];
+  const accent = SECTION_ACCENT[sec][1];
   const POST = W * 0.05;
   const grp = new THREE.Group();
   grp.position.copy(place);
@@ -2662,7 +2701,7 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
      wall — and a real ema wall is boarded anyway. */
   /* and a shade lighter than it was: the board faces away from the sun at this bearing, and at
      0x59493a it came out near-black, which is not a surface a weathered tablet reads against */
-  frame.push({ geo: beamSeg(W * 0.97, HH * 0.86, HH * 0.05, 0, HH * 0.46, 0), color: 0x6c5943 });
+  frame.push({ geo: beamSeg(W * 0.97, HH * 0.86, HH * 0.05, 0, HH * 0.46, 0), color: 0x51402f });
   /* THE RAILS THE CROWD HANGS FROM. Without them the blanks are rectangles lying flat on a
      board, and a board covered in close-packed tilted rectangles is crazy paving — which is what
      it kept reading as, however the tone was adjusted. One thin bar above each row turns the
@@ -2686,6 +2725,15 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
   }));
   grp.add(frameMesh);
   addOutline(frameMesh, 0.0024);
+  /* 基壇 — the stone footing. The wall stands at the edge of a 360-wide paved approach, and the
+     paving is 26 units proud of the ground it is laid on, so a post planted at ground level
+     comes up THROUGH the stone. Every attempt to solve that by moving the wall further out ran
+     into the frame's left edge instead, because at this standoff there is only about thirty
+     degrees between the gate and the edge of the picture. A footing solves it where it actually
+     happens: the wall now sits on something that is meant to overlap the paving, which is what
+     real ema-kake stand on anyway. */
+  frame.push({ geo: beamSeg(W * 1.14, HH * 0.32, W * 0.36, 0, HH * 0.06, 0), color: 0x6b6459 });
+
   /* piles, so it stands in the shallows rather than floating on them */
   const piles = [];
   for (let i = -2; i <= 2; i++) {
@@ -2723,7 +2771,7 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
        and the path runs away from the light. Everything on it is therefore lit by fill alone, so
        the emissive floor is doing most of the work — at 0x3d3428 the crowd came out as dark
        even blocks and read as coursed masonry rather than as a hundred wooden tablets. */
-    new THREE.MeshToonMaterial({ vertexColors: true, emissive: 0x574c3c, gradientMap: RAMP, flatShading: true }),
+    new THREE.MeshToonMaterial({ vertexColors: true, emissive: 0x6d5f49, gradientMap: RAMP, flatShading: true }),
     PER * ROWS);
   const mx = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3();
   const zc = new THREE.Vector3(0, 0, 1), col = new THREE.Color();
@@ -2741,7 +2789,11 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
     mx.compose(new THREE.Vector3(x, y, W * 0.05 - row * W * 0.008), qt, sc);
     blanks.setMatrixAt(i, mx);
     /* weathered across a real range — a narrow one just made the slab evenly tan */
-    col.setHSL(0.075 + hash01(i, 43) * 0.05, 0.16 + hash01(i, 51) * 0.16, 0.4 + hash01(i, 67) * 0.26);
+    /* CONTRAST IS A PAIR, NOT A VALUE. The blanks were lightened twice and still vanished,
+       because the board was lightened with them — what makes a tablet visible is the difference
+       between it and what it hangs on. Board down, blanks up, and the gap is now wide enough
+       that the crowd reads at a glance instead of being a texture on the timber. */
+    col.setHSL(0.075 + hash01(i, 43) * 0.045, 0.18 + hash01(i, 51) * 0.16, 0.56 + hash01(i, 67) * 0.26);
     blanks.setColorAt(i, col);
   }
   blanks.instanceMatrix.needsUpdate = true;
@@ -2777,8 +2829,14 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
     }));
     body.position.y = -CORD - TH / 2;
     root.add(body);
+    /* THE EMISSIVE IS MAPPED. A flat emissive term is added to every pixel equally, so on a
+       surface this far from the key light it dominates, and it lifts the ink exactly as much as
+       it lifts the paper — the writing was being washed off the tablet by the thing meant to
+       make it visible. Multiplying it by the face's own texture lights the paper and leaves the
+       glyphs alone, which is both more legible and physically closer to true. */
+    const tex = emaTexture(jp, en, meta, accent);
     const face = new THREE.Mesh(new THREE.PlaneGeometry(TW, TH), new THREE.MeshToonMaterial({
-      map: emaTexture(jp, en, meta, accent), emissive: 0x5c503c,
+      map: tex, emissive: 0x8d8069, emissiveMap: tex,
       gradientMap: RAMP, transparent: true,
     }));
     face.position.set(0, body.position.y, TTH / 2 + 0.4);
@@ -2830,11 +2888,13 @@ function pickWorldTile(sec, jp) {
    gate — the same size as the landmark, which is the one thing it must never be. */
 {
   const GATE_H = 470;
-  const WALL_W = GATE_H * 0.5;      /* 235 — two-fifths of the gate's width, a third of its height */
-  /* a little taller than before, because the up-pitch pushes everything low in the frame and the
-     tablets hang near the top of the wall. Still well under half the gate: furniture, not a
-     building. */
-  const WALL_H = GATE_H * 0.40;
+  /* SIZED AGAINST THE PAVING AS WELL AS AGAINST THE GATE. The approach is 360 wide, so a wall
+     standing at side -110 with a half-width of 103 had its near end 70 units inside the paving —
+     posts growing straight out of the stone. It is smaller and further off now: 207 wide at side
+     -270, which puts its near edge six units clear of the kerb, and it stops being the largest
+     object in the frame. */
+  const WALL_W = GATE_H * 0.45;     /* 211 */
+  const WALL_H = GATE_H * 0.345;
   const base = destPlace(105, 5200, 0);
   const fwd = new THREE.Vector3().copy(base).sub(HOME_EYE).setY(0).normalize();
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
@@ -2885,7 +2945,7 @@ function pickWorldTile(sec, jp) {
      what makes a gate read as something you stand under rather than something you look at. It
      cannot go much higher than this — the wall is close and low, and every degree of up-pitch
      drives it toward the bottom edge twice as fast as it lifts the gate. */
-  DEST_SPECS[1].focus = at3(-430, 18, GATE_H * 0.50);
+  DEST_SPECS[1].focus = at3(-430, 18, GATE_H * 0.46);
 
   /* the tunnel: each gate smaller than the last AND closer to it, so the far end reads as
      distance rather than as a row of identical objects */
@@ -2938,7 +2998,7 @@ function pickWorldTile(sec, jp) {
      to -700 and in to -110 it is 600 away, its tablets still read at 80px, and its far edge
      clears the frame with room to spare. Distance is the right lever here: scale is not, because
      the wall's size relative to the gate is the one thing about it that must not move. */
-  const wallGrp = buildEmaWall('REVIEW', at3(-700, -110), eye, WALL_W, WALL_H);
+  const wallGrp = buildEmaWall('REVIEW', at3(-690, -215), eye, WALL_W, WALL_H);
   /* and then turned toward the PATH, which is the direction the sign was wrong in before: the
      wall stands to the left of the axis, so facing the way in means turning its face to its own
      right and letting its left edge come forward. After `lookAt`, the group's local +X is the
@@ -2949,7 +3009,7 @@ function pickWorldTile(sec, jp) {
      A board square to the camera is a poster; a board angled along the way in is something that
      was put there for people walking past it. 0.62 rad is about 36°, enough to read as addressed
      to the path while still showing the tablets nearly full width (cos 36° = 0.81). */
-  wallGrp.rotateY(0.55);
+  wallGrp.rotateY(0.62);
 
   /* ---- planting ----
      The corridor blockers strip the wood out of a 1,500-unit band and leave a lawn, and a lawn
@@ -2967,8 +3027,11 @@ function pickWorldTile(sec, jp) {
      dropping thins the very edge you most want planted, which is the join between the clearing
      and the wood. */
   {
-    /* clear of the paving (+-180), the lanterns (+-250, base 45) and the gates' footings */
-    const VERGE = 312;
+    /* clear of the paving (180) and of the gates' footings, whose outer edge is at 236. It used
+       to have to clear the LANTERNS too, at 250 with a 45-unit base, which pushed the first bush
+       130 units out into mown grass — the spacing registry knows where the lanterns are now, so
+       the verge only has to answer for the things that are not in it. */
+    const VERGE = 260;
     /* and the hall, whose plinth is 713 wide — wider than the corridor it stands at the end of */
     const KEEP = [[3170, 0, 560]];
     const clear = (f2, sd) => {
@@ -2979,68 +3042,127 @@ function pickWorldTile(sec, jp) {
       }
       return [f2, t];
     };
-    /* one clump member: `n` centres drawn off the seed, then a point around the chosen centre */
-    const clump = (i, seed, n, fLo, fHi, sLo, sHi, rad) => {
+    /* one clump member: `n` centres drawn off the seed, then a point around the chosen centre.
+       `a` is the attempt number — it re-rolls the offset within the clump WITHOUT changing which
+       clump this one belongs to, so a rejected position is retried nearby rather than thrown
+       across the map. */
+    const clump = (i, a, seed, n, fLo, fHi, sLo, sHi, rad) => {
       const c = i % n;
       const cf = fLo + hash01(c, 101 + seed) * (fHi - fLo);
       const cs = (hash01(c, 113 + seed) < 0.5 ? -1 : 1) * (sLo + hash01(c, 127 + seed) * (sHi - sLo));
-      const a = hash01(i, 151 + seed) * 6.283;
-      const r = Math.sqrt(hash01(i, 163 + seed)) * rad;
-      return clear(cf + Math.cos(a) * r, cs + Math.sin(a) * r);
+      const j = i + a * 977;
+      const ang = hash01(j, 151 + seed) * 6.283;
+      const r = Math.sqrt(hash01(j, 163 + seed)) * rad;
+      return clear(cf + Math.cos(ang) * r, cs + Math.sin(ang) * r);
     };
 
-    /* the undergrowth: four tones, four draw calls, six hundred bushes. Two low tones bank the
-       verge and two taller ones stand behind them, so the planting has a section rather than
-       being one height everywhere. */
+    /* ---- spacing ----
+       Clumping got the DISTRIBUTION right and said nothing about whether two plants may occupy
+       the same ground — so at a hundred and eighty units per bush they simply grew through one
+       another, and at this camera distance an intersection is not a texture, it is a fault.
+
+       Every plant registers a footprint and every candidate is tested against the ones already
+       standing. Two radii, not one, because clipping is a question about height as much as about
+       plan: a bush beside a cedar is a bush at the foot of a cedar, which is correct and normal,
+       while two canopies at the same height are a graft. `rLo` is what occupies the ground, `rHi`
+       what occupies the air; a shrub has no `rHi` at all, so it is free to sit under anything.
+
+       Rejected candidates are retried within their own clump a dozen times and then given up on.
+       A gap where a clump has run out of room is the honest outcome — the alternative is exactly
+       the intersection this exists to prevent. */
+    const PLANTED = [];
+    const fits = (f2, sd, rLo, rHi) => {
+      for (let k = 0; k < PLANTED.length; k++) {
+        const q = PLANTED[k];
+        const d = Math.hypot(f2 - q[0], sd - q[1]);
+        if (d < rLo + q[2]) return false;
+        if (rHi > 0 && q[3] > 0 && d < rHi + q[3]) return false;
+      }
+      return true;
+    };
+    const grow = (i, seed, n, fLo, fHi, sLo, sHi, rad, rLo, rHi) => {
+      for (let a = 0; a < 12; a++) {
+        const q = clump(i, a, seed, n, fLo, fHi, sLo, sHi, rad);
+        if (fits(q[0], q[1], rLo, rHi)) { PLANTED.push([q[0], q[1], rLo, rHi]); return q; }
+      }
+      return null;
+    };
+    /* the built things go in first, so nothing can grow through them either */
+    PLANTED.push([-690, -215, 155, 155]);
+    [[-980, 250], [-980, -250], [-180, 250], [-180, -250], [420, 250], [420, -250]]
+      .forEach(([lf, ls]) => PLANTED.push([lf, ls, 78, 78]));
+
+    /* THE TREES GO DOWN FIRST. They are fewer, larger, and their placement is what the eye reads
+       as the shape of the clearing; letting six hundred bushes take the ground first and then
+       asking a cedar to find a gap gets that backwards. Instanced with a shared outline twin like
+       the rest of the wood, so the whole treeline is four draw calls. */
+    const woodM = () => new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
+    instanced(broadleafGeo(), woodM(), 62, (i) => {
+      const k = 1.0 + hash01(i, 19) * 0.5;
+      const q = grow(i, 211, 16, -1100, 4300, 520, 1300, 340, 34 * k, 128 * k);
+      if (!q) return null;
+      const w = at3(q[0], q[1]);
+      treeClaim(w.x, w.z, 132 * k);
+      return { pos: at3(q[0], q[1], -14), rot: hash01(i, 7) * 6.28, scale: new THREE.Vector3(k, k, k) };
+    }, 0.0018);
+    /* cedars are 480 tall and the camera stands at f -1290, so they start well forward of it:
+       a stand of them beside the eye would be a wall across the frame rather than a treeline */
+    instanced(cedarGeo(), woodM(), 58, (i) => {
+      const k = 0.85 + hash01(i, 23) * 0.5;
+      const q = grow(i, 307, 14, -300, 4400, 640, 1500, 360, 28 * k, 62 * k);
+      if (!q) return null;
+      const w = at3(q[0], q[1]);
+      treeClaim(w.x, w.z, 64 * k);
+      return { pos: at3(q[0], q[1], -14), rot: hash01(i, 29) * 6.28, scale: new THREE.Vector3(k, k, k) };
+    }, 0.0016);
+    /* the undergrowth: five bands, low and near the path through to tall and back at the
+       treeline, so the planting has a section rather than being one height everywhere. The first
+       is deliberately tiny and numerous — the strip between the paving and the first bushes was
+       130 units of mown lawn, which is the thing this whole block exists to get rid of.
+
+       Nothing goes past 730 out: that is where the corridor blockers stop clearing the valley's
+       own wood, and a bush placed beyond it is a bush placed where a cedar the shrine has never
+       heard of is about to stand. */
     const shrubGeo = new THREE.IcosahedronGeometry(46, 1);
     shrubGeo.scale(1.25, 0.82, 1.1);
-    /* five bands, low and near the path through to tall and back at the treeline, so the
-       planting has a section. The first is deliberately tiny and numerous: the strip between the
-       paving and the first bushes was 130 units of mown lawn, which is the thing this whole
-       block exists to get rid of. */
-    [[0x4d6338, 312, 560, 0.24, 0.62, 230], [0x40592f, 330, 800, 0.5, 1.25, 150],
-      [0x4c6636, 360, 920, 0.55, 1.3, 150],
-      [0x37502b, 430, 1050, 0.85, 2.0, 150], [0x556f3c, 470, 1150, 0.9, 2.1, 150]]
-      .forEach(([c, sLo, sHi, kLo, kHi, n], t) => {
+    /* THE ANSWER TO A THIN RESULT IS MORE CANDIDATES, NOT LOOSER SPACING. Once a rejection can
+       only ever cost a gap, throwing twice as many at the ground is free of risk and fills it;
+       slackening the radius to force them in would put the intersections straight back. The
+       `sep` column is a per-band radius multiplier. It was 0.72 for the ground cover on the
+       theory that a carpet of small leaf masses may knit; measuring it said otherwise — an
+       audit of the shrine's own ground found eighty-six intersections and every one of them was
+       two of these, up to 85% of a radius deep, which is not knitting, it is one mound inside
+       another. Held just under 1.0 they touch and stop, and the density that costs is bought
+       back with more candidates instead. */
+    [[0x4d6338, 260, 520, 0.24, 0.62, 520, 30, 250, 0.95], [0x40592f, 300, 700, 0.5, 1.25, 270, 19, 340, 0.95],
+      [0x4c6636, 360, 730, 0.55, 1.3, 270, 19, 340, 0.95],
+      [0x37502b, 430, 730, 0.85, 1.7, 260, 19, 340, 1.0], [0x556f3c, 470, 730, 0.9, 1.8, 260, 19, 340, 1.0]]
+      .forEach(([c, sLo, sHi, kLo, kHi, n, cl, rad, sep], t) => {
         const m = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
         NO_REFLECT.push(instanced(shrubGeo, m, n, (i) => {
-          const [f2, sd] = clump(i, t * 17, t ? 17 : 26, -2000, 4300, sLo, sHi, t ? 330 : 240);
           const k = kLo + hash01(i, 41 + t) * (kHi - kLo);
+          const q = grow(i, t * 17, cl, -2000, 4300, sLo, sHi, rad, 56 * k * sep, 0);
+          if (!q) return null;
           return {
-            pos: at3(f2, sd, -6),
+            pos: at3(q[0], q[1], -6),
             rot: hash01(i, 53 + t) * 6.28,
             scale: new THREE.Vector3(k, k * (0.62 + hash01(i, 67 + t) * 0.5), k),
           };
         }));
       });
-
-    /* maples through the middle distance, and cedars closing the far edge, so the clearing has
-       walls instead of fading into open grass. Instanced with a shared outline twin like the
-       rest of the wood — a dozen hand-placed meshes each with its own outline was a dozen extra
-       draw calls for the same picture. */
-    const woodM = () => new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
-    instanced(broadleafGeo(), woodM(), 34, (i) => {
-      const [f2, sd] = clump(i, 211, 11, -1100, 4300, 620, 1300, 300);
-      const k = 1.0 + hash01(i, 19) * 0.55;
-      return { pos: at3(f2, sd, -14), rot: hash01(i, 7) * 6.28, scale: new THREE.Vector3(k, k, k) };
-    }, 0.0018);
-    /* cedars are 480 tall and the camera stands at f -1290, so they start well forward of it:
-       a stand of them beside the eye would be a wall across the frame rather than a treeline */
-    instanced(cedarGeo(), woodM(), 26, (i) => {
-      const [f2, sd] = clump(i, 307, 9, -300, 4400, 780, 1600, 340);
-      const k = 0.85 + hash01(i, 23) * 0.5;
-      return { pos: at3(f2, sd, -14), rot: hash01(i, 29) * 6.28, scale: new THREE.Vector3(k, k, k) };
-    }, 0.0016);
   }
 
   /* a clearing the shape of the thing it clears — a line along the axis, and a second down the
      wall's side, because the corridor is measured from the axis while the wall stands off it */
+  /* 1000, not 760: at 760 the valley's wood resumed 585 out from the axis, which is inside the
+     band the shrine plants — so the two were placing trees into each other with neither aware of
+     the other. The corridor now clears to 769 and the shrine owns everything inside that. */
   for (let k = -1700; k <= 4400; k += 320) {
     const q = at3(k, 0);
-    blockAdd(q.x, q.z, 760, 520);
+    blockAdd(q.x, q.z, 1000, 520);
   }
   for (let k = -900; k <= -100; k += 220) {
-    const q = at3(k, -420);
+    const q = at3(k, -560);
     blockAdd(q.x, q.z, 460, 520);
   }
 }
@@ -3197,21 +3319,24 @@ function ringSpot(seed, near, far, lo, hi) {
   /* the wood across the valley. Held back and scaled down from the first pass: at 2,600 with a
      2.3 multiplier the near cedars stood 920 units against a 3,500-unit mountain 13,500 away,
      so the wood competed with Fuji instead of sitting under it. */
-  instanced(cedar, woodMat(), 420, standSpot(41, 2800, 10500, 17000, 1200, 0.85, 1.9), 0.0016);
-  instanced(broad, woodMat(), 320, standSpot(97, 2600, 9500, 16000, 900, 0.9, 2.0), 0.0018);
+  /* the counts are CANDIDATES now, not trees. Spacing rejects perhaps a third of them, so the
+     numbers went up by half to keep the wood as deep as it was — which is the right way round:
+     the density you get is then a property of the ground rather than of the seed. */
+  instanced(cedar, woodMat(), 620, spaced(standSpot(41, 2800, 10500, 17000, 1200, 0.85, 1.9), 62), 0.0016);
+  instanced(broad, woodMat(), 480, spaced(standSpot(97, 2600, 9500, 16000, 900, 0.9, 2.0), 132), 0.0018);
   /* the surround */
-  instanced(cedar, woodMat(), 300, ringSpot(151, 6000, 16000, 1.4, 2.8), 0.0016);
-  instanced(broad, woodMat(), 200, ringSpot(199, 5500, 14000, 1.5, 2.8), 0.0018);
+  instanced(cedar, woodMat(), 450, spaced(ringSpot(151, 6000, 16000, 1.4, 2.8), 62), 0.0016);
+  instanced(broad, woodMat(), 300, spaced(ringSpot(199, 5500, 14000, 1.5, 2.8), 132), 0.0018);
   /* sakura, near enough to read as blossom rather than as pink dots — but at 1.5–3.0 on a
      250-unit model they stood taller than the cedars while being half the distance away, and
      four of them filled the frame. Same footprint as everything else now. */
-  instanced(sakura, woodMat(), 26, (i) => {
+  instanced(sakura, woodMat(), 40, spaced((i) => {
     const p = scatter(i, 71, 2200, 8000, 11000);
     const pos = onGround(p.d, p.s - 700, -10);
     if (blocked(pos.x, pos.z)) return null;
     const k = 1.0 + p.r * 0.9;
     return { pos, rot: hash01(i, 401) * 6.28, scale: new THREE.Vector3(k, k, k) };
-  }, 0.0020);
+  }, 78), 0.0020);
 
   /* ---- the coast ----
      A shoreline wants its own planting, not whatever the valley scatter happens to leave there:
@@ -3250,9 +3375,9 @@ function ringSpot(seed, near, far, lo, hi) {
       scale: new THREE.Vector3(k, k * (0.82 + hash01(i, seed + 617) * 0.42), k),
     };
   };
-  instanced(cedar, woodMat(), 170, coastSpot(457, 0.8, 1.7), 0.0016);
-  instanced(broad, woodMat(), 130, coastSpot(521, 0.85, 1.8), 0.0018);
-  instanced(sakura, woodMat(), 30, coastSpot(587, 0.9, 1.6), 0.0020);
+  instanced(cedar, woodMat(), 260, spaced(coastSpot(457, 0.8, 1.7), 62), 0.0016);
+  instanced(broad, woodMat(), 200, spaced(coastSpot(521, 0.85, 1.8), 132), 0.0018);
+  instanced(sakura, woodMat(), 46, spaced(coastSpot(587, 0.9, 1.6), 150), 0.0020);
 }
 
 /* ---- clouds ----
@@ -5001,17 +5126,22 @@ function worldL2Bodies() { return worldL2 ? worldL2.picks.map((q) => q.hit) : []
 function setHot(q) {
   if (worldHot === q) return;
   if (worldHot) {
-    gsap.to(worldHot.root.rotation, { x: 0, duration: 0.5, ease: 'elastic.out(1, 0.7)' });
+    /* OVERWRITE, ALWAYS. Two tweens on the same property do not queue, they both run, and with
+       an elastic ease of one duration racing a shorter one of another the loser can finish last
+       and leave the tablet parked at the wrong angle — which is exactly what a fast hover and
+       unhover produced. `overwrite: true` kills whatever else is animating this object first, so
+       there is only ever one tween per tablet and the rest pose cannot be overshot into. */
+    gsap.to(worldHot.root.rotation, { x: 0, duration: 0.5, ease: 'elastic.out(1, 0.7)', overwrite: true });
     const r = worldHot.emRest;
-    gsap.to(worldHot.face.material.emissive, { r: r.r, g: r.g, b: r.b, duration: 0.28 });
+    gsap.to(worldHot.face.material.emissive, { r: r.r, g: r.g, b: r.b, duration: 0.28, overwrite: true });
   }
   worldHot = q;
   if (q) {
-    gsap.to(q.root.rotation, { x: -0.30, duration: 0.72, ease: 'elastic.out(1, 0.55)' });
+    gsap.to(q.root.rotation, { x: -0.30, duration: 0.72, ease: 'elastic.out(1, 0.55)', overwrite: true });
     /* a lift, not a floodlight: at 3x the writing washed off the tablet, which is the opposite
        of what picking one is for */
     const h = q.emHot;
-    gsap.to(q.face.material.emissive, { r: h.r, g: h.g, b: h.b, duration: 0.2 });
+    gsap.to(q.face.material.emissive, { r: h.r, g: h.g, b: h.b, duration: 0.2, overwrite: true });
   }
   document.body.style.cursor = q ? 'pointer' : '';
 }
