@@ -477,6 +477,20 @@
      problems at any viewport, and it belongs with the ESC hint opposite it, which already says
      the same thing. Small, off to the side, and carrying the section's colour so it still reads
      as part of the place. */
+  /* the walk's only chrome. You cannot see the whole list from inside a corridor, so the one
+     thing the screen has to say is where in it you are — everything else is on the placards. */
+  .walk-hud {
+    left: 50%; top: 30px; transform: translateX(-50%);
+    display: flex; align-items: baseline; gap: 14px;
+    opacity: 0; transition: opacity 0.34s ease;
+    /* it sits against vermilion for the whole of the walk, so it needs more than a wash */
+    background: rgba(12, 10, 8, 0.72); padding: 9px 20px;
+    border-bottom: 3px solid var(--sec, var(--hi));
+  }
+  body.at-walk .walk-hud { opacity: 1; }
+  .walk-hud .wh-jp { font-family: var(--jp); font-weight: 700; font-size: 21px; letter-spacing: 0.1em; color: var(--washi); }
+  .walk-hud .wh-en { font-family: var(--lat); font-size: 11px; letter-spacing: 0.3em; color: rgba(242,234,216,0.55); }
+  .walk-hud .wh-at { font-family: var(--lat); font-size: 13px; letter-spacing: 0.14em; color: var(--sec, var(--hi)); }
   .back-tab { left: 40px; bottom: 62px; opacity: 0; transition: opacity 0.32s ease; }
   body:not(.at-menu) .back-tab { opacity: 1; }
   body.at-menu .back-tab button { pointer-events: none; }
@@ -1038,6 +1052,9 @@
   <button class="upnext-item" id="upnextBtn"><span id="upnextText">24 cards due for review</span><i>→</i></button>
 </div>
 <div class="chrome desc-line menu-only" id="descLine"><b>Kana, kanji and vocabulary by section</b><i>かな・漢字・語彙のセクション学習</i></div>
+<div class="chrome walk-hud" id="walkHud">
+  <span class="wh-jp"></span><span class="wh-en"></span><b class="wh-at"></b>
+</div>
 <div class="chrome back-tab" id="backTab">
   <button type="button"><span class="bt-ar">&#9666;</span><span class="bt-jp">&#25147;&#12427;</span><span class="bt-en">BACK</span></button>
 </div>
@@ -2683,6 +2700,60 @@ function emaTexture(jp, en, meta, accent, size, msize) {
   return t;
 }
 
+/* 神額 — the placard on a gate. Landscape rather than portrait, so it is a different object
+   from the ema and reads as one: the deck's name across it, its count and how far through it you
+   are down the right, and the row's number struck into the corner. Same rules as the tablet —
+   English leads, the Japanese is a gloss, the figure shares no size with anything because there
+   is only one of it on each board. */
+function signTexture(jp, en, count, unit, pct, accent) {
+  const W = 520, H = 316;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f0e5cb';
+  g.fillRect(0, 0, W, H);
+  g.save();
+  g.beginPath(); g.rect(0, 0, W, H); g.clip();
+  for (let i = 0; i < 22; i++) {
+    g.strokeStyle = `rgba(120,94,58,${(0.03 + Math.random() * 0.05).toFixed(3)})`;
+    g.lineWidth = 1 + Math.random() * 2.5;
+    const y = Math.random() * H;
+    g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(W * 0.4, y + 10, W * 0.7, y - 12, W, y + 4); g.stroke();
+  }
+  g.restore();
+  g.strokeStyle = 'rgba(74,54,34,0.55)'; g.lineWidth = 10; g.strokeRect(0, 0, W, H);
+
+  const INK = '#2b1c10';
+  g.textAlign = 'left';
+  g.fillStyle = INK;
+  g.letterSpacing = '2px';
+  const size = emaFit(en, W - 200, 74, '2px');
+  g.font = `900 ${size}px "Arial Black", Arial, sans-serif`;
+  g.fillText(en, 34, 128, W - 200);
+  g.letterSpacing = '0px';
+  g.fillStyle = 'rgba(43,28,16,0.6)';
+  g.font = '700 34px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif';
+  g.fillText(jp, 36, 176, W - 210);
+  /* the rule and the count, the same two moves the tablet makes */
+  g.fillStyle = accent;
+  g.fillRect(34, 208, W * 0.5, 6);
+  g.font = '900 54px "Arial Black", Arial, sans-serif';
+  g.fillText(`${count} ${unit}`.toUpperCase(), 34, 276, W * 0.52);
+  /* how far through it you are: five segments, filled */
+  const segs = Math.round(pct / 20);
+  for (let i = 0; i < 5; i++) {
+    g.fillStyle = i < segs ? accent : 'rgba(43,28,16,0.16)';
+    g.fillRect(W - 44 - i * 34, 246, 26, 30);
+  }
+  g.textAlign = 'right';
+  g.fillStyle = 'rgba(43,28,16,0.5)';
+  g.font = '700 30px "Yu Gothic UI", sans-serif';
+  g.fillText(pct === 100 ? 'DONE' : (pct === 0 ? '\u2014' : pct + '%'), W - 36, 200);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = backRenderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
 const backTab = document.getElementById('backTab');
 backTab.querySelector('button').addEventListener('click', () => goBack());
 
@@ -2702,6 +2773,9 @@ function worldPickEl(label, onPick) {
 }
 
 const WORLD_L2 = {};
+/* a section whose level three is a walk registers it here: the placards, how to letter them, and
+   where the camera stands to read each one */
+const WORLD_L3 = {};
 const WORLD_SWAY = [];
 /* THE RACK IS GONE. It was 974 units wide against a gate 781 wide and cedars 800 tall — a
    fifteen-metre timber structure standing in front of the landmark and out-massing it, which
@@ -2943,8 +3017,8 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
   return grp;
 }
 function pickWorldTile(sec, jp) {
-  if (busy || state !== 'sub') return;
-  if (L3DATA[sec] && L3DATA[sec][jp]) enterL3(sec, jp);
+  if (busy || state !== 'sub' || subLevel !== 2) return;
+  if (WORLD_L3[sec] || (L3DATA[sec] && L3DATA[sec][jp])) enterL3(sec, jp);
 }
 /* ================= REVIEW: 神社 — the shrine precinct =================
    A FULL AREA, AND DELIBERATELY OUT OF THE MENU'S SIGHT. At bearing 26° it sat inside the home
@@ -2997,6 +3071,11 @@ function pickWorldTile(sec, jp) {
      whatever the hill is doing, and everything standing on it can be placed from one number
      instead of from `groundAt` at its own station — which is the bug that hid the wall's plinth
      three times over. */
+  /* the tunnel's measurements, needed here because the paving has to reach the end of it */
+  /* long enough to hold the walk. The viewpoint for one placard has to stand clear of the one
+     before it, so the sign spacing sets the tunnel's length, not the other way round. */
+  const TUN_H = GATE_H * 0.86, TUN_STEP = 268, TUN_F0 = 640, TUN_N = 26;
+  const TUN_END = TUN_F0 + (TUN_N - 1) * TUN_STEP;
   const CY = { f0: -1400, f1: -170, half: 470 };
   let CY_TOP = -Infinity;
   for (let f2 = CY.f0; f2 <= CY.f1; f2 += 110) {
@@ -3020,7 +3099,7 @@ function pickWorldTile(sec, jp) {
       }
     };
     strip(-2560, CY.f0 + 30);
-    strip(CY.f1 - 30, 3400);
+    strip(CY.f1 - 30, TUN_END + 860);
     /* the court: one slab and a kerb course standing just proud of it */
     const slab = (halfW, top, depth, colour, over) => {
       const a = at3(CY.f0 - over, 0), b = at3(CY.f1 + over, 0);
@@ -3085,25 +3164,25 @@ function pickWorldTile(sec, jp) {
      drives it toward the bottom edge twice as fast as it lifts the gate. */
   DEST_SPECS[1].focus = at3(-430, 18, GATE_H * 0.46);
 
-  /* the tunnel: each gate smaller than the last AND closer to it, so the far end reads as
-     distance rather than as a row of identical objects */
-  let f = 640, sc = 0.80;
-  for (let i = 0; i < 11; i++) {
-    const g = new THREE.Mesh(toriiGeo(GATE_H * sc), gateMat);
-    g.position.copy(at3(f, 0));
-    g.rotation.copy(gate.rotation);
-    backScene.add(g);
-    if (i < 3) addOutline(g, 0.0028);
-    f += 290 * sc;
-    sc *= 0.94;
-  }
+  /* ---- 千本鳥居 — the tunnel ----
+     UNIFORM NOW, AND THAT IS NOT A STYLE CHOICE. Each gate smaller and nearer than the last was
+     a cheap way to fake depth from one fixed viewpoint, and it worked perfectly until level three
+     sent the camera down it — at which point it is a corridor that closes to a point you cannot
+     fit through, with a tie beam at 114 units and a camera at 182. A real senbon-torii is uniform
+     anyway; the depth comes from there being a great many of them, which is also cheaper: one
+     instanced mesh and one outline twin instead of eleven of each. */
+  instanced(toriiGeo(TUN_H), gateMat, TUN_N, (i) => ({
+    pos: at3(TUN_F0 + i * TUN_STEP, 0),
+    rot: gate.rotation.y,
+    scale: new THREE.Vector3(1, 1, 1),
+  }), 0.0026);
 
   /* the hall at the end of it */
   const hall = new THREE.Mesh(shrineHallGeo(620, 420, 520), new THREE.MeshToonMaterial({
     vertexColors: true, gradientMap: RAMP, flatShading: true,
   }));
-  hall.position.copy(at3(f + 620, 0));
-  facing(hall, -1, 0);
+  hall.position.copy(at3(TUN_END + 700, 0));
+  facing(hall, TUN_END, 0);
   backScene.add(hall);
   addOutline(hall, 0.0026);
 
@@ -3123,6 +3202,126 @@ function pickWorldTile(sec, jp) {
       backScene.add(m);
       if (i < 4) addOutline(m, 0.0024);
     });
+
+  /* ---- level three's placards ----
+     A corridor cannot show a list all at once. Anything standing in it converges on the vanishing
+     point, so the only way to separate N signs on screen is to have their offsets grow with their
+     distance — which means a widening corridor, which is not a corridor. Every arrangement that
+     keeps the camera still ends with the third sign hiding behind the first. So the camera moves,
+     and the list is something you WALK: one placard beside you, the next ahead of you, the rest
+     receding, and a counter to say where in it you are. That is what "a path you travel down"
+     turns out to require rather than merely permit.
+
+     The placards are PERMANENT, like everything else here — hung from the tie beams of alternate
+     gates, which is where a senbon-torii carries its donors' names. Choosing a queue re-letters
+     them; it does not conjure them. */
+  /* every fourth gate. At every second the viewpoints are 536 apart and the stand-off is 620,
+     so each one lands 84 units SHORT of the previous placard — the camera flies into the back of
+     the sign it has just left. The rule is simply that the spacing must exceed the stand-off, and
+     it wants to exceed it by enough that the last sign is behind you rather than beside you. */
+  /* AND THE STAND-OFF HAS TO LAND MID-BAY. At 620 the eye came to rest 50 units past a gate —
+     inside it, near enough — and every viewpoint had a post filling the frame's edge. In a
+     regular colonnade the camera's distance is not a free number: it has to be a whole count of
+     bays plus a half, measured from the placard's own offset. 804 is three bays back from the
+     gate the sign hangs half a bay in front of. */
+  const L3_SLOTS = 6, L3_STEP = 4, L3_STAND = 3.5 * 268 - 134;
+  const L3_SIGNS = [];
+  {
+    const SW = 168, SH = 102, STH = 7;
+    const board = new THREE.BoxGeometry(SW, SH, STH);
+    const woodMat = new THREE.MeshToonMaterial({ color: 0x6b5744, gradientMap: RAMP, flatShading: true });
+    for (let k = 0; k < L3_SLOTS; k++) {
+      /* BETWEEN THE GATES, NOT ON ONE. Hung at a gate's own plane the placard is turned toward
+         the reader, and turning it swings its outer edge 34 units BACK — straight into the post
+         it is hanging beside, which cuts the first letter off every line. Half a bay forward it
+         has the whole opening to itself, and the rail it then needs is a better answer anyway:
+         a beam across the corridor is what you would actually hang a sign from. */
+      const gi = 2 + k * L3_STEP;
+      const f2 = TUN_F0 + gi * TUN_STEP - TUN_STEP / 2;
+      /* INSIDE THE SIGHT LINE PAST THE NEAREST POST. The placard and the posts sit at similar
+         distances from the axis, so from three bays back the post two bays ahead subtends a
+         slightly WIDER angle than the sign's outer edge does — and shaves the first character off
+         every line. It is not a depth-sorting problem and no amount of moving the sign along the
+         corridor fixes it; the offset has to come in until the sign fits inside the opening the
+         nearer gate leaves. */
+      const sd = (k % 2 ? 1 : -1) * 92;
+      const hangY = at3(f2, sd).y + TUN_H * 0.60;
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(TUN_H * 0.88, 10, 12),
+        new THREE.MeshToonMaterial({ color: 0x46372a, gradientMap: RAMP, flatShading: true }));
+      rail.position.copy(at3(f2, 0));
+      rail.position.y = hangY;
+      rail.rotation.y = gate.rotation.y;
+      backScene.add(rail);
+      const root = new THREE.Group();
+      root.position.copy(at3(f2, sd));
+      root.position.y = hangY - SH * 0.62 - 34;
+      /* facing back down the corridor and canted inward, the way a shop sign in an alley is:
+         readable from just before it, foreshortened from far off, which is the right order */
+      /* NO HALF-TURN. `facing` already points the gates back down the approach, so the gate's own
+         +Z is the direction a reader comes from — adding pi sent every placard's written face
+         down the tunnel and left the back of the board pointing at the camera, which renders as
+         a plain brown rectangle and looks exactly like a texture that failed to load. */
+      root.rotation.y = gate.rotation.y + (k % 2 ? 0.42 : -0.42);
+      backScene.add(root);
+      const body = new THREE.Mesh(board, woodMat);
+      root.add(body);
+      /* the cords it hangs by */
+      [-1, 1].forEach((sx) => {
+        const c2 = new THREE.Mesh(new THREE.BoxGeometry(5, 40, 5),
+          new THREE.MeshToonMaterial({ color: 0x3d3128, gradientMap: RAMP }));
+        c2.position.set(sx * SW * 0.36, SH * 0.5 + 20, 0);
+        root.add(c2);
+      });
+      const o = new THREE.Mesh(outlineGeom(board), outlineMaterial(0.0024));
+      o.frustumCulled = false;
+      root.add(o);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(SW, SH), new THREE.MeshToonMaterial({
+        gradientMap: RAMP, transparent: true,
+      }));
+      face.position.z = STH / 2 + 0.4;
+      root.add(face);
+      face.material.opacity = 0.42;
+      /* the sign turns to meet you when you stop beside it, and sits back when you move on */
+      L3_SIGNS.push({ root, face, f: f2, sd, baseRy: root.rotation.y, turn: (k % 2 ? -0.30 : 0.30) });
+    }
+    WORLD_L3.REVIEW = {
+      signs: L3_SIGNS,
+      rows: L3_SLOTS,
+      /* the decks never change, only the numbers the chosen queue puts against them */
+      letter(tileJp) {
+        const q = L3_REVIEW.queues[tileJp] || L3_REVIEW.queues['総復習'];
+        const accent = SECTION_ACCENT.REVIEW[1];
+        this.rows = Math.min(L3_SLOTS, L3_REVIEW.decks.length);
+        L3_SIGNS.forEach((s2, k) => {
+          if (k >= this.rows) return;
+          const [jp2, en2] = L3_REVIEW.decks[k];
+          const [n, pct] = q[k];
+          if (s2.face.material.map) s2.face.material.map.dispose();
+          const t2 = signTexture(jp2, en2, n, L3_REVIEW.unit, pct, accent);
+          s2.face.material.map = t2;
+          s2.face.material.emissiveMap = t2;
+          /* A TUNNEL IS A DARK PLACE. The ema wall's emissive was tuned against open sky; a
+             placard hung between two vermilion gates gets almost no direct light and very little
+             fill, so at the same value it came out as a brown rectangle with writing invisible
+             inside it. It has to carry itself here. */
+          /* essentially self-lit. A placard between two vermilion gates gets almost no direct
+             light and very little fill, and the sun rakes post shadows across it — at anything
+             less than this the writing goes in and out of legibility as you walk. */
+          s2.face.material.emissive.setHex(0xe8dfc8);
+          s2.face.material.needsUpdate = true;
+        });
+      },
+      /* stand short of the placard and look past it down the corridor, so the one you are reading
+         is beside you and the rest of the walk is still ahead */
+      /* 112 UNITS, NOT 200. The gate is 470 for a torii that would be nine metres, which puts a
+         unit at about twenty millimetres — so the 182 the courtyard camera rides at is a viewer
+         three and a half metres tall. Outdoors nobody notices; inside a corridor whose tie beams
+         are at 242 it means the beams cross at eye level and there is no corridor to see down.
+         112 is a shade over two metres and the tunnel opens up. */
+      eyeAt: (s2) => { const v = at3(s2.f - L3_STAND, 0); v.y += 112; return v; },
+      tgtAt: (s2) => { const v = at3(s2.f + 620, s2.sd * 0.34); v.y += 150; return v; },
+    };
+  }
 
   /* AND THE WALL. Small, and standing much nearer the camera than the gate does — that is the
      whole trick: perspective gives the tablets the frame they need while the gate stays the
@@ -4811,6 +5010,24 @@ const L3DATA = {
     '聴解': { en: 'LISTENING', rows: [['N5 模試', 'N5 mock exam', '2 tries · best 80%', 80], ['N4 模試', 'N4 mock exam', '1 try · best 58%', 58], ['N3 模試', 'N3 mock exam', 'not taken', 0], ['N2 模試', 'N2 mock exam', 'not taken', 0], ['N1 模試', 'N1 mock exam', 'not taken', 0]] },
   },
 };
+/* ---- what REVIEW's level three actually IS ----
+   Its four tiles are QUEUES, not lists — you do not browse "due today", you run it — which is why
+   this section has had no level three while four others did. What it can honestly show is what
+   the queue is made OF: the same decks every time, with the count and the progress that this
+   queue sees. So the placards down the tunnel never change identity, only their numbers, which
+   is also why they can be permanent scenery rather than something that spawns. */
+const L3_REVIEW = {
+  decks: [['漢字 N5', 'KANJI N5'], ['語彙', 'VOCAB'], ['文法', 'GRAMMAR'],
+    ['カタカナ', 'KATAKANA'], ['聴解', 'LISTENING'], ['ひらがな', 'HIRAGANA']],
+  /* per queue, per deck: [count, percent through] */
+  queues: {
+    '今日の分': [[8, 74], [7, 61], [5, 88], [4, 42], [0, 100], [0, 100]],
+    '苦手札': [[3, 22], [2, 31], [1, 45], [1, 12], [0, 0], [0, 0]],
+    '先取り': [[4, 96], [3, 88], [2, 92], [2, 70], [1, 55], [0, 100]],
+    '総復習': [[96, 74], [88, 61], [64, 88], [46, 42], [47, 30], [46, 100]],
+  },
+  unit: 'cards',
+};
 let subLevel = 2, l3Page = 0, l3Section = 'STUDY', l3Tile = '漢字';
 function renderL3(animate = true) {
   const sec = L3DATA[l3Section];
@@ -4842,6 +5059,7 @@ function renderL3(animate = true) {
 const _dolly = new THREE.Vector3();
 function enterL3(sectionEn, tileJp) {
   if (state !== 'sub' || subLevel !== 2) return;
+  if (WORLD_L3[sectionEn]) { enterWalk(sectionEn, tileJp); return; }
   subLevel = 3;
   l3Section = sectionEn;
   l3Tile = tileJp;
@@ -4875,6 +5093,7 @@ function enterL3(sectionEn, tileJp) {
 }
 function exitL3() {
   if (subLevel !== 3) return;
+  if (walkSec) { exitWalk(); return; }
   subLevel = 2;
   const face = subEl.querySelector('.sub-l3');
   const tl = gsap.timeline({ onComplete: () => { showSubBoard(false); } });
@@ -4890,6 +5109,75 @@ function exitL3() {
     duration: 0.6, ease: 'power2.inOut',
   }, 0.1);
 }
+
+/* ================= level three as a walk =================
+   The camera stops beside one placard at a time and glides to the next. Everything else is a
+   consequence of that: the counter exists because you cannot see the whole list, the arrow keys
+   exist because moving IS the scrollbar, and the placards are lit by proximity rather than by
+   hover because the one you are beside is the one you are reading. */
+let walkSec = null, walkTile = '', walkAt = 0;
+const walkHud = document.getElementById('walkHud');
+function walkPlace(i) {
+  const w = WORLD_L3[walkSec];
+  const s = w.signs[Math.max(0, Math.min(i, w.rows - 1))];
+  return { eye: w.eyeAt(s), tgt: w.tgtAt(s) };
+}
+function walkGo(i, dur = 0.62) {
+  const w = WORLD_L3[walkSec];
+  walkAt = Math.max(0, Math.min(i, w.rows - 1));
+  const { eye, tgt } = walkPlace(walkAt);
+  gsap.to(cam, {
+    px: eye.x, py: eye.y, pz: eye.z, tx: tgt.x, ty: tgt.y, tz: tgt.z,
+    fov: 44, roll: 0, duration: dur, ease: 'power2.inOut', overwrite: true,
+  });
+  walkLight();
+  walkHud.querySelector('.wh-at').textContent = `${walkAt + 1} / ${w.rows}`;
+}
+/* the placard you are beside is the one you are reading: it takes the ink, its neighbours fade */
+function walkLight() {
+  const w = WORLD_L3[walkSec];
+  w.signs.forEach((s, k) => {
+    const near = Math.abs(k - walkAt);
+    gsap.to(s.face.material, { opacity: k >= w.rows ? 0 : (near === 0 ? 1 : near === 1 ? 0.72 : 0.42),
+      duration: 0.4, overwrite: true });
+    gsap.to(s.root.rotation, { y: s.baseRy + (near === 0 ? s.turn : 0), duration: 0.5, ease: 'power2.out', overwrite: true });
+  });
+}
+function enterWalk(sectionEn, tileJp) {
+  const w = WORLD_L3[sectionEn];
+  if (!w || busy) return;
+  subLevel = 3;
+  walkSec = sectionEn;
+  walkTile = tileJp;
+  w.letter(tileJp);
+  document.body.classList.add('at-walk');
+  document.body.classList.remove('world-l2');
+  walkHud.querySelector('.wh-jp').textContent = tileJp;
+  walkHud.querySelector('.wh-en').textContent = (SUBTILES[sectionEn].find((t) => t[0] === tileJp) || ['', ''])[1];
+  walkHud.style.setProperty('--sec', SECTION_ACCENT[sectionEn][0]);
+  /* the section's own chrome steps aside — you are past it now */
+  gsap.to(L2_PLANES[sectionEn].map((q) => q.el), { opacity: 0, duration: 0.3 });
+  walkGo(0, 1.15);
+  boldStreaks(1);
+}
+function exitWalk() {
+  if (!walkSec) return;
+  const sec = walkSec;
+  walkSec = null;
+  subLevel = 2;
+  document.body.classList.remove('at-walk');
+  document.body.classList.add('world-l2');
+  gsap.to(L2_PLANES[sec].map((q) => q.el), { opacity: 1, duration: 0.4, delay: 0.35 });
+  const d = destFor(ITEMS.findIndex((it) => it.en === sec));
+  gsap.to(cam, {
+    px: d.eye.x, py: d.eye.y, pz: d.eye.z, tx: d.focus.x, ty: d.focus.y, tz: d.focus.z,
+    fov: 42, roll: 0, duration: 0.95, ease: 'power2.inOut', overwrite: true,
+  });
+}
+addEventListener('wheel', (e) => {
+  if (!walkSec || busy) return;
+  walkGo(walkAt + (e.deltaY > 0 ? 1 : -1), 0.5);
+}, { passive: true });
 
 /* the sub plane is detached until the first CSS3D render — query through subEl, not document */
 subEl.querySelector('#l3Back').addEventListener('click', exitL3);
@@ -5434,6 +5722,11 @@ addEventListener('keydown', (e) => {
     else if (e.key === 'Enter') select(active);
     else if (e.key >= '1' && e.key <= '6') { const i = +e.key - 1; setActive(i); itemEls[i].focus({ preventScroll: true }); }
     else if (e.key === 't' || e.key === 'T') { if (!busy) setTmode(tmode === 1 ? 2 : 1); }
+  } else if (state === 'sub' && walkSec) {
+    /* moving IS the scrollbar down here */
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') walkGo(walkAt + 1, 0.5);
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') walkGo(walkAt - 1, 0.5);
+    else if (e.key === 'Escape' || e.key === 'Backspace') goBack();
   } else if (state === 'sub' && (e.key === 'Escape' || e.key === 'Backspace')) goBack();
 });
 

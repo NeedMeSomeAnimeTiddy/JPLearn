@@ -1367,6 +1367,47 @@ Three things worth keeping out of the exercise itself:
   before the shot lands. Exposing the camera RIG — not `camera`, which `applyCamera` overwrites
   every frame from it — lets any point on any flight path be parked on and photographed.
 
+## v41 — level three is a walk
+
+REVIEW's four tiles are QUEUES, not lists — you do not browse "due today", you run it — which is
+why this section had no level three while four others did. What it can honestly show is what the
+queue is made OF: the same six decks every time, with the count and the progress **this** queue
+sees. The placards down the tunnel therefore never change identity, only their numbers, which is
+also what lets them be permanent scenery instead of something that spawns on arrival.
+
+- **A corridor cannot show a list all at once, and no arrangement fixes that.** Everything in a
+  corridor converges on the vanishing point, so keeping N signs apart on screen needs their
+  offsets to grow with their distance — which means a widening corridor, which is not a corridor.
+  Every static-camera layout ends with the third sign hidden behind the first. So the camera
+  moves, the counter exists because you cannot see the whole list, and the arrow keys are the
+  scrollbar. **"A path you travel down" turned out to be required by the geometry rather than
+  merely permitted by it.**
+- **A tunnel that fakes depth cannot be entered.** Gates each smaller and nearer than the last
+  read beautifully from one fixed viewpoint and are a corridor that closes to a point the moment
+  the camera goes down it — tie beam at 114 against a camera at 182. Uniform gates are what a
+  real senbon-torii has anyway, and they instance to one draw call instead of eleven.
+- **Check the unit scale before choosing an eye height.** The gate is 470 for a torii that would
+  be nine metres, so a unit is about twenty millimetres and the courtyard camera rides at three
+  and a half metres. Outdoors nobody notices. Inside a corridor whose beams are at 242 it means
+  the beams cross at eye level and there is no corridor to look down.
+- **In a regular colonnade the camera's distance is not a free number.** At an arbitrary stand-off
+  every viewpoint came to rest inside a gate. It has to be a whole count of bays plus a half,
+  measured from the sign's own offset within the bay.
+- **Sight lines, not depth sorting.** The placards and the posts sit at similar distances from the
+  axis, so from three bays back the post two bays ahead subtends a *wider* angle than the sign's
+  outer edge and shaves the first character off every line. Nothing about moving the sign along
+  the corridor fixes that; the offset has to come inside the opening the nearer gate leaves.
+- **`facing` had already turned the gates round.** Adding a further half-turn to the placards sent
+  their written faces down the tunnel and left the backs of the boards pointing at the camera —
+  which renders as a plain brown rectangle and looks *exactly* like a texture that failed to load.
+  Half an hour went into the wrong half of that.
+- **A tunnel is a dark place.** The emissive tuned for a tablet under open sky leaves a placard
+  between two vermilion gates as a brown rectangle with invisible writing, and post shadows rake
+  across it as you walk. In there a sign has to carry itself almost entirely.
+- **A colonnade is not a collision.** The clipping audit counted every adjacent pair of tunnel
+  gates as a 97% intersection the moment they became an InstancedMesh. A repeated structure with
+  deliberate spacing looks identical to a fault if all you measure is bounding boxes.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1562,6 +1603,16 @@ Three things worth keeping out of the exercise itself:
 - **Expose the camera rig, not the camera.** Anything that rewrites `camera.position` every frame
   makes the camera unsettable from outside, and every question about a flight path then becomes
   unanswerable without it.
+
+- **Scenery built for one viewpoint cannot be entered.** Any depth faked by scaling breaks the
+  moment the camera is allowed inside it.
+- **Know your unit scale.** An eye height that is invisible outdoors is a giant indoors.
+- **In a repeated structure, distances are quantised.** Bay spacing decides where a camera may
+  stand, not taste.
+- **Occlusion in a colonnade is a question about angles, not depths.** Two things at similar
+  offsets from an axis trade places in the frame as the camera moves back.
+- **A measurement that cannot tell a colonnade from a collision will report a colonnade.** Every
+  automatic check needs to know what the scene means, not just where its boxes are.
 
 ## Sources
 
