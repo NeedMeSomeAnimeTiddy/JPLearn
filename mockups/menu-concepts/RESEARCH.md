@@ -1525,6 +1525,28 @@ coat, and the second is the interesting one.
   viewport sizes and asserting a 4% margin turned "looks fine to me" into six numbers, three of
   which were negative.
 
+## v46 — the name becomes a board
+
+The section title stops being type floating over the scene and becomes a 扁額 hanging in it,
+which also retires the last thing the safe-zone problem was about: a board mounted on a building
+cannot leave the frame, because the building cannot.
+
+- **Black lacquer and gold is not a stylistic choice here, it is the only thing that reads.** A
+  name-board has to sit against vermilion at dusk; a light board disappears into the sky behind it
+  and a mid-tone one disappears into the timber. A ground darker than anything else in the frame
+  with letters that carry their own light is what a real hengaku is for.
+- **Where a name-board goes is a question about the building, not about the type.** Three
+  placements, built and switchable with `?title=a|b|c`, because the only way to judge one is in
+  the place — over the tablets on the ema wall, on the gate's gakuzuka (which is what that strut
+  is FOR), and under the water pavilion's near eave.
+- **A board mounted on a structure that faces across the court is invisible from up the court.**
+  The pavilion is turned to address the ema wall — that is what makes the courtyard a courtyard —
+  so the first version of C was seen edge-on and read as a bright sliver on the roof. The eave
+  facing back down the way in is the surface a visitor actually sees, and hanging a board under
+  an eave is what that surface is for.
+- **Parent to the structure and inherit its geometry for free.** The ema-wall board is a child of
+  the wall group, so it takes the wall's 36° turn toward the path without knowing the number.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.

@@ -2731,6 +2731,114 @@ function emaTexture(jp, en, meta, accent, size, msize) {
   return t;
 }
 
+/* ---- 扁額 — the name-board ----
+   The section's name as a thing hanging in the shrine rather than as type floating over it. A
+   hengaku is black lacquer with the characters raised in gold, which is not a stylistic choice
+   so much as the only way a name-board reads at dusk against vermilion: the ground goes darker
+   than anything behind it and the letters carry their own light.
+
+   Three placements are built and switchable with `?title=a|b|c`, because where a name-board goes
+   is a question about the building and not about the type — it has to be judged in the place:
+
+     a  on the ema wall, over the tablets      (the board belongs to the thing you read)
+     b  in the gate, on the gakuzuka           (where a torii actually carries a shrine's name)
+     c  on the water pavilion's gable          (across the court, answering the wall)
+*/
+const TITLE_V = (() => {
+  const v = (new URLSearchParams(location.search).get('title') || 'a').toLowerCase();
+  return ['a', 'b', 'c'].includes(v) ? v : 'a';
+})();
+function hengakuTexture(jp, en, w, h) {
+  const W = 512, H = Math.round(512 * h / w);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#17120c'; g.fillRect(0, 0, W, H);
+  /* lacquer is not flat — a few long soft streaks stop it reading as a hole cut in the scene */
+  g.save(); g.beginPath(); g.rect(0, 0, W, H); g.clip();
+  for (let i = 0; i < 16; i++) {
+    g.strokeStyle = `rgba(232,215,170,${(0.012 + Math.random() * 0.022).toFixed(3)})`;
+    g.lineWidth = 2 + Math.random() * 9;
+    const y = Math.random() * H;
+    g.beginPath(); g.moveTo(-10, y); g.bezierCurveTo(W * 0.4, y + 8, W * 0.7, y - 9, W + 10, y + 3); g.stroke();
+  }
+  g.restore();
+  /* a gold fillet inset from the edge, which is what makes a board look framed rather than cut */
+  g.strokeStyle = '#8a6f33'; g.lineWidth = 5;
+  g.strokeRect(13, 13, W - 26, H - 26);
+  g.strokeStyle = 'rgba(216,178,92,0.30)'; g.lineWidth = 2;
+  g.strokeRect(24, 24, W - 48, H - 48);
+
+  const wide = w / h > 2.1;
+  g.textBaseline = 'alphabetic';
+  const gold = '#dcb75f';
+  if (wide) {
+    /* side by side: the kanji carries it and the latin sits after it on the same line */
+    g.textAlign = 'left';
+    const size = Math.round(H * 0.56);
+    g.font = `700 ${size}px "Yu Mincho", "Hiragino Mincho ProN", serif`;
+    const jw = g.measureText(jp).width;
+    const total = jw + 26 + en.length * (size * 0.30);
+    let x = (W - total) / 2;
+    g.fillStyle = 'rgba(0,0,0,0.55)';
+    g.fillText(jp, x + 4, H * 0.72 + 4);
+    g.fillStyle = gold;
+    g.fillText(jp, x, H * 0.72);
+    x += jw + 26;
+    g.letterSpacing = '7px';
+    g.font = `700 ${Math.round(size * 0.26)}px "Arial Black", Arial, sans-serif`;
+    g.fillStyle = 'rgba(232,223,200,0.82)';
+    g.fillText(en, x, H * 0.66);
+    g.letterSpacing = '0px';
+  } else {
+    g.textAlign = 'center';
+    const size = Math.round(H * 0.44);
+    g.font = `700 ${size}px "Yu Mincho", "Hiragino Mincho ProN", serif`;
+    g.fillStyle = 'rgba(0,0,0,0.55)';
+    g.fillText(jp, W / 2 + 4, H * 0.60 + 4, W - 90);
+    g.fillStyle = gold;
+    g.fillText(jp, W / 2, H * 0.60, W - 90);
+    g.letterSpacing = '8px';
+    g.font = `700 ${Math.round(H * 0.11)}px "Arial Black", Arial, sans-serif`;
+    g.fillStyle = 'rgba(232,223,200,0.8)';
+    g.fillText(en, W / 2, H * 0.82, W - 100);
+    g.letterSpacing = '0px';
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = backRenderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+/* the board itself: a lacquered panel in a frame, with a cap over it. Returned as a group so the
+   caller can hang it, mount it or stand it on something. */
+function hengaku(jp, en, w, h) {
+  const grp = new THREE.Group();
+  const TH = w * 0.045;
+  const parts = [];
+  parts.push({ geo: beamSeg(w, h, TH, 0, 0, 0), color: 0x241d15 });
+  /* stiles and rails, standing proud of the panel */
+  const r = Math.max(w, h) * 0.045;
+  parts.push({ geo: beamSeg(w + r * 2, r, TH * 1.7, 0, h / 2 + r / 2, 0), color: 0x3a2c1c });
+  parts.push({ geo: beamSeg(w + r * 2, r, TH * 1.7, 0, -h / 2 - r / 2, 0), color: 0x3a2c1c });
+  [-1, 1].forEach((sx) => {
+    parts.push({ geo: beamSeg(r, h + r * 2, TH * 1.7, sx * (w / 2 + r / 2), 0, 0), color: 0x3a2c1c });
+  });
+  const frame = new THREE.Mesh(mergeParts(parts), new THREE.MeshToonMaterial({
+    vertexColors: true, gradientMap: RAMP, flatShading: true,
+  }));
+  grp.add(frame);
+  const tex = hengakuTexture(jp, en, w, h);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshToonMaterial({
+    map: tex, emissiveMap: tex, emissive: new THREE.Color(0xd8cfb8), gradientMap: RAMP,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
+  }));
+  face.position.z = TH / 2 + 1.6;
+  grp.add(face);
+  const o = new THREE.Mesh(outlineGeom(frame.geometry), outlineMaterial(0.0024));
+  o.frustumCulled = false;
+  grp.add(o);
+  return grp;
+}
+
 /* 神額 — the placard on a gate. Landscape rather than portrait, so it is a different object
    from the ema and reads as one: the deck's name across it, its count and how far through it you
    are down the right, and the row's number struck into the corner. Same rules as the tablet —
@@ -3490,6 +3598,7 @@ function pickWorldTile(sec, jp) {
      level platform replaces the guess with a number. */
   const wallPlace = at3(-690, -215);
   wallPlace.y = CY_TOP + WALL_LIFT;
+  let CHOZUYA = null;
   const wallGrp = buildEmaWall('REVIEW', wallPlace, eye, WALL_W, WALL_H);
   /* and then turned toward the PATH, which is the direction the sign was wrong in before: the
      wall stands to the left of the axis, so facing the way in means turning its face to its own
@@ -3522,6 +3631,7 @@ function pickWorldTile(sec, jp) {
     facing(ch, -430, 0);
     backScene.add(ch);
     addOutline(ch, 0.0024);
+    CHOZUYA = ch;
   }
 
   /* ---- 手水 — the one thing here you can touch ----
@@ -3589,6 +3699,41 @@ function pickWorldTile(sec, jp) {
         });
       },
     });
+  }
+
+  /* ---- the name-board, in three places ----
+     Only one is built. Each is sized and mounted against the structure it belongs to rather than
+     to a common number, because a board that fits the gate does not fit the pavilion's gable and
+     a board sized to be readable from the standing point is not a board at all — it is a poster
+     leaning on a shrine. */
+  {
+    if (TITLE_V === 'a') {
+      /* over the tablets, on the wall's own top rail. It belongs to the thing you read, and it
+         inherits the wall's turn toward the path for free by being parented to it. */
+      const b = hengaku('復習', 'REVIEW', WALL_W * 0.74, WALL_H * 0.29);
+      b.position.set(0, WALL_H + WALL_H * 0.055, WALL_W * 0.055);
+      wallGrp.add(b);
+    } else if (TITLE_V === 'b') {
+      /* in the gate, on the gakuzuka — the strut between the tie beam and the lintel, which is
+         exactly where a torii carries a shrine's name and the reason that strut is there. */
+      const b = hengaku('復習', 'REVIEW', GATE_H * 0.40, GATE_H * 0.26);
+      b.position.copy(at3(0, 0));
+      b.position.y += GATE_H * 0.705;
+      b.rotation.y = gate.rotation.y;
+      b.translateZ(GATE_H * 0.055);
+      backScene.add(b);
+    } else {
+      /* UNDER THE EAVE THAT FACES YOU, not on the pavilion's own front. The pavilion is turned to
+         face ACROSS the court — it addresses the ema wall, which is what makes the courtyard a
+         courtyard — so anything mounted on its front is seen edge-on from up the approach and
+         reads as a bright sliver. The eave facing back down the way in is the surface a visitor
+         actually sees, and a board hung under an eave is what that surface is for. */
+      const b = hengaku('復習', 'REVIEW', 178 * 0.92, 178 * 0.28);
+      b.position.copy(CHOZUYA.position).addScaledVector(fwd, -128);
+      b.position.y += 238 * 0.60;
+      b.rotation.y = gate.rotation.y;
+      backScene.add(b);
+    }
   }
 
   /* ---- planting ----
@@ -5162,8 +5307,12 @@ function buildWorldMenus() {
       });
       el.addEventListener('mouseleave', () => picks.forEach((o) => o.classList.remove('is-hot', 'is-cold')));
     });
-    made.push(wPlane(grp, 'w-sign',
-      `<span class="w-jp">${it.jp}</span><span class="w-en">${it.en}</span>`, spec.sign));
+    /* a section whose name is a board in the world does not also get one floating in front of
+       it — the whole point of moving it into the scene is that there is only one of it */
+    if (!(it.en === 'REVIEW')) {
+      made.push(wPlane(grp, 'w-sign',
+        `<span class="w-jp">${it.jp}</span><span class="w-en">${it.en}</span>`, spec.sign));
+    }
     /* every plane carries its section's colour so --sec resolves without a shared ancestor */
     made.forEach((p) => {
       p.el.style.setProperty('--sec', sec);
