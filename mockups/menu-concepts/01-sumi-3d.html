@@ -2385,7 +2385,7 @@ function standOff(place, off = STAND_OFF) {
    turn: two ahead of the shoulders, two abeam, two behind. */
 const DEST_SPECS = [
   { bearing: -37, dist: 4400, lift: 0 },   /* STUDY   — the pavilion on the west shore     */
-  { bearing: 20, dist: 4000, lift: 270, stand: 1420 }, /* REVIEW — the torii in the water */
+  { bearing: 20, dist: 4000, lift: 190, stand: 1400 }, /* REVIEW — the torii in the water */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
   { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
@@ -2448,7 +2448,7 @@ function toriiGeo(H) {
 }
 let TORII = null;
 {
-  const H = 620;
+  const H = 450;
   const at2 = DEST_SPECS[1].place;
   const gate = new THREE.Mesh(toriiGeo(H), new THREE.MeshToonMaterial({
     vertexColors: true, gradientMap: RAMP, flatShading: true,
@@ -2462,6 +2462,15 @@ let TORII = null;
   addOutline(gate, 0.0026);
   blockAdd(gate.position.x, gate.position.z, 520, 700);
   TORII = { gate, H };
+  /* a second, smaller one further out — it turns a single object into the start of an approach,
+     and it is the first gate of the tunnel level three will travel down */
+  const far = new THREE.Mesh(toriiGeo(H * 0.66), gate.material);
+  const step = new THREE.Vector3().copy(at2).sub(HOME_EYE).setY(0).normalize();
+  far.position.copy(gate.position).addScaledVector(step, 900);
+  far.position.y = LAKE_Y - 18;
+  far.rotation.copy(gate.rotation);
+  backScene.add(far);
+  addOutline(far, 0.0026);
 }
 
 
@@ -2563,26 +2572,99 @@ const WORLD_SWAY = [];
    scenery made before the single-landscape rebuild — nothing in this world appears or vanishes,
    you only ever get closer to it. From the menu they are a detail on the shrine; the fly-in is
    the only animation there needs to be. */
-function hangEma(sec, gate, H) {
+/* 絵馬掛所 — the wall the tablets actually hang on.
+   The gate is a landmark and its opening is a void you pass through; hanging the interface in
+   it fought what the object is for, which is why it read as wrong at any size. The wall is the
+   correct object and it solves more than the framing: a real one is a CROWD of hundreds of
+   tablets, so the blanks are not padding, they are accuracy — and four live ones standing out
+   of a crowd read as CHOSEN rather than as a row of four rectangles, which is the failure this
+   design has fallen into at every previous attempt. */
+function buildEmaWall(sec, place, faceTowards) {
   const tiles = SUBTILES[sec];
   const accent = SECTION_ACCENT[sec][0];
-  /* proportioned off the gate: the four sit inside the span between its pillars, hanging from
-     the tie beam, and stop well short of the lintel */
-  const span = H * 0.84, nuki = H * 0.60;
-  const TW = span / tiles.length * 0.94, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.05;
-  const GAP = (span - TW * tiles.length) / (tiles.length - 1);
-  const hang = H * 0.075;
+  const W = 620, HH = 300, POST = 26;
+  const grp = new THREE.Group();
+  grp.position.copy(place);
+  grp.lookAt(faceTowards.x, place.y, faceTowards.z);
+  backScene.add(grp);
 
+  /* the structure: two posts, a rail and a shallow roof — small, and read at a glance */
+  const frame = [];
+  [-1, 1].forEach((sx) => {
+    const g = new THREE.CylinderGeometry(POST * 0.42, POST * 0.5, HH + 60, 8);
+    g.translate(sx * W / 2, (HH + 60) / 2, 0);
+    frame.push({ geo: g, color: 0x4a3a2b });
+  });
+  frame.push({ geo: beamSeg(W + 70, 20, 30, 0, HH + 40, 0), color: 0x54422f });
+  frame.push({ geo: beamSeg(W + 30, 13, 22, 0, HH - 8, 0), color: 0x46372a });
+  [-1, 1].forEach((sx) => {
+    const g = new THREE.BoxGeometry(W / 2 + 60, 11, 118);
+    g.rotateZ(-sx * 0.20);
+    g.translate(sx * (W / 4 + 12), HH + 78, 0);
+    frame.push({ geo: g, color: 0x3f3428 });
+  });
+  const frameMesh = new THREE.Mesh(mergeParts(frame), new THREE.MeshToonMaterial({
+    vertexColors: true, gradientMap: RAMP, flatShading: true,
+  }));
+  grp.add(frameMesh);
+  addOutline(frameMesh, 0.0024);
+  /* piles, so it stands in the shallows rather than floating on them */
+  const piles = [];
+  for (let i = -2; i <= 2; i++) {
+    const g = new THREE.CylinderGeometry(13, 15, 300, 7);
+    g.translate(i * W / 4.4, -150, hash01(i + 5, 3) * 30 - 15);
+    piles.push({ geo: g, color: 0x3b3026 });
+  }
+  const pileMesh = new THREE.Mesh(mergeParts(piles), new THREE.MeshToonMaterial({
+    vertexColors: true, emissive: 0x241d16, gradientMap: RAMP, flatShading: true,
+  }));
+  grp.add(pileMesh);
+
+  /* the crowd: small, weathered, unreadable at any distance, hung at every angle. Instanced,
+     so several dozen cost one draw call. */
+  /* A CROWD HAS TO SHOW ITS EDGES. Packed 24 to a row at 54 wide they overlapped into a
+     continuous tan slab and read as a solid board — the opposite of the point. Fewer per row
+     than the width allows, a wide spread of size and tilt, and a real range of weathering, so
+     every tablet has a dark line either side of it and the four live ones sit against texture
+     rather than against a panel. */
+  const bw = 46;
+  const PER = 15, ROWS = 4;
+  const blanks = new THREE.InstancedMesh(
+    emaGeo(bw, bw * 1.2, bw * 0.25, bw * 0.05),
+    /* the same emissive floor the live tablets needed: without it the crowd renders as a
+       black mass rather than as weathered wood, and reads as a hole in the structure */
+    new THREE.MeshToonMaterial({ vertexColors: true, emissive: 0x3d3428, gradientMap: RAMP, flatShading: true }),
+    PER * ROWS);
+  const mx = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3();
+  const zc = new THREE.Vector3(0, 0, 1), col = new THREE.Color();
+  for (let i = 0; i < blanks.count; i++) {
+    const row = Math.floor(i / PER), k = i % PER;
+    const x = -W / 2 + 40 + (k + (hash01(i, 7) - 0.5) * 0.55) * (W - 80) / (PER - 1);
+    const y = HH - 62 - row * 66 - hash01(i, 19) * 22;
+    qt.setFromAxisAngle(zc, (hash01(i, 31) - 0.5) * 0.7);
+    const g = 0.78 + hash01(i, 83) * 0.44;
+    sc.set(g, g, 1);
+    mx.compose(new THREE.Vector3(x, y, -16 - row * 9), qt, sc);
+    blanks.setMatrixAt(i, mx);
+    /* weathered across a real range — a narrow one just made the slab evenly tan */
+    col.setHSL(0.075 + hash01(i, 43) * 0.05, 0.14 + hash01(i, 51) * 0.16, 0.3 + hash01(i, 67) * 0.3);
+    blanks.setColorAt(i, col);
+  }
+  blanks.instanceMatrix.needsUpdate = true;
+  if (blanks.instanceColor) blanks.instanceColor.needsUpdate = true;
+  grp.add(blanks);
+
+  /* and the four that are yours: bigger, forward of the crowd, lit, hanging straight */
+  const TW = 120, TH = TW * 1.2, GAB = TW * 0.25, TTH = TW * 0.06;
+  const GAP = (W - 66 - TW * tiles.length) / (tiles.length - 1);
   const picks = tiles.map(([jp, en, meta], j) => {
     const root = new THREE.Group();
-    root.position.set(-span / 2 + TW / 2 + j * (TW + GAP), nuki - hang - TH / 2, 0);
-    gate.add(root);
-    const cord = new THREE.Mesh(new THREE.BoxGeometry(TW * 0.045, hang, TW * 0.045),
+    root.position.set(-(W - 66) / 2 + TW / 2 + j * (TW + GAP), HH - 54 - TH / 2, 42);
+    grp.add(root);
+    const cord = new THREE.Mesh(new THREE.BoxGeometry(5, 46, 5),
       new THREE.MeshToonMaterial({ color: 0x3d3128, gradientMap: RAMP }));
-    cord.position.y = TH / 2 + hang / 2;
+    cord.position.y = TH / 2 + 23;
     root.add(cord);
-    /* the emissive is not decoration: writing has to stay readable in shade, and a four-step
-       ramp at a grazing sun angle puts the whole gate in its darkest band */
     const body = new THREE.Mesh(emaGeo(TW, TH, GAB, TTH), new THREE.MeshToonMaterial({
       color: 0xd6c39c, emissive: 0x4d4232, gradientMap: RAMP, flatShading: true,
     }));
@@ -2593,24 +2675,36 @@ function hangEma(sec, gate, H) {
     }));
     face.position.z = TTH / 2 + 0.4;
     root.add(face);
-    const o = new THREE.Mesh(outlineGeom(body.geometry), outlineMaterial(0.0026));
+    const o = new THREE.Mesh(outlineGeom(body.geometry), outlineMaterial(0.0028));
     o.frustumCulled = false;
     root.add(o);
-    const el = worldPickEl(`${jp} — ${en}, ${meta}`, () => pickWorldTile(sec, jp));
-    const q = { root, body, face, el, jp, base: root.position.clone(), swayP: j * 1.9, swayR: 0.7 + j * 0.11 };
-    /* a thing that hangs moves. The sway is what says these are objects on a cord rather than
-       panels pinned to the air — and it runs always, so arriving needs no entrance at all. */
-    WORLD_SWAY.push(q);
-    return q;
+    const el = worldPickEl(jp + ' \u2014 ' + en + ', ' + meta, () => pickWorldTile(sec, jp));
+    const qq = { root, body, face, el, jp, base: root.position.clone(),
+      swayP: j * 1.9, swayR: 0.7 + j * 0.11 };
+    WORLD_SWAY.push(qq);
+    return qq;
   });
   WORLD_L2[sec] = { picks };
+  blockAdd(place.x, place.z, 300, 320);
+  return grp;
 }
 function pickWorldTile(sec, jp) {
   if (busy || state !== 'sub') return;
   if (L3DATA[sec] && L3DATA[sec][jp]) enterL3(sec, jp);
 }
 
-hangEma('REVIEW', TORII.gate, TORII.H);
+{
+  /* on the far shore and off the gate's own bearing, so the arrival frames the WALL with the
+     gate off to one side rather than shooting head-on down the middle of a symmetrical object.
+     Nobody photographs Itsukushima square-on. */
+  /* ON THE WATER, on piles, in line with the gate — which is what Itsukushima's shrine
+     actually is, and it is also the only way to have it near the gate at all: the lake is
+     2,700 across and every point within reach of the torii is in it. Standing it on the far
+     shore put 77° between the two and the gate never made the frame. */
+  const wall = destPlace(25, 4900, 0);
+  DEST_SPECS[1].focus = wall.clone().setY(wall.y + 190);
+  buildEmaWall('REVIEW', wall, HOME_EYE);
+}
 
 /* ---- the woods ----
    Three species, each a merged multi-part model rather than a repeated primitive. A repeated
@@ -3360,7 +3454,14 @@ setTimeout(redrawStroke, 4000);
 
 /* the places themselves are landscape — see WHERE THE SIX PLACES ARE, up with the lake. Only
    the camera's standing point belongs here, because it is a fact about navigation. */
-const DESTS = DEST_SPECS.map((d) => ({ ...d, eye: standOff(d.place, d.stand) }));
+/* A LANDMARK AND A THRESHOLD ARE NOT THE SAME POINT. `place` is the silhouette you aim at
+   from the menu; `focus` is what the camera actually frames on arrival. Collapsing the two is
+   what put the interface inside the gate's void and then framed the gate around the
+   interface's legibility — the tail wagging the dog in both directions at once. */
+const DESTS = DEST_SPECS.map((d) => {
+  const focus = d.focus || d.place;
+  return { ...d, focus, eye: standOff(focus, d.stand) };
+});
 const HOME_SUB = DESTS[0];
 
 const subEl = document.createElement('div');
@@ -3380,13 +3481,13 @@ subEl.innerHTML = `
     <div class="l3-grid" id="l3Grid"></div>
     <button class="l3-back" id="l3Back">← BACK <em>戻る</em></button>
   </div>`;
-const subObj = cssPlane(subEl, HOME_SUB.place.x, HOME_SUB.place.y, HOME_SUB.place.z, -24 * D2R, -1.2 * D2R);
+const subObj = cssPlane(subEl, HOME_SUB.focus.x, HOME_SUB.focus.y, HOME_SUB.focus.z, -24 * D2R, -1.2 * D2R);
 
 const subWmEl = document.createElement('div');
 subWmEl.className = 'plane-wm';
 subWmEl.id = 'subWm';
 subWmEl.textContent = '学';
-const subWmObj = cssPlane(subWmEl, HOME_SUB.place.x + 340, HOME_SUB.place.y - 40, HOME_SUB.place.z - 320, -24 * D2R);
+const subWmObj = cssPlane(subWmEl, HOME_SUB.focus.x + 340, HOME_SUB.focus.y - 40, HOME_SUB.focus.z - 320, -24 * D2R);
 
 /* One room per destination. Only the room you are standing in is ever visible — otherwise a
    neighbour's architecture leaks into the main menu and eats the landscape. */
@@ -3406,7 +3507,7 @@ function envPlane(el, x, y, z, rx = 0, ry = 0, rz = 0) {
   return o;
 }
 /* the alcove is world geometry: parked once at the engawa bearing */
-destEnv.position.copy(HOME_SUB.place);
+destEnv.position.copy(HOME_SUB.focus);
 destEnv.lookAt(HOME_SUB.eye);
 
 /* ---- destination set-dressing: one little world per section ---- */
@@ -3414,7 +3515,7 @@ function makeEnv(idx) {
   const d = DESTS[idx];
   const grp = new THREE.Group();
   cssScene.add(grp);
-  grp.position.copy(d.place);
+  grp.position.copy(d.focus);
   grp.lookAt(d.eye);
   ENVS[idx] = grp;
   return {
@@ -3463,7 +3564,7 @@ const BUILD_ROOMS = false;
 function meshRoom(idx) {
   const d = DESTS[idx];
   const g = new THREE.Group();
-  g.position.copy(d.place);
+  g.position.copy(d.focus);
   g.lookAt(d.eye);
   g.visible = false;
   if (BUILD_ROOMS) backScene.add(g);
@@ -4152,7 +4253,7 @@ let tmode = (() => {
   return v >= 1 && v <= 2 ? v : 1;
 })();
 let activeMode = tmode;
-const subRest = { pos: HOME_SUB.eye.clone(), tgt: HOME_SUB.place.clone() };
+const subRest = { pos: HOME_SUB.eye.clone(), tgt: HOME_SUB.focus.clone() };
 
 const chips = [...document.querySelectorAll('.trans-chip')];
 function setTmode(n) {
@@ -4186,8 +4287,8 @@ function applySpin() {
 function destFor(i) { return DESTS[i]; }
 function placeSubAt(d) {
   subRest.pos.copy(d.eye);
-  subRest.tgt.copy(d.place);
-  placeSub(d.place, d.eye);
+  subRest.tgt.copy(d.focus);
+  placeSub(d.focus, d.eye);
 }
 function placeSubDefault() { placeSubAt(destFor(0)); }
 placeSubDefault();
@@ -4331,7 +4432,7 @@ function whipTo(restPos, restTgt, dir, card, done) {
 function selectWhip(i) {
   const d = destFor(i);
   placeSubAt(d);
-  const tl = whipTo(d.eye, d.place, turnDirTo(d.place), i, arriveSub);
+  const tl = whipTo(d.eye, d.focus, turnDirTo(d.focus), i, arriveSub);
   tl.add(() => openSub(0.45), 0.5);
 }
 function backWhip() {
@@ -4410,7 +4511,7 @@ function selectOrbit(i) {
   const d = destFor(i);
   placeSubAt(d);
   spawnPetals(itemObjs[i].position);
-  turnTo(d.eye, d.place, arriveSub, 0.82);
+  turnTo(d.eye, d.focus, arriveSub, 0.82);
 }
 function backOrbit() {
   turnTo(HOME_EYE, new THREE.Vector3(HOME.tx, HOME.ty, HOME.tz), arriveMenu, null);

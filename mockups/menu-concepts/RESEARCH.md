@@ -1023,6 +1023,41 @@ problem"*.
   camera stops far enough back to keep the shrine and the valley in frame and legibility has to
   survive that. Games oversize signage constantly and nobody notices.
 
+## v31 — the gate is a landmark again, and the threshold is a wall of ema
+
+The tablets hanging in the torii were ugly, and size was the symptom rather than the fault. Two
+mistakes underneath it:
+
+**The interface was inside the landmark's void.** A torii's entire meaning is the empty space you
+pass through; hanging four tablets across it is a menu nailed over a doorway, and it reads wrong
+at any scale because it fights what the object is for.
+
+**And the landmark was framed around the interface's legibility.** The camera stood where the
+writing became readable, which put a symmetrical object dead-centre, front-on, filling 60% of
+frame — a title card, not a place. Nobody photographs Itsukushima square-on.
+
+So `place` (the silhouette you aim at from the menu) and `focus` (what the camera frames on
+arrival) are now separate points. Collapsing them is what let the tail wag the dog in both
+directions at once.
+
+The threshold is a **絵馬掛所**, and it fixes more than the framing:
+
+- **A real ema wall is a crowd of hundreds**, so the blanks are not padding, they are accuracy —
+  and four live tablets standing out of a crowd read as CHOSEN rather than as a row of four
+  rectangles, which is the failure this design has fallen into at every previous attempt.
+- **A crowd has to show its edges.** Packed 24 to a row at 54 wide they overlapped into a
+  continuous tan slab and read as a solid board. Fewer per row than the width allows, a wide
+  spread of size and tilt, and a real range of weathering, so every tablet has a dark line
+  either side of it.
+- **It stands on piles over the water**, which is what Itsukushima's shrine actually is — and
+  also the only way to have it near the gate at all. The lake is 2,700 across and every point
+  within reach of the torii is in it; standing the wall on the far shore put 77° between the two
+  and the gate never made the frame.
+
+The gate itself came down from 620 to 450 (Itsukushima's is 16m against 30m trees) and gained a
+smaller second gate behind it — which turns a single object into the start of an approach, and
+is the first gate of the senbon-torii tunnel level three will travel down.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1155,6 +1190,13 @@ problem"*.
 - **Apply the no-unloading rule to UI as well as to scenery.** It is easy to fix pop-in in the
   world and then reintroduce it in the interface, because interface code has always worked that
   way. If nothing else in the scene may appear or vanish, neither may the menu.
+
+- **Never let legibility choose the framing.** If the camera stands where the type becomes
+  readable, the composition is a by-product of the font size. Frame the shot, then solve
+  legibility with the type — oversized signage is invisible as a cheat and a badly framed
+  landmark is not.
+- **Don't put the interface in the part of an object that is meant to be empty.** A gate, an
+  archway, a window: the void is the point, and filling it fights the object's own meaning.
 
 ## Sources
 
