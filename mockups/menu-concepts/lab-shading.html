@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shading lab — one hill, one tree</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #0d1018; }
+  #stage { position: fixed; inset: 0; }
+  .hud {
+    position: fixed; left: 18px; top: 16px; z-index: 5;
+    font: 12px/1.7 "Consolas", "Courier New", monospace;
+    color: #dfe6f2; text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    letter-spacing: 0.06em; pointer-events: none;
+  }
+  .hud b { color: #ffd9a1; font-weight: 400; }
+  .hud .off { color: #6a7488; }
+  .hud h1 { font: 600 13px/1.9 "Consolas", monospace; letter-spacing: 0.22em; color: #ffd9a1; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="hud" id="hud"></div>
+
+<script type="module">
+import * as THREE from './lib/three.module.min.js';
+
+/* ============================================================================
+   SHADING LAB — one hill, one tree.
+
+   The point is not the scene. It is to isolate the four things the main mockup
+   was missing, and to make each one switchable so its contribution is visible
+   rather than asserted:
+
+     1  vertex AO      shading baked into the mesh at build time, so ground
+                       contact and concavity read without any runtime cost
+     2  ramp colour    terrain colour driven by slope and height instead of one
+                       flat material value
+     3  toon + outline the look is authored rather than simulated — which makes
+                       simple geometry an asset instead of a liability
+     4  shadows        a real shadow map, so things are attached to the ground
+
+   Press 1-4 to toggle, 0 for all off (which is roughly what the main mockup
+   was doing), 9 for all on.
+   ============================================================================ */
+
+const state = { ao: true, ramp: true, toon: true, shadow: true };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/* filmic tone mapping + sRGB out. Without this the raw framebuffer is what you
+   see, which is a large part of why untreated three.js looks flat. */
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.getElementById('stage').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const SKY_LO = new THREE.Color(0xf2c89a), SKY_HI = new THREE.Color(0x35508c);
+scene.fog = new THREE.Fog(0xd9c3a8, 2600, 7200);
+
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 1, 20000);
+camera.position.set(2700, 1450, 0);
+camera.lookAt(0, 240, 0);
+
+/* ---- sky: a gradient dome, so the horizon has somewhere to fade into ---- */
+{
+  const c = document.createElement('canvas'); c.width = 4; c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.00, '#25396e');
+  grad.addColorStop(0.42, '#6d7fa6');
+  grad.addColorStop(0.60, '#c9a184');
+  grad.addColorStop(0.70, '#f4d3a6');
+  grad.addColorStop(1.00, '#c9b49c');
+  g.fillStyle = grad; g.fillRect(0, 0, 4, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(9000, 32, 20),
+    new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false })));
+}
+
+/* ---- the toon ramp: 4 hard steps. NearestFilter is what makes it band ---- */
+function toonRamp(steps) {
+  const d = new Uint8Array(steps * 4);
+  for (let i = 0; i < steps; i++) {
+    /* weighted so the lit side holds and the terminator sits where it reads */
+    const v = Math.round(255 * Math.pow((i + 1) / steps, 0.72));
+    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+  }
+  const t = new THREE.DataTexture(d, steps, 1, THREE.RGBAFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter;
+  t.needsUpdate = true;
+  return t;
+}
+const RAMP = toonRamp(4);
+
+/* ---- lights ---- */
+const key = new THREE.DirectionalLight(0xffe6c4, 2.6);
+key.position.set(-1500, 1900, 900);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+const sc = key.shadow.camera;
+sc.left = -1800; sc.right = 1800; sc.top = 1800; sc.bottom = -1800; sc.near = 100; sc.far = 6000;
+key.shadow.bias = -0.0012;
+key.shadow.normalBias = 6;
+scene.add(key, key.target);
+const fill = new THREE.HemisphereLight(0xbcd0ec, 0x4a4433, 1.1);
+scene.add(fill);
+
+/* ============================ THE TERRAIN ============================ */
+const SIZE = 3000, SEG = 190;
+const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+geo.rotateX(-Math.PI / 2);
+const pos = geo.attributes.position;
+
+/* one hill, plus enough small relief that the surface is not glassy */
+function heightAt(x, z) {
+  const d = Math.hypot(x, z);
+  const hill = Math.exp(-(d * d) / (2 * 620 * 620)) * 760;          /* the hill */
+  const shoulder = Math.exp(-(Math.hypot(x + 900, z - 500) ** 2) / (2 * 520 * 520)) * 260;
+  const relief = Math.sin(x * 0.0042) * Math.cos(z * 0.0037) * 46
+               + Math.sin(x * 0.0111 + 2.1) * Math.cos(z * 0.0093) * 17
+               + Math.sin(x * 0.027 + 4.4) * Math.cos(z * 0.023) * 5.5;
+  return hill + shoulder + relief;
+}
+for (let i = 0; i < pos.count; i++) pos.setY(i, heightAt(pos.getX(i), pos.getZ(i)));
+geo.computeVertexNormals();
+
+/* ---- 1. VERTEX AO, baked at build time ----
+   For a heightfield this is nearly free: a vertex sitting lower than the ground
+   around it is in a hollow and should be darker. Sampling a ring of neighbours
+   at two radii gives both the wide concavity and the local crease. This is the
+   thing that makes objects look *attached* — it was completely absent before. */
+const aoAttr = new Float32Array(pos.count);
+for (let i = 0; i < pos.count; i++) {
+  const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+  let occ = 0, n = 0;
+  for (const r of [34, 96, 210]) {
+    for (let a = 0; a < 6; a++) {
+      const th = (a / 6) * Math.PI * 2 + r;
+      const hn = heightAt(x + Math.cos(th) * r, z + Math.sin(th) * r);
+      occ += Math.max(0, Math.min(1, (hn - y) / (r * 0.55)));
+      n++;
+    }
+  }
+  aoAttr[i] = 1 - (occ / n) * 1.5;
+}
+
+/* ---- 2. RAMP COLOUR from slope and height ----
+   Faces pointing up take grass, steep faces take rock, altitude pushes toward
+   pale dry grass. This is what replaces "the ground is one hex value". */
+const nrm = geo.attributes.normal;
+const GRASS = new THREE.Color(0x6f8a45), GRASS_D = new THREE.Color(0x445b2c);
+const ROCK = new THREE.Color(0x7d7466), DRY = new THREE.Color(0xb2ad76);
+const FLAT = new THREE.Color(0x6f7a52);
+const col = new Float32Array(pos.count * 3);
+const tmp = new THREE.Color();
+for (let i = 0; i < pos.count; i++) {
+  const slope = 1 - nrm.getY(i);                      /* 0 flat, 1 vertical */
+  const alt = THREE.MathUtils.clamp(pos.getY(i) / 700, 0, 1);
+  tmp.copy(GRASS_D).lerp(GRASS, THREE.MathUtils.smoothstep(alt, 0.02, 0.4));
+  tmp.lerp(DRY, THREE.MathUtils.smoothstep(alt, 0.5, 0.95) * 0.75);
+  tmp.lerp(ROCK, THREE.MathUtils.smoothstep(slope, 0.14, 0.42));
+  const ao = state.ao ? aoAttr[i] : 1;
+  const base = state.ramp ? tmp : FLAT;
+  tmp.copy(base).multiplyScalar(THREE.MathUtils.clamp(ao, 0.35, 1.12));
+  col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+}
+geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+
+function repaintTerrain() {
+  const a = geo.attributes.color.array;
+  for (let i = 0; i < pos.count; i++) {
+    const slope = 1 - nrm.getY(i);
+    const alt = THREE.MathUtils.clamp(pos.getY(i) / 700, 0, 1);
+    tmp.copy(GRASS_D).lerp(GRASS, THREE.MathUtils.smoothstep(alt, 0.02, 0.4));
+    tmp.lerp(DRY, THREE.MathUtils.smoothstep(alt, 0.5, 0.95) * 0.75);
+    tmp.lerp(ROCK, THREE.MathUtils.smoothstep(slope, 0.14, 0.42));
+    const ao = state.ao ? aoAttr[i] : 1;
+    if (!state.ramp) tmp.copy(FLAT);
+    tmp.multiplyScalar(THREE.MathUtils.clamp(ao, 0.35, 1.12));
+    a[i * 3] = tmp.r; a[i * 3 + 1] = tmp.g; a[i * 3 + 2] = tmp.b;
+  }
+  geo.attributes.color.needsUpdate = true;
+}
+
+const matToon = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP });
+const matPlain = new THREE.MeshLambertMaterial({ vertexColors: true });
+const ground = new THREE.Mesh(geo, matToon);
+ground.receiveShadow = true;
+ground.castShadow = true;
+scene.add(ground);
+
+/* ============================ THE TREE ============================ */
+/* ---- 3. OUTLINE: inverted hull, extruded along the normal in a vertex shader.
+   Scaling the mesh does not work on anything non-spherical; extruding does. */
+function outlineFor(mesh, w) {
+  const m = new THREE.Mesh(mesh.geometry, new THREE.ShaderMaterial({
+    uniforms: { w: { value: w } },
+    vertexShader: `uniform float w; void main(){
+      vec3 p = position + normal * w;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
+    fragmentShader: `void main(){ gl_FragColor = vec4(0.055, 0.06, 0.085, 1.0); }`,
+    side: THREE.BackSide,
+  }));
+  m.position.copy(mesh.position);
+  m.rotation.copy(mesh.rotation);
+  m.scale.copy(mesh.scale);
+  return m;
+}
+
+const outlines = [];
+function tree(x, z, s) {
+  const g = new THREE.Group();
+  const y = heightAt(x, z);
+  g.position.set(x, y, z);
+  g.scale.setScalar(s);
+  scene.add(g);
+
+  const bark = new THREE.MeshToonMaterial({ color: 0x584234, gradientMap: RAMP });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(13, 22, 190, 7), bark);
+  trunk.position.y = 95; trunk.castShadow = true; trunk.receiveShadow = true;
+  g.add(trunk);
+  const ot = outlineFor(trunk, 3); g.add(ot); outlines.push(ot);
+
+  [[0, 236, 0, 96], [-52, 200, 26, 66], [58, 208, -20, 72], [8, 292, -30, 58]]
+    .forEach(([bx, by, bz, r], i) => {
+      const leaf = new THREE.MeshToonMaterial({
+        color: [0x5d7d3a, 0x51702f, 0x678a42, 0x4a672c][i], gradientMap: RAMP,
+      });
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leaf);
+      m.position.set(bx, by, bz);
+      m.scale.set(1.18, 0.92, 1.1);
+      m.castShadow = true; m.receiveShadow = true;
+      g.add(m);
+      const o = outlineFor(m, 3.4); g.add(o); outlines.push(o);
+    });
+  return g;
+}
+tree(-120, 130, 1.9);
+
+/* a couple of rocks, so the shadow test has more than one caster */
+[[380, -260, 54], [-520, -420, 38], [190, 420, 30]].forEach(([x, z, r]) => {
+  const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0),
+    new THREE.MeshToonMaterial({ color: 0x8a8275, gradientMap: RAMP }));
+  m.position.set(x, heightAt(x, z) + r * 0.45, z);
+  m.rotation.set(0.5, x * 0.01, 0.3);
+  m.castShadow = true; m.receiveShadow = true;
+  scene.add(m);
+  const o = outlineFor(m, 2.4); scene.add(o); outlines.push(o);
+});
+
+/* ============================ TOGGLES ============================ */
+const hud = document.getElementById('hud');
+function apply() {
+  repaintTerrain();
+  const toonMats = [];
+  scene.traverse((o) => { if (o.isMesh && o.material && o.material.isMeshToonMaterial) toonMats.push(o.material); });
+  /* toon off: swap the ramp out so shading goes smooth, which is the Lambert look */
+  toonMats.forEach((m) => { m.gradientMap = state.toon ? RAMP : null; m.needsUpdate = true; });
+  ground.material = state.toon ? matToon : matPlain;
+  outlines.forEach((o) => { o.visible = state.toon; });
+  renderer.shadowMap.enabled = state.shadow;
+  scene.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
+  const row = (on, k, label) => `<div class="${on ? '' : 'off'}">[${k}] ${on ? '<b>on </b>' : 'off'} ${label}</div>`;
+  hud.innerHTML = '<h1>SHADING LAB</h1>'
+    + row(state.ao, 1, 'vertex AO (baked)')
+    + row(state.ramp, 2, 'slope/height ramp colour')
+    + row(state.toon, 3, 'toon ramp + outline')
+    + row(state.shadow, 4, 'shadow map')
+    + '<div class="off" style="margin-top:8px">[0] all off &nbsp; [9] all on</div>';
+}
+addEventListener('keydown', (e) => {
+  if (e.key === '1') state.ao = !state.ao;
+  else if (e.key === '2') state.ramp = !state.ramp;
+  else if (e.key === '3') state.toon = !state.toon;
+  else if (e.key === '4') state.shadow = !state.shadow;
+  else if (e.key === '0') Object.keys(state).forEach((k) => { state[k] = false; });
+  else if (e.key === '9') Object.keys(state).forEach((k) => { state[k] = true; });
+  else return;
+  apply();
+});
+apply();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+let t = 0;
+function tick() {
+  t += 0.0016;
+  camera.position.set(Math.cos(t) * 2700, 1450, Math.sin(t) * 2700);
+  camera.lookAt(0, 240, 0);
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>
