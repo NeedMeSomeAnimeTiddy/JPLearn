@@ -1547,6 +1547,60 @@ cannot leave the frame, because the building cannot.
 - **Parent to the structure and inherit its geometry for free.** The ema-wall board is a child of
   the wall group, so it takes the wall's 36° turn toward the path without knowing the number.
 
+## v47 — the gate takes the name, and the outline stops floating
+
+The board hangs on the gakuzuka, a shade smaller than the version that was tried, with the gate's
+own timber showing round it on all four sides. Of the three placements it is the only one that
+says the name belongs to the whole precinct rather than to the thing it is bolted to — and it is
+where a real shrine would have put it, which is what that strut is for.
+
+Looking at it closely is what exposed the outline. The hull sat detached above and to the right of
+the board with red showing through the gap, and no line at all along the bottom and the left.
+
+- **An asymmetric outline is a displaced hull, not a fat one.** If the line were merely too wide it
+  would be too wide everywhere. A gap on two edges and nothing on the other two says the duplicate
+  has MOVED rather than grown, and that narrows the cause to the offset direction.
+- **The offset must never touch z.** The first version pushed each hull vertex along its view-space
+  normal — `mv.xyz += vn * d` — which is the recipe everyone writes first. `vn` has a z component,
+  so a surface facing the camera is pushed toward it and a surface facing away is pushed further
+  off. On a board eight units thick seen from 855 the push is a quarter of its own thickness, so
+  the hull stops being the same shape scaled up and becomes a different shape moved. Offsetting in
+  clip space instead — `clip.xy += dir * px * 2/res * clip.w` — leaves depth exactly alone, and a
+  hull that can only move ACROSS the screen cannot get in front of the thing it wraps or sink
+  behind it.
+- **Normalise the direction in pixels, not in NDC.** NDC is anisotropic on every aspect but 1:1,
+  so a diagonal edge normalised there comes out thinner than a vertical one. Scale by the viewport
+  before normalising and back after.
+- **Multiplying by `clip.w` is what makes the width distance-invariant** — it pre-empts the
+  perspective divide, so the offset survives it intact.
+- **A line is a number of pixels, so say so.** The old parameter was a world-units-per-unit-of-
+  depth rate: 0.0024 for a placard, 0.0052 for Fuji, and no way to know from the number what either
+  would look like. They are now 3.2 and 7.0 pixels. Twenty call sites, one honest unit — and the
+  width no longer moves when the field of view does.
+- **A weld that fails is worse than no weld.** The corner correction divides out `dot(smooth, flat)`
+  so a flat-shaded corner reaches as far as its neighbours; a cube corner is 0.577 and needs 1.73x.
+  The old floor of 0.30 meant anything below that got a 3.3x SPIKE — and below a cube corner is
+  exactly where merged parts that merely touch end up, because averaging their normals produces a
+  direction that belongs to neither. Under 0.5, use the face's own normal and do not correct at
+  all. This is what was making the ema wall's outlines patchy.
+- **A render target is a different number of pixels.** The lake reflection renders the same scene
+  into a 768² buffer; with a pixel-width outline, leaving the window's size in the uniform draws
+  every line in the reflection two and a half times too thin. The pass has to declare what it is
+  being measured in. One shared uniform object, written by whoever is rendering.
+
+### What else was on the table
+
+- **Post-process edge detection** (render depth + view normals, then a Sobel over the buffer) is
+  the ceiling, and the one thing it buys that a hull cannot is INTERIOR lines — the crease where a
+  beam crosses another beam, not just the silhouette. It was not taken because this file renders
+  the scene three times already (back layer, front layer, lake) and it would want two more; and
+  because the layers are `#glBack` / CSS3D / `#glFront`, so the front pass cannot read the back
+  pass's depth and every edge across the seam would be wrong. Worth revisiting only if interior
+  definition is ever the thing that is missing — at present the flat-shaded toon banding carries it.
+- **Leaving the width as a world rate and only fixing the direction** would have been a smaller
+  diff and kept every tuned number. Rejected because the tuned numbers were the problem: nobody can
+  look at 0.0026 and say whether it is a thick line.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -1793,6 +1847,20 @@ cannot leave the frame, because the building cannot.
   against a percentage margin can.
 - **Two rotations that cancel are one rotation too many.** If arriving somewhere requires undoing
   a transform, ask why the transform is there.
+
+- **An asymmetric artefact is a displaced thing, not an oversized one.** Too wide is too wide
+  everywhere; a gap on two edges and nothing on the other two means something moved.
+- **Put the unit in the number.** A parameter nobody can read is a parameter nobody can tune, and
+  it hides its own bugs — a screen-space width expressed as a world-space rate silently depends on
+  the field of view.
+- **A clamp that rescues a bad input amplifies it.** Flooring `dot(smooth, flat)` at 0.30 turned
+  every failed weld into a 3.3x spike. When a value goes outside the range the correction is FOR,
+  stop correcting rather than clamping and carrying on.
+- **Every render target is its own coordinate system.** Anything measured in pixels has to be told
+  which pixels — the window, a reflection buffer and a shadow map are three different answers.
+- **Expose the thing the test needs to see.** A 3D title cannot be measured with
+  `getBoundingClientRect`; projecting its bounding box behind `NAV.titleRect()` keeps the safe-zone
+  rule assertable after the title stopped being DOM.
 
 ## Sources
 

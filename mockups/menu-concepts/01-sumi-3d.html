@@ -1207,11 +1207,18 @@ const cssRenderer = new CSS3DRenderer();
 cssRenderer.setSize(W(), H());
 document.getElementById('cssStage').appendChild(cssRenderer.domElement);
 
+/* The viewport, shared BY REFERENCE with every outline material ever built (see
+   `outlineMaterial`). Outlines are now a pixel width, so they need the size of the thing they
+   are measured in — and there are dozens of these materials, so handing each one its own copy
+   would mean keeping a registry of them just to resize. One object, written once. */
+const OUTLINE_RES = { value: new THREE.Vector2(W(), H()) };
+
 addEventListener('resize', () => {
   fitFov(cam ? cam.fov : camera.fov);
   backRenderer.setSize(W(), H());
   frontRenderer.setSize(W(), H());
   cssRenderer.setSize(W(), H());
+  OUTLINE_RES.value.set(W(), H());
 });
 
 /* ================= textures ================= */
@@ -1944,15 +1951,40 @@ function outlineGeom(src) {
   n.needsUpdate = true;
   return g;
 }
-function outlineMaterial(w) {
+/* THE LINE IS A NUMBER OF PIXELS, AND THE OFFSET NEVER TOUCHES Z.
+   The first version of this pushed the duplicated hull along its view-space normal — `mv.xyz +=
+   vn * d` — which is the recipe everyone writes first and it has two faults that only show up
+   on close, thin, flat-on objects. Both were visible on the name-board in the gate:
+
+   1. `vn` has a z component. A surface facing the camera gets pushed TOWARD it, a surface facing
+      away gets pushed further off. On a board 8 units thick seen from 855 units the push is a
+      quarter of its own thickness, so the hull stops being the same shape scaled up and becomes
+      a different shape moved — the line detaches along the two edges whose faces lean toward the
+      eye and vanishes along the two that lean away. That is exactly the "hovering off to one
+      side, and you can see it front on" that got reported. A hull that only ever moves ACROSS
+      the screen cannot do this: it cannot get in front of the thing it belongs to, and it cannot
+      sink behind it.
+   2. the width was a world-space rate, so its thickness in pixels depended on the field of view,
+      and every call site was a four-decimal number that meant nothing on its own.
+
+   Offsetting in clip space fixes both. Normalising in PIXEL space rather than NDC matters — NDC
+   is anisotropic, so a diagonal edge normalised there comes out thinner than a vertical one on
+   any aspect but 1:1. Multiplying by clip.w pre-empts the perspective divide, which is what
+   makes the width the same at every distance.
+
+   `px` is the width in CSS pixels. 3 is a normal line; a mountain wants 6 or 7 because it is
+   also the only thing on screen at that size. */
+function outlineMaterial(px) {
   return new THREE.ShaderMaterial({
     uniforms: {
-      w: { value: w },
+      px: { value: px },
+      res: OUTLINE_RES,
       fogColor: { value: backScene.fog.color },
       fogDensity: { value: backScene.fog.density },
     },
     vertexShader: `
-      uniform float w;
+      uniform float px;
+      uniform vec2 res;
       attribute vec3 aFlat;
       varying float vDepth;
       void main() {
@@ -1966,12 +1998,25 @@ function outlineMaterial(w) {
         #endif
         vec4 mv = modelViewMatrix * lp;
         vDepth = -mv.z;
-        float k = 1.0 / max( dot( ln, lf ), 0.30 );
-        vec3 vn = normalize( mat3( modelViewMatrix ) * ln );
-        /* screen-constant out to 4,000 units and then frozen, so a tree on the far side of the
-           valley sheds its line instead of turning into a black lozenge */
-        mv.xyz += vn * ( w * min( vDepth, 4000.0 ) * k );
-        gl_Position = projectionMatrix * mv;
+        /* Corner correction. A flat-shaded box gives each corner three normals; extruding along
+           the averaged one under-reaches by exactly dot(smooth, flat), so dividing that back out
+           closes the gap. A cube corner is 0.577 and needs 1.73x. Anything BELOW that is not a
+           sharp corner at all — it is a weld that averaged two parts which merely touch, and the
+           old code's 0.30 floor turned those into a 3.3x spike sticking out of the join. Where
+           the average has gone bad, use the face's own normal and do not correct at all. */
+        float d = dot( ln, lf );
+        vec3 n  = d >= 0.5 ? ln : lf;
+        float k = d >= 0.5 ? 1.0 / d : 1.0;
+        vec4 clip = projectionMatrix * mv;
+        vec2 sn = ( projectionMatrix * vec4( normalize( mat3( modelViewMatrix ) * n ), 0.0 ) ).xy * res;
+        float l = length( sn );
+        if ( l > 1e-6 ) {
+          /* full width out to 4,000 units and then shed with distance, so a tree on the far side
+             of the valley loses its line instead of turning into a black lozenge */
+          float wpx = px * k * min( 1.0, 4000.0 / max( vDepth, 1.0 ) );
+          clip.xy += ( sn / l ) * wpx * 2.0 / res * clip.w;
+        }
+        gl_Position = clip;
       }`,
     fragmentShader: `
       uniform vec3 fogColor;
@@ -2004,11 +2049,10 @@ function hash01(a, b) {
    rippled 768² image of the far shore, and they were being drawn twice a frame for it. */
 const NO_REFLECT = [];
 
-/* the same hull for a single mesh. Mountains need a much larger `w` than trees: the extrusion
-   stops growing past 4,000 units, so beyond that it is effectively a fixed world width, and
-   the tree value of 0.0016 comes to six units — sub-pixel on something 13,500 away. */
-function addOutline(mesh, w) {
-  const o = new THREE.Mesh(outlineGeom(mesh.geometry), outlineMaterial(w));
+/* the same hull for a single mesh. Mountains ask for a much wider line than trees because the
+   width sheds past 4,000 units: 7 pixels on something 13,500 away arrives as 2. */
+function addOutline(mesh, px) {
+  const o = new THREE.Mesh(outlineGeom(mesh.geometry), outlineMaterial(px));
   o.position.copy(mesh.position);
   o.rotation.copy(mesh.rotation);
   o.scale.copy(mesh.scale);
@@ -2095,7 +2139,7 @@ function spaced(place, radius) {
 
 /* `outline` is a width, or 0 for none. The twin shares the instance matrices, so it can never
    drift out of register with what it is outlining. */
-function instanced(geo, mat, n, place, outline = 0) {
+function instanced(geo, mat, n, place, outlinePx = 0) {
   const im = new THREE.InstancedMesh(geo, mat, n);
   const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
   const up = new THREE.Vector3(0, 1, 0);
@@ -2109,8 +2153,8 @@ function instanced(geo, mat, n, place, outline = 0) {
   }
   im.instanceMatrix.needsUpdate = true;
   backScene.add(im);
-  if (outline > 0) {
-    const ol = new THREE.InstancedMesh(outlineGeom(geo), outlineMaterial(outline), n);
+  if (outlinePx > 0) {
+    const ol = new THREE.InstancedMesh(outlineGeom(geo), outlineMaterial(outlinePx), n);
     ol.instanceMatrix.copy(im.instanceMatrix);
     ol.instanceMatrix.needsUpdate = true;
     ol.frustumCulled = false;
@@ -2166,7 +2210,7 @@ function makeFuji(dist, side, R, Hh) {
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const shell = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   grp.add(shell);
-  addOutline(shell, 0.0052);
+  addOutline(shell, 7.0);
   grp.position.copy(at(dist, side, GROUND_Y - 120));
   backScene.add(grp);
   blockAdd(grp.position.x, grp.position.z, R * 0.94, Hh);
@@ -2218,7 +2262,7 @@ function mountainRidge(dist, side, w, h, palette) {
   const b = onGround(dist, side, -140);
   m.position.copy(b);
   backScene.add(m);
-  addOutline(m, 0.0048);
+  addOutline(m, 6.4);
   /* the cluster reaches the furthest shoulder offset plus its radius: 0.74w + 0.60w */
   blockAdd(b.x, b.z, w * 1.34, h);
 }
@@ -2253,7 +2297,7 @@ for (let k = 0; k < 26; k++) {
   const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
   m.position.set(EYE.x + Math.cos(a) * r, GROUND_Y - 300, EYE.y + Math.sin(a) * r);
   backScene.add(m);
-  addOutline(m, 0.0045);
+  addOutline(m, 6.0);
   blockAdd(m.position.x, m.position.z, cw * 1.1, h);
 }
 
@@ -2593,7 +2637,7 @@ let TORII = null;
   gate.position.set(at2.x, LAKE_Y - 26, at2.z);
   gate.lookAt(HOME_EYE.x, LAKE_Y, HOME_EYE.z);
   backScene.add(gate);
-  addOutline(gate, 0.0026);
+  addOutline(gate, 3.5);
   blockAdd(gate.position.x, gate.position.z, 520, 700);
   TORII = { gate, H };
   /* a second, smaller one further out — it turns a single object into the start of an approach,
@@ -2604,7 +2648,7 @@ let TORII = null;
   far.position.y = LAKE_Y - 18;
   far.rotation.copy(gate.rotation);
   backScene.add(far);
-  addOutline(far, 0.0026);
+  addOutline(far, 3.5);
 }
 
 
@@ -2737,17 +2781,12 @@ function emaTexture(jp, en, meta, accent, size, msize) {
    so much as the only way a name-board reads at dusk against vermilion: the ground goes darker
    than anything behind it and the letters carry their own light.
 
-   Three placements are built and switchable with `?title=a|b|c`, because where a name-board goes
-   is a question about the building and not about the type — it has to be judged in the place:
-
-     a  on the ema wall, over the tablets      (the board belongs to the thing you read)
-     b  in the gate, on the gakuzuka           (where a torii actually carries a shrine's name)
-     c  on the water pavilion's gable          (across the court, answering the wall)
+   It hangs in the gate, on the gakuzuka. Two other placements were built and looked at in the
+   place — over the tablets on the ema wall, and under the water pavilion's near eave — and both
+   were readable; the gate wins because it is the only one of the three that says the name
+   belongs to the WHOLE PRECINCT rather than to the thing it is bolted to. It is also the one
+   spot a real shrine would have used, which is what the gakuzuka is for.
 */
-const TITLE_V = (() => {
-  const v = (new URLSearchParams(location.search).get('title') || 'a').toLowerCase();
-  return ['a', 'b', 'c'].includes(v) ? v : 'a';
-})();
 function hengakuTexture(jp, en, w, h) {
   const W = 512, H = Math.round(512 * h / w);
   const c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -2833,7 +2872,7 @@ function hengaku(jp, en, w, h) {
   }));
   face.position.z = TH / 2 + 1.6;
   grp.add(face);
-  const o = new THREE.Mesh(outlineGeom(frame.geometry), outlineMaterial(0.0024));
+  const o = new THREE.Mesh(outlineGeom(frame.geometry), outlineMaterial(3.2));
   o.frustumCulled = false;
   grp.add(o);
   return grp;
@@ -2922,6 +2961,10 @@ const WORLD_L2 = {};
 /* a section whose level three is a walk registers it here: the placards, how to letter them, and
    where the camera stands to read each one */
 const WORLD_L3 = {};
+/* the name-board, per section. The safe-zone rule that used to apply to a DOM title still applies
+   to a board hanging in a gate — it is just no longer something the browser can measure for you,
+   so the board has to be reachable from outside to be asserted at all. */
+const WORLD_TITLE = {};
 const WORLD_SWAY = [];
 /* THE RACK IS GONE. It was 974 units wide against a gate 781 wide and cedars 800 tall — a
    fifteen-metre timber structure standing in front of the landmark and out-massing it, which
@@ -3010,7 +3053,7 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
     vertexColors: true, gradientMap: RAMP, flatShading: true,
   }));
   grp.add(frameMesh);
-  addOutline(frameMesh, 0.0024);
+  addOutline(frameMesh, 3.2);
   /* piles, so it stands in the shallows rather than floating on them */
   const piles = [];
   for (let i = -2; i <= 2; i++) {
@@ -3130,7 +3173,7 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
     }));
     face.position.set(0, body.position.y, TTH / 2 + 0.4);
     root.add(face);
-    const o = new THREE.Mesh(outlineGeom(body.geometry), outlineMaterial(0.0028));
+    const o = new THREE.Mesh(outlineGeom(body.geometry), outlineMaterial(3.7));
     o.position.copy(body.position);
     o.frustumCulled = false;
     root.add(o);
@@ -3330,7 +3373,7 @@ function pickWorldTile(sec, jp) {
     o.position.copy(at3(-2100, 0));
     facing(o, -2101, 0);
     backScene.add(o);
-    addOutline(o, 0.0026);
+    addOutline(o, 3.5);
   }
 
   const gateMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
@@ -3338,7 +3381,7 @@ function pickWorldTile(sec, jp) {
   gate.position.copy(at3(0, 0));
   facing(gate, -1, 0);
   backScene.add(gate);
-  addOutline(gate, 0.0028);
+  addOutline(gate, 3.7);
   /* THE AIM POINT IS THE FRAME'S CENTRE, so it says two things at once: `sd` decides what sits
      on the middle vertical, and `lift` decides the pitch. Held on the gate's own axis the gate
      centres; raised to half its height the camera tips UP at it and the horizon drops, which is
@@ -3358,7 +3401,7 @@ function pickWorldTile(sec, jp) {
     pos: at3(TUN_F0 + i * TUN_STEP, 0),
     rot: gate.rotation.y,
     scale: new THREE.Vector3(1, 1, 1),
-  }), 0.0026);
+  }), 3.5);
 
   /* the hall at the end of it */
   const hall = new THREE.Mesh(shrineHallGeo(620, 420, 520), new THREE.MeshToonMaterial({
@@ -3367,7 +3410,7 @@ function pickWorldTile(sec, jp) {
   hall.position.copy(at3(TUN_END + 700, 0));
   facing(hall, TUN_END, 0);
   backScene.add(hall);
-  addOutline(hall, 0.0026);
+  addOutline(hall, 3.5);
 
   /* lanterns flanking the way in */
   const lanternMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
@@ -3383,7 +3426,7 @@ function pickWorldTile(sec, jp) {
       if (onCourt(lf)) m.position.y = CY_TOP;
       m.rotation.y = hash01(i, 11) * 6.28;
       backScene.add(m);
-      if (i < 4) addOutline(m, 0.0024);
+      if (i < 4) addOutline(m, 3.2);
     });
 
   /* ---- level three's placards ----
@@ -3471,7 +3514,7 @@ function pickWorldTile(sec, jp) {
         c2.position.set(sx * SW * 0.36, SH * 0.5 + 20, 0);
         root.add(c2);
       });
-      const o = new THREE.Mesh(outlineGeom(board), outlineMaterial(0.0024));
+      const o = new THREE.Mesh(outlineGeom(board), outlineMaterial(3.2));
       o.frustumCulled = false;
       hold.add(o);
       /* lettered NOW, with the whole collection, so the tunnel is never a row of blank boards.
@@ -3630,7 +3673,7 @@ function pickWorldTile(sec, jp) {
     ch.position.y = CY_TOP;
     facing(ch, -430, 0);
     backScene.add(ch);
-    addOutline(ch, 0.0024);
+    addOutline(ch, 3.2);
     CHOZUYA = ch;
   }
 
@@ -3707,33 +3750,17 @@ function pickWorldTile(sec, jp) {
      a board sized to be readable from the standing point is not a board at all — it is a poster
      leaning on a shrine. */
   {
-    if (TITLE_V === 'a') {
-      /* over the tablets, on the wall's own top rail. It belongs to the thing you read, and it
-         inherits the wall's turn toward the path for free by being parented to it. */
-      const b = hengaku('復習', 'REVIEW', WALL_W * 0.74, WALL_H * 0.29);
-      b.position.set(0, WALL_H + WALL_H * 0.055, WALL_W * 0.055);
-      wallGrp.add(b);
-    } else if (TITLE_V === 'b') {
-      /* in the gate, on the gakuzuka — the strut between the tie beam and the lintel, which is
-         exactly where a torii carries a shrine's name and the reason that strut is there. */
-      const b = hengaku('復習', 'REVIEW', GATE_H * 0.40, GATE_H * 0.26);
-      b.position.copy(at3(0, 0));
-      b.position.y += GATE_H * 0.705;
-      b.rotation.y = gate.rotation.y;
-      b.translateZ(GATE_H * 0.055);
-      backScene.add(b);
-    } else {
-      /* UNDER THE EAVE THAT FACES YOU, not on the pavilion's own front. The pavilion is turned to
-         face ACROSS the court — it addresses the ema wall, which is what makes the courtyard a
-         courtyard — so anything mounted on its front is seen edge-on from up the approach and
-         reads as a bright sliver. The eave facing back down the way in is the surface a visitor
-         actually sees, and a board hung under an eave is what that surface is for. */
-      const b = hengaku('復習', 'REVIEW', 178 * 0.92, 178 * 0.28);
-      b.position.copy(CHOZUYA.position).addScaledVector(fwd, -128);
-      b.position.y += 238 * 0.60;
-      b.rotation.y = gate.rotation.y;
-      backScene.add(b);
-    }
+    /* On the gakuzuka — the short strut between the tie beam and the lintel. Sized to sit inside
+       that opening with the gate's own timber showing round it on all four sides: a board that
+       fills the gap reads as a panel let into the structure, and the thing that makes it a hung
+       board is the margin. */
+    const b = hengaku('復習', 'REVIEW', GATE_H * 0.365, GATE_H * 0.237);
+    b.position.copy(at3(0, 0));
+    b.position.y += GATE_H * 0.705;
+    b.rotation.y = gate.rotation.y;
+    b.translateZ(GATE_H * 0.055);
+    backScene.add(b);
+    WORLD_TITLE.REVIEW = b;
   }
 
   /* ---- planting ----
@@ -3834,7 +3861,7 @@ function pickWorldTile(sec, jp) {
       const w = at3(q[0], q[1]);
       treeClaim(w.x, w.z, 132 * k);
       return { pos: at3(q[0], q[1], -14), rot: hash01(i, 7) * 6.28, scale: new THREE.Vector3(k, k, k) };
-    }, 0.0018);
+    }, 2.4);
     /* cedars are 480 tall and the camera stands at f -1290, so they start well forward of it:
        a stand of them beside the eye would be a wall across the frame rather than a treeline */
     instanced(cedarGeo(), woodM(), 92, (i) => {
@@ -3844,7 +3871,7 @@ function pickWorldTile(sec, jp) {
       const w = at3(q[0], q[1]);
       treeClaim(w.x, w.z, 64 * k);
       return { pos: at3(q[0], q[1], -14), rot: hash01(i, 29) * 6.28, scale: new THREE.Vector3(k, k, k) };
-    }, 0.0016);
+    }, 2.1);
     /* the undergrowth: five bands, low and near the path through to tall and back at the
        treeline, so the planting has a section rather than being one height everywhere. The first
        is deliberately tiny and numerous — the strip between the paving and the first bushes was
@@ -4083,11 +4110,11 @@ function ringSpot(seed, near, far, lo, hi) {
   /* the counts are CANDIDATES now, not trees. Spacing rejects perhaps a third of them, so the
      numbers went up by half to keep the wood as deep as it was — which is the right way round:
      the density you get is then a property of the ground rather than of the seed. */
-  instanced(cedar, woodMat(), 620, spaced(standSpot(41, 2800, 10500, 17000, 1200, 0.85, 1.9), 62), 0.0016);
-  instanced(broad, woodMat(), 480, spaced(standSpot(97, 2600, 9500, 16000, 900, 0.9, 2.0), 132), 0.0018);
+  instanced(cedar, woodMat(), 620, spaced(standSpot(41, 2800, 10500, 17000, 1200, 0.85, 1.9), 62), 2.1);
+  instanced(broad, woodMat(), 480, spaced(standSpot(97, 2600, 9500, 16000, 900, 0.9, 2.0), 132), 2.4);
   /* the surround */
-  instanced(cedar, woodMat(), 450, spaced(ringSpot(151, 6000, 16000, 1.4, 2.8), 62), 0.0016);
-  instanced(broad, woodMat(), 300, spaced(ringSpot(199, 5500, 14000, 1.5, 2.8), 132), 0.0018);
+  instanced(cedar, woodMat(), 450, spaced(ringSpot(151, 6000, 16000, 1.4, 2.8), 62), 2.1);
+  instanced(broad, woodMat(), 300, spaced(ringSpot(199, 5500, 14000, 1.5, 2.8), 132), 2.4);
   /* sakura, near enough to read as blossom rather than as pink dots — but at 1.5–3.0 on a
      250-unit model they stood taller than the cedars while being half the distance away, and
      four of them filled the frame. Same footprint as everything else now. */
@@ -4097,7 +4124,7 @@ function ringSpot(seed, near, far, lo, hi) {
     if (blocked(pos.x, pos.z)) return null;
     const k = 1.0 + p.r * 0.9;
     return { pos, rot: hash01(i, 401) * 6.28, scale: new THREE.Vector3(k, k, k) };
-  }, 78), 0.0020);
+  }, 78), 2.7);
 
   /* ---- the coast ----
      A shoreline wants its own planting, not whatever the valley scatter happens to leave there:
@@ -4136,9 +4163,9 @@ function ringSpot(seed, near, far, lo, hi) {
       scale: new THREE.Vector3(k, k * (0.82 + hash01(i, seed + 617) * 0.42), k),
     };
   };
-  instanced(cedar, woodMat(), 260, spaced(coastSpot(457, 0.8, 1.7), 62), 0.0016);
-  instanced(broad, woodMat(), 200, spaced(coastSpot(521, 0.85, 1.8), 132), 0.0018);
-  instanced(sakura, woodMat(), 46, spaced(coastSpot(587, 0.9, 1.6), 150), 0.0020);
+  instanced(cedar, woodMat(), 260, spaced(coastSpot(457, 0.8, 1.7), 62), 2.1);
+  instanced(broad, woodMat(), 200, spaced(coastSpot(521, 0.85, 1.8), 132), 2.4);
+  instanced(sakura, woodMat(), 46, spaced(coastSpot(587, 0.9, 1.6), 150), 2.7);
 }
 
 /* ---- clouds ----
@@ -4283,7 +4310,7 @@ function patchAt(x, z) {
       if (blocked(pos.x, pos.z)) return null;
       const k = 0.7 + p.r * 1.5;
       return { pos, rot: hash01(i, 1319) * 6.28, scale: new THREE.Vector3(k * 1.3, k * 0.85, k * 1.1) };
-    }, 0.0022);
+    }, 2.9);
 }
 
 /* ---- one pass over the finished landscape ----
@@ -4344,10 +4371,16 @@ function renderReflection() {
   for (let i = 0; i < NO_REFLECT.length; i++) NO_REFLECT[i].visible = false;
   const prevClip = backRenderer.clippingPlanes;
   backRenderer.clippingPlanes = REFLECT_CLIP;
+  /* An outline is a width in pixels, and this pass is 768 pixels wide rather than the window —
+     leaving the window's size in there draws every line in the reflection two and a half times
+     too thin. The pass has to say what it is being measured in. */
+  const prevRes = OUTLINE_RES.value.clone();
+  OUTLINE_RES.value.set(reflectRT.width, reflectRT.height);
   backRenderer.setRenderTarget(reflectRT);
   backRenderer.clear();
   backRenderer.render(backScene, reflectCam);
   backRenderer.setRenderTarget(null);
+  OUTLINE_RES.value.copy(prevRes);
   backRenderer.clippingPlanes = prevClip;
   for (let i = 0; i < NO_REFLECT.length; i++) NO_REFLECT[i].visible = true;
   lakeWater.visible = true;
@@ -5140,7 +5173,24 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* the hover state of world level two, so a swing can be measured rather than eyeballed */
   swing: () => (worldL2 || { picks: [] }).picks.map((q) => ({
     jp: q.jp, x: +q.root.rotation.x.toFixed(3), em: +q.face.material.emissive.r.toFixed(3),
-  })) };
+  })),
+  /* where the name-board actually lands on screen. A 3D title cannot be measured with
+     getBoundingClientRect, and "is the title inside the safe zone" is precisely the question that
+     a 1400x880 test window answered wrongly for the DOM version — so project it here. */
+  titleRect: (key) => {
+    const b = WORLD_TITLE[key || 'REVIEW'];
+    if (!b) return null;
+    const box = new THREE.Box3().setFromObject(b);
+    const v = new THREE.Vector3();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < 8; i++) {
+      v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z);
+      v.project(camera);
+      const sx = (v.x * 0.5 + 0.5) * W(), sy = (0.5 - v.y * 0.5) * H();
+      x0 = Math.min(x0, sx); y0 = Math.min(y0, sy); x1 = Math.max(x1, sx); y1 = Math.max(y1, sy);
+    }
+    return [x0, y0, x1, y1].map(Math.round);
+  } };
 
 const flash = document.getElementById('flash');
 const descLine = document.getElementById('descLine');
