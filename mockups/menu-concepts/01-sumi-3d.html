@@ -96,7 +96,10 @@
     color: #ded6bd;
     transform: skewX(-8deg);
     white-space: nowrap;
-    text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.55);
+    /* the hard offset shadow is the Persona look and it only guards the down-right edge; the
+       soft halo behind it is what holds the glyph against whatever the world puts there —
+       invisible as a shadow, but it lifts local contrast on every side */
+    text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.55), 0 0 16px rgba(6, 9, 15, 0.62);
     transition: color 0.2s, transform 0.25s cubic-bezier(0.2, 1.4, 0.3, 1), text-shadow 0.25s;
   }
   body[data-menu="b"] .t-en {
@@ -764,12 +767,19 @@
      it reads as depth rather than as a panel. Sits under the 3D stage, never over it. */
   /* z-index 1 and placed after #glBack in the DOM, so it darkens the world but is still under
      #cssStage at 2 — the type itself must never be touched by it */
+  /* Measured, not guessed: with the type hidden, the background luminance behind each item
+     gives contrast ratios of 2.1 and 1.9 for STUDY and REVIEW against 8.3–8.9 for the three
+     below them. The weak pair are the TOP two, sitting against the brightest part of the dawn
+     sky — not the ones over the bright meadow. An edge-anchored gradient barely reached them,
+     so the main shade is now an ellipse centred on the stack itself. */
   #typeShade {
     position: fixed; inset: 0; z-index: 1; pointer-events: none;
     background:
-      linear-gradient(100deg, rgba(10,14,22,0.52) 0%, rgba(10,14,22,0.38) 26%,
-        rgba(10,14,22,0.16) 46%, rgba(10,14,22,0) 62%),
-      linear-gradient(0deg, rgba(8,11,18,0.30) 0%, rgba(8,11,18,0) 28%);
+      radial-gradient(118% 88% at 6% 15%, rgba(10,14,22,0.66) 0%, rgba(10,14,22,0.36) 42%,
+        rgba(10,14,22,0) 76%),
+      linear-gradient(100deg, rgba(10,14,22,0.30) 0%, rgba(10,14,22,0.20) 30%,
+        rgba(10,14,22,0) 60%),
+      linear-gradient(0deg, rgba(8,11,18,0.28) 0%, rgba(8,11,18,0) 26%);
     opacity: 0; transition: opacity 0.5s ease;
   }
   body.at-menu #typeShade { opacity: 1; }
@@ -1639,55 +1649,207 @@ function landAt(x, z) {
   backScene.add(ground);
 }
 
+/* ================= THE VALLEY: SHARED TOOLKIT =================
+   Everything in the valley is built with these. Landform takes smooth vertex-coloured shading;
+   objects take a toon ramp and an inverted-hull outline. That split is the lab's finding and it
+   is the whole reason the two read as different classes of thing rather than as one soup. */
+
+/* WHERE THE GROUND ACTUALLY IS. Every prop used to sit at a flat GROUND_Y while the terrain
+   rolled underneath it — which is most of why the valley read as objects placed on a board
+   rather than as a place. Nothing is positioned by hand-picked y any more. */
+function groundAt(x, z) { return GROUND_Y + landAt(x - EYE.x, z - EYE.y); }
+function onGround(dist, side, lift = 0) {
+  const p = at(dist, side, 0);
+  p.y = groundAt(p.x, p.z) + lift;
+  return p;
+}
+
+/* the toon ramp: 4 hard steps, NearestFilter is what makes it band rather than blur */
+const RAMP = (() => {
+  const steps = 4, d = new Uint8Array(steps * 4);
+  for (let i = 0; i < steps; i++) {
+    const v = Math.round(255 * Math.pow((i + 1) / steps, 0.72));
+    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+  }
+  const t = new THREE.DataTexture(d, steps, 1, THREE.RGBAFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter;
+  t.needsUpdate = true;
+  return t;
+})();
+
+/* MERGE, so a multi-part tree is ONE InstancedMesh. A trunk and three canopy blobs as separate
+   instanced meshes would be four draw calls and four outline twins that can drift apart; merged
+   into one vertex-coloured geometry it is one of each, and the outline wraps the whole tree
+   instead of wrapping each piece. Parts arrive already positioned via geometry .translate(). */
+function mergeParts(parts) {
+  const prepped = parts.map(({ geo, color }) => ({
+    g: geo.index ? geo.toNonIndexed() : geo, c: new THREE.Color(color),
+  }));
+  const total = prepped.reduce((n, p) => n + p.g.attributes.position.count, 0);
+  const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3), col = new Float32Array(total * 3);
+  let o = 0;
+  for (const { g, c } of prepped) {
+    const p = g.attributes.position, n = g.attributes.normal;
+    pos.set(p.array, o * 3);
+    nor.set(n.array, o * 3);
+    for (let i = 0; i < p.count; i++) { col[(o + i) * 3] = c.r; col[(o + i) * 3 + 1] = c.g; col[(o + i) * 3 + 2] = c.b; }
+    o += p.count;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return out;
+}
+
+/* OUTLINE. A flat-shaded polyhedron duplicates each vertex per face with its own face normal,
+   so extruding tears the hull open at every corner. The outline gets its own geometry with
+   normals averaged across coincident vertices, and keeps the original normal in `aFlat` so the
+   shader can divide out dot(smooth, flat) — without that the corners stay under-extruded and
+   the gaps only narrow instead of closing. */
+function outlineGeom(src) {
+  const g = src.clone();
+  const p = g.attributes.position, n = g.attributes.normal;
+  g.setAttribute('aFlat', new THREE.BufferAttribute(new Float32Array(n.array), 3));
+  const buckets = new Map();
+  for (let i = 0; i < p.count; i++) {
+    const k = `${Math.round(p.getX(i) * 16)},${Math.round(p.getY(i) * 16)},${Math.round(p.getZ(i) * 16)}`;
+    let b = buckets.get(k);
+    if (!b) { b = { x: 0, y: 0, z: 0, at: [] }; buckets.set(k, b); }
+    b.x += n.getX(i); b.y += n.getY(i); b.z += n.getZ(i); b.at.push(i);
+  }
+  const v = new THREE.Vector3();
+  buckets.forEach((b) => {
+    v.set(b.x, b.y, b.z);
+    if (v.lengthSq() < 1e-8) return;
+    v.normalize();
+    b.at.forEach((i) => n.setXYZ(i, v.x, v.y, v.z));
+  });
+  n.needsUpdate = true;
+  return g;
+}
+function outlineMaterial(w) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      w: { value: w },
+      fogColor: { value: backScene.fog.color },
+      fogDensity: { value: backScene.fog.density },
+    },
+    vertexShader: `
+      uniform float w;
+      attribute vec3 aFlat;
+      varying float vDepth;
+      void main() {
+        vec4 lp = vec4( position, 1.0 );
+        vec3 ln = normal, lf = aFlat;
+        #ifdef USE_INSTANCING
+          lp = instanceMatrix * lp;
+          mat3 im = mat3( instanceMatrix );
+          ln = normalize( im * ln );
+          lf = normalize( im * lf );
+        #endif
+        vec4 mv = modelViewMatrix * lp;
+        vDepth = -mv.z;
+        float k = 1.0 / max( dot( ln, lf ), 0.30 );
+        vec3 vn = normalize( mat3( modelViewMatrix ) * ln );
+        /* screen-constant out to 4,000 units and then frozen, so a tree on the far side of the
+           valley sheds its line instead of turning into a black lozenge */
+        mv.xyz += vn * ( w * min( vDepth, 4000.0 ) * k );
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 fogColor;
+      uniform float fogDensity;
+      varying float vDepth;
+      void main() {
+        /* the line has to take the haze too — an unfogged outline stays jet black against a
+           dissolving mountain and reads as a crack in the image */
+        float f = 1.0 - exp( - fogDensity * fogDensity * vDepth * vDepth );
+        gl_FragColor = vec4( mix( vec3( 0.055, 0.06, 0.085 ), fogColor, clamp( f, 0.0, 1.0 ) ), 1.0 );
+      }`,
+    side: THREE.BackSide,
+  });
+}
+
+/* one shared scatter so trees, rocks and grass agree about where the ground is busy */
+function scatter(i, seed, near, far, spread) {
+  const a = (i * 9301 + seed * 49297) % 233280 / 233280;
+  const b = (i * 4271 + seed * 15731) % 233280 / 233280;
+  const c = (i * 7919 + seed * 30011) % 233280 / 233280;
+  return { d: near + Math.pow(a, 0.62) * (far - near), s: (b - 0.42) * spread, r: c };
+}
+/* `outline` is a width, or 0 for none. The twin shares the instance matrices, so it can never
+   drift out of register with what it is outlining. */
+function instanced(geo, mat, n, place, outline = 0) {
+  const im = new THREE.InstancedMesh(geo, mat, n);
+  const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < n; i++) {
+    const p = place(i);
+    if (!p) { sc.set(0, 0, 0); mx.compose(new THREE.Vector3(), q, sc); im.setMatrixAt(i, mx); continue; }
+    q.setFromAxisAngle(up, p.rot || 0);
+    sc.copy(p.scale);
+    mx.compose(p.pos, q, sc);
+    im.setMatrixAt(i, mx);
+  }
+  im.instanceMatrix.needsUpdate = true;
+  backScene.add(im);
+  if (outline > 0) {
+    const ol = new THREE.InstancedMesh(outlineGeom(geo), outlineMaterial(outline), n);
+    ol.instanceMatrix.copy(im.instanceMatrix);
+    ol.instanceMatrix.needsUpdate = true;
+    ol.frustumCulled = false;
+    backScene.add(ol);
+  }
+  return im;
+}
+
 /* ---- Fuji, standing on the sight line ---- */
-/* A lathe, not a cone: the flanks have to bow inward (r falls as (1−t)^1.4) or it reads as a
-   volcano rather than as Fuji. Broad and low — the real thing is 40km across and under 4km high,
-   so the temptation to make it steep is the thing to resist. */
+/* A lathe, not a cone: the flanks have to bow inward or it reads as a volcano rather than as
+   Fuji. Broad and low — the real thing is 40km across and under 4km high, so the temptation to
+   make it steep is the thing to resist. The profile is kept from the version that finally
+   worked; what is rebuilt is the shading. */
 function makeFuji(dist, side, R, Hh) {
   const grp = new THREE.Group();
-  /* ONE radius function for both shells. Deriving them separately is what broke the summit:
-     the cap sat only 40 units outside the rock — sub-pixel at 13,500 away, so they z-fought —
-     and the two floors (210 vs 200) left the rock *wider* than the cap at the very top, so
-     bare rock punched through the snow. The cap is now a proportional offset of the same curve
-     and cannot cross it. */
-  /* A floored radius is what produced the wine-bottle neck: above t=0.88 the floor won and
-     the top eighth of the mountain ran straight up as a cylinder. Interpolating to a real
-     summit radius instead means it tapers all the way and only goes flat at the very top. */
-  const rTop = R * 0.016;
-  const rAt = (t) => rTop + (R - rTop) * Math.pow(1 - t, 1.7);
+  /* A floored radius is what produced the wine-bottle neck: above t=0.88 the floor won and the
+     top eighth ran straight up as a cylinder. Interpolating to a real summit radius means it
+     tapers all the way and only goes flat at the very top. */
+  /* THE SUMMIT IS BROAD, NOT SHARP. At exponent 1.7 with a 1.6% summit radius the top few per
+     cent tapered to a stub and read as a nipple on the skyline. The real mountain has a
+     600-metre-wide crater rim on a 40km base — about 3% — and its flanks are less concave than
+     the instinct to draw a "volcano" suggests. 1.45 and 5.5% give a summit you can believe
+     someone stands on. */
+  const rTop = R * 0.055;
+  const rAt = (t) => rTop + (R - rTop) * Math.pow(1 - t, 1.45);
+  const rows = 26;
   const prof = [];
-  for (let i = 0; i <= 16; i++) { const t = i / 16; prof.push(new THREE.Vector2(rAt(t), t * Hh)); }
-  grp.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 64), new THREE.MeshLambertMaterial({
-    color: 0x5b6788, emissive: 0x171d2e, flatShading: true,
-  })));
-  /* the crater lip, so the flat top reads as a summit rather than a cut-off cone */
-  /* the torus crater lip is gone — at 13,500 away it read as a bead stuck on the summit */
-  /* the snow cap: same curve, offset outward, with a ragged snowline rather than a drawn circle */
-  const capLo = 0.58, off = R * 0.02;
-  const cap = [];
-  for (let i = 0; i <= 9; i++) {
-    const t = capLo + (i / 9) * (1 - capLo);
-    /* the offset tapers to nothing at the top, so the snow meets the rock at the summit
-       instead of flaring out past it like a mushroom cap */
-    cap.push(new THREE.Vector2(rAt(t) + off * (1 - t), t * Hh));
+  for (let i = 0; i <= rows; i++) { const t = i / rows; prof.push(new THREE.Vector2(rAt(t), t * Hh)); }
+  /* the summit closed off — a bare lathe lets you look straight down the inside of the mountain */
+  prof.push(new THREE.Vector2(0, Hh));
+  const geo = new THREE.LatheGeometry(prof, 72);
+
+  /* SNOW AS VERTEX COLOUR ON ONE SHELL, not a second shell offset outward. Two shells is what
+     broke this three times over — z-fighting at 13,500 away, the rock ending up wider than the
+     cap, the cap flaring past the rock like a mushroom. A snowline cannot fight geometry it is
+     part of. It is ragged in azimuth, and deeper down the gullies than on the ribs, which is
+     what actually happens and what stops it reading as a drawn circle. */
+  const p = geo.attributes.position;
+  const ROCK = new THREE.Color(0x4d5876), ROCK_HI = new THREE.Color(0x5f6c8c);
+  const SNOW = new THREE.Color(0xf7dcd2), SNOW_SH = new THREE.Color(0xcbc0cc);
+  const col = new Float32Array(p.count * 3), tmp = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i), t = y / Hh;
+    const a = Math.atan2(p.getZ(i), p.getX(i));
+    const line = 0.60 + Math.sin(a * 7) * Math.sin(a * 3 + 1.2) * 0.055 + Math.sin(a * 13 + 0.6) * 0.022;
+    tmp.copy(ROCK).lerp(ROCK_HI, THREE.MathUtils.smoothstep(t, 0.0, 0.55));
+    /* a short blend so the hem has tongues of snow rather than a hard edge */
+    tmp.lerp(SNOW, THREE.MathUtils.smoothstep(t, line, line + 0.075));
+    /* the dawn catches the very top first */
+    tmp.lerp(SNOW_SH, THREE.MathUtils.smoothstep(t, 0.55, 0.72) * (1 - THREE.MathUtils.smoothstep(t, 0.8, 0.95)) * 0.35);
+    col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
   }
-  const capGeo = new THREE.LatheGeometry(cap, 64);
-  const cp = capGeo.attributes.position;
-  for (let i = 0; i < cp.count; i++) {
-    const y = cp.getY(i);
-    const k = 1 - THREE.MathUtils.clamp((y / Hh - capLo) / (1 - capLo), 0, 1);   /* only the hem */
-    const a = Math.atan2(cp.getZ(i), cp.getX(i));
-    cp.setY(i, y + Math.sin(a * 7) * Math.sin(a * 3 + 1.2) * Hh * 0.052 * k * k);
-  }
-  capGeo.computeVertexNormals();
-  grp.add(new THREE.Mesh(capGeo, new THREE.MeshLambertMaterial({
-    color: 0xf7dcd2, emissive: 0x4a3038, flatShading: true,   /* alpenglow: dawn catches the snow first */
-  })));
-  /* the lathe leaves the summit open — without this you look straight down the inside of the
-     mountain, which is what kept the tip looking wrong */
-  const top = new THREE.Mesh(new THREE.CircleGeometry(rTop + off * 0.0, 24),
-    new THREE.MeshLambertMaterial({ color: 0xf7dcd2, emissive: 0x4a3038, flatShading: true }));
-  top.rotation.x = -Math.PI / 2; top.position.y = Hh; grp.add(top);
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  grp.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
   grp.position.copy(at(dist, side, GROUND_Y - 120));
   backScene.add(grp);
   return grp;
@@ -1697,43 +1859,74 @@ function makeFuji(dist, side, R, Hh) {
    putting it on the sight line. Offset right so it sits clear of the type stack. */
 makeFuji(13500, 2600, 6000, 3500);
 
-/* A ridge is never one cone. Each of these is a cluster — a main mass with two smaller
-   shoulders offset around it — and anything tall enough gets snow, which is what makes the
-   far ranges read as mountains rather than as cardboard triangles. */
-function foothill(dist, side, w, h, tone) {
-  const rock = new THREE.MeshLambertMaterial({ color: tone, emissive: 0x161d28, flatShading: true });
-  const snow = new THREE.MeshLambertMaterial({ color: 0xe8d8d4, emissive: 0x4a3f42, flatShading: true });
-  const parts = [[0, 0, 1, 1], [w * 0.78, dist * 0.06, 0.62, 0.7], [-w * 0.7, -dist * 0.05, 0.5, 0.55]];
-  parts.forEach(([dx, dz, sw, sh], k) => {
-    const cw = w * sw, ch = h * sh;
-    const m = new THREE.Mesh(new THREE.ConeGeometry(cw, ch, 5 + ((Math.floor(w) + k) % 3)), rock);
-    m.position.copy(at(dist + dz, side + dx, GROUND_Y + ch / 2 - 160));
-    m.rotation.y = (side + dist + k * 900) * 0.0007;
-    backScene.add(m);
-    if (ch > 1200) {
-      const cap = new THREE.Mesh(new THREE.ConeGeometry(cw * 0.34, ch * 0.3, 5), snow);
-      cap.position.copy(at(dist + dz, side + dx, GROUND_Y + ch - ch * 0.15 - 160));
-      cap.rotation.y = m.rotation.y;
-      backScene.add(cap);
-    }
+/* A RIDGE IS NEVER ONE CONE, and it is never one colour either. Each is a cluster of four or
+   five masses merged into a single vertex-coloured mesh, coloured by height the same way Fuji
+   is — dark forested skirt, bare rock above it, snow on anything that gets high enough, with a
+   ragged line between each. Merging matters: as separate cones the shoulders showed their own
+   silhouettes through each other and the cluster read as a pile of triangles. */
+function mountainRidge(dist, side, w, h, palette) {
+  const [SKIRT, ROCK, SNOW] = palette.map((c) => new THREE.Color(c));
+  const seed = Math.abs(Math.floor(dist * 7 + side * 3));
+  const rnd = (n) => ((seed * 9301 + n * 49297) % 233280) / 233280;
+  const parts = [[0, 0, 1, 1], [0.74, 0.10, 0.60, 0.72], [-0.68, -0.09, 0.52, 0.58],
+    [0.36, -0.22, 0.40, 0.42], [-0.30, 0.24, 0.34, 0.35]];
+  const geos = [];
+  parts.forEach(([fx, fz, sw, sh], k) => {
+    if (k > 2 && rnd(k) < 0.35) return;                       /* not every ridge gets five */
+    const cw = w * sw * (0.85 + rnd(k + 9) * 0.35);
+    const ch = h * sh * (0.85 + rnd(k + 17) * 0.3);
+    const g = new THREE.ConeGeometry(cw, ch, 5 + ((seed + k) % 4));
+    g.rotateY(rnd(k + 5) * 6.28);
+    /* squashed across the sight line so a ridge is a ridge and not a pyramid */
+    g.scale(1, 1, 0.62 + rnd(k + 3) * 0.3);
+    const p = at(dist + w * fz, side + w * fx, 0);
+    const base = at(dist, side, 0);
+    g.translate(p.x - base.x, ch / 2, p.z - base.z);
+    geos.push(g);
   });
+  /* one merged shell, coloured by absolute height across the whole cluster */
+  const merged = mergeParts(geos.map((g) => ({ geo: g, color: 0xffffff })));
+  const p = merged.attributes.position;
+  const col = merged.attributes.color, tmp = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const t = THREE.MathUtils.clamp(p.getY(i) / h, 0, 1);
+    const a = Math.atan2(p.getZ(i), p.getX(i));
+    const wob = Math.sin(a * 5 + seed) * 0.05 + Math.sin(a * 11) * 0.025;
+    tmp.copy(SKIRT).lerp(ROCK, THREE.MathUtils.smoothstep(t, 0.22 + wob, 0.52 + wob));
+    tmp.lerp(SNOW, THREE.MathUtils.smoothstep(t, 0.70 + wob, 0.86 + wob));
+    col.setXYZ(i, tmp.r, tmp.g, tmp.b);
+  }
+  const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  const b = onGround(dist, side, -140);
+  m.position.copy(b);
+  backScene.add(m);
 }
-/* two layers between the eye and Fuji, so the valley reads as having depth rather than a backdrop */
-[[5200, -4200, 1900, 900], [6100, 2900, 2300, 760], [8200, -1400, 2800, 1250], [8900, 5400, 2200, 880]]
-  .forEach(([d, s, w, h]) => foothill(d, s, w, h, 0x54637a));
-[[11500, -8000, 4200, 2000], [12500, 8200, 3800, 1750]]
-  .forEach(([d, s, w, h]) => foothill(d, s, w, h, 0x6b7a92));
-/* and a rim all the way round, so turning the camera never finds an edge of the world */
-for (let k = 0; k < 22; k++) {
-  const a = (k / 22) * Math.PI * 2 + 0.3;
-  const r = 26000 + ((k * 811) % 5000);
-  const p = new THREE.Vector3(EYE.x + Math.cos(a) * r, 0, EYE.y + Math.sin(a) * r);
-  const h = 1600 + ((k * 397) % 1900);
-  const m = new THREE.Mesh(
-    new THREE.ConeGeometry(3200 + ((k * 233) % 2600), h, 5),
-    new THREE.MeshLambertMaterial({ color: 0x7d8aa2, emissive: 0x2a3242, flatShading: true }));
-  m.position.set(p.x, GROUND_Y + h / 2 - 300, p.z);
-  m.rotation.y = k * 0.7;
+/* three layers between the eye and Fuji, so the valley reads as having depth rather than as a
+   backdrop: wooded hills close, bare ranges behind them, snow only on the far ones */
+[[5200, -4200, 1900, 820], [6100, 2900, 2300, 700], [8200, -1400, 2800, 1150], [8900, 5400, 2200, 820]]
+  .forEach(([d, s, w, h]) => mountainRidge(d, s, w, h, [0x33452f, 0x4c5771, 0xdcd2d6]));
+[[11500, -8000, 4200, 2000], [12500, 8200, 3800, 1750], [15000, -2200, 3400, 1500]]
+  .forEach(([d, s, w, h]) => mountainRidge(d, s, w, h, [0x3d4a52, 0x66738c, 0xe6dcdc]));
+/* and a rim all the way round, so turning the camera never finds an edge of the world. Nearly
+   dissolved by the haze at this range, so it only has to give the horizon a broken edge. */
+for (let k = 0; k < 26; k++) {
+  const a = (k / 26) * Math.PI * 2 + 0.3;
+  const r = 24000 + ((k * 811) % 6000);
+  const h = 1700 + ((k * 397) % 2200);
+  const cw = 3000 + ((k * 233) % 2800);
+  const g = new THREE.ConeGeometry(cw, h, 5 + (k % 3));
+  g.rotateY(k * 0.7);
+  g.scale(1, 1, 0.7);
+  g.translate(0, h / 2, 0);
+  const merged = mergeParts([{ geo: g, color: 0xffffff }]);
+  const p = merged.attributes.position, col = merged.attributes.color, tmp = new THREE.Color();
+  const LO = new THREE.Color(0x5f6c86), HI = new THREE.Color(0xd8d2d8);
+  for (let i = 0; i < p.count; i++) {
+    tmp.copy(LO).lerp(HI, THREE.MathUtils.smoothstep(p.getY(i) / h, 0.62, 0.9));
+    col.setXYZ(i, tmp.r, tmp.g, tmp.b);
+  }
+  const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  m.position.set(EYE.x + Math.cos(a) * r, GROUND_Y - 300, EYE.y + Math.sin(a) * r);
   backScene.add(m);
 }
 
@@ -1826,153 +2019,230 @@ function radialTex(inner, outer, stops) {
   }
 }
 
-/* ---- trees: three silhouettes, because one repeated cone reads as a pattern not a wood ---- */
-{
-  /* held back from the camera and leaned right, so the woods never crowd the type stack */
-  const place = (seed, near, far) => (i) => {
-    const p = scatter(i, seed, near, far, 15000);
-    const k = 0.7 + p.r * 1.9;
-    return { pos: at(p.d, p.s + 1800, GROUND_Y - 20), rot: p.r * 6.28,
-      scale: new THREE.Vector3(k, k * (0.75 + p.r * 0.7), k) };
+/* ---- the woods ----
+   Three species, each a merged multi-part model rather than a repeated primitive. A repeated
+   cone is a pattern, and the eye reads a pattern as wallpaper however many of them you put
+   down — which is exactly what the old wood did. Each species is one InstancedMesh plus one
+   outline twin sharing its instance matrices, so the whole forest is six draw calls. */
+
+/* 杉 — cedar. A bare trunk carrying three stacked skirts: the tall dark verticals that give
+   the valley its rhythm. */
+function cedarGeo() {
+  const parts = [];
+  const trunk = new THREE.CylinderGeometry(5, 13, 160, 6);
+  trunk.translate(0, 80, 0);
+  parts.push({ geo: trunk, color: 0x46362b });
+  [[140, 58, 175, 0x2c4634], [258, 44, 148, 0x243c2c], [360, 27, 118, 0x35543b]]
+    .forEach(([y, r, h, c]) => {
+      const g = new THREE.ConeGeometry(r, h, 7);
+      g.translate(0, y + h / 2, 0);
+      parts.push({ geo: g, color: c });
+    });
+  return mergeParts(parts);
+}
+
+/* 欅 — broadleaf. A short trunk under a bundle of canopy masses, which is what stops a round
+   tree reading as a lollipop: the silhouette has to have more than one bump in it. */
+function broadleafGeo() {
+  const parts = [];
+  const trunk = new THREE.CylinderGeometry(9, 19, 130, 6);
+  trunk.translate(0, 65, 0);
+  parts.push({ geo: trunk, color: 0x4a3a2b });
+  [[0, 205, 0, 78, 0x516d33], [-58, 168, 24, 60, 0x466030], [50, 178, -20, 54, 0x5c7a3b],
+    [8, 252, -12, 44, 0x4b6a2f]]
+    .forEach(([x, y, z, r, c]) => {
+      const g = new THREE.IcosahedronGeometry(r, 1);
+      g.scale(1.16, 0.9, 1.06);
+      g.translate(x, y, z);
+      parts.push({ geo: g, color: c });
+    });
+  return mergeParts(parts);
+}
+
+/* 桜 — sakura. Leaning trunk, two branches thrown out sideways, four blossom masses. Kept
+   for the near ground where a tree is big enough to be read as a tree and not as a colour. */
+function sakuraGeo() {
+  const parts = [];
+  const trunk = new THREE.CylinderGeometry(8, 17, 140, 7);
+  trunk.rotateZ(0.07);
+  trunk.translate(0, 70, 0);
+  parts.push({ geo: trunk, color: 0x3d2e29 });
+  [[-46, 150, 0.62, 100], [52, 162, -0.55, 92]].forEach(([x, y, rz, len]) => {
+    const g = new THREE.CylinderGeometry(4, 8, len, 5);
+    g.rotateZ(rz);
+    g.translate(x, y, 0);
+    parts.push({ geo: g, color: 0x3d2e29 });
+  });
+  [[0, 232, 0, 68, 0xeeb3c3], [-78, 200, 22, 52, 0xe5a2b5], [80, 210, -18, 55, 0xf3c3cf],
+    [14, 282, -26, 42, 0xe9adbe]]
+    .forEach(([x, y, z, r, c]) => {
+      const g = new THREE.IcosahedronGeometry(r, 1);
+      g.scale(1.2, 0.82, 1.1);
+      g.translate(x, y, z);
+      parts.push({ geo: g, color: c });
+    });
+  return mergeParts(parts);
+}
+
+const woodMat = () => new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
+
+/* placement along the sight line: held off the immediate foreground so the near meadow stays
+   open under the type, and leaned right so the wood never crowds the stack */
+function standSpot(seed, near, far, spread, off, lo, hi) {
+  return (i) => {
+    const p = scatter(i, seed, near, far, spread);
+    const k = lo + p.r * (hi - lo);
+    return {
+      pos: onGround(p.d, p.s + off, -14),
+      rot: p.r * 6.28,
+      scale: new THREE.Vector3(k, k * (0.82 + p.r * 0.42), k),
+    };
   };
-  /* tall conifers */
-  const conifer = new THREE.ConeGeometry(58, 320, 6);
-  conifer.translate(0, 160, 0);
-  instanced(conifer, new THREE.MeshLambertMaterial({
-    color: 0x2c4030, emissive: 0x0d1510, flatShading: true }), 240, place(41, 3000, 12500));
-  /* squat ones, a different profile at the same distance */
-  const squat = new THREE.ConeGeometry(95, 175, 5);
-  squat.translate(0, 88, 0);
-  instanced(squat, new THREE.MeshLambertMaterial({
-    color: 0x354a34, emissive: 0x101810, flatShading: true }), 190, place(97, 2600, 10000));
-  /* broadleaf: a round canopy — no trunk needed, nothing is close enough to miss it */
-  const round = new THREE.IcosahedronGeometry(115, 1);
-  round.scale(1.15, 0.95, 1.15);
-  round.translate(0, 130, 0);
-  instanced(round, new THREE.MeshLambertMaterial({
-    color: 0x4a5c38, emissive: 0x161d12, flatShading: true }), 170, place(151, 2400, 9500));
+}
+/* and a ring all the way round at mid distance, so turning the camera never finds bare ground
+   where a wood should be — the sight-line scatter only covers about 35° of the horizon */
+function ringSpot(seed, near, far, lo, hi) {
+  return (i) => {
+    const a = ((i * 9301 + seed * 49297) % 233280) / 233280 * Math.PI * 2;
+    const b = ((i * 4271 + seed * 15731) % 233280) / 233280;
+    const c = ((i * 7919 + seed * 30011) % 233280) / 233280;
+    const r = near + Math.pow(b, 0.6) * (far - near);
+    const x = EYE.x + Math.cos(a) * r, z = EYE.y + Math.sin(a) * r;
+    const k = lo + c * (hi - lo);
+    return {
+      pos: new THREE.Vector3(x, groundAt(x, z) - 14, z),
+      rot: c * 6.28,
+      scale: new THREE.Vector3(k, k * (0.82 + c * 0.42), k),
+    };
+  };
 }
 
-/* ---- sakura: a few close enough to read as blossom rather than as pink dots ---- */
-function blossomTree(dist, side, s) {
-  const g2 = new THREE.Group();
-  g2.position.copy(at(dist, side, GROUND_Y - 30));
-  g2.scale.setScalar(s);
-  const bark = new THREE.MeshLambertMaterial({ color: 0x3a2c28, flatShading: true });
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(16, 30, 300, 7), bark);
-  trunk.position.y = 150; g2.add(trunk);
-  [[-70, 250, 0.5], [80, 270, -0.6], [0, 300, 0.1]].forEach(([bx, by, rz]) => {
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(8, 15, 190, 5), bark);
-    b.position.set(bx, by, 0); b.rotation.z = rz; g2.add(b);
-  });
-  const petal = new THREE.MeshLambertMaterial({ color: 0xf2c2ce, emissive: 0x5a2f3c, flatShading: true });
-  [[0, 400, 0, 200], [-110, 360, 40, 145], [120, 375, -30, 155], [20, 460, -60, 120], [-60, 440, 70, 110]]
-    .forEach(([bx, by, bz, r]) => {
-      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), petal);
-      m.position.set(bx, by, bz); m.scale.set(1.25, 0.78, 1.15); g2.add(m);
-    });
-  backScene.add(g2);
-}
-[[1750, -1500, 1.5], [2100, 1900, 1.25], [3100, -3000, 1.9], [3600, 3300, 1.6], [5000, -5200, 2.3]]
-  .forEach(([d, s, k]) => blossomTree(d, s, k));
-
-/* ---- ground cover: everything below is instanced, so the whole valley floor is 4 draw calls ---- */
-/* one shared scatter so grass, rocks and stones agree about where the ground is busy */
-function scatter(i, seed, near, far, spread) {
-  const a = (i * 9301 + seed * 49297) % 233280 / 233280;
-  const b = (i * 4271 + seed * 15731) % 233280 / 233280;
-  const c = (i * 7919 + seed * 30011) % 233280 / 233280;
-  return { d: near + Math.pow(a, 0.62) * (far - near), s: (b - 0.42) * spread, r: c };
-}
-function instanced(geo, mat, n, place) {
-  const im = new THREE.InstancedMesh(geo, mat, n);
-  const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
-  const up = new THREE.Vector3(0, 1, 0);
-  for (let i = 0; i < n; i++) {
-    const p = place(i);
-    if (!p) { sc.set(0, 0, 0); mx.compose(new THREE.Vector3(), q, sc); im.setMatrixAt(i, mx); continue; }
-    q.setFromAxisAngle(up, p.rot || 0);
-    sc.copy(p.scale);
-    mx.compose(p.pos, q, sc);
-    im.setMatrixAt(i, mx);
-  }
-  im.instanceMatrix.needsUpdate = true;
-  backScene.add(im);
-  return im;
-}
-
-/* the meadow: clumps, not blades. Individual grass is hopeless at this framing — true-scale
-   blades are sub-pixel and anything big enough to see reads as scenery, which is what the
-   plane-based first pass did. Tufts of varied size and tone give texture that survives. */
 {
-  /* small and close to the ground tone. At radius 30 with a light palette these read as a
-     field of pebbles; grass has to sit only just above the surface it grows out of. */
-  const geo = new THREE.IcosahedronGeometry(14, 0);
-  const tone = [0x4a5a3e, 0x445238, 0x51603f, 0x3d4a34];
-  tone.forEach((col, t) => {
-    const mat = new THREE.MeshLambertMaterial({ color: col, emissive: 0x0d1309, flatShading: true });
-    instanced(geo, mat, 900, (i) => {
-      const p = scatter(i, 3 + t * 13, 1400, 8200, 12500);
-      const k = 0.4 + p.r * 0.9;
-      return {
-        pos: at(p.d, p.s, GROUND_Y + 4),
-        rot: p.r * 6.28,
-        scale: new THREE.Vector3(k * 1.6, k * 0.35, k * 1.4),
-      };
+  const cedar = cedarGeo(), broad = broadleafGeo(), sakura = sakuraGeo();
+  /* the wood across the valley. Held back and scaled down from the first pass: at 2,600 with a
+     2.3 multiplier the near cedars stood 920 units against a 3,500-unit mountain 13,500 away,
+     so the wood competed with Fuji instead of sitting under it. */
+  instanced(cedar, woodMat(), 340, standSpot(41, 3000, 13000, 17000, 1200, 0.85, 1.9), 0.0016);
+  instanced(broad, woodMat(), 260, standSpot(97, 2800, 11000, 16000, 900, 0.9, 2.0), 0.0018);
+  /* the surround */
+  instanced(cedar, woodMat(), 260, ringSpot(151, 7000, 19000, 1.4, 3.0), 0.0016);
+  instanced(broad, woodMat(), 170, ringSpot(199, 6000, 16000, 1.5, 3.0), 0.0018);
+  /* sakura, near enough to read as blossom rather than as pink dots */
+  instanced(sakura, woodMat(), 22, (i) => {
+    const p = scatter(i, 71, 1500, 6200, 9000);
+    const k = 1.5 + p.r * 1.5;
+    return { pos: onGround(p.d, p.s - 700, -10), rot: p.r * 6.28, scale: new THREE.Vector3(k, k, k) };
+  }, 0.0020);
+}
+
+/* ---- ground cover ---- */
+/* GRASS GROWS IN PATCHES. Evenly scattered detail reads as a printed pattern no matter how you
+   vary its size — the foreground kept coming out as a sprinkle of identical lozenges. Gating
+   placement on a coarse field, so there are drifts of cover with bare ground between them,
+   does more for the meadow than any amount of tuning the tufts themselves. */
+function patchAt(x, z) {
+  return Math.sin(x * 0.00125 + 1.7) * Math.cos(z * 0.00108)
+       + Math.sin(x * 0.0031 - z * 0.0027) * 0.55
+       + Math.sin(z * 0.0068 + x * 0.0021) * 0.22;
+}
+/* the meadow: clumps, not blades. True-scale grass is sub-pixel here and anything big enough
+   to see reads as scenery — so tufts, sitting only just proud of the surface they grow out of,
+   in four tones so the field is never one flat green. No outline: at this size a line would be
+   the whole tuft. */
+{
+  const geo = new THREE.IcosahedronGeometry(15, 0);
+  [0x4c5c3f, 0x455339, 0x536241, 0x3e4b35].forEach((c, t) => {
+    const mat = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
+    instanced(geo, mat, 780, (i) => {
+      const p = scatter(i, 3 + t * 13, 1800, 9000, 13500);
+      const pos = onGround(p.d, p.s, 3);
+      if (patchAt(pos.x, pos.z) < 0.05) return null;
+      const k = 0.5 + Math.pow(p.r, 1.4) * 1.9;
+      return { pos, rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.7, k * 0.36, k * 1.5) };
     });
   });
 }
 
-/* low scrub, a darker second layer so the meadow is not one flat tone */
+/* THE NEAR FIELD NEEDS ITS OWN PASS. A scatter weighted across 900–9,000 units puts almost
+   nothing in the first thousand, because that band is a rounding error of the area — so the
+   ground right under the camera, which is a third of the frame, came out bare. This covers
+   only 350–2,600 and is what stops the foreground reading as baize. */
 {
-  const geo = new THREE.IcosahedronGeometry(34, 0);
-  const mat = new THREE.MeshLambertMaterial({ color: 0x3d5236, emissive: 0x121a10, flatShading: true });
-  instanced(geo, mat, 900, (i) => {
-    const p = scatter(i, 11, 700, 9000, 13000);
-    const k = 0.5 + p.r * 1.3;
-    return { pos: at(p.d, p.s, GROUND_Y + 20), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.5, k * 0.5, k * 1.4) };
+  /* and the near field also needs the widest SIZE range in the scene. Evenly-sized detail at
+     even density is gravel, whatever colour it is — the first pass covered the foreground in a
+     carpet of identical lozenges. Fewer of them, over a 4× spread of sizes, with a couple of
+     tones dark enough to read as clumps in their own shade. */
+  const geo = new THREE.IcosahedronGeometry(12, 0);
+  [0x51633f, 0x3f4d33, 0x5c6c44, 0x35422c].forEach((c, t) => {
+    const mat = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
+    instanced(geo, mat, 300, (i) => {
+      const p = scatter(i, 211 + t * 7, 350, 2800, 5600);
+      const pos = onGround(p.d, p.s, 1);
+      if (patchAt(pos.x, pos.z) < 0.2) return null;
+      const k = 0.45 + Math.pow(p.r, 1.6) * 2.6;
+      return { pos, rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.8, k * 0.3, k * 1.6) };
+    });
+  });
+  const stone = new THREE.DodecahedronGeometry(20, 0);
+  instanced(stone, new THREE.MeshToonMaterial({ color: 0x776f63, gradientMap: RAMP, flatShading: true }),
+    64, (i) => {
+      const p = scatter(i, 233, 500, 2800, 5000);
+      const k = 0.4 + Math.pow(p.r, 1.4) * 1.7;
+      return { pos: onGround(p.d, p.s, 3), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.4, k * 0.7, k) };
+    });
+}
+
+/* low scrub — a darker, larger second layer that breaks the tuft field up at mid distance */
+{
+  const geo = new THREE.IcosahedronGeometry(38, 0);
+  const mat = new THREE.MeshToonMaterial({ color: 0x3c5135, gradientMap: RAMP, flatShading: true });
+  instanced(geo, mat, 700, (i) => {
+    const p = scatter(i, 11, 1200, 11000, 15000);
+    const pos = onGround(p.d, p.s, 14);
+    /* scrub takes the ground the grass patches leave, so the two interlock instead of stacking */
+    if (patchAt(pos.x, pos.z) > 0.35) return null;
+    const k = 0.6 + p.r * 1.5;
+    return { pos, rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.5, k * 0.52, k * 1.4) };
   });
 }
 
-/* stones scattered through the grass, catching the low sun on one side */
+/* stones through the grass, and a handful of real boulders near the eye for scale. The
+   boulders get an outline because they are the only ground detail big enough to carry one. */
 {
-  const geo = new THREE.DodecahedronGeometry(26, 0);
-  const mat = new THREE.MeshLambertMaterial({ color: 0x6d6f68, emissive: 0x232520, flatShading: true });
-  instanced(geo, mat, 260, (i) => {
-    const p = scatter(i, 29, 500, 8000, 12000);
-    const k = 0.35 + p.r * 1.4;
-    return { pos: at(p.d, p.s, GROUND_Y + 6), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.4, k * 0.75, k) };
-  });
+  const stone = new THREE.DodecahedronGeometry(26, 0);
+  instanced(stone, new THREE.MeshToonMaterial({ color: 0x736f66, gradientMap: RAMP, flatShading: true }),
+    300, (i) => {
+      const p = scatter(i, 29, 700, 9000, 13000);
+      const k = 0.35 + p.r * 1.3;
+      return { pos: onGround(p.d, p.s, 4), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.4, k * 0.7, k) };
+    });
+  const rock = new THREE.DodecahedronGeometry(105, 0);
+  instanced(rock, new THREE.MeshToonMaterial({ color: 0x6f6b61, gradientMap: RAMP, flatShading: true }),
+    18, (i) => {
+      const p = scatter(i, 173, 1100, 6000, 10000);
+      const k = 0.7 + p.r * 1.5;
+      return { pos: onGround(p.d, p.s, 24), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.3, k * 0.85, k * 1.1) };
+    }, 0.0022);
 }
 
-/* a handful of real boulders for scale near the eye */
-{
-  const geo = new THREE.DodecahedronGeometry(95, 0);
-  const mat = new THREE.MeshLambertMaterial({ color: 0x6a6c64, emissive: 0x232520, flatShading: true });
-  instanced(geo, mat, 14, (i) => {
-    const p = scatter(i, 71, 900, 5200, 9000);
-    const k = 0.7 + p.r * 1.6;
-    return { pos: at(p.d, p.s, GROUND_Y + 40), rot: p.r * 6.28, scale: new THREE.Vector3(k * 1.3, k * 0.85, k * 1.1) };
-  });
-}
-
-/* the river: a ribbon crossing the valley, mirroring the dawn sky */
+/* the river: a ribbon following the ground rather than a flat plank laid across it. Sampling
+   the terrain per control point is the whole difference — a straight-and-level river through
+   rolling ground is the single most diorama-like thing you can put in a valley. */
 {
   const pts = [];
-  for (let i = 0; i <= 40; i++) {
-    const t = i / 40;
-    const d = 1400 + t * 11000;
-    const s = Math.sin(t * 4.1) * 2400 + 1800 - t * 2600;
-    pts.push(at(d, s, GROUND_Y + 14));
+  for (let i = 0; i <= 56; i++) {
+    const t = i / 56;
+    const d = 1200 + t * 12000;
+    const s = Math.sin(t * 4.1) * 2600 + 1900 - t * 3000;
+    const p = at(d, s, 0);
+    p.y = groundAt(p.x, p.z) + 10;
+    pts.push(p);
   }
-  const curve = new THREE.CatmullRomCurve3(pts);
-  const geo = new THREE.TubeGeometry(curve, 90, 260, 4, false);
-  geo.scale(1, 0.04, 1);
-  const water = new THREE.MeshLambertMaterial({
-    color: 0x9fb6c9, emissive: 0x4a5c72, flatShading: true, transparent: true, opacity: 0.9,
-  });
-  const river = new THREE.Mesh(geo, water);
-  river.position.y = GROUND_Y + 30;
+  const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 120, 230, 4, false);
+  geo.scale(1, 0.05, 1);
+  const river = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+    color: 0xa9c0d2, emissive: 0x2e4055, transparent: true, opacity: 0.88,
+  }));
   backScene.add(river);
 }
 
@@ -1991,9 +2261,12 @@ function instanced(geo, mat, n, place) {
     /* the sky dome, the valley fog banks and the sunrise sprites are ART: they are already the
        colour they should end up, so tone mapping would only wash the dawn gradient out */
     if (m.isMeshBasicMaterial || m.isSpriteMaterial) { m.toneMapped = false; return; }
+    /* the outline hulls own their whole shader — patching cloud code into it would fail loudly,
+       and letting them cast would put every silhouette into the shadow map twice */
+    if (m.isShaderMaterial) return;
     if (!o.isMesh) return;
     cloudy(m);
-    /* the river is a flat ribbon lying in the ground — it has nothing to cast */
+    /* the river is a ribbon lying in the ground — it has nothing to cast */
     if (!m.transparent) o.castShadow = true;
     o.receiveShadow = true;
   });

@@ -747,6 +747,48 @@ are ellipsoids scaled ×2.3 in world x — one placed 3,400 units out with a 3,4
 looking out through it. They are now held at arm's length and kept below the eye, which is what
 valley fog looks like from a slope anyway.
 
+## v23 — the valley rebuilt, and type contrast measured
+
+**Type contrast, measured rather than guessed.** With the type hidden and the shade left up, the
+background luminance behind each item gives the contrast directly. The result contradicted the
+eye: the weak pair were **STUDY and REVIEW at 2.14 and 1.89**, sitting against the brightest part
+of the dawn sky — not the items over the bright meadow, which were already at 8.3–8.9. An
+edge-anchored gradient barely reached the top of the stack, so the main shade is now an ellipse
+centred on the stack itself, and the type carries a soft dark halo behind its hard offset shadow
+(the offset shadow is the Persona look and only guards one edge). STUDY went to 4.09, REVIEW to
+3.48, and after the valley rebuild the whole stack holds 3.5–5.3 worst-case.
+
+**Everything in the valley is rebuilt.** The pattern throughout: landform takes smooth
+vertex-coloured shading, objects take a toon ramp and an inverted-hull outline.
+
+- **Nothing is placed at a flat `GROUND_Y` any more.** `groundAt(x, z)` samples the heightfield,
+  and every tree, rock, tuft and river control point sits on it. This is most of why the old
+  valley read as objects arranged on a board — the terrain rolled and the props did not.
+- **A repeated primitive is wallpaper.** Three species, each a merged multi-part model (trunk
+  plus stacked skirts, or trunk plus a bundle of canopy masses), instanced with an outline twin
+  that shares its instance matrices so the two can never drift apart. Merging also matters for
+  the outline: as separate meshes it would wrap each piece rather than the tree.
+- **Outlines need a distance policy.** Screen-constant width out to 4,000 units and then frozen,
+  so a far tree sheds its line instead of turning into a black lozenge; and the line itself takes
+  the fog, because an unfogged outline stays jet black against a dissolving mountain and reads as
+  a crack in the image.
+- **Fuji's snow is vertex colour on one shell.** Two shells broke it three times over —
+  z-fighting at 13,500 away, the rock ending up wider than the cap, the cap flaring past the rock.
+  A snowline cannot fight geometry it is part of. The summit also had to get *broader*: at
+  exponent 1.7 with a 1.6% summit radius the top tapered to a nipple; the real mountain is a
+  600 m crater on a 40 km base and its flanks are less concave than the instinct to draw a
+  "volcano" suggests.
+- **Ridges are merged clusters, coloured by height** — forested skirt, bare rock, snow only high
+  up, with a ragged line between each. As separate cones the shoulders showed their silhouettes
+  through one another and the cluster read as a pile of triangles.
+- **Ground cover has to grow in patches.** Evenly scattered detail reads as a printed pattern no
+  matter how much its size varies — three passes of tuning size and count all came out as a
+  sprinkle of identical lozenges. Gating placement on a coarse field, with grass and scrub taking
+  opposite sides of the same threshold so they interlock, did more than any of them.
+- **The near field needs its own scatter.** A distribution weighted across 900–9,000 units puts
+  almost nothing in the first thousand, because that band is a rounding error of the area — so
+  the ground directly under the camera, a third of the frame, came out bare.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -830,6 +872,13 @@ valley fog looks like from a slope anyway.
 - **When a seam survives every change to the surface it appears to be on, stop changing the
   surface.** One raycast through pixels either side of it names the object in a single run —
   a screenshot cannot, because a veil and a shade look identical.
+- **Measure contrast, don't judge it.** Hide the type, screenshot, and read the background
+  luminance inside each item's rect. Twice now the item that *looked* worst was fine and the one
+  that looked fine was the failure — bright ground draws the eye, but it is the bright *sky*
+  behind the top of a stack that actually kills cream type.
+- A new top-level `function` in a 3,400-line file will collide sooner or later — `ridge` was
+  already taken by an SVG helper 600 lines further down, and the only symptom is a bare
+  `Identifier has already been declared` with the whole module dead.
 
 ## Sources
 
