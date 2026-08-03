@@ -2139,6 +2139,41 @@ rim, sway, mist. Shafts: hold.
 - **Look at the intermediate buffer, not at the output.** An effect that reads from a render
   target fails identically whether its parameters are wrong or its input is empty. `LAB.show()`
   answered in one frame what three rounds of tuning could not.
+- **A post chain has four stages and the stage is not negotiable.** GEOMETRY (distortion,
+  chromatic aberration) decides *where* to read and must precede every read — applied afterwards
+  it smears the grain and the ink lines, which belong on the paper, not in the lens. LIGHT
+  (bloom, halation, streak, shafts) is additive and belongs in linear, before the curve. GRADE
+  maps to display. PRINT (ink, posterise, paper, vignette) puts marks *on* the result, so
+  nothing after it may blur or tint them. An effect in the wrong stage is wrong, not subtler.
+- **`readPixels` on the default framebuffer returns zeros** once the frame is presented and the
+  canvas has no `preserveDrawingBuffer` — so the first pass at measuring nine post effects
+  reported all nine as doing nothing. Route the composite into a byte target and read that.
+- **Amounts belong in a table, not in literals inside `apply()`.** Anything set straight onto a
+  uniform from the console survives exactly until the next keypress, because `apply()` rewrites
+  them all. That is the difference between a lab you can tune and one you have to edit.
+- **Depth-buffer precision is governed by the near/far ratio.** 1:20000 spends almost the whole
+  buffer on the first few metres, where nothing ever is; a near plane the camera still never
+  crosses bought twenty times the resolution for everything that reads depth.
+- **A depth-derived edge must be measured relative to its own depth.** An absolute threshold
+  draws every distant silhouette and nothing near, because the same metre of separation is a
+  hundredth of the depth at range and half of it up close.
+- **Transparent things are not in the depth texture.** Anything with `depthWrite: false` — mist,
+  petals — is invisible to focus and to contour lines. Usually right (fog with an ink outline is
+  a cutout), but it has to be a decision rather than a surprise.
+- **A radial lens effect is radial.** Chromatic aberration as a constant offset puts a fringe on
+  the centre of the frame, where a real lens has none. And the magnitude matters more than it
+  looks: 21 px of fringe is a broken image, 1–4 px is glass.
+- **A separable blur cannot make a bokeh.** Two passes give a box or a gaussian, and the shape
+  of an out-of-focus point is the one thing anyone notices about depth of field; it needs a
+  gather on a disc.
+- **Kuwahara is not a blur** — picking the least-variant of four overlapping quadrants flattens
+  interiors while keeping edges, which is why it reads as brushwork rather than as a smeared
+  photograph. It also costs 36 taps a pixel, ~110 ms/frame on a software rasteriser.
+- **Halation is not bloom with a bigger radius.** It is wide, weak and *warm* — the warmth is
+  what reads; a neutral wide bloom just looks like fog.
+- **Posterise without a dither bands every gradient into onion rings.** An ordered 4×4 matrix
+  trades those for a regular texture, which on a woodblock look is the point rather than a
+  compromise.
 - **One landform cannot demonstrate mist or shafts, and it is the same missing thing.** Mist
   needs low ground with high ground on both sides or it has nothing to sit in; rays need a
   crest with gaps in it. A ridge with notches cut through it and a hollow in front of it closes

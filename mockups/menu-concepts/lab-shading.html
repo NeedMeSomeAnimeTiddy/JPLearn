@@ -62,13 +62,31 @@ import * as THREE from './lib/three.module.min.js';
      [ ]  grade        eight looks, cycled. They touch the grade only and never the
                        toggles, so any of them can be judged against any scene state
 
+   POST — the composite runs in four stages and the stage is not negotiable: GEOMETRY decides
+   where to read, LIGHT adds in linear before the curve, GRADE maps to display, PRINT puts
+   marks on the result. An effect in the wrong stage is wrong, not subtler.
+
+     Y  focus          depth of field off the depth texture; - and = move the focus plane
+     U  ink            contours from depth discontinuity, measured relative to depth
+     I  lens           barrel distortion and radial chromatic aberration
+     O  halation       wide warm bleed + a very wide horizontal streak
+     P  painterly      Kuwahara: flattens interiors, keeps edges. 36 taps, off by default
+     K  sharpen        unsharp mask that skips whatever focus just blurred
+     L  washi          pulp mottle under the fibre grain
+     ;  posterise      quantise with a 4x4 ordered dither, for the woodblock looks
+     '  bleach         bleach bypass: contrast up, colour down, silver left in the print
+
    Press 1-8 to toggle, 0 for all off (which is roughly what the main mockup
    was doing), 9 for all on.
    ============================================================================ */
 
 const state = { ao: true, ramp: true, toon: true, shadow: true, clouds: true,
   hfog: true, post: true, petals: true, rim: true, sway: true, aerial: true,
-  mist: true, shafts: true };
+  mist: true, shafts: true,
+  /* the post block. Independent of the grade on purpose: eight looks times nine lenses
+     compose freely, where folding them together would make both harder to judge. */
+  dof: true, ink: false, lens: true, halo: true, paint: false,
+  sharpen: true, paper: true, poster: false, bleach: false };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
@@ -88,7 +106,11 @@ const scene = new THREE.Scene();
 const SKY_LO = new THREE.Color(0xf2c89a), SKY_HI = new THREE.Color(0x35508c);
 scene.fog = new THREE.Fog(0xd9c3a8, 2600, 7200);
 
-const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 1, 20000);
+/* NEAR IS 20, NOT 1. Depth-buffer precision is governed by the near/far RATIO, and 1:20000
+   spends almost the whole buffer on the first few metres, where nothing ever is. Everything
+   that reads depth downstream — focus, contour lines — gets twenty times the resolution for a
+   near plane the camera still never crosses. */
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 20, 20000);
 camera.position.set(2700, 1450, 0);
 camera.lookAt(0, 620, 0);
 
@@ -1045,6 +1067,31 @@ const POST = {
      asking where the SKY is rather than where the highlights are */
   shaftCut: { value: 0.20 },
   shaftReach: { value: 0.62 },
+  /* ---- depth of field ---- */
+  dofAmt: { value: 1 },
+  dofFocus: { value: 2700 },     /* world units; the orbit radius, so the hill is sharp */
+  dofRange: { value: 2200 },
+  dofMax: { value: 0.85 },
+  dofRadius: { value: 2.6 },
+  /* ---- screen-space ink contours ---- */
+  inkAmt: { value: 0.6 },
+  inkThresh: { value: 0.012 },
+  inkWidth: { value: 1.4 },
+  /* ---- lens ---- */
+  caAmt: { value: 0.9 },
+  distortAmt: { value: 0.055 },
+  /* ---- halation and anamorphic streak ---- */
+  haloAmt: { value: 0.5 },
+  haloTint: { value: new THREE.Color(0xff9a6a) },
+  streakAmt: { value: 0.28 },
+  /* ---- print ---- */
+  sharpenAmt: { value: 0.35 },
+  paperAmt: { value: 0.6 },
+  posterAmt: { value: 0 },
+  posterLevels: { value: 10 },
+  bleachAmt: { value: 0 },
+  uNear: { value: 20 },
+  uFar: { value: 20000 },
   shaftDensity: { value: 1.0 },
   shaftDecay: { value: 0.93 },
   sunUv: { value: new THREE.Vector2(0.5, 0.5) },
@@ -1065,6 +1112,17 @@ function blit(mat, target) {
 }
 const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }';
 const rtScene = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true });
+/* A DEPTH TEXTURE IS THE PREREQUISITE FOR HALF OF THIS FILE. Focus and contour lines are both
+   questions about distance, and without somewhere to read distance from, neither can exist —
+   the depth BUFFER is written every frame and cannot be sampled; a depth TEXTURE can.
+
+   Note what is missing from it: mist and petals draw with depthWrite off, so they are not in
+   here. That is right for both — fog with an ink contour round it is a cutout, and a petal is
+   too small to focus on — but it does mean neither is ever blurred by depth of field. */
+rtScene.depthTexture = new THREE.DepthTexture(1, 1);
+rtScene.depthTexture.type = THREE.UnsignedIntType;
+rtScene.depthTexture.minFilter = THREE.NearestFilter;
+rtScene.depthTexture.magFilter = THREE.NearestFilter;
 const rtA = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
 const rtB = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
 /* THE SHAFT MARCH NEEDS A SHARP BUFFER AND THE GLOW NEEDS A SOFT ONE, so the bright pass gets
@@ -1074,6 +1132,12 @@ const rtB = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depth
    a rounder halo however it was tuned. Half res keeps the crowns readable and still costs a
    quarter of the fill. */
 const rtSharp = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+const HF = { type: THREE.HalfFloatType, depthBuffer: false };
+const rtDof = new THREE.WebGLRenderTarget(1, 1, HF);      /* half: the out-of-focus copy */
+const rtPaint = new THREE.WebGLRenderTarget(1, 1, HF);    /* full: the Kuwahara copy */
+const rtC = new THREE.WebGLRenderTarget(1, 1, HF);        /* eighth: wide-blur scratch */
+const rtHalo = new THREE.WebGLRenderTarget(1, 1, HF);     /* eighth */
+const rtStreak = new THREE.WebGLRenderTarget(1, 1, HF);   /* eighth */
 function sizePost() {
   const dpr = Math.min(devicePixelRatio, 2);
   const w = Math.max(1, Math.floor(innerWidth * dpr)), h = Math.max(1, Math.floor(innerHeight * dpr));
@@ -1081,6 +1145,11 @@ function sizePost() {
   rtA.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
   rtB.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
   rtSharp.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1));
+  rtDof.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1));
+  rtPaint.setSize(w, h);
+  for (const rt of [rtC, rtHalo, rtStreak]) rt.setSize(Math.max(1, w >> 3), Math.max(1, h >> 3));
+  matDof.uniforms.uTexel.value.set(2 / w, 2 / h);
+  matPaint.uniforms.uTexel.value.set(1 / w, 1 / h);
   matOcc.uniforms.uAspect.value = w / h;
   matBlurH.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
   matBlurV.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
@@ -1133,12 +1202,16 @@ function blurMat(dx, dy) {
       tSrc: { value: null },
       uDir: { value: new THREE.Vector2(dx, dy) },
       uTexel: { value: new THREE.Vector2() },
+      /* ONE MATERIAL, THREE JOBS. Bloom wants a tight blur, halation a wide one and the
+         anamorphic streak a very wide horizontal one; they are the same kernel at different
+         strides, so the scale is a uniform set between blits rather than three materials. */
+      uScale: { value: 1 },
     },
     vertexShader: VS,
     fragmentShader: [
-      'varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uDir; uniform vec2 uTexel;',
+      'varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uDir, uTexel; uniform float uScale;',
       'void main() {',
-      '  vec2 o = uDir * uTexel;',
+      '  vec2 o = uDir * uTexel * uScale;',
       '  vec3 c = texture2D( tSrc, vUv ).rgb * 0.227;',
       '  c += ( texture2D( tSrc, vUv + o * 1.385 ).rgb + texture2D( tSrc, vUv - o * 1.385 ).rgb ) * 0.316;',
       '  c += ( texture2D( tSrc, vUv + o * 3.253 ).rgb + texture2D( tSrc, vUv - o * 3.253 ).rgb ) * 0.070;',
@@ -1148,28 +1221,112 @@ function blurMat(dx, dy) {
   });
 }
 const matBlurH = blurMat(1, 0), matBlurV = blurMat(0, 1);
+
+/* ---- the out-of-focus copy ----
+   One gather on a golden-angle spiral rather than a separable two-pass blur: a separable blur
+   makes a BOX or a gaussian, and the shape of an out-of-focus point is the one thing anybody
+   ever notices about depth of field. Twelve taps at half resolution is a soft disc, which is
+   what a stylised scene wants; it is not a real bokeh and does not pretend to be. */
+const matDof = new THREE.ShaderMaterial({
+  uniforms: { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, radius: POST.dofRadius },
+  vertexShader: VS,
+  fragmentShader: [
+    'varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uTexel; uniform float radius;',
+    'void main() {',
+    '  vec3 sum = texture2D( tSrc, vUv ).rgb;',
+    '  for ( int i = 0; i < 12; i++ ) {',
+    '    float a = float( i ) * 2.39996323;',
+    '    float r = sqrt( float( i ) + 0.5 ) * 0.2887;',
+    '    sum += texture2D( tSrc, vUv + vec2( cos( a ), sin( a ) ) * r * radius * uTexel * 8.0 ).rgb;',
+    '  }',
+    '  gl_FragColor = vec4( sum / 13.0, 1.0 );',
+    '}',
+  ].join('\n'),
+});
+
+/* ---- Kuwahara: the painterly one ----
+   Four overlapping quadrants around each pixel; take the mean of whichever has the least
+   variance. That is what makes it flatten interiors while KEEPING edges sharp, where a blur
+   softens both — the result reads as brushwork rather than as a smeared photograph. Thirty-six
+   taps a pixel at full resolution, which is why it is off by default. */
+const matPaint = new THREE.ShaderMaterial({
+  uniforms: { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } },
+  vertexShader: VS,
+  fragmentShader: [
+    'varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uTexel;',
+    'void main() {',
+    '  vec3 m0 = vec3( 0.0 ), m1 = m0, m2 = m0, m3 = m0;',
+    '  vec3 s0 = vec3( 0.0 ), s1 = s0, s2 = s0, s3 = s0;',
+    '  const int R = 2;',
+    '  for ( int j = 0; j <= R; j++ ) {',
+    '    for ( int i = 0; i <= R; i++ ) {',
+    '      vec2 o = vec2( float( i ), float( j ) ) * uTexel;',
+    '      vec3 a = texture2D( tSrc, vUv + vec2( -o.x, -o.y ) ).rgb; m0 += a; s0 += a * a;',
+    '      vec3 b = texture2D( tSrc, vUv + vec2(  o.x, -o.y ) ).rgb; m1 += b; s1 += b * b;',
+    '      vec3 cc = texture2D( tSrc, vUv + vec2( -o.x,  o.y ) ).rgb; m2 += cc; s2 += cc * cc;',
+    '      vec3 d = texture2D( tSrc, vUv + vec2(  o.x,  o.y ) ).rgb; m3 += d; s3 += d * d;',
+    '    }',
+    '  }',
+    '  float n = float( ( R + 1 ) * ( R + 1 ) );',
+    '  m0 /= n; m1 /= n; m2 /= n; m3 /= n;',
+    '  s0 = abs( s0 / n - m0 * m0 ); s1 = abs( s1 / n - m1 * m1 );',
+    '  s2 = abs( s2 / n - m2 * m2 ); s3 = abs( s3 / n - m3 * m3 );',
+    '  float v0 = s0.r + s0.g + s0.b, v1 = s1.r + s1.g + s1.b;',
+    '  float v2 = s2.r + s2.g + s2.b, v3 = s3.r + s3.g + s3.b;',
+    '  vec3 outc = m0; float best = v0;',
+    '  if ( v1 < best ) { outc = m1; best = v1; }',
+    '  if ( v2 < best ) { outc = m2; best = v2; }',
+    '  if ( v3 < best ) { outc = m3; }',
+    '  gl_FragColor = vec4( outc, 1.0 );',
+    '}',
+  ].join('\n'),
+});
+/* ============================ THE COMPOSITE ============================
+   ORDER IS THE WHOLE DESIGN HERE, and it is not arbitrary. Four stages, and an effect in the
+   wrong one is not a subtler version of itself, it is wrong:
+
+     1  GEOMETRY  — distortion and chromatic aberration decide WHERE to read, so they must run
+                    before anything reads. Applied afterwards they smear the grain and the ink
+                    lines too, which are supposed to be on the paper, not in the lens.
+     2  LIGHT     — bloom, halation, streak, shafts. All additive, all in LINEAR light, all
+                    before the tone curve, because that is where light adds.
+     3  GRADE     — exposure, ACES, lift/contrast/saturation, split tone, bleach. Display space.
+     4  PRINT     — ink, posterise, paper, vignette. These are marks ON the image rather than
+                    properties OF it, so nothing after them is allowed to blur or tint them. */
 const matComposite = new THREE.ShaderMaterial({
   uniforms: {
     tSrc: { value: rtScene.texture }, tBloom: { value: rtB.texture },
-    tOcc: { value: rtSharp.texture },
+    tOcc: { value: rtSharp.texture }, tDof: { value: rtDof.texture },
+    tHalo: { value: rtHalo.texture }, tStreak: { value: rtStreak.texture },
+    tDepth: { value: rtScene.depthTexture }, tPaper: { value: NOISE_TEX },
     exposure: POST.exposure, bloomAmt: POST.bloomAmt, grain: POST.grain,
     vignette: POST.vignette, splitShadow: POST.splitShadow, splitHigh: POST.splitHigh,
     splitAmt: POST.splitAmt, uTime: POST.uTime, uRes: { value: new THREE.Vector2(1, 1) },
     lift: POST.lift, contrast: POST.contrast, sat: POST.sat, bloomTint: POST.bloomTint,
     shaftAmt: POST.shaftAmt, shaftDensity: POST.shaftDensity, shaftDecay: POST.shaftDecay,
     sunUv: POST.sunUv, sunVis: POST.sunVis,
+    dofAmt: POST.dofAmt, dofFocus: POST.dofFocus, dofRange: POST.dofRange, dofMax: POST.dofMax,
+    inkAmt: POST.inkAmt, inkThresh: POST.inkThresh, inkWidth: POST.inkWidth,
+    caAmt: POST.caAmt, distortAmt: POST.distortAmt,
+    haloAmt: POST.haloAmt, haloTint: POST.haloTint, streakAmt: POST.streakAmt,
+    sharpenAmt: POST.sharpenAmt, paperAmt: POST.paperAmt,
+    posterAmt: POST.posterAmt, posterLevels: POST.posterLevels, bleachAmt: POST.bleachAmt,
+    uNear: POST.uNear, uFar: POST.uFar,
   },
   vertexShader: VS,
   fragmentShader: [
     'varying vec2 vUv;',
-    'uniform sampler2D tSrc; uniform sampler2D tBloom; uniform sampler2D tOcc;',
+    'uniform sampler2D tSrc, tBloom, tOcc, tDof, tHalo, tStreak, tDepth, tPaper;',
     'uniform float exposure, bloomAmt, grain, vignette, splitAmt, uTime;',
     'uniform float lift, contrast, sat;',
-    'uniform vec3 bloomTint;',
     'uniform float shaftAmt, shaftDensity, shaftDecay, sunVis;',
-    'uniform vec2 sunUv;',
-    'uniform vec3 splitShadow, splitHigh;',
-    'uniform vec2 uRes;',
+    'uniform float dofAmt, dofFocus, dofRange, dofMax;',
+    'uniform float inkAmt, inkThresh, inkWidth;',
+    'uniform float caAmt, distortAmt, haloAmt, streakAmt;',
+    'uniform float sharpenAmt, paperAmt, posterAmt, posterLevels, bleachAmt;',
+    'uniform float uNear, uFar;',
+    'uniform vec3 bloomTint, splitShadow, splitHigh, haloTint;',
+    'uniform vec2 sunUv, uRes;',
     /* Narkowicz ACES: one polynomial, close enough to the real curve at a fraction of the cost */
     'vec3 aces( vec3 x ) {',
     '  return clamp( ( x * ( 2.51 * x + 0.03 ) ) / ( x * ( 2.43 * x + 0.59 ) + 0.14 ), 0.0, 1.0 );',
@@ -1179,69 +1336,182 @@ const matComposite = new THREE.ShaderMaterial({
     '  return mix( 1.055 * pow( c, vec3( 1.0 / 2.4 ) ) - 0.055, c * 12.92, step( c, vec3( 0.0031308 ) ) );',
     '}',
     'float hash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }',
+    'float luma( vec3 c ) { return dot( c, vec3( 0.2126, 0.7152, 0.0722 ) ); }',
+    /* the depth texture is non-linear; every question asked of it wants metres */
+    'float linDepth( float dz ) {',
+    '  float z = dz * 2.0 - 1.0;',
+    '  return ( 2.0 * uNear * uFar ) / ( uFar + uNear - z * ( uFar - uNear ) );',
+    '}',
+    /* the 4x4 ordered matrix in closed form — GLSL ES 1.0 has no indexable constant array */
+    'float bayer2( vec2 a ) { a = floor( a ); return fract( a.x * 0.5 + a.y * a.y * 0.75 ); }',
+    'float bayer4( vec2 a ) { return bayer2( a * 0.5 ) * 0.25 + bayer2( a ); }',
+    'vec3 overlay( vec3 b, vec3 t ) {',
+    '  return mix( 2.0 * b * t, 1.0 - 2.0 * ( 1.0 - b ) * ( 1.0 - t ), step( 0.5, b ) );',
+    '}',
+
     'void main() {',
-    '  vec3 c = texture2D( tSrc, vUv ).rgb;',
-    '  c += texture2D( tBloom, vUv ).rgb * bloomAmt * bloomTint;',
-    /* the shafts: march toward the sun through the bright buffer, decaying as you go */
+    /* ---------------- 1. GEOMETRY ---------------- */
+    '  vec2 d0 = vUv - 0.5;',
+    '  float r2 = dot( d0, d0 );',
+    /* barrel distortion: everything reads from slightly further out toward the corners */
+    '  vec2 uvD = vUv + d0 * r2 * distortAmt;',
+    /* CHROMATIC ABERRATION IS A RADIAL EFFECT, NOT A CONSTANT OFFSET. A fixed shift puts a
+       colour fringe on the middle of the frame, where a real lens has none — the whole point is
+       that it grows with distance from the axis, which is r2 here. */
+    '  vec2 caOff = d0 * r2 * caAmt * 0.06;',
+    '  vec3 sharpC = vec3(',
+    '    texture2D( tSrc, uvD + caOff ).r,',
+    '    texture2D( tSrc, uvD ).g,',
+    '    texture2D( tSrc, uvD - caOff ).b );',
+
+    /* ---------------- 2. FOCUS ---------------- */
+    /* CoC is symmetric about the focus plane and SMOOTHSTEPPED, because a linear ramp puts a
+       visible seam where the blur begins and the eye finds it immediately */
+    '  float dep = linDepth( texture2D( tDepth, uvD ).x );',
+    '  float coc = clamp( abs( dep - dofFocus ) / max( dofRange, 1.0 ), 0.0, 1.0 );',
+    '  coc = coc * coc * ( 3.0 - 2.0 * coc ) * dofMax * dofAmt;',
+    '  vec3 c = mix( sharpC, texture2D( tDof, uvD ).rgb, coc );',
+
+    /* ---------------- 3. SHARPEN ---------------- */
+    /* unsharp against a four-tap cross, and NEVER on what focus just blurred — sharpening the
+       out-of-focus half is how a depth-of-field pass ends up looking like a filter */
+    '  if ( sharpenAmt > 0.0 ) {',
+    '    vec2 t = 1.0 / uRes;',
+    '    vec3 bl = ( texture2D( tSrc, uvD + vec2( t.x, 0.0 ) ).rgb',
+    '              + texture2D( tSrc, uvD - vec2( t.x, 0.0 ) ).rgb',
+    '              + texture2D( tSrc, uvD + vec2( 0.0, t.y ) ).rgb',
+    '              + texture2D( tSrc, uvD - vec2( 0.0, t.y ) ).rgb ) * 0.25;',
+    '    c += ( c - bl ) * sharpenAmt * ( 1.0 - coc );',
+    '  }',
+
+    /* ---------------- 4. LIGHT, all additive and all pre-curve ---------------- */
+    '  c += texture2D( tBloom, uvD ).rgb * bloomAmt * bloomTint;',
+    /* HALATION IS NOT BLOOM WITH A BIGGER RADIUS. On film it is light scattering off the back
+       of the base and re-exposing the RED layer, so it is wide, weak and warm, and it is the
+       warmth that reads — a neutral wide bloom just looks like fog. */
+    '  c += texture2D( tHalo, uvD ).rgb * haloAmt * haloTint;',
+    '  c += texture2D( tStreak, uvD ).rgb * streakAmt;',
     '  if ( sunVis > 0.0 && shaftAmt > 0.0 ) {',
-    '    vec2 dir = ( sunUv - vUv ) * shaftDensity / 18.0;',
+    '    vec2 dir = ( sunUv - uvD ) * shaftDensity / 18.0;',
     /* JITTER THE FIRST STEP. Eighteen samples along a line is a stair; offsetting each pixel's
-       start by a fraction of one step turns the stair into grain, which the paper texture then
-       hides completely. */
-    '    float jit = hash( vUv * uRes );',
-    '    vec2 uv2 = vUv + dir * jit;',
+       start by a fraction of one step turns the stair into grain, which the paper then hides. */
+    '    vec2 uv2 = uvD + dir * hash( vUv * uRes );',
     '    float decay = 1.0;',
     '    vec3 sh = vec3( 0.0 );',
     '    for ( int i = 0; i < 18; i++ ) {',
     '      uv2 += dir;',
-    /* the SHARP buffer, so the trees are still in it to cast the ray */
     '      sh += texture2D( tOcc, uv2 ).rgb * decay;',
     '      decay *= shaftDecay;',
     '    }',
-    /* faded out as the sun leaves the frame, or a shaft field snaps off at the edge */
     '    vec2 sd = abs( sunUv - vec2( 0.5 ) );',
-    /* generous, because shafts from a sun just outside the frame are the common case and the
-       first window (0.42-0.72) switched them off exactly when they would be most useful */
     '    float edge = ( 1.0 - smoothstep( 0.75, 1.45, sd.x ) ) * ( 1.0 - smoothstep( 0.75, 1.45, sd.y ) );',
     '    c += sh * ( shaftAmt / 18.0 ) * sunVis * edge;',
     '  }',
+
+    /* ---------------- 5. GRADE ---------------- */
     '  c *= exposure;',
     '  c = aces( c );',
-    /* ORDER MATTERS AND THIS IS THE ORDER. Lift the floor first, because raising black after
-       adding contrast just greys the whole image; pivot contrast around mid grey; desaturate
-       last so the split tone below still has something to push against. */
+    /* Lift the floor first, because raising black after adding contrast just greys the whole
+       image; pivot contrast around mid grey; desaturate last so the split tone below still has
+       something to push against. */
     '  c = mix( vec3( lift ), vec3( 1.0 ), c );',
     '  c = mix( vec3( 0.5 ), c, contrast );',
-    '  float sl = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );',
-    '  c = mix( vec3( sl ), c, sat );',
+    '  c = mix( vec3( luma( c ) ), c, sat );',
     /* SPLIT TONE. Dawn is not one colour temperature: the sun is warm and everything it does not
-       reach is lit by the sky, which is blue. Pushing the two ends apart is most of what makes a
-       render read as a photograph of a time of day rather than as lit geometry. */
-    '  float l = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );',
+       reach is lit by the sky, which is blue. */
+    '  float l = luma( c );',
     '  c = mix( c, c * splitShadow * 2.6, splitAmt * ( 1.0 - smoothstep( 0.0, 0.55, l ) ) );',
     '  c = mix( c, c * splitHigh, splitAmt * smoothstep( 0.45, 1.0, l ) );',
+    /* bleach bypass: the silver left in the print. An overlay of the image against its own
+       luminance — contrast up, colour down, and not the same thing as doing both by hand */
+    '  if ( bleachAmt > 0.0 ) c = mix( c, overlay( c, vec3( luma( c ) ) ), bleachAmt );',
+
+    /* ---------------- 6. PRINT ---------------- */
+    /* INK FROM DEPTH, and the difference is measured RELATIVE to the pixel it belongs to. An
+       absolute threshold draws every distant silhouette and nothing near, because the same
+       metre of separation is a hundredth of the depth at range and half of it up close.
+       A Roberts cross on the diagonals: four taps rather than eight, and on a contour that is
+       going to be roughened anyway the extra precision buys nothing. */
+    '  if ( inkAmt > 0.0 ) {',
+    '    vec2 t = inkWidth / uRes;',
+    '    float a = linDepth( texture2D( tDepth, uvD + t ).x );',
+    '    float b = linDepth( texture2D( tDepth, uvD - t ).x );',
+    '    float e = linDepth( texture2D( tDepth, uvD + vec2( t.x, -t.y ) ).x );',
+    '    float f = linDepth( texture2D( tDepth, uvD + vec2( -t.x, t.y ) ).x );',
+    '    float g = ( abs( a - b ) + abs( e - f ) ) / max( dep, 1.0 );',
+    '    float line = smoothstep( inkThresh, inkThresh * 3.5, g );',
+    /* a line of exactly even weight is a filter; ink varies along its length */
+    '    line *= 0.62 + 0.38 * texture2D( tPaper, uvD * 4.0 ).r;',
+    '    c *= 1.0 - line * inkAmt;',
+    '  }',
+    /* POSTERISE WITH AN ORDERED DITHER, not without one. Straight quantisation bands every
+       gradient in the sky into onion rings; the dither trades those for a regular texture,
+       which on a woodblock look is the point rather than a compromise. */
+    '  if ( posterAmt > 0.0 ) {',
+    '    float bay = bayer4( gl_FragCoord.xy );',
+    '    c = mix( c, floor( c * posterLevels + bay ) / posterLevels, posterAmt );',
+    '  }',
     /* PAPER, NOT NOISE. Grain sampled square reads as video noise; stretched about 4:1 it reads
-       as fibre, which is the difference between a dirty render and ink on paper. Two octaves so
-       it does not tile visibly, and it is static — animated grain is film, not paper. */
+       as fibre. Static, because animated grain is film and this is meant to be a sheet. */
     '  vec2 gp = vUv * uRes;',
     '  float fib = hash( floor( vec2( gp.x * 0.25, gp.y ) ) ) - 0.5;',
     '  float fine = hash( floor( gp * 0.85 ) + 17.3 ) - 0.5;',
     '  c += ( fib * 0.65 + fine * 0.35 ) * grain;',
+    /* and washi has MOTTLE as well as fibre: slow variation in how much pulp settled where.
+       Aspect-corrected so the blotches are round rather than stretched with the window. */
+    '  if ( paperAmt > 0.0 ) {',
+    '    vec2 pp = vUv * vec2( uRes.x / uRes.y, 1.0 );',
+    '    float mo = texture2D( tPaper, pp * 0.9 ).r * 0.62',
+    '             + texture2D( tPaper, pp * 3.1 + 0.37 ).r * 0.38;',
+    '    c *= 1.0 - paperAmt * 0.20 * ( 0.5 - mo );',
+    '  }',
     /* vignette last, so it darkens the paper as well as the picture */
-    '  vec2 d = vUv - 0.5;',
-    '  c *= 1.0 - vignette * dot( d, d ) * 2.2;',
+    '  c *= 1.0 - vignette * r2 * 2.2;',
     '  gl_FragColor = vec4( lin2srgb( c ), 1.0 );',
     '}',
   ].join('\n'),
 });
 sizePost();
 
+/* WHERE THE COMPOSITE LANDS, so the finished frame can be read back. Everything downstream of
+   here draws to the screen by default; frameSig() points it at a byte target for one frame
+   instead, because readPixels on the default framebuffer returns zeros once the frame has been
+   presented and the canvas has no preserveDrawingBuffer. */
+let POST_TARGET = null;
+const SIG_W = 320, SIG_H = 200;
+const rtSig = new THREE.WebGLRenderTarget(SIG_W, SIG_H, { type: THREE.UnsignedByteType });
+const SIG_BUF = new Uint8Array(SIG_W * SIG_H * 4);
+function frameSig() {
+  POST_TARGET = rtSig;
+  renderFrame();
+  POST_TARGET = null;
+  renderer.readRenderTargetPixels(rtSig, 0, 0, SIG_W, SIG_H, SIG_BUF);
+  let h = 2166136261, mean = 0;
+  for (let i = 0; i < SIG_BUF.length; i += 4) {
+    h = Math.imul(h ^ SIG_BUF[i], 16777619) ^ SIG_BUF[i + 1] ^ SIG_BUF[i + 2];
+    mean += (SIG_BUF[i] + SIG_BUF[i + 1] + SIG_BUF[i + 2]) / 3;
+  }
+  return { hash: h >>> 0, mean: +(mean / (SIG_BUF.length / 4)).toFixed(2), buf: SIG_BUF };
+}
+/* how far apart two frames are, in mean absolute pixel difference — the honest answer to
+   "is this effect subtle or is it broken" */
+function sigDiff(a, b) {
+  let sum = 0, n = 0, mx = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    const d = (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2])) / 3;
+    if (d > mx) mx = d;
+    sum += d; n++;
+  }
+  return { mean: +(sum / n).toFixed(3), max: mx };
+}
+
 /* the whole chain, or the plain render if post is off */
 function renderFrame() {
   if (!state.post) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(POST_TARGET);
     renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
     return;
   }
   /* linear into the buffer; the curve is applied in the composite */
@@ -1251,33 +1521,97 @@ function renderFrame() {
   /* TWO PASSES OVER THE SAME PIXELS ASKING DIFFERENT QUESTIONS. Bloom wants highlights and
      wants them blurred; the shafts want visible sky near the sun and want it sharp. Sharing one
      buffer meant whichever question was asked second got the wrong answer. */
-  matOcc.uniforms.tSrc.value = rtScene.texture;
-  blit(matOcc, rtSharp);
+  /* EVERY PASS IS SKIPPED WHEN ITS EFFECT IS OFF. With all of them on this is ten fullscreen
+     passes, and the point of a lab is to be able to turn things off and have that mean
+     something — including meaning it in the frame time. */
+  let src = rtScene.texture;
+  if (state.paint) {
+    matPaint.uniforms.tSrc.value = rtScene.texture;
+    blit(matPaint, rtPaint);
+    src = rtPaint.texture;
+  }
+  if (state.dof) {
+    matDof.uniforms.tSrc.value = src;
+    blit(matDof, rtDof);
+  }
+  /* TWO PASSES OVER THE SAME PIXELS ASKING DIFFERENT QUESTIONS. Bloom wants highlights and
+     wants them blurred; the shafts want visible sky near the sun and want it sharp. Sharing one
+     buffer meant whichever question was asked second got the wrong answer. */
+  if (state.shafts) {
+    matOcc.uniforms.tSrc.value = rtScene.texture;
+    blit(matOcc, rtSharp);
+  }
   matBright.uniforms.tSrc.value = rtScene.texture;
   blit(matBright, rtA);
+  matBlurH.uniforms.uScale.value = matBlurV.uniforms.uScale.value = 1;
   matBlurH.uniforms.tSrc.value = rtA.texture;
   blit(matBlurH, rtB);
   matBlurV.uniforms.tSrc.value = rtB.texture;
   blit(matBlurV, rtA);
-  matComposite.uniforms.tSrc.value = rtScene.texture;
+  if (state.halo) {
+    /* halation: the same kernel at four times the stride, off the bloom result, so it is a
+       blur OF a blur and gets genuinely wide for two cheap passes at an eighth resolution */
+    matBlurH.uniforms.uScale.value = matBlurV.uniforms.uScale.value = 4;
+    matBlurH.uniforms.tSrc.value = rtA.texture;
+    blit(matBlurH, rtC);
+    matBlurV.uniforms.tSrc.value = rtC.texture;
+    blit(matBlurV, rtHalo);
+    /* and the streak: horizontal only and very wide, which is the whole of what makes an
+       anamorphic flare read as one rather than as more bloom */
+    matBlurH.uniforms.uScale.value = 16;
+    matBlurH.uniforms.tSrc.value = rtA.texture;
+    blit(matBlurH, rtStreak);
+    matBlurH.uniforms.uScale.value = matBlurV.uniforms.uScale.value = 1;
+  }
+  matComposite.uniforms.tSrc.value = src;
   matComposite.uniforms.tBloom.value = rtA.texture;
   matComposite.uniforms.tOcc.value = rtSharp.texture;
+  matComposite.uniforms.tDof.value = rtDof.texture;
+  matComposite.uniforms.tHalo.value = rtHalo.texture;
+  matComposite.uniforms.tStreak.value = rtStreak.texture;
+  POST.uNear.value = camera.near;
+  POST.uFar.value = camera.far;
   /* LOOK AT THE BUFFER, NOT AT THE OUTPUT. An effect that reads from an intermediate target can
      fail because its parameters are wrong or because the target is empty, and the final frame
      looks identical either way. */
   const dbg = window.LAB && window.LAB.show;
-  if (!dbg) { blit(matComposite, null); return; }
+  if (!dbg) { blit(matComposite, POST_TARGET); return; }
   /* the VALUES are saved and restored, never the uniform objects — swapping those is how the
      cloud shadows lost their link to the state last time */
   const bs = POST.bloomAmt.value, ss = POST.shaftAmt.value;
+  const bs2 = POST.haloAmt.value, ss2 = POST.streakAmt.value, ds = POST.dofAmt.value;
+  const is = POST.inkAmt.value;
   matComposite.uniforms.tSrc.value =
-    dbg === 'sharp' ? rtSharp.texture : dbg === 'bloom' ? rtA.texture : rtScene.texture;
+    dbg === 'sharp' ? rtSharp.texture : dbg === 'bloom' ? rtA.texture
+      : dbg === 'halo' ? rtHalo.texture : dbg === 'streak' ? rtStreak.texture
+        : dbg === 'dof' ? rtDof.texture : dbg === 'paint' ? rtPaint.texture : rtScene.texture;
   POST.bloomAmt.value = 0;
   POST.shaftAmt.value = 0;
-  blit(matComposite, null);
+  POST.haloAmt.value = 0;
+  POST.streakAmt.value = 0;
+  POST.dofAmt.value = 0;
+  POST.inkAmt.value = 0;
+  blit(matComposite, POST_TARGET);
   POST.bloomAmt.value = bs;
   POST.shaftAmt.value = ss;
+  POST.haloAmt.value = bs2;
+  POST.streakAmt.value = ss2;
+  POST.dofAmt.value = ds;
+  POST.inkAmt.value = is;
 }
+
+/* THE AMOUNTS ARE DATA, NOT LITERALS INSIDE apply(). Anything set straight onto a POST uniform
+   from the console survives exactly until the next keypress, because apply() rewrites all of
+   them; putting the numbers here means LAB.AMT.ca = 0.5 sticks, which is the difference between
+   a lab you can tune and one you have to edit.
+
+   ca started at 0.9, which works out to a twenty-one pixel rainbow at the corner of a
+   1100-wide frame. A lens fringe is one to four pixels; past that it stops reading as glass
+   and starts reading as a broken image. */
+const AMT = {
+  dof: 1, ink: 0.6, ca: 0.25, distort: 0.055, halo: 0.5, streak: 0.28,
+  sharpen: 0.35, paper: 0.6, poster: 0.85, bleach: 0.45,
+};
 
 /* ============================ GRADES ============================
    A look cannot be chosen from a description, only by flipping between them on the same frame,
@@ -1359,6 +1693,19 @@ function apply() {
   MIST.uAmt.value = state.mist ? 0.72 : 0;
   MIST.mesh.visible = state.mist;
   POST.shaftAmt.value = state.shafts ? 0.9 : 0;
+  /* the post block, from AMT rather than from literals. Amounts are independent of the grade
+     on purpose: nine lenses times eight looks compose freely this way, and a toggle that does
+     something on some grades and nothing on others is a toggle nobody can learn. */
+  POST.dofAmt.value = state.dof ? AMT.dof : 0;
+  POST.inkAmt.value = state.ink ? AMT.ink : 0;
+  POST.caAmt.value = state.lens ? AMT.ca : 0;
+  POST.distortAmt.value = state.lens ? AMT.distort : 0;
+  POST.haloAmt.value = state.halo ? AMT.halo : 0;
+  POST.streakAmt.value = state.halo ? AMT.streak : 0;
+  POST.sharpenAmt.value = state.sharpen ? AMT.sharpen : 0;
+  POST.paperAmt.value = state.paper ? AMT.paper : 0;
+  POST.posterAmt.value = state.poster ? AMT.poster : 0;
+  POST.bleachAmt.value = state.bleach ? AMT.bleach : 0;
   petalMeshes.forEach((m) => { m.visible = state.petals; });
   scene.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
   const row = (on, k, label) => `<div class="${on ? '' : 'off'}">[${k}] ${on ? '<b>on </b>' : 'off'} ${label}</div>`;
@@ -1376,6 +1723,16 @@ function apply() {
     + row(state.aerial, 'E', 'aerial tint (fog warms toward the sun)')
     + row(state.mist, 'R', 'mist ribbons (banks in the low ground)')
     + row(state.shafts, 'T', 'sun shafts (march through the occlusion buffer)')
+    + '<div style="margin-top:9px;opacity:.55;letter-spacing:.12em">POST</div>'
+    + row(state.dof, 'Y', 'depth of field (focus ' + POST.dofFocus.value + ')')
+    + row(state.ink, 'U', 'ink contours from depth')
+    + row(state.lens, 'I', 'lens: barrel + chromatic aberration')
+    + row(state.halo, 'O', 'halation + anamorphic streak')
+    + row(state.paint, 'P', 'painterly (Kuwahara — expensive)')
+    + row(state.sharpen, 'K', 'sharpen (unsharp, skips the blurred half)')
+    + row(state.paper, 'L', 'washi mottle')
+    + row(state.poster, ';', 'posterise + ordered dither')
+    + row(state.bleach, "'", 'bleach bypass')
     + '<div style="margin-top:8px">[ [ ] ] grade <b>' + (gradeIx + 1) + '/' + GRADES.length
       + '  ' + GRADES[gradeIx].name + '</b></div>'
     + '<div class="off" style="margin-left:22px">' + GRADES[gradeIx].note + '</div>'
@@ -1396,6 +1753,18 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'e' || e.key === 'E') state.aerial = !state.aerial;
   else if (e.key === 'r' || e.key === 'R') state.mist = !state.mist;
   else if (e.key === 't' || e.key === 'T') state.shafts = !state.shafts;
+  else if (e.key === 'y' || e.key === 'Y') state.dof = !state.dof;
+  else if (e.key === 'u' || e.key === 'U') state.ink = !state.ink;
+  else if (e.key === 'i' || e.key === 'I') state.lens = !state.lens;
+  else if (e.key === 'o' || e.key === 'O') state.halo = !state.halo;
+  else if (e.key === 'p' || e.key === 'P') state.paint = !state.paint;
+  else if (e.key === 'k' || e.key === 'K') state.sharpen = !state.sharpen;
+  else if (e.key === 'l' || e.key === 'L') state.paper = !state.paper;
+  else if (e.key === ';') state.poster = !state.poster;
+  else if (e.key === "'") state.bleach = !state.bleach;
+  /* focus is a distance, not a toggle, so it gets its own pair */
+  else if (e.key === '-') { POST.dofFocus.value = Math.max(200, POST.dofFocus.value - 300); }
+  else if (e.key === '=') { POST.dofFocus.value += 300; }
   else if (e.key === '[') { setGrade(gradeIx - 1); return; }
   else if (e.key === ']') { setGrade(gradeIx + 1); return; }
   else if (e.key === '0') Object.keys(state).forEach((k) => { state[k] = false; });
@@ -1454,9 +1823,9 @@ let t = 0, ct = 0;
 window.LAB = {
   state, apply, CLOUD, cloud: CLOUD.uCloudMap.value.image,
   HFOG, POST, PETALS, FX, MIST, petalMeshes, sunAt, SUN_SPRITES,
-  GRADES, grade: setGrade, gradeName: () => GRADES[gradeIx].name,
-  scene, camera, renderer, key, ground, motion, THREE, heightAt,
-  rtSharp, rtBloom: rtA, rtScene,
+  GRADES, grade: setGrade, gradeName: () => GRADES[gradeIx].name, AMT,
+  scene, camera, renderer, key, ground, motion, THREE, heightAt, frameSig, sigDiff,
+  rtSharp, rtBloom: rtA, rtScene, rtDof, rtHalo, rtStreak, rtPaint,
   freeze: false, view: null, show: null, at: (v) => { t = v; },
 };
 
