@@ -1763,6 +1763,38 @@ lab already had a guard for exactly this class ("String.replace on a chunk name 
 silent no-op") and it did not catch this, because it checked that the CODE went in and not that
 what the code REFERS TO went in. It now asserts both, and that they agree.
 
+## v51 — rim, sway and aerial tint
+
+Three more lab toggles, on q / w / e.
+
+- **Rim light (q) is for OBJECTS, not for terrain** — the same shape of finding the toon ramp
+  produced, and it arrived the same way. `1 - dot(N, V)` is the edge term, and on a large surface
+  seen at grazing incidence it is near 1 across the *whole visible area*: the hill went uniformly
+  milky blue and stopped reading as a hill. On something with curvature and a silhouette it does
+  exactly what it should. It is opt-in per material now, and the ground does not opt in. **An
+  effect that depends on a surface turning away from you has nothing to say about a surface that
+  is always turned away from you.**
+  It is also weighted by how much sky the surface can see, so it never lands on an underside — a
+  rim on a downward face is a highlight with no source.
+- **Wind sway (w) has to move the OUTLINE too.** An inverted-hull outline is a second copy of the
+  geometry; displace one in a vertex shader and not the other and the black shell walks off the
+  crown — which looks exactly like the outline bug this whole system was built to fix. The
+  displacement is one GLSL snippet pasted into both shaders, and the hull shares the *same uniform
+  objects* rather than equal copies of them. **Sharing the object is what makes disagreement
+  impossible; two uniforms holding equal values today is not the same guarantee.**
+- **Aerial tint (e) meant replacing the fog chunk outright.** Appending height fog after the stock
+  `fog_fragment` was two mixes toward two different colours, so a direction-dependent tint could
+  only ever reach one of them and the mist stayed stubbornly grey looking into the sun. One
+  expression, one colour, both terms inside it.
+
+### Verifying an animation from a still frame
+
+A screenshot cannot show that something moves. Two checks that can, and both are cheap:
+**identity** — assert the hull's uniforms *are* the mesh's uniform objects, not merely equal; and
+**motion** — turn off every other animation (petals, cloud drift), then two frames a second apart
+must differ with sway on and be byte-identical with it off. Both passed: 4 foliage materials, 4
+hulls, 4 sharing `uTime` and `uSwayAmt`.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -2048,6 +2080,12 @@ what the code REFERS TO went in. It now asserts both, and that they agree.
   confidently.
 - **Clearing around a thing is not clearing the way to it.** Everything between the camera and the
   subject is in shot, and that is a wedge, not a circle.
+- **An effect keyed on a surface turning away from you says nothing about a surface that is
+  always turned away.** Grazing-angle terms wash flat across terrain; keep them opt-in.
+- **A vertex-shader displacement has to be applied to the outline hull as well**, from the
+  same snippet and the same uniform OBJECTS — not equal values.
+- **To prove something animates, silence everything else and diff two frames.** Identical
+  when off, different when on.
 - **A particle effect is a question about its source, not its count.** Evenly spread, small
   and numerous reads as dust; few, large and clustered on what shed them reads as the thing.
 - **A shader-injection guard must check the declarations too**, not just the injected body.

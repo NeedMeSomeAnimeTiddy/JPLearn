@@ -47,13 +47,19 @@ import * as THREE from './lib/three.module.min.js';
                        paper grain, vignette
      8  petals         cherry and maple falling — the one VFX that IS the design,
                        since the four gardens are the four seasons
+     Q  rim            a cool edge from the sky, so things sit in FRONT of the mist
+                       rather than dissolving into it
+     W  sway           foliage moves, and so does its outline hull — displace one and
+                       not the other and the black shell walks off the crown
+     E  aerial         fog that warms toward the sun, because haze looking into the
+                       light is not the colour of haze looking away from it
 
    Press 1-8 to toggle, 0 for all off (which is roughly what the main mockup
    was doing), 9 for all on.
    ============================================================================ */
 
 const state = { ao: true, ramp: true, toon: true, shadow: true, clouds: true,
-  hfog: true, post: true, petals: true };
+  hfog: true, post: true, petals: true, rim: true, sway: true, aerial: true };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
@@ -116,6 +122,26 @@ const RAMP = toonRamp(4);
    separates a valley floor from the ridge behind it and is most of what sumi-e distance is.
    Driven off world height, which `cloudy()` already carries into the fragment shader as
    `vCloudPos` — so this costs one varying that was already being paid for. */
+/* ---- three more, sharing one uniform block ----
+   rim   a cool edge from the sky opposite the sun. With height fog in, distant objects dissolve
+         INTO the mist; a rim is what puts them back in front of it, and it is the cheapest
+         separation there is.
+   sway  the world is dead still. Foliage that moves is most of the difference between a render
+         and a place — and it has to move the OUTLINE too, or the hull parts company with the
+         thing it wraps.
+   air   aerial perspective with a direction to it: haze looking into the sun is not the same
+         colour as haze looking away from it, and one flat fog colour is what makes a dawn read
+         as a grey afternoon. */
+const FX = {
+  uTime: { value: 0 },
+  uRimAmt: { value: 0.55 },
+  uRimPow: { value: 2.6 },
+  uRimCol: { value: new THREE.Color(0x9fc0e8) },
+  uSwayAmt: { value: 5.5 },
+  uAerialAmt: { value: 0.85 },
+  uAerialWarm: { value: new THREE.Color(0xf6c9a8) },
+  uSunDir: { value: new THREE.Vector3(-1500, 1900, 900).normalize() },
+};
 const HFOG = {
   uHfAmt: { value: 0.85 },
   uHfTop: { value: 520 },      /* mist ceiling: above this, none */
@@ -236,12 +262,44 @@ const CLOUD = {
    Anything animated through onBeforeCompile in the real scene needs this same registry. */
 const CLOUD_MATS = [];
 
+/* ONE SNIPPET, TWO SHADERS. The crown and its outline hull have to be displaced by exactly
+   the same expression or the hull parts company with the thing it wraps — which is the whole
+   reason the outline system exists. Written once and pasted into both. */
+/* RIM IS FOR OBJECTS, NOT FOR TERRAIN — the same shape of finding as the toon ramp.
+   `1 - dot(N, V)` is the edge term, and on a large surface seen at grazing incidence it is near
+   1 across the WHOLE visible area: the hill went uniformly milky blue and stopped reading as a
+   hill at all. On something with curvature and a silhouette it does exactly what it should. So
+   it is opt-in per material, and the ground does not opt in. */
+const RIM_GLSL = `
+  {
+    vec3 Vv = normalize( vViewPosition );
+    float rimF = pow( 1.0 - clamp( dot( normal, Vv ), 0.0, 1.0 ), uRimPow );
+    /* weighted by how much sky the surface can see, so it never lands on an underside — a rim
+       on a downward face is a highlight with no source */
+    float sky = clamp( vWorldN.y * 0.5 + 0.5, 0.0, 1.0 );
+    reflectedLight.indirectDiffuse += uRimCol * ( rimF * uRimAmt * sky );
+  }`;
+const SWAY_GLSL = `
+  {
+    vec3 swp = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+    float sph = uTime * 0.85 + swp.x * 0.0042 + swp.z * 0.0036;
+    transformed.x += sin( sph ) * uSwayAmt;
+    transformed.z += cos( sph * 0.83 ) * uSwayAmt * 0.62;
+  }`;
 function cloudy(mat) {
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, CLOUD);
-    Object.assign(shader.uniforms, HFOG);
+    Object.assign(shader.uniforms, HFOG, FX);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vCloudPos;')
+      .replace('#include <common>', `#include <common>
+        varying vec3 vCloudPos;
+        varying vec3 vWorldN;
+        uniform float uTime;
+        uniform float uSwayAmt;`)
+      /* SWAY GOES IN BEFORE project_vertex, and only on what is flagged foliage. It displaces
+         `transformed`, which is what every downstream chunk reads, so shadows and the cloud
+         lookup follow it for free. */
+      .replace('#include <begin_vertex>', '#include <begin_vertex>' + (mat.userData.sway ? SWAY_GLSL : ''))
       /* after project_vertex so `transformed` is final; the instancing branch matters
          because everything in the real scene will be an InstancedMesh */
       .replace('#include <project_vertex>', `#include <project_vertex>
@@ -249,10 +307,18 @@ function cloudy(mat) {
         #ifdef USE_INSTANCING
           cwp = instanceMatrix * cwp;
         #endif
-        vCloudPos = ( modelMatrix * cwp ).xyz;`);
+        vCloudPos = ( modelMatrix * cwp ).xyz;
+        vWorldN = normalize( mat3( modelMatrix ) * objectNormal );`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
         varying vec3 vCloudPos;
+        varying vec3 vWorldN;
+        uniform float uRimAmt;
+        uniform float uRimPow;
+        uniform vec3  uRimCol;
+        uniform float uAerialAmt;
+        uniform vec3  uAerialWarm;
+        uniform vec3  uSunDir;
         uniform sampler2D uCloudMap;
         uniform vec2 uCloudOff;
         uniform vec2 uCloudProj;
@@ -267,15 +333,24 @@ function cloudy(mat) {
           vec2 cuv = ( vCloudPos.xz - vCloudPos.y * uCloudProj ) * uCloudScale + uCloudOff;
           float cs = texture2D( uCloudMap, cuv ).r;
           reflectedLight.directDiffuse *= mix( 1.0, cs, uCloudAmt );
-        }`)
+        }
+        ${mat.userData.rim ? RIM_GLSL : ''}`)
       /* AFTER the standard fog, not instead of it. Distance fog is still doing the far-field
          work; this only adds the pooling near the ground. `vFogDepth` is the built-in, so the
          mist thins to nothing at the camera — mist you are standing in is not mist. */
-      .replace('#include <fog_fragment>', `#include <fog_fragment>
+      /* THE WHOLE FOG, REPLACED. Appending height fog after the stock chunk meant two mixes
+         toward two different colours, so the aerial tint could only ever affect one of them and
+         the mist stayed stubbornly grey looking into the sun. One expression, one colour. */
+      .replace('#include <fog_fragment>', `
         {
+          vec3 Vw = normalize( vCloudPos - cameraPosition );
+          float sunF = pow( max( dot( Vw, uSunDir ), 0.0 ), 3.0 ) * uAerialAmt;
+          vec3 fogC = mix( fogColor, uAerialWarm, sunF );
+          float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
+          gl_FragColor.rgb = mix( gl_FragColor.rgb, fogC, fogFactor );
           float hfH = clamp( ( uHfTop - vCloudPos.y ) / max( uHfTop - uHfBot, 1.0 ), 0.0, 1.0 );
           float hfD = 1.0 - exp( - vFogDepth * 0.00042 );
-          gl_FragColor.rgb = mix( gl_FragColor.rgb, uHfCol,
+          gl_FragColor.rgb = mix( gl_FragColor.rgb, mix( uHfCol, uAerialWarm, sunF * 0.7 ),
             clamp( uHfAmt * hfH * hfH * hfD, 0.0, 1.0 ) );
         }`);
     /* String.replace on a chunk name that moved is a silent no-op — which looks exactly
@@ -286,6 +361,11 @@ function cloudy(mat) {
        declarations did not — the anchor's indentation had changed — so every Lambert failed to
        compile with "undeclared identifier". A guard that checks the code went in but not that
        what the code REFERS TO went in is half a guard. */
+    const wantRim = !!mat.userData.rim, gotRim = shader.fragmentShader.includes('uRimPow )');
+    const wantSway = !!mat.userData.sway, gotSway = shader.vertexShader.includes('sin( sph )');
+    if (wantRim !== gotRim || wantSway !== gotSway) {
+      console.error('FX PATCH FAILED', mat.type, 'rim', wantRim, gotRim, 'sway', wantSway, gotSway);
+    }
     const wroteFog = shader.fragmentShader.includes('uHfTop - vCloudPos.y');
     const wroteFogUni = shader.fragmentShader.includes('uniform float uHfTop;');
     if (!wroteVarying || !wroteSample || wroteFog !== wroteFogUni) {
@@ -435,15 +515,22 @@ function outlineGeom(src) {
   return g;
 }
 
-function outlineFor(mesh, w) {
+function outlineFor(mesh, w, sway) {
+  /* THE HULL HAS TO MOVE WITH WHAT IT WRAPS. An inverted-hull outline is a second copy of the
+     geometry; displace one in a vertex shader and not the other and the black shell walks off
+     the crown, which looks exactly like the outline bug this whole system was built to fix.
+     The same snippet, pasted into both. */
   const m = new THREE.Mesh(outlineGeom(mesh.geometry), new THREE.ShaderMaterial({
-    uniforms: { w: { value: w } },
-    /* scale the extrusion by view distance so the line holds the same weight on screen —
-     a fixed world-space width is ~1px at this camera range, which is why it vanished */
-    vertexShader: `uniform float w; attribute vec3 aFlat; void main(){
-      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    uniforms: sway ? { w: { value: w }, uTime: FX.uTime, uSwayAmt: FX.uSwayAmt } : { w: { value: w } },
+    vertexShader: `uniform float w;
+      ${sway ? 'uniform float uTime; uniform float uSwayAmt;' : ''}
+      attribute vec3 aFlat;
+      void main(){
+      vec3 transformed = position;
+      ${sway ? SWAY_GLSL : ''}
+      vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
       float k = 1.0 / max( dot( normal, aFlat ), 0.30 );
-      vec3 p = position + normal * (w * -mv.z * k);
+      vec3 p = transformed + normal * (w * -mv.z * k);
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
     fragmentShader: `void main(){ gl_FragColor = vec4(0.055, 0.06, 0.085, 1.0); }`,
     side: THREE.BackSide,
@@ -462,7 +549,9 @@ function tree(x, z, s) {
   g.scale.setScalar(s);
   scene.add(g);
 
-  const bark = cloudy(new THREE.MeshToonMaterial({ color: 0x584234, gradientMap: RAMP }));
+  const barkMat = new THREE.MeshToonMaterial({ color: 0x584234, gradientMap: RAMP });
+  barkMat.userData.rim = 1;
+  const bark = cloudy(barkMat);
   const trunk = new THREE.Mesh(new THREE.CylinderGeometry(13, 22, 190, 7), bark);
   trunk.position.y = 95; trunk.castShadow = true; trunk.receiveShadow = true;
   g.add(trunk);
@@ -470,15 +559,18 @@ function tree(x, z, s) {
 
   [[0, 236, 0, 96], [-52, 200, 26, 66], [58, 208, -20, 72], [8, 292, -30, 58]]
     .forEach(([bx, by, bz, r], i) => {
-      const leaf = cloudy(new THREE.MeshToonMaterial({
+      const leafMat = new THREE.MeshToonMaterial({
         color: [0x5d7d3a, 0x51702f, 0x678a42, 0x4a672c][i], gradientMap: RAMP,
-      }));
+      });
+      leafMat.userData.sway = 1;      /* foliage moves; the trunk does not */
+      leafMat.userData.rim = 1;
+      const leaf = cloudy(leafMat);
       const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leaf);
       m.position.set(bx, by, bz);
       m.scale.set(1.18, 0.92, 1.1);
       m.castShadow = true; m.receiveShadow = true;
       g.add(m);
-      const o = outlineFor(m, 0.0026); g.add(o); outlines.push(o);
+      const o = outlineFor(m, 0.0026, true); g.add(o); outlines.push(o);
     });
   return g;
 }
@@ -486,8 +578,9 @@ tree(-120, 130, 1.9);
 
 /* a couple of rocks, so the shadow test has more than one caster */
 [[380, -260, 54], [-520, -420, 38], [190, 420, 30]].forEach(([x, z, r]) => {
-  const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0),
-    cloudy(new THREE.MeshToonMaterial({ color: 0x8a8275, gradientMap: RAMP })));
+  const rockMat = new THREE.MeshToonMaterial({ color: 0x8a8275, gradientMap: RAMP });
+  rockMat.userData.rim = 1;
+  const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), cloudy(rockMat));
   m.position.set(x, heightAt(x, z) + r * 0.45, z);
   m.rotation.set(0.5, x * 0.01, 0.3);
   m.castShadow = true; m.receiveShadow = true;
@@ -762,6 +855,9 @@ function apply() {
   renderer.shadowMap.enabled = state.shadow;
   CLOUD.uCloudAmt.value = state.clouds ? 0.78 : 0;
   HFOG.uHfAmt.value = state.hfog ? 0.85 : 0;
+  FX.uRimAmt.value = state.rim ? 0.55 : 0;
+  FX.uSwayAmt.value = state.sway ? 5.5 : 0;
+  FX.uAerialAmt.value = state.aerial ? 0.85 : 0;
   petalMeshes.forEach((m) => { m.visible = state.petals; });
   scene.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
   const row = (on, k, label) => `<div class="${on ? '' : 'off'}">[${k}] ${on ? '<b>on </b>' : 'off'} ${label}</div>`;
@@ -774,6 +870,9 @@ function apply() {
     + row(state.hfog, 6, 'height fog (valley mist)')
     + row(state.post, 7, 'post: grade + bloom + grain + vignette')
     + row(state.petals, 8, 'falling petals')
+    + row(state.rim, 'Q', 'sky rim light')
+    + row(state.sway, 'W', 'wind sway (foliage + its outline)')
+    + row(state.aerial, 'E', 'aerial tint (fog warms toward the sun)')
     + '<div class="off" style="margin-top:8px">[0] all off &nbsp; [9] all on</div>';
 }
 addEventListener('keydown', (e) => {
@@ -785,6 +884,9 @@ addEventListener('keydown', (e) => {
   else if (e.key === '6') state.hfog = !state.hfog;
   else if (e.key === '7') state.post = !state.post;
   else if (e.key === '8') state.petals = !state.petals;
+  else if (e.key === 'q' || e.key === 'Q') state.rim = !state.rim;
+  else if (e.key === 'w' || e.key === 'W') state.sway = !state.sway;
+  else if (e.key === 'e' || e.key === 'E') state.aerial = !state.aerial;
   else if (e.key === '0') Object.keys(state).forEach((k) => { state[k] = false; });
   else if (e.key === '9') Object.keys(state).forEach((k) => { state[k] = true; });
   else return;
@@ -806,7 +908,7 @@ let t = 0, ct = 0;
    close enough to an object to judge an outline seam */
 window.LAB = {
   state, apply, CLOUD, cloud: CLOUD.uCloudMap.value.image,
-  HFOG, POST, PETALS, petalMeshes,
+  HFOG, POST, PETALS, FX, petalMeshes,
   scene, camera, renderer, key, ground,
   freeze: false, view: null, at: (v) => { t = v; },
 };
@@ -821,6 +923,7 @@ function tick() {
      cross the terminator rather than sliding along it. */
   CLOUD.uCloudOff.value.set(ct * 0.22, ct * -0.08);
   PETALS.uTime.value = ct * 60;
+  FX.uTime.value = ct * 60;
   POST.uTime.value = ct;
   for (const m of CLOUD_MATS) m.needsUpdate = true;   /* see THE UNIFORM TRAP above */
   const v = window.LAB.view;
