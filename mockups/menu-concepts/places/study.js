@@ -18,9 +18,16 @@ import * as THREE from 'three';
 
 export function buildStudy(ctx) {
   const {
-    DEST_SPECS, HOME_EYE, LAKE_Y, MARKS, PROBE, RAMP,
-    addOutline, backScene, blockAdd, destPlace, groundAt, treeClaim,
+    DEST_SPECS, HOME_EYE, LAKE_Y, MARKS, PROBE, RAMP, SECTION_ACCENT, SUBTILES, WORLD_L2,
+    addOutline, backScene, blockAdd, destPlace, groundAt, outlineGeom, outlineMaterial,
+    pickWorldTile, treeClaim, worldPickEl,
   } = ctx;
+
+  /* the invisible proxy the raycast actually tests. `buildEmaWall` keeps its own copy of this
+     because it was written before there was a second place; one each is cheaper than another
+     name in the context object. */
+  const hitMat = new THREE.MeshBasicMaterial();
+  hitMat.visible = false;
 
   /* ---- the site, and its own coordinates ----
      f down the axis away from home, sd across it, positive to the right. The bearing is READ from
@@ -391,19 +398,178 @@ export function buildStudy(ctx) {
      photograph rather than as a garden anyone is standing in. It is also the wrong shape for the
      interaction — in a garden you do not survey four quarters and choose one, you stand near the
      entrance and choose a way to go. */
-  const Q = [['kana', -420, MOSS], ['kanji', -140, WATER], ['goi', 140, MAPLE], ['bunpou', 420, SAND]];
-  Q.forEach(([name, sd, tint]) => {
-    const z = zOf(PICK_F);
-    [[-1], [1]].forEach(([s]) => {
-      block('hedge-' + name + (s < 0 ? 'L' : 'R'), 84, 140, 160, sd + s * 88, 0, z, MOSS, 2.7);
-    });
-    /* the 駒札 — the wooden name-plaque a Japanese garden actually names a scene with */
-    block('post-' + name, 18, 160, 18, sd, 0, z + 66, TIMBER, 2.2);
-    block('fuda-' + name, 104, 72, 14, sd, 160, z + 66, TIMBER, 2.4);
-    /* the season's tree over the opening, tinted to its garden so the pick and its destination
+  const ACC = SECTION_ACCENT.STUDY[0];
+  const tiles = SUBTILES.STUDY;
+  /* the four, in the order the decks are declared, each aimed at the garden it opens onto */
+  const Q = [['kana', -420, 0xd9a8b4, '東'], ['kanji', -140, WATER, '北'],
+    ['goi', 140, MAPLE, '西'], ['bunpou', 420, SAND, '南']];
+  const FW = 176, FH = 128, FT = 16;   /* the plaque */
+  const PICK_Y = 176;                  /* how high it sits on its post */
+
+  /* 駒札 — the plaque a Japanese garden actually names a scene with. Its own texture rather than
+     `drawSign`, which is tuned landscape for the walk's placards: this one is a small upright
+     board read at three metres, so the name carries it and everything else is a footnote. */
+  function fudaTexture(jp, en, meta, tint) {
+    const c = document.createElement('canvas');
+    c.width = FW * 3; c.height = FH * 3;
+    const g = c.getContext('2d');
+    const W2 = c.width, H2 = c.height;
+    g.fillStyle = '#efe3c8';
+    g.fillRect(0, 0, W2, H2);
+    /* the grain, which is what stops a painted board reading as a printed card */
+    for (let i = 0; i < 16; i++) {
+      g.strokeStyle = `rgba(122,96,60,${(0.03 + (i % 5) * 0.012).toFixed(3)})`;
+      g.lineWidth = 1 + (i % 3);
+      const y = (i + 0.5) * (H2 / 16);
+      g.beginPath(); g.moveTo(0, y);
+      g.bezierCurveTo(W2 * 0.4, y + 7, W2 * 0.7, y - 9, W2, y + 3); g.stroke();
+    }
+    /* the season's colour as a band down the hinge side: the plaque and the garden it opens onto
        are the same colour before either carries a word */
-    block('tree-' + name, 200, 64, 200, sd, 250, z - 44, tint, 2.9);
+    g.fillStyle = '#' + tint.toString(16).padStart(6, '0');
+    g.fillRect(0, 0, 26, H2);
+    g.strokeStyle = 'rgba(70,50,30,0.5)'; g.lineWidth = 9; g.strokeRect(0, 0, W2, H2);
+
+    g.textAlign = 'center';
+    g.fillStyle = '#2b1c10';
+    g.font = `700 ${jp.length > 2 ? 150 : 178}px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif`;
+    g.fillText(jp, W2 / 2 + 13, H2 * 0.52, W2 - 90);
+    g.fillStyle = ACC;
+    g.fillRect(W2 * 0.28, H2 * 0.60, W2 * 0.44, 7);
+    g.letterSpacing = '5px';
+    g.fillStyle = 'rgba(43,28,16,0.72)';
+    g.font = '900 46px "Arial Black", Arial, sans-serif';
+    g.fillText(en, W2 / 2 + 13, H2 * 0.755, W2 - 80);
+    g.letterSpacing = '0px';
+    g.fillStyle = 'rgba(43,28,16,0.5)';
+    g.font = '600 38px "Yu Gothic UI", sans-serif';
+    g.fillText(meta, W2 / 2 + 13, H2 * 0.90, W2 - 60);
+    const t = new THREE.CanvasTexture(c);
+    t.anisotropy = 8;
+    return t;
+  }
+
+  const picks = Q.map(([name, sd, tint, face], j) => {
+    const [jp, en, meta] = tiles[j];
+    const z = zOf(PICK_F);
+    /* the opening: two hedge cheeks with the way through between them */
+    [[-1], [1]].forEach(([s]) => {
+      block('hedge-' + name + (s < 0 ? 'L' : 'R'), 84, 140, 160, sd + s * 108, 0, z, MOSS, 2.7);
+    });
+    block('post-' + name, 20, PICK_Y, 20, sd, 0, z + 74, TIMBER, 2.2);
+    /* THE SEASON'S TREE OVER THE OPENING, AND IT HAS TO BE A CROWN. A box behind each plaque read
+       as a coloured billboard — which is exactly what it was. Three overlapping masses give a
+       silhouette with more than one bump in it, which is the difference between a tree and a
+       lollipop, and it is the same trick `broadleafGeo` uses in the wood. */
+    plant('tree-trunk-' + name, sd, z - 44, 22, 230, 0x4d3d31, 2.4);
+    [[0, 262, 0, 104], [-64, 232, 26, 78], [58, 240, -22, 72]].forEach(([dx, dy, dz, r], k) => {
+      const cg = new THREE.IcosahedronGeometry(r, 1);
+      cg.scale(1.18, 0.82, 1.06);
+      cg.translate(sd + dx, dy, z - 44 + dz);
+      const cc = new THREE.Color(tint).offsetHSL(0, 0, k === 1 ? -0.05 : (k === 2 ? 0.04 : 0));
+      const ccol = [];
+      for (let i = 0; i < cg.attributes.position.count; i++) ccol.push(cc.r, cc.g, cc.b);
+      cg.setAttribute('color', new THREE.Float32BufferAttribute(ccol, 3));
+      const m = new THREE.Mesh(cg, mat);
+      m.name = 'tree-' + name;
+      grp.add(m);
+      addOutline(m, 2.7);
+    });
+
+    /* ROOT HINGED AT THE POST TOP, NOT AT THE BOARD'S MIDDLE. `setHot` tweens `root.rotation.x`
+       to -0.30, and a plaque spun about its own centre sinks its lower half into the post. Hung
+       from the top edge it tips toward you like a signboard, which is what a fixed plaque can
+       plausibly do. */
+    const root = new THREE.Group();
+    root.position.set(sd, PICK_Y + FH / 2, z + 74);
+    grp.add(root);
+
+    const bodyG = new THREE.BoxGeometry(FW, FH, FT);
+    const bc = new THREE.Color(0xa08a63);
+    const bcol = [];
+    for (let i = 0; i < bodyG.attributes.position.count; i++) bcol.push(bc.r, bc.g, bc.b);
+    bodyG.setAttribute('color', new THREE.Float32BufferAttribute(bcol, 3));
+    const body = new THREE.Mesh(bodyG, mat);
+    body.name = 'fuda-' + name;
+    root.add(body);
+    MARKS['study-fuda-' + name] = body;
+    {
+      const o = new THREE.Mesh(outlineGeom(bodyG), outlineMaterial(2.6));
+      o.frustumCulled = false;
+      root.add(o);
+    }
+
+    const tex = fudaTexture(jp, en, meta, tint);
+    const faceM = new THREE.Mesh(new THREE.PlaneGeometry(FW, FH), new THREE.MeshToonMaterial({
+      map: tex, emissive: 0x8d8069, emissiveMap: tex, gradientMap: RAMP, transparent: true,
+    }));
+    faceM.position.set(0, 0, FT / 2 + 0.4);
+    root.add(faceM);
+
+    /* THE TARGET DOES NOT MOVE WITH THE PLAQUE. Raycasting the board itself means the hover tilt
+       displaces the very thing the test is against, so the cursor falls off what it just picked
+       and the two states chatter — the shrine's tablets learned this the expensive way. */
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(FW + 40, FH + 90, FT + FH * 0.5), hitMat);
+    /* named so a raycast can report WHICH pick answered. The proxy is what the cursor actually
+       finds, so an unnamed one makes every pick read as a miss from outside. */
+    hit.name = 'pick-' + name;
+    hit.position.set(sd, PICK_Y + FH / 2, z + 74);
+    grp.add(hit);
+
+    const el = worldPickEl(jp + ' — ' + en + ', ' + meta, () => pickWorldTile('STUDY', jp));
+    /* READ THE REST VALUE, DO NOT RETYPE IT — the renderer stores linear, the literal is sRGB */
+    return { root, body, face: faceM, hit, el, jp, tw: FW, th: FH,
+      emRest: faceM.material.emissive.clone(),
+      emHot: faceM.material.emissive.clone().multiplyScalar(1.8) };
   });
+  WORLD_L2.STUDY = { picks };
+
+  /* ---- 前庭 — the entrance court ----
+     THE LARGEST THING IN THE ARRIVAL SHOT AND IT WAS BARE. The court is 1,400 deep because the
+     flight makes it so, which means the lower half of the frame is its floor — and a flat slab of
+     one colour there reads as an unfinished room, not as a garden. It gets the treatment a real
+     forecourt gets: swept gravel, a stone path from the gate to the rank, and a 手水鉢 to stop at.
+     The path runs from the GATE, which is off to one side, so it comes in at an angle and turns —
+     which is the same reason the gate is offset in the first place. */
+  {
+    const cz0 = zOf(F_NEAR) - 40, cz1 = zOf(PICK_F) + 40;
+    block('court-gravel', HALF_S * 2 - WALL_T * 2, GY, cz0 - cz1, 0, 0, (cz0 + cz1) / 2, GRAVEL, 2.4);
+    /* the swept lines, running across the court the way a courtyard is raked — fewer and wider
+       than the dry garden's, because this is a floor you walk on and that is a picture you do not */
+    for (let i = 0; i < 9; i++) {
+      block('sweep' + i, HALF_S * 2 - 260, 4, 12, 0, GY, cz1 + 70 + i * ((cz0 - cz1 - 140) / 8),
+        0xb6ae9c, 1.5);
+    }
+    /* 延段 — the flagged path. From the gate it runs in on the slant, then squares up to the rank,
+       so the walk to level two is a turn rather than a corridor. */
+    const legs = [[GATE_X, F_NEAR + 120, GATE_X + 180, PICK_F - 760],
+      [GATE_X + 180, PICK_F - 760, 0, PICK_F - 420]];
+    legs.forEach(([x0, f0, x1, f1], li) => {
+      const z0 = zOf(f0), z1 = zOf(f1);
+      const len = Math.hypot(x1 - x0, z1 - z0), n = Math.round(len / 132);
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        block('flag' + li + '-' + i, 150, 12, 118, x0 + (x1 - x0) * t, GY, z0 + (z1 - z0) * t,
+          0x8f8b80, 1.7);
+      }
+    });
+    /* and the last of it, squared up and running at the middle of the rank */
+    for (let i = 0; i < 3; i++) {
+      block('flag-run' + i, 190, 12, 130, 0, GY, zOf(PICK_F - 380 + i * 120), 0x8f8b80, 1.7);
+    }
+    /* 手水鉢 — the water basin, set off the path where you would actually stop at one */
+    const bz = zOf(PICK_F - 900);
+    block('chozu-base', 150, 40, 150, -560, GY, bz, 0x6f6a63, 2.2);
+    block('chozu-bowl', 118, 62, 118, -560, GY + 40, bz, 0x7d786f, 2.4);
+    block('chozu-water', 84, 6, 84, -560, GY + 96, bz, 0x46606c, 1.8);
+    /* two lanterns flanking the way in, which is what tells you the court has a direction */
+    [-1, 1].forEach((s) => {
+      const lx = s * 700, lz = zOf(PICK_F - 700);
+      plant('court-toro-post' + (s < 0 ? 'W' : 'E'), lx, lz, 26, 104, 0x807b71, 2.2);
+      block('court-toro-light' + (s < 0 ? 'W' : 'E'), 104, 60, 104, lx, GY + 104, lz, 0x8d887d, 2.4);
+      block('court-toro-cap' + (s < 0 ? 'W' : 'E'), 138, 26, 138, lx, GY + 164, lz, 0x7a756c, 2.4);
+    });
+  }
 
   MARKS['study'] = grp;
   blockAdd(foot.x, foot.z, Math.max(HALF_S, (F_FAR - F_NEAR) / 2) + 280,

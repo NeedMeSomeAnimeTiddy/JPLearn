@@ -116,7 +116,7 @@ between DRILLS and RECORDS.
    north, gravel and rock in the south, moss in the east, maples in the west. The paths are the ribbon
    mesh REVIEW's approach already uses — it cannot step or gap, and it carries its own colour.
 
-**4. Level two.** The rank of path-heads, their lanterns and 駒札, the picks and their focus twins.
+**4. Level two — DONE.** The rank of path-heads as real world picks, and the entrance court.
 
 **5. Level three.** The stations along a quarter, and the 駒札 name-plaques. Reuses REVIEW's walk.
 
@@ -401,3 +401,73 @@ none reports another’s. Arrival holds 4/4 picks at six aspect ratios, plaques 
   the arrival. Step 4 replaces level two, which takes it with it.
 - **The south garden is only glimpsed** from the entrance; the hall hides most of it. Correct for a
   walk-round plan, but it means the one garden facing the arrival is the one you see least of.
+
+---
+
+# What step 4 settled
+
+Level two stopped being four black CSS3D tiles floating over the hall and became four 駒札 standing
+in the court.
+
+## かな, not ひらがな and カタカナ
+
+The four decks were ひらがな / カタカナ / 漢字 / 語彙 — two syllabaries taking two of the four
+slots while **grammar had no home at all**. かな *is* both syllabaries; the blocks below it keep the
+split (five hiragana blocks, three katakana). That freed the fourth face for 文法, which now has a
+deck of its own for the first time: eight blocks from です・ます to 敬語.
+
+## The plaque is its own texture
+
+`drawSign` is tuned landscape for the walk's placards. A 駒札 is a small upright board read at three
+metres, so the name carries it and everything else is a footnote — the kanji at half the board's
+height, the English under a rule, the count under that, and the season's colour as a band down the
+hinge side so **the pick and the garden it opens onto are the same colour before either carries a
+word.**
+
+## Two things the shrine had already learned, and one it had not
+
+- **The hit proxy does not move with the plaque.** Raycasting the board itself means the hover tilt
+  displaces the thing the test is against, so the cursor falls off what it just picked and the two
+  states chatter. A static proxy, padded sideways to just under the gap.
+- **Read the rest value, do not retype it.** The renderer stores linear, the literal is sRGB.
+- **NEW: the root hinges at the post top, not the board's middle.** `setHot` tweens
+  `root.rotation.x` to −0.30; a plaque spun about its own centre sinks its lower half into its post.
+  Hung from the top edge it tips toward you like a signboard, which is what a fixed plaque can
+  plausibly do.
+- **Name the proxy.** An unnamed one makes every pick read as a miss from outside, because the
+  proxy is what a ray actually finds.
+
+## The entrance court
+
+It was the largest thing in the arrival shot and it was flat brown. Swept gravel, nine rake lines
+wider and fewer than the dry garden’s (this is a floor you walk on, that is a picture you do not), a
+延段 flagged path that comes in from the offset gate **on the slant and then squares up**, a 手水鉢
+off the path where you would stop at one, and two lanterns flanking the way in.
+
+## A tree needs more than one bump
+
+The season’s tree over each opening was a coloured box, and it read as exactly that: a billboard
+behind the plaque. Three overlapping crowns on a trunk, the same trick `broadleafGeo` uses in the
+wood.
+
+## Verified
+
+Four picks かな/漢字/語彙/文法, **4/4 hit at six aspect ratios**, plaques 106–226px. Four focus twins
+placed, **zero overlaps**. Hover tilts and lights; a fast hover/unhover thrash leaves everything at
+rest. 文法 opens a six-row deck. Escape returns to level two. REVIEW unchanged, walk and title
+unchanged, no console errors anywhere.
+
+**The harnesses needed fixing too, twice, for the same reason.** Every section’s focus twins exist
+in the DOM from load and sit unplaced at 0,0 until their own level two opens. Both `shrine.cjs` and
+the new overlap test were written when the shrine was the only place with world picks, so they
+assumed the query returned four — STUDY’s arrival made it eight and they started failing on
+rectangles that are not on screen at all. **A test that counts everything of a kind breaks when a
+second one of that kind appears.**
+
+## Open
+
+- **The south dry garden is still the one you see least of**, hidden behind the hall from the
+  entrance. Its rake lines and rocks only read from inside it.
+- **Level four does not exist anywhere yet.** The hall has four faces and no rooms.
+- **The gardens have no level-three walk**; `WORLD_L3.STUDY` is unregistered, so picking a block
+  falls through to the DOM board rather than walking the garden.

@@ -1108,7 +1108,9 @@ const ITEMS = [
   { jp: '記録', en: 'RECORDS', kanji: '記', desc: 'Progress, statistics and streaks', descJp: '進捗・統計・連続記録' },
 ];
 const SUBTILES = {
-  STUDY:   [['ひらがな','HIRAGANA','46 chars · 92%'], ['カタカナ','KATAKANA','46 chars · 71%'], ['漢字','KANJI','2,136 kanji'], ['語彙','VOCAB','8,000 words']],
+  /* かな rather than ひらがな and カタカナ as two: the garden has four faces and grammar had no home
+     at all, which is a worse gap than the two syllabaries sharing one. かな IS both of them. */
+  STUDY:   [['かな','KANA','92 chars · 78%'], ['漢字','KANJI','2,136 kanji'], ['語彙','VOCAB','8,000 words'], ['文法','GRAMMAR','114 points']],
   REVIEW:  [['今日の分','DUE TODAY','24 cards'], ['苦手札','WEAK CARDS','7 cards'], ['先取り','AHEAD','12 cards'], ['総復習','ALL','341 cards']],
   READING: [['短文','SHORT','N5 · 12 texts'], ['物語','STORIES','N4 · 8 stories'], ['記事','ARTICLES','N3 · 15 pieces'], ['随筆','ESSAYS','N2 · 6 essays']],
   DRILLS:  [['聞き取り','LISTENING','4 drills'], ['書き取り','WRITING','4 drills'], ['速読','SPEED','best 42'], ['対戦','VERSUS','weekends']],
@@ -3290,8 +3292,9 @@ buildReview({
    its approach coordinates in `PROBE`, its parts in `MARKS`, and rewrites `DEST_SPECS[0].focus`,
    so like the shrine it has to run above where those are read. */
 const STUDY_MASS = buildStudy({
-  DEST_SPECS, HOME_EYE, LAKE_Y, MARKS, PROBE, RAMP,
-  addOutline, backScene, blockAdd, destPlace, groundAt, treeClaim,
+  DEST_SPECS, HOME_EYE, LAKE_Y, MARKS, PROBE, RAMP, SECTION_ACCENT, SUBTILES, WORLD_L2,
+  addOutline, backScene, blockAdd, destPlace, groundAt, outlineGeom, outlineMaterial,
+  pickWorldTile, treeClaim, worldPickEl,
 });
 
 /* ---- the woods ----
@@ -4619,10 +4622,11 @@ function buildSub(i) {
 const L3DATA = {
   STUDY: {
     label: 'BLOCKS', labelJp: 'ブロック一覧',
-    'ひらがな': { en: 'HIRAGANA', rows: [['清音 あ〜そ', 'Basic あ–そ', '15 chars', 100], ['清音 た〜ほ', 'Basic た–ほ', '15 chars', 96], ['清音 ま〜ん', 'Basic ま–ん', '16 chars', 88], ['濁音・半濁音', 'Voiced marks', '25 chars', 74], ['拗音', 'Combined sounds', '33 chars', 61], ['長音と促音', 'Long & double', '12 chars', 45]] },
-    'カタカナ': { en: 'KATAKANA', rows: [['清音 ア〜ソ', 'Basic ア–ソ', '15 chars', 92], ['清音 タ〜ホ', 'Basic タ–ホ', '15 chars', 80], ['清音 マ〜ン', 'Basic マ–ン', '16 chars', 66], ['濁音・半濁音', 'Voiced marks', '25 chars', 38], ['拗音', 'Combined sounds', '33 chars', 17], ['外来語の音', 'Loanword sounds', '14 chars', 5]] },
+    /* one deck, because かな is one subject taught in two alphabets — the blocks keep the split */
+    'かな': { en: 'KANA', rows: [['清音 あ〜そ', 'Basic あ–そ', '15 chars', 100], ['清音 た〜ほ', 'Basic た–ほ', '15 chars', 96], ['清音 ま〜ん', 'Basic ま–ん', '16 chars', 88], ['濁音・半濁音', 'Voiced marks', '25 chars', 74], ['拗音', 'Combined sounds', '33 chars', 61], ['カタカナ 清音', 'Katakana basics', '46 chars', 44], ['カタカナ 濁音・拗音', 'Katakana marks', '58 chars', 17], ['外来語の音', 'Loanword sounds', '14 chars', 5]] },
     '漢字': { en: 'KANJI', rows: [['数と時', 'Numbers & time', '18 kanji', 100], ['人と家族', 'People & family', '16 kanji', 92], ['体と健康', 'Body & health', '14 kanji', 85], ['町と乗り物', 'Town & transport', '15 kanji', 70], ['自然と天気', 'Nature & weather', '17 kanji', 64], ['家と暮らし', 'Home & living', '15 kanji', 41], ['食べ物', 'Food', '14 kanji', 22], ['学びの言葉', 'Study words', '16 kanji', 8], ['位置と方向', 'Position & direction', '12 kanji', 0], ['色と形', 'Colour & shape', '11 kanji', 0], ['動きの言葉', 'Action words', '15 kanji', 0], ['仕事と時間', 'Work & time', '13 kanji', 0]] },
     '語彙': { en: 'VOCAB', rows: [['あいさつと決まり文句', 'Greetings & set phrases', '42 words', 100], ['家族と人びと', 'Family & people', '58 words', 88], ['食べ物と飲み物', 'Food & drink', '76 words', 73], ['時間と日付', 'Time & dates', '54 words', 66], ['場所と移動', 'Places & travel', '69 words', 48], ['買い物とお金', 'Shopping & money', '47 words', 31], ['学校と勉強', 'School & study', '62 words', 12], ['体と気持ち', 'Body & feelings', '71 words', 0]] },
+    '文法': { en: 'GRAMMAR', rows: [['です・ます', 'Polite forms', '12 points', 100], ['助詞 は・が・を', 'Particles は/が/を', '9 points', 88], ['動詞のグループ', 'Verb groups', '14 points', 71], ['て形', 'The て-form', '18 points', 54], ['形容詞', 'Adjectives', '11 points', 40], ['過去と否定', 'Past & negative', '16 points', 22], ['条件形', 'Conditionals', '13 points', 6], ['敬語', 'Honorific speech', '21 points', 0]] },
   },
   READING: {
     label: 'TEXTS', labelJp: '読みもの一覧',
