@@ -471,3 +471,81 @@ second one of that kind appears.**
 - **Level four does not exist anywhere yet.** The hall has four faces and no rooms.
 - **The gardens have no level-three walk**; `WORLD_L3.STUDY` is unregistered, so picking a block
   falls through to the DOM board rather than walking the garden.
+
+---
+
+# Next: steps 5–7
+
+Three separate problems, and they want different treatment. Written 2026-08-03.
+
+## Step 5 — L2 becomes the hall’s face: 四季の襄絵
+
+**Everything proposed so far was the same idea in different clothes: a labelled object standing in
+a yard.** Signboards, name-plaques, windows onto miniatures, tray landscapes, lit paths — eight
+proposals, all of them a menu bar in costume, and all correctly rejected. The fault is the category,
+not the styling.
+
+So the picks stop being furniture in the court and become **the four 襄 sliding across the hall’s
+south face**, painted with the four seasons.
+
+- **襄絵 is the great Japanese painting tradition** — Kanō-school painted sliding doors — and
+  **四季絵, the four seasons across a set of panels, is its canonical subject.** A four-panel seasonal
+  composition is not a menu dressed as a painting; it is a painting that happens to have four parts.
+- **Four is what a 襄 set IS.** No arrangement has to be invented and nothing has to be spaced out
+  to keep it separable.
+- **Sliding is its real motion.** Hover slides a panel a hand’s width and warm light spills from the
+  gap — the room behind is lit and the garden is not. That is a hover no other section can have,
+  and it is the building doing it rather than a widget.
+- **It ties L2 to L4 directly.** You slide the door and go through it; the room behind is where the
+  minigame plays. The pick and the destination stop being two different things.
+- **Season = subject, already settled.** 春 cherry → かな, 夏 iris and water → 漢字, 秋 maple →
+  語彙, 冬 pine under snow → 文法. The panel you slide is painted with the garden you are about to
+  walk into.
+
+Geometry checks out: the hall’s face is 940 wide at 2,104 from the arrival eye — about 720px across
+the frame’s centre, so four panels are roughly 180px each, comparable to the shrine’s tablets. The
+camera does not move, because the flight length fixes it.
+
+What it costs: the court’s rank of path-heads comes out (the hedges, posts and plaques), and the
+court becomes what it should have been — an approach, not a lobby.
+
+## Step 6 — L3, the garden walk
+
+`WORLD_L3.STUDY` is simply unregistered, which is why picking a block falls through to the DOM
+board. The contract REVIEW fills is known and specific:
+
+```
+WORLD_L3[sec] = { signs, rows, write(k, tileJp), letter(tileJp, animate),
+                  eyeAt(sign), tgtAt(sign), sway(i), raise() }
+```
+and `walkLight` reaches into `sign.face.material.emissive`, so each sign needs a real material.
+
+The route: through the opened panel, along the veranda, down the steps into that garden, then the
+length of its band **turning the corner at the far end** — which is what stops it being a corridor
+and is the difference between this and the shrine’s tunnel. Stations are 駒札 set beside the path.
+
+One sizing problem to solve first: 漢字 has **12** blocks against かな/語彙/文法’s 8, and a garden band
+is 2,700 long. At the shrine’s spacing that is 6–8 stations before the corner — so either the walk
+turns two corners for the long decks, or the spacing tightens with the count.
+
+## Step 7 — fidelity: stop building out of boxes
+
+Everything is `block()`. Ordered by how much of the arrival frame each occupies, because that is
+what decides the return:
+
+1. **The hall’s roof** — about 40% of the frame and currently a plain pyramid. Needs flared eaves
+   with a concave sweep, a ridge, 鬼瓦 at the ridge ends, and rafters visible under the eaves. The
+   single biggest win available.
+2. **The hall’s body** — shoji mullions, veranda posts, 縁側 boards laid as boards, a step stone.
+3. **The wall** — coping as a run of tiles rather than one slab, a plinth course.
+4. **The gate** — a small gabled roof rather than a slab on two posts.
+5. **The lanterns** — a 雪見灯籠 has legs, a bowl, a fire box with cut windows, a wide cap and a
+   finial. Currently three boxes.
+6. **The trees** — cherry and maple with branches, not crowns on a stick.
+
+The rocks (dodecahedra), the rake lines and the bridge arch are already doing their job.
+
+## Order
+
+5 before 6 before 7, because the panel is where the walk starts and both decide what the court has
+to look like — and there is no sense detailing geometry that step 5 removes.

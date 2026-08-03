@@ -2002,6 +2002,10 @@ function outlineGeom(src) {
    also the only thing on screen at that size. */
 function outlineMaterial(px) {
   return new THREE.ShaderMaterial({
+    /* TAGGED SO EXPORT CAN SKIP IT. Every visible mesh has an inverted-hull twin wearing this
+       material; handing those to a modelling tool doubles the geometry and none of it is a thing
+       anyone would model. `NAV.exportGLB` filters on this. */
+    userData: { outline: true },
     uniforms: {
       px: { value: px },
       res: OUTLINE_RES,
@@ -4355,6 +4359,39 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
       px: +(((q.y - up.y) * 0.5 * H()) / 100).toFixed(4),
       behind: q.z > 1 ? 1 : 0,
     };
+  },
+  /* THE WORLD AS IT STANDS, AS A FILE. A modelling pass should start from the real massing rather
+     than from a screenshot and a table of numbers — the export IS the scale spec, so nothing has
+     to be converted by hand and nothing can be converted wrongly.
+     Loaded on demand: the exporter is 93KB and no normal use of this page needs it.
+     The transform is reset for the duration, so what comes out sits at the origin, axis-aligned,
+     rather than four thousand units out on a bearing. Outline hulls are skipped. */
+  exportGLB: async (key) => {
+    const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+    const src = key ? MARKS[key] : backScene;
+    if (!src) return null;
+    const keep = { p: src.position.clone(), q: src.quaternion.clone() };
+    src.position.set(0, 0, 0);
+    src.quaternion.identity();
+    src.updateMatrixWorld(true);
+    /* a shallow clone that leaves the hulls behind. Cloning rather than hiding, because
+       `visible = false` is exactly what the exporter is entitled to ignore or not. */
+    const strip = (o) => {
+      const c = o.clone(false);
+      o.children.forEach((ch) => {
+        if (ch.isMesh && ch.material && ch.material.userData && ch.material.userData.outline) return;
+        c.add(strip(ch));
+      });
+      return c;
+    };
+    const clean = strip(src);
+    const buf = await new GLTFExporter().parseAsync(clean, { binary: true, onlyVisible: false });
+    src.position.copy(keep.p);
+    src.quaternion.copy(keep.q);
+    src.updateMatrixWorld(true);
+    let n = 0, tris = 0;
+    clean.traverse((o) => { if (o.isMesh) { n++; tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; } });
+    return { bytes: Array.from(new Uint8Array(buf)), meshes: n, tris: Math.round(tris) };
   },
   marks: () => Object.keys(MARKS),
   outlineAudit: () => {
