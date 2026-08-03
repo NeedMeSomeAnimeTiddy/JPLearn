@@ -2593,29 +2593,26 @@ function standOff(place, off = STAND_OFF, lift = EYE_LIFT) {
    menu, and it must not stack on the mountain. The rest spread wide enough that each is a real
    turn: two ahead of the shoulders, two abeam, two behind. */
 const DEST_SPECS = [
-  /* STUDY: 回遊式庭園, the stroll garden. Its site was re-derived from scratch when the costume
-     changed, because every number the pavilion left behind was chosen to frame a 1,040-tall
-     building and none of them transfer.
+  /* STUDY: 方丈と四方の庭 — one hall with four gardens round it, ON HIGH DRY GROUND.
 
-     THE FLIGHT IS PART OF THE SHOT. The camera's journey is `dist - stand`, and the rest of the
-     world runs 3,100 (READING) to 4,345 (REVIEW). Tuning the pavilion's framing three times
-     without ever checking this left STUDY on a journey of 950 — arriving somewhere you were
-     already standing. It is a constraint on the pair, not on either number alone.
+     THE LAKE OWNS THE WEST. The garden's first site sat 57% in the water with its far wall standing
+     in open lake. Asked for dry ground at REVIEW's travel distance the sweep found none anywhere on
+     the western arc at any distance — 63% wet at the driest — so the whole circle was swept once
+     instead, and the world has a shape worth stating: bearings -140 through +40 are 25-90% water at
+     4,600 to 5,800, and +80 through +170 are bone dry. Every viable site is in the east.
 
-     That looked fatal at first, because the whole western arc is lake past about 6,000 and the
-     far shore does not return until 11,000+, at bearings that sit inside the menu's frame. But
-     the premise was the pavilion's: a building has to be stood BACK from to be seen whole, so
-     `stand` was large and `dist` had to be enormous to compensate. A garden is ENTERED. Its
-     camera stops at the gate, the way the shrine's stops in its own court at 855 — and at
-     `stand` 900 a site at 4,400 buys a 3,500-unit flight, right in the middle of the band.
+     THE FLIGHT IS THE OTHER HALF OF THE SHOT, AND IT IS NOT `dist - stand`. The camera flies to
+     `standOff(FOCUS, stand)`, and every place rewrites its own focus — STUDY's sits on the rank of
+     path-heads 1,320 short of the nominal place, so `dist - stand` overstated the journey by
+     exactly that. Measured from home the travel is |focus| - stand, which is why dist is 6520:
+     6520 - 1320 - 1284 = 3,916, the shrine's own flight to the unit. Bearing 170 is also the
+     longest turn in the world, nearly straight behind the menu camera, which for the section most
+     people land on is the biggest journey available.
 
-     Two further criteria died with the pavilion. "The footprint must be dry" — a garden's pond
-     WANTS water, and here the far side is 78% lake, so the garden's water and the world's meet
-     instead of the pond being a puddle inside a wall. "It must be level" — a garden makes its own
-     level, exactly as the shrine's court does, and a 242 fall is less than that court already
-     handles. What is left: out of the menu (clear by 510px), the lake reaching back 2,930 along
-     the approach so it can be borrowed, and a flight worth flying. */
-  { bearing: -54, dist: 4400, lift: 0, stand: 1100, eyeLift: 460 }, /* STUDY — the garden */
+     The site is 0% wet over a 207 fall, the lake does not come within 7,500 units, and the ground
+     sits at -90 against the valley floor's -300 — 210 up. Not merely away from the water but above
+     it, which is the right ground for a walled compound and gives the wall something to frame. */
+  { bearing: 170, dist: 6520, lift: 0, stand: 1284, eyeLift: 460 }, /* STUDY — the hall and its gardens */
   { bearing: 105, dist: 5200, lift: 150, stand: 855, eyeLift: 182 }, /* REVIEW — the shrine */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
@@ -4378,18 +4375,32 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   mass: () => STUDY_MASS,
   titleRect: (key) => screenRect(WORLD_TITLE[key || 'REVIEW']) };
 
+/* PROJECTION BEHIND THE CAMERA IS NOT A SMALL ERROR, IT IS A WRONG ANSWER. `project` divides by w,
+   and for a point behind the eye w is negative — so the point comes back mirrored through the
+   origin and lands somewhere plausible-looking on screen. That has now produced two confident
+   wrong conclusions in this project: a compound sitting 170 degrees behind the menu camera
+   reported a 1,406-pixel-wide rect across the type column, and an enclosure the camera was
+   standing inside reported rects of tens of thousands of pixels. Neither was in shot at all.
+   Everything behind the eye now returns null, and a caller that gets null has its answer. */
 function screenRect(o) {
   if (!o) return null;
   const box = new THREE.Box3().setFromObject(o);
   const v = new THREE.Vector3();
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, front = 0;
   for (let i = 0; i < 8; i++) {
     v.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z);
-    v.project(camera);
+    v.applyMatrix4(camera.matrixWorldInverse);
+    if (v.z >= -camera.near) continue;          /* behind the eye: contributes nothing */
+    front++;
+    v.applyMatrix4(camera.projectionMatrix);
     const sx = (v.x * 0.5 + 0.5) * W(), sy = (0.5 - v.y * 0.5) * H();
     x0 = Math.min(x0, sx); y0 = Math.min(y0, sy); x1 = Math.max(x1, sx); y1 = Math.max(y1, sy);
   }
-  return [x0, y0, x1, y1].map(Math.round);
+  if (!front) return null;
+  const r = [x0, y0, x1, y1].map(Math.round);
+  /* a box straddling the eye plane has no honest screen box — say so rather than guess */
+  r.partial = front < 8;
+  return r;
 }
 
 const flash = document.getElementById('flash');

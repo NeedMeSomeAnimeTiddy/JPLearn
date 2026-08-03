@@ -1,4 +1,4 @@
-# STUDY — 回遊式庭園, the stroll garden
+# STUDY — 方丈と四方の庭, the hall and its four gardens
 
 The second of the six places. Costume settled 2026-08-03 — see `PLAN-places.md` for the whole set
 and why it was re-planned.
@@ -8,59 +8,120 @@ and why it was re-planned.
 > work done against it is kept below, because most of it is facts about the terrain and the
 > instruments rather than facts about a pavilion.
 
-## Why the garden
+## Why a garden
 
-- **It is the one Japanese form designed as a sequence of framed scenes you walk between.** L3 is
-  not something imposed on it, it is what a stroll garden is *for* — which is the opposite of the
-  pavilion, where a walk along a veranda had to be invented.
-- **It has a room at the end of every path.** The 茶室 or 東屋 at each station is where the minigame
-  plays. L4 was the requirement that killed the four preceding proposals.
-- **It is not a building**, which is the objection that started the re-plan, while still being
-  unmistakably Japanese in every element: arched bridge, stepping stones, snow-viewing lantern,
-  moss, koi, 鹿威し.
+- **A garden is designed as a sequence of framed scenes you walk between.** L3 is not something
+  imposed on it, it is what a garden is *for* — the opposite of the pavilion, where a walk along a
+  veranda had to be invented.
+- **There is a room at the end of every path.** L4 was the requirement that killed the four
+  preceding proposals; here it is the hall’s own room on that side.
+- **Its identity is not a roof.** That is the objection that started the re-plan, and it still holds
+  — the hall is single-storey and everything else is ground, water, stone and planting: arched
+  bridge, stepping stones, raked gravel, moss, koi, 雪見灯籠.
 - It is REVIEW's counterpart in temperament as well as in name — the shrine is ceremony on an axis,
-  the garden is a wandering circuit. Study against review.
+  the garden is four rooms you wander between. Study against review.
+
+## The form: 方丈と四方の庭 — one hall, four gardens
+
+**There is a real precedent and it is exactly this.** 東福寺方丈 (Tōfuku-ji Hōjō) in Kyoto has four
+gardens, one on each face of a single hall, each in a *different style* — the only such arrangement
+in Japan. So the structure is not invented: a hall in the middle, and four gardens round it that
+share nothing but their wall.
+
+That gives level two something no other place in the set has — **four picks that are genuinely
+different objects rather than four labels on the same object.** A dry gravel garden and a pond
+garden do not look like variants of each other.
+
+| face | garden | season | subject | why |
+|---|---|---|---|---|
+| 東 east | 苔庭 — moss and cherry | 春 spring | **かな** | soft, low, first things |
+| 北 north | 池庭 — the pond, with the 反橋 arched bridge over it | 夏 summer | **漢字** | water and irises; the deep work |
+| 西 west | 紅葉 — the maple grove | 秋 autumn | **語彙** | accumulation, the harvest |
+| 南 south | 枯山水 — raked gravel and rock groupings | 冬 winter | **文法** | nothing grows; pure structure, which is what grammar is |
+
+**The bridge is in the north garden** and is crossed during that quarter's level-three walk, so it
+is a thing you use rather than a thing you look at.
+
+## The hall, and why it is the answer to L4
+
+A single-storey 書院 with a 縁側 veranda running right round it and shoji on all four faces. Its
+roof showing over the wall is the compound's landmark — there is no second storey and no stacked
+roof, so it stays clear of the pagoda at JLPT.
+
+And it solves level four for nothing: **the room you kneel in is the room that faces your garden.**
+かな plays against moss and cherry, 漢字 against the pond and the bridge, 語彙 against maples, 文法
+against raked gravel. Four different backdrops for the minigames out of one building, because the
+building was always going to have four sides.
 
 ## Levels
 
 | | what it is | the picks |
 |---|---|---|
-| L1 | a low walled garden on the lake shore, one roof and a few crowns showing over the wall | — |
-| L2 | four quarters, one per season | **かな / 漢字 / 語彙 / 文法** |
-| L3 | the stations along that quarter's path, each named by a 駒札 | the blocks within the subject |
-| L4 | the 茶室 or 東屋 at a station — you kneel inside and the game plays on the mat | — |
+| L1 | the walled compound on high ground, the hall's roof over the wall, the gate off to one side | — |
+| L2 | four path-heads ranked across the entrance court, each the mouth of the way round to its garden | **かな / 漢字 / 語彙 / 文法** |
+| L3 | the stations along that garden's path, each named by a 駒札 | the blocks within the subject |
+| L4 | the hall's room on that side — you step onto the veranda and kneel, and the garden is the view | — |
 
-The season mapping is not decoration; it is doing work:
-
-- **春 spring, cherry → かな.** The beginning, first things.
-- **夏 summer, iris and open water → 漢字.** The deep work, the heaviest green.
-- **秋 autumn, maple → 語彙.** Accumulation, the harvest.
-- **冬 winter, pine under 雪吊り rope cones → 文法.** Bare branches — winter is when structure shows.
+Level two keeps the arrangement step 1 measured and proved: a rank of four path-heads, with the
+**gate deliberately off the axis**. See "What step 1 settled" — a roofed threshold standing between
+the eye and the picks fails at some band of eye heights and cannot be made not to.
 
 ## Borrowed scenery
 
-借景 is a real technique and it hands the garden a landmark for nothing: the wall is built to *frame*
-the lake and the far ranges as part of the composition rather than to shut them out. That is how a
-low enclosure gets a skyline without building one, and it is the reason the garden belongs on the
-shore rather than back from it.
+借景 still applies, but it borrows the mountains rather than the lake. The compound stands 210 units
+above the valley floor with the water 7,500 away, so what the wall frames is the far ranges and the
+wood below — which is the drier, older kind of 借景 anyway (Entsū-ji borrows Hiei, not a pond).
+
+## The site — moved off the water entirely
+
+The first site put the compound half in the lake (57% wet over a 389 fall) with its far wall
+standing in open water. Asked for dry ground at REVIEW's travel distance, the sweep found **none
+anywhere on the western arc at any distance** — 63% wet at the driest. So the whole circle was
+swept once instead, and the world turned out to have a shape worth writing down:
+
+| arc | ground at 4,600–5,800 |
+|---|---|
+| **−140° → +40°** — west and forward | **25–90% water.** The lake owns it. |
+| **+80° → +170°** — east and south | **0% water**, falls 138–338. |
+
+Every dry, unclaimed, out-of-menu bearing is in the east. The neighbours are READING 74, REVIEW 105,
+DRILLS 143, RECORDS 196 (−164), and the only gap wide enough for a 2,800-unit compound is the one
+between DRILLS and RECORDS.
+
+**Settled: bearing 170, dist 6520, `stand` 1284** — a flight of **3,916**, which is REVIEW's exactly.
+
+- **0% wet** over a 207 fall, and the lake does not come within 7,500 units.
+- **Ground at −90 against the valley floor's −300**, so it stands 210 up. It is not merely away from
+  the water, it is above it — which is the right ground for a walled compound and gives the wall
+  something to frame.
+- **170° is the longest turn in the world**, nearly straight behind the menu camera. For the section
+  most people land on, that is the biggest journey there is.
+
+> **Worth flagging for later: JLPT and RECORDS are also sited on water.** JLPT at −101 is 60–80% wet
+> and RECORDS at −164 is 12–29%. Neither is built, and RECORDS wants a ridge so a slope may suit it,
+> but a pagoda cannot stand in a lake. The six destinations were spread evenly round a circle before
+> anyone knew where the land was; that spread needs revisiting before READING or DRILLS start.
 
 ## Order of work
 
-**1. The site and the shot — DONE.** See "What step 1 settled" below. Settled at bearing **−54**,
-   dist **4400**, `stand` **1100**, `eyeLift` **460**, focus on the rank of path-heads. The
-   stand-in is in `places/study.js`.
+**1. The site and the shot — DONE (twice).** First pass settled −54/4400 against a low walled
+   garden on the shore; the site then moved off the water entirely, as above. What survived the move
+   is everything about the *shot* rather than the place: the picks at the entrance, the offset gate,
+   the flight arithmetic. See "What step 1 settled".
 
-**2. The enclosure.** Wall, coping, gate. One `mergeParts` geometry.
+**2. The compound.** The wall, its coping, the offset gate, and the hall at the centre — the
+   structure, before any of the four gardens are planted. One `mergeParts` geometry per element.
 
-**3. The water and the circuit.** The pond, the island, the path around it. The path is the ribbon
+**3. The four gardens.** Their ground, planting and character — the pond and its bridge in the
+   north, gravel and rock in the south, moss in the east, maples in the west. The paths are the ribbon
    mesh REVIEW's approach already uses — it cannot step or gap, and it carries its own colour.
 
-**4. The four quarters.** Their planting, their lanterns, their picks and focus twins.
+**4. Level two.** The rank of path-heads, their lanterns and 駒札, the picks and their focus twins.
 
 **5. Level three.** The stations along a quarter, and the 駒札 name-plaques. Reuses REVIEW's walk.
 
-**6. The rooms.** A 茶室 at each station — the first L4 interior in the project, so it sets the
-   pattern for the other five places.
+**6. The rooms.** The hall’s four rooms, each looking out on its own garden — the first L4
+   interiors in the project, so they set the pattern for the other five places.
 
 ## Reused vs new
 
@@ -215,3 +276,66 @@ Verified at six aspect ratios: **4/4 picks at every one**, spread 369–788px, p
 - **The site is 57% wet over a 389 fall** now the footprint is 2,400 deep. The far wall stands in
   the lake, which is the pond opening to it, but it is a large platform to build and skirt.
 - **900×1000 portrait** gives 65px plaques. Smallest of any viewport; check once they carry text.
+
+---
+
+# What step 2 settled
+
+The compound built as structure only — wall, coping, offset gate, platform and hall. Two of the
+three findings are corrections to things stated as fact earlier.
+
+## The flight is not `dist - stand`
+
+**It is `|focus| - stand`.** The camera flies to `standOff(focus, stand)`, and every place rewrites
+its own `focus` — STUDY’s sits on the rank of path-heads, 1,320 short of the nominal place. So a
+`dist` of 5200 with a `stand` of 1284 gave a journey of **2,597**, not the 3,916 the arithmetic
+suggested and not the number that had already been written down as settled. REVIEW is offset the
+same way (5200 nominal, 4,345 by the naive sum, 3,916 in fact).
+
+dist is now **6520**: 6520 − 1320 − 1284 = 3,916, measured from home in the running page rather than
+computed on paper.
+
+## The entrance court’s depth is fixed by the stand-off, not chosen
+
+The flight length fixes the eye exactly `stand` short of the picks — wherever that falls. At a court
+620 deep it fell **664 units outside the near wall**, and from out there the compound’s own plinth
+(it stands 194 above the ground it is cut into) filled the lower third of the frame as a brown
+cliff, with the wall a band across the middle: arriving *at* a place you are supposed to have
+arrived *in*. The court is now 1400 — deeper than the 1,284 stand-off — so the arrival lands inside
+it with the wall behind the eye. **Any enclosure that is entered has to be at least as deep as its
+own stand-off before the wall.**
+
+## Projection behind the camera is a wrong answer, not a small error
+
+`project()` divides by w, and behind the eye w is negative, so a point comes back mirrored through
+the origin and lands somewhere entirely plausible. It has now produced two confident wrong
+conclusions here: a compound 170° behind the menu camera reported a **1,406-pixel-wide rect across
+the type column**, and an enclosure the camera stood inside reported rects of tens of thousands of
+pixels. `screenRect` now discards corners behind the eye, returns **null** when nothing is in front,
+and flags `partial` when a box straddles the eye plane. A caller that gets null has its answer.
+
+## The state
+
+| | |
+|---|---|
+| bearing / dist | 170 / 6520 |
+| `stand` / `eyeLift` | 1284 / 460 |
+| flight | 3,916 — REVIEW’s to the unit |
+| site | 0% wet, 194 fall, ground −104 against the valley’s −300, lake 7,500 away |
+| compound | f −2720 to +1320, sd ±1410; wall 100 + 28 coping |
+| court | 1400 deep, gate at sd −790 |
+| hall | 940 × 760 body, 120 veranda, 230 eaves, ridge 724 |
+| picks | f −1320, sd −420 / −140 / +140 / +420 |
+
+Verified at six aspect ratios: **4/4 picks at every one**, spread 456–974px, plaques 65–139px, and
+the compound correctly reported as behind the menu camera at all of them. REVIEW unchanged — twins
+in frame at five aspects, hover at rest, walk and back tab, title safe at six sizes, no console
+errors.
+
+## Open
+
+- **The north garden is invisible from the entrance**, since the hall stands between. Expected —
+  it is what level three walks round to — but it means the pond and its bridge, the one element with
+  a fixed place in the brief, never appear in the arrival shot. Worth deciding whether that matters.
+- **The four gardens are bare coloured slabs.** Step 3.
+- **The legacy CSS3D level two is still there**, four black tiles stepping across the hall.
