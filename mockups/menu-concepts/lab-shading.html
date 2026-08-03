@@ -53,13 +53,18 @@ import * as THREE from './lib/three.module.min.js';
                        not the other and the black shell walks off the crown
      E  aerial         fog that warms toward the sun, because haze looking into the
                        light is not the colour of haze looking away from it
+     R  mist           visible banks lying in the low ground — height fog is atmosphere
+                       and has no shape; this is what gives the air strands
+     T  shafts         a radial blur of the bloom buffer toward the sun, so the scene
+                       occludes its own light shafts for nothing
 
    Press 1-8 to toggle, 0 for all off (which is roughly what the main mockup
    was doing), 9 for all on.
    ============================================================================ */
 
 const state = { ao: true, ramp: true, toon: true, shadow: true, clouds: true,
-  hfog: true, post: true, petals: true, rim: true, sway: true, aerial: true };
+  hfog: true, post: true, petals: true, rim: true, sway: true, aerial: true,
+  mist: true, shafts: true };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
@@ -99,6 +104,63 @@ camera.lookAt(0, 620, 0);
   scene.add(new THREE.Mesh(
     new THREE.SphereGeometry(9000, 32, 20),
     new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false })));
+}
+
+/* ---- the sun itself ----
+   THE LAB HAD NO SUN, ONLY A DIRECTIONAL LIGHT AND A GRADIENT SKY — and sun shafts turned out to
+   be untestable because of it: the bright pass found a broad band of horizon rather than a disc,
+   and a radial blur of something uniform is that same uniform thing. Shafts need a small, very
+   bright source with the scene able to stand in front of it. The main mockup already has exactly
+   this (`sun-disc` and `sun-bloom`), so the lab was simply missing a thing it is meant to model. */
+const SUN_AT = new THREE.Vector3(-1500, 1900, 900).normalize().multiplyScalar(7200);
+const SUN_SPRITES = [];
+{
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  rg.addColorStop(0.00, 'rgba(255,255,255,1)');
+  rg.addColorStop(0.22, 'rgba(255,240,205,0.92)');
+  rg.addColorStop(0.55, 'rgba(255,205,150,0.30)');
+  rg.addColorStop(1.00, 'rgba(255,190,140,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  /* A SPRITE, NOT A PLANE. The first pass used a PlaneGeometry, which faces world +Z and is
+     FrontSide by default — so from a camera looking up at it from the side there was simply
+     nothing there, and the shafts had a source that could not be seen. A Sprite always faces the
+     eye, which is what a sun is. */
+  const mk = (scale, opacity) => {
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, transparent: true, depthWrite: false, fog: false,
+      blending: THREE.AdditiveBlending, opacity,
+    }));
+    m.position.copy(SUN_AT);
+    m.scale.setScalar(scale);
+    scene.add(m);
+    return m;
+  };
+  /* the disc, and a much wider glow around it — the glow is what the bright pass mostly finds */
+  SUN_SPRITES.push(mk(360, 1.0), mk(2600, 0.55));
+}
+
+/* ---- the sun's elevation, as a knob ----
+   SHAFTS NEED A LOW SUN, and that is not a tuning detail — it is the whole precondition. A
+   crepuscular ray is the GAP between things that block the glow, so something has to be able to
+   get in front of it; at the key light's 47 degrees nothing on the ground ever can, and the
+   radial blur simply makes the halo rounder. The mockup is a dawn scene with the sun sitting just
+   above the treeline, so the lab was modelling the wrong time of day to test its own effect.
+   Moves the light and the sprites together — a visible sun in one place and its shadows coming
+   from another is the kind of wrong that is hard to see and impossible to unsee. */
+function sunAt(elevDeg, azDeg) {
+  const e = elevDeg * Math.PI / 180, a = azDeg * Math.PI / 180;
+  const dir = new THREE.Vector3(Math.cos(e) * Math.cos(a), Math.sin(e), Math.cos(e) * Math.sin(a));
+  key.position.copy(dir).multiplyScalar(2600);
+  FX.uSunDir.value.copy(dir);
+  SUN_AT.copy(dir).multiplyScalar(7200);
+  SUN_SPRITES.forEach((m) => m.position.copy(SUN_AT));
+  key.target.position.set(0, 0, 0);
+  key.target.updateMatrixWorld();
+  key.shadow.camera.updateProjectionMatrix();
 }
 
 /* ---- the toon ramp: 4 hard steps. NearestFilter is what makes it band ---- */
@@ -684,6 +746,91 @@ const petalMeshes = [
   petalField(180, 0xd4703e, 0xa8402a, [560, 560, 520, 330, 250, -420]),
 ];
 
+/* ============================ MIST RIBBONS ============================
+   Height fog is atmosphere — it has no shape. What a valley at dawn actually has is STRANDS: a
+   few visible banks lying along the low ground, which is what tells you the air has depth rather
+   than just haze in it. One InstancedMesh of soft billboards, turned about the vertical axis only
+   so they stay horizontal — a mist bank that tilts to face the camera is a sprite.
+
+   THEY DO NOT INTERSECT THE GROUND. Soft-particle depth fade needs the scene's depth texture, and
+   these are drawn INTO that same buffer, so it cannot sample itself. Placing each one a known
+   clearance above the terrain avoids the hard intersection line entirely, which for a stylised
+   look is the cheaper answer to the same problem. */
+const MIST = { uTime: { value: 0 }, uAmt: { value: 0.5 } };
+{
+  const COUNT = 30;
+  const g = new THREE.PlaneGeometry(1, 1);
+  const seed = new Float32Array(COUNT * 4);
+  const off = new Float32Array(COUNT * 3);
+  /* MIST BELONGS TO LOW GROUND, AND IT HAS TO FLOAT. The first pass scattered it evenly and sat
+     it 24-114 above the terrain, so half of it lay ON the hillside like a pale stain and the
+     rest crowned the ridge, where mist never is. Clearance is 110-380 now, so a bank reads as
+     something hanging in front of the slope rather than painted onto it, and the opacity falls
+     off with height so the ridge keeps clear. */
+  for (let i = 0; i < COUNT; i++) {
+    const x = (Math.random() - 0.5) * 3100, z = (Math.random() - 0.5) * 3100;
+    const gy = heightAt(x, z);
+    off[i * 3] = x;
+    off[i * 3 + 1] = gy + 110 + Math.random() * 270;
+    off[i * 3 + 2] = z;
+    seed[i * 4] = 520 + Math.random() * 760;      /* width  */
+    seed[i * 4 + 1] = 55 + Math.random() * 95;    /* height: wide and thin, not square */
+    seed[i * 4 + 2] = Math.random();              /* drift phase */
+    /* low ground takes it, the ridge does not */
+    seed[i * 4 + 3] = (0.45 + Math.random() * 0.55) * THREE.MathUtils.clamp(1.0 - gy / 520, 0.05, 1.0);
+  }
+  g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 4));
+  g.setAttribute('aOff', new THREE.InstancedBufferAttribute(off, 3));
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: {
+      uTime: MIST.uTime, uAmt: MIST.uAmt,
+      uCol: { value: new THREE.Color(0xdccfbd) },
+      fogNear: { value: scene.fog.near }, fogFar: { value: scene.fog.far },
+    },
+    vertexShader: [
+      'attribute vec4 aSeed; attribute vec3 aOff;',
+      'uniform float uTime;',
+      'varying vec2 vUv; varying float vFog; varying float vOp;',
+      'void main() {',
+      '  vUv = uv; vOp = aSeed.w;',
+      '  vec3 c = aOff;',
+      /* the drift is slow and wraps over a long period, so nothing is seen to reset */
+      '  c.x += sin( uTime * 0.06 + aSeed.z * 6.28 ) * 190.0;',
+      '  c.z += cos( uTime * 0.045 + aSeed.z * 6.28 ) * 150.0;',
+      '  c.y += sin( uTime * 0.09 + aSeed.z * 3.1 ) * 12.0;',
+      /* TURNED ABOUT THE VERTICAL AXIS ONLY. Full billboarding tips the bank up to face the eye,
+         which reads as a sprite; mist lies flat however you look at it. */
+      '  vec3 toCam = normalize( vec3( cameraPosition.x - c.x, 0.0, cameraPosition.z - c.z ) );',
+      '  vec3 rt = normalize( cross( vec3( 0.0, 1.0, 0.0 ), toCam ) );',
+      '  vec3 wp = c + rt * ( position.x * aSeed.x ) + vec3( 0.0, position.y * aSeed.y, 0.0 );',
+      '  vec4 mv = viewMatrix * vec4( wp, 1.0 );',
+      '  vFog = -mv.z;',
+      '  gl_Position = projectionMatrix * mv;',
+      '}',
+    ].join('\n'),
+    fragmentShader: [
+      'varying vec2 vUv; varying float vFog; varying float vOp;',
+      'uniform vec3 uCol; uniform float uAmt; uniform float fogNear; uniform float fogFar;',
+      'void main() {',
+      /* soft on every edge, and softest at the top: mist has a floor and no ceiling */
+      '  float ex = smoothstep( 0.0, 0.34, vUv.x ) * smoothstep( 1.0, 0.66, vUv.x );',
+      '  float ey = smoothstep( 0.0, 0.30, vUv.y ) * smoothstep( 1.0, 0.42, vUv.y );',
+      '  float a = ex * ey * vOp * uAmt;',
+      /* and it fades out CLOSE as well as far, so the camera never flies through a wall of it */
+      '  a *= smoothstep( 260.0, 900.0, vFog ) * ( 1.0 - smoothstep( fogNear, fogFar, vFog ) );',
+      '  if ( a < 0.004 ) discard;',
+      '  gl_FragColor = vec4( uCol, a );',
+      '}',
+    ].join('\n'),
+  });
+  const im = new THREE.InstancedMesh(g, mat, COUNT);
+  im.frustumCulled = false;
+  im.renderOrder = 2;
+  scene.add(im);
+  MIST.mesh = im;
+}
+
 /* ============================ POST ============================
    ONE PASS, NOT A CHAIN. The main mockup has no EffectComposer, already renders the scene twice a
    frame for the planar reflection, and does it inside a CSS3D sandwich. So the grade, the bloom
@@ -704,6 +851,15 @@ const POST = {
   splitHigh: { value: new THREE.Color(0xffd9a8) },
   splitAmt: { value: 0.22 },
   uTime: { value: 0 },
+  /* SUN SHAFTS COME OUT OF THE BLOOM BUFFER, NOT OUT OF GEOMETRY. The bright pass already holds
+     the sky and the sun and nothing else — the hill and the tree are black in it — so a radial
+     blur toward the sun's screen position produces shafts that are occluded by the scene for
+     free. Cones of geometry would cost more and be harder to make behave. */
+  shaftAmt: { value: 0.9 },
+  shaftDensity: { value: 0.62 },
+  shaftDecay: { value: 0.93 },
+  sunUv: { value: new THREE.Vector2(0.5, 0.5) },
+  sunVis: { value: 0 },
 };
 const fsGeo = new THREE.BufferGeometry();
 fsGeo.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
@@ -772,12 +928,16 @@ const matComposite = new THREE.ShaderMaterial({
     exposure: POST.exposure, bloomAmt: POST.bloomAmt, grain: POST.grain,
     vignette: POST.vignette, splitShadow: POST.splitShadow, splitHigh: POST.splitHigh,
     splitAmt: POST.splitAmt, uTime: POST.uTime, uRes: { value: new THREE.Vector2(1, 1) },
+    shaftAmt: POST.shaftAmt, shaftDensity: POST.shaftDensity, shaftDecay: POST.shaftDecay,
+    sunUv: POST.sunUv, sunVis: POST.sunVis,
   },
   vertexShader: VS,
   fragmentShader: [
     'varying vec2 vUv;',
     'uniform sampler2D tSrc; uniform sampler2D tBloom;',
     'uniform float exposure, bloomAmt, grain, vignette, splitAmt, uTime;',
+    'uniform float shaftAmt, shaftDensity, shaftDecay, sunVis;',
+    'uniform vec2 sunUv;',
     'uniform vec3 splitShadow, splitHigh;',
     'uniform vec2 uRes;',
     /* Narkowicz ACES: one polynomial, close enough to the real curve at a fraction of the cost */
@@ -792,6 +952,24 @@ const matComposite = new THREE.ShaderMaterial({
     'void main() {',
     '  vec3 c = texture2D( tSrc, vUv ).rgb;',
     '  c += texture2D( tBloom, vUv ).rgb * bloomAmt;',
+    /* the shafts: march toward the sun through the bright buffer, decaying as you go */
+    '  if ( sunVis > 0.0 && shaftAmt > 0.0 ) {',
+    '    vec2 dir = ( sunUv - vUv ) * shaftDensity / 14.0;',
+    '    vec2 uv2 = vUv;',
+    '    float decay = 1.0;',
+    '    vec3 sh = vec3( 0.0 );',
+    '    for ( int i = 0; i < 14; i++ ) {',
+    '      uv2 += dir;',
+    '      sh += texture2D( tBloom, uv2 ).rgb * decay;',
+    '      decay *= shaftDecay;',
+    '    }',
+    /* faded out as the sun leaves the frame, or a shaft field snaps off at the edge */
+    '    vec2 sd = abs( sunUv - vec2( 0.5 ) );',
+    /* generous, because shafts from a sun just outside the frame are the common case and the
+       first window (0.42-0.72) switched them off exactly when they would be most useful */
+    '    float edge = ( 1.0 - smoothstep( 0.75, 1.45, sd.x ) ) * ( 1.0 - smoothstep( 0.75, 1.45, sd.y ) );',
+    '    c += sh * ( shaftAmt / 14.0 ) * sunVis * edge;',
+    '  }',
     '  c *= exposure;',
     '  c = aces( c );',
     /* SPLIT TONE. Dawn is not one colour temperature: the sun is warm and everything it does not
@@ -858,6 +1036,9 @@ function apply() {
   FX.uRimAmt.value = state.rim ? 0.55 : 0;
   FX.uSwayAmt.value = state.sway ? 5.5 : 0;
   FX.uAerialAmt.value = state.aerial ? 0.85 : 0;
+  MIST.uAmt.value = state.mist ? 0.5 : 0;
+  MIST.mesh.visible = state.mist;
+  POST.shaftAmt.value = state.shafts ? 0.9 : 0;
   petalMeshes.forEach((m) => { m.visible = state.petals; });
   scene.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
   const row = (on, k, label) => `<div class="${on ? '' : 'off'}">[${k}] ${on ? '<b>on </b>' : 'off'} ${label}</div>`;
@@ -873,6 +1054,8 @@ function apply() {
     + row(state.rim, 'Q', 'sky rim light')
     + row(state.sway, 'W', 'wind sway (foliage + its outline)')
     + row(state.aerial, 'E', 'aerial tint (fog warms toward the sun)')
+    + row(state.mist, 'R', 'mist ribbons (banks in the low ground)')
+    + row(state.shafts, 'T', 'sun shafts (radial blur of the bloom buffer)')
     + '<div class="off" style="margin-top:8px">[0] all off &nbsp; [9] all on</div>';
 }
 addEventListener('keydown', (e) => {
@@ -887,6 +1070,8 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'q' || e.key === 'Q') state.rim = !state.rim;
   else if (e.key === 'w' || e.key === 'W') state.sway = !state.sway;
   else if (e.key === 'e' || e.key === 'E') state.aerial = !state.aerial;
+  else if (e.key === 'r' || e.key === 'R') state.mist = !state.mist;
+  else if (e.key === 't' || e.key === 'T') state.shafts = !state.shafts;
   else if (e.key === '0') Object.keys(state).forEach((k) => { state[k] = false; });
   else if (e.key === '9') Object.keys(state).forEach((k) => { state[k] = true; });
   else return;
@@ -908,7 +1093,7 @@ let t = 0, ct = 0;
    close enough to an object to judge an outline seam */
 window.LAB = {
   state, apply, CLOUD, cloud: CLOUD.uCloudMap.value.image,
-  HFOG, POST, PETALS, FX, petalMeshes,
+  HFOG, POST, PETALS, FX, MIST, petalMeshes, sunAt, SUN_SPRITES,
   scene, camera, renderer, key, ground,
   freeze: false, view: null, at: (v) => { t = v; },
 };
@@ -924,6 +1109,13 @@ function tick() {
   CLOUD.uCloudOff.value.set(ct * 0.22, ct * -0.08);
   PETALS.uTime.value = ct * 60;
   FX.uTime.value = ct * 60;
+  MIST.uTime.value = ct * 60;
+  /* the sun's screen position, recomputed every frame because the camera orbits */
+  {
+    const v = SUN_AT.clone().project(camera);
+    POST.sunUv.value.set(v.x * 0.5 + 0.5, -v.y * 0.5 + 0.5);
+    POST.sunVis.value = v.z < 1 ? 1 : 0;
+  }
   POST.uTime.value = ct;
   for (const m of CLOUD_MATS) m.needsUpdate = true;   /* see THE UNIFORM TRAP above */
   const v = window.LAB.view;

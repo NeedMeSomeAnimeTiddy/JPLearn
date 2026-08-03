@@ -1795,6 +1795,46 @@ A screenshot cannot show that something moves. Two checks that can, and both are
 must differ with sway on and be byte-identical with it off. Both passed: 4 foliage materials, 4
 hulls, 4 sharing `uTime` and `uSwayAmt`.
 
+## v52 — mist ribbons, and the sun the lab never had
+
+- **Mist has to FLOAT, and it belongs to low ground.** The first pass scattered ribbons evenly and
+  sat them 24–114 above the terrain: half of them lay ON the hillside like a pale stain and the
+  rest crowned the ridge, where mist never is. Clearance 110–380 and opacity falling off with
+  height fixes both — a bank reads as something hanging in front of a slope rather than painted
+  onto it. They are turned about the vertical axis only; full billboarding tips a bank up to face
+  the eye, which reads as a sprite.
+- **They do not intersect the ground, deliberately.** Soft-particle depth fade needs the scene
+  depth texture and these are drawn INTO that buffer, so it cannot sample itself. Keeping a known
+  clearance sidesteps the hard intersection line entirely, which for a stylised look is the
+  cheaper answer to the same problem.
+
+### The lab was missing a thing it is meant to model
+
+**Sun shafts were untestable because the lab had no sun** — only a directional light and a gradient
+sky. The bright pass found a broad band of horizon rather than a disc, and a radial blur of
+something uniform is that same uniform thing. The mockup has had `sun-disc` and `sun-bloom` all
+along. **When an effect refuses to appear, check that the thing it operates on exists.**
+
+Three further corrections came out of adding it:
+
+- **A Sprite, not a Plane.** The first sun was a `PlaneGeometry`, which faces world +Z and is
+  `FrontSide` by default — from a camera looking up at it from the side there was simply nothing
+  there.
+- **Shafts need a LOW sun.** A crepuscular ray is the GAP between things that block the glow, so
+  something has to be able to get in front of it. At the key light's 47° nothing on the ground ever
+  can. The lab now has `sunAt(elev, az)`, which moves the light and the sprites TOGETHER — a
+  visible sun in one place with its shadows coming from another is the kind of wrong that is hard
+  to see and impossible to unsee.
+- **And a BROKEN occluder — which is why the verdict is "unproven".** At dawn over one smooth hill
+  the effect is atmospheric SPILL, not rays: the glow reaches further over the ridge and warms the
+  sky above it, but nothing streaks. Rays need an interrupted silhouette — a treeline, a lattice, a
+  row of gates. The lab has one hill and one tree and cannot produce them. **This is the one effect
+  of the six that the lab cannot sign off**; it has to be re-tested against the real scene's
+  treeline, where the occluder is broken by construction.
+
+Keepers on the evidence so far: height fog, the post pass (grade, bloom, grain, vignette), petals,
+rim, sway, mist. Shafts: hold.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -2080,6 +2120,12 @@ hulls, 4 sharing `uTime` and `uSwayAmt`.
   confidently.
 - **Clearing around a thing is not clearing the way to it.** Everything between the camera and the
   subject is in shot, and that is a wedge, not a circle.
+- **When an effect refuses to appear, check the thing it operates on exists.** Shafts had no
+  sun to radiate from because the lab had never had one.
+- **A billboard that must stay horizontal turns about the vertical axis only.** Full
+  billboarding tips it to face the eye and it reads as a sprite.
+- **Crepuscular rays need a low sun AND a broken occluder.** A smooth silhouette gives spill,
+  not rays.
 - **An effect keyed on a surface turning away from you says nothing about a surface that is
   always turned away.** Grazing-angle terms wash flat across terrain; keep them opt-in.
 - **A vertex-shader displacement has to be applied to the outline hull as well**, from the
