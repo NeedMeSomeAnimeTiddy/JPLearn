@@ -1729,6 +1729,40 @@ water reaching 2,500 back along the approach, and clear of the menu at every asp
 900px in height; 3,200 seats the pavilion in its landscape at 65% of frame height with the ground
 veranda 468px wide, which is 117 per bay — still more than the shrine's tablets ever had.
 
+## v50 — the lab grows colour, post and VFX
+
+Three additions to `lab-shading.html`, on keys 6/7/8, each A/B'd from a pinned camera.
+
+- **Height fog (6).** Distance fog alone flattens a landscape into one grey wash — everything far
+  is equally hazy, so nothing reads as ABOVE anything else. Mist pooling in low ground is what
+  separates a valley floor from the ridge behind it, and it is most of what sumi-e distance is.
+  It rides on the world position `cloudy()` already carries into the fragment shader, so it costs
+  a varying that was being paid for anyway. **The biggest single win of the three.**
+- **Post (7): one pass, not a chain.** The mockup has no `EffectComposer`, already renders twice a
+  frame for the planar reflection, and does it inside a CSS3D sandwich — so grade, bloom
+  composite, grain and vignette are one fullscreen shader, and only the bloom blur costs extra
+  draws (at quarter resolution). **Tone mapping had to move off the renderer and into the
+  composite**: the scene must reach the bloom threshold in LINEAR light, because tone mapping
+  first flattens exactly the highlights the bright-pass is looking for.
+  - *Split tone is doing more work than bloom.* Dawn is not one colour temperature — the sun is
+    warm and everything it does not reach is lit by a blue sky. Pushing the two ends apart is most
+    of what makes a render read as a photograph of a time of day rather than as lit geometry.
+  - *Grain has to be paper, not video.* Sampled square it reads as noise; stretched about 4:1 it
+    reads as fibre, and static rather than animated — animated grain is film.
+- **Petals (8), and the lesson is scale.** The first pass ran 1,600 at 5–10 units across a
+  1,700-unit box and it read as **dust**: an even rash of specks over the whole frame including
+  empty sky, which is what a particle system looks like when nobody decided where the particles
+  come FROM. A quarter as many, twice the size, in a box that hugs the tree they fell off, and it
+  reads as petals. **A particle effect is a question about the source, not about the count.**
+
+### The guard that was half a guard
+
+The height-fog injection landed while its four `uniform` declarations did not — the anchor's
+indentation had changed — and every Lambert failed to compile with "undeclared identifier". The
+lab already had a guard for exactly this class ("String.replace on a chunk name that moved is a
+silent no-op") and it did not catch this, because it checked that the CODE went in and not that
+what the code REFERS TO went in. It now asserts both, and that they agree.
+
 ## Gotchas learned (worth keeping)
 
 - `three.module.min.js` (r167+) imports a sibling `three.core.min.js` — vendor both.
@@ -2014,6 +2048,11 @@ veranda 468px wide, which is 117 per bay — still more than the shrine's tablet
   confidently.
 - **Clearing around a thing is not clearing the way to it.** Everything between the camera and the
   subject is in shot, and that is a wedge, not a circle.
+- **A particle effect is a question about its source, not its count.** Evenly spread, small
+  and numerous reads as dust; few, large and clustered on what shed them reads as the thing.
+- **A shader-injection guard must check the declarations too**, not just the injected body.
+- **Tone mapping goes after the bright-pass, not before it.** Otherwise bloom is looking for
+  highlights that the curve has already flattened.
 - **`entered` is not `arrived`, and neither is a state flag.** The only reliable "the shot has
   settled" is the camera rig reporting the same numbers two frames running.
 - **When a horizontal surface won't read, raise the camera.** Ground depth on screen is governed by

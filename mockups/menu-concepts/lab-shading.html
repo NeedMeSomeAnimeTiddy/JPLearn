@@ -41,12 +41,19 @@ import * as THREE from './lib/three.module.min.js';
      4  shadows        a real shadow map, so things are attached to the ground
      5  cloud shadows  drifting sky occlusion, which breaks up the terminator a
                        single directional light otherwise leaves as a plain diagonal
+     6  height fog     mist pooling in low ground, so the valley floor separates from
+                       the ridge behind it instead of washing into one grey
+     7  post           one fullscreen pass: ACES + split tone, thresholded bloom,
+                       paper grain, vignette
+     8  petals         cherry and maple falling — the one VFX that IS the design,
+                       since the four gardens are the four seasons
 
-   Press 1-5 to toggle, 0 for all off (which is roughly what the main mockup
+   Press 1-8 to toggle, 0 for all off (which is roughly what the main mockup
    was doing), 9 for all on.
    ============================================================================ */
 
-const state = { ao: true, ramp: true, toon: true, shadow: true, clouds: true };
+const state = { ao: true, ramp: true, toon: true, shadow: true, clouds: true,
+  hfog: true, post: true, petals: true };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
@@ -102,6 +109,19 @@ function toonRamp(steps) {
   return t;
 }
 const RAMP = toonRamp(4);
+
+/* ---- height fog: mist lying in the valley ----
+   Distance fog alone flattens a landscape into one grey wash: everything far is equally hazy,
+   so nothing reads as ABOVE anything else. Real morning mist pools in low ground, which is what
+   separates a valley floor from the ridge behind it and is most of what sumi-e distance is.
+   Driven off world height, which `cloudy()` already carries into the fragment shader as
+   `vCloudPos` — so this costs one varying that was already being paid for. */
+const HFOG = {
+  uHfAmt: { value: 0.85 },
+  uHfTop: { value: 520 },      /* mist ceiling: above this, none */
+  uHfBot: { value: -120 },     /* and below this, full */
+  uHfCol: { value: new THREE.Color(0xd8c9b6) },
+};
 
 /* ---- lights ---- */
 /* KEY-TO-FILL RATIO IS THE WHOLE GAME. Last round I pushed the fill to 1.9 to stop shadows
@@ -219,6 +239,7 @@ const CLOUD_MATS = [];
 function cloudy(mat) {
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, CLOUD);
+    Object.assign(shader.uniforms, HFOG);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vCloudPos;')
       /* after project_vertex so `transformed` is final; the instancing branch matters
@@ -236,19 +257,40 @@ function cloudy(mat) {
         uniform vec2 uCloudOff;
         uniform vec2 uCloudProj;
         uniform float uCloudScale;
-        uniform float uCloudAmt;`)
+        uniform float uCloudAmt;
+        uniform float uHfAmt;
+        uniform float uHfTop;
+        uniform float uHfBot;
+        uniform vec3  uHfCol;`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         {
           vec2 cuv = ( vCloudPos.xz - vCloudPos.y * uCloudProj ) * uCloudScale + uCloudOff;
           float cs = texture2D( uCloudMap, cuv ).r;
           reflectedLight.directDiffuse *= mix( 1.0, cs, uCloudAmt );
+        }`)
+      /* AFTER the standard fog, not instead of it. Distance fog is still doing the far-field
+         work; this only adds the pooling near the ground. `vFogDepth` is the built-in, so the
+         mist thins to nothing at the camera — mist you are standing in is not mist. */
+      .replace('#include <fog_fragment>', `#include <fog_fragment>
+        {
+          float hfH = clamp( ( uHfTop - vCloudPos.y ) / max( uHfTop - uHfBot, 1.0 ), 0.0, 1.0 );
+          float hfD = 1.0 - exp( - vFogDepth * 0.00042 );
+          gl_FragColor.rgb = mix( gl_FragColor.rgb, uHfCol,
+            clamp( uHfAmt * hfH * hfH * hfD, 0.0, 1.0 ) );
         }`);
     /* String.replace on a chunk name that moved is a silent no-op — which looks exactly
        like a working feature with the effect turned off. Never let it fail quietly. */
     const wroteVarying = shader.vertexShader.includes('vCloudPos = (');
     const wroteSample = shader.fragmentShader.includes('texture2D( uCloudMap');
-    if (!wroteVarying || !wroteSample) {
-      console.error('CLOUD PATCH FAILED', mat.type, 'vert write:', wroteVarying, 'frag sample:', wroteSample);
+    /* AND THE UNIFORMS THEY USE. The height-fog injection landed while its four `uniform`
+       declarations did not — the anchor's indentation had changed — so every Lambert failed to
+       compile with "undeclared identifier". A guard that checks the code went in but not that
+       what the code REFERS TO went in is half a guard. */
+    const wroteFog = shader.fragmentShader.includes('uHfTop - vCloudPos.y');
+    const wroteFogUni = shader.fragmentShader.includes('uniform float uHfTop;');
+    if (!wroteVarying || !wroteSample || wroteFog !== wroteFogUni) {
+      console.error('SHADER PATCH FAILED', mat.type, 'vert:', wroteVarying, 'cloud:', wroteSample,
+        'hfog body:', wroteFog, 'hfog uniforms:', wroteFogUni);
     }
   };
   CLOUD_MATS.push(mat);
@@ -453,6 +495,257 @@ tree(-120, 130, 1.9);
   const o = outlineFor(m, 0.0024); scene.add(o); outlines.push(o);
 });
 
+
+/* ============================ PETALS ============================
+   The one VFX that IS the design rather than decoration on it: STUDY's four gardens are the four
+   seasons, so falling cherry and maple are the subject, not an effect laid over it. One
+   InstancedMesh each, all the motion in the vertex shader off a per-instance seed, so a thousand
+   of them cost one draw call and nothing per frame on the CPU. */
+const PETALS = { uTime: { value: 0 }, uAmt: { value: 1 } };
+function petalField(count, colorA, colorB, box) {
+  const g = new THREE.PlaneGeometry(1, 1);
+  const seed = new Float32Array(count * 4);
+  for (let i = 0; i < count; i++) {
+    seed[i * 4] = Math.random();          /* across    */
+    seed[i * 4 + 1] = Math.random();      /* fall phase */
+    seed[i * 4 + 2] = Math.random();      /* rate       */
+    seed[i * 4 + 3] = Math.random();      /* depth, size, colour mix */
+  }
+  g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 4));
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: {
+      uTime: PETALS.uTime, uAmt: PETALS.uAmt,
+      uA: { value: new THREE.Color(colorA) }, uB: { value: new THREE.Color(colorB) },
+      uBox: { value: new THREE.Vector3(box[0], box[1], box[2]) },
+      uOrigin: { value: new THREE.Vector3(box[3], box[4], box[5]) },
+      fogColor: { value: scene.fog.color },
+      fogNear: { value: scene.fog.near }, fogFar: { value: scene.fog.far },
+    },
+    vertexShader: [
+      'attribute vec4 aSeed;',
+      'uniform float uTime; uniform vec3 uBox; uniform vec3 uOrigin;',
+      'uniform vec3 uA; uniform vec3 uB;',
+      'varying vec3 vCol; varying float vFog; varying vec2 vUv; varying float vFall;',
+      'void main() {',
+      '  vUv = uv;',
+      /* FALL IS A SAWTOOTH, NOT A SIMULATION. A petal that reappears at the top the instant it
+         lands needs no state, never drifts out of its box, and cannot desynchronise. */
+      '  float fall = fract( aSeed.y + uTime * ( 0.028 + aSeed.z * 0.022 ) );',
+      '  vec3 p = uOrigin;',
+      '  p.x += ( aSeed.x - 0.5 ) * uBox.x;',
+      '  p.z += ( aSeed.w - 0.5 ) * uBox.z;',
+      '  p.y += ( 1.0 - fall ) * uBox.y;',
+      /* the slip: a petal does not drop, it slides sideways and turns over */
+      '  float ph = uTime * ( 0.7 + aSeed.z * 1.1 ) + aSeed.x * 30.0;',
+      '  p.x += sin( ph ) * 26.0;',
+      '  p.z += cos( ph * 0.77 ) * 22.0;',
+      /* SIZE AND SPREAD ARE THE WHOLE EFFECT. The first pass ran 1,600 petals at 5-10 units
+         across a 1,700-unit box and it read as DUST - an even rash of specks over the whole
+         frame including empty sky, which is what a particle system looks like when nobody
+         decided where the particles come FROM. A quarter as many, twice the size, in a box
+         that hugs the tree they fell off. */
+      '  float sz = 13.0 + aSeed.w * 11.0;',
+      '  vec3 right = vec3( modelViewMatrix[0][0], modelViewMatrix[1][0], modelViewMatrix[2][0] );',
+      '  vec3 up    = vec3( modelViewMatrix[0][1], modelViewMatrix[1][1], modelViewMatrix[2][1] );',
+      '  float r = ph * 0.9;',
+      '  vec2 q = vec2( position.x * cos( r ) - position.y * sin( r ),',
+      '                 position.x * sin( r ) + position.y * cos( r ) );',
+      /* squashed on one axis by the same phase, which is what reads as a petal turning over
+         rather than as a disc spinning in its own plane */
+      '  q.x *= 0.35 + 0.65 * abs( sin( ph * 0.5 ) );',
+      '  vec3 wp = p + ( right * q.x + up * q.y ) * sz;',
+      '  vec4 mv = viewMatrix * vec4( wp, 1.0 );',
+      '  vFog = -mv.z;',
+      '  vCol = mix( uA, uB, aSeed.w );',
+      '  vFall = fall;',
+      '  gl_Position = projectionMatrix * mv;',
+      '}',
+    ].join('\n'),
+    fragmentShader: [
+      'varying vec3 vCol; varying float vFog; varying vec2 vUv; varying float vFall;',
+      'uniform float uAmt;',
+      'uniform vec3 fogColor; uniform float fogNear; uniform float fogFar;',
+      'void main() {',
+      /* a petal shape, not a square: an ellipse pinched on one axis */
+      '  vec2 d = vUv - 0.5;',
+      '  float rr = length( vec2( d.x * 1.7, d.y ) );',
+      '  if ( rr > 0.5 ) discard;',
+      '  vec3 c = mix( vCol, vec3( 1.0 ), 0.25 * ( 1.0 - rr * 2.0 ) );',
+      '  float f = smoothstep( fogNear, fogFar, vFog );',
+      /* fade in over the top tenth of the box: a petal at full opacity where the sawtooth
+         resets is a petal that pops into existence in mid-air */
+      '  float born = smoothstep( 1.0, 0.9, vFall );',
+      '  gl_FragColor = vec4( mix( c, fogColor, f ), uAmt * born * ( 1.0 - f ) );',
+      '}',
+    ].join('\n'),
+  });
+  const im = new THREE.InstancedMesh(g, mat, count);
+  im.frustumCulled = false;
+  scene.add(im);
+  return im;
+}
+/* cherry over the near ground and maple further out, so both are judged in one frame */
+const petalMeshes = [
+  petalField(240, 0xf0c8d4, 0xe093ad, [640, 620, 560, -140, 300, 150]),
+  petalField(180, 0xd4703e, 0xa8402a, [560, 560, 520, 330, 250, -420]),
+];
+
+/* ============================ POST ============================
+   ONE PASS, NOT A CHAIN. The main mockup has no EffectComposer, already renders the scene twice a
+   frame for the planar reflection, and does it inside a CSS3D sandwich. So the grade, the bloom
+   composite, the vignette and the grain are a single fullscreen shader; only the bloom's blur
+   costs extra draws and it runs at quarter resolution where nobody can tell.
+
+   TONE MAPPING MOVES OFF THE RENDERER AND INTO THE COMPOSITE. The scene has to reach the bloom
+   threshold in LINEAR light — tone mapping first flattens exactly the highlights bloom is
+   supposed to find, so a bright-pass after ACES finds almost nothing and the effect reads as
+   broken rather than as subtle. */
+const POST = {
+  exposure: { value: 1.05 },
+  bloomAmt: { value: 0.55 },
+  bloomCut: { value: 0.72 },
+  grain: { value: 0.055 },
+  vignette: { value: 0.30 },
+  splitShadow: { value: new THREE.Color(0x2a3a5c) },
+  splitHigh: { value: new THREE.Color(0xffd9a8) },
+  splitAmt: { value: 0.22 },
+  uTime: { value: 0 },
+};
+const fsGeo = new THREE.BufferGeometry();
+fsGeo.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
+fsGeo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 2, 0, 0, 2], 2));
+const fsCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const fsScene = new THREE.Scene();
+const fsQuad = new THREE.Mesh(fsGeo, null);
+fsQuad.frustumCulled = false;
+fsScene.add(fsQuad);
+function blit(mat, target) {
+  fsQuad.material = mat;
+  renderer.setRenderTarget(target || null);
+  renderer.render(fsScene, fsCam);
+}
+const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }';
+const rtScene = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true });
+const rtA = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+const rtB = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+function sizePost() {
+  const dpr = Math.min(devicePixelRatio, 2);
+  const w = Math.max(1, Math.floor(innerWidth * dpr)), h = Math.max(1, Math.floor(innerHeight * dpr));
+  rtScene.setSize(w, h);
+  rtA.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
+  rtB.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
+  matBlurH.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
+  matBlurV.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
+  matComposite.uniforms.uRes.value.set(w, h);
+}
+const matBright = new THREE.ShaderMaterial({
+  uniforms: { tSrc: { value: rtScene.texture }, cut: POST.bloomCut },
+  vertexShader: VS,
+  fragmentShader: [
+    'varying vec2 vUv; uniform sampler2D tSrc; uniform float cut;',
+    'void main() {',
+    '  vec3 c = texture2D( tSrc, vUv ).rgb;',
+    '  float l = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );',
+    /* a soft knee, so the dawn sky does not step into bloom along a hard contour line */
+    '  gl_FragColor = vec4( c * smoothstep( cut, cut + 0.45, l ), 1.0 );',
+    '}',
+  ].join('\n'),
+});
+function blurMat(dx, dy) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      tSrc: { value: null },
+      uDir: { value: new THREE.Vector2(dx, dy) },
+      uTexel: { value: new THREE.Vector2() },
+    },
+    vertexShader: VS,
+    fragmentShader: [
+      'varying vec2 vUv; uniform sampler2D tSrc; uniform vec2 uDir; uniform vec2 uTexel;',
+      'void main() {',
+      '  vec2 o = uDir * uTexel;',
+      '  vec3 c = texture2D( tSrc, vUv ).rgb * 0.227;',
+      '  c += ( texture2D( tSrc, vUv + o * 1.385 ).rgb + texture2D( tSrc, vUv - o * 1.385 ).rgb ) * 0.316;',
+      '  c += ( texture2D( tSrc, vUv + o * 3.253 ).rgb + texture2D( tSrc, vUv - o * 3.253 ).rgb ) * 0.070;',
+      '  gl_FragColor = vec4( c, 1.0 );',
+      '}',
+    ].join('\n'),
+  });
+}
+const matBlurH = blurMat(1, 0), matBlurV = blurMat(0, 1);
+const matComposite = new THREE.ShaderMaterial({
+  uniforms: {
+    tSrc: { value: rtScene.texture }, tBloom: { value: rtB.texture },
+    exposure: POST.exposure, bloomAmt: POST.bloomAmt, grain: POST.grain,
+    vignette: POST.vignette, splitShadow: POST.splitShadow, splitHigh: POST.splitHigh,
+    splitAmt: POST.splitAmt, uTime: POST.uTime, uRes: { value: new THREE.Vector2(1, 1) },
+  },
+  vertexShader: VS,
+  fragmentShader: [
+    'varying vec2 vUv;',
+    'uniform sampler2D tSrc; uniform sampler2D tBloom;',
+    'uniform float exposure, bloomAmt, grain, vignette, splitAmt, uTime;',
+    'uniform vec3 splitShadow, splitHigh;',
+    'uniform vec2 uRes;',
+    /* Narkowicz ACES: one polynomial, close enough to the real curve at a fraction of the cost */
+    'vec3 aces( vec3 x ) {',
+    '  return clamp( ( x * ( 2.51 * x + 0.03 ) ) / ( x * ( 2.43 * x + 0.59 ) + 0.14 ), 0.0, 1.0 );',
+    '}',
+    'vec3 lin2srgb( vec3 c ) {',
+    '  c = max( c, vec3( 0.0 ) );',
+    '  return mix( 1.055 * pow( c, vec3( 1.0 / 2.4 ) ) - 0.055, c * 12.92, step( c, vec3( 0.0031308 ) ) );',
+    '}',
+    'float hash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }',
+    'void main() {',
+    '  vec3 c = texture2D( tSrc, vUv ).rgb;',
+    '  c += texture2D( tBloom, vUv ).rgb * bloomAmt;',
+    '  c *= exposure;',
+    '  c = aces( c );',
+    /* SPLIT TONE. Dawn is not one colour temperature: the sun is warm and everything it does not
+       reach is lit by the sky, which is blue. Pushing the two ends apart is most of what makes a
+       render read as a photograph of a time of day rather than as lit geometry. */
+    '  float l = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );',
+    '  c = mix( c, c * splitShadow * 2.6, splitAmt * ( 1.0 - smoothstep( 0.0, 0.55, l ) ) );',
+    '  c = mix( c, c * splitHigh, splitAmt * smoothstep( 0.45, 1.0, l ) );',
+    /* PAPER, NOT NOISE. Grain sampled square reads as video noise; stretched about 4:1 it reads
+       as fibre, which is the difference between a dirty render and ink on paper. Two octaves so
+       it does not tile visibly, and it is static — animated grain is film, not paper. */
+    '  vec2 gp = vUv * uRes;',
+    '  float fib = hash( floor( vec2( gp.x * 0.25, gp.y ) ) ) - 0.5;',
+    '  float fine = hash( floor( gp * 0.85 ) + 17.3 ) - 0.5;',
+    '  c += ( fib * 0.65 + fine * 0.35 ) * grain;',
+    /* vignette last, so it darkens the paper as well as the picture */
+    '  vec2 d = vUv - 0.5;',
+    '  c *= 1.0 - vignette * dot( d, d ) * 2.2;',
+    '  gl_FragColor = vec4( lin2srgb( c ), 1.0 );',
+    '}',
+  ].join('\n'),
+});
+sizePost();
+
+/* the whole chain, or the plain render if post is off */
+function renderFrame() {
+  if (!state.post) {
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.setRenderTarget(null);
+    renderer.render(scene, camera);
+    return;
+  }
+  /* linear into the buffer; the curve is applied in the composite */
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.setRenderTarget(rtScene);
+  renderer.render(scene, camera);
+  matBright.uniforms.tSrc.value = rtScene.texture;
+  blit(matBright, rtA);
+  matBlurH.uniforms.tSrc.value = rtA.texture;
+  blit(matBlurH, rtB);
+  matBlurV.uniforms.tSrc.value = rtB.texture;
+  blit(matBlurV, rtA);
+  matComposite.uniforms.tSrc.value = rtScene.texture;
+  matComposite.uniforms.tBloom.value = rtA.texture;
+  blit(matComposite, null);
+}
+
 /* ============================ TOGGLES ============================ */
 const hud = document.getElementById('hud');
 function apply() {
@@ -468,6 +761,8 @@ function apply() {
   outlines.forEach((o) => { o.visible = state.toon; });
   renderer.shadowMap.enabled = state.shadow;
   CLOUD.uCloudAmt.value = state.clouds ? 0.78 : 0;
+  HFOG.uHfAmt.value = state.hfog ? 0.85 : 0;
+  petalMeshes.forEach((m) => { m.visible = state.petals; });
   scene.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
   const row = (on, k, label) => `<div class="${on ? '' : 'off'}">[${k}] ${on ? '<b>on </b>' : 'off'} ${label}</div>`;
   hud.innerHTML = '<h1>SHADING LAB</h1>'
@@ -476,6 +771,9 @@ function apply() {
     + row(state.toon, 3, 'toon ramp + outline (objects only)')
     + row(state.shadow, 4, 'shadow map')
     + row(state.clouds, 5, 'drifting cloud shadows')
+    + row(state.hfog, 6, 'height fog (valley mist)')
+    + row(state.post, 7, 'post: grade + bloom + grain + vignette')
+    + row(state.petals, 8, 'falling petals')
     + '<div class="off" style="margin-top:8px">[0] all off &nbsp; [9] all on</div>';
 }
 addEventListener('keydown', (e) => {
@@ -484,6 +782,9 @@ addEventListener('keydown', (e) => {
   else if (e.key === '3') state.toon = !state.toon;
   else if (e.key === '4') state.shadow = !state.shadow;
   else if (e.key === '5') state.clouds = !state.clouds;
+  else if (e.key === '6') state.hfog = !state.hfog;
+  else if (e.key === '7') state.post = !state.post;
+  else if (e.key === '8') state.petals = !state.petals;
   else if (e.key === '0') Object.keys(state).forEach((k) => { state[k] = false; });
   else if (e.key === '9') Object.keys(state).forEach((k) => { state[k] = true; });
   else return;
@@ -495,6 +796,7 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  sizePost();
 });
 
 /* a lab you cannot take a controlled screenshot of is a worse lab: freeze pins the orbit
@@ -504,6 +806,7 @@ let t = 0, ct = 0;
    close enough to an object to judge an outline seam */
 window.LAB = {
   state, apply, CLOUD, cloud: CLOUD.uCloudMap.value.image,
+  HFOG, POST, PETALS, petalMeshes,
   scene, camera, renderer, key, ground,
   freeze: false, view: null, at: (v) => { t = v; },
 };
@@ -517,11 +820,13 @@ function tick() {
      being scrolled. Direction is deliberately not the light direction, so the shadow edges
      cross the terminator rather than sliding along it. */
   CLOUD.uCloudOff.value.set(ct * 0.22, ct * -0.08);
+  PETALS.uTime.value = ct * 60;
+  POST.uTime.value = ct;
   for (const m of CLOUD_MATS) m.needsUpdate = true;   /* see THE UNIFORM TRAP above */
   const v = window.LAB.view;
   if (v) { camera.position.set(v[0], v[1], v[2]); camera.lookAt(v[3], v[4], v[5]); }
   else { camera.position.set(Math.cos(t) * 2700, 1450, Math.sin(t) * 2700); camera.lookAt(0, 620, 0); }
-  renderer.render(scene, camera);
+  renderFrame();
   requestAnimationFrame(tick);
 }
 tick();
