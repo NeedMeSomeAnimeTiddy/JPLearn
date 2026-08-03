@@ -54,7 +54,8 @@ import * as THREE from './lib/three.module.min.js';
      E  aerial         fog that warms toward the sun, because haze looking into the
                        light is not the colour of haze looking away from it
      R  mist           visible banks lying in the low ground — height fog is atmosphere
-                       and has no shape; this is what gives the air strands
+                       and has no shape; this is what gives the air strands. The density is
+                       noise, not a plateau: a soft edge round a flat interior is a lozenge
      T  shafts         a radial blur of the bloom buffer toward the sun, so the scene
                        occludes its own light shafts for nothing
 
@@ -199,7 +200,7 @@ const FX = {
   uRimAmt: { value: 0.55 },
   uRimPow: { value: 2.6 },
   uRimCol: { value: new THREE.Color(0x9fc0e8) },
-  uSwayAmt: { value: 5.5 },
+  uSwayAmt: { value: 7.0 },
   uAerialAmt: { value: 0.85 },
   uAerialWarm: { value: new THREE.Color(0xf6c9a8) },
   uSunDir: { value: new THREE.Vector3(-1500, 1900, 900).normalize() },
@@ -344,9 +345,21 @@ const RIM_GLSL = `
 const SWAY_GLSL = `
   {
     vec3 swp = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
-    float sph = uTime * 0.85 + swp.x * 0.0042 + swp.z * 0.0036;
-    transformed.x += sin( sph ) * uSwayAmt;
-    transformed.z += cos( sph * 0.83 ) * uSwayAmt * 0.62;
+    /* uTime advances 5.76 per real second, so 0.85 was 4.9 rad/s: a
+       one-and-a-quarter-second swing — a shiver, not a breeze. Foliage wants three or four
+       seconds, which is 0.273. The complaint landed on the OUTLINE because a solid black shows
+       motion far more clearly than the green mass underneath it — but the outline was
+       innocent. It moved exactly as much as what it wraps, and what it wraps was shivering. */
+    float sph = uTime * 0.273 + swp.x * 0.0013 + swp.z * 0.0011;
+    /* ONE TREE IS ONE THING. The phase gradient was 0.0042 per unit — a full wave across a
+       500-unit crown, so its near and far sides travelled in opposite directions and the mass
+       went rubbery. A third of that: the crown moves together, with a lag across it. */
+    float gust = 0.4 + 0.6 * ( 0.5 + 0.5 * sin( uTime * 0.100 + swp.z * 0.00035 ) );
+    /* AND WIND IS NOT A METRONOME. At one fixed amplitude the eye finds the period inside two
+       seconds and the tree reads as a shader. The gust swells over about ten seconds. */
+    float amp = uSwayAmt * gust;
+    transformed.x += sin( sph ) * amp;
+    transformed.z += cos( sph * 0.83 ) * amp * 0.62;
   }`;
 function cloudy(mat) {
   mat.onBeforeCompile = (shader) => {
@@ -686,15 +699,22 @@ function petalField(count, colorA, colorB, box) {
       '  vUv = uv;',
       /* FALL IS A SAWTOOTH, NOT A SIMULATION. A petal that reappears at the top the instant it
          lands needs no state, never drifts out of its box, and cannot desynchronise. */
-      '  float fall = fract( aSeed.y + uTime * ( 0.028 + aSeed.z * 0.022 ) );',
+      /* THE BOX IS 620 UNITS, WHICH IS 25 METRES. The old rate crossed it in 3.5 to 6
+         seconds — five metres a second, which is a stone, not a petal. 14 to 22 seconds is
+         about 1.2 m/s, brisk for a real petal and slow enough to read as drifting. */
+      '  float fall = fract( aSeed.y + uTime * ( 0.0079 + aSeed.z * 0.0045 ) );',
       '  vec3 p = uOrigin;',
       '  p.x += ( aSeed.x - 0.5 ) * uBox.x;',
       '  p.z += ( aSeed.w - 0.5 ) * uBox.z;',
       '  p.y += ( 1.0 - fall ) * uBox.y;',
-      /* the slip: a petal does not drop, it slides sideways and turns over */
-      '  float ph = uTime * ( 0.7 + aSeed.z * 1.1 ) + aSeed.x * 30.0;',
-      '  p.x += sin( ph ) * 26.0;',
-      '  p.z += cos( ph * 0.77 ) * 22.0;',
+      /* THE SLIP AND THE TUMBLE ARE TWO DIFFERENT RATES, and running both off one phase was
+         the other half of the speed problem — the same number cannot be right for a turn and
+         for a drift. A petal turns over every two or three seconds and MEANDERS across seven
+         to twelve, so they get separate clocks. */
+      '  float tum = uTime * ( 0.273 + aSeed.z * 0.164 ) + aSeed.x * 30.0;',
+      '  float ph = uTime * ( 0.091 + aSeed.z * 0.065 ) + aSeed.x * 17.0;',
+      '  p.x += sin( ph ) * 30.0;',
+      '  p.z += cos( ph * 0.77 ) * 26.0;',
       /* SIZE AND SPREAD ARE THE WHOLE EFFECT. The first pass ran 1,600 petals at 5-10 units
          across a 1,700-unit box and it read as DUST - an even rash of specks over the whole
          frame including empty sky, which is what a particle system looks like when nobody
@@ -703,12 +723,12 @@ function petalField(count, colorA, colorB, box) {
       '  float sz = 13.0 + aSeed.w * 11.0;',
       '  vec3 right = vec3( modelViewMatrix[0][0], modelViewMatrix[1][0], modelViewMatrix[2][0] );',
       '  vec3 up    = vec3( modelViewMatrix[0][1], modelViewMatrix[1][1], modelViewMatrix[2][1] );',
-      '  float r = ph * 0.9;',
+      '  float r = tum;',
       '  vec2 q = vec2( position.x * cos( r ) - position.y * sin( r ),',
       '                 position.x * sin( r ) + position.y * cos( r ) );',
       /* squashed on one axis by the same phase, which is what reads as a petal turning over
          rather than as a disc spinning in its own plane */
-      '  q.x *= 0.35 + 0.65 * abs( sin( ph * 0.5 ) );',
+      '  q.x *= 0.35 + 0.65 * abs( sin( tum * 0.5 ) );',
       '  vec3 wp = p + ( right * q.x + up * q.y ) * sz;',
       '  vec4 mv = viewMatrix * vec4( wp, 1.0 );',
       '  vFog = -mv.z;',
@@ -728,9 +748,10 @@ function petalField(count, colorA, colorB, box) {
       '  if ( rr > 0.5 ) discard;',
       '  vec3 c = mix( vCol, vec3( 1.0 ), 0.25 * ( 1.0 - rr * 2.0 ) );',
       '  float f = smoothstep( fogNear, fogFar, vFog );',
-      /* fade in over the top tenth of the box: a petal at full opacity where the sawtooth
-         resets is a petal that pops into existence in mid-air */
-      '  float born = smoothstep( 1.0, 0.9, vFall );',
+      /* BOTH ENDS. fall = 0 is the TOP of the box, so the single smoothstep here only ever
+         faded petals out at the bottom and let them snap into existence at full opacity at the
+         top — invisible while they crossed the box three times a second, obvious now. */
+      '  float born = smoothstep( 0.0, 0.06, vFall ) * smoothstep( 1.0, 0.90, vFall );',
       '  gl_FragColor = vec4( mix( c, fogColor, f ), uAmt * born * ( 1.0 - f ) );',
       '}',
     ].join('\n'),
@@ -745,6 +766,51 @@ const petalMeshes = [
   petalField(240, 0xf0c8d4, 0xe093ad, [640, 620, 560, -140, 300, 150]),
   petalField(180, 0xd4703e, 0xa8402a, [560, 560, 520, 330, 250, -420]),
 ];
+
+/* A TILING VALUE-NOISE TEXTURE, built once. The mist needs several octaves sampled twice per
+   fragment across thirty large overlapping transparent cards; doing that with hash-and-sin in
+   the shader is ~40 transcendentals per pixel of heavy overdraw. A 256px texture is two fetches.
+   The lattice wraps, so the texture repeats without a seam. */
+function noiseTexture(size, octaves) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const layers = [];
+  let amp = 0;
+  for (let o = 0; o < octaves; o++) {
+    const n = 4 << o;
+    const g = new Float32Array(n * n);
+    for (let i = 0; i < n * n; i++) g[i] = Math.random();
+    layers.push({ n, g, a: 1 / (1 << o) });
+    amp += 1 / (1 << o);
+  }
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let v = 0;
+      for (const l of layers) {
+        const fx = x / size * l.n, fy = y / size * l.n;
+        const x0 = Math.floor(fx), y0 = Math.floor(fy);
+        const tx = fx - x0, ty = fy - y0;
+        const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+        const i0 = x0 % l.n, i1 = (i0 + 1) % l.n;
+        const j0 = y0 % l.n, j1 = (j0 + 1) % l.n;
+        const a0 = l.g[j0 * l.n + i0], b0 = l.g[j0 * l.n + i1];
+        const a1 = l.g[j1 * l.n + i0], b1 = l.g[j1 * l.n + i1];
+        const top = a0 + (b0 - a0) * sx, bot = a1 + (b1 - a1) * sx;
+        v += l.a * (top + (bot - top) * sy);
+      }
+      const q = (y * size + x) * 4;
+      img.data[q] = img.data[q + 1] = img.data[q + 2] = (v / amp) * 255;
+      img.data[q + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+const NOISE_TEX = noiseTexture(256, 5);
 
 /* ============================ MIST RIBBONS ============================
    Height fog is atmosphere — it has no shape. What a valley at dawn actually has is STRANDS: a
@@ -762,38 +828,51 @@ const MIST = { uTime: { value: 0 }, uAmt: { value: 0.5 } };
   const g = new THREE.PlaneGeometry(1, 1);
   const seed = new Float32Array(COUNT * 4);
   const off = new Float32Array(COUNT * 3);
-  /* MIST BELONGS TO LOW GROUND, AND IT HAS TO FLOAT. The first pass scattered it evenly and sat
-     it 24-114 above the terrain, so half of it lay ON the hillside like a pale stain and the
-     rest crowned the ridge, where mist never is. Clearance is 110-380 now, so a bank reads as
-     something hanging in front of the slope rather than painted onto it, and the opacity falls
-     off with height so the ridge keeps clear. */
+  /* MIST BELONGS TO LOW GROUND, AND YOU FIND LOW GROUND BY LOOKING FOR IT. Scattering
+     uniformly and then dimming whatever landed high wastes most of the budget on cards that
+     are nearly invisible; six candidate points, keep the lowest, spends all thirty where mist
+     would actually collect. */
   for (let i = 0; i < COUNT; i++) {
-    const x = (Math.random() - 0.5) * 3100, z = (Math.random() - 0.5) * 3100;
-    const gy = heightAt(x, z);
+    let x = 0, z = 0, gy = 1e9;
+    for (let t = 0; t < 6; t++) {
+      const cx = (Math.random() - 0.5) * 3400, cz = (Math.random() - 0.5) * 3400;
+      const cy = heightAt(cx, cz);
+      if (cy < gy) { gy = cy; x = cx; z = cz; }
+    }
+    /* THE OFFSET IS THE CENTRE, NOT THE FOOT — which is how a bank with a 240-unit height
+       and a 15-unit clearance ended up with half its body underground, showing only its top
+       half as a stain lying on the slope. Place the foot, then add half the height. */
+    const h = 90 + Math.random() * 150;           /* wide and thin, not square */
     off[i * 3] = x;
-    off[i * 3 + 1] = gy + 110 + Math.random() * 270;
+    off[i * 3 + 1] = gy + 40 + Math.random() * 90 + h * 0.5;
     off[i * 3 + 2] = z;
-    seed[i * 4] = 520 + Math.random() * 760;      /* width  */
-    seed[i * 4 + 1] = 55 + Math.random() * 95;    /* height: wide and thin, not square */
-    seed[i * 4 + 2] = Math.random();              /* drift phase */
-    /* low ground takes it, the ridge does not */
-    seed[i * 4 + 3] = (0.45 + Math.random() * 0.55) * THREE.MathUtils.clamp(1.0 - gy / 520, 0.05, 1.0);
+    seed[i * 4] = 620 + Math.random() * 900;      /* width  */
+    seed[i * 4 + 1] = h;
+    seed[i * 4 + 2] = Math.random();              /* drift phase + noise offset */
+    seed[i * 4 + 3] = (0.5 + Math.random() * 0.5) * THREE.MathUtils.clamp(1.0 - gy / 420, 0.06, 1.0);
   }
   g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 4));
   g.setAttribute('aOff', new THREE.InstancedBufferAttribute(off, 3));
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
     uniforms: {
-      uTime: MIST.uTime, uAmt: MIST.uAmt,
+      uTime: MIST.uTime, uAmt: MIST.uAmt, tNoise: { value: NOISE_TEX },
       uCol: { value: new THREE.Color(0xdccfbd) },
       fogNear: { value: scene.fog.near }, fogFar: { value: scene.fog.far },
     },
     vertexShader: [
       'attribute vec4 aSeed; attribute vec3 aOff;',
       'uniform float uTime;',
-      'varying vec2 vUv; varying float vFog; varying float vOp;',
+      'varying vec2 vUv; varying float vFog; varying float vOp; varying vec2 vNz;',
       'void main() {',
       '  vUv = uv; vOp = aSeed.w;',
+      /* NOISE IS MEASURED IN METRES, NOT IN UV. Scaling by the card's aspect ratio — a
+         unitless number — gave a 1500-unit bank and a 600-unit bank the same amount of
+         structure across them, which at these sizes worked out to about one blurry repeat
+         per card: a soft-edged lozenge, which is what the noise exists to prevent. Dividing
+         by a fixed 300 units makes a detail the same real size on every card. */
+      '  vNz = vec2( uv.x * aSeed.x, uv.y * aSeed.y ) / 300.0',
+      '        + vec2( aSeed.z * 53.0, aSeed.z * 91.0 );',
       '  vec3 c = aOff;',
       /* the drift is slow and wraps over a long period, so nothing is seen to reset */
       '  c.x += sin( uTime * 0.06 + aSeed.z * 6.28 ) * 190.0;',
@@ -810,15 +889,32 @@ const MIST = { uTime: { value: 0 }, uAmt: { value: 0.5 } };
       '}',
     ].join('\n'),
     fragmentShader: [
-      'varying vec2 vUv; varying float vFog; varying float vOp;',
-      'uniform vec3 uCol; uniform float uAmt; uniform float fogNear; uniform float fogFar;',
+      'varying vec2 vUv; varying float vFog; varying float vOp; varying vec2 vNz;',
+      'uniform vec3 uCol; uniform float uAmt; uniform float uTime;',
+      'uniform sampler2D tNoise; uniform float fogNear; uniform float fogFar;',
       'void main() {',
-      /* soft on every edge, and softest at the top: mist has a floor and no ceiling */
-      '  float ex = smoothstep( 0.0, 0.34, vUv.x ) * smoothstep( 1.0, 0.66, vUv.x );',
-      '  float ey = smoothstep( 0.0, 0.30, vUv.y ) * smoothstep( 1.0, 0.42, vUv.y );',
-      '  float a = ex * ey * vOp * uAmt;',
-      /* and it fades out CLOSE as well as far, so the camera never flies through a wall of it */
-      '  a *= smoothstep( 260.0, 900.0, vFog ) * ( 1.0 - smoothstep( fogNear, fogFar, vFog ) );',
+      /* AN ELLIPSE, NOT A RECTANGLE. Two soft-edged rectangles overlapping still show you two
+         rectangles — the corners survive any amount of feathering, and thirty of them all
+         turned to face the camera is thirty visible cards. */
+      '  vec2 d = vUv - vec2( 0.5 );',
+      '  float env = 1.0 - smoothstep( 0.16, 0.5, length( vec2( d.x, d.y * 1.15 ) ) );',
+      /* denser at the bottom, because mist settles rather than hanging evenly */
+      '  env *= mix( 1.0, 0.30, smoothstep( 0.2, 1.0, vUv.y ) );',
+      /* THE INTERIOR IS THE TELL, NOT THE EDGE. A flat plateau of alpha inside a soft border is
+         a lozenge however soft the border is; what stops a billboard reading as a billboard is
+         that its density varies INSIDE, so two overlapping cards never agree on where anything
+         ends. Two octaves scrolling at different rates and directions. */
+      /* three octaves, each sliding at its own rate and direction, so the pattern never
+         repeats visibly and the bank appears to churn rather than to translate */
+      '  float n = texture2D( tNoise, vNz * 0.80 + vec2( uTime * 0.0026, 0.0 ) ).r * 0.50',
+      '          + texture2D( tNoise, vNz * 1.90 - vec2( uTime * 0.0042, uTime * 0.0011 ) ).r * 0.32',
+      '          + texture2D( tNoise, vNz * 4.60 + vec2( uTime * 0.0016, uTime * -0.0022 ) ).r * 0.18;',
+      /* and a hard-ish threshold, so it forms tendrils with holes in rather than a grey veil */
+      '  float a = env * smoothstep( 0.34, 0.74, n + env * 0.20 ) * vOp * uAmt;',
+      /* IT FADES OUT CLOSE AS WELL AS FAR. 120 units was far too near: a 1,500-unit bank seen
+         from 400 away is the entire frame, a flat pale wash with its detail stretched past the
+         point of being detail. Nothing shows until 300 and it is not full until 1,500. */
+      '  a *= smoothstep( 300.0, 1500.0, vFog ) * ( 1.0 - smoothstep( fogNear, fogFar, vFog ) );',
       '  if ( a < 0.004 ) discard;',
       '  gl_FragColor = vec4( uCol, a );',
       '}',
@@ -1034,9 +1130,9 @@ function apply() {
   CLOUD.uCloudAmt.value = state.clouds ? 0.78 : 0;
   HFOG.uHfAmt.value = state.hfog ? 0.85 : 0;
   FX.uRimAmt.value = state.rim ? 0.55 : 0;
-  FX.uSwayAmt.value = state.sway ? 5.5 : 0;
+  FX.uSwayAmt.value = state.sway ? 7.0 : 0;
   FX.uAerialAmt.value = state.aerial ? 0.85 : 0;
-  MIST.uAmt.value = state.mist ? 0.5 : 0;
+  MIST.uAmt.value = state.mist ? 0.72 : 0;
   MIST.mesh.visible = state.mist;
   POST.shaftAmt.value = state.shafts ? 0.9 : 0;
   petalMeshes.forEach((m) => { m.visible = state.petals; });
@@ -1086,6 +1182,40 @@ addEventListener('resize', () => {
   sizePost();
 });
 
+/* MOTION IS INVISIBLE IN A SCREENSHOT. "Too fast" and "too dynamic" are claims about change
+   over time, and no number of stills can settle one — which is how an eight-hertz sway survived
+   a whole round of review. Hold the camera, read the exact pixels twice a known interval apart,
+   report how far they moved.
+
+   Through a RENDER TARGET, not the canvas: the canvas has no preserveDrawingBuffer, and a
+   target also bypasses the post chain, whose bloom smears local motion across the whole frame
+   and would make a calm tree score like a busy one. */
+const MOTION_W = 480, MOTION_H = 320;
+const MOTION_RT = new THREE.WebGLRenderTarget(MOTION_W, MOTION_H);
+const MOTION_BUF = [new Uint8Array(MOTION_W * MOTION_H * 4), new Uint8Array(MOTION_W * MOTION_H * 4)];
+function motionRead(i) {
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(MOTION_RT);
+  renderer.render(scene, camera);
+  renderer.readRenderTargetPixels(MOTION_RT, 0, 0, MOTION_W, MOTION_H, MOTION_BUF[i]);
+  renderer.setRenderTarget(prev);
+}
+function motion(ms) {
+  motionRead(0);
+  return new Promise((res) => setTimeout(() => {
+    motionRead(1);
+    const a = MOTION_BUF[0], b = MOTION_BUF[1];
+    let moved = 0, sum = 0;
+    for (let q = 0; q < a.length; q += 4) {
+      const d = Math.abs(a[q] - b[q]) + Math.abs(a[q + 1] - b[q + 1]) + Math.abs(a[q + 2] - b[q + 2]);
+      if (d > 8) moved++;
+      sum += d / 3;
+    }
+    const n = a.length / 4;
+    res({ ms, pct: +(100 * moved / n).toFixed(2), mean: +(sum / n).toFixed(2) });
+  }, ms));
+}
+
 /* a lab you cannot take a controlled screenshot of is a worse lab: freeze pins the orbit
    so two toggle states can be compared from the identical camera */
 let t = 0, ct = 0;
@@ -1094,15 +1224,31 @@ let t = 0, ct = 0;
 window.LAB = {
   state, apply, CLOUD, cloud: CLOUD.uCloudMap.value.image,
   HFOG, POST, PETALS, FX, MIST, petalMeshes, sunAt, SUN_SPRITES,
-  scene, camera, renderer, key, ground,
+  scene, camera, renderer, key, ground, motion, THREE,
   freeze: false, view: null, at: (v) => { t = v; },
 };
 
+/* CT ADVANCES PER SECOND, NOT PER FRAME. It used to be `ct += 0.0016` once a tick, which
+   makes every animation in the lab a function of frame rate: the same sway is 4.9 rad/s at
+   60 fps, 11.8 at 144, and 1.1 in the headless browser where all the measuring happens. That
+   is why the rates here were tuned blind for as long as they were — nobody was ever looking
+   at the speed anyone else was seeing. 0.096/s is exactly the old per-frame rate at 60 fps,
+   so the look is unchanged on a 60 Hz machine and merely correct everywhere else.
+   The clamp is for a backgrounded tab, which otherwise resumes with a several-second jump —
+   and it is 0.25, not 0.1, because the headless browser this gets measured in runs at 7 fps
+   on a software rasteriser. A 0.1 clamp there silently ran the clock at 69% of real time,
+   which is the frame-rate dependence this whole change exists to remove, reintroduced by the
+   guard against it. */
+const CT_RATE = 0.096;
+let ctLast = performance.now();
 function tick() {
+  const now = performance.now();
+  const dt = Math.min((now - ctLast) / 1000, 0.25);
+  ctLast = now;
   /* the weather clock keeps running while the camera is pinned, so drift can be checked
      on its own instead of being confounded with the orbit */
-  ct += 0.0016;
-  if (!window.LAB.freeze) t += 0.0016;
+  ct += dt * CT_RATE;
+  if (!window.LAB.freeze) t += dt * CT_RATE;
   /* the cover drifts across the valley — slow enough to read as weather, not as a texture
      being scrolled. Direction is deliberately not the light direction, so the shadow edges
      cross the terminator rather than sliding along it. */

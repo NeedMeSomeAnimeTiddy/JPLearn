@@ -2142,6 +2142,44 @@ rim, sway, mist. Shafts: hold.
 - **When a horizontal surface won't read, raise the camera.** Ground depth on screen is governed by
   eye height far more than by how much ground there is.
 - **Two identical rows in a sweep mean a parameter has stopped being one.** Something clamped.
+- **A frame-counted clock is not a clock.** `ct += 0.0016` once a tick makes every animation a
+  function of frame rate: the same sway ran at 4.9 rad/s on the user's 60 Hz machine, 11.8 at
+  144, and 1.1 in the headless browser where all the measuring happens. Nothing in this lab had
+  ever been tuned against the speed anyone else was seeing. Drive the clock from
+  `performance.now()` before tuning anything that moves.
+- **And then measure the clock before trusting a rate derived from it.** `uTime = ct * 60` reads
+  as sixty per second and is 5.76; the first correction pass, computed from the misreading, was
+  out by a factor of ten in the opposite direction and left the tree frozen.
+- **The tab-backgrounding clamp is part of the clock.** A 0.1 s clamp silently ran the clock at
+  69% of real time in a 7 fps software rasteriser — the frame-rate dependence the real-time clock
+  exists to remove, reintroduced by the guard against it.
+- **"Too fast" and "too dynamic" cannot be reviewed from stills**, which is how an animation
+  four times too quick survived a round of review. Build the instrument: hold the camera, read
+  the exact pixels twice a known interval apart, report what moved. Through a render target —
+  the canvas has no `preserveDrawingBuffer`, and a target also skips the post chain, whose bloom
+  smears local motion across the whole frame.
+- **Measure an effect at the magnification you judge it at.** A 20 cm sway 2,700 units away is a
+  fraction of a pixel; reading 0% there is a fact about the distance, not about the effect.
+- **A complaint about the outline was a complaint about the crown.** The hull was moving exactly
+  as much as what it wraps — but a solid black silhouette shows motion an order of magnitude more
+  clearly than the shaded mass underneath, so it is where any error in a displacement surfaces.
+- **The interior is what gives a billboard away, not the edge.** A flat plateau of alpha inside a
+  soft border is a lozenge however soft the border is; two overlapping cards have to disagree
+  about where anything ends. Torn alpha also removes the reason to float mist above the terrain,
+  because there is no longer a straight line for the intersection to show.
+- **Noise scaled in UV is not scaled at all.** Dividing by the card's aspect ratio — a unitless
+  number — gave a 1,500-unit bank and a 600-unit bank the same structure across them, about one
+  blurry repeat each. Scale by world size so a detail is a fixed number of metres.
+- **A placement offset is a centre unless you make it a foot.** A 240-tall bank at a 15-unit
+  clearance is half underground, and shows as a stain lying on the slope.
+- **One rate cannot be right for a turn and for a drift.** Petals tumble every 2-3 s and meander
+  over 7-12; running both off one phase made them shiver.
+- **Separate an effect from whatever else is pale and low and switched on.** Height fog was doing
+  most of the work being credited to the mist ribbons, so "the mist looks bad" and "the fog looks
+  bad" were the same picture until they were shot apart.
+- **Scatter and appearance are two different questions.** A bank that is beautiful and behind the
+  hill scores the same as one that is in frame and ugly; re-lay the instances into a rank in
+  front of the camera to judge the second.
 
 ## Sources
 
