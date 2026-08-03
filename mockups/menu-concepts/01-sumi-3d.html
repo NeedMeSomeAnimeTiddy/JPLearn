@@ -4299,6 +4299,11 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
          has to be set above the HIGHEST point it covers, and a site that turns out to be under
          the waterline is a different building */
       wy: Math.round(v.y - lift), wet: v.y - lift < LAKE_Y ? 1 : 0,
+      /* and the point in world space, so a harness can PUT THE CAMERA THERE. A place with an
+         interior cannot be checked from its arrival shot — four gardens round a hall means three
+         of them are behind it — and standing in one meant hand-converting approach coordinates
+         to world every time. */
+      w: [v.x, v.y, v.z],
     };
   },
   /* WHERE A PLACE COULD GO AT ALL. A destination's bearing and distance settle three things at

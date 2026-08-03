@@ -55,7 +55,11 @@ export function buildStudy(ctx) {
      inside the compound at all. */
   const COURT = 1400;                 /* the entrance court, > stand so the camera lands within it */
   const F_NEAR = PICK_F - COURT;      /* -2,720 to the near wall */
-  const WALL_H = 100, WALL_T = 54, COPE = 28;
+  /* THE WALL WAS TOO TALL FOR THE EYE THAT HAS TO FLY IN OVER IT. At 128 to the coping it stood
+     only 34 below the arrival eye, so the camera skimmed its top on the way in and then stood
+     peering over it. A 築地塀 is a garden wall, not a rampart — it marks the enclosure and is
+     meant to be seen over from inside. At 92 the eye clears it properly and can come down. */
+  const WALL_H = 70, WALL_T = 54, COPE = 22;
   const GATE_W = 320, GATE_H = 230, GATE_X = -HALF_S + 620;      /* off the axis, deliberately */
 
   /* THE COMPOUND MAKES ITS OWN GROUND. Same rule the shrine's court had to learn: a platform set
@@ -167,20 +171,218 @@ export function buildStudy(ctx) {
     MARKS['study-hall-roof'] = m;
   }
 
-  /* ---- the four gardens, as bare ground ----
-     Step three plants them. What they have to prove now is that each face has room for a garden
-     and that the four are separable from the entrance, so each is one coloured slab of its own
-     character: gravel south, moss east, water north, maple leaf west. The pond and its bridge are
-     stood in because the bridge is the one element with a fixed place in the brief. */
+  /* ================= STEP THREE: the four gardens =================
+     Each face of the hall gets a garden in its own style, after 東福寺方丈 — the whole reason for
+     this form. They share nothing but their wall, which is what makes level two four different
+     OBJECTS rather than four labels.
+
+     THE CHARACTER HAS TO BE IN THE GROUND, NOT IN THE PLANTING. A maple garden and a moss garden
+     with the same floor under them read as the same garden with different trees in it, and from
+     the entrance you mostly see FLOOR — the arrival looks down into the court. So each garden's
+     surface is its own colour and its own texture, and the planting is what confirms it. */
   const GY = 8;                       /* the gardens sit a little below the hall's plinth */
   const innerS = HALL.w / 2 + HALL.veranda, innerF = HALL.d / 2 + HALL.veranda;
-  block('garden-south', HALF_S * 2 - WALL_T * 2, GY, GARDEN, 0, 0, zOf(-innerF - GARDEN / 2), SAND, 2.4);
-  block('garden-north', HALF_S * 2 - WALL_T * 2, GY, GARDEN, 0, 0, zOf(innerF + GARDEN / 2), MOSS, 2.4);
-  block('garden-east', GARDEN, GY, innerF * 2, innerS + GARDEN / 2, 0, 0, MOSS, 2.4);
-  block('garden-west', GARDEN, GY, innerF * 2, -(innerS + GARDEN / 2), 0, 0, MAPLE, 2.4);
-  /* 池 and 反橋 — the pond on the north face and the arched bridge over it */
-  block('pond', 1180, 40, 520, 0, -40, zOf(innerF + GARDEN / 2), WATER, 2.4);
-  block('bridge', 150, 40, 620, -180, 40, zOf(innerF + GARDEN / 2), TIMBER, 2.9);
+  const IN_W = HALF_S * 2 - WALL_T * 2;
+  const gardens = {
+    south: { w: IN_W, d: GARDEN, x: 0, z: zOf(-innerF - GARDEN / 2), col: SAND },
+    north: { w: IN_W, d: GARDEN, x: 0, z: zOf(innerF + GARDEN / 2), col: MOSS },
+    east: { w: GARDEN, d: innerF * 2, x: innerS + GARDEN / 2, z: 0, col: MOSS },
+    west: { w: GARDEN, d: innerF * 2, x: -(innerS + GARDEN / 2), z: 0, col: MAPLE },
+  };
+  /* the pond's footprint, cut out of the north garden's floor rather than laid on top of it. A
+     slab spanning the whole face runs UNDER the water and over it at the same time: the first
+     pass drew the pond at y -46 and the garden at 0..8, so the water was buried and the arched
+     bridge crossed dry grass. A pond is a hole in the ground, so the ground has to have a hole. */
+  const POND = { hw: 780, hd: 310 };
+  Object.entries(gardens).forEach(([k, g]) => {
+    if (k !== 'north') { block('garden-' + k, g.w, GY, g.d, g.x, 0, g.z, g.col, 2.4); return; }
+    const nearD = g.d / 2 - POND.hd;
+    block('garden-north-near', g.w, GY, nearD, g.x, 0, g.z + POND.hd + nearD / 2, g.col, 2.4);
+    block('garden-north-far', g.w, GY, nearD, g.x, 0, g.z - POND.hd - nearD / 2, g.col, 2.4);
+    [-1, 1].forEach((s) => {
+      const sw = g.w / 2 - POND.hw;
+      block('garden-north-' + (s < 0 ? 'W' : 'E'), sw, GY, POND.hd * 2,
+        g.x + s * (POND.hw + sw / 2), 0, g.z, g.col, 2.4);
+    });
+  });
+
+  /* a stand and a rock, the two things every one of these gardens needs, so the four builders
+     below stay about what makes each of them different */
+  const plant = (name, x, z, r, h, color, px = 2.7) => {
+    const g = new THREE.CylinderGeometry(r * 0.86, r, h, 7);
+    const c = new THREE.Color(color);
+    const col = [];
+    for (let i = 0; i < g.attributes.position.count; i++) col.push(c.r, c.g, c.b);
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.translate(x, GY + h / 2, z);
+    const m = new THREE.Mesh(g, mat);
+    m.name = name;
+    grp.add(m);
+    addOutline(m, px);
+    return m;
+  };
+  const rock = (name, x, z, r, h, lean = 0) => {
+    const g = new THREE.DodecahedronGeometry(r, 0);
+    g.scale(1, h / r, 0.88);
+    g.rotateY(x * 0.013);
+    g.rotateZ(lean);
+    const c = new THREE.Color(0x6d6a63);
+    const col = [];
+    for (let i = 0; i < g.attributes.position.count; i++) col.push(c.r, c.g, c.b);
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.translate(x, GY + h * 0.42, z);
+    const m = new THREE.Mesh(g, mat);
+    m.name = name;
+    grp.add(m);
+    addOutline(m, 2.9);
+    return m;
+  };
+
+  /* ---- 南庭 · 枯山水 → 文法 ----
+     Raked gravel and rock groupings, and NOTHING GROWING. Grammar is structure with nothing on it,
+     and a dry garden is the one form in the set that says so. The rakes are shallow ridges rather
+     than a texture, because at this distance a texture is a flat colour and a ridge is a line.
+     Rock groupings are odd-numbered — three, five, seven — which is the rule the form actually
+     uses, and the reason a dry garden never reads as decoration. */
+  {
+    const g = gardens.south;
+    /* the rakes: SHALLOW AND CLOSE. The first pass used 13 ridges 22 deep and 9 tall, which from
+       inside the garden read as a striped floor rather than as combed gravel — at this scale a
+       ridge has to be a line, not a band. 21 of them, half the height. */
+    for (let i = 0; i < 21; i++) {
+      const z = g.z - g.d / 2 + 50 + i * ((g.d - 100) / 20);
+      block('rake-' + i, g.w - 120, 5, 14, 0, GY, z, 0xc4bcaa, 1.6);
+    }
+    /* rock groupings in odd numbers — three, two, three — which is the rule the form actually
+       uses and the reason a dry garden never reads as decoration.
+       SIZED AGAINST A PERSON, NOT AGAINST THE COURT. The first pass stood them 150 tall, which is
+       five and a half metres at this world's scale: standing stones, not garden rocks. */
+    [[-820, 78, 3], [-700, 52, 2.2], [-930, 40, 1.9],
+      [180, 68, 2.6], [320, 46, 2.0],
+      [900, 60, 2.4], [1010, 38, 1.8], [790, 31, 1.6]].forEach(([x, h, r], i) => {
+      rock('rock-s' + i, x, g.z + (i % 3 - 1) * 150, h / r, h, (i % 2 ? 0.1 : -0.08));
+    });
+  }
+
+  /* ---- 東庭 · 苔庭 → かな ----
+     Moss and cherry: the softest of the four, and the only one whose ground is a single unbroken
+     surface. Mounds rather than beds — moss follows the shape under it, so the character is in the
+     ground swelling, not in anything planted on it. */
+  {
+    const g = gardens.east;
+    [[-140, -520, 190, 44], [90, -170, 240, 58], [-60, 260, 200, 48], [120, 620, 165, 38]]
+      .forEach(([dx, dz, r, h], i) => {
+        const mg = new THREE.SphereGeometry(r, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+        mg.scale(1, h / r, 1.1);
+        const c = new THREE.Color(0x6c8046);
+        const col = [];
+        for (let j = 0; j < mg.attributes.position.count; j++) col.push(c.r, c.g, c.b);
+        mg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+        mg.translate(g.x + dx, GY, g.z + dz);
+        const m = new THREE.Mesh(mg, mat);
+        m.name = 'moss' + i;
+        grp.add(m);
+        addOutline(m, 2.4);
+      });
+    [[-180, -420], [140, 120], [-120, 560]].forEach(([dx, dz], i) => {
+      plant('cherry-trunk' + i, g.x + dx, g.z + dz, 26, 210, 0x4a3a2f, 2.7);
+      block('cherry-crown' + i, 330, 150, 300, g.x + dx, GY + 190, g.z + dz, 0xd9a8b4, 2.9);
+    });
+    /* 飛石 — stepping stones, which is how a moss garden is crossed without treading on it */
+    for (let i = 0; i < 9; i++) {
+      block('step-e' + i, 78, 14, 62, g.x - 250 + (i % 2) * 46, GY, g.z - 600 + i * 150, 0x7d7a72, 1.8);
+    }
+  }
+
+  /* ---- 西庭 · 紅葉 → 語彙 ----
+     The maple grove: accumulation. It is the busiest of the four by design — a vocabulary is a
+     heap of things and this is the garden that looks like one — and the only one whose ground is
+     covered by what fell on it rather than by what was laid. */
+  {
+    const g = gardens.west;
+    [[-120, -560], [110, -230], [-150, 90], [130, 400], [-90, 690]].forEach(([dx, dz], i) => {
+      plant('maple-trunk' + i, g.x + dx, g.z + dz, 22, 180, 0x53413a, 2.7);
+      block('maple-crown' + i, 340, 170, 320, g.x + dx, GY + 160, g.z + dz, i % 2 ? 0x9c4a2f : 0xb35a34, 2.9);
+    });
+    /* leaf litter: patches of fallen colour, which is what makes a maple garden autumn rather
+       than a garden with red trees in it */
+    for (let i = 0; i < 7; i++) {
+      block('litter' + i, 250 + (i % 3) * 90, 6, 210, g.x + ((i * 197) % 500 - 250), GY,
+        g.z - 700 + i * 230, i % 2 ? 0xa8603c : 0x8f4b31, 1.6);
+    }
+  }
+
+  /* ---- 北庭 · 池庭 → 漢字 ----
+     The pond and the 反橋 over it. THE BRIDGE IS THE ONE FIXED ELEMENT IN THE BRIEF, so it is
+     built as an arch rather than a plank: five segments on a shallow parabola, the same trick the
+     torii's kasagi uses, because a swept surface costs far more and at this size the facets read
+     as the traditional stepped boards. It crosses to the island, so it is a thing you use on the
+     way round rather than a thing you look at. */
+  {
+    const g = gardens.north;
+    /* the water fills the hole and its surface sits a little below the surrounding ground, which
+       is the whole reason a pond reads as a pond and not as a blue floor */
+    block('pond', POND.hw * 2, 54, POND.hd * 2, 0, -54, g.z, WATER, 2.4);
+    block('island', 300, 74, 240, -430, -54, g.z + 90, 0x5f7346, 2.7);
+    {
+      /* the arch: segments along y = rise * (1 - t²), t from -1 to 1 across the span */
+      const SPAN = g.d - 260, RISE = 96, N = 5, HALF_B = 84;
+      for (let i = 0; i < N; i++) {
+        const t0 = -1 + (i / N) * 2, t1 = -1 + ((i + 1) / N) * 2;
+        const z0 = t0 * SPAN / 2, y0 = (1 - t0 * t0) * RISE;
+        const z1 = t1 * SPAN / 2, y1 = (1 - t1 * t1) * RISE;
+        const len = Math.hypot(z1 - z0, y1 - y0) * 1.1;
+        const bg = new THREE.BoxGeometry(HALF_B * 2, 22, len);
+        bg.rotateX(-Math.atan2(y1 - y0, z1 - z0));
+        bg.translate(220, GY + (y0 + y1) / 2, g.z + (z0 + z1) / 2);
+        const c = new THREE.Color(0x8a5a3c);
+        const col = [];
+        for (let j = 0; j < bg.attributes.position.count; j++) col.push(c.r, c.g, c.b);
+        bg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+        const m = new THREE.Mesh(bg, mat);
+        m.name = 'bridge' + i;
+        grp.add(m);
+        addOutline(m, 2.9);
+        if (i === Math.floor(N / 2)) MARKS['study-bridge'] = m;
+      }
+      /* the rail posts, which is what stops an arch reading as a ramp. BOTH SIDES: the first pass
+         put them on one edge only and the bridge read as a ramp with a fence beside it. */
+      for (let i = 0; i <= 6; i++) {
+        const t = -1 + (i / 6) * 2;
+        const y = GY + (1 - t * t) * RISE + 22;
+        [-1, 1].forEach((s) => {
+          block('rail' + (s < 0 ? 'W' : 'E') + i, 16, 78, 16, 220 + s * (HALF_B - 12), y,
+            g.z + t * SPAN / 2, 0x8a5a3c, 2.0);
+        });
+      }
+      /* and the handrail they carry, without which seven posts are seven posts */
+      [-1, 1].forEach((s) => {
+        for (let i = 0; i < 6; i++) {
+          const t0 = -1 + (i / 6) * 2, t1 = -1 + ((i + 1) / 6) * 2;
+          const y0 = (1 - t0 * t0) * RISE, y1 = (1 - t1 * t1) * RISE;
+          const z0 = t0 * SPAN / 2, z1 = t1 * SPAN / 2;
+          const rg = new THREE.BoxGeometry(14, 14, Math.hypot(z1 - z0, y1 - y0) * 1.06);
+          rg.rotateX(-Math.atan2(y1 - y0, z1 - z0));
+          rg.translate(220 + s * (HALF_B - 12), GY + (y0 + y1) / 2 + 92, g.z + (z0 + z1) / 2);
+          const c = new THREE.Color(0x8a5a3c);
+          const col = [];
+          for (let j = 0; j < rg.attributes.position.count; j++) col.push(c.r, c.g, c.b);
+          rg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+          const m = new THREE.Mesh(rg, mat);
+          m.name = 'handrail';
+          grp.add(m);
+          addOutline(m, 2.0);
+        }
+      });
+    }
+    /* 菖蒲 — irises at the water's edge, and a 雪見灯籠 on the island */
+    for (let i = 0; i < 10; i++) {
+      block('iris' + i, 90, 62, 70, -760 + i * 150, GY - 20, g.z - g.d / 2 + 150, 0x4d6a7a, 1.8);
+    }
+    plant('toro-post', -430, g.z + 90, 30, 96, 0x807b71, 2.4);
+    block('toro-light', 130, 70, 130, -430, GY + 96, g.z + 90, 0x8d887d, 2.7);
+    block('toro-cap', 168, 32, 168, -430, GY + 166, g.z + 90, 0x7a756c, 2.7);
+  }
 
   /* ---- level two: the four path-heads ----
      A rank across the entrance court, each the mouth of the way round to its garden. The picks are
@@ -217,12 +419,30 @@ export function buildStudy(ctx) {
     treeClaim(p.x, p.z, 260 + 900 * ((f - CLEAR_F0) / (F_FAR - CLEAR_F0)));
   }
 
-  /* ---- where the camera looks ----
+  /* ---- where the camera stands, and what it looks at ----
      At the rank of path-heads, which is what level two is — so `stand` measures the distance that
-     decides whether four picks are separable, the number the shot actually turns on. */
+     decides whether four picks are separable, the number the shot actually turns on.
+
+     AND `eyeLift` IS COMPUTED, NOT CHOSEN, BECAUSE IT DOES NOT MEAN WHAT IT SAYS HERE. `standOff`
+     sets the eye to `surfaceAt(camera) + eyeLift`, and `surfaceAt` reads the natural terrain — it
+     knows nothing about the platform this compound is built on. The camera lands inside the walls,
+     where the floor is the platform and the terrain is 350 units below it, so an eyeLift of 460
+     put the eye only 162 above the court and 34 above the wall's coping: standing in a walled
+     garden and peering over the top of it. Everything below 300 put the eye INSIDE the platform
+     block, which is why the picks read 0/4 there.
+     So the height is stated against the floor you are actually standing on and the lift is
+     back-solved from the ground under the standing point. `EYE_H` is the real number. */
+  const EYE_H = 135;                  /* how far the eye rides above the court's own floor */
   const focus = at3(PICK_F, 0);
   focus.y = TOP + 130;
   DEST_SPECS[0].focus = focus;
+  {
+    /* the standing point, derived the same way `standOff` derives it */
+    const v = focus.clone().sub(HOME_EYE).setY(0);
+    const len = v.length();
+    const e = v.multiplyScalar(Math.max(len - SPEC.stand, 400) / len).add(HOME_EYE);
+    SPEC.eyeLift = (TOP + EYE_H) - Math.max(groundAt(e.x, e.z), LAKE_Y);
+  }
 
   ctx.STUDY_MASS = {
     bearing: SPEC.bearing, dist: SPEC.dist, stand: SPEC.stand, flight: SPEC.dist - SPEC.stand,

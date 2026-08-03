@@ -339,3 +339,65 @@ errors.
   a fixed place in the brief, never appear in the arrival shot. Worth deciding whether that matters.
 - **The four gardens are bare coloured slabs.** Step 3.
 - **The legacy CSS3D level two is still there**, four black tiles stepping across the hall.
+
+---
+
+# What step 3 settled
+
+## The camera was measuring the wrong floor
+
+"Barely passes over the wall" was exact, and the cause was not the eye height. `standOff` sets the
+eye to `surfaceAt(camera) + eyeLift`, and **`surfaceAt` reads the natural terrain** — it knows
+nothing about the platform a compound is built on. The camera lands inside the walls where the
+floor is the platform, 350 units above the terrain, so:
+
+- `eyeLift: 460` put the eye only **162 above the court** and **34 above the wall coping** —
+  standing in a walled garden and peering over the top of it.
+- Anything below `eyeLift` 300 put the eye **inside the platform block**, which is why the picks
+  read 0/4 there and why lowering it looked impossible.
+
+`eyeLift` is now **computed, not chosen**: study.js states `EYE_H` — how far the eye rides above the
+court’s own floor — and back-solves the lift from the ground under the standing point. The wall came
+down from 128 to 92 at the same time, because a 築地塀 is a garden wall meant to be seen over from
+inside, not a rampart the camera has to clear.
+
+**The same bug bit the harness.** `NAV.probe(...).w` returns terrain-relative points, so parking a
+camera in a garden with it buried the camera under the compound’s own floor and every raycast came
+back empty. Any place standing on made ground has two heights and they are not interchangeable.
+
+## A pond is a hole in the ground
+
+The first pass laid the water at y −46 and the garden floor at 0–8, so the floor ran over the top
+of the pond: the water was buried and the arched bridge crossed dry grass. The north garden’s floor
+is now built as four bands around the pond’s footprint. **Ground that a thing is set INTO has to
+have the thing’s shape taken out of it** — laying one slab over another only works upward.
+
+## Two things sized against the wrong reference
+
+- **Rocks at 150 units are 5.5 metres.** Standing stones, not garden rocks. Halved.
+- **13 rake ridges 22 deep read as a striped floor.** A raked line has to be a LINE at the distance
+  it is seen from; 21 ridges at 14 deep and half the height.
+- **Rails on one side make a bridge a ramp with a fence beside it.** Both sides now, with a
+  handrail, because seven posts without one are seven posts.
+
+## The four gardens
+
+| face | garden | what carries it |
+|---|---|---|
+| 南 · 文法 | 枯山水 | 21 rake ridges, rock groupings in threes and twos, nothing growing |
+| 東 · かな | 苔庭 | moss mounds (hemispheres, so the ground swells), cherries, 飛石 stepping stones |
+| 西 · 語彙 | 紅葉 | five maples and fallen leaf litter — the busiest, because a vocabulary is a heap |
+| 北 · 漢字 | 池庭 | the pond cut into the floor, the 反橋 as five segments on a parabola, irises, 雪見灯籠 |
+
+Verified by standing the camera in each: every garden reports its own elements under the ray and
+none reports another’s. Arrival holds 4/4 picks at six aspect ratios, plaques 65–138px, flight
+3,916. REVIEW unchanged, no console errors.
+
+## Open
+
+- **The entrance court floor is bare.** It is the largest single area in the arrival shot and it is
+  flat brown. Gravel, stepping stones and a 手水鉢 belong there — step 4.
+- **The legacy CSS3D room still overlays everything**, including a large red panel at the left of
+  the arrival. Step 4 replaces level two, which takes it with it.
+- **The south garden is only glimpsed** from the entrance; the hall hides most of it. Correct for a
+  walk-round plan, but it means the one garden facing the arrival is the one you see least of.
