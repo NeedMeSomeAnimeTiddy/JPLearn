@@ -2124,8 +2124,32 @@ rim, sway, mist. Shafts: hold.
   sun to radiate from because the lab had never had one.
 - **A billboard that must stay horizontal turns about the vertical axis only.** Full
   billboarding tips it to face the eye and it reads as a sprite.
-- **Crepuscular rays need a low sun AND a broken occluder.** A smooth silhouette gives spill,
-  not rays.
+- **Crepuscular rays need a low sun AND a broken occluder** — and then two more things that
+  took three further rounds to find. **The occluder has to be in front of the sun, not beside
+  it**: the first retry aimed straight up the valley, which is exactly where the saddle had been
+  cut, so the sun sat in clear sky and produced a clean halo. And **the march needs its own
+  buffer.** Bloom's bright pass asks "what is bright enough to bleed" at 0.72 of linear
+  luminance; a dawn sky is nowhere near that, so the buffer was black but for one speck and
+  every parameter being tuned was tuning the transport of a signal that did not exist. An
+  occlusion buffer asks a different question — where can the sun be seen from — with sky near
+  the sun white, everything solid black, and everything far from the sun black too, or the
+  march sums sky from all over the frame and lifts the image instead of drawing rays. It must
+  also be **sharp**: a ray is an occluder's silhouette, and at quarter resolution under two blur
+  passes a trunk is two texels wide and the blur erases exactly the thing being drawn.
+- **Look at the intermediate buffer, not at the output.** An effect that reads from a render
+  target fails identically whether its parameters are wrong or its input is empty. `LAB.show()`
+  answered in one frame what three rounds of tuning could not.
+- **One landform cannot demonstrate mist or shafts, and it is the same missing thing.** Mist
+  needs low ground with high ground on both sides or it has nothing to sit in; rays need a
+  crest with gaps in it. A ridge with notches cut through it and a hollow in front of it closes
+  both — and a saddle packed with trees is not a saddle, so the treeline has to stop short of
+  them.
+- **A per-instance vertex effect keyed on world position must use the instance's world
+  position.** `modelMatrix * position` without the `instanceMatrix` puts every tree in a stand
+  at the model origin, and the whole line sways as one object.
+- **`typeof` does not guard a `const` in its temporal dead zone** — it throws rather than
+  returning `'undefined'`. A forward reference to a later `const` needs a `let` initialised to
+  null.
 - **An effect keyed on a surface turning away from you says nothing about a surface that is
   always turned away.** Grazing-angle terms wash flat across terrain; keep them opt-in.
 - **A vertex-shader displacement has to be applied to the outline hull as well**, from the

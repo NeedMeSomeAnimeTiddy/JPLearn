@@ -56,8 +56,11 @@ import * as THREE from './lib/three.module.min.js';
      R  mist           visible banks lying in the low ground — height fog is atmosphere
                        and has no shape; this is what gives the air strands. The density is
                        noise, not a plateau: a soft edge round a flat interior is a lozenge
-     T  shafts         a radial blur of the bloom buffer toward the sun, so the scene
-                       occludes its own light shafts for nothing
+     T  shafts         a radial march through a DEDICATED occlusion buffer — sky near the
+                       sun, black on everything solid — so the trees cast their own rays
+
+     [ ]  grade        eight looks, cycled. They touch the grade only and never the
+                       toggles, so any of them can be judged against any scene state
 
    Press 1-8 to toggle, 0 for all off (which is roughly what the main mockup
    was doing), 9 for all on.
@@ -155,7 +158,10 @@ const SUN_SPRITES = [];
 function sunAt(elevDeg, azDeg) {
   const e = elevDeg * Math.PI / 180, a = azDeg * Math.PI / 180;
   const dir = new THREE.Vector3(Math.cos(e) * Math.cos(a), Math.sin(e), Math.cos(e) * Math.sin(a));
-  key.position.copy(dir).multiplyScalar(2600);
+  /* far enough out that the shadow camera's near plane still clears the terrain when the sun
+     is near the horizon; at a few degrees the box cannot hold the shadows anyway, which is a
+     limit of one directional light and not worth a cascade in a lab */
+  key.position.copy(dir).multiplyScalar(4600);
   FX.uSunDir.value.copy(dir);
   SUN_AT.copy(dir).multiplyScalar(7200);
   SUN_SPRITES.forEach((m) => m.position.copy(SUN_AT));
@@ -228,7 +234,10 @@ const sc = key.shadow.camera;
    at 47°, because the terrain projects much longer than itself along the light direction.
    Half-diagonal 2121 plus the height shift (760 / tan 47°, halved) lands at ~2470, so 2600
    covers it with margin — and every unit past that is texel resolution thrown away. */
-sc.left = -2600; sc.right = 2600; sc.top = 2600; sc.bottom = -2600; sc.near = 200; sc.far = 8000;
+/* the terrain grew from 3000 to 4400, so the box grows with it: half-diagonal is now 3111,
+   plus the height shift along the light direction. 4096 texels over 7400 units is 1.8 per
+   texel, and radius 2.5 is still a ~4-unit blur — soft on terrain, harmless on a rock. */
+sc.left = -3700; sc.right = 3700; sc.top = 3700; sc.bottom = -3700; sc.near = 200; sc.far = 12000;
 
 /* THE BLUR MUST BE SMALLER THAN WHAT IT SHADOWS. At 2048 over a 6400-unit box a texel was
    3.1 units, so radius 7 meant a ±22-unit PCF kernel — wider than the 54-unit rocks. Every
@@ -344,7 +353,12 @@ const RIM_GLSL = `
   }`;
 const SWAY_GLSL = `
   {
+    /* AN INSTANCED CROWN IS NOT AT THE MODEL ORIGIN. Without this every tree in a stand
+       reads the phase at the same point and the whole line sways as one object. */
     vec3 swp = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+    #ifdef USE_INSTANCING
+      swp = ( modelMatrix * instanceMatrix * vec4( transformed, 1.0 ) ).xyz;
+    #endif
     /* uTime advances 5.76 per real second, so 0.85 was 4.9 rad/s: a
        one-and-a-quarter-second swing — a shiver, not a breeze. Foliage wants three or four
        seconds, which is 0.273. The complaint landed on the OUTLINE because a solid black shows
@@ -452,21 +466,41 @@ function cloudy(mat) {
   return mat;
 }
 
-/* ============================ THE TERRAIN ============================ */
-const SIZE = 3000, SEG = 190;
+/* ============================ THE TERRAIN ============================
+   ONE HILL COULD NOT ANSWER TWO OF THE QUESTIONS PUT TO IT. Mist has nowhere to lie on a dome
+   — scatter it and it either floats over the slope like cards or lies on it like a stain —
+   and crepuscular rays are the GAPS in an occluder, which a smooth silhouette has none of.
+   Both gaps are the same gap, and one landform closes both: a ridge with notches cut through
+   it, a treeline along its crest, and a hollow between it and the hill. */
+const SIZE = 4400, SEG = 256;
 const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
 geo.rotateX(-Math.PI / 2);
 const pos = geo.attributes.position;
 
-/* one hill, plus enough small relief that the surface is not glassy */
+/* a hill, a ridge across the far side, a hollow between them, and enough small relief that
+   nothing is glassy */
+const RIDGE_Z = -1500, HOLLOW_Z = -780;
 function heightAt(x, z) {
   const d = Math.hypot(x, z);
   const hill = Math.exp(-(d * d) / (2 * 620 * 620)) * 760;          /* the hill */
   const shoulder = Math.exp(-(Math.hypot(x + 900, z - 500) ** 2) / (2 * 520 * 520)) * 260;
+  /* THE RIDGE, AND THE NOTCHES ARE THE POINT OF IT. An unbroken crest is just a second smooth
+     silhouette and would leave the shaft question exactly where it was; two saddles cut down
+     through it give the sun somewhere to come through from behind. */
+  const rz = z - RIDGE_Z;
+  const crest = 560 + Math.sin(x * 0.0021) * 130 + Math.sin(x * 0.0053 + 1.7) * 55;
+  const notch = 1
+    - 0.78 * Math.exp(-((x - 250) ** 2) / (2 * 210 * 210))
+    - 0.58 * Math.exp(-((x + 1150) ** 2) / (2 * 250 * 250));
+  const ridge = Math.exp(-(rz * rz) / (2 * 380 * 380)) * crest * Math.max(notch, 0.10);
+  /* THE HOLLOW. Mist needs low ground with high ground on BOTH sides, or it has no depth to
+     sit in and reads as a stain on whatever single slope is behind it. */
+  const hollow = -Math.exp(-((z - HOLLOW_Z) ** 2) / (2 * 330 * 330))
+                 * Math.exp(-((x - 150) ** 2) / (2 * 1150 * 1150)) * 215;
   const relief = Math.sin(x * 0.0042) * Math.cos(z * 0.0037) * 46
                + Math.sin(x * 0.0111 + 2.1) * Math.cos(z * 0.0093) * 17
                + Math.sin(x * 0.027 + 4.4) * Math.cos(z * 0.023) * 5.5;
-  return hill + shoulder + relief;
+  return hill + shoulder + ridge + hollow + relief;
 }
 for (let i = 0; i < pos.count; i++) pos.setY(i, heightAt(pos.getX(i), pos.getZ(i)));
 geo.computeVertexNormals();
@@ -651,6 +685,48 @@ function tree(x, z, s) {
 }
 tree(-120, 130, 1.9);
 
+/* ---- THE TREELINE ----
+   Sugi along the ridge crest, because what shafts need is a silhouette with GAPS in it and a
+   row of narrow cones is the cheapest thing that has them. Instanced: two draw calls for the
+   whole stand instead of eighty, which matters because this lab gets driven on a software
+   rasteriser. No outline hull — the outline system is already proven on the near tree and the
+   rocks, and an inverted hull per instance is not worth the draw calls to prove it twice.
+   They stop short of the notches on purpose: a saddle packed with trees is not a saddle. */
+{
+  const N = 34;
+  const trunkG = new THREE.CylinderGeometry(9, 15, 120, 5);
+  const crownG = new THREE.ConeGeometry(74, 300, 6);
+  const trunkM = new THREE.MeshToonMaterial({ color: 0x4b3a2e, gradientMap: RAMP });
+  const crownM = new THREE.MeshToonMaterial({ color: 0x3f5c30, gradientMap: RAMP });
+  crownM.userData.sway = 1;
+  crownM.userData.rim = 1;
+  trunkM.userData.rim = 1;
+  const trunks = new THREE.InstancedMesh(trunkG, cloudy(trunkM), N);
+  const crowns = new THREE.InstancedMesh(crownG, cloudy(crownM), N);
+  trunks.castShadow = crowns.castShadow = true;
+  trunks.receiveShadow = crowns.receiveShadow = true;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  const pv = new THREE.Vector3(), sv = new THREE.Vector3();
+  let n = 0;
+  for (let i = 0; i < N; i++) {
+    const x = -2050 + (i / (N - 1)) * 4100 + (Math.sin(i * 7.3) * 46);
+    /* the two saddles stay open */
+    if (Math.abs(x - 250) < 240 || Math.abs(x + 1150) < 250) continue;
+    const z = RIDGE_Z + Math.sin(i * 2.9) * 130;
+    const y = heightAt(x, z);
+    const s = 0.78 + ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1 * 0.55;
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), i * 1.31);
+    pv.set(x, y + 60 * s, z); sv.setScalar(s);
+    trunks.setMatrixAt(n, m.compose(pv, q, sv));
+    pv.set(x, y + (120 + 130) * s, z);
+    crowns.setMatrixAt(n, m.compose(pv, q, sv));
+    n++;
+  }
+  trunks.count = crowns.count = n;
+  trunks.instanceMatrix.needsUpdate = crowns.instanceMatrix.needsUpdate = true;
+  scene.add(trunks, crowns);
+}
+
 /* a couple of rocks, so the shadow test has more than one caster */
 [[380, -260, 54], [-520, -420, 38], [190, 420, 30]].forEach(([x, z, r]) => {
   const rockMat = new THREE.MeshToonMaterial({ color: 0x8a8275, gradientMap: RAMP });
@@ -824,7 +900,7 @@ const NOISE_TEX = noiseTexture(256, 5);
    look is the cheaper answer to the same problem. */
 const MIST = { uTime: { value: 0 }, uAmt: { value: 0.5 } };
 {
-  const COUNT = 30;
+  const COUNT = 44;      /* the terrain is twice the area it was */
   const g = new THREE.PlaneGeometry(1, 1);
   const seed = new Float32Array(COUNT * 4);
   const off = new Float32Array(COUNT * 3);
@@ -834,8 +910,14 @@ const MIST = { uTime: { value: 0 }, uAmt: { value: 0.5 } };
      would actually collect. */
   for (let i = 0; i < COUNT; i++) {
     let x = 0, z = 0, gy = 1e9;
-    for (let t = 0; t < 6; t++) {
-      const cx = (Math.random() - 0.5) * 3400, cz = (Math.random() - 0.5) * 3400;
+    /* WEIGHTED TOWARD THE HOLLOW, not scattered over the whole map and then dimmed. Two thirds
+       of the cards are drawn from a band along the valley floor; the rest go wherever the
+       lowest of eight candidates lands, so the low corners still get some. */
+    const inValley = i % 3 !== 0;
+    for (let t = 0; t < 8; t++) {
+      const cx = (Math.random() - 0.5) * (inValley ? 2600 : 4000) + (inValley ? 150 : 0);
+      const cz = inValley ? HOLLOW_Z + (Math.random() - 0.5) * 620
+        : (Math.random() - 0.5) * 4000;
       const cy = heightAt(cx, cz);
       if (cy < gy) { gy = cy; x = cx; z = cz; }
     }
@@ -946,13 +1028,24 @@ const POST = {
   splitShadow: { value: new THREE.Color(0x2a3a5c) },
   splitHigh: { value: new THREE.Color(0xffd9a8) },
   splitAmt: { value: 0.22 },
+  /* LIFT, CONTRAST AND SATURATION are what separate one look from another; exposure and bloom
+     alone only make the same picture brighter or softer. Lift in particular is the whole
+     difference between a cinematic grade and an ink-wash one — paper has no black on it. */
+  lift: { value: 0.0 },
+  contrast: { value: 1.0 },
+  sat: { value: 1.0 },
+  bloomTint: { value: new THREE.Color(0xffe9cf) },
   uTime: { value: 0 },
   /* SUN SHAFTS COME OUT OF THE BLOOM BUFFER, NOT OUT OF GEOMETRY. The bright pass already holds
      the sky and the sun and nothing else — the hill and the tree are black in it — so a radial
      blur toward the sun's screen position produces shafts that are occluded by the scene for
      free. Cones of geometry would cost more and be harder to make behave. */
   shaftAmt: { value: 0.9 },
-  shaftDensity: { value: 0.62 },
+  /* the occlusion pass's own threshold, an order of magnitude below bloom's, because it is
+     asking where the SKY is rather than where the highlights are */
+  shaftCut: { value: 0.20 },
+  shaftReach: { value: 0.62 },
+  shaftDensity: { value: 1.0 },
   shaftDecay: { value: 0.93 },
   sunUv: { value: new THREE.Vector2(0.5, 0.5) },
   sunVis: { value: 0 },
@@ -974,12 +1067,21 @@ const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4( positio
 const rtScene = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true });
 const rtA = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
 const rtB = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+/* THE SHAFT MARCH NEEDS A SHARP BUFFER AND THE GLOW NEEDS A SOFT ONE, so the bright pass gets
+   its own target instead of being blurred in place. A crepuscular ray is the silhouette of an
+   occluder printed through the glow; at quarter res under two blur passes a tree trunk is about
+   two texels wide and the blur removes it entirely, which is why the effect kept coming back as
+   a rounder halo however it was tuned. Half res keeps the crowns readable and still costs a
+   quarter of the fill. */
+const rtSharp = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
 function sizePost() {
   const dpr = Math.min(devicePixelRatio, 2);
   const w = Math.max(1, Math.floor(innerWidth * dpr)), h = Math.max(1, Math.floor(innerHeight * dpr));
   rtScene.setSize(w, h);
   rtA.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
   rtB.setSize(Math.max(1, w >> 2), Math.max(1, h >> 2));
+  rtSharp.setSize(Math.max(1, w >> 1), Math.max(1, h >> 1));
+  matOcc.uniforms.uAspect.value = w / h;
   matBlurH.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
   matBlurV.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
   matComposite.uniforms.uRes.value.set(w, h);
@@ -997,6 +1099,34 @@ const matBright = new THREE.ShaderMaterial({
     '}',
   ].join('\n'),
 });
+/* THE OCCLUSION BUFFER. White where sky can be seen near the sun, black on everything solid,
+   black again away from the sun -- that last part matters, because without it the march sums
+   bright sky from all over the frame and lifts the whole image instead of drawing rays.
+   Sharp, at half resolution: a crepuscular ray IS an occluder's silhouette, and at quarter res
+   under two blur passes a trunk is two texels wide and the blur erases exactly the thing being
+   drawn. */
+const matOcc = new THREE.ShaderMaterial({
+  uniforms: {
+    tSrc: { value: null }, cut: POST.shaftCut, sunUv: POST.sunUv,
+    reach: POST.shaftReach, uAspect: { value: 1 },
+  },
+  vertexShader: VS,
+  fragmentShader: [
+    'varying vec2 vUv; uniform sampler2D tSrc; uniform float cut, reach, uAspect;',
+    'uniform vec2 sunUv;',
+    'void main() {',
+    '  vec3 c = texture2D( tSrc, vUv ).rgb;',
+    '  float l = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );',
+    /* a soft knee so the sky does not step into the buffer along a contour */
+    '  float sky = smoothstep( cut, cut + 0.28, l );',
+    /* aspect-corrected, or the falloff is an ellipse and the shafts are longer sideways */
+    '  vec2 d = ( vUv - sunUv ) * vec2( uAspect, 1.0 );',
+    '  float near = 1.0 - smoothstep( reach * 0.35, reach, length( d ) );',
+    '  gl_FragColor = vec4( c * sky * near, 1.0 );',
+    '}',
+  ].join('\n'),
+});
+
 function blurMat(dx, dy) {
   return new THREE.ShaderMaterial({
     uniforms: {
@@ -1021,17 +1151,21 @@ const matBlurH = blurMat(1, 0), matBlurV = blurMat(0, 1);
 const matComposite = new THREE.ShaderMaterial({
   uniforms: {
     tSrc: { value: rtScene.texture }, tBloom: { value: rtB.texture },
+    tOcc: { value: rtSharp.texture },
     exposure: POST.exposure, bloomAmt: POST.bloomAmt, grain: POST.grain,
     vignette: POST.vignette, splitShadow: POST.splitShadow, splitHigh: POST.splitHigh,
     splitAmt: POST.splitAmt, uTime: POST.uTime, uRes: { value: new THREE.Vector2(1, 1) },
+    lift: POST.lift, contrast: POST.contrast, sat: POST.sat, bloomTint: POST.bloomTint,
     shaftAmt: POST.shaftAmt, shaftDensity: POST.shaftDensity, shaftDecay: POST.shaftDecay,
     sunUv: POST.sunUv, sunVis: POST.sunVis,
   },
   vertexShader: VS,
   fragmentShader: [
     'varying vec2 vUv;',
-    'uniform sampler2D tSrc; uniform sampler2D tBloom;',
+    'uniform sampler2D tSrc; uniform sampler2D tBloom; uniform sampler2D tOcc;',
     'uniform float exposure, bloomAmt, grain, vignette, splitAmt, uTime;',
+    'uniform float lift, contrast, sat;',
+    'uniform vec3 bloomTint;',
     'uniform float shaftAmt, shaftDensity, shaftDecay, sunVis;',
     'uniform vec2 sunUv;',
     'uniform vec3 splitShadow, splitHigh;',
@@ -1047,16 +1181,21 @@ const matComposite = new THREE.ShaderMaterial({
     'float hash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }',
     'void main() {',
     '  vec3 c = texture2D( tSrc, vUv ).rgb;',
-    '  c += texture2D( tBloom, vUv ).rgb * bloomAmt;',
+    '  c += texture2D( tBloom, vUv ).rgb * bloomAmt * bloomTint;',
     /* the shafts: march toward the sun through the bright buffer, decaying as you go */
     '  if ( sunVis > 0.0 && shaftAmt > 0.0 ) {',
-    '    vec2 dir = ( sunUv - vUv ) * shaftDensity / 14.0;',
-    '    vec2 uv2 = vUv;',
+    '    vec2 dir = ( sunUv - vUv ) * shaftDensity / 18.0;',
+    /* JITTER THE FIRST STEP. Eighteen samples along a line is a stair; offsetting each pixel's
+       start by a fraction of one step turns the stair into grain, which the paper texture then
+       hides completely. */
+    '    float jit = hash( vUv * uRes );',
+    '    vec2 uv2 = vUv + dir * jit;',
     '    float decay = 1.0;',
     '    vec3 sh = vec3( 0.0 );',
-    '    for ( int i = 0; i < 14; i++ ) {',
+    '    for ( int i = 0; i < 18; i++ ) {',
     '      uv2 += dir;',
-    '      sh += texture2D( tBloom, uv2 ).rgb * decay;',
+    /* the SHARP buffer, so the trees are still in it to cast the ray */
+    '      sh += texture2D( tOcc, uv2 ).rgb * decay;',
     '      decay *= shaftDecay;',
     '    }',
     /* faded out as the sun leaves the frame, or a shaft field snaps off at the edge */
@@ -1064,10 +1203,17 @@ const matComposite = new THREE.ShaderMaterial({
     /* generous, because shafts from a sun just outside the frame are the common case and the
        first window (0.42-0.72) switched them off exactly when they would be most useful */
     '    float edge = ( 1.0 - smoothstep( 0.75, 1.45, sd.x ) ) * ( 1.0 - smoothstep( 0.75, 1.45, sd.y ) );',
-    '    c += sh * ( shaftAmt / 14.0 ) * sunVis * edge;',
+    '    c += sh * ( shaftAmt / 18.0 ) * sunVis * edge;',
     '  }',
     '  c *= exposure;',
     '  c = aces( c );',
+    /* ORDER MATTERS AND THIS IS THE ORDER. Lift the floor first, because raising black after
+       adding contrast just greys the whole image; pivot contrast around mid grey; desaturate
+       last so the split tone below still has something to push against. */
+    '  c = mix( vec3( lift ), vec3( 1.0 ), c );',
+    '  c = mix( vec3( 0.5 ), c, contrast );',
+    '  float sl = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );',
+    '  c = mix( vec3( sl ), c, sat );',
     /* SPLIT TONE. Dawn is not one colour temperature: the sun is warm and everything it does not
        reach is lit by the sky, which is blue. Pushing the two ends apart is most of what makes a
        render read as a photograph of a time of day rather than as lit geometry. */
@@ -1102,6 +1248,11 @@ function renderFrame() {
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.setRenderTarget(rtScene);
   renderer.render(scene, camera);
+  /* TWO PASSES OVER THE SAME PIXELS ASKING DIFFERENT QUESTIONS. Bloom wants highlights and
+     wants them blurred; the shafts want visible sky near the sun and want it sharp. Sharing one
+     buffer meant whichever question was asked second got the wrong answer. */
+  matOcc.uniforms.tSrc.value = rtScene.texture;
+  blit(matOcc, rtSharp);
   matBright.uniforms.tSrc.value = rtScene.texture;
   blit(matBright, rtA);
   matBlurH.uniforms.tSrc.value = rtA.texture;
@@ -1110,7 +1261,80 @@ function renderFrame() {
   blit(matBlurV, rtA);
   matComposite.uniforms.tSrc.value = rtScene.texture;
   matComposite.uniforms.tBloom.value = rtA.texture;
+  matComposite.uniforms.tOcc.value = rtSharp.texture;
+  /* LOOK AT THE BUFFER, NOT AT THE OUTPUT. An effect that reads from an intermediate target can
+     fail because its parameters are wrong or because the target is empty, and the final frame
+     looks identical either way. */
+  const dbg = window.LAB && window.LAB.show;
+  if (!dbg) { blit(matComposite, null); return; }
+  /* the VALUES are saved and restored, never the uniform objects — swapping those is how the
+     cloud shadows lost their link to the state last time */
+  const bs = POST.bloomAmt.value, ss = POST.shaftAmt.value;
+  matComposite.uniforms.tSrc.value =
+    dbg === 'sharp' ? rtSharp.texture : dbg === 'bloom' ? rtA.texture : rtScene.texture;
+  POST.bloomAmt.value = 0;
+  POST.shaftAmt.value = 0;
   blit(matComposite, null);
+  POST.bloomAmt.value = bs;
+  POST.shaftAmt.value = ss;
+}
+
+/* ============================ GRADES ============================
+   A look cannot be chosen from a description, only by flipping between them on the same frame,
+   which is the entire reason these are a keypress and not a set of numbers in a comment.
+
+   Grades own the GRADE only — they never touch shafts, mist, petals or any other toggle — so
+   any of them can be judged against any state of the scene. */
+const GRADES = [
+  { name: 'sumi 墨', note: 'ink wash — where the lab already was',
+    exposure: 1.05, bloomAmt: 0.55, bloomCut: 0.72, bloomTint: 0xffe9cf,
+    grain: 0.055, vignette: 0.30, splitAmt: 0.22, splitShadow: 0x2a3a5c, splitHigh: 0xffd9a8,
+    contrast: 1.00, sat: 1.00, lift: 0.000 },
+  { name: 'akatsuki 暁', note: 'dawn — soft, warm, lifted, big bloom',
+    exposure: 1.16, bloomAmt: 0.95, bloomCut: 0.55, bloomTint: 0xffd0a0,
+    grain: 0.040, vignette: 0.20, splitAmt: 0.36, splitShadow: 0x33456e, splitHigh: 0xffc98e,
+    contrast: 0.90, sat: 1.06, lift: 0.050 },
+  { name: 'hare 晴', note: 'clear noon — neutral, crisp, almost no grade',
+    exposure: 1.00, bloomAmt: 0.28, bloomCut: 0.86, bloomTint: 0xffffff,
+    grain: 0.018, vignette: 0.14, splitAmt: 0.10, splitShadow: 0x33465e, splitHigh: 0xfff0d8,
+    contrast: 1.14, sat: 1.10, lift: 0.000 },
+  { name: 'kasumi 霞', note: 'haze — washed out and flat, heavy paper',
+    exposure: 1.02, bloomAmt: 0.62, bloomCut: 0.60, bloomTint: 0xf3e6d2,
+    grain: 0.105, vignette: 0.10, splitAmt: 0.16, splitShadow: 0x4b556b, splitHigh: 0xfff2df,
+    contrast: 0.80, sat: 0.70, lift: 0.090 },
+  { name: 'yuugure 夕暮', note: 'dusk — teal shadow, ember highlight, dark corners',
+    exposure: 0.95, bloomAmt: 0.78, bloomCut: 0.62, bloomTint: 0xffb27a,
+    grain: 0.050, vignette: 0.46, splitAmt: 0.42, splitShadow: 0x1c3a44, splitHigh: 0xffb07e,
+    contrast: 1.08, sat: 1.02, lift: 0.012 },
+  { name: 'ukiyo 浮世', note: 'woodblock — flat, cream, no bloom, all fibre',
+    exposure: 1.04, bloomAmt: 0.16, bloomCut: 0.90, bloomTint: 0xfff3d6,
+    grain: 0.165, vignette: 0.09, splitAmt: 0.30, splitShadow: 0x3d3a52, splitHigh: 0xfff0cc,
+    contrast: 0.86, sat: 0.80, lift: 0.105 },
+  { name: 'yoru 夜', note: 'night — cool, crushed, heavy vignette',
+    exposure: 0.70, bloomAmt: 0.55, bloomCut: 0.52, bloomTint: 0xa8c8ff,
+    grain: 0.060, vignette: 0.56, splitAmt: 0.34, splitShadow: 0x18233f, splitHigh: 0xb9d2ff,
+    contrast: 1.18, sat: 0.74, lift: 0.020 },
+  { name: 'nama 生', note: 'ungraded — ACES and gamma only, the control',
+    exposure: 1.00, bloomAmt: 0.00, bloomCut: 0.99, bloomTint: 0xffffff,
+    grain: 0.000, vignette: 0.00, splitAmt: 0.00, splitShadow: 0x808080, splitHigh: 0x808080,
+    contrast: 1.00, sat: 1.00, lift: 0.000 },
+];
+let gradeIx = 0;
+/* a `let`, not a `const` assigned later: setGrade is defined above apply() and may run before
+   it, and `typeof` on a const still in its temporal dead zone throws rather than returning
+   'undefined' — the one place the typeof guard does not guard */
+let hudPaint = null;
+function setGrade(g) {
+  if (typeof g === 'string') g = Math.max(0, GRADES.findIndex((x) => x.name.startsWith(g)));
+  gradeIx = ((g % GRADES.length) + GRADES.length) % GRADES.length;
+  const G = GRADES[gradeIx];
+  for (const k of ['exposure', 'bloomAmt', 'bloomCut', 'grain', 'vignette', 'splitAmt',
+    'contrast', 'sat', 'lift']) POST[k].value = G[k];
+  POST.splitShadow.value.setHex(G.splitShadow);
+  POST.splitHigh.value.setHex(G.splitHigh);
+  POST.bloomTint.value.setHex(G.bloomTint);
+  if (hudPaint) hudPaint();
+  return G.name;
 }
 
 /* ============================ TOGGLES ============================ */
@@ -1151,9 +1375,13 @@ function apply() {
     + row(state.sway, 'W', 'wind sway (foliage + its outline)')
     + row(state.aerial, 'E', 'aerial tint (fog warms toward the sun)')
     + row(state.mist, 'R', 'mist ribbons (banks in the low ground)')
-    + row(state.shafts, 'T', 'sun shafts (radial blur of the bloom buffer)')
+    + row(state.shafts, 'T', 'sun shafts (march through the occlusion buffer)')
+    + '<div style="margin-top:8px">[ [ ] ] grade <b>' + (gradeIx + 1) + '/' + GRADES.length
+      + '  ' + GRADES[gradeIx].name + '</b></div>'
+    + '<div class="off" style="margin-left:22px">' + GRADES[gradeIx].note + '</div>'
     + '<div class="off" style="margin-top:8px">[0] all off &nbsp; [9] all on</div>';
 }
+hudPaint = apply;
 addEventListener('keydown', (e) => {
   if (e.key === '1') state.ao = !state.ao;
   else if (e.key === '2') state.ramp = !state.ramp;
@@ -1168,6 +1396,8 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'e' || e.key === 'E') state.aerial = !state.aerial;
   else if (e.key === 'r' || e.key === 'R') state.mist = !state.mist;
   else if (e.key === 't' || e.key === 'T') state.shafts = !state.shafts;
+  else if (e.key === '[') { setGrade(gradeIx - 1); return; }
+  else if (e.key === ']') { setGrade(gradeIx + 1); return; }
   else if (e.key === '0') Object.keys(state).forEach((k) => { state[k] = false; });
   else if (e.key === '9') Object.keys(state).forEach((k) => { state[k] = true; });
   else return;
@@ -1224,8 +1454,10 @@ let t = 0, ct = 0;
 window.LAB = {
   state, apply, CLOUD, cloud: CLOUD.uCloudMap.value.image,
   HFOG, POST, PETALS, FX, MIST, petalMeshes, sunAt, SUN_SPRITES,
-  scene, camera, renderer, key, ground, motion, THREE,
-  freeze: false, view: null, at: (v) => { t = v; },
+  GRADES, grade: setGrade, gradeName: () => GRADES[gradeIx].name,
+  scene, camera, renderer, key, ground, motion, THREE, heightAt,
+  rtSharp, rtBloom: rtA, rtScene,
+  freeze: false, view: null, show: null, at: (v) => { t = v; },
 };
 
 /* CT ADVANCES PER SECOND, NOT PER FRAME. It used to be `ct += 0.0016` once a tick, which
@@ -1235,15 +1467,17 @@ window.LAB = {
    at the speed anyone else was seeing. 0.096/s is exactly the old per-frame rate at 60 fps,
    so the look is unchanged on a 60 Hz machine and merely correct everywhere else.
    The clamp is for a backgrounded tab, which otherwise resumes with a several-second jump —
-   and it is 0.25, not 0.1, because the headless browser this gets measured in runs at 7 fps
-   on a software rasteriser. A 0.1 clamp there silently ran the clock at 69% of real time,
-   which is the frame-rate dependence this whole change exists to remove, reintroduced by the
-   guard against it. */
+   and it is 0.5, not 0.1, because the headless browser this gets measured in runs at 6 fps on
+   a software rasteriser and hitches well past that. Every clamped frame drops real time on the
+   floor, so a tight clamp silently reintroduces exactly the frame-rate dependence the
+   performance.now() clock exists to remove — at 0.1 it ran the world at 69% speed, at 0.25 at
+   83%. Half a second still catches a backgrounded tab, which resumes seconds late, not
+   milliseconds. */
 const CT_RATE = 0.096;
 let ctLast = performance.now();
 function tick() {
   const now = performance.now();
-  const dt = Math.min((now - ctLast) / 1000, 0.25);
+  const dt = Math.min((now - ctLast) / 1000, 0.5);
   ctLast = now;
   /* the weather clock keeps running while the camera is pinned, so drift can be checked
      on its own instead of being confounded with the orbit */
