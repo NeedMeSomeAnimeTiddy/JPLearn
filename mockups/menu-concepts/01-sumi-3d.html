@@ -2593,32 +2593,29 @@ function standOff(place, off = STAND_OFF, lift = EYE_LIFT) {
    menu, and it must not stack on the mountain. The rest spread wide enough that each is a real
    turn: two ahead of the shoulders, two abeam, two behind. */
 const DEST_SPECS = [
-  /* STUDY was at -37/4400 until the massing went up and could be measured. Three things had to
-     agree and only two of them ever did at once:
-       - it must stay OUT of the menu's frame. At -37 the pavilion reached in from the left,
-         sliced by the edge and landing behind the type column. Same lesson the shrine learned
-         at +26: a landmark is wide enough to intrude from further out than its bearing suggests.
-       - its footprint must be dry and near enough level to platform. -37 sat 46% in the lake
-         over a 195 fall; -55/4400 was 40% wet over 199 and put the water BEHIND the building,
-         where the building hides its own reflection.
-       - and the lake has to come between the camera and it, which is the whole reason for
-         putting it on the shore.
-     -52/4000 is where all three hold: an 11%-wet footprint over the flattest ground in the
-     sweep (122), water reaching back 2,500 along the approach so the standing point is at the
-     water's edge, and 160px of clearance from the menu's left edge. */
-  /* and the shot — which is really a question about the FLIGHT. The camera's journey is
-     `dist - stand`, and the shrine's is 3,915 units. Three passes of tuning `stand` against a
-     dist of 4,000 gave STUDY a journey of 950: arriving somewhere you were already standing.
-     A long flight needs a distant PLACE, and the whole western arc is lake — every bearing from
-     -34 to -76 is open water past about 6,000, and the far shore does not come back until 15,000
-     to 17,000, where the fog is 37% and a building would be a smudge.
+  /* STUDY: 回遊式庭園, the stroll garden. Its site was re-derived from scratch when the costume
+     changed, because every number the pavilion left behind was chosen to frame a 1,040-tall
+     building and none of them transfer.
 
-     So the pavilion stands IN the water, which is a move this world has already made once with
-     the torii, and which makes the plan's "the lake is its counterpart" literal rather than
-     figurative: at 7,800 it is 3,000 units out from the peninsula, and the camera stops on the
-     peninsula's own far bank to look across at it. Foreground bank, then open water, then the
-     building and its reflection. */
-  { bearing: -52, dist: 7800, lift: 0, stand: 3900, eyeLift: 340 }, /* STUDY — the pavilion */
+     THE FLIGHT IS PART OF THE SHOT. The camera's journey is `dist - stand`, and the rest of the
+     world runs 3,100 (READING) to 4,345 (REVIEW). Tuning the pavilion's framing three times
+     without ever checking this left STUDY on a journey of 950 — arriving somewhere you were
+     already standing. It is a constraint on the pair, not on either number alone.
+
+     That looked fatal at first, because the whole western arc is lake past about 6,000 and the
+     far shore does not return until 11,000+, at bearings that sit inside the menu's frame. But
+     the premise was the pavilion's: a building has to be stood BACK from to be seen whole, so
+     `stand` was large and `dist` had to be enormous to compensate. A garden is ENTERED. Its
+     camera stops at the gate, the way the shrine's stops in its own court at 855 — and at
+     `stand` 900 a site at 4,400 buys a 3,500-unit flight, right in the middle of the band.
+
+     Two further criteria died with the pavilion. "The footprint must be dry" — a garden's pond
+     WANTS water, and here the far side is 78% lake, so the garden's water and the world's meet
+     instead of the pond being a puddle inside a wall. "It must be level" — a garden makes its own
+     level, exactly as the shrine's court does, and a 242 fall is less than that court already
+     handles. What is left: out of the menu (clear by 510px), the lake reaching back 2,930 along
+     the approach so it can be borrowed, and a flight worth flying. */
+  { bearing: -54, dist: 4400, lift: 0, stand: 1100, eyeLift: 460 }, /* STUDY — the garden */
   { bearing: 105, dist: 5200, lift: 150, stand: 855, eyeLift: 182 }, /* REVIEW — the shrine */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */

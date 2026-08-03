@@ -46,27 +46,20 @@ shore rather than back from it.
 
 ## Order of work
 
-**1. The site, re-measured.** The bearing was forced out to −52 by the pavilion's 1,240-unit width
-   reaching into the menu frame. A walled garden has no tall silhouette and may not need that, so
-   the constraint is re-run rather than inherited. What the garden wants instead: **level ground**
-   (a garden is built level), **a water edge** for the pond to meet the lake, and a view worth
-   borrowing. `NAV.site` reports fall, near/far wetness and reach; that is the same query with
-   different targets.
+**1. The site and the shot — DONE.** See "What step 1 settled" below. Settled at bearing **−54**,
+   dist **4400**, `stand` **1100**, `eyeLift` **460**, focus on the rank of path-heads. The
+   stand-in is in `places/study.js`.
 
-**2. The shot.** `stand` 3200 / `eyeLift` 460 framed a 1,040-tall building and does not transfer. A
-   garden is read as a *ground plan*, so the eye probably wants to be higher and the stand-off
-   closer. Measure before modelling — the instruments are built and this is one page load.
+**2. The enclosure.** Wall, coping, gate. One `mergeParts` geometry.
 
-**3. The enclosure.** Wall, coping, gate. One `mergeParts` geometry.
-
-**4. The water and the circuit.** The pond, the island, the path around it. The path is the ribbon
+**3. The water and the circuit.** The pond, the island, the path around it. The path is the ribbon
    mesh REVIEW's approach already uses — it cannot step or gap, and it carries its own colour.
 
-**5. The four quarters.** Their planting, their lanterns, their picks and focus twins.
+**4. The four quarters.** Their planting, their lanterns, their picks and focus twins.
 
-**6. Level three.** The stations along a quarter, and the 駒札 name-plaques. Reuses REVIEW's walk.
+**5. Level three.** The stations along a quarter, and the 駒札 name-plaques. Reuses REVIEW's walk.
 
-**7. The rooms.** A 茶室 at each station — the first L4 interior in the project, so it sets the
+**6. The rooms.** A 茶室 at each station — the first L4 interior in the project, so it sets the
    pattern for the other five places.
 
 ## Reused vs new
@@ -135,3 +128,90 @@ same numbers two frames running**.
   backdrop. The agreed set is **かな / 漢字 / 語彙 / 文法**, so those get replaced wholesale.
 - **900×1000 portrait is the weak viewport.** The pavilion fell to 33% of frame height and 55px per
   bay there. Re-check once the garden's real picks exist.
+
+---
+
+# What step 1 settled
+
+Measured against a boxes stand-in before any of the garden was modelled. Two of the findings
+changed the design rather than the numbers.
+
+## The picks are at the entrance, not at the corners
+
+The first stand-in put a 茶室 in each corner of a 1,700-square enclosure. The four measured **1,601
+pixels apart** — the whole frame width — with the pond a dark slab between them, and it read as an
+aerial photograph of a compound rather than a garden anyone was standing in. No stand-off fixes it:
+pulling back far enough to gather four corners costs the flight, and a big enclosure seen whole is a
+plan drawing either way.
+
+That is the wrong shape for the interaction anyway. **In a stroll garden you do not survey four
+quarters and choose one; you stand near the entrance and choose a way to go.** So level two is a
+rank of four path-heads across the court — an opening in a hedge, its season's tree over it, a
+lantern beside it and a 駒札 name-plaque on a post. The quarter is what level three walks into, and
+the tea house at its end is level four.
+
+## A roofed threshold on the sight line cannot be made to work
+
+With the gate centred, the picks measured 4/4 visible at an eye of 200, **0/4 at 320**, 4/4 at 460
+and 0/4 again at 1,400/460. The sight line passes *under* the gate roof from low down and *over* it
+from high up, and between those is a band where the slab cuts exactly through the name-plaques.
+Widening the opening does not fix it; raising the roof only moves the band. **Any roofed threshold
+standing between the eye and level two has that failure somewhere in its range.**
+
+Offsetting the gate removes the whole class of problem — and is what a Japanese garden does anyway.
+Entrances are deliberately not axial: you turn to come in, so the garden is disclosed rather than
+presented. With the gate at sd −450 the picks read **4/4 at every stand-off and every eye height
+measured**.
+
+## The flight is part of the shot
+
+`dist − stand` is how far the camera actually travels, and the rest of the world runs 3,100 to
+4,100. Three passes of tuning the pavilion's framing never looked at it and left STUDY on a journey
+of **950** — arriving somewhere you were already standing.
+
+That looked fatal for a garden, because the whole western arc is lake past about 6,000 and the far
+shore does not return until 11,000+, at bearings inside the menu frame. But the premise was the
+pavilion's: a building has to be stood BACK from to be seen whole. **A garden is entered.** Its
+camera stops just inside the gate, the way the shrine's stops in its own court at 855.
+
+| | STUDY | REVIEW | READING | DRILLS | JLPT | RECORDS |
+|---|---|---|---|---|---|---|
+| flight | **3550** | 3916 | 3100 | 4100 | 3500 | 3300 |
+
+## The enclosure is deep rather than square
+
+Two constraints pulling opposite ways, fixed by one number. Arriving has to put the camera *inside*
+the garden — outside it, the near wall stands 500 units off the eye and fills the bottom third of
+the frame, and the threshold you have supposedly just crossed is still in front of you. But an
+interior camera is close to everything, and the picks were then 2,000 pixels apart.
+
+So the garden runs **2,400 deep against 1,700 across**, the camera stands just inside the gate and
+the picks sit 950 further on. Which is also simply what a stroll garden is: the circuit needs a
+there and a back.
+
+## The settled numbers
+
+| | |
+|---|---|
+| bearing / dist | −54 / 4400 |
+| `stand` / `eyeLift` | 1100 / 460 |
+| focus | the rank of path-heads, 120 above the platform |
+| enclosure | f −900 to +1500, sd ±850; wall 90 + 26 coping |
+| gate | sd −450, 300 wide, 210 to the eaves |
+| picks | f +250, sd −300 / −100 / +100 / +300 |
+| pond | f +620 to +1340, half-width 620 |
+
+Verified at six aspect ratios: **4/4 picks at every one**, spread 369–788px, plaques 65–139px.
+
+## Open
+
+- **The menu.** The garden's platform corner reaches ~60px into the 16:9 frame and ~380px at 21:9,
+  both below the horizon at the extreme lower-left. Invisible at 16:9; at 21:9 it is a faint grey
+  slab in the fog. Re-check once the wall has material and planting — it may simply stop reading, or
+  the far wall may need pulling in.
+- **The foreground is empty.** The bottom half of the arrival is bare platform. That is where the
+  entrance court's gravel, stepping stones and 手水鉢 go, so it should fill itself — but if it does
+  not, the eye comes down.
+- **The site is 57% wet over a 389 fall** now the footprint is 2,400 deep. The far wall stands in
+  the lake, which is the pond opening to it, but it is a large platform to build and skirt.
+- **900×1000 portrait** gives 65px plaques. Smallest of any viewport; check once they carry text.
