@@ -45,12 +45,13 @@ export function buildStudy(ctx) {
 
   /* ---- the massing ----
      Sized against the landscape rather than against a metre. A near cedar is a 478-unit model at
-     0.85–2.8, so the wood stands 400–1,340; the shrine's main hall is 780 and reads as a
-     one-storey building. A three-storey pavilion that is both a landmark from the menu and the
-     container for two levels of interface wants to sit at the top of that range without leaving
-     it — 1,040 to the ridge. */
-  const SP = 250;                     /* floor to floor */
-  const BASE_H = 90;                  /* the stone base, above the platform line */
+     0.85–2.8, so the wood stands 400–1,340 and the shrine's main hall is 780. The first massing
+     sat inside that range at 1,040 and read as a big building among trees. It now stands 3,000
+     units out in the lake with nothing beside it for scale, and at that remove a landmark has to
+     out-top the treeline it is seen against rather than join it — 1,380 to the ridge, taller than
+     any cedar in the wood, which is what makes it read as architecture from the far bank. */
+  const SP = 300;                     /* floor to floor */
+  const BASE_H = 220;                 /* the stone podium, above the waterline */
   const DECK = 110;                   /* how far the veranda steps out past the wall */
   const DECK_T = 24, EAVE_T = 34;
   /* each storey draws in, which is what stops a stack of boxes reading as a stack of boxes:
@@ -59,8 +60,8 @@ export function buildStudy(ctx) {
      940 and 870 wide and the silhouette read as a stack of identical trays. The eave is the
      only part of a storey with a hard edge against the sky, so it is the part that carries the
      taper, and holding it constant cancels the taper everywhere it could have been seen. */
-  const CORE = [[640, 540, 200, 195], [540, 450, 185, 165], [430, 350, 170, 135]];
-  const ROOF_H = 200, ROOF_R = 560;   /* four-sided hip; the radius is the half-diagonal */
+  const CORE = [[640, 540, 240, 195], [540, 450, 225, 165], [430, 350, 210, 135]];
+  const ROOF_H = 260, ROOF_R = 560;   /* four-sided hip; the radius is the half-diagonal */
   /* TURNED OFF THE SIGHT LINE. Square-on, a building is a facade and the level-two veranda is a
      line of bays seen edge-first. At 17° you get the front and one flank, which is the oblique
      the veranda needs to be legible — and it widens the silhouette, so it is a framing question
@@ -112,11 +113,14 @@ export function buildStudy(ctx) {
     return m;
   }
 
-  /* the stone base, carried well below the platform line so the skirt buries itself in whatever
-     the shore is doing rather than floating over the low corner. SIZED OFF THE VERANDA, NOT THE
-     EAVE: run out to the eave's footprint it came to 1,140 wide against a 1,020 eave, so the
-     widest thing in the silhouette was the plinth — a building standing on a bigger building. */
-  block('base', CORE[0][0] + 2 * DECK + 120, BASE_H + 260, CORE[0][1] + 2 * DECK + 120, -260, STONE, 3.5);
+  /* the stone podium. SIZED OFF THE VERANDA, NOT THE EAVE: run out to the eave's footprint it
+     came to 1,140 wide against a 1,020 eave, so the widest thing in the silhouette was the
+     plinth — a building standing on a bigger building.
+     ITS DEPTH IS READ, NOT ASSUMED. A fixed 260 skirt was enough to bury itself in a shore; a
+     pavilion standing in the lake has to reach the BED, which here is 260 below the surface and
+     would be a different number at any other site. */
+  const SINK = Math.max(280, TOP - LOW + 90);
+  block('base', CORE[0][0] + 2 * DECK + 120, BASE_H + SINK, CORE[0][1] + 2 * DECK + 120, -SINK, STONE, 3.5);
 
   for (let i = 0; i < 3; i++) {
     const [w, d, h, eave] = CORE[i];
@@ -166,9 +170,9 @@ export function buildStudy(ctx) {
   /* ---- where the camera looks ----
      Not at the feet. A destination's target is the point the arrival flight settles on, and
      aiming it at ground level puts two thirds of the building above the frame's centre and the
-     roof out of it. Held partway up, which is the number step zero is here to settle. */
+     roof out of it. Held a little under halfway up the ridge. */
   const focus = at3(0, 0);
-  focus.y = TOP + 430;
+  focus.y = TOP + 560;
   DEST_SPECS[0].focus = focus;
 
   /* what step zero needs to read back out */

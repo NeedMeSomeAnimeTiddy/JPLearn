@@ -1,190 +1,137 @@
-# STUDY — 学習, the three-storey pavilion
+# STUDY — 回遊式庭園, the stroll garden
 
-The second of the six places, and the first one cut from REVIEW's pattern rather than invented.
-Agreed 2026-08-02.
+The second of the six places. Costume settled 2026-08-03 — see `PLAN-places.md` for the whole set
+and why it was re-planned.
 
-## Why this one next
+> **This file used to plan a three-storey pavilion (楼閣).** That was dropped: it was one of three
+> stacked-roof timber buildings in the set, and it had nowhere to put L4. The step-0 measurement
+> work done against it is kept below, because most of it is facts about the terrain and the
+> instruments rather than facts about a pavilion.
 
-- **It is the hardest test of the pattern, and that is the point of doing it early.** REVIEW is a
-  shrine precinct — outdoors, with sky, treeline and fog doing a lot of the work. STUDY is a
-  building. If Landmark → Threshold → Path only survives outdoors, that is worth finding out with
-  five places left rather than one.
-- It is menu item #1 and owns the home screen's UP NEXT hook, so it is the one most people land on.
-- It is REVIEW's counterpart — study against review — which justifies a shared visual family while
-  still being a different structure.
+## Why the garden
 
-## The shape of it
-
-REVIEW's two levels are both **horizontal**: you stand in a court, then you walk down a corridor.
-Repeating that in a different costume would be a re-skin. STUDY's level change is **vertical**, and
-that one decision is what makes it a different place at the level of structure.
-
-It also removes REVIEW's hardest problem. Level three there had to become a walk because a corridor
-converges on a vanishing point — six signs cannot be separated on screen without moving the camera.
-A veranda is a straight run seen obliquely: every bay reads at once.
-
-### The one danger, and the fix
-
-**An interior occludes itself.** The tunnel proved this the expensive way — twenty-six gates closed
-their own sight line about three thousand units in, and four separate attempts to put something at
-the far end failed because nothing there was ever visible. Floors are worse than gates: a floor is a
-solid plane. Enclosed storeys would mean standing on one you cannot see the next, and the continuity
-that makes REVIEW work — you can see the tunnel from the court, so you know where you are going —
-would be gone.
-
-So the pavilion is **never enclosed**. 楼閣 form: a stone base, three open storeys, a veranda (縁側)
-wrapping each, shoji behind them, deep eaves instead of walls, an open stair on the near face. You
-can see the storey above from the one below, which is the continuity the tunnel never had.
+- **It is the one Japanese form designed as a sequence of framed scenes you walk between.** L3 is
+  not something imposed on it, it is what a stroll garden is *for* — which is the opposite of the
+  pavilion, where a walk along a veranda had to be invented.
+- **It has a room at the end of every path.** The 茶室 or 東屋 at each station is where the minigame
+  plays. L4 was the requirement that killed the four preceding proposals.
+- **It is not a building**, which is the objection that started the re-plan, while still being
+  unmistakably Japanese in every element: arched bridge, stepping stones, snow-viewing lantern,
+  moss, koi, 鹿威し.
+- It is REVIEW's counterpart in temperament as well as in name — the shrine is ceremony on an axis,
+  the garden is a wandering circuit. Study against review.
 
 ## Levels
 
 | | what it is | the picks |
 |---|---|---|
-| menu | one building, three storeys, on the west shore at bearing −37° | — |
-| L2 | the ground veranda, seen slightly obliquely | four shoji bays: **かな / 漢字 / 語彙 / 文法** |
-| L3 | a walk along the upper veranda, turning the building's corner | the blocks within the chosen subject |
+| L1 | a low walled garden on the lake shore, one roof and a few crowns showing over the wall | — |
+| L2 | four quarters, one per season | **かな / 漢字 / 語彙 / 文法** |
+| L3 | the stations along that quarter's path, each named by a 駒札 | the blocks within the subject |
+| L4 | the 茶室 or 東屋 at a station — you kneel inside and the game plays on the mat | — |
 
-- **L2** — the pick is a bay: a shoji panel with a noren over it. Hover lights the paper from within
-  rather than moving anything. This is strictly easier than REVIEW's ema wall, whose tablets had to
-  be turned 36° toward the path before they were legible; a veranda is already oblique.
-- **L3** — reuses REVIEW's walk wholesale: `walkGo`, screen navigation, `.walk-pick` focus twins,
-  the HUD, Escape to back out. The one new thing is that the flight **rises**: station 0 is the
-  stair head, and the line turns the corner at the end, which is what stops it being a corridor.
+The season mapping is not decoration; it is doing work:
 
-## The counterpart
+- **春 spring, cherry → かな.** The beginning, first things.
+- **夏 summer, iris and open water → 漢字.** The deep work, the heaviest green.
+- **秋 autumn, maple → 語彙.** Accumulation, the harvest.
+- **冬 winter, pine under 雪吊り rope cones → 文法.** Bare branches — winter is when structure shows.
 
-REVIEW learned that a place with one thing in it is a yard with a thing in it — the water pavilion
-is what turned its court into a courtyard. STUDY's counterpart is the lake itself: the pavilion
-stands at the water's edge, so its own reflection answers it. The planar reflection pass already
-exists and already runs, so this costs nothing — and it is the reason the building belongs on the
+## Borrowed scenery
+
+借景 is a real technique and it hands the garden a landmark for nothing: the wall is built to *frame*
+the lake and the far ranges as part of the composition rather than to shut them out. That is how a
+low enclosure gets a skyline without building one, and it is the reason the garden belongs on the
 shore rather than back from it.
 
 ## Order of work
 
-**0. Measure before modelling. — DONE.** See below; it changed the site, and step 1 starts from
-   settled numbers rather than from this section's guesses.
+**1. The site, re-measured.** The bearing was forced out to −52 by the pavilion's 1,240-unit width
+   reaching into the menu frame. A walled garden has no tall silhouette and may not need that, so
+   the constraint is re-run rather than inherited. What the garden wants instead: **level ground**
+   (a garden is built level), **a water edge** for the pond to meet the lake, and a view worth
+   borrowing. `NAV.site` reports fall, near/far wetness and reach; that is the same query with
+   different targets.
 
-**1. The building.** One `mergeParts` geometry per storey, so each is one draw call and one outline.
+**2. The shot.** `stand` 3200 / `eyeLift` 460 framed a 1,040-tall building and does not transfer. A
+   garden is read as a *ground plan*, so the eye probably wants to be higher and the stand-off
+   closer. Measure before modelling — the instruments are built and this is one page load.
 
-**2. Level two.** The four bays, their hover, the picks and their focus twins.
+**3. The enclosure.** Wall, coping, gate. One `mergeParts` geometry.
 
-**3. Level three.** The rising flight and the row placards.
+**4. The water and the circuit.** The pond, the island, the path around it. The path is the ribbon
+   mesh REVIEW's approach already uses — it cannot step or gap, and it carries its own colour.
 
-**4. Dressing.** Planting through `spaced`/`PLANTED`, the stair, the approach from the shore.
+**5. The four quarters.** Their planting, their lanterns, their picks and focus twins.
+
+**6. Level three.** The stations along a quarter, and the 駒札 name-plaques. Reuses REVIEW's walk.
+
+**7. The rooms.** A 茶室 at each station — the first L4 interior in the project, so it sets the
+   pattern for the other five places.
 
 ## Reused vs new
 
-**Reused:** the walk mechanism, the screen-space outline, the placard/sign canvas pipeline,
-`spaced`/`PLANTED`/`treeClaim`, the transition machinery, and all four measurement instruments
-(`NAV.probe`, `NAV.rectOf`, `NAV.hit`, `NAV.outlineAudit`).
+**Reused:** the walk mechanism, the screen-space outline, the placard/sign canvas pipeline, the path
+ribbon, `spaced`/`PLANTED`/`treeClaim`, the transition machinery, the planar reflection, and all the
+measurement instruments (`NAV.probe`, `NAV.rectOf`, `NAV.hit`, `NAV.site`, `NAV.tryStand`,
+`NAV.outlineAudit`).
 
-**New:** the pavilion geometry, the shoji/noren bay, and a flight path that climbs.
-
-## Before the geometry lands: split the file
-
-6,435 lines, of which REVIEW is roughly 1,200. Five more places at that rate is well over twelve
-thousand in one file. The shrine moves to `places/review.js` exporting a single `buildReview(ctx)`,
-with `ctx` carrying what it needs from the core — a mechanical move with no behaviour change, and
-far cheaper now than once a second place is tangled into the same scope. STUDY then follows the same
-shape as `places/study.js`, and the pattern is established rather than invented twice.
-
-(An inline `<script type="module">` can import from a file but cannot be imported from, which is why
-the core is passed in as a context object rather than exported.)
+**New:** the enclosure, the pond and its bridges, seasonal planting, and the first L4 interior.
 
 ---
 
-# Step 0 — what the measurement said
+# What step 0 established (kept)
 
-A stand-in massing went up first: nine named boxes at the intended dimensions, in
-`places/study.js`. Step 1 replaces it. Everything below is measured, not chosen.
+Measured against the pavilion massing, but most of it is not about the pavilion.
 
-## The site moved
+## Still true — terrain and instruments
 
-`DEST_SPECS[0]` had carried **bearing −37, dist 4400** since the destinations were authored, and it
-is not a site the pavilion can stand on. Three things had to agree and only ever two did at once:
+**The shore at bearing −52 is a neck of land.** Lake from f −2600 to −1000, dry ground −800 to +600,
+open water beyond +800. Measured, and independent of what stands on it.
 
-| bearing / dist | menu | footprint | shore |
-|---|---|---|---|
-| −37 / 4400 | **reaches into the frame**, sliced by the left edge, behind the type column | 46% under water, 195 fall | water on the near side — ideal |
-| −55 / 4400 | clear | 40% wet, 199 fall | water on the **far** side; building hides its own reflection, foreground is wood |
-| **−52 / 4150** | **clear** at every aspect tested to 21:9 | **~10% wet, ~120 fall — flattest in the sweep** | water reaching 2,500 back along the approach |
+**A bearing outside the menu's 31° half-cone is not automatically safe.** The cone is a rule about
+points. STUDY sat at −37 and the pavilion still reached into the frame, sliced by the left edge and
+landing behind the type column. *A destination's bearing is safe only for an object of the size that
+was there when it was chosen* — which is why the garden's bearing gets re-measured rather than
+inherited, in the other direction this time.
 
-The two findings worth carrying to the other four places:
+**Wetness has to be split near from far.** The same "40% water" is the lake between you and the
+place at one bearing and the lake behind it at another, where the place hides its own reflection.
+`NAV.site` reports `near`, `far` and `reach`.
 
-- **A bearing outside the menu's 31° half-cone is not automatically safe.** The cone is a rule about
-  points; the pavilion is 1,240 units wide. A landmark intrudes from further out than its bearing
-  suggests, and only something of the final size standing there can say by how much.
-- **Wetness has to be split near from far.** The same "40% water" is the lake between you and the
-  building at one bearing and the lake behind it at another. `NAV.site` now reports `near`, `far`
-  and `reach` (how far back along the approach the water still comes) for exactly this reason.
+**Clearing the footprint does nothing about the approach.** Everything between the camera and the
+subject is in shot, so a tree claim has to be a wedge widening toward the subject, not a circle
+around it. Two of the pavilion's four bays came back blocked by a broadleaf.
 
-## The shot
+**Height is what makes level ground read, not how much of it there is.** 360 units of bank at a 180
+eye is 48 pixels; the same bank at 460 is 60. *This one matters more for a garden than it did for a
+building* — a garden IS level ground, and how much of its plan you can see is almost entirely a
+question of eye height.
 
-`stand: 3200, eyeLift: 460`, focus **430 above the platform top**. The default 1,500 overflowed the
-frame by 900px in height.
+**`standOff` clamps at `len - 400`.** Stand-offs of 3,700 and 4,200 measure identically. There is a
+ceiling on how far back any of these shots can go.
 
-| viewport | building height | % of frame | ground veranda |
-|---|---|---|---|
-| 1920×1080 | 703 | 65% | 468px |
-| 1600×900 | 585 | 65% | 390px |
-| 1400×880 | 512 | 58% | 341px |
-| 1024×768 | 374 | 49% | 250px |
-| 2560×1080 | 703 | 65% | 468px |
-| 900×1000 | 329 | 33% | 219px |
+**`entered` is not `arrived`, and neither is `state === 'menu' && !busy`.** Both go true while the
+intro camera is still easing — rig at [381,180,1050] fov 46 against a home of [170,60,830] fov 42.
+Two separate readings claimed the pavilion had come 300–500px back into the menu frame at 21:9 when
+it is clear of it. The only condition that means the shot has arrived is **the rig reporting the
+same numbers two frames running**.
 
-468px of veranda is **117 per bay** — still more than the shrine's ema tablets ever had, so level
-two's legibility is not in question at the common sizes. The weak case is 900×1000 at 33% of frame
-height and 55px per bay; it is the least likely viewport, but it is the one to re-check once real
-bays exist.
+## Superseded
 
-### Setting it off the water
+- The site choice **−52 / 4150** and the shot **stand 3200 / eyeLift 460 / focus +430** were both
+  chosen to frame a 1,040-tall building. Re-derive.
+- The massing constraints — eave taper carried by the oversail, storey pitch 250, the widest eave
+  near 1,030 units, the plinth's 260 skirt — die with the pavilion.
+- **The occlusion finding dies with it too**, but the shape of the answer is worth keeping: the
+  danger ran the *opposite* way to the one predicted. An eave hides what is behind and above it, so
+  what got swallowed was the deck of the storey above, never the wall below. When a plan predicts an
+  occlusion, check which direction it actually runs before designing around it.
 
-The first pass put `stand` at 2700 and `eyeLift` at 180, which framed the building at 80% of frame
-height and read as a pavilion standing *in* the lake. Three things were going on, and only the
-first was obvious:
-
-- **The site is a neck of land.** Lake from f −2600 to −1000, dry ground −800 to +600, open water
-  beyond +800. The pavilion sat at the front edge of its own peninsula with 360 units between the
-  plinth and the waterline. Moving the site out to dist **4150** seats it deeper on the neck — 510
-  units of bank — without pushing the back of the plinth into the far water.
-- **A horizontal bank compresses to almost nothing at a low eye.** 360 units of ground at a 180 eye
-  is 48 pixels; the same ground at 460 is 60, and at 620 is 69. **Height is what makes level ground
-  read at all** — the depth of a bank on screen is a question about eye height far more than about
-  how much bank there is. Two dials, and the geometric one is the weaker of the two.
-- **`standOff` clamps.** Past roughly 3,600 the camera parks 400 units from home and further
-  numbers change nothing; 3,700 and 4,200 measured identically. There is a hard ceiling on how far
-  back this shot can go.
-
-## The occlusion question, answered — and it pointed the other way
-
-"Do storey two's eaves occlude storey one's veranda?" **No, and they cannot.** From a low camera an
-eave hides what is behind and above it, so what gets swallowed is the *deck of the storey above*,
-never the wall below. Raycast at the chosen shot: `core1`, `core2`, `core3` and `roof` all report
-themselves; `deck2` and `deck3` report `eave1` and `eave2`, which is what a pavilion looks like from
-the ground. Level three stands on the veranda, so it never needs that view.
-
-**The real occlusion problem was trees.** Two of the four bays came back BLOCKED by a broadleaf.
-A claim circle round the building does nothing about the 2,700 units between it and the camera, so
-the claim is now a wedge widening from the standing point to the facade.
-
-## Constraints step 1 inherits
-
-- **The widest eave must stay near 1,030 units.** At 21:9 the massing clears the menu's left edge by
-  a handful of pixels. A wider building needs the bearing re-checked, not just the eave.
-- **The taper has to be carried by the eaves.** Drawing the walls in while holding the oversail
-  constant produced a visible stack of identical trays. Current: cores 640/540/430, oversails
-  195/165/135, so the eaves read 1030/870/700.
-- **Storey pitch 250 works** — it is what leaves all three fronts clear at a 180 eye. Changing it
-  reopens the occlusion question.
-- **The platform is level at −296** and the base skirt has to reach 260 below it; the near ground
-  rises enough to bury the plinth's foot, which is correct but means the base's visible height is
-  less than its modelled height.
-
-## Two things step 0 uncovered that steps 2 and 4 own
+## Open, and now inherited by the garden
 
 - **STUDY still has its legacy CSS3D level two** — four black tiles (ひらがな / カタカナ / 漢字 /
-  語彙) stepping diagonally across the facade, plus the 学習 title plane and the env backdrop. They
-  are what step 2 replaces with shoji bays, and the agreed set is **かな / 漢字 / 語彙 / 文法**, not
-  the four currently there.
-- **The base reads as a blank slab** and the ground cuts across its foot. Step 1 gives it a stone
-  edge; step 4 dresses the bank.
+  語彙) stepping diagonally across whatever stands there, plus the 学習 title plane and the env
+  backdrop. The agreed set is **かな / 漢字 / 語彙 / 文法**, so those get replaced wholesale.
+- **900×1000 portrait is the weak viewport.** The pavilion fell to 33% of frame height and 55px per
+  bay there. Re-check once the garden's real picks exist.
