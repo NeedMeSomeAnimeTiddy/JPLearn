@@ -1701,20 +1701,33 @@ four questions, each with a number rather than an impression.
   940 and 870 wide and the silhouette read as a stack of identical trays — the taper existed and
   was invisible, because the only part of a storey with a hard edge against the sky was not doing
   any of it.
-- **`entered` is not `arrived`.** A menu-frame reading taken 600ms after the type animates in said
-  the pavilion had come 500px back into frame at 21:9. It had not; the intro camera was still
-  flying. Waiting for `state === 'menu' && !busy` gives 17px of eave at the extreme edge, which the
-  screenshot confirms is invisible against the treeline. **A measurement of a moving camera is a
-  measurement of the clock.**
+- **`entered` is not `arrived`, and neither is `state === 'menu' && !busy`.** A menu-frame reading
+  taken 600ms after the type animates in said the pavilion had come 500px back into frame at 21:9.
+  It had not; the intro camera was still flying. Waiting on the state flags did not fix it either —
+  they go true while the intro is still easing, with the rig at [381,180,1050] fov 46 against a home
+  of [170,60,830] fov 42. The only condition that means "the shot has arrived" is **the rig has
+  stopped changing**, polled frame to frame. Two separate wrong conclusions came out of this before
+  it was nailed down, and both looked like real regressions. **A measurement of a moving camera is
+  a measurement of the clock.**
+- **Height is what makes level ground read, not how much of it there is.** The pavilion looked like
+  it was standing in the lake. There were 360 units of bank between the plinth and the water — at a
+  180 eye that is 48 pixels, and no amount of shuffling the building along its peninsula was going
+  to fix it, because the peninsula is only 1,400 units long. Raising the eye to 460 was worth more
+  than moving the building 150 units further onto its own ground, and the two together turned "in
+  the water" into "set back from it". **When a horizontal surface won't read, the dial is the
+  camera's height, not the surface's size.**
+- **`standOff` clamps at `len - 400`.** Stand-offs of 3,700 and 4,200 measured byte-identically
+  because both park the camera 400 units from home. A sweep that reports two rows the same is
+  telling you a parameter has stopped being a parameter.
 - **Reduced motion is the right emulation for a measurement and the wrong one for an arrival.** It
   stops `breath` drifting the camera between the read and the shot, and it also stops the
   transition ever completing. The two harnesses want opposite settings.
 
-Settled: bearing -52, dist 4000 — the flattest ground in the whole sweep (114 fall), a 10%-wet
-footprint, water reaching 2,500 back along the approach, and clear of the menu at every aspect
-tested. `stand` 2700, `eyeLift` 180, focus 430 above the platform. The default 1,500 overflowed the
-frame by 900px in height; 2,700 holds all three storeys at 80% of frame height with the ground
-veranda 560px wide, which is 140 per bay — more than the shrine's tablets ever had.
+Settled: bearing -52, dist 4150 — the flattest ground in the whole sweep, a ~10%-wet footprint,
+water reaching 2,500 back along the approach, and clear of the menu at every aspect tested to 21:9.
+`stand` 3200, `eyeLift` 460, focus 430 above the platform. The default 1,500 overflowed the frame by
+900px in height; 3,200 seats the pavilion in its landscape at 65% of frame height with the ground
+veranda 468px wide, which is 117 per bay — still more than the shrine's tablets ever had.
 
 ## Gotchas learned (worth keeping)
 
@@ -2001,7 +2014,11 @@ veranda 560px wide, which is 140 per bay — more than the shrine's tablets ever
   confidently.
 - **Clearing around a thing is not clearing the way to it.** Everything between the camera and the
   subject is in shot, and that is a wedge, not a circle.
-- **`entered` is not `arrived`.** Measuring while a camera is still moving measures the clock.
+- **`entered` is not `arrived`, and neither is a state flag.** The only reliable "the shot has
+  settled" is the camera rig reporting the same numbers two frames running.
+- **When a horizontal surface won't read, raise the camera.** Ground depth on screen is governed by
+  eye height far more than by how much ground there is.
+- **Two identical rows in a sweep mean a parameter has stopped being one.** Something clamped.
 
 ## Sources
 

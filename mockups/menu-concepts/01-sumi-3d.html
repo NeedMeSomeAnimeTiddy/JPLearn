@@ -2606,12 +2606,18 @@ const DEST_SPECS = [
      -52/4000 is where all three hold: an 11%-wet footprint over the flattest ground in the
      sweep (122), water reaching back 2,500 along the approach so the standing point is at the
      water's edge, and 160px of clearance from the menu's left edge. */
-  /* and the shot: at the default 1,500 the pavilion overflows the frame by 900px in height.
-     2,700 is the first stand-off that holds all three storeys with margin, and it still leaves
-     the ground veranda 562px wide — 140 per bay, which is more than the shrine's tablets ever
-     had. The low eye keeps the lake in the foreground and looks UP at the building, which is
-     what a three-storey landmark wants. */
-  { bearing: -52, dist: 4000, lift: 0, stand: 2700, eyeLift: 180 }, /* STUDY — the pavilion */
+  /* and the shot. The site is a NECK of land: lake from 2,600 to 1,000 short of it, dry ground
+     for 1,400 units, then open water beyond. At dist 4000 the pavilion stood at the front edge
+     of that neck with its plinth 360 units off the waterline, and at a 180 eye a 360-unit bank
+     compresses to 48 pixels — so it read as a building standing in the lake. 4150 sets it deeper
+     onto its own ground (510 units of bank), and the eye rides higher because height is what
+     makes level ground read at all: 460 doubles the bank to 60px without giving up the upward
+     look at the roofs.
+     2,700 held the frame but at 80% of its height the pavilion loomed; 3,200 seats it in the
+     landscape at 65% and still leaves the ground veranda 468px wide — 117 per bay, comfortably
+     more than the shrine's tablets. (Past ~3,600 `standOff` clamps against home and further
+     numbers do nothing.) */
+  { bearing: -52, dist: 4150, lift: 0, stand: 3200, eyeLift: 460 }, /* STUDY — the pavilion */
   { bearing: 105, dist: 5200, lift: 150, stand: 855, eyeLift: 182 }, /* REVIEW — the shrine */
   { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
   { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */

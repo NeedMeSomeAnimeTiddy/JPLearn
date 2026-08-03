@@ -107,7 +107,7 @@ is not a site the pavilion can stand on. Three things had to agree and only ever
 |---|---|---|---|
 | −37 / 4400 | **reaches into the frame**, sliced by the left edge, behind the type column | 46% under water, 195 fall | water on the near side — ideal |
 | −55 / 4400 | clear | 40% wet, 199 fall | water on the **far** side; building hides its own reflection, foreground is wood |
-| **−52 / 4000** | **clear** (17px of eave at 21:9, invisible against the treeline) | **10% wet, 114 fall — flattest in the sweep** | water reaching 2,500 back along the approach |
+| **−52 / 4150** | **clear** at every aspect tested to 21:9 | **~10% wet, ~120 fall — flattest in the sweep** | water reaching 2,500 back along the approach |
 
 The two findings worth carrying to the other four places:
 
@@ -120,21 +120,40 @@ The two findings worth carrying to the other four places:
 
 ## The shot
 
-`stand: 2700, eyeLift: 180`, focus **430 above the platform top**. The default 1,500 overflowed the
+`stand: 3200, eyeLift: 460`, focus **430 above the platform top**. The default 1,500 overflowed the
 frame by 900px in height.
 
 | viewport | building height | % of frame | ground veranda |
 |---|---|---|---|
-| 1920×1080 | 859 | 80% | 560px |
-| 1600×900 | 716 | 80% | 467px |
-| 1400×880 | 626 | 71% | 409px |
-| 1024×768 | 458 | 60% | 299px |
-| 2560×1080 | 859 | 80% | 560px |
-| 900×1000 | 403 | 40% | 263px |
+| 1920×1080 | 703 | 65% | 468px |
+| 1600×900 | 585 | 65% | 390px |
+| 1400×880 | 512 | 58% | 341px |
+| 1024×768 | 374 | 49% | 250px |
+| 2560×1080 | 703 | 65% | 468px |
+| 900×1000 | 329 | 33% | 219px |
 
-560px of veranda is **140 per bay** — more than the shrine's ema tablets ever had, so level two's
-legibility is not in question. The 900×1000 case is the weak one at 40% of frame height; it is
-still legible and it is the least likely viewport.
+468px of veranda is **117 per bay** — still more than the shrine's ema tablets ever had, so level
+two's legibility is not in question at the common sizes. The weak case is 900×1000 at 33% of frame
+height and 55px per bay; it is the least likely viewport, but it is the one to re-check once real
+bays exist.
+
+### Setting it off the water
+
+The first pass put `stand` at 2700 and `eyeLift` at 180, which framed the building at 80% of frame
+height and read as a pavilion standing *in* the lake. Three things were going on, and only the
+first was obvious:
+
+- **The site is a neck of land.** Lake from f −2600 to −1000, dry ground −800 to +600, open water
+  beyond +800. The pavilion sat at the front edge of its own peninsula with 360 units between the
+  plinth and the waterline. Moving the site out to dist **4150** seats it deeper on the neck — 510
+  units of bank — without pushing the back of the plinth into the far water.
+- **A horizontal bank compresses to almost nothing at a low eye.** 360 units of ground at a 180 eye
+  is 48 pixels; the same ground at 460 is 60, and at 620 is 69. **Height is what makes level ground
+  read at all** — the depth of a bank on screen is a question about eye height far more than about
+  how much bank there is. Two dials, and the geometric one is the weaker of the two.
+- **`standOff` clamps.** Past roughly 3,600 the camera parks 400 units from home and further
+  numbers change nothing; 3,700 and 4,200 measured identically. There is a hard ceiling on how far
+  back this shot can go.
 
 ## The occlusion question, answered — and it pointed the other way
 
@@ -151,7 +170,7 @@ the claim is now a wedge widening from the standing point to the facade.
 ## Constraints step 1 inherits
 
 - **The widest eave must stay near 1,030 units.** At 21:9 the massing clears the menu's left edge by
-  17px. A wider building needs the bearing re-checked, not just the eave.
+  a handful of pixels. A wider building needs the bearing re-checked, not just the eave.
 - **The taper has to be carried by the eaves.** Drawing the walls in while holding the oversail
   constant produced a visible stack of identical trays. Current: cores 640/540/430, oversails
   195/165/135, so the eaves read 1030/870/700.

@@ -157,7 +157,7 @@ export function buildStudy(ctx) {
      point to the building, which removes exactly what would come between the two and leaves the
      flanking trees that frame the shot. It stops just past the building so the wood behind stays
      as a backdrop. */
-  const STAND = 2700;
+  const STAND = SPEC.stand;
   for (let f = -STAND - 200; f <= 260; f += 260) {
     const p = at3(f, 0);
     treeClaim(p.x, p.z, 200 + 700 * ((f + STAND + 200) / (STAND + 460)));
