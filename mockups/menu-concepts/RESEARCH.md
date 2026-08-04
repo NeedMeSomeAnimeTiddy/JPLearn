@@ -2174,6 +2174,42 @@ rim, sway, mist. Shafts: hold.
 - **Posterise without a dither bands every gradient into onion rings.** An ordered 4×4 matrix
   trades those for a regular texture, which on a woodblock look is the point rather than a
   compromise.
+- **Cel shading is a modelling decision at least as much as a shading one.** The finding that
+  "terrain always takes smooth shading — a 4-step ramp across a large curved surface quantises
+  into contour blotches" is correct and was never a shading problem: on a *smoothed* dome N·L
+  varies continuously over half the screen, so any quantisation of it draws topographic lines.
+  Cel-shaded landscapes are coarse and flat-shaded, so N·L is piecewise constant and the bands
+  land on facet edges where they read as form. Cel mode therefore gets its own terrain — 64
+  segments instead of 256, non-indexed, **colour computed per face and copied to its three
+  corners**, because interpolating vertex colours across a facet reintroduces exactly the
+  gradient the flat shading exists to remove.
+- **A cel mode has to switch things OFF.** Bloom, halation, focus and aberration are lens
+  artefacts; a drawing has no lens. Leaving them on is most of why an attempt at this reads as
+  a filter over a render rather than as a different image.
+- **Silhouettes and creases are one operator, not two.** A first-difference detector on depth
+  fires wherever depth changes fast per pixel — which is every surface seen edge-on, not just
+  every edge — and no threshold separates them: the value that quiets the false lines deletes
+  the real ones. The **second** difference of *raw* depth is exactly zero on any plane however
+  tilted, so it has no false positives to tune away, and a silhouette is simply a very large
+  one. Raw, not linearised: the depth buffer stores a quantity that is linear in screen space
+  across a plane, which is the whole reason the second difference vanishes there.
+- **A crease you cannot resolve should not be drawn.** Where facets are a few pixels across
+  every facet edge fires at once and the result is scribble. Attenuate by the first derivative
+  — that *is* the measure of edge-on — rather than by raising the threshold.
+- **And normalise that test, or it measures distance instead of tilt.** Raw depth is ≈ 1 −
+  near/z, so its gradient across a *face-on* surface still scales as near/z: close ground has a
+  steep gradient because it is close. One threshold on the raw quantity deletes near creases and
+  keeps far ones, exactly backwards. Divide by (1 − z).
+- **Show the mask.** A line threshold cannot be chosen from a finished frame — a mask that is
+  all black and one that is subtle look identical once multiplied into a picture. `POST.inkDebug`
+  draws it as black on white, and the first guess at the crease threshold turned out to be 25×
+  too high, contributing nothing at all.
+- **Split coverage by screen region when the artefact is local.** The scribble lived entirely in
+  the lower band, so a single whole-frame ink percentage could not distinguish losing the
+  artefact from losing the drawing.
+- **A single outlying reading in a sweep is a stale read until it reproduces.** One value in the
+  grazing sweep returned a 100%-inked frame between neighbours reading 2.8% and 5.6%; re-read
+  five times it was 5.57% every time.
 - **One landform cannot demonstrate mist or shafts, and it is the same missing thing.** Mist
   needs low ground with high ground on both sides or it has nothing to sit in; rays need a
   crest with gaps in it. A ridge with notches cut through it and a hollow in front of it closes

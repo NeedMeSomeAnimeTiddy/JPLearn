@@ -74,7 +74,14 @@ import * as THREE from './lib/three.module.min.js';
      K  sharpen        unsharp mask that skips whatever focus just blurred
      L  washi          pulp mottle under the fibre grain
      ;  posterise      quantise with a 4x4 ordered dither, for the woodblock looks
-     '  bleach         bleach bypass: contrast up, colour down, silver left in the print
+     '  bleach        bleach bypass: contrast up, colour down, silver left in the print
+
+     C  CEL           a MODE, not an effect. Swaps the terrain for a coarse flat-shaded
+                      copy — a hard ramp on a smoothed dome draws contour lines, which is
+                      why the terrain was never allowed the toon ramp — puts a three-step
+                      ramp on everything, doubles the outline weight, turns on the crease
+                      pass, and switches OFF bloom, halation, focus and aberration. Those
+                      are all lens artefacts, and a drawing has no lens.
 
    Press 1-8 to toggle, 0 for all off (which is roughly what the main mockup
    was doing), 9 for all on.
@@ -86,7 +93,8 @@ const state = { ao: true, ramp: true, toon: true, shadow: true, clouds: true,
   /* the post block. Independent of the grade on purpose: eight looks times nine lenses
      compose freely, where folding them together would make both harder to judge. */
   dof: true, ink: false, lens: true, halo: true, paint: false,
-  sharpen: true, paper: true, poster: false, bleach: false };
+  sharpen: true, paper: true, poster: false, bleach: false,
+  cel: false };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
@@ -206,6 +214,17 @@ function toonRamp(steps) {
   return t;
 }
 const RAMP = toonRamp(4);
+/* CEL WANTS FEWER STEPS AND A HARDER TERMINATOR. Four steps with a 0.72 gamma is a stylised
+   gradient; three with the break pushed late is a lit side, a turn and a shadow side, which is
+   what a painted cel actually has. */
+const RAMP_CEL = (() => {
+  const d = new Uint8Array(3 * 4);
+  [64, 176, 255].forEach((v, i) => { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255; });
+  const t = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter;
+  t.needsUpdate = true;
+  return t;
+})();
 
 /* ---- height fog: mist lying in the valley ----
    Distance fog alone flattens a landscape into one grey wash: everything far is equally hazy,
@@ -606,6 +625,53 @@ ground.receiveShadow = true;
 ground.castShadow = true;
 scene.add(ground);
 
+/* ============================ THE CEL TERRAIN ============================
+   A SECOND, COARSER, FLAT-SHADED COPY of the same landform. 64 segments instead of 256, so a
+   facet is about 69 units — nearly three metres, big enough to read as a plane rather than as
+   noise. Non-indexed, with the colour computed once per FACE and copied to its three corners:
+   interpolating vertex colours across a facet reintroduces exactly the smooth gradient the
+   flat shading exists to remove, and the result is a faceted mesh that still looks smooth.
+
+   It costs 8k triangles and about 15 ms to build, and it is worth more than any amount of
+   tuning the ramp on the smooth mesh, which cannot be made to work. */
+const geoCel = (() => {
+  const g = new THREE.PlaneGeometry(SIZE, SIZE, 64, 64);
+  g.rotateX(-Math.PI / 2);
+  const q = g.attributes.position;
+  for (let i = 0; i < q.count; i++) q.setY(i, heightAt(q.getX(i), q.getZ(i)));
+  const f = g.toNonIndexed();
+  f.computeVertexNormals();           /* non-indexed => these ARE face normals */
+  return f;
+})();
+{
+  const q = geoCel.attributes.position, n = geoCel.attributes.normal;
+  const cc = new Float32Array(q.count * 3);
+  const t3 = new THREE.Color();
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  for (let tri = 0; tri < q.count; tri += 3) {
+    A.fromBufferAttribute(q, tri); B.fromBufferAttribute(q, tri + 1); C.fromBufferAttribute(q, tri + 2);
+    const x = (A.x + B.x + C.x) / 3, y = (A.y + B.y + C.y) / 3, z = (A.z + B.z + C.z) / 3;
+    const slope = 1 - n.getY(tri);
+    const alt = THREE.MathUtils.clamp(y / 700, 0, 1);
+    t3.copy(GRASS_D).lerp(GRASS, THREE.MathUtils.smoothstep(alt, -0.05, 0.55));
+    t3.lerp(DRY, THREE.MathUtils.smoothstep(alt, 0.5, 0.95) * 0.75);
+    t3.lerp(ROCK, THREE.MathUtils.smoothstep(slope, 0.14, 0.42));
+    /* PER-FACET VARIATION, NOT PER-METRE. The smooth terrain's patchiness runs at a frequency
+       far finer than a facet, so on this mesh it would average out to nothing; this is coarse
+       enough that neighbouring facets differ, which is most of what sells a low-poly surface. */
+    t3.multiplyScalar(1 + Math.sin(x * 0.0031 + z * 0.0027) * Math.cos(z * 0.0024 - x * 0.0019) * 0.10
+                        + (((Math.sin(tri * 12.9898) * 43758.5453) % 1 + 1) % 1 - 0.5) * 0.055);
+    for (let k = 0; k < 3; k++) { cc[(tri + k) * 3] = t3.r; cc[(tri + k) * 3 + 1] = t3.g; cc[(tri + k) * 3 + 2] = t3.b; }
+  }
+  geoCel.setAttribute('color', new THREE.BufferAttribute(cc, 3));
+}
+const matCel = cloudy(new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP_CEL }));
+const groundCel = new THREE.Mesh(geoCel, matCel);
+groundCel.receiveShadow = true;
+groundCel.castShadow = true;
+groundCel.visible = false;
+scene.add(groundCel);
+
 /* ============================ THE TREE ============================ */
 /* ---- 3. OUTLINE: inverted hull, extruded along the normal in a vertex shader.
    Scaling the mesh does not work on anything non-spherical; extruding does. */
@@ -646,14 +712,21 @@ function outlineGeom(src) {
   return g;
 }
 
+/* THE LINE WEIGHT IS A SHARED UNIFORM, not a per-material constant. Cel mode wants a heavier,
+   darker line than the ink-wash look does, and forty separate outline materials cannot be
+   re-weighted after the fact unless they were all handed the same object to read it from. */
+const OUTLINE = { uScale: { value: 1 }, uCol: { value: new THREE.Color(0x0e1018) } };
+
 function outlineFor(mesh, w, sway) {
   /* THE HULL HAS TO MOVE WITH WHAT IT WRAPS. An inverted-hull outline is a second copy of the
      geometry; displace one in a vertex shader and not the other and the black shell walks off
      the crown, which looks exactly like the outline bug this whole system was built to fix.
      The same snippet, pasted into both. */
   const m = new THREE.Mesh(outlineGeom(mesh.geometry), new THREE.ShaderMaterial({
-    uniforms: sway ? { w: { value: w }, uTime: FX.uTime, uSwayAmt: FX.uSwayAmt } : { w: { value: w } },
-    vertexShader: `uniform float w;
+    uniforms: Object.assign(
+      { w: { value: w }, uScale: OUTLINE.uScale, uCol: OUTLINE.uCol },
+      sway ? { uTime: FX.uTime, uSwayAmt: FX.uSwayAmt } : {}),
+    vertexShader: `uniform float w; uniform float uScale;
       ${sway ? 'uniform float uTime; uniform float uSwayAmt;' : ''}
       attribute vec3 aFlat;
       void main(){
@@ -661,9 +734,9 @@ function outlineFor(mesh, w, sway) {
       ${sway ? SWAY_GLSL : ''}
       vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
       float k = 1.0 / max( dot( normal, aFlat ), 0.30 );
-      vec3 p = transformed + normal * (w * -mv.z * k);
+      vec3 p = transformed + normal * (w * uScale * -mv.z * k);
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
-    fragmentShader: `void main(){ gl_FragColor = vec4(0.055, 0.06, 0.085, 1.0); }`,
+    fragmentShader: `uniform vec3 uCol; void main(){ gl_FragColor = vec4(uCol, 1.0); }`,
     side: THREE.BackSide,
   }));
   m.position.copy(mesh.position);
@@ -1075,8 +1148,22 @@ const POST = {
   dofRadius: { value: 2.6 },
   /* ---- screen-space ink contours ---- */
   inkAmt: { value: 0.6 },
-  inkThresh: { value: 0.012 },
+  inkThresh: { value: 0.00016 },
   inkWidth: { value: 1.4 },
+  /* CREASES ARE NOT DEPTH JUMPS. Where a roof meets a wall, or one facet of a hillside meets
+     the next, depth is continuous and only its GRADIENT breaks — a silhouette detector sees
+     nothing there. Without this a cel scene has an outline round the outside of everything and
+     no line anywhere inside it, which reads as a sticker rather than as a drawing. */
+  creaseAmt: { value: 0 },
+  creaseThresh: { value: 0.000009 },
+  /* HOW STEEPLY DEPTH MAY RUN PER PIXEL, relative to depth, before a crease counts as
+     unresolvable. Found by splitting the mask's coverage by screen region rather than
+     measuring the whole frame: the scribble was all in the lower band, so one percentage over
+     the whole picture could not tell losing the artefact from losing the drawing. At 0.012 the
+     lower band falls to 1.9% inked while the upper holds 5.5, and the near and the far camera
+     now behave the same, which is what the normalisation was for. */
+  creaseGraze: { value: 0.012 },
+  inkDebug: { value: 0 },
   /* ---- lens ---- */
   caAmt: { value: 0.9 },
   distortAmt: { value: 0.055 },
@@ -1307,6 +1394,8 @@ const matComposite = new THREE.ShaderMaterial({
     sunUv: POST.sunUv, sunVis: POST.sunVis,
     dofAmt: POST.dofAmt, dofFocus: POST.dofFocus, dofRange: POST.dofRange, dofMax: POST.dofMax,
     inkAmt: POST.inkAmt, inkThresh: POST.inkThresh, inkWidth: POST.inkWidth,
+    creaseAmt: POST.creaseAmt, creaseThresh: POST.creaseThresh, inkDebug: POST.inkDebug,
+    creaseGraze: POST.creaseGraze,
     caAmt: POST.caAmt, distortAmt: POST.distortAmt,
     haloAmt: POST.haloAmt, haloTint: POST.haloTint, streakAmt: POST.streakAmt,
     sharpenAmt: POST.sharpenAmt, paperAmt: POST.paperAmt,
@@ -1321,7 +1410,8 @@ const matComposite = new THREE.ShaderMaterial({
     'uniform float lift, contrast, sat;',
     'uniform float shaftAmt, shaftDensity, shaftDecay, sunVis;',
     'uniform float dofAmt, dofFocus, dofRange, dofMax;',
-    'uniform float inkAmt, inkThresh, inkWidth;',
+    'uniform float inkAmt, inkThresh, inkWidth, creaseAmt, creaseThresh, inkDebug;',
+    'uniform float creaseGraze;',
     'uniform float caAmt, distortAmt, haloAmt, streakAmt;',
     'uniform float sharpenAmt, paperAmt, posterAmt, posterLevels, bleachAmt;',
     'uniform float uNear, uFar;',
@@ -1432,16 +1522,35 @@ const matComposite = new THREE.ShaderMaterial({
        metre of separation is a hundredth of the depth at range and half of it up close.
        A Roberts cross on the diagonals: four taps rather than eight, and on a contour that is
        going to be roughened anyway the extra precision buys nothing. */
+    '  float lineOut = 0.0;',
     '  if ( inkAmt > 0.0 ) {',
     '    vec2 t = inkWidth / uRes;',
-    '    float a = linDepth( texture2D( tDepth, uvD + t ).x );',
-    '    float b = linDepth( texture2D( tDepth, uvD - t ).x );',
-    '    float e = linDepth( texture2D( tDepth, uvD + vec2( t.x, -t.y ) ).x );',
-    '    float f = linDepth( texture2D( tDepth, uvD + vec2( -t.x, t.y ) ).x );',
-    '    float g = ( abs( a - b ) + abs( e - f ) ) / max( dep, 1.0 );',
-    '    float line = smoothstep( inkThresh, inkThresh * 3.5, g );',
+    '    float z0 = texture2D( tDepth, uvD ).x;',
+    '    float zl = texture2D( tDepth, uvD - vec2( t.x, 0.0 ) ).x;',
+    '    float zr = texture2D( tDepth, uvD + vec2( t.x, 0.0 ) ).x;',
+    '    float zu = texture2D( tDepth, uvD - vec2( 0.0, t.y ) ).x;',
+    '    float zd = texture2D( tDepth, uvD + vec2( 0.0, t.y ) ).x;',
+    '    float lap = abs( zl + zr - 2.0 * z0 ) + abs( zu + zd - 2.0 * z0 );',
+    '    float line = smoothstep( inkThresh, inkThresh * 3.5, lap );',
+    /* THE CREASE IS THE SAME LAPLACIAN AT A LOWER THRESHOLD. A silhouette is a large second
+       difference and a fold is a small one; they are the same measurement, and treating them
+       as two detectors is what produced two sets of artefacts to tune independently. */
+    '    if ( creaseAmt > 0.0 ) {',
+    /* THE GRAZING TEST, NORMALISED SO IT MEASURES TILT AND NOT DISTANCE. Where depth runs
+       away fast per pixel the surface is nearly edge-on, its facets are a few pixels across,
+       and every one of their edges fires at once — which is scribble, not drawing.
+
+       But raw depth is about 1 - near/z, so the first derivative across a FACE-ON surface
+       still scales as near/z: close ground has a steep gradient because it is close. A single
+       threshold on that deletes near creases and keeps far ones, exactly backwards. Dividing
+       by ( 1 - z ), which is near/z, cancels the distance and leaves the tilt. */
+    '      float graze = ( abs( zr - zl ) + abs( zd - zu ) ) / max( 1.0 - z0, 1e-5 );',
+    '      float ok = 1.0 - smoothstep( creaseGraze, creaseGraze * 3.0, graze );',
+    '      line = max( line, smoothstep( creaseThresh, creaseThresh * 4.0, lap ) * creaseAmt * ok );',
+    '    }',
     /* a line of exactly even weight is a filter; ink varies along its length */
     '    line *= 0.62 + 0.38 * texture2D( tPaper, uvD * 4.0 ).r;',
+    '    lineOut = line;',
     '    c *= 1.0 - line * inkAmt;',
     '  }',
     /* POSTERISE WITH AN ORDERED DITHER, not without one. Straight quantisation bands every
@@ -1467,6 +1576,9 @@ const matComposite = new THREE.ShaderMaterial({
     '  }',
     /* vignette last, so it darkens the paper as well as the picture */
     '  c *= 1.0 - vignette * r2 * 2.2;',
+    /* the mask on its own: black ink on white, which is the only view in which a threshold
+       can actually be chosen */
+    '  if ( inkDebug > 0.5 ) { gl_FragColor = vec4( vec3( 1.0 - lineOut ), 1.0 ); return; }',
     '  gl_FragColor = vec4( lin2srgb( c ), 1.0 );',
     '}',
   ].join('\n'),
@@ -1611,6 +1723,8 @@ function renderFrame() {
 const AMT = {
   dof: 1, ink: 0.6, ca: 0.25, distort: 0.055, halo: 0.5, streak: 0.28,
   sharpen: 0.35, paper: 0.6, poster: 0.85, bleach: 0.45,
+  /* cel: heavier line, a crease pass, and a wider ink sample so the line has body */
+  celInk: 0.95, celCrease: 0.9, celOutline: 2.1, celInkWidth: 2.0,
 };
 
 /* ============================ GRADES ============================
@@ -1648,6 +1762,10 @@ const GRADES = [
     exposure: 0.70, bloomAmt: 0.55, bloomCut: 0.52, bloomTint: 0xa8c8ff,
     grain: 0.060, vignette: 0.56, splitAmt: 0.34, splitShadow: 0x18233f, splitHigh: 0xb9d2ff,
     contrast: 1.18, sat: 0.74, lift: 0.020 },
+  { name: 'nurie 塗り絵', note: 'colouring book — flat, clean, no lens. Pair with C',
+    exposure: 1.08, bloomAmt: 0.10, bloomCut: 0.92, bloomTint: 0xffffff,
+    grain: 0.020, vignette: 0.08, splitAmt: 0.12, splitShadow: 0x44557a, splitHigh: 0xfff2d8,
+    contrast: 1.06, sat: 1.16, lift: 0.020 },
   { name: 'nama 生', note: 'ungraded — ACES and gamma only, the control',
     exposure: 1.00, bloomAmt: 0.00, bloomCut: 0.99, bloomTint: 0xffffff,
     grain: 0.000, vignette: 0.00, splitAmt: 0.00, splitShadow: 0x808080, splitHigh: 0x808080,
@@ -1683,6 +1801,17 @@ function apply() {
      surface quantises into contour blotches, while the same ramp reads correctly on the tree
      and the rocks. Toon is for objects; terrain gets ramp colour + baked AO + shadows. */
   ground.material = matPlain;
+  /* CEL IS A MODE, NOT A TOGGLE. It swaps the terrain for the flat-shaded copy, puts the hard
+     three-step ramp on every toon material, doubles the outline weight and turns on the crease
+     pass — and switches OFF the things that fight it. Bloom, halation, depth of field and
+     aberration are all photographic: they say "lens", and a cel frame is a drawing, which has
+     no lens. Leaving them on is what makes most attempts at this look like a filter. */
+  const cel = state.cel;
+  ground.visible = !cel;
+  groundCel.visible = cel;
+  toonMats.forEach((m) => { if (m !== matPlain) m.gradientMap = state.toon ? (cel ? RAMP_CEL : RAMP) : null; });
+  OUTLINE.uScale.value = cel ? AMT.celOutline : 1;
+  OUTLINE.uCol.value.setHex(cel ? 0x141019 : 0x0e1018);
   outlines.forEach((o) => { o.visible = state.toon; });
   renderer.shadowMap.enabled = state.shadow;
   CLOUD.uCloudAmt.value = state.clouds ? 0.78 : 0;
@@ -1696,12 +1825,14 @@ function apply() {
   /* the post block, from AMT rather than from literals. Amounts are independent of the grade
      on purpose: nine lenses times eight looks compose freely this way, and a toggle that does
      something on some grades and nothing on others is a toggle nobody can learn. */
-  POST.dofAmt.value = state.dof ? AMT.dof : 0;
-  POST.inkAmt.value = state.ink ? AMT.ink : 0;
-  POST.caAmt.value = state.lens ? AMT.ca : 0;
-  POST.distortAmt.value = state.lens ? AMT.distort : 0;
-  POST.haloAmt.value = state.halo ? AMT.halo : 0;
-  POST.streakAmt.value = state.halo ? AMT.streak : 0;
+  POST.dofAmt.value = (state.dof && !cel) ? AMT.dof : 0;
+  POST.inkAmt.value = cel ? AMT.celInk : (state.ink ? AMT.ink : 0);
+  POST.creaseAmt.value = cel ? AMT.celCrease : 0;
+  POST.inkWidth.value = cel ? AMT.celInkWidth : 1.4;
+  POST.caAmt.value = (state.lens && !cel) ? AMT.ca : 0;
+  POST.distortAmt.value = (state.lens && !cel) ? AMT.distort : 0;
+  POST.haloAmt.value = (state.halo && !cel) ? AMT.halo : 0;
+  POST.streakAmt.value = (state.halo && !cel) ? AMT.streak : 0;
   POST.sharpenAmt.value = state.sharpen ? AMT.sharpen : 0;
   POST.paperAmt.value = state.paper ? AMT.paper : 0;
   POST.posterAmt.value = state.poster ? AMT.poster : 0;
@@ -1724,6 +1855,7 @@ function apply() {
     + row(state.mist, 'R', 'mist ribbons (banks in the low ground)')
     + row(state.shafts, 'T', 'sun shafts (march through the occlusion buffer)')
     + '<div style="margin-top:9px;opacity:.55;letter-spacing:.12em">POST</div>'
+    + row(state.cel, 'C', '<b>CEL</b> flat terrain, hard ramp, heavy line, creases')
     + row(state.dof, 'Y', 'depth of field (focus ' + POST.dofFocus.value + ')')
     + row(state.ink, 'U', 'ink contours from depth')
     + row(state.lens, 'I', 'lens: barrel + chromatic aberration')
@@ -1762,6 +1894,7 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'l' || e.key === 'L') state.paper = !state.paper;
   else if (e.key === ';') state.poster = !state.poster;
   else if (e.key === "'") state.bleach = !state.bleach;
+  else if (e.key === 'c' || e.key === 'C') state.cel = !state.cel;
   /* focus is a distance, not a toggle, so it gets its own pair */
   else if (e.key === '-') { POST.dofFocus.value = Math.max(200, POST.dofFocus.value - 300); }
   else if (e.key === '=') { POST.dofFocus.value += 300; }
@@ -1826,6 +1959,7 @@ window.LAB = {
   GRADES, grade: setGrade, gradeName: () => GRADES[gradeIx].name, AMT,
   scene, camera, renderer, key, ground, motion, THREE, heightAt, frameSig, sigDiff,
   rtSharp, rtBloom: rtA, rtScene, rtDof, rtHalo, rtStreak, rtPaint,
+  OUTLINE, groundCel, RAMP, RAMP_CEL,
   freeze: false, view: null, show: null, at: (v) => { t = v; },
 };
 
