@@ -1266,12 +1266,215 @@ const OUTLINE_RES = { value: new THREE.Vector2(W(), H()) };
    read from inside its own temporal dead zone throws rather than reading undefined. */
 const OUTLINE_SCALE = { value: 1 };
 
+/* ================= SUN POST =================
+   See the header note in the patch that added this: four passes, tone mapping at the end. */
+const POST = {
+  /* OFF BY DEFAULT, AND HONESTLY SO.
+     The two effects work — a tight bloom on the sun and crepuscular rays struck from its screen
+     position. The PIPELINE does not yet: with bloomAmt, rayAmt and vignette all set to zero, so
+     that the passes are a pure copy of the scene, the composited image is still measurably
+     lighter and flatter than rendering straight to the canvas, and the cloud sprites show their
+     quad edges. Something about routing the scene through a HalfFloat render target and
+     compositing it is not yet equivalent, and it is not a double sRGB encode: the target reads
+     back linear (sky 0.393, 0.262, 0.346) and the composite applies the curve exactly once.
+     Until that null case matches, this stays opt-in rather than quietly degrading a look that
+     took a long time to tune.  ?post=on, or NAV.postOn(true). */
+  on: new URLSearchParams(location.search).get('post') === 'on',
+  /* MEASURED, NOT PICKED. The scene's linear luminance runs: median 0.277, p95 0.483, p99
+     0.70, max 1.985. A cut at 0.72 therefore takes the top 0.9% — which sounds selective and is
+     not, because most of that 0.9% is BRIGHT SKY around the sun rather than the sun. Marching
+     rays out of a sky-sized source washed the entire frame. At 0.95 it is 0.06%: the disc and
+     its bloom sprite, and nothing else in the world. */
+  bloomCut: { value: 0.95 },
+  bloomAmt: { value: 0.90 },
+  rayAmt: { value: 0.45 },
+  rayDensity: { value: 0.50 },    /* how far along the ray to the sun each step walks */
+  rayDecay: { value: 0.965 },
+  sunUv: { value: new THREE.Vector2(0.5, 0.5) },
+  sunVis: { value: 0 },           /* 0 when the sun is behind the camera or off frame */
+  vignette: { value: 0.20 },
+  aspect: { value: 1 },
+};
+/* MSAA HAS TO BE ASKED FOR AGAIN. The canvas was created with antialias:true, which applies to
+   the DEFAULT framebuffer only — a render target gets none unless it says so, and routing the
+   scene through one silently threw away the multisampling the whole look was tuned with. The
+   giveaway was the cloud sprites suddenly showing their quad edges. */
+const rtScene = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+const rtBrightA = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+const rtBrightB = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+[rtBrightA, rtBrightB].forEach((r) => {
+  r.texture.minFilter = r.texture.magFilter = THREE.LinearFilter;
+  r.texture.generateMipmaps = false;
+});
+/* one quad, reused by every pass: a fullscreen triangle-pair with no camera transform at all */
+const quadGeo = new THREE.PlaneGeometry(2, 2);
+const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const quadScene = new THREE.Scene();
+const quadMesh = new THREE.Mesh(quadGeo, null);
+quadMesh.frustumCulled = false;
+quadScene.add(quadMesh);
+function blit(mat, target) {
+  quadMesh.material = mat;
+  backRenderer.setRenderTarget(target || null);
+  backRenderer.render(quadScene, quadCam);
+  backRenderer.setRenderTarget(null);
+}
+const QUAD_VS = `
+  varying vec2 vUv;
+  void main() { vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`;
+
+/* 1. the bright pass. Anything above the cut, and only the amount ABOVE it, so a surface that
+   merely reaches the threshold contributes nothing rather than popping. */
+const matBright = new THREE.ShaderMaterial({
+  uniforms: { tSrc: { value: rtScene.texture }, cut: POST.bloomCut },
+  vertexShader: QUAD_VS,
+  fragmentShader: `
+    uniform sampler2D tSrc; uniform float cut; varying vec2 vUv;
+    void main() {
+      vec3 c = texture2D( tSrc, vUv ).rgb;
+      float l = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );
+      gl_FragColor = vec4( c * max( l - cut, 0.0 ) / max( l, 1e-4 ), 1.0 );
+    }`,
+});
+/* 2. a separable blur, run twice */
+const matBlur = new THREE.ShaderMaterial({
+  uniforms: { tSrc: { value: null }, dir: { value: new THREE.Vector2(1, 0) }, texel: { value: new THREE.Vector2() } },
+  vertexShader: QUAD_VS,
+  fragmentShader: `
+    uniform sampler2D tSrc; uniform vec2 dir, texel; varying vec2 vUv;
+    void main() {
+      /* nine taps on a gaussian; at half resolution that is a wide, soft bleed for very little */
+      float w[5];
+      w[0] = 0.2270; w[1] = 0.1946; w[2] = 0.1216; w[3] = 0.0540; w[4] = 0.0162;
+      vec3 sum = texture2D( tSrc, vUv ).rgb * w[0];
+      for ( int i = 1; i < 5; i++ ) {
+        vec2 o = dir * texel * float( i ) * 1.6;
+        sum += texture2D( tSrc, vUv + o ).rgb * w[i];
+        sum += texture2D( tSrc, vUv - o ).rgb * w[i];
+      }
+      gl_FragColor = vec4( sum, 1.0 );
+    }`,
+});
+/* 3. crepuscular rays: march the bright buffer back toward the sun, decaying. This is the same
+   trick every game has used since Crysis, and it works here because the thing casting the rays —
+   a mountain in front of a very bright disc — is exactly the case it was designed for. */
+const matRays = new THREE.ShaderMaterial({
+  uniforms: {
+    tSrc: { value: rtBrightA.texture }, sunUv: POST.sunUv, density: POST.rayDensity,
+    decay: POST.rayDecay, aspect: POST.aspect, reach: { value: 0.85 },
+  },
+  vertexShader: QUAD_VS,
+  fragmentShader: `
+    uniform sampler2D tSrc; uniform vec2 sunUv; uniform float density, decay, aspect, reach;
+    varying vec2 vUv;
+    void main() {
+      const int STEPS = 24;
+      vec2 delta = ( vUv - sunUv ) * ( density / float( STEPS ) );
+      vec2 uv = vUv;
+      vec3 acc = vec3( 0.0 );
+      float illum = 1.0;
+      /* JITTERED, or twenty-four steps band the sky into twenty-four visible arcs */
+      float j = fract( sin( dot( vUv, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+      uv -= delta * j;
+      for ( int i = 0; i < STEPS; i++ ) {
+        uv -= delta;
+        acc += texture2D( tSrc, uv ).rgb * illum;
+        illum *= decay;
+      }
+      /* AND THEY HAVE TO STOP. Every pixel in the frame has a straight line to the sun, so
+         without a falloff the march delivers some of the sun to all of them and the picture goes
+         milky — which is what it did. Shafts are a local phenomenon; this makes them one.
+         Aspect-corrected, or the reach is an ellipse on a wide window. */
+      float r = length( ( vUv - sunUv ) * vec2( aspect, 1.0 ) );
+      gl_FragColor = vec4( acc / float( STEPS ) * smoothstep( reach, reach * 0.18, r ), 1.0 );
+    }`,
+});
+/* 4. composite, and the only pass that touches the canvas */
+const matComposite = new THREE.ShaderMaterial({
+  uniforms: {
+    tScene: { value: rtScene.texture }, tBloom: { value: rtBrightA.texture },
+    tRays: { value: rtBrightB.texture },
+    bloomAmt: POST.bloomAmt, rayAmt: POST.rayAmt, sunVis: POST.sunVis,
+    vignette: POST.vignette,
+  },
+  vertexShader: QUAD_VS,
+  fragmentShader: `
+    uniform sampler2D tScene, tBloom, tRays;
+    uniform float bloomAmt, rayAmt, sunVis, vignette;
+    varying vec2 vUv;
+    void main() {
+      vec3 c = texture2D( tScene, vUv ).rgb;
+      c += texture2D( tBloom, vUv ).rgb * bloomAmt;
+      /* warm, because this is a sunrise and white shafts read as searchlights */
+      c += texture2D( tRays, vUv ).rgb * vec3( 1.0, 0.86, 0.66 ) * rayAmt * sunVis;
+      vec2 d = vUv - 0.5;
+      c *= 1.0 - vignette * dot( d, d ) * 2.2;
+      gl_FragColor = vec4( c, 1.0 );
+      /* the scene pass went to a render target, where three switches tone mapping off — so the
+         curve and the sRGB encode both have to happen here, once, at the very end */
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+});
+
+const _sunProj = new THREE.Vector3();
+function sizePost() {
+  const w = Math.max(1, Math.floor(W() * Math.min(devicePixelRatio, 2)));
+  const h = Math.max(1, Math.floor(H() * Math.min(devicePixelRatio, 2)));
+  rtScene.setSize(w, h);
+  rtBrightA.setSize(w >> 1, h >> 1);
+  rtBrightB.setSize(w >> 1, h >> 1);
+  matBlur.uniforms.texel.value.set(2 / w, 2 / h);
+  POST.aspect.value = w / h;
+}
+/* where the sun is ON SCREEN, which is the one thing every pass here needs and the one thing
+   that cannot be a constant */
+function updateSunUv() {
+  const sun = backScene.getObjectByName('sun-disc');
+  if (!sun) { POST.sunVis.value = 0; return; }
+  _sunProj.copy(sun.position).project(camera);
+  POST.sunUv.value.set(_sunProj.x * 0.5 + 0.5, _sunProj.y * 0.5 + 0.5);
+  /* behind the camera projects to a mirrored point in front of it, which would strike rays from
+     a sun that is not there. Fade rather than cut, so walking the sun off frame is not a pop. */
+  const behind = _sunProj.z > 1;
+  const u = POST.sunUv.value;
+  const edge = Math.max(Math.abs(u.x - 0.5), Math.abs(u.y - 0.5));
+  POST.sunVis.value = behind ? 0 : Math.max(0, 1 - Math.max(0, edge - 0.5) / 0.35);
+}
+function renderPost() {
+  updateSunUv();
+  backRenderer.setRenderTarget(rtScene);
+  backRenderer.clear();
+  backRenderer.render(backScene, camera);
+  backRenderer.setRenderTarget(null);
+
+  matBright.uniforms.tSrc.value = rtScene.texture;
+  blit(matBright, rtBrightB);
+  matBlur.uniforms.tSrc.value = rtBrightB.texture;
+  matBlur.uniforms.dir.value.set(1, 0);
+  blit(matBlur, rtBrightA);
+  matBlur.uniforms.tSrc.value = rtBrightA.texture;
+  matBlur.uniforms.dir.value.set(0, 1);
+  blit(matBlur, rtBrightB);
+  /* rtBrightB is now the blurred bright pass: it is both the bloom and what the rays march */
+  matComposite.uniforms.tBloom.value = rtBrightB.texture;
+  if (POST.rayAmt.value > 0 && POST.sunVis.value > 0) {
+    matRays.uniforms.tSrc.value = rtBrightB.texture;
+    blit(matRays, rtBrightA);
+    matComposite.uniforms.tRays.value = rtBrightA.texture;
+  } else {
+    matComposite.uniforms.tRays.value = rtBrightB.texture;
+  }
+  blit(matComposite, null);
+}
+
 addEventListener('resize', () => {
   fitFov(cam ? cam.fov : camera.fov);
   backRenderer.setSize(W(), H());
   frontRenderer.setSize(W(), H());
   cssRenderer.setSize(W(), H());
   OUTLINE_RES.value.set(W(), H());
+  sizePost();
 });
 
 /* ================= textures ================= */
@@ -5654,6 +5857,16 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   sun: (u, v, dist) => placeSun(u, v, dist),
   sunClear: () => sunClear([HOME.px, HOME.py, HOME.pz]),
   clouds: (on) => { CLOUDS.forEach((c) => { c.visible = on !== false; }); return CLOUDS.length; },
+  /* the sun post, as dials. NAV.post({ rayAmt: 0 }) to see it without the shafts, ?post=off for
+     none of it at all — which is also the comparison to judge the rest against. */
+  post: (o) => {
+    if (o) for (const k of Object.keys(o)) { if (POST[k] && 'value' in POST[k]) POST[k].value = o[k]; }
+    return { on: POST.on, bloomAmt: POST.bloomAmt.value, bloomCut: POST.bloomCut.value,
+      rayAmt: POST.rayAmt.value, rayDensity: POST.rayDensity.value, rayDecay: POST.rayDecay.value,
+      vignette: POST.vignette.value, sunUv: POST.sunUv.value.toArray().map((v) => +v.toFixed(3)),
+      sunVis: POST.sunVis.value };
+  },
+  postOn: (on) => { POST.on = on !== false; return POST.on; },
   /* the framing with the sun in the middle — the default, kept callable for after a fly-out */
   sunMid: () => composeSunCentred(),
   /* the other one: sun off Fuji's right shoulder, mountain centred. Also at ?sun=shoulder */
@@ -6781,6 +6994,7 @@ document.getElementById('upnextBtn').addEventListener('click', () => {
    own — which is a reasonable thing to look at rather than a wrong one.
    It must be HERE and not beside the loader: HOME, cam and itemEls are all declared further down
    the file, and calling setHomeView from up there reads three consts inside their dead zones. */
+sizePost();
 if (WORLD_PENDING) {
   hideGeneratedWorld(null);
   composeWorldHome();
@@ -6940,7 +7154,7 @@ function tick() {
   }
   /* one float, so no hand-written shader can ever be fogging at a density the scene left behind */
   FOG_U.fogDensity.value = backScene.fog.density;
-  backRenderer.render(backScene, camera);
+  if (POST.on) renderPost(); else backRenderer.render(backScene, camera);
   cssRenderer.render(cssScene, camera);
   frontRenderer.render(frontScene, camera);
   requestAnimationFrame(tick);
