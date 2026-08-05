@@ -3327,6 +3327,50 @@ function bakeShoreDepth(centre, half, surfaceY) {
   return { deepest: Math.round(deepest), span: Math.round(span) };
 }
 
+/* A SCROLLING NORMAL MAP, which is the part of the stylised-water recipe that needs no scene
+   data at all — unlike the depth pass, which this terrain could not feed.
+   Two copies of one tileable normal texture, sampled at different scales and scrolled in
+   different directions, summed. That is the standard trick and it works because the beat
+   between two incommensurate scroll rates never repeats visibly, so the surface stops looking
+   like a moving pattern and starts looking like water. The summed normal drives both the
+   reflection's UV offset and the sun glint, so the highlight breaks up on the same ripples the
+   reflection bends around, which is the thing that sells it. */
+const WATER_NRM = (() => {
+  const N = 256;
+  const h = new Float32Array(N * N);
+  /* tileable value noise: sample a 3D noise on a torus so both axes wrap */
+  const oct = [[4, 1], [8, 0.5], [16, 0.25], [32, 0.12]];
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      let v = 0;
+      for (const [f, a] of oct) {
+        const u = (x / N) * Math.PI * 2, w = (y / N) * Math.PI * 2;
+        v += a * jsNoise(Math.cos(u) * f + 8, Math.sin(u) * f + 8, Math.cos(w) * f + 8)
+           * jsNoise(Math.sin(w) * f + 3, Math.cos(u) * f + 3, Math.sin(u) * f + 3);
+      }
+      h[y * N + x] = v;
+    }
+  }
+  const d = new Uint8Array(N * N * 4);
+  const at = (x, y) => h[((y + N) % N) * N + ((x + N) % N)];
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const dx = at(x + 1, y) - at(x - 1, y);
+      const dy = at(x, y + 1) - at(x, y - 1);
+      const i = (y * N + x) * 4;
+      d[i] = Math.max(0, Math.min(255, 128 + dx * 900));
+      d[i + 1] = Math.max(0, Math.min(255, 128 + dy * 900));
+      d[i + 2] = 255;
+      d[i + 3] = 255;
+    }
+  }
+  const t = new THREE.DataTexture(d, N, N, THREE.RGBAFormat);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.minFilter = t.magFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+})();
+
 const reflectCam = new THREE.PerspectiveCamera();
 const reflectTexM = new THREE.Matrix4();
 const lakeWater = (() => {
@@ -3354,6 +3398,9 @@ const lakeWater = (() => {
       uShoreSize: { value: SHORE.size },
       uShoreMax: SHORE.maxDepth,
       uFoam: { value: 0.0 },
+      uNrm: { value: WATER_NRM },
+      uNrmScale: { value: 1 / 900 },
+      uNrmAmt: { value: 1.0 },
       fogColor: FOG_U.fogColor,
       fogDensity: FOG_U.fogDensity,
       uMistColor: CLOUD.uMistColor,
@@ -3379,8 +3426,8 @@ const lakeWater = (() => {
       uniform float uTime;
       uniform vec3 uDeep, uShallow, fogColor, uMistColor;
       uniform float fogDensity, uMistY, uMistH, uMistAmt;
-      uniform float uReflPow, uReflMin, uReflGain, uShoreMax, uFoam;
-      uniform sampler2D uShore;
+      uniform float uReflPow, uReflMin, uReflGain, uShoreMax, uFoam, uNrmScale, uNrmAmt;
+      uniform sampler2D uShore, uNrm;
       uniform vec2 uShoreOrigin, uShoreSize;
       varying vec4 vProj;
       varying vec3 vWorld;
@@ -3396,13 +3443,23 @@ const lakeWater = (() => {
         float w2 = sin( ( vWorld.x + vWorld.z ) * 0.0125 + uTime * 1.15 )
                  * cos( ( vWorld.x - vWorld.z ) * 0.0092 - uTime * 0.86 );
         float chop = w + w2 * 0.45;
+        /* TWO SCROLLS OF ONE TILEABLE NORMAL MAP, at different scales and directions. Their
+           beat is what keeps it from reading as a repeating pattern. */
+        vec2 nuv = vWorld.xz * uNrmScale;
+        vec2 n1 = texture2D( uNrm, nuv + vec2( uTime * 0.011, uTime * 0.007 ) ).xy * 2.0 - 1.0;
+        vec2 n2 = texture2D( uNrm, nuv * 2.7 + vec2( -uTime * 0.019, uTime * 0.013 ) ).xy * 2.0 - 1.0;
+        vec2 ripple = ( n1 + n2 * 0.6 ) * uNrmAmt;
         vec2 uv = vProj.xy / vProj.w
-          + vec2( w * 0.0021, w * 0.0008 ) + vec2( w2 * 0.0009, w2 * 0.0005 );
+          + vec2( w * 0.0021, w * 0.0008 ) + vec2( w2 * 0.0009, w2 * 0.0005 )
+          + ripple * 0.014;
         vec3 refl = texture2D( tReflect, uv ).rgb;
         /* grazing angles reflect almost everything, steep ones show the water's own colour —
            and the camera IS at a grazing angle here, which is why the reflection carries */
         vec3 v = normalize( cameraPosition - vWorld );
-        float f = pow( 1.0 - clamp( v.y, 0.0, 1.0 ), uReflPow );
+        /* the same ripple tilts the surface, so the Fresnel and the glint break on the ripples
+           the reflection is already bending around rather than on a separate field */
+        vec3 nrm = normalize( vec3( ripple.x * 0.28, 1.0, ripple.y * 0.28 ) );
+        float f = pow( 1.0 - clamp( dot( v, nrm ), 0.0, 1.0 ), uReflPow );
         /* NO DEPTH TERM. The baked shore-depth experiment is removed, and it deserves a note
            because the idea was sound and the DATA was not. Depth-driven colour and shoreline
            foam are what every stylised-water reference reaches for, and getting depth from the
@@ -4329,11 +4386,18 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   let matched = 0;
   root.traverse((o) => {
     if (!o.isMesh || /outline/.test(o.name)) return;
-    /* the named surfaces that lie flat on the terrain and were authored to their own palette */
-    if (!/(FestivalGround|GardenDetail|TownGround|ZenGround|ShrineGround)/i.test(o.name)) return;
-    /* 0.55 rather than 1.0: these are meant to read as trodden earth against grass, just not as
-       a different material entirely. Pulling them all the way to the terrain colour would erase
-       the distinction the author drew on purpose. */
+    /* NOTHING IS MATCHED ANY MORE, and the reason is worth keeping.
+       The festival ground was reported as black. I measured its colour, found #b1a896 against a
+       #909778 terrain, concluded the paint disagreed with the ground and shifted four surfaces
+       55% toward the terrain's average. That was solving a problem that did not exist: the floor
+       was black because an inverted-hull OUTLINE was lying on top of it like a lid, which is the
+       flat-sheet rule now in the hull pass. Removing the lid revealed the authored colour — and
+       my correction on top of it then made the plaza almost exactly the colour of the grass, so
+       it went straight from black to invisible.
+       A pale tan festival ground against green field is what the author drew, and it is right.
+       matchToGround is kept for the one seam that IS real — Fuji's skirt against the terrain,
+       below — where two different meshes have to meet along a line. */
+    return;
     if (matchToGround(o, groundCol, 0.55)) matched++;
   });
 
@@ -4446,7 +4510,14 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     im.instanceMatrix.needsUpdate = true;
     im.castShadow = im.receiveShadow = true;
     im.name = list[0].name.replace(/[._]?\d+$/, '') + '-x' + list.length;
-    im.frustumCulled = false;
+    /* CULLED, WHICH IT WAS NOT. frustumCulled = false forces every instanced set to be drawn
+       every frame no matter where the camera is looking — 143 sets spread over a 70,000-unit map
+       while the menu camera sees a slice of it. The usual reason to disable culling on an
+       InstancedMesh is that its bounding sphere is computed from ONE instance and is therefore
+       wrong; the fix is to compute the real one, which three will do across all the matrices, and
+       it is valid here because these matrices are written once at load and never touched again. */
+    im.computeBoundingSphere();
+    im.frustumCulled = true;
     root.add(im);
     list.forEach((o) => o.parent && o.parent.remove(o));
     instMeshes++; instTotal += list.length;
@@ -4564,7 +4635,9 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
       h = new THREE.Mesh(g, mat);
       h.position.copy(o.position); h.quaternion.copy(o.quaternion); h.scale.copy(o.scale);
     }
-    h.frustumCulled = false;
+    /* same reasoning as the sets themselves */
+    if (h.isInstancedMesh) h.computeBoundingSphere();
+    h.frustumCulled = true;
     h.name = (o.name || 'part') + '-outline';
     (o.parent || root).add(h);
     ENV.hulls.push(h);
