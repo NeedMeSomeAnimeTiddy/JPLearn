@@ -1198,6 +1198,19 @@ const backScene = new THREE.Scene();
    (This is prophylactic, not the fix for the seam that was actually there — see the valley fog
    banks below, which is where that came from.) */
 backScene.fog = new THREE.FogExp2(0xd8c1ab, 4.0e-5);
+/* THE FOG AS A UNIFORM EVERY CUSTOM SHADER SHARES.
+   `fogDensity: { value: backScene.fog.density }` reads a NUMBER once, at material creation.
+   Built-in materials are re-fogged by three every frame; hand-written ones are not, so the 522
+   outline hulls and the lake were still fogging at the 4.0e-5 they were born with long after the
+   environment loader dropped the scene to 1.85e-5. At Fuji's 34,000 units that is a line 84%
+   dissolved into a tan fog colour drawn over a mountain only 33% dissolved — which is exactly
+   and only why distant outlines read brown.
+   One object, handed to every shader by reference, re-read from the fog each frame. A future
+   `backScene.fog.density = x` anywhere then cannot desynchronise anything. */
+const FOG_U = {
+  fogColor: { value: backScene.fog.color },
+  fogDensity: { value: backScene.fog.density },
+};
 const backRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 backRenderer.setSize(W(), H());
 backRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -2079,6 +2092,13 @@ function outlineGeom(src) {
 
    `px` is the width in CSS pixels. 3 is a normal line; a mountain wants 6 or 7 because it is
    also the only thing on screen at that size. */
+/* Set by the query-string block below; read by the boot sequence at the bottom, which has to
+   know whether it is composing for the authored world or the generated one BEFORE it builds the
+   intro tween. Declared with `let` up here rather than `const` down there because a const read
+   from inside its own temporal dead zone throws rather than reading undefined — which this file
+   has now learned four separate times. */
+let WORLD_PENDING = false;
+
 /* SHED_AT defaults to the generated world's 4,000 so nothing already tuned moves. Loaded
    geometry passes a much larger value: with one flat width across a whole imported world there
    is no per-object px to compensate with, so the width has to actually be constant instead. */
@@ -2096,8 +2116,15 @@ function outlineMaterial(px, shedAt) {
       pxScale: OUTLINE_SCALE,
       shedAt: { value: shedAt || 4000 },
       res: OUTLINE_RES,
-      fogColor: { value: backScene.fog.color },
-      fogDensity: { value: backScene.fog.density },
+      fogColor: FOG_U.fogColor,
+      fogDensity: FOG_U.fogDensity,
+      /* THE SAME MIST THE SURFACES TAKE. Without it the two converge on different colours —
+         the surface ends at the pale mist grey, the line at the warm fog tan — and a line that
+         disagrees with the thing it wraps is a line you can see disagreeing. */
+      uMistColor: CLOUD.uMistColor,
+      uMistY: CLOUD.uMistY,
+      uMistH: CLOUD.uMistH,
+      uMistAmt: CLOUD.uMistAmt,
     },
     vertexShader: `
       uniform float px;
@@ -2106,6 +2133,7 @@ function outlineMaterial(px, shedAt) {
       uniform vec2 res;
       attribute vec3 aFlat;
       varying float vDepth;
+      varying vec3 vWorld;
       void main() {
         vec4 lp = vec4( position, 1.0 );
         vec3 ln = normal, lf = aFlat;
@@ -2117,6 +2145,7 @@ function outlineMaterial(px, shedAt) {
         #endif
         vec4 mv = modelViewMatrix * lp;
         vDepth = -mv.z;
+        vWorld = ( modelMatrix * lp ).xyz;
         /* Corner correction, and it must ALWAYS use the averaged normal.
            A flat-shaded box gives each corner three normals; extruding along the averaged one
            under-reaches by exactly dot(smooth, flat), so dividing that back out closes the gap.
@@ -2148,14 +2177,26 @@ function outlineMaterial(px, shedAt) {
         gl_Position = clip;
       }`,
     fragmentShader: `
-      uniform vec3 fogColor;
-      uniform float fogDensity;
+      uniform vec3 fogColor, uMistColor;
+      uniform float fogDensity, uMistY, uMistH, uMistAmt;
       varying float vDepth;
+      varying vec3 vWorld;
       void main() {
         /* the line has to take the haze too — an unfogged outline stays jet black against a
            dissolving mountain and reads as a crack in the image */
         float f = 1.0 - exp( - fogDensity * fogDensity * vDepth * vDepth );
-        gl_FragColor = vec4( mix( vec3( 0.055, 0.06, 0.085 ), fogColor, clamp( f, 0.0, 1.0 ) ), 1.0 );
+        vec3 c = mix( vec3( 0.055, 0.06, 0.085 ), fogColor, clamp( f, 0.0, 1.0 ) );
+        /* and then the valley mist, integrated exactly the way every lit surface integrates it
+           in the cloudy() patch — same field, same constants, so the line lands on the same
+           colour as whatever it is drawn over and disappears into the distance instead of
+           staining it. (No backticks in here: this whole shader is a template literal.) */
+        vec3 mv = vWorld - cameraPosition;
+        float mk = 1.0 / uMistH;
+        float mbase = uMistAmt * exp( - max( cameraPosition.y - uMistY, 0.0 ) * mk );
+        float mdy = mv.y * mk;
+        float mint = abs( mdy ) < 1e-4 ? length( mv ) : length( mv ) * ( 1.0 - exp( - mdy ) ) / mdy;
+        c = mix( c, uMistColor, clamp( 1.0 - exp( - max( mbase * mint, 0.0 ) ), 0.0, 1.0 ) );
+        gl_FragColor = vec4( c, 1.0 );
       }`,
     side: THREE.BackSide,
   });
@@ -2177,6 +2218,8 @@ function hash01(a, b) {
 /* Ground detail is not worth reflecting: thousands of 15-unit tufts contribute nothing to a
    rippled 768² image of the far shore, and they were being drawn twice a frame for it. */
 const NO_REFLECT = [];
+/* what each of them was, for the frame the reflection pass borrows it — see renderReflection */
+const NO_REFLECT_WAS = [];
 
 /* the same hull for a single mesh. Mountains ask for a much wider line than trees because the
    width sheds past 4,000 units: 7 pixels on something 13,500 away arrives as 2. */
@@ -2449,13 +2492,23 @@ for (let k = 0; k < 26; k++) {
    200 units, well below it, and the key light is derived from the same vector so the shading
    agrees with where you can see the sun. 14° of elevation: low enough to be a sunrise, high
    enough that the ground still takes a majority of its light from the key. */
-const SUN_AT = at(15000, 7200, 0);
-SUN_AT.y = GROUND_Y + Math.hypot(SUN_AT.x - EYE.x, SUN_AT.z - EYE.y) * Math.tan(11 * Math.PI / 180);
+/* PAST THE MOUNTAIN, NOT INSIDE IT.
+   The authored world put Fuji at at(22813, 7431) with an eleven-thousand-unit radius. The sun
+   was at at(14930, 7165) — the SAME BEARING to within 270 units, at two thirds of the distance —
+   so it stood inside the cone and lit the near flank from within. Raycasting the home eye at it
+   is unambiguous: first hit Fuji at 27,748, sun at 27,237.
+   Two things fix it and both are needed. It goes out to 44,000 horizontal, well beyond Fuji's
+   far extent of 45,243 measured along the sight line, so that wherever the two overlap the
+   mountain occludes the sun rather than the reverse. And it swings out to a bearing that clears
+   the silhouette, so it is actually in the sky. 10.5 degrees of elevation keeps the low sunrise.
+   SUN_CLEAR below turns all of this into something the console complains about, rather than
+   something you notice in a screenshot three days later. */
+const SUN_AT = at(31800, 31500, 0);
+SUN_AT.y = GROUND_Y + Math.hypot(SUN_AT.x - EYE.x, SUN_AT.z - EYE.y) * Math.tan(10.5 * Math.PI / 180);
 {
   /* raised from 3.2 with the sun: dropping the elevation from 20° to 14° cuts cos(incidence) on
      flat ground by a third, and the meadow went with it */
   const sun = new THREE.DirectionalLight(0xffd9b0, 4.6);
-  sun.position.copy(SUN_AT);
   sun.castShadow = true;
   sun.shadow.mapSize.set(4096, 4096);
   /* SIZE THE BOX, THEN COUNT ITS TEXELS. There is no point covering a 70,000-unit valley: at
@@ -2464,6 +2517,15 @@ SUN_AT.y = GROUND_Y + Math.hypot(SUN_AT.x - EYE.x, SUN_AT.z - EYE.y) * Math.tan(
      which is a 4.4-unit texel, and the far ranges simply go unshadowed, where nobody looks
      for contact anyway. */
   sun.target.position.copy(at(3000, 0, GROUND_Y));
+  /* THE LIGHT STANDS 14,000 FROM ITS TARGET, WHEREVER THE SUN IS.
+     A directional light has no position, only a direction — but its SHADOW camera very much has
+     one, and it is tuned here with near 500 / far 26,000. Following the sun out to 44,000 would
+     put the whole scene behind the shadow camera's far plane and silently delete every shadow in
+     the world. So the sprite says where the sun looks like it is and this says where the rig
+     stands; only the direction is shared. 14,000 is what the old placement happened to give,
+     so the numbers below stay exactly as tuned. */
+  sun.position.copy(sun.target.position)
+    .addScaledVector(SUN_AT.clone().sub(sun.target.position).normalize(), 14000);
   const sc = sun.shadow.camera;
   sc.left = -9000; sc.right = 9000; sc.top = 9000; sc.bottom = -9000;
   sc.near = 500; sc.far = 26000;
@@ -2498,7 +2560,10 @@ function radialTex(inner, outer, stops) {
   }));
   /* both driven off SUN_AT, so the glow can never drift away from the light again */
   bloom.position.copy(SUN_AT);
-  bloom.scale.set(7600, 7600, 1);
+  /* A SPRITE IS A WORLD-SPACE QUAD, so moving the sun from 27,000 away to 50,000 shrinks it by
+     the same 1.84 unless the quad grows to match. These are the old sizes times that ratio —
+     the sun subtends what it always did. */
+  bloom.scale.set(13950, 13950, 1);
   bloom.name = 'sun-bloom';
   backScene.add(bloom);
   const disc = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -2506,7 +2571,7 @@ function radialTex(inner, outer, stops) {
     transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
   }));
   disc.position.copy(SUN_AT).multiplyScalar(0.995);
-  disc.scale.set(820, 820, 1);
+  disc.scale.set(1505, 1505, 1);
   disc.name = 'sun-disc';
   backScene.add(disc);
 }
@@ -2550,8 +2615,18 @@ const lakeWater = (() => {
       uTime: { value: 0 },
       uDeep: { value: new THREE.Color(0x2c3b4e) },
       uShallow: { value: new THREE.Color(0x5c7385) },
-      fogColor: { value: backScene.fog.color },
-      fogDensity: { value: backScene.fog.density },
+      /* HOW MUCH OF THE MOUNTAIN THE WATER IS ALLOWED TO KEEP.
+         Real water at this depression angle reflects a few percent, and the honest Fresnel curve
+         delivered Fuji as a grey smudge on navy. This is a picture of a lake, not a lake: the
+         exponent is flattened so the falloff still runs the right way with angle, and the floor
+         is lifted so the water never stops being a mirror. Dials rather than literals because
+         the home view and these two numbers are one decision — move the eye up and the
+         reflection has to be pushed back or the mountain leaves the water. */
+      uReflPow: { value: 1.6 },
+      uReflMin: { value: 0.30 },
+      uReflGain: { value: 1.15 },
+      fogColor: FOG_U.fogColor,
+      fogDensity: FOG_U.fogDensity,
       uMistColor: CLOUD.uMistColor,
       uMistY: CLOUD.uMistY,
       uMistH: CLOUD.uMistH,
@@ -2575,6 +2650,7 @@ const lakeWater = (() => {
       uniform float uTime;
       uniform vec3 uDeep, uShallow, fogColor, uMistColor;
       uniform float fogDensity, uMistY, uMistH, uMistAmt;
+      uniform float uReflPow, uReflMin, uReflGain;
       varying vec4 vProj;
       varying vec3 vWorld;
       varying float vDepth;
@@ -2588,9 +2664,9 @@ const lakeWater = (() => {
         /* grazing angles reflect almost everything, steep ones show the water's own colour —
            and the camera IS at a grazing angle here, which is why the reflection carries */
         vec3 v = normalize( cameraPosition - vWorld );
-        float f = pow( 1.0 - clamp( v.y, 0.0, 1.0 ), 2.4 );
+        float f = pow( 1.0 - clamp( v.y, 0.0, 1.0 ), uReflPow );
         vec3 body = mix( uDeep, uShallow, clamp( w * 0.25 + 0.5, 0.0, 1.0 ) );
-        vec3 col = mix( body, refl, clamp( f * 1.05, 0.12, 0.94 ) );
+        vec3 col = mix( body, refl, clamp( f * uReflGain, uReflMin, 0.95 ) );
         /* the same valley mist every other surface takes, so the far shore of the lake sits in
            it too instead of staying sharp while the land around it softens */
         vec3 mv2 = vWorld - cameraPosition;
@@ -2661,6 +2737,11 @@ const lakeWater = (() => {
    the home sight line, positive to the right; `dist` is how far out along it. Where the ground
    is at that point is looked up, not assumed. */
 const HOME_EYE = new THREE.Vector3(170, 60, 830);
+/* and what it looks AT. These two are one decision and are written together by setHomeView;
+   HOME_LOOK used to be declared beside homeIsOffScreen() at the very bottom of the file, which
+   was fine while nothing composed a home until after a fetch, and a temporal-dead-zone throw the
+   moment the boot sequence did it synchronously. */
+const HOME_LOOK = new THREE.Vector3(-240, 30, -160);
 /* how high the camera rides above whatever it is standing on — taken from home so the eye
    keeps a consistent height wherever it goes rather than flying at a fixed altitude */
 const EYE_LIFT = HOME_EYE.y - Math.max(groundAt(HOME_EYE.x, HOME_EYE.z), LAKE_Y);
@@ -2679,11 +2760,10 @@ function surfaceAt(x, z) { return Math.max(groundAt(x, z), LAKE_Y); }
    subtends is an angle, so the aim is the eye-to-sun direction rotated by it — yaw about the
    world up, then pitch about the resulting right vector, NEGATED because rotating an aim
    upward pushes its subject down the frame. */
-function aimAtSun(eye, fov, u, v) {
-  const sun = backScene.getObjectByName('sun-disc') || backScene.getObjectByName('sun-bloom');
+function aimAt(target, eye, fov, u, v) {
   const E = new THREE.Vector3(eye[0], eye[1], eye[2]);
-  if (!sun) return [E.x, E.y, E.z - 9000];
-  const d = sun.position.clone().sub(E).normalize();
+  if (!target) return [E.x, E.y, E.z - 9000];
+  const d = target.clone().sub(E).normalize();
   const tanV = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
   const yaw = Math.atan((u - 0.5) * 2 * tanV * camera.aspect);
   const pitch = Math.atan((0.5 - v) * 2 * tanV);
@@ -2691,6 +2771,91 @@ function aimAtSun(eye, fov, u, v) {
   const right = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize();
   d.applyAxisAngle(right, -pitch);
   return E.add(d.multiplyScalar(12000)).toArray();
+}
+function aimAtSun(eye, fov, u, v) {
+  const sun = backScene.getObjectByName('sun-disc') || backScene.getObjectByName('sun-bloom');
+  return aimAt(sun && sun.position, eye, fov, u, v);
+}
+
+/* THE HIGHEST POINT OF THE MOUNTAIN, found in the model rather than written down, so it survives
+   a re-export that moves it. Only callable once the world is in — which is why the alternative
+   composition below is a post-load switch and the default is not. */
+function fujiPeak() {
+  let peak = null;
+  (ENV.root || backScene).traverse((o) => {
+    if (!o.isMesh || !/fuji/i.test(o.name) || /outline/.test(o.name)) return;
+    const pos = o.geometry.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      if (!peak || v.y > peak.y) peak = v.clone();
+    }
+  });
+  return peak;
+}
+
+/* THE OTHER COMPOSITION: sun in the middle of the frame, Fuji off to the right, the lake and its
+   reflection under the mountain rather than under the sun. Both aims are solved — the camera is
+   aimed so the measured summit lands at (0.76, 0.24), and the sun is then unprojected to the
+   middle of the frame that produces. The sun crosses to the far side of the mountain doing this,
+   so the key light goes with it (placeSun moves both) and the whole valley is lit from the new
+   direction rather than from a sun that is no longer there. */
+function composeSunCentred() {
+  const peak = fujiPeak();
+  if (!peak) { console.warn('[sun] no Fuji in the scene to compose against'); return null; }
+  const eye = [HOME.px, HOME.py, HOME.pz];
+  setHomeView(eye, aimAt(peak, eye, HOME.fov, 0.76, 0.24), HOME.fov);
+  return placeSun(0.5, 0.30);
+}
+
+/* IS THE SUN ACTUALLY IN THE SKY FROM HERE? The old placement was wrong for weeks and the only
+   symptom was a glow on a mountainside that read as atmosphere. One raycast answers it. */
+function sunClear(eye) {
+  const sun = backScene.getObjectByName('sun-disc');
+  if (!sun) return null;
+  const E = new THREE.Vector3(eye[0], eye[1], eye[2]);
+  const d = sun.position.clone().sub(E);
+  const targets = [];
+  backScene.traverse((o) => {
+    if ((o.isMesh || o.isInstancedMesh) && o.visible && o.name !== 'sky-dome'
+      && !(o.material && o.material.userData && o.material.userData.outline)) targets.push(o);
+  });
+  const hit = new THREE.Raycaster(E, d.clone().normalize(), 1, d.length())
+    .intersectObjects(targets, false)[0];
+  if (hit) {
+    console.warn(`[sun] blocked from [${eye.map(Math.round)}] by ${hit.object.name || hit.object.type}`
+      + ` at ${Math.round(hit.distance)} of ${Math.round(d.length())}`);
+  }
+  return hit ? { by: hit.object.name, at: Math.round(hit.distance) } : null;
+}
+
+/* Put the sun at a chosen place IN THE FRAME rather than at a chosen place in the world, which
+   is how anyone actually thinks about a sunset. Unprojects (u, v) through the home camera and
+   walks out `dist` — far enough to be behind Fuji rather than in it. */
+function placeSun(u, v, dist = 50000) {
+  const c = camera.clone();
+  c.position.set(HOME.px, HOME.py, HOME.pz);
+  c.lookAt(HOME.tx, HOME.ty, HOME.tz);
+  c.fov = HOME.fov;
+  c.updateProjectionMatrix();
+  c.updateMatrixWorld(true);
+  const E = c.position.clone();
+  const ray = new THREE.Vector3(u * 2 - 1, 1 - v * 2, 0.5).unproject(c).sub(E).normalize();
+  const at = E.clone().addScaledVector(ray, dist);
+  const k = dist / 50000;
+  [['sun-disc', 1505], ['sun-bloom', 13950]].forEach(([n, base]) => {
+    const o = backScene.getObjectByName(n);
+    if (o) { o.position.copy(at); o.scale.set(base * k, base * k, 1); }
+  });
+  /* the key light takes the new direction, keeping its own 14,000-unit stand-off so the shadow
+     camera stays valid — see the rig above */
+  let key = null;
+  backScene.traverse((o) => { if (o.isDirectionalLight && o.castShadow) key = o; });
+  if (key) {
+    const t = key.target.position;
+    key.position.copy(t).addScaledVector(at.clone().sub(t).normalize(), 14000);
+    key.updateMatrixWorld(true);
+  }
+  return { at: at.toArray().map(Math.round), blocked: sunClear([HOME.px, HOME.py, HOME.pz]) };
 }
 
 function setHomeView(eye, look, fov) {
@@ -3010,41 +3175,20 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     hulls++;
   }
 
-  /* 6. hide what it replaces */
-  ENV.hidden = [];
-  backScene.children.forEach((o) => {
-    if (o.isLight || o === root) return;
-    /* the water, the clouds and the sun stay generated; the sky steps aside if the model
-       brought its own, because a dome is the one piece of atmosphere worth authoring */
-    if (ENV_ATMOS.test(o.name) && !(ENV_SKY.test(o.name) && ENV.modelSky)) return;
-    if (o.visible) { ENV.hidden.push(o); o.visible = false; }
-  });
+  /* 6. hide what it replaces. Mostly already done before the fetch started — this second call
+     catches the sky, which can only be decided once the model has been read. */
+  hideGeneratedWorld(root);
 
   backScene.add(root);
   ENV.root = root;
   /* THE HOME VIEW MOVES WITH THE WORLD. The old eye was sited against a heightfield this
      model replaced, and it faces away from the sun. */
   if (opts.home !== false) {
-    /* the wide framing, with the menu rigged onto it — the whole valley, Fuji and the sun */
-    /* LOW ENOUGH THAT THE LAKE IS AT A GRAZING ANGLE, which is the only thing that makes the
-       reflection carry — the water shader's own note says so. The 11,000-unit eye showed the
-       whole map and lost Fuji's mirror entirely: from up there you look INTO the water rather
-       than across it.
-       THE AIM IS COMPUTED, NOT TRANSCRIBED. Hard-coding a look vector copied off a sweep is
-       how this ended up pointing at the pagoda — aimAtSun derives it from where the sun
-       actually is, so the eye is the only number anyone has to get right. */
-    setHomeView([-4200, 2000, 11000], aimAtSun([-4200, 2000, 11000], 43, 0.70, 0.26), 43);
-    /* FOG WAS TUNED FOR A CAMERA 800 UNITS FROM ITS SUBJECT. At 21,000 the same exp2 density
-       buries the whole valley, and raising saturation only made the haze more emphatic — the
-       shot came back as an orange wash with a mountain in it. Roughly halved, so distance still
-       reads as distance and the map is still a map. */
-    backScene.fog.density = 0.0000185;
-    CLOUD_MATS.forEach((m) => { m.needsUpdate = true; });
+    composeWorldHome();
     /* THE MENU DOES NOT WAIT FOR AN ANIMATION. Whatever the intro is doing, by the time the
        world is in, the type belongs on screen — a reveal that has not run is a reason to show
        the thing, not to keep hiding it. */
     itemEls.forEach((el) => { el.classList.add('enter', 'entered'); });
-    ENV.homeMoved = true;
   }
 
   ENV.culled = culled;
@@ -3091,16 +3235,73 @@ function setCel(on) {
   const q = new URLSearchParams(location.search);
   /* THE AUTHORED WORLD IS THE WORLD NOW. ?generated keeps the old one, which is worth having
      for two reasons rather than sentiment: it is what every measurement in RESEARCH.md was
-     taken against, and it is what the page falls back to if a 53MB fetch fails — the generated
-     world builds first and is only hidden once the model is actually in, so a failed load
-     leaves a working page rather than an empty one. */
-  if (!q.has('generated')) {
+     taken against, and it is what the page falls back to if a 53MB fetch fails. It is still
+     BUILT first, so a failed load leaves a working page rather than an empty one — but it is no
+     longer SHOWN first, which is a separate decision and was the whole of the pop-in. The catch
+     below is what makes building it worth the cost. */
+  WORLD_PENDING = !q.has('generated');
+  if (WORLD_PENDING) {
     addEventListener('load', () => {
       loadEnvironment(q.get('env') || undefined)
-        .then(() => { if (q.has('cel')) setCel(true); })
-        .catch((e) => console.error('[env] load failed, keeping the generated world:', e));
+        .then(() => {
+          if (q.has('cel')) setCel(true);
+          /* AFTER the load, not before, because it aims at the summit and the summit arrives
+             with the model. The default composition needs no such thing — it aims at the sun,
+             which the page owns — which is why only this one costs a small camera move. */
+          if (q.get('sun') === 'mid') composeSunCentred();
+        })
+        .catch((e) => {
+          console.error('[env] load failed, showing the generated world instead:', e);
+          /* the whole reason the generated world is still built: it is the fallback */
+          ENV.hidden.forEach((o) => { o.visible = true; });
+          ENV.hidden = [];
+        });
     });
   }
+}
+
+/* THE AUTHORED WORLD'S FRAMING, as one call rather than a block buried in the loader — because
+   it now has to happen BEFORE the fetch as well as after it, or the intro tween spends its 1.7
+   seconds flying to a composition the world is about to replace.
+   THE EYE: 4,200 units to the right of where it was and 5,000 nearer, which is what puts the
+   lake between the camera and Fuji. That is the whole trick to the reflection — measured, not
+   hoped: the mirrored eye's ray to the summit crosses the water at (-368, -956), and the lake
+   spans (-4119..2901, -5605..1415). It was landing 2,900 units short of the near shore before,
+   on dry land, which is why there was never a mountain in the water to find.
+   THE AIM IS COMPUTED, NOT TRANSCRIBED. Hard-coding a look vector copied off a sweep is how this
+   ended up pointing at the pagoda — aimAtSun derives it from where the sun actually is, so the
+   eye is the only number anyone has to get right. (0.80, 0.30) puts the sun clear off Fuji's
+   right shoulder with the mountain centred; NAV.sun(0.5, 0.30) moves it to the middle of the
+   frame instead, which needs the aim yawed to match. */
+function composeWorldHome() {
+  if (ENV.homeMoved) return null;
+  const eye = [0, 2000, 6000];
+  const r = setHomeView(eye, aimAtSun(eye, 43, 0.80, 0.30), 43);
+  /* FOG WAS TUNED FOR A CAMERA 800 UNITS FROM ITS SUBJECT. At 21,000 the same exp2 density
+     buries the whole valley, and raising saturation only made the haze more emphatic — the shot
+     came back as an orange wash with a mountain in it. Roughly halved, so distance still reads
+     as distance and the map is still a map. (FOG_U carries this to the hand-written shaders;
+     see the fog uniform above for what happens when it does not.) */
+  backScene.fog.density = 0.0000185;
+  CLOUD_MATS.forEach((m) => { m.needsUpdate = true; });
+  ENV.homeMoved = true;
+  return r;
+}
+
+/* WHAT THE MODEL REPLACES, HIDDEN. Idempotent and APPENDING, because it is called twice: once
+   before the fetch so the old world is never seen, and once after so the generated sky can step
+   aside if the model brought its own — which is the one thing that cannot be known in advance.
+   Resetting ENV.hidden on the second call would strand the first call's objects invisible for
+   good, and NAV.unloadEnv() would put back half a world. */
+function hideGeneratedWorld(root) {
+  backScene.children.forEach((o) => {
+    if (o.isLight || o === root) return;
+    /* the water, the clouds and the sun stay generated; the sky steps aside if the model
+       brought its own, because a dome is the one piece of atmosphere worth authoring */
+    if (ENV_ATMOS.test(o.name) && !(ENV_SKY.test(o.name) && ENV.modelSky)) return;
+    if (o.visible) { ENV.hidden.push(o); o.visible = false; }
+  });
+  return ENV.hidden.length;
 }
 
 function unloadEnvironment() {
@@ -4223,7 +4424,16 @@ function renderReflection() {
     .multiply(reflectCam.matrixWorldInverse);
 
   lakeWater.visible = false;
-  for (let i = 0; i < NO_REFLECT.length; i++) NO_REFLECT[i].visible = false;
+  /* PUT BACK WHAT WAS THERE, NOT `true`.
+     The generated grass, scrub and stones are all in NO_REFLECT, and restoring them to `true`
+     every frame silently overrode anything else that had hidden them — so the environment
+     loader's "hide what this replaces" lasted exactly one frame for two thousand instanced
+     tufts, and the old world's ground cover went on being drawn, floating, over the new one's
+     terrain. A per-frame writer of a shared flag has to be a stack, not an assignment. */
+  for (let i = 0; i < NO_REFLECT.length; i++) {
+    NO_REFLECT_WAS[i] = NO_REFLECT[i].visible;
+    NO_REFLECT[i].visible = false;
+  }
   const prevClip = backRenderer.clippingPlanes;
   backRenderer.clippingPlanes = REFLECT_CLIP;
   /* An outline is a width in pixels, and this pass is 768 pixels wide rather than the window —
@@ -4237,7 +4447,7 @@ function renderReflection() {
   backRenderer.setRenderTarget(null);
   OUTLINE_RES.value.copy(prevRes);
   backRenderer.clippingPlanes = prevClip;
-  for (let i = 0; i < NO_REFLECT.length; i++) NO_REFLECT[i].visible = true;
+  for (let i = 0; i < NO_REFLECT.length; i++) NO_REFLECT[i].visible = NO_REFLECT_WAS[i];
   lakeWater.visible = true;
 }
 
@@ -4914,6 +5124,11 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
        NAV.unloadEnv()          put the generated world back, same camera */
   loadEnv: (url, opts) => loadEnvironment(url, opts),
   unloadEnv: () => unloadEnvironment(),
+  /* the sun, placed in the frame: NAV.sun(0.5, 0.30) centre-frames it. Reports what blocks it. */
+  sun: (u, v, dist) => placeSun(u, v, dist),
+  sunClear: () => sunClear([HOME.px, HOME.py, HOME.pz]),
+  /* the alternative framing, also at ?sun=mid */
+  sunMid: () => composeSunCentred(),
   cel: (on) => setCel(on !== false),
   /* the sunset framing, so it can be re-applied after the camera has been flown elsewhere */
   home: () => { HOME_EYE.set(-3000, 1250, 8200); HOME_LOOK.set(-3822, 498, -731);
@@ -4930,6 +5145,14 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   lakeside: () => setHomeView([-3000, 1250, 8200], [-3822, 498, -731], 42),
   setHome: (eye, look, fov) => setHomeView(eye, look, fov),
   outlineWeight: (v) => { OUTLINE_SCALE.value = v; return v; },
+  /* the lake's two dials, together, because they are one decision (see the uniforms) */
+  water: (pow, min, gain) => {
+    const u = lakeWater.material.uniforms;
+    if (pow != null) u.uReflPow.value = pow;
+    if (min != null) u.uReflMin.value = min;
+    if (gain != null) u.uReflGain.value = gain;
+    return { pow: u.uReflPow.value, min: u.uReflMin.value, gain: u.uReflGain.value };
+  },
   env: ENV,
   /* the ground query itself, so a loaded model's heightfield can be compared against the
      analytic world it replaced without going through a probe and a camera */
@@ -6015,12 +6238,30 @@ document.getElementById('upnextBtn').addEventListener('click', () => {
   if (state === 'menu' && !busy) select(UPNEXT[upnextIdx].target);
 });
 
+/* BEFORE THE FIRST FRAME, NOT AFTER THE FETCH.
+   Two things were waiting on a 53MB download that had no business waiting on it. The generated
+   world was built VISIBLE and only hidden once the model was in, so every reload showed the old
+   map and then cut to the new one. And the home view was set at the same moment, so the intro
+   spent its 1.7 seconds flying to a composition that was about to be thrown away, and the
+   arrival snapped the camera somewhere else.
+   Both are decided here instead, synchronously, before tick() has drawn anything. What is left
+   on screen during the load is the sky, the sun and the lake — the atmosphere the model does not
+   own — which is a reasonable thing to look at rather than a wrong one.
+   It must be HERE and not beside the loader: HOME, cam and itemEls are all declared further down
+   the file, and calling setHomeView from up there reads three consts inside their dead zones. */
+if (WORLD_PENDING) {
+  hideGeneratedWorld(null);
+  composeWorldHome();
+}
+
 if (reduced) {
   itemEls.forEach((el) => el.classList.add('entered'));
   ensoEl.classList.add('draw');
 } else {
   Object.assign(cam, { px: 1050, py: 560, pz: 1750, tx: 0, ty: 0, tz: -300, fov: 58, roll: -9 });
   const tl = gsap.timeline();
+  /* the spread reads HOME's values NOW, which is exactly why composeWorldHome() has to have
+     already run — a tween created against the old home cannot be redirected by changing HOME */
   tl.to(cam, { ...HOME, duration: 1.7, ease: 'power3.inOut' });
   tl.add(() => { itemEls.forEach((el) => el.classList.add('enter')); }, 0.75);
   tl.add(() => { ensoEl.classList.add('draw'); }, 0.9);
@@ -6044,8 +6285,9 @@ addEventListener('keydown', (e) => {
 
 /* Is the menu's own composition still in shot? Measured as the angle between the camera's view
    axis and the direction to what the menu is framed around, against the real horizontal half-cone
-   plus a margin for the backdrop's own width. */
-const HOME_LOOK = new THREE.Vector3(-240, 30, -160);
+   plus a margin for the backdrop's own width. (HOME_LOOK itself now lives beside HOME_EYE, near
+   the top — they are one pair, and having them two and a half thousand lines apart is what put
+   the second of them inside its own dead zone when the boot sequence started composing home.) */
 const _hv1 = new THREE.Vector3(), _hv2 = new THREE.Vector3(), _hv3 = new THREE.Vector3();
 let dropHomeWhenClear = false;
 function homeIsOffScreen() {
@@ -6152,6 +6394,8 @@ function tick() {
   placeWorldPicks();
   /* the sky travels with the eye, so it is never seen as the sphere it is */
   if (SKY_DOME) SKY_DOME.position.copy(camera.position);
+  /* one float, so no hand-written shader can ever be fogging at a density the scene left behind */
+  FOG_U.fogDensity.value = backScene.fog.density;
   backRenderer.render(backScene, camera);
   cssRenderer.render(cssScene, camera);
   frontRenderer.render(frontScene, camera);
