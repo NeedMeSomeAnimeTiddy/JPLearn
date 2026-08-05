@@ -1260,6 +1260,9 @@ document.getElementById('cssStage').appendChild(cssRenderer.domElement);
    are measured in — and there are dozens of these materials, so handing each one its own copy
    would mean keeping a registry of them just to resize. One object, written once. */
 let SKY_DOME = null;
+/* the sun quad, billboarded by hand each frame — a Mesh rather than a Sprite because a Sprite
+   only takes a SpriteMaterial and this one needs a shader */
+let SUN_MESH = null;
 const OUTLINE_RES = { value: new THREE.Vector2(W(), H()) };
 /* DECLARED HERE, NOT BESIDE THE LOADER THAT USES IT. outlineMaterial() runs all through world
    construction, hundreds of times, long before the loader block is evaluated — and a `const`
@@ -1849,8 +1852,22 @@ const CLOUD_MATS = [];
      uGully    radial ridges running down a cone — the whole character of Fuji, and wrong on a
                ridge line, so the far ranges pass 0
      uSnowAdd  how much snow may appear above uSnowY, slope-masked so cliffs stay bare */
+/* WARMED ON THE MATERIAL, NOT IN THE SHADER — because the shader version does not run.
+   The aerial-perspective and de-chill code IS in the compiled fragment source (the guard that
+   greps for it passes) and its uniforms ARE bound, and it still has no effect on a single pixel:
+   forcing the haze colour to pure red at runtime leaves Fuji exactly as blue as before. I have
+   not found the reason and I am not going to keep guessing at it in the dark.
+   This is the same correction applied one stage earlier, on the material, where it is a plain
+   multiply that cannot quietly do nothing. `color` multiplies the authored vertex colours, so
+   pulling its blue channel down takes the chill out of the rock itself; `emissive` lifts the
+   shadow side, which on this mountain is nearly all of it, and lifts it warm — the visible flank
+   faces the camera and away from the key, so almost all of its light was arriving from a cold
+   0x93b0dc bounce and a cold hemisphere. Less controllable than the shader would have been, and
+   it works. */
 function rocky(mat, opts = {}) {
   if (opts.gradientMap) mat.gradientMap = opts.gradientMap;
+  if (opts.warm) mat.color.setHex(opts.warm);
+  if (opts.lift) mat.emissive = new THREE.Color(opts.lift);
   /* A CLONED MATERIAL LIES ABOUT BEING PATCHED. Material.copy() deep-copies userData but does
      NOT copy onBeforeCompile — so `mat.clone()` arrives carrying `cloudy: true` with no patch
      attached, cloudy() takes its early return, and the result is a material with no rock, no
@@ -1888,6 +1905,15 @@ function rocky(mat, opts = {}) {
     uAerNear: { value: opts.aerNear != null ? opts.aerNear : 9000 },
     uAerFar: { value: opts.aerFar != null ? opts.aerFar : 40000 },
     uAerAmt: { value: opts.aerAmt != null ? opts.aerAmt : 0 },
+    /* AND THE COLD LIGHT ITSELF.
+       Aerial perspective at 43% still left a blue mountain, because what it is mixing INTO is a
+       surface lit almost entirely by the cold rig: Fuji's visible flank faces the camera and away
+       from the key, so nearly all of its light comes from a 0x93b0dc bounce and a 0xcfd8e6
+       hemisphere. Both are deliberately cold and the whole valley is tuned around them, so the
+       fix is not to change the lights — it is to let the mountains, and only the mountains, drop
+       most of their chroma and take the warm end back from the haze. A distant mountain at dawn
+       IS very nearly monochrome, which is also why every sumi-e of one is. */
+    uDechill: { value: opts.dechill != null ? opts.dechill : 0 },
     uMottle: { value: opts.mottle != null ? opts.mottle : 0.30 },
     uGully: { value: opts.gully || 0 },
     uGullyN: { value: opts.gullyN != null ? opts.gullyN : 26 },
@@ -1938,7 +1964,7 @@ function cloudy(mat) {
         uniform float uRockScale, uMottle, uGully, uGullyN;
         uniform float uSnowY, uSnowBand, uSnowJitter, uSnowSlope, uSnowAdd;
         uniform float uSnowMid, uSnowSoft, uRockDark, uDesat;
-        uniform float uAerNear, uAerFar, uAerAmt;
+        uniform float uAerNear, uAerFar, uAerAmt, uDechill;
         uniform vec3 uNoiseOrigin, uRockTint, uAerColor;
         uniform vec2 uAxis;
         uniform vec3 uSnowCol;
@@ -2072,6 +2098,10 @@ function cloudy(mat) {
            mountains read as a range rather than one dark mass. */
         + (mat.userData.rock ? `
         {
+          if ( uDechill > 0.0 ) {
+            float lum = dot( gl_FragColor.rgb, vec3( 0.299, 0.587, 0.114 ) );
+            gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( lum ) * uAerColor * 1.35, uDechill );
+          }
           float aer = clamp( ( length( vCloudPos - cameraPosition ) - uAerNear )
             / max( uAerFar - uAerNear, 1.0 ), 0.0, 1.0 );
           gl_FragColor.rgb = mix( gl_FragColor.rgb, uAerColor, aer * aer * uAerAmt );
@@ -2082,14 +2112,23 @@ function cloudy(mat) {
     if (!shader.vertexShader.includes('vCloudPos = (') || !shader.fragmentShader.includes('texture2D( uCloudMap')) {
       console.error('CLOUD PATCH FAILED', mat.type);
     }
-    /* Watch a line that is unlikely to be renamed by a tuning pass — the previous version
-       matched the exact fbm call and cried wolf the moment the noise gained an origin. */
-    if (mat.userData.rock && !shader.fragmentShader.includes('uNoiseOrigin')) {
-      console.error('ROCK PATCH FAILED', mat.type);
+    /* THE GUARD HAS TO GREP THE BODY, NOT A UNIFORM NAME.
+       This watched for `uNoiseOrigin`, which is declared in the <common> block — and <common>
+       lands even when <color_fragment> does not. So it passed happily while the entire rock
+       body (mottle, gullies, the snow re-threshold) was silently absent, and every symptom
+       looked like a value tuned to zero: warm the snow colour, nothing; force the haze to pure
+       red, nothing. A check that can pass while the thing it checks is missing is worse than no
+       check, because it is evidence pointing the wrong way. These two greps are only satisfiable
+       by the injected statements themselves. */
+    if (mat.userData.rock) {
+      if (!shader.fragmentShader.includes('float n1 = rkFbm( np )')) {
+        console.error('ROCK BODY MISSING (<color_fragment> did not land)', mat.type);
+      }
+      if (!shader.fragmentShader.includes('aer * aer * uAerAmt')) {
+        console.error('AERIAL BODY MISSING (<fog_fragment> did not land)', mat.type);
+      }
     }
-    if (mat.userData.rock && !shader.fragmentShader.includes('uAerFar - uAerNear')) {
-      console.error('AERIAL PATCH FAILED', mat.type);
-    }
+
   };
   mat.needsUpdate = true;
   CLOUD_MATS.push(mat);
@@ -2611,6 +2650,28 @@ function outlineMaterial(px, shedAt) {
   });
 }
 
+/* Declared HERE, beside RAMP, and not beside the loader that first needed it: the sky
+   clouds are built long before the environment loader is evaluated, and a const read
+   from inside its own temporal dead zone throws rather than reading undefined. That is
+   six times now in this file. */
+/* THE MOUNTAINS GET THEIR OWN RAMP, and this is most of why Fuji looked pixelated.
+   RAMP is four steps with NearestFilter. On a shrine lantern that is the house style; on a cone
+   twenty-two thousand units wide it is four hard bands across the single largest object in the
+   frame, and no amount of surface detail survives being quantised to four levels. Sixteen steps
+   with LinearFilter is still a ramp — the terminator still sits where the art direction put it,
+   the falloff is still stylised — but it stops shading a mountain like a poster. */
+const RAMP_MTN = (() => {
+  const steps = 16, d = new Uint8Array(steps * 4);
+  for (let i = 0; i < steps; i++) {
+    const v = Math.round(255 * Math.pow((i + 1) / steps, 0.72));
+    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+  }
+  const t = new THREE.DataTexture(d, steps, 1, THREE.RGBAFormat);
+  t.minFilter = t.magFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+})();
+
 /* A REAL HASH, NOT AN ARITHMETIC PROGRESSION.
    `(i * 9301 + seed * 49297) % 233280` is LINEAR in i — consecutive instances step by exactly
    9301/233280 and wrap, so the values land on a regular lattice. Using two of them as distance
@@ -2961,28 +3022,69 @@ function radialTex(inner, outer, stops) {
   g.fillStyle = rg; g.fillRect(0, 0, S, S);
   return new THREE.CanvasTexture(c);
 }
+/* THE SUN, DRAWN RATHER THAN PHOTOGRAPHED.
+   It was two additive sprites carrying 256-pixel canvas gradients stretched to fourteen thousand
+   world units — a quarter of a megapixel scaled up by fifty — which is precisely why it read as
+   a fuzzy ball. This is the same thing evaluated per fragment, so it is exactly as sharp as the
+   screen no matter how large it is drawn or how far away it stands.
+
+   WHAT THE REFERENCES AGREE ON, for a low sun seen through a lot of air:
+     - There is a DISC, with an edge. The single thing that says "sun" rather than "glow" is that
+       the core terminates; brightness alone never reads as a star.
+     - The edge is soft by about one percent of the radius, not ten. That is refraction in the
+       atmosphere, not blur in a lens.
+     - Immediately outside it, a corona falling off very steeply — a few radii, no more.
+     - Then a broad, faint aureole out to ten or twenty radii, carrying hardly any intensity but
+       most of the colour.
+     - Colour runs outward white -> gold -> orange, because the longer the path through air the
+       more of the blue end has been scattered out of it. At this elevation the aureole is
+       already well into orange.
+     - And the disc is drawn a little larger than geometry says, because a source this bright
+       bleeds in the eye and in every camera ever pointed at one.
+   Additive, unfogged, depth-tested — so the mountain in front of it still occludes it, which was
+   the whole point of moving it past Fuji in the first place. */
+const SUN_SIZE = 26000;
 {
-  const bloom = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: radialTex(0, 128, [[0, 'rgba(255,226,182,0.85)'], [0.28, 'rgba(255,196,136,0.34)'],
-      [0.62, 'rgba(232,158,120,0.10)'], [1, 'rgba(232,158,120,0)']]),
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uCore: { value: new THREE.Color(0xfff6e8) },
+      uMid: { value: new THREE.Color(0xffc887) },
+      uOuter: { value: new THREE.Color(0xff8a52) },
+      uCoreR: { value: 0.055 },
+      uLimb: { value: 0.0055 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      }`,
+    fragmentShader: `
+      uniform vec3 uCore, uMid, uOuter;
+      uniform float uCoreR, uLimb;
+      varying vec2 vUv;
+      void main() {
+        float r = length( vUv - 0.5 ) * 2.0;
+        /* the disc, and its one percent of limb */
+        float disc = 1.0 - smoothstep( uCoreR - uLimb, uCoreR + uLimb, r );
+        /* the steep corona: a couple of radii, inverse-square-ish */
+        float corona = pow( max( 0.0, 1.0 - r / ( uCoreR * 6.5 ) ), 2.6 );
+        /* and the wide aureole, which is nearly all colour and almost no light */
+        float aureole = pow( max( 0.0, 1.0 - r ), 2.4 );
+        vec3 c = uCore * disc * 1.7 + uMid * corona * 0.85 + uOuter * aureole * 0.30;
+        gl_FragColor = vec4( c, 1.0 );
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
     transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
-  }));
-  /* both driven off SUN_AT, so the glow can never drift away from the light again */
-  bloom.position.copy(SUN_AT);
-  /* A SPRITE IS A WORLD-SPACE QUAD, so moving the sun from 27,000 away to 50,000 shrinks it by
-     the same 1.84 unless the quad grows to match. These are the old sizes times that ratio —
-     the sun subtends what it always did. */
-  bloom.scale.set(13950, 13950, 1);
-  bloom.name = 'sun-bloom';
-  backScene.add(bloom);
-  const disc = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: radialTex(0, 90, [[0, 'rgba(255,248,232,1)'], [0.5, 'rgba(255,226,178,0.9)'], [1, 'rgba(255,210,150,0)']]),
-    transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
-  }));
-  disc.position.copy(SUN_AT).multiplyScalar(0.995);
-  disc.scale.set(1505, 1505, 1);
+  });
+  const disc = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  disc.scale.set(SUN_SIZE, SUN_SIZE, 1);
+  disc.position.copy(SUN_AT);
+  disc.frustumCulled = false;
   disc.name = 'sun-disc';
   backScene.add(disc);
+  SUN_MESH = disc;
 }
 
 /* ================= CLOUDS =================
@@ -3020,52 +3122,79 @@ function cloudTex(seed) {
 /* where the sun is, as a direction, kept current so the pond glints agree with it */
 const SUN_DIR_LIVE = new THREE.Vector3();
 const CLOUDS = [];
+/* CLOUDS ARE GEOMETRY NOW.
+   The first version was billboarded sprites carrying a canvas blob, and it looked like exactly
+   that: a sticker, flat under any camera move, in a world where every other object is faceted
+   and outlined. The style here is low-poly and flat-shaded, so a cloud that belongs in it is a
+   SHAPE — which is also how clouds are drawn in the tradition this whole thing is borrowing
+   from. Ukiyo-e and Ghibli clouds are silhouettes with a defined edge and a lit top, not soft
+   focus.
+   So: each cloud is a cluster of icosahedra, instanced into one draw call, flat-shaded, and lit
+   by the same directional sun as the landscape — which means the sun side is warm, the underside
+   is mauve, and turning the camera actually moves the form. Sixteen clouds of eight to fourteen
+   blobs is about 13k triangles and 16 draw calls, against a scene that already draws five
+   million. */
+const CLOUD_BLOB = new THREE.IcosahedronGeometry(1, 1);
+/* THE SHADOW SIDE OF A CLOUD IS NOT DARK. It is lit by the whole rest of the sky, which is why
+   a cumulus at dawn has a bright top and a merely COOLER underside rather than a black one. The
+   toon ramp will happily take it to near-black without a strong emissive to sit under it, and at
+   0x4a4560 it did — the clouds came out as grey-blue boulders hanging in the air. */
+const CLOUD_MAT = new THREE.MeshToonMaterial({
+  color: 0xfffdfa, gradientMap: RAMP_MTN, flatShading: true,
+  emissive: new THREE.Color(0x9d97b2), fog: true,
+});
 {
-  const texes = [0, 1, 2, 3, 4].map(cloudTex);
-  const sunDirXZ = new THREE.Vector2(SUN_AT.x - EYE.x, SUN_AT.z - EYE.y).normalize();
-  for (let i = 0; i < 38; i++) {
+  const N = 16;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  const pos = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < N; i++) {
     /* A RING, NOT A DOME CAP. Anything overhead is out of frame at these fovs and would only
        cost fill; the band that matters runs from a little above the ridgeline to a little above
        the sun. */
-    const az = (i / 38) * Math.PI * 2 + hash01(i, 91) * 0.16;
-    const dist = 15000 + hash01(i, 3) * 20000;
-    const y = 4200 + hash01(i, 17) * 7000;
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: texes[i % texes.length],
-      transparent: true, depthWrite: false, fog: false, opacity: 0.30 + hash01(i, 23) * 0.34,
-    }));
-    sp.position.set(EYE.x + Math.cos(az) * dist, y, EYE.y + Math.sin(az) * dist);
-    const w = 3400 + hash01(i, 41) * 6200;
-    sp.scale.set(w, w * (0.36 + hash01(i, 53) * 0.20), 1);
-    /* LIT FROM WHERE THE SUN IS, not from a constant. A cloud on the sun's side of the sky takes
-       the burn; one behind you at dawn is a cold mauve. Baked once because the sun does not
-       move — placeSun() re-tints them when it does. */
-    const toward = new THREE.Vector2(Math.cos(az), Math.sin(az)).dot(sunDirXZ);
-    sp.material.color.copy(new THREE.Color(0x8f86a8).lerp(new THREE.Color(0xffdcb4),
-      Math.pow(Math.max(0, toward * 0.5 + 0.5), 2.2)));
-    sp.renderOrder = -9;
-    sp.name = 'sky-cloud';
-    sp.userData.az = az;
-    sp.userData.dist = dist;
-    sp.userData.drift = 0.0009 + hash01(i, 67) * 0.0016;
-    backScene.add(sp);
-    CLOUDS.push(sp);
+    const az = (i / N) * Math.PI * 2 + hash01(i, 91) * 0.22;
+    const dist = 19000 + hash01(i, 3) * 21000;
+    const y = 5400 + hash01(i, 17) * 5400;
+    const blobs = 8 + Math.floor(hash01(i, 29) * 7);
+    const im = new THREE.InstancedMesh(CLOUD_BLOB, CLOUD_MAT, blobs);
+    /* the cluster: wide, shallow, and with the big blobs low and the small ones piled on top,
+       which is the whole read of a cumulus — a flat base with billows growing out of it */
+    const W = 1500 + hash01(i, 41) * 2100;
+    for (let k = 0; k < blobs; k++) {
+      const t = k / blobs;
+      const r = 1 - Math.abs(hash01(i * 17 + k, 5) * 2 - 1);
+      pos.set((hash01(i * 13 + k, 7) - 0.5) * 2 * W,
+        r * W * 0.30 * (0.4 + t),
+        (hash01(i * 19 + k, 11) - 0.5) * 2 * W * 0.45);
+      const rad = W * (0.30 + hash01(i * 23 + k, 13) * 0.34) * (1 - t * 0.35);
+      sc.set(rad * 1.25, rad * (0.62 + hash01(i * 29 + k, 17) * 0.3), rad);
+      q.setFromAxisAngle(up, hash01(i * 31 + k, 19) * 6.28);
+      m.compose(pos, q, sc);
+      im.setMatrixAt(k, m);
+    }
+    im.instanceMatrix.needsUpdate = true;
+    im.position.set(EYE.x + Math.cos(az) * dist, y, EYE.y + Math.sin(az) * dist);
+    im.castShadow = false;
+    im.receiveShadow = false;
+    im.frustumCulled = false;
+    im.name = 'sky-cloud';
+    im.userData.az = az;
+    im.userData.dist = dist;
+    im.userData.drift = 0.0009 + hash01(i, 67) * 0.0016;
+    backScene.add(im);
+    CLOUDS.push(im);
     /* they are worth reflecting — a lake with sky in it and no clouds in the sky is the giveaway
        that the sky is a painting */
   }
 }
 /* Re-tint against wherever the sun has been put. Called by placeSun so the two can never
    disagree about which side of the sky is warm. */
+/* Nothing to re-tint any more: the clouds are geometry and the directional sun lights them the
+   same way it lights the mountains, so moving the sun moves their shading for free. This is now
+   only here to keep the pond glints pointed at the right place. */
 function relightClouds() {
   const sun = backScene.getObjectByName('sun-disc');
   if (!sun) return 0;
   SUN_DIR_LIVE.copy(sun.position).normalize();
-  const sd = new THREE.Vector2(sun.position.x - EYE.x, sun.position.z - EYE.y).normalize();
-  const warm = new THREE.Color(0xffdcb4), cold = new THREE.Color(0x8f86a8);
-  CLOUDS.forEach((sp) => {
-    const t = new THREE.Vector2(Math.cos(sp.userData.az), Math.sin(sp.userData.az)).dot(sd);
-    sp.material.color.copy(cold).lerp(warm, Math.pow(Math.max(0, t * 0.5 + 0.5), 2.2));
-  });
   return CLOUDS.length;
 }
 
@@ -3266,7 +3395,7 @@ function aimAt(target, eye, fov, u, v) {
   return E.add(d.multiplyScalar(12000)).toArray();
 }
 function aimAtSun(eye, fov, u, v) {
-  const sun = backScene.getObjectByName('sun-disc') || backScene.getObjectByName('sun-bloom');
+  const sun = backScene.getObjectByName('sun-disc');
   return aimAt(sun && sun.position, eye, fov, u, v);
 }
 
@@ -3357,11 +3486,11 @@ function placeSun(u, v, dist = 50000) {
   const E = c.position.clone();
   const ray = new THREE.Vector3(u * 2 - 1, 1 - v * 2, 0.5).unproject(c).sub(E).normalize();
   const at = E.clone().addScaledVector(ray, dist);
+  /* one object now, and its size still tracks distance so the sun subtends the same angle
+     wherever it is put */
   const k = dist / 50000;
-  [['sun-disc', 1505], ['sun-bloom', 13950]].forEach(([n, base]) => {
-    const o = backScene.getObjectByName(n);
-    if (o) { o.position.copy(at); o.scale.set(base * k, base * k, 1); }
-  });
+  const o = backScene.getObjectByName('sun-disc');
+  if (o) { o.position.copy(at); o.scale.set(SUN_SIZE * k, SUN_SIZE * k, 1); }
   /* the key light takes the new direction, keeping its own 14,000-unit stand-off so the shadow
      camera stays valid — see the rig above */
   let key = null;
@@ -3419,24 +3548,6 @@ function setHomeView(eye, look, fov) {
     cssScene.matrixWorldNeedsUpdate = true;
     return { HOME: { ...HOME } };
   }
-
-/* THE MOUNTAINS GET THEIR OWN RAMP, and this is most of why Fuji looked pixelated.
-   RAMP is four steps with NearestFilter. On a shrine lantern that is the house style; on a cone
-   twenty-two thousand units wide it is four hard bands across the single largest object in the
-   frame, and no amount of surface detail survives being quantised to four levels. Sixteen steps
-   with LinearFilter is still a ramp — the terminator still sits where the art direction put it,
-   the falloff is still stylised — but it stops shading a mountain like a poster. */
-const RAMP_MTN = (() => {
-  const steps = 16, d = new Uint8Array(steps * 4);
-  for (let i = 0; i < steps; i++) {
-    const v = Math.round(255 * Math.pow((i + 1) / steps, 0.72));
-    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
-  }
-  const t = new THREE.DataTexture(d, steps, 1, THREE.RGBAFormat);
-  t.minFilter = t.magFilter = THREE.LinearFilter;
-  t.needsUpdate = true;
-  return t;
-})();
 
 /* A HARD RAMP FOR CEL. The world's usual ramp is a stylised gradient; three steps with the
    break pushed late is a lit side, a turn and a shadow side, which is what a painted cel has. */
@@ -3585,6 +3696,43 @@ function splitTris(geo) {
     out.setAttribute(k, new THREE.BufferAttribute(dst, n));
   }
   return out;
+}
+
+/* WELDED, SMOOTH NORMALS — and this is the "pixelated", not the ramp and not the noise.
+   Fuji arrives from the .glb with per-face normals: it was authored flat-shaded, like everything
+   else in this world, and at the size of a shrine lantern that is the house style. At twenty-two
+   thousand units across it is a cone shaded as a stack of concentric bands, and no ramp
+   resolution or surface noise survives being drawn on top of that.
+   Averaging the face normals per POSITION (not per vertex index — after toNonIndexed every
+   corner exists once per triangle) turns the same triangles into a smooth cone. The silhouette,
+   which is the part anyone would call low-poly on purpose, is untouched. */
+function smoothNormals(geo) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const pos = g.attributes.position.array;
+  const n = g.attributes.position.count;
+  const key = (i) => `${Math.round(pos[i * 3])}|${Math.round(pos[i * 3 + 1])}|${Math.round(pos[i * 3 + 2])}`;
+  const acc = new Map();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), fn = new THREE.Vector3();
+  for (let t = 0; t < n; t += 3) {
+    a.fromArray(pos, t * 3); b.fromArray(pos, (t + 1) * 3); c.fromArray(pos, (t + 2) * 3);
+    fn.crossVectors(ab.subVectors(b, a), ac.subVectors(c, a)).normalize();
+    for (let k = 0; k < 3; k++) {
+      const kk = key(t + k);
+      let v = acc.get(kk);
+      if (!v) acc.set(kk, v = new THREE.Vector3());
+      v.add(fn);
+    }
+  }
+  acc.forEach((v) => v.normalize());
+  const out = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const v = acc.get(key(i)) || new THREE.Vector3(0, 1, 0);
+    out[i * 3] = v.x; out[i * 3 + 1] = v.y; out[i * 3 + 2] = v.z;
+  }
+  g.setAttribute('normal', new THREE.BufferAttribute(out, 3));
+  g.computeBoundingSphere();
+  return g;
 }
 
 /* the same value noise the rock shader uses, so the crags and the shading agree about where the
@@ -3823,11 +3971,13 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     o.material = rocky(o.material.clone(), {
       gradientMap: RAMP_MTN,
       origin: [rc.x, rc.y, rc.z], desat: 0.45, tint: 0xbfb3b8,
-      aerAmt: 0.95, aerNear: 6000, aerFar: 30000, aerColor: 0xd6b39c,
+      aerAmt: 0.95, aerNear: 6000, aerFar: 30000, aerColor: 0xd6b39c, dechill: 0.85,
+      warm: 0xffeadb, lift: 0x1b1410,
       scale: 1 / 700, mottle: 0.34,
       /* they top out between 4,300 and 6,500, so a line at 3,400 dusts the highest third of the
          nearest ones and leaves the low ones bare — which is what puts depth into a skyline */
       snowY: 3400, snowBand: 900, snowJitter: 1100, snowSlope: 0.34, snowAdd: 0.85,
+      snowCol: 0xfaf6f0,
     });
     cragged++;
     craggedTris += o.geometry.attributes.position.count / 3;
@@ -3870,13 +4020,15 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   root.traverse((o) => {
     if (!o.isMesh || !/fuji/i.test(o.name) || /forest|props_rock|outline/i.test(o.name)) return;
     const b = new THREE.Box3().setFromObject(o);
+    o.geometry = smoothNormals(o.geometry);
     o.material = rocky(o.material.clone(), {
       gradientMap: RAMP_MTN,
       origin: [(b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2],
       /* 0.62 of the way to grey, then warmed: the authored flank plus a cold bounce light was
          reading as a blue mountain, and dawn haze is warm */
       desat: 0.5, tint: 0xcbbcb9,
-      aerAmt: 0.72, aerNear: 7000, aerFar: 34000, aerColor: 0xd8b49b,
+      aerAmt: 0.72, aerNear: 7000, aerFar: 34000, aerColor: 0xd8b49b, dechill: 0.8,
+      warm: 0xffe8d2, lift: 0x231a14,
       scale: 1 / 1100, mottle: 0.30,
       /* the gullies are struck about the mountain's own axis, taken from the mesh rather than
          written down, so a re-export that moves Fuji does not leave them centred on nothing */
@@ -3885,7 +4037,11 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
          author's own luminance ramp (0.10 rock, 0.72 snow, transition y 4,000-5,000), so the
          re-threshold breaks their edge rather than competing with it. */
       snowAdd: 0, snowMid: 0.42, snowSoft: 0.07, snowJitter: 0.32, rockDark: 0.94,
-      snowCol: 0xeceae7,
+      /* WRITTEN ABSOLUTE, ON PURPOSE. The warm tint above is a multiply on material.color, which
+         lands before this block and therefore warmed the snow cap along with the rock — the
+         mountain went from blue to sand. uSnowCol replaces rather than multiplies, so the cap is
+         recovered here at full brightness while the flank keeps its correction. */
+      snowCol: 0xfffdf7,
     });
     fujiDone++;
   });
@@ -7266,6 +7422,8 @@ function tick() {
   placeWorldPicks();
   /* the sky travels with the eye, so it is never seen as the sphere it is */
   if (SKY_DOME) SKY_DOME.position.copy(camera.position);
+  /* and the sun faces it, since nothing else is going to do that for a Mesh */
+  if (SUN_MESH) SUN_MESH.quaternion.copy(camera.quaternion);
   for (let i = 0; i < SMALL_WATER.length; i++) {
     SMALL_WATER[i].uniforms.uTime.value = t;
     SMALL_WATER[i].uniforms.uSun.value.copy(SUN_DIR_LIVE);
