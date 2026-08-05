@@ -44,6 +44,62 @@ and all have nowhere to sit down.
 Six materials, six silhouettes, six relationships to the ground — and only one stacked roof left in
 the world, at the one place where the stack *means* something.
 
+## The sites — settled 2026-08-05 against the built world
+
+`models/environment.blend` is 20,695 objects across thirteen areas, and the mapping below was
+settled by reading what is actually modelled in each rather than by matching collection names.
+Two earlier calls were reversed on the evidence, and the reasons matter more than the outcome.
+
+| | area in the .blend | ground | what decided it |
+|---|---|---|---|
+| **学習 STUDY** | `Zen` | −257 | `Hojo_001` — the 方丈 itself — plus `Sanmon`, `Teahouse`, `HallMonks`, tsukubai, moss, momiji, 95 stems of bamboo |
+| **復習 REVIEW** | `Torii` | **+149** | `Honden`, six `Hokora`, two `Chozuya` — a full shrine precinct on the highest built ground |
+| **読解 READING** | `Onsen` | −560 | **`Signboard` ×10**, `Vending` ×7, `GasLamp` ×40, a lane of inns and shops |
+| **特訓 DRILLS** | `Festival` | −250 | `Yagura` — the drum tower — with `Yatai` stalls, `ChochinPole`, `MaskWall`, goldfish tanks |
+| **検定 JLPT** | `Pagoda` | +76 | `Pagoda5_001`, `Hondo`, `Sanmon`, `Shoro` |
+| **記録 RECORDS** | *not built* — north ridge ~(−4000, 14000) | **+1717** | the only ground in the map from which every other place is visible |
+
+Held back, deliberately: **`Garden`** (teahouse, two azumaya, drum and zigzag bridges, 65 moss,
+30 azalea, 9 sakura, four 雪見灯籠) is the best-appointed area in the file and has **no text in it
+at all**, which makes it a poor destination and a strong candidate for a seventh. **`Onsen`'s**
+former role and **`Meadow`** (58 objects) are scenery and a waypoint.
+
+### The two reversals, and what caused them
+
+**READING was going to be Zen, and moved to Onsen.** Zen's bamboo grove is beautiful and the first
+instinct was to put reading in it. But the props say otherwise: Zen's writing is `Sotoba`, `EmaRack`
+and `OmikujiRack` — sacred, vertical, classical — while Onsen has ten signboards, seven vending
+machines and a street of shopfronts. 読解 practice is everyday written Japanese, and a town lane is
+made of it. **An area's props are a better statement of what it is for than its name.**
+
+**STUDY was going to be the Garden, and moved back to Zen.** That was a consequence rather than a
+decision: moving READING out of Zen freed the `Hojo`, which restores 方丈と四方の庭 and means the
+619 lines already written in `places/study.js` — hall, four gardens on four faces, the seasonal
+subject mapping — keep their intent instead of being rewritten against a stroll garden.
+
+### What the cameras say, and why they were not followed
+
+The file carries seven named cameras. Only **two** agree with the architecture: `Camera_JLPT` aims
+at the Pagoda (18° off) and `Camera_Study` is nearest Zen. The rest are crossed — `Camera_Drills`
+aims at the shrine (5°), `Camera_Review` at the garden (6°), `Camera_Records` at the onsen (7°).
+They are "look at this area" framings placed before the mapping was settled, and they are useful for
+**testing fly-ins** rather than as final positions. A `Yagura` is unambiguously the drill ground;
+a camera name is a label.
+
+### Coordinates, for wiring
+
+Blender is Z-up and glTF is Y-up, so `(x, y, z)` becomes `(x, z, −y)`:
+
+| place | Blender centroid | three.js |
+|---|---|---|
+| STUDY / Zen | 2390, 8228, −257 | `2390, -257, -8228` |
+| REVIEW / Torii | 11165, 656, 149 | `11165, 149, -656` |
+| READING / Onsen | −6738, 4446, −560 | `-6738, -560, -4446` |
+| DRILLS / Festival | 2285, −3287, −250 | `2285, -250, 3287` |
+| JLPT / Pagoda | −2127, −4532, 76 | `-2127, 76, 4532` |
+| RECORDS / ridge | −4000, 14000, 1717 | `-4000, 1717, -14000` |
+| *(held)* Garden | −3871, −1353, −474 | `-3871, -474, 1353` |
+
 ## Each place, level by level
 
 ### 学習 STUDY — 回遊式庭園, the stroll garden
