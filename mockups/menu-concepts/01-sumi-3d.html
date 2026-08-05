@@ -3353,7 +3353,7 @@ const lakeWater = (() => {
       uShoreOrigin: { value: SHORE.origin },
       uShoreSize: { value: SHORE.size },
       uShoreMax: SHORE.maxDepth,
-      uFoam: { value: 0.42 },
+      uFoam: { value: 0.0 },
       fogColor: FOG_U.fogColor,
       fogDensity: FOG_U.fogDensity,
       uMistColor: CLOUD.uMistColor,
@@ -3403,34 +3403,19 @@ const lakeWater = (() => {
            and the camera IS at a grazing angle here, which is why the reflection carries */
         vec3 v = normalize( cameraPosition - vWorld );
         float f = pow( 1.0 - clamp( v.y, 0.0, 1.0 ), uReflPow );
-        /* DEPTH, from the baked heightfield. This is the thing that was missing: a lake whose
-           colour comes only from its ripple is the same colour everywhere, which is why it read
-           as a flat sheet however much the surface moved. */
-        vec2 suv = ( vWorld.xz - uShoreOrigin ) / uShoreSize;
-        float depth = texture2D( uShore, suv ).r * uShoreMax;
-        /* RELATIVE TO WHAT THE BED ACTUALLY DOES, not to a number in units.
-           Measured after the fact: the imported terrain has no lake basin cut into it. The
-           generated lake is a plane sitting on nearly flat ground, and the bed varies by 74
-           units end to end — so an absolute 42-unit foam threshold covered almost the entire
-           surface and the lake came back white. Everything here is now a fraction of the deepest
-           point found at bake time, which is correct for this terrain and stays correct if the
-           model is ever re-exported with a real basin in it. */
-        float rel = depth / max( uShoreMax, 1.0 );
-        float shallow = 1.0 - clamp( rel, 0.0, 1.0 );
-        /* A HINT, NOT THE SUBJECT. With only 74 units of bed relief the depth term at full
-           strength repaints the whole lake and buries the reflection, which is the best thing
-           about this water. It gets a third of the weight: enough to see the bank shelve, not
-           enough to compete with the mountain in the mirror. */
-        vec3 body = mix( uDeep, uShallow, clamp( shallow * 0.34 + chop * 0.14 + 0.16, 0.0, 1.0 ) );
+        /* NO DEPTH TERM. The baked shore-depth experiment is removed, and it deserves a note
+           because the idea was sound and the DATA was not. Depth-driven colour and shoreline
+           foam are what every stylised-water reference reaches for, and getting depth from the
+           existing heightfield instead of a second scene render was the right way to afford it.
+           But the imported terrain has no basin cut under the lake: the bed varies 74 units end
+           to end across a 7,020-unit span. A 256-texel map of an almost-flat field is mostly
+           quantisation, which is where the hexagonal patterning came from, and the one genuinely
+           deep patch in the middle took no foam and no tint at all — the hole. Any tuning of the
+           thresholds just moves those artefacts around; the input cannot support the effect.
+           It comes back for free if a basin is ever modelled — bakeShoreDepth and the uniforms
+           are left in place and simply unused. */
+        vec3 body = mix( uDeep, uShallow, clamp( chop * 0.25 + 0.5, 0.0, 1.0 ) );
         vec3 col = mix( body, refl, clamp( f * uReflGain, uReflMin, 0.95 ) );
-        /* SHORELINE FOAM. A band that follows the real waterline wherever the bed comes up,
-           wobbled by the chop so it is not a contour line, plus a second thinner band further
-           out for the sense of a wave having just gone through. */
-        float relc = rel - chop * 0.10;
-        float edge = 1.0 - smoothstep( 0.0, 0.085, relc );
-        float lace = 1.0 - smoothstep( 0.08, 0.22, rel - chop * 0.14 );
-        float foam = clamp( edge * 0.8 + lace * 0.18 * ( 0.5 + 0.5 * sin( chop * 3.1 + uTime * 1.7 ) ), 0.0, 1.0 );
-        col = mix( col, vec3( 0.93, 0.95, 0.96 ), foam * uFoam );
         /* the same valley mist every other surface takes, so the far shore of the lake sits in
            it too instead of staying sharp while the land around it softens */
         vec3 mv2 = vWorld - cameraPosition;
@@ -4152,7 +4137,12 @@ function jsRidged(x, y, z) {
    copy of a corner looks up the same one. */
 function cragify(geo, amp, freq) {
   let g = geo;
-  for (let i = 0; i < 3; i++) g = splitTris(g);
+  /* TWO SPLITS, NOT THREE. Three is 64x — it took the far ranges from 128 triangles each to
+     8,192, which is 155k across nineteen of them for objects that occupy a few hundred pixels of
+     skyline. Two is 16x and still gives every ridge more crest detail than it can show at this
+     distance; the difference in the render is not visible and the difference in the frame is
+     116,000 triangles. */
+  for (let i = 0; i < 2; i++) g = splitTris(g);
   const pos = g.attributes.position.array;
   const n = g.attributes.position.count;
 
@@ -4527,11 +4517,32 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   const madeFor = [];
   root.traverse((o) => {
     if ((!o.isMesh && !o.isInstancedMesh) || ENV_SKY.test(o.name)) return;
-    /* AN INVERTED HULL IS THE WRONG TOOL FOR A FLAT SHEET. The hull is the same geometry drawn
-       back-faces-only and nudged away from the eye; on a water surface whose normals point down
-       that is a solid dark lid sitting exactly where the water is, and it turned the garden pond
-       black. Water gets its edge from the bank around it. */
     if (o.userData.noOutline) return;
+
+    /* AN INVERTED HULL IS THE WRONG TOOL FOR A FLAT SHEET, and this is now a RULE rather than a
+       list of names. The hull is the same geometry drawn back-faces-only and nudged away from
+       the eye. On anything with real thickness that is a silhouette. On a sheet — a ground
+       surface, a path, a pond — the back faces sit in the same plane as the front ones, so the
+       result is a solid near-black lid laid exactly over the thing it was supposed to outline.
+       It turned the garden pond black; it was also, all along, why the festival ground was
+       black, because `Festival_Surfaces_FestivalGround_001-outline` is one of these lids and no
+       amount of correcting the GROUND's colour was ever going to show through it.
+       Measured off the geometry, so it catches every one of them and any added later: if the
+       vertical extent is under 4% of the footprint, it is a sheet. */
+    o.geometry.computeBoundingBox();
+    const bb = o.geometry.boundingBox;
+    if (bb) {
+      const w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z);
+      if (w > 1 && (bb.max.y - bb.min.y) / w < 0.04) return;
+    }
+
+    /* AND NOT THE FOREST. An instanced hull carries one copy of the geometry per instance, so
+       outlining 20,328 instanced trees costs as many triangles as the trees themselves — 2.4M of
+       a 5.2M frame was inverted hulls, and most of it was vegetation whose line is shedding to
+       nothing by 14,000 units anyway (see shedAt). The big single meshes keep their outlines,
+       which is where the ink actually reads. */
+    if (o.isInstancedMesh) return;
+
     o.geometry.computeBoundingSphere();
     const bs = o.geometry.boundingSphere;
     if (!bs || bs.radius < OUTLINE_MIN_R) return;
