@@ -1876,12 +1876,18 @@ const CLOUD_MATS = [];
    The rest of the world keeps its toon look; distant terrain rendered smooth against a
    cel-shaded foreground is the normal arrangement in stylised games, not a compromise.
    https://threejs.org/docs/pages/MeshToonMaterial.html */
-function rockMaterial(src, colour) {
-  const m = new THREE.MeshLambertMaterial({
+/* A TOON RAMP IS ALSO AN AMBIENT LIGHT, WHICH IS WHY THE MOUNTAINS WENT DARK.
+   RAMP's lowest step is 0.37, so under MeshToonMaterial a face turned completely away from the
+   key still returned 37% of full diffuse — a large, invisible fill baked into the shading model.
+   Lambert returns the honest dot product, which on Fuji's camera-facing flank (away from a
+   sunrise key) is very nearly nothing, so the same palette that read as grey rock read as
+   near-black. The palette is brightened to match, and a small flat emissive stands in for the
+   fill the ramp used to provide. */
+function rockMaterial(src, colour, vcolor) {
+  return new THREE.MeshBasicMaterial({
     color: colour != null ? colour : 0xffffff,
-    vertexColors: colour == null && !!src && src.vertexColors,
+    vertexColors: vcolor != null ? !!vcolor : (colour == null && !!src && src.vertexColors),
   });
-  return m;
 }
 
 function rocky(mat, opts = {}) {
@@ -3178,14 +3184,17 @@ const CLOUD_MAT = new THREE.MeshToonMaterial({
   emissive: new THREE.Color(0x9d97b2), fog: true,
 });
 {
-  const N = 16;
+  /* MORE OF THEM, and spread over a wider band of the sky. Sixteen left obvious gaps at the
+     edges of a 43-degree frame; thirty-four is dense enough that the ring reads as weather
+     rather than as a row of objects, and it is still one draw call each. */
+  const N = 34;
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
   const pos = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   for (let i = 0; i < N; i++) {
     /* A RING, NOT A DOME CAP. Anything overhead is out of frame at these fovs and would only
        cost fill; the band that matters runs from a little above the ridgeline to a little above
        the sun. */
-    const az = (i / N) * Math.PI * 2 + hash01(i, 91) * 0.22;
+    const az = (i / N) * Math.PI * 2 + hash01(i, 91) * 0.30;
     const dist = 19000 + hash01(i, 3) * 21000;
     const y = 5400 + hash01(i, 17) * 5400;
     const blobs = 8 + Math.floor(hash01(i, 29) * 7);
@@ -3732,6 +3741,119 @@ function splitTris(geo) {
   return out;
 }
 
+/* PAINTED PER VERTEX, ON THE CPU, AFTER SUBDIVIDING — which is what should have been done
+   three attempts ago, and it is the suggestion that got there: SUBDIVIDE IT.
+   Every previous version drove the snow line from a fragment shader, and that shader has spent
+   this whole exercise not executing for reasons I could not pin down — the block is in the
+   compiled source, the program is Fuji's own (its cache key ends `cloudy|rock`), the uniforms
+   are bound, and forcing the snow line down to sea level still changes nothing on screen.
+   So stop depending on it. A colour written into a vertex attribute is interpolated across the
+   triangle by the fixed-function rasteriser: it cannot silently not run, and the smoothness of
+   the gradient is decided by how many vertices there are, which is a thing I control directly.
+   Two subdivisions take Fuji from 9,916 triangles to 158,000 — at that density the snow line is
+   a gradient sampled every forty units or so up the cone, which is far finer than the screen.
+   The direction question was the right one to ask, too. What matters is not horizontal versus
+   vertical: it is that midpoint subdivision splits every triangle FOUR ways, so the new vertices
+   land on every edge and the interpolation gets finer in both directions at once. The earlier
+   pass did this to the far ranges and never to Fuji. */
+function paintMountain(mesh, opts) {
+  let g = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
+  for (let i = 0; i < (opts.split || 0); i++) g = splitTris(g);
+
+  const pos = g.attributes.position.array;
+  const n = g.attributes.position.count;
+  /* the normal is needed per vertex to keep snow off the cliffs, and it has to be the WELDED
+     one or adjacent triangles disagree about whether they are flat and the snow line frays */
+  const key = (i) => `${Math.round(pos[i * 3])}|${Math.round(pos[i * 3 + 1])}|${Math.round(pos[i * 3 + 2])}`;
+  const acc = new Map();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), fn = new THREE.Vector3();
+  for (let t = 0; t < n; t += 3) {
+    a.fromArray(pos, t * 3); b.fromArray(pos, (t + 1) * 3); c.fromArray(pos, (t + 2) * 3);
+    fn.crossVectors(ab.subVectors(b, a), ac.subVectors(c, a)).normalize();
+    for (let k = 0; k < 3; k++) {
+      const kk = key(t + k);
+      let v = acc.get(kk);
+      if (!v) acc.set(kk, v = new THREE.Vector3());
+      v.add(fn);
+    }
+  }
+  acc.forEach((v) => v.normalize());
+
+  const nrm = new Float32Array(n * 3);
+  const col = new Float32Array(n * 3);
+  const rock = new THREE.Color(opts.rock);
+  const rockHi = new THREE.Color(opts.rockHi != null ? opts.rockHi : opts.rock);
+  const foot = new THREE.Color(opts.foot != null ? opts.foot : opts.rock);
+  const snow = new THREE.Color(opts.snow != null ? opts.snow : 0xfffdf8);
+  const snowLit = new THREE.Color();
+  const tmp = new THREE.Color();
+  const up = new THREE.Vector3(0, 1, 0);
+  const wp = new THREE.Vector3();
+
+  for (let i = 0; i < n; i++) {
+    const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+    const nv = acc.get(key(i)) || up;
+    nrm[i * 3] = nv.x; nrm[i * 3 + 1] = nv.y; nrm[i * 3 + 2] = nv.z;
+    /* world position, because the noise and the snow line are world quantities and this mesh
+       may sit under a transform */
+    wp.set(x, y, z).applyMatrix4(mesh.matrixWorld);
+
+    /* THE BODY: a foot colour blending up into rock, so the base sits into the treeline
+       instead of ending at it. This is the "depth treatment" — a mountain is not one colour. */
+    const up01 = THREE.MathUtils.clamp((wp.y - opts.footY) / Math.max(1, opts.rockY - opts.footY), 0, 1);
+    tmp.copy(foot).lerp(rock, up01 * up01 * (3 - 2 * up01));
+    /* mottle, from the same value noise the crags use, so colour and form agree */
+    const m = (jsFbm(wp.x * opts.grain, wp.y * opts.grain, wp.z * opts.grain) - 0.5) * (opts.mottle || 0);
+    tmp.lerp(rockHi, THREE.MathUtils.clamp(0.5 + m * 3, 0, 1) * 0.45);
+
+    /* THE SNOW: a wide height blend with a noisy line, and nothing on the steep faces. Wide is
+       the whole point — uSnowBand of 1,500 over a cone 6,100 tall spreads the transition across
+       a quarter of its height, which cannot read as a cutoff at any zoom. */
+    /* THE LIGHT IS BAKED IN, AND THE MOUNTAINS ARE UNLIT.
+       Every attempt to get a white cap has been fighting the rig: the key is a low sunrise sun
+       that barely touches the camera-facing flank, and what remains is a 0x93b0dc bounce and a
+       0xcfd8e6 hemisphere — both cold — so a warm albedo comes back neutral and a white one
+       comes back grey-blue. The toon ramp had been hiding this behind a 37% floor.
+       A mountain twenty-six thousand units away is a matte painting. Its shading is baked here,
+       with the sun direction the scene actually uses, and the material is unlit: what is painted
+       is what is seen. Snow stays snow-coloured, rock stays warm, and nothing downstream can
+       tint it by accident. (paintMountain is re-runnable if the sun ever moves far enough to
+       matter — NAV.sun does not currently do that.) */
+    if (opts.sun) {
+      const nl = Math.max(0, nv.x * opts.sun.x + nv.y * opts.sun.y + nv.z * opts.sun.z);
+      /* a soft wrap rather than a hard terminator: at this distance the shadow side of a
+         mountain is lit by the whole sky, not by nothing */
+      const shade = 0.52 + 0.48 * Math.pow(nl, 0.85);
+      tmp.multiplyScalar(shade);
+      /* and the lit side takes the sunrise's colour, the shadow side a little of the sky's */
+      tmp.r *= 1 + 0.16 * nl; tmp.b *= 1 - 0.10 * nl + 0.06 * (1 - nl);
+    }
+    if (opts.snowY != null) {
+      const line = opts.snowY + (jsFbm(wp.x * opts.snowGrain, wp.y * opts.snowGrain, wp.z * opts.snowGrain) - 0.5) * opts.snowJitter;
+      let sn = THREE.MathUtils.smoothstep(wp.y, line, line + opts.snowBand);
+      sn *= THREE.MathUtils.smoothstep(Math.abs(nv.y), opts.snowSlope, opts.snowSlope + 0.28);
+      /* the cap is blended in after the shading, and keeps most of its brightness: snow is the
+         one thing in the frame that is genuinely near-white, and letting the terminator drag it
+         down to grey is what made every previous version look capless */
+      const k = THREE.MathUtils.clamp(sn, 0, 1);
+      if (k > 0 && opts.sun) {
+        const nl = Math.max(0, nv.x * opts.sun.x + nv.y * opts.sun.y + nv.z * opts.sun.z);
+        snowLit.copy(snow).multiplyScalar(0.80 + 0.20 * nl);
+        tmp.lerp(snowLit, k);
+      } else {
+        tmp.lerp(snow, k);
+      }
+    }
+    col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+  }
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeBoundingSphere();
+  mesh.geometry = g;
+  return n;
+}
+
 /* WELDED, SMOOTH NORMALS — and this is the "pixelated", not the ramp and not the noise.
    Fuji arrives from the .glb with per-face normals: it was authored flat-shaded, like everything
    else in this world, and at the size of a shrine lantern that is the house style. At twenty-two
@@ -3998,26 +4120,30 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   root.traverse((o) => {
     if (!o.isMesh || !/(^|[_\-.])(farrange|range|ridge)/i.test(o.name)) return;
     const rb = new THREE.Box3().setFromObject(o);
-    const rc = rb.getCenter(new THREE.Vector3());
     /* 460 rather than 210: these are four to six thousand units tall and twelve to nineteen
        thousand across, so a two-hundred-unit wobble on them is a texture, not a landform */
     o.geometry = cragify(o.geometry, 460, 1 / 1500);
-    o.material = rocky(rockMaterial(o.material), {
-      origin: [rc.x, rc.y, rc.z], desat: 0.22, tint: 0xbfb3b8,
-      aerAmt: 0.55, aerNear: 9000, aerFar: 36000, aerColor: 0xd2ac96, dechill: 0.45,
-      warm: 0xfff2e4, lift: 0x090705,
-      scale: 1 / 700, mottle: 0.20,
-      /* they top out between 4,300 and 6,500, so a line at 3,400 dusts the highest third of the
-         nearest ones and leaves the low ones bare — which is what puts depth into a skyline */
-      snowY: 3400, snowBand: 900, snowJitter: 1100, snowSlope: 0.34, snowAdd: 0.85,
-      snowCol: 0xfaf6f0,
+    /* THE SAME TREATMENT AS FUJI, which is why they were black.
+       They had no colour of their own worth keeping — flat dark vertex paint, unlit because
+       they face away from the key — so they read as cardboard cutouts whatever was done to the
+       geometry. Painted the same way as the mountain now: a dark foot that meets the treeline,
+       rock through the middle, snow on whatever stands high enough, and each range's own snow
+       line set from its own height so the tall ones are capped and the low ones are not. That
+       last part is what makes a range of mountains read as a range. */
+    const top = rb.max.y, bot = rb.min.y;
+    paintMountain(o, {
+      split: 0,
+      footY: bot, rockY: bot + (top - bot) * 0.55,
+      foot: 0x5f6668, rock: 0x8e8b88, rockHi: 0xa8a29b,
+      grain: 1 / 900, mottle: 0.5, sun: SUN_AT.clone().normalize(),
+      snowY: bot + (top - bot) * 0.72, snowBand: (top - bot) * 0.24,
+      snowJitter: 420, snowSlope: 0.30, snowGrain: 1 / 1400, snow: 0xf4f1ec,
     });
+    o.material = rockMaterial(o.material, null, true);
+    o.material.color.setHex(0xffffff);
     cragged++;
     craggedTris += o.geometry.attributes.position.count / 3;
   });
-  /* 1c. THE PONDS AND THE BATHS. Named surfaces, so this is a lookup rather than a guess:
-     Garden_Surfaces_GardenWater_001 and Onsen_Surfaces_OnsenPools_001. The onsen gets its own
-     tint — a hot spring is milky and warm and does not reflect like a garden pond. */
   let ponds = 0;
   root.traverse((o) => {
     if (!o.isMesh) return;
@@ -4053,73 +4179,32 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   root.traverse((o) => {
     if (!o.isMesh || !/fuji/i.test(o.name) || /forest|props_rock|outline/i.test(o.name)) return;
     const b = new THREE.Box3().setFromObject(o);
-    o.geometry = smoothNormals(o.geometry);
-    /* A FLAT ROCK COLOUR, AND CURRENTLY NO SNOW AT ALL — deliberately, and not finished.
-       The design is a flat base with the snow line as a height blend, wide and high and fully
-       under my control, which is the only way to get the smooth transition that was asked for
-       three times. It is written, and it does NOT RUN: forcing uSnowY to -2,000, which should
-       turn the entire cone white, changes nothing. The rock fragment block is present in the
-       generated source — both guards pass — and still does not execute, which is the same
-       failure the program-cache-key fix was supposed to cure and evidently only half cured.
-       Putting the authored vertex colours back was tried and rejected: it restores a cap, but it
-       restores it as a hard painted edge, which is the exact complaint. Between a mountain with
-       no snow and a mountain with a hard line on it, this leaves the one with no hard line,
-       because that is the thing that has been reported three times running. The cap comes back
-       the moment the block executes. */
-    o.material = rocky(rockMaterial(o.material, 0x91837c), {
-      origin: [(b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2],
-      /* 0.62 of the way to grey, then warmed: the authored flank plus a cold bounce light was
-         reading as a blue mountain, and dawn haze is warm */
-      desat: 0.18, tint: 0xcbbcb9,
-      aerAmt: 0.34, aerNear: 9000, aerFar: 40000, aerColor: 0xcfae9a, dechill: 0.40,
-      /* dialled down from 0x231a14: it was lifting the whole flank into sand. Just enough to
-         answer the cold bounce, not enough to repaint the mountain. */
-      /* NEARLY NEUTRAL NOW. This existed only because the shader appeared to do nothing; with
-         the de-chill actually running it is a second correction on top of a working one. */
-      warm: 0xfff6ee, lift: 0x0a0705,
-      scale: 1 / 1100, mottle: 0.16,
-      /* the gullies are struck about the mountain's own axis, taken from the mesh rather than
-         written down, so a re-export that moves Fuji does not leave them centred on nothing */
-      gully: 0.10, gullyN: 34, axis: [(b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2],
-      /* NO height-based snow here: the cap is already painted. 0.42 is the midpoint of the
-         author's own luminance ramp (0.10 rock, 0.72 snow, transition y 4,000-5,000), so the
-         re-threshold breaks their edge rather than competing with it. */
-      /* THE HARD CUTOFF WAS THIS, and it was mine.
-         The re-threshold existed to break the painted snowline into tongues, and at a softness
-         of 0.07 it is not a blend, it is a CUT: everything above luminance 0.49 became snow
-         colour, everything below 0.35 became rock, and the author's gradient in between was
-         thrown away and replaced by an edge. Ruled out one at a time first — turning off cast
-         shadows changed nothing, a 256-step gradient map changed nothing, removing the emissive
-         changed nothing, so it was never the toon ramp.
-         The measurement that started all this also settles it: the painted luminance runs 0.10
-         on the lower cone and climbs smoothly to 0.72 between y 4,000 and 5,000. That IS a
-         smooth transition. It did not need rescuing; it needed leaving alone. */
-      /* AND THE PAINT ITSELF IS THE EDGE. Turning my re-threshold off did not soften it, which
-         rules out the last of my own code — the .glb's snowline is painted hard, and the
-         "smooth 0.17-to-0.69 ramp" I measured earlier was an artefact of my own method: I
-         averaged vertex luminance into 250-unit height buckets, and a bucket straddling a
-         JAGGED HARD boundary averages to a mid value exactly as a gradient does. The measurement
-         could not tell the two apart, and I read it as proof of something it could not prove.
-         So the gradient has to be MADE. A wide softness plus heavy noise jitter turns the
-         painted edge into a broad mottled blend: at 1/1100 the noise features are about eighty
-         pixels at this distance, so the boundary dissolves across several hundred units of the
-         cone instead of snapping over one triangle. */
-      /* wide enough to be a gradient, jittered enough to be an edge rather than a contour */
-      /* HEIGHT-DRIVEN, HIGH, WIDE AND WHITE. The cone runs y 1,097 to 7,220; a line at 5,300
-         with a 1,500-unit band puts the transition in the top third and spreads it over a fifth
-         of the mountain's height, which cannot read as a cutoff. The jitter is in world units
-         here, not luminance, so it breaks the line into tongues without touching the gradient. */
-      snowMid: 0, snowAdd: 1.0, snowY: 5300, snowBand: 1500, snowJitter: 1100, snowSlope: 0.0,
-      snowCol: 0xffffff, rockDark: 1.0,
-      /* WRITTEN ABSOLUTE, ON PURPOSE. The warm tint above is a multiply on material.color, which
-         lands before this block and therefore warmed the snow cap along with the rock — the
-         mountain went from blue to sand. uSnowCol replaces rather than multiplies, so the cap is
-         recovered here at full brightness while the flank keeps its correction. */
-      snowCol: 0xfffdf7,
+    /* TWO SUBDIVISIONS, and this is the answer to the hard cutoffs.
+       9,916 triangles over a cone 22,000 wide means a vertex every few hundred units, so any
+       per-vertex gradient snaps across one triangle. Splitting twice is sixteen times the
+       vertices — the snow line becomes a blend sampled far more finely than the screen can
+       resolve, and there is nothing left to step. */
+    paintMountain(o, {
+      split: 2,
+      footY: b.min.y, rockY: b.min.y + (b.max.y - b.min.y) * 0.45,
+      /* warm slate, not blue: the cold bounce light is what made this mountain read blue, and a
+         warm base colour is the honest place to answer it */
+      foot: 0x6d6355, rock: 0xa2937f, rockHi: 0xc3b49c,
+      grain: 1 / 1400, mottle: 0.34, sun: SUN_AT.clone().normalize(),
+      /* HIGH AND WIDE, as asked. The cone runs 1,097 to 7,220; a line at 5,400 with a
+         1,600-unit band puts the transition in the top third and spreads it over a quarter of
+         the mountain's height. */
+      /* 4,700 with a 1,900 band: full snow from about 6,600 up, first traces around 3,900, so
+         the cap occupies the top third and the transition is spread over nearly a third of the
+         cone's height. Wider than looks sensible on paper is the point — this is the number that
+         decides whether there is a visible line, and there must not be one. */
+      snowY: 4700, snowBand: 1900, snowJitter: 1000, snowSlope: 0.14,
+      snowGrain: 1 / 2600, snow: 0xfffdfa,
     });
+    o.material = rockMaterial(o.material, null, true);
+    o.material.color.setHex(0xffffff);
     fujiDone++;
   });
-
   /* 2. INSTANCE WHAT SHARES A SHAPE. glTF deduplicates accessors, so meshes that were linked
      duplicates in Blender arrive already sharing one BufferGeometry object — which makes
      geometry identity a reliable grouping key without comparing any vertex data. */
