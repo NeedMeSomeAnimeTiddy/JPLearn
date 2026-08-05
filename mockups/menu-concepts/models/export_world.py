@@ -37,6 +37,11 @@ for o in list(bpy.context.scene.objects):
         why = 'water'
     elif o.type == 'MESH' and len(o.data.polygons) == 0:
         why = 'empty'
+    elif o.type == 'EMPTY' and not o.children:
+        # CHILDLESS ONLY. An empty with children is a parent whose transform its children are
+        # expressed relative to; dropping it moves everything under it. A childless one is an
+        # anchor left behind and exports as a node that draws nothing.
+        why = 'empty'
     elif o.type == 'MESH' and n.startswith('legacy'):
         zs = [(o.matrix_world @ mathutils.Vector(c)).z for c in o.bound_box]
         if min(zs) > 1500:

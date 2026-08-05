@@ -2055,7 +2055,10 @@ function outlineGeom(src) {
 
    `px` is the width in CSS pixels. 3 is a normal line; a mountain wants 6 or 7 because it is
    also the only thing on screen at that size. */
-function outlineMaterial(px) {
+/* SHED_AT defaults to the generated world's 4,000 so nothing already tuned moves. Loaded
+   geometry passes a much larger value: with one flat width across a whole imported world there
+   is no per-object px to compensate with, so the width has to actually be constant instead. */
+function outlineMaterial(px, shedAt) {
   return new THREE.ShaderMaterial({
     /* TAGGED SO EXPORT CAN SKIP IT. Every visible mesh has an inverted-hull twin wearing this
        material; handing those to a modelling tool doubles the geometry and none of it is a thing
@@ -2067,6 +2070,7 @@ function outlineMaterial(px) {
          much heavier line than the ink-wash look does, and a per-material constant cannot be
          changed after five hundred of them exist. */
       pxScale: OUTLINE_SCALE,
+      shedAt: { value: shedAt || 4000 },
       res: OUTLINE_RES,
       fogColor: { value: backScene.fog.color },
       fogDensity: { value: backScene.fog.density },
@@ -2074,6 +2078,7 @@ function outlineMaterial(px) {
     vertexShader: `
       uniform float px;
       uniform float pxScale;
+      uniform float shedAt;
       uniform vec2 res;
       attribute vec3 aFlat;
       varying float vDepth;
@@ -2113,7 +2118,7 @@ function outlineMaterial(px) {
         if ( l > 0.5 ) {
           /* full width out to 4,000 units and then shed with distance, so a tree on the far side
              of the valley loses its line instead of turning into a black lozenge */
-          float wpx = px * pxScale * k * min( 1.0, 4000.0 / max( vDepth, 1.0 ) );
+          float wpx = px * pxScale * k * min( 1.0, shedAt / max( vDepth, 1.0 ) );
           clip.xy += ( sn / l ) * wpx * 2.0 / res * clip.w;
         }
         gl_Position = clip;
@@ -2892,7 +2897,10 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   });
   for (const o of madeFor) {
     const g = outlineGeom(o.geometry);
-    const mat = outlineMaterial(terrainish.includes(o) ? 1.4 : 2.2);
+    /* 1.0 rather than 2.2, and shedding from 14,000 rather than 4,000. The old pair drew a
+       near tree at 2.2px and the far treeline at about 1 — visibly two different weights in one
+       frame. This is one weight everywhere inside the valley, and only the horizon thins. */
+    const mat = outlineMaterial(terrainish.includes(o) ? 0.8 : 1.0, 14000);
     let h;
     if (o.isInstancedMesh) {
       h = new THREE.InstancedMesh(g, mat, o.count);
@@ -2927,6 +2935,14 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
 
   backScene.add(root);
   ENV.root = root;
+  /* THE HOME VIEW MOVES WITH THE WORLD. The old eye was sited against a heightfield this
+     model replaced, and it faces away from the sun. */
+  if (opts.home !== false) {
+    HOME_EYE.set(-3000, 1250, 8200);
+    HOME_LOOK.set(-3822, 498, -731);
+    ENV.homeMoved = true;
+  }
+
   ENV.culled = culled;
   if (culledSets.length) {
     console.log('[env] large sets cut from the reflection: '
@@ -4783,6 +4799,9 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   loadEnv: (url, opts) => loadEnvironment(url, opts),
   unloadEnv: () => unloadEnvironment(),
   cel: (on) => setCel(on !== false),
+  /* the sunset framing, so it can be re-applied after the camera has been flown elsewhere */
+  home: () => { HOME_EYE.set(-3000, 1250, 8200); HOME_LOOK.set(-3822, 498, -731);
+    return { eye: HOME_EYE.toArray(), look: HOME_LOOK.toArray() }; },
   outlineWeight: (v) => { OUTLINE_SCALE.value = v; return v; },
   env: ENV,
   /* the ground query itself, so a loaded model's heightfield can be compared against the
