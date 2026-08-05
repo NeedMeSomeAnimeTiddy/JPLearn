@@ -30,15 +30,36 @@ so it lands at the origin, and every part keeps the name the code gave it.
 - Lights and the sun sprites come through too (`sun-disc`, `sun-bloom`); they are not geometry you
   want to model against.
 
-## Replacing a part
+## Loading one
 
-**There is no loader yet.** `GLTFLoader.js` is vendored at `../lib/addons/loaders/`, but nothing in
-`01-sumi-3d.html` or `lab-shading.html` imports it — every mesh in both is still built in code. A
-`.glb` dropped in this directory today is read by nothing. This section describes what a model has
-to satisfy so that it *will* load correctly once the loading path is written; it is a spec for the
-modelling, not a description of a working pipeline.
+`NAV.loadEnv()` in the mockup replaces the generated world with `environment.glb`; `NAV.loadEnv(url)`
+for any other file, `NAV.unloadEnv()` to put the generated one back from the same camera. Nothing
+loads unless asked — every measurement in `RESEARCH.md` was taken against the analytic world.
 
-Model it, export as `.glb` next to this file. Rules that matter:
+What the loader does, and what it therefore needs from your file:
+
+- **It rebuilds the heightfield from your terrain.** `landAt()` is what places the camera stand-off,
+  the tree scatter, the grass and the STUDY compound, and a loaded model makes the analytic version
+  a lie. So a 384×384 field is baked off the mesh and `landAt` reads that instead. **Name your ground
+  object `terrain`** (or anything matching `terrain|ground|land`). Without it the bake falls back to
+  every mesh in the file and reads rooftops as ground — it warns loudly when this happens.
+- **It replaces every material.** The look — toon ramp, cloud shadows, height fog, sky rim, aerial
+  tint — lives in patched shaders, and a model keeping its own PBR materials is lit by none of it.
+  Only base colour and vertex colours carry across, so **flat colour per material** is not a
+  stylistic request, it is the only thing that survives.
+- **It leaves the atmosphere alone.** Anything named `sky-dome`, `lake`, `river`, `cloud`,
+  `sun-disc`, `sun-bloom` or `water` is dropped from your file and kept from the generated world.
+  Those are shader effects with geometry attached; relit as toon meshes the sky goes navy and the
+  lake becomes grey card. **Don't model them.**
+- **It does not build outlines yet.** Loaded meshes get no inverted-hull outline, so a loaded world
+  is noticeably flatter than the generated one. Known gap.
+
+Round-trip caveat: re-importing `environment.glb` puts one instanced prop (`scatter_23`) close to
+the camera, because `EXT_mesh_gpu_instancing` does not survive export→import cleanly here. That is
+an artefact of exporting this scene and re-reading it, not of the loader; a file authored in Blender
+will not have it.
+
+Rules that matter:
 
 - **Do not join objects.** One logical part, one object. The outline system welds vertex normals
   within a mesh; a joined mesh averages across seams that are not continuous and produces black

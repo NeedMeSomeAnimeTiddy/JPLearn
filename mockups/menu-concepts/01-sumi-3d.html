@@ -1094,6 +1094,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildReview } from './places/review.js';
 import { buildStudy } from './places/study.js';
 
@@ -1763,7 +1764,45 @@ function lakeField(x, z) {
   return 1 - Math.hypot(lx, lz) / lakeRadiusAt(Math.atan2(lz, lx));
 }
 
+/* WHAT A MODEL DOES NOT GET TO REPLACE. The sky gradient, the water, the drifting clouds and
+   the sun are shader effects with geometry attached, not modelling — the sky dome alone is a
+   46,000-unit sphere whose whole appearance is a gradient shader. Relit as toon geometry the
+   sky goes navy, the lake becomes grey card and the sun becomes a beige hexagon in the middle
+   of the frame, which is exactly what the first load produced.
+
+   Matched against BOTH sides: generated objects with these names stay visible, and loaded nodes
+   with these names are dropped. So a .glb exported from this very scene round-trips without
+   doubling them up. */
+const ENV_ATMOS = /^(sky-dome|lake|river|cloud|sun-disc|sun-bloom|water)/i;
+
+const ENV = {
+  url: './models/environment.glb',
+  root: null,          /* the loaded scene */
+  hidden: [],          /* what it replaced, kept for putting back */
+  field: null,         /* Float32Array heightfield, or null for the analytic world */
+  fw: 0, fh: 0, x0: 0, z0: 0, dx: 1, dz: 1,
+};
+
+/* SAMPLED BILINEARLY AND IN EYE-RELATIVE COORDINATES, because that is landAt's contract: it
+   takes x,z already offset by EYE and returns a height relative to GROUND_Y. Getting either of
+   those wrong puts the whole world 300 units out or 830 sideways, which looks like a modelling
+   error rather than a units error and is miserable to chase. */
+ENV.sample = (x, z) => {
+  const fx = THREE.MathUtils.clamp((x + EYE.x - ENV.x0) / ENV.dx, 0, ENV.fw - 1.001);
+  const fz = THREE.MathUtils.clamp((z + EYE.y - ENV.z0) / ENV.dz, 0, ENV.fh - 1.001);
+  const i = Math.floor(fx), j = Math.floor(fz), tx = fx - i, tz = fz - j;
+  const f = ENV.field, w = ENV.fw;
+  const a = f[j * w + i], b = f[j * w + i + 1];
+  const c = f[(j + 1) * w + i], d = f[(j + 1) * w + i + 1];
+  return (a + (b - a) * tx) + ((c + (d - c) * tx) - (a + (b - a) * tx)) * tz - GROUND_Y;
+};
+
 function landAt(x, z) {
+  /* THE ONE LINE THAT MAKES A LOADED ENVIRONMENT SAFE. Everything that places anything reaches
+     the ground through here, so redirecting it at the source means the loader does not have to
+     find and patch twenty-seven call sites — and the analytic path stays intact and exact for
+     when no model is loaded, which is still the default. */
+  if (ENV.field) return ENV.sample(x, z);
   const rad = Math.hypot(x, z);
   /* the valley's shape. Long wavelengths only, and flattened near the camera so the ground
      under the type stays calm and the horizon does not heave about. */
@@ -2587,6 +2626,146 @@ const STAND_OFF = 1500;
    on the bottom of the lake, arriving nine units above the surface and skimming it. Everything
    here reads whichever is higher. */
 function surfaceAt(x, z) { return Math.max(groundAt(x, z), LAKE_Y); }
+
+/* ============================ THE ENVIRONMENT LOADER ============================
+   A .glb replaces the generated world wholesale: the model IS the scene. Four things have to
+   happen, and only the first is loading.
+
+   1  MATERIALS ARE REPLACED, NOT KEPT. Whatever Blender exports is a PBR material, and this
+      scene's entire look — the toon ramp, drifting cloud shadows, height fog, the sky rim,
+      the aerial tint — lives in patched Lambert/Toon shaders. A loaded model that keeps its
+      own materials is lit by none of it and reads as a foreign object dropped in the frame.
+      Colour is the only thing worth carrying across.
+
+   2  THE HEIGHTFIELD IS REBUILT FROM THE MESH. See landAt above for why.
+
+   3  THE GENERATED WORLD IS HIDDEN, not deleted, so the swap is reversible in the console and
+      the two can be compared from the same camera.
+
+   4  IT IS OPT-IN. No model loads unless asked, because the analytic world is still the one
+      every measurement in RESEARCH.md was taken against. */
+/* BUILT FROM VERTICES, NOT FROM RAYCASTS. A 384x384 grid is 147,000 downward rays against
+   250,000 triangles, and three.js has no BVH — that is minutes. Splatting the terrain's own
+   vertices into cells is one pass over the geometry, and since the mesh has roughly one vertex
+   per cell at this resolution it lands nearly exact. */
+function bakeField(meshes, N = 384) {
+  const box = new THREE.Box3();
+  meshes.forEach((m) => box.expandByObject(m));
+  const pad = 1e-3;
+  ENV.x0 = box.min.x - pad; ENV.z0 = box.min.z - pad;
+  ENV.fw = ENV.fh = N;
+  ENV.dx = (box.max.x - box.min.x + 2 * pad) / (N - 1);
+  ENV.dz = (box.max.z - box.min.z + 2 * pad) / (N - 1);
+  const f = new Float32Array(N * N).fill(NaN);
+  const v = new THREE.Vector3();
+  for (const m of meshes) {
+    const pos = m.geometry.attributes.position;
+    m.updateWorldMatrix(true, false);
+    for (let k = 0; k < pos.count; k++) {
+      v.fromBufferAttribute(pos, k).applyMatrix4(m.matrixWorld);
+      const i = Math.round((v.x - ENV.x0) / ENV.dx), j = Math.round((v.z - ENV.z0) / ENV.dz);
+      if (i < 0 || j < 0 || i >= N || j >= N) continue;
+      const q = j * N + i;
+      /* HIGHEST WINS. A terrain mesh has undersides, cliff backfaces and anything tucked below
+         it; taking the last vertex written would sample whichever happened to come last in the
+         buffer, which is a coin toss per cell and reads as noise in the ground. */
+      if (!(f[q] >= v.y)) f[q] = v.y;
+    }
+  }
+  /* fill the cells no vertex landed in, by spreading from the ones that got filled */
+  let holes = 0;
+  for (let k = 0; k < f.length; k++) if (Number.isNaN(f[k])) holes++;
+  const before = holes;
+  for (let pass = 0; pass < 64 && holes > 0; pass++) {
+    const g = f.slice();
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const q = j * N + i;
+        if (!Number.isNaN(f[q])) continue;
+        let sum = 0, n = 0;
+        for (let dj = -1; dj <= 1; dj++) {
+          for (let di = -1; di <= 1; di++) {
+            const ii = i + di, jj = j + dj;
+            if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
+            const w = f[jj * N + ii];
+            if (!Number.isNaN(w)) { sum += w; n++; }
+          }
+        }
+        if (n) { g[q] = sum / n; holes--; }
+      }
+    }
+    f.set(g);
+  }
+  /* anything still empty had no neighbours at all — flat ground is a better answer than NaN,
+     which would silently poison every placement downstream */
+  for (let k = 0; k < f.length; k++) if (Number.isNaN(f[k])) f[k] = GROUND_Y;
+  ENV.field = f;
+  /* a loop, not Math.min(...f): spreading a 147,000-element array is 147,000 arguments and
+     blows the call stack outright */
+  let lo = Infinity, hi = -Infinity;
+  for (let k = 0; k < f.length; k++) { if (f[k] < lo) lo = f[k]; if (f[k] > hi) hi = f[k]; }
+  return { cells: N * N, holes: before, filled: before - holes, min: lo, max: hi };
+}
+
+async function loadEnvironment(url = ENV.url, opts = {}) {
+  const t0 = performance.now();
+  const gltf = await new GLTFLoader().loadAsync(url);
+  const root = gltf.scene;
+
+  /* 1. re-material */
+  let meshes = 0, converted = 0, dropped = 0;
+  const terrainish = [];
+  const bin = [];
+  root.traverse((o) => {
+    if (!o.isMesh && !o.isInstancedMesh) return;
+    if (ENV_ATMOS.test(o.name)) { bin.push(o); return; }
+    meshes++;
+    const src = Array.isArray(o.material) ? o.material[0] : o.material;
+    const col = (src && src.color) ? src.color.clone() : new THREE.Color(0x8899aa);
+    const m = new THREE.MeshToonMaterial({ color: col, gradientMap: RAMP });
+    if (o.geometry.attributes.color) { m.vertexColors = true; m.color.setHex(0xffffff); }
+    o.material = cloudy(m);
+    o.castShadow = o.receiveShadow = true;
+    converted++;
+    if (/terrain|ground|land/i.test(o.name)) terrainish.push(o);
+  });
+  bin.forEach((o) => { o.parent.remove(o); dropped++; });
+
+  /* 2. the heightfield */
+  const src = terrainish.length ? terrainish
+    : (() => {
+      console.warn('[env] no mesh named terrain/ground/land — baking from EVERY mesh, which '
+        + 'will read rooftops as ground. Name the ground object "terrain" in the .glb.');
+      const all = [];
+      root.traverse((o) => { if (o.isMesh) all.push(o); });
+      return all;
+    })();
+  const stats = bakeField(src, opts.grid || 384);
+
+  /* 3. hide what it replaces */
+  ENV.hidden = [];
+  backScene.children.forEach((o) => {
+    if (o.isLight || o === root) return;
+    if (ENV_ATMOS.test(o.name)) return;      /* the sky, the water and the sun stay */
+    if (o.visible) { ENV.hidden.push(o); o.visible = false; }
+  });
+
+  backScene.add(root);
+  ENV.root = root;
+  const ms = Math.round(performance.now() - t0);
+  console.log(`[env] ${url}: ${meshes} meshes, ${converted} re-materialled, `
+    + `${dropped} atmosphere nodes dropped, ${ENV.hidden.length} generated objects hidden, `
+    + `heightfield ${stats.cells} cells (${stats.holes} empty, ${stats.filled} filled), `
+    + `y ${stats.min.toFixed(0)}..${stats.max.toFixed(0)}, ${ms} ms`);
+  return { meshes, dropped, hidden: ENV.hidden.length, terrainMeshes: src.length, ...stats, ms };
+}
+
+function unloadEnvironment() {
+  if (ENV.root) { backScene.remove(ENV.root); ENV.root = null; }
+  ENV.hidden.forEach((o) => { o.visible = true; });
+  ENV.hidden = [];
+  ENV.field = null;
+}
 function destPlace(bearingDeg, dist, lift = 0) {
   const b = bearingDeg * Math.PI / 180;
   const p = at(Math.cos(b) * dist, Math.sin(b) * dist, 0);
@@ -4372,6 +4551,20 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
       behind: q.z > 1 ? 1 : 0,
     };
   },
+  /* THE WORLD FROM A FILE, replacing the generated one. Opt-in: nothing loads unless asked,
+     because every measurement in RESEARCH.md was taken against the analytic world and a page
+     that silently swapped it would invalidate all of them without saying so.
+       NAV.loadEnv()            the default ./models/environment.glb
+       NAV.loadEnv(url, {grid}) anything else; grid is the heightfield resolution
+       NAV.unloadEnv()          put the generated world back, same camera */
+  loadEnv: (url, opts) => loadEnvironment(url, opts),
+  unloadEnv: () => unloadEnvironment(),
+  env: ENV,
+  /* the ground query itself, so a loaded model's heightfield can be compared against the
+     analytic world it replaced without going through a probe and a camera */
+  groundAt: (x, z) => groundAt(x, z),
+  surfaceAt: (x, z) => surfaceAt(x, z),
+
   /* THE WORLD AS IT STANDS, AS A FILE. A modelling pass should start from the real massing rather
      than from a screenshot and a table of numbers — the export IS the scale spec, so nothing has
      to be converted by hand and nothing can be converted wrongly.
