@@ -32,7 +32,13 @@ so it lands at the origin, and every part keeps the name the code gave it.
 
 ## Replacing a part
 
-Model it, export as `.glb` next to this file, and the loader swaps it in by name. Rules that matter:
+**There is no loader yet.** `GLTFLoader.js` is vendored at `../lib/addons/loaders/`, but nothing in
+`01-sumi-3d.html` or `lab-shading.html` imports it — every mesh in both is still built in code. A
+`.glb` dropped in this directory today is read by nothing. This section describes what a model has
+to satisfy so that it *will* load correctly once the loading path is written; it is a spec for the
+modelling, not a description of a working pipeline.
+
+Model it, export as `.glb` next to this file. Rules that matter:
 
 - **Do not join objects.** One logical part, one object. The outline system welds vertex normals
   within a mesh; a joined mesh averages across seams that are not continuous and produces black
