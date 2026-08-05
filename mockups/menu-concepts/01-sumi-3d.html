@@ -1635,11 +1635,53 @@ const CLOUD = {
    `needsUpdate` is only `version++` (it disposes nothing), so bumping it on the cloud-lit
    materials each frame is the cheap, supported way through. */
 const CLOUD_MATS = [];
+
+/* ROCK, SNOW AND GULLIES AS A FUNCTION OF WORLD POSITION.
+   `rocky(mat, opts)` marks a material for the extra fragment block that cloudy() injects below.
+   It is one function of position and the surface normal, and it deliberately never writes an
+   absolute colour: everything is a MULTIPLIER on whatever the author painted, plus snow that can
+   only be ADDED above a noisy line. Replacing diffuseColor outright would throw away the vertex
+   colours in the model, which are the only art direction these meshes carry.
+     uMottle   how hard the fbm breaks up the flat paint
+     uGully    radial ridges running down a cone — the whole character of Fuji, and wrong on a
+               ridge line, so the far ranges pass 0
+     uSnowAdd  how much snow may appear above uSnowY, slope-masked so cliffs stay bare */
+function rocky(mat, opts = {}) {
+  /* A CLONED MATERIAL LIES ABOUT BEING PATCHED. Material.copy() deep-copies userData but does
+     NOT copy onBeforeCompile — so `mat.clone()` arrives carrying `cloudy: true` with no patch
+     attached, cloudy() takes its early return, and the result is a material with no rock, no
+     cloud shadows and no valley mist that reports itself as fully patched. Clearing the flag is
+     the whole fix, and it has to be here rather than at the call site because every future
+     caller would have to remember. */
+  delete mat.userData.cloudy;
+  mat.userData.rock = {
+    uRockScale: { value: opts.scale != null ? opts.scale : 1 / 900 },
+    uMottle: { value: opts.mottle != null ? opts.mottle : 0.30 },
+    uGully: { value: opts.gully || 0 },
+    uGullyN: { value: opts.gullyN != null ? opts.gullyN : 26 },
+    uAxis: { value: new THREE.Vector2(opts.axis ? opts.axis[0] : 0, opts.axis ? opts.axis[1] : 0) },
+    uSnowY: { value: opts.snowY != null ? opts.snowY : 1e9 },
+    uSnowBand: { value: opts.snowBand != null ? opts.snowBand : 400 },
+    uSnowJitter: { value: opts.snowJitter != null ? opts.snowJitter : 700 },
+    uSnowSlope: { value: opts.snowSlope != null ? opts.snowSlope : 0.42 },
+    uSnowAdd: { value: opts.snowAdd != null ? opts.snowAdd : 0 },
+    /* THE OTHER SNOW MODE. Where the author already painted a cap, a height-based snow line is
+       the wrong tool — it lands on top of theirs and turns the mountain into a white cone.
+       uSnowMid > 0 switches to re-thresholding the paint they did: see the fragment block. */
+    uSnowMid: { value: opts.snowMid || 0 },
+    uSnowSoft: { value: opts.snowSoft != null ? opts.snowSoft : 0.10 },
+    uRockDark: { value: opts.rockDark != null ? opts.rockDark : 0.94 },
+    uSnowCol: { value: new THREE.Color(opts.snowCol != null ? opts.snowCol : 0xf2f0ee) },
+  };
+  return cloudy(mat);
+}
+
 function cloudy(mat) {
   if (mat.userData.cloudy) return mat;
   mat.userData.cloudy = true;
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, CLOUD);
+    if (mat.userData.rock) Object.assign(shader.uniforms, mat.userData.rock);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vCloudPos;')
       /* after project_vertex so `transformed` is final; the instancing branch matters because
@@ -1659,7 +1701,91 @@ function cloudy(mat) {
         uniform float uCloudScale;
         uniform float uCloudAmt;
         uniform vec3 uMistColor;
-        uniform float uMistY, uMistH, uMistAmt;`)
+        uniform float uMistY, uMistH, uMistAmt;`
+        + (mat.userData.rock ? `
+        uniform float uRockScale, uMottle, uGully, uGullyN;
+        uniform float uSnowY, uSnowBand, uSnowJitter, uSnowSlope, uSnowAdd;
+        uniform float uSnowMid, uSnowSoft, uRockDark;
+        uniform vec2 uAxis;
+        uniform vec3 uSnowCol;
+        /* value noise, five octaves. Cheap, and its slightly blobby character is closer to
+           weathered rock than the streaky look gradient noise gives at this scale. */
+        float rkHash( vec3 p ) {
+          p = fract( p * 0.3183099 + vec3( 0.71, 0.113, 0.419 ) );
+          p *= 17.0;
+          return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) );
+        }
+        float rkNoise( vec3 x ) {
+          vec3 i = floor( x ), f = fract( x );
+          f = f * f * ( 3.0 - 2.0 * f );
+          return mix(
+            mix( mix( rkHash( i ), rkHash( i + vec3( 1, 0, 0 ) ), f.x ),
+                 mix( rkHash( i + vec3( 0, 1, 0 ) ), rkHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
+            mix( mix( rkHash( i + vec3( 0, 0, 1 ) ), rkHash( i + vec3( 1, 0, 1 ) ), f.x ),
+                 mix( rkHash( i + vec3( 0, 1, 1 ) ), rkHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ),
+            f.z );
+        }
+        float rkFbm( vec3 p ) {
+          float a = 0.5, s = 0.0;
+          for ( int i = 0; i < 5; i++ ) { s += a * rkNoise( p ); p *= 2.03; a *= 0.5; }
+          return s;
+        }` : ''))
+      .replace('#include <color_fragment>', mat.userData.rock ? `#include <color_fragment>
+        {
+          /* THE FACE NORMAL FROM DERIVATIVES, not a varying. These meshes are shaded flat
+             anyway, so the geometric normal IS the shading normal, and taking it here costs
+             nothing and adds no attribute to twenty thousand meshes that do not want one. */
+          vec3 gn = normalize( cross( dFdx( vCloudPos ), dFdy( vCloudPos ) ) );
+          float up = abs( gn.y );
+          float n1 = rkFbm( vCloudPos * uRockScale );
+          float n2 = rkFbm( vCloudPos * uRockScale * 4.7 + 31.0 );
+
+          /* RADIAL GULLIES. A stratovolcano is not a smooth cone: it is scored top to bottom by
+             erosion channels, and they are most of why a photograph of Fuji does not look like a
+             lathe. The count is broken up by noise so they are not a comb, and they fade out at
+             the summit and wherever the surface turns flat. */
+          float g = 0.0;
+          if ( uGully > 0.0 ) {
+            vec2 d = vCloudPos.xz - uAxis;
+            float r = length( d );
+            float ang = atan( d.x, d.y );
+            g = sin( ang * uGullyN + rkFbm( vCloudPos * 0.00028 ) * 5.0 );
+            /* MASKED BY RADIUS, NOT BY SLOPE. Keying this on how far the face tilts from
+               horizontal was wrong for a shallow cone: Fuji's flanks run at 29 degrees, so
+               abs(n.y) is 0.87 across the whole mountain and one-minus-up never left 0.13 — the
+               gullies were being multiplied by about 0.04 and simply were not there. Radius is
+               the honest axis: nothing at the summit, full on the open flanks, gone under the
+               treeline. (No backticks in this file's shaders — they are template literals.) */
+            g *= uGully * smoothstep( 700.0, 3500.0, r ) * ( 1.0 - smoothstep( 8500.0, 12500.0, r ) );
+          }
+
+          /* MODULATE, NEVER REPLACE: the author's vertex colours stay the palette. */
+          diffuseColor.rgb *= 1.0 + ( n1 - 0.5 ) * uMottle + ( n2 - 0.5 ) * uMottle * 0.4 + g;
+
+          /* SNOW ABOVE A RAGGED LINE, and only where snow could actually lie. Additive on top of
+             whatever cap was painted, so the painted edge gains tongues and fingers instead of
+             being overwritten by a second, competing snow line. */
+          if ( uSnowAdd > 0.0 ) {
+            float line = uSnowY + ( n1 - 0.5 ) * uSnowJitter;
+            float snow = smoothstep( line, line + uSnowBand, vCloudPos.y );
+            snow *= smoothstep( uSnowSlope, uSnowSlope + 0.30, up );
+            snow *= 0.70 + 0.30 * n2;
+            diffuseColor.rgb = mix( diffuseColor.rgb, uSnowCol, clamp( snow * uSnowAdd, 0.0, 1.0 ) );
+          }
+          /* RE-THRESHOLDING A PAINTED CAP, rather than adding a second one.
+             Measured off the mesh: Fuji's vertex-colour luminance sits at 0.10 on the lower cone,
+             ramps from 0.17 at y=4,000 to 0.69 at y=5,000, and plateaus at 0.72. That ramp IS the
+             snow line, drawn as a soft vertical gradient. Offsetting the luminance by noise and
+             re-thresholding it turns that gradient into a ragged edge with tongues and fingers,
+             and leaves everything the author painted decisively exactly as painted — only the
+             soft middle of their own ramp moves. */
+          if ( uSnowMid > 0.0 ) {
+            float lum = dot( diffuseColor.rgb, vec3( 0.299, 0.587, 0.114 ) );
+            float noisy = lum + ( n1 - 0.5 ) * uSnowJitter + ( n2 - 0.5 ) * uSnowJitter * 0.35;
+            float t = smoothstep( uSnowMid - uSnowSoft, uSnowMid + uSnowSoft, noisy );
+            diffuseColor.rgb = mix( diffuseColor.rgb * uRockDark, uSnowCol, t );
+          }
+        }` : '#include <color_fragment>')
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         {
           vec2 cuv = ( vCloudPos.xz - vCloudPos.y * uCloudProj ) * uCloudScale + uCloudOff;
@@ -1694,6 +1820,9 @@ function cloudy(mat) {
        exactly like a working feature with its strength set to zero. Never let it fail quietly */
     if (!shader.vertexShader.includes('vCloudPos = (') || !shader.fragmentShader.includes('texture2D( uCloudMap')) {
       console.error('CLOUD PATCH FAILED', mat.type);
+    }
+    if (mat.userData.rock && !shader.fragmentShader.includes('rkFbm( vCloudPos * uRockScale )')) {
+      console.error('ROCK PATCH FAILED', mat.type);
     }
   };
   mat.needsUpdate = true;
@@ -2590,6 +2719,90 @@ function radialTex(inner, outer, stops) {
   backScene.add(disc);
 }
 
+/* ================= CLOUDS =================
+   The sky has been a painted dome with faint bands in it since the beginning, which is fine
+   until the camera pulls back to a wide shot and the top third of the frame is a flat gradient.
+   These are the cheapest thing that fixes that and the only one that suits the style: sprites,
+   which is to say camera-facing quads, so a cloud is never seen edge-on and never has to be
+   volumetric to survive being looked at.
+   (Not the ones that were dropped from the .blend — those were 48 props sitting at the wrong
+   altitude over the terrain. These live in the sky and are placed against the sun.) */
+function cloudTex(seed) {
+  const S = 256;
+  const c = document.createElement('canvas'); c.width = S; c.height = S;
+  const g = c.getContext('2d');
+  const rnd = (i) => hash01(seed * 31 + i, seed + 7);
+  /* A CUMULUS IS LUMPS ON A FLAT BOTTOM. Stacking soft radial blobs along a slightly rising
+     baseline gives the billow without any of them reading as a circle, and keeping every blob's
+     centre above 0.62 of the height keeps the underside flat, which is the whole silhouette. */
+  for (let i = 0; i < 11; i++) {
+    const x = S * (0.10 + 0.80 * rnd(i * 3));
+    const lift = 1 - Math.abs(x / S - 0.5) * 1.5;
+    const y = S * (0.66 - 0.20 * lift * rnd(i * 3 + 1));
+    const r = S * (0.10 + 0.16 * rnd(i * 3 + 2)) * (0.55 + 0.65 * lift);
+    const rg = g.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, 'rgba(255,255,255,0.92)');
+    rg.addColorStop(0.55, 'rgba(255,255,255,0.55)');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = rg;
+    g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+/* where the sun is, as a direction, kept current so the pond glints agree with it */
+const SUN_DIR_LIVE = new THREE.Vector3();
+const CLOUDS = [];
+{
+  const texes = [0, 1, 2, 3, 4].map(cloudTex);
+  const sunDirXZ = new THREE.Vector2(SUN_AT.x - EYE.x, SUN_AT.z - EYE.y).normalize();
+  for (let i = 0; i < 38; i++) {
+    /* A RING, NOT A DOME CAP. Anything overhead is out of frame at these fovs and would only
+       cost fill; the band that matters runs from a little above the ridgeline to a little above
+       the sun. */
+    const az = (i / 38) * Math.PI * 2 + hash01(i, 91) * 0.16;
+    const dist = 15000 + hash01(i, 3) * 20000;
+    const y = 4200 + hash01(i, 17) * 7000;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texes[i % texes.length],
+      transparent: true, depthWrite: false, fog: false, opacity: 0.30 + hash01(i, 23) * 0.34,
+    }));
+    sp.position.set(EYE.x + Math.cos(az) * dist, y, EYE.y + Math.sin(az) * dist);
+    const w = 3400 + hash01(i, 41) * 6200;
+    sp.scale.set(w, w * (0.36 + hash01(i, 53) * 0.20), 1);
+    /* LIT FROM WHERE THE SUN IS, not from a constant. A cloud on the sun's side of the sky takes
+       the burn; one behind you at dawn is a cold mauve. Baked once because the sun does not
+       move — placeSun() re-tints them when it does. */
+    const toward = new THREE.Vector2(Math.cos(az), Math.sin(az)).dot(sunDirXZ);
+    sp.material.color.copy(new THREE.Color(0x8f86a8).lerp(new THREE.Color(0xffdcb4),
+      Math.pow(Math.max(0, toward * 0.5 + 0.5), 2.2)));
+    sp.renderOrder = -9;
+    sp.name = 'sky-cloud';
+    sp.userData.az = az;
+    sp.userData.dist = dist;
+    sp.userData.drift = 0.0009 + hash01(i, 67) * 0.0016;
+    backScene.add(sp);
+    CLOUDS.push(sp);
+    /* they are worth reflecting — a lake with sky in it and no clouds in the sky is the giveaway
+       that the sky is a painting */
+  }
+}
+/* Re-tint against wherever the sun has been put. Called by placeSun so the two can never
+   disagree about which side of the sky is warm. */
+function relightClouds() {
+  const sun = backScene.getObjectByName('sun-disc');
+  if (!sun) return 0;
+  SUN_DIR_LIVE.copy(sun.position).normalize();
+  const sd = new THREE.Vector2(sun.position.x - EYE.x, sun.position.z - EYE.y).normalize();
+  const warm = new THREE.Color(0xffdcb4), cold = new THREE.Color(0x8f86a8);
+  CLOUDS.forEach((sp) => {
+    const t = new THREE.Vector2(Math.cos(sp.userData.az), Math.sin(sp.userData.az)).dot(sd);
+    sp.material.color.copy(cold).lerp(warm, Math.pow(Math.max(0, t * 0.5 + 0.5), 2.2));
+  });
+  return CLOUDS.length;
+}
+
 /* ---- valley mist ----
    There is no geometry here on purpose. The mist is an exponential height-density field
    integrated along the view ray inside every lit material's shader (see `cloudy`), so it pools
@@ -2892,6 +3105,7 @@ function placeSun(u, v, dist = 50000) {
     key.position.copy(t).addScaledVector(at.clone().sub(t).normalize(), 14000);
     key.updateMatrixWorld(true);
   }
+  relightClouds();
   return { at: at.toArray().map(Math.round), blocked: sunClear([HOME.px, HOME.py, HOME.pz]) };
 }
 
@@ -2950,6 +3164,213 @@ const RAMP_CEL = (() => {
   t.needsUpdate = true;
   return t;
 })();
+
+/* ============================ SMALL WATER ============================
+   Ponds and baths, as opposed to the lake. See the note in the patch that introduced this. */
+const SMALL_WATER = [];
+function pondMaterial(opts = {}) {
+  const m = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uDeep: { value: new THREE.Color(opts.deep != null ? opts.deep : 0x1d3038) },
+      uShallow: { value: new THREE.Color(opts.shallow != null ? opts.shallow : 0x40707a) },
+      uSkyLo: { value: new THREE.Color(opts.skyLo != null ? opts.skyLo : 0xf6c79a) },
+      uSkyHi: { value: new THREE.Color(opts.skyHi != null ? opts.skyHi : 0x6d6f95) },
+      uGlint: { value: opts.glint != null ? opts.glint : 1.0 },
+      uChop: { value: opts.chop != null ? opts.chop : 1.0 },
+      uSun: { value: new THREE.Vector3() },
+      fogColor: FOG_U.fogColor,
+      fogDensity: FOG_U.fogDensity,
+      uMistColor: CLOUD.uMistColor,
+      uMistY: CLOUD.uMistY,
+      uMistH: CLOUD.uMistH,
+      uMistAmt: CLOUD.uMistAmt,
+    },
+    /* DOUBLE-SIDED, AND THAT IS THE ACTUAL BUG.
+       Raycasting the pond from the menu camera hit `Garden_Surfaces_GardenWater_001-outline` and
+       then the big lake and then the terrain — never the pond itself. Its faces are wound with
+       their normals pointing DOWN, so a FrontSide material is back-face culled from above and
+       the water simply was not drawn: what you were looking at was the pond BED, seen through
+       where the surface should have been, under the black inverted-hull outline that was still
+       being drawn over the top of it. No shader could have fixed that. */
+    side: THREE.DoubleSide,
+    vertexShader: `
+      varying vec3 vWorld;
+      varying float vDepth;
+      void main() {
+        vec4 wp = modelMatrix * vec4( position, 1.0 );
+        vWorld = wp.xyz;
+        vec4 mv = viewMatrix * wp;
+        vDepth = -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform float uTime, uGlint, uChop, fogDensity, uMistY, uMistH, uMistAmt;
+      uniform vec3 uDeep, uShallow, uSkyLo, uSkyHi, uSun, fogColor, uMistColor;
+      varying vec3 vWorld;
+      varying float vDepth;
+      void main() {
+        /* A POND IS SMALL, so the ripple has to be small too — the lake's wavelength is measured
+           in thousands of units and laid over a garden it is a single flat sheet with one
+           highlight on it. Three crossed waves at garden scale, no noise: still water in a
+           designed garden is deliberate, not choppy. */
+        float w = sin( vWorld.x * 0.026 + uTime * 1.10 ) * cos( vWorld.z * 0.021 - uTime * 0.83 )
+                + sin( ( vWorld.x + vWorld.z ) * 0.041 - uTime * 1.5 ) * 0.5;
+        w *= uChop;
+        /* the surface normal the ripple implies, by differencing the same wave field */
+        /* ENOUGH TILT TO BREAK THE HIGHLIGHT, NOT ENOUGH TO CHOP THE POND UP. At 0.26 the
+           Fresnel swung the full width of its range every half wavelength and the water came out
+           as a blue and white checkerboard. A garden pond is still water. */
+        vec3 n = normalize( vec3( w * 0.085, 1.0, w * 0.07 ) );
+        vec3 v = normalize( cameraPosition - vWorld );
+        float f = pow( 1.0 - clamp( dot( v, n ), 0.0, 1.0 ), 2.0 );
+
+        /* THE SKY, ANALYTICALLY. There is one planar-reflection pass in this file and the lake
+           owns it. What a pond actually shows is nearly all sky anyway, and the sky here is a
+           vertical gradient — so the reflected ray's elevation is enough to look it up, for the
+           cost of a mix. */
+        vec3 r = reflect( -v, n );
+        vec3 sky = mix( uSkyLo, uSkyHi, clamp( r.y * 1.6, 0.0, 1.0 ) );
+
+        vec3 body = mix( uDeep, uShallow, clamp( w * 0.30 + 0.5, 0.0, 1.0 ) );
+        /* FLOORED HIGH ON PURPOSE. A garden pond is looked down into from a few metres, where
+           real Fresnel returns a few percent and the water reads as a hole cut in the lawn. The
+           floor is what makes it water rather than physics does. */
+        /* FLOORED, AND ALSO CAPPED. A garden pond is looked down into from a few metres, where
+           real Fresnel returns a few percent and the water reads as a hole cut in the lawn — so
+           there is a floor. The ceiling is the other half: without it the ripple crests go to
+           pure sky and the surface turns to tinfoil. */
+        vec3 col = mix( body, sky, clamp( f * 1.2, 0.30, 0.64 ) );
+
+        /* the sun on the water, which is the thing that says "this is wet" more than any of it */
+        float spec = pow( max( dot( r, normalize( uSun ) ), 0.0 ), 150.0 );
+        col += vec3( 1.0, 0.92, 0.78 ) * spec * uGlint * 1.1;
+
+        /* the same air as everything else */
+        vec3 mv = vWorld - cameraPosition;
+        float mk = 1.0 / uMistH;
+        float mbase = uMistAmt * exp( - max( cameraPosition.y - uMistY, 0.0 ) * mk );
+        float mdy = mv.y * mk;
+        float mint = abs( mdy ) < 1e-4 ? length( mv ) : length( mv ) * ( 1.0 - exp( - mdy ) ) / mdy;
+        col = mix( col, uMistColor, clamp( 1.0 - exp( - max( mbase * mint, 0.0 ) ), 0.0, 1.0 ) );
+        float fg = 1.0 - exp( - fogDensity * fogDensity * vDepth * vDepth );
+        gl_FragColor = vec4( mix( col, fogColor, clamp( fg, 0.0, 1.0 ) ), 1.0 );
+        /* THE TWO CHUNKS A HAND-WRITTEN SHADER HAS TO ASK FOR.
+           THREE.Color converts a hex literal from sRGB to LINEAR the moment it is assigned, and
+           three only appends tone mapping and the sRGB encode where the shader source includes
+           these — built-in materials have them, a ShaderMaterial has whatever you typed. Without
+           them the pond wrote linear values straight into an sRGB framebuffer and came out
+           looking like a hole cut in the lawn, and no amount of picking lighter colours fixes
+           that, because the error is a curve and not an offset. */
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+  });
+  SMALL_WATER.push(m);
+  return m;
+}
+
+/* ============================ CRAGGING THE FAR RANGES ============================
+   A hundred and twenty triangles stretched over fifteen thousand units is a silhouette, and a
+   silhouette is exactly what a 4,000-unit-tall mountain twenty-five thousand units away is made
+   of. So the fidelity has to go into the skyline itself: subdivide, then push every vertex along
+   the surface by noise. */
+
+/* MIDPOINT SUBDIVISION. Each triangle becomes four; three passes is sixty-four times the
+   triangles, which turns 128 into 8,192 — nothing, at eight ranges. Works on non-indexed
+   geometry only, which is also what gives flat shading for free afterwards. */
+function splitTris(geo) {
+  const src = geo.index ? geo.toNonIndexed() : geo;
+  const attrs = ['position', 'normal', 'color'].filter((k) => src.attributes[k]);
+  const out = new THREE.BufferGeometry();
+  for (const k of attrs) {
+    const a = src.attributes[k], n = a.itemSize;
+    const dst = new Float32Array(a.count * 4 * n);
+    let w = 0;
+    const mid = (i, j, o) => { for (let c = 0; c < n; c++) o[c] = (a.array[i * n + c] + a.array[j * n + c]) / 2; };
+    const put = (i) => { for (let c = 0; c < n; c++) dst[w++] = a.array[i * n + c]; };
+    const putV = (v) => { for (let c = 0; c < n; c++) dst[w++] = v[c]; };
+    const ab = new Float32Array(n), bc = new Float32Array(n), ca = new Float32Array(n);
+    for (let t = 0; t < a.count; t += 3) {
+      mid(t, t + 1, ab); mid(t + 1, t + 2, bc); mid(t + 2, t, ca);
+      put(t); putV(ab); putV(ca);
+      putV(ab); put(t + 1); putV(bc);
+      putV(ca); putV(bc); put(t + 2);
+      putV(ab); putV(bc); putV(ca);
+    }
+    out.setAttribute(k, new THREE.BufferAttribute(dst, n));
+  }
+  return out;
+}
+
+/* the same value noise the rock shader uses, so the crags and the shading agree about where the
+   rough ground is rather than being two unrelated fields laid over each other */
+function jsHash(x, y, z) {
+  let a = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
+  return a - Math.floor(a);
+}
+function jsNoise(x, y, z) {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+  const fx = x - ix, fy = y - iy, fz = z - iz;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), sz = fz * fz * (3 - 2 * fz);
+  const L = (a, b, t) => a + (b - a) * t;
+  return L(
+    L(L(jsHash(ix, iy, iz), jsHash(ix + 1, iy, iz), sx),
+      L(jsHash(ix, iy + 1, iz), jsHash(ix + 1, iy + 1, iz), sx), sy),
+    L(L(jsHash(ix, iy, iz + 1), jsHash(ix + 1, iy, iz + 1), sx),
+      L(jsHash(ix, iy + 1, iz + 1), jsHash(ix + 1, iy + 1, iz + 1), sx), sy), sz);
+}
+function jsFbm(x, y, z) {
+  let a = 0.5, s = 0, f = 1;
+  for (let i = 0; i < 4; i++) { s += a * jsNoise(x * f, y * f, z * f); f *= 2.07; a *= 0.5; }
+  return s;
+}
+
+/* CRACKS ARE THE ONLY REAL RISK HERE. After toNonIndexed every shared corner exists once per
+   triangle, so displacing "along the vertex normal" moves the same corner three different ways
+   and tears the mesh open. Both the direction AND the amount have to be pure functions of
+   POSITION: the normals are re-averaged into a map keyed on the quantised position, so every
+   copy of a corner looks up the same one. */
+function cragify(geo, amp, freq) {
+  let g = geo;
+  for (let i = 0; i < 3; i++) g = splitTris(g);
+  const pos = g.attributes.position.array;
+  const n = g.attributes.position.count;
+
+  const key = (i) => `${Math.round(pos[i * 3])}|${Math.round(pos[i * 3 + 1])}|${Math.round(pos[i * 3 + 2])}`;
+  const acc = new Map();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), fn = new THREE.Vector3();
+  for (let t = 0; t < n; t += 3) {
+    a.fromArray(pos, t * 3); b.fromArray(pos, (t + 1) * 3); c.fromArray(pos, (t + 2) * 3);
+    fn.crossVectors(ab.subVectors(b, a), ac.subVectors(c, a)).normalize();
+    for (let k = 0; k < 3; k++) {
+      const kk = key(t + k);
+      const v = acc.get(kk) || acc.set(kk, new THREE.Vector3()).get(kk);
+      v.add(fn);
+    }
+  }
+  acc.forEach((v) => v.normalize());
+
+  const d = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+    d.copy(acc.get(key(i)) || new THREE.Vector3(0, 1, 0));
+    const f = (jsFbm(x * freq, y * freq, z * freq) - 0.5) * 2;
+    /* ridges get the most, valley floors the least — a mountain is rough at the top and buried
+       in scree at the bottom, and pushing the base around only makes it float */
+    const h = Math.min(1, Math.max(0, (y - 200) / 2600));
+    const k = amp * f * (0.35 + 0.65 * h);
+    pos[i * 3] += d.x * k;
+    pos[i * 3 + 1] += d.y * k + f * amp * 0.45 * h;
+    pos[i * 3 + 2] += d.z * k;
+  }
+  g.attributes.position.needsUpdate = true;
+  /* non-indexed, so this is per-face: flat shading without asking for it */
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
 
 /* ============================ THE ENVIRONMENT LOADER ============================
    A .glb replaces the generated world wholesale: the model IS the scene. Four things have to
@@ -3084,6 +3505,62 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   ENV.modelSky = false;
   root.traverse((o) => { if ((o.isMesh || o.isInstancedMesh) && ENV_SKY.test(o.name)) ENV.modelSky = true; });
 
+  /* 1b. THE MOUNTAINS, which are a different job from everything else in the file.
+     Before instancing and before the outline hulls, because both read the geometry: cragging
+     after the hulls are built would leave every ridge wearing the silhouette of the shape it
+     used to be. */
+  let cragged = 0, craggedTris = 0;
+  root.traverse((o) => {
+    if (!o.isMesh || !/(^|[_\-.])(farrange|range|ridge)/i.test(o.name)) return;
+    o.geometry = cragify(o.geometry, 210, 1 / 900);
+    o.material = rocky(o.material.clone(), {
+      scale: 1 / 700, mottle: 0.34,
+      /* they top out between 4,300 and 6,500, so a line at 3,400 dusts the highest third of the
+         nearest ones and leaves the low ones bare — which is what puts depth into a skyline */
+      snowY: 3400, snowBand: 900, snowJitter: 1100, snowSlope: 0.34, snowAdd: 0.85,
+    });
+    cragged++;
+    craggedTris += o.geometry.attributes.position.count / 3;
+  });
+  /* 1c. THE PONDS AND THE BATHS. Named surfaces, so this is a lookup rather than a guess:
+     Garden_Surfaces_GardenWater_001 and Onsen_Surfaces_OnsenPools_001. The onsen gets its own
+     tint — a hot spring is milky and warm and does not reflect like a garden pond. */
+  let ponds = 0;
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    if (/gardenwater/i.test(o.name)) {
+      o.material = pondMaterial({ deep: 0x27443f, shallow: 0x4d7a72, chop: 0.75, glint: 0.55 });
+      o.castShadow = false; o.receiveShadow = false;
+      o.userData.noOutline = true;
+      ponds++;
+    } else if (/onsenpool/i.test(o.name)) {
+      o.material = pondMaterial({
+        deep: 0x4d6f70, shallow: 0x9fc3bd, skyLo: 0xffe0c0, skyHi: 0xa7b0c4,
+        chop: 0.45, glint: 0.5,
+      });
+      o.castShadow = false; o.receiveShadow = false;
+      o.userData.noOutline = true;
+      ponds++;
+    }
+  });
+  let fujiDone = 0;
+  root.traverse((o) => {
+    if (!o.isMesh || !/fuji/i.test(o.name) || /forest|props_rock|outline/i.test(o.name)) return;
+    const b = new THREE.Box3().setFromObject(o);
+    o.material = rocky(o.material.clone(), {
+      scale: 1 / 1100, mottle: 0.30,
+      /* the gullies are struck about the mountain's own axis, taken from the mesh rather than
+         written down, so a re-export that moves Fuji does not leave them centred on nothing */
+      gully: 0.19, gullyN: 34, axis: [(b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2],
+      /* NO height-based snow here: the cap is already painted. 0.42 is the midpoint of the
+         author's own luminance ramp (0.10 rock, 0.72 snow, transition y 4,000-5,000), so the
+         re-threshold breaks their edge rather than competing with it. */
+      snowAdd: 0, snowMid: 0.42, snowSoft: 0.07, snowJitter: 0.32, rockDark: 0.94,
+      snowCol: 0xeceae7,
+    });
+    fujiDone++;
+  });
+
   /* 2. INSTANCE WHAT SHARES A SHAPE. glTF deduplicates accessors, so meshes that were linked
      duplicates in Blender arrive already sharing one BufferGeometry object — which makes
      geometry identity a reliable grouping key without comparing any vertex data. */
@@ -3179,6 +3656,11 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   const madeFor = [];
   root.traverse((o) => {
     if ((!o.isMesh && !o.isInstancedMesh) || ENV_SKY.test(o.name)) return;
+    /* AN INVERTED HULL IS THE WRONG TOOL FOR A FLAT SHEET. The hull is the same geometry drawn
+       back-faces-only and nudged away from the eye; on a water surface whose normals point down
+       that is a solid dark lid sitting exactly where the water is, and it turned the garden pond
+       black. Water gets its edge from the bank around it. */
+    if (o.userData.noOutline) return;
     o.geometry.computeBoundingSphere();
     const bs = o.geometry.boundingSphere;
     if (!bs || bs.radius < OUTLINE_MIN_R) return;
@@ -3235,6 +3717,8 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   }
   const ms = Math.round(performance.now() - t0);
   console.log(`[env] ${url}: ${meshes} meshes, ${converted} re-materialled, `
+    + `${cragged} ranges cragged to ${Math.round(craggedTris / 1000)}k tris, ${fujiDone} fuji, `
+    + `${ponds} water surfaces, `
     + `${dropped} atmosphere dropped, ${culled} cut from the reflection `
     + `(${Math.round(culledTris / 1000)}k tris/frame saved), ${hulls} outline hulls, `
     + `${instMeshes} instanced meshes carrying ${instTotal} `
@@ -5169,6 +5653,7 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* the sun, placed in the frame: NAV.sun(0.5, 0.30) centre-frames it. Reports what blocks it. */
   sun: (u, v, dist) => placeSun(u, v, dist),
   sunClear: () => sunClear([HOME.px, HOME.py, HOME.pz]),
+  clouds: (on) => { CLOUDS.forEach((c) => { c.visible = on !== false; }); return CLOUDS.length; },
   /* the framing with the sun in the middle — the default, kept callable for after a fly-out */
   sunMid: () => composeSunCentred(),
   /* the other one: sun off Fuji's right shoulder, mountain centred. Also at ?sun=shoulder */
@@ -6441,6 +6926,18 @@ function tick() {
   placeWorldPicks();
   /* the sky travels with the eye, so it is never seen as the sphere it is */
   if (SKY_DOME) SKY_DOME.position.copy(camera.position);
+  for (let i = 0; i < SMALL_WATER.length; i++) {
+    SMALL_WATER[i].uniforms.uTime.value = t;
+    SMALL_WATER[i].uniforms.uSun.value.copy(SUN_DIR_LIVE);
+  }
+  /* the clouds walk round the ring. Slowly: at 0.001 rad/s a cloud crosses the frame in about
+     four minutes, which is weather rather than a screensaver. */
+  for (let i = 0; i < CLOUDS.length; i++) {
+    const c = CLOUDS[i], u = c.userData;
+    u.az += u.drift * dt;
+    c.position.x = EYE.x + Math.cos(u.az) * u.dist;
+    c.position.z = EYE.y + Math.sin(u.az) * u.dist;
+  }
   /* one float, so no hand-written shader can ever be fogging at a density the scene left behind */
   FOG_U.fogDensity.value = backScene.fog.density;
   backRenderer.render(backScene, camera);
