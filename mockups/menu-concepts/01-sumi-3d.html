@@ -2130,6 +2130,21 @@ function cloudy(mat) {
     }
 
   };
+  /* THE CACHE KEY, AND THIS IS WHY NONE OF THE ROCK SHADING EVER APPEARED.
+     three caches compiled programs by getProgramCacheKey(), and for a material carrying an
+     onBeforeCompile that key includes customProgramCacheKey() — whose DEFAULT implementation
+     returns onBeforeCompile.toString(). Every material cloudy() touches installs the same
+     function, so all twenty thousand of them hash to the same key and every one after the first
+     is handed the first one's program. The mountains were being drawn with a shader compiled
+     for a material that had no rock block in it.
+     Every symptom followed from that and every one of them pointed somewhere else: the guards
+     passed (they grep the string I built, which is correct — it is simply not the program that
+     got bound), the uniforms existed and were bound, and forcing the haze colour to pure red,
+     rewriting the snow colour and disabling the re-threshold all did nothing at all, because
+     none of that code was in the executing program. Three separate sessions of tuning values
+     that could not have had an effect.
+     The key has to distinguish anything that changes the GENERATED SOURCE. */
+  mat.customProgramCacheKey = () => 'cloudy' + (mat.userData.rock ? '|rock' : '');
   mat.needsUpdate = true;
   CLOUD_MATS.push(mat);
   return mat;
@@ -3970,10 +3985,10 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     o.geometry = cragify(o.geometry, 460, 1 / 1500);
     o.material = rocky(o.material.clone(), {
       gradientMap: RAMP_MTN,
-      origin: [rc.x, rc.y, rc.z], desat: 0.45, tint: 0xbfb3b8,
-      aerAmt: 0.95, aerNear: 6000, aerFar: 30000, aerColor: 0xd6b39c, dechill: 0.85,
-      warm: 0xffeadb, lift: 0x1b1410,
-      scale: 1 / 700, mottle: 0.34,
+      origin: [rc.x, rc.y, rc.z], desat: 0.22, tint: 0xbfb3b8,
+      aerAmt: 0.55, aerNear: 9000, aerFar: 36000, aerColor: 0xd2ac96, dechill: 0.45,
+      warm: 0xfff2e4, lift: 0x090705,
+      scale: 1 / 700, mottle: 0.20,
       /* they top out between 4,300 and 6,500, so a line at 3,400 dusts the highest third of the
          nearest ones and leaves the low ones bare — which is what puts depth into a skyline */
       snowY: 3400, snowBand: 900, snowJitter: 1100, snowSlope: 0.34, snowAdd: 0.85,
@@ -4026,17 +4041,43 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
       origin: [(b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2],
       /* 0.62 of the way to grey, then warmed: the authored flank plus a cold bounce light was
          reading as a blue mountain, and dawn haze is warm */
-      desat: 0.5, tint: 0xcbbcb9,
-      aerAmt: 0.72, aerNear: 7000, aerFar: 34000, aerColor: 0xd8b49b, dechill: 0.8,
-      warm: 0xffe8d2, lift: 0x231a14,
-      scale: 1 / 1100, mottle: 0.30,
+      desat: 0.18, tint: 0xcbbcb9,
+      aerAmt: 0.34, aerNear: 9000, aerFar: 40000, aerColor: 0xcfae9a, dechill: 0.40,
+      /* dialled down from 0x231a14: it was lifting the whole flank into sand. Just enough to
+         answer the cold bounce, not enough to repaint the mountain. */
+      /* NEARLY NEUTRAL NOW. This existed only because the shader appeared to do nothing; with
+         the de-chill actually running it is a second correction on top of a working one. */
+      warm: 0xfff6ee, lift: 0x0a0705,
+      scale: 1 / 1100, mottle: 0.16,
       /* the gullies are struck about the mountain's own axis, taken from the mesh rather than
          written down, so a re-export that moves Fuji does not leave them centred on nothing */
-      gully: 0.19, gullyN: 34, axis: [(b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2],
+      gully: 0.10, gullyN: 34, axis: [(b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2],
       /* NO height-based snow here: the cap is already painted. 0.42 is the midpoint of the
          author's own luminance ramp (0.10 rock, 0.72 snow, transition y 4,000-5,000), so the
          re-threshold breaks their edge rather than competing with it. */
-      snowAdd: 0, snowMid: 0.42, snowSoft: 0.07, snowJitter: 0.32, rockDark: 0.94,
+      /* THE HARD CUTOFF WAS THIS, and it was mine.
+         The re-threshold existed to break the painted snowline into tongues, and at a softness
+         of 0.07 it is not a blend, it is a CUT: everything above luminance 0.49 became snow
+         colour, everything below 0.35 became rock, and the author's gradient in between was
+         thrown away and replaced by an edge. Ruled out one at a time first — turning off cast
+         shadows changed nothing, a 256-step gradient map changed nothing, removing the emissive
+         changed nothing, so it was never the toon ramp.
+         The measurement that started all this also settles it: the painted luminance runs 0.10
+         on the lower cone and climbs smoothly to 0.72 between y 4,000 and 5,000. That IS a
+         smooth transition. It did not need rescuing; it needed leaving alone. */
+      /* AND THE PAINT ITSELF IS THE EDGE. Turning my re-threshold off did not soften it, which
+         rules out the last of my own code — the .glb's snowline is painted hard, and the
+         "smooth 0.17-to-0.69 ramp" I measured earlier was an artefact of my own method: I
+         averaged vertex luminance into 250-unit height buckets, and a bucket straddling a
+         JAGGED HARD boundary averages to a mid value exactly as a gradient does. The measurement
+         could not tell the two apart, and I read it as proof of something it could not prove.
+         So the gradient has to be MADE. A wide softness plus heavy noise jitter turns the
+         painted edge into a broad mottled blend: at 1/1100 the noise features are about eighty
+         pixels at this distance, so the boundary dissolves across several hundred units of the
+         cone instead of snapping over one triangle. */
+      /* wide enough to be a gradient, jittered enough to be an edge rather than a contour */
+      snowAdd: 0, snowMid: 0.40, snowSoft: 0.20, snowJitter: 0.26, rockDark: 0.97,
+      snowCol: 0xfffaf2,
       /* WRITTEN ABSOLUTE, ON PURPOSE. The warm tint above is a multiply on material.color, which
          lands before this block and therefore warmed the snow cap along with the rock — the
          mountain went from blue to sand. uSnowCol replaces rather than multiplies, so the cap is
