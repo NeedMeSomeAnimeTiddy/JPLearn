@@ -18,20 +18,37 @@ import os
 import sys
 import json
 import re
+import mathutils
 
 OUT = os.path.join(os.path.dirname(bpy.data.filepath), 'world.glb')
 
-# ---- exclude only what the mockup keeps ownership of ----
-dropped = []
+# ---- exclude what the mockup keeps ownership of, and what is dead weight ----
+# The water: the mockup's lake carries a planar reflection a flat exported plane cannot.
+# The Legacy clouds: duplicates of clouds the mockup already generates, and they sit thousands
+#   of units up where they are pure overdraw. Identified by height, not by name, because they
+#   are called Legacy_Props_MeshNN like everything else in that collection.
+# The empties: meshes with no polygons, left over as anchors. They export as nodes that draw
+#   nothing and cost a matrix each.
+dropped = {'water': [], 'clouds': [], 'empty': []}
 for o in list(bpy.context.scene.objects):
     n = o.name.lower()
+    why = None
     if '_water_' in n or n.startswith('landscape_water'):
-        dropped.append(o.name)
+        why = 'water'
+    elif o.type == 'MESH' and len(o.data.polygons) == 0:
+        why = 'empty'
+    elif o.type == 'MESH' and n.startswith('legacy'):
+        zs = [(o.matrix_world @ mathutils.Vector(c)).z for c in o.bound_box]
+        if min(zs) > 1500:
+            why = 'clouds'
+    if why:
+        dropped[why].append(o.name)
         o.hide_set(True)
         o.hide_viewport = True
         o.hide_render = True
 
-print('EXCLUDED ' + json.dumps(dropped))
+print('EXCLUDED ' + json.dumps({k: len(v) for k, v in dropped.items()}))
+print('EXCLUDED_CLOUDS ' + json.dumps(dropped['clouds'][:6]))
 
 # ---- the export ----
 kw = dict(

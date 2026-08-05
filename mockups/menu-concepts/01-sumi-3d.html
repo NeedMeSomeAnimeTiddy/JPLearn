@@ -2962,6 +2962,22 @@ function setCel(on) {
   return { cel: ENV.cel, outlineScale: OUTLINE_SCALE.value };
 }
 
+/* ?world LOADS IT, ?world&cel LOADS IT SHADED. Opt-in was the right default — every
+   measurement in RESEARCH.md was taken against the analytic world, and a page that silently
+   swapped it would invalidate all of them without saying so — but "open the console and type
+   a function name" is not a way to show somebody a thing. A query string is opt-in and still
+   a link you can send. */
+{
+  const q = new URLSearchParams(location.search);
+  if (q.has('world') || q.has('env')) {
+    addEventListener('load', () => {
+      loadEnvironment(q.get('env') || undefined)
+        .then(() => { if (q.has('cel')) setCel(true); })
+        .catch((e) => console.error('[env] load failed:', e));
+    });
+  }
+}
+
 function unloadEnvironment() {
   /* the hulls live under the loaded root, so removing it takes them — but NO_REFLECT holds
      references into it, and leaving those behind hides objects that no longer exist and, worse,
