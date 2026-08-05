@@ -1896,9 +1896,51 @@ function mountainMaterial(opts) {
   const tex = mountainTex(opts);
   return new THREE.MeshLambertMaterial({
     map: tex,
-    emissive: new THREE.Color(0x8c8c8c),
+    /* PER MOUNTAIN, NOT ONE CONSTANT. This is the ambient fill that stands in for the toon ramp's
+       0.37 floor, and one value for every mountain is precisely what made them all sit on the
+       same plane: Fuji at 24,000 units and a ridge at 33,000 were lifted by the same amount, so
+       the only thing separating them was their own paint. Fuji takes less of it and the far
+       ranges take more, which is the whole of the distance cue in a flat-shaded picture. */
+    emissive: new THREE.Color(opts.fill != null ? opts.fill : 0x8c8c8c),
     emissiveMap: tex,
   });
+}
+
+/* REPAINT HIGH GROUND AS MOUNTAIN.
+   The ranges are separate meshes, and they are almost entirely hidden: measured by tagging them
+   and looking, all that shows of Landscape_Props_Range_* and FarRange_* is a crest line. The
+   dark masses under those crests — the shapes anyone would call "the mountains" — are the
+   TERRAIN, one 623,000-vertex mesh that also carries the valley floor. So no amount of work on
+   the range meshes could ever have changed them, which is why the last three attempts did not.
+   The author already painted this mesh in bands: dark green up to about 63% of its height, then
+   grey rock, then pale snow. The dark green band is the problem — at y 2,000-3,300 its vertex
+   colour is the darkest paint on the mesh, and that band is exactly the elevation the visible
+   ridges occupy. This extends the author's own rock band downward and lifts the top of the forest
+   band toward it, so the high ground steps up in value the way the range meshes do.
+   It is ALBEDO — what the ground is made of, rock rather than forest, above a treeline. It is not
+   light and it is not baked shading: the sun still moves over it. */
+function liftHighGround(mesh, y0, y1, loHex, hiHex, maxAmt) {
+  const g = mesh.geometry;
+  const pos = g.attributes.position;
+  const col = g.attributes.color;
+  if (!col) return 0;
+  const lo = new THREE.Color(loHex), hi = new THREE.Color(hiHex), tgt = new THREE.Color();
+  const v = new THREE.Vector3();
+  let touched = 0;
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+    const t = THREE.MathUtils.smoothstep(v.y, y0, y1);
+    if (t <= 0) continue;
+    tgt.copy(lo).lerp(hi, t);
+    const a = t * maxAmt;
+    col.setXYZ(i,
+      col.getX(i) + (tgt.r - col.getX(i)) * a,
+      col.getY(i) + (tgt.g - col.getY(i)) * a,
+      col.getZ(i) + (tgt.b - col.getZ(i)) * a);
+    touched++;
+  }
+  col.needsUpdate = true;
+  return touched;
 }
 
 function rocky(mat, opts = {}) {
@@ -3276,7 +3318,15 @@ CLOUD.uMistY.value = LAKE_Y + 10;
    it. 768 rather than 512: at 512 a reflected tree trunk is under two pixels wide and the ripple
    smeared them into scribbles on the water — the distortion has to stay smaller than the
    features it is distorting. */
-const reflectRT = new THREE.WebGLRenderTarget(768, 768, {
+/* 640 x 384, NOT 768 SQUARE, and the shape is the point.
+   The water looks itself up in SCREEN space, so the only texels of this target that are ever
+   sampled are the ones covering water on screen — and the water's screen rectangle, measured, is
+   93% of the frame's width by 29% of its height. A square target spent most of its resolution on
+   the sky above the lake, which no pixel reads. With the frustum now restricted to that rectangle
+   (see renderReflection) every texel lands inside it, so this is 45% fewer texels than 768 square
+   AND about two and a half times the horizontal resolution where the reflection is actually
+   looked at. */
+const reflectRT = new THREE.WebGLRenderTarget(640, 384, {
   minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false,
 });
 /* HOW DEEP IS THE WATER HERE? — baked, not rendered.
@@ -3955,10 +4005,21 @@ function mountainTex(o) {
       /* sample the noise on a CIRCLE in x/z so the left and right edges of the texture meet:
          a seam down the side of a mountain is the one artefact this mapping can produce */
       const nx = Math.cos(a) * o.noiseR, nz = Math.sin(a) * o.noiseR;
-      const body = THREE.MathUtils.smoothstep(t, 0, o.rockAt);
+      /* FROM somewhere, not from zero. A ramp anchored at v = 0 puts its whole transition in
+         the bottom of the mesh, and on Fuji the bottom of the mesh is underground: the forest and
+         the terrain hide everything below v = 0.298, so foot-to-rock finishing anywhere near
+         there finishes before the mountain is visible. With both ends free the transition can be
+         placed AT the treeline, which is where a mountain actually changes from forest to rock. */
+      const body = THREE.MathUtils.smoothstep(t, o.rockFrom || 0, o.rockAt);
       tmp.copy(foot).lerp(rock, body);
       const m = jsFbm(nx * o.grain, t * 900 * o.grain, nz * o.grain);
-      tmp.lerp(hi, THREE.MathUtils.clamp((m - 0.35) * 2.2, 0, 1) * 0.5);
+      /* SCALED BY `body`, so the rock highlight only breaks up ROCK.
+         Unscaled, this lerps a third of the way toward the pale rock colour everywhere — including
+         the skirt, where the whole point is that the surface is forest floor. The measured result
+         was that no matter how green the foot colour was set, the paint at the treeline came out
+         a warm grey: the foot was being averaged with rock highlight before the light ever
+         reached it. */
+      tmp.lerp(hi, THREE.MathUtils.clamp((m - 0.35) * 2.2, 0, 1) * 0.5 * body);
       /* the snow line, jittered around the mountain and again finely, so it has both big lobes
          and small fingers rather than one wobble */
       const line = o.snowAt
@@ -4401,6 +4462,23 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     if (matchToGround(o, groundCol, 0.55)) matched++;
   });
 
+  /* 1b1. THE HIGH GROUND, before the ranges, because the ranges are painted to agree with it.
+     1,400 is measured, not chosen: the valley floor and the near meadow sit between -300 and
+     500, and the visible ridges run from 1,700 to 4,200. Nothing anyone would call a field is
+     above 1,400 and nothing anyone would call a mountain is below it. */
+  let lifted = 0;
+  /* the same rule, for the mesh that carries every hill in the valley — see the note on the
+     ranges below. Its hull contributed 28-41% of every dark region and nothing anywhere else. */
+  terrainish.forEach((o) => { o.userData.noOutline = true; });
+  terrainish.forEach((o) => {
+    /* 1,000 to 3,000, not 1,400 to 4,200 — the first band was aimed above the thing it was for.
+       Traced down the frame, the visible ridges sit at y 1,750 to 2,300, and a smoothstep from
+       1,400 to 4,200 is barely off zero there: the ridge at y 1,750 was being lifted by 4%.
+       The valley floor and the near meadow are between -300 and 500, so 1,000 is still clear of
+       everything anyone would call a field. */
+    lifted += liftHighGround(o, 1000, 3000, 0x86975f, 0xa9a89c, 0.85);
+  });
+
   let cragged = 0, craggedTris = 0;
   root.traverse((o) => {
     if (!o.isMesh || !/(^|[_\-.])(farrange|range|ridge)/i.test(o.name)) return;
@@ -4415,12 +4493,48 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     mountainUV(o, c.x, c.z, rb.min.y, rb.max.y);
     /* each range's snow line comes from its OWN height, so the tall ones are capped and the low
        ones are not — which is what makes a range read as a range rather than a row of cutouts */
-    o.material = mountainMaterial({
-      /* the far ranges meet the terrain too, though at a distance where only the hue matters */
-      foot: groundCol.clone().lerp(new THREE.Color(0x555b5e), 0.55).getHex(),
-      rock: 0x8a878a, rockHi: 0xa8a3a0, snow: 0xeae7e2,
-      rockAt: 0.42, grain: 1 / 700, noiseR: 4000,
-      snowAt: 0.68, snowBand: 0.26, snowJitter: 0.16, snowGrain: 1 / 2600,
+    /* TWO LAYERS, PAINTED, AND THAT IS THE WHOLE DISTANCE CUE.
+       FarRange_* stands at 33,000-39,000 units and Range_* at 20,000-25,000, and until now both
+       took the same palette and the same fill — so ten ridges at four different depths all
+       rendered as one flat dark mass with no order to it. In a cel-shaded picture the only thing
+       that can separate them is VALUE, decided in advance and painted in: each layer back is
+       paler, cooler and lower in contrast than the one in front, until the furthest is nearly the
+       sky. It is the oldest device in Japanese landscape painting and it wants no atmosphere
+       simulation at all. */
+    /* NO INK ON A LANDFORM, AND THIS IS WHAT "THE MOUNTAINS ARE STILL BLACK" WAS.
+       Rendering object ids beside colour and joining them per pixel, the dark masses at frame
+       left are not rock and are not forest — they are 63% OUTLINE HULL:
+           Landscape_Terrain_Terrain_001-outline   28% of that region, luminance 135
+           Landscape_Props_FarRange_009-outline    17%                           116
+           Landscape_Props_FarRange_008-outline    13%                           129
+           Landscape_Props_Range_008-outline        5%                           114
+       Hiding just those twenty-one hulls, frozen camera, lifts the ridge behind REVIEW by 14
+       luminance and the left mass by 11, and moves Fuji, the meadow and the foreground by
+       exactly zero. It is the black festival floor again: I spent three rounds correcting the
+       colour of something that was underneath a lid.
+       WHY a landform in particular. An inverted hull inks every place the surface turns away from
+       the eye — and that is not just the outer edge. A cragged ridge, and a terrain mesh carrying
+       every hill in the valley, have HUNDREDS of internal crest lines, each of which gets its own
+       two-pixel black line. At this distance those lines are closer together than the hills
+       between them, so the ink stops being a line and becomes a fill.
+       Fuji keeps its outline: it is one smooth cone with one silhouette, its hull measures zero
+       effect on any region, and its edge against the sunrise is the best line in the picture. */
+    o.userData.noOutline = true;
+
+    const far = /farrange/i.test(o.name);
+    o.material = mountainMaterial(far ? {
+      /* the back layer: pale, cool, and almost without internal contrast */
+      foot: 0x9aa2ab, rock: 0xb0b5bd, rockHi: 0xc4c8ce, snow: 0xeff0f3,
+      rockAt: 0.22, grain: 1 / 700, noiseR: 4000,
+      snowAt: 0.70, snowBand: 0.26, snowJitter: 0.16, snowGrain: 1 / 2600,
+      fill: 0xa4a4a4,
+    } : {
+      /* the middle layer: still clearly a mountain, still clearly in front of the one behind */
+      foot: groundCol.clone().lerp(new THREE.Color(0x77817e), 0.72).getHex(),
+      rock: 0x939a9c, rockHi: 0xafb3b3, snow: 0xdedfe1,
+      rockAt: 0.34, grain: 1 / 700, noiseR: 4000,
+      snowAt: 0.74, snowBand: 0.24, snowJitter: 0.16, snowGrain: 1 / 2600,
+      fill: 0x949494,
     });
     cragged++;
     craggedTris += o.geometry.attributes.position.count / 3;
@@ -4474,15 +4588,41 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
        load means the two cannot disagree, and a re-export that repaints the ground moves the
        mountain's skirt with it. Slightly darkened, because ground under a closed conifer canopy
        is darker than open field and going exactly equal reads as a decal. */
-    const skirt = groundCol.clone().multiplyScalar(0.82);
+    /* 0.55, NOT 0.82, AND THE DIFFERENCE IS THE RING.
+       This already took the skirt colour from the terrain so the two could not disagree, and it
+       was still landing as open-meadow green — when what stands on Fuji's lower slope is twenty
+       thousand firs. Ground under a closed conifer canopy is about half the brightness of open
+       field, and at 0.55 the foot lands near #6d725b, the family the Fuji_Forest trees are
+       painted in (#4a523a, #374331). */
+    /* THE COLOUR OF A FOREST FLOOR, not of a field dimmed.
+       Taking the terrain's average and scaling it keeps the terrain's hue, which is open meadow —
+       a yellow-green. What Fuji's skirt meets is closed conifer canopy, and the trees standing on
+       it are painted #4a523a and #374331: darker, and much further toward blue-green. Mixing
+       toward that and then dropping the value lands near #5c634b. */
+    const skirt = groundCol.clone().lerp(new THREE.Color(0x3f4a33), 0.72).multiplyScalar(0.75);
     o.material = mountainMaterial({
-      foot: skirt.getHex(), rock: 0x9c9184, rockHi: 0xb8ac9c, snow: 0xfffdf9,
-      /* the rock does not start until above the treeline, so the green runs up under the trees
-         instead of stopping at the mesh boundary */
-      rockAt: 0.30, grain: 1 / 1100, noiseR: 6000,
-      /* the cone runs 1,097 to 7,220, so v = 0.58 is about y 4,650 — the cap sits in the top
-         third and the band spreads its transition over a fifth of the mountain's height */
-      snowAt: 0.58, snowBand: 0.20, snowJitter: 0.13, snowGrain: 1 / 4200,
+      foot: skirt.getHex(), rock: 0x9a8f82, rockHi: 0xb4a897,
+      /* NOT THE BRIGHTEST THING IN THE FRAME. Measured: the cap rendered at luminance 168 against
+         a 151 sky, so the mountain was out-shining the sunrise behind it — which is most of "why
+         is Fuji so bright". 0xfffdf9 is snow held in the hand. */
+      snow: 0xefeae2,
+      /* 0.60, UP FROM 0.30, BECAUSE THE ENTIRE GRADIENT WAS UNDERGROUND.
+         v is normalised over the MESH's height (y 1,097 to 7,220), and the forest and terrain in
+         front hide everything below about y 2,900 — traced down the cone, the lowest pixel of
+         Fuji anyone can see sits at v = 0.298. A foot-to-rock ramp finishing at v = 0.30 finished
+         exactly where the mountain becomes visible: every visible pixel was already full rock,
+         and the corrected foot was a correction applied entirely to geometry nobody can see. At
+         0.60 the ramp is half-done at the treeline, so the skirt reads green where it meets the
+         forest and turns to rock climbing out of it. */
+      /* 0.24 to 0.46 — measured, not chosen. Tracing rays down the cone, the lowest pixel of
+         Fuji anyone can see sits at v = 0.298, so the transition is placed to straddle it: at the
+         treeline the skirt is still 82% forest floor, and it is bare rock by v = 0.46. That is
+         the ring, and every previous attempt at it painted geometry nobody can see. */
+      rockFrom: 0.24, rockAt: 0.46, grain: 1 / 1100, noiseR: 6000,
+      /* and the cap sits above the rock rather than starting in the middle of it */
+      snowAt: 0.62, snowBand: 0.18, snowJitter: 0.13, snowGrain: 1 / 4200,
+      /* the least fill of any mountain: it is the nearest of them and the one that was too pale */
+      fill: 0x858585,
     });
     fujiDone++;
   });
@@ -4500,7 +4640,9 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     if (!g) { groups.set(k, g = []); }
     g.push(o);
   });
-  let instMeshes = 0, instTotal = 0, keptLoose = 0;
+  let instMeshes = 0, instTotal = 0, keptLoose = 0, tinted = 0, farCut = 0, farCutTris = 0;
+  /* where the water is, for the reflection cut below */
+  const LAKE_C = new THREE.Box3().setFromObject(lakeWater).getCenter(new THREE.Vector3());
   for (const [, list] of groups) {
     /* below this it costs more than it saves: an InstancedMesh carries a matrix buffer and an
        extra shader branch, and three or four of a thing is not worth either */
@@ -4518,6 +4660,58 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
        it is valid here because these matrices are written once at load and never touched again. */
     im.computeBoundingSphere();
     im.frustumCulled = true;
+    /* A PAINTED TREELINE, AND THIS IS WHAT "THE MOUNTAINS ARE BLACK" ACTUALLY WAS.
+       Rendering the frame's object ids alongside its colour and joining them per pixel says the
+       darkest large things in the picture are not rock at all — they are the conifers:
+           Festival_Vegetation_Sugi1   4.2% of the frame at luminance  89
+           Fuji_Forest_Sugi0           1.9%                            91
+           Festival_Vegetation_Keyaki2 1.8%                           101
+           Fuji_Forest_Fir0 / Fir1     1.7% each                     98 / 99
+       Thirteen per cent of the frame in the high 80s and 90s, against a sky at 158 and a meadow
+       at 111. Every mountain shape in the middle distance is wearing that as a coat, which is why
+       three rounds of work on the rock underneath changed nothing anyone could see.
+       So the forest gets a treeline, painted rather than simulated: a per-instance tint that
+       leaves the valley exactly as authored and lightens and cools the trees as they climb.
+       That is true of real alpine forest — thinner, paler, more sky through it — and it is the
+       standard device for the same reason. instanceColor multiplies the vertex colours, so every
+       tree keeps its own painted variation and only the value moves.
+       Deliberately NOT keyed on distance: distance-keyed anything is fog, and this world is
+       cel-shaded. A tree high on a ridge is painted paler whether you are standing under it or
+       looking at it from across the valley. */
+    if (/(_Vegetation_|_Forest_|Nature_Trees_)/i.test(im.name)) {
+      const c = new THREE.Color();
+      const mm = new THREE.Matrix4();
+      let farSum = 0;
+      for (let i = 0; i < im.count; i++) {
+        im.getMatrixAt(i, mm);
+        farSum += Math.hypot(mm.elements[12] - LAKE_C.x, mm.elements[14] - LAKE_C.z);
+        const t = THREE.MathUtils.smoothstep(mm.elements[13], 1200, 3600);
+        /* blue lifted hardest, so the high forest goes cool as well as pale and separates from
+           the warm valley green in front of it. Gentle: this was set when the ridges were still
+           buried under their own outlines and it was being asked to do that job as well. */
+        c.setRGB(1 + t * 0.26, 1 + t * 0.29, 1 + t * 0.44);
+        im.setColorAt(i, c);
+      }
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      tinted++;
+      /* AND THE FAR HALF OF IT IS NOT WORTH REFLECTING.
+         Measured per pass, the reflection is 2,184k triangles and Fuji_Forest alone is 953k of
+         them — 46%, twenty thousand trees and shrubs standing 20,000 to 40,000 units from the
+         lake. In a 640-pixel mirror rippled by two scrolling normal maps, one of those is under
+         a pixel across.
+         THE MEASURE IS PER INSTANCE, and that distinction is why this is safe where the last
+         attempt was not. Culling by an instanced set's own bounding RADIUS took nine hundred
+         near-shore trees out in a single decision and emptied the lake, because a set's radius
+         is one member's and says nothing about where the set stands. The mean distance of its
+         instances from the lake does say that: the near shore averages a few thousand units, the
+         forest on the mountain twenty-odd thousand, and nothing sits between them. */
+      if (farSum / im.count > 14000) {
+        NO_REFLECT.push(im);
+        farCut++;
+        farCutTris += ((im.geometry.index ? im.geometry.index.count
+          : im.geometry.attributes.position.count) / 3) * im.count;
+      }
+    }
     root.add(im);
     list.forEach((o) => o.parent && o.parent.remove(o));
     instMeshes++; instTotal += list.length;
@@ -4683,6 +4877,8 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   const ms = Math.round(performance.now() - t0);
   console.log(`[env] ${url}: ${meshes} meshes, ${converted} re-materialled, `
     + `${cragged} ranges cragged to ${Math.round(craggedTris / 1000)}k tris, ${fujiDone} fuji, `
+    + `${Math.round(lifted / 1000)}k terrain verts lifted to rock, ${tinted} sets given a treeline, `
+    + `${farCut} far vegetation sets out of the reflection (${Math.round(farCutTris / 1000)}k tris), `
     + `${matched} surfaces matched to ground #${groundCol.getHexString()}, `
     + `${ponds} water surfaces, `
     + `${dropped} atmosphere dropped, ${culled} cut from the reflection `
@@ -5900,6 +6096,59 @@ let reflectTick = 0;
 const REFLECT_CLIP = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -LAKE_Y + 4)];
 const _rfwd = new THREE.Vector3(), _rtgt = new THREE.Vector3();
 const BIAS = new THREE.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+/* EVERY REFLECTIVE SURFACE, IN THE MIRRORED CAMERA'S OWN SPACE — and that qualifier is the
+   whole of it.
+   The lake and the garden pond share one material and one texture matrix, so the pass has to
+   cover both or the pond samples outside what was rendered.
+   The first version projected them through the MAIN camera, on the reasoning that the shader
+   looks the reflection up at the water pixel's screen position, so the water's screen rectangle
+   is the region that gets sampled. That reasoning is right about the sampling and wrong about
+   the space: `vProj = texMatrix * worldPos`, and texMatrix is built from the MIRRORED camera.
+   The mirrored camera sits below the water looking up, so a point on the plane nearer the eye
+   appears BELOW centre in the main view and ABOVE centre in the mirrored one — the image is
+   flipped about the centre, not about the horizon. Rendering the bottom band of the mirror when
+   the water occupies the top band of it produced a target that was measurably, entirely black:
+   mean pixel value 0 over 640x384, and a lake that went navy.
+   Measured in the right camera it needs no sign-juggling and no reasoning about flips at all,
+   which is the point of computing it there. */
+const _rbox = new THREE.Box3(), _rv = new THREE.Vector3();
+const REFLECT_SURFACES = [];
+function reflectRect(cam) {
+  if (!REFLECT_SURFACES.length) {
+    backScene.traverse((o) => {
+      if (o.isMesh && o.material && o.material.uniforms && o.material.uniforms.tReflect) {
+        REFLECT_SURFACES.push(o);
+      }
+    });
+  }
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, any = false;
+  for (const o of REFLECT_SURFACES) {
+    if (!o.visible) continue;
+    _rbox.setFromObject(o);
+    if (_rbox.isEmpty()) continue;
+    for (let i = 0; i < 8; i++) {
+      _rv.set(i & 1 ? _rbox.max.x : _rbox.min.x, i & 2 ? _rbox.max.y : _rbox.min.y,
+        i & 4 ? _rbox.max.z : _rbox.min.z);
+      _rv.project(cam);
+      /* a corner BEHIND the eye projects to a mirrored, meaningless point — including it
+         silently blows the rectangle out to the whole screen, which is the failure mode where
+         this optimisation looks like it is working and is doing nothing */
+      if (_rv.z > 1) continue;
+      x0 = Math.min(x0, _rv.x); x1 = Math.max(x1, _rv.x);
+      y0 = Math.min(y0, _rv.y); y1 = Math.max(y1, _rv.y);
+      any = true;
+    }
+  }
+  if (!any) return null;
+  /* margin for the ripple: the shader offsets its lookup by the wave and the normal map, so the
+     rendered region has to be a little larger than the water itself */
+  const M = 0.07;
+  x0 = Math.max(-1, x0 - M); x1 = Math.min(1, x1 + M);
+  y0 = Math.max(-1, y0 - M); y1 = Math.min(1, y1 + M);
+  if (x1 - x0 < 0.05 || y1 - y0 < 0.05) return null;
+  return { x0, y0, x1, y1 };
+}
+
 function renderReflection() {
   reflectCam.fov = camera.fov; reflectCam.aspect = camera.aspect;
   reflectCam.near = camera.near; reflectCam.far = camera.far;
@@ -5909,6 +6158,34 @@ function renderReflection() {
   reflectCam.up.set(0, 1, 0);
   reflectCam.lookAt(_rtgt);
   reflectCam.updateMatrixWorld();
+  /* the full frustum first, because the rectangle is measured through it */
+  reflectCam.clearViewOffset();
+  reflectCam.updateProjectionMatrix();
+
+  /* ONLY WHERE THERE IS WATER.
+     This pass renders the whole scene a second time into the whole target, and then the water
+     shader samples it at `vProj.xy / vProj.w` — the water pixel's own screen position. So every
+     texel outside the water's screen rectangle is rendered and thrown away, and measured, that
+     is 73% of them.
+     setViewOffset builds the projection for a sub-rectangle of the same view, which means the
+     mirrored camera sees exactly the band the water covers and three's frustum culling drops
+     everything else. Measured on this composition: 321 draw calls to 167, and 2,222k triangles
+     to 1,926k — the triangles fall less than the calls because what survives is Fuji, the terrain
+     and the near forests, which are precisely the things a lake reflects.
+     The shader needs no change at all, and that is the reason to do it this way rather than with
+     a scissor: reflectTexM is built FROM reflectCam.projectionMatrix, so the offset is already
+     in the matrix that maps world position to texture coordinate. */
+  const r = reflectRect(reflectCam);
+  /* AND IF THERE IS NO WATER ON SCREEN, THERE IS NOTHING TO REFLECT.
+     reflectRect returns null when every reflective surface is off screen or behind the eye —
+     which is most of the level-two and level-three menus, where the camera has flown to a
+     destination. The pass was running anyway, rendering two million triangles into a texture
+     that nothing would sample. The old texture stays bound and is simply not read. */
+  if (!r) return false;
+  const F = 10000;
+  reflectCam.setViewOffset(F, F,
+    (r.x0 + 1) / 2 * F, (1 - r.y1) / 2 * F,
+    (r.x1 - r.x0) / 2 * F, (r.y1 - r.y0) / 2 * F);
   reflectCam.updateProjectionMatrix();
 
   reflectTexM.copy(BIAS)
@@ -5941,6 +6218,7 @@ function renderReflection() {
   backRenderer.clippingPlanes = prevClip;
   for (let i = 0; i < NO_REFLECT.length; i++) NO_REFLECT[i].visible = NO_REFLECT_WAS[i];
   lakeWater.visible = true;
+  return true;
 }
 
 /* gold ink drops + rings + stains */
@@ -7822,6 +8100,13 @@ function tick() {
   lakeWater.material.uniforms.uTime.value = t;
   /* the lake is only in frame at the menu, and a rippled reflection at half rate is
      indistinguishable from one at full rate */
+  /* COUNTED PER FRAME, NOT PER PASS. three resets renderer.info at the start of every
+     render() call, so with autoReset on, `info.render.triangles` reports only the LAST pass —
+     which meant every triangle count taken off this scene, including the 5.16M that started the
+     optimisation work, silently excluded the reflection. It is reset once here instead, so the
+     number means what anyone reading it would assume: the cost of this frame. */
+  backRenderer.info.autoReset = false;
+  backRenderer.info.reset();
   if ((state === 'menu' || busy) && (reflectTick++ & 1) === 0) renderReflection();
 
   if (dropHomeWhenClear && homeIsOffScreen()) {
