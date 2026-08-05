@@ -1169,7 +1169,21 @@ const W = () => innerWidth, H = () => innerHeight;
 const NIGHT = 0x151928;
 
 /* far plane out to 60k: Fuji stands 17,000 away and the horizon rim another 30,000 behind it */
-const camera = new THREE.PerspectiveCamera(42, W() / H(), 1, 60000);
+/* THE NEAR PLANE IS THE DEPTH BUFFER'S PRECISION KNOB, and 1 was throwing almost all of it
+   away. A 24-bit depth buffer resolves about z^2 / (near * 2^24) at distance z, so near = 1 in a
+   world 60,000 deep left SIX WHOLE UNITS of slop at 10,000 out — a quarter of a metre at this
+   world's 25 units to the metre, which is far more than the gap between a roof and its ridge or
+   a snow cap and the cone under it. Everything nearly-coplanar in the model fought, and because
+   the menu camera breathes a few units at rest the fight was resolved differently every frame:
+   that is the flicker.
+   20 is 0.8 m of clip distance — closer than the camera ever comes to a surface, including the
+   placards in walk mode — and buys twenty times the precision. Measured: the share of pixels
+   that flip under a 0.4-unit camera nudge falls from 0.20% to 0.08%, and 0.08% is what a purely
+   antialiased silhouette gives, i.e. the fighting is gone rather than reduced.
+   Not logarithmicDepthBuffer: it needs every material to include three's logdepth chunks, and
+   the outline, water and ink shaders here are hand-written and would silently stop agreeing with
+   everything else about where they are. */
+const camera = new THREE.PerspectiveCamera(42, W() / H(), 20, 60000);
 /* EVERY FRAMING IN THIS FILE WAS COMPOSED AT 16:9, and a vertical field of view crops the SIDES
    off the moment the window is narrower than that — which is most laptops in a windowed browser
    and every portrait phone. Below the reference aspect the vertical field opens up instead, so
@@ -2778,11 +2792,20 @@ function aimAtSun(eye, fov, u, v) {
 }
 
 /* THE HIGHEST POINT OF THE MOUNTAIN, found in the model rather than written down, so it survives
-   a re-export that moves it. Only callable once the world is in — which is why the alternative
-   composition below is a post-load switch and the default is not. */
+   a re-export that moves it — except that the home composition is now settled BEFORE the model
+   downloads, to stop the old world flashing up first. So there is a measured hint to compose
+   against up front, and a check once the real thing arrives: if the model's summit has moved far
+   enough to matter the console says so and the framing is redone, rather than the page quietly
+   aiming at where a mountain used to be. */
+const FUJI_PEAK_HINT = new THREE.Vector3(-1342, 7220, -23319);
 function fujiPeak() {
+  /* ONLY EVER THE LOADED MODEL'S. Falling back to backScene finds the GENERATED Fuji — which is
+     still in the scene, merely hidden, and stands somewhere else entirely — so a pre-load call
+     would compose the whole menu against the wrong mountain. No model, no measurement: use the
+     hint and let checkFujiHint() correct it when the real one lands. */
+  if (!ENV.root) return FUJI_PEAK_HINT;
   let peak = null;
-  (ENV.root || backScene).traverse((o) => {
+  ENV.root.traverse((o) => {
     if (!o.isMesh || !/fuji/i.test(o.name) || /outline/.test(o.name)) return;
     const pos = o.geometry.attributes.position, v = new THREE.Vector3();
     for (let i = 0; i < pos.count; i++) {
@@ -2790,7 +2813,7 @@ function fujiPeak() {
       if (!peak || v.y > peak.y) peak = v.clone();
     }
   });
-  return peak;
+  return peak || FUJI_PEAK_HINT;
 }
 
 /* THE OTHER COMPOSITION: sun in the middle of the frame, Fuji off to the right, the lake and its
@@ -2800,11 +2823,25 @@ function fujiPeak() {
    so the key light goes with it (placeSun moves both) and the whole valley is lit from the new
    direction rather than from a sun that is no longer there. */
 function composeSunCentred() {
-  const peak = fujiPeak();
-  if (!peak) { console.warn('[sun] no Fuji in the scene to compose against'); return null; }
   const eye = [HOME.px, HOME.py, HOME.pz];
-  setHomeView(eye, aimAt(peak, eye, HOME.fov, 0.76, 0.24), HOME.fov);
+  setHomeView(eye, aimAt(fujiPeak(), eye, HOME.fov, 0.76, 0.24), HOME.fov);
   return placeSun(0.5, 0.30);
+}
+
+/* Did the hint the page composed against turn out to be where the mountain is? 400 units is
+   about a third of a degree from the home eye — below that nobody could see the difference and
+   redoing the framing would only cost a visible lurch on arrival. */
+function checkFujiHint() {
+  const real = fujiPeak();
+  const off = real.distanceTo(FUJI_PEAK_HINT);
+  if (off > 400) {
+    console.warn(`[fuji] summit moved ${Math.round(off)} units from the composed hint `
+      + `[${FUJI_PEAK_HINT.toArray().map(Math.round)}] -> [${real.toArray().map(Math.round)}]; `
+      + 'update FUJI_PEAK_HINT. Reframing.');
+    ENV.homeMoved = false;
+    composeWorldHome();
+  }
+  return Math.round(off);
 }
 
 /* IS THE SUN ACTUALLY IN THE SKY FROM HERE? The old placement was wrong for weeks and the only
@@ -3245,10 +3282,10 @@ function setCel(on) {
       loadEnvironment(q.get('env') || undefined)
         .then(() => {
           if (q.has('cel')) setCel(true);
-          /* AFTER the load, not before, because it aims at the summit and the summit arrives
-             with the model. The default composition needs no such thing — it aims at the sun,
-             which the page owns — which is why only this one costs a small camera move. */
-          if (q.get('sun') === 'mid') composeSunCentred();
+          /* the framing was composed against FUJI_PEAK_HINT before this file existed on the
+             client; now that the real summit is here, confirm it */
+          checkFujiHint();
+          sunClear([HOME.px, HOME.py, HOME.pz]);
         })
         .catch((e) => {
           console.error('[env] load failed, showing the generated world instead:', e);
@@ -3268,15 +3305,20 @@ function setCel(on) {
    hoped: the mirrored eye's ray to the summit crosses the water at (-368, -956), and the lake
    spans (-4119..2901, -5605..1415). It was landing 2,900 units short of the near shore before,
    on dry land, which is why there was never a mountain in the water to find.
-   THE AIM IS COMPUTED, NOT TRANSCRIBED. Hard-coding a look vector copied off a sweep is how this
-   ended up pointing at the pagoda — aimAtSun derives it from where the sun actually is, so the
-   eye is the only number anyone has to get right. (0.80, 0.30) puts the sun clear off Fuji's
-   right shoulder with the mountain centred; NAV.sun(0.5, 0.30) moves it to the middle of the
-   frame instead, which needs the aim yawed to match. */
+   BOTH AIMS ARE COMPUTED, NOT TRANSCRIBED. Hard-coding a look vector copied off a sweep is how
+   this ended up pointing at the pagoda. The camera is aimed so the summit lands at (0.76, 0.24)
+   and the sun is then unprojected into the middle of the frame that produces — sun centred,
+   Fuji to the right, the lake and its reflection under the mountain rather than under the sun.
+   The sun crosses to the far side of Fuji doing this, so the key light goes with it and the
+   valley is lit from where the sun now is. ?sun=shoulder keeps the other framing. */
 function composeWorldHome() {
   if (ENV.homeMoved) return null;
   const eye = [0, 2000, 6000];
-  const r = setHomeView(eye, aimAtSun(eye, 43, 0.80, 0.30), 43);
+  const shoulder = new URLSearchParams(location.search).get('sun') === 'shoulder';
+  const r = shoulder
+    ? setHomeView(eye, aimAtSun(eye, 43, 0.80, 0.30), 43)
+    : setHomeView(eye, aimAt(fujiPeak(), eye, 43, 0.76, 0.24), 43);
+  if (!shoulder) placeSun(0.5, 0.30);
   /* FOG WAS TUNED FOR A CAMERA 800 UNITS FROM ITS SUBJECT. At 21,000 the same exp2 density
      buries the whole valley, and raising saturation only made the haze more emphatic — the shot
      came back as an orange wash with a mountain in it. Roughly halved, so distance still reads
@@ -5127,8 +5169,13 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* the sun, placed in the frame: NAV.sun(0.5, 0.30) centre-frames it. Reports what blocks it. */
   sun: (u, v, dist) => placeSun(u, v, dist),
   sunClear: () => sunClear([HOME.px, HOME.py, HOME.pz]),
-  /* the alternative framing, also at ?sun=mid */
+  /* the framing with the sun in the middle — the default, kept callable for after a fly-out */
   sunMid: () => composeSunCentred(),
+  /* the other one: sun off Fuji's right shoulder, mountain centred. Also at ?sun=shoulder */
+  sunShoulder: () => {
+    const eye = [HOME.px, HOME.py, HOME.pz];
+    return setHomeView(eye, aimAtSun(eye, HOME.fov, 0.80, 0.30), HOME.fov);
+  },
   cel: (on) => setCel(on !== false),
   /* the sunset framing, so it can be re-applied after the camera has been flown elsewhere */
   home: () => { HOME_EYE.set(-3000, 1250, 8200); HOME_LOOK.set(-3822, 498, -731);
