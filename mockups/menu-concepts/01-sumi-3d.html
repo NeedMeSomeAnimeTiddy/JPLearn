@@ -1883,10 +1883,21 @@ const CLOUD_MATS = [];
    sunrise key) is very nearly nothing, so the same palette that read as grey rock read as
    near-black. The palette is brightened to match, and a small flat emissive stands in for the
    fill the ramp used to provide. */
-function rockMaterial(src, colour, vcolor) {
-  return new THREE.MeshBasicMaterial({
-    color: colour != null ? colour : 0xffffff,
-    vertexColors: vcolor != null ? !!vcolor : (colour == null && !!src && src.vertexColors),
+/* LIT, NOT BAKED. The previous version was MeshBasicMaterial with the sun painted into the
+   vertex colours, which pins the lighting to wherever the sun stood at load time and takes the
+   mountains out of the scene's light rig entirely — a bad trade made because no shader was
+   available to do it properly. This is an ordinary lit material: the sun moves, the shading
+   moves.
+   emissiveMap is the honest replacement for the one thing the toon ramp was doing that Lambert
+   does not — its lowest step was 0.37, a large ambient fill that made faces turned away from the
+   key still read. Emissive intensity times the SAME texture is exactly that: a fill proportional
+   to albedo, so the snow stays bright in shadow and the rock stays dark. */
+function mountainMaterial(opts) {
+  const tex = mountainTex(opts);
+  return new THREE.MeshLambertMaterial({
+    map: tex,
+    emissive: new THREE.Color(0x8c8c8c),
+    emissiveMap: tex,
   });
 }
 
@@ -3268,6 +3279,54 @@ CLOUD.uMistY.value = LAKE_Y + 10;
 const reflectRT = new THREE.WebGLRenderTarget(768, 768, {
   minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false,
 });
+/* HOW DEEP IS THE WATER HERE? — baked, not rendered.
+   Every stylised-water writeup reaches for the same two things, and they are the two this lake
+   did not have: colour driven by DEPTH rather than by the wave, and FOAM where the water meets
+   something. Both normally need the scene depth buffer, which means rendering five million
+   triangles a second time from the main camera purely to know how far away the lake bed is.
+   This world already knows. The environment loader bakes a 384x384 heightfield off the terrain
+   so `landAt` can place things; water depth is just the surface height minus that. So it is
+   sampled once, into a 256x256 texture covering the lake, and the shader reads a depth per pixel
+   for the cost of one texture fetch and no extra geometry pass at all.
+   Baked at load rather than per frame because neither the terrain nor the water level moves.
+   https://tympanus.net/codrops/2025/03/04/creating-stylized-water-effects-with-react-three-fiber/ */
+const SHORE = {
+  tex: null,
+  origin: new THREE.Vector2(0, 0),
+  size: new THREE.Vector2(1, 1),
+  maxDepth: { value: 320 },
+};
+function bakeShoreDepth(centre, half, surfaceY) {
+  const N = 256;
+  const d = new Uint8Array(N * N * 4);
+  const x0 = centre.x - half, z0 = centre.z - half, span = half * 2;
+  let deepest = 1;
+  const raw = new Float32Array(N * N);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const x = x0 + (i / (N - 1)) * span;
+      const z = z0 + (j / (N - 1)) * span;
+      const dep = Math.max(0, surfaceY - landAt(x, z));
+      raw[j * N + i] = dep;
+      if (dep > deepest) deepest = dep;
+    }
+  }
+  for (let k = 0; k < N * N; k++) {
+    const v = Math.min(255, Math.round((raw[k] / deepest) * 255));
+    d[k * 4] = d[k * 4 + 1] = d[k * 4 + 2] = v;
+    d[k * 4 + 3] = 255;
+  }
+  const t = new THREE.DataTexture(d, N, N, THREE.RGBAFormat);
+  t.minFilter = t.magFilter = THREE.LinearFilter;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.needsUpdate = true;
+  SHORE.tex = t;
+  SHORE.origin.set(x0, z0);
+  SHORE.size.set(span, span);
+  SHORE.maxDepth.value = deepest;
+  return { deepest: Math.round(deepest), span: Math.round(span) };
+}
+
 const reflectCam = new THREE.PerspectiveCamera();
 const reflectTexM = new THREE.Matrix4();
 const lakeWater = (() => {
@@ -3290,6 +3349,11 @@ const lakeWater = (() => {
       uReflPow: { value: 1.6 },
       uReflMin: { value: 0.30 },
       uReflGain: { value: 1.15 },
+      uShore: { value: null },
+      uShoreOrigin: { value: SHORE.origin },
+      uShoreSize: { value: SHORE.size },
+      uShoreMax: SHORE.maxDepth,
+      uFoam: { value: 0.42 },
       fogColor: FOG_U.fogColor,
       fogDensity: FOG_U.fogDensity,
       uMistColor: CLOUD.uMistColor,
@@ -3315,23 +3379,58 @@ const lakeWater = (() => {
       uniform float uTime;
       uniform vec3 uDeep, uShallow, fogColor, uMistColor;
       uniform float fogDensity, uMistY, uMistH, uMistAmt;
-      uniform float uReflPow, uReflMin, uReflGain;
+      uniform float uReflPow, uReflMin, uReflGain, uShoreMax, uFoam;
+      uniform sampler2D uShore;
+      uniform vec2 uShoreOrigin, uShoreSize;
       varying vec4 vProj;
       varying vec3 vWorld;
       varying float vDepth;
       void main() {
         /* a slow chop, large enough to read at this scale and small enough not to smear the
            mountain into nothing. Two crossed waves, not noise — a still dawn lake is glassy. */
+        /* TWO LAYERS, CROSSING. One wave set gives a single rolling direction and reads as a
+           flag; two at different scales moving different ways is the least that reads as water,
+           and it costs three more sines. */
         float w = sin( vWorld.x * 0.0032 + uTime * 0.55 ) * cos( vWorld.z * 0.0027 - uTime * 0.41 )
                 + sin( vWorld.z * 0.0071 - uTime * 0.7 ) * 0.4;
-        vec2 uv = vProj.xy / vProj.w + vec2( w * 0.0021, w * 0.0008 );
+        float w2 = sin( ( vWorld.x + vWorld.z ) * 0.0125 + uTime * 1.15 )
+                 * cos( ( vWorld.x - vWorld.z ) * 0.0092 - uTime * 0.86 );
+        float chop = w + w2 * 0.45;
+        vec2 uv = vProj.xy / vProj.w
+          + vec2( w * 0.0021, w * 0.0008 ) + vec2( w2 * 0.0009, w2 * 0.0005 );
         vec3 refl = texture2D( tReflect, uv ).rgb;
         /* grazing angles reflect almost everything, steep ones show the water's own colour —
            and the camera IS at a grazing angle here, which is why the reflection carries */
         vec3 v = normalize( cameraPosition - vWorld );
         float f = pow( 1.0 - clamp( v.y, 0.0, 1.0 ), uReflPow );
-        vec3 body = mix( uDeep, uShallow, clamp( w * 0.25 + 0.5, 0.0, 1.0 ) );
+        /* DEPTH, from the baked heightfield. This is the thing that was missing: a lake whose
+           colour comes only from its ripple is the same colour everywhere, which is why it read
+           as a flat sheet however much the surface moved. */
+        vec2 suv = ( vWorld.xz - uShoreOrigin ) / uShoreSize;
+        float depth = texture2D( uShore, suv ).r * uShoreMax;
+        /* RELATIVE TO WHAT THE BED ACTUALLY DOES, not to a number in units.
+           Measured after the fact: the imported terrain has no lake basin cut into it. The
+           generated lake is a plane sitting on nearly flat ground, and the bed varies by 74
+           units end to end — so an absolute 42-unit foam threshold covered almost the entire
+           surface and the lake came back white. Everything here is now a fraction of the deepest
+           point found at bake time, which is correct for this terrain and stays correct if the
+           model is ever re-exported with a real basin in it. */
+        float rel = depth / max( uShoreMax, 1.0 );
+        float shallow = 1.0 - clamp( rel, 0.0, 1.0 );
+        /* A HINT, NOT THE SUBJECT. With only 74 units of bed relief the depth term at full
+           strength repaints the whole lake and buries the reflection, which is the best thing
+           about this water. It gets a third of the weight: enough to see the bank shelve, not
+           enough to compete with the mountain in the mirror. */
+        vec3 body = mix( uDeep, uShallow, clamp( shallow * 0.34 + chop * 0.14 + 0.16, 0.0, 1.0 ) );
         vec3 col = mix( body, refl, clamp( f * uReflGain, uReflMin, 0.95 ) );
+        /* SHORELINE FOAM. A band that follows the real waterline wherever the bed comes up,
+           wobbled by the chop so it is not a contour line, plus a second thinner band further
+           out for the sense of a wave having just gone through. */
+        float relc = rel - chop * 0.10;
+        float edge = 1.0 - smoothstep( 0.0, 0.085, relc );
+        float lace = 1.0 - smoothstep( 0.08, 0.22, rel - chop * 0.14 );
+        float foam = clamp( edge * 0.8 + lace * 0.18 * ( 0.5 + 0.5 * sin( chop * 3.1 + uTime * 1.7 ) ), 0.0, 1.0 );
+        col = mix( col, vec3( 0.93, 0.95, 0.96 ), foam * uFoam );
         /* the same valley mist every other surface takes, so the far shore of the lake sits in
            it too instead of staying sharp while the land around it softens */
         vec3 mv2 = vWorld - cameraPosition;
@@ -3741,6 +3840,121 @@ function splitTris(geo) {
   return out;
 }
 
+/* WHAT COLOUR IS THIS THING, ACTUALLY? The average of its vertex colours times its material
+   colour, which is what reaches the shader. Sampled rather than read off the .blend, so it stays
+   true across a re-export. */
+function avgVertexColor(mesh) {
+  const c = mesh.geometry.attributes.color;
+  const m = (mesh.material && mesh.material.color) || { r: 1, g: 1, b: 1 };
+  if (!c) return new THREE.Color(m.r, m.g, m.b);
+  let r = 0, g = 0, b = 0, n = 0;
+  const step = Math.max(1, Math.floor(c.count / 600));
+  for (let i = 0; i < c.count; i += step) { r += c.getX(i); g += c.getY(i); b += c.getZ(i); n++; }
+  return new THREE.Color(r / n * m.r, g / n * m.g, b / n * m.b);
+}
+
+/* PULL A SURFACE TOWARD THE GROUND IT SITS ON.
+   Measured, not eyeballed: the map's terrain averages #8f9677, a green olive. The festival
+   ground averages #b1a896 and the garden detail #98948c — both pale grey-tans, which is why
+   they read as slabs dropped onto the grass rather than as part of it. They are separate meshes
+   with separately authored paint and nothing was ever going to reconcile them by itself.
+   This shifts each one's vertex colours toward the terrain's average by `amt`, preserving its
+   own internal variation (the shift is applied to the mesh's MEAN, and every vertex moves by the
+   same delta) so a gravel path stays gravelly and a plaza keeps its markings — it just stops
+   being a different planet from the field around it. */
+function matchToGround(mesh, target, amt) {
+  const c = mesh.geometry.attributes.color;
+  if (!c) return false;
+  const have = avgVertexColor(mesh);
+  const dr = (target.r - have.r) * amt;
+  const dg = (target.g - have.g) * amt;
+  const db = (target.b - have.b) * amt;
+  for (let i = 0; i < c.count; i++) {
+    c.setXYZ(i, THREE.MathUtils.clamp(c.getX(i) + dr, 0, 1),
+      THREE.MathUtils.clamp(c.getY(i) + dg, 0, 1),
+      THREE.MathUtils.clamp(c.getZ(i) + db, 0, 1));
+  }
+  c.needsUpdate = true;
+  return true;
+}
+
+/* A TEXTURE, WHICH IS WHAT THIS SHOULD HAVE BEEN THE WHOLE TIME.
+   Two things were wrong with painting per vertex. It needed sixteen times the triangles to make
+   the gradient finer than the screen — 9,916 became 158,656 on one mountain, for shading — and
+   with no shader available it had the sun baked into it, which pins the lighting to wherever the
+   sun happened to be at load and is simply not how a scene should work.
+   Both go away at once. A gradient is a function of height; a texture IS a function of position,
+   sampled PER PIXEL by hardware that is already doing it for everything else. So:
+     - `mountainUV` writes v = normalised world height, u = angle about the mountain's axis.
+       Two floats per vertex on the ORIGINAL mesh. No subdivision at all.
+     - `mountainTex` paints rock, mottle and a noise-jittered snow line into a 1024x512 canvas.
+       The snowline varies along u, so it is ragged all the way round rather than a contour.
+     - the material is an ordinary lit MeshLambertMaterial with that as its `map`, so the sun
+       lights it like everything else in the world and moving the sun moves the shading.
+   The one thing genuinely lost with the toon ramp was its 0.37 floor, which was acting as a
+   large ambient fill. That is restored honestly with emissiveMap: emissive intensity times the
+   SAME texture is a fill proportional to albedo, which is what the ramp's floor was. */
+function mountainTex(o) {
+  const W = 1024, H = 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, H);
+  const d = img.data;
+  const foot = new THREE.Color(o.foot), rock = new THREE.Color(o.rock);
+  const hi = new THREE.Color(o.rockHi), snow = new THREE.Color(o.snow);
+  const tmp = new THREE.Color();
+  const lin2srgb = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
+  for (let y = 0; y < H; y++) {
+    /* v = 0 at the foot, 1 at the summit; the canvas is drawn top-down so flip it */
+    const t = 1 - y / (H - 1);
+    for (let x = 0; x < W; x++) {
+      const a = (x / W) * Math.PI * 2;
+      /* sample the noise on a CIRCLE in x/z so the left and right edges of the texture meet:
+         a seam down the side of a mountain is the one artefact this mapping can produce */
+      const nx = Math.cos(a) * o.noiseR, nz = Math.sin(a) * o.noiseR;
+      const body = THREE.MathUtils.smoothstep(t, 0, o.rockAt);
+      tmp.copy(foot).lerp(rock, body);
+      const m = jsFbm(nx * o.grain, t * 900 * o.grain, nz * o.grain);
+      tmp.lerp(hi, THREE.MathUtils.clamp((m - 0.35) * 2.2, 0, 1) * 0.5);
+      /* the snow line, jittered around the mountain and again finely, so it has both big lobes
+         and small fingers rather than one wobble */
+      const line = o.snowAt
+        + (jsFbm(nx * o.snowGrain, 0, nz * o.snowGrain) - 0.5) * o.snowJitter
+        + (jsFbm(nx * o.snowGrain * 5, 11, nz * o.snowGrain * 5) - 0.5) * o.snowJitter * 0.35;
+      tmp.lerp(snow, THREE.MathUtils.smoothstep(t, line, line + o.snowBand));
+      const i = (y * W + x) * 4;
+      d[i] = lin2srgb(tmp.r) * 255;
+      d[i + 1] = lin2srgb(tmp.g) * 255;
+      d[i + 2] = lin2srgb(tmp.b) * 255;
+      d[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/* v from world height, u from the angle about the mountain's own axis. Cheap, and it needs no
+   extra vertices — which is the entire point. */
+function mountainUV(mesh, axisX, axisZ, minY, maxY) {
+  const g = mesh.geometry;
+  const pos = g.attributes.position;
+  const uv = new Float32Array(pos.count * 2);
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+    uv[i * 2] = (Math.atan2(v.z - axisZ, v.x - axisX) / (Math.PI * 2)) + 0.5;
+    uv[i * 2 + 1] = THREE.MathUtils.clamp((v.y - minY) / Math.max(1, maxY - minY), 0, 1);
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return pos.count;
+}
+
 /* PAINTED PER VERTEX, ON THE CPU, AFTER SUBDIVIDING — which is what should have been done
    three attempts ago, and it is the suggestion that got there: SUBDIVIDE IT.
    Every previous version drove the snow line from a fragment shader, and that shader has spent
@@ -4116,31 +4330,44 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
      Before instancing and before the outline hulls, because both read the geometry: cragging
      after the hulls are built would leave every ridge wearing the silhouette of the shape it
      used to be. */
+  /* 1b0. THE GROUND'S OWN COLOUR, read before anything that has to agree with it — the far
+     ranges, Fuji's skirt and the flat surfaces all reference it, and they run in that order. */
+  let groundCol = new THREE.Color(0x8f9677);
+  root.traverse((o) => {
+    if (o.isMesh && /(^|[_\-.])(terrain)([_\-.]|$)/i.test(o.name)) groundCol = avgVertexColor(o);
+  });
+  let matched = 0;
+  root.traverse((o) => {
+    if (!o.isMesh || /outline/.test(o.name)) return;
+    /* the named surfaces that lie flat on the terrain and were authored to their own palette */
+    if (!/(FestivalGround|GardenDetail|TownGround|ZenGround|ShrineGround)/i.test(o.name)) return;
+    /* 0.55 rather than 1.0: these are meant to read as trodden earth against grass, just not as
+       a different material entirely. Pulling them all the way to the terrain colour would erase
+       the distinction the author drew on purpose. */
+    if (matchToGround(o, groundCol, 0.55)) matched++;
+  });
+
   let cragged = 0, craggedTris = 0;
   root.traverse((o) => {
     if (!o.isMesh || !/(^|[_\-.])(farrange|range|ridge)/i.test(o.name)) return;
     const rb = new THREE.Box3().setFromObject(o);
     /* 460 rather than 210: these are four to six thousand units tall and twelve to nineteen
-       thousand across, so a two-hundred-unit wobble on them is a texture, not a landform */
+       thousand across, so a two-hundred-unit wobble on them is a texture, not a landform.
+       This is the only subdivision left, and it buys SILHOUETTE — actual crags on the skyline —
+       which is the one thing a texture cannot do. */
     o.geometry = cragify(o.geometry, 460, 1 / 1500);
-    /* THE SAME TREATMENT AS FUJI, which is why they were black.
-       They had no colour of their own worth keeping — flat dark vertex paint, unlit because
-       they face away from the key — so they read as cardboard cutouts whatever was done to the
-       geometry. Painted the same way as the mountain now: a dark foot that meets the treeline,
-       rock through the middle, snow on whatever stands high enough, and each range's own snow
-       line set from its own height so the tall ones are capped and the low ones are not. That
-       last part is what makes a range of mountains read as a range. */
-    const top = rb.max.y, bot = rb.min.y;
-    paintMountain(o, {
-      split: 0,
-      footY: bot, rockY: bot + (top - bot) * 0.55,
-      foot: 0x5f6668, rock: 0x8e8b88, rockHi: 0xa8a29b,
-      grain: 1 / 900, mottle: 0.5, sun: SUN_AT.clone().normalize(),
-      snowY: bot + (top - bot) * 0.72, snowBand: (top - bot) * 0.24,
-      snowJitter: 420, snowSlope: 0.30, snowGrain: 1 / 1400, snow: 0xf4f1ec,
+    o.geometry = smoothNormals(o.geometry);
+    const c = rb.getCenter(new THREE.Vector3());
+    mountainUV(o, c.x, c.z, rb.min.y, rb.max.y);
+    /* each range's snow line comes from its OWN height, so the tall ones are capped and the low
+       ones are not — which is what makes a range read as a range rather than a row of cutouts */
+    o.material = mountainMaterial({
+      /* the far ranges meet the terrain too, though at a distance where only the hue matters */
+      foot: groundCol.clone().lerp(new THREE.Color(0x555b5e), 0.55).getHex(),
+      rock: 0x8a878a, rockHi: 0xa8a3a0, snow: 0xeae7e2,
+      rockAt: 0.42, grain: 1 / 700, noiseR: 4000,
+      snowAt: 0.68, snowBand: 0.26, snowJitter: 0.16, snowGrain: 1 / 2600,
     });
-    o.material = rockMaterial(o.material, null, true);
-    o.material.color.setHex(0xffffff);
     cragged++;
     craggedTris += o.geometry.attributes.position.count / 3;
   });
@@ -4179,30 +4406,30 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   root.traverse((o) => {
     if (!o.isMesh || !/fuji/i.test(o.name) || /forest|props_rock|outline/i.test(o.name)) return;
     const b = new THREE.Box3().setFromObject(o);
-    /* TWO SUBDIVISIONS, and this is the answer to the hard cutoffs.
-       9,916 triangles over a cone 22,000 wide means a vertex every few hundred units, so any
-       per-vertex gradient snaps across one triangle. Splitting twice is sixteen times the
-       vertices — the snow line becomes a blend sampled far more finely than the screen can
-       resolve, and there is nothing left to step. */
-    paintMountain(o, {
-      split: 2,
-      footY: b.min.y, rockY: b.min.y + (b.max.y - b.min.y) * 0.45,
-      /* warm slate, not blue: the cold bounce light is what made this mountain read blue, and a
-         warm base colour is the honest place to answer it */
-      foot: 0x6d6355, rock: 0xa2937f, rockHi: 0xc3b49c,
-      grain: 1 / 1400, mottle: 0.34, sun: SUN_AT.clone().normalize(),
-      /* HIGH AND WIDE, as asked. The cone runs 1,097 to 7,220; a line at 5,400 with a
-         1,600-unit band puts the transition in the top third and spreads it over a quarter of
-         the mountain's height. */
-      /* 4,700 with a 1,900 band: full snow from about 6,600 up, first traces around 3,900, so
-         the cap occupies the top third and the transition is spread over nearly a third of the
-         cone's height. Wider than looks sensible on paper is the point — this is the number that
-         decides whether there is a visible line, and there must not be one. */
-      snowY: 4700, snowBand: 1900, snowJitter: 1000, snowSlope: 0.14,
-      snowGrain: 1 / 2600, snow: 0xfffdfa,
+    /* NO SUBDIVISION. The previous pass split this twice to make a per-vertex gradient finer
+       than the screen — 9,916 triangles became 158,656, on one object, to hold a colour ramp.
+       A texture is a colour ramp evaluated per pixel by hardware that is already sampling
+       textures for everything else, and it needs no vertices at all. Welding the normals is
+       kept, because that fixes the FACETING, which is a different problem and a real one. */
+    o.geometry = smoothNormals(o.geometry);
+    mountainUV(o, (b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2, b.min.y, b.max.y);
+    /* FUJI'S FOOT IS THE TERRAIN'S COLOUR, which is the whole of the tree-ring seam.
+       The mountain is a separate mesh from the ground, so where its skirt meets the map there
+       was a hard edge between a brown-grey rock foot and the terrain's green — measured at
+       #8f9677 — with the forest ring straddling it. Taking the foot colour FROM the terrain at
+       load means the two cannot disagree, and a re-export that repaints the ground moves the
+       mountain's skirt with it. Slightly darkened, because ground under a closed conifer canopy
+       is darker than open field and going exactly equal reads as a decal. */
+    const skirt = groundCol.clone().multiplyScalar(0.82);
+    o.material = mountainMaterial({
+      foot: skirt.getHex(), rock: 0x9c9184, rockHi: 0xb8ac9c, snow: 0xfffdf9,
+      /* the rock does not start until above the treeline, so the green runs up under the trees
+         instead of stopping at the mesh boundary */
+      rockAt: 0.30, grain: 1 / 1100, noiseR: 6000,
+      /* the cone runs 1,097 to 7,220, so v = 0.58 is about y 4,650 — the cap sits in the top
+         third and the band spreads its transition over a fifth of the mountain's height */
+      snowAt: 0.58, snowBand: 0.20, snowJitter: 0.13, snowGrain: 1 / 4200,
     });
-    o.material = rockMaterial(o.material, null, true);
-    o.material.color.setHex(0xffffff);
     fujiDone++;
   });
   /* 2. INSTANCE WHAT SHARES A SHAPE. glTF deduplicates accessors, so meshes that were linked
@@ -4354,6 +4581,16 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     itemEls.forEach((el) => { el.classList.add('enter', 'entered'); });
   }
 
+  /* the heightfield exists by now, so the lake can be told where its own shore is */
+  {
+    const lb = new THREE.Box3().setFromObject(lakeWater);
+    const c = lb.getCenter(new THREE.Vector3());
+    const half = Math.max(lb.max.x - lb.min.x, lb.max.z - lb.min.z) * 0.5;
+    const sh = bakeShoreDepth(c, half, LAKE_Y);
+    lakeWater.material.uniforms.uShore.value = SHORE.tex;
+    console.log(`[water] shore depth baked: ${sh.span} units across, deepest ${sh.deepest}`);
+  }
+
   ENV.culled = culled;
   if (culledSets.length) {
     console.log('[env] large sets cut from the reflection: '
@@ -4362,6 +4599,7 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   const ms = Math.round(performance.now() - t0);
   console.log(`[env] ${url}: ${meshes} meshes, ${converted} re-materialled, `
     + `${cragged} ranges cragged to ${Math.round(craggedTris / 1000)}k tris, ${fujiDone} fuji, `
+    + `${matched} surfaces matched to ground #${groundCol.getHexString()}, `
     + `${ponds} water surfaces, `
     + `${dropped} atmosphere dropped, ${culled} cut from the reflection `
     + `(${Math.round(culledTris / 1000)}k tris/frame saved), ${hulls} outline hulls, `
