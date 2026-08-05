@@ -1864,8 +1864,27 @@ const CLOUD_MATS = [];
    faces the camera and away from the key, so almost all of its light was arriving from a cold
    0x93b0dc bounce and a cold hemisphere. Less controllable than the shader would have been, and
    it works. */
+/* MOUNTAINS ARE NOT TOON-SHADED, AND THAT WAS THE HARD CUTOFF ALL ALONG.
+   From the three.js docs: MeshToonMaterial renders with DISCRETE shading steps rather than a
+   smooth gradient — that is what the material is FOR — and the gradientMap is documented as
+   wanting NearestFilter, because quantising is the intended behaviour and not a side effect.
+   Every attempt to get a smooth ramp out of it was fighting the material's whole purpose:
+   sixteen steps instead of four moved the bands, it never removed them, and a 256-step map at
+   this viewing size just makes the Mach banding finer.
+   So the mountains are Lambert now — smooth diffuse, the same cost, and every chunk cloudy()
+   patches (<color_fragment>, <lights_fragment_end>, <fog_fragment>) exists in it unchanged.
+   The rest of the world keeps its toon look; distant terrain rendered smooth against a
+   cel-shaded foreground is the normal arrangement in stylised games, not a compromise.
+   https://threejs.org/docs/pages/MeshToonMaterial.html */
+function rockMaterial(src, colour) {
+  const m = new THREE.MeshLambertMaterial({
+    color: colour != null ? colour : 0xffffff,
+    vertexColors: colour == null && !!src && src.vertexColors,
+  });
+  return m;
+}
+
 function rocky(mat, opts = {}) {
-  if (opts.gradientMap) mat.gradientMap = opts.gradientMap;
   if (opts.warm) mat.color.setHex(opts.warm);
   if (opts.lift) mat.emissive = new THREE.Color(opts.lift);
   /* A CLONED MATERIAL LIES ABOUT BEING PATCHED. Material.copy() deep-copies userData but does
@@ -3983,8 +4002,7 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     /* 460 rather than 210: these are four to six thousand units tall and twelve to nineteen
        thousand across, so a two-hundred-unit wobble on them is a texture, not a landform */
     o.geometry = cragify(o.geometry, 460, 1 / 1500);
-    o.material = rocky(o.material.clone(), {
-      gradientMap: RAMP_MTN,
+    o.material = rocky(rockMaterial(o.material), {
       origin: [rc.x, rc.y, rc.z], desat: 0.22, tint: 0xbfb3b8,
       aerAmt: 0.55, aerNear: 9000, aerFar: 36000, aerColor: 0xd2ac96, dechill: 0.45,
       warm: 0xfff2e4, lift: 0x090705,
@@ -4036,8 +4054,19 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     if (!o.isMesh || !/fuji/i.test(o.name) || /forest|props_rock|outline/i.test(o.name)) return;
     const b = new THREE.Box3().setFromObject(o);
     o.geometry = smoothNormals(o.geometry);
-    o.material = rocky(o.material.clone(), {
-      gradientMap: RAMP_MTN,
+    /* A FLAT ROCK COLOUR, AND CURRENTLY NO SNOW AT ALL — deliberately, and not finished.
+       The design is a flat base with the snow line as a height blend, wide and high and fully
+       under my control, which is the only way to get the smooth transition that was asked for
+       three times. It is written, and it does NOT RUN: forcing uSnowY to -2,000, which should
+       turn the entire cone white, changes nothing. The rock fragment block is present in the
+       generated source — both guards pass — and still does not execute, which is the same
+       failure the program-cache-key fix was supposed to cure and evidently only half cured.
+       Putting the authored vertex colours back was tried and rejected: it restores a cap, but it
+       restores it as a hard painted edge, which is the exact complaint. Between a mountain with
+       no snow and a mountain with a hard line on it, this leaves the one with no hard line,
+       because that is the thing that has been reported three times running. The cap comes back
+       the moment the block executes. */
+    o.material = rocky(rockMaterial(o.material, 0x91837c), {
       origin: [(b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2],
       /* 0.62 of the way to grey, then warmed: the authored flank plus a cold bounce light was
          reading as a blue mountain, and dawn haze is warm */
@@ -4076,8 +4105,12 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
          pixels at this distance, so the boundary dissolves across several hundred units of the
          cone instead of snapping over one triangle. */
       /* wide enough to be a gradient, jittered enough to be an edge rather than a contour */
-      snowAdd: 0, snowMid: 0.40, snowSoft: 0.20, snowJitter: 0.26, rockDark: 0.97,
-      snowCol: 0xfffaf2,
+      /* HEIGHT-DRIVEN, HIGH, WIDE AND WHITE. The cone runs y 1,097 to 7,220; a line at 5,300
+         with a 1,500-unit band puts the transition in the top third and spreads it over a fifth
+         of the mountain's height, which cannot read as a cutoff. The jitter is in world units
+         here, not luminance, so it breaks the line into tongues without touching the gradient. */
+      snowMid: 0, snowAdd: 1.0, snowY: 5300, snowBand: 1500, snowJitter: 1100, snowSlope: 0.0,
+      snowCol: 0xffffff, rockDark: 1.0,
       /* WRITTEN ABSOLUTE, ON PURPOSE. The warm tint above is a multiply on material.color, which
          lands before this block and therefore warmed the snow cap along with the rock — the
          mountain went from blue to sand. uSnowCol replaces rather than multiplies, so the cap is
