@@ -2700,13 +2700,27 @@ function setHomeView(eye, look, fov) {
        camera onto the new one — every plane keeps exactly the screen position it was composed
        to have, from any eye. */
     if (!window.__camRef) {
-      window.__camRef = new THREE.Matrix4().copy(camera.matrixWorld).invert();
+      /* THE POSE THE PLANES WERE COMPOSED AGAINST, built from numbers rather than sampled from
+         a camera. Reading camera.matrixWorld here captured whatever the intro happened to be
+         doing — a fov-63 pose a third of the way through its opening move — and every plane was
+         then mapped from an origin that never existed. */
+      const ref = camera.clone();
+      ref.position.set(170, 60, 830);
+      ref.lookAt(-240, 30, -160);
+      ref.fov = 42;
+      ref.updateProjectionMatrix();
+      ref.updateMatrixWorld(true);
+      window.__camRef = new THREE.Matrix4().copy(ref.matrixWorld).invert();
     }
     /* HOME IS THE LIVE CAMERA STATE; HOME_EYE and HOME_LOOK are the SITING logic — stand-off
        distances, which way the gate faces, whether the menu's composition is still in shot.
        Writing only the latter moved nothing, which is how five hero-shot candidates came back
        as the same frame twice over. Both have to move, and `cam` has to be pushed too or the
        change waits for the next time something tweens home. */
+    /* STOP WHATEVER IS ALREADY FLYING THE CAMERA. The intro tween spread HOME's values in at
+       the moment it was created, so it holds the ORIGINAL numbers and will happily spend the
+       next few seconds undoing this. */
+    gsap.killTweensOf(cam);
     HOME_EYE.set(eye[0], eye[1], eye[2]);
     HOME_LOOK.set(look[0], look[1], look[2]);
     Object.assign(HOME, { px: eye[0], py: eye[1], pz: eye[2],
@@ -4174,7 +4188,14 @@ function patchAt(x, z) {
 
   /* a handle for headless verification — the same reason lab-shading.html has one. Without it
      the only way to check whether an effect is on is to squint at a screenshot. */
-  window.WORLD = { THREE, backScene, camera, backRenderer, CLOUD, CLOUD_MATS, sunDir: L, lakeWater };
+  /* GETTERS, because this export runs above where several of these are declared and a plain
+     reference reads a const inside its temporal dead zone — which throws, taking the whole
+     module with it. A getter is not evaluated until something asks. */
+  window.WORLD = { THREE, backScene, camera, backRenderer, CLOUD, CLOUD_MATS, sunDir: L, lakeWater,
+    cssScene,
+    get itemObjs() { return itemObjs; },
+    get HOME() { return HOME; },
+    get SKY_DOME() { return SKY_DOME; } };
   backRenderer.shadowMap.needsUpdate = true;    /* the one build; see autoUpdate above */
 }
 
