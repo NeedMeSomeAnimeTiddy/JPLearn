@@ -2667,6 +2667,24 @@ const STAND_OFF = 1500;
    here reads whichever is higher. */
 function surfaceAt(x, z) { return Math.max(groundAt(x, z), LAKE_Y); }
 
+/* Where to look from `eye` so the sun lands at screen (u, v). The offset a screen position
+   subtends is an angle, so the aim is the eye-to-sun direction rotated by it — yaw about the
+   world up, then pitch about the resulting right vector, NEGATED because rotating an aim
+   upward pushes its subject down the frame. */
+function aimAtSun(eye, fov, u, v) {
+  const sun = backScene.getObjectByName('sun-disc') || backScene.getObjectByName('sun-bloom');
+  const E = new THREE.Vector3(eye[0], eye[1], eye[2]);
+  if (!sun) return [E.x, E.y, E.z - 9000];
+  const d = sun.position.clone().sub(E).normalize();
+  const tanV = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
+  const yaw = Math.atan((u - 0.5) * 2 * tanV * camera.aspect);
+  const pitch = Math.atan((0.5 - v) * 2 * tanV);
+  d.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+  const right = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 1, 0)).normalize();
+  d.applyAxisAngle(right, -pitch);
+  return E.add(d.multiplyScalar(12000)).toArray();
+}
+
 function setHomeView(eye, look, fov) {
     /* THE MENU TYPE COMES WITH THE CAMERA. It lives in cssScene at coordinates composed for the
        original eye, so moving the camera left it twenty-six thousand units behind. Rather than
@@ -2986,7 +3004,14 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
      model replaced, and it faces away from the sun. */
   if (opts.home !== false) {
     /* the wide framing, with the menu rigged onto it — the whole valley, Fuji and the sun */
-    setHomeView([-11000, 11000, 21000], [-11804, 8258, 1339], 38);
+    /* LOW ENOUGH THAT THE LAKE IS AT A GRAZING ANGLE, which is the only thing that makes the
+       reflection carry — the water shader's own note says so. The 11,000-unit eye showed the
+       whole map and lost Fuji's mirror entirely: from up there you look INTO the water rather
+       than across it.
+       THE AIM IS COMPUTED, NOT TRANSCRIBED. Hard-coding a look vector copied off a sweep is
+       how this ended up pointing at the pagoda — aimAtSun derives it from where the sun
+       actually is, so the eye is the only number anyone has to get right. */
+    setHomeView([-4200, 2000, 11000], aimAtSun([-4200, 2000, 11000], 43, 0.70, 0.26), 43);
     /* FOG WAS TUNED FOR A CAMERA 800 UNITS FROM ITS SUBJECT. At 21,000 the same exp2 density
        buries the whole valley, and raising saturation only made the haze more emphatic — the
        shot came back as an orange wash with a mountain in it. Roughly halved, so distance still
