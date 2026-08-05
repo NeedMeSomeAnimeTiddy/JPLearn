@@ -2985,11 +2985,16 @@ function setCel(on) {
    a link you can send. */
 {
   const q = new URLSearchParams(location.search);
-  if (q.has('world') || q.has('env')) {
+  /* THE AUTHORED WORLD IS THE WORLD NOW. ?generated keeps the old one, which is worth having
+     for two reasons rather than sentiment: it is what every measurement in RESEARCH.md was
+     taken against, and it is what the page falls back to if a 53MB fetch fails — the generated
+     world builds first and is only hidden once the model is actually in, so a failed load
+     leaves a working page rather than an empty one. */
+  if (!q.has('generated')) {
     addEventListener('load', () => {
       loadEnvironment(q.get('env') || undefined)
         .then(() => { if (q.has('cel')) setCel(true); })
-        .catch((e) => console.error('[env] load failed:', e));
+        .catch((e) => console.error('[env] load failed, keeping the generated world:', e));
     });
   }
 }
@@ -4802,6 +4807,27 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* the sunset framing, so it can be re-applied after the camera has been flown elsewhere */
   home: () => { HOME_EYE.set(-3000, 1250, 8200); HOME_LOOK.set(-3822, 498, -731);
     return { eye: HOME_EYE.toArray(), look: HOME_LOOK.toArray() }; },
+  /* SET THE HOME, NOT THE CAMERA. The rig eases the camera back to HOME_EYE whenever it is
+     idle, so anything written straight onto camera.position is gone inside a second — which is
+     how five different hero-shot candidates all came back looking like the same frame. */
+  /* THE HERO SHOT: the whole valley, Fuji and the sun. Not the menu's home, because the menu
+     type is anchored in world space near the lake and simply is not in this frame — this is a
+     shot of the map, and the menu is a shot with room for six words down the left. */
+  hero: () => window.NAV.setHome([-11000, 11000, 21000], [-11804, 8258, 1339], 38),
+  setHome: (eye, look, fov) => {
+    /* HOME IS THE LIVE CAMERA STATE; HOME_EYE and HOME_LOOK are the SITING logic — stand-off
+       distances, which way the gate faces, whether the menu's composition is still in shot.
+       Writing only the latter moved nothing, which is how five hero-shot candidates came back
+       as the same frame twice over. Both have to move, and `cam` has to be pushed too or the
+       change waits for the next time something tweens home. */
+    HOME_EYE.set(eye[0], eye[1], eye[2]);
+    HOME_LOOK.set(look[0], look[1], look[2]);
+    Object.assign(HOME, { px: eye[0], py: eye[1], pz: eye[2],
+      tx: look[0], ty: look[1], tz: look[2] });
+    if (fov) HOME.fov = fov;
+    Object.assign(cam, HOME);
+    return { HOME: { ...HOME } };
+  },
   outlineWeight: (v) => { OUTLINE_SCALE.value = v; return v; },
   env: ENV,
   /* the ground query itself, so a loaded model's heightfield can be compared against the
