@@ -1773,10 +1773,18 @@ function lakeField(x, z) {
    Matched against BOTH sides: generated objects with these names stay visible, and loaded nodes
    with these names are dropped. So a .glb exported from this very scene round-trips without
    doubling them up. */
-const ENV_ATMOS = /^(sky-dome|lake|river|cloud|sun-disc|sun-bloom|water)/i;
+/* NOT ANCHORED, and matched on word boundaries. Real exports name things
+   `Landscape_Props_SkyDome_001`, not `sky-dome`; an anchored pattern let the sky dome through
+   to be relit as a toon mesh, which is the navy-sky failure all over again. */
+const ENV_ATMOS = /(^|[_\-.])(sky-?dome|lake|river|cloud|sun-?disc|sun-?bloom|water)([_\-.]|$)/i;
+/* THE SKY IS NOT LIT. Whatever else a loaded model brings, a dome painted with a gradient has
+   to stay unlit or the scene's own lights turn it into geometry — which is what it is, and
+   exactly what it must not look like. Matched separately because unlike the rest of the
+   atmosphere it is worth KEEPING from the model when the model has authored one. */
+const ENV_SKY = /(^|[_\-.])sky-?dome([_\-.]|$)/i;
 
 const ENV = {
-  url: './models/environment.glb',
+  url: './models/world.glb',        /* the authored world; environment.glb is the old self-export */
   root: null,          /* the loaded scene */
   hidden: [],          /* what it replaced, kept for putting back */
   field: null,         /* Float32Array heightfield, or null for the analytic world */
@@ -2716,22 +2724,81 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   let meshes = 0, converted = 0, dropped = 0;
   const terrainish = [];
   const bin = [];
+  /* ONE CONVERTED MATERIAL PER SOURCE MATERIAL. Minting a fresh one per mesh would give
+     twenty thousand materials that happen to be identical, and instancing groups on material
+     identity — so a per-mesh material silently makes the scene un-instanceable. */
+  const matCache = new Map();
   root.traverse((o) => {
     if (!o.isMesh && !o.isInstancedMesh) return;
-    if (ENV_ATMOS.test(o.name)) { bin.push(o); return; }
+    if (ENV_ATMOS.test(o.name) && !ENV_SKY.test(o.name)) { bin.push(o); return; }
     meshes++;
     const src = Array.isArray(o.material) ? o.material[0] : o.material;
     const col = (src && src.color) ? src.color.clone() : new THREE.Color(0x8899aa);
-    const m = new THREE.MeshToonMaterial({ color: col, gradientMap: RAMP });
-    if (o.geometry.attributes.color) { m.vertexColors = true; m.color.setHex(0xffffff); }
-    o.material = cloudy(m);
+    /* A TEXTURE THAT EXISTS IS WORK SOMEBODY DID. MeshToonMaterial takes a map, so an image
+       survives the swap to toon shading — only the PBR response is discarded, which is the
+       part that was never going to apply here anyway. */
+    const map = (src && src.map) ? src.map : null;
+    if (ENV_SKY.test(o.name)) {
+      /* unlit, and outside the shadow and fog systems entirely */
+      o.material = new THREE.MeshBasicMaterial({ color: col, map, side: THREE.BackSide, fog: false });
+      o.castShadow = o.receiveShadow = false;
+      o.renderOrder = -1;
+      converted++;
+      return;
+    }
+    const key = (src ? src.uuid : 'none') + '|' + (o.geometry.attributes.color ? 'vc' : '');
+    let m = matCache.get(key);
+    if (!m) {
+      m = new THREE.MeshToonMaterial({ color: col, map, gradientMap: RAMP });
+      if (o.geometry.attributes.color) { m.vertexColors = true; if (!map) m.color.setHex(0xffffff); }
+      m = cloudy(m);
+      matCache.set(key, m);
+    }
+    o.material = m;
     o.castShadow = o.receiveShadow = true;
     converted++;
-    if (/terrain|ground|land/i.test(o.name)) terrainish.push(o);
+    /* THE WHOLE WORD, or `Nature_GroundCover_Bush0_001` is terrain and the heightfield gets
+       baked from the tops of six thousand bushes. `Landscape_` is likewise a prefix on half
+       the file and says nothing about what an object is. */
+    if (/(^|[_\-.])(terrain|ground|landform|heightfield)([_\-.]|$)/i.test(o.name)) {
+      terrainish.push(o);
+    }
   });
   bin.forEach((o) => { o.parent.remove(o); dropped++; });
+  ENV.modelSky = false;
+  root.traverse((o) => { if ((o.isMesh || o.isInstancedMesh) && ENV_SKY.test(o.name)) ENV.modelSky = true; });
 
-  /* 2. the heightfield */
+  /* 2. INSTANCE WHAT SHARES A SHAPE. glTF deduplicates accessors, so meshes that were linked
+     duplicates in Blender arrive already sharing one BufferGeometry object — which makes
+     geometry identity a reliable grouping key without comparing any vertex data. */
+  const groups = new Map();
+  const loose = [];
+  root.updateMatrixWorld(true);
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh) return;
+    if (terrainish.includes(o) || ENV_SKY.test(o.name)) { loose.push(o); return; }
+    const k = o.geometry.uuid + '|' + o.material.uuid;
+    let g = groups.get(k);
+    if (!g) { groups.set(k, g = []); }
+    g.push(o);
+  });
+  let instMeshes = 0, instTotal = 0, keptLoose = 0;
+  for (const [, list] of groups) {
+    /* below this it costs more than it saves: an InstancedMesh carries a matrix buffer and an
+       extra shader branch, and three or four of a thing is not worth either */
+    if (list.length < 6) { keptLoose += list.length; continue; }
+    const im = new THREE.InstancedMesh(list[0].geometry, list[0].material, list.length);
+    list.forEach((o, i) => im.setMatrixAt(i, o.matrixWorld));
+    im.instanceMatrix.needsUpdate = true;
+    im.castShadow = im.receiveShadow = true;
+    im.name = list[0].name.replace(/[._]?\d+$/, '') + '-x' + list.length;
+    im.frustumCulled = false;
+    root.add(im);
+    list.forEach((o) => o.parent && o.parent.remove(o));
+    instMeshes++; instTotal += list.length;
+  }
+
+  /* 3. the heightfield */
   const src = terrainish.length ? terrainish
     : (() => {
       console.warn('[env] no mesh named terrain/ground/land — baking from EVERY mesh, which '
@@ -2742,11 +2809,13 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     })();
   const stats = bakeField(src, opts.grid || 384);
 
-  /* 3. hide what it replaces */
+  /* 4. hide what it replaces */
   ENV.hidden = [];
   backScene.children.forEach((o) => {
     if (o.isLight || o === root) return;
-    if (ENV_ATMOS.test(o.name)) return;      /* the sky, the water and the sun stay */
+    /* the water, the clouds and the sun stay generated; the sky steps aside if the model
+       brought its own, because a dome is the one piece of atmosphere worth authoring */
+    if (ENV_ATMOS.test(o.name) && !(ENV_SKY.test(o.name) && ENV.modelSky)) return;
     if (o.visible) { ENV.hidden.push(o); o.visible = false; }
   });
 
@@ -2754,10 +2823,13 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   ENV.root = root;
   const ms = Math.round(performance.now() - t0);
   console.log(`[env] ${url}: ${meshes} meshes, ${converted} re-materialled, `
-    + `${dropped} atmosphere nodes dropped, ${ENV.hidden.length} generated objects hidden, `
+    + `${dropped} atmosphere dropped, ${instMeshes} instanced meshes carrying ${instTotal} `
+    + `(${keptLoose + loose.length} left loose), ${ENV.hidden.length} generated hidden, `
     + `heightfield ${stats.cells} cells (${stats.holes} empty, ${stats.filled} filled), `
     + `y ${stats.min.toFixed(0)}..${stats.max.toFixed(0)}, ${ms} ms`);
-  return { meshes, dropped, hidden: ENV.hidden.length, terrainMeshes: src.length, ...stats, ms };
+  return { meshes, dropped, hidden: ENV.hidden.length, terrainMeshes: src.length,
+    instMeshes, instTotal, keptLoose: keptLoose + loose.length,
+    drawCalls: instMeshes + keptLoose + loose.length, ...stats, ms };
 }
 
 function unloadEnvironment() {
