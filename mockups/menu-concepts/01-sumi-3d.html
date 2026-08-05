@@ -36,7 +36,11 @@
 
   /* ---------- render stages ---------- */
   #glBack, #cssStage, #glFront { position: fixed; inset: 0; }
-  #glBack { z-index: 1; pointer-events: none; }
+  /* SATURATION. The world renders through toon ramps and a hemisphere fill that both pull
+     colour toward grey, and there is no post chain in this page to grade it in — so it is a
+     filter on the canvas, which costs nothing and applies to the reflection and the sky as
+     well. Contrast comes up slightly with it, because saturating alone flattens. */
+  #glBack { z-index: 1; pointer-events: none; filter: saturate(1.34) contrast(1.05); }
   #cssStage { z-index: 2; pointer-events: none; }
   #cssStage * { pointer-events: none; }
   #cssStage button { pointer-events: auto; }
@@ -817,10 +821,14 @@
          out before READING and DRILLS, and once the rebuilt wood put sunlit canopy behind them
          their worst-case contrast fell to 2.45. Narrow in x on purpose — 75% keeps it off
          Fuji, which must not be dimmed to make type legible. */
-      radial-gradient(78% 128% at 12% 32%, rgba(10,14,22,0.68) 0%, rgba(10,14,22,0.48) 34%,
-        rgba(10,14,22,0.20) 62%, rgba(10,14,22,0) 86%),
-      linear-gradient(100deg, rgba(10,14,22,0.26) 0%, rgba(10,14,22,0.16) 30%,
-        rgba(10,14,22,0) 58%),
+      /* PULLED BACK. The old ellipse ran to 0.68 at its centre and 86% of the frame wide, and
+         with a denser world behind it that is not legibility, it is a hole. Half the density
+         and two thirds the reach: the type still clears its background, and the world it is
+         standing in front of is still visible. */
+      radial-gradient(58% 96% at 10% 34%, rgba(10,14,22,0.38) 0%, rgba(10,14,22,0.24) 36%,
+        rgba(10,14,22,0.09) 64%, rgba(10,14,22,0) 84%),
+      linear-gradient(100deg, rgba(10,14,22,0.14) 0%, rgba(10,14,22,0.07) 30%,
+        rgba(10,14,22,0) 52%),
       linear-gradient(0deg, rgba(8,11,18,0.26) 0%, rgba(8,11,18,0) 24%);
     opacity: 0; transition: opacity 0.5s ease;
   }
@@ -1216,6 +1224,7 @@ document.getElementById('cssStage').appendChild(cssRenderer.domElement);
    `outlineMaterial`). Outlines are now a pixel width, so they need the size of the thing they
    are measured in — and there are dozens of these materials, so handing each one its own copy
    would mean keeping a registry of them just to resize. One object, written once. */
+let SKY_DOME = null;
 const OUTLINE_RES = { value: new THREE.Vector2(W(), H()) };
 /* DECLARED HERE, NOT BESIDE THE LOADER THAT USES IT. outlineMaterial() runs all through world
    construction, hundreds of times, long before the loader block is evaluated — and a `const`
@@ -1727,9 +1736,16 @@ function paintSky() {
     new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false }));
   dome.renderOrder = -10;
   dome.name = 'sky-dome';
+  /* A DOME CENTRED ON THE ORIGIN IS ONLY A SKY FROM NEAR THE ORIGIN. Stand 26,000 units out and
+     you see it as what it is: a sphere, with a curved edge and a far side. Keeping it centred on
+     the EYE makes it a sky from anywhere, which is the whole point of a sky. */
+  dome.matrixAutoUpdate = true;
+  SKY_DOME = dome;
   backScene.add(dome);
 }
 
+/* set above, followed every frame — see the note on the dome */
+/* eslint-disable-next-line no-var */
 /* ---- terrain ----
    Rebuilt against lab-shading.html. The old version was one flat hex value on a flat-shaded
    plane, which is why the near ground read as a sheet of dark green rather than as land. What
@@ -2651,6 +2667,37 @@ const STAND_OFF = 1500;
    here reads whichever is higher. */
 function surfaceAt(x, z) { return Math.max(groundAt(x, z), LAKE_Y); }
 
+function setHomeView(eye, look, fov) {
+    /* THE MENU TYPE COMES WITH THE CAMERA. It lives in cssScene at coordinates composed for the
+       original eye, so moving the camera left it twenty-six thousand units behind. Rather than
+       re-authoring six positions, the whole CSS scene takes the transform that carries the old
+       camera onto the new one — every plane keeps exactly the screen position it was composed
+       to have, from any eye. */
+    if (!window.__camRef) {
+      window.__camRef = new THREE.Matrix4().copy(camera.matrixWorld).invert();
+    }
+    /* HOME IS THE LIVE CAMERA STATE; HOME_EYE and HOME_LOOK are the SITING logic — stand-off
+       distances, which way the gate faces, whether the menu's composition is still in shot.
+       Writing only the latter moved nothing, which is how five hero-shot candidates came back
+       as the same frame twice over. Both have to move, and `cam` has to be pushed too or the
+       change waits for the next time something tweens home. */
+    HOME_EYE.set(eye[0], eye[1], eye[2]);
+    HOME_LOOK.set(look[0], look[1], look[2]);
+    Object.assign(HOME, { px: eye[0], py: eye[1], pz: eye[2],
+      tx: look[0], ty: look[1], tz: look[2] });
+    if (fov) HOME.fov = fov;
+    Object.assign(cam, HOME);
+    /* rebuild the camera's world matrix for the NEW pose, then rig the css scene onto it */
+    const probe = camera.clone();
+    probe.position.set(eye[0], eye[1], eye[2]);
+    probe.lookAt(look[0], look[1], look[2]);
+    probe.updateMatrixWorld(true);
+    cssScene.matrixAutoUpdate = false;
+    cssScene.matrix.multiplyMatrices(probe.matrixWorld, window.__camRef);
+    cssScene.matrixWorldNeedsUpdate = true;
+    return { HOME: { ...HOME } };
+  }
+
 /* A HARD RAMP FOR CEL. The world's usual ramp is a stylised gradient; three steps with the
    break pushed late is a lit side, a turn and a shadow side, which is what a painted cel has. */
 const RAMP_CEL = (() => {
@@ -2938,8 +2985,14 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   /* THE HOME VIEW MOVES WITH THE WORLD. The old eye was sited against a heightfield this
      model replaced, and it faces away from the sun. */
   if (opts.home !== false) {
-    HOME_EYE.set(-3000, 1250, 8200);
-    HOME_LOOK.set(-3822, 498, -731);
+    /* the wide framing, with the menu rigged onto it — the whole valley, Fuji and the sun */
+    setHomeView([-11000, 11000, 21000], [-11804, 8258, 1339], 38);
+    /* FOG WAS TUNED FOR A CAMERA 800 UNITS FROM ITS SUBJECT. At 21,000 the same exp2 density
+       buries the whole valley, and raising saturation only made the haze more emphatic — the
+       shot came back as an orange wash with a mountain in it. Roughly halved, so distance still
+       reads as distance and the map is still a map. */
+    backScene.fog.density = 0.0000185;
+    CLOUD_MATS.forEach((m) => { m.needsUpdate = true; });
     ENV.homeMoved = true;
   }
 
@@ -4813,21 +4866,11 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* THE HERO SHOT: the whole valley, Fuji and the sun. Not the menu's home, because the menu
      type is anchored in world space near the lake and simply is not in this frame — this is a
      shot of the map, and the menu is a shot with room for six words down the left. */
-  hero: () => window.NAV.setHome([-11000, 11000, 21000], [-11804, 8258, 1339], 38),
-  setHome: (eye, look, fov) => {
-    /* HOME IS THE LIVE CAMERA STATE; HOME_EYE and HOME_LOOK are the SITING logic — stand-off
-       distances, which way the gate faces, whether the menu's composition is still in shot.
-       Writing only the latter moved nothing, which is how five hero-shot candidates came back
-       as the same frame twice over. Both have to move, and `cam` has to be pushed too or the
-       change waits for the next time something tweens home. */
-    HOME_EYE.set(eye[0], eye[1], eye[2]);
-    HOME_LOOK.set(look[0], look[1], look[2]);
-    Object.assign(HOME, { px: eye[0], py: eye[1], pz: eye[2],
-      tx: look[0], ty: look[1], tz: look[2] });
-    if (fov) HOME.fov = fov;
-    Object.assign(cam, HOME);
-    return { HOME: { ...HOME } };
-  },
+  hero: () => setHomeView([-11000, 11000, 21000], [-11804, 8258, 1339], 38),
+  /* the older, closer sunset framing, kept because a wide shot and a menu are different jobs
+     and this one may yet win */
+  lakeside: () => setHomeView([-3000, 1250, 8200], [-3822, 498, -731], 42),
+  setHome: (eye, look, fov) => setHomeView(eye, look, fov),
   outlineWeight: (v) => { OUTLINE_SCALE.value = v; return v; },
   env: ENV,
   /* the ground query itself, so a loaded model's heightfield can be compared against the
@@ -6049,6 +6092,8 @@ function tick() {
   depthDress();
   for (const q of WORLD_SWAY) q.root.rotation.z = Math.sin(t * q.swayR + q.swayP) * 0.045;
   placeWorldPicks();
+  /* the sky travels with the eye, so it is never seen as the sphere it is */
+  if (SKY_DOME) SKY_DOME.position.copy(camera.position);
   backRenderer.render(backScene, camera);
   cssRenderer.render(cssScene, camera);
   frontRenderer.render(frontScene, camera);
