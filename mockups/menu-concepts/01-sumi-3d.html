@@ -1106,6 +1106,14 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildReview } from './places/review.js';
 import { buildStudy } from './places/study.js';
 
+/* GSAP SMOOTHS LAG BY DEFAULT: past 500ms in one frame it advances tween time by the smoothed
+   delta instead of the real one, so nothing jumps after a hitch. This scene's frames can exceed
+   that legitimately — a 53MB load, twenty thousand material conversions, a heightfield bake —
+   and once the clock falls behind it does not catch up: a 1.7-second intro had not reached its
+   0.75-second mark after fifteen real seconds, so the type never faded in.
+   2,000ms before smoothing, and a 33ms floor so a genuine stall still does not teleport. */
+gsap.ticker.lagSmoothing(2000, 33);
+
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const ITEMS = [
@@ -3018,6 +3026,10 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
        reads as distance and the map is still a map. */
     backScene.fog.density = 0.0000185;
     CLOUD_MATS.forEach((m) => { m.needsUpdate = true; });
+    /* THE MENU DOES NOT WAIT FOR AN ANIMATION. Whatever the intro is doing, by the time the
+       world is in, the type belongs on screen — a reveal that has not run is a reason to show
+       the thing, not to keep hiding it. */
+    itemEls.forEach((el) => { el.classList.add('enter', 'entered'); });
     ENV.homeMoved = true;
   }
 
