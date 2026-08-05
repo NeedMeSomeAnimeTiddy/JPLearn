@@ -1217,6 +1217,10 @@ document.getElementById('cssStage').appendChild(cssRenderer.domElement);
    are measured in — and there are dozens of these materials, so handing each one its own copy
    would mean keeping a registry of them just to resize. One object, written once. */
 const OUTLINE_RES = { value: new THREE.Vector2(W(), H()) };
+/* DECLARED HERE, NOT BESIDE THE LOADER THAT USES IT. outlineMaterial() runs all through world
+   construction, hundreds of times, long before the loader block is evaluated — and a `const`
+   read from inside its own temporal dead zone throws rather than reading undefined. */
+const OUTLINE_SCALE = { value: 1 };
 
 addEventListener('resize', () => {
   fitFov(cam ? cam.fov : camera.fov);
@@ -1789,6 +1793,8 @@ const ENV = {
   hidden: [],          /* what it replaced, kept for putting back */
   field: null,         /* Float32Array heightfield, or null for the analytic world */
   fw: 0, fh: 0, x0: 0, z0: 0, dx: 1, dz: 1,
+  hulls: [],
+  cel: false,
 };
 
 /* SAMPLED BILINEARLY AND IN EYE-RELATIVE COORDINATES, because that is landAt's contract: it
@@ -2057,12 +2063,17 @@ function outlineMaterial(px) {
     userData: { outline: true },
     uniforms: {
       px: { value: px },
+      /* A SHARED SCALE, so every hull in the world can be re-weighted at once. Cel wants a
+         much heavier line than the ink-wash look does, and a per-material constant cannot be
+         changed after five hundred of them exist. */
+      pxScale: OUTLINE_SCALE,
       res: OUTLINE_RES,
       fogColor: { value: backScene.fog.color },
       fogDensity: { value: backScene.fog.density },
     },
     vertexShader: `
       uniform float px;
+      uniform float pxScale;
       uniform vec2 res;
       attribute vec3 aFlat;
       varying float vDepth;
@@ -2102,7 +2113,7 @@ function outlineMaterial(px) {
         if ( l > 0.5 ) {
           /* full width out to 4,000 units and then shed with distance, so a tree on the far side
              of the valley loses its line instead of turning into a black lozenge */
-          float wpx = px * k * min( 1.0, 4000.0 / max( vDepth, 1.0 ) );
+          float wpx = px * pxScale * k * min( 1.0, 4000.0 / max( vDepth, 1.0 ) );
           clip.xy += ( sn / l ) * wpx * 2.0 / res * clip.w;
         }
         gl_Position = clip;
@@ -2635,6 +2646,17 @@ const STAND_OFF = 1500;
    here reads whichever is higher. */
 function surfaceAt(x, z) { return Math.max(groundAt(x, z), LAKE_Y); }
 
+/* A HARD RAMP FOR CEL. The world's usual ramp is a stylised gradient; three steps with the
+   break pushed late is a lit side, a turn and a shadow side, which is what a painted cel has. */
+const RAMP_CEL = (() => {
+  const d = new Uint8Array(3 * 4);
+  [64, 176, 255].forEach((v, i) => { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255; });
+  const t = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter;
+  t.needsUpdate = true;
+  return t;
+})();
+
 /* ============================ THE ENVIRONMENT LOADER ============================
    A .glb replaces the generated world wholesale: the model IS the scene. Four things have to
    happen, and only the first is loading.
@@ -2809,7 +2831,91 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     })();
   const stats = bakeField(src, opts.grid || 384);
 
-  /* 4. hide what it replaces */
+  /* 4. WHAT IS NOT WORTH REFLECTING. The scene is drawn a second time every frame into a
+     768-square target for the lake, and at that resolution an object's contribution is its
+     angular size: a 40-unit bush on the far shore is a third of a pixel. Culling by world
+     RADIUS rather than by name or collection means it keeps working when the model changes.
+
+     BUT A PER-MEMBER TEST IS THE WRONG TEST FOR AN INSTANCED SET. At 120 units this emptied
+     the lake: one tree's radius is under the threshold, so the rule removed nine hundred trees
+     in a single decision and took the whole far shore with them. In a reflection a tree is two
+     pixels and a FOREST is the entire image — what reads is the mass, not the member.
+
+     So the threshold is what cannot read even in aggregate: grass, groundcover, small clutter.
+     A stand of anything tree-sized stays. */
+  const REFLECT_MIN_R = 55;
+  let culled = 0, culledTris = 0;
+  const culledSets = [];
+  root.traverse((o) => {
+    if (!o.isMesh && !o.isInstancedMesh) return;
+    if (terrainish.includes(o) || ENV_SKY.test(o.name)) return;
+    o.geometry.computeBoundingSphere();
+    const bs = o.geometry.boundingSphere;
+    if (!bs) return;
+    /* an InstancedMesh's geometry radius is one instance's; the instances carry the scale */
+    let sc = 1;
+    if (o.isInstancedMesh) {
+      const m = new THREE.Matrix4(), v = new THREE.Vector3();
+      for (let i = 0; i < Math.min(o.count, 32); i++) {
+        o.getMatrixAt(i, m);
+        m.decompose(new THREE.Vector3(), new THREE.Quaternion(), v);
+        sc = Math.max(sc, Math.max(v.x, v.y, v.z));
+      }
+    } else {
+      sc = Math.max(o.scale.x, o.scale.y, o.scale.z);
+    }
+    if (bs.radius * sc < REFLECT_MIN_R) {
+      NO_REFLECT.push(o);
+      culled++;
+      const t = (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
+      const n = o.isInstancedMesh ? o.count : 1;
+      culledTris += t * n;
+      /* an instanced set is one entry in the list and can be thousands of objects on screen —
+         worth naming, so a mistake like the forest cannot hide inside a total again */
+      if (n > 200) culledSets.push([o.name, n, Math.round(bs.radius * sc)]);
+    }
+  });
+
+  /* 5. OUTLINE HULLS. Loaded geometry had none, which is why a loaded world read flatter than
+     the generated one — the black line is most of this scene's language. Instanced sets get an
+     instanced hull sharing the same matrices, so it stays one extra draw call per set rather
+     than one per tree. Skipped below the same size at which an outline is sub-pixel anyway. */
+  const OUTLINE_MIN_R = 60;
+  let hulls = 0;
+  const madeFor = [];
+  root.traverse((o) => {
+    if ((!o.isMesh && !o.isInstancedMesh) || ENV_SKY.test(o.name)) return;
+    o.geometry.computeBoundingSphere();
+    const bs = o.geometry.boundingSphere;
+    if (!bs || bs.radius < OUTLINE_MIN_R) return;
+    madeFor.push(o);
+  });
+  for (const o of madeFor) {
+    const g = outlineGeom(o.geometry);
+    const mat = outlineMaterial(terrainish.includes(o) ? 1.4 : 2.2);
+    let h;
+    if (o.isInstancedMesh) {
+      h = new THREE.InstancedMesh(g, mat, o.count);
+      const m = new THREE.Matrix4();
+      for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); h.setMatrixAt(i, m); }
+      h.instanceMatrix.needsUpdate = true;
+    } else {
+      h = new THREE.Mesh(g, mat);
+      h.position.copy(o.position); h.quaternion.copy(o.quaternion); h.scale.copy(o.scale);
+    }
+    h.frustumCulled = false;
+    h.name = (o.name || 'part') + '-outline';
+    (o.parent || root).add(h);
+    ENV.hulls.push(h);
+    /* NOT IN THE REFLECTION. An outline is a width in pixels and the reflection is 768 of them:
+       a line sized for the window covers a reflected tree entirely, and 252 hulls turned the
+       lake into flat grey. The section above already says ground detail is not worth
+       reflecting; a contour line in a rippled 768-pixel image is worth even less. */
+    NO_REFLECT.push(h);
+    hulls++;
+  }
+
+  /* 6. hide what it replaces */
   ENV.hidden = [];
   backScene.children.forEach((o) => {
     if (o.isLight || o === root) return;
@@ -2821,18 +2927,47 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
 
   backScene.add(root);
   ENV.root = root;
+  ENV.culled = culled;
+  if (culledSets.length) {
+    console.log('[env] large sets cut from the reflection: '
+      + culledSets.map((c) => `${c[0]} x${c[1]} (r${c[2]})`).join(', '));
+  }
   const ms = Math.round(performance.now() - t0);
   console.log(`[env] ${url}: ${meshes} meshes, ${converted} re-materialled, `
-    + `${dropped} atmosphere dropped, ${instMeshes} instanced meshes carrying ${instTotal} `
+    + `${dropped} atmosphere dropped, ${culled} cut from the reflection `
+    + `(${Math.round(culledTris / 1000)}k tris/frame saved), ${hulls} outline hulls, `
+    + `${instMeshes} instanced meshes carrying ${instTotal} `
     + `(${keptLoose + loose.length} left loose), ${ENV.hidden.length} generated hidden, `
     + `heightfield ${stats.cells} cells (${stats.holes} empty, ${stats.filled} filled), `
     + `y ${stats.min.toFixed(0)}..${stats.max.toFixed(0)}, ${ms} ms`);
   return { meshes, dropped, hidden: ENV.hidden.length, terrainMeshes: src.length,
+    culled, culledTris, hulls, culledSets,
     instMeshes, instTotal, keptLoose: keptLoose + loose.length,
     drawCalls: instMeshes + keptLoose + loose.length, ...stats, ms };
 }
 
+/* CEL OVER THE LOADED WORLD. Hard ramp everywhere, a much heavier line, and the atmosphere
+   turned down — height fog is a smooth continuous gradient laid over an image whose whole
+   premise is that tone comes in steps, and it is what washed the look out in the lab. */
+function setCel(on) {
+  ENV.cel = !!on;
+  OUTLINE_SCALE.value = on ? 2.1 : 1;
+  backScene.traverse((o) => {
+    if (!o.isMesh && !o.isInstancedMesh) return;
+    const m = o.material;
+    if (!m || !m.isMeshToonMaterial) return;
+    m.gradientMap = on ? RAMP_CEL : RAMP;
+    m.needsUpdate = true;
+  });
+  return { cel: ENV.cel, outlineScale: OUTLINE_SCALE.value };
+}
+
 function unloadEnvironment() {
+  /* the hulls live under the loaded root, so removing it takes them — but NO_REFLECT holds
+     references into it, and leaving those behind hides objects that no longer exist and, worse,
+     keeps the whole loaded scene alive in memory */
+  ENV.hulls.length = 0;
+  NO_REFLECT.length = 0;
   if (ENV.root) { backScene.remove(ENV.root); ENV.root = null; }
   ENV.hidden.forEach((o) => { o.visible = true; });
   ENV.hidden = [];
@@ -4631,6 +4766,8 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
        NAV.unloadEnv()          put the generated world back, same camera */
   loadEnv: (url, opts) => loadEnvironment(url, opts),
   unloadEnv: () => unloadEnvironment(),
+  cel: (on) => setCel(on !== false),
+  outlineWeight: (v) => { OUTLINE_SCALE.value = v; return v; },
   env: ENV,
   /* the ground query itself, so a loaded model's heightfield can be compared against the
      analytic world it replaced without going through a probe and a camera */
