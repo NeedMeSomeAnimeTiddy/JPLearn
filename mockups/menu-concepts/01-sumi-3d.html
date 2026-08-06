@@ -1489,7 +1489,7 @@ function sizePost() {
    https://threejs.org/examples/webgl_postprocessing_sobel.html */
 const INK = {
   on: true,
-  width: { value: 1.35 },        /* half-width of the sample cross, in pixels */
+  width: { value: 1.35 },        /* half-width of the sample cross, in pixels, before falloff */
   depthT: { value: 0.018 },      /* relative depth jump that counts as a silhouette */
   /* 1 - dot(n, n') that counts as a crease, and 0.22 was below the geometry.
      0.22 is a 38-degree fold. A conifer in this world is a cone with eight radial facets, so
@@ -1500,7 +1500,7 @@ const INK = {
      0.50 is a 60-degree fold: past anything a faceted cone or a round canopy produces, and well
      under a building corner, which is 90 degrees and scores 1.0. */
   normalT: { value: 0.50 },
-  amount: { value: 0.85 },
+  amount: { value: 0.92 },
   color: { value: new THREE.Color(0x121319) },
   texel: { value: new THREE.Vector2(1 / 1440, 1 / 810) },
 };
@@ -1561,7 +1561,13 @@ const matInk = new THREE.ShaderMaterial({
       vec4 c = texture2D( tND, vUv );
       vec3 n0 = c.xyz * 2.0 - 1.0;
       float d0 = c.w;
-      vec2 o = texel * uWidth;
+      /* THE LINE GETS HEAVIER AS IT COMES FORWARD. A drawn outline is not one width — the near
+         edge of a thing is the confident stroke and the far edge is a hairline, and a constant
+         width is most of what makes a screen-space outline read as a filter rather than as ink.
+         Widening the sample cross rather than fading the alpha means the near line is genuinely
+         thicker, not just darker. Sky reads d0 = 0 and so takes the full width, which is right:
+         a silhouette against the dawn is the strongest line in the picture. */
+      vec2 o = texel * uWidth * mix( 1.35, 0.82, smoothstep( 4000.0, 26000.0, d0 ) );
       float dJump = 0.0, nJump = 0.0, dRef = d0;
       for ( int i = 0; i < 4; i++ ) {
         vec2 off = i == 0 ? vec2( o.x, 0.0 ) : i == 1 ? vec2( - o.x, 0.0 )
@@ -2824,8 +2830,18 @@ function onGround(dist, side, lift = 0) {
    ramp is tinted: the dark steps are pulled blue and away from red, the bright steps stay
    neutral, and the step VALUES are unchanged so nothing about the existing balance moves. It is
    one texture and it re-lights every toon material in the scene at once.
-   The multipliers are per channel and are deliberately not normalised — a cool shadow reads as
-   slightly darker as well as bluer, which is also true. */
+   AND IT PRESERVES LUMINANCE, which the first version did not — that is what was blotching the
+   mountain and the meadow.
+   Written as `v * (tint + (1 - tint) * v)` per channel, the red multiplier goes from 0.74 at the
+   bottom of the ramp to 1.0 at the top. That is not a tint, it is a CURVE: at v = 0.5 it takes
+   13% off, at v = 0.9 only 2.6%. The mapping's slope is therefore steepest through the middle of
+   the ramp, so it magnifies whatever small variation in N.L is already there — and the mountains
+   and the ground now have deliberate relief putting exactly that variation in. A wobble that was
+   meant to break a terminator into something ragged came out instead as dark patches, which is
+   what "the cel shading is causing the splotches" was pointing at, and correctly.
+   So the tinted triple is rescaled to the luminance of the neutral step it replaces. The ramp's
+   value curve is then identical to the old one byte for byte, the CEL toggle changes hue and
+   nothing else, and a shadow is a different colour of light rather than a steeper one. */
 const SHADOW_TINT = [0.74, 0.87, 1.16];
 /* AND A SWITCH BETWEEN THE TWO, because "it looks a bit weird" is not a thing anyone can act on
    from memory — the two versions have to be side by side. `?cel=old` restores exactly what was
@@ -2838,10 +2854,11 @@ function writeRamp(tex, steps) {
   const tint = CEL.mode === 'old' ? [1, 1, 1] : SHADOW_TINT;
   for (let i = 0; i < steps; i++) {
     const v = Math.pow((i + 1) / steps, 0.72);
-    for (let c = 0; c < 3; c++) {
-      const k = tint[c] + (1 - tint[c]) * v;
-      d[i * 4 + c] = Math.round(255 * Math.min(1, v * k));
-    }
+    const rgb = [0, 1, 2].map((c) => v * (tint[c] + (1 - tint[c]) * v));
+    /* back to the value it started with: hue moves, brightness does not */
+    const lum = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+    const k = lum > 1e-5 ? v / lum : 1;
+    for (let c = 0; c < 3; c++) d[i * 4 + c] = Math.round(255 * Math.min(1, rgb[c] * k));
     d[i * 4 + 3] = 255;
   }
   tex.needsUpdate = true;
