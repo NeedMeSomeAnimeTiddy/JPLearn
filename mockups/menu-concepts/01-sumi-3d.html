@@ -2170,6 +2170,9 @@ function landformMaterial(o) {
      mist and fog. */
   delete m.userData.cloudy;
   m.gradientMap = RAMP_PEAK;
+  /* the softer ramp's lift, taken back out. Safe to read here for the same reason RAMP_PEAK is:
+     both are declared below this function, and nothing calls it until the environment loads. */
+  m.color.multiplyScalar(LANDFORM_LEVEL);
   /* a mountain is the one surface the cloud-shadow projection cannot work on: it offsets a world
      position along the light and reads a noise texture, which assumes the shadow lands near
      y = 0, so on a cone rising seven thousand units the blob smears up the flank as a stain
@@ -3182,8 +3185,32 @@ const RAMP_MTN = toonRamp(64, THREE.LinearFilter, 1.8, 0.26);
    is true, and reads wrong, because the eye expects one continuous landform to be one value.
    So the peaks get a steeper curve with a lower floor, and take the albedo down with it. Both
    together land the flank on 109 against a 103 meadow. The terrain keeps RAMP_MTN — it is the
-   surface the mountains are being matched TO, and moving it would move the target. */
-const RAMP_PEAK = toonRamp(64, THREE.LinearFilter, 2.2, 0.10);
+   surface the mountains are being matched TO, and moving it would move the target.
+
+   SOFTENED, AND IT IS THE FLOOR THAT DOES IT, NOT THE EXPONENT. The ground still stepped where it
+   tilts up into Fuji's flank, so the curve was swept against two things at once: that step, and
+   Fuji's lit side against its shadow side, both as a percentage rather than a difference — an
+   absolute gap means nothing when the candidates sit at different brightnesses.
+
+       exp / floor      ground step    Fuji lit vs shadow
+       2.2 / 0.10          22.2%            24.2%
+       1.6 / 0.10          25.2%            23.5%
+       1.2 / 0.10          24.3%            21.4%
+       1.6 / 0.22          17.7%            18.1%
+       1.2 / 0.28          14.8%            15.3%
+
+   Dropping the exponent alone makes the ground WORSE — it steepens the curve exactly where a low
+   sun puts these two surfaces, around 0.55 to 0.75 of the ramp. The floor is what compresses the
+   whole range, and it takes both numbers down together: the ground and the mountains share this
+   ramp, so there is no softening one without the other, and 1.6/0.22 is as far as it goes before
+   Fuji stops reading as a cone. Everything it lifts, LANDFORM_LEVEL puts back. */
+const RAMP_PEAK = toonRamp(64, THREE.LinearFilter, 1.6, 0.22);
+/* WHAT THE SOFTER RAMP COSTS, GIVEN BACK. Raising the floor lifts every landform about 24% —
+   Fuji's lit flank 77.8 to 96.1, the meadow 79.7 to 102.9 — and brightness is the one thing this
+   scene has been asked about most. Scaling the material colour scales the albedo uniformly, so it
+   holds the whole set at the value that was signed off while the ramp does the softening, and it
+   applies to the valley too, which recolor_land.py deliberately never repaints. 77.8 / 96.1. */
+const LANDFORM_LEVEL = 0.81;
 
 /* how much darker the ranges are painted than Fuji, to cancel the extra distance fog they take.
    Swept with ?range=<n> against Fuji's flank. */
