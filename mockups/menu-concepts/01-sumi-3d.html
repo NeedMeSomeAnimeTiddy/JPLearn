@@ -1503,7 +1503,10 @@ const INK = {
      0.50 is a 60-degree fold: past anything a faceted cone or a round canopy produces, and well
      under a building corner, which is 90 degrees and scores 1.0. */
   normalT: { value: 0.50 },
-  amount: { value: 0.92 },
+  /* back to 0.85: it was raised to 0.92 in the same pass that widened the sample cross, and a
+     wider cross with a heavier alpha is a darker smear. The near/far weight in the shader carries
+     the heaviness now, so this is the base again. */
+  amount: { value: 0.85 },
   color: { value: new THREE.Color(0x121319) },
   texel: { value: new THREE.Vector2(1 / 1440, 1 / 810) },
 };
@@ -1564,13 +1567,18 @@ const matInk = new THREE.ShaderMaterial({
       vec4 c = texture2D( tND, vUv );
       vec3 n0 = c.xyz * 2.0 - 1.0;
       float d0 = c.w;
-      /* THE LINE GETS HEAVIER AS IT COMES FORWARD. A drawn outline is not one width — the near
-         edge of a thing is the confident stroke and the far edge is a hairline, and a constant
-         width is most of what makes a screen-space outline read as a filter rather than as ink.
-         Widening the sample cross rather than fading the alpha means the near line is genuinely
-         thicker, not just darker. Sky reads d0 = 0 and so takes the full width, which is right:
-         a silhouette against the dawn is the strongest line in the picture. */
-      vec2 o = texel * uWidth * mix( 1.35, 0.82, smoothstep( 4000.0, 26000.0, d0 ) );
+      /* THE CROSS IS ONE WIDTH, AND THAT IS THE POINT. It used to be scaled by distance —
+         x1.35 near, x0.82 far — on the reasoning that widening the sample cross makes the near
+         line genuinely thicker rather than merely darker. It does not. The cross is the
+         DETECTOR's footprint: at 1.35 x 1.35 = 1.82 texels the taps land nearly two pixels either
+         side of an edge, so every pixel within two of it sees some jump and takes some alpha, and
+         since dEdge is a smoothstep over that jump the result is a gradient two pixels deep on
+         both sides. Measured as the difference between the frame with the pass and without it,
+         near strokes averaged 6.34 pixels across with half of them four or wider — a smear, which
+         is exactly "blurry at the edges".
+         Heavier-near is a question of WEIGHT, not of footprint, so it moves to the alpha below
+         and the cross goes back to the constant it was when this looked right. */
+      vec2 o = texel * uWidth;
       float dJump = 0.0, nJump = 0.0, dRef = d0;
       for ( int i = 0; i < 4; i++ ) {
         vec2 off = i == 0 ? vec2( o.x, 0.0 ) : i == 1 ? vec2( - o.x, 0.0 )
@@ -1587,6 +1595,13 @@ const matInk = new THREE.ShaderMaterial({
          hundreds of units from one pixel to the next while being perfectly flat — without this
          the whole meadow comes out as solid ink. n0.z is how square-on the surface is. */
       float graze = clamp( abs( normalize( n0 ).z ), 0.06, 1.0 );
+      /* THE RAMPS STAY WIDE, and that was worth testing rather than assuming. The obvious second
+         suspect for a soft stroke is these two smoothsteps grading the edge instead of deciding
+         it, so they were narrowed — 2.6t to 1.7t, and 0.30 to 0.14 — and measured: the stroke went
+         from 2.97 pixels to 2.90 on one silhouette and from 2.63 to 2.70 on another, which is
+         noise, while the foreground's total darkening rose 7% because every partial pixel in the
+         forest got pushed further up its ramp. All cost, no width. The spread was never here; it
+         was the sample cross, and this ramp is the only antialiasing the line has. */
       float dEdge = smoothstep( uDepthT / graze, uDepthT * 2.6 / graze, rel );
       float nEdge = smoothstep( uNormalT, uNormalT + 0.30, nJump );
       /* AND A CREASE IS A LIGHTER LINE THAN A SILHOUETTE. In a drawing the outside of a form
@@ -1605,7 +1620,13 @@ const matInk = new THREE.ShaderMaterial({
          this shader is a template literal, and that is the fourth time) — a line is a drawing
          decision, and past a certain distance the drawing does not have that line in it. */
       float shed = mix( 1.0, 0.30, smoothstep( 9000.0, 30000.0, far ) );
-      gl_FragColor = vec4( col, e * uAmount * shed );
+      /* AND THE NEAR LINE IS THE CONFIDENT ONE. This is what the distance-scaled sample cross was
+         trying to be: the near edge of a thing is a firm stroke, the far edge a hairline. Done on
+         the alpha it costs no width, so the line stays one pixel of decision and simply presses
+         harder. Sky reads d0 = 0 and takes the full weight, which is right — a silhouette against
+         the dawn is the strongest line in the picture. */
+      float weight = mix( 1.18, 0.86, smoothstep( 4000.0, 26000.0, d0 ) );
+      gl_FragColor = vec4( col, clamp( e * uAmount * shed * weight, 0.0, 1.0 ) );
     }`,
   transparent: true,
   depthTest: false,
