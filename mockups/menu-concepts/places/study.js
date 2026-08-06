@@ -623,8 +623,21 @@ export function buildStudy(ctx) {
     SITE, TOP: Math.round(TOP), F_NEAR, F_FAR, HALF_S, PICK_F, GATE_X,
     ridge: Math.round(124 + HALL.wall + HALL.roof), quarters: Q.map((q) => q[0]),
   };
+  /* THE COMPOUND IS LIVE — the authored world does not model it — and the ground it stands on
+     is claimed, or the authored wood grows straight through the court. The claim is the
+     compound's own RECTANGLE (plus a margin), not discs: the authored festival's edge stands
+     1,300 units from the compound's centreline, and a disc big enough to reach the corners
+     reached the festival's stalls too — the first application of the claims quietly hid a
+     yatai, three nobori and four takahari that were never this place's to take. A disc clears
+     the forecourt outside the offset gate. */
+  const cc = at3(MID_F, 0);
+  const fc = at3(F_NEAR - 620, GATE_X);
+  const claims = [
+    { x: cc.x, z: cc.z, fx: fwd.x, fz: fwd.z, hf: (F_FAR - F_NEAR) / 2 + 260, hs: HALF_S + 240 },
+    { x: fc.x, z: fc.z, r: 720 },
+  ];
   return {
     probe: _probe, focus: _focus, eyeLift: _eyeLift, l2: _l2,
-    marks: _marks, mass,
+    marks: _marks, mass, live: 'all', claims,
   };
 }

@@ -492,6 +492,10 @@
     border-bottom: 3px solid var(--sec, var(--hi));
   }
   body.at-walk .walk-hud { opacity: 1; }
+  /* level four borrows the walk hud's dress; the id out-specifies the class so the two are
+     never up together */
+  #l4Hud { opacity: 0; }
+  body.at-l4 #l4Hud { opacity: 1; }
   .walk-hud .wh-jp { font-family: var(--jp); font-weight: 700; font-size: 21px; letter-spacing: 0.1em; color: var(--washi); }
   .walk-hud .wh-en { font-family: var(--lat); font-size: 11px; letter-spacing: 0.3em; color: rgba(242,234,216,0.55); }
   .walk-hud .wh-at { font-family: var(--lat); font-size: 13px; letter-spacing: 0.14em; color: var(--sec, var(--hi)); }
@@ -1055,6 +1059,9 @@
   <button class="wh-step" data-d="-1" type="button">&#8249;</button>
   <span class="wh-jp"></span><span class="wh-en"></span><b class="wh-at"></b>
   <button class="wh-step" data-d="1" type="button">&#8250;</button>
+</div>
+<div class="chrome walk-hud" id="l4Hud">
+  <span class="wh-jp"></span><span class="wh-en"></span><b class="wh-at"></b>
 </div>
 <div class="chrome back-tab" id="backTab">
   <button type="button"><span class="bt-ar">&#9666;</span><span class="bt-jp">&#25147;&#12427;</span><span class="bt-en">BACK</span></button>
@@ -4540,6 +4547,10 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
 
   backScene.add(root);
   ENV.root = root;
+  /* the ground the places own, carved out of the authored props. A no-op at boot (the places
+     are not built yet — buildPlacesLate applies it after them); on a manual NAV.loadEnv the
+     claims already exist and apply here. */
+  applyWorldClaims();
   /* THE HOME VIEW MOVES WITH THE WORLD. The old eye was sited against a heightfield this
      model replaced, and it faces away from the sun. */
   if (opts.home !== false) {
@@ -4618,6 +4629,9 @@ function setCel(on) {
     addEventListener('load', () => {
       loadEnvironment(q.get('env') || undefined)
         .then(() => {
+          /* the places are built HERE, against the ground they will actually stand in —
+             see BUILDING THE PLACES, AND WHEN at the build site */
+          buildPlacesLate();
           if (q.has('cel')) setCel(true);
           /* the framing was composed against FUJI_PEAK_HINT before this file existed on the
              client; now that the real summit is here, confirm it */
@@ -4629,6 +4643,10 @@ function setCel(on) {
           /* the whole reason the generated world is still built: it is the fallback */
           ENV.hidden.forEach((o) => { o.visible = true; });
           ENV.hidden = [];
+          /* and the places still have to exist — built against the generated ground, since
+             that is the world that is actually up. (The generated planting was placed before
+             their tree claims in this path; a rare fallback wears that.) */
+          buildPlacesLate();
         });
     });
   }
@@ -4699,6 +4717,9 @@ function hideGeneratedWorld(root) {
     /* the water, the clouds and the sun stay generated; the sky steps aside if the model
        brought its own, because a dome is the one piece of atmosphere worth authoring */
     if (ENV_ATMOS.test(o.name) && !(ENV_SKY.test(o.name) && ENV.modelSky)) return;
+    /* and the live layer stays: lettered surfaces and moving parts cannot be baked, and the
+       places the .blend does not model yet have no other body to appear in */
+    if (LIVE.has(o)) return;
     if (o.visible) { ENV.hidden.push(o); o.visible = false; }
   });
   return ENV.hidden.length;
@@ -4758,11 +4779,40 @@ const DEST_SPECS = [
      sits at -90 against the valley floor's -300 — 210 up. Not merely away from the water but above
      it, which is the right ground for a walled compound and gives the wall something to frame. */
   { bearing: 170, dist: 6520, lift: 0, stand: 1284, eyeLift: 460 }, /* STUDY — the hall and its gardens */
-  { bearing: 105, dist: 5200, lift: 150, stand: 855, eyeLift: 182 }, /* REVIEW — the shrine */
-  { bearing: 74, dist: 4600, lift: 0 },   /* READING — the repository under the wood      */
-  { bearing: 143, dist: 5600, lift: 0 },   /* DRILLS  — the tower district, across the water */
-  { bearing: -101, dist: 5000, lift: 260 }, /* JLPT    — the stair climbing the ridge       */
-  { bearing: -164, dist: 4800, lift: 180 }, /* RECORDS — the pagoda on the hill behind      */
+  /* eyeLift re-derived 2026-08-06 for the AUTHORED court: the shrine terrace stands above the
+     terrain the stand-off measures from (the same two-heights trap STUDY's step 3 hit), so at
+     182 the eye surfaced just over the terrace lip with the retaining wall filling the frame's
+     lower third. Swept 260/340/420 in place: 340 clears the terrace, holds all four tablets in
+     frame at the left and keeps the titled gate on the centre vertical. */
+  { bearing: 105, dist: 5200, lift: 150, stand: 855, eyeLift: 340 }, /* REVIEW — the shrine */
+  /* THE FOUR BELOW WERE RE-MEASURED 2026-08-06, TWICE, and the second pass is the one that
+     matters. The first was a full-compass NAV.site terrain sweep — dryness and fall — which
+     already overturned the STUDY-era "the west is all lake" (that was measured against the
+     GENERATED field; the authored field has a dry mesa at +76 near -146 and a ridge at +306
+     near -106). The second pass read the authored world's own AREA NAMES: the .blend models a
+     named home for most sections (Torii_, Festival_, Pagoda_, Garden_, Zen_, Onsen_), laid out
+     along bearing radials from the world origin — solved exactly as world = R(-112.5°)·(u,v) +
+     (170, 830), scale 1.0000. An area's props out-rank a terrain number: a festival ground
+     already standing at 167° is a better statement of where DRILLS belongs than the flattest
+     empty plain at 143° ever was. */
+  { bearing: 74, dist: 4900, lift: 0 },   /* READING — 蔵 on the town lane. The lake reaches up
+     this approach and the first dry ground on the bearing is 4800; the bearing stays — the
+     lane's props (signboards, vending machines, shopfronts) are the reason the place is here
+     at all. The lane's exact authored line is read at build time, like the shrine's tunnel. */
+  { bearing: 167.5, dist: 3400, lift: 160, stand: 1100, eyeLift: 220 }, /* DRILLS — the AUTHORED
+     festival ground: yatai rows, nobori, takahari poles, a red entrance torii, crowds — already
+     standing at 152-180° / 3,100-3,800. The old 143/5600 was the flattest empty plain in the
+     world, which is a fine place to build a festival and a poor place to stand next to a real
+     one. The shot (stand 1100, eyeLift 220, aim 160 up) was swept in place: under the lantern
+     ropes, through the entrance torii, down the stall row. */
+  { bearing: -122.2, dist: 4450, lift: 0 }, /* JLPT — the AUTHORED pagoda, on the +76 mesa:
+     a five-storey tower on a lantern-lined plaza with the crowd already waiting. The -106
+     ridge crest from the terrain pass stands empty 16° away; a place that exists beats a site
+     that would suit one. */
+  { bearing: -146, dist: 4300, lift: 0 }, /* RECORDS — 観月台 at the mesa rim. No authored area
+     claims this section, so the deck stays an analytic build: top +76 against the valley's
+     -240, dry, and the rim's drop on the HOME side — the deck cantilevers over it facing the
+     valley, the one orientation the brief needs. */
 ].map((d) => ({ ...d, place: destPlace(d.bearing, d.dist, d.lift) }));
 
 /* ---- 鳥居 — the gate standing in the water ----
@@ -5112,6 +5162,11 @@ const WORLD_L2 = {};
 /* a section whose level three is a walk registers it here: the placards, how to letter them, and
    where the camera stands to read each one */
 const WORLD_L3 = {};
+/* and level four — the room the practice happens in. A place registers { enter, leave, eye, tgt }:
+   `enter(tileJp, k)` dresses the room for the chosen queue and deck and returns the HUD line,
+   `eye()`/`tgt()` are the room shot, `leave()` puts the room back. The page owns the camera and
+   the state; the place owns the room. */
+const WORLD_L4 = {};
 /* the name-board, per section. The safe-zone rule that used to apply to a DOM title still applies
    to a board hanging in a gate — it is just no longer something the browser can measure for you,
    so the board has to be reachable from outside to be asserted at all. */
@@ -5157,6 +5212,14 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
   grp.position.copy(place);
   grp.lookAt(faceTowards.x, place.y, faceTowards.z);
   backScene.add(grp);
+  /* THE PICKS RIDE THEIR OWN GROUP, a twin of the wall's. The wall's structure has a baked
+     twin in the authored world and hides under it; the four lettered tablets are the interface
+     and cannot be baked, so they must be independently keepable-alive. Same transform, so
+     every local position below means the same thing in either group. */
+  const pickGrp = new THREE.Group();
+  pickGrp.position.copy(grp.position);
+  pickGrp.quaternion.copy(grp.quaternion);
+  backScene.add(pickGrp);
 
   /* the structure: two posts, a rail and a shallow roof — small, and read at a glance */
   const frame = [];
@@ -5313,7 +5376,7 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
     const pz = W * 0.07;
     const root = new THREE.Group();
     root.position.set(px, py, pz);
-    grp.add(root);
+    pickGrp.add(root);
     const cord = new THREE.Mesh(new THREE.BoxGeometry(TW * 0.05, CORD, TW * 0.05),
       new THREE.MeshToonMaterial({ color: 0x3d3128, gradientMap: RAMP }));
     cord.position.y = -CORD / 2;
@@ -5350,7 +5413,7 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
     const hit = new THREE.Mesh(
       new THREE.BoxGeometry(TW + GAP * 0.9, hitH, TTH + TH * 0.55), hitMat);
     hit.position.set(px, py + CORD * 0.12 - hitH / 2, pz + TH * 0.2);
-    grp.add(hit);
+    pickGrp.add(hit);
     const el = worldPickEl(jp + ' \u2014 ' + en + ', ' + meta, () => pickWorldTile(sec, jp));
     /* READ THE REST VALUE, DO NOT RETYPE IT. Tweening back to a hand-written 0.361 — the sRGB
        component of 0x5c503c — left every hovered tablet permanently three times brighter than
@@ -5365,7 +5428,7 @@ function buildEmaWall(sec, place, faceTowards, W, HH) {
   });
   WORLD_L2[sec] = { picks };
   blockAdd(place.x, place.z, 300, 320);
-  return grp;
+  return { grp, pickGrp, picks };
 }
 function pickWorldTile(sec, jp) {
   if (busy || state !== 'sub' || subLevel !== 2) return;
@@ -5388,6 +5451,7 @@ function installPlace(key, idx, r) {
   if (r.eyeLift != null) DEST_SPECS[idx].eyeLift = r.eyeLift;
   if (r.marks) Object.assign(MARKS, r.marks);
   if (r.walk) WORLD_L3[key] = r.walk;
+  if (r.l4) WORLD_L4[key] = r.l4;
   if (r.title) WORLD_TITLE[key] = r.title;
   if (r.l2) WORLD_L2[key] = r.l2;
   if (r.ambient) AMBIENT.push(...r.ambient);
@@ -5395,21 +5459,150 @@ function installPlace(key, idx, r) {
   return r;
 }
 
-/* ---- REVIEW, built from places/review.js ---- */
-installPlace('REVIEW', 1, buildReview({
-  HOME_EYE, L3_REVIEW, RAMP, SECTION_ACCENT, addOutline, backRenderer, backScene, blockAdd,
-  buildEmaWall, destPlace, drawSign, groundAt, hengaku, instanced, outlineMaterial, standOff,
-  treeClaim, worldPickEl,
-}));
+/* ---- BUILDING THE PLACES, AND WHEN ----
+   THE PLACES ARE BUILT AGAINST THE HEIGHTFIELD THEY WILL STAND IN. They used to be built at
+   module evaluation, which reads the GENERATED terrain — and then the authored world arrived
+   with different ground. Measured at the six sites, the two fields disagree by -12 to +699
+   units: a pagoda sited on the authored ridge would have been built 699 units inside it, and
+   the study compound floated 71 up. So when the authored world is pending, the build waits for
+   it; `?generated` builds at evaluation exactly as before, which also keeps the places' tree
+   claims ahead of the generated planting.
 
-/* ---- STUDY, built from places/study.js ----
-   STEP ZERO ONLY: a stand-in massing at the pavilion's intended size, so `stand`, `eyeLift` and
-   the focus height can be measured against something before the building exists. */
-const STUDY_MASS = installPlace('STUDY', 0, buildStudy({
-  HOME_EYE, LAKE_Y, RAMP, SECTION_ACCENT, addOutline, backScene, blockAdd, destPlace, groundAt,
-  outlineMaterial, pickWorldTile, spec: DEST_SPECS[0], tiles: SUBTILES.STUDY, treeClaim,
-  worldPickEl,
-})).mass;
+   THE LIVE LAYER. The authored world replaces the generated one wholesale, and that replacement
+   was hiding the built places too — STUDY's whole compound, REVIEW's lettered tablets, every
+   moving part. A canvas texture and a sliding door cannot be baked into a .glb, so each place
+   now says what stays: `live: 'all'` keeps the place's world geometry (for places the .blend
+   does not model), a list keeps only those objects (REVIEW: the baked shrine is richer than the
+   analytic one, so only the level-four room stays live), nothing keeps the old behaviour.
+
+   THE CLAIMS. A live place standing in the authored world stands among authored props placed
+   with no knowledge of it. `claims: [{x, z, r}]` are the ground a place owns: authored meshes
+   whose footprint centres fall inside are hidden, and authored instanced sets have those
+   instances scaled to zero. The terrain itself and the sky are never touched. */
+const LIVE = new Set();
+const WORLD_CLAIMS = [];
+let STUDY_MASS = null;
+let PLACES_BUILT = false;
+function buildPlace(key, idx, build, ctx) {
+  const before = new Set(backScene.children);
+  const r = build(ctx);
+  const objs = backScene.children.filter((o) => !before.has(o));
+  if (r.live === 'all') objs.forEach((o) => LIVE.add(o));
+  else if (Array.isArray(r.live)) r.live.forEach((o) => LIVE.add(o));
+  /* a place with a baked costume hides its analytic one when the authored world is up; the
+     hidden list is ENV's own, so NAV.unloadEnv puts everything back exactly as before */
+  if (ENV.root && r.live !== 'all') {
+    objs.forEach((o) => {
+      if (!LIVE.has(o) && o.visible) { ENV.hidden.push(o); o.visible = false; }
+    });
+  }
+  if (r.claims) WORLD_CLAIMS.push(...r.claims);
+  return installPlace(key, idx, r);
+}
+/* WHAT THE AUTHORED WORLD SAYS IS THERE. A place built onto an authored area needs the area's
+   own geometry — where the gates actually stand, where the hall actually is — and reading it
+   from the loaded model is the only version that survives a re-bake. Names drive it, which is
+   why models/README.md insists on them. Empty results when no world is loaded: the caller's
+   analytic fallback is the answer then. */
+function authoredQuery() {
+  const mm = new THREE.Matrix4();
+  const c = new THREE.Vector3();
+  return {
+    ready: !!ENV.root,
+    instances(re) {
+      const out = [];
+      if (!ENV.root) return out;
+      ENV.root.updateMatrixWorld(true);
+      ENV.root.traverse((o) => {
+        if (!o.isInstancedMesh || !re.test(o.name)) return;
+        for (let i = 0; i < o.count; i++) {
+          o.getMatrixAt(i, mm);
+          if (mm.elements[0] === 0 && mm.elements[5] === 0) continue;
+          out.push({ name: o.name, x: mm.elements[12], y: mm.elements[13], z: mm.elements[14] });
+        }
+      });
+      return out;
+    },
+    meshes(re) {
+      const out = [];
+      if (!ENV.root) return out;
+      ENV.root.updateMatrixWorld(true);
+      ENV.root.traverse((o) => {
+        if (!o.isMesh || o.isInstancedMesh || !re.test(o.name)) return;
+        new THREE.Box3().setFromObject(o).getCenter(c);
+        out.push({ name: o.name, x: c.x, y: c.y, z: c.z });
+      });
+      return out;
+    },
+  };
+}
+function buildPlacesCore() {
+  if (PLACES_BUILT) return;
+  PLACES_BUILT = true;
+  /* ---- REVIEW, built from places/review.js ---- */
+  buildPlace('REVIEW', 1, buildReview, {
+    HOME_EYE, L3_REVIEW, RAMP, SECTION_ACCENT, addOutline, authored: authoredQuery(),
+    backRenderer, backScene, blockAdd,
+    buildEmaWall, destPlace, drawSign, groundAt, hengaku, instanced, outlineMaterial, standOff,
+    treeClaim, walkAct, worldPickEl,
+  });
+  /* ---- STUDY, built from places/study.js ---- */
+  STUDY_MASS = buildPlace('STUDY', 0, buildStudy, {
+    HOME_EYE, LAKE_Y, RAMP, SECTION_ACCENT, addOutline, backScene, blockAdd, destPlace, groundAt,
+    outlineMaterial, pickWorldTile, spec: DEST_SPECS[0], tiles: SUBTILES.STUDY, treeClaim,
+    worldPickEl,
+  }).mass;
+}
+/* the late path, for when the authored world decided the ground: install, then bring every
+   eval-time snapshot of the destinations up to date */
+function buildPlacesLate() {
+  buildPlacesCore();
+  refreshDests();
+  buildWorldMenus();
+  applyWorldClaims();
+}
+function applyWorldClaims() {
+  if (!ENV.root || !WORLD_CLAIMS.length) return;
+  /* a claim is a disc {x, z, r} or a rectangle {x, z, fx, fz, hf, hs} — centre, its own frame
+     (fx, fz the forward direction), half-extents along and across. The rectangle exists because
+     STUDY's compound stands 1,300 units from the authored festival's edge: a disc big enough to
+     cover the compound's corners swallowed festival stalls, and the compound is a rectangle. */
+  const inClaim = (x, z) => WORLD_CLAIMS.some((c) => {
+    const dx = x - c.x, dz = z - c.z;
+    if (c.r) return dx * dx + dz * dz < c.r * c.r;
+    const f = dx * c.fx + dz * c.fz, s = -dx * c.fz + dz * c.fx;
+    return Math.abs(f) < c.hf && Math.abs(s) < c.hs;
+  });
+  const keepName = /(^|[_\-.])(terrain|ground|landform|heightfield)([_\-.]|$)/i;
+  const mm = new THREE.Matrix4();
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  const ctr = new THREE.Vector3();
+  let meshesHidden = 0, instancesCleared = 0;
+  ENV.root.updateMatrixWorld(true);
+  ENV.root.traverse((o) => {
+    if (keepName.test(o.name) || ENV_SKY.test(o.name)) return;
+    if (o.isInstancedMesh) {
+      let touched = false;
+      for (let i = 0; i < o.count; i++) {
+        o.getMatrixAt(i, mm);
+        if (mm.elements[0] !== 0 && inClaim(mm.elements[12], mm.elements[14])) {
+          o.setMatrixAt(i, zero);
+          touched = true;
+          instancesCleared++;
+        }
+      }
+      if (touched) { o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere(); }
+    } else if (o.isMesh && o.visible) {
+      new THREE.Box3().setFromObject(o).getCenter(ctr);
+      if (inClaim(ctr.x, ctr.z)) { o.visible = false; meshesHidden++; }
+    }
+  });
+  if (meshesHidden + instancesCleared) {
+    console.log(`[claims] cleared ${meshesHidden} authored meshes, ${instancesCleared} instances`
+      + ` inside ${WORLD_CLAIMS.length} claims`);
+  }
+}
+if (!WORLD_PENDING) buildPlacesCore();
 
 /* ---- the woods ----
    Three species, each a merged multi-part model rather than a repeated primitive. A repeated
@@ -6209,6 +6402,22 @@ const DESTS = DEST_SPECS.map((d) => {
   return { ...d, focus, eye: standOff(focus, d.stand, d.eyeLift) };
 });
 const HOME_SUB = DESTS[0];
+/* WHEN THE PLACES BUILD LATE, THE SNAPSHOTS ABOVE ARE STALE. Each place rewrites its spec's
+   focus and eyeLift at install; a DESTS built before that carries place-markers as focuses and
+   default stand-offs as eyes. Re-derive every entry, then re-park the sub board where the
+   default destination's fresh numbers put it. */
+function refreshDests() {
+  DESTS.forEach((d, i) => {
+    const s = DEST_SPECS[i];
+    d.focus = s.focus || d.place;
+    d.eyeLift = s.eyeLift;
+    d.stand = s.stand;
+    d.eye = standOff(d.focus, s.stand, s.eyeLift);
+  });
+  placeSubDefault();
+  destEnv.position.copy(HOME_SUB.focus);
+  destEnv.lookAt(HOME_SUB.eye);
+}
 
 const subEl = document.createElement('div');
 subEl.className = 'plane-sub';
@@ -6354,6 +6563,7 @@ let active = 0, busy = false;
 /* a handle for headless verification: an arrival is a state change, and waiting a fixed number
    of milliseconds for one is guesswork the moment the frame rate moves */
 window.NAV = { get state() { return state; }, get busy() { return busy; },
+  get subLevel() { return subLevel; },
   dests: () => DESTS.map((d) => ({ b: d.bearing, place: d.place.toArray().map(Math.round), eye: d.eye.toArray().map(Math.round) })),
   /* the camera rig itself. `applyCamera` rewrites camera.position from this every frame, so
      setting the camera object directly does nothing — any question about what a point on a
@@ -7037,6 +7247,56 @@ function exitWalk() {
     fov: 42, roll: 0, duration: 1.6, ease: 'sine.inOut', overwrite: true,
   });
 }
+/* ================= level four: the room =================
+   THE FIRST ONE IN THE PROJECT, so this is the pattern the other five follow, the way review.js
+   set the place pattern. The page's share is deliberately small: a state (subLevel 4), a ride,
+   and a HUD line. Everything about the room itself — what it contains, how it lights, what the
+   doors do — belongs to the place, behind the four-function contract WORLD_L4 describes.
+
+   THE WAY DOWN IS THE PLACARD YOU ARE ALREADY BESIDE. The walk's click always meant "go to that
+   placard"; the placard you have walked to is the one place that click had no meaning, so that
+   is where the descent lives. No new control, no button — arriving at a thing and choosing it
+   again is what entering has always meant. */
+function walkAct(k) {
+  if (!walkSec || busy || subLevel !== 3) return;
+  if (k === walkAt && WORLD_L4[walkSec]) enterL4();
+  else walkGo(k);
+}
+let l4Sec = null;
+const l4Hud = document.getElementById('l4Hud');
+function enterL4() {
+  const w4 = WORLD_L4[walkSec];
+  if (!w4 || busy || subLevel !== 3) return;
+  subLevel = 4;
+  l4Sec = walkSec;
+  document.body.classList.remove('at-walk');
+  document.body.classList.add('at-l4');
+  /* the room dresses itself for the chosen queue and deck, and says what the HUD should read */
+  const info = w4.enter(walkTile, walkAt) || {};
+  l4Hud.querySelector('.wh-jp').textContent = info.jp || '';
+  l4Hud.querySelector('.wh-en').textContent = info.en || '';
+  l4Hud.querySelector('.wh-at').textContent = info.meta || '';
+  l4Hud.style.setProperty('--sec', SECTION_ACCENT[l4Sec][0]);
+  const eye = w4.eye(), tgt = w4.tgt();
+  /* the ride is paced by how much corridor is left: entering from the last placard and from the
+     first are different journeys and should take different times */
+  const travel = Math.hypot(eye.x - cam.px, eye.y - cam.py, eye.z - cam.pz);
+  gsap.to(cam, {
+    px: eye.x, py: eye.y, pz: eye.z, tx: tgt.x, ty: tgt.y, tz: tgt.z,
+    fov: 44, roll: 0, duration: THREE.MathUtils.clamp(travel / 1400, 1.6, 3.4),
+    ease: 'sine.inOut', overwrite: true,
+  });
+}
+function exitL4() {
+  if (subLevel !== 4) return;
+  const w4 = WORLD_L4[l4Sec];
+  subLevel = 3;
+  l4Sec = null;
+  document.body.classList.add('at-walk');
+  document.body.classList.remove('at-l4');
+  if (w4) w4.leave();
+  walkGo(walkAt, 1.8, false);
+}
 /* the raycast for the walk. The signs turn a little when you stop beside them, but nothing like
    enough to move the target out from under the cursor, so they are their own hit shape. */
 function walkPickAt(cx, cy) {
@@ -7049,20 +7309,21 @@ function walkPickAt(cx, cy) {
   return hit ? w.signs.findIndex((q) => q.face === hit.object) : null;
 }
 addEventListener('pointermove', (e) => {
-  if (!walkSec || busy) return;
+  if (!walkSec || busy || subLevel !== 3) return;
   const i = walkPickAt(e.clientX, e.clientY);
-  document.body.style.cursor = i !== null && i !== walkAt ? 'pointer' : '';
+  /* the placard you are beside is a control too now — it is the way down */
+  document.body.style.cursor = i !== null && (i !== walkAt || WORLD_L4[walkSec]) ? 'pointer' : '';
 });
 addEventListener('click', (e) => {
-  if (!walkSec || busy) return;
+  if (!walkSec || busy || subLevel !== 3) return;
   const i = walkPickAt(e.clientX, e.clientY);
-  if (i !== null) walkGo(i);
+  if (i !== null) walkAct(i);
 });
 walkHud.querySelectorAll('.wh-step').forEach((b) => {
-  b.addEventListener('click', () => { if (walkSec) walkGo(walkAt + (+b.dataset.d)); });
+  b.addEventListener('click', () => { if (walkSec && subLevel === 3) walkGo(walkAt + (+b.dataset.d)); });
 });
 addEventListener('wheel', (e) => {
-  if (!walkSec || busy) return;
+  if (!walkSec || busy || subLevel !== 3) return;
   walkGo(walkAt + (e.deltaY > 0 ? 1 : -1));
 }, { passive: true });
 
@@ -7176,7 +7437,9 @@ function showOnlyEnv(i, fade = true) {
     }
   });
 }
-buildWorldMenus();
+/* with the authored world pending, the menus wait for the places (buildPlacesLate builds
+   them); built now they would put legacy CSS tiles over every world level-two */
+if (!WORLD_PENDING) buildWorldMenus();
 showSubBoard(false);
 showOnlyEnv(-1, false);
 
@@ -7353,6 +7616,7 @@ function select(i) {
 }
 function goBack() {
   if (busy || state !== 'sub') return;
+  if (subLevel === 4) { exitL4(); return; }
   if (subLevel === 3) { exitL3(); return; }
   busy = true;
   state = 'moving';
@@ -7556,10 +7820,11 @@ addEventListener('keydown', (e) => {
     else if (e.key === 'ArrowUp') { setActive((active + ITEMS.length - 1) % ITEMS.length); itemEls[active].focus({ preventScroll: true }); }
     else if (e.key === 'Enter') select(active);
     else if (e.key >= '1' && e.key <= '6') { const i = +e.key - 1; setActive(i); itemEls[i].focus({ preventScroll: true }); }
-  } else if (state === 'sub' && walkSec) {
+  } else if (state === 'sub' && walkSec && subLevel === 3) {
     /* moving IS the scrollbar down here */
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') walkGo(walkAt + 1);
     else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') walkGo(walkAt - 1);
+    else if (e.key === 'Enter') walkAct(walkAt);
     else if (e.key === 'Escape' || e.key === 'Backspace') goBack();
   } else if (state === 'sub' && (e.key === 'Escape' || e.key === 'Backspace')) goBack();
 });
