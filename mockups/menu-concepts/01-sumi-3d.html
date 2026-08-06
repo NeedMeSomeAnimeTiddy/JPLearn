@@ -5745,26 +5745,45 @@ function pickWorldTile(sec, jp) {
   if (busy || state !== 'sub' || subLevel !== 2) return;
   if (WORLD_L3[sec] || (L3DATA[sec] && L3DATA[sec][jp])) enterL3(sec, jp);
 }
-/* ---- REVIEW, built from places/review.js ----
-   It has to run HERE and not later: the precinct registers its walk in `WORLD_L3`, its name-board
-   in `WORLD_TITLE`, its landmarks in `MARKS` and its approach coordinates in `PROBE`, and it
-   rewrites `DEST_SPECS[1].focus` — all of which the code below reads. */
-buildReview({
-  AMBIENT, DEST_SPECS, HOME_EYE, L3_REVIEW, MARKS, NO_REFLECT, PROBE, RAMP, SECTION_ACCENT,
-  WORLD_L3, WORLD_TITLE, addOutline, backRenderer, backScene, blockAdd, buildEmaWall, destPlace,
-  drawSign, groundAt, hengaku, instanced, outlineMaterial, standOff, treeClaim, worldPickEl,
-});
+/* ---- INSTALLING A PLACE ----
+   A place used to register itself by writing into these registries as a side effect of being
+   built, which is why both call sites carried a note that they had to run HERE and not later:
+   the write and the read were separated by a thousand lines and nothing but comment discipline
+   connected them. Now each build* returns a description of itself and this puts it away, so the
+   ordering requirement is one function long and visible at the point it matters.
+
+   It is also the whole interface a new place has to satisfy. Anything a sixth section needs to
+   announce about itself — where you stand to look at it, what its landmarks are called, what its
+   walk is, what its four picks are — is a key here, and if it needs a key that does not exist
+   yet, that is a deliberate decision rather than another line reaching into a global. */
+function installPlace(key, idx, r) {
+  if (r.probe) PROBE[key] = r.probe;
+  if (r.focus) DEST_SPECS[idx].focus = r.focus;
+  if (r.eyeLift != null) DEST_SPECS[idx].eyeLift = r.eyeLift;
+  if (r.marks) Object.assign(MARKS, r.marks);
+  if (r.walk) WORLD_L3[key] = r.walk;
+  if (r.title) WORLD_TITLE[key] = r.title;
+  if (r.l2) WORLD_L2[key] = r.l2;
+  if (r.ambient) AMBIENT.push(...r.ambient);
+  if (r.noReflect) NO_REFLECT.push(...r.noReflect);
+  return r;
+}
+
+/* ---- REVIEW, built from places/review.js ---- */
+installPlace('REVIEW', 1, buildReview({
+  HOME_EYE, L3_REVIEW, RAMP, SECTION_ACCENT, addOutline, backRenderer, backScene, blockAdd,
+  buildEmaWall, destPlace, drawSign, groundAt, hengaku, instanced, outlineMaterial, standOff,
+  treeClaim, worldPickEl,
+}));
 
 /* ---- STUDY, built from places/study.js ----
    STEP ZERO ONLY: a stand-in massing at the pavilion's intended size, so `stand`, `eyeLift` and
-   the focus height can be measured against something before the building exists. It registers
-   its approach coordinates in `PROBE`, its parts in `MARKS`, and rewrites `DEST_SPECS[0].focus`,
-   so like the shrine it has to run above where those are read. */
-const STUDY_MASS = buildStudy({
-  DEST_SPECS, HOME_EYE, LAKE_Y, MARKS, PROBE, RAMP, SECTION_ACCENT, SUBTILES, WORLD_L2,
-  addOutline, backScene, blockAdd, destPlace, groundAt, outlineMaterial, pickWorldTile,
-  treeClaim, worldPickEl,
-});
+   the focus height can be measured against something before the building exists. */
+const STUDY_MASS = installPlace('STUDY', 0, buildStudy({
+  HOME_EYE, LAKE_Y, RAMP, SECTION_ACCENT, addOutline, backScene, blockAdd, destPlace, groundAt,
+  outlineMaterial, pickWorldTile, spec: DEST_SPECS[0], tiles: SUBTILES.STUDY, treeClaim,
+  worldPickEl,
+})).mass;
 
 /* ---- the woods ----
    Three species, each a merged multi-part model rather than a repeated primitive. A repeated

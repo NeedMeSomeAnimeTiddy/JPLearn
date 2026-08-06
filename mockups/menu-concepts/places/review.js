@@ -28,11 +28,20 @@ import {
 
 export function buildReview(ctx) {
   const {
-    AMBIENT, DEST_SPECS, HOME_EYE, L3_REVIEW, MARKS, NO_REFLECT, PROBE, RAMP, SECTION_ACCENT,
-    WORLD_L3, WORLD_TITLE, addOutline, backRenderer, backScene, blockAdd, buildEmaWall,
-    destPlace, drawSign, groundAt, hengaku, instanced, outlineMaterial, standOff, treeClaim,
-    worldPickEl,
+    HOME_EYE, L3_REVIEW, RAMP, SECTION_ACCENT, addOutline, backRenderer, backScene, blockAdd,
+    buildEmaWall, destPlace, drawSign, groundAt, hengaku, instanced, outlineMaterial, standOff,
+    treeClaim, worldPickEl,
   } = ctx;
+  /* WHAT THIS PLACE REGISTERS, GATHERED RATHER THAN SCATTERED. These used to be writes straight
+     into the page's registries, which is what forced the call site to sit at an exact point in the
+     module — the comment there read "it has to run HERE and not later". They are collected here
+     and handed back instead, so installing them is the caller's decision and its timing is visible
+     in the caller. */
+  const _marks = {};
+  const _ambient = [];
+  const _noReflect = [];
+  let _probe = null, _focus = null, _walk = null, _title = null;
+
 
 /* ================= REVIEW: 神社 — the shrine precinct =================
    A FULL AREA, AND DELIBERATELY OUT OF THE MENU'S SIGHT. At bearing 26° it sat inside the home
@@ -71,7 +80,7 @@ export function buildReview(ctx) {
     const t = at3(f, sd);
     o.lookAt(t.x, o.position.y, t.z);
   };
-  PROBE.REVIEW = at3;
+  _probe = at3;
 
   /* ---- the paving, and the courtyard let into it ----
      A 360-wide strip is a path, and a path is not somewhere anything can stand: the ema wall had
@@ -214,7 +223,7 @@ export function buildReview(ctx) {
      what makes a gate read as something you stand under rather than something you look at. It
      cannot go much higher than this — the wall is close and low, and every degree of up-pitch
      drives it toward the bottom edge twice as fast as it lifts the gate. */
-  DEST_SPECS[1].focus = at3(-430, 18, GATE_H * 0.46);
+  _focus = at3(-430, 18, GATE_H * 0.46);
 
   /* ---- 千本鳥居 — the tunnel ----
      UNIFORM NOW, AND THAT IS NOT A STYLE CHOICE. Each gate smaller and nearer than the last was
@@ -380,7 +389,7 @@ export function buildReview(ctx) {
       el.classList.add('walk-pick');
       L3_SIGNS.push({ root, flip, hold, face, canvas, tex, el, idx: k, f: f2, sd });
     }
-    WORLD_L3.REVIEW = {
+    _walk = {
       signs: L3_SIGNS,
       rows: L3_SLOTS,
       /* the decks never change, only the numbers the chosen queue puts against them */
@@ -447,7 +456,7 @@ export function buildReview(ctx) {
       /* and they are lettered before anyone has ever been down here */
       tgtAt: (s2) => { const v = at3(s2.f + 620, s2.sd * 0.34); v.y += 150; return v; },
     };
-    WORLD_L3.REVIEW.letter('総復習', false);
+    _walk.letter('総復習', false);
   }
 
   /* AND THE WALL. Small, and standing much nearer the camera than the gate does — that is the
@@ -458,7 +467,7 @@ export function buildReview(ctx) {
      It is aimed at the camera's actual standing point, not at HOME_EYE. The eye is derived from
      the focus, so it has to be computed here rather than guessed — pointing the wall at the
      wrong place is what had it presenting its back. */
-  const eye = standOff(DEST_SPECS[1].focus, 855, 182);
+  const eye = standOff(_focus, 855, 182);
   /* FURTHER DOWN THE APPROACH THAN IT LOOKS. Aiming the camera at the gate swings anything
      standing beside the eye hard to the left, and at 490 units from a camera 855 short of its
      focus the wall was both the biggest thing in the frame and cut off by its edge. Moved along
@@ -485,7 +494,7 @@ export function buildReview(ctx) {
      was put there for people walking past it. 0.62 rad is about 36°, enough to read as addressed
      to the path while still showing the tablets nearly full width (cos 36° = 0.81). */
   wallGrp.rotateY(0.62);
-  MARKS.wall = wallGrp;
+  _marks.wall = wallGrp;
 
   /* 手水舎 — the water pavilion, facing the wall across the court. A courtyard with one thing in
      it is a yard with a thing in it; the second structure is what makes the space between them
@@ -512,7 +521,7 @@ export function buildReview(ctx) {
     backScene.add(ch);
     addOutline(ch, 3.2);
     CHOZUYA = ch;
-    MARKS.chozuya = ch;
+    _marks.chozuya = ch;
   }
 
   /* ---- 狛犬 — the guardians, on the court in front of the pavilion ----
@@ -544,7 +553,7 @@ export function buildReview(ctx) {
       facing(m, -3000, sd);
       backScene.add(m);
       addOutline(m, 3.2);
-      if (sd > 0) MARKS.komainu = m;
+      if (sd > 0) _marks.komainu = m;
     });
   }
 
@@ -584,7 +593,7 @@ export function buildReview(ctx) {
     m.rotation.y = 2.1;
     backScene.add(m);
     addOutline(m, 3.2);
-    MARKS.tree = m;
+    _marks.tree = m;
     /* claim it in the global wood registry too, or the valley's own planting grows through it */
     treeClaim(m.position.x, m.position.z, 480);
   }
@@ -608,7 +617,7 @@ export function buildReview(ctx) {
       m.position.set(cx, cy + 1.5, cz);
       m.scale.setScalar(0.01);
       backScene.add(m);
-      NO_REFLECT.push(m);
+      _noReflect.push(m);
       return m;
     });
     const dropGeo = new THREE.IcosahedronGeometry(3.4, 0);
@@ -618,7 +627,7 @@ export function buildReview(ctx) {
       m.position.set(cx, cy, cz);
       m.scale.setScalar(0);
       backScene.add(m);
-      NO_REFLECT.push(m);
+      _noReflect.push(m);
       return m;
     });
     const hitMat2 = new THREE.MeshBasicMaterial();
@@ -626,7 +635,7 @@ export function buildReview(ctx) {
     const hit = new THREE.Mesh(new THREE.BoxGeometry(120, 86, 116), hitMat2);
     hit.position.set(cx, cy - 18, cz);
     backScene.add(hit);
-    AMBIENT.push({
+    _ambient.push({
       hit,
       /* three rings leaving at a stagger, and a scatter of drops thrown up and pulled back —
          a stone into water, which is what a ladle sounds like when you cannot hear it */
@@ -672,7 +681,7 @@ export function buildReview(ctx) {
     b.rotation.y = gate.rotation.y;
     b.translateZ(GATE_H * 0.055);
     backScene.add(b);
-    WORLD_TITLE.REVIEW = b;
+    _title = b;
   }
 
   /* ---- planting ----
@@ -815,7 +824,7 @@ export function buildReview(ctx) {
       [0x37502b, 430, 730, 0.85, 1.7, 380, 28, 340, 1.0], [0x556f3c, 470, 730, 0.9, 1.8, 380, 28, 340, 1.0]]
       .forEach(([c, sLo, sHi, kLo, kHi, n, cl, rad, sep], t) => {
         const m = new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP, flatShading: true });
-        NO_REFLECT.push(instanced(shrubGeo, m, n, (i) => {
+        _noReflect.push(instanced(shrubGeo, m, n, (i) => {
           const k = kLo + hash01(i, 41 + t) * (kHi - kLo);
           const q = grow(i, t * 17, cl, -2000, 8700, sLo, sHi, rad, 56 * k * sep, 0);
           if (!q) return null;
@@ -1059,4 +1068,9 @@ function shrineHallGeo(W, D, H) {
   g = new THREE.BoxGeometry(W * 0.06, H * 0.07, D * 1.5); g.translate(0, H * 0.96, 0); add(g, 0x332c25);
   return mergeParts(parts);
 }
+
+  return {
+    probe: _probe, focus: _focus, walk: _walk, title: _title,
+    marks: _marks, ambient: _ambient, noReflect: _noReflect,
+  };
 }

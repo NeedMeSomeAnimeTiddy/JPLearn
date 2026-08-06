@@ -19,10 +19,17 @@ import { outlineGeom } from './toolkit.js';
 
 export function buildStudy(ctx) {
   const {
-    DEST_SPECS, HOME_EYE, LAKE_Y, MARKS, PROBE, RAMP, SECTION_ACCENT, SUBTILES, WORLD_L2,
-    addOutline, backScene, blockAdd, destPlace, groundAt, outlineMaterial, pickWorldTile,
-    treeClaim, worldPickEl,
+    HOME_EYE, LAKE_Y, RAMP, SECTION_ACCENT, addOutline, backScene, blockAdd, destPlace, groundAt,
+    outlineMaterial, pickWorldTile, spec, treeClaim, worldPickEl,
   } = ctx;
+  /* WHAT THIS PLACE REGISTERS, GATHERED RATHER THAN SCATTERED. These used to be writes straight
+     into the page's registries, which is what forced the call site to sit at an exact point in the
+     module — the comment there read "it has to run HERE and not later". They are collected here
+     and handed back instead, so installing them is the caller's decision and its timing is visible
+     in the caller. */
+  const _marks = {};
+  let _probe = null, _focus = null, _eyeLift = null, _l2 = null;
+
 
   /* the invisible proxy the raycast actually tests. `buildEmaWall` keeps its own copy of this
      because it was written before there was a second place; one each is cheaper than another
@@ -33,7 +40,7 @@ export function buildStudy(ctx) {
   /* ---- the site, and its own coordinates ----
      f down the axis away from home, sd across it, positive to the right. The bearing is READ from
      the spec rather than repeated here — written out twice it is two numbers kept equal by hand. */
-  const SPEC = DEST_SPECS[0];
+  const SPEC = spec;
   const base = destPlace(SPEC.bearing, SPEC.dist, 0);
   const fwd = new THREE.Vector3().copy(base).sub(HOME_EYE).setY(0).normalize();
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
@@ -42,7 +49,7 @@ export function buildStudy(ctx) {
     v.y = groundAt(v.x, v.z) + lift;
     return v;
   };
-  PROBE.STUDY = at3;
+  _probe = at3;
 
   /* ---- the compound ----
      The hall sits at the middle with a garden on each face, so the plan is a square of squares and
@@ -112,7 +119,7 @@ export function buildStudy(ctx) {
     m.name = name;
     grp.add(m);
     addOutline(m, px);
-    MARKS['study-' + name] = m;
+    _marks['study-' + name] = m;
     return m;
   }
 
@@ -176,7 +183,7 @@ export function buildStudy(ctx) {
     m.name = 'hall-roof';
     grp.add(m);
     addOutline(m, 3.5);
-    MARKS['study-hall-roof'] = m;
+    _marks['study-hall-roof'] = m;
   }
 
   /* ================= STEP THREE: the four gardens =================
@@ -351,7 +358,7 @@ export function buildStudy(ctx) {
         m.name = 'bridge' + i;
         grp.add(m);
         addOutline(m, 2.9);
-        if (i === Math.floor(N / 2)) MARKS['study-bridge'] = m;
+        if (i === Math.floor(N / 2)) _marks['study-bridge'] = m;
       }
       /* the rail posts, which is what stops an arch reading as a ramp. BOTH SIDES: the first pass
          put them on one edge only and the bridge read as a ramp with a fence beside it. */
@@ -400,7 +407,7 @@ export function buildStudy(ctx) {
      interaction — in a garden you do not survey four quarters and choose one, you stand near the
      entrance and choose a way to go. */
   const ACC = SECTION_ACCENT.STUDY[0];
-  const tiles = SUBTILES.STUDY;
+  const tiles = ctx.tiles;
   /* the four, in the order the decks are declared, each aimed at the garden it opens onto */
   const Q = [['kana', -420, 0xd9a8b4, '東'], ['kanji', -140, WATER, '北'],
     ['goi', 140, MAPLE, '西'], ['bunpou', 420, SAND, '南']];
@@ -493,7 +500,7 @@ export function buildStudy(ctx) {
     const body = new THREE.Mesh(bodyG, mat);
     body.name = 'fuda-' + name;
     root.add(body);
-    MARKS['study-fuda-' + name] = body;
+    _marks['study-fuda-' + name] = body;
     {
       const o = new THREE.Mesh(outlineGeom(bodyG), outlineMaterial(2.6));
       o.frustumCulled = false;
@@ -523,7 +530,7 @@ export function buildStudy(ctx) {
       emRest: faceM.material.emissive.clone(),
       emHot: faceM.material.emissive.clone().multiplyScalar(1.8) };
   });
-  WORLD_L2.STUDY = { picks };
+  _l2 = { picks };
 
   /* ---- 前庭 — the entrance court ----
      THE LARGEST THING IN THE ARRIVAL SHOT AND IT WAS BARE. The court is 1,400 deep because the
@@ -572,7 +579,7 @@ export function buildStudy(ctx) {
     });
   }
 
-  MARKS['study'] = grp;
+  _marks['study'] = grp;
   blockAdd(foot.x, foot.z, Math.max(HALF_S, (F_FAR - F_NEAR) / 2) + 280,
     360 + (TOP - groundAt(foot.x, foot.z)));
 
@@ -602,19 +609,22 @@ export function buildStudy(ctx) {
   const EYE_H = 135;                  /* how far the eye rides above the court's own floor */
   const focus = at3(PICK_F, 0);
   focus.y = TOP + 130;
-  DEST_SPECS[0].focus = focus;
+  _focus = focus;
   {
     /* the standing point, derived the same way `standOff` derives it */
     const v = focus.clone().sub(HOME_EYE).setY(0);
     const len = v.length();
     const e = v.multiplyScalar(Math.max(len - SPEC.stand, 400) / len).add(HOME_EYE);
-    SPEC.eyeLift = (TOP + EYE_H) - Math.max(groundAt(e.x, e.z), LAKE_Y);
+    _eyeLift = (TOP + EYE_H) - Math.max(groundAt(e.x, e.z), LAKE_Y);
   }
 
-  ctx.STUDY_MASS = {
+  const mass = {
     bearing: SPEC.bearing, dist: SPEC.dist, stand: SPEC.stand, flight: SPEC.dist - SPEC.stand,
     SITE, TOP: Math.round(TOP), F_NEAR, F_FAR, HALF_S, PICK_F, GATE_X,
     ridge: Math.round(124 + HALL.wall + HALL.roof), quarters: Q.map((q) => q[0]),
   };
-  return ctx.STUDY_MASS;
+  return {
+    probe: _probe, focus: _focus, eyeLift: _eyeLift, l2: _l2,
+    marks: _marks, mass,
+  };
 }
