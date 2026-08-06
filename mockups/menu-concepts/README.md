@@ -10,10 +10,13 @@ git history if the comparison is ever wanted again.
 ## Viewing
 
 ```bash
-python -m http.server 5230 --directory mockups/menu-concepts
+python mockups/menu-concepts/serve.py 5230
 ```
 
-Then open http://localhost:5230 (or use the `menu-concepts` entry in `.claude/launch.json`).
+Then open http://localhost:5230 (or use the `menu-concepts` entry in `.claude/launch.json`, which
+runs exactly this). Not `python -m http.server`: `serve.py` is the same thing with `no-store` on
+every response, because a cached copy of one module against a fresh copy of another half-loads the
+page in a way that looks like a bug in whatever you were working on.
 
 ## The concept
 

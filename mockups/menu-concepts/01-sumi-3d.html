@@ -1577,7 +1577,26 @@ const matInk = new THREE.ShaderMaterial({
          crust. The inverted hulls did this with their shedAt and it was right (NO BACKTICKS IN HERE:
          this shader is a template literal, and that is the fourth time) — a line is a drawing
          decision, and past a certain distance the drawing does not have that line in it. */
-      float shed = mix( 1.0, 0.30, smoothstep( 9000.0, 30000.0, far ) );
+      /* 0.30 WAS TOO MUCH, and the symptom was not "the far line is faint" — it was "some things
+         have outlines and some do not", which is what a four-to-one strength difference inside one
+         frame actually looks like. Measured as the difference between the frame with the pass and
+         without it, by band:
+
+             shed    far ridge   meadow   near      near/far
+             0.30      12.8       35.3     50.3      3.92x
+             0.48      15.6       37.1     50.5      3.25x
+             0.62      17.9       38.7     50.7      2.83x
+             0.78      20.5       40.5     50.9      2.48x
+
+         The lines were never missing — the pixel count barely moves across that sweep — they were
+         drawn at a quarter strength against a background that had also gone pale, and the eye
+         calls that absent.
+         Note how little the far number moves for how much the floor moves: shed is not the only
+         thing attenuating it. The line also takes the distance fog a few lines above, which is
+         deliberate and stays — an unfogged line on a mountain that has dissolved into haze reads
+         as a crack in the image. 0.62 buys back 40% of the far line and still sheds a third of it
+         at the horizon, which is what the crawling-crust problem needed. */
+      float shed = mix( 1.0, 0.62, smoothstep( 9000.0, 30000.0, far ) );
       /* AND THE NEAR LINE IS THE CONFIDENT ONE. This is what the distance-scaled sample cross was
          trying to be: the near edge of a thing is a firm stroke, the far edge a hairline. Done on
          the alpha it costs no width, so the line stays one pixel of decision and simply presses
