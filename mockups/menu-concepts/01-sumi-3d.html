@@ -2174,7 +2174,16 @@ function landformMaterial(o) {
      position along the light and reads a noise texture, which assumes the shadow lands near
      y = 0, so on a cone rising seven thousand units the blob smears up the flank as a stain
      belonging to no cloud in the sky */
-  m.userData.over = { uCloudAmt: { value: 0.06 } };
+  /* AND NO RIM. The rim term brightens a surface as it turns edge-on to the camera, which is what
+     keeps the near trees and the props off black. The ground does exactly that where it rises to
+     meet Fuji's flank — it runs almost edge-on along the whole junction — so the rim fires along
+     that line and draws a lit seam across the ground at one elevation, read from the front as the
+     ground changing colour just as it reaches the mountain. Measured across the junction with the
+     albedo held flat, the line ran +25.2 luminance above its surroundings with the rim on and
+     +12.8 with it off: half of it was this, and the other half is the slope itself turning toward
+     a very low sun, which is not a defect. Landforms are large and read by their silhouette
+     against the sky, so they lose nothing here; everything else keeps its rim. */
+  m.userData.over = { uCloudAmt: { value: 0.06 }, uRimAmt: { value: 0 } };
   return cloudy(m);
 }
 
