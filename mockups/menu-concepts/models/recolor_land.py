@@ -32,18 +32,37 @@ hills read brighter than the mountain.
 """
 import bpy
 import json
+import sys
 from mathutils import Vector
 
 # ---- the one ramp, in scene-linear RGB, as (height, colour) stops ----
 # field   the terrain's own measured colour below Z 800, so the ramp starts where the ground is
 # rock    the same luminance desaturated and warmed: a change of material, not a change of light
 # snow    well below the 0.767 the author had; a cap that out-shines the dawn sky reads as a lamp
+# THE RAMP DARKENS AS IT CLIMBS, and the first version of it did not — which is why the land came
+# back bright. The shader this replaced had a separate height-dimming term, MTN_LEVEL, taking the
+# land to 0.48 of the field colour above y 2,600; moving the paint into the model dropped it, so
+# every mountain came out at roughly the value of the meadow and the whole range went up about
+# twenty luminance.
+# The level is measured rather than guessed: with the mountains on a plain vertex-colour material
+# their material.color scales albedo exactly the way these stops do, so sweeping it in the browser
+# reads the answer straight off the frame —
+#     x1.00   Fuji 124   ridge 115
+#     x0.80        114         111
+#     x0.65        106         108
+#     x0.52         98         105
+#     x0.42         92         103
+# 0.52, applied to every stop ABOVE the valley. The first stop keeps the field colour exactly, so
+# the ramp leaves the meadow at the value the meadow already is and there is no step where the
+# two meet; the darkening then happens across 900 to 2,600, which is the fade from ground to
+# mountain rather than a line.
+LEVEL = 0.52
 STOPS = [
     (900.0,  Vector((0.195, 0.253, 0.083))),
-    (2600.0, Vector((0.230, 0.232, 0.196))),
-    (4300.0, Vector((0.286, 0.272, 0.248))),
-    (5200.0, Vector((0.620, 0.606, 0.578))),
-    (7400.0, Vector((0.680, 0.668, 0.646))),
+    (2600.0, Vector((0.230, 0.232, 0.196)) * LEVEL),
+    (4300.0, Vector((0.286, 0.272, 0.248)) * LEVEL),
+    (5200.0, Vector((0.620, 0.606, 0.578)) * LEVEL),
+    (7400.0, Vector((0.680, 0.668, 0.646)) * LEVEL),
 ]
 
 FUJI = 'Landscape_Props_Fuji_001'
@@ -130,7 +149,20 @@ for o in objs['fuji'] + objs['ranges']:
     key = 'fuji' if o.name == FUJI else 'ranges'
     touched[key] += repaint(o, keep_below=False)
 
+# ---- optionally make it permanent ----
+# Off by default: this normally runs in the same background Blender as the export and only alters
+# the in-memory data, so an open session is never at risk. `-- --save` writes the .blend, which is
+# a deliberate act and wants the file closed in the UI first — Blender keeps the previous version
+# as environment.blend1 either way.
+saved = None
+argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+if '--save' in argv:
+    bpy.ops.wm.save_mainfile()
+    saved = bpy.data.filepath
+
 print('RECOLOURED ' + json.dumps({
     'corners': touched,
     'objects': {k: len(v) for k, v in objs.items()},
+    'level': LEVEL,
+    'saved': saved,
 }))
