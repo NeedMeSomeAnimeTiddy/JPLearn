@@ -1429,7 +1429,171 @@ function sizePost() {
   rtBrightB.setSize(w >> 1, h >> 1);
   matBlur.uniforms.texel.value.set(2 / w, 2 / h);
   POST.aspect.value = w / h;
+  sizeInk();
 }
+/* ================= INK =================
+   OUTLINES IN SCREEN SPACE, AND THE INVERTED HULLS ARE GONE.
+   The hull worked by drawing every mesh a second time, back faces only, nudged outward. Three
+   things were wrong with it and all three were measured rather than argued:
+     - COST. Twenty thousand instanced trees each carried a full duplicate of their geometry:
+       2.4M of a 5.2M frame was hull, and dropping it is what took the trees' outlines away.
+     - IT INKS THE WRONG THINGS. A hull inks every place a surface turns away from the eye, not
+       just the silhouette — so a terrain mesh with hundreds of internal crest lines got hundreds
+       of black lines, close enough together at distance to read as a solid fill. That is what
+       made the far mountains black.
+     - IT CANNOT INK A FLAT SHEET AT ALL. On a ground plane or a pond the back faces are in the
+       same plane as the front ones and the result is a lid, which is what turned the festival
+       floor and the garden pond black.
+   A screen-space pass has none of those failure modes. It costs one prepass with a trivial
+   shader and one full-screen quad regardless of how many objects are in the world, it draws a
+   line exactly where two SURFACES meet in the image, and it has no geometry to lay over anything.
+   It is also what cel-shaded games actually do.
+   ONE PREPASS, NOT TWO. View-space normal in RGB and view distance in A, so silhouettes (a jump
+   in depth) and creases (a jump in normal) both come out of a single render.
+   https://threejs.org/examples/webgl_postprocessing_sobel.html */
+const INK = {
+  on: true,
+  width: { value: 1.35 },        /* half-width of the sample cross, in pixels */
+  depthT: { value: 0.018 },      /* relative depth jump that counts as a silhouette */
+  normalT: { value: 0.22 },      /* 1 - dot(n, n') that counts as a crease */
+  amount: { value: 0.85 },
+  color: { value: new THREE.Color(0x121319) },
+  texel: { value: new THREE.Vector2(1 / 1440, 1 / 810) },
+};
+const rtND = new THREE.WebGLRenderTarget(1, 1, { type: THREE.FloatType, depthBuffer: true });
+rtND.texture.minFilter = rtND.texture.magFilter = THREE.NearestFilter;
+rtND.texture.generateMipmaps = false;
+/* WHAT DOES NOT GET INKED: the sky, the clouds and the sun. Leaving them out of the prepass is
+   not the same as not inking them — it is BETTER, because then everything in front of them has a
+   depth jump to nothing and gets a clean silhouette against the sky, which is the one line in a
+   cel-shaded landscape that has to read. */
+const INK_SKIP = /^(sky-|sun-)/;
+const matPrepass = new THREE.ShaderMaterial({
+  vertexShader: `
+    varying vec3 vN;
+    varying float vD;
+    void main() {
+      vec4 lp = vec4( position, 1.0 );
+      vec3 ln = normal;
+      #ifdef USE_INSTANCING
+        lp = instanceMatrix * lp;
+        ln = normalize( mat3( instanceMatrix ) * ln );
+      #endif
+      vec4 mv = modelViewMatrix * lp;
+      vD = - mv.z;
+      vN = normalize( normalMatrix * ln );
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying vec3 vN;
+    varying float vD;
+    void main() { gl_FragColor = vec4( normalize( vN ) * 0.5 + 0.5, vD ); }`,
+});
+const matInk = new THREE.ShaderMaterial({
+  uniforms: {
+    tND: { value: rtND.texture },
+    texel: INK.texel,
+    uWidth: INK.width,
+    uDepthT: INK.depthT,
+    uNormalT: INK.normalT,
+    uAmount: INK.amount,
+    uColor: INK.color,
+    fogColor: FOG_U.fogColor,
+    fogDensity: FOG_U.fogDensity,
+    /* NO `CLOUD` REFERENCE HERE. That is the seventh temporal-dead-zone trap in this file: the
+       ink pass is declared beside the other screen-space passes near the top, CLOUD is declared
+       with the sky several hundred lines below it, and a const read from inside its own dead zone
+       THROWS rather than reading undefined — taking the whole module with it. The line takes the
+       distance fog, which is declared above; it does not need the valley mist. */
+  },
+  vertexShader: QUAD_VS,
+  fragmentShader: `
+    uniform sampler2D tND;
+    uniform vec2 texel;
+    uniform float uWidth, uDepthT, uNormalT, uAmount, fogDensity;
+    uniform vec3 uColor, fogColor;
+    varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D( tND, vUv );
+      vec3 n0 = c.xyz * 2.0 - 1.0;
+      float d0 = c.w;
+      vec2 o = texel * uWidth;
+      float dJump = 0.0, nJump = 0.0, dRef = d0;
+      for ( int i = 0; i < 4; i++ ) {
+        vec2 off = i == 0 ? vec2( o.x, 0.0 ) : i == 1 ? vec2( - o.x, 0.0 )
+                 : i == 2 ? vec2( 0.0, o.y ) : vec2( 0.0, - o.y );
+        vec4 s = texture2D( tND, vUv + off );
+        dJump = max( dJump, abs( s.w - d0 ) );
+        dRef = max( dRef, s.w );
+        nJump = max( nJump, 1.0 - dot( normalize( s.xyz * 2.0 - 1.0 ), normalize( n0 ) ) );
+      }
+      /* RELATIVE TO DEPTH, or every distant object is one solid edge: an absolute jump of 200
+         units is a cliff at 2,000 and nothing at 40,000. */
+      float rel = dJump / max( dRef, 1.0 );
+      /* AND RELAXED ON GRAZING SURFACES. A ground plane seen almost edge-on changes depth by
+         hundreds of units from one pixel to the next while being perfectly flat — without this
+         the whole meadow comes out as solid ink. n0.z is how square-on the surface is. */
+      float graze = clamp( abs( normalize( n0 ).z ), 0.06, 1.0 );
+      float dEdge = smoothstep( uDepthT / graze, uDepthT * 2.6 / graze, rel );
+      float nEdge = smoothstep( uNormalT, uNormalT + 0.30, nJump );
+      /* the crease line only where there is no silhouette, so a silhouette does not get drawn
+         twice at different strengths */
+      float e = max( dEdge, nEdge * ( 1.0 - dEdge * 0.5 ) );
+      if ( e <= 0.001 ) discard;
+      /* THE SAME HAZE EVERY SURFACE TAKES. An unfogged line stays jet black against a mountain
+         that has dissolved into the fog and reads as a crack in the image. */
+      float far = max( d0, dRef );
+      float f = 1.0 - exp( - fogDensity * fogDensity * far * far );
+      vec3 col = mix( uColor, fogColor, clamp( f, 0.0, 1.0 ) );
+      /* AND IT SHEDS. A forest at fifteen thousand units has more silhouette edges than it has
+         pixels, and inking all of them at full strength turns the far treeline into a crawling
+         crust. The inverted hulls did this with their shedAt and it was right (NO BACKTICKS IN HERE:
+         this shader is a template literal, and that is the fourth time) — a line is a drawing
+         decision, and past a certain distance the drawing does not have that line in it. */
+      float shed = mix( 1.0, 0.30, smoothstep( 9000.0, 30000.0, far ) );
+      gl_FragColor = vec4( col, e * uAmount * shed );
+    }`,
+  transparent: true,
+  depthTest: false,
+  depthWrite: false,
+});
+const INK_WAS = [];
+function renderInk() {
+  if (!INK.on) return false;
+  const hide = [];
+  backScene.traverse((o) => {
+    if ((o.isMesh || o.isInstancedMesh) && o.visible && INK_SKIP.test(o.name)) hide.push(o);
+  });
+  INK_WAS.length = 0;
+  hide.forEach((o, i) => { INK_WAS[i] = o.visible; o.visible = false; });
+  const prevClear = backRenderer.getClearAlpha();
+  backScene.overrideMaterial = matPrepass;
+  backRenderer.setRenderTarget(rtND);
+  backRenderer.setClearColor(0x000000, 0);
+  backRenderer.clear();
+  backRenderer.render(backScene, camera);
+  backRenderer.setRenderTarget(null);
+  backScene.overrideMaterial = null;
+  backRenderer.setClearAlpha(prevClear);
+  hide.forEach((o, i) => { o.visible = INK_WAS[i]; });
+  /* AND autoClear OFF FOR THE OVERLAY. render() clears the target it is given unless told not
+     to, so blitting the ink quad to the canvas wiped the frame that had just been drawn on it
+     and left a line drawing on an empty background. Every other blit in this file goes INTO a
+     target it means to overwrite; this is the only one that composites onto something. */
+  const prevAuto = backRenderer.autoClear;
+  backRenderer.autoClear = false;
+  blit(matInk, null);
+  backRenderer.autoClear = prevAuto;
+  return true;
+}
+function sizeInk() {
+  const dpr = Math.min(devicePixelRatio, 2);
+  const w = Math.max(1, Math.floor(W() * dpr));
+  const h = Math.max(1, Math.floor(H() * dpr));
+  rtND.setSize(w, h);
+  INK.texel.value.set(1 / w, 1 / h);
+}
+
 /* where the sun is ON SCREEN, which is the one thing every pass here needs and the one thing
    that cannot be a constant */
 function updateSunUv() {
@@ -1833,6 +1997,14 @@ const CLOUD = {
      valley gives 1-exp(-0.33*amt*8000). At the first value that came out 81% opaque and the
      reflection had vanished; this lands near 30%. */
   uMistAmt: { value: 0.00013 },
+  /* THE LIT EDGE. Every cel-shaded reference has one and this scene had none: a thin band of
+     light where a surface turns away from the eye, ON THE SIDE THAT IS ALREADY LIT. Masked by
+     the accumulated direct light rather than added everywhere, which is the difference between
+     a rim light and a glow — an unmasked rim outlines the shadow side too and reads as fog.
+     https://roystan.net/articles/toon-shader/ */
+  uRimColor: { value: new THREE.Color(0xffd8ae) },
+  uRimT: { value: 0.58 },
+  uRimAmt: { value: 0.42 },
 };
 
 /* THE UNIFORM TRAP: three.js uploads a built-in material's uniforms only when that material's
@@ -1894,15 +2066,29 @@ const CLOUD_MATS = [];
    to albedo, so the snow stays bright in shadow and the rock stays dark. */
 function mountainMaterial(opts) {
   const tex = mountainTex(opts);
-  return new THREE.MeshLambertMaterial({
+  /* TOON, LIKE EVERYTHING ELSE IN THE WORLD.
+     These were Lambert because MeshToonMaterial banded across the cone, and that was the wrong
+     conclusion from a correct observation: the material quantises by design, and a huge smooth
+     surface has nothing to quantise AGAINST. The bump in `rocky` below gives it that — see the
+     note on the normal patch in cloudy(). */
+  const mat = new THREE.MeshToonMaterial({
     map: tex,
-    /* PER MOUNTAIN, NOT ONE CONSTANT. This is the ambient fill that stands in for the toon ramp's
-       0.37 floor, and one value for every mountain is precisely what made them all sit on the
-       same plane: Fuji at 24,000 units and a ridge at 33,000 were lifted by the same amount, so
-       the only thing separating them was their own paint. Fuji takes less of it and the far
-       ranges take more, which is the whole of the distance cue in a flat-shaded picture. */
+    gradientMap: RAMP_MTN,
+    /* PER MOUNTAIN, NOT ONE CONSTANT. This is the ambient fill, and one value for every mountain
+       is what made them all sit on the same plane: Fuji at 24,000 units and a ridge at 33,000
+       lifted by the same amount, so the only thing separating them was their own paint. Fuji
+       takes less of it and the far ranges take more, and that is the distance cue. */
     emissive: new THREE.Color(opts.fill != null ? opts.fill : 0x8c8c8c),
     emissiveMap: tex,
+  });
+  /* the rock block is here for its BUMP, not for its paint: the mottle and the snow line are
+     already in the texture, and doing them twice would fight. */
+  return rocky(mat, {
+    mottle: 0,
+    scale: opts.bumpFreq != null ? opts.bumpFreq : 1 / 900,
+    origin: opts.origin,
+    bump: opts.bump != null ? opts.bump : 0.55,
+    bumpScale: opts.bumpScale != null ? opts.bumpScale : 1,
   });
 }
 
@@ -1993,6 +2179,9 @@ function rocky(mat, opts = {}) {
        IS very nearly monochrome, which is also why every sumi-e of one is. */
     uDechill: { value: opts.dechill != null ? opts.dechill : 0 },
     uMottle: { value: opts.mottle != null ? opts.mottle : 0.30 },
+    /* how hard the relief leans the normal, and at what size */
+    uBumpAmt: { value: opts.bump != null ? opts.bump : 0 },
+    uBumpScale: { value: opts.bumpScale != null ? opts.bumpScale : 1 },
     uGully: { value: opts.gully || 0 },
     uGullyN: { value: opts.gullyN != null ? opts.gullyN : 26 },
     uAxis: { value: new THREE.Vector2(opts.axis ? opts.axis[0] : 0, opts.axis ? opts.axis[1] : 0) },
@@ -2036,10 +2225,10 @@ function cloudy(mat) {
         uniform vec2 uCloudProj;
         uniform float uCloudScale;
         uniform float uCloudAmt;
-        uniform vec3 uMistColor;
-        uniform float uMistY, uMistH, uMistAmt;`
+        uniform vec3 uMistColor, uRimColor;
+        uniform float uMistY, uMistH, uMistAmt, uRimT, uRimAmt;`
         + (mat.userData.rock ? `
-        uniform float uRockScale, uMottle, uGully, uGullyN;
+        uniform float uRockScale, uMottle, uGully, uGullyN, uBumpAmt, uBumpScale;
         uniform float uSnowY, uSnowBand, uSnowJitter, uSnowSlope, uSnowAdd;
         uniform float uSnowMid, uSnowSoft, uRockDark, uDesat;
         uniform float uAerNear, uAerFar, uAerAmt, uDechill;
@@ -2131,11 +2320,46 @@ function cloudy(mat) {
           }
 
         }` : '#include <color_fragment>')
+      /* RELIEF, WHICH IS THE ANSWER TO "IT BANDS".
+         A toon ramp quantises N.L, so on a huge smooth surface — a cone twenty-two thousand units
+         across — N.L varies slowly and evenly and the quantisation comes out as four enormous
+         arcs with Mach banding at every join. Moving to Lambert removed the bands by removing the
+         cel shading, which was solving the wrong problem: the scene is meant to be cel shaded.
+         What every reference does instead is give the surface something to break the terminator
+         WITH. If the normal wobbles, the band edge wobbles with it, and a hard quantised edge
+         following real rock relief reads as rock rather than as a rendering artefact — the ramp
+         stays exactly as hard as it was.
+         This is a bump map with no map: two octaves of the same value noise the rock shading
+         already uses, differenced to get a gradient, rotated into view space and leaned into the
+         normal. It costs three noise samples on the mountains only and needs no texture, no UVs
+         and no extra vertices.
+         "Bump mapping affects all aspects of the toon shading, including breaking up the
+         transitions between cel shading in a tonemap ramp." — Redshift toon material docs. */
+      .replace('#include <normal_fragment_maps>', mat.userData.rock ? `#include <normal_fragment_maps>
+        if ( uBumpAmt > 0.0 ) {
+          vec3 bp = ( vCloudPos - uNoiseOrigin ) * uRockScale * uBumpScale;
+          float e = 0.35;
+          float h0 = rkNoise( bp ) + 0.5 * rkNoise( bp * 2.7 );
+          float hx = rkNoise( bp + vec3( e, 0.0, 0.0 ) ) + 0.5 * rkNoise( ( bp + vec3( e, 0.0, 0.0 ) ) * 2.7 );
+          float hz = rkNoise( bp + vec3( 0.0, 0.0, e ) ) + 0.5 * rkNoise( ( bp + vec3( 0.0, 0.0, e ) ) * 2.7 );
+          vec3 gW = vec3( hx - h0, 0.0, hz - h0 ) * ( uBumpAmt / e );
+          vec3 gV = mat3( viewMatrix ) * gW;
+          normal = normalize( normal - ( gV - dot( gV, normal ) * normal ) );
+        }` : '#include <normal_fragment_maps>')
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         {
           vec2 cuv = ( vCloudPos.xz - vCloudPos.y * uCloudProj ) * uCloudScale + uCloudOff;
           float cs = texture2D( uCloudMap, cuv ).r;
           reflectedLight.directDiffuse *= mix( 1.0, cs, uCloudAmt );
+        }
+        if ( uRimAmt > 0.0 ) {
+          float rim = 1.0 - clamp( dot( normalize( vViewPosition ), normal ), 0.0, 1.0 );
+          rim = smoothstep( uRimT, uRimT + 0.18, rim );
+          /* MASKED TO THE LIT SIDE. Rim added everywhere is a halo; rim added only where the sun
+             already reaches is the edge of a lit form. The mask is the direct diffuse that has
+             just been accumulated, which costs nothing and needs no second light loop. */
+          float lit = clamp( dot( reflectedLight.directDiffuse, vec3( 0.35, 0.5, 0.15 ) ) * 2.4, 0.0, 1.0 );
+          reflectedLight.directDiffuse += rim * lit * uRimAmt * uRimColor;
         }`)
       /* VALLEY MIST AS ATMOSPHERE, NOT AS OBJECTS. Flattened ellipsoids gave you a lid to look
          down on; sprites fixed that but 260 huge alpha-blended quads cost four times the rest
@@ -2525,17 +2749,33 @@ function onGround(dist, side, lift = 0) {
 }
 
 /* the toon ramp: 4 hard steps, NearestFilter is what makes it band rather than blur */
-const RAMP = (() => {
-  const steps = 4, d = new Uint8Array(steps * 4);
+/* A SHADOW IS NOT JUST LESS LIGHT, IT IS DIFFERENT LIGHT — and a greyscale ramp cannot say
+   that. Every step here was a neutral grey, so the shaded side of everything in the world was
+   exactly its own colour multiplied down, which is what makes amateur cel shading look like
+   flat art with the brightness turned off.
+   In shadow a surface is lit by the SKY rather than by the sun, and this sky is cool. So the
+   ramp is tinted: the dark steps are pulled blue and away from red, the bright steps stay
+   neutral, and the step VALUES are unchanged so nothing about the existing balance moves. It is
+   one texture and it re-lights every toon material in the scene at once.
+   The multipliers are per channel and are deliberately not normalised — a cool shadow reads as
+   slightly darker as well as bluer, which is also true. */
+const SHADOW_TINT = [0.74, 0.87, 1.16];
+function toonRamp(steps, filter) {
+  const d = new Uint8Array(steps * 4);
   for (let i = 0; i < steps; i++) {
-    const v = Math.round(255 * Math.pow((i + 1) / steps, 0.72));
-    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+    const v = Math.pow((i + 1) / steps, 0.72);
+    for (let c = 0; c < 3; c++) {
+      const k = SHADOW_TINT[c] + (1 - SHADOW_TINT[c]) * v;
+      d[i * 4 + c] = Math.round(255 * Math.min(1, v * k));
+    }
+    d[i * 4 + 3] = 255;
   }
   const t = new THREE.DataTexture(d, steps, 1, THREE.RGBAFormat);
-  t.minFilter = t.magFilter = THREE.NearestFilter;
+  t.minFilter = t.magFilter = filter;
   t.needsUpdate = true;
   return t;
-})();
+}
+const RAMP = toonRamp(4, THREE.NearestFilter);
 
 /* MERGE, so a multi-part tree is ONE InstancedMesh. A trunk and three canopy blobs as separate
    instanced meshes would be four draw calls and four outline twins that can drift apart; merged
@@ -2753,17 +2993,7 @@ function outlineMaterial(px, shedAt) {
    frame, and no amount of surface detail survives being quantised to four levels. Sixteen steps
    with LinearFilter is still a ramp — the terminator still sits where the art direction put it,
    the falloff is still stylised — but it stops shading a mountain like a poster. */
-const RAMP_MTN = (() => {
-  const steps = 16, d = new Uint8Array(steps * 4);
-  for (let i = 0; i < steps; i++) {
-    const v = Math.round(255 * Math.pow((i + 1) / steps, 0.72));
-    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
-  }
-  const t = new THREE.DataTexture(d, steps, 1, THREE.RGBAFormat);
-  t.minFilter = t.magFilter = THREE.LinearFilter;
-  t.needsUpdate = true;
-  return t;
-})();
+const RAMP_MTN = toonRamp(16, THREE.LinearFilter);
 
 /* A REAL HASH, NOT AN ARITHMETIC PROGRESSION.
    `(i * 9301 + seed * 49297) % 233280` is LINEAR in i — consecutive instances step by exactly
@@ -3488,28 +3718,27 @@ const lakeWater = (() => {
         /* TWO LAYERS, CROSSING. One wave set gives a single rolling direction and reads as a
            flag; two at different scales moving different ways is the least that reads as water,
            and it costs three more sines. */
-        float w = sin( vWorld.x * 0.0032 + uTime * 0.55 ) * cos( vWorld.z * 0.0027 - uTime * 0.41 )
-                + sin( vWorld.z * 0.0071 - uTime * 0.7 ) * 0.4;
-        float w2 = sin( ( vWorld.x + vWorld.z ) * 0.0125 + uTime * 1.15 )
-                 * cos( ( vWorld.x - vWorld.z ) * 0.0092 - uTime * 0.86 );
-        float chop = w + w2 * 0.45;
-        /* TWO SCROLLS OF ONE TILEABLE NORMAL MAP, at different scales and directions. Their
-           beat is what keeps it from reading as a repeating pattern. */
-        vec2 nuv = vWorld.xz * uNrmScale;
-        vec2 n1 = texture2D( uNrm, nuv + vec2( uTime * 0.011, uTime * 0.007 ) ).xy * 2.0 - 1.0;
-        vec2 n2 = texture2D( uNrm, nuv * 2.7 + vec2( -uTime * 0.019, uTime * 0.013 ) ).xy * 2.0 - 1.0;
-        vec2 ripple = ( n1 + n2 * 0.6 ) * uNrmAmt;
-        vec2 uv = vProj.xy / vProj.w
-          + vec2( w * 0.0021, w * 0.0008 ) + vec2( w2 * 0.0009, w2 * 0.0005 )
-          + ripple * 0.014;
+        /* A STILL LAKE, DRAWN RATHER THAN SIMULATED.
+           What was here was three wave fields and two scrolls of a normal map all offsetting the
+           reflection lookup per pixel. Every one of those was defensible on its own and together
+           they were wrong for this water twice over. Artistically, a dawn lake in this scene is
+           GLASS, and a surface that busy cannot be still. Technically, the reflection is a
+           640-pixel image of a forest, and jittering the lookup of a high-frequency image by a
+           different amount at every pixel is a recipe for salt-and-pepper — the speckle across
+           the lake was not ripple detail, it was the far treeline being point-sampled at random
+           offsets.
+           So: one slow, long wave, offsetting the lookup by a quarter of what it used to. The
+           reflection stays legible, which is the whole reason to have one.
+           "Wind Waker completely foregoes reflection calculations and renders a flat-shaded
+           water surface" — the cartoon end of this is flatter still, and flat is the direction. */
+        float w = sin( vWorld.x * 0.0016 + uTime * 0.22 ) * cos( vWorld.z * 0.0013 - uTime * 0.17 );
+        float chop = w;
+        vec2 uv = vProj.xy / vProj.w + vec2( w * 0.0006, w * 0.00022 );
         vec3 refl = texture2D( tReflect, uv ).rgb;
         /* grazing angles reflect almost everything, steep ones show the water's own colour —
            and the camera IS at a grazing angle here, which is why the reflection carries */
         vec3 v = normalize( cameraPosition - vWorld );
-        /* the same ripple tilts the surface, so the Fresnel and the glint break on the ripples
-           the reflection is already bending around rather than on a separate field */
-        vec3 nrm = normalize( vec3( ripple.x * 0.28, 1.0, ripple.y * 0.28 ) );
-        float f = pow( 1.0 - clamp( dot( v, nrm ), 0.0, 1.0 ), uReflPow );
+        float f = pow( 1.0 - clamp( v.y, 0.0, 1.0 ), uReflPow );
         /* NO DEPTH TERM. The baked shore-depth experiment is removed, and it deserves a note
            because the idea was sound and the DATA was not. Depth-driven colour and shoreline
            foam are what every stylised-water reference reaches for, and getting depth from the
@@ -3521,8 +3750,24 @@ const lakeWater = (() => {
            thresholds just moves those artefacts around; the input cannot support the effect.
            It comes back for free if a basin is ever modelled — bakeShoreDepth and the uniforms
            are left in place and simply unused. */
-        vec3 body = mix( uDeep, uShallow, clamp( chop * 0.25 + 0.5, 0.0, 1.0 ) );
-        vec3 col = mix( body, refl, clamp( f * uReflGain, uReflMin, 0.95 ) );
+        vec3 body = mix( uDeep, uShallow, clamp( chop * 0.12 + 0.5, 0.0, 1.0 ) );
+        /* POSTERISED, BECAUSE EVERYTHING ELSE IN THIS WORLD IS.
+           The mix between the water's own colour and the reflection was a smooth gradient across
+           the whole lake — the one continuously shaded surface in a cel-shaded scene, which is
+           why it never sat with the rest of the picture no matter how the ripple was tuned.
+           Four flat steps put it on the same footing as the toon ramp: the lake reads as a few
+           regions of flat colour, and the reflection appears in bands the way it does in a
+           painted one. */
+        float k = clamp( f * uReflGain, uReflMin, 0.95 );
+        k = floor( k * 4.0 + 0.5 ) / 4.0;
+        vec3 col = mix( body, refl, k );
+        /* AND A FEW DRAWN HIGHLIGHTS. Two long, slow crests picked out as flat pale streaks —
+           the cartoon shorthand for a calm surface, and the only thing here that moves fast
+           enough to notice. Thresholded, not faded, so they are shapes rather than a sheen. */
+        float g1 = sin( vWorld.z * 0.0021 - uTime * 0.16 ) * cos( vWorld.x * 0.0009 + uTime * 0.11 );
+        float g2 = sin( ( vWorld.x * 0.6 + vWorld.z ) * 0.0037 + uTime * 0.23 );
+        float glint = smoothstep( 0.86, 0.93, g1 ) * 0.7 + smoothstep( 0.90, 0.97, g2 ) * 0.45;
+        col = mix( col, uShallow * 1.45 + vec3( 0.06 ), clamp( glint, 0.0, 1.0 ) * 0.5 );
         /* the same valley mist every other surface takes, so the far shore of the lake sits in
            it too instead of staying sharp while the land around it softens */
         vec3 mv2 = vWorld - cameraPosition;
@@ -4524,17 +4769,20 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     const far = /farrange/i.test(o.name);
     o.material = mountainMaterial(far ? {
       /* the back layer: pale, cool, and almost without internal contrast */
-      foot: 0x9aa2ab, rock: 0xb0b5bd, rockHi: 0xc4c8ce, snow: 0xeff0f3,
+      foot: 0x939ba4, rock: 0xa6abb3, rockHi: 0xb8bcc3, snow: 0xdcdee2,
       rockAt: 0.22, grain: 1 / 700, noiseR: 4000,
       snowAt: 0.70, snowBand: 0.26, snowJitter: 0.16, snowGrain: 1 / 2600,
-      fill: 0xa4a4a4,
+      fill: 0x6e6e6e,
+      /* the back layer is meant to be flat and quiet, so barely any */
+      bump: 0.22, bumpFreq: 1 / 2600, origin: [c.x, rb.min.y, c.z],
     } : {
       /* the middle layer: still clearly a mountain, still clearly in front of the one behind */
       foot: groundCol.clone().lerp(new THREE.Color(0x77817e), 0.72).getHex(),
-      rock: 0x939a9c, rockHi: 0xafb3b3, snow: 0xdedfe1,
+      rock: 0x8b9294, rockHi: 0xa5a9a9, snow: 0xd0d1d3,
       rockAt: 0.34, grain: 1 / 700, noiseR: 4000,
       snowAt: 0.74, snowBand: 0.24, snowJitter: 0.16, snowGrain: 1 / 2600,
-      fill: 0x949494,
+      fill: 0x585858,
+      bump: 0.45, bumpFreq: 1 / 1700, origin: [c.x, rb.min.y, c.z],
     });
     cragged++;
     craggedTris += o.geometry.attributes.position.count / 3;
@@ -4605,7 +4853,12 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
       /* NOT THE BRIGHTEST THING IN THE FRAME. Measured: the cap rendered at luminance 168 against
          a 151 sky, so the mountain was out-shining the sunrise behind it — which is most of "why
          is Fuji so bright". 0xfffdf9 is snow held in the hand. */
-      snow: 0xefeae2,
+      /* MEASURED AGAINST THE SKY. With the toon ramp back, Fuji's cap rendered at luminance
+         186 against a 149 sky, and sweeping the ambient fill from 0x85 down to 0x2e only moved
+         it to 168 — the fill was never what made it bright. It is the albedo: 0xefeae2 is snow
+         held in the hand, and a cap 28,000 units off at sunrise is not brighter than the sunrise
+         behind it. */
+      snow: 0xcdc8c0,
       /* 0.60, UP FROM 0.30, BECAUSE THE ENTIRE GRADIENT WAS UNDERGROUND.
          v is normalised over the MESH's height (y 1,097 to 7,220), and the forest and terrain in
          front hide everything below about y 2,900 — traced down the cone, the lowest pixel of
@@ -4621,8 +4874,13 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
       rockFrom: 0.24, rockAt: 0.46, grain: 1 / 1100, noiseR: 6000,
       /* and the cap sits above the rock rather than starting in the middle of it */
       snowAt: 0.62, snowBand: 0.18, snowJitter: 0.13, snowGrain: 1 / 4200,
+      /* THE ONE THAT BANDED. Fuji is the largest smooth surface in the frame and needs the most
+         relief to break its terminator — measured against the mesh, 1/2200 is a ~2,200-unit
+         undulation, which at 24,000 units away is about the size of a real ridge on the cone. */
+      bump: 0.62, bumpFreq: 1 / 2200,
+      origin: [(b.min.x + b.max.x) / 2, b.min.y, (b.min.z + b.max.z) / 2],
       /* the least fill of any mountain: it is the nearest of them and the one that was too pale */
-      fill: 0x858585,
+      fill: 0x484848,
     });
     fujiDone++;
   });
@@ -4777,7 +5035,11 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
      the generated one — the black line is most of this scene's language. Instanced sets get an
      instanced hull sharing the same matrices, so it stays one extra draw call per set rather
      than one per tree. Skipped below the same size at which an outline is sub-pixel anyway. */
-  const OUTLINE_MIN_R = 60;
+  /* NO HULLS FOR THE LOADED WORLD. renderInk() draws every line in this scene now — see the
+     note at INK. This whole pass is left standing rather than deleted because the generated
+     fallback world and the hand-built precincts still call addOutline directly, and because the
+     size and flat-sheet rules in it are the record of what an inverted hull cannot do. */
+  const OUTLINE_MIN_R = 1e9;
   let hulls = 0;
   const madeFor = [];
   root.traverse((o) => {
@@ -8205,6 +8467,9 @@ function tick() {
   /* one float, so no hand-written shader can ever be fogging at a density the scene left behind */
   FOG_U.fogDensity.value = backScene.fog.density;
   if (POST.on) renderPost(); else backRenderer.render(backScene, camera);
+  /* the ink goes on OVER the finished frame, alpha-blended, so the main render still goes
+     straight to the canvas and nothing about the colour path changes */
+  renderInk();
   cssRenderer.render(cssScene, camera);
   frontRenderer.render(frontScene, camera);
   requestAnimationFrame(tick);
