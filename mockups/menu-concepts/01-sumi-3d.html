@@ -1221,6 +1221,14 @@ backScene.fog = new THREE.FogExp2(0xd8c1ab, 4.0e-5);
    and only why distant outlines read brown.
    One object, handed to every shader by reference, re-read from the fog each frame. A future
    `backScene.fog.density = x` anywhere then cannot desynchronise anything. */
+/* DECLARED UP HERE, WITH THE OTHER CROSS-CUTTING STATE, and that is the eighth temporal dead
+   zone in this file. CEL belongs with the ramps it controls — but CLOUD, three hundred lines
+   below the ramps, reads CEL.mode to decide the rim light's starting value, and a const read
+   from inside its own dead zone throws and takes the module with it. Anything two distant parts
+   of this file both need is declared before either of them. */
+const CEL = { mode: new URLSearchParams(location.search).get('cel') === 'old' ? 'old' : 'new' };
+const CEL_RIM = 0.42;
+
 const FOG_U = {
   fogColor: { value: backScene.fog.color },
   fogDensity: { value: backScene.fog.density },
@@ -2004,7 +2012,7 @@ const CLOUD = {
      https://roystan.net/articles/toon-shader/ */
   uRimColor: { value: new THREE.Color(0xffd8ae) },
   uRimT: { value: 0.58 },
-  uRimAmt: { value: 0.42 },
+  uRimAmt: { value: CEL.mode === 'old' ? 0 : CEL_RIM },
 };
 
 /* THE UNIFORM TRAP: three.js uploads a built-in material's uniforms only when that material's
@@ -2072,14 +2080,16 @@ function mountainMaterial(opts) {
      surface has nothing to quantise AGAINST. The bump in `rocky` below gives it that — see the
      note on the normal patch in cloudy(). */
   const mat = new THREE.MeshToonMaterial({
-    map: tex,
+    map: tex.map,
     gradientMap: RAMP_MTN,
     /* PER MOUNTAIN, NOT ONE CONSTANT. This is the ambient fill, and one value for every mountain
        is what made them all sit on the same plane: Fuji at 24,000 units and a ridge at 33,000
        lifted by the same amount, so the only thing separating them was their own paint. Fuji
        takes less of it and the far ranges take more, and that is the distance cue. */
     emissive: new THREE.Color(opts.fill != null ? opts.fill : 0x8c8c8c),
-    emissiveMap: tex,
+    /* not the same texture: this one is faded out through the skirt, so the foot of the mountain
+       is lit exactly like the ground it meets. See the note on mountainTex. */
+    emissiveMap: tex.emis,
   });
   /* the rock block is here for its BUMP, not for its paint: the mottle and the snow line are
      already in the texture, and doing them twice would fight. */
@@ -2760,20 +2770,40 @@ function onGround(dist, side, lift = 0) {
    The multipliers are per channel and are deliberately not normalised — a cool shadow reads as
    slightly darker as well as bluer, which is also true. */
 const SHADOW_TINT = [0.74, 0.87, 1.16];
-function toonRamp(steps, filter) {
-  const d = new Uint8Array(steps * 4);
+/* AND A SWITCH BETWEEN THE TWO, because "it looks a bit weird" is not a thing anyone can act on
+   from memory — the two versions have to be side by side. `?cel=old` restores exactly what was
+   here before: neutral grey ramp steps and no rim light. `?cel=new` (the default) is the tinted
+   ramp and the rim. NAV.cel('old'|'new') flips it live without a reload, because the ramps are
+   data textures and their bytes can simply be rewritten. */
+const CEL_RAMPS = [];
+function writeRamp(tex, steps) {
+  const d = tex.image.data;
+  const tint = CEL.mode === 'old' ? [1, 1, 1] : SHADOW_TINT;
   for (let i = 0; i < steps; i++) {
     const v = Math.pow((i + 1) / steps, 0.72);
     for (let c = 0; c < 3; c++) {
-      const k = SHADOW_TINT[c] + (1 - SHADOW_TINT[c]) * v;
+      const k = tint[c] + (1 - tint[c]) * v;
       d[i * 4 + c] = Math.round(255 * Math.min(1, v * k));
     }
     d[i * 4 + 3] = 255;
   }
-  const t = new THREE.DataTexture(d, steps, 1, THREE.RGBAFormat);
+  tex.needsUpdate = true;
+}
+function toonRamp(steps, filter) {
+  const t = new THREE.DataTexture(new Uint8Array(steps * 4), steps, 1, THREE.RGBAFormat);
   t.minFilter = t.magFilter = filter;
-  t.needsUpdate = true;
+  CEL_RAMPS.push([t, steps]);
+  writeRamp(t, steps);
   return t;
+}
+/* setCelMode, not setCel: `setCel` is already taken by the loader's heavy-line mode, and a
+   duplicate function declaration at module scope is a parse error that takes the whole page. */
+function setCelMode(mode) {
+  CEL.mode = mode === 'old' ? 'old' : 'new';
+  CEL_RAMPS.forEach(([t, n]) => writeRamp(t, n));
+  CLOUD.uRimAmt.value = CEL.mode === 'old' ? 0 : CEL_RIM;
+  CLOUD_MATS.forEach((m) => { m.needsUpdate = true; });
+  return CEL.mode;
 }
 const RAMP = toonRamp(4, THREE.NearestFilter);
 
@@ -3548,15 +3578,12 @@ CLOUD.uMistY.value = LAKE_Y + 10;
    it. 768 rather than 512: at 512 a reflected tree trunk is under two pixels wide and the ripple
    smeared them into scribbles on the water — the distortion has to stay smaller than the
    features it is distorting. */
-/* 640 x 384, NOT 768 SQUARE, and the shape is the point.
-   The water looks itself up in SCREEN space, so the only texels of this target that are ever
-   sampled are the ones covering water on screen — and the water's screen rectangle, measured, is
-   93% of the frame's width by 29% of its height. A square target spent most of its resolution on
-   the sky above the lake, which no pixel reads. With the frustum now restricted to that rectangle
-   (see renderReflection) every texel lands inside it, so this is 45% fewer texels than 768 square
-   AND about two and a half times the horizontal resolution where the reflection is actually
-   looked at. */
-const reflectRT = new THREE.WebGLRenderTarget(640, 384, {
+/* 832 x 468, WHICH IS THE VIEW'S OWN SHAPE.
+   768 square was rendering a 16:9 view into a 1:1 target and letting the texture matrix sort it
+   out, which works but spends a third of its texels on nothing. Matching the aspect is 34% fewer
+   texels than 768 square at the same effective resolution, and — since the frustum is the full
+   view again — every one of them lands where the water can sample it. */
+const reflectRT = new THREE.WebGLRenderTarget(832, 468, {
   minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false,
 });
 /* HOW DEEP IS THE WATER HERE? — baked, not rendered.
@@ -4231,6 +4258,19 @@ function matchToGround(mesh, target, amt) {
    The one thing genuinely lost with the toon ramp was its 0.37 floor, which was acting as a
    large ambient fill. That is restored honestly with emissiveMap: emissive intensity times the
    SAME texture is a fill proportional to albedo, which is what the ramp's floor was. */
+/* TWO TEXTURES OUT OF ONE PASS: the paint, and the paint masked by how much ROCK there is.
+   The second is the emissive map, and it is the whole answer to a seam I have now failed at
+   four times.
+   Every previous attempt matched Fuji's foot COLOUR to the terrain's — and measured at the
+   seam it still came out wrong: Fuji renders #948a67 where the terrain beside it renders
+   #87855d. The reason is not the colour. The two meshes have different MATERIALS. Fuji carries
+   an emissive fill (emissive 0x484848 times an emissive map) that stands in for the toon ramp's
+   floor on a mountain seen mostly from its shadow side; the terrain carries none at all. The
+   same albedo through two different responses cannot land on the same pixel, so matching the
+   albedo was solving an equation that had no solution.
+   Masking the emissive by `body` removes the fill exactly where the mountain is still forest
+   floor, so the skirt is lit precisely the way the ground it meets is lit — and above the
+   treeline, where there is nothing to match, the fill comes back in full. */
 function mountainTex(o) {
   const W = 1024, H = 512;
   const c = document.createElement('canvas');
@@ -4238,6 +4278,11 @@ function mountainTex(o) {
   const g = c.getContext('2d');
   const img = g.createImageData(W, H);
   const d = img.data;
+  const ce = document.createElement('canvas');
+  ce.width = W; ce.height = H;
+  const ge = ce.getContext('2d');
+  const imge = ge.createImageData(W, H);
+  const de = imge.data;
   const foot = new THREE.Color(o.foot), rock = new THREE.Color(o.rock);
   const hi = new THREE.Color(o.rockHi), snow = new THREE.Color(o.snow);
   const tmp = new THREE.Color();
@@ -4276,15 +4321,24 @@ function mountainTex(o) {
       d[i + 1] = lin2srgb(tmp.g) * 255;
       d[i + 2] = lin2srgb(tmp.b) * 255;
       d[i + 3] = 255;
+      /* the fill, faded out through the skirt — see the note above */
+      const k = body;
+      de[i] = lin2srgb(tmp.r * k) * 255;
+      de[i + 1] = lin2srgb(tmp.g * k) * 255;
+      de[i + 2] = lin2srgb(tmp.b * k) * 255;
+      de[i + 3] = 255;
     }
   }
-  g.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.anisotropy = 4;
-  return tex;
+  const mk = (canvas, ctx, image) => {
+    ctx.putImageData(image, 0, 0);
+    const t = new THREE.CanvasTexture(canvas);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = THREE.RepeatWrapping;
+    t.wrapT = THREE.ClampToEdgeWrapping;
+    t.anisotropy = 4;
+    return t;
+  };
+  return { map: mk(c, g, img), emis: mk(ce, ge, imge) };
 }
 
 /* v from world height, u from the angle about the mountain's own axis. Cheap, and it needs no
@@ -4715,7 +4769,16 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   /* the same rule, for the mesh that carries every hill in the valley — see the note on the
      ranges below. Its hull contributed 28-41% of every dark region and nothing anywhere else. */
   terrainish.forEach((o) => { o.userData.noOutline = true; });
-  terrainish.forEach((o) => {
+  /* AND THE REPAINT IS OFF, BECAUSE IT DOES NOTHING.
+     liftHighGround was written to fix mountains that read as black. They read as black because
+     they were under their own outline hulls, and once the hulls went the lift turned out to be
+     invisible: A/B with it on and off, frozen camera, the left ridge measures luminance 149
+     either way and the ridge behind the sun 160 against 157. It was repainting 421,000 terrain
+     vertices to move nothing — and any repaint of the ground around Fuji's base is exactly the
+     thing that can put a ring there. The function stays for the record and for the day the
+     terrain is re-exported with a flatter palette. */
+  const LIFT = new URLSearchParams(location.search).get('lift') === 'on';
+  if (LIFT) terrainish.forEach((o) => {
     /* 1,000 to 3,000, not 1,400 to 4,200 — the first band was aimed above the thing it was for.
        Traced down the frame, the visible ridges sit at y 1,750 to 2,300, and a smoothstep from
        1,400 to 4,200 is barely off zero there: the ridge at y 1,750 was being lifted by 4%.
@@ -4768,19 +4831,24 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
 
     const far = /farrange/i.test(o.name);
     o.material = mountainMaterial(far ? {
-      /* the back layer: pale, cool, and almost without internal contrast */
-      foot: 0x939ba4, rock: 0xa6abb3, rockHi: 0xb8bcc3, snow: 0xdcdee2,
-      rockAt: 0.22, grain: 1 / 700, noiseR: 4000,
-      snowAt: 0.70, snowBand: 0.26, snowJitter: 0.16, snowGrain: 1 / 2600,
+      /* HEIGHT-CONSCIOUS, NOT UNIFORMLY PALE. These were painted pale slate from the foot up
+         and read as white cutouts: the whole mountain was one value. A mountain is banded —
+         earth and scrub at the bottom, bare rock in the middle, snow only at the very top — and
+         it is the BANDS that say how tall it is. rockAt at 0.22 put bare rock almost at the
+         waterline; at 0.46 the foot occupies the lower half, which is what the eye reads as
+         mass. The cap is narrow and high because a distant range should be tipped, not capped. */
+      foot: 0x6f7566, rock: 0x9096a0, rockHi: 0xa9aeb6, snow: 0xe6e8ec,
+      rockAt: 0.46, grain: 1 / 700, noiseR: 4000,
+      snowAt: 0.84, snowBand: 0.13, snowJitter: 0.12, snowGrain: 1 / 2600,
       fill: 0x6e6e6e,
       /* the back layer is meant to be flat and quiet, so barely any */
       bump: 0.22, bumpFreq: 1 / 2600, origin: [c.x, rb.min.y, c.z],
     } : {
       /* the middle layer: still clearly a mountain, still clearly in front of the one behind */
-      foot: groundCol.clone().lerp(new THREE.Color(0x77817e), 0.72).getHex(),
-      rock: 0x8b9294, rockHi: 0xa5a9a9, snow: 0xd0d1d3,
-      rockAt: 0.34, grain: 1 / 700, noiseR: 4000,
-      snowAt: 0.74, snowBand: 0.24, snowJitter: 0.16, snowGrain: 1 / 2600,
+      foot: groundCol.clone().lerp(new THREE.Color(0x5f6a5c), 0.62).getHex(),
+      rock: 0x7f8681, rockHi: 0x979d96, snow: 0xd6d8da,
+      rockAt: 0.50, grain: 1 / 700, noiseR: 4000,
+      snowAt: 0.88, snowBand: 0.10, snowJitter: 0.12, snowGrain: 1 / 2600,
       fill: 0x585858,
       bump: 0.45, bumpFreq: 1 / 1700, origin: [c.x, rb.min.y, c.z],
     });
@@ -4847,7 +4915,29 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
        a yellow-green. What Fuji's skirt meets is closed conifer canopy, and the trees standing on
        it are painted #4a523a and #374331: darker, and much further toward blue-green. Mixing
        toward that and then dropping the value lands near #5c634b. */
-    const skirt = groundCol.clone().lerp(new THREE.Color(0x3f4a33), 0.72).multiplyScalar(0.75);
+    /* SOLVED AGAINST THE PIXEL, NOT AGAINST THE PALETTE — which is the fifth attempt at this
+       ring and the first one that measures the thing being matched.
+       Fuji and the terrain are different materials, so equal albedo does not give equal pixels:
+       measured across the seam, Fuji rendered #948a67 where the terrain beside it rendered
+       #87855d. Half of that gap was the emissive fill, which the masked emissive map above now
+       removes from the skirt. The rest is albedo, and the honest way to set it is to sweep the
+       multiplier and read the seam off the framebuffer rather than to derive a colour and hope.
+       Swept, reading the last Fuji pixel and the first terrain pixel below it across seven
+       columns of the base:
+           x0.42  Fuji #65614d  terrain #989269   off by -51 -49 -28
+           x0.62  Fuji #6b6752  terrain #9f986c   off by -52 -49 -26
+           x1.0   Fuji #737157  terrain #948e67   off by -32 -30 -15
+           x2.0   Fuji #8a8768  terrain #989269   off by -14 -11  -1
+           x2.6   Fuji #969270  terrain #989269   off by  -2   0   7
+       So: 2.6, and the seam is matched to two parts in 255. The HUE still comes from the
+       terrain, so a re-export that repaints the ground moves the skirt with it; only the level
+       is solved, and it has to be solved rather than derived because the two materials do not
+       answer the same albedo with the same pixel. Four earlier attempts set this by reasoning
+       about the paint and every one of them was wrong.
+       ?skirt=<n> is left in for the next time the ground changes. */
+    const SK = parseFloat(new URLSearchParams(location.search).get('skirt'));
+    const skirt = groundCol.clone().lerp(new THREE.Color(0x3f4a33), 0.55)
+      .multiplyScalar(Number.isFinite(SK) ? SK : 2.6);
     o.material = mountainMaterial({
       foot: skirt.getHex(), rock: 0x9a8f82, rockHi: 0xb4a897,
       /* NOT THE BRIGHTEST THING IN THE FRAME. Measured: the cap rendered at luminance 168 against
@@ -4877,7 +4967,11 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
       /* THE ONE THAT BANDED. Fuji is the largest smooth surface in the frame and needs the most
          relief to break its terminator — measured against the mesh, 1/2200 is a ~2,200-unit
          undulation, which at 24,000 units away is about the size of a real ridge on the cone. */
-      bump: 0.62, bumpFreq: 1 / 2200,
+      /* 0.32, DOWN FROM 0.62. At the higher value the relief was leaning some patches of the
+         cone far enough to jump a whole ramp step, so the snow band grew and lost islands and
+         the cone came out spotted — noise, not rock. It only has to break the terminator, not
+         re-sculpt the mountain. */
+      bump: 0.32, bumpFreq: 1 / 2200,
       origin: [(b.min.x + b.max.x) / 2, b.min.y, (b.min.z + b.max.z) / 2],
       /* the least fill of any mountain: it is the nearest of them and the one that was too pale */
       fill: 0x484848,
@@ -6424,30 +6518,26 @@ function renderReflection() {
   reflectCam.clearViewOffset();
   reflectCam.updateProjectionMatrix();
 
-  /* ONLY WHERE THERE IS WATER.
-     This pass renders the whole scene a second time into the whole target, and then the water
-     shader samples it at `vProj.xy / vProj.w` — the water pixel's own screen position. So every
-     texel outside the water's screen rectangle is rendered and thrown away, and measured, that
-     is 73% of them.
-     setViewOffset builds the projection for a sub-rectangle of the same view, which means the
-     mirrored camera sees exactly the band the water covers and three's frustum culling drops
-     everything else. Measured on this composition: 321 draw calls to 167, and 2,222k triangles
-     to 1,926k — the triangles fall less than the calls because what survives is Fuji, the terrain
-     and the near forests, which are precisely the things a lake reflects.
-     The shader needs no change at all, and that is the reason to do it this way rather than with
-     a scissor: reflectTexM is built FROM reflectCam.projectionMatrix, so the offset is already
-     in the matrix that maps world position to texture coordinate. */
+  /* IS THERE ANY WATER ON SCREEN AT ALL? If not there is nothing to reflect — which is most
+     of the level-two and level-three menus, where the camera has flown to a destination. The
+     pass was running anyway, rendering two million triangles into a texture nothing would read.
+     The old texture stays bound and is simply not sampled. */
   const r = reflectRect(reflectCam);
-  /* AND IF THERE IS NO WATER ON SCREEN, THERE IS NOTHING TO REFLECT.
-     reflectRect returns null when every reflective surface is off screen or behind the eye —
-     which is most of the level-two and level-three menus, where the camera has flown to a
-     destination. The pass was running anyway, rendering two million triangles into a texture
-     that nothing would sample. The old texture stays bound and is simply not read. */
   if (!r) return false;
-  const F = 10000;
-  reflectCam.setViewOffset(F, F,
-    (r.x0 + 1) / 2 * F, (1 - r.y1) / 2 * F,
-    (r.x1 - r.x0) / 2 * F, (r.y1 - r.y0) / 2 * F);
+  /* AND THE FRUSTUM IS NO LONGER NARROWED TO IT, WHICH IS WHAT STRETCHED THE LAKE.
+     The idea was sound: the water looks the reflection up at its own screen position, so every
+     texel outside the water's rectangle is rendered and discarded. The arithmetic was not.
+     Measured, that rectangle in the mirrored camera runs from NDC x -0.86 to 1.995 and y 0.42
+     to 1.83 — the lake extends half a screen-width PAST the edge of the view. Clamping the
+     rendered sub-frustum to [-1,1] therefore clipped away part of what the water samples, and
+     every pixel beyond the clamp read the texture's clamped edge: a smear, worst on the right
+     of the lake where the overrun is largest. That is the stretch.
+     Covering the true rectangle instead would mean rendering a frustum half again as wide as
+     the screen, which costs more than it saves — and it only ever saved 2% of the triangles and
+     15% of the draw calls, because the water fills most of the mirror. So it goes. What stays is
+     the part that was worth having: skipping the pass when there is no water, and the far
+     vegetation cull, which is where the real 60% came from. */
+  reflectCam.clearViewOffset();
   reflectCam.updateProjectionMatrix();
 
   reflectTexM.copy(BIAS)
@@ -7170,6 +7260,13 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
       sunVis: POST.sunVis.value };
   },
   postOn: (on) => { POST.on = on !== false; return POST.on; },
+  /* the cel-shading A/B: NAV.cel() reads, NAV.cel('old'|'new') sets */
+  /* the cel-shading A/B. NAV.celShade() reads, NAV.celShade('old'|'new') sets, ?cel=old at
+     load. `cel` itself was already taken by the loader's heavy-line mode below, and a duplicate
+     key in an object literal silently keeps the LAST one — which is why this read back as the
+     wrong function the first time. */
+  celShade: (m) => (m === undefined ? CEL.mode : setCelMode(m)),
+  ink: (on) => { if (on !== undefined) INK.on = on !== false; return INK.on; },
   /* the framing with the sun in the middle — the default, kept callable for after a fly-out */
   sunMid: () => composeSunCentred(),
   /* the other one: sun off Fuji's right shoulder, mountain centred. Also at ?sun=shoulder */
