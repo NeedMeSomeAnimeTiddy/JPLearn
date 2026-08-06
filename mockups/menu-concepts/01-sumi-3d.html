@@ -2169,15 +2169,20 @@ function mountainMaterial(opts) {
      the dawn fog colour is bright. Same paint, same ramp, and they still measured 141 to Fuji's
      109. The level is where that is corrected, because it is the only thing that scales with
      nothing else. */
+  /* NOT PRE-SCALED. The level is applied in the shader by height, above, so the material's
+     own colour is the field's colour exactly as the ground has it. */
   const lvl = opts.level != null ? opts.level : MTN_LEVEL;
   const mat = new THREE.MeshToonMaterial({
-    color: opts.base.clone().multiplyScalar(lvl),
+    color: opts.base.clone(),
     gradientMap: RAMP_PEAK,
   });
   /* GROUND, THEN MOUNTAIN, THEN SNOW — two height blends over the ground colour the material
      starts as. The rock colour is scaled by the same level as the base so a mountain stays one
      object; the snow is not, because a cap that dims with distance stops reading as snow. */
   mat.userData.snow = {
+    uBaseY0: { value: LAND_DIM_Y0 },
+    uBaseY1: { value: LAND_DIM_Y1 },
+    uBaseLevel: { value: MTN_LEVEL },
     uRockY: { value: opts.rockY },
     uRockBand: { value: opts.rockBand },
     uRockJitter: { value: opts.rockJitter },
@@ -2351,6 +2356,7 @@ function cloudy(mat) {
         + (mat.userData.snow ? `
         uniform float uSnowY, uSnowBand, uSnowJitter, uSnowScale;
         uniform float uRockY, uRockBand, uRockJitter;
+        uniform float uBaseY0, uBaseY1, uBaseLevel;
         uniform vec3 uSnowCol, uRockCol, uSnowOrigin;` : '')
         + ((mat.userData.rock || mat.userData.snow) && !mat.userData.rock ? `
         /* the same value noise the rock block carries, declared on its own when only the snow
@@ -2412,6 +2418,22 @@ function cloudy(mat) {
              sample at different offsets, so they wander together the way a real treeline and
              snowline do — bulging out over the same spurs, retreating into the same gullies —
              instead of being two independent squiggles that happen to share a mountain. */
+          /* THE SAME FUNCTION OF HEIGHT ON EVERY LANDFORM, and this is what "the rim I am
+             telling you to match is not the rim touching the ground" was pointing at.
+             Measured, Fuji's mesh runs from y 1,097 but its first VISIBLE pixel is at 1,509 —
+             only 7% of it is buried — while the ranges that show at all are 28% to 41% buried and
+             fifteen of the nineteen never draw a pixel. So the height at which each mountain
+             actually meets the ground is different for every one of them, and pre-scaling a
+             mountain's whole albedo by MTN_LEVEL made it disagree with the terrain everywhere
+             below the point where the terrain had been scaled too: Fuji's rim emerges at 1,509,
+             where the ground is still at full brightness, and Fuji was already at 0.48.
+             Doing the dimming HERE, as a function of world y, means there is no such thing as a
+             mountain colour and a ground colour any more — there is one colour at a given height,
+             and a mountain is whatever of it happens to be sticking up. It cannot mismatch at the
+             rim because there is nothing to mismatch. */
+          diffuseColor.rgb *= mix( 1.0, uBaseLevel,
+            smoothstep( uBaseY0, uBaseY1, vCloudPos.y ) );
+
           vec3 sp = ( vCloudPos - uSnowOrigin ) * uSnowScale;
           float sn = ( rkNoise( sp ) + 0.5 * rkNoise( sp * 3.1 + 11.0 ) ) / 1.5 - 0.5;
           float rl = uRockY + sn * uRockJitter;
@@ -3245,6 +3267,11 @@ const RAMP_PEAK = toonRamp(64, THREE.LinearFilter, 2.2, 0.10);
 
 /* how much darker the ranges are painted than Fuji, to cancel the extra distance fog they take.
    Swept with ?range=<n> against Fuji's flank. */
+/* where the land stops being valley and starts being mountain, in world units. One pair of
+   numbers for the whole scene — the terrain, Fuji and the ranges all read them. */
+const LAND_DIM_Y0 = 1200;
+const LAND_DIM_Y1 = 2600;
+
 const RANGE_LEVEL = (() => {
   const v = parseFloat(new URLSearchParams(location.search).get('range'));
   return Number.isFinite(v) ? v : 1;
@@ -5020,7 +5047,9 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
      full strength, so the hills carried twice the albedo of the mountain they were being compared
      to. Flattening them to the same scaled colour is the whole fix, and it has to be the same
      expression or the two drift again the next time either is touched. */
-  const highCol = fieldCol.clone().multiplyScalar(MTN_LEVEL);
+  /* the flatten only removes the author's pale high-altitude PAINT; the level is the shader's
+     job now, and doing it in both places was double-darkening the terrain relative to Fuji */
+  const highCol = fieldCol.clone();
   let flat = 0;
   terrainish.forEach((o) => {
     const g = o.geometry, pos = g.attributes.position, col = g.attributes.color;
@@ -5047,12 +5076,19 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     /* the same block Fuji uses, in absolute world height because the terrain has no single
        summit to measure fractions against */
     m.userData.snow = {
+      uBaseY0: { value: LAND_DIM_Y0 },
+      uBaseY1: { value: LAND_DIM_Y1 },
+      uBaseLevel: { value: MTN_LEVEL },
       uRockY: { value: 1900 },
       /* wider and wobblier than Fuji's, because the terrain's hills are broad and a clean curve
          across one reads as a drawn line rather than as a treeline */
       uRockBand: { value: 2100 },
       uRockJitter: { value: 1100 },
-      uRockCol: { value: rockFor(highCol) },
+      /* SCALED, because the rock band lives entirely above LAND_DIM_Y1 where the height dimming
+         is already at full strength — and the rock colour is an absolute mix target, so the
+         dimming does not reach it. Leaving it derived from the undimmed field colour is what put
+         the terrain above y 3,200 at luminance 122 while every other landform sat at 86-101. */
+      uRockCol: { value: rockFor(fieldCol.clone().multiplyScalar(MTN_LEVEL)) },
       uSnowY: { value: 4200 },
       uSnowBand: { value: 900 },
       uSnowJitter: { value: 700 },
