@@ -5464,18 +5464,17 @@ function installPlace(key, idx, r) {
    it; `?generated` builds at evaluation exactly as before, which also keeps the places' tree
    claims ahead of the generated planting.
 
-   THE LIVE LAYER. The authored world replaces the generated one wholesale, and that replacement
-   was hiding the built places too — STUDY's whole compound, REVIEW's lettered tablets, every
-   moving part. A canvas texture and a sliding door cannot be baked into a .glb, so each place
-   now says what stays: `live: 'all'` keeps the place's world geometry (for places the .blend
-   does not model), a list keeps only those objects (REVIEW: the baked shrine is richer than the
-   analytic one, so only the level-four room stays live), nothing keeps the old behaviour.
+   THE LIVE LAYER, AND WHY IT IS EMPTY. A place may declare objects that stay visible when the
+   authored world is up (`live: 'all'` or a list); everything else it built hides under the
+   bake, as it always did. Right now NO place declares anything live — Robbie's revert,
+   2026-08-06: the analytic models (the study compound, the tablets, the placards, the easel)
+   briefly stood inside his map and were rejected on sight. What the L2/L3/L4 interface should
+   look like standing in the authored world is his design to sign off before anything of ours
+   appears there; the mechanism waits for that conversation.
 
-   THE AUTHORED WORLD IS INVIOLABLE — Robbie's rule, stated 2026-08-06 after a "claims" system
-   briefly hid authored meshes (the Honden, the blank ema tablets, lanterns) to make room for
-   live ones. Never again: no authored mesh is hidden, no authored instance is zeroed, ever.
-   The page may MOVE CAMERAS and ADD interface objects; where a live object would coincide with
-   an authored one, the live object moves — the world does not. */
+   THE AUTHORED WORLD IS ITSELF INVIOLABLE — the same review also deleted a "claims" system
+   that hid authored meshes to make room. Never again: no authored mesh is hidden, no authored
+   instance is zeroed, ever. The page may MOVE CAMERAS; the world is Robbie's. */
 const LIVE = new Set();
 let STUDY_MASS = null;
 let PLACES_BUILT = false;

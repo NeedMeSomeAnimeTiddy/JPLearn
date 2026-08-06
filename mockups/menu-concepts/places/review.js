@@ -303,42 +303,20 @@ export function buildReview(ctx) {
      sit brighter in the same dark. Enter tweens all four up, leave tweens them home — nothing
      appears or vanishes, which is the rule everything here lives by. */
   let haidenL4 = null;
-  {
-    /* BEFORE THE AUTHORED HONDEN when there is one — IN FRONT OF IT, NEVER IN PLACE OF IT.
-       The authored hall is the artist's and stays exactly as modelled; level four ADDS
-       furniture: a mat, an easel and the lettered card, set on the court before the hall's
-       doors, and the camera frames the card against the Honden itself. In the generated
-       fallback world there is no authored hall, so the full analytic room — shell, sliding
-       doors, interior, lanterns — is built as before; there it only ever replaces this
-       module's own old scenery hall, nobody else's. */
+  /* THE ROOM EXISTS ONLY IN THE ANALYTIC WORLD (?generated), where it replaces this module's
+     own old scenery hall and nothing else. In the AUTHORED world level four builds NOTHING and
+     registers nothing — Robbie's revert, 2026-08-06: his map shows only his map, and what a
+     practice station should look like standing in it is his design call to make before any
+     object of ours appears there. (Choosing the placard you are beside then simply stays a
+     no-op, because WORLD_L4.REVIEW is unregistered.) */
+  if (!AUTH) {
     const HF = TUN_END + 700;
-    /* MEASURED BEFORE PLACING, twice, because the authored precinct is layered: a gate
-       building spans t 8,996-9,960 on the axis, the covered worship hall 9,535-10,659 (its
-       aisle railed — a camera inside it stands in a fence), the offering box under the hall's
-       far eave, the Honden behind. The one open ground on the axis is the strip between the
-       LAST TUNNEL GATE (t 8,644) and the gate building's face — so that is where the card
-       waits, 1,949 short of the Honden's centre: the arrival is framed by the final torii,
-       with the gate building, the sacred cedar and the halls stacking behind the easel. */
-    const hallAt = AUTH ? (() => {
-      const v = AUTH.atT(AUTH.tHonden - 1949);
-      /* the furniture stands on the authored court's own surface, not the terrain under it */
-      const court = authored.meshes(/Torii_Surfaces_ToriiCourtGround/)[0];
-      if (court) v.y = Math.max(v.y, court.y + 2);
-      return v;
-    })() : at3(HF, 0);
-    /* the floor the furniture rests on: the shell's raised floor in the analytic room, the
-       court itself in the authored world */
-    const FLR = AUTH ? 2 : 106;
+    const hallAt = at3(HF, 0);
+    const FLR = 106;                    /* the shell's raised interior floor */
     const grp = new THREE.Group();
     grp.position.copy(hallAt);
-    if (AUTH) {
-      const b = AUTH.atT(AUTH.tHonden - 2100);
-      grp.lookAt(b.x, hallAt.y, b.z);   /* local +Z looks back down the authored tunnel */
-    } else {
-      facing(grp, TUN_END, 0);          /* or back down the analytic one */
-    }
+    facing(grp, TUN_END, 0);            /* local +Z looks back down the tunnel */
     backScene.add(grp);
-    _live.push(grp);
 
     const VERM = 0xb03a2a, VERM_D = 0x8a3626, ROOF = 0x3b332a, RIDGE = 0x332c25,
       STONE = 0x6c6459, FLOOR = 0x6b5744, FLOOR_D = 0x5d4b3a, DARK = 0x3a2b20,
@@ -354,7 +332,7 @@ export function buildReview(ctx) {
       vertexColors: true, emissive: 0x14100b, gradientMap: RAMP, flatShading: true,
     });
     let matGold = null;
-    if (!AUTH) {
+    {
       /* the shell: plinth, steps up the front, columns, walls with the front bay open */
       box(ext, 1160, 92, 760, 0, 46, 0, STONE);
       for (let i = 0; i < 3; i++) {
@@ -524,8 +502,7 @@ export function buildReview(ctx) {
        front wall so an open panel stows behind the flank instead of fighting it. */
     const DOOR_REST = 95, DOOR_OPEN = 286;
     let matPaper = null;
-    /* only the analytic room has doors; before the authored Honden there is nothing to slide */
-    const doors = AUTH ? [] : [-1, 1].map((sx) => {
+    const doors = [-1, 1].map((sx) => {
       matPaper = matPaper || new THREE.MeshToonMaterial({
         color: PAPER, emissive: 0x241c12, gradientMap: RAMP, flatShading: true,
       });
@@ -587,12 +564,12 @@ export function buildReview(ctx) {
       /* the shot: past the tunnel mouth, looking onto the easel — with the authored Honden
          itself as the backdrop when the world is up */
       eye: () => {
-        const v = AUTH ? AUTH.atT(AUTH.tHonden - 2489) : at3(HF - 560, 0);
+        const v = at3(HF - 560, 0);
         v.y = hallAt.y + FLR + 156;
         return v;
       },
       tgt: () => {
-        const v = AUTH ? AUTH.atT(AUTH.tHonden - 1979) : at3(HF - 30, 0);
+        const v = at3(HF - 30, 0);
         v.y = hallAt.y + FLR + 118;
         return v;
       },
@@ -685,7 +662,6 @@ export function buildReview(ctx) {
       rail.position.y = hangY;
       rail.rotation.y = AX.yaw;
       backScene.add(rail);
-      _live.push(rail);
       const root = new THREE.Group();
       root.position.copy(AX.at(f2, sd));
       root.position.y = hangY - SH * 0.62 - 34;
@@ -703,7 +679,6 @@ export function buildReview(ctx) {
          renders as a plain brown rectangle and looks exactly like a texture that failed. */
       root.rotation.y = AX.yaw;
       backScene.add(root);
-      _live.push(root);
       /* THE HINGE IS THE TOP EDGE, not the board's middle. `flip` sits up on the cord line and
          `hold` puts the board back below it, so at zero the geometry is exactly where it was and
          any rotation about x is the board swinging on its hinge — which is the only motion a
@@ -870,17 +845,9 @@ export function buildReview(ctx) {
   wallGrp.rotateY(0.62);
   wall.pickGrp.rotateY(0.62);
   _marks.wall = wallGrp;
-  /* THE FOUR TABLETS ARE THE INTERFACE, so they stay live over the baked wall — the bake
-     carries the structure and the crowd, but a lettered canvas and a hover swing cannot be
-     baked. The authored wall hangs four blank stand-ins about thirty units in FRONT of where
-     these four rest, which buried the live ones behind them. The blanks are the artist's and
-     they stay; the LIVE rack slides fifty-five units toward the eye instead, so the lettered
-     four hang just proud of the blanks and the blanks read as the crowd behind them. */
-  {
-    const out = eye.clone().sub(wallPlace).setY(0).normalize();
-    wall.pickGrp.position.addScaledVector(out, 55);
-  }
-  _live.push(wall.pickGrp);
+  /* NOTHING OF THIS MODULE IS VISIBLE IN THE AUTHORED WORLD — Robbie's revert, 2026-08-06.
+     The lettered tablets belong to the analytic world (?generated) only; what a live tablet
+     should look like standing in HIS map is a design he signs off on first. */
 
   /* 手水舎 — the water pavilion, facing the wall across the court. A courtyard with one thing in
      it is a yard with a thing in it; the second structure is what makes the space between them

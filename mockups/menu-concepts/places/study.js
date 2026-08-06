@@ -623,13 +623,13 @@ export function buildStudy(ctx) {
     SITE, TOP: Math.round(TOP), F_NEAR, F_FAR, HALF_S, PICK_F, GATE_X,
     ridge: Math.round(124 + HALL.wall + HALL.roof), quarters: Q.map((q) => q[0]),
   };
-  /* THE COMPOUND IS LIVE — the authored world does not model it. THE AUTHORED WORLD IS ALSO
-     INVIOLABLE (Robbie's rule, 2026-08-06): nothing of it is hidden or zeroed to make room, so
-     at this site the authored wood currently grows through the court and the festival's edge
-     props stand against the east wall. That is a visible fact about the SITE, not something to
-     erase — the compound moves, or the .blend gains a clearing, by Robbie's hand either way. */
+  /* THE COMPOUND EXISTS ONLY IN THE ANALYTIC WORLD (?generated). Robbie's revert, 2026-08-06:
+     in the authored world his map shows only his map — these old-environment models briefly
+     stood live in the wood at 170° and were rejected on sight. Where STUDY lives in the
+     authored world, and what it looks like there, is his design call (the authored Garden at
+     −71° is the superseded stroll-garden costume; the ground at 170° is authored wood). */
   return {
     probe: _probe, focus: _focus, eyeLift: _eyeLift, l2: _l2,
-    marks: _marks, mass, live: 'all',
+    marks: _marks, mass,
   };
 }
