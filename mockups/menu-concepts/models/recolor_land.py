@@ -56,13 +56,21 @@ from mathutils import Vector
 # the ramp leaves the meadow at the value the meadow already is and there is no step where the
 # two meet; the darkening then happens across 900 to 2,600, which is the fade from ground to
 # mountain rather than a line.
+# THE SNOW IS NOT ON THE SAME LEVEL AS THE ROCK, and applying 0.52 to it as well is what took the
+# cap off the mountain. The rock stops are dimmed because rock at this height was reading brighter
+# than the meadow; snow has no such problem — it is snow, it is the brightest thing on the ground,
+# and dimming it to 0.52 left the summit rendering at 118 against a dawn sky of 150-200, which is
+# how a snow cap turns into more grey rock. Measured through a mask of the cone's own pixels, the
+# summit band goes 118 -> 150 -> 168 -> 181 at 0.52 / 0.85 / 1.15 / 1.45; 1.15 puts it just above
+# the sky away from the sun and just under the sky beside it, which is where a lit cap sits.
 LEVEL = 0.52
+SNOW_LEVEL = 1.15
 STOPS = [
     (900.0,  Vector((0.195, 0.253, 0.083))),
     (2600.0, Vector((0.230, 0.232, 0.196)) * LEVEL),
     (4300.0, Vector((0.286, 0.272, 0.248)) * LEVEL),
-    (5200.0, Vector((0.620, 0.606, 0.578)) * LEVEL),
-    (7400.0, Vector((0.680, 0.668, 0.646)) * LEVEL),
+    (5200.0, Vector((0.620, 0.606, 0.578)) * SNOW_LEVEL),
+    (7400.0, Vector((0.680, 0.668, 0.646)) * SNOW_LEVEL),
 ]
 
 FUJI = 'Landscape_Props_Fuji_001'
@@ -71,6 +79,23 @@ RANGE_KEY = ('landscape_props_farrange', 'landscape_props_range')
 # where the terrain stops being valley; below this its own paint is kept untouched
 VALLEY_TOP = 900.0
 VALLEY_FADE = 2200.0
+
+
+# ---- which vertices a run is allowed to touch ----
+# The first bake wrote its result back into the .blend, so the terrain's authored valley paint is
+# no longer there to blend against: repeating the full repaint would fade the 900-2200 band toward
+# the ramp a second time. A re-bake therefore names the band that actually changed. `--above Z`
+# repaints only vertices at or above Z, where the blend factor is already 1 and the repaint is a
+# straight overwrite — idempotent however many times it is run. Changing only SNOW_LEVEL moves
+# nothing below the 4300 stop, so `--above 4300` is the whole of that edit.
+ARGV = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+
+
+def arg(name, default):
+    return ARGV[ARGV.index(name) + 1] if name in ARGV else default
+
+
+ABOVE = float(arg('--above', '-1e9'))
 
 
 def ramp(z):
@@ -102,6 +127,8 @@ def repaint(o, keep_below):
     if ca.domain == 'POINT':
         for i in range(len(me.vertices)):
             z = zs[i]
+            if z < ABOVE:
+                continue
             tgt = ramp(z)
             k = 1.0 if not keep_below else smoothstep(z, VALLEY_TOP, VALLEY_FADE)
             if k <= 0.0:
@@ -116,6 +143,8 @@ def repaint(o, keep_below):
     else:
         for li, loop in enumerate(me.loops):
             z = zs[loop.vertex_index]
+            if z < ABOVE:
+                continue
             tgt = ramp(z)
             k = 1.0 if not keep_below else smoothstep(z, VALLEY_TOP, VALLEY_FADE)
             if k <= 0.0:
@@ -129,6 +158,16 @@ def repaint(o, keep_below):
             n += 1
     return n
 
+
+# ---- and one shader, because they were not on one either ----
+# The ground carries Material_1 and every mountain carries JP_VertexColor. Both are a Principled
+# BSDF fed by a Color Attribute node, so in Blender's own shading view they resolve to the same
+# thing and the mismatch is invisible — but they are not the same material, and the exporter
+# writes them out as two: JP_VertexColor with doubleSided and a KHR_materials_specular of 0.4,
+# Material_1 with neither. Anything downstream that treats a landform as a landform then has two
+# starting points to reconcile, which is the shape of every colour problem this file has had.
+# The mountains take the ground's material, so there is one.
+GROUND_MAT = 'Material_1'
 
 touched = {'terrain': 0, 'fuji': 0, 'ranges': 0}
 objs = {'terrain': [], 'fuji': [], 'ranges': []}
@@ -149,14 +188,23 @@ for o in objs['fuji'] + objs['ranges']:
     key = 'fuji' if o.name == FUJI else 'ranges'
     touched[key] += repaint(o, keep_below=False)
 
+ground_mat = bpy.data.materials.get(GROUND_MAT)
+unified = []
+if ground_mat is not None:
+    for o in objs['fuji'] + objs['ranges']:
+        for i in range(len(o.data.materials)):
+            if o.data.materials[i] is not ground_mat:
+                unified.append('%s[%d]:%s' % (o.name, i, o.data.materials[i].name
+                                              if o.data.materials[i] else None))
+                o.data.materials[i] = ground_mat
+
 # ---- optionally make it permanent ----
 # Off by default: this normally runs in the same background Blender as the export and only alters
 # the in-memory data, so an open session is never at risk. `-- --save` writes the .blend, which is
 # a deliberate act and wants the file closed in the UI first — Blender keeps the previous version
 # as environment.blend1 either way.
 saved = None
-argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-if '--save' in argv:
+if '--save' in ARGV:
     bpy.ops.wm.save_mainfile()
     saved = bpy.data.filepath
 
@@ -164,5 +212,9 @@ print('RECOLOURED ' + json.dumps({
     'corners': touched,
     'objects': {k: len(v) for k, v in objs.items()},
     'level': LEVEL,
+    'snow': SNOW_LEVEL,
+    'above': ABOVE if ABOVE > -1e8 else None,
+    'unified': len(unified),
+    'unifiedFrom': sorted({u.split(':')[-1] for u in unified}),
     'saved': saved,
 }))
