@@ -2113,6 +2113,14 @@ function mountainMaterial(opts) {
      already in the texture, and doing them twice would fight. */
   return rocky(mat, {
     mottle: 0,
+    /* THE SPLOTCHES ON FUJI ARE CLOUD SHADOWS, and a mountain is the one surface they cannot
+       work on. The projection assumes the shadow lands on ground near y = 0 — it is the world
+       position offset along the light and read out of a noise texture — so on a cone rising
+       seven thousand units the same blob smears up the flank as a stain that belongs to no
+       cloud you can see. Measured, turning the cloud shadow off lifts Fuji's face by 6 luminance
+       on average, and locally by much more, which is exactly the spotting.
+       0.06 keeps the faintest sense that weather passes over it and stops it patterning. */
+    cloudAmt: 0.06,
     scale: opts.bumpFreq != null ? opts.bumpFreq : 1 / 900,
     origin: opts.origin,
     bump: opts.bump != null ? opts.bump : 0.55,
@@ -2207,6 +2215,9 @@ function rocky(mat, opts = {}) {
        IS very nearly monochrome, which is also why every sumi-e of one is. */
     uDechill: { value: opts.dechill != null ? opts.dechill : 0 },
     uMottle: { value: opts.mottle != null ? opts.mottle : 0.30 },
+    /* A MATERIAL CAN OVERRIDE THE WEATHER. cloudy() assigns the shared CLOUD uniforms first and
+       the rock ones second, so anything named here wins for this material alone. */
+    uCloudAmt: { value: opts.cloudAmt != null ? opts.cloudAmt : CLOUD.uCloudAmt.value },
     /* how hard the relief leans the normal, and at what size */
     uBumpAmt: { value: opts.bump != null ? opts.bump : 0 },
     uBumpScale: { value: opts.bumpScale != null ? opts.bumpScale : 1 },
@@ -4787,6 +4798,28 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   /* the same rule, for the mesh that carries every hill in the valley — see the note on the
      ranges below. Its hull contributed 28-41% of every dark region and nothing anywhere else. */
   terrainish.forEach((o) => { o.userData.noOutline = true; });
+  /* THE BIG DARK OVAL IN THE MEADOW IS A TERMINATOR, and measuring it is what finally said so.
+     It is not the cloud shadow, not the shadow map and not the paint: turning each off in turn
+     moves it by 0, 2 and 0 luminance, and the terrain's own vertex colour there (#778551) is
+     within a few per cent of the bright meadow's (#848866). What IS different is the slope. The
+     average normal under the patch is (0.10, 0.89, 0.44) against a sun direction of
+     (-0.42, 0.21, -0.88): N.L = -0.254. That ground genuinely faces away from the sunrise.
+     So the shading is right and the RENDERING of it is what fails — a four-step ramp collapses
+     everything at or below zero into one flat value, and the hill is thousands of units across,
+     so the honest terminator comes out as a single enormous flat region with a hard rim. It is
+     precisely the problem Fuji had, on the largest surface in the frame, and it takes the same
+     answer: give it relief. With the normal wobbling, the step edge follows the ground instead
+     of cutting an oval across it, and the flat region inside gains the variation that says
+     "hillside in shadow" rather than "stain".
+     Large and gentle on purpose — 1/1400 is a ~1,400-unit undulation, the scale of the land
+     itself. Finer than that and the meadow reads as noise.
+     The material is cloned first because the loader shares one material per source material,
+     and the ground must not drag every other vertex-coloured surface with it. */
+  terrainish.forEach((o) => {
+    o.material = rocky(o.material.clone(), {
+      mottle: 0, bump: 0.5, scale: 1 / 1400, cloudAmt: CLOUD.uCloudAmt.value,
+    });
+  });
   /* AND THE REPAINT IS OFF, BECAUSE IT DOES NOTHING.
      liftHighGround was written to fix mountains that read as black. They read as black because
      they were under their own outline hulls, and once the hulls went the lift turned out to be
