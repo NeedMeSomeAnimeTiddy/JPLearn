@@ -7798,7 +7798,6 @@ function select(i) {
   if (busy || state !== 'menu') return;
   busy = true;
   activeMode = tmode;
-  setTimeout(() => { state = 'moving'; }, 0);
   buildSub(i);
   itemEls.forEach((el, j) => el.classList.toggle('is-active', j === i));
   document.body.classList.remove('at-menu');
@@ -7817,6 +7816,17 @@ function select(i) {
     state = 'sub'; busy = false;
     return;
   }
+  /* SET HERE, SYNCHRONOUSLY, AND NOT ON A TIMER. This was `setTimeout(() => { state = 'moving'; },
+     0)` at the top of the function, presumably so the synchronous body above still ran as 'menu'.
+     A zero-delay timer is not the next instant, it is the next free macrotask — and entering a
+     place starves the main thread for over a second building the sub-scene and compiling its
+     shaders. Traced: Enter, then `sub` at 652ms as the flight lands, then `moving` at 2042ms when
+     the stale timer finally fired ON TOP of the arrival. The menu was then wedged for good, since
+     goBack() requires state === 'sub' and nothing else ever sets it.
+     The reduced-motion branch above returns before this line, so it keeps the 'sub' it just set —
+     which is the other way the same timer used to land after the arrival, that path arriving
+     synchronously rather than late. */
+  state = 'moving';
   /* Light the destination room early — it is off-axis, so nobody sees it arrive. The home
      dressing is a different matter: switching it off on a fixed 0.4s timer killed it while it
      was still in shot. Drop it the frame it actually clears the frustum instead. */
