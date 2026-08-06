@@ -46,6 +46,11 @@ at 940 x 760 is roughly 38 x 30 m — a big 方丈, which is what it is.)
 
 ## Not in git
 
-`world.glb` (42 MB) and `environment.blend` (18 MB) are untracked, and `lib/` is gitignored — so a
-fresh clone cannot run the mockup without regenerating the model and restoring the vendored three.js
-and GSAP. Worth fixing before anyone else needs to open this.
+`world.glb`, `environment.blend` and `environment.blend1` are gitignored (see `.gitignore` here for
+why), and `lib/` is ignored by the repository root. So a **fresh clone cannot run the mockup**: it
+needs the vendored three.js and GSAP restored, and `world.glb` rebuilt from a `.blend` that is not
+in the repository either.
+
+**`environment.blend` is therefore backed up nowhere.** It is the source of truth for the whole
+world — 20,695 objects — and losing it means rebuilding the valley by hand. Put it somewhere with
+version history that is not this repository.

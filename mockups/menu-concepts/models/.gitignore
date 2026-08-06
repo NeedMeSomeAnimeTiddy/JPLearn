@@ -1,0 +1,15 @@
+# The Blender source and the world baked out of it.
+#
+# world.glb is a build artifact. `blender --background environment.blend --python recolor_land.py
+# --python export_world.py` regenerates it from scratch, and at 42 MB a revision it would dominate
+# the history of a repository whose next largest file is 400 KB.
+#
+# environment.blend is NOT an artifact — it is the source of truth for the entire world, and
+# ignoring it means GIT IS NOT BACKING IT UP. That is a deliberate trade: an 18 MB binary cannot be
+# diffed or merged, so every save would be a full copy and a conflict would be unresolvable. It
+# needs backing up somewhere that is not this repository. Blender's own environment.blend1 is a
+# single-step undo, not a backup.
+
+world.glb
+*.blend
+*.blend1
