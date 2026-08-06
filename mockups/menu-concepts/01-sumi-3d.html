@@ -1679,37 +1679,6 @@ addEventListener('resize', () => {
 
 
 /* ================= back scene: night atmosphere ================= */
-const P_COUNT = 800;
-const pGeo = new THREE.BufferGeometry();
-const pPos = new Float32Array(P_COUNT * 3);
-const pVel = new Float32Array(P_COUNT * 2);
-for (let i = 0; i < P_COUNT; i++) {
-  pPos[i*3]     = -1400 + Math.random() * 4200;
-  pPos[i*3 + 1] = -900 + Math.random() * 1900;
-  pPos[i*3 + 2] = -2400 + Math.random() * 2700;
-  pVel[i*2]     = 0.6 + Math.random() * 1.6;
-  pVel[i*2 + 1] = 2 + Math.random() * 7;
-}
-pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-const points = new THREE.Points(pGeo, new THREE.PointsMaterial({
-  size: 13, map: softDot(214, 224, 240), transparent: true, opacity: 0.4,
-  depthWrite: false, sizeAttenuation: true,
-}));
-/* removed: 2D foreground stylisation — the world carries the scene now */
-/* a scattering of gold embers among the mist */
-const E_COUNT = 90;
-const eGeo = new THREE.BufferGeometry();
-const ePos = new Float32Array(E_COUNT * 3);
-for (let i = 0; i < E_COUNT; i++) {
-  ePos[i*3] = -1200 + Math.random() * 3800;
-  ePos[i*3 + 1] = -800 + Math.random() * 1700;
-  ePos[i*3 + 2] = -2000 + Math.random() * 2300;
-}
-eGeo.setAttribute('position', new THREE.BufferAttribute(ePos, 3));
-const embers = new THREE.Points(eGeo, new THREE.PointsMaterial({
-  size: 10, map: softDot(232, 196, 124), transparent: true, opacity: 0.5,
-  depthWrite: false, sizeAttenuation: true,
-}));
 /* removed: 2D foreground stylisation — the world carries the scene now */
 
 const clouds = [];
@@ -2109,104 +2078,7 @@ function landformMaterial(o) {
    band toward it, so the high ground steps up in value the way the range meshes do.
    It is ALBEDO — what the ground is made of, rock rather than forest, above a treeline. It is not
    light and it is not baked shading: the sun still moves over it. */
-function liftHighGround(mesh, y0, y1, loHex, hiHex, maxAmt) {
-  const g = mesh.geometry;
-  const pos = g.attributes.position;
-  const col = g.attributes.color;
-  if (!col) return 0;
-  const lo = new THREE.Color(loHex), hi = new THREE.Color(hiHex), tgt = new THREE.Color();
-  const v = new THREE.Vector3();
-  let touched = 0;
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
-    const t = THREE.MathUtils.smoothstep(v.y, y0, y1);
-    if (t <= 0) continue;
-    tgt.copy(lo).lerp(hi, t);
-    const a = t * maxAmt;
-    col.setXYZ(i,
-      col.getX(i) + (tgt.r - col.getX(i)) * a,
-      col.getY(i) + (tgt.g - col.getY(i)) * a,
-      col.getZ(i) + (tgt.b - col.getZ(i)) * a);
-    touched++;
-  }
-  col.needsUpdate = true;
-  return touched;
-}
 
-function rocky(mat, opts = {}) {
-  if (opts.warm) mat.color.setHex(opts.warm);
-  if (opts.lift) mat.emissive = new THREE.Color(opts.lift);
-  /* A CLONED MATERIAL LIES ABOUT BEING PATCHED. Material.copy() deep-copies userData but does
-     NOT copy onBeforeCompile — so `mat.clone()` arrives carrying `cloudy: true` with no patch
-     attached, cloudy() takes its early return, and the result is a material with no rock, no
-     cloud shadows and no valley mist that reports itself as fully patched. Clearing the flag is
-     the whole fix, and it has to be here rather than at the call site because every future
-     caller would have to remember. */
-  delete mat.userData.cloudy;
-  mat.userData.rock = {
-    uRockScale: { value: opts.scale != null ? opts.scale : 1 / 900 },
-    /* NOISE IS EVALUATED ABOUT THE OBJECT, NOT ABOUT THE WORLD ORIGIN.
-       Fuji stands 23,000 units out, so its fifth octave was hashing coordinates around 2,150 —
-       and a float32 fract() of a product of numbers that size has about three significant digits
-       left. The hash collapses to a few hundred distinct values and the "rock detail" becomes
-       visible blocks. Subtracting the object's own centre first keeps every octave near the
-       origin where the hash actually works. */
-    uNoiseOrigin: { value: new THREE.Vector3(
-      opts.origin ? opts.origin[0] : 0, opts.origin ? opts.origin[1] : 0,
-      opts.origin ? opts.origin[2] : 0) },
-    /* HOW MUCH OF THE ROCK'S OWN HUE SURVIVES. The authored flank is a saturated blue-grey, and
-       under a cold bounce light at 0.95 it goes properly blue — which is not what a mountain
-       does at sunrise. Pulling it toward its own luminance and then tinting warm is aerial
-       perspective, which is warm at this hour, not cold. */
-    uDesat: { value: opts.desat != null ? opts.desat : 0 },
-    uRockTint: { value: new THREE.Color(opts.tint != null ? opts.tint : 0xffffff) },
-    /* AERIAL PERSPECTIVE, WHICH IS THE ACTUAL ANSWER TO "WHY IS IT SO BLUE".
-       Desaturating the albedo was treating the symptom: the blue is arriving from the cold
-       bounce light, and no change to the rock's own colour removes light that is being added on
-       top of it. What a mountain thirty thousand units away actually looks like at sunrise is
-       the AIR in front of it — twenty kilometres of it, lit warm from the side — and the scene's
-       distance fog only carries a third of that here because it was tuned to keep the valley
-       legible. This is the rest, applied only to the mountains, keyed on real distance: it makes
-       Fuji warm instead of blue and it separates the far ranges into pale layers, which is what
-       finally lets the new ridge detail read at all. */
-    uAerColor: { value: new THREE.Color(opts.aerColor != null ? opts.aerColor : 0xc9a68f) },
-    uAerNear: { value: opts.aerNear != null ? opts.aerNear : 9000 },
-    uAerFar: { value: opts.aerFar != null ? opts.aerFar : 40000 },
-    uAerAmt: { value: opts.aerAmt != null ? opts.aerAmt : 0 },
-    /* AND THE COLD LIGHT ITSELF.
-       Aerial perspective at 43% still left a blue mountain, because what it is mixing INTO is a
-       surface lit almost entirely by the cold rig: Fuji's visible flank faces the camera and away
-       from the key, so nearly all of its light comes from a 0x93b0dc bounce and a 0xcfd8e6
-       hemisphere. Both are deliberately cold and the whole valley is tuned around them, so the
-       fix is not to change the lights — it is to let the mountains, and only the mountains, drop
-       most of their chroma and take the warm end back from the haze. A distant mountain at dawn
-       IS very nearly monochrome, which is also why every sumi-e of one is. */
-    uDechill: { value: opts.dechill != null ? opts.dechill : 0 },
-    uMottle: { value: opts.mottle != null ? opts.mottle : 0.30 },
-    /* A MATERIAL CAN OVERRIDE THE WEATHER. cloudy() assigns the shared CLOUD uniforms first and
-       the rock ones second, so anything named here wins for this material alone. */
-    uCloudAmt: { value: opts.cloudAmt != null ? opts.cloudAmt : CLOUD.uCloudAmt.value },
-    /* how hard the relief leans the normal, and at what size */
-    uBumpAmt: { value: opts.bump != null ? opts.bump : 0 },
-    uBumpScale: { value: opts.bumpScale != null ? opts.bumpScale : 1 },
-    uGully: { value: opts.gully || 0 },
-    uGullyN: { value: opts.gullyN != null ? opts.gullyN : 26 },
-    uAxis: { value: new THREE.Vector2(opts.axis ? opts.axis[0] : 0, opts.axis ? opts.axis[1] : 0) },
-    uSnowY: { value: opts.snowY != null ? opts.snowY : 1e9 },
-    uSnowBand: { value: opts.snowBand != null ? opts.snowBand : 400 },
-    uSnowJitter: { value: opts.snowJitter != null ? opts.snowJitter : 700 },
-    uSnowSlope: { value: opts.snowSlope != null ? opts.snowSlope : 0.42 },
-    uSnowAdd: { value: opts.snowAdd != null ? opts.snowAdd : 0 },
-    /* THE OTHER SNOW MODE. Where the author already painted a cap, a height-based snow line is
-       the wrong tool — it lands on top of theirs and turns the mountain into a white cone.
-       uSnowMid > 0 switches to re-thresholding the paint they did: see the fragment block. */
-    uSnowMid: { value: opts.snowMid || 0 },
-    uSnowSoft: { value: opts.snowSoft != null ? opts.snowSoft : 0.10 },
-    uRockDark: { value: opts.rockDark != null ? opts.rockDark : 0.94 },
-    uSnowCol: { value: new THREE.Color(opts.snowCol != null ? opts.snowCol : 0xf2f0ee) },
-  };
-  return cloudy(mat);
-}
 
 function cloudy(mat) {
   if (mat.userData.cloudy) return mat;
@@ -2219,12 +2091,6 @@ function cloudy(mat) {
        block, and that block evaluates two five-octave noises per pixel whether or not anything
        is left switched on. */
     if (mat.userData.over) Object.assign(shader.uniforms, mat.userData.over);
-    /* AND THE SNOW'S. Forgetting this line is why the mountains came out solid black: the
-       uniforms were declared in the GLSL and read by the snow block, three bound none of them,
-       so uSnowY was 0 — putting the snow line at sea level — and uSnowCol was (0,0,0). The whole
-       mountain was being painted with black snow. A missing uniform does not error; it is zero,
-       and zero is a valid colour. */
-    if (mat.userData.rock) Object.assign(shader.uniforms, mat.userData.rock);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vCloudPos;')
       /* after project_vertex so `transformed` is final; the instancing branch matters because
@@ -2245,100 +2111,8 @@ function cloudy(mat) {
         uniform float uCloudAmt;
         uniform vec3 uMistColor, uRimColor;
         uniform float uMistY, uMistH, uMistAmt, uRimT, uRimAmt;`
-        + (mat.userData.rock ? `
-        uniform float uRockScale, uMottle, uGully, uGullyN, uBumpAmt, uBumpScale;
-        uniform float uSnowY, uSnowBand, uSnowJitter, uSnowSlope, uSnowAdd;
-        uniform float uSnowMid, uSnowSoft, uRockDark, uDesat;
-        uniform float uAerNear, uAerFar, uAerAmt, uDechill;
-        uniform vec3 uNoiseOrigin, uRockTint, uAerColor;
-        uniform vec2 uAxis;
-        uniform vec3 uSnowCol;
-        /* value noise, five octaves. Cheap, and its slightly blobby character is closer to
-           weathered rock than the streaky look gradient noise gives at this scale. */
-        float rkHash( vec3 p ) {
-          p = fract( p * 0.3183099 + vec3( 0.71, 0.113, 0.419 ) );
-          p *= 17.0;
-          return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) );
-        }
-        float rkNoise( vec3 x ) {
-          vec3 i = floor( x ), f = fract( x );
-          f = f * f * ( 3.0 - 2.0 * f );
-          return mix(
-            mix( mix( rkHash( i ), rkHash( i + vec3( 1, 0, 0 ) ), f.x ),
-                 mix( rkHash( i + vec3( 0, 1, 0 ) ), rkHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
-            mix( mix( rkHash( i + vec3( 0, 0, 1 ) ), rkHash( i + vec3( 1, 0, 1 ) ), f.x ),
-                 mix( rkHash( i + vec3( 0, 1, 1 ) ), rkHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ),
-            f.z );
-        }
-        float rkFbm( vec3 p ) {
-          float a = 0.5, s = 0.0;
-          for ( int i = 0; i < 5; i++ ) { s += a * rkNoise( p ); p *= 2.03; a *= 0.5; }
-          return s;
-        }` : ''))
+)
 
-      .replace('#include <color_fragment>', mat.userData.rock ? `#include <color_fragment>
-        {
-          /* THE FACE NORMAL FROM DERIVATIVES, not a varying. These meshes are shaded flat
-             anyway, so the geometric normal IS the shading normal, and taking it here costs
-             nothing and adds no attribute to twenty thousand meshes that do not want one. */
-          vec3 gn = normalize( cross( dFdx( vCloudPos ), dFdy( vCloudPos ) ) );
-          float up = abs( gn.y );
-          vec3 np = ( vCloudPos - uNoiseOrigin ) * uRockScale;
-          float n1 = rkFbm( np );
-          float n2 = rkFbm( np * 4.7 + 31.0 );
-
-          /* RADIAL GULLIES. A stratovolcano is not a smooth cone: it is scored top to bottom by
-             erosion channels, and they are most of why a photograph of Fuji does not look like a
-             lathe. The count is broken up by noise so they are not a comb, and they fade out at
-             the summit and wherever the surface turns flat. */
-          float g = 0.0;
-          if ( uGully > 0.0 ) {
-            vec2 d = vCloudPos.xz - uAxis;
-            float r = length( d );
-            float ang = atan( d.x, d.y );
-            g = sin( ang * uGullyN + rkFbm( ( vCloudPos - uNoiseOrigin ) * 0.00028 ) * 5.0 );
-            /* MASKED BY RADIUS, NOT BY SLOPE. Keying this on how far the face tilts from
-               horizontal was wrong for a shallow cone: Fuji's flanks run at 29 degrees, so
-               abs(n.y) is 0.87 across the whole mountain and one-minus-up never left 0.13 — the
-               gullies were being multiplied by about 0.04 and simply were not there. Radius is
-               the honest axis: nothing at the summit, full on the open flanks, gone under the
-               treeline. (No backticks in this file's shaders — they are template literals.) */
-            g *= uGully * smoothstep( 700.0, 3500.0, r ) * ( 1.0 - smoothstep( 8500.0, 12500.0, r ) );
-          }
-
-          /* MODULATE, NEVER REPLACE: the author's vertex colours stay the palette. */
-          diffuseColor.rgb *= 1.0 + ( n1 - 0.5 ) * uMottle + ( n2 - 0.5 ) * uMottle * 0.4 + g;
-          /* then take the blue out of it and hand it back warm */
-          if ( uDesat > 0.0 ) {
-            float lum = dot( diffuseColor.rgb, vec3( 0.299, 0.587, 0.114 ) );
-            diffuseColor.rgb = mix( diffuseColor.rgb, vec3( lum ) * uRockTint, uDesat );
-          }
-
-          /* SNOW ABOVE A RAGGED LINE, and only where snow could actually lie. Additive on top of
-             whatever cap was painted, so the painted edge gains tongues and fingers instead of
-             being overwritten by a second, competing snow line. */
-          if ( uSnowAdd > 0.0 ) {
-            float line = uSnowY + ( n1 - 0.5 ) * uSnowJitter;
-            float snow = smoothstep( line, line + uSnowBand, vCloudPos.y );
-            snow *= smoothstep( uSnowSlope, uSnowSlope + 0.30, up );
-            snow *= 0.70 + 0.30 * n2;
-            diffuseColor.rgb = mix( diffuseColor.rgb, uSnowCol, clamp( snow * uSnowAdd, 0.0, 1.0 ) );
-          }
-          /* RE-THRESHOLDING A PAINTED CAP, rather than adding a second one.
-             Measured off the mesh: Fuji's vertex-colour luminance sits at 0.10 on the lower cone,
-             ramps from 0.17 at y=4,000 to 0.69 at y=5,000, and plateaus at 0.72. That ramp IS the
-             snow line, drawn as a soft vertical gradient. Offsetting the luminance by noise and
-             re-thresholding it turns that gradient into a ragged edge with tongues and fingers,
-             and leaves everything the author painted decisively exactly as painted — only the
-             soft middle of their own ramp moves. */
-          if ( uSnowMid > 0.0 ) {
-            float lum = dot( diffuseColor.rgb, vec3( 0.299, 0.587, 0.114 ) );
-            float noisy = lum + ( n1 - 0.5 ) * uSnowJitter + ( n2 - 0.5 ) * uSnowJitter * 0.35;
-            float t = smoothstep( uSnowMid - uSnowSoft, uSnowMid + uSnowSoft, noisy );
-            diffuseColor.rgb = mix( diffuseColor.rgb * uRockDark, uSnowCol, t );
-          }
-
-        }` : '#include <color_fragment>')
       /* RELIEF, WHICH IS THE ANSWER TO "IT BANDS".
          A toon ramp quantises N.L, so on a huge smooth surface — a cone twenty-two thousand units
          across — N.L varies slowly and evenly and the quantisation comes out as four enormous
@@ -2354,17 +2128,6 @@ function cloudy(mat) {
          and no extra vertices.
          "Bump mapping affects all aspects of the toon shading, including breaking up the
          transitions between cel shading in a tonemap ramp." — Redshift toon material docs. */
-      .replace('#include <normal_fragment_maps>', mat.userData.rock ? `#include <normal_fragment_maps>
-        if ( uBumpAmt > 0.0 ) {
-          vec3 bp = ( vCloudPos - uNoiseOrigin ) * uRockScale * uBumpScale;
-          float e = 0.35;
-          float h0 = rkNoise( bp ) + 0.5 * rkNoise( bp * 2.7 );
-          float hx = rkNoise( bp + vec3( e, 0.0, 0.0 ) ) + 0.5 * rkNoise( ( bp + vec3( e, 0.0, 0.0 ) ) * 2.7 );
-          float hz = rkNoise( bp + vec3( 0.0, 0.0, e ) ) + 0.5 * rkNoise( ( bp + vec3( 0.0, 0.0, e ) ) * 2.7 );
-          vec3 gW = vec3( hx - h0, 0.0, hz - h0 ) * ( uBumpAmt / e );
-          vec3 gV = mat3( viewMatrix ) * gW;
-          normal = normalize( normal - ( gV - dot( gV, normal ) * normal ) );
-        }` : '#include <normal_fragment_maps>')
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         {
           vec2 cuv = ( vCloudPos.xz - vCloudPos.y * uCloudProj ) * uCloudScale + uCloudOff;
@@ -2417,16 +2180,7 @@ function cloudy(mat) {
            distance because it accumulates along the path — near ridges keep their detail, far
            ones dissolve into layers, and that separation is the only thing that makes a range of
            mountains read as a range rather than one dark mass. */
-        + (mat.userData.rock ? `
-        {
-          if ( uDechill > 0.0 ) {
-            float lum = dot( gl_FragColor.rgb, vec3( 0.299, 0.587, 0.114 ) );
-            gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( lum ) * uAerColor * 1.35, uDechill );
-          }
-          float aer = clamp( ( length( vCloudPos - cameraPosition ) - uAerNear )
-            / max( uAerFar - uAerNear, 1.0 ), 0.0, 1.0 );
-          gl_FragColor.rgb = mix( gl_FragColor.rgb, uAerColor, aer * aer * uAerAmt );
-        }` : ''));
+);
 
     /* a String.replace on a chunk name that moved is a silent no-op, and the result looks
        exactly like a working feature with its strength set to zero. Never let it fail quietly */
@@ -2441,14 +2195,6 @@ function cloudy(mat) {
        red, nothing. A check that can pass while the thing it checks is missing is worse than no
        check, because it is evidence pointing the wrong way. These two greps are only satisfiable
        by the injected statements themselves. */
-    if (mat.userData.rock) {
-      if (!shader.fragmentShader.includes('float n1 = rkFbm( np )')) {
-        console.error('ROCK BODY MISSING (<color_fragment> did not land)', mat.type);
-      }
-      if (!shader.fragmentShader.includes('aer * aer * uAerAmt')) {
-        console.error('AERIAL BODY MISSING (<fog_fragment> did not land)', mat.type);
-      }
-    }
 
   };
   /* THE CACHE KEY, AND THIS IS WHY NONE OF THE ROCK SHADING EVER APPEARED.
@@ -2464,8 +2210,10 @@ function cloudy(mat) {
      rewriting the snow colour and disabling the re-threshold all did nothing at all, because
      none of that code was in the executing program. Three separate sessions of tuning values
      that could not have had an effect.
-     The key has to distinguish anything that changes the GENERATED SOURCE. */
-  mat.customProgramCacheKey = () => 'cloudy' + (mat.userData.rock ? '|rock' : '');
+     The key has to distinguish anything that changes the GENERATED SOURCE. Only one shape
+     is generated now that the rock path is gone, so it is a constant — but it has to
+     stay, because the DEFAULT would go back to hashing onBeforeCompile.toString(). */
+  mat.customProgramCacheKey = () => 'cloudy';
   mat.needsUpdate = true;
   CLOUD_MATS.push(mat);
   return mat;
@@ -4263,103 +4011,6 @@ function matchToGround(mesh, target, amt) {
    vertical: it is that midpoint subdivision splits every triangle FOUR ways, so the new vertices
    land on every edge and the interpolation gets finer in both directions at once. The earlier
    pass did this to the far ranges and never to Fuji. */
-function paintMountain(mesh, opts) {
-  let g = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
-  for (let i = 0; i < (opts.split || 0); i++) g = splitTris(g);
-
-  const pos = g.attributes.position.array;
-  const n = g.attributes.position.count;
-  /* the normal is needed per vertex to keep snow off the cliffs, and it has to be the WELDED
-     one or adjacent triangles disagree about whether they are flat and the snow line frays */
-  const key = (i) => `${Math.round(pos[i * 3])}|${Math.round(pos[i * 3 + 1])}|${Math.round(pos[i * 3 + 2])}`;
-  const acc = new Map();
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
-  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), fn = new THREE.Vector3();
-  for (let t = 0; t < n; t += 3) {
-    a.fromArray(pos, t * 3); b.fromArray(pos, (t + 1) * 3); c.fromArray(pos, (t + 2) * 3);
-    fn.crossVectors(ab.subVectors(b, a), ac.subVectors(c, a)).normalize();
-    for (let k = 0; k < 3; k++) {
-      const kk = key(t + k);
-      let v = acc.get(kk);
-      if (!v) acc.set(kk, v = new THREE.Vector3());
-      v.add(fn);
-    }
-  }
-  acc.forEach((v) => v.normalize());
-
-  const nrm = new Float32Array(n * 3);
-  const col = new Float32Array(n * 3);
-  const rock = new THREE.Color(opts.rock);
-  const rockHi = new THREE.Color(opts.rockHi != null ? opts.rockHi : opts.rock);
-  const foot = new THREE.Color(opts.foot != null ? opts.foot : opts.rock);
-  const snow = new THREE.Color(opts.snow != null ? opts.snow : 0xfffdf8);
-  const snowLit = new THREE.Color();
-  const tmp = new THREE.Color();
-  const up = new THREE.Vector3(0, 1, 0);
-  const wp = new THREE.Vector3();
-
-  for (let i = 0; i < n; i++) {
-    const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
-    const nv = acc.get(key(i)) || up;
-    nrm[i * 3] = nv.x; nrm[i * 3 + 1] = nv.y; nrm[i * 3 + 2] = nv.z;
-    /* world position, because the noise and the snow line are world quantities and this mesh
-       may sit under a transform */
-    wp.set(x, y, z).applyMatrix4(mesh.matrixWorld);
-
-    /* THE BODY: a foot colour blending up into rock, so the base sits into the treeline
-       instead of ending at it. This is the "depth treatment" — a mountain is not one colour. */
-    const up01 = THREE.MathUtils.clamp((wp.y - opts.footY) / Math.max(1, opts.rockY - opts.footY), 0, 1);
-    tmp.copy(foot).lerp(rock, up01 * up01 * (3 - 2 * up01));
-    /* mottle, from the same value noise the crags use, so colour and form agree */
-    const m = (jsFbm(wp.x * opts.grain, wp.y * opts.grain, wp.z * opts.grain) - 0.5) * (opts.mottle || 0);
-    tmp.lerp(rockHi, THREE.MathUtils.clamp(0.5 + m * 3, 0, 1) * 0.45);
-
-    /* THE SNOW: a wide height blend with a noisy line, and nothing on the steep faces. Wide is
-       the whole point — uSnowBand of 1,500 over a cone 6,100 tall spreads the transition across
-       a quarter of its height, which cannot read as a cutoff at any zoom. */
-    /* THE LIGHT IS BAKED IN, AND THE MOUNTAINS ARE UNLIT.
-       Every attempt to get a white cap has been fighting the rig: the key is a low sunrise sun
-       that barely touches the camera-facing flank, and what remains is a 0x93b0dc bounce and a
-       0xcfd8e6 hemisphere — both cold — so a warm albedo comes back neutral and a white one
-       comes back grey-blue. The toon ramp had been hiding this behind a 37% floor.
-       A mountain twenty-six thousand units away is a matte painting. Its shading is baked here,
-       with the sun direction the scene actually uses, and the material is unlit: what is painted
-       is what is seen. Snow stays snow-coloured, rock stays warm, and nothing downstream can
-       tint it by accident. (paintMountain is re-runnable if the sun ever moves far enough to
-       matter — NAV.sun does not currently do that.) */
-    if (opts.sun) {
-      const nl = Math.max(0, nv.x * opts.sun.x + nv.y * opts.sun.y + nv.z * opts.sun.z);
-      /* a soft wrap rather than a hard terminator: at this distance the shadow side of a
-         mountain is lit by the whole sky, not by nothing */
-      const shade = 0.52 + 0.48 * Math.pow(nl, 0.85);
-      tmp.multiplyScalar(shade);
-      /* and the lit side takes the sunrise's colour, the shadow side a little of the sky's */
-      tmp.r *= 1 + 0.16 * nl; tmp.b *= 1 - 0.10 * nl + 0.06 * (1 - nl);
-    }
-    if (opts.snowY != null) {
-      const line = opts.snowY + (jsFbm(wp.x * opts.snowGrain, wp.y * opts.snowGrain, wp.z * opts.snowGrain) - 0.5) * opts.snowJitter;
-      let sn = THREE.MathUtils.smoothstep(wp.y, line, line + opts.snowBand);
-      sn *= THREE.MathUtils.smoothstep(Math.abs(nv.y), opts.snowSlope, opts.snowSlope + 0.28);
-      /* the cap is blended in after the shading, and keeps most of its brightness: snow is the
-         one thing in the frame that is genuinely near-white, and letting the terminator drag it
-         down to grey is what made every previous version look capless */
-      const k = THREE.MathUtils.clamp(sn, 0, 1);
-      if (k > 0 && opts.sun) {
-        const nl = Math.max(0, nv.x * opts.sun.x + nv.y * opts.sun.y + nv.z * opts.sun.z);
-        snowLit.copy(snow).multiplyScalar(0.80 + 0.20 * nl);
-        tmp.lerp(snowLit, k);
-      } else {
-        tmp.lerp(snow, k);
-      }
-    }
-    col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-  }
-  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.computeBoundingSphere();
-  mesh.geometry = g;
-  return n;
-}
 
 /* WELDED, SMOOTH NORMALS — and this is the "pixelated", not the ramp and not the noise.
    Fuji arrives from the .glb with per-face normals: it was authored flat-shaded, like everything
@@ -7955,22 +7606,6 @@ function tick() {
   }
 
   if (!reduced) {
-    const arr = pGeo.attributes.position.array;
-    for (let i = 0; i < P_COUNT; i++) {
-      arr[i*3]     += Math.sin(t * 0.3 + pVel[i*2]) * 2.4 * dt;
-      arr[i*3 + 1] -= pVel[i*2 + 1] * dt;
-      if (arr[i*3 + 1] < -950) arr[i*3 + 1] = 950;
-    }
-    pGeo.attributes.position.needsUpdate = true;
-
-    const eArr = eGeo.attributes.position.array;
-    for (let i = 0; i < E_COUNT; i++) {
-      eArr[i*3 + 1] += (4 + (i % 5)) * dt;
-      eArr[i*3]     += Math.sin(t * 0.5 + i) * 3 * dt;
-      if (eArr[i*3 + 1] > 950) eArr[i*3 + 1] = -850;
-    }
-    eGeo.attributes.position.needsUpdate = true;
-
     clouds.forEach((c2) => {
       c2.material.rotation += c2.userData.rot;
       const b = 1 + Math.sin(t * 0.14 * c2.userData.breathe) * 0.05;
