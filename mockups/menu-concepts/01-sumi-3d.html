@@ -2144,63 +2144,38 @@ const CLOUD_MATS = [];
    wandering line by world height in the shader.
    MTN_LEVEL still scales it, because a mountain at 24,000 units reasonably reads a little
    darker than the field at your feet, and it is one number rather than a palette. */
-/* THE MOUNTAIN COLOUR, DERIVED FROM WHATEVER IT IS GROWING OUT OF.
-   A fixed hex cannot do this job, and the measurement says why. The rock was one colour,
-   0x9a9184 scaled by MTN_LEVEL — right for Fuji, whose BASE is scaled by that same level, and
-   wrong for the terrain, whose base is its own unscaled vertex paint. Measured either side of
-   the line on the terrain:
-       base just below   #758451   luminance 0.210
-       rock              #6e675e   luminance 0.138     34% DARKER
-   while on Fuji the identical rock sits 25% BRIGHTER than its base. One number, two bases, two
-   opposite relationships — which on the hillside came out as a hard dark stripe across a bright
-   green field, because that is exactly what it was.
-   Taking the base's own luminance and desaturating it warm makes the band a change of HUE at
-   nearly the same value: rock instead of grass, not a shadow. `lift` is the only thing that
-   moves the value, and it moves it up, because bare ground above a treeline is lighter than the
-   meadow below it. */
-function rockFor(base, lift = 1.12) {
-  const l = 0.2126 * base.r + 0.7152 * base.g + 0.0722 * base.b;
-  return new THREE.Color(l * 1.06, l * 1.0, l * 0.90).multiplyScalar(lift);
-}
+/* EVERY LANDFORM, ONE MATERIAL, AND THE PAINT COMES FROM THE MODEL.
+   What used to live here — rockFor, a height ramp, a snow line, a rock band, MTN_LEVEL,
+   RANGE_LEVEL, a per-material dimming curve — was all one thing: an attempt to reconcile four
+   landforms that were painted on four different scales. Measured out of the .blend at the same
+   elevation (linear luminance of the Color attribute):
 
-function mountainMaterial(opts) {
-  /* PER MOUNTAIN, because the ranges stand 9,000 to 15,000 units further back than Fuji and the
-     distance fog lifts them for it — 31% of the fog colour at 33,000 against 18% at 24,000, and
-     the dawn fog colour is bright. Same paint, same ramp, and they still measured 141 to Fuji's
-     109. The level is where that is corrected, because it is the only thing that scales with
-     nothing else. */
-  /* NOT PRE-SCALED. The level is applied in the shader by height, above, so the material's
-     own colour is the field's colour exactly as the ground has it. */
-  const lvl = opts.level != null ? opts.level : MTN_LEVEL;
-  const mat = new THREE.MeshToonMaterial({
-    color: opts.base.clone(),
-    gradientMap: RAMP_PEAK,
-  });
-  /* GROUND, THEN MOUNTAIN, THEN SNOW — two height blends over the ground colour the material
-     starts as. The rock colour is scaled by the same level as the base so a mountain stays one
-     object; the snow is not, because a cap that dims with distance stops reading as snow. */
-  mat.userData.snow = {
-    uBaseY0: { value: LAND_DIM_Y0 },
-    uBaseY1: { value: LAND_DIM_Y1 },
-    uBaseLevel: { value: MTN_LEVEL },
-    uRockY: { value: opts.rockY },
-    uRockBand: { value: opts.rockBand },
-    uRockJitter: { value: opts.rockJitter },
-    uRockCol: { value: opts.rock != null ? new THREE.Color(opts.rock)
-      : rockFor(opts.base.clone().multiplyScalar(lvl)) },
-    uSnowY: { value: opts.snowY },
-    uSnowBand: { value: opts.snowBand },
-    uSnowJitter: { value: opts.snowJitter },
-    uSnowScale: { value: opts.snowScale != null ? opts.snowScale : 1 / 1800 },
-    uSnowCol: { value: new THREE.Color(opts.snow != null ? opts.snow : 0xd8d4cc) },
-    uSnowOrigin: { value: new THREE.Vector3(opts.origin[0], 0, opts.origin[1]) },
-  };
-  /* THE CLOUD SHADOW IS OVERRIDDEN, because a mountain is the one surface that projection cannot
-     work on: it offsets a world position along the light and reads a noise texture, which assumes
-     the shadow lands near y = 0, so on a cone rising seven thousand units the same blob smears up
-     the flank as a stain belonging to no cloud in the sky. */
-  mat.userData.over = { uCloudAmt: { value: 0.06 } };
-  return cloudy(mat);
+       Z band        terrain   Fuji   FarRange_009   Range_008
+       < 800           0.228      -        0.098       0.055
+       800-1900        0.208    0.141      0.105       0.061
+       1900-3200       0.166    0.121      0.115       0.065
+       3200-4500       0.519    0.171      0.135         -
+       > 4500          0.767    0.623      0.150         -
+
+   Three to five times apart, with a 3.1x step in the terrain alone at Z 3,200. No expression in
+   a renderer can undo four different paint jobs at once, which is exactly why every match here
+   produced a mismatch somewhere else.
+   The paint is fixed in Blender now — models/recolor_land.py repaints all twenty-one landform
+   objects from one ramp of world height at export time — so this is only a material: the mesh's
+   own colours, the landform light curve, and no cloud shadow to speak of. */
+function landformMaterial(o) {
+  const m = o.material.clone();
+  /* Material.clone() copies userData but NOT onBeforeCompile, so the cloudy flag has to be
+     cleared or the patch takes its early return and the clone silently loses cloud shadows,
+     mist and fog. */
+  delete m.userData.cloudy;
+  m.gradientMap = RAMP_PEAK;
+  /* a mountain is the one surface the cloud-shadow projection cannot work on: it offsets a world
+     position along the light and reads a noise texture, which assumes the shadow lands near
+     y = 0, so on a cone rising seven thousand units the blob smears up the flank as a stain
+     belonging to no cloud in the sky */
+  m.userData.over = { uCloudAmt: { value: 0.06 } };
+  return cloudy(m);
 }
 
 /* REPAINT HIGH GROUND AS MOUNTAIN.
@@ -2331,7 +2306,6 @@ function cloudy(mat) {
        so uSnowY was 0 — putting the snow line at sea level — and uSnowCol was (0,0,0). The whole
        mountain was being painted with black snow. A missing uniform does not error; it is zero,
        and zero is a valid colour. */
-    if (mat.userData.snow) Object.assign(shader.uniforms, mat.userData.snow);
     if (mat.userData.rock) Object.assign(shader.uniforms, mat.userData.rock);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vCloudPos;')
@@ -2353,29 +2327,6 @@ function cloudy(mat) {
         uniform float uCloudAmt;
         uniform vec3 uMistColor, uRimColor;
         uniform float uMistY, uMistH, uMistAmt, uRimT, uRimAmt;`
-        + (mat.userData.snow ? `
-        uniform float uSnowY, uSnowBand, uSnowJitter, uSnowScale;
-        uniform float uRockY, uRockBand, uRockJitter;
-        uniform float uBaseY0, uBaseY1, uBaseLevel;
-        uniform vec3 uSnowCol, uRockCol, uSnowOrigin;` : '')
-        + ((mat.userData.rock || mat.userData.snow) && !mat.userData.rock ? `
-        /* the same value noise the rock block carries, declared on its own when only the snow
-           line needs it — two octaves is all a ragged edge takes */
-        float rkHash( vec3 p ) {
-          p = fract( p * 0.3183099 + vec3( 0.71, 0.113, 0.419 ) );
-          p *= 17.0;
-          return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) );
-        }
-        float rkNoise( vec3 x ) {
-          vec3 i = floor( x ), f = fract( x );
-          f = f * f * ( 3.0 - 2.0 * f );
-          return mix(
-            mix( mix( rkHash( i ), rkHash( i + vec3( 1, 0, 0 ) ), f.x ),
-                 mix( rkHash( i + vec3( 0, 1, 0 ) ), rkHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
-            mix( mix( rkHash( i + vec3( 0, 0, 1 ) ), rkHash( i + vec3( 1, 0, 1 ) ), f.x ),
-                 mix( rkHash( i + vec3( 0, 1, 1 ) ), rkHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ),
-            f.z );
-        }` : '')
         + (mat.userData.rock ? `
         uniform float uRockScale, uMottle, uGully, uGullyN, uBumpAmt, uBumpScale;
         uniform float uSnowY, uSnowBand, uSnowJitter, uSnowSlope, uSnowAdd;
@@ -2406,43 +2357,7 @@ function cloudy(mat) {
           for ( int i = 0; i < 5; i++ ) { s += a * rkNoise( p ); p *= 2.03; a *= 0.5; }
           return s;
         }` : ''))
-      /* SNOW, ON WHATEVER THE SURFACE ALREADY IS.
-         The mountains carry the ground's own colour now, so this is the only thing that makes
-         them a mountain rather than a very tall field: white above a line, and the line wanders.
-         Keyed on world height rather than on a texture coordinate, so it is the same line on
-         every mountain and needs no UVs — and two octaves of value noise bend it enough that it
-         reads as a snowline rather than as a contour. */
-      .replace('#include <color_fragment>', (mat.userData.snow ? `#include <color_fragment>
-        {
-          /* ONE NOISE FIELD, TWO LINES. The rock line and the snow line are read from the same
-             sample at different offsets, so they wander together the way a real treeline and
-             snowline do — bulging out over the same spurs, retreating into the same gullies —
-             instead of being two independent squiggles that happen to share a mountain. */
-          /* THE SAME FUNCTION OF HEIGHT ON EVERY LANDFORM, and this is what "the rim I am
-             telling you to match is not the rim touching the ground" was pointing at.
-             Measured, Fuji's mesh runs from y 1,097 but its first VISIBLE pixel is at 1,509 —
-             only 7% of it is buried — while the ranges that show at all are 28% to 41% buried and
-             fifteen of the nineteen never draw a pixel. So the height at which each mountain
-             actually meets the ground is different for every one of them, and pre-scaling a
-             mountain's whole albedo by MTN_LEVEL made it disagree with the terrain everywhere
-             below the point where the terrain had been scaled too: Fuji's rim emerges at 1,509,
-             where the ground is still at full brightness, and Fuji was already at 0.48.
-             Doing the dimming HERE, as a function of world y, means there is no such thing as a
-             mountain colour and a ground colour any more — there is one colour at a given height,
-             and a mountain is whatever of it happens to be sticking up. It cannot mismatch at the
-             rim because there is nothing to mismatch. */
-          diffuseColor.rgb *= mix( 1.0, uBaseLevel,
-            smoothstep( uBaseY0, uBaseY1, vCloudPos.y ) );
 
-          vec3 sp = ( vCloudPos - uSnowOrigin ) * uSnowScale;
-          float sn = ( rkNoise( sp ) + 0.5 * rkNoise( sp * 3.1 + 11.0 ) ) / 1.5 - 0.5;
-          float rl = uRockY + sn * uRockJitter;
-          diffuseColor.rgb = mix( diffuseColor.rgb, uRockCol,
-            smoothstep( rl, rl + uRockBand, vCloudPos.y ) );
-          float sl = uSnowY + sn * uSnowJitter;
-          diffuseColor.rgb = mix( diffuseColor.rgb, uSnowCol,
-            smoothstep( sl, sl + uSnowBand, vCloudPos.y ) );
-        }` : '#include <color_fragment>'))
       .replace('#include <color_fragment>', mat.userData.rock ? `#include <color_fragment>
         {
           /* THE FACE NORMAL FROM DERIVATIVES, not a varying. These meshes are shaded flat
@@ -2608,9 +2523,6 @@ function cloudy(mat) {
        red, nothing. A check that can pass while the thing it checks is missing is worse than no
        check, because it is evidence pointing the wrong way. These two greps are only satisfiable
        by the injected statements themselves. */
-    if (mat.userData.snow && !shader.fragmentShader.includes('float rl = uRockY + sn')) {
-      console.error('SNOW BODY MISSING (<color_fragment> did not land)', mat.type);
-    }
     if (mat.userData.rock) {
       if (!shader.fragmentShader.includes('float n1 = rkFbm( np )')) {
         console.error('ROCK BODY MISSING (<color_fragment> did not land)', mat.type);
@@ -2635,8 +2547,7 @@ function cloudy(mat) {
      none of that code was in the executing program. Three separate sessions of tuning values
      that could not have had an effect.
      The key has to distinguish anything that changes the GENERATED SOURCE. */
-  mat.customProgramCacheKey = () => 'cloudy' + (mat.userData.rock ? '|rock' : '')
-    + (mat.userData.snow ? '|snow' : '');
+  mat.customProgramCacheKey = () => 'cloudy' + (mat.userData.rock ? '|rock' : '');
   mat.needsUpdate = true;
   CLOUD_MATS.push(mat);
   return mat;
@@ -3267,36 +3178,9 @@ const RAMP_PEAK = toonRamp(64, THREE.LinearFilter, 2.2, 0.10);
 
 /* how much darker the ranges are painted than Fuji, to cancel the extra distance fog they take.
    Swept with ?range=<n> against Fuji's flank. */
-/* where the land stops being valley and starts being mountain, in world units. One pair of
-   numbers for the whole scene — the terrain, Fuji and the ranges all read them. */
-const LAND_DIM_Y0 = 1200;
-const LAND_DIM_Y1 = 2600;
 
-const RANGE_LEVEL = (() => {
-  const v = parseFloat(new URLSearchParams(location.search).get('range'));
-  return Number.isFinite(v) ? v : 1;
-})();
 
-/* HOW BRIGHT THE ROCK AND SNOW ARE, as one number, because it is one decision — and the answer
-   to "the mountains look overexposed by something I cannot see".
-   It was not the emissive fill, which was the obvious suspect since the mountains are the only
-   large surfaces in the world carrying one: 628 materials have emissive #000000 and only these
-   twenty have a map. Sweeping it from full to zero moved Fuji's face by four luminance. It was
-   not the ramp and not the relief either. It is simply the PAINT — Fuji's flank measured 161
-   against a sky of 151 and a meadow of 105, which makes the mountain the brightest large thing
-   in the frame, and a mountain twenty-four thousand units away should not be.
-   Swept with ?mtn=<n>, reading the flank off the framebuffer:
-       1.00 -> 161    0.85 -> 153    0.72 -> 145    0.60 -> 139    0.50 -> 132
-   0.75 put it near 146, under the sky and clear of the meadow — and still too bright, because
-   the level was only half the problem: the ramp was handing a side-on flank 61% of full sun
-   whatever the paint did. With the mountains on their own steeper curve (see toonRamp) the two
-   compound, and 0.66 is where the flank sits properly below the sky rather than beside it. */
-const MTN_LEVEL = (() => {
-  const v = parseFloat(new URLSearchParams(location.search).get('mtn'));
-  /* 0.48, and it is doing half the work — RAMP_PEAK does the other half. See the note there
-     for why matching the paint exactly was not enough to match the pixels. */
-  return Number.isFinite(v) ? v : 0.48;
-})();
+
 
 /* A REAL HASH, NOT AN ARITHMETIC PROGRESSION.
    `(i * 9301 + seed * 49297) % 233280` is LINEAR in i — consecutive instances step by exactly
@@ -4941,20 +4825,8 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
      So "the average colour of the terrain" is not the colour of the ground around Fuji; it is
      the colour of the ground plus a third of a mountain. Taking it from the low vertices only
      gives the mountains the paint of the field they stand in, which is what was asked for. */
-  let fieldCol = new THREE.Color(0x7b8a52);
   root.traverse((o) => {
-    if (!o.isMesh || !/(^|[_\-.])(terrain)([_\-.]|$)/i.test(o.name)) return;
-    groundCol = avgVertexColor(o);
-    const pos = o.geometry.attributes.position, col = o.geometry.attributes.color;
-    if (!col) return;
-    const v = new THREE.Vector3();
-    let r = 0, g = 0, b2 = 0, n = 0;
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
-      if (v.y > 800) continue;
-      r += col.getX(i); g += col.getY(i); b2 += col.getZ(i); n++;
-    }
-    if (n) fieldCol = new THREE.Color(r / n, g / n, b2 / n);
+    if (o.isMesh && /(^|[_\-.])(terrain)([_\-.]|$)/i.test(o.name)) groundCol = avgVertexColor(o);
   });
   let matched = 0;
   root.traverse((o) => {
@@ -4978,7 +4850,6 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
      1,400 is measured, not chosen: the valley floor and the near meadow sit between -300 and
      500, and the visible ridges run from 1,700 to 4,200. Nothing anyone would call a field is
      above 1,400 and nothing anyone would call a mountain is below it. */
-  let lifted = 0;
   /* the same rule, for the mesh that carries every hill in the valley — see the note on the
      ranges below. Its hull contributed 28-41% of every dark region and nothing anywhere else. */
   terrainish.forEach((o) => { o.userData.noOutline = true; });
@@ -5019,103 +4890,15 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
      Cloned so the loader's shared material does not drag every other vertex-coloured surface
      along, and cloudy() re-applied because Material.clone() copies userData but not
      onBeforeCompile — the flag has to be cleared or the patch takes its early return. */
-  /* THE RIDGES ARE THE TERRAIN, AND THIS IS THE THIRD TIME THAT HAS BEEN THE ANSWER.
-     Sweeping the Range meshes' paint by a factor of two moved the ridges on screen by ZERO
-     luminance, because Landscape_Props_Range_* and FarRange_* are buried to their crest lines —
-     the shapes anyone would call the mountains are hills in the one 623,000-vertex terrain mesh.
-     They looked brighter than Fuji for a reason that is now familiar: the author painted the
-     terrain's high ground pale (#bbb8ad above y 3,000 against #7b8a52 below 800), so the hills
-     carry mountain-coloured paint of their own, at a value nothing about Fuji could match.
-     So the terrain gets exactly the scheme asked for, and gets it the same way Fuji does:
-       - its own high-altitude paint is flattened back toward the FIELD colour, so albedo is one
-         value from the valley floor to the summits and nothing is pre-painted as rock;
-       - then the same two height blends run in the shader — ground, fading to mountain, fading
-         to snow — off the same noise, so a ridge and Fuji are the same object seen at different
-         distances rather than two different paint jobs that have to be reconciled.
-     Flattened rather than replaced: the valley's own painting — paths, clearings, the festival
-     ground — is all below 1,200 and is untouched. */
-  /* THE HIGH GROUND IS DARKENED TO FUJI'S LEVEL, and this is the last of "the ranges are
-     brighter than Fuji". Grouping every landform pixel by object instead of sampling boxes finally
-     said which objects were meant:
-         TERRAIN above y 3,200   luminance 123
-         TERRAIN y 1,900-3,200             108
-         Fuji                               99
-         FarRange_008 / _009            98 / 88
-         Range_008 / _009               83 / 79
-     The Range MESHES were already darker than Fuji. What is bright is the terrain's own high
-     ground — because Fuji's base is fieldCol times MTN_LEVEL and the terrain's was fieldCol at
-     full strength, so the hills carried twice the albedo of the mountain they were being compared
-     to. Flattening them to the same scaled colour is the whole fix, and it has to be the same
-     expression or the two drift again the next time either is touched. */
-  /* the flatten only removes the author's pale high-altitude PAINT; the level is the shader's
-     job now, and doing it in both places was double-darkening the terrain relative to Fuji */
-  const highCol = fieldCol.clone();
-  let flat = 0;
-  terrainish.forEach((o) => {
-    const g = o.geometry, pos = g.attributes.position, col = g.attributes.color;
-    if (col) {
-      const v = new THREE.Vector3();
-      for (let i = 0; i < pos.count; i++) {
-        v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
-        const t = THREE.MathUtils.smoothstep(v.y, 1200, 2600);
-        if (t <= 0) continue;
-        col.setXYZ(i,
-          col.getX(i) + (highCol.r - col.getX(i)) * t,
-          col.getY(i) + (highCol.g - col.getY(i)) * t,
-          col.getZ(i) + (highCol.b - col.getZ(i)) * t);
-        flat++;
-      }
-      col.needsUpdate = true;
-    }
-    const m = o.material.clone();
-    delete m.userData.cloudy;
-    /* ONE RAMP FOR EVERY LANDFORM. The terrain's hills ARE the mountains — lighting them on a
-       different curve from Fuji is the thing that has to be justified, not the thing to default
-       to. The props keep the four-step ramp. */
-    m.gradientMap = RAMP_PEAK;
-    /* the same block Fuji uses, in absolute world height because the terrain has no single
-       summit to measure fractions against */
-    m.userData.snow = {
-      uBaseY0: { value: LAND_DIM_Y0 },
-      uBaseY1: { value: LAND_DIM_Y1 },
-      uBaseLevel: { value: MTN_LEVEL },
-      uRockY: { value: 1900 },
-      /* wider and wobblier than Fuji's, because the terrain's hills are broad and a clean curve
-         across one reads as a drawn line rather than as a treeline */
-      uRockBand: { value: 2100 },
-      uRockJitter: { value: 1100 },
-      /* SCALED, because the rock band lives entirely above LAND_DIM_Y1 where the height dimming
-         is already at full strength — and the rock colour is an absolute mix target, so the
-         dimming does not reach it. Leaving it derived from the undimmed field colour is what put
-         the terrain above y 3,200 at luminance 122 while every other landform sat at 86-101. */
-      uRockCol: { value: rockFor(fieldCol.clone().multiplyScalar(MTN_LEVEL)) },
-      /* 4,900, NOT 4,200 — the last of the "ranges are brighter than Fuji".
-         The jitter pulls a snow line DOWN as well as up, so at 4,200 with 700 of wobble the
-         terrain could be snow from 3,500, and the high band's mean height is 3,872: a third of
-         what was being measured at luminance 111 was simply snow. Fuji's line sits at 4,893 of a
-         summit at 7,189 — the top third — and the terrain's ridges top out near 4,800, so 4,200
-         was giving the hills proportionally far more snow than the mountain they are compared
-         with. At 4,900 with 500 of wobble only the genuinely tallest ridges cap. */
-      uSnowY: { value: 4900 },
-      uSnowBand: { value: 700 },
-      uSnowJitter: { value: 500 },
-      uSnowScale: { value: 1 / 1400 },
-      uSnowCol: { value: new THREE.Color(0xd6d3cc) },
-      uSnowOrigin: { value: new THREE.Vector3() },
-    };
-    o.material = cloudy(m);
-  });
-  console.log(`[env] ${Math.round(flat / 1000)}k terrain verts flattened to the field colour`);
+  /* THE TERRAIN IS A LANDFORM LIKE THE REST OF THEM.
+     Everything that used to happen here — flattening the author's pale high-altitude paint back
+     toward the field colour, then reinstating a rock band and a snow line in the shader — was
+     undoing a paint job and redoing it at render time. models/recolor_land.py does it in the
+     model instead, from the same ramp Fuji and the ranges get, so all this needs is the light
+     curve every landform shares. */
+  terrainish.forEach((o) => { o.material = landformMaterial(o); });
 
-  const LIFT = new URLSearchParams(location.search).get('lift') === 'on';
-  if (LIFT) terrainish.forEach((o) => {
-    /* 1,000 to 3,000, not 1,400 to 4,200 — the first band was aimed above the thing it was for.
-       Traced down the frame, the visible ridges sit at y 1,750 to 2,300, and a smoothstep from
-       1,400 to 4,200 is barely off zero there: the ridge at y 1,750 was being lifted by 4%.
-       The valley floor and the near meadow are between -300 and 500, so 1,000 is still clear of
-       everything anyone would call a field. */
-    lifted += liftHighGround(o, 1000, 3000, 0x86975f, 0xa9a89c, 0.85);
-  });
+
 
   let cragged = 0, craggedTris = 0;
   root.traverse((o) => {
@@ -5158,27 +4941,7 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
        effect on any region, and its edge against the sunrise is the best line in the picture. */
     o.userData.noOutline = true;
 
-    /* SNOW ONLY WHERE THESE ACTUALLY CLEAR THE TERRAIN. Measured earlier: the ranges are
-       buried and only their top third shows, so a cap placed by a fraction of the MESH's height
-       lands underground. 0.86 of each range's own height is a tip on the tall ones and nothing
-       at all on the low ones, which is what makes a row of them read as a range. */
-    const far = /farrange/i.test(o.name);
-    const rh = rb.max.y - rb.min.y;
-    o.material = mountainMaterial({
-      base: fieldCol,
-      origin: [c.x, c.z],
-      /* these are buried to about their top third, so both lines sit high on the mesh or they
-         land underground — the same measurement that moved the old texture's gradient */
-      rockY: rb.min.y + rh * 0.52,
-      rockBand: rh * 0.22,
-      rockJitter: rh * 0.16,
-      snowY: rb.min.y + rh * (far ? 0.84 : 0.90),
-      snowBand: rh * 0.10,
-      snowJitter: rh * 0.13,
-      snowScale: 1 / 1400,
-      snow: far ? 0xdcdad6 : 0xd2d0cb,
-      level: MTN_LEVEL * (far ? RANGE_LEVEL * 0.9 : RANGE_LEVEL),
-    });
+    o.material = landformMaterial(o);
     cragged++;
     craggedTris += o.geometry.attributes.position.count / 3;
   });
@@ -5223,25 +4986,7 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
        textures for everything else, and it needs no vertices at all. Welding the normals is
        kept, because that fixes the FACETING, which is a different problem and a real one. */
     o.geometry = smoothNormals(o.geometry);
-    /* THE SNOW LINE, IN WORLD UNITS, and it is the only thing set per mountain now.
-       Fuji's cone runs y 1,097 to 7,220, so 0.70 of the way up is about y 5,390 — the cap sits
-       in the top third, which is where the reference photograph has it, and the band spreads the
-       transition over a tenth of the height so the edge is soft before the noise even bends it. */
-    const fh = b.max.y - b.min.y;
-    o.material = mountainMaterial({
-      base: fieldCol,
-      origin: [(b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2],
-      /* the forest hides everything below v = 0.30, so the rock band starts just above it and
-         is most of the way in by the time the snow begins */
-      rockY: b.min.y + fh * 0.34,
-      rockBand: fh * 0.24,
-      rockJitter: fh * 0.14,
-      snowY: b.min.y + fh * 0.62,
-      snowBand: fh * 0.12,
-      snowJitter: fh * 0.11,
-      snowScale: 1 / 2000,
-      snow: 0xdedbd4,
-    });
+    o.material = landformMaterial(o);
     fujiDone++;
   });
   /* 2. INSTANCE WHAT SHARES A SHAPE. glTF deduplicates accessors, so meshes that were linked
@@ -5499,10 +5244,9 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   const ms = Math.round(performance.now() - t0);
   console.log(`[env] ${url}: ${meshes} meshes, ${converted} re-materialled, `
     + `${cragged} ranges cragged to ${Math.round(craggedTris / 1000)}k tris, ${fujiDone} fuji, `
-    + `${Math.round(lifted / 1000)}k terrain verts lifted to rock, ${tinted} sets given a treeline, `
+    + `${tinted} sets given a treeline, `
     + `${farCut} far vegetation sets out of the reflection (${Math.round(farCutTris / 1000)}k tris), `
     + `${matched} surfaces matched to ground #${groundCol.getHexString()}, `
-    + `mountains painted the field's #${fieldCol.getHexString()}, `
     + `${ponds} water surfaces, `
     + `${dropped} atmosphere dropped, ${culled} cut from the reflection `
     + `(${Math.round(culledTris / 1000)}k tris/frame saved), ${hulls} outline hulls, `
