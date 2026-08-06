@@ -1,0 +1,13 @@
+# Working documents, not deliverables.
+#
+# The design plan for the six places, the STUDY build journal and the research behind the look.
+# They are read at the start of a session and rewritten during it, so they churn far faster than
+# the code they describe and their history is noise.
+#
+# Untracked, not deleted: they stay on disk and the next session still opens with them. Earlier
+# revisions remain in the history up to the commit that stopped tracking them, so nothing written
+# so far is lost — see PLAN-places.md and PLAN-study.md at 7a2dc44 and before.
+
+PLAN-places.md
+PLAN-study.md
+RESEARCH.md
