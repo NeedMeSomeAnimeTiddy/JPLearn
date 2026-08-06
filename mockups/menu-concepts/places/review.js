@@ -5,24 +5,32 @@
    So the shape is settled here, with one place built, rather than discovered later with two.
 
    THE CORE IS PASSED IN, NOT IMPORTED. An inline `<script type="module">` can import from a file
-   but cannot be imported from, and the core lives inline in the page. Handing it over as a
-   context object is not a workaround for that so much as a useful constraint: the 33 names below
-   are the complete list of what a place is allowed to reach for, and adding to it is a decision
-   somebody has to make on purpose.
+   but cannot be imported from, and the core lives inline in the page. So anything that genuinely
+   belongs to the page — the scene, the renderer, the look state, the world's coordinate frame,
+   the registries a place writes itself into — has to be handed over, and the context object is
+   that. It is also a useful constraint: the 25 names below are the complete list of what a place
+   may reach for, and adding to it is a decision somebody has to make on purpose.
 
-   What stayed behind in the core, deliberately: `toriiGeo`, `buildEmaWall`, the ema-tablet text
-   helpers and `L3_REVIEW`. All four are used only by this place today, and all four are the ones
-   most likely to generalise once STUDY exists — a wall of hanging labels and a queue's worth of
-   deck data are not obviously shrine-shaped. Moving them now would be guessing at a boundary
-   that the second place is about to reveal for free. */
+   WHAT IS IMPORTED INSTEAD. Eight of those names used to be in the bag and are not any more:
+   they depend on nothing but THREE and a canvas, so they live in `toolkit.js` and both this file
+   and the page import them from there. The membership test was mechanical rather than aesthetic —
+   see that file's header. `toriiGeo` was one of them, listed here for a long time as a thing
+   deliberately left in the core; it turned out to be pure geometry and had no reason to be.
+
+   What DOES stay behind: `buildEmaWall`, the ema-tablet text helpers and `L3_REVIEW`. All three
+   are used only by this place today, and all three are the ones most likely to generalise once a
+   third place exists — a wall of hanging labels and a queue's worth of deck data are not
+   obviously shrine-shaped. Moving them now would be guessing at a boundary. */
 import * as THREE from 'three';
+import {
+  beamSeg, broadleafGeo, cedarGeo, hash01, mergeParts, outlineGeom, signCanvas, toriiGeo,
+} from './toolkit.js';
 
 export function buildReview(ctx) {
   const {
     AMBIENT, DEST_SPECS, HOME_EYE, L3_REVIEW, MARKS, NO_REFLECT, PROBE, RAMP, SECTION_ACCENT,
-    WORLD_L3, WORLD_TITLE, addOutline, backRenderer, backScene, beamSeg, blockAdd, broadleafGeo,
-    buildEmaWall, cedarGeo, destPlace, drawSign, groundAt, hash01, hengaku, instanced,
-    mergeParts, outlineGeom, outlineMaterial, signCanvas, standOff, toriiGeo, treeClaim,
+    WORLD_L3, WORLD_TITLE, addOutline, backRenderer, backScene, blockAdd, buildEmaWall,
+    destPlace, drawSign, groundAt, hengaku, instanced, outlineMaterial, standOff, treeClaim,
     worldPickEl,
   } = ctx;
 

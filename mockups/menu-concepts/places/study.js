@@ -15,12 +15,13 @@
    be measured. Everything is still separately named boxes — `NAV.hit` reports what a ray struck,
    which is how the level-two rank was proved and how the gate's occlusion band was found. */
 import * as THREE from 'three';
+import { outlineGeom } from './toolkit.js';
 
 export function buildStudy(ctx) {
   const {
     DEST_SPECS, HOME_EYE, LAKE_Y, MARKS, PROBE, RAMP, SECTION_ACCENT, SUBTILES, WORLD_L2,
-    addOutline, backScene, blockAdd, destPlace, groundAt, outlineGeom, outlineMaterial,
-    pickWorldTile, treeClaim, worldPickEl,
+    addOutline, backScene, blockAdd, destPlace, groundAt, outlineMaterial, pickWorldTile,
+    treeClaim, worldPickEl,
   } = ctx;
 
   /* the invisible proxy the raycast actually tests. `buildEmaWall` keeps its own copy of this
