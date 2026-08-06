@@ -5007,6 +5007,20 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
          distances rather than two different paint jobs that have to be reconciled.
      Flattened rather than replaced: the valley's own painting — paths, clearings, the festival
      ground — is all below 1,200 and is untouched. */
+  /* THE HIGH GROUND IS DARKENED TO FUJI'S LEVEL, and this is the last of "the ranges are
+     brighter than Fuji". Grouping every landform pixel by object instead of sampling boxes finally
+     said which objects were meant:
+         TERRAIN above y 3,200   luminance 123
+         TERRAIN y 1,900-3,200             108
+         Fuji                               99
+         FarRange_008 / _009            98 / 88
+         Range_008 / _009               83 / 79
+     The Range MESHES were already darker than Fuji. What is bright is the terrain's own high
+     ground — because Fuji's base is fieldCol times MTN_LEVEL and the terrain's was fieldCol at
+     full strength, so the hills carried twice the albedo of the mountain they were being compared
+     to. Flattening them to the same scaled colour is the whole fix, and it has to be the same
+     expression or the two drift again the next time either is touched. */
+  const highCol = fieldCol.clone().multiplyScalar(MTN_LEVEL);
   let flat = 0;
   terrainish.forEach((o) => {
     const g = o.geometry, pos = g.attributes.position, col = g.attributes.color;
@@ -5017,9 +5031,9 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
         const t = THREE.MathUtils.smoothstep(v.y, 1200, 2600);
         if (t <= 0) continue;
         col.setXYZ(i,
-          col.getX(i) + (fieldCol.r - col.getX(i)) * t,
-          col.getY(i) + (fieldCol.g - col.getY(i)) * t,
-          col.getZ(i) + (fieldCol.b - col.getZ(i)) * t);
+          col.getX(i) + (highCol.r - col.getX(i)) * t,
+          col.getY(i) + (highCol.g - col.getY(i)) * t,
+          col.getZ(i) + (highCol.b - col.getZ(i)) * t);
         flat++;
       }
       col.needsUpdate = true;
@@ -5038,7 +5052,7 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
          across one reads as a drawn line rather than as a treeline */
       uRockBand: { value: 2100 },
       uRockJitter: { value: 1100 },
-      uRockCol: { value: rockFor(fieldCol) },
+      uRockCol: { value: rockFor(highCol) },
       uSnowY: { value: 4200 },
       uSnowBand: { value: 900 },
       uSnowJitter: { value: 700 },
