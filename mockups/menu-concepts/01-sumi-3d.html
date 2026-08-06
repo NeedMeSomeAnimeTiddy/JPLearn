@@ -942,13 +942,12 @@
     padding: 3px 8px; margin-right: 7px;
     transform: skewX(-8deg); display: inline-block;
   }
-  .concept-back, .flat-link {
+  .concept-back {
     font-family: var(--lat); font-size: 10px; letter-spacing: 0.2em;
     color: rgba(242, 234, 216, 0.35); text-decoration: none;
   }
   .concept-back { left: 12px; bottom: 12px; }
-  .flat-link { left: 12px; bottom: 32px; }
-  .concept-back:hover, .flat-link:hover { color: var(--gold); }
+  .concept-back:hover { color: var(--gold); }
 
   /* flash + whip dressing */
   #flash { position: fixed; inset: 0; z-index: 55; background: #fdf7e8; opacity: 0; pointer-events: none; }
@@ -1104,7 +1103,6 @@
   <span><b>ENTER</b>Confirm<em>決定</em></span>
   <span><b>ESC</b>Back<em>戻る</em></span>
 </div>
-<a class="chrome flat-link" href="01-sumi.html">▪ FLAT V1</a>
 <a class="chrome concept-back" href="index.html">◂ CONCEPTS</a>
 
 <div id="flash"></div>
@@ -1194,7 +1192,6 @@ const SECTION_ACCENT = {
 
 /* ================= renderers ================= */
 const W = () => innerWidth, H = () => innerHeight;
-const NIGHT = 0x151928;
 
 /* far plane out to 60k: Fuji stands 17,000 away and the horizon rim another 30,000 behind it */
 /* THE NEAR PLANE IS THE DEPTH BUFFER'S PRECISION KNOB, and 1 was throwing almost all of it
@@ -3580,15 +3577,6 @@ SUN_AT.y = GROUND_Y + Math.hypot(SUN_AT.x - EYE.x, SUN_AT.z - EYE.y) * Math.tan(
 }
 
 /* ---- the sunrise itself: a disc and a wide bloom, aimed rather than baked into the dome ---- */
-function radialTex(inner, outer, stops) {
-  const S = 256;
-  const c = document.createElement('canvas'); c.width = S; c.height = S;
-  const g = c.getContext('2d');
-  const rg = g.createRadialGradient(S / 2, S / 2, inner, S / 2, S / 2, outer);
-  stops.forEach(([o, col]) => rg.addColorStop(o, col));
-  g.fillStyle = rg; g.fillRect(0, 0, S, S);
-  return new THREE.CanvasTexture(c);
-}
 /* THE SUN, DRAWN RATHER THAN PHOTOGRAPHED.
    It was two additive sprites carrying 256-pixel canvas gradients stretched to fourteen thousand
    world units — a quarter of a megapixel scaled up by fifty — which is precisely why it read as
@@ -3662,30 +3650,6 @@ const SUN_SIZE = 26000;
    volumetric to survive being looked at.
    (Not the ones that were dropped from the .blend — those were 48 props sitting at the wrong
    altitude over the terrain. These live in the sky and are placed against the sun.) */
-function cloudTex(seed) {
-  const S = 256;
-  const c = document.createElement('canvas'); c.width = S; c.height = S;
-  const g = c.getContext('2d');
-  const rnd = (i) => hash01(seed * 31 + i, seed + 7);
-  /* A CUMULUS IS LUMPS ON A FLAT BOTTOM. Stacking soft radial blobs along a slightly rising
-     baseline gives the billow without any of them reading as a circle, and keeping every blob's
-     centre above 0.62 of the height keeps the underside flat, which is the whole silhouette. */
-  for (let i = 0; i < 11; i++) {
-    const x = S * (0.10 + 0.80 * rnd(i * 3));
-    const lift = 1 - Math.abs(x / S - 0.5) * 1.5;
-    const y = S * (0.66 - 0.20 * lift * rnd(i * 3 + 1));
-    const r = S * (0.10 + 0.16 * rnd(i * 3 + 2)) * (0.55 + 0.65 * lift);
-    const rg = g.createRadialGradient(x, y, 0, x, y, r);
-    rg.addColorStop(0, 'rgba(255,255,255,0.92)');
-    rg.addColorStop(0.55, 'rgba(255,255,255,0.55)');
-    rg.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = rg;
-    g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
 /* where the sun is, as a direction, kept current so the pond glints agree with it */
 const SUN_DIR_LIVE = new THREE.Vector3();
 const CLOUDS = [];
@@ -5193,79 +5157,22 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     }
   });
 
-  /* 5. OUTLINE HULLS. Loaded geometry had none, which is why a loaded world read flatter than
-     the generated one — the black line is most of this scene's language. Instanced sets get an
-     instanced hull sharing the same matrices, so it stays one extra draw call per set rather
-     than one per tree. Skipped below the same size at which an outline is sub-pixel anyway. */
-  /* NO HULLS FOR THE LOADED WORLD. renderInk() draws every line in this scene now — see the
-     note at INK. This whole pass is left standing rather than deleted because the generated
-     fallback world and the hand-built precincts still call addOutline directly, and because the
-     size and flat-sheet rules in it are the record of what an inverted hull cannot do. */
-  const OUTLINE_MIN_R = 1e9;
-  let hulls = 0;
-  const madeFor = [];
-  root.traverse((o) => {
-    if ((!o.isMesh && !o.isInstancedMesh) || ENV_SKY.test(o.name)) return;
-    if (o.userData.noOutline) return;
+  /* 5. NO OUTLINE HULLS. renderInk() draws every line in this scene — see the note at INK.
+     What stood here was a full hull pass behind a sentinel: OUTLINE_MIN_R was set to 1e9 so the
+     radius test rejected every mesh in the world, the list it filled was always empty and the
+     loop after it never ran. It was kept for its own comments, so those are what is kept:
 
-    /* AN INVERTED HULL IS THE WRONG TOOL FOR A FLAT SHEET, and this is now a RULE rather than a
-       list of names. The hull is the same geometry drawn back-faces-only and nudged away from
-       the eye. On anything with real thickness that is a silhouette. On a sheet — a ground
-       surface, a path, a pond — the back faces sit in the same plane as the front ones, so the
-       result is a solid near-black lid laid exactly over the thing it was supposed to outline.
-       It turned the garden pond black; it was also, all along, why the festival ground was
-       black, because `Festival_Surfaces_FestivalGround_001-outline` is one of these lids and no
-       amount of correcting the GROUND's colour was ever going to show through it.
-       Measured off the geometry, so it catches every one of them and any added later: if the
-       vertical extent is under 4% of the footprint, it is a sheet. */
-    o.geometry.computeBoundingBox();
-    const bb = o.geometry.boundingBox;
-    if (bb) {
-      const w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z);
-      if (w > 1 && (bb.max.y - bb.min.y) / w < 0.04) return;
-    }
+       - an inverted hull is the wrong tool for a flat sheet. The hull is the same geometry drawn
+         back-faces-only and nudged away from the eye; on a sheet the back faces sit in the plane
+         of the front ones and the result is a near-black lid laid over the thing it should have
+         outlined. That is what blackened the garden pond and the festival ground, and no amount
+         of correcting the GROUND colour could ever show through it. The test was geometric, not a
+         list of names: vertical extent under 4% of footprint is a sheet.
+       - and never the forest. An instanced hull carries a copy of the geometry per instance, so
+         outlining 20,328 trees costs as many triangles as the trees do — 2.4M of a 5.2M frame.
 
-    /* AND NOT THE FOREST. An instanced hull carries one copy of the geometry per instance, so
-       outlining 20,328 instanced trees costs as many triangles as the trees themselves — 2.4M of
-       a 5.2M frame was inverted hulls, and most of it was vegetation whose line is shedding to
-       nothing by 14,000 units anyway (see shedAt). The big single meshes keep their outlines,
-       which is where the ink actually reads. */
-    if (o.isInstancedMesh) return;
-
-    o.geometry.computeBoundingSphere();
-    const bs = o.geometry.boundingSphere;
-    if (!bs || bs.radius < OUTLINE_MIN_R) return;
-    madeFor.push(o);
-  });
-  for (const o of madeFor) {
-    const g = outlineGeom(o.geometry);
-    /* 1.0 rather than 2.2, and shedding from 14,000 rather than 4,000. The old pair drew a
-       near tree at 2.2px and the far treeline at about 1 — visibly two different weights in one
-       frame. This is one weight everywhere inside the valley, and only the horizon thins. */
-    const mat = outlineMaterial(terrainish.includes(o) ? 0.8 : 1.0, 14000);
-    let h;
-    if (o.isInstancedMesh) {
-      h = new THREE.InstancedMesh(g, mat, o.count);
-      const m = new THREE.Matrix4();
-      for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); h.setMatrixAt(i, m); }
-      h.instanceMatrix.needsUpdate = true;
-    } else {
-      h = new THREE.Mesh(g, mat);
-      h.position.copy(o.position); h.quaternion.copy(o.quaternion); h.scale.copy(o.scale);
-    }
-    /* same reasoning as the sets themselves */
-    if (h.isInstancedMesh) h.computeBoundingSphere();
-    h.frustumCulled = true;
-    h.name = (o.name || 'part') + '-outline';
-    (o.parent || root).add(h);
-    ENV.hulls.push(h);
-    /* NOT IN THE REFLECTION. An outline is a width in pixels and the reflection is 768 of them:
-       a line sized for the window covers a reflected tree entirely, and 252 hulls turned the
-       lake into flat grey. The section above already says ground detail is not worth
-       reflecting; a contour line in a rippled 768-pixel image is worth even less. */
-    NO_REFLECT.push(h);
-    hulls++;
-  }
+     outlineGeom/outlineMaterial/addOutline all stay: the generated fallback world and the
+     hand-built precincts still call them directly. */
 
   /* 6. hide what it replaces. Mostly already done before the fetch started — this second call
      catches the sky, which can only be decided once the model has been read. */
@@ -5306,13 +5213,13 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     + `${matched} surfaces matched to ground #${groundCol.getHexString()}, `
     + `${ponds} water surfaces, `
     + `${dropped} atmosphere dropped, ${culled} cut from the reflection `
-    + `(${Math.round(culledTris / 1000)}k tris/frame saved), ${hulls} outline hulls, `
+    + `(${Math.round(culledTris / 1000)}k tris/frame saved), `
     + `${instMeshes} instanced meshes carrying ${instTotal} `
     + `(${keptLoose + loose.length} left loose), ${ENV.hidden.length} generated hidden, `
     + `heightfield ${stats.cells} cells (${stats.holes} empty, ${stats.filled} filled), `
     + `y ${stats.min.toFixed(0)}..${stats.max.toFixed(0)}, ${ms} ms`);
   return { meshes, dropped, hidden: ENV.hidden.length, terrainMeshes: src.length,
-    culled, culledTris, hulls, culledSets,
+    culled, culledTris, culledSets,
     instMeshes, instTotal, keptLoose: keptLoose + loose.length,
     drawCalls: instMeshes + keptLoose + loose.length, ...stats, ms };
 }
@@ -6690,21 +6597,6 @@ function spawnDropLanding(x, z) {
 }
 
 /* ================= front scene: near life + the swan ================= */
-const M_COUNT = 80;
-const mGeo = new THREE.BufferGeometry();
-const mPos = new Float32Array(M_COUNT * 3);
-const mVel = new Float32Array(M_COUNT * 2);
-for (let i = 0; i < M_COUNT; i++) {
-  mPos[i*3]     = -800 + Math.random() * 2200;
-  mPos[i*3 + 1] = -600 + Math.random() * 1300;
-  mPos[i*3 + 2] = 100 + Math.random() * 640;
-  mVel[i*2]     = Math.random() * 6.28;
-  mVel[i*2 + 1] = 2 + Math.random() * 5;
-}
-mGeo.setAttribute('position', new THREE.BufferAttribute(mPos, 3));
-const motes = new THREE.Points(mGeo, new THREE.PointsMaterial({
-  size: 6, map: softDot(242, 234, 216, 32), transparent: true, opacity: 0.5, depthWrite: false, sizeAttenuation: true,
-}));
 /* removed: 2D foreground stylisation — the world carries the scene now */
 
 function fallDrop() {
@@ -7088,15 +6980,6 @@ function collectEnvEls(i, el) { (envEls[i] || (envEls[i] = [])).push(el); }
 const destEnv = new THREE.Group();
 cssScene.add(destEnv);
 ENVS[0] = destEnv;
-function envPlane(el, x, y, z, rx = 0, ry = 0, rz = 0) {
-  const o = new CSS3DObject(el);
-  decorPlane(el);
-  o.position.set(x, y, z);
-  o.rotation.set(rx, ry, rz);
-  destEnv.add(o);
-  collectEnvEls(0, el);
-  return o;
-}
 /* the alcove is world geometry: parked once at the engawa bearing */
 destEnv.position.copy(HOME_SUB.focus);
 destEnv.lookAt(HOME_SUB.eye);
@@ -7330,7 +7213,7 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* THE WORLD FROM A FILE, replacing the generated one. Opt-in: nothing loads unless asked,
      because every measurement in RESEARCH.md was taken against the analytic world and a page
      that silently swapped it would invalidate all of them without saying so.
-       NAV.loadEnv()            the default ./models/environment.glb
+       NAV.loadEnv()            the default ./models/world.glb
        NAV.loadEnv(url, {grid}) anything else; grid is the heightfield resolution
        NAV.unloadEnv()          put the generated world back, same camera */
   loadEnv: (url, opts) => loadEnvironment(url, opts),
@@ -8034,13 +7917,6 @@ function placeSub(pos, faceTowards) {
   subWmObj.lookAt(faceTowards);
 }
 const subBaseQ = new THREE.Quaternion();
-const _spinQ = new THREE.Quaternion();
-const _yAxis = new THREE.Vector3(0, 1, 0);
-const spin = { v: 0 };
-function applySpin() {
-  _spinQ.setFromAxisAngle(_yAxis, spin.v);
-  subObj.quaternion.copy(subBaseQ).multiply(_spinQ);
-}
 /* every section travels to its own bearing */
 function destFor(i) { return DESTS[i]; }
 function placeSubAt(d) {
@@ -8207,7 +8083,6 @@ function backWhip() {
    Lerping a point gives non-constant angular velocity — fast through the middle of a wide turn
    and slow at its ends — and the eye reads angular velocity, so the old swing had to discount
    its own pacing to compensate. Rotating at a constant rate needs no such correction. */
-const _tdir = new THREE.Vector3();
 function turnDirTo(place) {
   const a0 = Math.atan2(cam.tz - cam.pz, cam.tx - cam.px);
   const a1 = Math.atan2(place.z - cam.pz, place.x - cam.px);
@@ -8596,14 +8471,6 @@ function tick() {
       if (eArr[i*3 + 1] > 950) eArr[i*3 + 1] = -850;
     }
     eGeo.attributes.position.needsUpdate = true;
-
-    const mArr = mGeo.attributes.position.array;
-    for (let i = 0; i < M_COUNT; i++) {
-      mArr[i*3]     += Math.sin(t * 0.6 + mVel[i*2]) * 5 * dt;
-      mArr[i*3 + 1] += mVel[i*2 + 1] * dt;
-      if (mArr[i*3 + 1] > 700) mArr[i*3 + 1] = -650;
-    }
-    mGeo.attributes.position.needsUpdate = true;
 
     clouds.forEach((c2) => {
       c2.material.rotation += c2.userData.rot;
