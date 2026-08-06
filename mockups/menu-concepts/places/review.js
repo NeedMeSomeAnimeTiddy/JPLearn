@@ -42,11 +42,10 @@ export function buildReview(ctx) {
   const _noReflect = [];
   /* the shrine's costume is BAKED — the authored world models this whole precinct, richer than
      the analytic build, so the analytic one stays hidden under it. What stays live is what the
-     bake cannot carry: the level-four room, whose doors move and whose card is lettered at
-     entry. The claim underneath it clears the authored honden so the room is not standing
-     inside a baked twin of itself. */
+     bake cannot carry: the lettered tablets, the placards, and the level-four furniture. THE
+     AUTHORED WORLD IS NEVER TOUCHED (Robbie's rule): live objects are additions, and where a
+     live object would coincide with an authored one, the live object moves out of its way. */
   const _live = [];
-  const _claims = [];
   let _probe = null, _focus = null, _walk = null, _title = null, _l4 = null;
 
 
@@ -305,22 +304,41 @@ export function buildReview(ctx) {
      appears or vanishes, which is the rule everything here lives by. */
   let haidenL4 = null;
   {
-    /* AT THE AUTHORED HONDEN when there is one. The claim clears the baked hall (and the
-       offering box in front of it), and this room stands in its place at the end of the real
-       tunnel, fronting the authored court — so the reward for the walk is a room that opens. */
+    /* BEFORE THE AUTHORED HONDEN when there is one — IN FRONT OF IT, NEVER IN PLACE OF IT.
+       The authored hall is the artist's and stays exactly as modelled; level four ADDS
+       furniture: a mat, an easel and the lettered card, set on the court before the hall's
+       doors, and the camera frames the card against the Honden itself. In the generated
+       fallback world there is no authored hall, so the full analytic room — shell, sliding
+       doors, interior, lanterns — is built as before; there it only ever replaces this
+       module's own old scenery hall, nobody else's. */
     const HF = TUN_END + 700;
-    const hallAt = AUTH ? AUTH.atT(AUTH.tHonden) : at3(HF, 0);
+    /* MEASURED BEFORE PLACING, twice, because the authored precinct is layered: a gate
+       building spans t 8,996-9,960 on the axis, the covered worship hall 9,535-10,659 (its
+       aisle railed — a camera inside it stands in a fence), the offering box under the hall's
+       far eave, the Honden behind. The one open ground on the axis is the strip between the
+       LAST TUNNEL GATE (t 8,644) and the gate building's face — so that is where the card
+       waits, 1,949 short of the Honden's centre: the arrival is framed by the final torii,
+       with the gate building, the sacred cedar and the halls stacking behind the easel. */
+    const hallAt = AUTH ? (() => {
+      const v = AUTH.atT(AUTH.tHonden - 1949);
+      /* the furniture stands on the authored court's own surface, not the terrain under it */
+      const court = authored.meshes(/Torii_Surfaces_ToriiCourtGround/)[0];
+      if (court) v.y = Math.max(v.y, court.y + 2);
+      return v;
+    })() : at3(HF, 0);
+    /* the floor the furniture rests on: the shell's raised floor in the analytic room, the
+       court itself in the authored world */
+    const FLR = AUTH ? 2 : 106;
     const grp = new THREE.Group();
     grp.position.copy(hallAt);
     if (AUTH) {
-      const b = AUTH.atT(AUTH.tHonden - 101);
+      const b = AUTH.atT(AUTH.tHonden - 2100);
       grp.lookAt(b.x, hallAt.y, b.z);   /* local +Z looks back down the authored tunnel */
     } else {
       facing(grp, TUN_END, 0);          /* or back down the analytic one */
     }
     backScene.add(grp);
     _live.push(grp);
-    _claims.push({ x: hallAt.x, z: hallAt.z, r: AUTH ? 560 : 640 });
 
     const VERM = 0xb03a2a, VERM_D = 0x8a3626, ROOF = 0x3b332a, RIDGE = 0x332c25,
       STONE = 0x6c6459, FLOOR = 0x6b5744, FLOOR_D = 0x5d4b3a, DARK = 0x3a2b20,
@@ -332,98 +350,107 @@ export function buildReview(ctx) {
       arr.push({ geo: g, color: c });
     };
 
-    /* the shell: plinth, steps up the front, columns, walls with the front bay open */
-    box(ext, 1160, 92, 760, 0, 46, 0, STONE);
-    for (let i = 0; i < 3; i++) {
-      const h = 72 - i * 24;
-      box(ext, 430 - i * 24, h, 62, 0, h / 2, 411 + i * 62, STONE);
-    }
-    for (const sx of [-1, 1]) for (const cz of [-287, 0, 287]) {
-      const g = new THREE.CylinderGeometry(22, 26, 420, 8);
-      g.translate(sx * 468, 302, cz);
-      ext.push({ geo: g, color: VERM_D });
-    }
-    for (const sx of [-1, 1]) {
-      const g = new THREE.CylinderGeometry(20, 24, 420, 8);
-      g.translate(sx * 205, 302, 287);
-      ext.push({ geo: g, color: VERM_D });
-    }
-    box(ext, 962, 394, 26, 0, 303, -300, VERM);        /* back wall */
-    for (const sx of [-1, 1]) {
-      box(ext, 26, 394, 626, sx * 481, 303, 0, VERM);  /* side walls */
-      box(ext, 282, 394, 26, sx * 331, 303, 300, VERM); /* front flanks either side of the bay */
-    }
-    box(ext, 440, 70, 30, 0, 465, 300, VERM_D);        /* lintel over the opening */
-    box(ext, 440, 14, 40, 0, 106, 300, FLOOR_D);       /* the threshold beam */
-    /* the roof, kept from the scenery hall so the silhouette every distant shot was tuned
-       against does not move */
-    box(ext, 1300, 39, 832, 0, 520, 0, 0x4a3d2f);
-    for (const sx of [-1, 1]) {
-      const g = new THREE.BoxGeometry(780, 47, 960);
-      g.rotateZ(-sx * 0.46);
-      g.translate(sx * 340, 622, 0);
-      ext.push({ geo: g, color: ROOF });
-    }
-    box(ext, 60, 55, 960, 0, 750, 0, RIDGE);
-
-    const extMesh = new THREE.Mesh(mergeParts(ext), new THREE.MeshToonMaterial({
-      vertexColors: true, gradientMap: RAMP, flatShading: true,
-    }));
-    extMesh.name = 'haiden';
-    grp.add(extMesh);
-    addOutline(extMesh, 3.5);
-    _marks.haiden = grp;
-
-    /* the room: everything on one material so one emissive is the room's light */
-    for (let i = 0; i < 5; i++) {
-      box(inn, 188, 14, 600, -376 + i * 188, 99, 0, i % 2 ? FLOOR_D : FLOOR);
-    }
-    box(inn, 940, 394, 10, 0, 303, -284, DARK);        /* interior face of the back wall */
-    for (const sx of [-1, 1]) box(inn, 10, 394, 600, sx * 463, 303, 0, DARK);
-    for (const sx of [-1, 1]) box(inn, 282, 394, 8, sx * 331, 303, 288, DARK);
-    box(inn, 560, 40, 150, 0, 126, -230, FLOOR_D);     /* the altar dais */
-    box(inn, 18, 96, 18, 0, 194, -232, DARK);          /* the mirror's stand */
-    for (const sx of [-1, 1]) {                        /* 御幣 flanking it */
-      box(inn, 10, 80, 10, sx * 140, 186, -228, DARK);
-      box(inn, 30, 46, 6, sx * 140, 240, -222, PAPER);
-      box(inn, 22, 34, 6, sx * 140 + (sx < 0 ? -14 : 14), 228, -220, PAPER);
-    }
-    box(inn, 380, 10, 280, 0, 111, 40, 0x7e2f22);      /* the mat the easel stands on */
-    box(inn, 240, 26, 170, 0, 129, 30, DARK);          /* the easel's foot */
-    for (const sx of [-1, 1]) box(inn, 6, 60, 6, sx * 330, 465, -40, DARK); /* lantern cords */
     const intMat = new THREE.MeshToonMaterial({
       vertexColors: true, emissive: 0x14100b, gradientMap: RAMP, flatShading: true,
     });
-    const innMesh = new THREE.Mesh(mergeParts(inn), intMat);
-    innMesh.name = 'haiden-interior';
-    grp.add(innMesh);
+    let matGold = null;
+    if (!AUTH) {
+      /* the shell: plinth, steps up the front, columns, walls with the front bay open */
+      box(ext, 1160, 92, 760, 0, 46, 0, STONE);
+      for (let i = 0; i < 3; i++) {
+        const h = 72 - i * 24;
+        box(ext, 430 - i * 24, h, 62, 0, h / 2, 411 + i * 62, STONE);
+      }
+      for (const sx of [-1, 1]) for (const cz of [-287, 0, 287]) {
+        const g = new THREE.CylinderGeometry(22, 26, 420, 8);
+        g.translate(sx * 468, 302, cz);
+        ext.push({ geo: g, color: VERM_D });
+      }
+      for (const sx of [-1, 1]) {
+        const g = new THREE.CylinderGeometry(20, 24, 420, 8);
+        g.translate(sx * 205, 302, 287);
+        ext.push({ geo: g, color: VERM_D });
+      }
+      box(ext, 962, 394, 26, 0, 303, -300, VERM);        /* back wall */
+      for (const sx of [-1, 1]) {
+        box(ext, 26, 394, 626, sx * 481, 303, 0, VERM);  /* side walls */
+        box(ext, 282, 394, 26, sx * 331, 303, 300, VERM); /* front flanks either side of the bay */
+      }
+      box(ext, 440, 70, 30, 0, 465, 300, VERM_D);        /* lintel over the opening */
+      box(ext, 440, 14, 40, 0, 106, 300, FLOOR_D);       /* the threshold beam */
+      /* the roof, kept from the scenery hall so the silhouette every distant shot was tuned
+         against does not move */
+      box(ext, 1300, 39, 832, 0, 520, 0, 0x4a3d2f);
+      for (const sx of [-1, 1]) {
+        const g = new THREE.BoxGeometry(780, 47, 960);
+        g.rotateZ(-sx * 0.46);
+        g.translate(sx * 340, 622, 0);
+        ext.push({ geo: g, color: ROOF });
+      }
+      box(ext, 60, 55, 960, 0, 750, 0, RIDGE);
 
-    /* 神鏡 — the mirror, the one pale thing at the back of the dark */
-    {
-      const g = new THREE.CylinderGeometry(60, 60, 8, 14);
-      g.rotateX(Math.PI / 2);
-      const m = new THREE.Mesh(g, new THREE.MeshToonMaterial({
-        color: 0xcfdadb, emissive: 0x3d4a4c, gradientMap: RAMP, flatShading: true,
+      const extMesh = new THREE.Mesh(mergeParts(ext), new THREE.MeshToonMaterial({
+        vertexColors: true, gradientMap: RAMP, flatShading: true,
       }));
-      m.position.set(0, 286, -236);
-      m.name = 'haiden-mirror';
-      grp.add(m);
+      extMesh.name = 'haiden';
+      grp.add(extMesh);
+      addOutline(extMesh, 3.5);
+
+      /* the room: everything on one material so one emissive is the room's light */
+      for (let i = 0; i < 5; i++) {
+        box(inn, 188, 14, 600, -376 + i * 188, 99, 0, i % 2 ? FLOOR_D : FLOOR);
+      }
+      box(inn, 940, 394, 10, 0, 303, -284, DARK);        /* interior face of the back wall */
+      for (const sx of [-1, 1]) box(inn, 10, 394, 600, sx * 463, 303, 0, DARK);
+      for (const sx of [-1, 1]) box(inn, 282, 394, 8, sx * 331, 303, 288, DARK);
+      box(inn, 560, 40, 150, 0, 126, -230, FLOOR_D);     /* the altar dais */
+      box(inn, 18, 96, 18, 0, 194, -232, DARK);          /* the mirror's stand */
+      for (const sx of [-1, 1]) {                        /* 御幣 flanking it */
+        box(inn, 10, 80, 10, sx * 140, 186, -228, DARK);
+        box(inn, 30, 46, 6, sx * 140, 240, -222, PAPER);
+        box(inn, 22, 34, 6, sx * 140 + (sx < 0 ? -14 : 14), 228, -220, PAPER);
+      }
+      for (const sx of [-1, 1]) box(inn, 6, 60, 6, sx * 330, 465, -40, DARK); /* lantern cords */
+      const innMesh = new THREE.Mesh(mergeParts(inn), intMat);
+      innMesh.name = 'haiden-interior';
+      grp.add(innMesh);
+
+      /* 神鏡 — the mirror, the one pale thing at the back of the dark */
+      {
+        const g = new THREE.CylinderGeometry(60, 60, 8, 14);
+        g.rotateX(Math.PI / 2);
+        const m = new THREE.Mesh(g, new THREE.MeshToonMaterial({
+          color: 0xcfdadb, emissive: 0x3d4a4c, gradientMap: RAMP, flatShading: true,
+        }));
+        m.position.set(0, 286, -236);
+        m.name = 'haiden-mirror';
+        grp.add(m);
+      }
+      /* the hanging lanterns, one either side — the room's stated light source */
+      matGold = new THREE.MeshToonMaterial({
+        color: 0xe8c47c, emissive: 0x2a1f10, gradientMap: RAMP, flatShading: true,
+      });
+      for (const sx of [-1, 1]) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(54, 70, 54), matGold);
+        m.position.set(sx * 330, 400, -40);
+        m.name = 'haiden-lantern';
+        grp.add(m);
+      }
     }
-    /* the hanging lanterns, one either side — the room's stated light source */
-    const matGold = new THREE.MeshToonMaterial({
-      color: 0xe8c47c, emissive: 0x2a1f10, gradientMap: RAMP, flatShading: true,
-    });
-    for (const sx of [-1, 1]) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(54, 70, 54), matGold);
-      m.position.set(sx * 330, 400, -40);
-      m.name = 'haiden-lantern';
-      grp.add(m);
-    }
+    _marks.haiden = grp;
+
+    /* the furniture — the part that exists in BOTH worlds, resting on FLR */
+    const furn = [];
+    box(furn, 380, 10, 280, 0, FLR + 5, 40, 0x7e2f22);   /* the mat the easel stands on */
+    box(furn, 240, 26, 170, 0, FLR + 23, 30, DARK);      /* the easel's foot */
+    const furnMesh = new THREE.Mesh(mergeParts(furn), intMat);
+    furnMesh.name = 'l4-furniture';
+    grp.add(furnMesh);
 
     /* the easel and the card. The card is the game surface: it is lettered for the queue and
        deck that were chosen, so the room is never dressed with a placeholder. */
     const boardGrp = new THREE.Group();
-    boardGrp.position.set(0, 224, 30);
+    boardGrp.position.set(0, FLR + 118, 30);
     boardGrp.rotation.x = -0.34;
     grp.add(boardGrp);
     const boardGeo = new THREE.BoxGeometry(175, 210, 12);
@@ -496,10 +523,12 @@ export function buildReview(ctx) {
        was — and part as the level-four ride closes on them. The track sits just inside the
        front wall so an open panel stows behind the flank instead of fighting it. */
     const DOOR_REST = 95, DOOR_OPEN = 286;
-    const matPaper = new THREE.MeshToonMaterial({
-      color: PAPER, emissive: 0x241c12, gradientMap: RAMP, flatShading: true,
-    });
-    const doors = [-1, 1].map((sx) => {
+    let matPaper = null;
+    /* only the analytic room has doors; before the authored Honden there is nothing to slide */
+    const doors = AUTH ? [] : [-1, 1].map((sx) => {
+      matPaper = matPaper || new THREE.MeshToonMaterial({
+        color: PAPER, emissive: 0x241c12, gradientMap: RAMP, flatShading: true,
+      });
       const d2 = new THREE.Group();
       d2.position.set(sx * DOOR_REST, 268, 278);
       grp.add(d2);
@@ -518,10 +547,12 @@ export function buildReview(ctx) {
       return d2;
     });
 
-    /* the room's light, as one dial. Rest values are READ from the materials, not retyped. */
+    /* the room's light, as one dial. Rest values are READ from the materials, not retyped.
+       Only materials that were built take part — before the authored Honden that is the
+       furniture and the card. */
     const LIT = [
       [intMat, 0x4a3823], [matGold, 0x9a7434], [matPaper, 0x8a6f45], [matCard, 0xcfc5ae],
-    ].map(([m, hot]) => ({ m, rest: m.emissive.clone(), hot: new THREE.Color(hot) }));
+    ].filter(([m]) => m).map(([m, hot]) => ({ m, rest: m.emissive.clone(), hot: new THREE.Color(hot) }));
     const glow = (on) => LIT.forEach(({ m, rest, hot }) => {
       const c = on ? hot : rest;
       gsap.to(m.emissive, {
@@ -553,15 +584,16 @@ export function buildReview(ctx) {
         });
         glow(0);
       },
-      /* the shot: at the foot of the steps, past the tunnel mouth, looking onto the easel */
+      /* the shot: past the tunnel mouth, looking onto the easel — with the authored Honden
+         itself as the backdrop when the world is up */
       eye: () => {
-        const v = AUTH ? AUTH.atT(AUTH.tHonden - 560) : at3(HF - 560, 0);
-        v.y = hallAt.y + 262;
+        const v = AUTH ? AUTH.atT(AUTH.tHonden - 2489) : at3(HF - 560, 0);
+        v.y = hallAt.y + FLR + 156;
         return v;
       },
       tgt: () => {
-        const v = AUTH ? AUTH.atT(AUTH.tHonden - 30) : at3(HF - 30, 0);
-        v.y = hallAt.y + 224;
+        const v = AUTH ? AUTH.atT(AUTH.tHonden - 1979) : at3(HF - 30, 0);
+        v.y = hallAt.y + FLR + 118;
         return v;
       },
     };
@@ -840,20 +872,15 @@ export function buildReview(ctx) {
   _marks.wall = wallGrp;
   /* THE FOUR TABLETS ARE THE INTERFACE, so they stay live over the baked wall — the bake
      carries the structure and the crowd, but a lettered canvas and a hover swing cannot be
-     baked. The authored wall has four blank stand-ins hanging where these four go (about
-     thirty units in front of them); a 45-unit claim under each live tablet takes the blank
-     and its backing piece out without reaching the wall's own board. What it costs: a claim
-     is a column, so a few of the baked crowd tablets directly below each live one go with
-     them — four narrow gaps in a crowd of dozens. */
-  _live.push(wall.pickGrp);
-  wall.pickGrp.updateMatrixWorld(true);
+     baked. The authored wall hangs four blank stand-ins about thirty units in FRONT of where
+     these four rest, which buried the live ones behind them. The blanks are the artist's and
+     they stay; the LIVE rack slides fifty-five units toward the eye instead, so the lettered
+     four hang just proud of the blanks and the blanks read as the crowd behind them. */
   {
-    const wv = new THREE.Vector3();
-    wall.picks.forEach((q) => {
-      q.root.getWorldPosition(wv);
-      _claims.push({ x: wv.x, z: wv.z, r: 45 });
-    });
+    const out = eye.clone().sub(wallPlace).setY(0).normalize();
+    wall.pickGrp.position.addScaledVector(out, 55);
   }
+  _live.push(wall.pickGrp);
 
   /* 手水舎 — the water pavilion, facing the wall across the court. A courtyard with one thing in
      it is a yard with a thing in it; the second structure is what makes the space between them
@@ -1403,6 +1430,6 @@ function chozuyaGeo(W, D, H) {
   return {
     probe: _probe, focus: _focus, walk: _walk, title: _title, l4: _l4,
     marks: _marks, ambient: _ambient, noReflect: _noReflect,
-    live: _live, claims: _claims,
+    live: _live,
   };
 }

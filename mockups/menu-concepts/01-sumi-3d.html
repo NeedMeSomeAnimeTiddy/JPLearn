@@ -4547,10 +4547,6 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
 
   backScene.add(root);
   ENV.root = root;
-  /* the ground the places own, carved out of the authored props. A no-op at boot (the places
-     are not built yet — buildPlacesLate applies it after them); on a manual NAV.loadEnv the
-     claims already exist and apply here. */
-  applyWorldClaims();
   /* THE HOME VIEW MOVES WITH THE WORLD. The old eye was sited against a heightfield this
      model replaced, and it faces away from the sun. */
   if (opts.home !== false) {
@@ -5475,12 +5471,12 @@ function installPlace(key, idx, r) {
    does not model), a list keeps only those objects (REVIEW: the baked shrine is richer than the
    analytic one, so only the level-four room stays live), nothing keeps the old behaviour.
 
-   THE CLAIMS. A live place standing in the authored world stands among authored props placed
-   with no knowledge of it. `claims: [{x, z, r}]` are the ground a place owns: authored meshes
-   whose footprint centres fall inside are hidden, and authored instanced sets have those
-   instances scaled to zero. The terrain itself and the sky are never touched. */
+   THE AUTHORED WORLD IS INVIOLABLE — Robbie's rule, stated 2026-08-06 after a "claims" system
+   briefly hid authored meshes (the Honden, the blank ema tablets, lanterns) to make room for
+   live ones. Never again: no authored mesh is hidden, no authored instance is zeroed, ever.
+   The page may MOVE CAMERAS and ADD interface objects; where a live object would coincide with
+   an authored one, the live object moves — the world does not. */
 const LIVE = new Set();
-const WORLD_CLAIMS = [];
 let STUDY_MASS = null;
 let PLACES_BUILT = false;
 function buildPlace(key, idx, build, ctx) {
@@ -5496,7 +5492,6 @@ function buildPlace(key, idx, build, ctx) {
       if (!LIVE.has(o) && o.visible) { ENV.hidden.push(o); o.visible = false; }
     });
   }
-  if (r.claims) WORLD_CLAIMS.push(...r.claims);
   return installPlace(key, idx, r);
 }
 /* WHAT THE AUTHORED WORLD SAYS IS THERE. A place built onto an authored area needs the area's
@@ -5559,48 +5554,6 @@ function buildPlacesLate() {
   buildPlacesCore();
   refreshDests();
   buildWorldMenus();
-  applyWorldClaims();
-}
-function applyWorldClaims() {
-  if (!ENV.root || !WORLD_CLAIMS.length) return;
-  /* a claim is a disc {x, z, r} or a rectangle {x, z, fx, fz, hf, hs} — centre, its own frame
-     (fx, fz the forward direction), half-extents along and across. The rectangle exists because
-     STUDY's compound stands 1,300 units from the authored festival's edge: a disc big enough to
-     cover the compound's corners swallowed festival stalls, and the compound is a rectangle. */
-  const inClaim = (x, z) => WORLD_CLAIMS.some((c) => {
-    const dx = x - c.x, dz = z - c.z;
-    if (c.r) return dx * dx + dz * dz < c.r * c.r;
-    const f = dx * c.fx + dz * c.fz, s = -dx * c.fz + dz * c.fx;
-    return Math.abs(f) < c.hf && Math.abs(s) < c.hs;
-  });
-  const keepName = /(^|[_\-.])(terrain|ground|landform|heightfield)([_\-.]|$)/i;
-  const mm = new THREE.Matrix4();
-  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
-  const ctr = new THREE.Vector3();
-  let meshesHidden = 0, instancesCleared = 0;
-  ENV.root.updateMatrixWorld(true);
-  ENV.root.traverse((o) => {
-    if (keepName.test(o.name) || ENV_SKY.test(o.name)) return;
-    if (o.isInstancedMesh) {
-      let touched = false;
-      for (let i = 0; i < o.count; i++) {
-        o.getMatrixAt(i, mm);
-        if (mm.elements[0] !== 0 && inClaim(mm.elements[12], mm.elements[14])) {
-          o.setMatrixAt(i, zero);
-          touched = true;
-          instancesCleared++;
-        }
-      }
-      if (touched) { o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere(); }
-    } else if (o.isMesh && o.visible) {
-      new THREE.Box3().setFromObject(o).getCenter(ctr);
-      if (inClaim(ctr.x, ctr.z)) { o.visible = false; meshesHidden++; }
-    }
-  });
-  if (meshesHidden + instancesCleared) {
-    console.log(`[claims] cleared ${meshesHidden} authored meshes, ${instancesCleared} instances`
-      + ` inside ${WORLD_CLAIMS.length} claims`);
-  }
 }
 if (!WORLD_PENDING) buildPlacesCore();
 
