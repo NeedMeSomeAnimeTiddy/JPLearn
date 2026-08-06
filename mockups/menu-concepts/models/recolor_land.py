@@ -63,12 +63,21 @@ from mathutils import Vector
 # how a snow cap turns into more grey rock. Measured through a mask of the cone's own pixels, the
 # summit band goes 118 -> 150 -> 168 -> 181 at 0.52 / 0.85 / 1.15 / 1.45; 1.15 puts it just above
 # the sky away from the sun and just under the sky beside it, which is where a lit cap sits.
+# AND THE GROUND COLOUR HAS TO HOLD UNTIL THE MOUNTAIN IS OUT OF THE TREES. The base stop is the
+# field colour exactly, which is what "the bottom matches the ground" is supposed to mean — but it
+# sat at 900 and the ramp was fully rock by 2600, while Fuji's foot is buried in forest to roughly
+# that height. Every part of the cone anyone could actually SEE was already rock, so the mountain
+# read as a grey cone standing in green grass however well the buried part matched. Moving the rock
+# stop to 4400 puts the whole green->rock transition above the treeline, in open view.
+# The snow stops do NOT move with it. Pushing them up by the same amount is the obvious thing and
+# it is wrong: it drags the snow line up with the rock and shrinks the cap away — a first sweep at
+# 5000 had no cap left at all. Only the lower transition travels.
 LEVEL = 0.52
 SNOW_LEVEL = 1.15
 STOPS = [
     (900.0,  Vector((0.195, 0.253, 0.083))),
-    (2600.0, Vector((0.230, 0.232, 0.196)) * LEVEL),
-    (4300.0, Vector((0.286, 0.272, 0.248)) * LEVEL),
+    (4400.0, Vector((0.230, 0.232, 0.196)) * LEVEL),
+    (4800.0, Vector((0.286, 0.272, 0.248)) * LEVEL),
     (5200.0, Vector((0.620, 0.606, 0.578)) * SNOW_LEVEL),
     (7400.0, Vector((0.680, 0.668, 0.646)) * SNOW_LEVEL),
 ]
@@ -88,6 +97,10 @@ VALLEY_FADE = 2200.0
 # repaints only vertices at or above Z, where the blend factor is already 1 and the repaint is a
 # straight overwrite — idempotent however many times it is run. Changing only SNOW_LEVEL moves
 # nothing below the 4300 stop, so `--above 4300` is the whole of that edit.
+# A change to the lower stops does need the full pass, and the cost of running it twice is small
+# enough to accept: blending c1 = c0 + (t_old - c0)k a second time leaves an error of k(1-k)(t_old
+# - c0), worst at k = 0.5, which for this terrain is about 0.005 luminance — a twentieth of the
+# step it is smoothing out.
 ARGV = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 
 
