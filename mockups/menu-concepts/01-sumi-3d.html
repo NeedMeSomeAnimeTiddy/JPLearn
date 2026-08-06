@@ -2144,6 +2144,25 @@ const CLOUD_MATS = [];
    wandering line by world height in the shader.
    MTN_LEVEL still scales it, because a mountain at 24,000 units reasonably reads a little
    darker than the field at your feet, and it is one number rather than a palette. */
+/* THE MOUNTAIN COLOUR, DERIVED FROM WHATEVER IT IS GROWING OUT OF.
+   A fixed hex cannot do this job, and the measurement says why. The rock was one colour,
+   0x9a9184 scaled by MTN_LEVEL — right for Fuji, whose BASE is scaled by that same level, and
+   wrong for the terrain, whose base is its own unscaled vertex paint. Measured either side of
+   the line on the terrain:
+       base just below   #758451   luminance 0.210
+       rock              #6e675e   luminance 0.138     34% DARKER
+   while on Fuji the identical rock sits 25% BRIGHTER than its base. One number, two bases, two
+   opposite relationships — which on the hillside came out as a hard dark stripe across a bright
+   green field, because that is exactly what it was.
+   Taking the base's own luminance and desaturating it warm makes the band a change of HUE at
+   nearly the same value: rock instead of grass, not a shadow. `lift` is the only thing that
+   moves the value, and it moves it up, because bare ground above a treeline is lighter than the
+   meadow below it. */
+function rockFor(base, lift = 1.12) {
+  const l = 0.2126 * base.r + 0.7152 * base.g + 0.0722 * base.b;
+  return new THREE.Color(l * 1.06, l * 1.0, l * 0.90).multiplyScalar(lift);
+}
+
 function mountainMaterial(opts) {
   /* PER MOUNTAIN, because the ranges stand 9,000 to 15,000 units further back than Fuji and the
      distance fog lifts them for it — 31% of the fog colour at 33,000 against 18% at 24,000, and
@@ -2162,7 +2181,8 @@ function mountainMaterial(opts) {
     uRockY: { value: opts.rockY },
     uRockBand: { value: opts.rockBand },
     uRockJitter: { value: opts.rockJitter },
-    uRockCol: { value: new THREE.Color(opts.rock != null ? opts.rock : 0x9a9184).multiplyScalar(lvl) },
+    uRockCol: { value: opts.rock != null ? new THREE.Color(opts.rock)
+      : rockFor(opts.base.clone().multiplyScalar(lvl)) },
     uSnowY: { value: opts.snowY },
     uSnowBand: { value: opts.snowBand },
     uSnowJitter: { value: opts.snowJitter },
@@ -5014,9 +5034,11 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
        summit to measure fractions against */
     m.userData.snow = {
       uRockY: { value: 1900 },
-      uRockBand: { value: 1400 },
-      uRockJitter: { value: 700 },
-      uRockCol: { value: new THREE.Color(0x9a9184).multiplyScalar(MTN_LEVEL) },
+      /* wider and wobblier than Fuji's, because the terrain's hills are broad and a clean curve
+         across one reads as a drawn line rather than as a treeline */
+      uRockBand: { value: 2100 },
+      uRockJitter: { value: 1100 },
+      uRockCol: { value: rockFor(fieldCol) },
       uSnowY: { value: 4200 },
       uSnowBand: { value: 900 },
       uSnowJitter: { value: 700 },
