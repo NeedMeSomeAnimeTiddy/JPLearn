@@ -1004,29 +1004,50 @@
     font-family: var(--lat); font-size: 9px; letter-spacing: 0.3em;
     color: rgba(242, 234, 216, 0.4); margin-right: 4px;
   }
-  .trans-chip {
+  .trans-chip, .look-chip {
     font-family: var(--jp-go); font-weight: 700; font-size: 11.5px; letter-spacing: 0.1em;
     padding: 6px 12px;
     background: rgba(242, 234, 216, 0.1); color: var(--washi);
     transform: skewX(-8deg);
     transition: background 0.15s, color 0.15s;
   }
-  .trans-chip.on { background: var(--washi); color: var(--ink); }
-  .trans-chip:hover { background: var(--hi); color: var(--washi); }
+  .trans-chip.on, .look-chip.on { background: var(--washi); color: var(--ink); }
+  .trans-chip:hover, .look-chip:hover { background: var(--hi); color: var(--washi); }
+  /* the ones that cannot change without rebuilding what the loader baked; marked so it is
+     obvious the click costs a reload rather than being instant like the others */
+  .look-chip.reloads { font-size: 10.5px; opacity: 0.82; }
+  .look-chip.reloads::after { content: ' ↻'; opacity: 0.5; }
 
   /* THE BOTTOM ROW IS THREE SEPARATE FIXED ITEMS and they meet in the middle on a narrow window:
-     back tab left, transition picker centred, key hints right. The camera now widens its field
-     rather than cropping it, so the 3D composition survives any aspect — the chrome has to do
-     the same. The picker is a mockup control rather than part of the design, so it steps up a
-     line first, and below that the hints drop the two that are least load-bearing (Escape is
-     already stated by the back tab in the opposite corner). */
-  @media (max-width: 1180px) {
+     back tab left, look bar centred, key hints right. The camera now widens its field rather
+     than cropping it, so the 3D composition survives any aspect — the chrome has to do the same.
+     The bar is a mockup control rather than part of the design, so it steps up a line first, and
+     below that the hints drop the two that are least load-bearing (Escape is already stated by
+     the back tab in the opposite corner).
+     1400, NOT 1180: the transition picker was two chips and about 250px wide, and the look bar
+     is five and about 510px. Measured at 1440 it ends 25px short of the key hints, so it starts
+     touching them at roughly 1390 — the old breakpoint would have let them overlap for two
+     hundred pixels of width. A breakpoint is a measurement of the content, not a round number. */
+  @media (max-width: 1400px) {
     .trans-picker { bottom: 66px; }
+  }
+  @media (max-width: 1180px) {
     .hints { gap: 13px; }
   }
   @media (max-width: 860px) {
     .hints span:nth-child(1), .hints span:nth-child(2) { display: none; }
     .trans-picker b { display: none; }
+  }
+  /* and below that the chips themselves have to give, or five of them run off both sides */
+  @media (max-width: 720px) {
+    .trans-picker { gap: 5px; }
+    .look-chip { font-size: 10px; padding: 5px 7px; }
+    .look-chip.reloads { font-size: 9.5px; }
+  }
+  /* and one more step up, because below about 640 the shrunk bar reaches the back tab in the
+     bottom-left corner instead of the hints on the right — measured, not assumed */
+  @media (max-width: 640px) {
+    .trans-picker { bottom: 104px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1092,10 +1113,17 @@
 <div class="bold-streak" id="streak2" style="top: 58vh"></div>
 <div class="bold-streak" id="streak3" style="top: 78vh"></div>
 <div id="cutCard"><div class="cc-inner"><div class="cc-en" id="ccEn"></div><div class="cc-jp" id="ccJp"></div><div class="cc-slash" id="ccSlash"></div></div></div>
-<div class="chrome trans-picker" id="transPicker">
-  <b>TRANSITION</b>
-  <button class="trans-chip" data-t="1">① 振向 WHIP</button>
-  <button class="trans-chip" data-t="2">② 軸回 ORBIT</button>
+<!-- THE TRANSITION PICKER IS GONE. WHIP and ORBIT both still exist and the ?t= parameter and
+     NAV still choose between them; what went is the picker, because nobody was switching them
+     and the bottom centre is the only place in this chrome with room for the controls that ARE
+     being used. -->
+<div class="chrome trans-picker" id="lookPicker">
+  <b>LOOK</b>
+  <button class="look-chip" data-look="cel">陰影 CEL</button>
+  <button class="look-chip" data-look="ink">輪郭 INK</button>
+  <button class="look-chip" data-look="cloud">雲影 CLOUD</button>
+  <button class="look-chip" data-look="post">陽光 SUN</button>
+  <button class="look-chip reloads" data-look="lift">地色 LIFT</button>
 </div>
 
 <script src="./lib/gsap.min.js"></script>
@@ -7986,6 +8014,8 @@ let tmode = (() => {
 let activeMode = tmode;
 const subRest = { pos: HOME_SUB.eye.clone(), tgt: HOME_SUB.focus.clone() };
 
+/* empty now that the picker is gone, and deliberately still driven: setTmode keeps writing
+   the preference and ?t= keeps choosing the mode, so removing the UI removed only the UI */
 const chips = [...document.querySelectorAll('.trans-chip')];
 function setTmode(n) {
   tmode = n;
@@ -8635,6 +8665,65 @@ function tick() {
   frontRenderer.render(frontScene, camera);
   requestAnimationFrame(tick);
 }
+
+/* ================= THE LOOK BAR =================
+   Every one of these was a URL parameter or a console line, which is a bad way to compare two
+   versions of a picture: by the time you have typed it you are no longer looking at the first
+   one. As buttons they are an A/B you can flip while staring at the same frame.
+   Three of them are live because they are uniforms or a data texture, and one is not: the
+   terrain repaint is baked into vertex colours by the loader, so it can only change by loading
+   again. That one carries its state in the URL and reloads; the rest remember in localStorage.
+   Declared here, at the end, so every const it touches is already initialised — the same
+   temporal-dead-zone rule that has bitten this file eight times. */
+{
+  const CLOUD_BASE = CLOUD.uCloudAmt.value;
+  const q = new URLSearchParams(location.search);
+  const saved = (k, d) => {
+    const v = localStorage.getItem('sumi3d-look-' + k);
+    return v === null ? d : v === '1';
+  };
+  const LOOK = {
+    cel: { get: () => CEL.mode === 'new', set: (on) => setCelMode(on ? 'new' : 'old') },
+    ink: { get: () => INK.on, set: (on) => { INK.on = on; } },
+    cloud: {
+      get: () => CLOUD.uCloudAmt.value > 0,
+      set: (on) => {
+        CLOUD.uCloudAmt.value = on ? CLOUD_BASE : 0;
+        CLOUD_MATS.forEach((m) => { m.needsUpdate = true; });
+      },
+    },
+    post: { get: () => POST.on, set: (on) => { POST.on = on; } },
+    /* the loader bakes this one into the terrain's vertex colours, so the only way to change it
+       is to load again with the flag set */
+    lift: {
+      reloads: true,
+      get: () => q.get('lift') === 'on',
+      set: (on) => {
+        const u = new URL(location.href);
+        if (on) u.searchParams.set('lift', 'on'); else u.searchParams.delete('lift');
+        location.href = u.toString();
+      },
+    },
+  };
+  const lookChips = [...document.querySelectorAll('.look-chip')];
+  const paint = () => lookChips.forEach((c) => c.classList.toggle('on', LOOK[c.dataset.look].get()));
+  /* restore the remembered state before the first paint, but never for the reloading one and
+     never over an explicit URL parameter */
+  for (const [k, o] of Object.entries(LOOK)) {
+    if (o.reloads || q.has(k)) continue;
+    const want = saved(k, o.get());
+    if (want !== o.get()) o.set(want);
+  }
+  lookChips.forEach((c) => c.addEventListener('click', () => {
+    const k = c.dataset.look, o = LOOK[k];
+    const on = !o.get();
+    if (!o.reloads) localStorage.setItem('sumi3d-look-' + k, on ? '1' : '0');
+    o.set(on);
+    paint();
+  }));
+  paint();
+}
+
 tick();
 </script>
 </body>
