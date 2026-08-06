@@ -3105,7 +3105,35 @@ function outlineMaterial(px, shedAt) {
    frame, and no amount of surface detail survives being quantised to four levels. Sixteen steps
    with LinearFilter is still a ramp — the terminator still sits where the art direction put it,
    the falloff is still stylised — but it stops shading a mountain like a poster. */
-const RAMP_MTN = toonRamp(16, THREE.LinearFilter);
+/* 64 STEPS, UP FROM 16, AND THE REASON IS THE MODEL RATHER THAN THE RAMP.
+   Fuji's mesh is not a clean cone — rendered with a plain white Lambert, no texture, no ramp and
+   no emissive, its right flank carries a broad soft dent, and a raw normal render shows the same
+   shape as a patch of different hue. That undulation is the author's geometry and it is fine;
+   what was wrong was how hard this ramp answered it. Sixteen texels under LinearFilter is
+   sixteen straight segments with a slope change at every join, and a broad normal wobble
+   drifting across one of those joins turns into a visible edge with a flat region behind it.
+   Those are the blotches that survived taking the relief out.
+   At 64 the segments are 1.6% apart and the joins stop being findable; measured against a
+   256-step version the two are indistinguishable, so this is the cheap end of "no longer
+   quantising the thing that matters". The props keep the four-step ramp — the cel look reads on
+   objects with edges, not on a mountain twenty-four thousand units away. */
+const RAMP_MTN = toonRamp(64, THREE.LinearFilter);
+
+/* HOW BRIGHT THE ROCK AND SNOW ARE, as one number, because it is one decision — and the answer
+   to "the mountains look overexposed by something I cannot see".
+   It was not the emissive fill, which was the obvious suspect since the mountains are the only
+   large surfaces in the world carrying one: 628 materials have emissive #000000 and only these
+   twenty have a map. Sweeping it from full to zero moved Fuji's face by four luminance. It was
+   not the ramp and not the relief either. It is simply the PAINT — Fuji's flank measured 161
+   against a sky of 151 and a meadow of 105, which makes the mountain the brightest large thing
+   in the frame, and a mountain twenty-four thousand units away should not be.
+   Swept with ?mtn=<n>, reading the flank off the framebuffer:
+       1.00 -> 161    0.85 -> 153    0.72 -> 145    0.60 -> 139    0.50 -> 132
+   0.75 puts it near 146, under the sky and still well clear of the meadow. */
+const MTN_LEVEL = (() => {
+  const v = parseFloat(new URLSearchParams(location.search).get('mtn'));
+  return Number.isFinite(v) ? v : 0.75;
+})();
 
 /* A REAL HASH, NOT AN ARITHMETIC PROGRESSION.
    `(i * 9301 + seed * 49297) % 233280` is LINEAR in i — consecutive instances step by exactly
@@ -4365,8 +4393,14 @@ function mountainTex(o) {
   const ge = ce.getContext('2d');
   const imge = ge.createImageData(W, H);
   const de = imge.data;
-  const foot = new THREE.Color(o.foot), rock = new THREE.Color(o.rock);
-  const hi = new THREE.Color(o.rockHi), snow = new THREE.Color(o.snow);
+  /* ROCK AND SNOW TAKE A LEVEL, THE FOOT DOES NOT.
+     The foot colour is solved against the terrain's pixels so the skirt seam closes; scaling it
+     would break that. Everything above the treeline is free to move, and it is what makes the
+     mountains read as overexposed. */
+  const foot = new THREE.Color(o.foot);
+  const rock = new THREE.Color(o.rock).multiplyScalar(MTN_LEVEL);
+  const hi = new THREE.Color(o.rockHi).multiplyScalar(MTN_LEVEL);
+  const snow = new THREE.Color(o.snow).multiplyScalar(MTN_LEVEL);
   const tmp = new THREE.Color();
   const lin2srgb = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
   for (let y = 0; y < H; y++) {
