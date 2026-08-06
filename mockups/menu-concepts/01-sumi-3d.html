@@ -1463,7 +1463,15 @@ const INK = {
   on: true,
   width: { value: 1.35 },        /* half-width of the sample cross, in pixels */
   depthT: { value: 0.018 },      /* relative depth jump that counts as a silhouette */
-  normalT: { value: 0.22 },      /* 1 - dot(n, n') that counts as a crease */
+  /* 1 - dot(n, n') that counts as a crease, and 0.22 was below the geometry.
+     0.22 is a 38-degree fold. A conifer in this world is a cone with eight radial facets, so
+     neighbouring faces differ by 45 degrees — 1 - cos(45) = 0.293, comfortably over the line —
+     and the pass dutifully inked EVERY FACET EDGE on every tree of that shape. It was not the
+     outline being wrong; it was the crease detector doing exactly what it was told on a
+     low-poly shape whose faces are supposed to read as one curved surface.
+     0.50 is a 60-degree fold: past anything a faceted cone or a round canopy produces, and well
+     under a building corner, which is 90 degrees and scores 1.0. */
+  normalT: { value: 0.50 },
   amount: { value: 0.85 },
   color: { value: new THREE.Color(0x121319) },
   texel: { value: new THREE.Vector2(1 / 1440, 1 / 810) },
@@ -1544,9 +1552,10 @@ const matInk = new THREE.ShaderMaterial({
       float graze = clamp( abs( normalize( n0 ).z ), 0.06, 1.0 );
       float dEdge = smoothstep( uDepthT / graze, uDepthT * 2.6 / graze, rel );
       float nEdge = smoothstep( uNormalT, uNormalT + 0.30, nJump );
-      /* the crease line only where there is no silhouette, so a silhouette does not get drawn
-         twice at different strengths */
-      float e = max( dEdge, nEdge * ( 1.0 - dEdge * 0.5 ) );
+      /* AND A CREASE IS A LIGHTER LINE THAN A SILHOUETTE. In a drawing the outside of a form
+         is the heavy stroke and the folds inside it are hairlines; giving both the same weight
+         is most of what makes screen-space outlines look mechanical. */
+      float e = max( dEdge, nEdge * ( 1.0 - dEdge * 0.5 ) * 0.55 );
       if ( e <= 0.001 ) discard;
       /* THE SAME HAZE EVERY SURFACE TAKES. An unfogged line stays jet black against a mountain
          that has dissolved into the fog and reads as a crack in the image. */
@@ -1993,8 +2002,17 @@ const CLOUD = {
   uCloudProj: { value: new THREE.Vector2() },
   /* the tile holds ~3 blobs, so this is a ~1700-unit cloud. At 4000 the whole near meadow sat
      inside a single blob and the effect read as a uniform dimmer rather than as weather. */
-  uCloudScale: { value: 1 / 5000 },
-  uCloudAmt: { value: 0.72 },
+  /* SMALLER AND MUCH LIGHTER, and this is the dark oval on the meadow.
+     It is not a bug and it is not new — it is the cloud-shadow system, a noise texture projected
+     along the sun onto everything the light touches. At 0.72 it removed nearly three quarters of
+     the direct light under a blob, and at 1/5000 a blob was thousands of units across, so what
+     landed on the grass between Fuji and the lake was one enormous soft oval that reads as a
+     stain rather than as weather. Measured, it was pulling that patch of meadow down by 6
+     luminance across a region the size of the whole field.
+     A third the strength and two thirds the size: several shadows drifting rather than one, and
+     each of them a suggestion. */
+  uCloudScale: { value: 1 / 3400 },
+  uCloudAmt: { value: 0.30 },
   /* the valley mist. uMistY is set to the water surface once the lake exists; 300 units of
      scale height puts the bulk of it below the treetops, which is where dawn mist sits. */
   uMistColor: { value: new THREE.Color(0xe4dfe0) },
@@ -4837,18 +4855,28 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
          it is the BANDS that say how tall it is. rockAt at 0.22 put bare rock almost at the
          waterline; at 0.46 the foot occupies the lower half, which is what the eye reads as
          mass. The cap is narrow and high because a distant range should be tipped, not capped. */
-      foot: 0x6f7566, rock: 0x9096a0, rockHi: 0xa9aeb6, snow: 0xe6e8ec,
-      rockAt: 0.46, grain: 1 / 700, noiseR: 4000,
-      snowAt: 0.84, snowBand: 0.13, snowJitter: 0.12, snowGrain: 1 / 2600,
+      /* THE GRADIENT HAS TO SIT WHERE THE MOUNTAIN IS VISIBLE.
+         Dumping the texture is what showed this: it was a flat pale slate over four fifths of
+         its height with a sliver of green at the very bottom. v is normalised over the mesh's
+         whole height and these ranges are buried — only their top third clears the terrain — so
+         a foot-to-rock ramp finishing at 0.46 finished far below anything on screen, and every
+         visible pixel was bare rock. Same mistake as Fuji's skirt, one mountain over.
+         With both ends free the ramp is placed across the part that shows: still earthy at 0.5,
+         bare rock by 0.82, and a cap that is a TIP rather than a band. */
+      foot: 0x6f7566, rock: 0x848c93, rockHi: 0x9aa0a7, snow: 0xdfe2e6,
+      rockFrom: 0.42, rockAt: 0.82, grain: 1 / 700, noiseR: 4000,
+      /* and a snow line that wanders. At 1/2600 the noise circle spanned 1.5 units, so the line
+         had barely one lobe in it and came out as a straight horizontal edge with teeth. */
+      snowAt: 0.90, snowBand: 0.07, snowJitter: 0.15, snowGrain: 1 / 900,
       fill: 0x6e6e6e,
       /* the back layer is meant to be flat and quiet, so barely any */
       bump: 0.22, bumpFreq: 1 / 2600, origin: [c.x, rb.min.y, c.z],
     } : {
       /* the middle layer: still clearly a mountain, still clearly in front of the one behind */
       foot: groundCol.clone().lerp(new THREE.Color(0x5f6a5c), 0.62).getHex(),
-      rock: 0x7f8681, rockHi: 0x979d96, snow: 0xd6d8da,
-      rockAt: 0.50, grain: 1 / 700, noiseR: 4000,
-      snowAt: 0.88, snowBand: 0.10, snowJitter: 0.12, snowGrain: 1 / 2600,
+      rock: 0x757c78, rockHi: 0x8b918b, snow: 0xd6d8da,
+      rockFrom: 0.38, rockAt: 0.78, grain: 1 / 700, noiseR: 4000,
+      snowAt: 0.93, snowBand: 0.06, snowJitter: 0.15, snowGrain: 1 / 900,
       fill: 0x585858,
       bump: 0.45, bumpFreq: 1 / 1700, origin: [c.x, rb.min.y, c.z],
     });
@@ -4963,7 +4991,10 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
          the ring, and every previous attempt at it painted geometry nobody can see. */
       rockFrom: 0.24, rockAt: 0.46, grain: 1 / 1100, noiseR: 6000,
       /* and the cap sits above the rock rather than starting in the middle of it */
-      snowAt: 0.62, snowBand: 0.18, snowJitter: 0.13, snowGrain: 1 / 4200,
+      /* the same wandering line as the ranges — 1/4200 over a 6,000-unit circle is 1.4 noise
+         units, which is not enough to bend a snow line, and the straightness of it is what read
+         as a splotch where the one lobe it did have happened to dip */
+      snowAt: 0.62, snowBand: 0.18, snowJitter: 0.17, snowGrain: 1 / 1300,
       /* THE ONE THAT BANDED. Fuji is the largest smooth surface in the frame and needs the most
          relief to break its terminator — measured against the mesh, 1/2200 is a ~2,200-unit
          undulation, which at 24,000 units away is about the size of a real ridge on the cone. */
