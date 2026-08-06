@@ -5089,9 +5089,16 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
          dimming does not reach it. Leaving it derived from the undimmed field colour is what put
          the terrain above y 3,200 at luminance 122 while every other landform sat at 86-101. */
       uRockCol: { value: rockFor(fieldCol.clone().multiplyScalar(MTN_LEVEL)) },
-      uSnowY: { value: 4200 },
-      uSnowBand: { value: 900 },
-      uSnowJitter: { value: 700 },
+      /* 4,900, NOT 4,200 — the last of the "ranges are brighter than Fuji".
+         The jitter pulls a snow line DOWN as well as up, so at 4,200 with 700 of wobble the
+         terrain could be snow from 3,500, and the high band's mean height is 3,872: a third of
+         what was being measured at luminance 111 was simply snow. Fuji's line sits at 4,893 of a
+         summit at 7,189 — the top third — and the terrain's ridges top out near 4,800, so 4,200
+         was giving the hills proportionally far more snow than the mountain they are compared
+         with. At 4,900 with 500 of wobble only the genuinely tallest ridges cap. */
+      uSnowY: { value: 4900 },
+      uSnowBand: { value: 700 },
+      uSnowJitter: { value: 500 },
       uSnowScale: { value: 1 / 1400 },
       uSnowCol: { value: new THREE.Color(0xd6d3cc) },
       uSnowOrigin: { value: new THREE.Vector3() },
@@ -5598,7 +5605,16 @@ function composeWorldHome() {
      At 0.7 the near ridge and Fuji land within six of each other and the far one still reads as
      further away, which is the point of having fog at all — flattening it to zero puts the
      furthest ridge BELOW the nearest mountain, which is worse than the problem. */
-  backScene.fog.density = 0.000013;
+  /* 1.1e-5, and this one was found by minimising rather than by eye. Sweeping the density and
+     measuring every landform group per pixel, the SPREAD between them — Fuji, the range meshes,
+     and the terrain's lower, mid and high ground — has a minimum:
+         x1.00   fuji 101  high 109   spread 18
+         x0.85   fuji  97  high  99   spread 16
+         x0.70   fuji  93  high  90   spread 19
+         x0.55   fuji  90  high  81   spread 24
+     Below the minimum it widens again, because the range meshes fall away faster than the
+     terrain does. Fuji and the high ridges land two apart. */
+  backScene.fog.density = 0.000011;
   CLOUD_MATS.forEach((m) => { m.needsUpdate = true; });
   ENV.homeMoved = true;
   return r;
