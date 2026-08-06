@@ -4,7 +4,7 @@
     {
       "name": "menu-concepts",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5230", "--directory", "mockups/menu-concepts"],
+      "runtimeArgs": ["mockups/menu-concepts/serve.py", "5230"],
       "port": 5230
     }
   ]
