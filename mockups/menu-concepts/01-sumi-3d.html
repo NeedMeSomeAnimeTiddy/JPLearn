@@ -1255,7 +1255,10 @@ backScene.fog = new THREE.FogExp2(0xd8c1ab, 4.0e-5);
    from inside its own dead zone throws and takes the module with it. Anything two distant parts
    of this file both need is declared before either of them. */
 const CEL = { mode: new URLSearchParams(location.search).get('cel') === 'old' ? 'old' : 'new' };
-const CEL_RIM = 0.42;
+/* 0.20, DOWN FROM 0.42. At the higher value the lit edge was a band rather than a hint, and
+   with the rest of the new shading being questioned it was adding to the noise rather than to
+   the form. */
+const CEL_RIM = 0.20;
 
 const FOG_U = {
   fogColor: { value: backScene.fog.color },
@@ -2143,23 +2146,22 @@ function mountainMaterial(opts) {
        is lit exactly like the ground it meets. See the note on mountainTex. */
     emissiveMap: tex.emis,
   });
-  /* the rock block is here for its BUMP, not for its paint: the mottle and the snow line are
-     already in the texture, and doing them twice would fight. */
-  return rocky(mat, {
-    mottle: 0,
-    /* THE SPLOTCHES ON FUJI ARE CLOUD SHADOWS, and a mountain is the one surface they cannot
-       work on. The projection assumes the shadow lands on ground near y = 0 — it is the world
-       position offset along the light and read out of a noise texture — so on a cone rising
-       seven thousand units the same blob smears up the flank as a stain that belongs to no
-       cloud you can see. Measured, turning the cloud shadow off lifts Fuji's face by 6 luminance
-       on average, and locally by much more, which is exactly the spotting.
-       0.06 keeps the faintest sense that weather passes over it and stops it patterning. */
-    cloudAmt: 0.06,
-    scale: opts.bumpFreq != null ? opts.bumpFreq : 1 / 900,
-    origin: opts.origin,
-    bump: opts.bump != null ? opts.bump : 0.55,
-    bumpScale: opts.bumpScale != null ? opts.bumpScale : 1,
-  });
+  /* NO RELIEF, AND THIS IS THE SECOND TIME THE SAME MISTAKE HAS BEEN MADE HERE IN REVERSE.
+     The bump went in to break a toon terminator that was banding across the cone — and the cone
+     was banding because it was on RAMP, four steps with NearestFilter. It is on RAMP_MTN now,
+     sixteen steps with LinearFilter, which does not band: rendering the same frozen frame with
+     the relief switched off shows a clean smooth cone with a single soft shadow. So the relief
+     was fixing a problem that the ramp had already fixed, and all it contributed was its own
+     artefact — at 1/2,200 across a mountain 22,000 units wide that is about ten blobs, each one
+     a soft dark lobe big enough to read as a stain. Those are the blotches.
+     The machinery stays (it is the right tool the day something genuinely banded needs it), and
+     every caller passes nothing.
+     THE CLOUD SHADOW IS STILL OVERRIDDEN, because a mountain is the one surface that projection
+     cannot work on: it offsets a world position along the light and reads a noise texture, which
+     assumes the shadow lands near y = 0, so on a cone rising seven thousand units the same blob
+     smears up the flank as a stain belonging to no cloud in the sky. */
+  mat.userData.over = { uCloudAmt: { value: 0.06 } };
+  return cloudy(mat);
 }
 
 /* REPAINT HIGH GROUND AS MOUNTAIN.
@@ -2279,6 +2281,12 @@ function cloudy(mat) {
   mat.userData.cloudy = true;
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, CLOUD);
+    /* PER-MATERIAL OVERRIDES WITHOUT THE ROCK BODY. Assigned after CLOUD, so anything named here
+       wins for this material alone — which is what the mountains need to opt out of the cloud
+       shadow, and all they need. Going through rocky() for it would drag in the rock fragment
+       block, and that block evaluates two five-octave noises per pixel whether or not anything
+       is left switched on. */
+    if (mat.userData.over) Object.assign(shader.uniforms, mat.userData.over);
     if (mat.userData.rock) Object.assign(shader.uniforms, mat.userData.rock);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vCloudPos;')
@@ -4860,11 +4868,7 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
      itself. Finer than that and the meadow reads as noise.
      The material is cloned first because the loader shares one material per source material,
      and the ground must not drag every other vertex-coloured surface with it. */
-  terrainish.forEach((o) => {
-    o.material = rocky(o.material.clone(), {
-      mottle: 0, bump: 0.5, scale: 1 / 1400, cloudAmt: CLOUD.uCloudAmt.value,
-    });
-  });
+
   /* AND THE REPAINT IS OFF, BECAUSE IT DOES NOTHING.
      liftHighGround was written to fix mountains that read as black. They read as black because
      they were under their own outline hulls, and once the hulls went the lift turned out to be
@@ -4873,6 +4877,24 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
      vertices to move nothing — and any repaint of the ground around Fuji's base is exactly the
      thing that can put a ring there. The function stays for the record and for the day the
      terrain is re-exported with a flatter palette. */
+  /* THE FINER RAMP, NOT RELIEF — the same conclusion as the mountains, reached the same way.
+     The oval on the meadow is an honest terminator (N.L = -0.254 on that slope) collapsed into
+     one flat value by a four-step ramp across a hill thousands of units wide. Relief broke it up
+     and blotched the whole field doing it: a sweep of amount and scale showed nothing between
+     "still an oval" and "dappled like camouflage".
+     Sixteen steps with LinearFilter has no such edge to break. The props, the buildings and the
+     trees keep the four-step ramp, which is where the cel look actually reads — a ground plane
+     the size of a valley was never the thing carrying the style.
+     Cloned so the loader's shared material does not drag every other vertex-coloured surface
+     along, and cloudy() re-applied because Material.clone() copies userData but not
+     onBeforeCompile — the flag has to be cleared or the patch takes its early return. */
+  terrainish.forEach((o) => {
+    const m = o.material.clone();
+    delete m.userData.cloudy;
+    m.gradientMap = RAMP_MTN;
+    o.material = cloudy(m);
+  });
+
   const LIFT = new URLSearchParams(location.search).get('lift') === 'on';
   if (LIFT) terrainish.forEach((o) => {
     /* 1,000 to 3,000, not 1,400 to 4,200 — the first band was aimed above the thing it was for.
@@ -4947,8 +4969,6 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
          had barely one lobe in it and came out as a straight horizontal edge with teeth. */
       snowAt: 0.90, snowBand: 0.07, snowJitter: 0.15, snowGrain: 1 / 900,
       fill: 0x6e6e6e,
-      /* the back layer is meant to be flat and quiet, so barely any */
-      bump: 0.22, bumpFreq: 1 / 2600, origin: [c.x, rb.min.y, c.z],
     } : {
       /* the middle layer: still clearly a mountain, still clearly in front of the one behind */
       foot: groundCol.clone().lerp(new THREE.Color(0x5f6a5c), 0.62).getHex(),
@@ -4956,7 +4976,6 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
       rockFrom: 0.38, rockAt: 0.78, grain: 1 / 700, noiseR: 4000,
       snowAt: 0.93, snowBand: 0.06, snowJitter: 0.15, snowGrain: 1 / 900,
       fill: 0x585858,
-      bump: 0.45, bumpFreq: 1 / 1700, origin: [c.x, rb.min.y, c.z],
     });
     cragged++;
     craggedTris += o.geometry.attributes.position.count / 3;
@@ -5076,12 +5095,6 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
       /* THE ONE THAT BANDED. Fuji is the largest smooth surface in the frame and needs the most
          relief to break its terminator — measured against the mesh, 1/2200 is a ~2,200-unit
          undulation, which at 24,000 units away is about the size of a real ridge on the cone. */
-      /* 0.32, DOWN FROM 0.62. At the higher value the relief was leaning some patches of the
-         cone far enough to jump a whole ramp step, so the snow band grew and lost islands and
-         the cone came out spotted — noise, not rock. It only has to break the terminator, not
-         re-sculpt the mountain. */
-      bump: 0.32, bumpFreq: 1 / 2200,
-      origin: [(b.min.x + b.max.x) / 2, b.min.y, (b.min.z + b.max.z) / 2],
       /* the least fill of any mountain: it is the nearest of them and the one that was too pale */
       fill: 0x484848,
     });
