@@ -2147,7 +2147,7 @@ const CLOUD_MATS = [];
 function mountainMaterial(opts) {
   const mat = new THREE.MeshToonMaterial({
     color: opts.base.clone().multiplyScalar(MTN_LEVEL),
-    gradientMap: RAMP_MTN,
+    gradientMap: RAMP_PEAK,
   });
   /* the snow line, in world units, per mountain — see the block cloudy() injects */
   mat.userData.snow = {
@@ -3189,6 +3189,20 @@ function outlineMaterial(px, shedAt) {
    no emissive fill), side-on lands near 0.47, and the lit flank goes to full. */
 const RAMP_MTN = toonRamp(64, THREE.LinearFilter, 1.8, 0.26);
 
+/* AND A SEPARATE ONE FOR THE PEAKS, because "the mountain is the same colour as the ground" was
+   true and still came out brighter than the ground. Measured with everything identical — same
+   albedo #7b8a52, same material, same ramp — Fuji's flank rendered 136 against 96 for the field
+   below it, and neither lever alone closed it: scaling the albedo 2.4x moved it 21, dropping the
+   ramp floor from 0.26 to 0.04 moved it 18. Switching things off one at a time says why. The
+   distance fog contributes 19 of it (Fuji is 24,000 units out and the dawn fog colour is bright),
+   the rim light 4, the valley mist nothing — and the remaining 33 is simply that a big smooth
+   flank tilted toward a low sun catches more light than a flat valley floor under trees. Which
+   is true, and reads wrong, because the eye expects one continuous landform to be one value.
+   So the peaks get a steeper curve with a lower floor, and take the albedo down with it. Both
+   together land the flank on 109 against a 103 meadow. The terrain keeps RAMP_MTN — it is the
+   surface the mountains are being matched TO, and moving it would move the target. */
+const RAMP_PEAK = toonRamp(64, THREE.LinearFilter, 2.2, 0.10);
+
 /* HOW BRIGHT THE ROCK AND SNOW ARE, as one number, because it is one decision — and the answer
    to "the mountains look overexposed by something I cannot see".
    It was not the emissive fill, which was the obvious suspect since the mountains are the only
@@ -3205,10 +3219,9 @@ const RAMP_MTN = toonRamp(64, THREE.LinearFilter, 1.8, 0.26);
    compound, and 0.66 is where the flank sits properly below the sky rather than beside it. */
 const MTN_LEVEL = (() => {
   const v = parseFloat(new URLSearchParams(location.search).get('mtn'));
-  /* 1.0 — the mountains ARE the ground now, so anything else here is a lie about the paint.
-     The value difference between a field at your feet and a mountain at 24,000 units is made by
-     the ramp's floor and exponent, which is where it belongs. */
-  return Number.isFinite(v) ? v : 1.0;
+  /* 0.48, and it is doing half the work — RAMP_PEAK does the other half. See the note there
+     for why matching the paint exactly was not enough to match the pixels. */
+  return Number.isFinite(v) ? v : 0.48;
 })();
 
 /* A REAL HASH, NOT AN ARITHMETIC PROGRESSION.
@@ -4844,8 +4857,30 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
   /* 1b0. THE GROUND'S OWN COLOUR, read before anything that has to agree with it — the far
      ranges, Fuji's skirt and the flat surfaces all reference it, and they run in that order. */
   let groundCol = new THREE.Color(0x8f9677);
+  /* THE FIELD'S COLOUR, NOT THE WHOLE MESH'S AVERAGE — and this is why the mountains still came
+     out brighter than the grass beside them even after they were given "the ground's colour".
+     The terrain mesh is one object carrying the valley AND every hill in it, and the author
+     painted the high ground pale. Averaged by height:
+         below 800   #7b8a52   190,300 vertices   the field anyone actually sees
+         above 3000  #bbb8ad   186,145 vertices   the rock and snow the author put up top
+         everything   brighter than the field, because that second group is a third of the mesh
+     So "the average colour of the terrain" is not the colour of the ground around Fuji; it is
+     the colour of the ground plus a third of a mountain. Taking it from the low vertices only
+     gives the mountains the paint of the field they stand in, which is what was asked for. */
+  let fieldCol = new THREE.Color(0x7b8a52);
   root.traverse((o) => {
-    if (o.isMesh && /(^|[_\-.])(terrain)([_\-.]|$)/i.test(o.name)) groundCol = avgVertexColor(o);
+    if (!o.isMesh || !/(^|[_\-.])(terrain)([_\-.]|$)/i.test(o.name)) return;
+    groundCol = avgVertexColor(o);
+    const pos = o.geometry.attributes.position, col = o.geometry.attributes.color;
+    if (!col) return;
+    const v = new THREE.Vector3();
+    let r = 0, g = 0, b2 = 0, n = 0;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      if (v.y > 800) continue;
+      r += col.getX(i); g += col.getY(i); b2 += col.getZ(i); n++;
+    }
+    if (n) fieldCol = new THREE.Color(r / n, g / n, b2 / n);
   });
   let matched = 0;
   root.traverse((o) => {
@@ -4975,7 +5010,7 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     const far = /farrange/i.test(o.name);
     const rh = rb.max.y - rb.min.y;
     o.material = mountainMaterial({
-      base: groundCol,
+      base: fieldCol,
       origin: [c.x, c.z],
       snowY: rb.min.y + rh * (far ? 0.82 : 0.88),
       snowBand: rh * 0.10,
@@ -5033,7 +5068,7 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
        transition over a tenth of the height so the edge is soft before the noise even bends it. */
     const fh = b.max.y - b.min.y;
     o.material = mountainMaterial({
-      base: groundCol,
+      base: fieldCol,
       origin: [(b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2],
       snowY: b.min.y + fh * 0.62,
       snowBand: fh * 0.12,
@@ -5301,6 +5336,7 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
     + `${Math.round(lifted / 1000)}k terrain verts lifted to rock, ${tinted} sets given a treeline, `
     + `${farCut} far vegetation sets out of the reflection (${Math.round(farCutTris / 1000)}k tris), `
     + `${matched} surfaces matched to ground #${groundCol.getHexString()}, `
+    + `mountains painted the field's #${fieldCol.getHexString()}, `
     + `${ponds} water surfaces, `
     + `${dropped} atmosphere dropped, ${culled} cut from the reflection `
     + `(${Math.round(culledTris / 1000)}k tris/frame saved), ${hulls} outline hulls, `
