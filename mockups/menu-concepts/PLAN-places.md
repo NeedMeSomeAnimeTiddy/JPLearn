@@ -5,6 +5,14 @@ keeping the reasoning and dropping the siting: which area of the .blend a place 
 centroid and its Blender→three.js coordinate conversion were all settled long ago and now live in
 the model and in `DEST_SPECS`, where they can be read instead of remembered.
 
+Companion documents:
+
+- **`PLAN-study.md`** — the step-by-step journal of building STUDY, step 0 to step 4. The worked
+  example of taking one place from a bearing to a standing structure, and the source of the
+  cross-place findings near the end of this file.
+- **`places/review.js`** — the worked example in code. The pattern every other place follows.
+- **`RESEARCH.md`** — the reference behind the look.
+
 ## The two tests
 
 Applied to every candidate, and the reason the first costume table was thrown out — it had three
@@ -219,6 +227,33 @@ seven cameras in the file: only two of them agree with the architecture, because
 before the mapping was settled. A 櫓 is unambiguously the drill ground; a camera called
 `Camera_Drills` pointed at the shrine is a label.
 
+## What building the first two taught
+
+Findings from `PLAN-study.md`'s step log that are **not** about STUDY, and will otherwise be
+rediscovered the hard way. That file is the full journal, step 0 to step 4; read it before siting
+or framing anything.
+
+- **The six bearings were spread evenly round a circle before anyone knew where the land was.**
+  They are not sited against the terrain. Asked for dry ground on the western arc at REVIEW's
+  travel distance, a sweep found **none at any distance** — 63% wet at the driest. A pagoda cannot
+  stand in a lake. **Re-measure the bearing before building READING, DRILLS, JLPT or RECORDS**;
+  inheriting it is how a place ends up in the water.
+- **The flight, not the distance, is the shot.** What the camera travels is `dist − stand`, and the
+  rest of the world runs 3,100–4,100. STUDY settled at 3,916, REVIEW's exactly. Three passes of
+  tuning framing never looked at it and left STUDY on a journey unlike everywhere else.
+- **`standOff` clamps at `len − 400`.** Stand-offs of 3,700 and 4,200 measure identically. There is
+  a ceiling on how far back any of these shots can go, and past it you are changing a number that
+  does nothing.
+- **A roofed threshold on the sight line cannot be made to work.** A gate between the eye and the
+  picks fails at some band of eye heights, and no stand-off fixes it. STUDY's gate is deliberately
+  off-axis; with it at sd −450 the picks read 4/4 at every stand-off and eye height measured.
+- **Picks go at the entrance, not at the corners.** The first STUDY stand-in put one in each corner
+  of a 1,700-square enclosure: they measured 1,601 pixels apart — the whole frame width — and read
+  as an aerial photograph of a compound rather than a place anyone was standing in. You do not
+  survey four quarters and choose one; you stand near the entrance and choose a way to go.
+- **The instruments are costume-independent** and are how all of the above was measured:
+  `NAV.probe`, `NAV.site`, `NAV.tryStand`, `NAV.hit`, `NAV.rectOf`, `NAV.outlineAudit`.
+
 ## Open before building
 
 - **L4 exists nowhere.** REVIEW is three levels deep and has been the template for everything; the
@@ -226,5 +261,8 @@ before the mapping was settled. A 櫓 is unambiguously the drill ground; a camer
   REVIEW, where L1–L3 already work, rather than discovering it inside a new place.
 - **JLPT's five picks against L2's four** — see above.
 - **RECORDS' L2 is not a tile row** and cannot be built from the same helper as the others.
-- **STUDY's shot** — `stand` and `eyeLift` were measured against a tall pavilion that no longer
-  exists. A hall behind a low wall is horizontal and wants a higher eye to read its ground plan.
+- **The four unbuilt bearings** — the first item above. This is the one that blocks starting.
+
+STUDY's shot is **not** open: `bearing 170, dist 6520, stand 1284, eyeLift 460` was re-derived for
+the hall after the pavilion was dropped and is settled. (An older note said it still framed a
+1,040-tall building and needed re-deriving; that was done.)
