@@ -2857,11 +2857,11 @@ const SHADOW_TINT = [0.74, 0.87, 1.16];
    ramp and the rim. NAV.cel('old'|'new') flips it live without a reload, because the ramps are
    data textures and their bytes can simply be rewritten. */
 const CEL_RAMPS = [];
-function writeRamp(tex, steps) {
+function writeRamp(tex, steps, exp) {
   const d = tex.image.data;
   const tint = CEL.mode === 'old' ? [1, 1, 1] : SHADOW_TINT;
   for (let i = 0; i < steps; i++) {
-    const v = Math.pow((i + 1) / steps, 0.72);
+    const v = Math.pow((i + 1) / steps, exp);
     const rgb = [0, 1, 2].map((c) => v * (tint[c] + (1 - tint[c]) * v));
     /* back to the value it started with: hue moves, brightness does not */
     const lum = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
@@ -2871,23 +2871,37 @@ function writeRamp(tex, steps) {
   }
   tex.needsUpdate = true;
 }
-function toonRamp(steps, filter) {
+/* THE EXPONENT IS THE SHAPE OF THE LIGHT, and it is the answer to "is Fuji even using the toon
+   shader". It is: MeshToonMaterial, 64-step gradient map. What made it look unshaded is that
+   three samples the ramp at `dot(N, L) * 0.5 + 0.5`, so the whole [-1, 1] range of the dot
+   product maps across the texture — and at 0.72 the curve is already at 0.607 by the halfway
+   point. A surface exactly side-on to the sun therefore keeps 61% of full sunlight, and a
+   mountain whose visible flank is mostly side-on or turned away never gets dark.
+   Measured on Fuji's flank, lit side against shadow side:
+       0.72   158 / 150   (8 apart — barely a form)
+       1.10   152 / 140   (12)
+       1.50   148 / 134   (14)
+       2.00   143 / 128   (15)
+   The props keep 0.72, which is the house look on objects a few hundred units away that want to
+   read as flat and bright. The mountains take 2.0, which gives them a lit side and a shadow side
+   instead of one even wash. */
+function toonRamp(steps, filter, exp = 0.72) {
   const t = new THREE.DataTexture(new Uint8Array(steps * 4), steps, 1, THREE.RGBAFormat);
   t.minFilter = t.magFilter = filter;
-  CEL_RAMPS.push([t, steps]);
-  writeRamp(t, steps);
+  CEL_RAMPS.push([t, steps, exp]);
+  writeRamp(t, steps, exp);
   return t;
 }
 /* setCelMode, not setCel: `setCel` is already taken by the loader's heavy-line mode, and a
    duplicate function declaration at module scope is a parse error that takes the whole page. */
 function setCelMode(mode) {
   CEL.mode = mode === 'old' ? 'old' : 'new';
-  CEL_RAMPS.forEach(([t, n]) => writeRamp(t, n));
+  CEL_RAMPS.forEach(([t, n, e]) => writeRamp(t, n, e));
   CLOUD.uRimAmt.value = CEL.mode === 'old' ? 0 : CEL_RIM;
   CLOUD_MATS.forEach((m) => { m.needsUpdate = true; });
   return CEL.mode;
 }
-const RAMP = toonRamp(4, THREE.NearestFilter);
+const RAMP = toonRamp(4, THREE.NearestFilter, 0.72);
 
 /* MERGE, so a multi-part tree is ONE InstancedMesh. A trunk and three canopy blobs as separate
    instanced meshes would be four draw calls and four outline twins that can drift apart; merged
@@ -3117,7 +3131,7 @@ function outlineMaterial(px, shedAt) {
    256-step version the two are indistinguishable, so this is the cheap end of "no longer
    quantising the thing that matters". The props keep the four-step ramp — the cel look reads on
    objects with edges, not on a mountain twenty-four thousand units away. */
-const RAMP_MTN = toonRamp(64, THREE.LinearFilter);
+const RAMP_MTN = toonRamp(64, THREE.LinearFilter, 2.0);
 
 /* HOW BRIGHT THE ROCK AND SNOW ARE, as one number, because it is one decision — and the answer
    to "the mountains look overexposed by something I cannot see".
@@ -3129,10 +3143,13 @@ const RAMP_MTN = toonRamp(64, THREE.LinearFilter);
    in the frame, and a mountain twenty-four thousand units away should not be.
    Swept with ?mtn=<n>, reading the flank off the framebuffer:
        1.00 -> 161    0.85 -> 153    0.72 -> 145    0.60 -> 139    0.50 -> 132
-   0.75 puts it near 146, under the sky and still well clear of the meadow. */
+   0.75 put it near 146, under the sky and clear of the meadow — and still too bright, because
+   the level was only half the problem: the ramp was handing a side-on flank 61% of full sun
+   whatever the paint did. With the mountains on their own steeper curve (see toonRamp) the two
+   compound, and 0.66 is where the flank sits properly below the sky rather than beside it. */
 const MTN_LEVEL = (() => {
   const v = parseFloat(new URLSearchParams(location.search).get('mtn'));
-  return Number.isFinite(v) ? v : 0.75;
+  return Number.isFinite(v) ? v : 0.66;
 })();
 
 /* A REAL HASH, NOT AN ARITHMETIC PROGRESSION.
