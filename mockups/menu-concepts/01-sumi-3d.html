@@ -3624,6 +3624,123 @@ const LAMP_NOT = /(pole|post|stand|bracket|base)/i;
    (`EMIT` on the material, not the object. Object names already carry the lamp patterns above,
    which is what makes a whole gas lamp a lamp; this is for a PART of one.) */
 const LAMP_EMIT_MAT = /^emit/i;
+/* ================= AND THE WINDOWS GO OUT ONE AT A TIME =================
+   Robbie marked every window in the onsen with a material called `EMIT_window` — 772 faces over
+   six meshes, all four floors of the three inns, the shops and the bathhouse. `LAMP_EMIT_MAT`
+   above already turns anything starting EMIT into a lamp, so the moment that lands they glow at
+   full paper strength and spill into the lamp grid for nothing. What that alone does NOT give is
+   life: one cloned material serves all six meshes, so every window in the valley would light and
+   dim together on one clock, and a town whose four hundred windows go out simultaneously at
+   dusk is a light switch, not a town.
+
+   SO EACH WINDOW GETS ITS OWN BEDTIME, AND ITS IDENTITY IS ITS PLACE IN THE WORLD. The obvious
+   channel — an index baked per window — cannot work here: `PROP_inn_1` is ONE geometry drawn by
+   two objects, and `PROP_shop_1` by four, so an index would put both inns and all four shops on
+   exactly the same pattern of lit and dark. What distinguishes them is the model matrix. So the
+   attribute is the window's own centre in LOCAL space, the vertex shader pushes it through
+   `modelMatrix`, and the hash is taken of the result: same geometry, different building,
+   different night.
+
+   NOTHING IS WRITTEN PER FRAME. Two uniforms — the hour and a clock — and every window works out
+   its own state from a hash. The dusk ramp is not in here at all: the lamp sweep is already
+   scaling this material's `emissive` by `lampOn`, and multiplying by it again would square it. */
+const WINDOW_U = { uWinHour: { value: 12 }, uWinTime: { value: 0 } };
+/* `geos` is one entry per OBJECT and not per geometry, deliberately: two inns share one mesh and
+   the whole point of hashing the world centre is that they keep different hours, so a readout
+   that counted geometries would report half the town. */
+const WINDOW = { spots: 0, meshes: 0, floor: 0.05, spot: 100, geos: [] };
+/* ONE SPOT PER WINDOW, then every vertex carries its own window's centre. Same greedy clustering
+   as `emitSpots` uses for the lanterns and for the same reason — a lattice window is a dozen
+   separate slat faces, and they have to agree about which window they are. 100 units: a panel is
+   about 120 across and the bays are 143 apart, so this gathers the slats of one and stops short
+   of the next. Cached on the geometry, because two inns share one. */
+function windowBake(geo) {
+  if (geo.getAttribute('aWinC')) return geo.userData.winSpots || 0;
+  const pos = geo.attributes.position, ix = geo.index;
+  const n = ix ? ix.count : pos.count;
+  const spots = [], c = new THREE.Vector3();
+  const MIN = WINDOW.spot * WINDOW.spot;
+  for (let t = 0; t + 2 < n; t += 3) {
+    const a = ix ? ix.getX(t) : t, b = ix ? ix.getX(t + 1) : t + 1;
+    const d = ix ? ix.getX(t + 2) : t + 2;
+    c.set((pos.getX(a) + pos.getX(b) + pos.getX(d)) / 3,
+      (pos.getY(a) + pos.getY(b) + pos.getY(d)) / 3,
+      (pos.getZ(a) + pos.getZ(b) + pos.getZ(d)) / 3);
+    let near = false;
+    for (let k = 0; k < spots.length; k++) {
+      if (spots[k].distanceToSquared(c) < MIN) { near = true; break; }
+    }
+    if (!near) spots.push(c.clone());
+  }
+  const out = new Float32Array(pos.count * 3);
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    let best = 0, bd = Infinity;
+    for (let k = 0; k < spots.length; k++) {
+      const d = spots[k].distanceToSquared(v);
+      if (d < bd) { bd = d; best = k; }
+    }
+    out[i * 3] = spots[best].x;
+    out[i * 3 + 1] = spots[best].y;
+    out[i * 3 + 2] = spots[best].z;
+  }
+  geo.setAttribute('aWinC', new THREE.BufferAttribute(out, 3));
+  geo.userData.winSpots = spots.length;
+  return spots.length;
+}
+/* CHAINED ONTO WHATEVER THE MATERIAL ALREADY HAD, not assigned over it. By the time this runs the
+   lamp sweep has cloned the material and put `cloudy` on its onBeforeCompile; replacing that hook
+   would take the valley's cloud lighting off every window in the town. Same for the cache key. */
+function windowLife(mat) {
+  if (mat.userData.winlife) return mat;
+  mat.userData.winlife = true;
+  const prev = mat.onBeforeCompile;
+  const prevKey = mat.customProgramCacheKey;
+  mat.onBeforeCompile = (shader, renderer) => {
+    if (prev) prev(shader, renderer);
+    Object.assign(shader.uniforms, WINDOW_U);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+        attribute vec3 aWinC;
+        uniform float uWinHour, uWinTime;
+        varying float vWinLit;
+        float winHash( vec3 p ) {
+          return fract( sin( dot( p, vec3( 12.9898, 78.233, 45.164 ) ) ) * 43758.5453 );
+        }`)
+      /* after project_vertex so the model matrix is certainly in hand */
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        {
+          vec3 wc = ( modelMatrix * vec4( aWinC, 1.0 ) ).xyz;
+          /* quantised before hashing: two vertices of one window must land on the same number,
+             and floating point across a 57,000-unit world will not do that on its own */
+          vec3 key = floor( wc * 0.05 );
+          float h = winHash( key );
+          /* HOURS SINCE SIX IN THE EVENING, so a bedtime that crosses midnight is a straight
+             comparison instead of a wrap. Most of the town is dark between nine and half two;
+             one window in eight belongs to somebody who does not sleep. */
+          float t = mod( uWinHour - 18.0 + 24.0, 24.0 );
+          float bed = 3.0 + h * 5.5;
+          if ( winHash( key + 7.31 ) > 0.875 ) bed = 13.0;
+          float lit = 1.0 - smoothstep( bed - 0.18, bed + 0.18, t );
+          /* never fully out: a corridor light, and a black rectangle in a lit wall reads as a
+             hole rather than as a window with nobody behind it */
+          lit = max( lit, ${WINDOW.floor} );
+          vWinLit = lit * ( 1.0 + 0.05 * sin( uWinTime * 0.7 + h * 37.0 ) );
+        }`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vWinLit;')
+      .replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= vWinLit;');
+    if (!shader.fragmentShader.includes('totalEmissiveRadiance *= vWinLit')
+      || !shader.vertexShader.includes('vWinLit = lit')) {
+      console.error('WINDOW PATCH FAILED', mat.name);
+    }
+  };
+  mat.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|winlife';
+  mat.needsUpdate = true;
+  return mat;
+}
 /* lamps that TRAVEL, and so cannot live in the static cluster grid — see where this is used */
 const LAMP_MOVING = /Chochin/i;
 
@@ -10392,6 +10509,14 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
         sets++;
       }
       o.material = swap.get(key);
+      /* A WINDOW IS A LAMP THAT KEEPS ITS OWN HOURS. Everything above has already made it glow;
+         this is the part that stops all four hundred of them doing it in step. See windowLife. */
+      if (marked && /^emit_window/i.test(src.name || '')) {
+        WINDOW.spots += windowBake(o.geometry);
+        WINDOW.meshes++;
+        WINDOW.geos.push({ geo: o.geometry, world: o.matrixWorld.clone() });
+        windowLife(swap.get(key));
+      }
       if (marked) bloomTag(o);
       /* ONE LIGHT PER LANTERN, NOT ONE PER ROW OF THEM.
          The festival's chochin arrive as SPANS: a single instance 401 units long carrying a
@@ -13305,6 +13430,38 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
      star counting to ink coverage, is measuring the crane unless it is told not to: a star count
      over the night sky came back with 6,303 of them, and 6,300 were its wings. */
   crane: (on) => { if (on !== undefined) swan.visible = on !== false; return swan.visible; },
+  /* the town's windows: how many were found, and what each one is doing at this hour */
+  windows: () => {
+    const out = { spots: WINDOW.spots, meshes: WINDOW.meshes, hour: +DAY_NOW.hour.toFixed(2) };
+    /* the same arithmetic the vertex shader does, run on the CPU over every window, so "how many
+       are lit right now" is a number rather than a squint at a screenshot */
+    const hash = (p) => {
+      const s = Math.sin(p.x * 12.9898 + p.y * 78.233 + p.z * 45.164) * 43758.5453;
+      return s - Math.floor(s);
+    };
+    const t = ((DAY_NOW.hour - 18 + 24) % 24);
+    let lit = 0, dark = 0, always = 0;
+    const k = new THREE.Vector3(), w = new THREE.Vector3();
+    for (const g of WINDOW.geos) {
+      const a = g.geo.getAttribute('aWinC');
+      if (!a) continue;
+      const seen = new Set();
+      for (let i = 0; i < a.count; i++) {
+        w.set(a.getX(i), a.getY(i), a.getZ(i)).applyMatrix4(g.world);
+        k.set(Math.floor(w.x * 0.05), Math.floor(w.y * 0.05), Math.floor(w.z * 0.05));
+        const id = k.x + ',' + k.y + ',' + k.z;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const h = hash(k);
+        const never = hash(k.clone().addScalar(7.31)) > 0.875;
+        if (never) always++;
+        const bed = never ? 13 : 3 + h * 5.5;
+        if (t < bed) lit++; else dark++;
+      }
+    }
+    return Object.assign(out, { windows: lit + dark, lit, dark, neverOut: always,
+      lampOn: +CLOUD.uLampOn.value.toFixed(2) });
+  },
   /* the baths and the chimneys: NAV.steam({ amt: 1 }) to see it from across the valley,
      { rise: 40 } to watch a whole cycle without waiting, { on: false } to take it away */
   steam: (o) => {
@@ -16935,6 +17092,10 @@ function tick() {
      but the air is nowhere near saturated. */
   STEAM.time.value = t;
   STEAM.cold.value = 0.34 + 0.66 * (1 - THREE.MathUtils.smoothstep(DAY_NOW.alt, -6, 34));
+  /* and the town's bedtimes. Two numbers for four hundred windows — every one of them works out
+     its own state from the hour and a hash of where it stands. */
+  WINDOW_U.uWinHour.value = DAY_NOW.hour;
+  WINDOW_U.uWinTime.value = t;
   lakeWater.material.uniforms.uTime.value = t;
   /* the lake is only in frame at the menu, and a rippled reflection at half rate is
      indistinguishable from one at full rate */
