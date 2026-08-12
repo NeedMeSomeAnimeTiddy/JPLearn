@@ -1502,6 +1502,227 @@
     box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 2px rgba(232, 196, 124, 0.45);
   }
 
+  /* ================================================================================================
+     THE COURSE, IN THREE SHAPES. C cycles them; `NAV.course(n)` names them.
+
+     One markup — sixteen `.cs-step` buttons carrying a mark, a number, two names, the gate in words,
+     a bar and a percentage, plus one SVG holding the route and the travelled part of it. What each
+     shape does is decide which of those parts is drawn and where. Three renderers would have been
+     three places for a state to go stale; this way `data-state` is written once.
+
+     SHARED, BECAUSE ALL THREE ARE THE SAME PROJECT: square corners, the -8 degree skew on anything
+     filled, gold for travelled and earned, vermilion for the one thing to press, ink for what has
+     not happened yet, and the keyline (`paint-order: stroke fill`) on any type standing over the
+     valley — which is the trick the row list already uses and the only thing that keeps cream
+     legible over raked gravel.
+     ================================================================================================ */
+  /* ALL THREE OCCUPY THE SAME HEIGHT, or the section title moves when you cycle them: the panel's
+     stack is bottom-anchored, so the path at 392 tall put the head at y 86 and the hero at 177 put
+     it at 360 — the same heading in two different places depending on a layout choice underneath it.
+     A floor on the block holds the head still and costs nothing but empty space in the short one. */
+  .course-shape {
+    position: relative; margin-top: 10px;
+    min-height: 400px; display: flex; align-items: flex-start;
+  }
+  .course-wrap { position: relative; }
+  .cs-step {
+    background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+    font: inherit; color: inherit; display: block;
+  }
+  .cs-mark {
+    display: block; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45);
+    transition: background 0.28s ease, transform 0.36s var(--ease-pop), box-shadow 0.28s ease;
+  }
+  .cs-en {
+    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    white-space: nowrap; transform: skewX(-8deg);
+    paint-order: stroke fill; -webkit-text-stroke: 0.05em rgba(8, 11, 18, 0.92);
+    transition: color 0.28s ease, font-size 0.3s ease;
+  }
+  .cs-jp {
+    display: block; font-family: var(--jp-go); font-weight: 700; white-space: nowrap;
+    paint-order: stroke fill; -webkit-text-stroke: 0.06em rgba(8, 11, 18, 0.9);
+  }
+  .cs-no, .cs-want, .cs-pct {
+    display: block; font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
+    white-space: nowrap;
+  }
+  .cs-bar { display: block; background: rgba(242, 234, 216, 0.2); overflow: hidden; }
+  .cs-bar i { display: block; height: 100%; background: var(--gold); }
+  /* the three states, stated once. Gold is earned, cream is now, ink-hollow is not yet — the same
+     three readings the row list's ticks were given, at every shape's scale. */
+  .cs-step[data-state="done"] .cs-mark { background: var(--gold-hi); }
+  .cs-step[data-state="here"] .cs-mark { background: var(--hi); }
+  .cs-step[data-state="ahead"] .cs-mark {
+    background: none; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3),
+      inset 0 0 0 2px rgba(242, 234, 216, 0.38);
+  }
+  .cs-step[data-state="done"] .cs-en { color: rgba(232, 196, 124, 0.78); }
+  .cs-step[data-state="here"] .cs-en { color: #fff; }
+  .cs-step[data-state="ahead"] .cs-en { color: rgba(222, 214, 189, 0.42); }
+  .cs-step[data-state="ahead"] .cs-bar i { background: rgba(242, 234, 216, 0.3); }
+  .cs-step.on .cs-mark { transform: scale(1.5) rotate(45deg); }
+
+  /* ---- 径 PATH · the course drawn as a course --------------------------------------------------
+     A serpentine of sixteen nodes with the route behind them, gold as far as you have walked and a
+     hairline after. That one detail is what a list can never do: the line itself carries the
+     progress, so direction and position are legible before you have read a single word.
+     Only three nodes are ever lettered — the one you are on and its two neighbours. Sixteen labels
+     on a 300px-wide snake is a knot, and the whole point of a map is the shape. */
+  .hud[data-course="path"] .course-wrap { width: var(--cs-w); height: var(--cs-h); }
+  .hud[data-course="path"] .cs-line { position: absolute; left: 0; top: 0; overflow: visible; }
+  .hud[data-course="path"] .cs-track {
+    fill: none; stroke: rgba(242, 234, 216, 0.22); stroke-width: 3;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .hud[data-course="path"] .cs-trav {
+    fill: none; stroke: var(--gold); stroke-width: 5;
+    stroke-linecap: round; stroke-linejoin: round;
+    filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.45));
+  }
+  .hud[data-course="path"] .cs-step {
+    position: absolute; left: var(--x); top: var(--y);
+    transform: translate(-50%, -50%);
+  }
+  .hud[data-course="path"] .cs-mark { width: 15px; height: 15px; margin: 0 auto; }
+  .hud[data-course="path"] .cs-step[data-state="here"] .cs-mark { width: 23px; height: 23px; }
+  .hud[data-course="path"] .cs-no,
+  .hud[data-course="path"] .cs-want,
+  .hud[data-course="path"] .cs-pct,
+  .hud[data-course="path"] .cs-bar,
+  .hud[data-course="path"] .cs-jp { display: none; }
+  .hud[data-course="path"] .cs-en {
+    position: absolute; left: 26px; top: 50%; transform: translateY(-50%) skewX(-8deg);
+    font-size: 15px; opacity: 0; transition: opacity 0.26s ease;
+  }
+  /* the lettered three: the step you are on, and one either side of the cursor */
+  .hud[data-course="path"] .cs-step[data-state="here"] .cs-en,
+  .hud[data-course="path"] .cs-step.on .cs-en { opacity: 1; }
+  .hud[data-course="path"] .cs-step.on .cs-en { font-size: 21px; }
+  /* nodes on the left half letter to their right and vice versa, or a label runs off the panel */
+  .hud[data-course="path"] .cs-step.on { z-index: 3; }
+
+  /* ---- 梯 LADDER · all sixteen on one rule ----------------------------------------------------
+     One continuous vertical rule with every step hung off it, sized by what it is: a finished step
+     is a tight ticked line, the one you are on breaks out to full size with its bar and its gate,
+     and the ones ahead compress to a name. All sixteen fit because most of them are small, and the
+     rule is what gives a column of type a direction. */
+  .hud[data-course="ladder"] .course-wrap {
+    display: flex; flex-direction: column; gap: 0;
+    padding-left: 26px; position: relative; width: 430px;
+  }
+  .hud[data-course="ladder"] .course-wrap::before {
+    content: ''; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 3px;
+    background: linear-gradient(180deg, var(--gold) 0%, var(--gold) var(--done, 50%),
+      rgba(242, 234, 216, 0.2) var(--done, 50%), rgba(242, 234, 216, 0.2) 100%);
+    box-shadow: 2px 0 0 rgba(0, 0, 0, 0.4);
+  }
+  .hud[data-course="ladder"] .cs-line { display: none; }
+  .hud[data-course="ladder"] .cs-step {
+    position: relative; display: grid; align-items: center;
+    grid-template-columns: auto 1fr auto; gap: 0 11px; height: 22px;
+    transition: height 0.3s ease;
+  }
+  .hud[data-course="ladder"] .cs-mark {
+    width: 9px; height: 9px; position: absolute; left: -24px; top: 50%; margin-top: -5px;
+  }
+  .hud[data-course="ladder"] .cs-no {
+    font-size: 9px; color: rgba(242, 234, 216, 0.4); min-width: 20px;
+  }
+  .hud[data-course="ladder"] .cs-en { font-size: 15px; }
+  .hud[data-course="ladder"] .cs-pct {
+    font-size: 9.5px; color: rgba(232, 196, 124, 0.7); text-align: right;
+  }
+  .hud[data-course="ladder"] .cs-jp,
+  .hud[data-course="ladder"] .cs-want,
+  .hud[data-course="ladder"] .cs-bar { display: none; }
+  /* and the one you are on takes the room */
+  .hud[data-course="ladder"] .cs-step.on {
+    height: 74px; grid-template-columns: auto 1fr auto;
+    grid-template-areas: 'no en pct' 'no jp pct' 'no bar pct';
+  }
+  .hud[data-course="ladder"] .cs-step.on .cs-mark { width: 13px; height: 13px; margin-top: -7px; }
+  .hud[data-course="ladder"] .cs-step.on .cs-no { grid-area: no; font-size: 22px; color: var(--gold-hi); }
+  .hud[data-course="ladder"] .cs-step.on .cs-en { grid-area: en; font-size: 30px; }
+  .hud[data-course="ladder"] .cs-step.on .cs-jp {
+    grid-area: jp; display: block; font-size: 12px; color: var(--washi-dim);
+  }
+  .hud[data-course="ladder"] .cs-step.on .cs-bar {
+    grid-area: bar; display: block; height: 5px; margin-top: 5px; max-width: 240px;
+  }
+  .hud[data-course="ladder"] .cs-step.on .cs-pct { grid-area: pct; font-size: 15px; color: var(--gold-hi); }
+
+  /* ---- 札 HERO · one card, and the rest a filmstrip -------------------------------------------
+     The step you are on is the only thing at full size — an ink-on-washi card, the treatment this
+     project gives anything meant to read as an object — and the whole course runs under it as
+     sixteen marks with the current one raised. Detail and overview on separate axes, which is the
+     one arrangement of the three where neither has to compromise for the other. */
+  .hud[data-course="hero"] .course-wrap {
+    display: flex; flex-wrap: wrap; gap: 7px 6px; width: 430px; align-items: flex-end;
+  }
+  .hud[data-course="hero"] .cs-line { display: none; }
+  /* the filmstrip is bigger than the first pass, where 18x9 marks read as a progress bar chopped
+     into pieces rather than as sixteen things you could go to */
+  .hud[data-course="hero"] .cs-step {
+    order: 2; width: 22px; height: 34px; display: flex; align-items: flex-end;
+  }
+  .hud[data-course="hero"] .cs-mark { width: 22px; height: 11px; }
+  .hud[data-course="hero"] .cs-step[data-state="here"] .cs-mark { height: 26px; }
+  .hud[data-course="hero"] .cs-step.on .cs-mark { transform: none; height: 34px; }
+  .hud[data-course="hero"] .cs-no,
+  .hud[data-course="hero"] .cs-en,
+  .hud[data-course="hero"] .cs-jp,
+  .hud[data-course="hero"] .cs-want,
+  .hud[data-course="hero"] .cs-bar,
+  .hud[data-course="hero"] .cs-pct { display: none; }
+  .hud[data-course="hero"] .cs-step.on {
+    order: 1; width: 100%; height: auto;
+    display: grid; grid-template-columns: auto 1fr; gap: 2px 15px;
+    grid-template-areas: 'no en' 'no jp' 'bar bar' 'want pct';
+    background: var(--washi); padding: 15px 18px 14px;
+    transform: skewX(-8deg); transform-origin: left center;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.42);
+    margin-bottom: 13px;
+  }
+  .hud[data-course="hero"] .cs-step.on .cs-mark { display: none; }
+  .hud[data-course="hero"] .cs-step.on .cs-no {
+    grid-area: no; display: block; font-size: 34px; font-family: var(--lat);
+    font-style: italic; font-weight: 900; letter-spacing: 0;
+    color: rgba(20, 17, 13, 0.28); align-self: start;
+  }
+  .hud[data-course="hero"] .cs-step.on .cs-en {
+    grid-area: en; display: block; font-size: 32px; color: var(--ink);
+    -webkit-text-stroke: 0; transform: none;
+  }
+  .hud[data-course="hero"] .cs-step.on .cs-jp {
+    grid-area: jp; display: block; font-size: 13px; color: rgba(20, 17, 13, 0.6);
+    -webkit-text-stroke: 0;
+  }
+  .hud[data-course="hero"] .cs-step.on .cs-bar {
+    grid-area: bar; display: block; height: 5px; margin-top: 11px;
+    background: rgba(20, 17, 13, 0.16);
+  }
+  .hud[data-course="hero"] .cs-step.on .cs-bar i { background: var(--hi); }
+  .hud[data-course="hero"] .cs-step.on .cs-want {
+    grid-area: want; display: block; font-size: 9px; margin-top: 8px;
+    color: rgba(20, 17, 13, 0.55);
+  }
+  .hud[data-course="hero"] .cs-step.on .cs-pct {
+    grid-area: pct; display: block; font-size: 13px; margin-top: 7px; text-align: right;
+    font-family: var(--lat); font-style: italic; font-weight: 900; color: var(--hi);
+  }
+
+  /* ---- the slab, when it is the action rather than a caption ---------------------------------- */
+  .hud-next[data-act] { min-height: 58px; }
+  .hud-next[data-act="go"] i { color: #ffd9a1; font-weight: 700; letter-spacing: 0.16em; }
+  .hud-next[data-act="locked"] { background: rgba(12, 10, 8, 0.72); }
+  .hud-next[data-act="locked"] i { color: rgba(242, 234, 216, 0.62); }
+  .hud-next[data-act="dead"] { background: rgba(12, 10, 8, 0.5); }
+  .hud-next[data-act="dead"] i { color: rgba(242, 234, 216, 0.45); }
+  /* the chips go: a figure that restates the row beside it is decoration, and the step's own bar
+     already carries its number */
+  .hud[data-course] .hud-figs { display: none; }
+
   /* ---- the readout, same treatment: no field, held by shadow ---- */
   /* ================================================================================
      THE READOUT MOVES OUT FROM UNDER THE LIST.
@@ -16379,7 +16600,7 @@ const HUD_AIR = {
 /* `cur` is the cursor into the WHOLE list; `at` is its index inside the window the panel is
    actually showing; `lo` is the window's top. For every list short enough to fit, `lo` is 0 and
    the two are the same, which is why nothing outside `hudWindow` has to care. */
-const HUD = { on: true, t: 0, b: 5, air: true, sec: null, tile: null,
+const HUD = { on: true, t: 0, b: 5, c: 0, air: true, sec: null, tile: null,
   cur: 0, at: 0, lo: 0, win: 5, level: 2 };
 const hudEl = document.getElementById('hud');
 
@@ -16544,6 +16765,36 @@ function pathGo(i, dur = 1.15) {
   pathHud();
   hudDraw();
 }
+/* ================================================================================================
+   THE READOUT BECOMES THE ACTION.
+
+   It used to repeat the row that was already lit: four generic chips and a slab naming the same
+   step the list had selected, on a screen whose whole left side was already saying it. A course
+   does not need a second description — it needs ONE OBVIOUS THING TO PRESS.
+
+   So the slab is the button. It is the same `.hud-next` element in the same corner with the same
+   fill, skew and shadow; what changes is that it now states the step, what the step wants of you,
+   and GO — and it carries the gold arrow the menu's own UP NEXT button wears, which is the one
+   other primary action on this project. The four chips go with it: a figure that restates the row
+   beside it is decoration, and the step's own bar already carries the number.
+   ================================================================================================ */
+function hudCourseAct(sel) {
+  const nx = hudEl.querySelector('.hud-next');
+  if (!nx || !sel) return;
+  const em = nx.querySelector('em'), b = nx.querySelector('b'), i = nx.querySelector('i');
+  const locked = sel.state === 'ahead';
+  const dead = sel.kind === 'none' || (sel.kind === 'goto' && !sel.to);
+  nx.dataset.act = dead ? 'dead' : (locked ? 'locked' : 'go');
+  em.textContent = `STEP ${sel.step + 1} / ${STUDY_PATH.length}`;
+  b.textContent = sel.small + ' ' + sel.big;
+  /* WHAT IT SAYS IS WHAT IT WILL DO, in the third line: the deck steps open blocks, the ten
+     hand-offs fly you to whoever owns them, and the two with no tutor say so instead of lying. */
+  i.textContent = dead ? 'NOTHING HERE YET'
+    : locked ? ('LOCKED · ' + sel.meta)
+      : sel.kind === 'goto' ? ('GO TO ' + sel.to + ' ▸')
+        : ('START · ' + sel.meta + ' ▸');
+}
+
 /* the counter is `.walk-hud`, unchanged: the same element, the same two buttons, the same
    `7 / 16`. It was built for the level-three walk and this is the same question.
    IT READS THE LIST RATHER THAN THE COURSE, so it is right at both levels without a branch —
@@ -16574,6 +16825,104 @@ function pathHud() {
   });
 }
 function onCourse() { return HUD.on && HUD.sec === 'STUDY' && HUD.level === 2 && state === 'sub'; }
+
+/* ================= THE COURSE HAS A SHAPE, AND HERE ARE THREE ====================================
+   C cycles; `NAV.course(n)` names. Built as a bench for the same reason the figure sets were: three
+   layouts that differ in STRUCTURE cannot be judged from a description, and the row list they
+   replace was rejected on sight for looking like the four-tile menu it stood in for.
+
+   WHAT ALL THREE FIX. Sixteen ordered steps were being drawn as five equal rows differing only in
+   opacity and a tick colour: no shape, no direction, no hero, and the only thing saying "you are in
+   a sequence" was a small counter at the top of the screen. A course needs three things a list of
+   peers does not — you must be able to see the WHOLE of it, it must have a DIRECTION, and the step
+   you are on must be obviously the one to press.
+
+   ONE MARKUP, THREE STYLESHEETS. Every shape gets the same sixteen `.cs-step` buttons carrying the
+   same parts and the same `data-state`; only the CSS differs, and the serpentine's coordinates ride
+   in as custom properties so even the path is positioned by the stylesheet rather than by a second
+   renderer. Three renderers would have meant three places for a state to go stale.
+   ================================================================================================ */
+const COURSE_SHAPES = [
+  ['path', '径', 'the course drawn as a course · a serpentine of sixteen nodes'],
+  ['ladder', '梯', 'all sixteen on one rule, sized by state'],
+  ['hero', '札', 'one card for the step you are on, the rest a filmstrip'],
+];
+
+/* the serpentine, in the container's own pixels so the line and the nodes cannot disagree. A sine
+   rather than a zigzag: the path has no corners to catch the eye, which is what makes it read as a
+   route rather than as a chart. */
+/* 392 TALL, AND IT HAS TO BE. The first pass ran the serpentine 556px down, which is taller than
+   the space between the panel's head and its readout — and the stack is anchored to the BOTTOM (the
+   note by `.hud-next` explains why), so the overflow came out of the TOP: the section title climbed
+   into the brand mark and off the screen. Measured: the list area runs y 246 to about 660, so 392
+   fits with room. The amplitude comes down with it or the snake turns into a zigzag. */
+const CS_W = 286, CS_H = 392, CS_AMP = 92;
+function courseNodes() {
+  const n = STUDY_PATH.length;
+  return STUDY_PATH.map((s, i) => ({
+    x: Math.round(CS_W / 2 + Math.sin(i * 0.72) * CS_AMP),
+    y: Math.round(18 + (i * (CS_H - 36)) / (n - 1)),
+  }));
+}
+/* the whole markup for one course, whatever shape is showing */
+function courseMarkup(rows) {
+  const pts = courseNodes();
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ');
+  /* the travelled part of the line is drawn separately and in gold, so the route itself carries the
+     progress — the single cheapest way to give a path a direction */
+  const doneTo = Math.max(0, Math.min(PATH.done, pts.length - 1));
+  const lineDone = pts.slice(0, doneTo + 1).map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ');
+  const steps = rows.map((r, i) => {
+    const p = pts[i];
+    return `<button class="cs-step" data-i="${i}" data-state="${r.state}"`
+      + ` style="--x:${p.x}px; --y:${p.y}px">`
+      + `<span class="cs-mark"></span>`
+      + `<span class="cs-no">${r.no}</span>`
+      + `<span class="cs-en">${r.big}</span>`
+      + `<span class="cs-jp">${r.small}</span>`
+      + `<span class="cs-want">${r.meta}</span>`
+      + `<span class="cs-bar"><i style="width:${Math.max(r.pct, 0)}%"></i></span>`
+      + `<span class="cs-pct">${r.pct}%</span>`
+      + `</button>`;
+  }).join('');
+  /* `--done` is how far up the LADDER's rule the gold runs. The path shape says the same thing with
+     its own two strokes; the ladder has one rule and a gradient stop, and the stop has to come from
+     here because CSS cannot count how many steps are behind you. */
+  const donePct = Math.round((doneTo / Math.max(1, pts.length - 1)) * 100);
+  /* THE SIZE RIDES IN, it is not written twice. `CS_W`/`CS_H` set the node coordinates and the
+     SVG's box; the stylesheet had the same two numbers again as literals, so shrinking the constants
+     moved the nodes and left the container 556 tall — the overflow the shrink was meant to fix. */
+  return `<div class="course-wrap" style="--done:${donePct}%;`
+    + ` --cs-w:${CS_W}px; --cs-h:${CS_H}px">`
+    + `<svg class="cs-line" viewBox="0 0 ${CS_W} ${CS_H}" width="${CS_W}" height="${CS_H}"`
+    + ` aria-hidden="true"><path class="cs-track" d="${line}"/>`
+    + `<path class="cs-trav" d="${lineDone}"/></svg>${steps}</div>`;
+}
+
+/* ================================================================================================
+   HANDING OFF TO ANOTHER SECTION, AND WHY THE FIRST VERSION DID NOTHING AT ALL.
+
+   Ten of the course's sixteen steps belong to somebody else — reading to READING, five exams to
+   JLPT, listening to the rack — so pressing one has to fly you there. The first attempt was:
+
+       goBack(); gsap.delayedCall(0.45, () => select(gi));
+
+   and it silently failed every single time. `goBack()` sets `busy = true` and starts a return
+   flight that runs for seconds; `select()` opens with `if (busy || state !== 'menu') return`. At
+   0.45s it is always still busy, so `select` refused and you were left standing at the menu with
+   nothing chosen. Two guards, both correct, and a fixed delay between them that could not be long
+   enough — the same class of mistake as the walk-in's 0.8s.
+
+   So it WAITS FOR THE MENU rather than guessing when the menu will be there. Capped, because a
+   flight that never lands must not leave a timer running forever, and abandoned if something else
+   has taken the wheel in the meantime.
+   ================================================================================================ */
+function handOff(gi, tries = 32) {
+  if (state === 'menu' && !busy) { select(gi); return; }
+  if (tries <= 0) return;
+  if (state === 'sub' && !busy) goBack();
+  gsap.delayedCall(0.2, () => handOff(gi, tries - 1));
+}
 function hudRows() {
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
@@ -16660,15 +17009,27 @@ function hudWindow(rows) {
   return rows.slice(HUD.lo, HUD.lo + HUD.win);
 }
 
+/* the course's shapes draw the WHOLE course, which is the point of them, so they opt out of the
+   window. Everything else still gets it. */
+function courseShaped() { return HUD.sec === 'STUDY' && HUD.level === 2; }
+
 function hudDraw(force) {
   const all = hudRows();
   if (!all.length) return;
-  const rows = hudWindow(all);
+  let rows;
+  if (courseShaped()) {
+    HUD.lo = 0;
+    HUD.cur = Math.max(0, Math.min(HUD.cur, all.length - 1));
+    HUD.at = HUD.cur;
+    rows = all;
+  } else {
+    rows = hudWindow(all);
+  }
   /* `HUD.lo` and the FULL length are both in the key: the first because a shift changes every
      row's content, the second because a list that grew or shrank is a different list even if the
      window happens to show the same number of rows. */
   const key = [HUD.sec, HUD.level, HUD.tile, HUD.t, HUD.b, HUD.air,
-    rows.length, HUD.lo, all.length].join('|');
+    rows.length, HUD.lo, all.length, courseShaped() ? HUD.c : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
   /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
@@ -16738,15 +17099,31 @@ function hudBuild(rows) {
     + `</div><div class="hud-next"><span class="hud-next-in">`
     + `<em></em><b></b><i></i></span></div></div>`;
   const footed = tk === 'kado' || tk === 'hashira' || tk === 'fuchi';
+  /* THE COURSE IS ITS OWN LIST. Same panel, same head, same readout, same rule -- only the middle
+     changes, and it changes to one of three shapes rather than to sixteen rows of the thing that was
+     rejected for looking like a menu. `data-course` is what the three stylesheets hang off. */
+  const shaped = courseShaped();
+  /* DELETED, NOT EMPTIED. `dataset.course = ''` leaves the attribute present, and `[data-course]`
+     matches an attribute that exists whatever its value — so writing an empty string here would
+     have hidden the figure chips in all six sections via the rule at the end of the course block. */
+  if (shaped) hudEl.dataset.course = COURSE_SHAPES[HUD.c][0];
+  else delete hudEl.dataset.course;
+  const middle = shaped
+    ? `<div class="course-shape">${courseMarkup(rows)}</div>`
+    : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
   hudEl.innerHTML = `<div class="hud-panel"><div class="hud-head">${head}</div>`
     + `<div class="hud-rule"></div>`
-    + `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>${footed ? '' : detail}</div>`
+    + `${middle}${footed ? '' : detail}</div>`
     + `<div class="hud-cut"></div>`
     + (footed ? `<div class="hud-foot">${detail}</div>` : '')
     /* NO BENCH TAG. V, B and A still cycle treatment, frame and the place's colour -- but
        MIDASHI is the design now and the other twelve are a comparison nobody needs printed over
        the world, least of all stacked on top of the key hints in the corner. */
     + '';
+  hudEl.querySelectorAll('.cs-step').forEach((b) => {
+    b.addEventListener('mouseenter', () => pathGo(+b.dataset.i, 0.5));
+    b.addEventListener('click', () => { HUD.cur = +b.dataset.i; hudPick(); });
+  });
   hudEl.querySelectorAll('.hud-row').forEach((b) => {
     /* `data-i` is the row's place in the WINDOW, so it is lifted back into the full list before
        it becomes the cursor — otherwise hovering row 0 of a window that starts at 6 jumps the
@@ -16808,6 +17185,16 @@ function hudSeal(el, on, animate) {
 function hudSync(rows) {
   const sel = rows[HUD.at];
   const moved = hudPrevAt !== HUD.at;
+  /* the course's steps are `.cs-step`, not `.hud-row`, and the rest of this function's row work
+     does not apply to them -- they carry their state in `data-state` and their bar is built with a
+     width rather than tweened to one. All they need from a sync is which one is lit. */
+  if (courseShaped()) {
+    const steps = hudEl.querySelectorAll('.cs-step');
+    steps.forEach((b, j) => b.classList.toggle('on', j === HUD.at));
+    hudCourseAct(sel);
+    hudPrevAt = HUD.at;
+    return;
+  }
   const all = hudEl.querySelectorAll('.hud-row');
   all.forEach((b, j) => b.classList.toggle('on', j === HUD.at));
   all.forEach((b, j) => hudSeal(b.querySelector('.hud-seal'), j === HUD.at,
@@ -16895,7 +17282,7 @@ function hudPick() {
     if (r.kind === 'goto') {
       if (!r.to) { doFlash(0.2); punchShake(0.24); return; }
       const gi = ITEMS.findIndex((x) => x.en === r.to);
-      if (gi >= 0) { goBack(); gsap.delayedCall(0.45, () => select(gi)); return; }
+      if (gi >= 0) { handOff(gi); return; }
       doFlash(0.2); punchShake(0.24); return;
     }
     if (r.kind !== 'deck') { doFlash(0.2); punchShake(0.24); return; }
@@ -17065,7 +17452,21 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'v' || e.key === 'V') { HUD.t = (HUD.t + 1) % HUD_TREATMENTS.length; hudDraw(); }
   else if (e.key === 'b' || e.key === 'B') { HUD.b = (HUD.b + 1) % HUD_BORDERS.length; hudDraw(); }
   else if (e.key === 'a' || e.key === 'A') { HUD.air = !HUD.air; hudDraw(); }
+  else if (e.key === 'c' || e.key === 'C') { NAV.course(HUD.c + 1); }
 });
+/* C from the keyboard, `NAV.course(n)` from the console, `NAV.course()` to ask which is on. It
+   prints, because three layouts that differ in structure are not tellable apart from a screenshot
+   without being told which one you are looking at. */
+NAV.course = (n) => {
+  if (n != null) {
+    HUD.c = ((n % COURSE_SHAPES.length) + COURSE_SHAPES.length) % COURSE_SHAPES.length;
+    hudDraw();
+  }
+  const [k, j, note] = COURSE_SHAPES[HUD.c];
+  console.log('course ' + HUD.c + '/' + (COURSE_SHAPES.length - 1) + '  ' + j + ' ' + k
+    + ' — ' + note);
+  return k;
+};
 
 /* ================= level three as a walk =================
    The camera stops beside one placard at a time and glides to the next. Everything else is a
