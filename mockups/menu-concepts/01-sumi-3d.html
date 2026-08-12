@@ -2087,8 +2087,19 @@
      them. Pivoting on the right keeps that edge flush and lets the lean happen leftward, into
      the panel, which is the direction there is room in.
      `border-box`, or 100% plus 28px of padding overflows the column by 28px. */
+  /* AND IT HAS TO BE ABLE TO RESIZE, which `width: 100%` took away from it. swapText has two
+     branches and the one that makes the UP NEXT button read — fade the label out, resize the
+     empty slab, fade it back — needs two things this did not have: a width that depends on the
+     words, and a LABEL separate from the BOX, because the function tells them apart by
+     `box !== label`. With the slab at 100% of its column there was nothing to animate and it
+     silently took the cross-fade branch instead, which is why it still did not behave like the
+     button. So: `max-content` again for the width, but `margin-left: auto` to pin it to the
+     right edge of the column — which is what was actually wrong the first time. The button grows
+     leftward from the edge of the screen; this grows leftward from the edge of its column. Same
+     gesture, same anchor, different edge. */
   .hud-next {
-    display: block; width: 100%; max-width: 100%; box-sizing: border-box;
+    display: block; width: max-content; max-width: 100%; margin-left: auto;
+    box-sizing: border-box;
     background: var(--hi);
     padding: 8px 14px;
     transform: skewX(-8deg);
@@ -2096,8 +2107,12 @@
     box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
     min-height: 44px;
   }
-  .hud-next b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hud-next i { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* `nowrap` and no `overflow: hidden`. The clipping was there to protect a fixed-width box, and
+     the box is max-content again — so the only thing hiding overflow can do now is cut the words
+     off mid-resize, which is exactly the frame the swap is trying to hide. */
+  .hud-next-in { display: block; white-space: nowrap; }
+  .hud-next b { white-space: nowrap; }
+  .hud-next i { white-space: nowrap; }
   .hud-next em {
     display: block; font-family: var(--lat-ui); font-weight: 700; font-style: normal;
     font-size: 9.5px; line-height: 12px; letter-spacing: 0.24em;
@@ -4946,12 +4961,21 @@ const SWAY = {
 const SWAY_GLSL = `
   uniform float uSwayT, uSwayAmp, uSwayGust, uSwayRate;
   uniform vec3 uSwayDir;
-  attribute float aPlantH;
+  /* .x is HOW FAR UP ITS OWN PLANT this vertex is, 0 at the foot and 1 at the tip; .y is how
+     tall the plant is. The first version carried only the height and divided the vertex's raw
+     local y by it — which assumes every plant's origin sits at its base, and in this export they
+     do not. On a geometry modelled about its middle that makes the whole lower half clamp to
+     zero and the upper half reach 0.5, so a handful of vertices moved and the rest did not: what
+     Robbie saw as a bit of geometry dislocated out of each tree rather than a tree bending.
+     Baked per vertex against the geometry's own bounding box, so where the origin sits stops
+     being a question anyone has to answer. */
+  attribute vec2 aPlant;
   void swayPlant( inout vec3 p, vec3 ip ) {
+    float aPlantH = aPlant.y;
     if ( aPlantH < 0.5 ) return;
     float ph = fract( sin( dot( ip.xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
     /* a tree bends: the trunk holds and the crown carries it */
-    float bend = pow( clamp( p.y / aPlantH, 0.0, 1.0 ), 2.2 );
+    float bend = pow( clamp( aPlant.x, 0.0, 1.0 ), 2.2 );
     float t = uSwayT * uSwayRate * ( 0.72 + ph * 0.56 ) + ph * 6.2831;
     /* A GUST CROSSES THE VALLEY rather than every plant breathing together: the phase runs along
        the wind, so the wave arrives at the near shore after the far one. */
@@ -4965,15 +4989,22 @@ const SWAY_GLSL = `
     /* and the tip dips as it goes over, so the crown swings rather than slides sideways */
     p.y -= abs( a ) * 0.14 * bend;
   }`;
-/* one float per vertex, constant over the geometry: how tall this plant is in its own space */
+/* per vertex: how far up its own plant it is, and how tall that plant is */
 function swayBake(geo) {
-  if (geo.getAttribute('aPlantH')) return false;
+  if (geo.getAttribute('aPlant')) return false;
   if (!geo.boundingBox) geo.computeBoundingBox();
-  const h = geo.boundingBox.max.y - geo.boundingBox.min.y;
-  const n = geo.attributes.position.count;
-  const a = new Float32Array(n);
-  a.fill(h > 0.5 ? h : 0);
-  geo.setAttribute('aPlantH', new THREE.BufferAttribute(a, 1));
+  const y0 = geo.boundingBox.min.y;
+  const h = geo.boundingBox.max.y - y0;
+  const pos = geo.attributes.position;
+  const n = pos.count;
+  const a = new Float32Array(n * 2);
+  if (h > 0.5) {
+    for (let i = 0; i < n; i++) {
+      a[i * 2] = Math.min(1, Math.max(0, (pos.getY(i) - y0) / h));
+      a[i * 2 + 1] = h;
+    }
+  }
+  geo.setAttribute('aPlant', new THREE.BufferAttribute(a, 2));
   return true;
 }
 function swayMaterial(src) {
@@ -7482,6 +7513,16 @@ function lifeRiders(root) {
     if (f.o.isInstancedMesh && !LIFE.meshes.includes(f.o)) {
       f.o.frustumCulled = false;
       LIFE.meshes.push(f.o);
+    } else if (!f.o.isInstancedMesh) {
+      /* AND A PLAIN MESH RIDER HAS TO STOP RECOMPUTING ITS OWN MATRIX. `lifeTick` welds it by
+         writing `f.o.matrix` directly, and three rebuilds that matrix from position/quaternion/
+         scale every frame unless told not to — so the weld was being written and then discarded
+         before it could reach the renderer. `lifeBuild` already does this for the props it drives
+         itself; riders never did, and it never showed because until Robbie added these four the
+         only passengers in the world were instances lifted out of the crowd, which are moved with
+         setMatrixAt and never touch this path at all.
+         Same shape of bug as the boat lanterns: the write happened, nothing arrived. */
+      f.o.matrixAutoUpdate = false;
     }
     LIFE.riders.push(f);
   }
@@ -16006,7 +16047,11 @@ function hudBuild(rows) {
      what lets them count rather than jump. */
   const detail = `<div class="hud-detail"><div class="hud-figs">`
     + rows[0].figs.map(() => `<span><b></b><i></i></span>`).join('')
-    + `</div><div class="hud-next"><em></em><b></b><i></i></div></div>`;
+    /* the inner span is the LABEL and the div is the BOX: swapText tells the two apart by
+       identity, and only when they differ does it fade the words, resize the slab and fade them
+       back — the UP NEXT button's own behaviour */
+    + `</div><div class="hud-next"><span class="hud-next-in">`
+    + `<em></em><b></b><i></i></span></div></div>`;
   const footed = tk === 'kado' || tk === 'hashira' || tk === 'fuchi';
   hudEl.innerHTML = `<div class="hud-panel"><div class="hud-head">${head}</div>`
     + `<div class="hud-rule"></div>`
@@ -16103,7 +16148,9 @@ function hudSync(rows) {
        half-replaced, which the old fade could not promise.
        HELD TO THE ROW ACTUALLY CHANGING. hudSync also runs on ticks where it did not, and
        swapping a sentence for itself is motion carrying no information. */
-    if (moved) swapText(nx, nx, write, 12);
+    /* the box is the slab, the label is the span inside it — see the markup in hudBuild */
+    const label = nx.querySelector('.hud-next-in') || nx;
+    if (moved) swapText(nx, label, write, 14);
     else write();
   }
   hudPrevAt = HUD.at;
@@ -17563,6 +17610,12 @@ function solarState(date, lat, lon) {
     altMax: altMax / rad,
     /* 0 at sunrise, 1 at sunset, outside that at night */
     p: H0 > 1e-6 ? (H + H0) / (2 * H0) : 0.5,
+    /* THE HALF-DAY, AND THE MOON NEEDS IT. `p` is the hour angle rescaled, and the hour angle
+       wraps at the antimeridian — for the sun that is the middle of the night, where nobody can
+       see it jump. The moon is half a turn away, so the same wrap lands while the moon is
+       overhead, which is the snap Robbie saw at half past one. Exporting H0 lets the moon do the
+       wrap in its OWN frame instead of inheriting the sun's. */
+    h0: H0,
   };
 }
 
@@ -18419,7 +18472,18 @@ function dayTick(nowMs, force, dt) {
      something in the sky at three in the morning and to give the valley an edge to be lit from.
      A moon that is always full and always opposite the sun is up all night, every night, which
      is exactly the property this needs. */
-  const mp = sol.p + 0.5 > 1.35 ? sol.p - 0.5 : sol.p + 0.5;
+  /* THE MOON WRAPS IN ITS OWN FRAME, WHICH IS THE WHOLE FIX. The old line switched branch at
+     `sol.p + 0.5 > 1.35`, and `sol.p` is the sun's hour angle rescaled — an angle, so it wraps.
+     Measured across the night it goes 1.312 at 01:00 to -0.291 at 01:30, a step of 1.603, and the
+     moon inherited it and jumped 17,343 units while sitting 23 degrees up in plain view. The sun
+     survives its own wrap because it happens at the antimeridian, in the middle of the night,
+     where the sun is not on screen.
+     So: half a turn away in HOUR ANGLE, then folded back into exactly the window `p` occupies,
+     which puts the wrap at the moon's own antimeridian — the moment it is furthest below the
+     horizon. One turn is pi/H0 in p units, because p rescales an angle of 2*H0 to 1. */
+  const per = sol.h0 > 1e-6 ? Math.PI / sol.h0 : 2;
+  const pLo = 0.5 - per / 2;
+  const mp = pLo + (((sol.p + per * 0.5 - pLo) % per) + per) % per;
   const mAlt = -sol.alt;
   DAY_NOW.moonAlt = mAlt;
   const ma = arcPlace(mAlt, mp);
