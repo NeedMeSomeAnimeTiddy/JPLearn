@@ -3232,7 +3232,10 @@
   .hints {
     right: 40px; bottom: 26px;
     display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
-    font-family: var(--lat-ui); font-weight: 600; font-size: 11.5px; letter-spacing: 0.12em;
+    /* 0.14em is the chips' label tracking, set on the container so the words beside each cap take
+       it. `.hints em` keeps its own 0.1em, which is `.stat-chip .jp`'s — the same split the chips
+       make between their Latin labels and their Japanese. */
+    font-family: var(--lat-ui); font-weight: 600; font-size: 11.5px; letter-spacing: 0.14em;
     color: rgba(242, 234, 216, 0.86);
     /* A FINER HALO FOR SMALL TYPE. `--halo` carries a 2px HARD offset, which is right under a
        72px section name and doubles every stroke of an 11px label — at this size the shadow is
@@ -3245,24 +3248,45 @@
      the same length */
   .hints span { display: flex; align-items: baseline; }
   .hints b { min-width: 46px; text-align: center; }
+  /* 400, not `.stat-chip .jp`'s 700. That chip's 連続 is ink on washi; this is cream at 45% over
+     open country, where bold would make the quietest thing on the screen the loudest word in its
+     own row. The tracking matches; the weight is answering a different question. */
   .hints em {
     font-family: var(--jp-go); font-weight: 400; font-style: normal;
     font-size: 10px; letter-spacing: 0.1em;
     color: rgba(242, 234, 216, 0.45); margin-left: 7px;
   }
+  /* AND THE CAPS ARE THE CHIPS TOO — the smallest members of the family, but the same object.
+     Ink on washi, the -8 degree skew, the hard offset: they always had all of that. What they did
+     not have is the ROTATION, which is the thing that makes the group read as laid down, and the
+     chips' 0.14em tracking and 2px/3px 0.45 shadow.
+
+     THE CAP ROTATES, NOT THE ROW. In the readout every chip is the whole line, so the whole line
+     leans; here the cap is the box and `Confirm 決定` stands beside it on the world, so leaning
+     the row would tilt loose type over a valley for no reason. The cap is the chip.
+
+     EVERY STACK STARTS AT -1.2 AND ALTERNATES, which is the rule that keeps this from needing a
+     lookup table: the four figure chips, the two menu slabs, these three caps. Continuing one
+     global sequence down the right edge would give a different answer on the menu than at a
+     destination, because the boxes above the hints are not the same boxes in the two states.
+
+     PLAIN INK, NO VERMILION, and the precedent is up top: the clock and date chips are ink on
+     washi with no accent in them, and only the two chips carrying a NUMBER take one. A keycap has
+     no number in it. It is a clock chip, not a level chip. */
   .hints b {
-    font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.1em;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
     background: var(--washi); color: var(--ink);
     padding: 3px 9px; margin-right: 8px;
-    transform: skewX(-8deg); display: inline-block;
-    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+    transform: skewX(-8deg) rotate(-1.2deg); display: inline-block;
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
     /* AND THE CAP ITSELF TAKES NONE. It inherited the halo from `.hints`, so dark ink on a cream
        slab was carrying a black shadow two pixels down and to the right of every letter — on a
        10.5px face that is the stroke width again, and it is why ENTER and ESC were the hardest
        words on the screen to read. Dark on light needs no halo; the cap's own drop shadow is
-       what separates it from the world. */
+       what separates it from the world. No chip in this family has a text shadow anywhere. */
     text-shadow: none;
   }
+  .hints span:nth-child(even) b { transform: skewX(-8deg) rotate(1deg); }
   /* the white flash, and the streaks the arrival still uses */
   #flash { position: fixed; inset: 0; z-index: 55; background: #fdf7e8; opacity: 0; pointer-events: none; }
   .bold-streak {
