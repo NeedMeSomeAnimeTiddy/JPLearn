@@ -16,22 +16,55 @@ things. A tile called SENTENCES is called SENTENCES here even though it draws �
 
 **Nothing in this document is a physical object.** Every list, row, figure, label and state in
 here is drawn in screen space — the HUD panel, its row list, the figure chips, the NEXT UP slab,
-the keycaps. The world is what you are looking *at*; the interface is drawn *over* it. The camera
-moves, the interface is added, and the map stays Robbie's.
+the keycaps, the top-right chips. The world is what you are looking *at*; the interface is drawn
+*over* it. The camera moves, the interface is added, and the map stays Robbie's.
 
 The first version of this file broke that rule without noticing. It said in its own opening
 section that level two is the HUD's row list and screen-space in all six sections, and then two
 hundred lines later described "placards" carrying block names, a "placard you can see and cannot
 turn", and figures "between placards" — which are world geometry. That got built: 323 lines whose
 first act was `body.at-path .hud-list { display: none }`, switching the 2D list off and standing
-boards in the valley instead. It was rejected on sight and it is `stash@{0}` if any of it is ever
-wanted.
+boards in the valley instead. Rewound on sight and deleted, not kept.
 
 **So when this file says a route, it means where the CAMERA goes. Never a rack of signs.** A walk
 is a camera move plus a 2D list that re-letters; the world contributes the movement, the place and
 the sense of distance, and contributes no widgets at all. Two systems in this project have already
 died of ignoring this — the thirteen floating-type designs (`FT`, now off by default) and the
-world-geometry level twos in `places/*.js` (hidden since `world.glb` landed). This makes three.
+world-geometry level twos in `places/*.js` (hidden since `world.glb` landed). That made three.
+
+### The corollary: almost nothing new gets built
+
+The consistency rule is not "make it look similar". It is **use the elements that are already
+there**, and the honest finding once you go and check is that the existing interface already
+covers all of this. Everything below is assembled from:
+
+| element | what it already does | what the course needs it for |
+|---|---|---|
+| `.hud-row` × N in `.hud-list` | one selectable row, with `.on` | one step of the course |
+| `.hud-n` | the row's two-digit number | the step number, 01 … 16 |
+| `.hud-name b` / `i`, `.hud-big` / `.hud-small` | English and Japanese name | the step's name |
+| `.hud-bar` + its `i` | fills to `data-pct`, animates on `.on` | progress toward the step's gate |
+| `.hud-side u` | the percentage, right-aligned | the same number in figures |
+| `.hud-side em` | the row's meta line | the gate in words — "all 46 characters" |
+| `.hud-seal` | stamps the row's first Japanese character | unchanged, works as-is |
+| `.hud-slash`, `.drop` ×3, `.hud-tick` | the selection wipe, ink drops and tick | unchanged, works as-is |
+| `.walk-hud` | `‹ jp en 7 / 16 ›` top centre, prev/next, `body.at-walk` | **the step counter, already built** |
+| `.hud-figs` | four chips, value + label + XP bar | the selected step's four figures |
+| `.hud-next` | the vermilion slab saying what is next | saying what is next — literally its job |
+| `.l3-pager` | `‹ 1 / 2 ›`, 6 rows a page | the fallback if windowing is rejected |
+
+**What is genuinely new is three things, and none of them is an element:**
+
+1. **Two row states.** Today a row is `.on` or it is not. A course needs *done* and *ahead* as
+   well. Two classes on `.hud-row`, styled in MIDASHI's existing vocabulary — `.hud-tick` filled
+   for done, and for ahead the slash stays unwiped and the row sits at the dimmed opacity the
+   unselected rows already use.
+2. **A window over the list.** Sixteen rows against seven that fit. `hudBuild` renders every row
+   today; the course renders the step you are on with two either side and re-letters as you move.
+   The alternative is the existing pager at six a page — recommended against, because a course has
+   a *you are here* and a pager does not.
+3. **A camera path.** The only part that touches the world at all, and it moves the camera and
+   nothing else.
 
 ## READ THIS FIRST — the same trap PLAN-places.md warns about
 
@@ -186,23 +219,44 @@ the top of your own course.**
 `Zen_Curve` — the Bezier the stones were laid along — is dropped at parse by `ENV_CAM_BLOCK`.
 Un-dropping it would give the walk a smooth spine instead of sixteen straight hops.
 
-## L2 — walk the route
+## L2 — the course, in the panel that is already there
 
-**The camera walks; the interface stays on the glass.** The camera glides along the route, one
-node at a time, arrows to step. The world's whole contribution is the movement and the view — how
-far you have come is legible because the gate is behind you and the arbour is ahead. It puts up no
-signs.
+**The camera walks; the interface stays on the glass.** Nothing is added to the valley.
 
-The list is the HUD row list, exactly as it is in every other section: the node you are on is the
-selected row, with its name, its bar (`4 / 12 blocks`, `31 / 46 characters`) and its state —
-**done**, **here** or **ahead**. Sixteen nodes against seven rows that fit means the list is a
-**window**, not the whole course: it shows the node you are on with a couple either side and
-re-letters as the camera moves, which is the same thing the level-three walk's counter already
-does (`3 / 16`).
+The list is `.hud-list`, the same one every other section uses, and a step is a `.hud-row` with
+the parts it already has:
 
-The nine landmarks are the milestones, and they are milestones by being *scenery you pass*, not
-by being labelled. Reaching the inner gate means something because you can see it; nothing has to
-write "UNIT 3" on it.
+```
+  07   SCRIPTED TALK          ▓▓▓▓▓▓▓▓░░░░░░░   45%    会
+       会話練習                every scene
+  ──   ─────────────          ───────────────  ────    ──
+  .hud-n  .hud-name b/i        .hud-bar         .side u  .hud-seal
+          .hud-big/.hud-small                   .side em
+```
+
+Nothing in that line is new. The bar already fills to `data-pct` and already animates when the row
+takes `.on`; the side already carries a meta string and a percentage; the seal already stamps the
+row's first Japanese character. The course supplies different *values*, not different furniture.
+
+**Three row states instead of two.** `.on` is the step you are on. `is-done` fills the
+`.hud-tick`, which is already there and already animates. `is-ahead` leaves `.hud-slash` unwiped —
+the brush stroke only clips open on `.on` today, so a step you have not reached simply never gets
+its stroke, which reads correctly for free.
+
+**The counter is `.walk-hud`**, unchanged: `‹ 会話練習 SCRIPTED TALK 7 / 16 ›`, top centre, dark
+wash with a 3px section-coloured underline, prev and next as real buttons, shown by `body.at-walk`.
+It was built for exactly this and is currently driving walks whose scenery is hidden.
+
+**The readout is `.hud-detail`**, unchanged: four figure chips for the selected step and the
+vermilion NEXT UP slab under them. On a course the slab finally means what it says.
+
+**Sixteen rows against seven that fit** — the list is a window on the current step with two either
+side, re-lettering as the camera moves. The `7 / 16` in the counter is what tells you the window is
+a window.
+
+**The nine landmarks are milestones by being scenery you pass**, not by being labelled. Reaching
+the inner gate means something because you can see it behind you. Nothing writes "UNIT 3" on it,
+and nothing in the world is clickable.
 
 **Locks are soft, matching the app.** A node ahead of you is dimmed and you can still walk to it
 and enter, with the app's own warning first: *"This part of the course builds on earlier steps
@@ -268,13 +322,15 @@ The real block names. A sample of what each list holds:
 - **sentence_examples, 8** — Copula / Existence · Core Particles · Verb Forms · i-Adjectives ·
   na-Adjectives · Question Words · Connectives · Common Patterns
 
-The rows carry the block name, its card count and its state — in the HUD list, as ever. Climbing
-is what the world does here; the reading is on the glass.
+**Same list, same rows, same three states, same counter** — the only thing that changes between
+the course and the lessons is which route the camera is on and what the rows say. That is the whole
+argument for reusing the row: one list serves four levels, and a level is a camera path plus a data
+source.
 
 **Blocks lock**: a block opens once the previous one has 80% of its cards answered at least once
-(70% for thematic category blocks). A locked row is dimmed in the list, the way the course's own
-locked nodes are. This is a second gate chain inside every node's gate, and it is the app's, not
-an invention: it is what makes a node feel like a unit of five lessons rather than one wall.
+(70% for thematic category blocks). A locked block is an `is-ahead` row, exactly as a locked course
+step is. This is a second gate chain inside every step's gate, and it is the app's, not an
+invention: it is what makes a step feel like a unit of five lessons rather than one wall.
 
 Only the six deck nodes reach this level. The other ten fly out to their own section instead.
 
@@ -303,9 +359,11 @@ Stated plainly, because none of it is free:
 - **The grouping is not the app's.** The graph is 16 flat nodes; the landmarks that make them
   feel like units are the garden's, chosen here. Nothing breaks if the app disagrees later,
   because the milestones are scenery rather than data.
-- **The route needs authoring.** Sixteen stops from the main gate to the arbour is a camera path
-  nobody has composed yet. The level below it is in better shape: `ZEN_L4` already stands at the
-  foot of the stairway looking up it, so the lessons have their shot and only the course does not.
+- **The camera route needs composing.** Sixteen positions from the main gate to the arbour, which
+  nobody has solved yet. The level below it is in better shape: `ZEN_L4` already stands at the foot
+  of the stairway looking up it, so the lessons have their shot and only the course does not.
+
+None of those costs is interface work. The interface is the list that is already on screen.
 
 ---
 
@@ -470,18 +528,33 @@ They should agree, and if they ever disagree the button is the one that is wrong
 
 # Open items
 
-1. **The route is uncomposed.** Sixteen stops from the main gate to the arbour, 139 units apart.
-   Whether the camera stops at each or glides past with the type doing the work is a composition
-   question nobody has answered.
-2. **`Zen_Curve` is dropped at parse.** Un-dropping it gives the walk a real spine instead of
-   sixteen straight hops between points. It is one line in `ENV_CAM_BLOCK`.
-3. **Two dead stones** — scripted and free conversation, above.
-4. **READING still wants the corridor one level early**, and the code has no L2→L4 path.
-5. **DAILY's L3 has nowhere to stand** now the shrine walk is hidden.
-6. **Session settings** — does the game screen ask for length and toggles, or take the defaults?
-7. **`L3_LEVELS` is stale** — 32/31/105/89/133 in the file against 44/35/109/93/137 in the app.
-   Still worth fixing even though STUDY no longer shows a level list: the numbers are wrong
-   wherever they are read.
-8. **One stray stone.** `Zen_Garden_TobiIshi_001` reports a world position of exactly (0, 0, 0),
-   which is 8,800 units from every other stone in the chain. Either an unplaced object or a
-   parent whose transform never arrived — worth a look in the .blend before the path is laid.
+Only two of these need a decision. The rest are work.
+
+1. **The two new row states need drawing.** `is-done` and `is-ahead`, in MIDASHI's own vocabulary.
+   Done is probably the `.hud-tick` filled; ahead is probably the slash left unwiped, which the
+   stylesheet does already since the stroke only clips open on `.on`. Both want looking at rather
+   than reasoning about. **Decision needed.**
+2. **Window or pager.** A window of three rows centred on the current step, or the existing
+   `.l3-pager` at six a page. Recommended: the window, because a course has a *you are here*.
+   **Decision needed.**
+3. **The camera route is uncomposed** — sixteen positions from the main gate to the arbour. Whether
+   the camera stops at each or slides continuously while the list re-letters is a composition
+   question, and it is only about the camera.
+4. **`Zen_Curve` is dropped at parse.** Un-dropping it gives the camera a real spine instead of
+   sixteen straight hops between points. One line in `ENV_CAM_BLOCK`.
+5. **Two steps with nowhere to go** — scripted and free conversation point at a tutor the menu
+   does not have. They can sit in the list saying so, which is honest, but they cannot be entered.
+6. **READING wants the long list one level early**, and the code has no L2→L4 path.
+7. **Session settings** — does the game step ask for length and toggles, or take the defaults?
+8. **`L3_LEVELS` is stale** — 32/31/105/89/133 in the file against 44/35/109/93/137 in the app.
+   Worth fixing wherever it is read, even though STUDY no longer shows a level list.
+
+Two items came *off* this list when the interface went back to 2D, which is worth noting as
+evidence the reading is the right one:
+
+- *"DAILY's L3 has nowhere to stand now the shrine walk is hidden"* — it stands in the row list,
+  like everything else. There was never a problem here; the problem was thinking it needed
+  scenery.
+- *"One stray stone at (0,0,0)"* — `Zen_Garden_TobiIshi_001` is 8,800 units from the rest of its
+  own chain, which mattered only while something was going to be placed on the stones. Nothing
+  is. Still an oddity worth a glance in the .blend, no longer a blocker.
