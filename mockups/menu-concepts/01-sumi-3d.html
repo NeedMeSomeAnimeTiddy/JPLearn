@@ -1503,288 +1503,147 @@
   }
 
   /* ================================================================================================
-     THE COURSE, THIRD TIME, AND THIS TIME THE SURFACE CHANGED RATHER THAN THE LAYOUT.
+     THE COURSE AS A CARD TABLE — Design's B2, ported.
 
-     SEVEN DESIGNS HAVE NOW BEEN REJECTED as ugly across TWO completely different structures -- four
-     ladders, then a printed sheet, a calendar and a stack of save slabs. When the structure changes
-     twice and the reaction does not, the structure was never the problem. What every one of the seven
-     had in common is the SURFACE:
+     Ten designs of mine were rejected. This one is not mine: it came back from claude.ai/design
+     against the constraints in `mockups/menu-concepts/design-system/`, and the idea is one none of
+     the ten had. THE COURSE IS A HAND OF CARDS. Sixteen of them fanned around the one you are on,
+     the finished and current ones face up in cream, the locked ones FACE DOWN with a hatched back,
+     and the two with nothing behind them yet drawn as a dashed outline. For a flashcard app that is
+     the obvious metaphor and nobody had reached for it.
 
-         heavy italic display type, skewed, at high contrast
-         hard black offset shadows on everything
-         a keyline or an ink wash on every element, fighting a bright lit valley
-         one loud vermilion fill shouting over all of it
-         and no imagery of any kind -- seven designs made entirely of words
+     WHY IT WORKS WHERE THE OTHERS DID NOT, as far as I can tell: every one of my ten tried to show
+     sixteen equal things at once, which forces everything to be small. This shows ONE thing at full
+     size -- a 290x384 card with its character at 66px -- and lets the rest fall away by distance,
+     two neighbours at 160 wide, two more at 120, and the remainder collapsed into a stacked pile at
+     each edge with a count on it. It is a carousel, and a carousel has a hero for free.
 
-     That is Persona's surface, and it was imported from Persona's LIST STRUCTURES without noticing
-     that Persona's art direction is the exact opposite of this world's. Persona 5 is red, black,
-     urban and loud. This valley is a soft low-poly Japanese landscape at sunset -- a pagoda, raked
-     gravel, bamboo, green hills. A shouting interface over it is not a style clash at the margins,
-     it is the whole problem.
+     WHAT IT KEPT FROM THE EXISTING CHROME, unprompted and correctly: the -8 degree skew, the
+     alternating 1.2 degree lean, the hard offset shadow, square corners, ink on cream, and the
+     vermilion action slab. It read `foundations/geometry.html` and used it.
 
-     SO THE REFERENCE FAMILY CHANGED: Ghost of Tsushima, whose art direction is this one's neighbour.
-     Its menus (via the Game UI Database) do five things, and the seven rejected designs did none:
-
-       1. THE GROUND IS CRUSHED, NOT FOUGHT. Its menu backgrounds are concept art with the values
-          crushed to near-monochrome, which is why its type needs no keyline, no wash and no shadow.
-          Every legibility fix in this file so far has been a per-element patch for a problem you can
-          solve once, behind the whole panel. `backdrop-filter` on one fixed layer replaces the
-          keyline on every piece of type at level two.
-       2. THE TYPE IS QUIET. Thin, unskewed, small, generously letterspaced, near-white on dark.
-          No italic, no black weight, no shadow. Nothing in its menus shouts, and it is the most
-          legible interface of any game looked at for this.
-       3. THE UNIT IS A CREST, NOT A ROW. Skills are marks -- a glyph inside a diamond -- so the
-          screen is a field of SYMBOLS with names beside them rather than sixteen lines of words.
-          That is the imagery all seven attempts were missing entirely.
-       4. PROGRESS IS PIPS, NOT BARS. `NEXT UPGRADE` is four diamonds, three filled. Sixteen
-          percentage bars was always sixteen things to read; a four-pip row is one glance.
-       5. ONE RED, USED AS A WASH ON THE SELECTED THING ONLY. Never as a slab, never as a fill you
-          could mistake for decoration.
-
-     AND ONE HOUSE RULE OVERRIDES THE REFERENCE: its crests are CIRCLES, and this UI does not have a
-     rounded corner anywhere in it. They are diamonds here -- a square turned 45 degrees, with the
-     glyph turned back upright inside it, which is how the reference draws its upgrade marks anyway.
+     THE LAYOUT IS COMPUTED IN JS, NOT IN CSS, because every card's size, offset, opacity and depth
+     depend on its DISTANCE FROM THE SELECTION, which changes on every keypress. `courseLayout()`
+     below is this file's version of the design's `renderVals()`. The stylesheet holds only what does
+     not move.
      ================================================================================================ */
-  /* THE ONE LAYER THAT REPLACES EVERY KEYLINE. Values crushed behind the whole panel, so cream type
-     at 400 weight reads over raked gravel with nothing added to it. z-index -1 inside `.hud` (which
-     is a stacking context at 4) puts it behind the panel's own content and above the canvas; the
-     chrome at 5 stays in full colour above it, the way the reference keeps its nav bar crisp. */
-  .hud[data-course]::before {
-    content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-    backdrop-filter: grayscale(0.92) brightness(0.46) contrast(1.14);
-    -webkit-backdrop-filter: grayscale(0.92) brightness(0.46) contrast(1.14);
-  }
   .course-shape {
-    position: relative; margin-top: 12px;
-    min-height: 400px; display: flex; align-items: flex-start;
+    position: relative; margin-top: 8px;
+    min-height: 436px; display: flex; align-items: flex-start;
   }
-  .course-wrap { position: relative; }
-  .cs-step {
+  .course-wrap { position: relative; width: 1180px; height: 436px; }
+  /* the card. Everything dimensional is written by `courseLayout`; this is the part that is the
+     same on all sixteen. */
+  .cs-card {
+    position: absolute; left: 50%; top: 50%;
+    display: flex; flex-direction: column;
     background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
-    font: inherit; color: inherit; display: block;
+    font: inherit; color: inherit;
+    transition: left 0.22s ease, width 0.22s ease, height 0.22s ease, opacity 0.22s ease;
   }
-  /* ---- THE CREST. A diamond, and the glyph inside it stands upright. ---- */
-  .cs-seal {
-    display: grid; place-items: center; box-sizing: border-box;
-    transform: rotate(45deg);
-    transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.36s var(--ease-pop);
+  .cs-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
   }
-  .cs-seal i {
-    display: block; transform: rotate(-45deg); font-family: var(--jp); font-style: normal;
-    line-height: 1;
+  .cs-num {
+    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    letter-spacing: 0;
   }
-  .cs-step[data-state="done"] .cs-seal {
-    background: rgba(10, 9, 6, 0.72); box-shadow: inset 0 0 0 1.5px var(--gold);
+  /* the type chip: DECK, an arrow to whoever owns the step, or NOT BUILT */
+  .cs-chip {
+    display: inline-block; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.16em; padding: 2px 7px; white-space: nowrap;
+    box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.25);
   }
-  .cs-step[data-state="done"] .cs-seal i { color: var(--gold-hi); }
-  .cs-step[data-state="here"] .cs-seal {
-    background: rgba(10, 9, 6, 0.72); box-shadow: inset 0 0 0 1.5px var(--hi);
-  }
-  .cs-step[data-state="here"] .cs-seal i { color: #fff; }
-  .cs-step[data-state="ahead"] .cs-seal {
-    background: rgba(10, 9, 6, 0.5); box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.2);
-  }
-  .cs-step[data-state="ahead"] .cs-seal i { color: rgba(242, 234, 216, 0.28); }
-  /* the pick: the reference frames the selected mark in red rather than filling it */
-  .cs-step.on .cs-seal {
-    box-shadow: inset 0 0 0 2px var(--hi), 0 0 0 4px rgba(227, 74, 51, 0.28);
-    transform: rotate(45deg) scale(1.1);
-  }
-  /* ---- THE TYPE. Thin, unskewed, letterspaced, and NOTHING added to it. ---- */
-  .cs-en {
-    display: block; font-family: var(--lat-ui); font-weight: 500; font-style: normal;
-    letter-spacing: 0.18em; white-space: nowrap; transform: none;
-    -webkit-text-stroke: 0; text-shadow: none;
-    transition: color 0.26s ease;
-  }
+  /* the character, which is the card's face and the largest thing on the screen */
   .cs-jp {
-    display: block; font-family: var(--jp-go); font-weight: 400; white-space: nowrap;
-    -webkit-text-stroke: 0; text-shadow: none;
+    margin-top: auto; padding: 0 12px;
+    font-family: var(--jp); font-weight: 400; line-height: 1.15;
+    white-space: nowrap; text-align: center;
   }
-  .cs-no, .cs-num, .cs-want, .cs-pct, .cs-tag {
-    display: block; font-family: var(--lat-ui); font-weight: 500; letter-spacing: 0.18em;
-    white-space: nowrap; font-style: normal; -webkit-text-stroke: 0; text-shadow: none;
+  .cs-en {
+    padding: 2px 18px 0; font-family: var(--lat); font-style: italic; font-weight: 900;
+    letter-spacing: 0.01em; white-space: nowrap; text-align: center;
   }
-  .cs-step[data-state="done"] .cs-en { color: rgba(242, 234, 216, 0.82); }
-  .cs-step[data-state="here"] .cs-en { color: #fff; }
-  .cs-step[data-state="ahead"] .cs-en { color: rgba(242, 234, 216, 0.34); }
-  .cs-step[data-state="ahead"] .cs-jp { color: rgba(242, 234, 216, 0.24); }
-  .cs-step.on .cs-en { color: #fff; }
-  /* ---- THE PIPS. Five diamonds a step, which is the whole measure. ---- */
-  .cs-pips { display: flex; gap: 4px; align-items: center; }
-  .cs-pips u {
-    display: block; width: 5px; height: 5px; transform: rotate(45deg);
-    background: rgba(242, 234, 216, 0.16); text-decoration: none;
+  .cs-foot {
+    margin-top: auto; padding: 0 18px 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
   }
-  .cs-pips u[data-on="1"] { background: var(--gold); }
-  .cs-step[data-state="here"] .cs-pips u[data-on="1"] { background: var(--hi); }
-  /* ---- THE GROUPS. Four of them, contiguous, in the course's own order. ---- */
-  .cs-ghead { display: block; }
-  .cs-ghead b {
-    display: block; font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.24em;
-    color: var(--washi); font-size: 12px;
+  .cs-gauge {
+    position: relative; display: block; width: 100%; height: 12px;
+    background: rgba(20, 17, 13, 0.15); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.25);
   }
-  .cs-ghead i {
-    display: block; font-family: var(--lat-ui); font-style: normal; font-weight: 400;
-    letter-spacing: 0.1em; font-size: 10px; color: rgba(242, 234, 216, 0.44); margin-top: 3px;
+  .cs-gauge i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); }
+  /* the finished mark, stamped a little crooked the way a real one is */
+  .cs-seal {
+    width: 34px; height: 34px; background: var(--gold); color: var(--ink);
+    font-family: var(--jp-go); font-weight: 700; font-size: 19px; line-height: 34px;
+    text-align: center; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3); transform: rotate(-6deg);
   }
-  /* the group's own pip row -- one diamond per step in it, which is the reference's NEXT UPGRADE
-     row doing the job sixteen percentage columns used to do */
-  .cs-ghead u { display: flex; gap: 5px; margin-top: 8px; text-decoration: none; }
-  .cs-ghead u s {
-    display: block; width: 7px; height: 7px; transform: rotate(45deg); text-decoration: none;
-    background: rgba(242, 234, 216, 0.16);
+  .cs-note {
+    display: block; font-family: var(--lat-ui); font-weight: 600; font-size: 9.5px;
+    letter-spacing: 0.14em; white-space: nowrap;
   }
-  .cs-ghead u s[data-state="done"] { background: var(--gold); }
-  .cs-ghead u s[data-state="here"] { background: var(--hi); }
-
-  /* ---- 紋 CREST · four groups across, a field of marks ----------------------------------------
-     The technique screen: named columns, a caption under each name, and the skills as marks rather
-     than as rows of words. Reading it is reading SYMBOLS -- the crest is the step's own character,
-     so the field says what the course is made of before a single name is read.
-     HEIGHT: head 52 + 6 x 42 = 304, and the tallest group sets it. */
-  .hud[data-course="crest"] .course-wrap {
-    display: grid; grid-template-columns: 300px 240px 260px 300px; gap: 0 26px;
-    width: 1180px; align-items: start;
+  /* THE ACTION IS ON THE CARD, not in the corner. It grows out of the selected card's bottom edge,
+     which is why the card alone has `overflow: visible`. */
+  .cs-slabwrap {
+    flex: none; margin: 0 -1px -1px; height: 0; opacity: 0; overflow: hidden;
+    transition: height 0.22s ease, margin 0.22s ease, opacity 0.22s ease;
   }
-  .hud[data-course="crest"] .cs-ghead { margin-bottom: 16px; }
-  .hud[data-course="crest"] .cs-gsteps { display: flex; flex-direction: column; gap: 6px; }
-  .hud[data-course="crest"] .cs-step {
-    display: grid; grid-template-columns: 34px 1fr;
-    grid-template-areas: 'seal en' 'seal pips';
-    align-items: center; gap: 2px 14px; padding: 3px 0;
+  .cs-slab { display: block; height: 38px; padding: 11px 14px; }
+  .cs-slab i {
+    display: block; font-family: var(--lat-ui); font-style: normal; font-size: 12px;
+    line-height: 16px; text-align: center;
   }
-  .hud[data-course="crest"] .cs-seal { grid-area: seal; width: 26px; height: 26px; }
-  .hud[data-course="crest"] .cs-seal i { font-size: 13px; }
-  .hud[data-course="crest"] .cs-en { grid-area: en; font-size: 13px; }
-  .hud[data-course="crest"] .cs-pips { grid-area: pips; }
-  .hud[data-course="crest"] .cs-no, .hud[data-course="crest"] .cs-num,
-  .hud[data-course="crest"] .cs-jp, .hud[data-course="crest"] .cs-want,
-  .hud[data-course="crest"] .cs-pct, .hud[data-course="crest"] .cs-tag { display: none; }
-  /* the selected step is the only one that says more, and it says it quietly */
-  .hud[data-course="crest"] .cs-step.on {
-    grid-template-areas: 'seal en' 'seal jp' 'seal pips';
+  /* the two piles: what is behind you on the left, what is still to come on the right, each as
+     three stacked card edges and a count */
+  .cs-pile {
+    position: absolute; top: 50%; width: 54px; height: 128px;
+    transform: translateY(-50%) skewX(-8deg);
   }
-  .hud[data-course="crest"] .cs-step.on .cs-seal { width: 34px; height: 34px; }
-  .hud[data-course="crest"] .cs-step.on .cs-seal i { font-size: 17px; }
-  .hud[data-course="crest"] .cs-step.on .cs-en { font-size: 17px; letter-spacing: 0.2em; }
-  .hud[data-course="crest"] .cs-step.on .cs-jp {
-    display: block; grid-area: jp; font-size: 11px; color: rgba(242, 234, 216, 0.6);
+  /* three stacked card edges a pile: cream for what is behind you, hatched dark for what is not
+     turned over yet, each one 8px further back than the last */
+  .cs-pile i { position: absolute; top: 0; width: 30px; height: 100px; display: block; }
+  .cs-pile i:nth-child(1) { top: 16px; }
+  .cs-pile i:nth-child(2) { top: 8px; }
+  .cs-pile.lo i { box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35); }
+  .cs-pile.lo i:nth-child(1) { left: 16px; background: #bdb49c; }
+  .cs-pile.lo i:nth-child(2) { left: 8px; background: #d9d0ba; }
+  .cs-pile.lo i:nth-child(3) {
+    left: 0; background: var(--washi);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
   }
-
-  /* ---- 連 CHAIN · the technique tree, drawn as one ---------------------------------------------
-     The reference's own shape: the first step of a group is a large crest, and the rest descend from
-     it as a chain of smaller ones joined by a hairline. It is the only one of the three that draws
-     the ORDER rather than implying it, and the hairline going gold as far as you have travelled is
-     the whole progress reading -- no bar, no percentage, no counter.
-     HEIGHT: 44 + 5 x 58 = 334. */
-  .hud[data-course="chain"] .course-wrap {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 20px;
-    width: 1160px; align-items: start;
+  .cs-pile.hi i { box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3); }
+  .cs-pile.hi i:nth-child(1) { right: 16px; background: rgba(16, 13, 9, 0.72); }
+  .cs-pile.hi i:nth-child(2) { right: 8px; background: rgba(16, 13, 9, 0.84); }
+  .cs-pile.hi i:nth-child(3) {
+    right: 0;
+    background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.06) 0 7px,
+      rgba(0, 0, 0, 0) 7px 14px), linear-gradient(rgba(16, 13, 9, 0.94), rgba(16, 13, 9, 0.94));
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(242, 234, 216, 0.14);
   }
-  .hud[data-course="chain"] .cs-ghead { margin-bottom: 18px; text-align: center; }
-  .hud[data-course="chain"] .cs-ghead u { justify-content: center; }
-  .hud[data-course="chain"] .cs-gsteps {
-    display: flex; flex-direction: column; align-items: center; gap: 0;
+  .cs-pile b {
+    position: absolute; bottom: 0; display: inline-block;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+    padding: 4px 9px; white-space: nowrap; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
   }
-  .hud[data-course="chain"] .cs-step {
-    position: relative; display: grid; justify-items: center;
-    grid-template-areas: 'seal' 'en'; gap: 4px; padding: 9px 0 11px;
+  .cs-pile b em {
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 13px;
+    letter-spacing: 0;
   }
-  /* the link, in the travelled colour of the step BELOW it, so the chain fills downward */
-  .hud[data-course="chain"] .cs-step::before {
-    content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 9px;
-    background: rgba(242, 234, 216, 0.2);
+  .cs-pile.lo { left: 0; }
+  .cs-pile.lo b { left: -8px; background: var(--gold); color: var(--ink); transform: rotate(-1.2deg); }
+  .cs-pile.lo b em { color: var(--hi-deep); }
+  .cs-pile.hi { right: 0; }
+  .cs-pile.hi b {
+    right: -8px; background: rgba(10, 9, 6, 0.82); color: rgba(222, 214, 189, 0.7);
+    transform: rotate(1deg); box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4),
+      inset 0 0 0 1px rgba(242, 234, 216, 0.16);
   }
-  .hud[data-course="chain"] .cs-step[data-state="done"]::before { background: var(--gold); }
-  .hud[data-course="chain"] .cs-step[data-state="here"]::before { background: var(--hi); }
-  .hud[data-course="chain"] .cs-gsteps > .cs-step:first-child::before { display: none; }
-  .hud[data-course="chain"] .cs-seal { grid-area: seal; width: 24px; height: 24px; }
-  .hud[data-course="chain"] .cs-seal i { font-size: 12px; }
-  .hud[data-course="chain"] .cs-gsteps > .cs-step:first-child .cs-seal {
-    width: 38px; height: 38px;
-  }
-  .hud[data-course="chain"] .cs-gsteps > .cs-step:first-child .cs-seal i { font-size: 19px; }
-  .hud[data-course="chain"] .cs-en { grid-area: en; font-size: 10.5px; letter-spacing: 0.16em; }
-  .hud[data-course="chain"] .cs-pips, .hud[data-course="chain"] .cs-no,
-  .hud[data-course="chain"] .cs-num, .hud[data-course="chain"] .cs-jp,
-  .hud[data-course="chain"] .cs-want, .hud[data-course="chain"] .cs-pct,
-  .hud[data-course="chain"] .cs-tag { display: none; }
-  .hud[data-course="chain"] .cs-step.on .cs-seal { width: 42px; height: 42px; }
-  .hud[data-course="chain"] .cs-step.on .cs-seal i { font-size: 21px; }
-  .hud[data-course="chain"] .cs-step.on .cs-en { font-size: 13px; letter-spacing: 0.2em; }
-  .hud[data-course="chain"] .cs-step.on .cs-jp {
-    display: block; grid-area: jp; font-size: 10px; color: rgba(242, 234, 216, 0.55);
-  }
-  .hud[data-course="chain"] .cs-step.on { grid-template-areas: 'seal' 'en' 'jp'; }
-
-  /* ---- 巻 SCROLL · the panel owns its own ground -------------------------------------------------
-     The reference's menus do not show the world at all: they stand on a near-white field, and that
-     one decision is what lets everything on them be thin. This is that -- a pale washi panel over
-     the left half, the valley crushed behind the rest, and sixteen steps in ink-grey at 400 weight
-     with a diamond and a pip row. No fills, no shadows, no vermilion except the one wash under the
-     step you are on. The quietest of the three by a distance.
-     HEIGHT: 2 columns x (2 heads + 8 rows) = 2 x 30 + 8 x 26 = 268 plus padding. */
-  .hud[data-course="scroll"] .course-wrap {
-    width: 900px; padding: 26px 30px 28px;
-    background: linear-gradient(158deg, rgba(246, 241, 230, 0.955), rgba(228, 220, 202, 0.93));
-    display: grid; grid-template-columns: 1fr 1fr; gap: 20px 34px; align-content: start;
-  }
-  .hud[data-course="scroll"] .cs-ghead { margin-bottom: 10px; }
-  .hud[data-course="scroll"] .cs-ghead b { color: rgba(20, 17, 13, 0.88); font-size: 11px; }
-  .hud[data-course="scroll"] .cs-ghead i { color: rgba(20, 17, 13, 0.46); font-size: 9.5px; }
-  .hud[data-course="scroll"] .cs-ghead u { margin-top: 7px; }
-  .hud[data-course="scroll"] .cs-ghead u s { background: rgba(20, 17, 13, 0.16); }
-  .hud[data-course="scroll"] .cs-ghead u s[data-state="done"] { background: var(--gold); }
-  .hud[data-course="scroll"] .cs-ghead u s[data-state="here"] { background: var(--hi); }
-  .hud[data-course="scroll"] .cs-gsteps { display: flex; flex-direction: column; gap: 1px; }
-  .hud[data-course="scroll"] .cs-step {
-    position: relative;
-    display: grid; grid-template-columns: 26px 1fr auto;
-    grid-template-areas: 'seal en pips'; align-items: center; gap: 0 12px;
-    height: 26px; padding: 0 10px 0 4px;
-  }
-  /* the wash, which is the only red on the page and the only fill anywhere on it */
-  .hud[data-course="scroll"] .cs-step.on {
-    background: linear-gradient(90deg, rgba(227, 74, 51, 0.9), rgba(227, 74, 51, 0.62));
-    height: 46px; grid-template-areas: 'seal en pips' 'seal jp pips';
-    align-content: center; row-gap: 1px;
-  }
-  .hud[data-course="scroll"] .cs-seal { grid-area: seal; width: 18px; height: 18px; }
-  .hud[data-course="scroll"] .cs-seal i { font-size: 10px; }
-  .hud[data-course="scroll"] .cs-step[data-state="done"] .cs-seal {
-    background: none; box-shadow: inset 0 0 0 1.5px rgba(20, 17, 13, 0.62);
-  }
-  .hud[data-course="scroll"] .cs-step[data-state="done"] .cs-seal i { color: rgba(20, 17, 13, 0.8); }
-  .hud[data-course="scroll"] .cs-step[data-state="here"] .cs-seal {
-    background: none; box-shadow: inset 0 0 0 1.5px var(--hi);
-  }
-  .hud[data-course="scroll"] .cs-step[data-state="here"] .cs-seal i { color: var(--hi); }
-  .hud[data-course="scroll"] .cs-step[data-state="ahead"] .cs-seal {
-    background: none; box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
-  }
-  .hud[data-course="scroll"] .cs-step[data-state="ahead"] .cs-seal i { color: rgba(20, 17, 13, 0.26); }
-  .hud[data-course="scroll"] .cs-step[data-state="done"] .cs-en { color: rgba(20, 17, 13, 0.86); }
-  .hud[data-course="scroll"] .cs-step[data-state="here"] .cs-en { color: var(--ink); }
-  .hud[data-course="scroll"] .cs-step[data-state="ahead"] .cs-en { color: rgba(20, 17, 13, 0.34); }
-  .hud[data-course="scroll"] .cs-en { grid-area: en; font-size: 12px; }
-  .hud[data-course="scroll"] .cs-pips { grid-area: pips; }
-  .hud[data-course="scroll"] .cs-pips u { background: rgba(20, 17, 13, 0.15); }
-  .hud[data-course="scroll"] .cs-pips u[data-on="1"] { background: var(--gold); }
-  .hud[data-course="scroll"] .cs-no, .hud[data-course="scroll"] .cs-num,
-  .hud[data-course="scroll"] .cs-jp, .hud[data-course="scroll"] .cs-want,
-  .hud[data-course="scroll"] .cs-pct, .hud[data-course="scroll"] .cs-tag { display: none; }
-  /* on the wash everything inverts to cream, including the crest's ring */
-  .hud[data-course="scroll"] .cs-step.on .cs-seal {
-    width: 24px; height: 24px; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.9);
-  }
-  .hud[data-course="scroll"] .cs-step.on .cs-seal i { color: #fff; font-size: 13px; }
-  .hud[data-course="scroll"] .cs-step.on .cs-en { color: #fff; font-size: 15px; }
-  .hud[data-course="scroll"] .cs-step.on .cs-jp {
-    display: block; grid-area: jp; font-size: 10px; color: rgba(255, 255, 255, 0.86);
-  }
-  .hud[data-course="scroll"] .cs-step.on .cs-pips u { background: rgba(255, 255, 255, 0.3); }
-  .hud[data-course="scroll"] .cs-step.on .cs-pips u[data-on="1"] { background: #fff; }
+  .cs-pile.hi b em { color: rgba(222, 214, 189, 0.8); }
+  /* the corner readout goes: the selected card carries its own action slab now, and two of them
+     saying the same sentence is the doubling this design exists to remove */
+  .hud[data-course] .hud-next { display: none; }
+  .hud[data-course] .hud-figs { display: none; }
 
   /* ---- the slab, when it is the action rather than a caption ---------------------------------- */
   .hud-next[data-act] { min-height: 58px; }
@@ -16839,35 +16698,12 @@ function pathGo(i, dur = 1.15) {
   pathHud();
   hudDraw();
 }
-/* ================================================================================================
-   THE READOUT BECOMES THE ACTION.
-
-   It used to repeat the row that was already lit: four generic chips and a slab naming the same
-   step the list had selected, on a screen whose whole left side was already saying it. A course
-   does not need a second description — it needs ONE OBVIOUS THING TO PRESS.
-
-   So the slab is the button. It is the same `.hud-next` element in the same corner with the same
-   fill, skew and shadow; what changes is that it now states the step, what the step wants of you,
-   and GO — and it carries the gold arrow the menu's own UP NEXT button wears, which is the one
-   other primary action on this project. The four chips go with it: a figure that restates the row
-   beside it is decoration, and the step's own bar already carries the number.
-   ================================================================================================ */
-function hudCourseAct(sel) {
-  const nx = hudEl.querySelector('.hud-next');
-  if (!nx || !sel) return;
-  const em = nx.querySelector('em'), b = nx.querySelector('b'), i = nx.querySelector('i');
-  const locked = sel.state === 'ahead';
-  const dead = sel.kind === 'none' || (sel.kind === 'goto' && !sel.to);
-  nx.dataset.act = dead ? 'dead' : (locked ? 'locked' : 'go');
-  em.textContent = `STEP ${sel.step + 1} / ${STUDY_PATH.length}`;
-  b.textContent = sel.small + ' ' + sel.big;
-  /* WHAT IT SAYS IS WHAT IT WILL DO, in the third line: the deck steps open blocks, the ten
-     hand-offs fly you to whoever owns them, and the two with no tutor say so instead of lying. */
-  i.textContent = dead ? 'NOTHING HERE YET'
-    : locked ? ('LOCKED · ' + sel.meta)
-      : sel.kind === 'goto' ? ('GO TO ' + sel.to + ' ▸')
-        : ('START · ' + sel.meta + ' ▸');
-}
+/* THE READOUT USED TO LIVE IN THE CORNER, and `hudCourseAct` wrote it: a vermilion slab naming the
+   selected step and what pressing Enter would do. The card table moved that sentence ONTO the
+   selected card, where the thing it describes actually is, so both the function and the corner slab
+   are gone -- `.hud-next` is hidden under `[data-course]` and `courseLayout` writes the card's own.
+   The contract it held survives in `cardLine`: what the slab says is what the step can do, and the
+   three with nothing behind them still say so rather than lying. */
 
 /* the counter is `.walk-hud`, unchanged: the same element, the same two buttons, the same
    `7 / 16`. It was built for the level-three walk and this is the same question.
@@ -16900,85 +16736,176 @@ function pathHud() {
 }
 function onCourse() { return HUD.on && HUD.sec === 'STUDY' && HUD.level === 2 && state === 'sub'; }
 
-/* ================= THE COURSE HAS A SHAPE, AND THE SURFACE FINALLY CHANGED =======================
-   C cycles; `NAV.course(n)` names.
+/* ================= ONE SHAPE NOW, AND IT CAME FROM SOMEWHERE ELSE ================================
+   The bench is gone. Ten shapes were built here and all ten were rejected -- four ladders, then a
+   printed sheet, a calendar and a stack of save slabs, then a crest field, a chain and a scroll.
+   This one came back from claude.ai/design (project "JPLearn study course screen", B2 Card Table),
+   designed against the constraints published in `mockups/menu-concepts/design-system/` rather than
+   against another of my variants, which is the thing that had gone wrong ten times running.
 
-   SEVEN REJECTED, ACROSS TWO STRUCTURES -- four ladders, then a sheet, a calendar and a stack. The
-   long note over the stylesheet has the diagnosis: the structure was never what was wrong. All seven
-   wore Persona's surface (skewed black italics, hard shadows, keylines, one loud vermilion fill, and
-   no imagery at all) over a soft low-poly valley at sunset, which is the opposite art direction.
-   These three come from Ghost of Tsushima instead -- crushed ground, thin unskewed type, crests
-   instead of rows, diamond pips instead of bars, red as a wash and nothing else.
-
-   THEY ARE MEANT TO SHARE A LANGUAGE. That is not the ladders' mistake repeated: the ladders were
-   four arrangements of a surface that was itself the problem. These three differ on the two things
-   that matter here -- how much of the world survives behind them, and whether the order is drawn or
-   implied -- while agreeing about the surface, because the surface is the part being proposed.
-   ================================================================================================ */
+   `NAV.course()` still answers, so anything that called it keeps working, and C is free again. */
 const COURSE_SHAPES = [
-  ['crest', '紋', 'four groups across · a field of marks, the world crushed behind them'],
-  ['chain', '連', 'the technique tree · crests descending on a hairline that fills as you go'],
-  ['scroll', '巻', 'a pale panel that owns its own ground · the quietest of the three'],
+  ['cards', '札', 'a hand of sixteen, fanned around the one you are on'],
 ];
 
-/* THE SIXTEEN STEPS ARE FOUR GROUPS, CONTIGUOUS AND IN THE COURSE'S OWN ORDER. This is the other
-   half of the answer to an arithmetic problem that has been dodged twice: sixteen peers in one
-   column cannot be big, and sixteen peers anywhere have no shape. Four named groups of 6/2/3/5 are
-   four things to read, each with a pip row saying how far into it you are -- and the boundaries are
-   real rather than decorative, since the wall in this course genuinely is kanji and everything after
-   the certification boundary is an exam rather than a lesson.
-   Contiguous on purpose: speaking and listening interleave in the graph, and a group that skipped
-   from step seven to step ten would break the one thing a course has that a menu does not. */
-const COURSE_GROUPS = [
-  { en: 'FOUNDATIONS', from: 0, to: 5, note: 'the two scripts, the first words, the first patterns' },
-  { en: 'EAR AND VOICE', from: 6, to: 7, note: 'scripted speech, then listening' },
-  { en: 'THE WALL', from: 8, to: 10, note: 'kanji, free conversation, reading' },
-  { en: 'CERTIFICATION', from: 11, to: 15, note: 'five levels, N5 up to N1' },
-];
+/* THE FAN, IN THE DESIGN'S OWN NUMBERS. Width, height and offset by distance from the selection,
+   then a constant 130 a card beyond the third, which never shows -- anything past two is at zero
+   opacity and lives in the edge pile instead. */
+const CARD_W = [290, 160, 120], CARD_H = [384, 270, 224];
+const CARD_OFF = [0, 239, 393];
+/* 0.82/0.62 in the source, which is right over a painted background and wrong over a real one --
+   a face-down card is already 0.88 alpha, so the second neighbour landed near 0.55 and the rocks
+   behind it showed through. Size and overlap carry the depth; this only softens the edge. */
+const CARD_FADE = [1, 0.94, 0.82];
+/* the card back, for a step you have not reached: hatched, so it reads as face-down rather than as
+   a card that failed to render */
+const CARD_BACK = 'repeating-linear-gradient(135deg, rgba(242,234,216,0.06) 0 7px,'
+  + ' rgba(0,0,0,0) 7px 14px), linear-gradient(rgba(16,13,9,0.88), rgba(16,13,9,0.88))';
 
-/* the whole markup for one course, whatever shape is showing.
+/* THE MARKUP IS A SHELL AND THE LAYOUT IS WRITTEN EVERY SYNC, which is the one structural thing
+   this shape needs that none of the ten did: a card's size, offset, depth, opacity, colours and
+   even its footer sentence all depend on its DISTANCE FROM THE SELECTION, and that changes on every
+   keypress. The design computes the lot in `renderVals()` on each state change; `courseLayout()`
+   below is the same function against real DOM.
 
-   GROUPED NOW, and the grouping is in the MARKUP rather than in the CSS because a group has content
-   of its own -- a name, a caption and a pip row per step in it. All three shapes read the same
-   wrappers; what differs is whether they run the groups across the panel or down it.
-
-   THE CREST IS THE STEP'S OWN FIRST CHARACTER, the way the row list's seal already is: かな takes か,
-   漢字 takes 漢, N5 検定 takes 検. Nothing is authored twice, and the field of sixteen marks is
-   therefore a picture of the course rather than a decoration laid over one.
-
-   `.cs-step` keeps its DOCUMENT ORDER across the groups, which is what lets `hudSync` go on toggling
-   `.on` by index and `hudBuild` go on reading `data-i` -- neither knows the groups exist. */
-const CS_TAG = { done: 'DONE', here: 'NOW', ahead: 'LOCKED' };
-const csSeal = (t) => ((String(t).match(/[\u3040-\u30ff\u4e00-\u9faf]/) || [''])[0]);
-function courseStep(r, i) {
-  /* five pips, so a step's own measure is a glance rather than a number. `Math.ceil` on purpose:
-     one pip lit is "started", and a step at 5% that shows nothing looks like a step at zero. */
-  const lit = Math.max(0, Math.min(5, Math.ceil((r.pct || 0) / 20)));
-  const pips = [0, 1, 2, 3, 4].map((k) => `<u data-on="${k < lit ? 1 : 0}"></u>`).join('');
-  return `<button class="cs-step" data-i="${i}" data-state="${r.state}" style="--i:${i}">`
-    + `<span class="cs-seal"><i>${csSeal(r.small)}</i></span>`
-    + `<span class="cs-tag">${CS_TAG[r.state] || ''}</span>`
-    + `<span class="cs-no">${r.no}</span>`
-    + `<span class="cs-num">${i + 1}</span>`
-    + `<span class="cs-en">${r.big}</span>`
-    + `<span class="cs-jp">${r.small}</span>`
-    + `<span class="cs-want">${r.meta}</span>`
-    + `<span class="cs-pips">${pips}</span>`
-    + `<span class="cs-pct">${r.pct}%</span>`
-    + `</button>`;
-}
+   So `courseMarkup` emits sixteen empty cards and two piles, and `courseLayout` fills them. Getting
+   this the other way round -- baking values into the markup and rebuilding on every move -- would
+   also throw away the CSS transitions, since a freshly built element has no previous state to
+   animate from. That is the same lesson `hudBuild` versus `hudSync` already learned. */
 function courseMarkup(rows) {
-  const groups = COURSE_GROUPS.map((g) => {
-    const mine = rows.slice(g.from, g.to + 1);
-    /* the group's pip row is built from the STEPS' states rather than from a count, so it cannot
-       disagree with the marks underneath it */
-    const dots = mine.map((r) => `<s data-state="${r.state}"></s>`).join('');
-    const steps = mine.map((r, k) => courseStep(r, g.from + k)).join('');
-    return `<div class="cs-group">`
-      + `<div class="cs-ghead"><b>${g.en}</b><i>${g.note}</i><u>${dots}</u></div>`
-      + `<div class="cs-gsteps">${steps}</div></div>`;
-  }).join('');
-  return `<div class="course-wrap">${groups}</div>`;
+  const cards = rows.map((r, i) => `<button class="cs-card" data-i="${i}" data-state="${r.state}">`
+    + `<span class="cs-head"><span class="cs-num"></span><span class="cs-chip"></span></span>`
+    + `<span class="cs-jp"></span>`
+    + `<span class="cs-en"></span>`
+    + `<span class="cs-foot">`
+    + `<span class="cs-gauge"><i></i></span>`
+    + `<span class="cs-seal">済</span>`
+    + `<span class="cs-note"></span></span>`
+    + `<span class="cs-slabwrap"><span class="cs-slab"><i></i></span></span>`
+    + `</button>`).join('');
+  const pile = (k) => `<span class="cs-pile ${k}">`
+    + `<i></i><i></i><i></i><b><em></em> MORE</b></span>`;
+  return `<div class="course-wrap">${pile('lo')}${cards}${pile('hi')}</div>`;
+}
+
+/* what the slab says, and it still cannot promise something the step cannot do -- the same contract
+   `hudCourseAct` held when the readout lived in the corner */
+function cardLine(r, status) {
+  if (r.kind === 'none' || (r.kind === 'goto' && !r.to)) {
+    return ['NOTHING HERE YET', 'rgba(242,234,216,0.45)', 'rgba(12,10,8,0.5)', '600', '0.14em'];
+  }
+  if (status === 'locked') {
+    return ['LOCKED · ' + r.meta, 'rgba(242,234,216,0.62)', 'rgba(12,10,8,0.72)', '600', '0.14em'];
+  }
+  const go = r.kind === 'deck'
+    ? (status === 'current' ? 'START · ' + r.meta + ' ▸' : 'CLEARED · REVISIT ▸')
+    : (status === 'current' ? 'GO TO ' + r.to + ' ▸' : 'CLEARED · GO TO ' + r.to + ' ▸');
+  return [go, '#ffd9a1', 'var(--hi)', '700', '0.16em'];
+}
+
+/* set by a real pointer move, cleared by every relayout -- see the note on the card's mouseenter */
+let csPointerLive = false;
+addEventListener('mousemove', () => { csPointerLive = true; }, { passive: true });
+
+function courseLayout(rows) {
+  const wrap = hudEl.querySelector('.course-wrap');
+  if (!wrap) return;
+  csPointerLive = false;
+  const sel = Math.max(0, Math.min(HUD.at | 0, rows.length - 1));
+  const dim = 'rgba(222,214,189,0.55)';
+  wrap.querySelectorAll('.cs-card').forEach((el, i) => {
+    const r = rows[i];
+    const status = r.state === 'done' ? 'done' : (r.state === 'here' ? 'current' : 'locked');
+    const isSel = i === sel;
+    const dead = r.kind === 'none' || (r.kind === 'goto' && !r.to);
+    /* face up is what you have reached. A locked step is a card you have not turned over yet, and
+       that is the whole reason this design can show sixteen without showing sixteen names. */
+    const faceUp = status !== 'locked';
+    const raw = i - sel, ad = Math.abs(raw), dist = Math.min(2, ad);
+    const off = (raw < 0 ? -1 : 1) * (ad <= 2 ? CARD_OFF[ad] : CARD_OFF[2] + 130 * (ad - 2));
+    let bg, sh, border = '';
+    if (faceUp) {
+      bg = 'var(--washi)';
+      sh = '2px 3px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(20,17,13,0.15)';
+    } else {
+      bg = CARD_BACK;
+      sh = '2px 3px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(242,234,216,0.14)';
+      if (dead) { sh = '2px 3px 0 rgba(0,0,0,0.45)'; border = '1px dashed rgba(242,234,216,0.4)'; }
+    }
+    if (isSel) {
+      sh = '4px 6px 0 rgba(0,0,0,0.45), inset 0 0 0 1px '
+        + (faceUp ? 'rgba(20,17,13,0.15)' : 'rgba(242,234,216,0.14)');
+    } else if (status === 'current') {
+      /* the step you are ON keeps a gold edge even when the cursor has wandered off it, or the
+         course loses the one fact it exists to state */
+      sh += ', inset 0 0 0 2px var(--gold-hi)';
+    }
+    el.style.cssText = `left: calc(50% + ${off}px); width: ${CARD_W[dist]}px;`
+      + ` height: ${CARD_H[dist]}px;`
+      + ` transform: translate(-50%, -50%) skewX(-8deg) rotate(${isSel ? -1.2 : (i % 2 ? 1 : -1.2)}deg);`
+      + ` z-index: ${30 - ad}; background: ${bg}; box-shadow: ${sh};`
+      + (border ? ` border: ${border};` : '')
+      + ` opacity: ${ad > 2 ? 0 : CARD_FADE[dist]};`
+      + ` overflow: ${isSel ? 'visible' : 'hidden'};`
+      + ` pointer-events: ${ad > 2 ? 'none' : 'auto'};`;
+    const q = (c) => el.querySelector(c);
+    q('.cs-head').style.cssText = `padding: ${[15, 10, 8][dist]}px ${[18, 14, 10][dist]}px 6px;`;
+    const num = q('.cs-num');
+    num.textContent = r.no;
+    num.style.cssText = `font-size: ${[24, 17, 14][dist]}px; color: ${faceUp ? 'var(--ink)' : dim};`;
+    const chip = q('.cs-chip');
+    if (dead) {
+      chip.textContent = 'NOT BUILT';
+      chip.style.cssText = 'background: none; border: 1px dashed rgba(242,234,216,0.4);'
+        + ` color: ${dim}; box-shadow: none;`;
+    } else if (r.kind === 'goto') {
+      const acc = (SECTION_ACCENT[r.to] || SECTION_ACCENT.STUDY)[0];
+      chip.textContent = '→ ' + r.to;
+      chip.style.cssText = `background: ${acc}; color: var(--washi);`;
+    } else {
+      chip.textContent = 'DECK';
+      chip.style.cssText = faceUp
+        ? 'background: var(--ink); color: var(--gold-hi);'
+        : 'background: rgba(207,164,92,0.2); color: var(--gold-hi);';
+    }
+    const jp = q('.cs-jp');
+    jp.textContent = r.jp;
+    jp.style.cssText = `font-size: ${[66, 30, 22][dist]}px;`
+      + ` color: ${faceUp ? 'var(--ink)' : 'rgba(230,222,200,0.72)'};`;
+    const en = q('.cs-en');
+    en.textContent = r.en;
+    en.style.cssText = `font-size: ${[28, 13, 10][dist]}px;`
+      + ` color: ${faceUp ? 'var(--hi-deep)' : dim};`;
+    q('.cs-gauge').style.display = status === 'current' ? 'block' : 'none';
+    q('.cs-gauge i').style.width = Math.max(0, r.pct) + '%';
+    q('.cs-seal').style.display = status === 'done' ? 'block' : 'none';
+    /* THE FOOTER IS TWO SENTENCES, and which one it is depends on whether you are pointing at the
+       card. At rest it states the card's condition in one word; under the cursor it states the gate
+       in the course's own plain words. */
+    const note = q('.cs-note');
+    note.textContent = status === 'current' ? (isSel ? 'GATE · ' + r.meta : 'YOU ARE HERE')
+      : status === 'done' ? (isSel ? 'CLEARED · ' + r.meta : 'CLEARED')
+        : dead ? (isSel ? 'NOTHING HERE YET' : 'NOT BUILT')
+          : (isSel ? 'LOCKED · ' + r.meta : 'LOCKED');
+    note.style.color = faceUp ? 'rgba(20,17,13,0.55)' : dim;
+    const [line, lc, lbg, lw, ls] = cardLine(r, status);
+    const sw = q('.cs-slabwrap');
+    sw.style.cssText = `margin: ${isSel ? 10 : 0}px -1px -1px; height: ${isSel ? 38 : 0}px;`
+      + ` opacity: ${isSel ? 1 : 0};`;
+    q('.cs-slab').style.background = lbg;
+    const li = q('.cs-slab i');
+    li.textContent = line;
+    li.style.cssText = `font-weight: ${lw}; letter-spacing: ${ls}; color: ${lc};`;
+  });
+  /* the piles carry what the fan cannot: everything more than two cards away, counted */
+  const lo = Math.max(0, sel - 2), hi = Math.max(0, rows.length - 1 - sel - 2);
+  const setPile = (k, n) => {
+    const p = wrap.querySelector('.cs-pile.' + k);
+    p.style.visibility = n > 0 ? 'visible' : 'hidden';
+    p.querySelector('em').textContent = n;
+  };
+  setPile('lo', lo);
+  setPile('hi', hi);
 }
 
 /* ================================================================================================
@@ -17202,8 +17129,19 @@ function hudBuild(rows) {
        MIDASHI is the design now and the other twelve are a comparison nobody needs printed over
        the world, least of all stacked on top of the key hints in the corner. */
     + '';
-  hudEl.querySelectorAll('.cs-step').forEach((b) => {
-    b.addEventListener('mouseenter', () => pathGo(+b.dataset.i, 0.5));
+  hudEl.querySelectorAll('.cs-card').forEach((b) => {
+    /* GUARDED, BECAUSE THE CARDS MOVE. Every other list in this interface is stationary, so
+       `mouseenter` there can only mean the pointer arrived. Here choosing a step re-lays out all
+       sixteen cards, and a card sliding under a STATIONARY pointer fires `mouseenter` exactly the
+       same way -- so pressing Right moved the cursor one step and the card that swept under the
+       mouse immediately dragged it back. Caught by a probe that asked for step 5 and was handed
+       step 1; it presents as the arrow keys jumping to wherever the mouse happens to rest.
+       `csPointerLive` is cleared by every layout and set only by a real `mousemove`, so hover has
+       to be earned by the pointer actually moving. */
+    b.addEventListener('mouseenter', () => {
+      if (!csPointerLive) return;
+      pathGo(+b.dataset.i, 0.5);
+    });
     b.addEventListener('click', () => { HUD.cur = +b.dataset.i; hudPick(); });
   });
   hudEl.querySelectorAll('.hud-row').forEach((b) => {
@@ -17267,13 +17205,12 @@ function hudSeal(el, on, animate) {
 function hudSync(rows) {
   const sel = rows[HUD.at];
   const moved = hudPrevAt !== HUD.at;
-  /* the course's steps are `.cs-step`, not `.hud-row`, and the rest of this function's row work
-     does not apply to them -- they carry their state in `data-state` and their bar is built with a
-     width rather than tweened to one. All they need from a sync is which one is lit. */
+  /* the course's cards are `.cs-card`, not `.hud-row`, and none of this function's row work applies
+     to them: no seal to swap, no bar to tween, no lean to set. */
   if (courseShaped()) {
-    const steps = hudEl.querySelectorAll('.cs-step');
-    steps.forEach((b, j) => b.classList.toggle('on', j === HUD.at));
-    hudCourseAct(sel);
+    /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
+       rather than adding a state, so the whole layout is rewritten from the cursor every sync */
+    courseLayout(rows);
     hudPrevAt = HUD.at;
     return;
   }
