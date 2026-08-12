@@ -16,3 +16,4 @@ world.glb
 
 # and the backup copies of it that a re-export leaves behind
 *.bak
+window-check/
