@@ -6368,6 +6368,202 @@ function windTick(dt) {
   WIND.mesh.instanceMatrix.needsUpdate = true;
 }
 
+/* ================= STEAM OFF THE BATHS, SMOKE OFF THE ROOFS =================
+   AN ONSEN TOWN WITH NO STEAM IS MISSING THE THING IT IS NAMED AFTER, and this one nearly had
+   none: the world does ship twelve `Onsen_Props_Steam` columns on the `puff` rule, but each one
+   is 40 x 82 x 36 units — against inns that stand 700 to 950 tall and a figure that is 51.5, a
+   column of steam the height of a person and a half. You have to be told it is there.
+
+   RISING MOTION IN THE MIDDLE DISTANCE IS THE CHEAPEST LIFE THERE IS, and it is the right kind
+   for the menu: it never darts, it has no edges to catch the eye, and at the wide shot it reads
+   as the town breathing rather than as something moving. Robbie's rule for this round was that
+   menu-visible motion stays slow — a puff climbs fifteen units a second, so it takes half a
+   minute to leave its vent, which at the scale the town is drawn at is a drift you notice only
+   if you look.
+
+   ONE INSTANCED QUAD PER PUFF, EVERYTHING IN THE MATRIX, which is the same bargain `windBuild`
+   struck and for the same reason: four numbers a puff, no instanced attributes to allocate,
+   upload or keep in step, and the matrix was going to be uploaded anyway. Nothing here is
+   written per frame at all — the whole animation is `fract(t * speed + phase)` in the vertex
+   shader, so the CPU cost after build is zero and the buffer never moves again.
+
+   IT IS OCCLUDED, WHICH THE FIREFLIES ARE NOT. `depthTest` stays on: steam behind the bathhouse
+   must be behind the bathhouse. It writes no depth, so the puffs of one column blend into each
+   other instead of cutting each other out.
+
+   AND IT ANSWERS TO THE COLD. Steam is water condensing, so you see it when the air is cold and
+   barely at all at midday — `uCold` is driven off the sun's altitude in the frame loop. Smoke is
+   not the same substance and does not care, which is why the two are one system with a `grey`
+   channel rather than two: a chimney plume is narrower, climbs twice as far, leans further
+   downwind and stays visible all day. */
+const STEAM = {
+  on: new URLSearchParams(location.search).get('steam') !== 'off',
+  amt: { value: 0.52 },          /* peak alpha of a puff at the middle of its life */
+  cold: { value: 1 },            /* how much of that the air is showing — set by the day cycle */
+  rise: { value: 15 },           /* units a second, and deliberately slow */
+  time: { value: 0 },
+  col: { value: new THREE.Color(0xe6ecef) },     /* steam: the mist colour, near white */
+  smoke: { value: new THREE.Color(0x6b6a66) },   /* and woodsmoke, which is a grey */
+  mesh: null, vents: [], puffs: 0,
+};
+/* WHERE IT COMES FROM, BY NAME, so a re-export that moves the town moves the steam with it.
+   `n` puffs per vent, `w` their width at birth, `h` how far the column climbs, `at` how many
+   emission points to spread across the footprint (the big pool is 1,200 x 1,640 and one plume in
+   the middle of it would read as a bonfire), and `top` where on the mesh the vent sits as a
+   fraction of its height — 1.0 is the ridge of a roof, 0 the surface of a bath. */
+const STEAM_VENTS = [
+  /* `top: 1` on the baths and not 0, which is the first thing this got wrong: a SotoYu mesh is
+     the whole bath INCLUDING its sunken tub, so the bottom of its box is 192 units underground
+     and the water is at the TOP of it. Steam was being born below the street. */
+  { m: /Onsen_Buildings_SotoYu/i, n: 12, w: 78, h: 300, at: 1, top: 1, grey: 0 },
+  { m: /Onsen_Buildings_YumomiHall/i, n: 14, w: 104, h: 360, at: 1, top: 1, grey: 0 },
+  /* THE BIG POOL IS THREE VENTS AND THEY HAD TO COME DOWN. At n 18 and w 132 the three of them
+     laid a solid white sheet over the whole bath terrace — rocks, lanterns and bathers all under
+     it. Steam that hides the thing it is rising off is fog. Fewer and narrower: it still reads
+     as a pool you cannot see the far side of, and the terrace is still there. */
+  { m: /Onsen_Surfaces_OnsenPools/i, n: 13, w: 98, h: 430, at: 3, top: 1, grey: 0 },
+  /* the bathhouse is where the fire is, so it is the one chimney that really smokes */
+  { m: /Onsen_Buildings_Bathhouse/i, n: 12, w: 46, h: 700, at: 1, top: 1, grey: 1, off: [0.30, 0.20] },
+  { m: /Onsen_Buildings_Shop2/i, n: 8, w: 34, h: 430, at: 1, top: 1, grey: 0.82, off: [0.26, 0.24] },
+];
+function steamBuild(root) {
+  if (!STEAM.on || STEAM.mesh || !root) return 0;
+  const V = new THREE.Vector3();
+  const lo = new THREE.Vector3(), hi = new THREE.Vector3();
+  const vents = [];
+  root.updateMatrixWorld(true);
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh) return;
+    const rule = STEAM_VENTS.find((r) => r.m.test(o.name || ''));
+    if (!rule) return;
+    const g = o.geometry;
+    if (!g.boundingBox) g.computeBoundingBox();
+    const b = g.boundingBox;
+    lo.set(Infinity, Infinity, Infinity);
+    hi.set(-Infinity, -Infinity, -Infinity);
+    for (let i = 0; i < 8; i++) {
+      V.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z)
+        .applyMatrix4(o.matrixWorld);
+      lo.min(V); hi.max(V);
+    }
+    const cx = (lo.x + hi.x) / 2, cz = (lo.z + hi.z) / 2;
+    const sx = hi.x - lo.x, sz = hi.z - lo.z;
+    const y = lo.y + (hi.y - lo.y) * rule.top;
+    for (let k = 0; k < (rule.at || 1); k++) {
+      /* spread the emission points along the LONG axis, which for a bath is its length and for
+         a roof does not arise because a roof gets one */
+      const f = (rule.at || 1) < 2 ? 0 : (k / ((rule.at || 1) - 1) - 0.5) * 0.62;
+      const ox = rule.off ? rule.off[0] : 0, oz = rule.off ? rule.off[1] : 0;
+      vents.push({
+        x: cx + (sx > sz ? f * sx : 0) + ox * sx,
+        y, z: cz + (sx > sz ? 0 : f * sz) + oz * sz,
+        r: Math.min(sx, sz) * 0.26, rule,
+      });
+    }
+  });
+  if (!vents.length) return 0;
+  STEAM.vents = vents;
+  const total = vents.reduce((n, v) => n + v.rule.n, 0);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: STEAM.time, uAmt: STEAM.amt, uCold: STEAM.cold, uRise: STEAM.rise,
+      uCol: STEAM.col, uSmoke: STEAM.smoke, uWind: WIND.dir,
+      fogColor: FOG_U.fogColor, fogDensity: FOG_U.fogDensity },
+    vertexShader: `
+      uniform float uTime, uRise;
+      uniform vec3 uWind;
+      varying vec2 vUv;
+      varying float vA, vFog, vGrey;
+      void main() {
+        vec3 base = vec3( instanceMatrix[ 3 ][ 0 ], instanceMatrix[ 3 ][ 1 ], instanceMatrix[ 3 ][ 2 ] );
+        float climb = instanceMatrix[ 0 ][ 0 ];          /* how far this one gets */
+        float jx = instanceMatrix[ 0 ][ 1 ];             /* and where on the vent it starts */
+        float jz = instanceMatrix[ 0 ][ 2 ];
+        float rate = instanceMatrix[ 1 ][ 0 ];           /* its own pace, so no two are in step */
+        float wide = instanceMatrix[ 1 ][ 1 ];
+        float ph = instanceMatrix[ 2 ][ 0 ];
+        vGrey = instanceMatrix[ 2 ][ 2 ];
+        /* ONE CLOCK AND ONE CYCLE. fract() means the puff is reborn at the vent the instant it
+           dies at the top, and because the alpha is zero at both ends of u there is no seam
+           where that happens — the same trick the puff prop rule uses on its scale.
+           (NO BACKTICKS IN A SHADER COMMENT: this is inside a template literal. Fourth time.) */
+        float u = fract( uTime * uRise * rate / max( climb, 1.0 ) + ph );
+        vec3 p = base + vec3( jx, 0.0, jz ) * ( 0.4 + 0.6 * u );
+        p.y += u * climb;
+        /* THE LEAN IS QUADRATIC IN HEIGHT, not linear: a plume goes straight up out of the vent
+           and only starts travelling once the air has hold of it, which is what makes a column
+           read as a column rather than as a diagonal line of blobs. */
+        p += uWind * ( u * u * climb * ( 0.30 + 0.55 * vGrey ) );
+        p.x += sin( uTime * 0.31 + ph * 41.0 ) * wide * u;
+        p.z += cos( uTime * 0.27 + ph * 27.0 ) * wide * u;
+        /* it swells as it goes, which is the other half of reading as a plume */
+        float grow = wide * ( 0.42 + 1.9 * u );
+        float g = sin( 3.14159 * u );
+        vA = g * g;
+        vec3 toEye = normalize( cameraPosition - p );
+        vec3 side = normalize( cross( vec3( 0.0, 1.0, 0.0 ), toEye ) );
+        vec3 up = cross( toEye, side );
+        vec3 w = p + side * ( position.x * grow ) + up * ( position.y * grow );
+        vec4 mv = modelViewMatrix * vec4( w, 1.0 );
+        vFog = - mv.z;
+        vUv = uv;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 uCol, uSmoke, fogColor;
+      uniform float uAmt, uCold, fogDensity;
+      varying vec2 vUv;
+      varying float vA, vFog, vGrey;
+      void main() {
+        float r = length( vUv - 0.5 ) * 2.0;
+        if ( r > 1.0 ) discard;
+        /* soft, and ZERO AT THE RIM rather than merely small — the constant subtracted is the
+           value the gaussian has at r = 1, so there is no disc edge to see. Third time this
+           file has needed that: the sun's aureole, the fireflies, and now this. */
+        float a = max( 0.0, exp( - r * r * 2.6 ) - 0.0743 ) * 1.0803;
+        /* smoke keeps its body all day; steam is a thing the cold air is doing */
+        a *= vA * uAmt * mix( uCold, 1.0, vGrey * 0.8 );
+        if ( a < 0.004 ) discard;
+        vec3 c = mix( uCol, uSmoke, vGrey );
+        float f = 1.0 - exp( - fogDensity * fogDensity * vFog * vFog );
+        gl_FragColor = vec4( mix( c, fogColor, clamp( f, 0.0, 1.0 ) ), a );
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, total);
+  /* `sun-` so the ink prepass leaves it alone: a plume has no silhouette worth drawing and an
+     outline round a puff of steam is a cartoon cloud */
+  mesh.name = 'sun-steam';
+  mesh.frustumCulled = false;
+  mesh.castShadow = mesh.receiveShadow = false;
+  backScene.add(mesh);
+  NO_REFLECT.push(mesh);
+  STEAM.mesh = mesh;
+  const m = new THREE.Matrix4();
+  let i = 0;
+  for (let v = 0; v < vents.length; v++) {
+    const vent = vents[v];
+    for (let k = 0; k < vent.rule.n; k++) {
+      const e = m.elements;
+      e.fill(0);
+      const ang = walkRnd(i, 71) * 6.2831;
+      const rad = Math.sqrt(walkRnd(i, 72)) * vent.r;
+      e[0] = vent.rule.h * (0.72 + walkRnd(i, 73) * 0.56);   /* climb */
+      e[1] = Math.cos(ang) * rad;                            /* jx */
+      e[2] = Math.sin(ang) * rad;                            /* jz */
+      e[4] = 0.72 + walkRnd(i, 74) * 0.56;                   /* rate */
+      e[5] = vent.rule.w * (0.74 + walkRnd(i, 75) * 0.52);   /* width */
+      e[8] = k / vent.rule.n + walkRnd(i, 76) * 0.08;        /* phase, evenly spread */
+      e[10] = vent.rule.grey;
+      e[12] = vent.x; e[13] = vent.y; e[14] = vent.z; e[15] = 1;
+      mesh.setMatrixAt(i, m);
+      i++;
+    }
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  STEAM.puffs = i;
+  return i;
+}
+
 /* ================= WHAT THE TREES LET GO OF =================
    217 momiji and three dozen sakura, and nothing has ever come off any of them.
 
@@ -10390,6 +10586,12 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
           + ` ${OUTFIT.dressed} meshes, ${OUTFIT.parts} models classified into robe/trim/head`);
       }
       const wn = windBuild();
+      const st = steamBuild(root);
+      if (st) {
+        console.log('[crowd] ' + st + ' puffs of steam and smoke from ' + STEAM.vents.length
+          + ' vents — ' + STEAM.vents.filter((v) => !v.rule.grey).length + ' baths, '
+          + STEAM.vents.filter((v) => v.rule.grey).length + ' chimneys');
+      }
       const pt = petalBuild(root);
       const fl = flyBuild();
       if (fl) console.log('[crowd] ' + fl + ' fireflies, and 517 flames breathing');
@@ -13103,6 +13305,23 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
      star counting to ink coverage, is measuring the crane unless it is told not to: a star count
      over the night sky came back with 6,303 of them, and 6,300 were its wings. */
   crane: (on) => { if (on !== undefined) swan.visible = on !== false; return swan.visible; },
+  /* the baths and the chimneys: NAV.steam({ amt: 1 }) to see it from across the valley,
+     { rise: 40 } to watch a whole cycle without waiting, { on: false } to take it away */
+  steam: (o) => {
+    if (o) {
+      for (const k of ['amt', 'rise']) if (o[k] !== undefined) STEAM[k].value = o[k];
+      if (o.col !== undefined) STEAM.col.value.setHex(o.col);
+      if (o.smoke !== undefined) STEAM.smoke.value.setHex(o.smoke);
+      if (o.on !== undefined && STEAM.mesh) STEAM.mesh.visible = o.on !== false;
+    }
+    return { puffs: STEAM.puffs, vents: STEAM.vents.length,
+      baths: STEAM.vents.filter((v) => !v.rule.grey).length,
+      chimneys: STEAM.vents.filter((v) => v.rule.grey).length,
+      amt: STEAM.amt.value, rise: STEAM.rise.value, cold: +STEAM.cold.value.toFixed(2),
+      on: STEAM.mesh ? STEAM.mesh.visible : false,
+      at: STEAM.vents.map((v) => [Math.round(v.x), Math.round(v.y), Math.round(v.z),
+        v.rule.grey ? 'smoke' : 'steam'].join(' ')) };
+  },
   /* the moon's own brightness, live: NAV.moon({ core: 4, corona: 0.6 }). `core` is the disc's
      gain (the sun's is 3.6 at noon), `corona` the glow inside its own quad; the wide halo around
      it is the screen-space pass and moves with NAV.glow({ haloAmt, coreAmt }). */
@@ -16709,6 +16928,13 @@ function tick() {
      already switched off by uStars = 0 */
   SKY_U.uTime.value = t;
   for (const m of SKY_MATS) m.needsUpdate = true;
+  /* the baths. One uniform for the whole field — the puffs animate entirely in their own vertex
+     shader, so this and `uCold` are the only two numbers the CPU writes for the steam all frame.
+     COLD IS THE SUN'S ALTITUDE, because that is what the air temperature follows: full strength
+     through the night and the dawn, a third of it at midday when a bath still steams a little
+     but the air is nowhere near saturated. */
+  STEAM.time.value = t;
+  STEAM.cold.value = 0.34 + 0.66 * (1 - THREE.MathUtils.smoothstep(DAY_NOW.alt, -6, 34));
   lakeWater.material.uniforms.uTime.value = t;
   /* the lake is only in frame at the menu, and a rippled reflection at half rate is
      indistinguishable from one at full rate */
