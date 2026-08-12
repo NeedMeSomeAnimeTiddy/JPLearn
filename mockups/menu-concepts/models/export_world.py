@@ -29,11 +29,23 @@ OUT = os.path.join(os.path.dirname(bpy.data.filepath), 'world.glb')
 #   are called Legacy_Props_MeshNN like everything else in that collection.
 # The empties: meshes with no polygons, left over as anchors. They export as nodes that draw
 #   nothing and cost a matrix each.
-dropped = {'water': [], 'clouds': [], 'empty': []}
+# Anything in an `Extras*` collection: the boat lantern and the ten extra figures. They are
+# modelled here so they can be edited, but they ship as their own small glbs (`boatlamp.glb` and
+# `people.glb`, written by `export_extras.py`) which the page loads separately — leaving them in
+# the world would hand the page a second copy of every one of them.
+EXTRA_PREFIX = 'Extras'
+
+
+def is_extra(o):
+    return any(c.name.startswith(EXTRA_PREFIX) for c in o.users_collection)
+
+dropped = {'water': [], 'clouds': [], 'empty': [], 'extras': []}
 for o in list(bpy.context.scene.objects):
     n = o.name.lower()
     why = None
-    if '_water_' in n or n.startswith('landscape_water'):
+    if is_extra(o):
+        why = 'extras'
+    elif '_water_' in n or n.startswith('landscape_water'):
         why = 'water'
     elif o.type == 'MESH' and len(o.data.polygons) == 0:
         why = 'empty'

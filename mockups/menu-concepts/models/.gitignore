@@ -13,3 +13,6 @@
 world.glb
 *.blend
 *.blend1
+
+# and the backup copies of it that a re-export leaves behind
+*.bak

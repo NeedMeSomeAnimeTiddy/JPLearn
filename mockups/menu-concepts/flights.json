@@ -1,0 +1,72 @@
+{
+  "STUDY": {
+    "mid": [
+      437,
+      191,
+      -1075
+    ],
+    "bend": true,
+    "lean": 0.1,
+    "pace": 0.72
+  },
+  "DAILY": {
+    "mid": [
+      700,
+      757,
+      1696
+    ],
+    "bend": true,
+    "lean": null,
+    "pace": 1.15
+  },
+  "READING": {
+    "mid": [
+      -4980,
+      1558,
+      3808
+    ],
+    "bend": true,
+    "lean": 0.4,
+    "pace": 1
+  },
+  "DRILLS": {
+    "mid": [
+      440,
+      1004,
+      5682
+    ],
+    "bend": true,
+    "lean": 0.1,
+    "pace": 1.4
+  },
+  "JLPT": {
+    "mid": [
+      -126,
+      562,
+      3192
+    ],
+    "bend": true,
+    "lean": 0.1,
+    "pace": 1.5
+  },
+  "RECORDS": {
+    "mid": [
+      9661,
+      2169,
+      -3686
+    ],
+    "bend": true,
+    "lean": 0,
+    "pace": null,
+    "eye": [
+      -1781,
+      1165,
+      -11192
+    ],
+    "focus": [
+      -1661,
+      1111,
+      -9999
+    ]
+  }
+}

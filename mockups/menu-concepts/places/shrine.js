@@ -1,4 +1,4 @@
-/* ===================== REVIEW — 神社, the shrine precinct =====================
+/* ===================== DAILY — 神社, the shrine precinct =====================
    THE FIRST PLACE TO BECOME ITS OWN FILE. The mockup had reached 6,400 lines with one place in
    it; five more at the same weight is well past twelve thousand, and the point at which that
    becomes expensive is the point at which a second place starts sharing scope with the first.
@@ -17,7 +17,7 @@
    see that file's header. `toriiGeo` was one of them, listed here for a long time as a thing
    deliberately left in the core; it turned out to be pure geometry and had no reason to be.
 
-   What DOES stay behind: `buildEmaWall`, the ema-tablet text helpers and `L3_REVIEW`. All three
+   What DOES stay behind: `buildEmaWall`, the ema-tablet text helpers and `L3_DAILY`. All three
    are used only by this place today, and all three are the ones most likely to generalise once a
    third place exists — a wall of hanging labels and a queue's worth of deck data are not
    obviously shrine-shaped. Moving them now would be guessing at a boundary. */
@@ -26,11 +26,11 @@ import {
   beamSeg, broadleafGeo, cedarGeo, hash01, mergeParts, outlineGeom, signCanvas, toriiGeo,
 } from './toolkit.js';
 
-export function buildReview(ctx) {
+export function buildShrine(ctx) {
   const {
-    HOME_EYE, L3_REVIEW, RAMP, SECTION_ACCENT, addOutline, authored, backRenderer, backScene,
-    blockAdd, buildEmaWall, destPlace, drawSign, groundAt, hengaku, instanced, outlineMaterial,
-    standOff, treeClaim, walkAct, worldPickEl,
+    HOME_EYE, L3_DAILY, RAMP, SECTION_ACCENT, addOutline, backRenderer, backScene, blockAdd,
+    buildEmaWall, destPlace, drawSign, groundAt, hengaku, instanced, outlineMaterial, standOff,
+    treeClaim, worldPickEl,
   } = ctx;
   /* WHAT THIS PLACE REGISTERS, GATHERED RATHER THAN SCATTERED. These used to be writes straight
      into the page's registries, which is what forced the call site to sit at an exact point in the
@@ -40,16 +40,10 @@ export function buildReview(ctx) {
   const _marks = {};
   const _ambient = [];
   const _noReflect = [];
-  /* the shrine's costume is BAKED — the authored world models this whole precinct, richer than
-     the analytic build, so the analytic one stays hidden under it. What stays live is what the
-     bake cannot carry: the lettered tablets, the placards, and the level-four furniture. THE
-     AUTHORED WORLD IS NEVER TOUCHED (Robbie's rule): live objects are additions, and where a
-     live object would coincide with an authored one, the live object moves out of its way. */
-  const _live = [];
-  let _probe = null, _focus = null, _walk = null, _title = null, _l4 = null;
+  let _probe = null, _focus = null, _walk = null, _title = null;
 
 
-/* ================= REVIEW: 神社 — the shrine precinct =================
+/* ================= DAILY: 神社 — the shrine precinct =================
    A FULL AREA, AND DELIBERATELY OUT OF THE MENU'S SIGHT. At bearing 26° it sat inside the home
    camera's 31° half-cone and cluttered the one composition that works. Everything here is at
    105°, well behind the shoulder — you only ever see it by going there.
@@ -87,40 +81,6 @@ export function buildReview(ctx) {
     o.lookAt(t.x, o.position.y, t.z);
   };
   _probe = at3;
-
-  /* ---- the authored tunnel, when there is one ----
-     THE WALK FOLLOWS THE WORLD IT IS SEEN IN. The analytic axis runs from HOME toward the
-     place; the authored shrine was laid out along the BEARING RADIAL from the world origin,
-     and the two diverge 37° — measured, the walk was gliding through open meadow four hundred
-     units to the side of the authored gates. So when the authored world is up, the corridor's
-     line is read from the model itself: the 25 authored gates (spaced 268, the analytic
-     spacing, which the artist matched), the Romon at one end and the Honden at the other.
-     Everything the walk and level four place — placards, rails, cameras, the room — rides
-     whichever line is real. Names drive the read; a re-bake that keeps the names keeps this
-     working, which is exactly what models/README.md promises.
-     (Declared ahead of everything that uses it — the hall as well as the walk. This module has
-     now been bitten by its own TDZ nine times.) */
-  const AUTH = (() => {
-    if (!authored || !authored.ready) return null;
-    const gates = authored.instances(/Landscape_Structures_ToriiExtra/);
-    const romon = authored.meshes(/Torii_Buildings_Romon/)[0];
-    const honden = authored.meshes(/Torii_Buildings_Honden/)[0];
-    if (gates.length < 24 || !romon || !honden) return null;
-    const len = Math.hypot(honden.x - romon.x, honden.z - romon.z);
-    const fx = (honden.x - romon.x) / len, fz = (honden.z - romon.z) / len;
-    const tOf = (p) => (p.x - romon.x) * fx + (p.z - romon.z) * fz;
-    const atT = (t, sd = 0, lift = 0) => {
-      const v = new THREE.Vector3(romon.x + fx * t - fz * sd, 0, romon.z + fz * t + fx * sd);
-      v.y = groundAt(v.x, v.z) + lift;
-      return v;
-    };
-    return {
-      atT,
-      yaw: Math.atan2(-fx, -fz),   /* points a plane's +Z back toward the Romon */
-      gates: gates.map((g) => ({ y: g.y, t: tOf(g) })).sort((a, b) => a.t - b.t),
-      tHonden: tOf(honden),
-    };
-  })();
 
   /* ---- the paving, and the courtyard let into it ----
      A 360-wide strip is a path, and a path is not somewhere anything can stand: the ema wall had
@@ -278,304 +238,14 @@ export function buildReview(ctx) {
     scale: new THREE.Vector3(1, 1, 1),
   }), 3.5);
 
-  /* ================= the hall at the end of it — and LEVEL FOUR =================
-     THE ROOM THE PRACTICE HAPPENS IN, and the first L4 in the project. The hall used to be
-     scenery: a closed red mass whose whole job was to give twenty-six converging gates something
-     to converge ON. That job is unchanged, and so is the reasoning that sized and coloured it:
-     from the standing point the tunnel's far opening is a 54 x 64 pixel window, nothing about a
-     SHAPE survives that distance, and vermilion is the one hue that means "shrine" and appears
-     nowhere in the ground — so the walls stay lacquer red, the roof dark and the plinth stone.
-     The silhouette is deliberately kept too: same footprint, same roof line. What changed is
-     that the front bay is now a doorway with two sliding panels in it, and behind them is a
-     room — floor, altar, mirror, hanging lanterns, and a card standing on an easel, which is
-     where the queue you chose at level three actually runs.
-
-     THE DESCENT IS THE REST OF THE CORRIDOR. The walk already points at the hall; choosing the
-     placard you are beside rides the remaining bays, the doors part as you close, and the light
-     comes up inside — the room was dark until you were expected, which is what makes an interior
-     read as entered rather than as switched on. The camera stops just past the tunnel mouth,
-     at the foot of the steps: the doorway fills a 16:9 frame edge to edge there, so the arrival
-     reads as standing at the threshold with the room around you, while wider frames keep the
-     door posts as a proscenium.
-
-     ONE EMISSIVE DRIVES THE ROOM. Every interior surface shares one material whose emissive is
-     the room's light; the lanterns, the door paper and the card each carry their own so they can
-     sit brighter in the same dark. Enter tweens all four up, leave tweens them home — nothing
-     appears or vanishes, which is the rule everything here lives by. */
-  let haidenL4 = null;
-  /* THE ROOM EXISTS ONLY IN THE ANALYTIC WORLD (?generated), where it replaces this module's
-     own old scenery hall and nothing else. In the AUTHORED world level four builds NOTHING and
-     registers nothing — Robbie's revert, 2026-08-06: his map shows only his map, and what a
-     practice station should look like standing in it is his design call to make before any
-     object of ours appears there. (Choosing the placard you are beside then simply stays a
-     no-op, because WORLD_L4.REVIEW is unregistered.) */
-  if (!AUTH) {
-    const HF = TUN_END + 700;
-    const hallAt = at3(HF, 0);
-    const FLR = 106;                    /* the shell's raised interior floor */
-    const grp = new THREE.Group();
-    grp.position.copy(hallAt);
-    facing(grp, TUN_END, 0);            /* local +Z looks back down the tunnel */
-    backScene.add(grp);
-
-    const VERM = 0xb03a2a, VERM_D = 0x8a3626, ROOF = 0x3b332a, RIDGE = 0x332c25,
-      STONE = 0x6c6459, FLOOR = 0x6b5744, FLOOR_D = 0x5d4b3a, DARK = 0x3a2b20,
-      PAPER = 0xe6dcc4;
-    const ext = [], inn = [];
-    const box = (arr, w, h, d, x, y, z, c) => {
-      const g = new THREE.BoxGeometry(w, h, d);
-      g.translate(x, y, z);
-      arr.push({ geo: g, color: c });
-    };
-
-    const intMat = new THREE.MeshToonMaterial({
-      vertexColors: true, emissive: 0x14100b, gradientMap: RAMP, flatShading: true,
-    });
-    let matGold = null;
-    {
-      /* the shell: plinth, steps up the front, columns, walls with the front bay open */
-      box(ext, 1160, 92, 760, 0, 46, 0, STONE);
-      for (let i = 0; i < 3; i++) {
-        const h = 72 - i * 24;
-        box(ext, 430 - i * 24, h, 62, 0, h / 2, 411 + i * 62, STONE);
-      }
-      for (const sx of [-1, 1]) for (const cz of [-287, 0, 287]) {
-        const g = new THREE.CylinderGeometry(22, 26, 420, 8);
-        g.translate(sx * 468, 302, cz);
-        ext.push({ geo: g, color: VERM_D });
-      }
-      for (const sx of [-1, 1]) {
-        const g = new THREE.CylinderGeometry(20, 24, 420, 8);
-        g.translate(sx * 205, 302, 287);
-        ext.push({ geo: g, color: VERM_D });
-      }
-      box(ext, 962, 394, 26, 0, 303, -300, VERM);        /* back wall */
-      for (const sx of [-1, 1]) {
-        box(ext, 26, 394, 626, sx * 481, 303, 0, VERM);  /* side walls */
-        box(ext, 282, 394, 26, sx * 331, 303, 300, VERM); /* front flanks either side of the bay */
-      }
-      box(ext, 440, 70, 30, 0, 465, 300, VERM_D);        /* lintel over the opening */
-      box(ext, 440, 14, 40, 0, 106, 300, FLOOR_D);       /* the threshold beam */
-      /* the roof, kept from the scenery hall so the silhouette every distant shot was tuned
-         against does not move */
-      box(ext, 1300, 39, 832, 0, 520, 0, 0x4a3d2f);
-      for (const sx of [-1, 1]) {
-        const g = new THREE.BoxGeometry(780, 47, 960);
-        g.rotateZ(-sx * 0.46);
-        g.translate(sx * 340, 622, 0);
-        ext.push({ geo: g, color: ROOF });
-      }
-      box(ext, 60, 55, 960, 0, 750, 0, RIDGE);
-
-      const extMesh = new THREE.Mesh(mergeParts(ext), new THREE.MeshToonMaterial({
-        vertexColors: true, gradientMap: RAMP, flatShading: true,
-      }));
-      extMesh.name = 'haiden';
-      grp.add(extMesh);
-      addOutline(extMesh, 3.5);
-
-      /* the room: everything on one material so one emissive is the room's light */
-      for (let i = 0; i < 5; i++) {
-        box(inn, 188, 14, 600, -376 + i * 188, 99, 0, i % 2 ? FLOOR_D : FLOOR);
-      }
-      box(inn, 940, 394, 10, 0, 303, -284, DARK);        /* interior face of the back wall */
-      for (const sx of [-1, 1]) box(inn, 10, 394, 600, sx * 463, 303, 0, DARK);
-      for (const sx of [-1, 1]) box(inn, 282, 394, 8, sx * 331, 303, 288, DARK);
-      box(inn, 560, 40, 150, 0, 126, -230, FLOOR_D);     /* the altar dais */
-      box(inn, 18, 96, 18, 0, 194, -232, DARK);          /* the mirror's stand */
-      for (const sx of [-1, 1]) {                        /* 御幣 flanking it */
-        box(inn, 10, 80, 10, sx * 140, 186, -228, DARK);
-        box(inn, 30, 46, 6, sx * 140, 240, -222, PAPER);
-        box(inn, 22, 34, 6, sx * 140 + (sx < 0 ? -14 : 14), 228, -220, PAPER);
-      }
-      for (const sx of [-1, 1]) box(inn, 6, 60, 6, sx * 330, 465, -40, DARK); /* lantern cords */
-      const innMesh = new THREE.Mesh(mergeParts(inn), intMat);
-      innMesh.name = 'haiden-interior';
-      grp.add(innMesh);
-
-      /* 神鏡 — the mirror, the one pale thing at the back of the dark */
-      {
-        const g = new THREE.CylinderGeometry(60, 60, 8, 14);
-        g.rotateX(Math.PI / 2);
-        const m = new THREE.Mesh(g, new THREE.MeshToonMaterial({
-          color: 0xcfdadb, emissive: 0x3d4a4c, gradientMap: RAMP, flatShading: true,
-        }));
-        m.position.set(0, 286, -236);
-        m.name = 'haiden-mirror';
-        grp.add(m);
-      }
-      /* the hanging lanterns, one either side — the room's stated light source */
-      matGold = new THREE.MeshToonMaterial({
-        color: 0xe8c47c, emissive: 0x2a1f10, gradientMap: RAMP, flatShading: true,
-      });
-      for (const sx of [-1, 1]) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(54, 70, 54), matGold);
-        m.position.set(sx * 330, 400, -40);
-        m.name = 'haiden-lantern';
-        grp.add(m);
-      }
-    }
-    _marks.haiden = grp;
-
-    /* the furniture — the part that exists in BOTH worlds, resting on FLR */
-    const furn = [];
-    box(furn, 380, 10, 280, 0, FLR + 5, 40, 0x7e2f22);   /* the mat the easel stands on */
-    box(furn, 240, 26, 170, 0, FLR + 23, 30, DARK);      /* the easel's foot */
-    const furnMesh = new THREE.Mesh(mergeParts(furn), intMat);
-    furnMesh.name = 'l4-furniture';
-    grp.add(furnMesh);
-
-    /* the easel and the card. The card is the game surface: it is lettered for the queue and
-       deck that were chosen, so the room is never dressed with a placeholder. */
-    const boardGrp = new THREE.Group();
-    boardGrp.position.set(0, FLR + 118, 30);
-    boardGrp.rotation.x = -0.34;
-    grp.add(boardGrp);
-    const boardGeo = new THREE.BoxGeometry(175, 210, 12);
-    {
-      const c = new THREE.Color(0x4a3626);
-      const col = [];
-      for (let i = 0; i < boardGeo.attributes.position.count; i++) col.push(c.r, c.g, c.b);
-      boardGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      const m = new THREE.Mesh(boardGeo, intMat);
-      m.name = 'l4-easel';
-      boardGrp.add(m);
-      const o = new THREE.Mesh(outlineGeom(boardGeo), outlineMaterial(3.0));
-      o.frustumCulled = false;
-      boardGrp.add(o);
-    }
-    const cardCanvas = document.createElement('canvas');
-    cardCanvas.width = 360; cardCanvas.height = 456;
-    const cardTex = new THREE.CanvasTexture(cardCanvas);
-    cardTex.colorSpace = THREE.SRGBColorSpace;
-    cardTex.anisotropy = backRenderer.capabilities.getMaxAnisotropy();
-    const matCard = new THREE.MeshToonMaterial({
-      map: cardTex, emissiveMap: cardTex, emissive: new THREE.Color(0x4a443c),
-      gradientMap: RAMP,
-      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
-    });
-    const cardFace = new THREE.Mesh(new THREE.PlaneGeometry(150, 190), matCard);
-    cardFace.position.z = 6 + 2;
-    cardFace.name = 'l4-card';
-    boardGrp.add(cardFace);
-
-    /* one representative card per deck, so what is on the easel is always the deck you chose */
-    const L4_SAMPLE = {
-      '漢字 N5': ['水', 'みず · water'],
-      '語彙': ['食べる', 'たべる · to eat'],
-      '文法': ['〜ている', 'ongoing state'],
-      'カタカナ': ['ア', 'a'],
-      '聴解': ['音', 'listen and answer'],
-      'ひらがな': ['あ', 'a'],
-    };
-    function drawCard(queueJp, deckJp, n, pct) {
-      const g = cardCanvas.getContext('2d');
-      const W2 = cardCanvas.width, H2 = cardCanvas.height;
-      g.fillStyle = '#ece1c8';
-      g.fillRect(0, 0, W2, H2);
-      g.strokeStyle = 'rgba(70,50,30,0.55)';
-      g.lineWidth = 8;
-      g.strokeRect(7, 7, W2 - 14, H2 - 14);
-      g.textAlign = 'center';
-      g.fillStyle = 'rgba(43,28,16,0.62)';
-      g.font = '600 26px "Yu Gothic UI", sans-serif';
-      g.fillText(queueJp + ' — ' + deckJp, W2 / 2, 56, W2 - 50);
-      const [glyph, gloss] = L4_SAMPLE[deckJp] || ['問', ''];
-      g.fillStyle = '#241809';
-      g.font = `700 ${glyph.length > 2 ? 100 : 180}px "Yu Gothic UI", "Hiragino Kaku Gothic ProN", sans-serif`;
-      g.fillText(glyph, W2 / 2, H2 * 0.56, W2 - 50);
-      g.fillStyle = SECTION_ACCENT.REVIEW[1];
-      g.fillRect(W2 * 0.3, H2 * 0.655, W2 * 0.4, 5);
-      g.fillStyle = 'rgba(43,28,16,0.66)';
-      g.font = '600 30px "Yu Gothic UI", sans-serif';
-      g.fillText(gloss, W2 / 2, H2 * 0.775, W2 - 46);
-      g.fillStyle = 'rgba(43,28,16,0.5)';
-      g.font = '800 24px "Arial Black", Arial, sans-serif';
-      g.fillText(`${n} ${L3_REVIEW.unit.toUpperCase()} · ${pct}%`, W2 / 2, H2 * 0.9, W2 - 46);
-    }
-    drawCard('総復習', '漢字 N5', 96, 74);
-    cardTex.needsUpdate = true;
-
-    /* the doors: two sliding panels, each a timber frame with a paper field that takes the
-       room's light. They rest closed — from the tunnel the hall is the same red mass it always
-       was — and part as the level-four ride closes on them. The track sits just inside the
-       front wall so an open panel stows behind the flank instead of fighting it. */
-    const DOOR_REST = 95, DOOR_OPEN = 286;
-    let matPaper = null;
-    const doors = [-1, 1].map((sx) => {
-      matPaper = matPaper || new THREE.MeshToonMaterial({
-        color: PAPER, emissive: 0x241c12, gradientMap: RAMP, flatShading: true,
-      });
-      const d2 = new THREE.Group();
-      d2.position.set(sx * DOOR_REST, 268, 278);
-      grp.add(d2);
-      const bodyGeo = new THREE.BoxGeometry(190, 324, 14);
-      const body = new THREE.Mesh(bodyGeo, new THREE.MeshToonMaterial({
-        color: 0x6e3b23, gradientMap: RAMP, flatShading: true,
-      }));
-      body.name = 'haiden-door' + (sx < 0 ? 'L' : 'R');
-      d2.add(body);
-      const paper = new THREE.Mesh(new THREE.BoxGeometry(150, 260, 6), matPaper);
-      paper.position.z = 6;
-      d2.add(paper);
-      const o = new THREE.Mesh(outlineGeom(bodyGeo), outlineMaterial(3.0));
-      o.frustumCulled = false;
-      d2.add(o);
-      return d2;
-    });
-
-    /* the room's light, as one dial. Rest values are READ from the materials, not retyped.
-       Only materials that were built take part — before the authored Honden that is the
-       furniture and the card. */
-    const LIT = [
-      [intMat, 0x4a3823], [matGold, 0x9a7434], [matPaper, 0x8a6f45], [matCard, 0xcfc5ae],
-    ].filter(([m]) => m).map(([m, hot]) => ({ m, rest: m.emissive.clone(), hot: new THREE.Color(hot) }));
-    const glow = (on) => LIT.forEach(({ m, rest, hot }) => {
-      const c = on ? hot : rest;
-      gsap.to(m.emissive, {
-        r: c.r, g: c.g, b: c.b, duration: 1.3, delay: on ? 0.9 : 0.1, overwrite: true,
-      });
-    });
-
-    haidenL4 = {
-      enter(tileJp, k) {
-        const [jp2, en2] = L3_REVIEW.decks[k];
-        const q = (L3_REVIEW.queues[tileJp] || L3_REVIEW.queues['総復習'])[k];
-        drawCard(tileJp, jp2, q[0], q[1]);
-        cardTex.needsUpdate = true;
-        doors.forEach((d2, i) => {
-          gsap.killTweensOf(d2.position);
-          gsap.to(d2.position, {
-            x: (i ? 1 : -1) * DOOR_OPEN, duration: 1.2, delay: 0.85, ease: 'power2.inOut',
-          });
-        });
-        glow(1);
-        return { jp: jp2, en: en2, meta: `${q[0]} ${L3_REVIEW.unit} · ${q[1]}%` };
-      },
-      leave() {
-        doors.forEach((d2, i) => {
-          gsap.killTweensOf(d2.position);
-          gsap.to(d2.position, {
-            x: (i ? 1 : -1) * DOOR_REST, duration: 1.0, delay: 0.35, ease: 'power2.inOut',
-          });
-        });
-        glow(0);
-      },
-      /* the shot: past the tunnel mouth, looking onto the easel — with the authored Honden
-         itself as the backdrop when the world is up */
-      eye: () => {
-        const v = at3(HF - 560, 0);
-        v.y = hallAt.y + FLR + 156;
-        return v;
-      },
-      tgt: () => {
-        const v = at3(HF - 30, 0);
-        v.y = hallAt.y + FLR + 118;
-        return v;
-      },
-    };
-    _l4 = haidenL4;
-  }
+  /* the hall at the end of it */
+  const hall = new THREE.Mesh(shrineHallGeo(1000, 640, 780), new THREE.MeshToonMaterial({
+    vertexColors: true, gradientMap: RAMP, flatShading: true,
+  }));
+  hall.position.copy(at3(TUN_END + 700, 0));
+  facing(hall, TUN_END, 0);
+  backScene.add(hall);
+  addOutline(hall, 3.5);
 
   /* lanterns flanking the way in */
   const lanternMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: RAMP, flatShading: true });
@@ -617,20 +287,6 @@ export function buildReview(ctx) {
      gate the sign hangs half a bay in front of. */
   const L3_SLOTS = 6, L3_STEP = 4, L3_STAND = 3.5 * 268 - 134;
   const L3_SIGNS = [];
-  /* the corridor's frame, chosen once: the authored gates when the world is up, the analytic
-     tunnel otherwise. Same interface either way, so the walk below is written once. */
-  const AX = AUTH ? {
-    at: (t, sd = 0, lift = 0) => AUTH.atT(t, sd, lift),
-    yaw: AUTH.yaw,
-    stationT: (gi) => AUTH.gates[gi].t - TUN_STEP / 2,
-    hangBase: (gi) => AUTH.gates[gi].y,
-  } : {
-    at: (t, sd = 0, lift = 0) => at3(t, sd, lift),
-    yaw: 0,   /* filled below once the gate exists — see the assignment after `gate` */
-    stationT: (gi) => TUN_F0 + gi * TUN_STEP - TUN_STEP / 2,
-    hangBase: (gi) => at3(TUN_F0 + gi * TUN_STEP - TUN_STEP / 2, 0).y,
-  };
-  if (!AUTH) AX.yaw = gate.rotation.y;
   {
     /* A SIZE DOWN, AND THE TYPE FILLS MORE OF IT. Everything about a placard derives from these
        three — the rail, the cords, the hinge, the hang height and the outline — so the whole
@@ -647,7 +303,7 @@ export function buildReview(ctx) {
          has the whole opening to itself, and the rail it then needs is a better answer anyway:
          a beam across the corridor is what you would actually hang a sign from. */
       const gi = 2 + k * L3_STEP;
-      const f2 = AX.stationT(gi);
+      const f2 = TUN_F0 + gi * TUN_STEP - TUN_STEP / 2;
       /* INSIDE THE SIGHT LINE PAST THE NEAREST POST. The placard and the posts sit at similar
          distances from the axis, so from three bays back the post two bays ahead subtends a
          slightly WIDER angle than the sign's outer edge does — and shaves the first character off
@@ -655,15 +311,15 @@ export function buildReview(ctx) {
          corridor fixes it; the offset has to come in until the sign fits inside the opening the
          nearer gate leaves. */
       const sd = (k % 2 ? 1 : -1) * 92;
-      const hangY = AX.hangBase(gi) + TUN_H * 0.60;
+      const hangY = at3(f2, sd).y + TUN_H * 0.60;
       const rail = new THREE.Mesh(new THREE.BoxGeometry(TUN_H * 0.88, 10, 12),
         new THREE.MeshToonMaterial({ color: 0x46372a, gradientMap: RAMP, flatShading: true }));
-      rail.position.copy(AX.at(f2, 0));
+      rail.position.copy(at3(f2, 0));
       rail.position.y = hangY;
-      rail.rotation.y = AX.yaw;
+      rail.rotation.y = gate.rotation.y;
       backScene.add(rail);
       const root = new THREE.Group();
-      root.position.copy(AX.at(f2, sd));
+      root.position.copy(at3(f2, sd));
       root.position.y = hangY - SH * 0.62 - 34;
       /* SQUARE TO THE CORRIDOR, AND IT STAYS SQUARE. The cant was borrowed from a shop sign in
          an alley, where it earns its keep because you walk PAST the sign; here you walk toward
@@ -677,7 +333,7 @@ export function buildReview(ctx) {
          gate's own +Z is the direction a reader comes from — adding pi sent every placard's
          written face down the tunnel and left the back of the board toward the camera, which
          renders as a plain brown rectangle and looks exactly like a texture that failed. */
-      root.rotation.y = AX.yaw;
+      root.rotation.y = gate.rotation.y;
       backScene.add(root);
       /* THE HINGE IS THE TOP EDGE, not the board's middle. `flip` sits up on the cord line and
          `hold` puts the board back below it, so at zero the geometry is exactly where it was and
@@ -729,11 +385,7 @@ export function buildReview(ctx) {
       /* the placard is the control. Picking one from across the corridor is how you navigate
          with the screen rather than with the keyboard, so it carries a transparent twin for
          focus and Enter exactly as the ema tablets do. */
-      /* through the page's own dispatcher: a different placard is a move, this one is the way
-         down to level four. (It used to call `walkGo` directly, which is a page function this
-         module cannot see — the button threw on every activation and nobody noticed, because
-         the raycast path is what a mouse actually exercises.) */
-      const el = worldPickEl('', () => walkAct(k));
+      const el = worldPickEl('', () => walkGo(k));
       el.classList.add('walk-pick');
       L3_SIGNS.push({ root, flip, hold, face, canvas, tex, el, idx: k, f: f2, sd });
     }
@@ -743,12 +395,12 @@ export function buildReview(ctx) {
       /* the decks never change, only the numbers the chosen queue puts against them */
       /* redraw one placard where it stands */
       write(k, tileJp) {
-        const q = L3_REVIEW.queues[tileJp] || L3_REVIEW.queues['総復習'];
-        const [jp2, en2] = L3_REVIEW.decks[k];
+        const q = L3_DAILY.perGame[tileJp] || L3_DAILY.perGame['クロスワード'];
+        const [jp2, en2] = L3_DAILY.decks[k];
         const [n, pct] = q[k];
-        drawSign(L3_SIGNS[k].canvas, jp2, en2, n, L3_REVIEW.unit, pct, SECTION_ACCENT.REVIEW[1]);
+        drawSign(L3_SIGNS[k].canvas, jp2, en2, n, L3_DAILY.unit, pct, SECTION_ACCENT.DAILY[1]);
         L3_SIGNS[k].tex.needsUpdate = true;
-        L3_SIGNS[k].el.textContent = `${en2} — ${jp2}, ${n} ${L3_REVIEW.unit}, ${pct}%`;
+        L3_SIGNS[k].el.textContent = `${en2} — ${jp2}, ${n} ${L3_DAILY.unit}, ${pct}%`;
       },
       /* THE BOARD TURNS OVER AND COMES BACK LETTERED. Swapping the face in place meant watching a
          sign fill in, which is the one thing signage must never do — a sign is a thing that was
@@ -764,7 +416,7 @@ export function buildReview(ctx) {
          in sequence, and settles. It is the motion a hinged sign actually makes, and the swap it
          hides is now hidden by being ABOVE you rather than by being fast. */
       letter(tileJp, turn = true) {
-        this.rows = Math.min(L3_SLOTS, L3_REVIEW.decks.length);
+        this.rows = Math.min(L3_SLOTS, L3_DAILY.decks.length);
         L3_SIGNS.forEach((s2, k) => {
           if (k >= this.rows) return;
           this.write(k, tileJp);
@@ -800,11 +452,11 @@ export function buildReview(ctx) {
          three and a half metres tall. Outdoors nobody notices; inside a corridor whose tie beams
          are at 242 it means the beams cross at eye level and there is no corridor to see down.
          112 is a shade over two metres and the tunnel opens up. */
-      eyeAt: (s2) => { const v = AX.at(s2.f - L3_STAND, 0); v.y += 112; return v; },
+      eyeAt: (s2) => { const v = at3(s2.f - L3_STAND, 0); v.y += 112; return v; },
       /* and they are lettered before anyone has ever been down here */
-      tgtAt: (s2) => { const v = AX.at(s2.f + 620, s2.sd * 0.34); v.y += 150; return v; },
+      tgtAt: (s2) => { const v = at3(s2.f + 620, s2.sd * 0.34); v.y += 150; return v; },
     };
-    _walk.letter('総復習', false);
+    _walk.letter('クロスワード', false);
   }
 
   /* AND THE WALL. Small, and standing much nearer the camera than the gate does — that is the
@@ -830,8 +482,7 @@ export function buildReview(ctx) {
   const wallPlace = at3(-690, -215);
   wallPlace.y = CY_TOP + WALL_LIFT;
   let CHOZUYA = null;
-  const wall = buildEmaWall('REVIEW', wallPlace, eye, WALL_W, WALL_H);
-  const wallGrp = wall.grp;
+  const wallGrp = buildEmaWall('DAILY', wallPlace, eye, WALL_W, WALL_H);
   /* and then turned toward the PATH, which is the direction the sign was wrong in before: the
      wall stands to the left of the axis, so facing the way in means turning its face to its own
      right and letting its left edge come forward. After `lookAt`, the group's local +X is the
@@ -843,11 +494,7 @@ export function buildReview(ctx) {
      was put there for people walking past it. 0.62 rad is about 36°, enough to read as addressed
      to the path while still showing the tablets nearly full width (cos 36° = 0.81). */
   wallGrp.rotateY(0.62);
-  wall.pickGrp.rotateY(0.62);
   _marks.wall = wallGrp;
-  /* NOTHING OF THIS MODULE IS VISIBLE IN THE AUTHORED WORLD — Robbie's revert, 2026-08-06.
-     The lettered tablets belong to the analytic world (?generated) only; what a live tablet
-     should look like standing in HIS map is a design he signs off on first. */
 
   /* 手水舎 — the water pavilion, facing the wall across the court. A courtyard with one thing in
      it is a yard with a thing in it; the second structure is what makes the space between them
@@ -1028,7 +675,7 @@ export function buildReview(ctx) {
        that opening with the gate's own timber showing round it on all four sides: a board that
        fills the gap reads as a panel let into the structure, and the thing that makes it a hung
        board is the margin. */
-    const b = hengaku('復習', 'REVIEW', GATE_H * 0.365, GATE_H * 0.237);
+    const b = hengaku('日課', 'DAILY', GATE_H * 0.365, GATE_H * 0.237);
     b.position.copy(at3(0, 0));
     b.position.y += GATE_H * 0.705;
     b.rotation.y = gate.rotation.y;
@@ -1390,13 +1037,40 @@ function chozuyaGeo(W, D, H) {
   g = new THREE.BoxGeometry(W * 0.4, H * 0.02, D * 0.4); g.translate(0, H * 0.235, 0); add(g, 0x9dbfc2);
   return mergeParts(parts);
 }
-/* The 本殿-colour note lives with the hall build now — see LEVEL FOUR above. The old
-   `shrineHallGeo` (a closed box costume) went with it: the hall is a room, and a room cannot be
-   a single merged solid because its doors move and its light changes. */
+/* 本殿 — the hall the approach is an approach TO. Without something at the far end the tunnel
+   is a corridor to nowhere, which is what makes an area feel like a set rather than a place.
+
+   AND AT THAT DISTANCE, ONLY COLOUR CARRIES. The far end of the tunnel is not a view, it is a
+   54 x 64 pixel window: the opening of the last gate, 8,645 units off, framed by twenty-six sets
+   of converging posts. Nothing about a shape survives that. A dark trunk in it is twenty-five
+   pixels of dark among the darks of the gate posts; a pale sand wall in it is indistinguishable
+   from the pale lit path leading to it, which is exactly why the end read as a flat wash — the
+   hall was there the whole time and its walls were the same value as the floor.
+
+   Vermilion is the one hue in this scene that means "shrine" and appears nowhere in the ground,
+   so a red mass in that window separates instantly and says what it is. It is also what a honden
+   is actually painted. The lacquer goes on the walls only; the roof stays dark and the plinth
+   stays stone, so it reads as a building and not as a swatch. */
+function shrineHallGeo(W, D, H) {
+  const parts = [];
+  const add = (g, c) => parts.push({ geo: g, color: c });
+  let g = new THREE.BoxGeometry(W * 1.15, H * 0.12, D * 1.15); g.translate(0, H * 0.06, 0); add(g, 0x6c6459);
+  g = new THREE.BoxGeometry(W, H * 0.52, D); g.translate(0, H * 0.38, 0); add(g, 0xb03a2a);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    g = new THREE.CylinderGeometry(W * 0.035, W * 0.04, H * 0.55, 7);
+    g.translate(sx * W * 0.46, H * 0.39, sz * D * 0.46); add(g, 0x8a3626);
+  }
+  g = new THREE.BoxGeometry(W * 1.3, H * 0.05, D * 1.3); g.translate(0, H * 0.66, 0); add(g, 0x4a3d2f);
+  for (const sx of [-1, 1]) {
+    g = new THREE.BoxGeometry(W * 0.78, H * 0.06, D * 1.5);
+    g.rotateZ(-sx * 0.46); g.translate(sx * W * 0.34, H * 0.79, 0); add(g, 0x3b332a);
+  }
+  g = new THREE.BoxGeometry(W * 0.06, H * 0.07, D * 1.5); g.translate(0, H * 0.96, 0); add(g, 0x332c25);
+  return mergeParts(parts);
+}
 
   return {
-    probe: _probe, focus: _focus, walk: _walk, title: _title, l4: _l4,
+    probe: _probe, focus: _focus, walk: _walk, title: _title,
     marks: _marks, ambient: _ambient, noReflect: _noReflect,
-    live: _live,
   };
 }
