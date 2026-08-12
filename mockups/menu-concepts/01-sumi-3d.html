@@ -1454,6 +1454,54 @@
   .hud[data-t="midashi"] .hud-row.on .drop:nth-of-type(2) { animation-delay: 0.04s; }
   .hud[data-t="midashi"] .hud-row.on .drop:nth-of-type(3) { animation-delay: 0.02s; }
 
+  /* ================================================================================
+     DONE AND AHEAD — THE TWO STATES A COURSE NEEDS AND A MENU DID NOT.
+
+     A row has been `.on` or not-`.on` since the interface was built, which is all a list of four
+     peers ever wanted. STUDY is a course now: sixteen steps in a fixed order, some behind you and
+     most in front, and "behind you" and "in front of you" are not the same as "not selected".
+
+     NOTHING NEW IS DRAWN. Both states are made of parts already in the row:
+
+       AHEAD is almost free. `.hud-slash` — the brush stroke — is clipped to nothing and only
+       opens on `.on`, so a step you have not reached already has no stroke; all that is added is
+       taking the type down to where it reads as not-yet rather than merely not-selected. The tick
+       hollows out: same 11px square, same offset shadow, ink instead of the section colour, which
+       is the cheapest possible way to say "there is a slot here and it is empty".
+
+       DONE keeps its tick filled and turns it GOLD, which is the same move `.on` already makes —
+       and that is deliberate rather than lazy. Gold is this project's "achieved" colour: the
+       tier bars fill gold, the figures were gold before they moved onto washi. What separates
+       done from selected is everything else: no slash, no drops, no badge scaled up.
+
+     WHY NOT OPACITY ON THE WHOLE ROW. Fading a row fades its bar and its badge with it, and the
+     bar is the one thing an ahead row still has to state honestly — it reads 0%, and 0% at 30%
+     opacity looks like a rendering fault rather than a fact.
+     ================================================================================ */
+  .hud[data-t="midashi"] .hud-row.is-ahead .hud-big { color: rgba(222, 214, 189, 0.34); }
+  .hud[data-t="midashi"] .hud-row.is-ahead .hud-name b { color: rgba(242, 234, 216, 0.4); }
+  .hud[data-t="midashi"] .hud-row.is-ahead .hud-small { opacity: 0.4; }
+  .hud[data-t="midashi"] .hud-row.is-ahead .hud-seal { opacity: 0.22; }
+  .hud[data-t="midashi"] .hud-row.is-ahead .hud-tick {
+    background: none; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3),
+      inset 0 0 0 2px rgba(242, 234, 216, 0.34);
+  }
+  /* the bar keeps full contrast even on a step you have not reached — see the note above */
+  .hud[data-t="midashi"] .hud-row.is-done .hud-tick { background: var(--gold-hi); }
+  .hud[data-t="midashi"] .hud-row.is-done .hud-big { color: rgba(222, 214, 189, 0.66); }
+  /* AND A DONE STEP'S BADGE IS SHOWN AT REST, because it is already earned — the base rule keeps
+     the badge at `scale(0.4)` and zero opacity until a row is selected, which is right for a
+     percentage you are about to look at and wrong for one you finished last week.
+     IT NEEDS A GROUND. Gold on nothing inside a thin gold ring is invisible over the raked gravel
+     this course walks across — rendered and checked, the 100% on two done steps had all but
+     vanished. The wash is the one the counter and the old figure strip both use, so it costs no new
+     colour, and gold on near-black holds anywhere in the valley. */
+  .hud[data-t="midashi"] .hud-row.is-done .hud-side u {
+    transform: scale(1); opacity: 1;
+    background: rgba(12, 10, 8, 0.62); color: var(--gold-hi);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 2px rgba(232, 196, 124, 0.45);
+  }
+
   /* ---- the readout, same treatment: no field, held by shadow ---- */
   /* ================================================================================
      THE READOUT MOVES OUT FROM UNDER THE LIST.
@@ -2473,14 +2521,19 @@
     background: rgba(12, 10, 8, 0.72); padding: 9px 20px;
     border-bottom: 3px solid var(--sec, var(--hi));
   }
-  body.at-walk .walk-hud { opacity: 1; }
+  /* `body.course` joins `at-walk` here and NOWHERE ELSE. The counter is the same element doing the
+     same job — which step of how many, with a button either side — and STUDY's course is the second
+     thing to need it. What `body.course` deliberately does NOT do is turn on `.walk-pick`: those are
+     the transparent twins for world objects, and the course has no world objects. */
+  body.at-walk .walk-hud, body.course .walk-hud { opacity: 1; }
   /* AN INVISIBLE CONTROL THAT STILL EATS CLICKS. The walk counter is hidden with `opacity: 0`,
      and an opacity-0 element is still in the hit-test -- so its two stepper buttons have been
      swallowing pointer events across the top of the screen the whole time, for every state
      except the walk they belong to. It only surfaced when something else needed that space.
      The back tab already guards itself this way (`body.at-menu .back-tab button`); this one was
      missed. Specificity beats `.chrome button { pointer-events: auto }` without !important. */
-  body:not(.at-walk) .walk-hud, body:not(.at-walk) .walk-hud button { pointer-events: none; }
+  body:not(.at-walk):not(.course) .walk-hud,
+  body:not(.at-walk):not(.course) .walk-hud button { pointer-events: none; }
   .walk-hud .wh-jp { font-family: var(--jp); font-weight: 700; font-size: 21px; letter-spacing: 0.12em; color: var(--washi); }
   .walk-hud .wh-en { font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.32em; color: rgba(242,234,216,0.6); }
   .walk-hud .wh-at { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 14px; letter-spacing: 0.04em; color: var(--sec, var(--hi)); }
@@ -3532,6 +3585,119 @@ const L3_DAILY = {
   },
   unit: 'items',
 };
+
+/* ================= STUDY IS A COURSE ==============================================
+   Sixteen steps, walked in order, transcribed from `domain/progression_curriculum.py`. Not
+   invented and not rearranged: the chain is the graph's own, and `want` is each node's real
+   MasteryRequirement said in words — hiragana wants all 46 characters, vocabulary wants 40 words
+   as an absolute floor rather than a ratio, kanji wants 80 characters at 80%.
+
+   WHY STUDY STOPPED BEING A DECK LIST. It and DRILLS both ended on the same pair — a deck and a
+   game — by opposite routes, which is one destination with two doors and no reason to use the
+   second. STUDY answers "what should I do next"; DRILLS answers "I want to play this one". A
+   course cannot also be a browser, so the five tiles went. See PLAN-content.md.
+
+   ONLY SIX OF THE SIXTEEN ARE DECKS, which is what makes this the spine of the whole menu rather
+   than one section's furniture. `kind: 'goto'` hands off to whoever owns that step, and flying
+   between places is a move this menu already makes. Two of them have nowhere to go yet — the
+   app's scripted and free conversation belong to the tutor, and the menu has no tutor — so they
+   carry `to: null` and say so rather than pretending.
+
+   AND NONE OF IT IS AN OBJECT IN THE WORLD. Every step is a `.hud-row` in the panel that is
+   already there, the counter is the `.walk-hud` that is already there, and the world's entire
+   contribution is where the camera stands. A previous attempt at this built boards in the valley
+   and switched the row list off; it was deleted. The valley is scenery.
+   ================================================================================== */
+const STUDY_PATH = [
+  { id: 'tutorial', en: 'TUTORIAL', jp: '入門', kind: 'none', want: 'finish it once' },
+  { id: 'hiragana', en: 'HIRAGANA', jp: 'ひらがな', kind: 'deck',
+    deck: 'hiragana', want: 'all 46 characters' },
+  { id: 'katakana', en: 'KATAKANA', jp: 'カタカナ', kind: 'deck',
+    deck: 'katakana', want: 'all 46 characters' },
+  { id: 'vocabulary_n5', en: 'VOCABULARY', jp: '語彙', kind: 'deck',
+    deck: 'vocab_n5', want: '40 words' },
+  { id: 'grammar_n5', en: 'GRAMMAR', jp: '文法', kind: 'deck',
+    deck: 'grammar_patterns', want: '80% of it' },
+  /* a real side branch in the graph — it hangs off grammar as a leaf — but it stands inline in
+     the list, because a fork in a walked route is a worse problem than a slightly flattened graph */
+  { id: 'sentence_examples', en: 'SENTENCES', jp: '例文', kind: 'deck',
+    deck: 'sentence_examples', want: '80% of it' },
+  { id: 'scripted_conv', en: 'SCRIPTED TALK', jp: '会話練習', kind: 'goto',
+    to: null, want: 'every scene' },
+  /* not a deck at all: the app's listening node is a GAME — `listening_audio_first` run on
+     hiragana — so it belongs to the rack, not to a deck list */
+  { id: 'listening', en: 'LISTENING', jp: '聴解', kind: 'goto',
+    to: 'DRILLS', want: '80% of it' },
+  { id: 'kanji_n5', en: 'KANJI', jp: '漢字', kind: 'deck',
+    deck: 'kanji_n5', want: '80 characters' },
+  { id: 'free_conv', en: 'FREE TALK', jp: '自由会話', kind: 'goto',
+    to: null, want: '80% of it' },
+  { id: 'reading', en: 'READING', jp: '読解', kind: 'goto',
+    to: 'READING', want: '80% of it' },
+  { id: 'jlpt_n5', en: 'JLPT N5', jp: 'N5 検定', kind: 'goto', to: 'JLPT', want: '90% of it' },
+  { id: 'jlpt_n4', en: 'JLPT N4', jp: 'N4 検定', kind: 'goto', to: 'JLPT', want: '90% of it' },
+  { id: 'jlpt_n3', en: 'JLPT N3', jp: 'N3 検定', kind: 'goto', to: 'JLPT', want: '90% of it' },
+  { id: 'jlpt_n2', en: 'JLPT N2', jp: 'N2 検定', kind: 'goto', to: 'JLPT', want: '90% of it' },
+  { id: 'jlpt_n1', en: 'JLPT N1', jp: 'N1 検定', kind: 'goto', to: 'JLPT', want: '90% of it' },
+];
+
+/* THE BLOCKS EACH DECK STEP OPENS, real names and real card counts out of `domain/blocks.py`.
+   Only the six deck steps have one; the other ten hand off. vocab_n5's forty-four is the whole
+   list rather than a sample, because a list you can walk should not stop at twelve. */
+const STUDY_BLOCKS = {
+  hiragana: [['Vowels', 5], ['K-row', 5], ['S-row', 5], ['T-row', 5], ['N-row', 5], ['H-row', 5],
+    ['M-row', 5], ['Y / R / W + N', 11], ['Voiced G + Z', 10], ['Voiced D + B', 10],
+    ['Semi-voiced P', 5], ['Digraphs', 33]],
+  katakana: [['Vowels', 5], ['K-row', 5], ['S-row', 5], ['T-row', 5], ['N-row', 5], ['H-row', 5],
+    ['M-row', 5], ['Y / R / W + N', 11], ['Voiced G + Z', 10], ['Voiced D + B', 10],
+    ['Semi-voiced P', 5], ['Digraphs', 33]],
+  kanji_n5: [['Numbers & Time', 24], ['Nature & World', 29], ['People & Body', 14],
+    ['Study & Language', 9], ['Actions & Travel', 15], ['Time, Talk & Money', 8]],
+  grammar_patterns: [['Copula & Existence', 6], ['Core Particles', 13], ['Verb Forms', 12],
+    ['Descriptions & Questions', 18], ['Connectives', 5], ['Key Expressions', 10]],
+  sentence_examples: [['Copula / Existence', 6], ['Core Particles', 13], ['Verb Forms', 12],
+    ['i-Adjectives', 4], ['na-Adjectives', 3], ['Question Words', 11], ['Connectives', 5],
+    ['Common Patterns', 10]],
+  vocab_n5: [['Greetings', 15], ['Numbers', 6], ['Time & Days', 12], ['Family', 8], ['Body', 6],
+    ['Food & Drink', 13], ['School & Study', 12], ['Places', 8], ['Transport', 7],
+    ['Adjectives', 17], ['Verbs', 20], ['Common Nouns', 21], ['Counting & Digits', 25],
+    ['Counters', 28], ['Days of the Month', 16], ['Days of the Week', 7], ['This Week & Last', 17],
+    ['Times of Day', 21], ['Relatives', 18], ['People & Roles', 19], ['Colours', 14],
+    ['The Body', 12], ['Groceries & Taste', 21], ['Kitchen & Tableware', 14], ['Clothes', 21],
+    ['Rooms & Furniture', 24], ['Around Town', 22], ['Getting Around', 15],
+    ['Classroom & Reading', 21], ['Desk & Stationery', 17], ['Devices & Media', 16],
+    ['Weather', 12], ['Seasons & Holidays', 8], ['Animals & Plants', 7], ['Going & Coming', 21],
+    ['Speaking & Learning', 17], ['Handling Things', 31], ['Daily Routine', 19],
+    ['Size & Shape', 20], ['Quality & Manner', 30], ['Feelings & Likes', 14],
+    ['This, That & Where', 36], ['Asking & Answering', 20], ['Joining Words', 16]],
+};
+
+/* WHERE THE CAMERA STANDS FOR EACH STEP. The garden's own processional way, measured off the
+   loaded model rather than guessed: the main gate, the incense burner (5 units off the line the
+   stepping stones lie on), the deer scarer, the inner gate, four points along the stones as they
+   bend south, and the arbour at the far end. Gate to arbour is about 2,090 units, which puts
+   sixteen steps 139 apart — two person-heights, a walk. On the 1,021 units of stones alone it
+   would have been 75, and a person here is 66 tall, which is a shuffle.
+   Ground under the stones is -241 and the court is -255; the eye rides at -180, about sixty over
+   the higher of the two, because a person here is 66 tall. */
+const PATH_ROUTE = [
+  [3400, -5954],   /* Sanmon — the main gate */
+  [3526, -6530],   /* the incense burner */
+  [3599, -6748],   /* the deer scarer */
+  [3895, -6840],   /* the inner gate */
+  [4324, -6743],   /* the stones, at their bend */
+  [4550, -6925],
+  [4694, -7187],
+  [4850, -7374],   /* the last stone */
+  [4940, -7440],   /* the arbour */
+];
+const PATH_EYE_Y = -180, PATH_TGT_Y = -216;
+
+/* `done` is how far the learner has got and is INVENTED, like every other number on this page. It
+   is NOT the cursor: where you have got to and where you are looking are different questions, and
+   conflating them is what makes a course read as a list. The cursor is `HUD.cur`, because the
+   window that carries it is general rather than the course's own — see `hudWindow`. */
+const PATH = { done: 8, herePct: 45 };
 
 const SECTION_ACCENT = {
   STUDY:   ['#cfa45c', '#8f713a', '#e8c47c'],
@@ -13401,7 +13567,7 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
     : (HUD.b = ((i % HUD_BORDERS.length) + HUD_BORDERS.length) % HUD_BORDERS.length,
       hudDraw(), HUD_BORDERS[HUD.b][0])),
   hudAir: (v) => (HUD.air = v == null ? !HUD.air : !!v, hudDraw(), HUD.air),
-  hudAt: (i) => (HUD.at = i, hudDraw(), HUD.at),
+  hudAt: (i) => (HUD.cur = i, hudDraw(), HUD.cur),
   hudPick: () => (hudPick(), { level: HUD.level, tile: HUD.tile }),
   ft2: (i) => (i == null ? FT_LANGS.map((v, k) => k + ' ' + v.name)
     : (FT.l2 = ((i % FT_LANGS.length) + FT_LANGS.length) % FT_LANGS.length, dollyAt = 0,
@@ -15908,6 +16074,27 @@ const FT_LANGS = [LANG_SHIRUBE, LANG_DOLLY, LANG_STRATA, LANG_FUDA, LANG_MON];
 const L3_KAN_LEVELS = [['N5', 26], ['N4', 24], ['N3', 31], ['N2', 26], ['N1', 30]];
 const L3_LEVEL_JP = { N5: '\u5165\u9580', N4: '\u521d\u7d1a', N3: '\u4e2d\u7d1a', N2: '\u4e0a\u7d1a', N1: '\u6700\u4e0a\u7d1a' };
 function ftL3Rows(sec, jp) {
+  /* A COURSE STEP HANDS DOWN A DECK SLUG, not a Japanese tile name, so this is checked first. The
+     rows are the deck's real blocks out of `STUDY_BLOCKS`, and they carry the same lock chain the
+     app has: a block opens once the one before it is 80% answered, so with `PATH.herePct` of the
+     deck done, that many are behind you and the next one is where you are.
+     NOT SLICED TO FIVE. The list below caps at five because a standing shot cannot hold more;
+     these are walked up the bamboo stairway, and forty-four is what forty-four looks like. */
+  if (STUDY_BLOCKS[jp]) {
+    const B = STUDY_BLOCKS[jp];
+    const done = Math.round((B.length * PATH.herePct) / 100);
+    /* The app's block names are English only — "Voiced G + Z", "Groceries & Taste" — so there is no
+       Japanese for these rows to carry and `jp` holds the name too. Whoever renders them decides
+       what goes in the small slot; `meta` is the card count and that is what it gets. It does mean
+       these rows have no seal: the seal is the row's first Japanese character and there is not one. */
+    return B.map(([name, cards], k) => ({
+      key: String(k + 1).padStart(2, '0'), en: name, jp: name, block: k + 1, of: B.length,
+      n: cards, unit: 'cards',
+      pct: k < done ? 100 : (k === done ? 40 : 0),
+      meta: cards + ' cards',
+      state: k < done ? 'done' : (k === done ? 'here' : 'ahead'),
+    }));
+  }
   if (jp === '\u8a9e\u5f59' || jp === '\u6f22\u5b57') {
     const src = jp === '\u6f22\u5b57' ? L3_KAN_LEVELS : L3_LEVELS;
     const unit = jp === '\u6f22\u5b57' ? 'blocks' : 'themes';
@@ -15918,9 +16105,12 @@ function ftL3Rows(sec, jp) {
         meta: `${done} / ${n} ${unit}`, unit };
     });
   }
-  /* かな and 文法 have no levels -- their level three is simply their blocks, in the same shape */
+  /* NO LONGER SLICED TO FIVE. This used to cut every list to the five rows the panel could hold,
+     which silently dropped the rest — READING's short texts are eight and you could reach three of
+     them. `hudWindow` is what decides how much is on screen now, so the builder returns all of it
+     and the window scrolls. */
   const D = (L3DATA[sec] || {})[jp];
-  return ((D && D.rows) || []).slice(0, 5).map((r, k) => ({
+  return ((D && D.rows) || []).map((r, k) => ({
     key: String(k + 1).padStart(2, '0'), en: 'B' + (k + 1), jp: r[0],
     n: parseInt(r[2], 10) || 0, pct: r[3], meta: r[2], unit: '',
   }));
@@ -16186,7 +16376,11 @@ const HUD_AIR = {
 /* opens on plain glass. `b` is the frame axis and it starts at NONE -- the patterned frames are
    still on B for comparison, but nothing is drawn round a row by default any more. */
 /* opens on MIDASHI. The glass is one V away, at index 5. */
-const HUD = { on: true, t: 0, b: 5, air: true, sec: null, tile: null, at: 0, level: 2 };
+/* `cur` is the cursor into the WHOLE list; `at` is its index inside the window the panel is
+   actually showing; `lo` is the window's top. For every list short enough to fit, `lo` is 0 and
+   the two are the same, which is why nothing outside `hudWindow` has to care. */
+const HUD = { on: true, t: 0, b: 5, air: true, sec: null, tile: null,
+  cur: 0, at: 0, lo: 0, win: 5, level: 2 };
 const hudEl = document.getElementById('hud');
 
 /* ================= THE FOUR NUMBERS A SECTION CAN HONESTLY SHOW =================
@@ -16250,15 +16444,165 @@ function figRatio(v) {
   if (m && +m[2] > 0) return Math.max(0, Math.min(1, +m[1] / +m[2]));
   return null;
 }
+/* ---- the course: its window, its rows, and where the camera stands ----------------------- */
+/* THE ROUTE IS SAMPLED BY ARC LENGTH, not by segment index. `PATH_ROUTE`'s nine points are not
+   evenly spaced — the gate to the incense burner is 590 units and two of the stone points are 230
+   apart — so stepping a point at a time would make the camera lurch. Walking the polyline by
+   distance puts the sixteen steps 139 apart wherever they fall. */
+function pathAtDist(d) {
+  let run = 0;
+  for (let i = 1; i < PATH_ROUTE.length; i++) {
+    const [ax, az] = PATH_ROUTE[i - 1], [bx, bz] = PATH_ROUTE[i];
+    const seg = Math.hypot(bx - ax, bz - az);
+    if (run + seg >= d || i === PATH_ROUTE.length - 1) {
+      const t = seg > 0 ? Math.max(0, Math.min(1, (d - run) / seg)) : 0;
+      return [ax + (bx - ax) * t, az + (bz - az) * t];
+    }
+    run += seg;
+  }
+  return PATH_ROUTE[PATH_ROUTE.length - 1];
+}
+function pathLength() {
+  let run = 0;
+  for (let i = 1; i < PATH_ROUTE.length; i++) {
+    run += Math.hypot(PATH_ROUTE[i][0] - PATH_ROUTE[i - 1][0],
+      PATH_ROUTE[i][1] - PATH_ROUTE[i - 1][1]);
+  }
+  return run;
+}
+/* eye on the step, aim well down the route — so the camera looks the way it is walking.
+   THE AIM HAS TO BE FAR, and 260 units was not. At that range the 36 units between eye and target
+   height is an 8-degree downward pitch, which put two thirds of the frame under the horizon: the
+   shot read as looking at your own feet on the stepping stones. 760 flattens the same drop to under
+   two degrees and the garden opens up in front of you instead. The lesson generalises — a walking
+   camera's pitch is set by how far ahead it looks, not by how high it stands. */
+const PATH_LOOK = 760;
+function pathPose(i) {
+  const L = pathLength(), n = STUDY_PATH.length;
+  const d = (L * Math.max(0, Math.min(i, n - 1))) / (n - 1);
+  const [ex, ez] = pathAtDist(d);
+  /* past the end of the route for the last few steps, by carrying on along the final heading —
+     clamping to L instead would swing the aim sideways into the arbour as you approached it */
+  const [tx, tz] = d + PATH_LOOK <= L ? pathAtDist(d + PATH_LOOK) : (() => {
+    const a = pathAtDist(L - 1), b = PATH_ROUTE[PATH_ROUTE.length - 1];
+    const vx = b[0] - a[0], vz = b[1] - a[1];
+    const m = Math.hypot(vx, vz) || 1;
+    const over = d + PATH_LOOK - L;
+    return [b[0] + (vx / m) * over, b[1] + (vz / m) * over];
+  })();
+  return { eye: [ex, PATH_EYE_Y, ez], tgt: [tx, PATH_TGT_Y, tz] };
+}
+/* ALL SIXTEEN. The window is `hudWindow`'s job, not this one's — a row builder that also decided
+   what was on screen would be the second thing choosing, and the first one is the cursor.
+   `state` is what the two new row classes read. */
+function pathRows() {
+  return STUDY_PATH.map((s, i) => {
+    const state = i < PATH.done ? 'done' : (i === PATH.done ? 'here' : 'ahead');
+    const pct = i < PATH.done ? 100 : (i === PATH.done ? PATH.herePct : 0);
+    const blocks = s.deck ? STUDY_BLOCKS[s.deck] : null;
+    const nb = blocks ? blocks.length : 0;
+    const doneB = Math.round((nb * pct) / 100);
+    const cards = blocks ? blocks.reduce((a, b) => a + b[1], 0) : 0;
+    /* THE FIGURES SAY WHAT THE STEP IS — but every row in one list must offer the SAME NUMBER of
+       them. `hudBuild` sizes the chip shell from `rows[0]` and `hudSync` fills it, so a deck step
+       with four beside a hand-off step with three leaves either a blank chip or a figure with
+       nowhere to go, depending on which happened to be first in the window. Measured both ways:
+       arriving on the course showed three chips and dropped the fourth, and one keypress later
+       showed four with the last one empty.
+       So: four each. What differs is what they say, which is the point.
+       (`16 STEPS` was on every row of both in the first pass, which is a constant dressed as a
+       figure. The step's own position carries that and changes.) */
+    const figs = s.kind === 'deck'
+      ? [[doneB + '/' + nb, 'BLOCKS'], [cards, 'CARDS'], [pct + '%', 'DONE'],
+        [(i + 1) + '/' + STUDY_PATH.length, 'STEP']]
+      : [[pct + '%', 'DONE'], [s.to ? s.to : 'NOT YET', 'GOES TO'],
+        [STUDY_PATH.length - i - 1, 'TO GO'],
+        [(i + 1) + '/' + STUDY_PATH.length, 'STEP']];
+    return {
+      no: String(i + 1).padStart(2, '0'), en: s.en, jp: s.jp, big: s.en, small: s.jp,
+      meta: s.want.toUpperCase(), pct, figs, state, step: i, kind: s.kind,
+      deck: s.deck || null, to: s.to || null,
+      next: state === 'ahead'
+        ? ['LOCKED', s.jp + ' ・ ' + s.en, 'NEEDS THE STEP BEFORE IT']
+        : ['NEXT UP', s.jp + ' ・ ' + s.en, s.want.toUpperCase()],
+    };
+  });
+}
+/* MOVE THE CURSOR, THEN THE CAMERA, THEN REDRAW. `hudDraw` is what slides the window, so this
+   only has to say where the cursor went.
+   The camera tween is `walkGo`'s, value for value — a sine over 1.15s, `overwrite: true` so
+   holding an arrow key does not stack tweens. It was tuned to read as walking at this scale and
+   this is the same act. */
+function pathGo(i, dur = 1.15) {
+  HUD.cur = Math.max(0, Math.min(i, STUDY_PATH.length - 1));
+  const p = pathPose(HUD.cur);
+  gsap.to(cam, {
+    px: p.eye[0], py: p.eye[1], pz: p.eye[2],
+    tx: p.tgt[0], ty: p.tgt[1], tz: p.tgt[2],
+    fov: 46, roll: 0, duration: reduced ? 0 : dur, ease: 'sine.inOut', overwrite: true,
+  });
+  pathHud();
+  hudDraw();
+}
+/* the counter is `.walk-hud`, unchanged: the same element, the same two buttons, the same
+   `7 / 16`. It was built for the level-three walk and this is the same question.
+   IT READS THE LIST RATHER THAN THE COURSE, so it is right at both levels without a branch —
+   `9 / 16` walking the course, `3 / 44` climbing a deck's blocks. Reading `STUDY_PATH` directly
+   would have left it saying 9 / 16 while the panel showed forty-four blocks. */
+function pathHud() {
+  if (!document.body.classList.contains('course')) return;
+  const all = hudRows();
+  if (!all.length) return;
+  const i = Math.max(0, Math.min(HUD.cur | 0, all.length - 1));
+  const r = all[i];
+  /* NaN reaches here if anything upstream loses the cursor, and `r.small` on undefined throws
+     inside a keydown handler — which looks exactly like the arrow keys being dead, because it is.
+     That is how a leftover `PATH.at` from the window refactor presented. */
+  if (!r) return;
+  /* THE BIG SLOT TAKES THE NAME, whatever language the name is in. `.wh-jp` is 21px Mincho and
+     `.wh-en` is a 10px letterspaced label, so the big one is for what the row IS. A course step's
+     name is Japanese and lives in `small`; a block's name is English and lives in `big`, because
+     the app's block names have no Japanese. Reading `small` into the big slot unconditionally put
+     `14 cards` in 21px Mincho with `Colours` as its caption. */
+  const named = /[぀-ヿ一-龯]/.test(r.small || '');
+  walkHud.querySelector('.wh-jp').textContent = named ? r.small : (r.big || r.en || '');
+  walkHud.querySelector('.wh-en').textContent = named ? (r.big || r.en || '') : (r.small || '');
+  walkHud.querySelector('.wh-at').textContent = `${i + 1} / ${all.length}`;
+  walkHud.querySelectorAll('.wh-step').forEach((b) => {
+    const to = i + (+b.dataset.d);
+    b.disabled = to < 0 || to >= all.length;
+  });
+}
+function onCourse() { return HUD.on && HUD.sec === 'STUDY' && HUD.level === 2 && state === 'sub'; }
 function hudRows() {
+  /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
+     list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
+  if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
   if (HUD.level === 3) {
-    return ftL3Rows(HUD.sec, HUD.tile).map((r, j) => ({
-      no: r.en, en: r.jp, jp: r.en, big: r.en, small: r.jp,
-      meta: r.meta.toUpperCase(), pct: r.pct,
-      figs: [[r.n, (r.unit || 'BLOCKS').toUpperCase()], [r.meta.split(' ')[0], 'DONE'],
-        [r.pct + '%', 'MASTERY']],
-      next: ['NEXT UP', r.jp + ' \u30fb ' + r.en, r.meta.toUpperCase()],
-    }));
+    return ftL3Rows(HUD.sec, HUD.tile).map((r, j) => {
+      /* A BLOCK ROW IS NOT A LEVEL ROW, and the difference runs through every field. A level row's
+         label IS its number (N5), its `jp` is a real name, and its meta counts themes. A block row
+         has an index, no Japanese at all, and a card count. Reading one as the other is what put
+         `vocab_n5` in the heading, a card count where the name goes on the slab, and a figure
+         reading `14 DONE` -- three bugs from one wrong assumption. */
+      const blk = !!r.block;
+      return {
+        no: blk ? r.key : r.en,
+        en: r.jp, jp: r.en, big: r.en, small: blk ? r.meta : r.jp,
+        meta: r.meta.toUpperCase(), pct: r.pct,
+        /* `state` is carried through where the source set one: the course's block lists do, so a
+           locked block dims exactly as a locked step does. The other sections' level threes leave
+           it undefined and their rows come out unchanged. */
+        state: r.state,
+        figs: blk
+          ? [[r.n, 'CARDS'], [r.pct + '%', 'DONE'], [r.block + '/' + r.of, 'BLOCK']]
+          : [[r.n, (r.unit || 'BLOCKS').toUpperCase()], [r.meta.split(' ')[0], 'DONE'],
+            [r.pct + '%', 'MASTERY']],
+        next: r.state === 'ahead'
+          ? ['LOCKED', r.en, 'NEEDS THE BLOCK BEFORE IT']
+          : ['NEXT UP', blk ? r.en : (r.jp + ' \u30fb ' + r.en), r.meta.toUpperCase()],
+      };
+    });
   }
   return (SUBTILES[HUD.sec] || []).map(([jp, en, meta], j) => {
     const st = hudFigs(HUD.sec, meta, j);
@@ -16288,20 +16632,60 @@ function hudRows() {
    ================================================================================================ */
 let hudKey = '', hudPrevAt = -1;
 
+/* ================================================================================================
+   THE WINDOW, AND WHY IT IS GENERAL RATHER THAN THE COURSE'S OWN.
+
+   Measured: the list starts at y 248 and a row is 79px at `.hud-list.five`, so SEVEN rows fit in a
+   810-tall window. Five is what it shows, which leaves the readout its room.
+
+   Every level has outgrown the panel at some point and each one solved it differently — level
+   three capped itself at five rows with a `.slice(0, 5)` that silently dropped the rest, the
+   level-three BOARD paged six at a time, and the course arrived wanting sixteen. One mechanism
+   now: whatever the row builder returns, this is what decides how much of it is on screen.
+
+   THE WINDOW SHIFTS ONLY WHEN THE CURSOR LEAVES IT, keeping one row of lookahead at each edge.
+   Re-centring on every keypress would change every row's content every time, which is a rebuild,
+   and a rebuilt list has no history to animate from — the whole reason `hudDraw` splits build from
+   sync. Moving inside the window is a sync and keeps the slash, the drops and the bar.
+   ================================================================================================ */
+function hudWindow(rows) {
+  const n = rows.length;
+  HUD.cur = Math.max(0, Math.min(HUD.cur, n - 1));
+  if (n <= HUD.win) { HUD.lo = 0; HUD.at = HUD.cur; return rows; }
+  let lo = HUD.lo;
+  if (HUD.cur < lo + 1) lo = HUD.cur - 1;
+  if (HUD.cur > lo + HUD.win - 2) lo = HUD.cur - HUD.win + 2;
+  HUD.lo = Math.max(0, Math.min(lo, n - HUD.win));
+  HUD.at = HUD.cur - HUD.lo;
+  return rows.slice(HUD.lo, HUD.lo + HUD.win);
+}
+
 function hudDraw(force) {
-  const rows = hudRows();
-  if (!rows.length) return;
-  HUD.at = Math.max(0, Math.min(HUD.at, rows.length - 1));
-  const key = [HUD.sec, HUD.level, HUD.tile, HUD.t, HUD.b, HUD.air, rows.length].join('|');
+  const all = hudRows();
+  if (!all.length) return;
+  const rows = hudWindow(all);
+  /* `HUD.lo` and the FULL length are both in the key: the first because a shift changes every
+     row's content, the second because a list that grew or shrank is a different list even if the
+     window happens to show the same number of rows. */
+  const key = [HUD.sec, HUD.level, HUD.tile, HUD.t, HUD.b, HUD.air,
+    rows.length, HUD.lo, all.length].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
+  /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
+     with the list — it is a readout of the same draw */
+  pathHud();
 }
 
 function hudBuild(rows) {
   const it = ITEMS.find((x) => x.en === HUD.sec) || ITEMS[0];
   const acc = SECTION_ACCENT[HUD.sec] || SECTION_ACCENT.STUDY;
+  /* A COURSE STEP'S TILE IS A DECK SLUG, so the subtile lookup misses and the fallback printed the
+     slug itself as the heading: `vocab_n5` in 72px Mincho where 語彙 VOCABULARY belongs. STUDY has
+     no subtiles any more; `STUDY_PATH` is where its names live. */
   const tile = HUD.level === 3
-    ? ((SUBTILES[HUD.sec] || []).find((t) => t[0] === HUD.tile) || [HUD.tile, ''])
+    ? ((HUD.sec === 'STUDY' && (() => { const s = STUDY_PATH.find((x) => x.deck === HUD.tile);
+      return s ? [s.jp, s.en] : null; })())
+      || (SUBTILES[HUD.sec] || []).find((t) => t[0] === HUD.tile) || [HUD.tile, ''])
     : null;
   const [tk, tj, tn] = HUD_TREATMENTS[HUD.t];
   const [bk, bj, bn] = HUD_BORDERS[HUD.b];
@@ -16324,7 +16708,11 @@ function hudBuild(rows) {
   /* the seal is the row's own first Japanese character, the way the menu's is the section's --
      \u304b\u306a takes \u304b, \u30af\u30ed\u30b9\u30ef\u30fc\u30c9 takes \u30af, \u5165\u9580 takes \u5165. */
   const sealOf = (t) => ((String(t).match(/[\u3040-\u30ff\u4e00-\u9faf]/) || [''])[0]);
-  const list = rows.map((r, j) => `<button class="hud-row" data-i="${j}" data-pct="${Math.max(r.pct, 1)}">`
+  /* `state` only exists on the course's rows; everywhere else it is undefined and the class list
+     comes out unchanged. `is-here` is deliberately NOT emitted — the step you are on is the
+     selected row, and `.on` already says that; a second class for the same fact would be two
+     sources of truth for one highlight. */
+  const list = rows.map((r, j) => `<button class="hud-row${r.state && r.state !== 'here' ? ' is-' + r.state : ''}" data-i="${j}" data-pct="${Math.max(r.pct, 1)}">`
     + `<svg class="hud-slash" viewBox="0 0 620 120" preserveAspectRatio="none">`
     + `<path d="M6 88 C 130 30 300 16 612 42 L 604 98 C 320 64 150 84 12 116 Z"/></svg>`
     + `<span class="drop"></span><span class="drop"></span><span class="drop"></span>`
@@ -16360,8 +16748,15 @@ function hudBuild(rows) {
        the world, least of all stacked on top of the key hints in the corner. */
     + '';
   hudEl.querySelectorAll('.hud-row').forEach((b) => {
-    b.addEventListener('mouseenter', () => { HUD.at = +b.dataset.i; hudDraw(); });
-    b.addEventListener('click', () => { HUD.at = +b.dataset.i; hudPick(); });
+    /* `data-i` is the row's place in the WINDOW, so it is lifted back into the full list before
+       it becomes the cursor — otherwise hovering row 0 of a window that starts at 6 jumps the
+       selection to the top of the course. */
+    b.addEventListener('mouseenter', () => {
+      const to = HUD.lo + (+b.dataset.i);
+      if (onCourse()) { pathGo(to, 0.5); return; }
+      HUD.cur = to; hudDraw();
+    });
+    b.addEventListener('click', () => { HUD.cur = HUD.lo + (+b.dataset.i); hudPick(); });
   });
   /* one frame later, so the zero width is a real previous state and not a value the layout never
      had. requestAnimationFrame alone is not enough in Chrome -- the style has to be flushed. */
@@ -16484,8 +16879,28 @@ function hudSwap(dir, mutate) {
 }
 
 function hudPick() {
+  /* `hudRows` is the WHOLE list and `HUD.at` is an index into the window, so this indexes with the
+     cursor. Getting that wrong picks a row five places from the one that is lit. */
   const rows = hudRows();
-  const r = rows[HUD.at];
+  const r = rows[Math.max(0, Math.min(HUD.cur, rows.length - 1))];
+  /* ---- a step of the course does one of three things ----------------------------------------
+     A DECK STEP drills into its blocks, which is the ordinary L2 -> L3 move below, with the deck
+     slug standing in for the tile.
+     A HAND-OFF STEP flies you to the section that owns it. Ten of the sixteen are these, and it
+     is what makes the course the spine of the menu rather than one section's furniture.
+     A STEP WITH NOWHERE TO GO refuses, out loud. Scripted and free conversation are the tutor's
+     and the menu has no tutor; the tutorial is one-time and skippable. Flashing is what this
+     interface already does for "not that", so nothing new is needed to say it. */
+  if (r && r.kind && HUD.level === 2) {
+    if (r.kind === 'goto') {
+      if (!r.to) { doFlash(0.2); punchShake(0.24); return; }
+      const gi = ITEMS.findIndex((x) => x.en === r.to);
+      if (gi >= 0) { goBack(); gsap.delayedCall(0.45, () => select(gi)); return; }
+      doFlash(0.2); punchShake(0.24); return;
+    }
+    if (r.kind !== 'deck') { doFlash(0.2); punchShake(0.24); return; }
+    r.tile = r.deck;
+  }
   if (HUD.level === 3 || !r || !r.tile) { doFlash(0.2); punchShake(0.24); return; }
   /* the tier you chose acknowledges the key before anything else happens */
   const hit = hudEl.querySelector('.hud-row.on');
@@ -16503,28 +16918,64 @@ function hudPick() {
   }
   /* the world still moves: the camera walks to the level-three standing point behind the panel,
      which is the whole reason for keeping a live backdrop rather than a still */
-  const pose = ftPoseL3(HUD.sec, r.tile);
+  /* A COURSE DECK'S BLOCKS STAND AT THE FOOT OF THE BAMBOO STAIRWAY — `ZEN_L4`, the marker Robbie
+     placed and the pose transcribed in `FT_L4_POSE`, whose note has said "the walk that uses it is
+     not built yet" since it was set. This is that walk. The course runs along the garden's
+     processional way and a deck climbs out of it, which is the right shape for the two: the course
+     is level ground with landmarks, a deck is a hill with none.
+     Without this the blocks opened on `FT_L3_POSE` — the garden entrance — so a forty-four-row
+     climb was shown standing in the raked court looking at gravel. */
+  const l4 = HUD.sec === 'STUDY' && FT_L4_POSE[HUD.sec] && STUDY_BLOCKS[r.tile]
+    ? FT_L4_POSE[HUD.sec] : null;
+  const pose = l4
+    ? { eye: new THREE.Vector3().fromArray(l4.eye), focus: new THREE.Vector3().fromArray(l4.focus),
+      fov: l4.fov }
+    : ftPoseL3(HUD.sec, r.tile);
   turnTo(pose.eye, pose.focus, null, null, pose.fov, null, 0.05, 0.62, 0);
   hudSwap(1, () => {
     HUD.level = 3;
     HUD.tile = r.tile;
-    HUD.at = 0;
+    HUD.cur = 0; HUD.lo = 0;
     subLevel = 3;
     l3Section = HUD.sec;
     l3Tile = r.tile;
+    /* A DECK OPENS ON THE BLOCK YOU ARE ON, for the same reason the course opens on the step you
+       are on: landing on block 01 of forty-four when nineteen are behind you makes a course into a
+       list again. Only where the rows carry a state — the course's block lists do; the other
+       sections' level threes do not — so everywhere else this is still row 0. */
+    const rows3 = hudRows();
+    const here = rows3.findIndex((x) => x.state === 'here');
+    if (here >= 0) {
+      HUD.cur = here;
+      HUD.lo = Math.max(0, Math.min(here - 2, Math.max(0, rows3.length - HUD.win)));
+    }
   });
 }
 function hudBack() {
   if (HUD.level !== 3) return false;
-  const back = Math.max(0, (SUBTILES[HUD.sec] || []).findIndex((t) => t[0] === HUD.tile));
-  const i = ITEMS.findIndex((x) => x.en === HUD.sec);
-  const d = DESTS[i] || DESTS[0];
-  turnTo(d.eye, d.focus, null, null, d.fov, null, 0.05, 0.62, d.roll || 0);
+  /* COMING BACK TO THE COURSE RETURNS YOU TO THE STEP YOU LEFT, which `SUBTILES` cannot answer
+     because a course step's tile is a deck slug and STUDY has no subtiles any more. Found in
+     `STUDY_PATH` instead, and the camera goes back to that step's own standing point rather than
+     to the section's arrival — you were half way down the garden, not at the gate. */
+  const onPath = HUD.sec === 'STUDY';
+  const back = onPath
+    ? Math.max(0, STUDY_PATH.findIndex((s) => s.deck === HUD.tile))
+    : Math.max(0, (SUBTILES[HUD.sec] || []).findIndex((t) => t[0] === HUD.tile));
+  if (onPath) {
+    const p = pathPose(back);
+    turnTo(new THREE.Vector3().fromArray(p.eye), new THREE.Vector3().fromArray(p.tgt),
+      null, null, 46, null, 0.05, 0.62, 0);
+  } else {
+    const i = ITEMS.findIndex((x) => x.en === HUD.sec);
+    const d = DESTS[i] || DESTS[0];
+    turnTo(d.eye, d.focus, null, null, d.fov, null, 0.05, 0.62, d.roll || 0);
+  }
   hudSwap(-1, () => {
     HUD.level = 2;
-    HUD.at = back;
+    HUD.cur = back; HUD.lo = 0;
     HUD.tile = null;
     subLevel = 2;
+    if (onPath) { document.body.classList.add('course'); pathHud(); }
   });
   return true;
 }
@@ -16533,9 +16984,45 @@ function hudOpen(sec) {
   HUD.sec = sec;
   HUD.level = 2;
   HUD.tile = null;
-  HUD.at = 0;
+  HUD.cur = 0; HUD.lo = 0;
   hudEl.hidden = false;
+  /* STUDY OPENS ON THE STEP YOU ARE ON, not at the top of the course. A course whose cursor starts
+     at the tutorial every time is a list; starting where you actually are is the whole difference,
+     and it is what the app's own recommender does on Home.
+     THE WALK IN IS SLOWER THAN A STEP — 1.9s against 1.15 — because it is a longer move (the
+     arrival stands at the gate and step nine is most of the way down the garden) and because it is
+     the one camera move here that is not answering a keypress. Guarded on `!busy` for the same
+     reason `ftBuildL2` is: during the approach `turnTo` owns the camera, and a second tween on the
+     same properties would fight it. When it is skipped the cursor is still right and the first
+     arrow key catches the camera up. */
+  document.body.classList.toggle('course', sec === 'STUDY');
+  if (sec !== 'STUDY') { hudDraw(); return; }
+  HUD.lo = Math.max(0, Math.min(PATH.done - 2, STUDY_PATH.length - HUD.win));
+  HUD.cur = PATH.done;
+  pathHud();
   hudDraw();
+  /* AND THEN WALK IN, ONCE THE APPROACH HAS LET GO OF THE CAMERA. `hudOpen` runs from `openSub`,
+     which is called while the arrival flight is still `busy` — measured: the camera sat at the
+     arrival eye (3050, -6350) with the counter already reading 9 / 16, so the interface said "most
+     of the way down the garden" while the view said "at the gate".
+     IT WAITS FOR `busy`, IT DOES NOT GUESS AT IT. The first attempt used a fixed 0.8s and was still
+     inside the flight: STUDY's is the longest run on the board and takes about 3.3s. A fixed delay
+     tuned to that would break the moment a route's pace changed, so this polls instead, and gives
+     up after six seconds rather than waiting forever on a flight that never lands.
+     `onCourse()` is rechecked every tick because you can be back at the menu by then, and firing a
+     camera tween there would drag the menu's own view sideways. */
+  /* AND `onCourse()` IS THE WRONG TEST FOR THE POLL, which is why the first fix still did nothing.
+     During a flight `state` is `'moving'`, not `'sub'`, so `onCourse()` is false at every tick until
+     the flight lands — and returning on that killed the retry chain 0.3s in, every time. "Not yet"
+     and "no longer" are different answers and this has to tell them apart: it gives up only if the
+     section has actually changed or we are back at the menu, and otherwise keeps waiting. */
+  const walkIn = (tries) => {
+    if (tries <= 0) return;
+    if (state === 'menu' || HUD.sec !== 'STUDY' || HUD.level !== 2) return;
+    if (busy || state !== 'sub') { gsap.delayedCall(0.25, () => walkIn(tries - 1)); return; }
+    pathGo(PATH.done, 1.9);
+  };
+  gsap.delayedCall(0.3, () => walkIn(28));
 }
 function hudEnter(pace = 1) {
   if (!HUD.on || hudEl.hidden) return;
@@ -16560,12 +17047,20 @@ function hudClose() {
   gsap.delayedCall(0.32, () => { hudEl.hidden = true; });
   HUD.level = 2;
   HUD.tile = null;
+  /* or the counter stays up over the menu, with two live buttons on it. The back tab learned this
+     the same way — see the note by `.walk-hud`'s pointer-events guard. */
+  document.body.classList.remove('course');
 }
 addEventListener('keydown', (e) => {
   if (!HUD.on || state !== 'sub' || hudEl.hidden) return;
   const n = hudRows().length;
-  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { HUD.at = (HUD.at + 1) % n; hudDraw(); e.preventDefault(); }
-  else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { HUD.at = (HUD.at + n - 1) % n; hudDraw(); e.preventDefault(); }
+  /* THE COURSE DOES NOT WRAP. Four peers wrap because there is no first or last one; sixteen
+     ordered steps have both, and arriving at the arbour and being thrown back to the main gate
+     would say the course is a carousel. It clamps, and the counter's buttons grey out to match. */
+  if (onCourse() && (e.key === 'ArrowDown' || e.key === 'ArrowRight')) { pathGo(HUD.cur + 1); e.preventDefault(); }
+  else if (onCourse() && (e.key === 'ArrowUp' || e.key === 'ArrowLeft')) { pathGo(HUD.cur - 1); e.preventDefault(); }
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { HUD.cur = (HUD.cur + 1) % n; hudDraw(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { HUD.cur = (HUD.cur + n - 1) % n; hudDraw(); e.preventDefault(); }
   else if (e.key === 'Enter') { hudPick(); e.preventDefault(); }
   else if (e.key === 'v' || e.key === 'V') { HUD.t = (HUD.t + 1) % HUD_TREATMENTS.length; hudDraw(); }
   else if (e.key === 'b' || e.key === 'B') { HUD.b = (HUD.b + 1) % HUD_BORDERS.length; hudDraw(); }
@@ -16677,7 +17172,10 @@ addEventListener('click', (e) => {
   if (i !== null) walkGo(i);
 });
 walkHud.querySelectorAll('.wh-step').forEach((b) => {
-  b.addEventListener('click', () => { if (walkSec) walkGo(walkAt + (+b.dataset.d)); });
+  b.addEventListener('click', () => {
+    if (onCourse()) { pathGo(HUD.cur + (+b.dataset.d)); return; }
+    if (walkSec) walkGo(walkAt + (+b.dataset.d));
+  });
 });
 addEventListener('wheel', (e) => {
   if (!walkSec || busy) return;
