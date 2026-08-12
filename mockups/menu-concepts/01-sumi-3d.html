@@ -1473,7 +1473,7 @@
     background: none; width: auto; max-width: 430px; padding: 0; margin: 0;
     clip-path: none; text-align: right;
   }
-  .hud[data-t="midashi"] .hud-figs { gap: 26px; margin-bottom: 8px; justify-content: flex-end; }
+  /* the base rule owns the strip now — see .hud-figs. Nothing left for the treatment to say. */
   /* ================================================================================
      THE SLAB CARRIES ITS OWN EDGE, SO THERE IS NO RULE LEFT TO MIRROR — and this is where the
      NEXT UP line's missing left padding actually lived. MIDASHI reflects the whole readout to
@@ -2030,12 +2030,33 @@
      642/632 and MADO at 740/720 with five rows -- one block, one cause, one trim, instead of three
      separate patches that would each have drifted. */
   .hud-detail { margin-top: 14px; }
-  .hud-figs { display: flex; gap: 30px; margin-bottom: 10px; }
+  /* ================================================================================
+     THE FIGURES ARE ONE OBJECT NOW, AND THEY BELONG TO THE SLAB UNDER THEM.
+     Four numbers floating on the world with nothing but a halo read as four separate captions
+     that happened to land in a row — and since NEXT UP became a filled slab they had nothing in
+     common with the thing they sit on top of. So they get the same treatment every other filled
+     surface in this project has: a ground, the -8 degree skew, the 3px hard shadow, pinned to
+     the same right edge, pivoting on it so the two boxes stay in line. Hairlines between the
+     columns rather than a 30px gap, because what separates them is a rule, not air.
+     `fit-content` and `margin-left: auto` for the same reason the slab has them: the column's
+     logic is its right edge, and both boxes end on it.
+     ================================================================================ */
+  .hud-figs {
+    display: flex; gap: 0; justify-content: flex-end;
+    width: fit-content; margin-left: auto; margin-bottom: 5px;
+    background: rgba(12, 10, 8, 0.58);
+    padding: 7px 14px 6px;
+    transform: skewX(-8deg); transform-origin: right center;
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.34);
+  }
+  .hud-figs span + span { border-left: 1px solid rgba(242, 234, 216, 0.16); }
   /* a floor under every column, because the widest thing in one is sometimes the LABEL and
      sometimes the NUMBER -- and where the number wins, a counter running 41h down to 25h changes
      that column width on the way. Not tabular figures: Segoe UI Black has no tnum table, so the
      feature is silently ignored and only a real minimum holds the grid still. */
-  .hud-figs span { min-width: 48px; }
+  .hud-figs span { min-width: 48px; padding: 0 11px; }
+  .hud-figs span:first-child { padding-left: 0; }
+  .hud-figs span:last-child { padding-right: 0; }
   .hud-figs b {
     display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
     font-size: 24px; line-height: 1; color: var(--fig);
@@ -3142,7 +3163,13 @@
     right: 40px; bottom: 26px;
     display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
     font-family: var(--lat-ui); font-weight: 600; font-size: 11.5px; letter-spacing: 0.12em;
-    color: rgba(242, 234, 216, 0.78); text-shadow: var(--halo);
+    color: rgba(242, 234, 216, 0.86);
+    /* A FINER HALO FOR SMALL TYPE. `--halo` carries a 2px HARD offset, which is right under a
+       72px section name and doubles every stroke of an 11px label — at this size the shadow is
+       nearly as wide as the letters and reads as a smear. The soft glow is the part that does
+       the actual work of holding cream legible over a bright valley; the hard offset only ever
+       added weight. One pixel of it is enough to lift the line off the world. */
+    text-shadow: 0 1px 0 rgba(0, 0, 0, calc(0.34 + 0.24 * var(--sky))), var(--halo-soft);
   }
   /* the keys line up because the cap has a floor under it, not because the words happen to be
      the same length */
@@ -3159,6 +3186,12 @@
     padding: 3px 9px; margin-right: 8px;
     transform: skewX(-8deg); display: inline-block;
     box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+    /* AND THE CAP ITSELF TAKES NONE. It inherited the halo from `.hints`, so dark ink on a cream
+       slab was carrying a black shadow two pixels down and to the right of every letter — on a
+       10.5px face that is the stroke width again, and it is why ENTER and ESC were the hardest
+       words on the screen to read. Dark on light needs no halo; the cap's own drop shadow is
+       what separates it from the world. */
+    text-shadow: none;
   }
   /* the white flash, and the streaks the arrival still uses */
   #flash { position: fixed; inset: 0; z-index: 55; background: #fdf7e8; opacity: 0; pointer-events: none; }
@@ -16057,13 +16090,55 @@ const HUD_AIR = {
 const HUD = { on: true, t: 0, b: 5, air: true, sec: null, tile: null, at: 0, level: 2 };
 const hudEl = document.getElementById('hud');
 
-/* the numbers a section can honestly show. Derived from the tile's own strings so they move with
-   them; nothing here is real app data and none of it is claimed to be. */
-function hudStats(meta, j) {
+/* ================= THE FOUR NUMBERS A SECTION CAN HONESTLY SHOW =================
+   The values are still invented — there is no backend behind this page and none of them is
+   claimed to be real. What was wrong is that they were the SAME four everywhere: DUE TODAY /
+   BLOCKS / MASTERY / SPENT over READING, over DRILLS, over RECORDS, none of which has a card due
+   or a block in it. A mockup can invent a number; it should not invent the wrong QUESTION.
+
+   So each section now shows the figures its own screen in the app actually has, and every one of
+   them names the field it would come from. Traced through `scripts/desktop_bridge.py`:
+
+     STUDY    `DeckSummary` — due_today, total, mastered, completed_today. The deck list is what
+              this screen is, and mastery is mastered/total (domain rule: reps >= 3, interval >= 21).
+     DAILY    `DailyGamesStatePayload` — streak.current_streak_days, streak.best_streak_days,
+              progress.completed_daily_game_types against the four in `_DAILY_GAME_TYPES`
+              (crossword, word_search, match_pairs, typing_blitz), streak.freezes_available.
+     READING  `_cmd_passages_list` over the aozora set. The app tracks no per-passage progress, so
+              the honest figures are what a passage IS — its length, its kanji, and how much of
+              it you have already seen — not a completion percentage that nothing computes.
+     DRILLS   `load_minigame_breakdown()`, which `build_summary` returns as
+              `minigame_performance`; plus the leech flag the recommender sets
+              (`leech_focus_enabled` on a "problem items" row).
+     JLPT     `domain/jlpt_readiness.LevelReadiness` — readiness_pct (mastered vocab+kanji over
+              total), is_ready at the threshold — and `data/jlpt_repository.load_jlpt_exam_history`
+              for mocks sat and best accuracy.
+     RECORDS  `load_streak_state` and `load_activity_summary(7|30)`, both of which `build_summary`
+              already returns, plus the accuracy trend.
+
+   Keyed off the tile's own strings so the numbers still move as you go down the list, and so a
+   section's four columns never change width or meaning between rows. */
+const HUD_FIGS = {
+  STUDY: (n, j, pct) => [[6 + ((n + j * 7) % 23), 'DUE TODAY'], [n, 'CARDS'],
+    [pct + '%', 'MASTERED'], [4 + ((n + j * 5) % 17), 'TODAY']],
+  DAILY: (n, j) => [[(9 + ((n + j) % 26)) + 'd', 'STREAK'], [(23 + ((n * 3 + j) % 40)) + 'd', 'BEST'],
+    [(1 + ((n + j) % 4)) + '/4', 'GAMES'], [(n + j) % 3, 'FREEZES']],
+  READING: (n, j) => [[520 + ((n * 13 + j * 61) % 900), 'WORDS'],
+    [38 + ((n + j * 9) % 70), 'KANJI'], [(24 + ((n + j * 3) % 52)) + '%', 'UNSEEN'],
+    [3 + ((n + j) % 9), 'MIN']],
+  DRILLS: (n, j, pct) => [[12 + ((n + j * 4) % 90), 'PLAYED'], [pct + '%', 'ACCURACY'],
+    [180 + ((n * 7 + j * 31) % 800), 'BEST'], [(n + j * 2) % 12, 'LEECHES']],
+  JLPT: (n, j, pct) => [[pct + '%', 'READY'], [110 + ((n * 5 + j * 23) % 700), 'VOCAB'],
+    [40 + ((n * 3 + j * 11) % 320), 'KANJI'], [(n + j) % 7, 'MOCKS']],
+  RECORDS: (n, j, pct) => [[(9 + ((n + j) % 26)) + 'd', 'STREAK'],
+    [140 + ((n * 11 + j * 37) % 900), 'REVIEWS'], [pct + '%', 'ACCURACY'],
+    [(23 + ((n * 3 + j) % 40)) + 'd', 'BEST']],
+};
+function hudFigs(sec, meta, j) {
   const n = parseInt(String(meta).replace(/[^0-9]/g, ''), 10) || 40;
   const m = /(\d+)\s*%/.exec(meta || '');
-  return { due: 6 + ((n + j * 7) % 23), blocks: 8 + ((n / 7 | 0) % 24),
-    pct: m ? +m[1] : [78, 46, 31, 54][j % 4], hours: 3 + ((n + j * 11) % 40) };
+  const pct = m ? +m[1] : [78, 46, 31, 54][j % 4];
+  return { pct, figs: (HUD_FIGS[sec] || HUD_FIGS.STUDY)(n, j, pct) };
 }
 function hudRows() {
   if (HUD.level === 3) {
@@ -16076,12 +16151,12 @@ function hudRows() {
     }));
   }
   return (SUBTILES[HUD.sec] || []).map(([jp, en, meta], j) => {
-    const st = hudStats(meta, j);
+    const st = hudFigs(HUD.sec, meta, j);
     const D = (L3DATA[HUD.sec] || {})[jp];
     const nx = D && D.rows && D.rows.find((r) => r[3] > 0 && r[3] < 100);
     return { no: String(j + 1).padStart(2, '0'), en, jp, big: en, small: jp,
       meta: meta.toUpperCase(), pct: st.pct, tile: jp,
-      figs: [[st.due, 'DUE TODAY'], [st.blocks, 'BLOCKS'], [st.pct + '%', 'MASTERY'], [st.hours + 'h', 'SPENT']],
+      figs: st.figs,
       next: ['NEXT UP', nx ? nx[0] : jp, nx ? (nx[1] + ' \u00b7 ' + nx[2]) : meta.toUpperCase()] };
   });
 }
