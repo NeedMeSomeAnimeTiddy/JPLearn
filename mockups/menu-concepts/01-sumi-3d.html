@@ -1474,9 +1474,20 @@
     clip-path: none; text-align: right;
   }
   .hud[data-t="midashi"] .hud-figs { gap: 26px; margin-bottom: 8px; justify-content: flex-end; }
+  /* ================================================================================
+     THE SLAB CARRIES ITS OWN EDGE, SO THERE IS NO RULE LEFT TO MIRROR — and this is where the
+     NEXT UP line's missing left padding actually lived. MIDASHI reflects the whole readout to
+     the right, so it moved the 3px marker from the left of the line to the right of it and
+     zeroed the padding on the side the marker had vacated. Exactly right while that line was
+     bare type against a coloured rule. The moment it became a filled vermilion slab it became
+     `padding-left: 0` on a box with a background, which puts the longest line hard against the
+     fill's edge — and because MIDASHI is a `[data-t]` rule it outspecifies the base `.hud-next`,
+     so two rounds of fixing the base rule could not have worked no matter what they said.
+     The fill IS the marker now. Even padding, no border.
+     ================================================================================ */
   .hud[data-t="midashi"] .hud-next {
-    border-left: 0; border-right: 3px solid var(--sec, var(--hi));
-    padding-left: 0; padding-right: 13px;
+    border: 0;
+    padding: 8px 14px;
   }
   .hud[data-t="midashi"] .hud-figs b {
     font-size: 22px; color: var(--gold-hi);
@@ -3933,9 +3944,19 @@ const INK_IDLE = new URLSearchParams(location.search).get('inkidle') !== 'off';
    several hundred lines below, and a hoisted function reaches it at CALL time instead of reading
    a const from inside its own dead zone — which is the trap this file has fallen into seven
    times and which throws rather than reading undefined. */
-function prepassVS(idle) {
+/* `kind` is '', 'idle' or 'sway' — three copies of one shader, and the reason there are three is
+   the one real cost of screen-space ink: an override material replaces the shader that held the
+   animation, so anything that moves in its own vertex shader stands still in the buffer the
+   outlines are read from. Every such thing needs its displacement repeated here.
+   The SWAY copy takes the instance origin from `instanceMatrix` exactly as the idle one does, and
+   for a loose (uninstanced) plant it uses the model matrix's own translation — the same two
+   branches `swayMaterial` patches into the lit shader, so the two cannot disagree. */
+function prepassVS(kind) {
+  const idle = kind === 'idle' || kind === true;
+  const sway = kind === 'sway';
   return `
     ${idle ? IDLE_GLSL : ''}
+    ${sway ? SWAY_GLSL : ''}
     varying vec3 vN;
     varying float vD;
     void main() {
@@ -3944,9 +3965,12 @@ function prepassVS(idle) {
       vec4 lp;
       #ifdef USE_INSTANCING
         ${idle ? 'idleFigure( lpos, ln, IDLE_ORIGIN );' : ''}
+        ${sway ? `swayPlant( lpos, vec3( instanceMatrix[ 3 ][ 0 ], instanceMatrix[ 3 ][ 1 ],
+                                         instanceMatrix[ 3 ][ 2 ] ) );` : ''}
         lp = instanceMatrix * vec4( lpos, 1.0 );
         ln = normalize( mat3( instanceMatrix ) * ln );
       #else
+        ${sway ? 'swayPlant( lpos, ( modelMatrix * vec4( 0.0, 0.0, 0.0, 1.0 ) ).xyz );' : ''}
         lp = vec4( lpos, 1.0 );
       #endif
       vec4 mv = modelViewMatrix * lp;
@@ -4133,19 +4157,41 @@ function renderND() {
     CROWD.was.length = 0;
     CROWD.meshes.forEach((o, i) => { CROWD.was[i] = o.visible; o.visible = false; });
   }
+  /* THE SAME BARGAIN FOR THE TREES. Measured, the drift at the shipped amplitude was inside the
+     frame's own noise — but the amount is a dial now (see the sway bench) and past about 0.9 the
+     outlines visibly let go. So they go through their own pass too: hidden while the world is
+     drawn with the still override, then drawn on their own layer with the swaying one.
+     IT IS NOT AN EXTRA RENDER OF THE FOREST, which is the thing worth knowing before paying for
+     it. The vegetation is rasterised ONCE either way — skipped in the first pass, drawn in the
+     second — so what this actually costs is one more walk of the scene graph, the same 0.4ms the
+     crowd's pass costs. Nothing is cleared between them, so the depth the rest of the world just
+     wrote still occludes a tree standing behind a building. */
+  const leaves = SWAY.on && SWAY.prepass && SWAY.meshes.length > 0 && !reduced;
+  if (leaves) {
+    SWAY.was.length = 0;
+    SWAY.meshes.forEach((o, i) => { SWAY.was[i] = o.visible; o.visible = false; });
+  }
   const prevClear = backRenderer.getClearAlpha();
   backScene.overrideMaterial = matPrepass;
   backRenderer.setRenderTarget(rtND);
   backRenderer.setClearColor(0x000000, 0);
   backRenderer.clear();
   backRenderer.render(backScene, camera);
-  if (swaying) {
-    CROWD.meshes.forEach((o, i) => { o.visible = CROWD.was[i]; });
+  if (swaying || leaves) {
     const prevAuto = backRenderer.autoClear;
-    backScene.overrideMaterial = MAT_PREPASS_IDLE;
-    camera.layers.set(CROWD_LAYER);
     backRenderer.autoClear = false;
-    backRenderer.render(backScene, camera);
+    if (swaying) {
+      CROWD.meshes.forEach((o, i) => { o.visible = CROWD.was[i]; });
+      backScene.overrideMaterial = MAT_PREPASS_IDLE;
+      camera.layers.set(CROWD_LAYER);
+      backRenderer.render(backScene, camera);
+    }
+    if (leaves) {
+      SWAY.meshes.forEach((o, i) => { o.visible = SWAY.was[i]; });
+      backScene.overrideMaterial = MAT_PREPASS_SWAY;
+      camera.layers.set(SWAY_LAYER);
+      backRenderer.render(backScene, camera);
+    }
     backRenderer.autoClear = prevAuto;
     camera.layers.set(0);
   }
@@ -4968,8 +5014,16 @@ const SWAY = {
   rate: { value: 0.75 },
   gust: { value: 0.55 },
   t: { value: 0 },
-  dir: null,                 /* the wind's own direction, shared by reference */
-  mat: null, geos: 0, plants: 0,
+  /* ITS OWN UNIFORM, ALIASED TO THE WIND'S VECTOR IN swayBuild. It cannot simply BE `WIND.dir`:
+     the prepass material below is constructed at module eval and WIND is declared twelve hundred
+     lines further down, so reading it here throws — the ninth temporal-dead-zone trap in this
+     file. Aliasing the Vector3 itself once the world loads means `NAV.wind({dir})` still moves
+     the trees and the wisps together. */
+  dirU: { value: new THREE.Vector3(-0.937, 0, 0.350).normalize() },
+  /* the second ink pass, as a switch: it is the only way to A/B what it buys, and the answer
+     depends entirely on how far `amp` has been pushed */
+  prepass: true,
+  mat: null, geos: 0, plants: 0, meshes: [], was: [],
 };
 const SWAY_GLSL = `
   uniform float uSwayT, uSwayAmp, uSwayGust, uSwayRate;
@@ -5034,7 +5088,7 @@ function swayMaterial(src) {
   mat.onBeforeCompile = (shader, renderer) => {
     if (prev) prev(shader, renderer);
     Object.assign(shader.uniforms, { uSwayT: SWAY.t, uSwayAmp: SWAY.amp,
-      uSwayGust: SWAY.gust, uSwayRate: SWAY.rate, uSwayDir: SWAY.dir });
+      uSwayGust: SWAY.gust, uSwayRate: SWAY.rate, uSwayDir: SWAY.dirU });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\n' + SWAY_GLSL)
       /* BEFORE begin_vertex writes `transformed`, so the displacement is what everything
@@ -5058,7 +5112,7 @@ function swayMaterial(src) {
 const SWAY_RE = /_Vegetation_|_Forest_|Nature_Trees_|GroundCover|Grass|Bamboo|Susuki/i;
 function swayBuild(root) {
   if (!SWAY.on || SWAY.mat || !root) return 0;
-  SWAY.dir = WIND.dir;
+  SWAY.dirU.value = WIND.dir.value;   /* one Vector3, two uniforms */
   const hit = [];
   root.traverse((o) => {
     if ((!o.isMesh && !o.isInstancedMesh) || !SWAY_RE.test(o.name || '')) return;
@@ -5070,8 +5124,12 @@ function swayBuild(root) {
   for (const o of hit) {
     if (swayBake(o.geometry)) SWAY.geos++;
     o.material = mat;
+    /* on its own layer as well as layer 0, so `renderND` can draw the vegetation a second time
+       with the swaying prepass without drawing anything else — the crowd's arrangement exactly */
+    o.layers.enable(SWAY_LAYER);
     SWAY.plants += o.count || 1;
   }
+  SWAY.meshes = hit;
   return SWAY.plants;
 }
 
@@ -5137,9 +5195,19 @@ const CROWD = { meshes: [], mat: null, was: [], freeze: null };
 const CROWD_MIN_H = 40;
 const MAT_PREPASS_IDLE = new THREE.ShaderMaterial({
   uniforms: PEOPLE_U,
-  vertexShader: prepassVS(true),
+  vertexShader: prepassVS('idle'),
   fragmentShader: PREPASS_FS,
   /* the crowd's own copy of the prepass, and it takes the same sidedness — see PREPASS_SIDE */
+  side: PREPASS_SIDE,
+});
+/* and the vegetation's, on the same terms. The uniforms are the SAME OBJECTS the lit material
+   uses, not copies, so the outline and the tree cannot drift apart by a frame or by a dial. */
+const SWAY_LAYER = 3;
+const MAT_PREPASS_SWAY = new THREE.ShaderMaterial({
+  uniforms: { uSwayT: SWAY.t, uSwayAmp: SWAY.amp, uSwayGust: SWAY.gust, uSwayRate: SWAY.rate,
+    uSwayDir: SWAY.dirU },
+  vertexShader: prepassVS('sway'),
+  fragmentShader: PREPASS_FS,
   side: PREPASS_SIDE,
 });
 
@@ -13674,8 +13742,11 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* the vegetation: NAV.sway({ amp: 1.2 }) to see it from across the valley, { amp: 0 } to stop
      it dead for an A/B against the outlines */
   sway: (o) => {
-    if (o) for (const k of ['amp', 'rate', 'gust']) if (o[k] !== undefined) SWAY[k].value = o[k];
-    return { plants: SWAY.plants, geometries: SWAY.geos, on: !!SWAY.mat,
+    if (o) {
+      for (const k of ['amp', 'rate', 'gust']) if (o[k] !== undefined) SWAY[k].value = o[k];
+      if (o.prepass !== undefined) SWAY.prepass = o.prepass !== false;
+    }
+    return { plants: SWAY.plants, geometries: SWAY.geos, on: !!SWAY.mat, prepass: SWAY.prepass,
       amp: SWAY.amp.value, rate: SWAY.rate.value, gust: SWAY.gust.value };
   },
   /* the town's windows: how many were found, and what each one is doing at this hour */
@@ -13783,7 +13854,9 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
   inkSide: (s) => {
     if (s !== undefined) {
       const side = s === 'front' ? THREE.FrontSide : s === 'back' ? THREE.BackSide : THREE.DoubleSide;
-      for (const m of [matPrepass, MAT_PREPASS_IDLE]) { m.side = side; m.needsUpdate = true; }
+      for (const m of [matPrepass, MAT_PREPASS_IDLE, MAT_PREPASS_SWAY]) {
+        m.side = side; m.needsUpdate = true;
+      }
     }
     return ['front', 'back', 'double'][matPrepass.side];
   },
