@@ -2116,14 +2116,20 @@
      in front of it. Nothing to do with the skew, which transforms the text and the box together
      and cannot change the distance between them.
      `max-width` has to lose the same 28 too, or a long line overflows the column by the padding. */
-  /* `fit-content`, NOT `max-content`. Measured after the box-sizing fix, the slab was still ten
-     pixels narrower than the words inside it — max-content on a block that is also being pushed
-     right by `margin-left: auto` does not shrink-wrap reliably. fit-content is the idiom that
-     exists for exactly this (shrink to the content, then let the auto margin place it) and it
-     measures right: 14 pixels of padding on both sides. */
+  /* `fit-content` and BORDER-BOX, which is to say: leave the global reset alone.
+     I switched this one element to content-box while chasing the missing left padding, and the
+     padding turned out to be MIDASHI's `padding-left: 0` (see the note by that rule). The
+     box-sizing change was a fix for a bug I had misread, and it quietly broke the animation:
+     `swapText` measures `box.offsetWidth` — a BORDER box — and then tweens the CSS `width`
+     property, which under content-box is the CONTENT box. The two agree everywhere else in this
+     file because `* { box-sizing: border-box }` is set at the top, so the slab grew to a content
+     width of 190 (a 218px box), then `clearProps` handed it back to fit-content at 162 and it
+     snapped 28 pixels the moment the words came back. That is the whole of "not as smooth as the
+     one on the menu": the button never had the problem because it never left border-box.
+     Under border-box, `fit-content` shrink-wraps the BORDER box — the padding is inside the fit,
+     so the words still get their 14 either side. */
   .hud-next {
-    display: block; width: fit-content; max-width: calc(100% - 28px); margin-left: auto;
-    box-sizing: content-box;
+    display: block; width: fit-content; max-width: 100%; margin-left: auto;
     background: var(--hi);
     padding: 8px 14px;
     transform: skewX(-8deg);
