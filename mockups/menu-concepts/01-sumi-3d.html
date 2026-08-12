@@ -1499,16 +1499,14 @@
     --fg-2: rgba(242, 234, 216, 0.78);
     --fg-3: rgba(242, 234, 216, 0.62);
   }
-  .hud[data-t="midashi"] .hud-next em,
-  .hud[data-t="midashi"] .hud-next i,
-  .hud[data-t="midashi"] .hud-small {
-    text-shadow: var(--halo);
-  }
+  /* ONLY `.hud-small` KEEPS THE HALO, because it is the only one of these still standing on the
+     world. All three lines of NEXT UP are on a solid vermilion fill and none of the chips carries
+     a text shadow at all — a hard black offset on cream over vermilion is not separation, it is
+     mud, and it was inherited from when this line was bare type over the valley. */
+  .hud[data-t="midashi"] .hud-small { text-shadow: var(--halo); }
   /* and nothing about the figures either: every character in that block is dark ink on washi now,
      and a halo is for cream held over a valley. See the 札 note by `.hud-figs`. */
-  .hud[data-t="midashi"] .hud-next b {
-    color: var(--washi); text-shadow: var(--halo);
-  }
+  .hud[data-t="midashi"] .hud-next b { color: var(--washi); }
 
   /* ---- one: 切込 KIRIKOMI, a left panel with the cut down its right edge ---- */
   .hud[data-t="kiri"] .hud-panel {
@@ -2193,13 +2191,18 @@
      one on the menu": the button never had the problem because it never left border-box.
      Under border-box, `fit-content` shrink-wraps the BORDER box — the padding is inside the fit,
      so the words still get their 14 either side. */
+  /* AND THE CHIPS' ROTATION, CONTINUING THE STACK'S ALTERNATION. The four figure chips above run
+     -1.2, +1, -1.2, +1 by `:nth-child`; this is the fifth box down the same column, so it takes
+     -1.2 and the sequence holds through the whole readout. Shadow to the chips' 2px/3px 0.45.
+     `transform-origin: right center` still does the same job it did for the skew alone: both
+     transforms pivot on the edge every box in this column is aligned to. */
   .hud-next {
     display: block; width: fit-content; max-width: 100%; margin-left: auto;
     background: var(--hi);
     padding: 8px 14px;
-    transform: skewX(-8deg);
+    transform: skewX(-8deg) rotate(-1.2deg);
     transform-origin: right center;
-    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
     min-height: 44px;
   }
   /* `nowrap` and no `overflow: hidden`. The clipping was there to protect a fixed-width box, and
@@ -2208,21 +2211,27 @@
   .hud-next-in { display: block; white-space: nowrap; }
   .hud-next b { white-space: nowrap; }
   .hud-next i { white-space: nowrap; }
+  /* THE LEAD IS THE CHIP'S LEAD. `.stat-chip.shu` — the vermilion one along the top — puts its
+     accent in #ffd9a1, the one warm cream that reads bright against that fill without going pink;
+     washi at two thirds was a dimmed body text rather than a lead at all. 11px and 0.14em are the
+     chips' own label metrics, in place of a 9.5px at nearly a quarter em that matched no other
+     object on the screen. */
   .hud-next em {
     display: block; font-family: var(--lat-ui); font-weight: 700; font-style: normal;
-    font-size: 9.5px; line-height: 12px; letter-spacing: 0.24em;
-    /* washi at two thirds, not a grey: a neutral grey on a vermilion fill goes muddy */
-    color: rgba(242, 234, 216, 0.72);
+    font-size: 11px; line-height: 13px; letter-spacing: 0.14em;
+    color: #ffd9a1;
     margin-bottom: 3px;
   }
   .hud-next b {
     display: block; font-family: var(--jp-go); font-weight: 700; font-size: 15px;
     line-height: 18px; color: var(--washi);
   }
-  /* gold, which is the button's own accent — its arrow is the only other thing wearing it */
+  /* the meta line to the chips' label metrics as well — 600 at 0.14em. It keeps gold rather than
+     taking the lead's cream, because two identical creams above and below the payload would
+     bracket it instead of ranking it. */
   .hud-next i {
-    display: block; font-family: var(--lat-ui); font-weight: 500; font-style: normal;
-    font-size: 11px; line-height: 14px; letter-spacing: 0.1em; color: var(--gold-hi);
+    display: block; font-family: var(--lat-ui); font-weight: 600; font-style: normal;
+    font-size: 11px; line-height: 14px; letter-spacing: 0.14em; color: var(--gold-hi);
     margin-top: 3px;
   }
   /* ================================================================================
@@ -3076,13 +3085,23 @@
     display: flex; align-items: center; justify-content: flex-end; gap: 14px;
     background: var(--hi);
     border: 0; padding: 9px 16px;
-    transform: skewX(-8deg);
-    font-family: var(--lat-ui); font-weight: 700; font-size: 12.5px; letter-spacing: 0.12em;
+    /* THE STAT CHIPS' STYLISATION, WHICH IS THE SKEW PLUS A DEGREE OF ROTATION. Every filled
+       thing in this project was already at -8; what the chips along the top have and nothing else
+       did is the small rotate on top, which is what makes a group of them read as laid down
+       rather than printed. It only works as a SET, so the two boxes stacked here take the chips'
+       two values in alternation — this one -1.2, the description below it +1 — and the shadow
+       goes to the chips' 2px/3px 0.45 so all of it is one object family.
+       The rotation has to be repeated on :hover, or the button springs straight the moment the
+       mouse touches it. */
+    transform: skewX(-8deg) rotate(-1.2deg);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 12px; letter-spacing: 0.14em;
     color: var(--washi); cursor: pointer;
-    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
     transition: background 0.18s ease, transform 0.24s var(--ease-pop);
   }
-  .upnext-item:hover { background: var(--hi-deep); transform: skewX(-8deg) translateX(-3px); }
+  .upnext-item:hover {
+    background: var(--hi-deep); transform: skewX(-8deg) rotate(-1.2deg) translateX(-3px);
+  }
   .upnext-item i { font-style: normal; color: var(--gold-hi); font-size: 15px; }
 
   /* VIEWPORT UNITS INSIDE A ZOOMED BOX ARE MULTIPLIED TWICE, and this was the one place left
@@ -3107,7 +3126,9 @@
     right: 40px; left: auto; bottom: 116px;
     background: var(--washi); color: var(--ink);
     padding: 8px 15px 9px;
-    transform: skewX(-8deg);
+    /* the chips' other rotation — see the note on `.upnext-item`; the two boxes in this corner
+       lean opposite ways for the same reason the four along the top do */
+    transform: skewX(-8deg) rotate(1deg);
     box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
     max-width: 420px; text-align: right;
     transition: opacity 0.3s;
@@ -3125,9 +3146,14 @@
     display: block; font-family: var(--lat-ui); font-weight: 600;
     font-size: 12.5px; letter-spacing: 0.03em; color: var(--ink);
   }
+  /* 0.1em is `.stat-chip .jp`'s tracking, so the Japanese matches the chips'. The WEIGHT does
+     not: the chip's 連続 is one word at 700, and this is a whole sentence — at 11px and full
+     bold かな・漢字・語彙のセクション学習 closes up into a bar. The same reason the English line
+     above keeps its 0.03em rather than the chips' 0.14: chip tracking is for two-word labels,
+     and a sentence set that loose stops being readable. Match what transfers, not everything. */
   .desc-line i {
     display: block; font-family: var(--jp-go); font-weight: 400; font-style: normal;
-    font-size: 11px; letter-spacing: 0.05em; color: rgba(20, 17, 13, 0.6);
+    font-size: 11px; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.6);
     margin-top: 3px;
   }
   /* THE TWO FONTS WERE THE WRONG WAY ROUND. The markup is `<b>ENTER</b>Confirm<em>決定</em>`,
