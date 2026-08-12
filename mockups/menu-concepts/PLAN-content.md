@@ -26,9 +26,10 @@ screen-space, in all six sections. Read this file, not the modules.
 
 ## The decisions this encodes
 
-Taken 2026-08-12 with Robbie, in one sitting.
+Taken 2026-08-12 with Robbie, over two sittings. The second one replaced STUDY entirely — see
+the note below it.
 
-1. **STUDY has five tiles**, not four: KANA, KANJI, VOCAB, GRAMMAR, SENTENCES.
+1. **STUDY is a course you walk, not a library you browse.** Its five tiles are gone.
 2. **Level four gets built** as part of this work — the corridor that holds the long lists.
 3. **A block is followed by one more small screen that asks which game.** The app needs two
    answers before a round can start and the walk was only collecting one.
@@ -39,6 +40,19 @@ Taken 2026-08-12 with Robbie, in one sitting.
    content until there is something real to be faithful to.
 7. Real names and structure, invented numbers.
 
+### Why STUDY was rewritten after the first pass
+
+The first version gave STUDY five tiles that opened decks, opened levels, opened blocks and then
+asked for a game. DRILLS asked for a game, then a group, then a deck. **Both ended on the same
+pair — a deck and a game — by different routes.** The first draft of this document called that
+symmetry and put it in bold. It is duplication: two sections, one destination, no reason to visit
+the second if you have been to the first.
+
+The split that fixes it is not cosmetic. **STUDY answers "what should I do next" and DRILLS
+answers "I want to play this one."** One is ordered, gated and decides for you; the other is
+open, ungated and decides nothing. A course and an arcade. Once STUDY is a course it cannot be a
+deck browser, so the five tiles go.
+
 ## The measured limits
 
 | | limit | measured how |
@@ -48,6 +62,9 @@ Taken 2026-08-12 with Robbie, in one sitting.
 | **rows that fit** | **7** | (810 − 248) / 79 = 7.1 |
 | L3 rows today | capped at 5 | `ftL3Rows`'s `.slice(0, 5)` |
 | L4 | unbuilt | `ZEN_L4` pose transcribed, "the walk that uses it is not built yet" |
+| STUDY's route | 2,090 units, gate to arbour | landmarks projected onto the stone chain |
+| 16 nodes on it | **139 units apart** | 2,090 / 15 gaps; a person here is 66 tall |
+| on the stones alone | 75 units apart — a shuffle | 1,021-unit chain, why the route is longer |
 
 **The shape rule that falls out of it: a level is either a SHOT or a CORRIDOR.** A shot is five
 siblings you choose between while standing still. A corridor is any length and you walk it. L2
@@ -73,35 +90,102 @@ Overview, the dictionary and settings are titlebar overlays, not views.
 
 ---
 
-# STUDY — the hall and its four gardens
+# STUDY — the course through the garden
 
-## L2 — five tiles
+Decided 2026-08-12: STUDY is a Duolingo-shaped path. You walk one route, in order, and the
+course tells you where you are and what is next. There is no deck list and no way to jump
+sideways — that is DRILLS' job now.
 
-| tile | renders as | app section | L3 is | L4 |
-|---|---|---|---|---|
-| KANA | かな | hiragana + katakana | 2 rows: HIRAGANA, KATAKANA | 12 blocks each |
-| KANJI | 漢字 | kanji_n5 … kanji_n1 | 5 rows: N5 N4 N3 N2 N1 | 6 / 17 / 23 / 22 / 76 |
-| VOCAB | 語彙 | vocab_n5 … vocab_n1 | 5 rows: N5 N4 N3 N2 N1 | 44 / 35 / 109 / 93 / 137 |
-| GRAMMAR | 文法 | grammar_patterns + conjugation_training | 2 rows: PATTERNS, CONJUGATION | 6 / 4 |
-| SENTENCES | 例文 | sentence_examples | — corridor stands in | 8 blocks |
+## The course already exists in the app
 
-KANA keeps hiragana and katakana together at L2 because they are one subject taught in two
-alphabets, and splits them at L3 because they are two decks with two block lists. GRAMMAR does
-the same trick for a different reason: conjugation_training is a real deck with 4 real blocks and
-no door of its own in the app, and pairing it with the patterns deck gives it one.
+`domain/progression_curriculum.py` is a 16-node gated graph and nobody has to invent it:
 
-SENTENCES is the one tile with a single deck, no levels and more than seven blocks. It drills
-straight from L2 into the corridor. **This needs L2→L4 support in the code**, which does not
-exist yet.
+```
+tutorial → hiragana → katakana → vocabulary → grammar ─┬─ sentences  (side branch, leaf)
+                                                       └─ scripted conv → listening → kanji
+                                                          → free conv → reading
+                                                          → JLPT N5 → N4 → N3 → N2 → N1
+```
 
-## L3 — the five JLPT levels (KANJI and VOCAB only)
+Every node carries a **real gate** (the previous node mastered) and a **real bar**: hiragana
+wants all 46 characters, katakana all 46, vocabulary 40 words as an absolute floor, grammar 80%,
+kanji 80 characters at 80%, each JLPT level 90%. Every node also carries a **real reward**, and
+the rewards unlock features in `domain/feature_catalog.py` — Listening Mode, Conversation Mode,
+Kanji Mode, Reading Mode, Themes, Achievements, Advanced Analytics, JLPT Dashboard, Tutor Chat.
+That is the Duolingo carrot, already built and already persisted.
 
-Already built and correct. The rows render as 入門 / 初級 / 中級 / 上級 / 最上級 against N5 … N1.
-The block counts above are the real ones and replace the synthesised `L3_KAN_LEVELS` and
-`L3_LEVELS` tables. `L3_LEVELS` for vocab currently says 32/31/105/89/133; the true figures are
-**44/35/109/93/137**.
+## Only six of the sixteen nodes are decks
 
-## L4 — the corridor
+The rest point out of the section, which is the thing that makes this the spine of the whole
+menu rather than one section's furniture. From `NODE_DESTINATIONS`:
+
+| node | what it is | where it goes |
+|---|---|---|
+| tutorial | onboarding, one-time and skippable | nowhere — shown complete |
+| hiragana, katakana | decks | 12 blocks each, in place |
+| vocabulary, grammar, sentences | decks | 44 / 6 / 8 blocks, in place |
+| kanji | deck | 6 blocks (N5), in place |
+| scripted conv, free conv | the tutor | **no home in the menu yet** |
+| listening | a *game*, not a deck — `listening_audio_first` on hiragana | DRILLS |
+| reading | the passage hub | READING |
+| JLPT N5 … N1 | the exam hub | JLPT |
+
+So a node either **opens** (six of them) or **flies you** to the destination that owns it. The
+menu already knows how to fly between places; a node that hands off is a camera move it can
+already make.
+
+## The route — measured, and it is the garden's own
+
+The stepping stones are only the middle of it. Every landmark in the Zen area, projected onto the
+line from the first stone to the last (`t` 0 → 1 spans 1,021 units, offset is sideways distance):
+
+| t | landmark | offset |
+|---|---|---|
+| −1.11 | Komainu — guardian lion | 177 |
+| −0.94 | **Sanmon** — the main gate, 384×379×259 | 425 |
+| −0.54 | **Koro** — incense burner | **5** |
+| −0.36 | **Shishi** — deer scarer | 140 |
+| −0.20 | **Ishigumi / KareBed** — rock group and dry bed | 345 |
+| −0.07 | **GateSmall** — inner threshold | **59** |
+| 0 → 1 | **25 stepping stones** across the raked field (1,110 × 1,040) | 92 |
+| 0.57 | KareField / Rakes / GardenWall — the raked garden itself | 92 |
+| 1.11 | **GardenAzumaya** — the arbour | **8** |
+
+**Main gate to arbour is about 2,090 units.** Sixteen nodes over that is **139 units apart** —
+about two person-heights, which is a walk. On the stones alone it would have been 75 units, and
+a person here is 66 tall, so that would have been a shuffle. This is why the route is the whole
+processional way and not just the stones.
+
+And the arrival already looks down it: the eye lands at (3050, −195, −6350), beside the komainu
+at (3120, −6070), with its focus at (3900, −7300), which is mid-route. **You arrive standing at
+the top of your own course.**
+
+`Zen_Curve` — the Bezier the stones were laid along — is dropped at parse by `ENV_CAM_BLOCK`.
+Un-dropping it would give the walk a smooth spine instead of sixteen straight hops.
+
+## L2 — walk the route
+
+The camera glides from node to node, one in focus at a time, arrows to step. Same machinery as
+the existing level-three walk.
+
+Each node shows its name, its bar (`4 / 12 blocks`, `31 / 46 characters`), and its state:
+**done**, **here**, or **ahead**. The nine landmarks above are the milestones between them —
+free scenery that tells you how far you have come, which is the job Duolingo gives its unit
+headers and checkpoint chests.
+
+**Locks are soft, matching the app.** A node ahead of you is dimmed and you can still walk to it
+and enter, with the app's own warning first: *"This part of the course builds on earlier steps
+you have not finished yet. You can start it now — it may just be harder without those
+foundations."* That is `LOCKED_NODE_REASON`, verbatim. It also means the mockup can demo any part
+of the course without pretending to have earned it.
+
+The side branch is a real branch in the graph — sentences hangs off grammar as a leaf — but it
+sits inline on the walk between grammar and scripted conversation, because a fork in a corridor
+is a worse problem than a slightly wrong graph.
+
+## L3 — the lessons inside a node
+
+That node's blocks, which is where the six deck nodes land. The block list is the corridor.
 
 The real block names. A sample of what each list holds:
 
@@ -127,14 +211,39 @@ The real block names. A sample of what each list holds:
 Each placard carries the block name, its card count, and its state. **Blocks lock**: a block
 opens once the previous one has 80% of its cards answered at least once (70% for thematic
 category blocks). The corridor should show that — a locked block is a placard you can see and
-cannot turn.
+cannot turn. This is a second gate chain inside every node's gate, and it is the app's, not an
+invention: it is what makes a node feel like a unit of five lessons rather than one wall.
 
-## L5 — the game
+Only the six deck nodes reach this level. The other ten fly out to their own section instead.
+
+## L4 — the game
 
 Picking a block asks one question: which game. The list is that deck's own, from
 `SCRIPT_MINIGAMES` — 12 for kana, kanji and vocab, 11 for grammar, 9 for sentences. Session
 length, lives, focused review and confidence capture are the app's four toggles; whether the
 menu asks for them or takes the defaults (Medium, 12 items) is still open.
+
+**The course is one level shallower than the browser was.** Path → blocks → game is three steps
+where tiles → level → blocks → game was four, and the path does the work of two of them: it
+picks the deck *and* tells you which one you should be on.
+
+## What this costs
+
+Stated plainly, because none of it is free:
+
+- **The five tiles are gone**, and with them the only way to go straight to a deck. If you feel
+  like doing katakana today and the course says vocabulary, the course wins. That is Duolingo's
+  bargain and it is the point, but it is a real loss against the app, whose Home screen has a
+  deck carousel precisely so you can pick.
+- **Two nodes have nowhere to fly to.** Scripted conversation and free conversation are real
+  curriculum nodes pointing at the tutor, and the menu has no tutor. They will either sit on the
+  path as dead stones or need a seventh place.
+- **The grouping is not the app's.** The graph is 16 flat nodes; the landmarks that make them
+  feel like units are the garden's, chosen here. Nothing breaks if the app disagrees later,
+  because the milestones are scenery rather than data.
+- **The route needs authoring.** Sixteen stops from the main gate to the arbour is a camera path
+  nobody has composed yet, and only STUDY has an authored level-four marker (`ZEN_L4`) to
+  start from.
 
 ---
 
@@ -220,10 +329,24 @@ description from `constants.tsx` ("Type the romaji reading as quickly as you can
 Two to six rows, from `SCRIPT_MINIGAMES` read backwards. Stroke Order is kanji only; Meaning
 Match runs on all six; Compound Builder is vocab only. Picking a deck starts that game on it.
 
-**This is the same room by the other door.** STUDY walks material → material → material → game.
-DRILLS walks game → game → material. Both end on a (deck, game) pair, which is exactly what
-`script_hub` needs to start a round. Worth saying out loud because it is the thing that makes
-DRILLS more than a catalogue.
+## What keeps this from being STUDY again
+
+Both sections can start a round, and in the first draft that made them the same section by two
+routes. What separates them now is not the destination but **who decides**:
+
+| | STUDY | DRILLS |
+|---|---|---|
+| the question | what should I do next | I want to play this one |
+| order | fixed — one route, walked | none — any stall, any time |
+| gates | yes, soft, from the curriculum | none |
+| picks the deck | the course does | you do |
+| picks the game | you do, at the end | you do, at the start |
+| progress | advances the course | does not |
+
+That last row is the load-bearing one, and it is worth carrying into the transplant: **a round
+started from DRILLS should not advance the path.** The app already has this distinction and calls
+it Practice — see DAILY, where the practice mode explicitly leaves your streak and your daily
+progress alone. DRILLS is that idea applied to the whole minigame catalogue.
 
 ---
 
@@ -269,20 +392,33 @@ dialog and does not belong in a valley; Deck Snapshot duplicates MASTERY.
 
 Named so the transplant does not discover them late:
 
-- **the curriculum map** — `JPLEARN_GRAPH`'s 16 nodes, the centrepiece of the app's Home screen
-- **the tutor** — scenario practice and free chat, both real progression nodes
+- **the tutor** — scenario practice and free chat. This was a nice-to-have in the first draft and
+  is now blocking: they are two nodes *on the course*, so the path has two stones that lead
+  nowhere until the tutor has a place.
 - **the dictionary** and kanji detail
 - **settings**, **pomodoro**, **word of the day**, **CSV export**
 
+The curriculum map has come off this list — it is STUDY now.
+
 The menu's own UP NEXT button is the app's "Up next" block and matches it well, so the
-recommendation engine at least is represented.
+recommendation engine at least is represented. Worth noting the two now overlap: UP NEXT and the
+course are both answering "what next", from `recommendations` and from `progression` respectively.
+They should agree, and if they ever disagree the button is the one that is wrong.
 
 # Open items
 
-1. **L2 → L4 for SENTENCES and READING.** Two tiles want the corridor one level early and the
-   code has no path for it.
-2. **DAILY's L3 has nowhere to stand** now the shrine walk is hidden.
-3. **The corridor is unbuilt.** `ZEN_L4`'s pose exists for STUDY only; the other five sections
-   need their own, or a derived fallback.
-4. **Session settings** — does the game screen ask for length and toggles, or take the defaults?
-5. **`L3_LEVELS` is stale** — 32/31/105/89/133 in the file against 44/35/109/93/137 in the app.
+1. **The route is uncomposed.** Sixteen stops from the main gate to the arbour, 139 units apart.
+   Whether the camera stops at each or glides past with the type doing the work is a composition
+   question nobody has answered.
+2. **`Zen_Curve` is dropped at parse.** Un-dropping it gives the walk a real spine instead of
+   sixteen straight hops between points. It is one line in `ENV_CAM_BLOCK`.
+3. **Two dead stones** — scripted and free conversation, above.
+4. **READING still wants the corridor one level early**, and the code has no L2→L4 path.
+5. **DAILY's L3 has nowhere to stand** now the shrine walk is hidden.
+6. **Session settings** — does the game screen ask for length and toggles, or take the defaults?
+7. **`L3_LEVELS` is stale** — 32/31/105/89/133 in the file against 44/35/109/93/137 in the app.
+   Still worth fixing even though STUDY no longer shows a level list: the numbers are wrong
+   wherever they are read.
+8. **One stray stone.** `Zen_Garden_TobiIshi_001` reports a world position of exactly (0, 0, 0),
+   which is 8,800 units from every other stone in the chain. Either an unplaced object or a
+   parent whose transform never arrived — worth a look in the .blend before the path is laid.
