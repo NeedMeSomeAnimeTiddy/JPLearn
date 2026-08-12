@@ -1563,153 +1563,211 @@
   .cs-step[data-state="ahead"] .cs-bar i { background: rgba(242, 234, 216, 0.3); }
   .cs-step.on .cs-mark { transform: scale(1.5) rotate(45deg); }
 
-  /* ---- 径 PATH · the course drawn as a course --------------------------------------------------
-     A serpentine of sixteen nodes with the route behind them, gold as far as you have walked and a
-     hairline after. That one detail is what a list can never do: the line itself carries the
-     progress, so direction and position are legible before you have read a single word.
-     Only three nodes are ever lettered — the one you are on and its two neighbours. Sixteen labels
-     on a 300px-wide snake is a knot, and the whole point of a map is the shape. */
-  .hud[data-course="path"] .course-wrap { width: var(--cs-w); height: var(--cs-h); }
-  .hud[data-course="path"] .cs-line { position: absolute; left: 0; top: 0; overflow: visible; }
-  .hud[data-course="path"] .cs-track {
-    fill: none; stroke: rgba(242, 234, 216, 0.22); stroke-width: 3;
-    stroke-linecap: round; stroke-linejoin: round;
-  }
-  .hud[data-course="path"] .cs-trav {
-    fill: none; stroke: var(--gold); stroke-width: 5;
-    stroke-linecap: round; stroke-linejoin: round;
-    filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.45));
-  }
-  .hud[data-course="path"] .cs-step {
-    position: absolute; left: var(--x); top: var(--y);
-    transform: translate(-50%, -50%);
-  }
-  .hud[data-course="path"] .cs-mark { width: 15px; height: 15px; margin: 0 auto; }
-  .hud[data-course="path"] .cs-step[data-state="here"] .cs-mark { width: 23px; height: 23px; }
-  .hud[data-course="path"] .cs-no,
-  .hud[data-course="path"] .cs-want,
-  .hud[data-course="path"] .cs-pct,
-  .hud[data-course="path"] .cs-bar,
-  .hud[data-course="path"] .cs-jp { display: none; }
-  .hud[data-course="path"] .cs-en {
-    position: absolute; left: 26px; top: 50%; transform: translateY(-50%) skewX(-8deg);
-    font-size: 15px; opacity: 0; transition: opacity 0.26s ease;
-  }
-  /* the lettered three: the step you are on, and one either side of the cursor */
-  .hud[data-course="path"] .cs-step[data-state="here"] .cs-en,
-  .hud[data-course="path"] .cs-step.on .cs-en { opacity: 1; }
-  .hud[data-course="path"] .cs-step.on .cs-en { font-size: 21px; }
-  /* nodes on the left half letter to their right and vice versa, or a label runs off the panel */
-  .hud[data-course="path"] .cs-step.on { z-index: 3; }
+  /* ================================================================================================
+     THE LADDER, FOUR WAYS. C cycles them.
 
-  /* ---- 梯 LADDER · all sixteen on one rule ----------------------------------------------------
-     One continuous vertical rule with every step hung off it, sized by what it is: a finished step
-     is a tight ticked line, the one you are on breaks out to full size with its bar and its gate,
-     and the ones ahead compress to a name. All sixteen fit because most of them are small, and the
-     rule is what gives a column of type a direction. */
-  .hud[data-course="ladder"] .course-wrap {
-    display: flex; flex-direction: column; gap: 0;
-    padding-left: 26px; position: relative; width: 430px;
+     THREE THINGS WERE WRONG WITH THE FIRST PASS AND ALL THREE ARE FIXED HERE, GLOBALLY:
+
+     1. THE BARS HAD NO GROUND. A track at 20% cream is nothing over raked gravel, so sixteen bars
+        read as gold rules hanging in mid-air and every 0% step showed nothing at all. This is the
+        same lesson the figure chips learned: type and measures over a lit valley need a ground, not
+        an alpha. The track is an ink wash with a hairline now and reads anywhere.
+
+     2. THE RULE IS MADE OF THE STEPS. It used to be one gradient stopping at a computed `--done`
+        percentage, which cannot be right in two columns (both got the same 53%) and is a second
+        source of truth for something every step already knows. Each step now carries its own left
+        border in its own state's colour, so the rule is gold exactly as far as the gold goes. Per
+        step, not per cent.
+
+     3. SIXTEEN ROWS IN ONE COLUMN CANNOT BE BIG. Measured: the head lands at y 99 and the panel's
+        bottom padding puts the content floor at 641, so the block has about 435px. Fifteen compact
+        rows plus one expanded is 24px and 80px at best, which is where the first ladder's cramped
+        22px came from. It is not a taste failure, it is arithmetic — and the way out is to stop
+        using one column, which is what FLIGHTS and STAIR do.
+     ================================================================================================ */
+  .hud[data-course] .cs-line { display: none; }
+  .hud[data-course] .cs-step {
+    position: relative;
+    border-left: 4px solid rgba(242, 234, 216, 0.16);
+    box-shadow: -2px 0 0 rgba(0, 0, 0, 0.4);
   }
-  .hud[data-course="ladder"] .course-wrap::before {
-    content: ''; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 3px;
-    background: linear-gradient(180deg, var(--gold) 0%, var(--gold) var(--done, 50%),
-      rgba(242, 234, 216, 0.2) var(--done, 50%), rgba(242, 234, 216, 0.2) 100%);
+  .hud[data-course] .cs-step[data-state="done"] { border-left-color: var(--gold); }
+  .hud[data-course] .cs-step[data-state="here"] { border-left-color: var(--hi); }
+  .hud[data-course] .cs-step.on { border-left-color: var(--hi); }
+  .hud[data-course] .cs-no {
+    font-size: 10px; color: rgba(242, 234, 216, 0.42); letter-spacing: 0.12em;
+  }
+  .hud[data-course] .cs-want { display: none; }
+  /* the measure gets a ground, and so does its number -- see note 1 */
+  .hud[data-course] .cs-bar {
+    height: 7px; background: rgba(12, 10, 8, 0.62);
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(242, 234, 216, 0.18);
+  }
+  .hud[data-course] .cs-bar i { background: var(--gold); }
+  .hud[data-course] .cs-step[data-state="ahead"] .cs-bar { background: rgba(12, 10, 8, 0.42); }
+  .hud[data-course] .cs-pct {
+    font-size: 10.5px; color: var(--gold-hi); text-align: center;
+    font-variant-numeric: tabular-nums;
+    background: rgba(12, 10, 8, 0.62); padding: 2px 0 1px;
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4);
+  }
+  .hud[data-course] .cs-step[data-state="ahead"] .cs-pct {
+    color: rgba(242, 234, 216, 0.5); background: rgba(12, 10, 8, 0.4);
+  }
+  .hud[data-course] .cs-jp { display: none; }
+  .hud[data-course] .cs-step.on .cs-jp { display: block; color: var(--washi-dim); }
+  .hud[data-course] .cs-step.on .cs-no { color: var(--gold-hi); }
+  .hud[data-course] .cs-step.on .cs-bar { height: 10px; }
+  .hud[data-course] .cs-step.on .cs-bar i { background: var(--gold-hi); }
+  .hud[data-course] .cs-step.on .cs-pct {
+    font-size: 15px; font-family: var(--lat); font-style: italic; font-weight: 900;
+    letter-spacing: 0; color: var(--gold-hi);
+  }
+  .hud[data-course] .cs-mark { position: absolute; }
+
+  /* ---- \u5e83 WIDE \u00b7 one column, every step measured -----------------------------------------
+     The first ladder with the width it should have had: 880 across, so every step carries a 300px
+     bar and sixteen of them can be compared at a glance. That is the gain -- a ladder of names says
+     where you are, a ladder of bars says how each part is going, and the second is what a course is
+     for. The rows are 24px because sixteen in one column cannot be more (note 3). */
+  .hud[data-course="wide"] .course-wrap {
+    display: flex; flex-direction: column; gap: 3px; width: 880px;
+  }
+  .hud[data-course="wide"] .cs-step {
+    display: grid; grid-template-columns: 26px 1fr 300px 46px;
+    grid-template-areas: 'no en bar pct';
+    align-items: center; gap: 0 18px; height: 24px; padding-left: 18px;
+  }
+  .hud[data-course="wide"] .cs-mark { left: -9px; top: 50%; width: 11px; height: 11px; margin-top: -6px; }
+  .hud[data-course="wide"] .cs-no { grid-area: no; }
+  .hud[data-course="wide"] .cs-en { grid-area: en; font-size: 18px; }
+  .hud[data-course="wide"] .cs-bar { grid-area: bar; }
+  .hud[data-course="wide"] .cs-pct { grid-area: pct; }
+  .hud[data-course="wide"] .cs-step.on {
+    height: 84px; grid-template-areas: 'no en bar pct' 'no jp bar pct';
+    align-content: center; gap: 3px 18px;
+  }
+  .hud[data-course="wide"] .cs-step.on .cs-mark { width: 15px; height: 15px; margin-top: -8px; left: -11px; }
+  .hud[data-course="wide"] .cs-step.on .cs-en { font-size: 34px; }
+  .hud[data-course="wide"] .cs-step.on .cs-no { font-size: 20px; }
+  .hud[data-course="wide"] .cs-step.on .cs-jp { grid-area: jp; font-size: 13px; }
+
+  /* ---- \u6bb5 STAIR \u00b7 the layout is the direction -----------------------------------------
+     Every step sits 34px further right than the one above, so the column IS a flight of stairs and
+     nothing has to be drawn to say which way it goes. Each step's own left border is its piece of
+     the rule and a stub joins it to the one above, so the whole thing draws itself out of sixteen
+     borders. Spreading sideways is also what buys the height back: rows can be 26px here because
+     the eye is following a diagonal rather than scanning a column. */
+  /* 1010 AND 24, MEASURED AGAINST THE SLAB. At 1130 wide with a 34px tread the staircase walks
+     right into the action button: step thirteen's row overlapped it, which a collision test caught
+     and the eye would have caught later. The tread has to be small enough that sixteen of them stay
+     left of x 1185, which is where that corner starts. */
+  .hud[data-course="stair"] .course-wrap {
+    display: flex; flex-direction: column; width: 1010px;
+  }
+  .hud[data-course="stair"] .cs-step {
+    margin-left: calc(var(--i) * 24px);
+    display: grid; grid-template-columns: 24px 1fr 150px 46px;
+    grid-template-areas: 'no en bar pct';
+    align-items: center; gap: 0 14px; height: 26px; padding-left: 15px;
+  }
+  /* the tread, joining each step's rule to the one above it */
+  .hud[data-course="stair"] .cs-step::before {
+    content: ''; position: absolute; left: -28px; top: -4px; width: 28px; height: 4px;
+    background: rgba(242, 234, 216, 0.16); box-shadow: 0 -2px 0 rgba(0, 0, 0, 0.35);
+  }
+  .hud[data-course="stair"] .cs-step[data-state="done"]::before { background: var(--gold); }
+  .hud[data-course="stair"] .cs-step:first-child::before { display: none; }
+  .hud[data-course="stair"] .cs-mark { left: -9px; top: 50%; width: 11px; height: 11px; margin-top: -6px; }
+  .hud[data-course="stair"] .cs-no { grid-area: no; }
+  .hud[data-course="stair"] .cs-en { grid-area: en; font-size: 18px; }
+  .hud[data-course="stair"] .cs-bar { grid-area: bar; }
+  .hud[data-course="stair"] .cs-pct { grid-area: pct; }
+  .hud[data-course="stair"] .cs-step.on {
+    height: 80px; grid-template-areas: 'no en bar pct' 'no jp bar pct';
+    align-content: center; gap: 3px 14px;
+  }
+  .hud[data-course="stair"] .cs-step.on .cs-mark { width: 15px; height: 15px; margin-top: -8px; left: -11px; }
+  .hud[data-course="stair"] .cs-step.on .cs-en { font-size: 32px; }
+  .hud[data-course="stair"] .cs-step.on .cs-jp { grid-area: jp; font-size: 13px; }
+
+  /* ---- \u53cc FLIGHTS \u00b7 two flights of eight ---------------------------------------------
+     THE ONE THAT SOLVES THE ARITHMETIC. Eight steps to a flight means each can be 40px instead of
+     24, which is the difference between a list and something you read.
+
+     AND IT IS COLUMNS, NOT A GRID. The first pass used `grid-auto-flow: column` with eight rows,
+     which couples the two flights: row one holds step one AND step nine, so expanding step nine to
+     96px stretched step one's row to match and left it floating alone in the gap. CSS multi-column
+     flows each column independently and has no such row, which is exactly the property wanted. */
+  .hud[data-course="flights"] .course-wrap {
+    column-count: 2; column-gap: 90px; width: 1090px;
+  }
+  .hud[data-course="flights"] .cs-step {
+    break-inside: avoid; margin-bottom: 5px;
+    display: grid; grid-template-columns: 24px 1fr 120px 44px;
+    grid-template-areas: 'no en bar pct';
+    align-items: center; gap: 0 15px; height: 40px; padding-left: 17px;
+  }
+  .hud[data-course="flights"] .cs-mark { left: -9px; top: 50%; width: 12px; height: 12px; margin-top: -6px; }
+  .hud[data-course="flights"] .cs-no { grid-area: no; }
+  .hud[data-course="flights"] .cs-en { grid-area: en; font-size: 22px; }
+  .hud[data-course="flights"] .cs-bar { grid-area: bar; }
+  .hud[data-course="flights"] .cs-pct { grid-area: pct; }
+  .hud[data-course="flights"] .cs-step.on {
+    height: 96px; grid-template-areas: 'no en bar pct' 'no jp bar pct';
+    align-content: center; gap: 4px 15px;
+  }
+  .hud[data-course="flights"] .cs-step.on .cs-mark { width: 17px; height: 17px; margin-top: -9px; left: -11px; }
+  .hud[data-course="flights"] .cs-step.on .cs-en { font-size: 38px; }
+  .hud[data-course="flights"] .cs-step.on .cs-no { font-size: 22px; }
+  .hud[data-course="flights"] .cs-step.on .cs-jp { grid-area: jp; font-size: 14px; }
+
+  /* ---- \u80cc SPINE \u00b7 names left, progress right ---------------------------------------
+     The rule stops being a margin and becomes an axis. Names sit on its left reading toward it,
+     measures on its right reading away, so the two questions -- which step is this, how is it going
+     -- stop sharing a direction. That is what makes a wide row hard to scan, and it is the reason
+     this one stays legible at 22px where WIDE does not.
+     Here the border trick is inverted: the steps carry their rule on the RIGHT, so the spine is
+     built out of the name column's edge. */
+  .hud[data-course="spine"] .course-wrap {
+    display: flex; flex-direction: column; gap: 3px; width: 900px;
+  }
+  .hud[data-course="spine"] .cs-step {
+    display: grid; grid-template-columns: 1fr 4px 1fr;
+    grid-template-areas: 'en mark bar';
+    align-items: center; height: 24px; gap: 0;
+    border-left: 0; box-shadow: none;
+  }
+  /* the spine itself: each step's middle cell is its own segment of it */
+  .hud[data-course="spine"] .cs-mark {
+    position: static; grid-area: mark; width: 4px; height: 100%;
     box-shadow: 2px 0 0 rgba(0, 0, 0, 0.4);
   }
-  .hud[data-course="ladder"] .cs-line { display: none; }
-  .hud[data-course="ladder"] .cs-step {
-    position: relative; display: grid; align-items: center;
-    grid-template-columns: auto 1fr auto; gap: 0 11px; height: 22px;
-    transition: height 0.3s ease;
+  .hud[data-course="spine"] .cs-step[data-state="ahead"] .cs-mark {
+    background: rgba(242, 234, 216, 0.16); box-shadow: 2px 0 0 rgba(0, 0, 0, 0.35);
   }
-  .hud[data-course="ladder"] .cs-mark {
-    width: 9px; height: 9px; position: absolute; left: -24px; top: 50%; margin-top: -5px;
+  /* NOT ROTATED HERE. The shared rule turns the selected step's mark into a diamond — right when
+     the mark is a small square, wrong when it is a 4px segment of the spine itself, which came out
+     as a diagonal slash across the axis. The spine says "this one" by being vermilion. */
+  .hud[data-course="spine"] .cs-step.on .cs-mark { transform: none; }
+  .hud[data-course="spine"] .cs-en {
+    grid-area: en; font-size: 19px; text-align: right; padding-right: 22px;
   }
-  .hud[data-course="ladder"] .cs-no {
-    font-size: 9px; color: rgba(242, 234, 216, 0.4); min-width: 20px;
+  .hud[data-course="spine"] .cs-bar { grid-area: bar; margin-left: 22px; max-width: 270px; }
+  .hud[data-course="spine"] .cs-no { display: none; }
+  .hud[data-course="spine"] .cs-pct {
+    position: absolute; left: calc(50% + 314px); top: 50%; transform: translateY(-50%); width: 46px;
   }
-  .hud[data-course="ladder"] .cs-en { font-size: 15px; }
-  .hud[data-course="ladder"] .cs-pct {
-    font-size: 9.5px; color: rgba(232, 196, 124, 0.7); text-align: right;
+  .hud[data-course="spine"] .cs-step.on {
+    height: 86px; grid-template-areas: 'en mark bar' 'jp mark pct';
+    align-content: center; gap: 5px 0;
   }
-  .hud[data-course="ladder"] .cs-jp,
-  .hud[data-course="ladder"] .cs-want,
-  .hud[data-course="ladder"] .cs-bar { display: none; }
-  /* and the one you are on takes the room */
-  .hud[data-course="ladder"] .cs-step.on {
-    height: 74px; grid-template-columns: auto 1fr auto;
-    grid-template-areas: 'no en pct' 'no jp pct' 'no bar pct';
+  .hud[data-course="spine"] .cs-step.on .cs-en { font-size: 38px; }
+  .hud[data-course="spine"] .cs-step.on .cs-jp {
+    grid-area: jp; font-size: 13px; text-align: right; padding-right: 22px;
   }
-  .hud[data-course="ladder"] .cs-step.on .cs-mark { width: 13px; height: 13px; margin-top: -7px; }
-  .hud[data-course="ladder"] .cs-step.on .cs-no { grid-area: no; font-size: 22px; color: var(--gold-hi); }
-  .hud[data-course="ladder"] .cs-step.on .cs-en { grid-area: en; font-size: 30px; }
-  .hud[data-course="ladder"] .cs-step.on .cs-jp {
-    grid-area: jp; display: block; font-size: 12px; color: var(--washi-dim);
-  }
-  .hud[data-course="ladder"] .cs-step.on .cs-bar {
-    grid-area: bar; display: block; height: 5px; margin-top: 5px; max-width: 240px;
-  }
-  .hud[data-course="ladder"] .cs-step.on .cs-pct { grid-area: pct; font-size: 15px; color: var(--gold-hi); }
-
-  /* ---- 札 HERO · one card, and the rest a filmstrip -------------------------------------------
-     The step you are on is the only thing at full size — an ink-on-washi card, the treatment this
-     project gives anything meant to read as an object — and the whole course runs under it as
-     sixteen marks with the current one raised. Detail and overview on separate axes, which is the
-     one arrangement of the three where neither has to compromise for the other. */
-  .hud[data-course="hero"] .course-wrap {
-    display: flex; flex-wrap: wrap; gap: 7px 6px; width: 430px; align-items: flex-end;
-  }
-  .hud[data-course="hero"] .cs-line { display: none; }
-  /* the filmstrip is bigger than the first pass, where 18x9 marks read as a progress bar chopped
-     into pieces rather than as sixteen things you could go to */
-  .hud[data-course="hero"] .cs-step {
-    order: 2; width: 22px; height: 34px; display: flex; align-items: flex-end;
-  }
-  .hud[data-course="hero"] .cs-mark { width: 22px; height: 11px; }
-  .hud[data-course="hero"] .cs-step[data-state="here"] .cs-mark { height: 26px; }
-  .hud[data-course="hero"] .cs-step.on .cs-mark { transform: none; height: 34px; }
-  .hud[data-course="hero"] .cs-no,
-  .hud[data-course="hero"] .cs-en,
-  .hud[data-course="hero"] .cs-jp,
-  .hud[data-course="hero"] .cs-want,
-  .hud[data-course="hero"] .cs-bar,
-  .hud[data-course="hero"] .cs-pct { display: none; }
-  .hud[data-course="hero"] .cs-step.on {
-    order: 1; width: 100%; height: auto;
-    display: grid; grid-template-columns: auto 1fr; gap: 2px 15px;
-    grid-template-areas: 'no en' 'no jp' 'bar bar' 'want pct';
-    background: var(--washi); padding: 15px 18px 14px;
-    transform: skewX(-8deg); transform-origin: left center;
-    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.42);
-    margin-bottom: 13px;
-  }
-  .hud[data-course="hero"] .cs-step.on .cs-mark { display: none; }
-  .hud[data-course="hero"] .cs-step.on .cs-no {
-    grid-area: no; display: block; font-size: 34px; font-family: var(--lat);
-    font-style: italic; font-weight: 900; letter-spacing: 0;
-    color: rgba(20, 17, 13, 0.28); align-self: start;
-  }
-  .hud[data-course="hero"] .cs-step.on .cs-en {
-    grid-area: en; display: block; font-size: 32px; color: var(--ink);
-    -webkit-text-stroke: 0; transform: none;
-  }
-  .hud[data-course="hero"] .cs-step.on .cs-jp {
-    grid-area: jp; display: block; font-size: 13px; color: rgba(20, 17, 13, 0.6);
-    -webkit-text-stroke: 0;
-  }
-  .hud[data-course="hero"] .cs-step.on .cs-bar {
-    grid-area: bar; display: block; height: 5px; margin-top: 11px;
-    background: rgba(20, 17, 13, 0.16);
-  }
-  .hud[data-course="hero"] .cs-step.on .cs-bar i { background: var(--hi); }
-  .hud[data-course="hero"] .cs-step.on .cs-want {
-    grid-area: want; display: block; font-size: 9px; margin-top: 8px;
-    color: rgba(20, 17, 13, 0.55);
-  }
-  .hud[data-course="hero"] .cs-step.on .cs-pct {
-    grid-area: pct; display: block; font-size: 13px; margin-top: 7px; text-align: right;
-    font-family: var(--lat); font-style: italic; font-weight: 900; color: var(--hi);
+  .hud[data-course="spine"] .cs-step.on .cs-pct {
+    position: static; grid-area: pct; margin-left: 22px; text-align: left; width: 70px;
   }
 
   /* ---- the slab, when it is the action rather than a caption ---------------------------------- */
@@ -16842,10 +16900,18 @@ function onCourse() { return HUD.on && HUD.sec === 'STUDY' && HUD.level === 2 &&
    in as custom properties so even the path is positioned by the stylesheet rather than by a second
    renderer. Three renderers would have meant three places for a state to go stale.
    ================================================================================================ */
+/* FOUR LADDERS, after the first one was picked and its looks were not. The idea survived — one
+   rule, all sixteen steps, sized by state — and what was wrong was the room it was given: a 430px
+   column hard against the left edge, 22px a row, type at 15px, bars hidden, and most of the screen
+   empty beside it. The panel is full-bleed (`left: 0; right: 0`), so the middle was always
+   available and the first pass simply did not take it.
+   Each of these takes a different amount of it, and one of them stops using a straight rule at all.
+   The serpentine and the hero card are gone; they are in git if the ladder loses. */
 const COURSE_SHAPES = [
-  ['path', '径', 'the course drawn as a course · a serpentine of sixteen nodes'],
-  ['ladder', '梯', 'all sixteen on one rule, sized by state'],
-  ['hero', '札', 'one card for the step you are on, the rest a filmstrip'],
+  ['wide', '広', 'full-width rows, a long bar on every step'],
+  ['stair', '段', 'each step indented past the last · the layout is the direction'],
+  ['flights', '双', 'two flights of eight, side by side'],
+  ['spine', '背', 'the rule down the middle, names left, progress right'],
 ];
 
 /* the serpentine, in the container's own pixels so the line and the nodes cannot disagree. A sine
@@ -16874,8 +16940,11 @@ function courseMarkup(rows) {
   const lineDone = pts.slice(0, doneTo + 1).map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ');
   const steps = rows.map((r, i) => {
     const p = pts[i];
+    /* `--i` is the step's index as a NUMBER, which the staircase needs for its indent —
+        `calc(var(--i) * 38px)`. `--x`/`--y` are kept for any shape that wants to place a step
+        freely; none of the four ladders does, but they cost one attribute. */
     return `<button class="cs-step" data-i="${i}" data-state="${r.state}"`
-      + ` style="--x:${p.x}px; --y:${p.y}px">`
+      + ` style="--i:${i}; --x:${p.x}px; --y:${p.y}px">`
       + `<span class="cs-mark"></span>`
       + `<span class="cs-no">${r.no}</span>`
       + `<span class="cs-en">${r.big}</span>`
