@@ -1503,43 +1503,59 @@
   }
 
   /* ================================================================================================
-     THE COURSE, REBUILT FROM REFERENCE. C cycles the three; `NAV.course(n)` names them.
+     THE COURSE, THIRD TIME, AND THIS TIME THE SURFACE CHANGED RATHER THAN THE LAYOUT.
 
-     WHY THE PREVIOUS FOUR WERE THROWN OUT, written down so it is not done a third time: every one of
-     them was a SPREADSHEET. Number, name, hairline bar, percentage, aligned into four columns with a
-     rule down the side, sixteen times over. That is a TABLE of the course, and no amount of colour,
-     indent or column count turns a table into a picture of a journey. Rearranging the columns was
-     never going to fix it, which is why nothing here descends from any of them.
+     SEVEN DESIGNS HAVE NOW BEEN REJECTED as ugly across TWO completely different structures -- four
+     ladders, then a printed sheet, a calendar and a stack of save slabs. When the structure changes
+     twice and the reaction does not, the structure was never the problem. What every one of the seven
+     had in common is the SURFACE:
 
-     WHAT THE REFERENCE ACTUALLY DOES. Persona 5 / P5R by way of the Game UI Database: the save list,
-     the mission list, the story list, the rank list, the calendar. Four moves, and the ladders made
-     none of them:
+         heavy italic display type, skewed, at high contrast
+         hard black offset shadows on everything
+         a keyline or an ink wash on every element, fighting a bright lit valley
+         one loud vermilion fill shouting over all of it
+         and no imagery of any kind -- seven designs made entirely of words
 
-       1. THE STATE IS A WORD, SET LARGE. `DONE!` in heavy outlined display type at the HEAD of the
-          row is the loudest thing on it. Not a tick, not a bar, not a colour you have to learn.
-       2. THE SELECTION IS A FILLED SLAB THAT BREAKS THE EDGE, and ends in a point. It does not
-          recolour a border; it overhangs the sheet it lives on and puts its type up two sizes.
-       3. NUMERALS ARE ENORMOUS. A step's number is 30-70px of display type, not a 10px grey label.
-       4. NOTHING IS MEASURED SIXTEEN TIMES. Sixteen little bars is sixteen things to read and no
-          hierarchy at all. One big italic percentage, on the step you are pointing at, is one.
+     That is Persona's surface, and it was imported from Persona's LIST STRUCTURES without noticing
+     that Persona's art direction is the exact opposite of this world's. Persona 5 is red, black,
+     urban and loud. This valley is a soft low-poly Japanese landscape at sunset -- a pagoda, raked
+     gravel, bamboo, green hills. A shouting interface over it is not a style clash at the margins,
+     it is the whole problem.
 
-     AND FROM THE PRINTED RACE-BOARDS THE WHOLE IDEA COMES FROM -- single-track Edo and Meiji board
-     games printed on one sheet, which is exactly this feature drawn by hand two centuries ago: the
-     board is PAPER. Ink on cream, red annotation, a number above each square's name. That is where
-     SHEET's inversion comes from, and it is worth having because everything else in this interface
-     is cream type over a dark valley: a printed sheet reads as an OBJECT arriving on the screen
-     rather than as another restyle of the panel.
+     SO THE REFERENCE FAMILY CHANGED: Ghost of Tsushima, whose art direction is this one's neighbour.
+     Its menus (via the Game UI Database) do five things, and the seven rejected designs did none:
 
-     SHARED: square corners, the -8deg skew on anything filled, gold for earned, vermilion for the
-     one thing to press, ink for what has not happened, and the keyline (`paint-order: stroke fill`)
-     on any type left standing over the valley.
+       1. THE GROUND IS CRUSHED, NOT FOUGHT. Its menu backgrounds are concept art with the values
+          crushed to near-monochrome, which is why its type needs no keyline, no wash and no shadow.
+          Every legibility fix in this file so far has been a per-element patch for a problem you can
+          solve once, behind the whole panel. `backdrop-filter` on one fixed layer replaces the
+          keyline on every piece of type at level two.
+       2. THE TYPE IS QUIET. Thin, unskewed, small, generously letterspaced, near-white on dark.
+          No italic, no black weight, no shadow. Nothing in its menus shouts, and it is the most
+          legible interface of any game looked at for this.
+       3. THE UNIT IS A CREST, NOT A ROW. Skills are marks -- a glyph inside a diamond -- so the
+          screen is a field of SYMBOLS with names beside them rather than sixteen lines of words.
+          That is the imagery all seven attempts were missing entirely.
+       4. PROGRESS IS PIPS, NOT BARS. `NEXT UPGRADE` is four diamonds, three filled. Sixteen
+          percentage bars was always sixteen things to read; a four-pip row is one glance.
+       5. ONE RED, USED AS A WASH ON THE SELECTED THING ONLY. Never as a slab, never as a fill you
+          could mistake for decoration.
+
+     AND ONE HOUSE RULE OVERRIDES THE REFERENCE: its crests are CIRCLES, and this UI does not have a
+     rounded corner anywhere in it. They are diamonds here -- a square turned 45 degrees, with the
+     glyph turned back upright inside it, which is how the reference draws its upgrade marks anyway.
      ================================================================================================ */
-  /* ALL THREE OCCUPY THE SAME HEIGHT, or the section title moves when you cycle them: the panel's
-     stack is bottom-anchored, so a block 60px taller pushes the heading up by 60. Measured, the head
-     sits at y 99 and the content floor is 641, so the budget is about 435 and the floor is 400.
-     Every one of the three below is arithmetic'd against that number in its own note. */
+  /* THE ONE LAYER THAT REPLACES EVERY KEYLINE. Values crushed behind the whole panel, so cream type
+     at 400 weight reads over raked gravel with nothing added to it. z-index -1 inside `.hud` (which
+     is a stacking context at 4) puts it behind the panel's own content and above the canvas; the
+     chrome at 5 stays in full colour above it, the way the reference keeps its nav bar crisp. */
+  .hud[data-course]::before {
+    content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    backdrop-filter: grayscale(0.92) brightness(0.46) contrast(1.14);
+    -webkit-backdrop-filter: grayscale(0.92) brightness(0.46) contrast(1.14);
+  }
   .course-shape {
-    position: relative; margin-top: 10px;
+    position: relative; margin-top: 12px;
     min-height: 400px; display: flex; align-items: flex-start;
   }
   .course-wrap { position: relative; }
@@ -1547,341 +1563,228 @@
     background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
     font: inherit; color: inherit; display: block;
   }
-  /* THE STATE AS A WORD -- move 1, and the single biggest thing the ladders were missing. Display
-     type, because it is meant to be read before the name is. */
-  .cs-tag {
-    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
-    white-space: nowrap; letter-spacing: 0.01em;
-    paint-order: stroke fill; -webkit-text-stroke: 0.05em rgba(8, 11, 18, 0.92);
-    transition: color 0.24s ease;
+  /* ---- THE CREST. A diamond, and the glyph inside it stands upright. ---- */
+  .cs-seal {
+    display: grid; place-items: center; box-sizing: border-box;
+    transform: rotate(45deg);
+    transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.36s var(--ease-pop);
   }
-  /* the number twice: `.cs-no` padded for a printed right-hand column, `.cs-num` bare for the
-     calendar's numerals. One would have meant a shape formatting the other's text in CSS. */
-  .cs-num {
-    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
-    white-space: nowrap; font-variant-numeric: tabular-nums;
+  .cs-seal i {
+    display: block; transform: rotate(-45deg); font-family: var(--jp); font-style: normal;
+    line-height: 1;
   }
+  .cs-step[data-state="done"] .cs-seal {
+    background: rgba(10, 9, 6, 0.72); box-shadow: inset 0 0 0 1.5px var(--gold);
+  }
+  .cs-step[data-state="done"] .cs-seal i { color: var(--gold-hi); }
+  .cs-step[data-state="here"] .cs-seal {
+    background: rgba(10, 9, 6, 0.72); box-shadow: inset 0 0 0 1.5px var(--hi);
+  }
+  .cs-step[data-state="here"] .cs-seal i { color: #fff; }
+  .cs-step[data-state="ahead"] .cs-seal {
+    background: rgba(10, 9, 6, 0.5); box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.2);
+  }
+  .cs-step[data-state="ahead"] .cs-seal i { color: rgba(242, 234, 216, 0.28); }
+  /* the pick: the reference frames the selected mark in red rather than filling it */
+  .cs-step.on .cs-seal {
+    box-shadow: inset 0 0 0 2px var(--hi), 0 0 0 4px rgba(227, 74, 51, 0.28);
+    transform: rotate(45deg) scale(1.1);
+  }
+  /* ---- THE TYPE. Thin, unskewed, letterspaced, and NOTHING added to it. ---- */
   .cs-en {
-    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
-    white-space: nowrap; transform: skewX(-8deg);
-    paint-order: stroke fill; -webkit-text-stroke: 0.05em rgba(8, 11, 18, 0.92);
-    transition: color 0.28s ease, font-size 0.3s ease;
+    display: block; font-family: var(--lat-ui); font-weight: 500; font-style: normal;
+    letter-spacing: 0.18em; white-space: nowrap; transform: none;
+    -webkit-text-stroke: 0; text-shadow: none;
+    transition: color 0.26s ease;
   }
   .cs-jp {
-    display: block; font-family: var(--jp-go); font-weight: 700; white-space: nowrap;
-    paint-order: stroke fill; -webkit-text-stroke: 0.06em rgba(8, 11, 18, 0.9);
+    display: block; font-family: var(--jp-go); font-weight: 400; white-space: nowrap;
+    -webkit-text-stroke: 0; text-shadow: none;
   }
-  .cs-no, .cs-want, .cs-pct {
-    display: block; font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
-    white-space: nowrap;
+  .cs-no, .cs-num, .cs-want, .cs-pct, .cs-tag {
+    display: block; font-family: var(--lat-ui); font-weight: 500; letter-spacing: 0.18em;
+    white-space: nowrap; font-style: normal; -webkit-text-stroke: 0; text-shadow: none;
   }
-  /* ONE BAR IN THE WHOLE FEATURE, and only the calendar draws it -- under a 70px name, 620 wide,
-     where it is a reading rather than a repeated decoration. It keeps the ink ground the figure
-     chips had to learn twice: a track at 20% cream over raked gravel is nothing, and a 0% step then
-     shows no bar at all, which looks like a rendering fault instead of a fact. */
-  .cs-bar { display: block; background: rgba(10, 9, 6, 0.82); overflow: hidden;
-    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(242, 234, 216, 0.26); }
-  .cs-bar i { display: block; height: 100%; background: var(--gold-hi); }
+  .cs-step[data-state="done"] .cs-en { color: rgba(242, 234, 216, 0.82); }
+  .cs-step[data-state="here"] .cs-en { color: #fff; }
+  .cs-step[data-state="ahead"] .cs-en { color: rgba(242, 234, 216, 0.34); }
+  .cs-step[data-state="ahead"] .cs-jp { color: rgba(242, 234, 216, 0.24); }
+  .cs-step.on .cs-en { color: #fff; }
+  /* ---- THE PIPS. Five diamonds a step, which is the whole measure. ---- */
+  .cs-pips { display: flex; gap: 4px; align-items: center; }
+  .cs-pips u {
+    display: block; width: 5px; height: 5px; transform: rotate(45deg);
+    background: rgba(242, 234, 216, 0.16); text-decoration: none;
+  }
+  .cs-pips u[data-on="1"] { background: var(--gold); }
+  .cs-step[data-state="here"] .cs-pips u[data-on="1"] { background: var(--hi); }
+  /* ---- THE GROUPS. Four of them, contiguous, in the course's own order. ---- */
+  .cs-ghead { display: block; }
+  .cs-ghead b {
+    display: block; font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.24em;
+    color: var(--washi); font-size: 12px;
+  }
+  .cs-ghead i {
+    display: block; font-family: var(--lat-ui); font-style: normal; font-weight: 400;
+    letter-spacing: 0.1em; font-size: 10px; color: rgba(242, 234, 216, 0.44); margin-top: 3px;
+  }
+  /* the group's own pip row -- one diamond per step in it, which is the reference's NEXT UPGRADE
+     row doing the job sixteen percentage columns used to do */
+  .cs-ghead u { display: flex; gap: 5px; margin-top: 8px; text-decoration: none; }
+  .cs-ghead u s {
+    display: block; width: 7px; height: 7px; transform: rotate(45deg); text-decoration: none;
+    background: rgba(242, 234, 216, 0.16);
+  }
+  .cs-ghead u s[data-state="done"] { background: var(--gold); }
+  .cs-ghead u s[data-state="here"] { background: var(--hi); }
 
-  /* ---- 刷 SHEET · the course as a printed sheet ------------------------------------------------
-     Ink on cream. The stat chips have been ink-on-washi since the aesthetics pass and this is that
-     object at full size -- and it also answers the arithmetic that broke the ladders rather than
-     dodging it. Nineteen pixels a row is cramped for 15px cream over gravel and perfectly
-     comfortable for 16px ink on paper, because CONTRAST DOES HALF THE WORK OF SIZE. Same rhythm the
-     first ladder was rejected for, on a ground that can carry it.
-
-     Three things a row, in the reference's own hierarchy: the state in display type, the name in
-     plain type, the number at the right with dot leaders running out to it. The name is deliberately
-     NOT display italic -- if both the state and the name shout, neither is the head of the row.
-
-     THE TORN EDGE IS A PSEUDO-ELEMENT, NOT A CLIP ON THE WRAP, for the same reason `.hud-cut` is a
-     sibling of the panel: a clip would cut the selected slab off exactly where it is supposed to
-     hang over the edge.
-     HEIGHT: 15 x 19 + 76 + 30 of padding = 391. Constant whichever step is lit. */
-  .hud[data-course="sheet"] .course-wrap {
-    width: 880px; padding: 15px 0 15px;
-    display: flex; flex-direction: column;
+  /* ---- 紋 CREST · four groups across, a field of marks ----------------------------------------
+     The technique screen: named columns, a caption under each name, and the skills as marks rather
+     than as rows of words. Reading it is reading SYMBOLS -- the crest is the step's own character,
+     so the field says what the course is made of before a single name is read.
+     HEIGHT: head 52 + 6 x 42 = 304, and the tallest group sets it. */
+  .hud[data-course="crest"] .course-wrap {
+    display: grid; grid-template-columns: 300px 240px 260px 300px; gap: 0 26px;
+    width: 1180px; align-items: start;
   }
-  .hud[data-course="sheet"] .course-wrap::before {
-    content: ''; position: absolute; inset: 0; z-index: 0;
-    background: rgba(242, 234, 216, 0.965);
-    box-shadow: 5px 6px 0 rgba(0, 0, 0, 0.45);
-    clip-path: polygon(0 0, 33% 0, 33% 6px, 67% 6px, 67% 0, 100% 0,
-      100% 17%, calc(100% - 17px) 17%, calc(100% - 17px) 39%, 100% 39%,
-      100% 61%, calc(100% - 11px) 61%, calc(100% - 11px) 84%, 100% 84%, 100% 100%,
-      63% 100%, 63% calc(100% - 7px), 27% calc(100% - 7px), 27% 100%, 0 100%,
-      0 77%, 14px 77%, 14px 55%, 0 55%, 0 31%, 9px 31%, 9px 12%, 0 12%);
+  .hud[data-course="crest"] .cs-ghead { margin-bottom: 16px; }
+  .hud[data-course="crest"] .cs-gsteps { display: flex; flex-direction: column; gap: 6px; }
+  .hud[data-course="crest"] .cs-step {
+    display: grid; grid-template-columns: 34px 1fr;
+    grid-template-areas: 'seal en' 'seal pips';
+    align-items: center; gap: 2px 14px; padding: 3px 0;
   }
-  .hud[data-course="sheet"] .cs-step {
-    position: relative; z-index: 1;
-    display: grid; grid-template-columns: 86px 1fr 44px;
-    grid-template-areas: 'tag en no';
-    align-items: center; height: 19px; padding: 0 20px 0 22px;
+  .hud[data-course="crest"] .cs-seal { grid-area: seal; width: 26px; height: 26px; }
+  .hud[data-course="crest"] .cs-seal i { font-size: 13px; }
+  .hud[data-course="crest"] .cs-en { grid-area: en; font-size: 13px; }
+  .hud[data-course="crest"] .cs-pips { grid-area: pips; }
+  .hud[data-course="crest"] .cs-no, .hud[data-course="crest"] .cs-num,
+  .hud[data-course="crest"] .cs-jp, .hud[data-course="crest"] .cs-want,
+  .hud[data-course="crest"] .cs-pct, .hud[data-course="crest"] .cs-tag { display: none; }
+  /* the selected step is the only one that says more, and it says it quietly */
+  .hud[data-course="crest"] .cs-step.on {
+    grid-template-areas: 'seal en' 'seal jp' 'seal pips';
   }
-  .hud[data-course="sheet"] .cs-num, .hud[data-course="sheet"] .cs-jp,
-  .hud[data-course="sheet"] .cs-want, .hud[data-course="sheet"] .cs-bar,
-  .hud[data-course="sheet"] .cs-pct { display: none; }
-  /* the keyline comes OFF everything on the sheet. It is a dark stroke meant to hold cream type
-     over a lit valley; on cream it fattens every letter into a blob. */
-  .hud[data-course="sheet"] .cs-tag {
-    grid-area: tag; font-size: 12.5px; -webkit-text-stroke: 0;
-  }
-  /* the red annotation dot, which is what the printed boards put above the name of a square you
-     have passed. Five pixels of vermilion is the whole of "you have been here". */
-  .hud[data-course="sheet"] .cs-step[data-state="done"] .cs-tag::before {
-    content: ''; display: inline-block; width: 5px; height: 5px; background: var(--hi);
-    margin-right: 7px; vertical-align: 2px;
-  }
-  .hud[data-course="sheet"] .cs-en {
-    grid-area: en; font-family: var(--lat-ui); font-weight: 600; font-style: normal;
-    font-size: 16px; letter-spacing: 0.07em; transform: none; -webkit-text-stroke: 0;
-    display: flex; align-items: center; overflow: hidden;
-  }
-  /* the leader. A printed list joins a name to its number with dots, not with a table cell. */
-  .hud[data-course="sheet"] .cs-en::after {
-    content: ''; flex: 1 1 auto; height: 2px; min-width: 18px; margin: 0 0 4px 12px;
-    align-self: flex-end;
-    background: repeating-linear-gradient(90deg,
-      rgba(20, 17, 13, 0.4) 0 2px, rgba(0, 0, 0, 0) 2px 7px);
-  }
-  .hud[data-course="sheet"] .cs-no {
-    grid-area: no; text-align: right;
-    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
-    letter-spacing: 0;
-  }
-  .hud[data-course="sheet"] .cs-step[data-state="done"] .cs-tag { color: rgba(20, 17, 13, 0.52); }
-  .hud[data-course="sheet"] .cs-step[data-state="done"] .cs-en { color: rgba(20, 17, 13, 0.88); }
-  .hud[data-course="sheet"] .cs-step[data-state="done"] .cs-no { color: rgba(20, 17, 13, 0.7); }
-  .hud[data-course="sheet"] .cs-step[data-state="here"] .cs-tag { color: var(--hi); }
-  .hud[data-course="sheet"] .cs-step[data-state="here"] .cs-en { color: var(--ink); }
-  .hud[data-course="sheet"] .cs-step[data-state="here"] .cs-no { color: var(--ink); }
-  .hud[data-course="sheet"] .cs-step[data-state="ahead"] .cs-tag { color: rgba(20, 17, 13, 0.28); }
-  .hud[data-course="sheet"] .cs-step[data-state="ahead"] .cs-en { color: rgba(20, 17, 13, 0.34); }
-  .hud[data-course="sheet"] .cs-step[data-state="ahead"] .cs-no { color: rgba(20, 17, 13, 0.26); }
-  .hud[data-course="sheet"] .cs-step[data-state="ahead"] .cs-en::after {
-    background: repeating-linear-gradient(90deg,
-      rgba(20, 17, 13, 0.16) 0 2px, rgba(0, 0, 0, 0) 2px 7px);
-  }
-  /* MOVE 2, LITERALLY. The pick is a vermilion slab that runs 70px PAST the sheet's torn right edge
-     and ends in a point, with its type up from 16 to 34. Nothing about the row it replaces survives
-     except its place in the order. */
-  .hud[data-course="sheet"] .cs-step.on {
-    height: 86px; margin-right: -70px;
-    grid-template-columns: 86px 1fr 116px;
-    grid-template-rows: 40px 21px 14px;
-    grid-template-areas: 'tag en pct' 'tag jp pct' 'tag want pct';
-    align-content: center; row-gap: 0;
-    padding-right: 100px;
-    background: var(--hi);
-    clip-path: polygon(0 0, 100% 0, calc(100% - 46px) 100%, 0 100%);
-    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.42);
-  }
-  .hud[data-course="sheet"] .cs-step.on .cs-no { display: none; }
-  .hud[data-course="sheet"] .cs-step.on .cs-tag {
-    font-size: 14px; color: #ffd9a1; align-self: center;
-  }
-  .hud[data-course="sheet"] .cs-step[data-state="done"].on .cs-tag::before { background: #ffd9a1; }
-  .hud[data-course="sheet"] .cs-step.on .cs-en {
-    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
-    font-size: 34px; line-height: 38px; letter-spacing: 0.01em; color: #fff;
-    transform: skewX(-8deg); transform-origin: left center;
-  }
-  .hud[data-course="sheet"] .cs-step.on .cs-en::after { display: none; }
-  .hud[data-course="sheet"] .cs-step.on .cs-jp {
-    display: block; grid-area: jp; font-size: 14px; color: rgba(255, 255, 255, 0.94);
-    -webkit-text-stroke: 0;
-  }
-  .hud[data-course="sheet"] .cs-step.on .cs-want {
-    display: block; grid-area: want; font-size: 10.5px; font-weight: 700; color: #ffd9a1;
-  }
-  .hud[data-course="sheet"] .cs-step.on .cs-pct {
-    display: block; grid-area: pct; align-self: center; text-align: right;
-    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 32px;
-    letter-spacing: 0; color: #fff;
+  .hud[data-course="crest"] .cs-step.on .cs-seal { width: 34px; height: 34px; }
+  .hud[data-course="crest"] .cs-step.on .cs-seal i { font-size: 17px; }
+  .hud[data-course="crest"] .cs-step.on .cs-en { font-size: 17px; letter-spacing: 0.2em; }
+  .hud[data-course="crest"] .cs-step.on .cs-jp {
+    display: block; grid-area: jp; font-size: 11px; color: rgba(242, 234, 216, 0.6);
   }
 
-  /* ---- 暦 TALLY · the numbers are the interface -------------------------------------------------
-     Straight off the calendar screen, which is the best answer to this problem I found anywhere: it
-     shows THIRTY ordered things at once with no cells, no borders and no rules -- thirty big numerals
-     in a loose grid, coloured by state, and the one that is today wearing a red mark. Sixteen of
-     those cost 130px, which leaves two thirds of the block for a hero that can be any size it likes,
-     and 70px is a size no ladder could have offered.
+  /* ---- 連 CHAIN · the technique tree, drawn as one ---------------------------------------------
+     The reference's own shape: the first step of a group is a large crest, and the rest descend from
+     it as a chain of smaller ones joined by a hairline. It is the only one of the three that draws
+     the ORDER rather than implying it, and the hairline going gold as far as you have travelled is
+     the whole progress reading -- no bar, no percentage, no counter.
+     HEIGHT: 44 + 5 x 58 = 334. */
+  .hud[data-course="chain"] .course-wrap {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 20px;
+    width: 1160px; align-items: start;
+  }
+  .hud[data-course="chain"] .cs-ghead { margin-bottom: 18px; text-align: center; }
+  .hud[data-course="chain"] .cs-ghead u { justify-content: center; }
+  .hud[data-course="chain"] .cs-gsteps {
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+  }
+  .hud[data-course="chain"] .cs-step {
+    position: relative; display: grid; justify-items: center;
+    grid-template-areas: 'seal' 'en'; gap: 4px; padding: 9px 0 11px;
+  }
+  /* the link, in the travelled colour of the step BELOW it, so the chain fills downward */
+  .hud[data-course="chain"] .cs-step::before {
+    content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 9px;
+    background: rgba(242, 234, 216, 0.2);
+  }
+  .hud[data-course="chain"] .cs-step[data-state="done"]::before { background: var(--gold); }
+  .hud[data-course="chain"] .cs-step[data-state="here"]::before { background: var(--hi); }
+  .hud[data-course="chain"] .cs-gsteps > .cs-step:first-child::before { display: none; }
+  .hud[data-course="chain"] .cs-seal { grid-area: seal; width: 24px; height: 24px; }
+  .hud[data-course="chain"] .cs-seal i { font-size: 12px; }
+  .hud[data-course="chain"] .cs-gsteps > .cs-step:first-child .cs-seal {
+    width: 38px; height: 38px;
+  }
+  .hud[data-course="chain"] .cs-gsteps > .cs-step:first-child .cs-seal i { font-size: 19px; }
+  .hud[data-course="chain"] .cs-en { grid-area: en; font-size: 10.5px; letter-spacing: 0.16em; }
+  .hud[data-course="chain"] .cs-pips, .hud[data-course="chain"] .cs-no,
+  .hud[data-course="chain"] .cs-num, .hud[data-course="chain"] .cs-jp,
+  .hud[data-course="chain"] .cs-want, .hud[data-course="chain"] .cs-pct,
+  .hud[data-course="chain"] .cs-tag { display: none; }
+  .hud[data-course="chain"] .cs-step.on .cs-seal { width: 42px; height: 42px; }
+  .hud[data-course="chain"] .cs-step.on .cs-seal i { font-size: 21px; }
+  .hud[data-course="chain"] .cs-step.on .cs-en { font-size: 13px; letter-spacing: 0.2em; }
+  .hud[data-course="chain"] .cs-step.on .cs-jp {
+    display: block; grid-area: jp; font-size: 10px; color: rgba(242, 234, 216, 0.55);
+  }
+  .hud[data-course="chain"] .cs-step.on { grid-template-areas: 'seal' 'en' 'jp'; }
 
-     THE HERO IS NOT A SECOND ELEMENT. Every step already carries its reading, its gate, its bar and
-     its percentage; the lit one simply has its own parts placed down the page. So there is nothing
-     for `hudSync` to fill and therefore no second place for the state to go stale -- the same
-     argument that made one markup serve three shapes.
-     This is why `.cs-step` is STATIC here: the absolute children have to resolve against
-     `.course-wrap`, not against their own 130px grid cell. */
-  .hud[data-course="tally"] .course-wrap {
-    width: 1340px; flex: 0 0 auto; min-height: 396px; padding: 5px 0 0;
-    display: grid; grid-template-columns: repeat(8, 135px); gap: 2px 0; align-content: start;
-    background:
-      linear-gradient(var(--gold), var(--gold)) no-repeat 0 0 / 100% 2px,
-      linear-gradient(rgba(232, 196, 124, 0.32), rgba(232, 196, 124, 0.32))
-        no-repeat 0 155px / 100% 1px,
-      linear-gradient(rgba(12, 10, 8, 0.68), rgba(12, 10, 8, 0.68)) no-repeat 0 0 / 100% 156px;
+  /* ---- 巻 SCROLL · the panel owns its own ground -------------------------------------------------
+     The reference's menus do not show the world at all: they stand on a near-white field, and that
+     one decision is what lets everything on them be thin. This is that -- a pale washi panel over
+     the left half, the valley crushed behind the rest, and sixteen steps in ink-grey at 400 weight
+     with a diamond and a pip row. No fills, no shadows, no vermilion except the one wash under the
+     step you are on. The quietest of the three by a distance.
+     HEIGHT: 2 columns x (2 heads + 8 rows) = 2 x 30 + 8 x 26 = 268 plus padding. */
+  .hud[data-course="scroll"] .course-wrap {
+    width: 900px; padding: 26px 30px 28px;
+    background: linear-gradient(158deg, rgba(246, 241, 230, 0.955), rgba(228, 220, 202, 0.93));
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px 34px; align-content: start;
   }
-  .hud[data-course="tally"] .cs-step { position: static; text-align: center; padding: 2px 0 6px; }
-  .hud[data-course="tally"] .cs-no, .hud[data-course="tally"] .cs-tag,
-  .hud[data-course="tally"] .cs-jp, .hud[data-course="tally"] .cs-want,
-  .hud[data-course="tally"] .cs-bar, .hud[data-course="tally"] .cs-pct { display: none; }
-  .hud[data-course="tally"] .cs-num {
-    display: inline-block; font-size: 46px; line-height: 50px; letter-spacing: -0.02em;
-    padding: 0 10px; min-width: 66px; text-align: center;
-    paint-order: stroke fill; -webkit-text-stroke: 0.04em rgba(8, 11, 18, 0.92);
-    transition: color 0.24s ease, background 0.24s ease, transform 0.34s var(--ease-pop);
-  }
-  .hud[data-course="tally"] .cs-en {
-    font-family: var(--lat-ui); font-weight: 700; font-style: normal;
-    font-size: 10.5px; letter-spacing: 0.09em; transform: none; margin-top: 2px;
-    -webkit-text-stroke: 0;
-  }
-  .hud[data-course="tally"] .cs-step[data-state="done"] .cs-num { color: var(--gold-hi); }
-  .hud[data-course="tally"] .cs-step[data-state="done"] .cs-en { color: rgba(232, 196, 124, 0.7); }
-  .hud[data-course="tally"] .cs-step[data-state="here"] .cs-num { color: var(--hi); }
-  .hud[data-course="tally"] .cs-step[data-state="here"] .cs-en { color: var(--washi); }
-  .hud[data-course="tally"] .cs-step[data-state="ahead"] .cs-num { color: rgba(222, 214, 189, 0.42); }
-  .hud[data-course="tally"] .cs-step[data-state="ahead"] .cs-en { color: rgba(222, 214, 189, 0.46); }
-  /* the mark. The calendar rings today in red; a skewed vermilion slab is this project's version of
-     the same gesture, and it goes on the NUMERAL rather than on the cell so the cell can stay static
-     for the hero's sake. */
-  .hud[data-course="tally"] .cs-step.on .cs-num {
-    color: #fff; background: var(--hi); transform: skewX(-8deg) scale(1.06);
-    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.45);
-  }
-  .hud[data-course="tally"] .cs-step.on .cs-en { display: none; }
-  .hud[data-course="tally"] .cs-step.on .cs-jp,
-  .hud[data-course="tally"] .cs-step.on .cs-want,
-  .hud[data-course="tally"] .cs-step.on .cs-bar,
-  .hud[data-course="tally"] .cs-step.on .cs-pct { display: block; }
-  /* the hero. `.cs-en` is reused rather than a new element: it is already the step's name. */
-  .hud[data-course="tally"] .cs-step.on .cs-en {
-    display: block; position: absolute; left: 2px; top: 172px; width: 760px;
-    font-family: var(--lat); font-style: italic; font-weight: 900;
-    font-size: 66px; line-height: 70px; letter-spacing: 0.005em; margin: 0;
-    transform: skewX(-8deg); transform-origin: left top; text-align: left; color: #fff;
-    -webkit-text-stroke: 0.032em rgba(8, 11, 18, 0.92);
-  }
-  .hud[data-course="tally"] .cs-step.on .cs-jp {
-    position: absolute; left: 4px; top: 258px; font-size: 22px; text-align: left;
-    color: var(--washi);
-  }
-  .hud[data-course="tally"] .cs-step.on .cs-bar {
-    position: absolute; left: 4px; top: 300px; width: 620px; height: 14px;
-  }
-  .hud[data-course="tally"] .cs-step.on .cs-want {
-    position: absolute; left: 4px; top: 326px; font-size: 13px; font-weight: 700;
-    letter-spacing: 0.15em; color: var(--gold-hi); text-align: left;
-    paint-order: stroke fill; -webkit-text-stroke: 0.1em rgba(8, 11, 18, 0.85);
-  }
-  /* the one big number, in the poll screen's own manner: italic display type at 62px, not a column
-     of sixteen tabular figures. */
-  .hud[data-course="tally"] .cs-step.on .cs-pct {
-    position: absolute; left: 0; top: 240px; width: 624px; text-align: right;
-    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 58px;
-    line-height: 58px; letter-spacing: 0; color: var(--gold-hi);
-    paint-order: stroke fill; -webkit-text-stroke: 0.035em rgba(8, 11, 18, 0.92);
-  }
-  .hud[data-course="tally"] .cs-step[data-state="ahead"].on .cs-pct { color: var(--washi-dim); }
-
-  /* ---- 札 STACK · the save-slot slabs ---------------------------------------------------------
-     The load/save screen: a list of sixteen that looks nothing like a list. Heavy slabs stacked at
-     an angle and running off the edge of the frame, each stamped with its number on a perforated
-     stub, the chosen one filled solid and three times the height. No columns, no rule, no bars --
-     THE FILL IS THE STATE and the stub is the number.
-
-     THEY BLEED OFF THE PANEL'S LEFT EDGE. The panel's left padding is 52px and this takes 44 of it
-     back, which is the one thing the reference does that a politely inset list cannot: a stack that
-     runs off the frame reads as longer than the frame.
-
-     THE FAN IS A MARGIN, NOT A ROTATION. Each slab sits 1.6px further left than the one above, so
-     sixteen of them lean 25px over the whole stack -- present at a glance, and it costs no
-     transform, no wrapper and no per-row rotation to go stale.
-     Type inside a skewed slab must NOT be skewed again: it inherits the parent's transform, which is
-     what makes it lie ON the slab in the reference rather than beside it.
-     HEIGHT: 15 x 21 + 64 + 15 gaps = 394. */
-  .hud[data-course="stack"] .course-wrap {
-    width: 880px; margin-left: -44px;
-    display: flex; flex-direction: column; gap: 1px;
-  }
-  .hud[data-course="stack"] .cs-step {
+  .hud[data-course="scroll"] .cs-ghead { margin-bottom: 10px; }
+  .hud[data-course="scroll"] .cs-ghead b { color: rgba(20, 17, 13, 0.88); font-size: 11px; }
+  .hud[data-course="scroll"] .cs-ghead i { color: rgba(20, 17, 13, 0.46); font-size: 9.5px; }
+  .hud[data-course="scroll"] .cs-ghead u { margin-top: 7px; }
+  .hud[data-course="scroll"] .cs-ghead u s { background: rgba(20, 17, 13, 0.16); }
+  .hud[data-course="scroll"] .cs-ghead u s[data-state="done"] { background: var(--gold); }
+  .hud[data-course="scroll"] .cs-ghead u s[data-state="here"] { background: var(--hi); }
+  .hud[data-course="scroll"] .cs-gsteps { display: flex; flex-direction: column; gap: 1px; }
+  .hud[data-course="scroll"] .cs-step {
     position: relative;
-    display: grid; grid-template-columns: 62px 1fr auto;
-    grid-template-areas: 'no en tag';
-    align-items: center; gap: 0 18px; height: 21px; padding: 0 20px 0 0;
-    /* THE FAN LEANS RIGHT, NOT LEFT. Leaning left at 3px a step would have walked step 16 thirty
-       pixels off the screen edge and taken its stub and its number with it. Leaning right narrows
-       each slab as it goes down instead, which is the recession the load screen actually has: the
-       near slot is widest and the far ones step away from you. */
-    transform: skewX(-11deg) translateX(calc(var(--i) * 3.4px));
-    background: rgba(14, 12, 9, 0.82);
-    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
-    transition: background 0.24s ease, height 0.26s ease;
+    display: grid; grid-template-columns: 26px 1fr auto;
+    grid-template-areas: 'seal en pips'; align-items: center; gap: 0 12px;
+    height: 26px; padding: 0 10px 0 4px;
   }
-  /* the perforation off the ticket stubs. Four on, four off, straight down the head of the slab. */
-  .hud[data-course="stack"] .cs-step::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 12px;
-    background: repeating-linear-gradient(180deg,
-      rgba(242, 234, 216, 0.85) 0 4px, rgba(8, 7, 5, 0.9) 4px 8px);
+  /* the wash, which is the only red on the page and the only fill anywhere on it */
+  .hud[data-course="scroll"] .cs-step.on {
+    background: linear-gradient(90deg, rgba(227, 74, 51, 0.9), rgba(227, 74, 51, 0.62));
+    height: 46px; grid-template-areas: 'seal en pips' 'seal jp pips';
+    align-content: center; row-gap: 1px;
   }
-  .hud[data-course="stack"] .cs-num, .hud[data-course="stack"] .cs-bar,
-  .hud[data-course="stack"] .cs-jp, .hud[data-course="stack"] .cs-want,
-  .hud[data-course="stack"] .cs-pct { display: none; }
-  .hud[data-course="stack"] .cs-no {
-    grid-area: no; padding-left: 22px;
-    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 13px;
-    letter-spacing: 0;
+  .hud[data-course="scroll"] .cs-seal { grid-area: seal; width: 18px; height: 18px; }
+  .hud[data-course="scroll"] .cs-seal i { font-size: 10px; }
+  .hud[data-course="scroll"] .cs-step[data-state="done"] .cs-seal {
+    background: none; box-shadow: inset 0 0 0 1.5px rgba(20, 17, 13, 0.62);
   }
-  .hud[data-course="stack"] .cs-en { grid-area: en; font-size: 17px; transform: none; }
-  .hud[data-course="stack"] .cs-tag {
-    grid-area: tag; font-size: 11.5px; text-align: right;
+  .hud[data-course="scroll"] .cs-step[data-state="done"] .cs-seal i { color: rgba(20, 17, 13, 0.8); }
+  .hud[data-course="scroll"] .cs-step[data-state="here"] .cs-seal {
+    background: none; box-shadow: inset 0 0 0 1.5px var(--hi);
   }
-  .hud[data-course="stack"] .cs-step[data-state="done"] {
-    background: rgba(28, 23, 13, 0.86);
-    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(232, 196, 124, 0.5);
+  .hud[data-course="scroll"] .cs-step[data-state="here"] .cs-seal i { color: var(--hi); }
+  .hud[data-course="scroll"] .cs-step[data-state="ahead"] .cs-seal {
+    background: none; box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
   }
-  .hud[data-course="stack"] .cs-step[data-state="done"] .cs-no { color: var(--gold-hi); }
-  .hud[data-course="stack"] .cs-step[data-state="done"] .cs-en { color: rgba(240, 224, 190, 0.92); }
-  .hud[data-course="stack"] .cs-step[data-state="done"] .cs-tag { color: var(--gold-hi); }
-  .hud[data-course="stack"] .cs-step[data-state="here"] {
-    background: rgba(132, 40, 26, 0.86);
-    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(227, 74, 51, 0.7);
+  .hud[data-course="scroll"] .cs-step[data-state="ahead"] .cs-seal i { color: rgba(20, 17, 13, 0.26); }
+  .hud[data-course="scroll"] .cs-step[data-state="done"] .cs-en { color: rgba(20, 17, 13, 0.86); }
+  .hud[data-course="scroll"] .cs-step[data-state="here"] .cs-en { color: var(--ink); }
+  .hud[data-course="scroll"] .cs-step[data-state="ahead"] .cs-en { color: rgba(20, 17, 13, 0.34); }
+  .hud[data-course="scroll"] .cs-en { grid-area: en; font-size: 12px; }
+  .hud[data-course="scroll"] .cs-pips { grid-area: pips; }
+  .hud[data-course="scroll"] .cs-pips u { background: rgba(20, 17, 13, 0.15); }
+  .hud[data-course="scroll"] .cs-pips u[data-on="1"] { background: var(--gold); }
+  .hud[data-course="scroll"] .cs-no, .hud[data-course="scroll"] .cs-num,
+  .hud[data-course="scroll"] .cs-jp, .hud[data-course="scroll"] .cs-want,
+  .hud[data-course="scroll"] .cs-pct, .hud[data-course="scroll"] .cs-tag { display: none; }
+  /* on the wash everything inverts to cream, including the crest's ring */
+  .hud[data-course="scroll"] .cs-step.on .cs-seal {
+    width: 24px; height: 24px; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.9);
   }
-  .hud[data-course="stack"] .cs-step[data-state="here"] .cs-no { color: #fff; }
-  .hud[data-course="stack"] .cs-step[data-state="here"] .cs-en { color: #fff; }
-  .hud[data-course="stack"] .cs-step[data-state="here"] .cs-tag { color: #ffd9a1; }
-  .hud[data-course="stack"] .cs-step[data-state="ahead"] {
-    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(242, 234, 216, 0.13);
+  .hud[data-course="scroll"] .cs-step.on .cs-seal i { color: #fff; font-size: 13px; }
+  .hud[data-course="scroll"] .cs-step.on .cs-en { color: #fff; font-size: 15px; }
+  .hud[data-course="scroll"] .cs-step.on .cs-jp {
+    display: block; grid-area: jp; font-size: 10px; color: rgba(255, 255, 255, 0.86);
   }
-  .hud[data-course="stack"] .cs-step[data-state="ahead"] .cs-no { color: rgba(242, 234, 216, 0.34); }
-  .hud[data-course="stack"] .cs-step[data-state="ahead"] .cs-en { color: rgba(222, 214, 189, 0.4); }
-  .hud[data-course="stack"] .cs-step[data-state="ahead"] .cs-tag { color: rgba(242, 234, 216, 0.26); }
-  /* the pick: solid, 64 tall, 56px WIDER to the right than the stack it sits in, and lifted over
-     its neighbours' shadows. */
-  .hud[data-course="stack"] .cs-step.on {
-    height: 64px; margin-right: -56px; z-index: 2;
-    background: var(--hi);
-    box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45);
-    grid-template-columns: 62px 1fr auto;
-    grid-template-areas: 'no en tag' 'no jp pct';
-    align-content: center; row-gap: 2px;
-  }
-  .hud[data-course="stack"] .cs-step.on::before {
-    background: repeating-linear-gradient(180deg,
-      rgba(255, 255, 255, 0.92) 0 5px, rgba(8, 7, 5, 0.72) 5px 10px);
-  }
-  .hud[data-course="stack"] .cs-step.on .cs-no { font-size: 22px; color: #fff; }
-  .hud[data-course="stack"] .cs-step.on .cs-en { font-size: 32px; color: #fff; }
-  .hud[data-course="stack"] .cs-step.on .cs-tag { font-size: 13px; color: #ffd9a1; }
-  .hud[data-course="stack"] .cs-step.on .cs-jp {
-    display: block; grid-area: jp; font-size: 14px; color: rgba(255, 255, 255, 0.94);
-  }
-  .hud[data-course="stack"] .cs-step.on .cs-pct {
-    display: block; grid-area: pct; text-align: right;
-    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px;
-    letter-spacing: 0; color: #fff;
-  }
+  .hud[data-course="scroll"] .cs-step.on .cs-pips u { background: rgba(255, 255, 255, 0.3); }
+  .hud[data-course="scroll"] .cs-step.on .cs-pips u[data-on="1"] { background: #fff; }
 
   /* ---- the slab, when it is the action rather than a caption ---------------------------------- */
   .hud-next[data-act] { min-height: 58px; }
@@ -16997,50 +16900,85 @@ function pathHud() {
 }
 function onCourse() { return HUD.on && HUD.sec === 'STUDY' && HUD.level === 2 && state === 'sub'; }
 
-/* ================= THE COURSE HAS A SHAPE, AND THESE THREE CAME FROM REFERENCE ===================
-   C cycles; `NAV.course(n)` names. Still a bench, for the reason the figure sets were: three layouts
-   that differ in STRUCTURE cannot be judged from a description.
+/* ================= THE COURSE HAS A SHAPE, AND THE SURFACE FINALLY CHANGED =======================
+   C cycles; `NAV.course(n)` names.
 
-   FIVE SHAPES HAVE NOW BEEN REJECTED -- a serpentine, a hero card and four ladders -- and all four
-   ladders failed for the same reason, which is worth stating once: they were tables. Aligned
-   columns, a rule down the side, a hairline bar on every row, sixteen times. Reordering the columns
-   was never going to help, so NONE OF THESE THREE DESCENDS FROM ANY OF THEM. They come from looking
-   at how the genre actually draws a long ordered list -- the note over the stylesheet has the four
-   moves they all copy -- and from the printed single-track board games this feature is a version of.
+   SEVEN REJECTED, ACROSS TWO STRUCTURES -- four ladders, then a sheet, a calendar and a stack. The
+   long note over the stylesheet has the diagnosis: the structure was never what was wrong. All seven
+   wore Persona's surface (skewed black italics, hard shadows, keylines, one loud vermilion fill, and
+   no imagery at all) over a soft low-poly valley at sunset, which is the opposite art direction.
+   These three come from Ghost of Tsushima instead -- crushed ground, thin unskewed type, crests
+   instead of rows, diamond pips instead of bars, red as a wash and nothing else.
 
-   ONE MARKUP, THREE STYLESHEETS, and now one fewer element in it: the serpentine's SVG route and its
-   node table are gone, because no shape drew them. They were dead in all four ladders too.
+   THEY ARE MEANT TO SHARE A LANGUAGE. That is not the ladders' mistake repeated: the ladders were
+   four arrangements of a surface that was itself the problem. These three differ on the two things
+   that matter here -- how much of the world survives behind them, and whether the order is drawn or
+   implied -- while agreeing about the surface, because the surface is the part being proposed.
    ================================================================================================ */
 const COURSE_SHAPES = [
-  ['sheet', '刷', 'a printed sheet · ink on cream, the state as a word, the pick overhangs the edge'],
-  ['tally', '暦', 'the numbers are the interface · sixteen numerals over one very large hero'],
-  ['stack', '札', 'save-slot slabs · fanned, stamped, running off the left edge of the panel'],
+  ['crest', '紋', 'four groups across · a field of marks, the world crushed behind them'],
+  ['chain', '連', 'the technique tree · crests descending on a hairline that fills as you go'],
+  ['scroll', '巻', 'a pale panel that owns its own ground · the quietest of the three'],
+];
+
+/* THE SIXTEEN STEPS ARE FOUR GROUPS, CONTIGUOUS AND IN THE COURSE'S OWN ORDER. This is the other
+   half of the answer to an arithmetic problem that has been dodged twice: sixteen peers in one
+   column cannot be big, and sixteen peers anywhere have no shape. Four named groups of 6/2/3/5 are
+   four things to read, each with a pip row saying how far into it you are -- and the boundaries are
+   real rather than decorative, since the wall in this course genuinely is kanji and everything after
+   the certification boundary is an exam rather than a lesson.
+   Contiguous on purpose: speaking and listening interleave in the graph, and a group that skipped
+   from step seven to step ten would break the one thing a course has that a menu does not. */
+const COURSE_GROUPS = [
+  { en: 'FOUNDATIONS', from: 0, to: 5, note: 'the two scripts, the first words, the first patterns' },
+  { en: 'EAR AND VOICE', from: 6, to: 7, note: 'scripted speech, then listening' },
+  { en: 'THE WALL', from: 8, to: 10, note: 'kanji, free conversation, reading' },
+  { en: 'CERTIFICATION', from: 11, to: 15, note: 'five levels, N5 up to N1' },
 ];
 
 /* the whole markup for one course, whatever shape is showing.
 
-   EVERY STEP CARRIES EVERYTHING and each stylesheet decides what is drawn: the state as a word, the
-   number twice (padded for the sheet's right-hand column, bare for the calendar's numerals), both
-   names, the gate, a bar and a percentage. That is also how the calendar gets a hero without a hero
-   element -- the lit step's own parts are positioned down the page by CSS, so there is nothing extra
-   for `hudSync` to fill and no second place for the state to go stale.
+   GROUPED NOW, and the grouping is in the MARKUP rather than in the CSS because a group has content
+   of its own -- a name, a caption and a pip row per step in it. All three shapes read the same
+   wrappers; what differs is whether they run the groups across the panel or down it.
 
-   `--i` rides along as a NUMBER for the stack's fan (`calc(var(--i) * -1.6px)`). `--x`/`--y` and the
-   node table that fed them are gone with the serpentine. */
+   THE CREST IS THE STEP'S OWN FIRST CHARACTER, the way the row list's seal already is: かな takes か,
+   漢字 takes 漢, N5 検定 takes 検. Nothing is authored twice, and the field of sixteen marks is
+   therefore a picture of the course rather than a decoration laid over one.
+
+   `.cs-step` keeps its DOCUMENT ORDER across the groups, which is what lets `hudSync` go on toggling
+   `.on` by index and `hudBuild` go on reading `data-i` -- neither knows the groups exist. */
 const CS_TAG = { done: 'DONE', here: 'NOW', ahead: 'LOCKED' };
-function courseMarkup(rows) {
-  const steps = rows.map((r, i) => `<button class="cs-step" data-i="${i}" data-state="${r.state}"`
-    + ` style="--i:${i}">`
+const csSeal = (t) => ((String(t).match(/[\u3040-\u30ff\u4e00-\u9faf]/) || [''])[0]);
+function courseStep(r, i) {
+  /* five pips, so a step's own measure is a glance rather than a number. `Math.ceil` on purpose:
+     one pip lit is "started", and a step at 5% that shows nothing looks like a step at zero. */
+  const lit = Math.max(0, Math.min(5, Math.ceil((r.pct || 0) / 20)));
+  const pips = [0, 1, 2, 3, 4].map((k) => `<u data-on="${k < lit ? 1 : 0}"></u>`).join('');
+  return `<button class="cs-step" data-i="${i}" data-state="${r.state}" style="--i:${i}">`
+    + `<span class="cs-seal"><i>${csSeal(r.small)}</i></span>`
     + `<span class="cs-tag">${CS_TAG[r.state] || ''}</span>`
     + `<span class="cs-no">${r.no}</span>`
     + `<span class="cs-num">${i + 1}</span>`
     + `<span class="cs-en">${r.big}</span>`
     + `<span class="cs-jp">${r.small}</span>`
     + `<span class="cs-want">${r.meta}</span>`
-    + `<span class="cs-bar"><i style="width:${Math.max(r.pct, 0)}%"></i></span>`
+    + `<span class="cs-pips">${pips}</span>`
     + `<span class="cs-pct">${r.pct}%</span>`
-    + `</button>`).join('');
-  return `<div class="course-wrap">${steps}</div>`;
+    + `</button>`;
+}
+function courseMarkup(rows) {
+  const groups = COURSE_GROUPS.map((g) => {
+    const mine = rows.slice(g.from, g.to + 1);
+    /* the group's pip row is built from the STEPS' states rather than from a count, so it cannot
+       disagree with the marks underneath it */
+    const dots = mine.map((r) => `<s data-state="${r.state}"></s>`).join('');
+    const steps = mine.map((r, k) => courseStep(r, g.from + k)).join('');
+    return `<div class="cs-group">`
+      + `<div class="cs-ghead"><b>${g.en}</b><i>${g.note}</i><u>${dots}</u></div>`
+      + `<div class="cs-gsteps">${steps}</div></div>`;
+  }).join('');
+  return `<div class="course-wrap">${groups}</div>`;
 }
 
 /* ================================================================================================
