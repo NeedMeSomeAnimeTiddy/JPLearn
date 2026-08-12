@@ -1,0 +1,112 @@
+<!-- @dsCard group="Foundations" name="Geometry" subtitle="Square corners, one angle, one shadow" width="960" height="780" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Geometry — JPLearn menu</title>
+<style>
+  :root {
+    --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #10131e; color: var(--washi);
+    font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
+    padding: 30px 34px 34px;
+  }
+  h1 { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+    letter-spacing: 0.01em; margin-bottom: 4px; }
+  .lede { font-size: 11.5px; color: rgba(242, 234, 216, 0.6); max-width: 820px; line-height: 1.7;
+    margin-bottom: 26px; letter-spacing: 0.1em; }
+  h2 { font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 24px 0 14px; }
+  .row { display: flex; gap: 44px; align-items: flex-start; flex-wrap: wrap; }
+  .demo { text-align: center; }
+  .demo .cap { font-size: 9.5px; letter-spacing: 0.16em; color: rgba(242,234,216,0.5);
+    margin-top: 13px; font-weight: 700; }
+  .slab {
+    background: var(--washi); color: var(--ink); padding: 9px 16px;
+    font-size: 11px; letter-spacing: 0.14em; font-weight: 600;
+  }
+  /* the house transform and shadow, then each of them removed, so the difference is visible */
+  .house { transform: skewX(-8deg) rotate(-1.2deg); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); }
+  .alt { transform: skewX(-8deg) rotate(1deg); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); }
+  .noskew { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); }
+  .noshadow { transform: skewX(-8deg) rotate(-1.2deg); }
+  .rounded { transform: skewX(-8deg) rotate(-1.2deg); box-shadow: 2px 3px 0 rgba(0,0,0,0.45);
+    border-radius: 8px; }
+  .bad { outline: 2px solid var(--hi); outline-offset: 8px; }
+  .stack { display: flex; flex-direction: column; gap: 2px; width: 340px; }
+  .stack .s {
+    transform: skewX(-11deg) translateX(calc(var(--i) * 3.4px));
+    background: rgba(14, 12, 9, 0.82); box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4),
+      inset 0 0 0 1px rgba(242, 234, 216, 0.13);
+    height: 21px; display: flex; align-items: center; padding-left: 22px;
+    font-size: 11px; color: rgba(242, 234, 216, 0.6);
+  }
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+  .rules div { padding: 14px 16px; background: rgba(14, 12, 9, 0.82);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.13); }
+  .rules strong { display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 15px; color: var(--gold-hi); margin-bottom: 6px; letter-spacing: 0.01em; }
+  .rules span { font-size: 10.5px; letter-spacing: 0.09em; line-height: 1.7;
+    color: rgba(242, 234, 216, 0.74); display: block; }
+  code { font-family: ui-monospace, Consolas, monospace; letter-spacing: 0; color: var(--gold-hi); }
+</style>
+</head>
+<body>
+  <h1>GEOMETRY</h1>
+  <p class="lede">Three decisions, applied without exception. They are what makes a new element look
+    like it belongs here rather than like it was imported.</p>
+
+  <h2>THE ANGLE AND THE SHADOW · ONE OF EACH</h2>
+  <div class="row">
+    <div class="demo"><div class="slab house">12 DAY STREAK</div>
+      <div class="cap">HOUSE · <code>skewX(-8deg) rotate(-1.2deg)</code></div></div>
+    <div class="demo"><div class="slab alt">Lv 7 &nbsp;·&nbsp; 2,140 XP</div>
+      <div class="cap">ALTERNATE LEAN · <code>rotate(1deg)</code></div></div>
+    <div class="demo"><div class="slab noskew bad">NO SKEW</div>
+      <div class="cap" style="color:var(--hi)">READS AS A DIFFERENT PROJECT</div></div>
+    <div class="demo"><div class="slab noshadow bad">NO SHADOW</div>
+      <div class="cap" style="color:var(--hi)">FLOATS · NOTHING LIFTS IT OFF THE WORLD</div></div>
+    <div class="demo"><div class="slab rounded bad">ROUNDED</div>
+      <div class="cap" style="color:var(--hi)">FORBIDDEN · SEE BELOW</div></div>
+  </div>
+
+  <h2>STACKING · THE LEAN ALTERNATES, THE FAN TRANSLATES</h2>
+  <div class="row">
+    <div class="stack">
+      <div class="s" style="--i:0">01 &nbsp; TUTORIAL</div>
+      <div class="s" style="--i:1">02 &nbsp; HIRAGANA</div>
+      <div class="s" style="--i:2">03 &nbsp; KATAKANA</div>
+      <div class="s" style="--i:3">04 &nbsp; VOCABULARY</div>
+      <div class="s" style="--i:4">05 &nbsp; GRAMMAR</div>
+    </div>
+    <div style="max-width:440px;font-size:10.5px;letter-spacing:0.09em;line-height:1.8;color:rgba(242,234,216,0.74)">
+      A stack of slabs fans with <code>translateX(calc(var(--i) * 3.4px))</code>, never with a
+      margin. As a margin on a flex item the width comes out of the slab instead, so all sixteen
+      right edges stay in a perfect vertical line and the drift reads as a ragged left margin rather
+      than as a lean. A pure <code>translateX</code> survives the skew unchanged, so the two compose
+      without a wrapper.
+    </div>
+  </div>
+
+  <h2>THE RULES</h2>
+  <div class="rules">
+    <div><strong>SQUARE CORNERS, ALWAYS</strong><span>No <code>border-radius</code> anywhere, on
+      anything. It is the one standing rule of this UI and the reason the Kickstarter brand tile's
+      246/1024 radius was dropped when the mark itself was kept.</span></div>
+    <div><strong>ONE ANGLE: −8°</strong><span><code>skewX(-8deg)</code> on everything filled — the
+      word, the back tab, the keycaps, the action slab, every chip. Anything at −6 with a rotation
+      on top is close enough to look like a mistake rather than a decision.</span></div>
+    <div><strong>ONE SHADOW: <code>2px 3px 0 rgba(0,0,0,0.45)</code></strong><span>Hard, never
+      blurred. Small marks take <code>2px 2px 0 0.4</code>; a slab lifted over its neighbours takes
+      <code>4px 5px 0 0.45</code>. Nothing in this project has a soft shadow.</span></div>
+    <div><strong>TYPE INSIDE A SKEWED SLAB TAKES NO SKEW OF ITS OWN</strong><span>It inherits the
+      parent's transform. That is what makes it lie <em>on</em> the slab rather than beside it —
+      set <code>transform: none</code> and let the parent do the work.</span></div>
+  </div>
+</body>
+</html>

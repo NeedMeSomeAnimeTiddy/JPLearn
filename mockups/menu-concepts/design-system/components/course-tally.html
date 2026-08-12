@@ -1,0 +1,150 @@
+<!-- @dsCard group="Course" name="Course · TALLY" subtitle="The numbers are the interface, plus one very large hero" width="1120" height="640" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Course · TALLY — JPLearn menu</title>
+<style>
+  :root {
+    --washi: #f2ead8; --washi-dim: #cfc6ae; --ink: #14110d;
+    --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --ease-pop: cubic-bezier(0.22, 1.25, 0.36, 1);
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+    --jp-go: "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #10131e; color: var(--washi);
+    font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em; padding: 28px 32px;
+  }
+  h1 { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 24px;
+    letter-spacing: 0.01em; margin-bottom: 4px; }
+  .lede { font-size: 11px; color: rgba(242, 234, 216, 0.6); max-width: 880px; line-height: 1.7;
+    margin-bottom: 20px; letter-spacing: 0.1em; }
+  code { font-family: ui-monospace, Consolas, monospace; letter-spacing: 0; color: var(--gold-hi); }
+
+
+  /* ============ THE GROUND THESE ARE ACTUALLY ON ============
+     A stand-in for the valley in flat bands, because the world is flat-shaded too. Shown on flat
+     dark, half the rules in this project look like fussy over-engineering -- the keyline, the ink
+     ground, the hard shadow and the opaque fills are all answering a LIT, BUSY ground, and none of
+     them can be judged without one. The bands run left to right so a specimen crosses from shade
+     into sunlight rather than sitting entirely on one or the other. */
+  .stage {
+    position: relative; overflow: hidden; padding: 18px 24px;
+    background:
+      radial-gradient(72% 92% at 24% 72%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 76%),
+      linear-gradient(100deg, #2c4a2a 0 9%, #4e7a3c 9% 15%, #e2dccb 15% 58%, #cdd0cb 58% 100%);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.14);
+  }
+  .stage + h2 { margin-top: 22px; }
+  .on-stage { font-size: 10px; letter-spacing: 0.14em; font-weight: 700;
+    color: rgba(20, 17, 13, 0.66); }
+
+  /* ================= THE SHAPE ================= */
+  .course-wrap {
+    position: relative; width: 1340px; min-height: 400px; padding: 5px 0 0;
+    display: grid; grid-template-columns: repeat(8, 135px); gap: 2px 0; align-content: start;
+    background:
+      linear-gradient(var(--gold), var(--gold)) no-repeat 0 0 / 100% 2px,
+      linear-gradient(rgba(232, 196, 124, 0.32), rgba(232, 196, 124, 0.32))
+        no-repeat 0 155px / 100% 1px,
+      linear-gradient(rgba(12, 10, 8, 0.68), rgba(12, 10, 8, 0.68)) no-repeat 0 0 / 100% 156px;
+  }
+  .cs-step {
+    position: static; background: none; border: 0; cursor: pointer;
+    text-align: center; padding: 2px 0 6px;
+  }
+  .cs-num {
+    display: inline-block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 46px; line-height: 50px; letter-spacing: -0.02em;
+    padding: 0 10px; min-width: 66px; text-align: center;
+    font-variant-numeric: tabular-nums;
+    paint-order: stroke fill; -webkit-text-stroke: 0.04em rgba(8, 11, 18, 0.92);
+    transition: color 0.24s ease, background 0.24s ease, transform 0.34s var(--ease-pop);
+  }
+  .cs-en {
+    display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+    letter-spacing: 0.09em; margin-top: 2px; white-space: nowrap;
+  }
+  .cs-jp, .cs-want, .cs-bar, .cs-pct { display: none; }
+  .cs-step[data-state="done"] .cs-num { color: var(--gold-hi); }
+  .cs-step[data-state="done"] .cs-en { color: rgba(232, 196, 124, 0.7); }
+  .cs-step[data-state="here"] .cs-num { color: var(--hi); }
+  .cs-step[data-state="here"] .cs-en { color: var(--washi); }
+  .cs-step[data-state="ahead"] .cs-num { color: rgba(222, 214, 189, 0.42); }
+  .cs-step[data-state="ahead"] .cs-en { color: rgba(222, 214, 189, 0.46); }
+  /* the mark — the calendar rings today in red; this is the same gesture, skewed */
+  .cs-step.on .cs-num {
+    color: #fff; background: var(--hi); transform: skewX(-8deg) scale(1.06);
+    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.45);
+  }
+  /* THE HERO IS THE LIT STEP'S OWN PARTS, PLACED DOWN THE PAGE. No second element, so nothing to
+     keep in step. `.cs-step` is STATIC for exactly this: the absolute children resolve against the
+     wrap rather than against their own 135px cell. */
+  .cs-step.on .cs-en {
+    display: block; position: absolute; left: 2px; top: 172px; width: 760px;
+    font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 66px; line-height: 70px; letter-spacing: 0.005em; margin: 0;
+    transform: skewX(-8deg); transform-origin: left top; text-align: left; color: #fff;
+    paint-order: stroke fill; -webkit-text-stroke: 0.032em rgba(8, 11, 18, 0.92);
+  }
+  .cs-step.on .cs-jp {
+    display: block; position: absolute; left: 4px; top: 258px; font-size: 22px;
+    font-family: var(--jp-go); font-weight: 700; text-align: left; color: var(--washi);
+  }
+  .cs-step.on .cs-bar {
+    display: block; position: absolute; left: 4px; top: 300px; width: 620px; height: 14px;
+    background: rgba(10, 9, 6, 0.82); overflow: hidden;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
+  }
+  .cs-step.on .cs-bar i { display: block; height: 100%; background: var(--gold-hi); }
+  .cs-step.on .cs-want {
+    display: block; position: absolute; left: 4px; top: 326px; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.15em; color: var(--gold-hi); text-align: left;
+    paint-order: stroke fill; -webkit-text-stroke: 0.1em rgba(8, 11, 18, 0.85);
+  }
+  /* the one big number, right-aligned to its own bar so it is attached to what it measures */
+  .cs-step.on .cs-pct {
+    display: block; position: absolute; left: 0; top: 240px; width: 624px; text-align: right;
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 58px;
+    line-height: 58px; color: var(--gold-hi);
+    paint-order: stroke fill; -webkit-text-stroke: 0.035em rgba(8, 11, 18, 0.92);
+  }
+  .note { margin-top: 8px; font-size: 10.5px; letter-spacing: 0.1em; line-height: 1.7;
+    color: rgba(242, 234, 216, 0.6); border-left: 3px solid var(--gold); padding-left: 14px;
+    max-width: 900px; }
+</style>
+</head>
+<body>
+  <h1>COURSE · TALLY</h1>
+  <p class="lede">Sixteen numerals on an ink band that bleeds off the right edge, coloured by state,
+    the current one wearing a vermilion mark. Holding the whole sequence costs 156px instead of 400,
+    which is what buys the 66px hero underneath — a size no row list can offer.</p>
+
+  <div class="stage"><div class="course-wrap">
+    <button class="cs-step" data-state="done"><span class="cs-num">1</span><span class="cs-en">TUTORIAL</span></button>
+    <button class="cs-step" data-state="done"><span class="cs-num">2</span><span class="cs-en">HIRAGANA</span></button>
+    <button class="cs-step" data-state="done"><span class="cs-num">3</span><span class="cs-en">KATAKANA</span></button>
+    <button class="cs-step" data-state="done"><span class="cs-num">4</span><span class="cs-en">VOCABULARY</span></button>
+    <button class="cs-step" data-state="done"><span class="cs-num">5</span><span class="cs-en">GRAMMAR</span></button>
+    <button class="cs-step" data-state="done"><span class="cs-num">6</span><span class="cs-en">SENTENCES</span></button>
+    <button class="cs-step" data-state="done"><span class="cs-num">7</span><span class="cs-en">SCRIPTED TALK</span></button>
+    <button class="cs-step" data-state="done"><span class="cs-num">8</span><span class="cs-en">LISTENING</span></button>
+    <button class="cs-step on" data-state="here"><span class="cs-num">9</span><span class="cs-en">KANJI</span><span class="cs-jp">漢字</span><span class="cs-bar"><i style="width:45%"></i></span><span class="cs-want">80 CHARACTERS</span><span class="cs-pct">45%</span></button>
+    <button class="cs-step" data-state="ahead"><span class="cs-num">10</span><span class="cs-en">FREE TALK</span></button>
+    <button class="cs-step" data-state="ahead"><span class="cs-num">11</span><span class="cs-en">READING</span></button>
+    <button class="cs-step" data-state="ahead"><span class="cs-num">12</span><span class="cs-en">JLPT N5</span></button>
+    <button class="cs-step" data-state="ahead"><span class="cs-num">13</span><span class="cs-en">JLPT N4</span></button>
+    <button class="cs-step" data-state="ahead"><span class="cs-num">14</span><span class="cs-en">JLPT N3</span></button>
+    <button class="cs-step" data-state="ahead"><span class="cs-num">15</span><span class="cs-en">JLPT N2</span></button>
+    <button class="cs-step" data-state="ahead"><span class="cs-num">16</span><span class="cs-en">JLPT N1</span></button>
+  </div></div>
+
+  <p class="note"><strong>A background cannot be bled.</strong> <code>background-size: calc(100% +
+    340px)</code> is clipped to the box, so the BOX is wider than its own columns — and it must then be
+    told <code>flex: 0 0 auto</code>, because as a flex item the default <code>flex-shrink: 1</code>
+    pulled a 1340px wrap back to the panel's width and took the bleed with it.</p>
+</body>
+</html>

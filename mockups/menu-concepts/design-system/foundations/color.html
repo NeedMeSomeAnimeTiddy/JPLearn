@@ -1,0 +1,132 @@
+<!-- @dsCard group="Foundations" name="Colour" subtitle="Six tokens, and the law that assigns them" width="960" height="860" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Colour — JPLearn menu</title>
+<style>
+  :root {
+    --washi: #f2ead8; --washi-dim: #cfc6ae; --ink: #14110d;
+    --hi: #e34a33; --hi-deep: #b23320; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --night-hi: #222941; --night: #171c2c; --night-deep: #10131e; --mist: #9fb8d8;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--night-deep); color: var(--washi);
+    font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
+    padding: 30px 34px 34px;
+  }
+  h1 {
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+    letter-spacing: 0.01em; margin-bottom: 4px;
+  }
+  .lede {
+    font-size: 11.5px; color: rgba(242, 234, 216, 0.6); max-width: 780px; line-height: 1.7;
+    margin-bottom: 26px; letter-spacing: 0.1em;
+  }
+  h2 {
+    font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi);
+    margin: 0 0 12px; font-weight: 700;
+  }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 30px; }
+  .sw { border: 0; }
+  .sw i {
+    display: block; height: 62px; box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+  }
+  .sw b {
+    display: block; font-size: 11px; letter-spacing: 0.16em; margin-top: 9px; font-weight: 700;
+  }
+  .sw u {
+    display: block; font-size: 10px; letter-spacing: 0.12em; text-decoration: none;
+    color: rgba(242, 234, 216, 0.5); margin-top: 2px;
+  }
+  .sw p {
+    font-size: 10.5px; letter-spacing: 0.08em; line-height: 1.6; margin-top: 6px;
+    color: rgba(242, 234, 216, 0.72);
+  }
+  /* the law, stated as three slabs in the colours it is about */
+  .law { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px; }
+  .law div {
+    padding: 14px 16px 16px; transform: skewX(-8deg) rotate(-1.2deg);
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+  }
+  .law div:nth-child(2) { transform: skewX(-8deg) rotate(1deg); }
+  .law strong {
+    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 19px; letter-spacing: 0.01em; margin-bottom: 5px;
+  }
+  .law span { display: block; font-size: 10.5px; letter-spacing: 0.1em; line-height: 1.6; }
+  .law .earned { background: rgba(207, 164, 92, 0.2); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px var(--gold); }
+  .law .earned strong { color: var(--gold-hi); }
+  .law .press { background: var(--hi); }
+  .law .press strong { color: #fff; }
+  .law .press span { color: #ffd9a1; }
+  .law .notyet { background: rgba(14, 12, 9, 0.82); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(242, 234, 216, 0.13); }
+  .law .notyet strong { color: rgba(222, 214, 189, 0.42); }
+  .law .notyet span { color: rgba(222, 214, 189, 0.42); }
+  .acc { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .acc div { text-align: center; }
+  .acc i { display: block; height: 34px; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45); }
+  .acc b { display: block; font-size: 10px; letter-spacing: 0.16em; margin-top: 7px; font-weight: 700; }
+  .acc u { display: block; font-size: 9px; text-decoration: none; color: rgba(242, 234, 216, 0.45); margin-top: 2px; letter-spacing: 0.1em; }
+  .note {
+    margin-top: 26px; font-size: 10.5px; letter-spacing: 0.1em; line-height: 1.7;
+    color: rgba(242, 234, 216, 0.55); border-left: 3px solid var(--gold); padding-left: 14px;
+    max-width: 840px;
+  }
+</style>
+</head>
+<body>
+  <h1>COLOUR</h1>
+  <p class="lede">Four working colours and a night ground. The palette is small on purpose — every
+    one of these has a JOB, and the job is what decides which one a new element gets. Nothing here
+    is chosen for variety.</p>
+
+  <h2>THE LAW · WHAT EACH COLOUR MEANS</h2>
+  <div class="law">
+    <div class="earned"><strong>GOLD</strong><span>Earned. Progress that has happened: a finished
+      step, a filled bar, a mastery figure. Never used for something you can press.</span></div>
+    <div class="press"><strong>VERMILION</strong><span>The one thing to press. Exactly one element
+      per screen carries a vermilion fill — the selection, the action. Two is a bug.</span></div>
+    <div class="notyet"><strong>INK</strong><span>Not yet, and the ground for everything.
+      A locked step, an empty track, the wash behind type standing over the world.</span></div>
+  </div>
+
+  <h2>TOKENS</h2>
+  <div class="grid">
+    <div class="sw"><i style="background:#f2ead8"></i><b>WASHI</b><u>#f2ead8</u>
+      <p>The voice. All body type, and the ground of every chip.</p></div>
+    <div class="sw"><i style="background:#cfc6ae"></i><b>WASHI DIM</b><u>#cfc6ae</u>
+      <p>Second voice — readings, sub-labels, anything ranked below the line above it.</p></div>
+    <div class="sw"><i style="background:#14110d"></i><b>INK</b><u>#14110d</u>
+      <p>Type on cream, and the base of every wash. Not pure black.</p></div>
+    <div class="sw"><i style="background:#e34a33"></i><b>VERMILION</b><u>#e34a33</u>
+      <p>The action. <code>#b23320</code> is its deep, for pressed and for shadow.</p></div>
+    <div class="sw"><i style="background:#cfa45c"></i><b>GOLD</b><u>#cfa45c</u>
+      <p>Earned, at rest. Rules, hairlines, bar fills.</p></div>
+    <div class="sw"><i style="background:#e8c47c"></i><b>GOLD HI</b><u>#e8c47c</u>
+      <p>Earned, lit. Figures and the fill of the step you are on.</p></div>
+    <div class="sw"><i style="background:#171c2c"></i><b>NIGHT</b><u>#171c2c</u>
+      <p>The valley after dark; <code>#10131e</code> deep, <code>#222941</code> high.</p></div>
+    <div class="sw"><i style="background:#ffd9a1"></i><b>LEAD ON VERMILION</b><u>#ffd9a1</u>
+      <p>The one warm cream that reads bright on a vermilion fill without going pink.</p></div>
+  </div>
+
+  <h2>SECTION ACCENTS · ONE PER PLACE IN THE WORLD</h2>
+  <div class="acc">
+    <div><i style="background:#cfa45c"></i><b>STUDY</b><u>#cfa45c</u></div>
+    <div><i style="background:#e34a33"></i><b>DAILY</b><u>#e34a33</u></div>
+    <div><i style="background:#4f9d6b"></i><b>READING</b><u>#4f9d6b</u></div>
+    <div><i style="background:#c2344a"></i><b>DRILLS</b><u>#c2344a</u></div>
+    <div><i style="background:#5b86c4"></i><b>JLPT</b><u>#5b86c4</u></div>
+    <div><i style="background:#e0913a"></i><b>RECORDS</b><u>#e0913a</u></div>
+  </div>
+
+  <p class="note">Each accent ships as three values — base, deep, lit — set on the interface as
+    <code>--sec</code>, <code>--sec-lo</code>, <code>--sec-hi</code> when a section opens. The accent
+    tints the panel and the section's own marks; it never replaces the law above. STUDY's accent
+    being gold and DAILY's being vermilion is a coincidence of place, not a second meaning.</p>
+</body>
+</html>

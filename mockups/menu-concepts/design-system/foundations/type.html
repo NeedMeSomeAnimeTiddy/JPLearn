@@ -1,0 +1,114 @@
+<!-- @dsCard group="Foundations" name="Type" subtitle="Four faces, and the two jobs that split them" width="960" height="860" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Type — JPLearn menu</title>
+<style>
+  :root {
+    --washi: #f2ead8; --washi-dim: #cfc6ae; --ink: #14110d;
+    --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c; --night-deep: #10131e;
+    --jp: "Yu Mincho", YuMincho, "Hiragino Mincho ProN", "MS PMincho", serif;
+    --jp-go: "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--night-deep); color: var(--washi);
+    font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
+    padding: 30px 34px 34px;
+  }
+  h1 {
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+    letter-spacing: 0.01em; margin-bottom: 4px;
+  }
+  .lede {
+    font-size: 11.5px; color: rgba(242, 234, 216, 0.6); max-width: 800px; line-height: 1.7;
+    margin-bottom: 26px; letter-spacing: 0.1em;
+  }
+  h2 {
+    font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 0 0 14px; padding-bottom: 7px; border-bottom: 2px solid rgba(242, 234, 216, 0.15);
+  }
+  .face { margin-bottom: 26px; }
+  .face .spec {
+    font-size: 10px; letter-spacing: 0.12em; color: rgba(242, 234, 216, 0.5);
+    margin-bottom: 9px;
+  }
+  .face .why {
+    font-size: 10.5px; letter-spacing: 0.09em; line-height: 1.7;
+    color: rgba(242, 234, 216, 0.72); max-width: 800px; margin-top: 9px;
+  }
+  /* the display face, at the three sizes it is actually used at */
+  .disp { font-family: var(--lat); font-style: italic; font-weight: 900; letter-spacing: 0.01em; }
+  .d72 { font-size: 66px; line-height: 70px; }
+  .d34 { font-size: 34px; line-height: 38px; }
+  .d17 { font-size: 17px; }
+  .lab { font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em; }
+  .l14 { font-size: 14px; }
+  .l11 { font-size: 11px; }
+  .l95 { font-size: 9.5px; }
+  .jgo { font-family: var(--jp-go); font-weight: 700; letter-spacing: 0.1em; }
+  .jmin { font-family: var(--jp); font-weight: 400; }
+  .scale { display: grid; grid-template-columns: 84px 1fr; gap: 4px 18px; align-items: baseline; }
+  .scale dt {
+    font-size: 9.5px; letter-spacing: 0.14em; color: rgba(242, 234, 216, 0.42);
+    text-align: right; font-weight: 700;
+  }
+  .scale dd { padding-bottom: 6px; }
+  .note {
+    margin-top: 8px; font-size: 10.5px; letter-spacing: 0.1em; line-height: 1.7;
+    color: rgba(242, 234, 216, 0.55); border-left: 3px solid var(--gold); padding-left: 14px;
+    max-width: 860px;
+  }
+  code { font-family: ui-monospace, Consolas, monospace; letter-spacing: 0; color: var(--gold-hi); }
+</style>
+</head>
+<body>
+  <h1>TYPE</h1>
+  <p class="lede">Four faces, split by two questions rather than by language. DISPLAY and LABEL are
+    different jobs, and they were sharing one family purely because nobody had separated them — a
+    black weight at 9.5px is a row of grey blocks, and a condensed grotesque at 66px is a caption
+    that got promoted.</p>
+
+  <div class="face">
+    <h2>DISPLAY · <code>--lat</code> · Segoe UI Black, real italic</h2>
+    <div class="spec">SECTION NAMES · STEP NAMES · FIGURES · ANY NUMERAL OVER 20PX</div>
+    <div class="disp d72">KANJI</div>
+    <div class="disp d34" style="color:var(--gold-hi)">GRAMMAR 45%</div>
+    <p class="why"><strong>A real italic, not a synthetic oblique.</strong> Arial Black has no
+      italic, so every heavy italic in this project used to be the roman sheared over by the
+      browser — which thickens the verticals and leaves the curves behind. Segoe UI Black ships a
+      drawn italic, and the words tighten by about 8% at the same size.</p>
+  </div>
+
+  <div class="face">
+    <h2>LABEL · <code>--lat-ui</code> · Bahnschrift SemiCondensed</h2>
+    <div class="spec">EVERY SMALL LETTERSPACED STRING · 0.14EM IS THE HOUSE TRACKING</div>
+    <dl class="scale">
+      <dt>14 / 600</dt><dd class="lab l14">SECTION 01 / 06</dd>
+      <dt>11 / 600</dt><dd class="lab l11">DUE TODAY &nbsp;·&nbsp; MASTERY &nbsp;·&nbsp; 80 CHARACTERS</dd>
+      <dt>9.5 / 700</dt><dd class="lab l95">STEP 9 / 16</dd>
+    </dl>
+    <p class="why">A condensed grotesque that stays open at nine pixels. Tracking is
+      <code>0.14em</code> everywhere except where it deliberately matches the Japanese at
+      <code>0.1em</code>.</p>
+  </div>
+
+  <div class="face">
+    <h2>JAPANESE · <code>--jp</code> mincho for large, <code>--jp-go</code> gothic for small</h2>
+    <div class="spec">THE SAME SPLIT, FOR THE SAME REASON</div>
+    <div class="jmin" style="font-size:56px;line-height:60px">学習 &nbsp; 漢字</div>
+    <div class="jgo" style="font-size:14px;margin-top:10px">ひらがな &nbsp;·&nbsp; カタカナ &nbsp;·&nbsp; 語彙 &nbsp;·&nbsp; 例文</div>
+    <p class="why">Mincho for the big words, where its modulation is the whole point. A gothic for
+      kana at 12–14px, where mincho's thin horizontals disappear entirely.</p>
+  </div>
+
+  <p class="note"><strong>Never put a <code>font</code> shorthand in a second rule for an element
+    another rule has already styled.</strong> It is a shorthand: it silently reset family, size and
+    weight to the inherited values and took the chips from 11px Bahnschrift 600 to 16px gothic 400.
+    Third time that class of bug has been paid for in this file — twice more with
+    <code>transition</code>.</p>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!-- @dsCard group="Components" name="Action slab" subtitle="The readout that became the action — go / locked / dead" width="960" height="770" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Action slab — JPLearn menu</title>
+<style>
+  :root {
+    --washi: #f2ead8; --washi-dim: #cfc6ae; --ink: #14110d;
+    --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+    --jp-go: "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #10131e; color: var(--washi);
+    font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
+    padding: 30px 34px 34px;
+  }
+  h1 { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+    letter-spacing: 0.01em; margin-bottom: 4px; }
+  .lede { font-size: 11.5px; color: rgba(242, 234, 216, 0.6); max-width: 830px; line-height: 1.7;
+    margin-bottom: 26px; letter-spacing: 0.1em; }
+  h2 { font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 24px 0 15px; }
+
+  /* ============ THE SLAB, EXACTLY AS IT SHIPS ============ */
+  .hud-next {
+    display: block; width: fit-content; max-width: 100%;
+    background: var(--hi);
+    padding: 8px 14px;
+    transform: skewX(-8deg) rotate(-1.2deg);
+    transform-origin: right center;
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+    min-height: 58px;
+  }
+  .hud-next-in { display: block; white-space: nowrap; }
+  .hud-next em {
+    display: block; font-family: var(--lat-ui); font-weight: 700; font-style: normal;
+    font-size: 11px; line-height: 13px; letter-spacing: 0.14em;
+    color: #ffd9a1; margin-bottom: 3px;
+  }
+  .hud-next b {
+    display: block; font-family: var(--jp-go); font-weight: 700; font-size: 15px;
+    line-height: 18px; color: var(--washi);
+  }
+  .hud-next i {
+    display: block; font-family: var(--lat-ui); font-weight: 600; font-style: normal;
+    font-size: 11px; line-height: 14px; letter-spacing: 0.14em; color: var(--gold-hi);
+    margin-top: 3px;
+  }
+  .hud-next[data-act="go"] i { color: #ffd9a1; font-weight: 700; letter-spacing: 0.16em; }
+  .hud-next[data-act="locked"] { background: rgba(12, 10, 8, 0.72); }
+  .hud-next[data-act="locked"] i { color: rgba(242, 234, 216, 0.62); }
+  .hud-next[data-act="dead"] { background: rgba(12, 10, 8, 0.5); }
+  .hud-next[data-act="dead"] i { color: rgba(242, 234, 216, 0.45); }
+
+
+  /* ============ THE GROUND THESE ARE ACTUALLY ON ============
+     A stand-in for the valley in flat bands, because the world is flat-shaded too. Shown on flat
+     dark, half the rules in this project look like fussy over-engineering -- the keyline, the ink
+     ground, the hard shadow and the opaque fills are all answering a LIT, BUSY ground, and none of
+     them can be judged without one. The bands run left to right so a specimen crosses from shade
+     into sunlight rather than sitting entirely on one or the other. */
+  .stage {
+    position: relative; overflow: hidden; padding: 18px 24px;
+    background:
+      radial-gradient(72% 92% at 24% 72%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 76%),
+      linear-gradient(100deg, #2c4a2a 0 9%, #4e7a3c 9% 15%, #e2dccb 15% 58%, #cdd0cb 58% 100%);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.14);
+  }
+  .stage + h2 { margin-top: 22px; }
+  .on-stage { font-size: 10px; letter-spacing: 0.14em; font-weight: 700;
+    color: rgba(20, 17, 13, 0.66); }
+
+  .bench { display: flex; gap: 34px; align-items: flex-start; flex-wrap: wrap; }
+  .bench .cell { }
+  .bench .cap { font-size: 9.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.66);
+    margin-bottom: 11px; font-weight: 700; }
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
+  .rules div { padding: 14px 16px; background: rgba(14, 12, 9, 0.82);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.13); }
+  .rules strong { display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 15px; color: var(--gold-hi); margin-bottom: 6px; letter-spacing: 0.01em; }
+  .rules span { font-size: 10.5px; letter-spacing: 0.09em; line-height: 1.7;
+    color: rgba(242, 234, 216, 0.74); display: block; }
+  code { font-family: ui-monospace, Consolas, monospace; letter-spacing: 0; color: var(--gold-hi); }
+</style>
+</head>
+<body>
+  <h1>ACTION SLAB</h1>
+  <p class="lede">Bottom right of the interface, and the only element that says what pressing Enter
+    will do. It began as a caption describing the highlighted row and became the action itself — three
+    lines: where you are, what it is, and what happens. Its third line is written from the item's own
+    kind, so it can never promise something the item cannot do.</p>
+
+  <h2>THREE STATES · <code>data-act</code></h2>
+  <div class="stage"><div class="bench">
+    <div class="cell"><div class="cap">GO · A REAL DESTINATION</div>
+      <div class="hud-next" data-act="go"><span class="hud-next-in">
+        <em>STEP 9 / 16</em><b>漢字 KANJI</b><i>START · 80 CHARACTERS ▸</i></span></div></div>
+    <div class="cell"><div class="cap">GO · HANDS OFF TO ANOTHER SECTION</div>
+      <div class="hud-next" data-act="go"><span class="hud-next-in">
+        <em>STEP 11 / 16</em><b>読解 READING</b><i>GO TO READING ▸</i></span></div></div>
+    <div class="cell"><div class="cap">LOCKED</div>
+      <div class="hud-next" data-act="locked"><span class="hud-next-in">
+        <em>STEP 14 / 16</em><b>N3 検定 JLPT N3</b><i>LOCKED · 90% OF IT</i></span></div></div>
+    <div class="cell"><div class="cap">DEAD · NOTHING BUILT YET</div>
+      <div class="hud-next" data-act="dead"><span class="hud-next-in">
+        <em>STEP 7 / 16</em><b>会話練習 SCRIPTED TALK</b><i>NOTHING HERE YET</i></span></div></div>
+  </div></div>
+
+  <h2>RULES</h2>
+  <div class="rules">
+    <div><strong>WHAT IT SAYS IS WHAT IT WILL DO</strong><span>The third line comes from the item's
+      kind — a deck opens blocks, a hand-off names the section it flies to, and something with no
+      tutor yet says so instead of lying. A slab that reads START on a dead item is the bug this
+      component exists to prevent.</span></div>
+    <div><strong>ONE VERMILION FILL PER SCREEN</strong><span>When the slab is <code>go</code> it is
+      the action, and nothing else may carry a vermilion fill except the current selection —
+      which is the same act, seen in the list.</span></div>
+    <div><strong>THE LEAD IS <code>#ffd9a1</code>, NOT CREAM</strong><span>Washi at two-thirds on a
+      vermilion fill is dimmed body text, not a lead. <code>#ffd9a1</code> is the one warm cream
+      that reads bright on vermilion without going pink.</span></div>
+    <div><strong><code>nowrap</code>, NO <code>overflow: hidden</code>, NO FIXED WIDTH</strong><span>
+      The box is <code>max-content</code>. Clipping was there to protect a fixed width, and all it
+      can do now is cut words off mid-resize — exactly the frame a text swap is trying to
+      hide.</span></div>
+  </div>
+</body>
+</html>

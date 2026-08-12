@@ -1,0 +1,143 @@
+<!-- @dsCard group="Foundations" name="Legibility over the world" subtitle="The rule that has been paid for three times" width="960" height="860" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Legibility over the world — JPLearn menu</title>
+<style>
+  :root {
+    --washi: #f2ead8; --washi-dim: #cfc6ae; --ink: #14110d;
+    --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #10131e; color: var(--washi);
+    font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
+    padding: 30px 34px 34px;
+  }
+  h1 {
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+    letter-spacing: 0.01em; margin-bottom: 4px;
+  }
+  .lede {
+    font-size: 11.5px; color: rgba(242, 234, 216, 0.6); max-width: 820px; line-height: 1.7;
+    margin-bottom: 24px; letter-spacing: 0.1em;
+  }
+  /* A STAND-IN FOR THE VALLEY: the failures below only happen over something BRIGHT and BUSY, and
+     a card on a flat dark ground would show none of them. Sunlit sand and a green canopy, in flat
+     bands, because the world is flat-shaded too. */
+  .valley {
+    position: relative; height: 232px; margin-bottom: 8px; overflow: hidden;
+    background:
+      radial-gradient(72% 92% at 26% 74%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 76%),
+      linear-gradient(100deg, #2c4a2a 0 13%, #4e7a3c 13% 21%, #e2dccb 21% 58%,
+        #cdd0cb 58% 100%);
+  }
+  .valley .row {
+    position: absolute; left: 22px; right: 22px; display: flex; align-items: baseline;
+    gap: 26px; z-index: 2;
+  }
+  .r1 { top: 20px; } .r2 { top: 92px; } .r3 { top: 164px; }
+  .tag {
+    font-size: 9.5px; letter-spacing: 0.18em; font-weight: 700; color: var(--hi);
+    background: var(--washi); padding: 3px 8px; align-self: center; white-space: nowrap;
+  }
+  .bad .tag { background: var(--washi); color: #b23320; }
+  .word {
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 40px;
+    white-space: nowrap;
+  }
+  .valley .row > span:last-child { max-width: 300px; }
+  /* --- the three failures, exactly as they shipped and were caught --- */
+  .naked { color: var(--washi); }
+  .keyline {
+    color: var(--washi);
+    paint-order: stroke fill; -webkit-text-stroke: 0.05em rgba(8, 11, 18, 0.92);
+  }
+  .ground {
+    color: var(--washi); background: rgba(10, 9, 6, 0.82); padding: 2px 12px;
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+  }
+  .bars { display: flex; gap: 30px; align-items: center; }
+  .bar-thin { width: 240px; height: 5px; background: rgba(242, 234, 216, 0.2); }
+  .bar-thin i { display: block; height: 100%; width: 45%; background: var(--gold); }
+  .bar-ok { width: 240px; height: 14px; background: rgba(10, 9, 6, 0.82);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(242, 234, 216, 0.26); }
+  .bar-ok i { display: block; height: 100%; width: 45%; background: var(--gold-hi); }
+  h2 {
+    font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 22px 0 12px;
+  }
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .rules div {
+    padding: 14px 16px; background: rgba(14, 12, 9, 0.82);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.13);
+  }
+  .rules strong {
+    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 15px; color: var(--gold-hi); margin-bottom: 6px; letter-spacing: 0.01em;
+  }
+  .rules span { font-size: 10.5px; letter-spacing: 0.09em; line-height: 1.7;
+    color: rgba(242, 234, 216, 0.74); display: block; }
+  code { font-family: ui-monospace, Consolas, monospace; letter-spacing: 0; color: var(--gold-hi); }
+  .note {
+    margin-top: 18px; font-size: 10.5px; letter-spacing: 0.1em; line-height: 1.7;
+    color: rgba(242, 234, 216, 0.55); border-left: 3px solid var(--hi); padding-left: 14px;
+    max-width: 880px;
+  }
+</style>
+</head>
+<body>
+  <h1>LEGIBILITY OVER THE WORLD</h1>
+  <p class="lede">This interface stands on a lit, moving, flat-shaded valley — not on a panel. Every
+    legibility failure in it has been the same failure, and it has now been paid for three separate
+    times: the figure chips, the course bars, and the calendar band. The band below is a stand-in
+    for the ground the real thing sits on; none of this shows up against flat dark.</p>
+
+  <div class="valley">
+    <div class="row r1 bad"><span class="tag">FAILS</span><span class="word naked">KANJI &nbsp; VOCABULARY</span>
+      <span style="font-size:10.5px;color:rgba(20,17,13,0.85)">cream on nothing — gone the moment it crosses sand</span></div>
+    <div class="row r2"><span class="tag">KEYLINE</span><span class="word keyline">KANJI &nbsp; VOCABULARY</span>
+      <span style="font-size:10.5px;color:rgba(20,17,13,0.85)">holds anywhere · for display type</span></div>
+    <div class="row r3"><span class="tag">GROUND</span><span class="word ground">KANJI</span>
+      <span style="font-size:10.5px;color:rgba(20,17,13,0.85)">for anything small, or measured</span></div>
+  </div>
+
+  <div class="valley" style="height:96px">
+    <div class="row r1 bars" style="top:16px">
+      <span class="tag">FAILS</span>
+      <span class="bar-thin"><i></i></span>
+      <span class="tag">FIXED</span>
+      <span class="bar-ok"><i></i></span>
+    </div>
+    <div class="row" style="top:58px">
+      <span style="font-size:10.5px;color:rgba(20,17,13,0.9);letter-spacing:0.1em">
+        a track at 20% cream is not a track — 45% reads as a gold rule floating free, and 0% shows
+        nothing at all, which looks like a rendering fault rather than a fact</span>
+    </div>
+  </div>
+
+  <h2>THE TWO INSTRUMENTS, AND WHICH TO REACH FOR</h2>
+  <div class="rules">
+    <div><strong>KEYLINE</strong><span><code>paint-order: stroke fill</code> +
+      <code>-webkit-text-stroke: 0.04–0.06em rgba(8,11,18,0.92)</code>. For display type over 20px.
+      The paint order is what makes it a keyline rather than a fattened letter.</span></div>
+    <div><strong>GROUND</strong><span><code>rgba(10,9,6,0.82)</code> + a
+      <code>1px</code> cream inset hairline + the house <code>2px 3px 0 rgba(0,0,0,0.45)</code>
+      shadow. For labels, figures, chips and every measured element.</span></div>
+    <div><strong>NEVER ALPHA ON THE WHOLE THING</strong><span>Fading a row fades its bar and its
+      badge with it, and the bar is the one part that still has to state a fact honestly. Dim the
+      TYPE, not the object.</span></div>
+    <div><strong>DARK ON LIGHT TAKES NEITHER</strong><span>Ink on a cream chip needs no halo and no
+      keyline — the chip's own drop shadow separates it from the world. A halo on 10.5px ink is the
+      stroke width again, which is why ENTER and ESC were once the hardest words on screen.</span></div>
+  </div>
+
+  <p class="note"><strong>The lesson generalised:</strong> contrast does half the work of size. 19px
+    a row is cramped for cream over gravel and comfortable for ink on paper — which is how the
+    printed-sheet course fits sixteen legible steps in the same rhythm a rejected design was called
+    cramped for.</p>
+</body>
+</html>

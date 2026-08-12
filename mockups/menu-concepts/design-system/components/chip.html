@@ -1,0 +1,151 @@
+<!-- @dsCard group="Components" name="Chip" subtitle="The whole family — figures, keycaps, gauges" width="960" height="960" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chip — JPLearn menu</title>
+<style>
+  :root {
+    --washi: #f2ead8; --washi-dim: #cfc6ae; --ink: #14110d;
+    --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+    --jp-go: "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #10131e; color: var(--washi);
+    font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
+    padding: 30px 34px 34px;
+  }
+  h1 { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+    letter-spacing: 0.01em; margin-bottom: 4px; }
+  .lede { font-size: 11.5px; color: rgba(242, 234, 216, 0.6); max-width: 830px; line-height: 1.7;
+    margin-bottom: 26px; letter-spacing: 0.1em; }
+  h2 { font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 24px 0 15px; }
+
+  /* ============ THE CHIP, EXACTLY AS IT SHIPS ============ */
+  .stat-chip {
+    border: 0; cursor: pointer; text-align: left;
+    background: var(--washi); color: var(--ink);
+    font-family: var(--lat-ui); font-weight: 600; font-size: 11px; letter-spacing: 0.14em;
+    padding: 7px 13px;
+    transform: skewX(-8deg) rotate(-1.2deg);
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+    transition: filter 0.16s ease;
+  }
+  .stat-chip b {
+    font-family: var(--lat); font-style: italic; font-weight: 900;
+    color: var(--hi); font-size: 14px; letter-spacing: 0;
+  }
+  .stat-chip .jp { font-family: var(--jp-go); font-weight: 700; letter-spacing: 0.1em; }
+  .stat-chip.shu { background: var(--hi); color: var(--washi); transform: skewX(-8deg) rotate(1deg); }
+  .stat-chip.shu b { color: #ffd9a1; }
+  .stat-chip:hover { filter: brightness(1.08); }
+  .stat-chip .mut { opacity: 0.5; }
+  .stat-chip .xp-track {
+    display: inline-block; width: 40px; height: 4px; margin-left: 9px; vertical-align: 2px;
+    background: rgba(20, 17, 13, 0.2);
+  }
+  .stat-chip .xp-track i { display: block; height: 4px; background: var(--hi); }
+
+  /* ============ THE KEYCAP — THE SMALLEST MEMBER, SAME OBJECT ============ */
+  .hints {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+    font-family: var(--lat-ui); font-weight: 600; font-size: 11.5px; letter-spacing: 0.14em;
+    color: rgba(242, 234, 216, 0.86);
+  }
+  .hints span { display: flex; align-items: baseline; }
+  .hints b {
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+    background: var(--washi); color: var(--ink);
+    padding: 3px 9px; margin-right: 8px; min-width: 46px; text-align: center;
+    transform: skewX(-8deg) rotate(-1.2deg); display: inline-block;
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+    text-shadow: none;
+  }
+  .hints em {
+    font-family: var(--jp-go); font-weight: 400; font-style: normal;
+    font-size: 10px; letter-spacing: 0.1em;
+    color: rgba(242, 234, 216, 0.45); margin-left: 7px;
+  }
+
+
+  /* ============ THE GROUND THESE ARE ACTUALLY ON ============
+     A stand-in for the valley in flat bands, because the world is flat-shaded too. Shown on flat
+     dark, half the rules in this project look like fussy over-engineering -- the keyline, the ink
+     ground, the hard shadow and the opaque fills are all answering a LIT, BUSY ground, and none of
+     them can be judged without one. The bands run left to right so a specimen crosses from shade
+     into sunlight rather than sitting entirely on one or the other. */
+  .stage {
+    position: relative; overflow: hidden; padding: 18px 24px;
+    background:
+      radial-gradient(72% 92% at 24% 72%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 76%),
+      linear-gradient(100deg, #2c4a2a 0 9%, #4e7a3c 9% 15%, #e2dccb 15% 58%, #cdd0cb 58% 100%);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.14);
+  }
+  .stage + h2 { margin-top: 22px; }
+  .on-stage { font-size: 10px; letter-spacing: 0.14em; font-weight: 700;
+    color: rgba(20, 17, 13, 0.66); }
+
+  /* the figure stack, as the course readout wears it */
+  .figs { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+  .rowset { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
+  .rules div { padding: 14px 16px; background: rgba(14, 12, 9, 0.82);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.13); }
+  .rules strong { display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 15px; color: var(--gold-hi); margin-bottom: 6px; letter-spacing: 0.01em; }
+  .rules span { font-size: 10.5px; letter-spacing: 0.09em; line-height: 1.7;
+    color: rgba(242, 234, 216, 0.74); display: block; }
+  code { font-family: ui-monospace, Consolas, monospace; letter-spacing: 0; color: var(--gold-hi); }
+</style>
+</head>
+<body>
+  <h1>CHIP</h1>
+  <p class="lede">One object at four scales. The streak chips along the top, the figure stack beside
+    the course readout, and the keyboard caps in the corner are all the same thing: ink on cream, the
+    −8° skew, a hard offset shadow, and a vermilion figure. Anything that needs to state a number
+    over the world is a chip.</p>
+
+  <h2>THE TOP ROW · CREAM AND VERMILION</h2>
+  <div class="stage"><div class="rowset">
+    <button class="stat-chip">18:26</button>
+    <button class="stat-chip">8/12 WED</button>
+    <button class="stat-chip shu"><b>12</b> DAY STREAK <span class="jp">連続</span></button>
+    <button class="stat-chip">Lv <b>7</b><span class="xp-track"><i style="width:62%"></i></span></button>
+  </div></div>
+
+  <h2>THE FIGURE STACK · ONE LINE EACH, THE LEAN ALTERNATES</h2>
+  <div class="stage"><div class="figs">
+    <button class="stat-chip"><b>6</b> BLOCKS <span class="mut">/ 8 DONE</span></button>
+    <button class="stat-chip shu"><b>80</b> CHARACTERS</button>
+    <button class="stat-chip"><b>45%</b> MASTERY<span class="xp-track"><i style="width:45%"></i></span></button>
+    <button class="stat-chip shu"><b>9</b> / 16 STEP</button>
+  </div></div>
+
+  <h2>THE KEYCAPS · THE CAP LEANS, THE ROW DOES NOT</h2>
+  <div class="stage"><div class="hints">
+    <span><b>↑↓</b> Select <em>選択</em></span>
+    <span><b>ENTER</b> Confirm <em>決定</em></span>
+    <span><b>ESC</b> Back <em>戻る</em></span>
+  </div></div>
+
+  <h2>RULES</h2>
+  <div class="rules">
+    <div><strong>THE FIGURE IS DISPLAY, THE LABEL IS NOT</strong><span><code>b</code> is Segoe UI
+      Black italic 14px at zero tracking in vermilion; the words around it are Bahnschrift 600 11px
+      at <code>0.14em</code>. That contrast is the whole chip.</span></div>
+    <div><strong>THE CAP TAKES NO TEXT SHADOW</strong><span>Dark ink on a cream slab carrying a black
+      halo doubles every stroke — at 10.5px that is the stroke width again, and it is why ENTER and
+      ESC were once the hardest words on the screen. No chip in this family has one.</span></div>
+    <div><strong>THE LEAN ALTERNATES DOWN A STACK</strong><span><code>rotate(-1.2deg)</code> then
+      <code>rotate(1deg)</code>, so a column of chips reads as laid down rather than as a list of
+      identically tilted boxes.</span></div>
+    <div><strong>FIX THE WIDTH BEFORE THE NUMBERS MOVE</strong><span>A counting figure changes the
+      chip's width and shoves its neighbours 8px sideways every tick. Measure the widest value the
+      slot will ever hold and set that width; do not let content size a live figure.</span></div>
+  </div>
+</body>
+</html>
