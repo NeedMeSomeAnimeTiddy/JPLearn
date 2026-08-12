@@ -8693,9 +8693,33 @@ SUN_MESH = discBody('sun-disc', {
    right answer — the two really do subtend half a degree each. It reads as a moon because of
    what is AROUND it: a corona pulled in tight, and a night sky it is allowed to be brighter
    than by a factor it never gets in daylight. */
+/* THE MOON HAS ITS OWN DIAL NOW, AND UNTIL 2026-08-12 IT HAD NONE AT ALL.
+   `dayApply` writes the day table's `disc*` columns into `SUN_MESH.material.uniforms` and only
+   SUN_MESH — so the two night rows, whose disc colours are plainly a moon's (0xdfe8ff over
+   0xa8b8dc, gain 1.4) have spent every night painting a sun that is below the horizon, and the
+   moon has run on the constructor values below since the day it was built. That is why it read
+   as a pale sticker: `coreG` 1.35 against the sun's 3.6, on a body that is the brightest thing
+   in a midnight frame.
+   AND IT SHOULD NOT TAKE A ROW CHOSEN BY THE SUN'S ALTITUDE. How bright a moon looks is a
+   question about how high the MOON is, so it gets its own two-point ramp on `mAlt` — full
+   strength once clear of the haze, dimmer and warmer sitting on the horizon, which is what
+   atmosphere does to it. Driven in the moon block of `dayTick`, beside where it is placed.
+   NOT THROUGH THE BLOOM PASS, though that is the other thing "emissive" could have meant here.
+   `renderBloom` composites everything on its layer through one warm tint (`BLOOM.col`, 0xffc98a),
+   which is right for five hundred lanterns and wrong for the one cold object in the sky — the
+   moon would come out amber. The glow it gets instead is the screen-space one the sun already
+   uses (`GLOW`, struck from `GLOW_BODY`, which is the moon whenever the sun is down): an
+   exponential in screen space with no support boundary, so unlike a term inside the disc's own
+   quad it has no edge to see. Its two night rows are turned up to match. */
+const MOON_GLOW = {
+  core: 3.2,                              /* against the sun's 3.6 at noon — it may clip */
+  corona: 0.42,
+  hi: new THREE.Color(0xf4f8ff),          /* high and cold */
+  lo: new THREE.Color(0xffe0bc),          /* and on the horizon, through all that air */
+};
 MOON_MESH = discBody('sky-moon', {
-  core: 0xf2f6ff, mid: 0xb9c8ea, r: 0.150, limb: 0.0090,
-  coreG: 1.35, coronaG: 0.16, coronaR: 1.8, size: 1,
+  core: 0xf4f8ff, mid: 0xc4d4f4, r: 0.150, limb: 0.0090,
+  coreG: MOON_GLOW.core, coronaG: MOON_GLOW.corona, coronaR: 2.4, size: 1,
 });
 MOON_MESH.visible = false;
 
@@ -13079,6 +13103,23 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
      star counting to ink coverage, is measuring the crane unless it is told not to: a star count
      over the night sky came back with 6,303 of them, and 6,300 were its wings. */
   crane: (on) => { if (on !== undefined) swan.visible = on !== false; return swan.visible; },
+  /* the moon's own brightness, live: NAV.moon({ core: 4, corona: 0.6 }). `core` is the disc's
+     gain (the sun's is 3.6 at noon), `corona` the glow inside its own quad; the wide halo around
+     it is the screen-space pass and moves with NAV.glow({ haloAmt, coreAmt }). */
+  moon: (o) => {
+    if (o) {
+      if (o.core !== undefined) MOON_GLOW.core = o.core;
+      if (o.corona !== undefined) MOON_GLOW.corona = o.corona;
+      if (o.hi !== undefined) MOON_GLOW.hi.setHex(o.hi);
+      if (o.lo !== undefined) MOON_GLOW.lo.setHex(o.lo);
+      dayTick(_dayLast, true);
+    }
+    const u = MOON_MESH.material.uniforms;
+    return { core: MOON_GLOW.core, corona: MOON_GLOW.corona,
+      up: MOON_MESH.visible, alt: +DAY_NOW.moonAlt.toFixed(1),
+      liveCore: +u.uCoreG.value.toFixed(2), liveCorona: +u.uCoronaG.value.toFixed(2),
+      halo: GLOW.haloAmt.value, coreHalo: GLOW.coreAmt.value };
+  },
   /* THE TWO STAR FIELDS, LIVE. Every argument is a pair, [bright, fine]:
        NAV.stars({ cut: [0.9976, 0.9930] })   more of the small ones
        NAV.stars({ grid: [120, 620] })        bigger bright ones (size IS the cell — see SKY_U)
@@ -17003,7 +17044,9 @@ const DAY_STOPS = [
     skyHorizon: 0x2e3a66, skyZenith: 0x0e1128, skyHorizAmt: 0.90, skyZenAmt: 0.85,
     skyBurnCol: 0x243056, skyBurnG: 0.06, skyWideCol: 0x2a3a68, skyWideG: 0.06,
     skyTightCol: 0x8fa8e0, skyTightG: 0.10,
-    rayAmt: 0.35, haloAmt: 0.10, coreAmt: 0.22, rayCol: 0xc8d8ff, haloCol: 0x9ab0e8,
+    /* halo and core turned up for the MOON, which is what the glow is struck from at this hour
+       (GLOW_BODY switches below -2 degrees of sun) — see MOON_GLOW */
+    rayAmt: 0.35, haloAmt: 0.20, coreAmt: 0.42, rayCol: 0xc8d8ff, haloCol: 0x9ab0e8,
     discCore: 0xdfe8ff, discMid: 0xa8b8dc, discCoreG: 1.4, discCoronaG: 0.20 ,
     skyGain: 0.085, stars: 1.30, cloudEmis: 0x232840 ,
     uiSky: 0.00, lampOn: 1.00 },
@@ -17012,7 +17055,7 @@ const DAY_STOPS = [
     skyHorizon: 0x6a4a70, skyZenith: 0x1c2048, skyHorizAmt: 0.85, skyZenAmt: 0.75,
     skyBurnCol: 0x6a3a58, skyBurnG: 0.20, skyWideCol: 0x4a3a68, skyWideG: 0.12,
     skyTightCol: 0x8a6a8a, skyTightG: 0.10,
-    rayAmt: 0.30, haloAmt: 0.08, coreAmt: 0.14, rayCol: 0xa8a0d0, haloCol: 0x8a7aa8,
+    rayAmt: 0.30, haloAmt: 0.15, coreAmt: 0.30, rayCol: 0xa8a0d0, haloCol: 0x8a7aa8,
     discCore: 0xe8d8d0, discMid: 0xc08a80, discCoreG: 1.6, discCoronaG: 0.24 ,
     skyGain: 0.22, stars: 0.95, cloudEmis: 0x3f3b56 ,
     uiSky: 0.04, lampOn: 1.00 },
@@ -17813,6 +17856,14 @@ function dayTick(nowMs, force, dt) {
   _dayMoonAt.copy(framePoint(ma.u, ma.v, 50000));
   MOON_MESH.position.copy(_dayMoonAt);
   MOON_MESH.visible = mAlt > -1.5;
+  /* and how hard it shines — see MOON_GLOW. Its own altitude, not the sun's row. */
+  if (MOON_MESH.visible) {
+    const mu = MOON_MESH.material.uniforms;
+    const up = THREE.MathUtils.smoothstep(mAlt, -1.5, 14);
+    mu.uCoreG.value = MOON_GLOW.core * (0.42 + 0.58 * up);
+    mu.uCoronaG.value = MOON_GLOW.corona * (0.30 + 0.70 * up);
+    mu.uCore.value.copy(MOON_GLOW.lo).lerp(MOON_GLOW.hi, up);
+  }
   /* whichever is up gets the shafts and the halo */
   GLOW_BODY = sol.alt > -2 ? SUN_MESH : MOON_MESH;
 
@@ -17981,14 +18032,15 @@ const CLOCK_BAR = (() => {
    costs each editor one line at the point where it already has its `api` in hand. */
 const DBG = (() => {
   const CSS = `
-  #dbg { position:fixed; right:12px; bottom:12px; z-index:9100;
-    font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.14em; }
-  #dbgBtn { background:rgba(14,16,22,0.82); border:1px solid #2b2f3a; color:#8b8f9a;
-    padding:4px 7px; cursor:pointer; font:inherit; letter-spacing:.18em; }
-  #dbgBtn:hover { color:#e8e4dc; border-color:#4a505e; }
-  #dbg.on #dbgBtn { color:#e8e4dc; border-color:#4a505e; background:rgba(20,23,31,0.95); }
-  #dbgList { position:absolute; right:0; bottom:25px; display:none; flex-direction:column;
-    gap:3px; min-width:190px; }
+  #dbg { position:fixed; right:6px; bottom:6px; z-index:9100;
+    font:9px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.14em; }
+  #dbgBtn { background:rgba(14,16,22,0.7); border:1px solid #2b2f3a; color:#8b8f9a;
+    padding:2px 6px; cursor:pointer; font:inherit; letter-spacing:.18em; opacity:.55;
+    transition:opacity .18s ease; }
+  #dbgBtn:hover { color:#e8e4dc; border-color:#4a505e; opacity:1; }
+  #dbg.on #dbgBtn { color:#e8e4dc; border-color:#4a505e; background:rgba(20,23,31,0.95); opacity:1; }
+  #dbgList { position:absolute; right:0; bottom:20px; display:none; flex-direction:column;
+    gap:3px; width:170px; }
   #dbg.on #dbgList { display:flex; }
   #dbgList .hd { color:#5c5f68; padding:0 1px 3px; letter-spacing:.24em; }
   #dbgList button { display:flex; justify-content:space-between; align-items:baseline; gap:16px;
@@ -18021,16 +18073,47 @@ const DBG = (() => {
     }, true);
   }
 
-  /* SIT ABOVE THE KEY HINTS, MEASURED RATHER THAN GUESSED. The bottom right corner is already
-     occupied: `.hints` is a three-row stack that ends 29px off the bottom and 45px off the right
-     — and it lives inside `.chrome`, which carries `zoom: var(--u)`, so how tall it is depends on
-     the window. A hard-coded `bottom` clears it at 1440x810 and collides at 1920x1080. Its own
-     rect is the only honest answer, and it is one read on load and one per resize. */
+  /* THE CORNER, AND ONLY THE CORNER. The first version cleared `.hints` and nothing else, which
+     was not enough by half: the bottom right of this screen is fully occupied and the button
+     landed on the menu's description chip at every window size I measured (1280, 1366, 1440,
+     1600, 1920), and on the readout at a destination. Sitting ABOVE the hints puts it exactly
+     where the description and the readout's NEXT UP slab live.
+     What is actually free is the strip BELOW and RIGHT of the hint stack — the hints end 26 to
+     39 pixels off the bottom depending on `--u`, and their right edge is 45 off the right, so a
+     small chip pinned to the corner clears them at every size. Verified: 5 to 18 pixels of
+     daylight at the five sizes above, and the margin grows with the window because `--u` lifts
+     the stack faster than the corner moves.
+
+     AND THE FALLBACK IS A REAL RECTANGLE TEST, not another guess at an offset. Everything fixed
+     that this could land on is listed, hidden things are skipped by walking the parent chain for
+     opacity — `.upnext-item` is faded by its PARENT, so a check on the element alone reads it as
+     visible when it is not — and if anything is hit the chip is lifted above it and the test
+     runs again. In practice it never fires; it is there because "I picked an offset that works
+     on my window" is what broke this the first time. */
+  const DBG_AVOID = '.hints, .upnext-item, .hud-next, .desc-line, .clock-bar, .back-chip';
+  function shown(el) {
+    for (let p = el; p && p !== document.body; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05) return false;
+    }
+    return true;
+  }
   function place() {
     if (!root) return;
-    const h = document.querySelector('.hints');
-    const r = h && h.getBoundingClientRect();
-    root.style.bottom = (r && r.height ? Math.round(innerHeight - r.top + 12) : 12) + 'px';
+    const btn = root.querySelector('#dbgBtn');
+    root.style.bottom = '6px';
+    for (let pass = 0; pass < 5; pass++) {
+      const r = btn.getBoundingClientRect();
+      let lift = 0;
+      for (const el of document.querySelectorAll(DBG_AVOID)) {
+        const b = el.getBoundingClientRect();
+        if (!b.width || !b.height || !shown(el)) continue;
+        if (r.right <= b.left || r.left >= b.right || r.bottom <= b.top || r.top >= b.bottom) continue;
+        lift = Math.max(lift, Math.round(innerHeight - b.top + 6));
+      }
+      if (!lift) return;
+      root.style.bottom = lift + 'px';
+    }
   }
 
   /* redrawn rather than diffed: four rows, and the state that decides them lives inside four
@@ -18057,6 +18140,9 @@ const DBG = (() => {
     touch() { paint(); },
     toggle(v) {
       build();
+      /* re-measured on every open: `.hud-next` only exists at a destination and `.desc-line`
+         only at the menu, so which boxes are in the corner depends on where you are */
+      place();
       open = v == null ? !open : !!v;
       root.classList.toggle('on', open);
       if (open) paint();
