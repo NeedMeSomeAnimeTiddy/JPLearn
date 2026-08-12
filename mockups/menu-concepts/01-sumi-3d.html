@@ -2073,11 +2073,26 @@
      panel it would be a banner, not a button — and `max-width: 100%` so a long one clips inside
      the panel instead of widening it.
      ================================================================================ */
+  /* WIDTH 100%, NOT max-content, AND THE SKEW PIVOTS ON THE RIGHT EDGE.
+     Measured in place: `max-content` resolved to 133px inside a 316px readout, so the slab
+     stopped 161 pixels short of the right edge that everything else in the column is aligned to,
+     and the two lines with `text-overflow: ellipsis` on them were being cut inside it. The
+     max-content idea came from the UP NEXT button, which is right — but that button is pinned to
+     the viewport and grows leftward into empty screen, and this one is a block in a column whose
+     whole visual logic is a shared right edge. Different problem, same mistake as borrowing the
+     rest of the treatment was right.
+     `transform-origin: right center` is the other half: skewX moves the top and bottom edges in
+     opposite directions about the origin, so with the default centre the slab's right edge no
+     longer lined up with the figures above it and its left corner poked five pixels out past
+     them. Pivoting on the right keeps that edge flush and lets the lean happen leftward, into
+     the panel, which is the direction there is room in.
+     `border-box`, or 100% plus 28px of padding overflows the column by 28px. */
   .hud-next {
-    display: block; width: max-content; max-width: 100%;
+    display: block; width: 100%; max-width: 100%; box-sizing: border-box;
     background: var(--hi);
     padding: 8px 14px;
     transform: skewX(-8deg);
+    transform-origin: right center;
     box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
     min-height: 44px;
   }
@@ -4895,6 +4910,127 @@ const IDLE_GLSL = `
     p.z += sin( t * 0.83 + 1.7 ) * uIdleLean * 0.6 * hgt;
     p.y += ( sin( t * 1.9 ) * 0.5 + 0.5 ) * uIdleBob * hgt;
   }`;
+/* ================= AND THE VEGETATION MOVES =================
+   Seventeen thousand plants stood perfectly still in a valley with a wind field blowing through
+   it. Two facts decided how this is built, and both were measured rather than assumed:
+
+   ONE MATERIAL SERVES THE WHOLE WORLD. Every plant in the export — 83 geometries, 17,291
+   instances — draws with the same `JP_VertexColor`, and so does every building. Patching it would
+   sway the inns. So vegetation gets a CLONE of it, made once and shared between all 83.
+
+   AND THEY ARE 6 TO 1,907 UNITS TALL, in local space, on that one material. A single reference
+   height would leave the groundcover rigid and fold the sugi in half, and there is nowhere to put
+   a per-geometry number except the geometry: `aPlantH` is one float per vertex, constant across a
+   geometry, baked once at load. The same trick `aWinC` uses for the windows and for the same
+   reason — a shared material cannot carry per-object data.
+
+   THE BEND IS A POWER OF THE HEIGHT, NOT LINEAR. A tree bends; it does not lean. At 2.2 the
+   bottom half of a trunk moves almost nothing and the canopy carries the whole displacement,
+   which is what a tree does and what stops the whole forest looking like it is sliding.
+
+   NO SECOND PREPASS, AS AN EXPERIMENT WITH A MEASUREMENT BEHIND IT. Anything that moves in its own
+   vertex shader stands still in the ink buffer — that is the crowd's whole story, and the crowd
+   needed a second prepass pass to fix it. The crowd TRANSLATES though, a whole figure walking out
+   from under its outline; this is a canopy leaning a few units at a distance of hundreds. Cheaper
+   to ship it, look, and add the pass if the drift shows than to pay for a third render of the
+   forest on the assumption that it will. */
+const SWAY = {
+  on: new URLSearchParams(location.search).get('sway') !== 'off',
+  amp: { value: 0.35 },      /* against the plant's height to the power 0.55 — see swayBake */
+  rate: { value: 0.75 },
+  gust: { value: 0.55 },
+  t: { value: 0 },
+  dir: null,                 /* the wind's own direction, shared by reference */
+  mat: null, geos: 0, plants: 0,
+};
+const SWAY_GLSL = `
+  uniform float uSwayT, uSwayAmp, uSwayGust, uSwayRate;
+  uniform vec3 uSwayDir;
+  attribute float aPlantH;
+  void swayPlant( inout vec3 p, vec3 ip ) {
+    if ( aPlantH < 0.5 ) return;
+    float ph = fract( sin( dot( ip.xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+    /* a tree bends: the trunk holds and the crown carries it */
+    float bend = pow( clamp( p.y / aPlantH, 0.0, 1.0 ), 2.2 );
+    float t = uSwayT * uSwayRate * ( 0.72 + ph * 0.56 ) + ph * 6.2831;
+    /* A GUST CROSSES THE VALLEY rather than every plant breathing together: the phase runs along
+       the wind, so the wave arrives at the near shore after the far one. */
+    float g = 0.5 + 0.5 * sin( uSwayT * 0.19 - dot( ip.xz, uSwayDir.xz ) * 0.00055 );
+    /* to the power 0.55, so a 1,900-unit sugi swings about twenty units and a six-unit blade of
+       grass still moves a sixth of its own height — a straight proportion leaves the grass dead */
+    float amp = uSwayAmp * pow( aPlantH, 0.55 );
+    float a = ( sin( t ) * 0.72 + sin( t * 1.73 + ph ) * 0.28 ) * amp * bend
+            * ( 1.0 - uSwayGust + uSwayGust * g * 2.0 );
+    p.xz += uSwayDir.xz * a;
+    /* and the tip dips as it goes over, so the crown swings rather than slides sideways */
+    p.y -= abs( a ) * 0.14 * bend;
+  }`;
+/* one float per vertex, constant over the geometry: how tall this plant is in its own space */
+function swayBake(geo) {
+  if (geo.getAttribute('aPlantH')) return false;
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const h = geo.boundingBox.max.y - geo.boundingBox.min.y;
+  const n = geo.attributes.position.count;
+  const a = new Float32Array(n);
+  a.fill(h > 0.5 ? h : 0);
+  geo.setAttribute('aPlantH', new THREE.BufferAttribute(a, 1));
+  return true;
+}
+function swayMaterial(src) {
+  if (SWAY.mat) return SWAY.mat;
+  const mat = src.clone();
+  mat.name = (src.name || '') + '-sway';
+  /* the clone loses the flag `cloudy` sets on the original, so the valley's cloud lighting is
+     re-applied to it rather than inherited — without this the forest lights differently from
+     everything around it */
+  delete mat.userData.cloudy;
+  cloudy(mat);
+  const prev = mat.onBeforeCompile;
+  const prevKey = mat.customProgramCacheKey;
+  mat.onBeforeCompile = (shader, renderer) => {
+    if (prev) prev(shader, renderer);
+    Object.assign(shader.uniforms, { uSwayT: SWAY.t, uSwayAmp: SWAY.amp,
+      uSwayGust: SWAY.gust, uSwayRate: SWAY.rate, uSwayDir: SWAY.dir });
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\n' + SWAY_GLSL)
+      /* BEFORE begin_vertex writes `transformed`, so the displacement is what everything
+         downstream — the projection, the shadow, the fog depth — actually sees */
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+          swayPlant( transformed, vec3( instanceMatrix[ 3 ][ 0 ], instanceMatrix[ 3 ][ 1 ],
+                                        instanceMatrix[ 3 ][ 2 ] ) );
+        #else
+          swayPlant( transformed, ( modelMatrix * vec4( 0.0, 0.0, 0.0, 1.0 ) ).xyz );
+        #endif`);
+    if (!shader.vertexShader.includes('swayPlant( transformed')) {
+      console.error('SWAY PATCH FAILED');
+    }
+  };
+  mat.customProgramCacheKey = () => (prevKey ? prevKey() : '') + '|sway';
+  mat.needsUpdate = true;
+  SWAY.mat = mat;
+  return mat;
+}
+const SWAY_RE = /_Vegetation_|_Forest_|Nature_Trees_|GroundCover|Grass|Bamboo|Susuki/i;
+function swayBuild(root) {
+  if (!SWAY.on || SWAY.mat || !root) return 0;
+  SWAY.dir = WIND.dir;
+  const hit = [];
+  root.traverse((o) => {
+    if ((!o.isMesh && !o.isInstancedMesh) || !SWAY_RE.test(o.name || '')) return;
+    hit.push(o);
+  });
+  if (!hit.length) return 0;
+  const first = Array.isArray(hit[0].material) ? hit[0].material[0] : hit[0].material;
+  const mat = swayMaterial(first);
+  for (const o of hit) {
+    if (swayBake(o.geometry)) SWAY.geos++;
+    o.material = mat;
+    SWAY.plants += o.count || 1;
+  }
+  return SWAY.plants;
+}
+
 function peopleIdle(mat) {
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (shader) => {
@@ -6521,7 +6657,7 @@ const STEAM = {
   time: { value: 0 },
   col: { value: new THREE.Color(0xe6ecef) },     /* steam: the mist colour, near white */
   smoke: { value: new THREE.Color(0x6b6a66) },   /* and woodsmoke, which is a grey */
-  mesh: null, vents: [], puffs: 0,
+  mesh: null, vents: [], puffs: 0, props: [],
 };
 /* WHERE IT COMES FROM, BY NAME, so a re-export that moves the town moves the steam with it.
    `n` puffs per vent, `w` their width at birth, `h` how far the column climbs, `at` how many
@@ -6576,6 +6712,36 @@ function steamBuild(root) {
         y, z: cz + (sx > sz ? 0 : f * sz) + oz * sz,
         r: Math.min(sx, sz) * 0.26, rule,
       });
+    }
+  });
+  /* ================= AND THE TWELVE AUTHORED COLUMNS BECOME PLACEMENT =================
+     There were two kinds of steam in this town and they did not agree with each other: these
+     twelve `Onsen_Props_Steam` props, which are solid modelled columns rising and spinning on the
+     `puff` rule, and the sprite plumes above. Two languages for one substance, side by side along
+     the canal — Robbie's word for it was dissonance and it is the right one.
+     THE PROPS LOSE THE ARGUMENT AS DRAWINGS AND WIN IT AS SITING. A modelled column cannot be
+     soft at its edges or grow as it climbs, and at 82 units it is the height of a person and a
+     half; the sprites can do all of that. But WHERE the steam is was Robbie's decision, made in
+     Blender, and the sprite system had no opinion about the canal at all — it only knew about the
+     baths, because that is what I could find by name.
+     So the props stop being drawn and start being the vent list. Nothing leaves the .blend, the
+     siting is still his, and there is one kind of steam in the valley. `NAV.steam({props: true})`
+     puts the geometry back if this is ever the wrong call. */
+  const PROP_RULE = { n: 8, w: 44, h: 210, at: 1, top: 0, grey: 0 };
+  const m4 = new THREE.Matrix4();
+  root.traverse((o) => {
+    if (!/Onsen_Props_Steam/i.test(o.name || '')) return;
+    STEAM.props.push(o);
+    o.visible = false;
+    if (o.isInstancedMesh) {
+      for (let i = 0; i < o.count; i++) {
+        o.getMatrixAt(i, m4);
+        V.setFromMatrixPosition(m4).applyMatrix4(o.matrixWorld);
+        vents.push({ x: V.x, y: V.y + 8, z: V.z, r: 16, rule: PROP_RULE });
+      }
+    } else {
+      V.setFromMatrixPosition(o.matrixWorld);
+      vents.push({ x: V.x, y: V.y + 8, z: V.z, r: 16, rule: PROP_RULE });
     }
   });
   if (!vents.length) return 0;
@@ -10711,6 +10877,11 @@ async function loadEnvironment(url = ENV.url, opts = {}) {
           + ` ${OUTFIT.dressed} meshes, ${OUTFIT.parts} models classified into robe/trim/head`);
       }
       const wn = windBuild();
+      const sw = swayBuild(root);
+      if (sw) {
+        console.log('[crowd] ' + sw + ' plants sway on ' + SWAY.geos + ' geometries, '
+          + 'one cloned material, heights normalised per geometry');
+      }
       const st = steamBuild(root);
       if (st) {
         console.log('[crowd] ' + st + ' puffs of steam and smoke from ' + STEAM.vents.length
@@ -13430,6 +13601,13 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
      star counting to ink coverage, is measuring the crane unless it is told not to: a star count
      over the night sky came back with 6,303 of them, and 6,300 were its wings. */
   crane: (on) => { if (on !== undefined) swan.visible = on !== false; return swan.visible; },
+  /* the vegetation: NAV.sway({ amp: 1.2 }) to see it from across the valley, { amp: 0 } to stop
+     it dead for an A/B against the outlines */
+  sway: (o) => {
+    if (o) for (const k of ['amp', 'rate', 'gust']) if (o[k] !== undefined) SWAY[k].value = o[k];
+    return { plants: SWAY.plants, geometries: SWAY.geos, on: !!SWAY.mat,
+      amp: SWAY.amp.value, rate: SWAY.rate.value, gust: SWAY.gust.value };
+  },
   /* the town's windows: how many were found, and what each one is doing at this hour */
   windows: () => {
     const out = { spots: WINDOW.spots, meshes: WINDOW.meshes, hour: +DAY_NOW.hour.toFixed(2) };
@@ -13470,8 +13648,12 @@ window.NAV = { get state() { return state; }, get busy() { return busy; },
       if (o.col !== undefined) STEAM.col.value.setHex(o.col);
       if (o.smoke !== undefined) STEAM.smoke.value.setHex(o.smoke);
       if (o.on !== undefined && STEAM.mesh) STEAM.mesh.visible = o.on !== false;
+      /* the twelve authored columns back on, if hiding them was the wrong call */
+      if (o.props !== undefined) for (const p of STEAM.props) p.visible = o.props !== false;
     }
     return { puffs: STEAM.puffs, vents: STEAM.vents.length,
+      authoredProps: STEAM.props.length,
+      propsShown: STEAM.props.length ? STEAM.props.every((p) => p.visible) : null,
       baths: STEAM.vents.filter((v) => !v.rule.grey).length,
       chimneys: STEAM.vents.filter((v) => v.rule.grey).length,
       amt: STEAM.amt.value, rise: STEAM.rise.value, cold: +STEAM.cold.value.toFixed(2),
@@ -17090,6 +17272,7 @@ function tick() {
      COLD IS THE SUN'S ALTITUDE, because that is what the air temperature follows: full strength
      through the night and the dawn, a third of it at midday when a bath still steams a little
      but the air is nowhere near saturated. */
+  SWAY.t.value = t;
   STEAM.time.value = t;
   STEAM.cold.value = 0.34 + 0.66 * (1 - THREE.MathUtils.smoothstep(DAY_NOW.alt, -6, 34));
   /* and the town's bedtimes. Two numbers for four hundred windows — every one of them works out
