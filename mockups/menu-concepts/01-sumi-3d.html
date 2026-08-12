@@ -1489,22 +1489,23 @@
     border: 0;
     padding: 8px 14px;
   }
-  .hud[data-t="midashi"] .hud-figs b {
-    font-size: 22px; color: var(--gold-hi);
-    text-shadow: 3px 3px 0 rgba(0, 0, 0, calc(0.48 + 0.30 * var(--sky))), var(--halo-soft);
-  }
+  /* NOTHING LEFT FOR THE TREATMENT TO SAY ABOUT THE FIGURES. This used to enlarge them and give
+     them gold and a 3px hard shadow, all of which were for a number standing on the world with no
+     ground. They stand on washi now — see the 札 block by `.hud-figs` — and gold on cream with a
+     black offset behind it would be the worst-lit type in the interface. */
   /* SECONDARY TEXT CANNOT BE 55% CREAM WHEN THERE IS NO PANEL UNDER IT. Those alphas were set
      for type on a dark slab; on gravel in daylight DUE TODAY simply is not there. */
   .hud[data-t="midashi"] {
     --fg-2: rgba(242, 234, 216, 0.78);
     --fg-3: rgba(242, 234, 216, 0.62);
   }
-  .hud[data-t="midashi"] .hud-figs i,
   .hud[data-t="midashi"] .hud-next em,
   .hud[data-t="midashi"] .hud-next i,
   .hud[data-t="midashi"] .hud-small {
     text-shadow: var(--halo);
   }
+  /* and nothing about the figures either: every character in that block is dark ink on washi now,
+     and a halo is for cream held over a valley. See the 札 note by `.hud-figs`. */
   .hud[data-t="midashi"] .hud-next b {
     color: var(--washi); text-shadow: var(--halo);
   }
@@ -2031,46 +2032,87 @@
      separate patches that would each have drifted. */
   .hud-detail { margin-top: 14px; }
   /* ================================================================================
-     THE FIGURES ARE ONE OBJECT NOW, AND THEY BELONG TO THE SLAB UNDER THEM.
-     Four numbers floating on the world with nothing but a halo read as four separate captions
-     that happened to land in a row — and since NEXT UP became a filled slab they had nothing in
-     common with the thing they sit on top of. So they get the same treatment every other filled
-     surface in this project has: a ground, the -8 degree skew, the 3px hard shadow, pinned to
-     the same right edge, pivoting on it so the two boxes stay in line. Hairlines between the
-     columns rather than a 30px gap, because what separates them is a rule, not air.
-     `fit-content` and `margin-left: auto` for the same reason the slab has them: the column's
-     logic is its right edge, and both boxes end on it.
+     札 — THE FIGURES ARE FOUR TAGS, AND EACH ONE STANDS ON WHAT IT MEASURES.
+
+     WHAT THIS REPLACED, AND WHY TWICE. First these were four numbers floating on the world with
+     nothing but a halo, which read as four captions that happened to land in a row. Then they
+     were one dark strip carrying all four, which fixed the floating and bought a slab of ground
+     nobody had asked for, sitting under the vermilion one and agreeing with it about nothing.
+     Four sets were built and looked at side by side; this is two of them joined.
+
+     THE TAG IS THE OBJECT. Ink on washi, the -8 degree skew, the 3px hard shadow — a keycap grown
+     up, which is the treatment this project already gives anything meant to read as a thing you
+     could pick up. The number gets full contrast against a solid, so it is legible at noon over a
+     bright valley and at midnight over a lantern, which is what no amount of halo on cream ever
+     managed. One consequence worth knowing: the tags are a second family of cream chips above the
+     ENTER and ESC caps, and that is deliberate — same material, different size, same corner.
+
+     IT IS THE STAT CHIP. The four along the top of the menu — the clock, the date, the streak,
+     the level — are already exactly this object: ink on washi, one line, the number first in
+     vermilion Segoe UI Black italic, the label after it in 11px Bahnschrift, the -8 degree skew
+     with a degree of ROTATION on top so a row of them reads as laid down rather than printed,
+     and on the one chip that has a proportion to show, the XP track inline at the end. The
+     readout was inventing a second dialect for the same sentence. It speaks the first one now.
+
+     THE ROTATION ALTERNATES, which is where the top row's charm actually comes from: `.stat-chip`
+     is at -1.2 degrees and the highlighted one at +1. Two values, not a random scatter, so the
+     stack looks hand-laid without looking careless.
+
+     THEY STACK RATHER THAN SIT IN A ROW, and that is the one thing that is not copied. The menu's
+     four chips have the whole width of the screen; these have the 430 pixels the readout column
+     is allowed, and four chips of `15 DUE TODAY` come to about 560. So: a column, right-aligned,
+     which also puts them in the same posture as the key hints directly below them.
+
+     THE BAR IS THE XP BAR — the same object this file already carries at `.stat-chip .xp-track`,
+     which is itself the app's titlebar XP track at chip scale: 4 pixels tall, an ink track at a
+     fifth, a vermilion fill, square. It appears only where the figure is genuinely a ratio; see
+     `figRatio`, which reads that off the value rather than being told, so 78% and 2/4 draw a bar
+     and 9278 CARDS does not. Being INLINE is what makes that honest — the level chip up top has a
+     track and the streak chip does not, and neither looks unfinished. A stacked card could not do
+     that: leaving the slot empty read as nought per cent, and filling it read as a hundred.
+
+     NUMBERS DO NOT MOVE THEIR OWN CHIP. `hudCount` tweens 9278 up to 8000 through every width in
+     between, and the chips are right-aligned, so a number that sets its chip's width drags the
+     whole chip left for half a second on every arrow key. `b` gets a fixed box and is set right
+     inside it — measured, not guessed: the widest figure any section produces is four digits, at
+     36 pixels in this face and size. 42 is that with room.
      ================================================================================ */
   .hud-figs {
-    display: flex; gap: 0; justify-content: flex-end;
-    width: fit-content; margin-left: auto; margin-bottom: 5px;
-    background: rgba(12, 10, 8, 0.58);
-    padding: 7px 14px 6px;
-    transform: skewX(-8deg); transform-origin: right center;
-    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.34);
+    display: flex; flex-direction: column; align-items: flex-end; gap: 7px;
+    width: fit-content; margin-left: auto; margin-bottom: 12px;
   }
-  .hud-figs span + span { border-left: 1px solid rgba(242, 234, 216, 0.16); }
-  /* a floor under every column, because the widest thing in one is sometimes the LABEL and
-     sometimes the NUMBER -- and where the number wins, a counter running 41h down to 25h changes
-     that column width on the way. Not tabular figures: Segoe UI Black has no tnum table, so the
-     feature is silently ignored and only a real minimum holds the grid still. */
-  .hud-figs span { min-width: 48px; padding: 0 11px; }
-  .hud-figs span:first-child { padding-left: 0; }
-  .hud-figs span:last-child { padding-right: 0; }
+  /* the button reset is not needed here (these are spans, not buttons) but everything else is
+     `.stat-chip`'s, value for value */
+  .hud-figs span {
+    display: block; white-space: nowrap;
+    background: var(--washi); color: var(--ink);
+    font-family: var(--lat-ui); font-weight: 600; font-size: 11px; letter-spacing: 0.14em;
+    padding: 7px 13px;
+    transform: skewX(-8deg) rotate(-1.2deg);
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+  }
+  .hud-figs span:nth-child(even) { transform: skewX(-8deg) rotate(1deg); }
   .hud-figs b {
-    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
-    font-size: 24px; line-height: 1; color: var(--fig);
+    display: inline-block; min-width: 42px; text-align: right; margin-right: 8px;
+    font-family: var(--lat); font-style: italic; font-weight: 900;
+    color: var(--hi); font-size: 14px; letter-spacing: 0; text-shadow: none;
     /* TABULAR FIGURES, because these count. In a proportional face 1 is narrower than 4, so a
-       counter running 7 -> 16 changes its own width on nearly every frame and shoves whatever
-       is to the right of it. */
+       counter running 7 -> 16 changes its own width on nearly every frame. The fixed box above is
+       the real defence — Segoe UI Black has no tnum table, so the feature is silently ignored —
+       but it costs nothing to ask for on a face that might one day have one. */
     font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1;
   }
-  .hud-figs i {
-    display: block; font-family: var(--lat-ui); font-weight: 600; font-style: normal;
-    font-size: 9.5px; letter-spacing: 0.22em; color: var(--fg-2); margin-top: 6px;
+  .hud-figs i { font-style: normal; text-shadow: none; }
+  /* `.stat-chip .xp-track`'s numbers exactly: 40 by 4, ink at a fifth, vermilion, square */
+  .hud-figs u {
+    display: inline-block; width: 40px; height: 4px; margin-left: 9px; vertical-align: 2px;
+    text-decoration: none; background: rgba(20, 17, 13, 0.2);
   }
-  /* the per-figure rule, off unless a set asks for it — see the note in hudBuild */
-  .hud-figs u { display: none; }
+  .hud-figs u[data-gauge="off"] { display: none; }
+  .hud-figs u em {
+    display: block; height: 4px; width: 0; background: var(--hi);
+    transition: width 0.55s cubic-bezier(0.2, 1, 0.3, 1);
+  }
   /* ================================================================================
      WHY THE WHOLE INTERFACE MOVED 3PX EVERY TIME THE READOUT CHANGED.
 
@@ -2182,178 +2224,6 @@
     display: block; font-family: var(--lat-ui); font-weight: 500; font-style: normal;
     font-size: 11px; line-height: 14px; letter-spacing: 0.1em; color: var(--gold-hi);
     margin-top: 3px;
-  }
-
-  /* ================================================================================================
-     THE FIGURE SETS — FIVE ANSWERS TO THE SAME CORNER. F cycles, `NAV.figs(n)` names.
-
-     WHY THESE HAVE TO SIT HERE, AFTER MIDASHI. `.hud[data-t="midashi"] .hud-figs b` is three
-     class-level selectors and so is `.hud[data-figs="fuda"] .hud-figs b`; equal specificity means
-     SOURCE ORDER decides, and MIDASHI is the treatment this interface actually wears. Written above
-     that block none of this would have any effect on the only screen anyone sees. Same reason the
-     base `.hud-figs` rules cannot express any of it: they are one class and lose to MIDASHI outright.
-
-     Each set is written in the vocabulary already on the screen — square corners, the -8 degree
-     skew, the 3px hard shadow, washi over ink for anything you are meant to read as an object,
-     gold for a figure, a hairline for a division — and takes a different position on the two
-     questions the strip answered badly:
-
-        does the block have a GROUND, or is it type held over the world by a halo?
-        is it a ROW of four equals, a LIST, or a hierarchy?
-
-     BANZUKE  no ground · a list      each figure a line: label, leader, number
-     FUDA     five grounds · a row    each number its own tag, the label outside it
-     ICHIMAI  one ground · a row      the figures and NEXT UP are one printed plate
-     MEMORI   no ground · a row       bare figures, each over a rule that fills where it can
-     ITA      one ground · a row      the strip these replace
-     ================================================================================================ */
-  /* three of the four take their ground away. Stated once, because "no fill, no skew, no shadow"
-     is the same sentence in each of them and it is not what tells them apart. */
-  .hud[data-figs="banzuke"] .hud-figs,
-  .hud[data-figs="fuda"] .hud-figs,
-  .hud[data-figs="memori"] .hud-figs {
-    background: none; padding: 0; box-shadow: none; transform: none;
-  }
-  .hud[data-figs="banzuke"] .hud-figs span,
-  .hud[data-figs="fuda"] .hud-figs span,
-  .hud[data-figs="memori"] .hud-figs span { padding: 0; }
-  .hud[data-figs="banzuke"] .hud-figs span + span,
-  .hud[data-figs="fuda"] .hud-figs span + span,
-  .hud[data-figs="memori"] .hud-figs span + span,
-  .hud[data-figs="ichimai"] .hud-figs span + span { border-left: 0; }
-
-  /* ---- 番付 BANZUKE · the ranked sheet ----------------------------------------------------------
-     The one set that is not a row. Four lines, label on the left, figure on the right, a leader
-     rule carrying the eye between them — a ranking sheet, a bill, a results board. It reads in the
-     same direction as the list it belongs to and it costs no fill at all: the structure is four
-     hairlines, and a hairline is the cheapest thing this interface owns. The label column sizes
-     itself per line, so the leaders come out at four different lengths, which is the whole look. */
-  .hud[data-figs="banzuke"] .hud-figs {
-    display: block; width: fit-content; min-width: 236px; max-width: 100%;
-    margin-left: auto; margin-bottom: 11px;
-  }
-  .hud[data-figs="banzuke"] .hud-figs span {
-    display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-    gap: 12px; height: 25px; min-width: 0;
-  }
-  .hud[data-figs="banzuke"] .hud-figs i {
-    order: 1; margin-top: 0; font-size: 9.5px; letter-spacing: 0.2em; white-space: nowrap;
-  }
-  /* 0.32, not 0.24. At a quarter alpha over a lit valley the leader disappeared into whatever was
-     behind it and the four lines went back to being four floating captions — which is the exact
-     failure the set exists to fix. It needs the black under-rule as much as the cream: one pixel
-     of shadow is what stops it dissolving where the ground behind it is pale. */
-  .hud[data-figs="banzuke"] .hud-figs u {
-    order: 2; display: block; height: 1px; text-decoration: none;
-    background: rgba(242, 234, 216, 0.32); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
-  }
-  .hud[data-figs="banzuke"] .hud-figs u em { display: none; }
-  /* 52 so the column cannot move when a counter runs 9 -> 15 mid-tween; see the note on the base
-     rule about Segoe UI Black having no tnum table to fall back on */
-  .hud[data-figs="banzuke"] .hud-figs b {
-    order: 3; font-size: 20px; line-height: 20px; text-align: right; min-width: 52px;
-    text-shadow: 2px 2px 0 rgba(0, 0, 0, calc(0.44 + 0.28 * var(--sky))), var(--halo-soft);
-  }
-
-  /* ---- 札 FUDA · four tags ----------------------------------------------------------------------
-     The opposite bet: give every number a body. Each one is a keycap grown up — ink on washi, the
-     same -8 degree skew, the same hard shadow — and the label steps outside onto the world, so the
-     tag holds exactly one thing and holds it at full contrast. Four objects rather than one, which
-     is the argument against it as much as for it: it is the loudest of the five. Every tag pivots
-     on its own RIGHT edge so the row's right edge stays a straight line under the lean. */
-  .hud[data-figs="fuda"] .hud-figs {
-    display: flex; gap: 9px; justify-content: flex-end; align-items: flex-start;
-    width: fit-content; margin-left: auto; margin-bottom: 11px;
-  }
-  .hud[data-figs="fuda"] .hud-figs span {
-    display: flex; flex-direction: column; align-items: stretch; min-width: 0;
-  }
-  .hud[data-figs="fuda"] .hud-figs b {
-    font-size: 19px; line-height: 21px; text-align: center; min-width: 62px;
-    background: var(--washi); color: var(--ink); text-shadow: none;
-    padding: 7px 13px 6px;
-    transform: skewX(-8deg); transform-origin: right center;
-    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.42);
-  }
-  .hud[data-figs="fuda"] .hud-figs i {
-    margin-top: 8px; text-align: center; font-size: 8.5px; letter-spacing: 0.16em;
-  }
-
-  /* ---- 一枚 ICHIMAI · one plate ------------------------------------------------------------------
-     The figures were never a separate object from the slab under them — they describe the same row,
-     they change on the same keypress, they end on the same edge. So they stop being two things: one
-     skewed plate carrying one shadow, dark over vermilion, divided by the printer's rule. The skew
-     moves up to `.hud-detail` and both halves give up their own, or the lean would compound.
-     Both halves are `width: auto`, so the plate is as wide as whichever half is wider and neither
-     can end short of the other. That is also why NEXT UP takes the non-resizing swap here — see
-     `hudSync`: a slab that is half of a larger object does not get to change width by itself. */
-  /* THE PLATE HAS A FIXED WIDTH, AND IT HAS TO. Measured: with the plate shrink-wrapped to its
-     contents, moving down one row took it from 350 to 332 — the sentence got shorter and the whole
-     object jumped 18 pixels while the words inside it were at zero opacity. The swap can hide a
-     WORD changing; it cannot hide the plate changing, because the plate never fades. So `width:
-     100%` against MIDASHI's own `max-width: 430px`, which is the width this column was already
-     allowed. Nothing in the corner moves again, and a printed card that is always the same size is
-     the more honest object anyway. */
-  /* 368 rather than MIDASHI's own 430: the plate's width is now set by the FIGURES, which need
-     about 330 for four labels and their gutters, and every pixel past that is empty vermilion
-     under a right-aligned sentence. 430 gave the corner a red field with three words in it. */
-  .hud[data-figs="ichimai"] .hud-detail {
-    width: 100%; max-width: 368px; margin-left: auto;
-    transform: skewX(-8deg); transform-origin: right center;
-    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.42);
-  }
-  /* spread, not right-packed: a fixed plate wider than its four figures would otherwise carry a
-     block of empty ground on the left of the top half only */
-  .hud[data-figs="ichimai"] .hud-figs {
-    width: auto; justify-content: space-between; margin-bottom: 0;
-    background: rgba(12, 10, 8, 0.82); padding: 9px 16px 8px;
-    transform: none; box-shadow: none;
-  }
-  .hud[data-figs="ichimai"] .hud-figs b { font-size: 21px; text-shadow: none; }
-  .hud[data-figs="ichimai"] .hud-figs i { text-shadow: none; }
-  .hud[data-figs="ichimai"] .hud-next {
-    width: auto; max-width: none; margin-left: 0;
-    padding: 9px 16px 10px;
-    border: 0; border-top: 2px solid rgba(0, 0, 0, 0.42);
-    transform: none; box-shadow: none;
-  }
-  .hud[data-figs="ichimai"] .hud-next em,
-  .hud[data-figs="ichimai"] .hud-next b,
-  .hud[data-figs="ichimai"] .hud-next i { text-shadow: none; }
-
-  /* ---- 目盛 MEMORI · figures over gauges ----------------------------------------------------------
-     The least chrome of the five and the only one that says anything the number does not: label
-     above, figure below, and under each a 3px rule in exactly the language the list rows already
-     use for their tiers — a track that fills gold. It fills only where the figure is genuinely a
-     ratio (see `figRatio`); everywhere else the rule stays a rule, which is the honest answer and
-     also the reason the row still has a horizon when three of the four have no bar to draw. */
-  .hud[data-figs="memori"] .hud-figs {
-    display: flex; gap: 20px; justify-content: flex-end;
-    width: fit-content; margin-left: auto; margin-bottom: 12px;
-  }
-  .hud[data-figs="memori"] .hud-figs span {
-    display: flex; flex-direction: column; align-items: stretch; min-width: 66px;
-  }
-  .hud[data-figs="memori"] .hud-figs i {
-    order: 1; margin-top: 0; margin-bottom: 5px; text-align: right;
-    font-size: 8.5px; letter-spacing: 0.18em;
-  }
-  .hud[data-figs="memori"] .hud-figs b {
-    order: 2; font-size: 26px; line-height: 26px; text-align: right;
-    text-shadow: 2px 2px 0 rgba(0, 0, 0, calc(0.44 + 0.28 * var(--sky))), var(--halo-soft);
-  }
-  /* THE TRACK IS THE HORIZON, so it cannot be nearly invisible. At 0.20 filled and 0.10 unfilled
-     the row had no baseline at all over a lit valley and the four figures floated exactly the way
-     the strip's did. The unfilled one is still the quieter of the two — it is a rule, not a gauge —
-     but it is a rule you can see, and it carries the same hard under-shadow the leaders do. */
-  .hud[data-figs="memori"] .hud-figs u {
-    order: 3; display: block; height: 4px; margin-top: 8px; text-decoration: none;
-    background: rgba(242, 234, 216, 0.34); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
-  }
-  .hud[data-figs="memori"] .hud-figs u[data-gauge="off"] { background: rgba(242, 234, 216, 0.20); }
-  .hud[data-figs="memori"] .hud-figs u em {
-    display: block; height: 4px; width: 0; background: var(--gold-hi);
-    transition: width 0.55s cubic-bezier(0.2, 1, 0.3, 1);
   }
   /* ================================================================================
      THE BORDER, AS AN INDEPENDENT AXIS.
@@ -16248,27 +16118,11 @@ const HUD_BORDERS = [
   ['asanoha', '\u9ebb\u306e\u8449', 'the hemp leaf'],
   ['none', '\u306a\u3057', 'no frame at all'],
 ];
-/* ================= HOW THE FOUR FIGURES ARE PRESENTED \u2014 THE THIRD AXIS =================
-   F cycles it, the same way V cycles the treatment and B the frame, and it is separable from both
-   for the same reason: what the numbers SAY (HUD_FIGS, further down) and how they are SET are two
-   questions, and answering them in one place is how the strip ended up being the only answer.
-
-   All five are written in the vocabulary this project already has \u2014 square corners, the -8 degree
-   skew, the 3px hard shadow, washi over ink, gold for a figure, a hairline for a division \u2014 and
-   each one takes a different position on the two things actually in dispute:
-
-     does the block have a GROUND, or is it type held over the world by a halo?
-     is it a ROW of four equals, a LIST, or a hierarchy with one figure on top?
-
-   Authored against MIDASHI, which is the treatment this interface is. The other eleven still
-   carry their own `.hud-figs` sizing and will fight these; that is a comparison, not a bug. */
-const HUD_FIGSETS = [
-  ['banzuke', '\u756a\u4ed8', 'a ranked sheet \u00b7 label, leader, figure, one per line'],
-  ['fuda', '\u672d', 'four tags \u00b7 each number is its own object, label underneath'],
-  ['ichimai', '\u4e00\u679a', 'one plate \u00b7 the figures and NEXT UP share a single slab'],
-  ['memori', '\u76ee\u76db', 'bare figures over gauges \u00b7 no ground at all'],
-  ['ita', '\u677f', 'the strip these replace \u00b7 kept for comparison'],
-];
+/* HOW THE FIGURES ARE PRESENTED is not an axis any more. Four sets were built on a `data-figs`
+   attribute and cycled with F so they could be looked at side by side \u2014 a ranked sheet, four
+   tags, one plate shared with NEXT UP, and bare figures over gauges. The tags and the gauges won
+   and were joined; the switch and the other three are gone rather than left in as dead weight.
+   The whole design is now the \u672d block by `.hud-figs` in the stylesheet, which says why. */
 /* what the glass is made of in each place, for the bench tag. No objects -- a tint, an amount of
    blur, and the direction the light comes from. */
 const HUD_AIR = {
@@ -16282,7 +16136,7 @@ const HUD_AIR = {
 /* opens on plain glass. `b` is the frame axis and it starts at NONE -- the patterned frames are
    still on B for comparison, but nothing is drawn round a row by default any more. */
 /* opens on MIDASHI. The glass is one V away, at index 5. */
-const HUD = { on: true, t: 0, b: 5, f: 0, air: true, sec: null, tile: null, at: 0, level: 2 };
+const HUD = { on: true, t: 0, b: 5, air: true, sec: null, tile: null, at: 0, level: 2 };
 const hudEl = document.getElementById('hud');
 
 /* ================= THE FOUR NUMBERS A SECTION CAN HONESTLY SHOW =================
@@ -16388,7 +16242,7 @@ function hudDraw(force) {
   const rows = hudRows();
   if (!rows.length) return;
   HUD.at = Math.max(0, Math.min(HUD.at, rows.length - 1));
-  const key = [HUD.sec, HUD.level, HUD.tile, HUD.t, HUD.b, HUD.f, HUD.air, rows.length].join('|');
+  const key = [HUD.sec, HUD.level, HUD.tile, HUD.t, HUD.b, HUD.air, rows.length].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
 }
@@ -16401,10 +16255,8 @@ function hudBuild(rows) {
     : null;
   const [tk, tj, tn] = HUD_TREATMENTS[HUD.t];
   const [bk, bj, bn] = HUD_BORDERS[HUD.b];
-  const [fk] = HUD_FIGSETS[HUD.f];
   hudEl.dataset.t = tk;
   hudEl.dataset.b = bk;
-  hudEl.dataset.figs = fk;
   hudEl.dataset.area = HUD.sec || 'STUDY';
   hudEl.dataset.air = HUD.air ? 'on' : 'off';
   hudEl.style.setProperty('--sec', acc[0]);
@@ -16554,12 +16406,7 @@ function hudSync(rows) {
        HELD TO THE ROW ACTUALLY CHANGING. hudSync also runs on ticks where it did not, and
        swapping a sentence for itself is motion carrying no information. */
     /* the box is the slab, the label is the span inside it — see the markup in hudBuild */
-    /* EXCEPT UNDER ICHIMAI, WHERE THE SLAB IS HALF OF A LARGER OBJECT and its width is the
-       plate's, not its sentence's. `swapText`'s painted branch resizes the box, which there would
-       mean the bottom half of the plate narrowing away from the top half on every arrow key. Same
-       function, same clock, the branch that does not resize: box === label. */
-    const solo = HUD_FIGSETS[HUD.f][0] !== 'ichimai';
-    const label = (solo && nx.querySelector('.hud-next-in')) || nx;
+    const label = nx.querySelector('.hud-next-in') || nx;
     if (moved) swapText(nx, label, write, 14);
     else write();
   }
@@ -16673,20 +16520,7 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'v' || e.key === 'V') { HUD.t = (HUD.t + 1) % HUD_TREATMENTS.length; hudDraw(); }
   else if (e.key === 'b' || e.key === 'B') { HUD.b = (HUD.b + 1) % HUD_BORDERS.length; hudDraw(); }
   else if (e.key === 'a' || e.key === 'A') { HUD.air = !HUD.air; hudDraw(); }
-  else if (e.key === 'f' || e.key === 'F') { NAV.figs(HUD.f + 1); }
 });
-/* F from the keyboard, `NAV.figs(n)` from the console, `NAV.figs()` to ask which one is on.
-   It prints, because five sets that differ in layout rather than in colour are not tellable apart
-   from a screenshot without being told, and there is deliberately no bench tag on screen. */
-NAV.figs = (n) => {
-  if (n != null) {
-    HUD.f = ((n % HUD_FIGSETS.length) + HUD_FIGSETS.length) % HUD_FIGSETS.length;
-    hudDraw();
-  }
-  const [k, j, note] = HUD_FIGSETS[HUD.f];
-  console.log('figures ' + HUD.f + '/' + (HUD_FIGSETS.length - 1) + '  ' + j + ' ' + k + ' — ' + note);
-  return k;
-};
 
 /* ================= level three as a walk =================
    The camera stops beside one placard at a time and glides to the next. Everything else is a
