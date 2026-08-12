@@ -12,6 +12,27 @@ behind this page and there is not going to be one.
 `renders as` columns, because that is what they are — content the page draws, not names for
 things. A tile called SENTENCES is called SENTENCES here even though it draws 例文.
 
+## AND READ THIS ONE TOO — THE INTERFACE IS 2D. ALL OF IT.
+
+**Nothing in this document is a physical object.** Every list, row, figure, label and state in
+here is drawn in screen space — the HUD panel, its row list, the figure chips, the NEXT UP slab,
+the keycaps. The world is what you are looking *at*; the interface is drawn *over* it. The camera
+moves, the interface is added, and the map stays Robbie's.
+
+The first version of this file broke that rule without noticing. It said in its own opening
+section that level two is the HUD's row list and screen-space in all six sections, and then two
+hundred lines later described "placards" carrying block names, a "placard you can see and cannot
+turn", and figures "between placards" — which are world geometry. That got built: 323 lines whose
+first act was `body.at-path .hud-list { display: none }`, switching the 2D list off and standing
+boards in the valley instead. It was rejected on sight and it is `stash@{0}` if any of it is ever
+wanted.
+
+**So when this file says a route, it means where the CAMERA goes. Never a rack of signs.** A walk
+is a camera move plus a 2D list that re-letters; the world contributes the movement, the place and
+the sense of distance, and contributes no widgets at all. Two systems in this project have already
+died of ignoring this — the thirteen floating-type designs (`FT`, now off by default) and the
+world-geometry level twos in `places/*.js` (hidden since `world.glb` landed). This makes three.
+
 ## READ THIS FIRST — the same trap PLAN-places.md warns about
 
 The first pass of this plan was written against `places/study.js` and `places/shrine.js`, and it
@@ -167,13 +188,21 @@ Un-dropping it would give the walk a smooth spine instead of sixteen straight ho
 
 ## L2 — walk the route
 
-The camera glides from node to node, one in focus at a time, arrows to step. Same machinery as
-the existing level-three walk.
+**The camera walks; the interface stays on the glass.** The camera glides along the route, one
+node at a time, arrows to step. The world's whole contribution is the movement and the view — how
+far you have come is legible because the gate is behind you and the arbour is ahead. It puts up no
+signs.
 
-Each node shows its name, its bar (`4 / 12 blocks`, `31 / 46 characters`), and its state:
-**done**, **here**, or **ahead**. The nine landmarks above are the milestones between them —
-free scenery that tells you how far you have come, which is the job Duolingo gives its unit
-headers and checkpoint chests.
+The list is the HUD row list, exactly as it is in every other section: the node you are on is the
+selected row, with its name, its bar (`4 / 12 blocks`, `31 / 46 characters`) and its state —
+**done**, **here** or **ahead**. Sixteen nodes against seven rows that fit means the list is a
+**window**, not the whole course: it shows the node you are on with a couple either side and
+re-letters as the camera moves, which is the same thing the level-three walk's counter already
+does (`3 / 16`).
+
+The nine landmarks are the milestones, and they are milestones by being *scenery you pass*, not
+by being labelled. Reaching the inner gate means something because you can see it; nothing has to
+write "UNIT 3" on it.
 
 **Locks are soft, matching the app.** A node ahead of you is dimmed and you can still walk to it
 and enter, with the app's own warning first: *"This part of the course builds on earlier steps
@@ -211,9 +240,9 @@ to have both:
 | L3, the lessons | the bamboo stairway, 3,157 units | **no landmarks, even cadence** — a list of forty identical blocks wants uniformity and nothing competing with it |
 
 And the arithmetic works because the course only ever reaches six deck nodes, whose block counts
-run 6 to 44: over 3,157 units that is **72 to 526 units between placards**. The lists that would
-break it — vocab N1's 137 — are not on the course. They sit behind the JLPT nodes, which hand off
-to another section entirely.
+run 6 to 44: over 3,157 units that is **72 to 526 units of climb per row**, which is the camera's
+step, not a spacing between objects. The lists that would break even that — vocab N1's 137 — are
+not on the course. They sit behind the JLPT nodes, which hand off to another section entirely.
 
 Climbing is also the right shape for the thing: the course is a walk on the level, one deck is a
 hill.
@@ -239,11 +268,13 @@ The real block names. A sample of what each list holds:
 - **sentence_examples, 8** — Copula / Existence · Core Particles · Verb Forms · i-Adjectives ·
   na-Adjectives · Question Words · Connectives · Common Patterns
 
-Each placard carries the block name, its card count, and its state. **Blocks lock**: a block
-opens once the previous one has 80% of its cards answered at least once (70% for thematic
-category blocks). The corridor should show that — a locked block is a placard you can see and
-cannot turn. This is a second gate chain inside every node's gate, and it is the app's, not an
-invention: it is what makes a node feel like a unit of five lessons rather than one wall.
+The rows carry the block name, its card count and its state — in the HUD list, as ever. Climbing
+is what the world does here; the reading is on the glass.
+
+**Blocks lock**: a block opens once the previous one has 80% of its cards answered at least once
+(70% for thematic category blocks). A locked row is dimmed in the list, the way the course's own
+locked nodes are. This is a second gate chain inside every node's gate, and it is the app's, not
+an invention: it is what makes a node feel like a unit of five lessons rather than one wall.
 
 Only the six deck nodes reach this level. The other ten fly out to their own section instead.
 
@@ -324,8 +355,9 @@ chooses on:
 has one, with boats on it.
 
 Thirty real titles, shortest to longest, from 73 words to 2,539. Twenty-nine are by 小川未明
-(Ogawa Mimei); one, at 555 words, is by 岡本かの子 (Okamoto Kanoko). Each placard carries the
-title, its reading, its author and its word count — all real fields on the passage record.
+(Ogawa Mimei); one, at 555 words, is by 岡本かの子 (Okamoto Kanoko). Each row carries the title,
+its reading, its author and its word count — all real fields on the passage record. The canal is
+what the camera travels; the rows are in the panel.
 
 **Do not show a completion percentage.** The app's passage progress is a three-state ring
 (not-started / in-progress / completed) held in `useState` with no persistence — it resets every
