@@ -1503,23 +1503,41 @@
   }
 
   /* ================================================================================================
-     THE COURSE, IN THREE SHAPES. C cycles them; `NAV.course(n)` names them.
+     THE COURSE, REBUILT FROM REFERENCE. C cycles the three; `NAV.course(n)` names them.
 
-     One markup — sixteen `.cs-step` buttons carrying a mark, a number, two names, the gate in words,
-     a bar and a percentage, plus one SVG holding the route and the travelled part of it. What each
-     shape does is decide which of those parts is drawn and where. Three renderers would have been
-     three places for a state to go stale; this way `data-state` is written once.
+     WHY THE PREVIOUS FOUR WERE THROWN OUT, written down so it is not done a third time: every one of
+     them was a SPREADSHEET. Number, name, hairline bar, percentage, aligned into four columns with a
+     rule down the side, sixteen times over. That is a TABLE of the course, and no amount of colour,
+     indent or column count turns a table into a picture of a journey. Rearranging the columns was
+     never going to fix it, which is why nothing here descends from any of them.
 
-     SHARED, BECAUSE ALL THREE ARE THE SAME PROJECT: square corners, the -8 degree skew on anything
-     filled, gold for travelled and earned, vermilion for the one thing to press, ink for what has
-     not happened yet, and the keyline (`paint-order: stroke fill`) on any type standing over the
-     valley — which is the trick the row list already uses and the only thing that keeps cream
-     legible over raked gravel.
+     WHAT THE REFERENCE ACTUALLY DOES. Persona 5 / P5R by way of the Game UI Database: the save list,
+     the mission list, the story list, the rank list, the calendar. Four moves, and the ladders made
+     none of them:
+
+       1. THE STATE IS A WORD, SET LARGE. `DONE!` in heavy outlined display type at the HEAD of the
+          row is the loudest thing on it. Not a tick, not a bar, not a colour you have to learn.
+       2. THE SELECTION IS A FILLED SLAB THAT BREAKS THE EDGE, and ends in a point. It does not
+          recolour a border; it overhangs the sheet it lives on and puts its type up two sizes.
+       3. NUMERALS ARE ENORMOUS. A step's number is 30-70px of display type, not a 10px grey label.
+       4. NOTHING IS MEASURED SIXTEEN TIMES. Sixteen little bars is sixteen things to read and no
+          hierarchy at all. One big italic percentage, on the step you are pointing at, is one.
+
+     AND FROM THE PRINTED RACE-BOARDS THE WHOLE IDEA COMES FROM -- single-track Edo and Meiji board
+     games printed on one sheet, which is exactly this feature drawn by hand two centuries ago: the
+     board is PAPER. Ink on cream, red annotation, a number above each square's name. That is where
+     SHEET's inversion comes from, and it is worth having because everything else in this interface
+     is cream type over a dark valley: a printed sheet reads as an OBJECT arriving on the screen
+     rather than as another restyle of the panel.
+
+     SHARED: square corners, the -8deg skew on anything filled, gold for earned, vermilion for the
+     one thing to press, ink for what has not happened, and the keyline (`paint-order: stroke fill`)
+     on any type left standing over the valley.
      ================================================================================================ */
   /* ALL THREE OCCUPY THE SAME HEIGHT, or the section title moves when you cycle them: the panel's
-     stack is bottom-anchored, so the path at 392 tall put the head at y 86 and the hero at 177 put
-     it at 360 — the same heading in two different places depending on a layout choice underneath it.
-     A floor on the block holds the head still and costs nothing but empty space in the short one. */
+     stack is bottom-anchored, so a block 60px taller pushes the heading up by 60. Measured, the head
+     sits at y 99 and the content floor is 641, so the budget is about 435 and the floor is 400.
+     Every one of the three below is arithmetic'd against that number in its own note. */
   .course-shape {
     position: relative; margin-top: 10px;
     min-height: 400px; display: flex; align-items: flex-start;
@@ -1529,9 +1547,19 @@
     background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
     font: inherit; color: inherit; display: block;
   }
-  .cs-mark {
-    display: block; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45);
-    transition: background 0.28s ease, transform 0.36s var(--ease-pop), box-shadow 0.28s ease;
+  /* THE STATE AS A WORD -- move 1, and the single biggest thing the ladders were missing. Display
+     type, because it is meant to be read before the name is. */
+  .cs-tag {
+    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    white-space: nowrap; letter-spacing: 0.01em;
+    paint-order: stroke fill; -webkit-text-stroke: 0.05em rgba(8, 11, 18, 0.92);
+    transition: color 0.24s ease;
+  }
+  /* the number twice: `.cs-no` padded for a printed right-hand column, `.cs-num` bare for the
+     calendar's numerals. One would have meant a shape formatting the other's text in CSS. */
+  .cs-num {
+    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    white-space: nowrap; font-variant-numeric: tabular-nums;
   }
   .cs-en {
     display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
@@ -1547,227 +1575,312 @@
     display: block; font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
     white-space: nowrap;
   }
-  .cs-bar { display: block; background: rgba(242, 234, 216, 0.2); overflow: hidden; }
-  .cs-bar i { display: block; height: 100%; background: var(--gold); }
-  /* the three states, stated once. Gold is earned, cream is now, ink-hollow is not yet — the same
-     three readings the row list's ticks were given, at every shape's scale. */
-  .cs-step[data-state="done"] .cs-mark { background: var(--gold-hi); }
-  .cs-step[data-state="here"] .cs-mark { background: var(--hi); }
-  .cs-step[data-state="ahead"] .cs-mark {
-    background: none; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3),
-      inset 0 0 0 2px rgba(242, 234, 216, 0.38);
+  /* ONE BAR IN THE WHOLE FEATURE, and only the calendar draws it -- under a 70px name, 620 wide,
+     where it is a reading rather than a repeated decoration. It keeps the ink ground the figure
+     chips had to learn twice: a track at 20% cream over raked gravel is nothing, and a 0% step then
+     shows no bar at all, which looks like a rendering fault instead of a fact. */
+  .cs-bar { display: block; background: rgba(10, 9, 6, 0.82); overflow: hidden;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(242, 234, 216, 0.26); }
+  .cs-bar i { display: block; height: 100%; background: var(--gold-hi); }
+
+  /* ---- 刷 SHEET · the course as a printed sheet ------------------------------------------------
+     Ink on cream. The stat chips have been ink-on-washi since the aesthetics pass and this is that
+     object at full size -- and it also answers the arithmetic that broke the ladders rather than
+     dodging it. Nineteen pixels a row is cramped for 15px cream over gravel and perfectly
+     comfortable for 16px ink on paper, because CONTRAST DOES HALF THE WORK OF SIZE. Same rhythm the
+     first ladder was rejected for, on a ground that can carry it.
+
+     Three things a row, in the reference's own hierarchy: the state in display type, the name in
+     plain type, the number at the right with dot leaders running out to it. The name is deliberately
+     NOT display italic -- if both the state and the name shout, neither is the head of the row.
+
+     THE TORN EDGE IS A PSEUDO-ELEMENT, NOT A CLIP ON THE WRAP, for the same reason `.hud-cut` is a
+     sibling of the panel: a clip would cut the selected slab off exactly where it is supposed to
+     hang over the edge.
+     HEIGHT: 15 x 19 + 76 + 30 of padding = 391. Constant whichever step is lit. */
+  .hud[data-course="sheet"] .course-wrap {
+    width: 880px; padding: 15px 0 15px;
+    display: flex; flex-direction: column;
   }
-  .cs-step[data-state="done"] .cs-en { color: rgba(232, 196, 124, 0.78); }
-  .cs-step[data-state="here"] .cs-en { color: #fff; }
-  .cs-step[data-state="ahead"] .cs-en { color: rgba(222, 214, 189, 0.42); }
-  .cs-step[data-state="ahead"] .cs-bar i { background: rgba(242, 234, 216, 0.3); }
-  .cs-step.on .cs-mark { transform: scale(1.5) rotate(45deg); }
+  .hud[data-course="sheet"] .course-wrap::before {
+    content: ''; position: absolute; inset: 0; z-index: 0;
+    background: rgba(242, 234, 216, 0.965);
+    box-shadow: 5px 6px 0 rgba(0, 0, 0, 0.45);
+    clip-path: polygon(0 0, 33% 0, 33% 6px, 67% 6px, 67% 0, 100% 0,
+      100% 17%, calc(100% - 17px) 17%, calc(100% - 17px) 39%, 100% 39%,
+      100% 61%, calc(100% - 11px) 61%, calc(100% - 11px) 84%, 100% 84%, 100% 100%,
+      63% 100%, 63% calc(100% - 7px), 27% calc(100% - 7px), 27% 100%, 0 100%,
+      0 77%, 14px 77%, 14px 55%, 0 55%, 0 31%, 9px 31%, 9px 12%, 0 12%);
+  }
+  .hud[data-course="sheet"] .cs-step {
+    position: relative; z-index: 1;
+    display: grid; grid-template-columns: 86px 1fr 44px;
+    grid-template-areas: 'tag en no';
+    align-items: center; height: 19px; padding: 0 20px 0 22px;
+  }
+  .hud[data-course="sheet"] .cs-num, .hud[data-course="sheet"] .cs-jp,
+  .hud[data-course="sheet"] .cs-want, .hud[data-course="sheet"] .cs-bar,
+  .hud[data-course="sheet"] .cs-pct { display: none; }
+  /* the keyline comes OFF everything on the sheet. It is a dark stroke meant to hold cream type
+     over a lit valley; on cream it fattens every letter into a blob. */
+  .hud[data-course="sheet"] .cs-tag {
+    grid-area: tag; font-size: 12.5px; -webkit-text-stroke: 0;
+  }
+  /* the red annotation dot, which is what the printed boards put above the name of a square you
+     have passed. Five pixels of vermilion is the whole of "you have been here". */
+  .hud[data-course="sheet"] .cs-step[data-state="done"] .cs-tag::before {
+    content: ''; display: inline-block; width: 5px; height: 5px; background: var(--hi);
+    margin-right: 7px; vertical-align: 2px;
+  }
+  .hud[data-course="sheet"] .cs-en {
+    grid-area: en; font-family: var(--lat-ui); font-weight: 600; font-style: normal;
+    font-size: 16px; letter-spacing: 0.07em; transform: none; -webkit-text-stroke: 0;
+    display: flex; align-items: center; overflow: hidden;
+  }
+  /* the leader. A printed list joins a name to its number with dots, not with a table cell. */
+  .hud[data-course="sheet"] .cs-en::after {
+    content: ''; flex: 1 1 auto; height: 2px; min-width: 18px; margin: 0 0 4px 12px;
+    align-self: flex-end;
+    background: repeating-linear-gradient(90deg,
+      rgba(20, 17, 13, 0.4) 0 2px, rgba(0, 0, 0, 0) 2px 7px);
+  }
+  .hud[data-course="sheet"] .cs-no {
+    grid-area: no; text-align: right;
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
+    letter-spacing: 0;
+  }
+  .hud[data-course="sheet"] .cs-step[data-state="done"] .cs-tag { color: rgba(20, 17, 13, 0.52); }
+  .hud[data-course="sheet"] .cs-step[data-state="done"] .cs-en { color: rgba(20, 17, 13, 0.88); }
+  .hud[data-course="sheet"] .cs-step[data-state="done"] .cs-no { color: rgba(20, 17, 13, 0.7); }
+  .hud[data-course="sheet"] .cs-step[data-state="here"] .cs-tag { color: var(--hi); }
+  .hud[data-course="sheet"] .cs-step[data-state="here"] .cs-en { color: var(--ink); }
+  .hud[data-course="sheet"] .cs-step[data-state="here"] .cs-no { color: var(--ink); }
+  .hud[data-course="sheet"] .cs-step[data-state="ahead"] .cs-tag { color: rgba(20, 17, 13, 0.28); }
+  .hud[data-course="sheet"] .cs-step[data-state="ahead"] .cs-en { color: rgba(20, 17, 13, 0.34); }
+  .hud[data-course="sheet"] .cs-step[data-state="ahead"] .cs-no { color: rgba(20, 17, 13, 0.26); }
+  .hud[data-course="sheet"] .cs-step[data-state="ahead"] .cs-en::after {
+    background: repeating-linear-gradient(90deg,
+      rgba(20, 17, 13, 0.16) 0 2px, rgba(0, 0, 0, 0) 2px 7px);
+  }
+  /* MOVE 2, LITERALLY. The pick is a vermilion slab that runs 70px PAST the sheet's torn right edge
+     and ends in a point, with its type up from 16 to 34. Nothing about the row it replaces survives
+     except its place in the order. */
+  .hud[data-course="sheet"] .cs-step.on {
+    height: 86px; margin-right: -70px;
+    grid-template-columns: 86px 1fr 116px;
+    grid-template-rows: 40px 21px 14px;
+    grid-template-areas: 'tag en pct' 'tag jp pct' 'tag want pct';
+    align-content: center; row-gap: 0;
+    padding-right: 100px;
+    background: var(--hi);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 46px) 100%, 0 100%);
+    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.42);
+  }
+  .hud[data-course="sheet"] .cs-step.on .cs-no { display: none; }
+  .hud[data-course="sheet"] .cs-step.on .cs-tag {
+    font-size: 14px; color: #ffd9a1; align-self: center;
+  }
+  .hud[data-course="sheet"] .cs-step[data-state="done"].on .cs-tag::before { background: #ffd9a1; }
+  .hud[data-course="sheet"] .cs-step.on .cs-en {
+    display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 34px; line-height: 38px; letter-spacing: 0.01em; color: #fff;
+    transform: skewX(-8deg); transform-origin: left center;
+  }
+  .hud[data-course="sheet"] .cs-step.on .cs-en::after { display: none; }
+  .hud[data-course="sheet"] .cs-step.on .cs-jp {
+    display: block; grid-area: jp; font-size: 14px; color: rgba(255, 255, 255, 0.94);
+    -webkit-text-stroke: 0;
+  }
+  .hud[data-course="sheet"] .cs-step.on .cs-want {
+    display: block; grid-area: want; font-size: 10.5px; font-weight: 700; color: #ffd9a1;
+  }
+  .hud[data-course="sheet"] .cs-step.on .cs-pct {
+    display: block; grid-area: pct; align-self: center; text-align: right;
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 32px;
+    letter-spacing: 0; color: #fff;
+  }
 
-  /* ================================================================================================
-     THE LADDER, FOUR WAYS. C cycles them.
+  /* ---- 暦 TALLY · the numbers are the interface -------------------------------------------------
+     Straight off the calendar screen, which is the best answer to this problem I found anywhere: it
+     shows THIRTY ordered things at once with no cells, no borders and no rules -- thirty big numerals
+     in a loose grid, coloured by state, and the one that is today wearing a red mark. Sixteen of
+     those cost 130px, which leaves two thirds of the block for a hero that can be any size it likes,
+     and 70px is a size no ladder could have offered.
 
-     THREE THINGS WERE WRONG WITH THE FIRST PASS AND ALL THREE ARE FIXED HERE, GLOBALLY:
+     THE HERO IS NOT A SECOND ELEMENT. Every step already carries its reading, its gate, its bar and
+     its percentage; the lit one simply has its own parts placed down the page. So there is nothing
+     for `hudSync` to fill and therefore no second place for the state to go stale -- the same
+     argument that made one markup serve three shapes.
+     This is why `.cs-step` is STATIC here: the absolute children have to resolve against
+     `.course-wrap`, not against their own 130px grid cell. */
+  .hud[data-course="tally"] .course-wrap {
+    width: 1340px; flex: 0 0 auto; min-height: 396px; padding: 5px 0 0;
+    display: grid; grid-template-columns: repeat(8, 135px); gap: 2px 0; align-content: start;
+    background:
+      linear-gradient(var(--gold), var(--gold)) no-repeat 0 0 / 100% 2px,
+      linear-gradient(rgba(232, 196, 124, 0.32), rgba(232, 196, 124, 0.32))
+        no-repeat 0 155px / 100% 1px,
+      linear-gradient(rgba(12, 10, 8, 0.68), rgba(12, 10, 8, 0.68)) no-repeat 0 0 / 100% 156px;
+  }
+  .hud[data-course="tally"] .cs-step { position: static; text-align: center; padding: 2px 0 6px; }
+  .hud[data-course="tally"] .cs-no, .hud[data-course="tally"] .cs-tag,
+  .hud[data-course="tally"] .cs-jp, .hud[data-course="tally"] .cs-want,
+  .hud[data-course="tally"] .cs-bar, .hud[data-course="tally"] .cs-pct { display: none; }
+  .hud[data-course="tally"] .cs-num {
+    display: inline-block; font-size: 46px; line-height: 50px; letter-spacing: -0.02em;
+    padding: 0 10px; min-width: 66px; text-align: center;
+    paint-order: stroke fill; -webkit-text-stroke: 0.04em rgba(8, 11, 18, 0.92);
+    transition: color 0.24s ease, background 0.24s ease, transform 0.34s var(--ease-pop);
+  }
+  .hud[data-course="tally"] .cs-en {
+    font-family: var(--lat-ui); font-weight: 700; font-style: normal;
+    font-size: 10.5px; letter-spacing: 0.09em; transform: none; margin-top: 2px;
+    -webkit-text-stroke: 0;
+  }
+  .hud[data-course="tally"] .cs-step[data-state="done"] .cs-num { color: var(--gold-hi); }
+  .hud[data-course="tally"] .cs-step[data-state="done"] .cs-en { color: rgba(232, 196, 124, 0.7); }
+  .hud[data-course="tally"] .cs-step[data-state="here"] .cs-num { color: var(--hi); }
+  .hud[data-course="tally"] .cs-step[data-state="here"] .cs-en { color: var(--washi); }
+  .hud[data-course="tally"] .cs-step[data-state="ahead"] .cs-num { color: rgba(222, 214, 189, 0.42); }
+  .hud[data-course="tally"] .cs-step[data-state="ahead"] .cs-en { color: rgba(222, 214, 189, 0.46); }
+  /* the mark. The calendar rings today in red; a skewed vermilion slab is this project's version of
+     the same gesture, and it goes on the NUMERAL rather than on the cell so the cell can stay static
+     for the hero's sake. */
+  .hud[data-course="tally"] .cs-step.on .cs-num {
+    color: #fff; background: var(--hi); transform: skewX(-8deg) scale(1.06);
+    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.45);
+  }
+  .hud[data-course="tally"] .cs-step.on .cs-en { display: none; }
+  .hud[data-course="tally"] .cs-step.on .cs-jp,
+  .hud[data-course="tally"] .cs-step.on .cs-want,
+  .hud[data-course="tally"] .cs-step.on .cs-bar,
+  .hud[data-course="tally"] .cs-step.on .cs-pct { display: block; }
+  /* the hero. `.cs-en` is reused rather than a new element: it is already the step's name. */
+  .hud[data-course="tally"] .cs-step.on .cs-en {
+    display: block; position: absolute; left: 2px; top: 172px; width: 760px;
+    font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 66px; line-height: 70px; letter-spacing: 0.005em; margin: 0;
+    transform: skewX(-8deg); transform-origin: left top; text-align: left; color: #fff;
+    -webkit-text-stroke: 0.032em rgba(8, 11, 18, 0.92);
+  }
+  .hud[data-course="tally"] .cs-step.on .cs-jp {
+    position: absolute; left: 4px; top: 258px; font-size: 22px; text-align: left;
+    color: var(--washi);
+  }
+  .hud[data-course="tally"] .cs-step.on .cs-bar {
+    position: absolute; left: 4px; top: 300px; width: 620px; height: 14px;
+  }
+  .hud[data-course="tally"] .cs-step.on .cs-want {
+    position: absolute; left: 4px; top: 326px; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.15em; color: var(--gold-hi); text-align: left;
+    paint-order: stroke fill; -webkit-text-stroke: 0.1em rgba(8, 11, 18, 0.85);
+  }
+  /* the one big number, in the poll screen's own manner: italic display type at 62px, not a column
+     of sixteen tabular figures. */
+  .hud[data-course="tally"] .cs-step.on .cs-pct {
+    position: absolute; left: 0; top: 240px; width: 624px; text-align: right;
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 58px;
+    line-height: 58px; letter-spacing: 0; color: var(--gold-hi);
+    paint-order: stroke fill; -webkit-text-stroke: 0.035em rgba(8, 11, 18, 0.92);
+  }
+  .hud[data-course="tally"] .cs-step[data-state="ahead"].on .cs-pct { color: var(--washi-dim); }
 
-     1. THE BARS HAD NO GROUND. A track at 20% cream is nothing over raked gravel, so sixteen bars
-        read as gold rules hanging in mid-air and every 0% step showed nothing at all. This is the
-        same lesson the figure chips learned: type and measures over a lit valley need a ground, not
-        an alpha. The track is an ink wash with a hairline now and reads anywhere.
+  /* ---- 札 STACK · the save-slot slabs ---------------------------------------------------------
+     The load/save screen: a list of sixteen that looks nothing like a list. Heavy slabs stacked at
+     an angle and running off the edge of the frame, each stamped with its number on a perforated
+     stub, the chosen one filled solid and three times the height. No columns, no rule, no bars --
+     THE FILL IS THE STATE and the stub is the number.
 
-     2. THE RULE IS MADE OF THE STEPS. It used to be one gradient stopping at a computed `--done`
-        percentage, which cannot be right in two columns (both got the same 53%) and is a second
-        source of truth for something every step already knows. Each step now carries its own left
-        border in its own state's colour, so the rule is gold exactly as far as the gold goes. Per
-        step, not per cent.
+     THEY BLEED OFF THE PANEL'S LEFT EDGE. The panel's left padding is 52px and this takes 44 of it
+     back, which is the one thing the reference does that a politely inset list cannot: a stack that
+     runs off the frame reads as longer than the frame.
 
-     3. SIXTEEN ROWS IN ONE COLUMN CANNOT BE BIG. Measured: the head lands at y 99 and the panel's
-        bottom padding puts the content floor at 641, so the block has about 435px. Fifteen compact
-        rows plus one expanded is 24px and 80px at best, which is where the first ladder's cramped
-        22px came from. It is not a taste failure, it is arithmetic — and the way out is to stop
-        using one column, which is what FLIGHTS and STAIR do.
-     ================================================================================================ */
-  .hud[data-course] .cs-line { display: none; }
-  .hud[data-course] .cs-step {
+     THE FAN IS A MARGIN, NOT A ROTATION. Each slab sits 1.6px further left than the one above, so
+     sixteen of them lean 25px over the whole stack -- present at a glance, and it costs no
+     transform, no wrapper and no per-row rotation to go stale.
+     Type inside a skewed slab must NOT be skewed again: it inherits the parent's transform, which is
+     what makes it lie ON the slab in the reference rather than beside it.
+     HEIGHT: 15 x 21 + 64 + 15 gaps = 394. */
+  .hud[data-course="stack"] .course-wrap {
+    width: 880px; margin-left: -44px;
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .hud[data-course="stack"] .cs-step {
     position: relative;
-    border-left: 4px solid rgba(242, 234, 216, 0.16);
-    box-shadow: -2px 0 0 rgba(0, 0, 0, 0.4);
+    display: grid; grid-template-columns: 62px 1fr auto;
+    grid-template-areas: 'no en tag';
+    align-items: center; gap: 0 18px; height: 21px; padding: 0 20px 0 0;
+    /* THE FAN LEANS RIGHT, NOT LEFT. Leaning left at 3px a step would have walked step 16 thirty
+       pixels off the screen edge and taken its stub and its number with it. Leaning right narrows
+       each slab as it goes down instead, which is the recession the load screen actually has: the
+       near slot is widest and the far ones step away from you. */
+    transform: skewX(-11deg) translateX(calc(var(--i) * 3.4px));
+    background: rgba(14, 12, 9, 0.82);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+    transition: background 0.24s ease, height 0.26s ease;
   }
-  .hud[data-course] .cs-step[data-state="done"] { border-left-color: var(--gold); }
-  .hud[data-course] .cs-step[data-state="here"] { border-left-color: var(--hi); }
-  .hud[data-course] .cs-step.on { border-left-color: var(--hi); }
-  .hud[data-course] .cs-no {
-    font-size: 10px; color: rgba(242, 234, 216, 0.42); letter-spacing: 0.12em;
+  /* the perforation off the ticket stubs. Four on, four off, straight down the head of the slab. */
+  .hud[data-course="stack"] .cs-step::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 12px;
+    background: repeating-linear-gradient(180deg,
+      rgba(242, 234, 216, 0.85) 0 4px, rgba(8, 7, 5, 0.9) 4px 8px);
   }
-  .hud[data-course] .cs-want { display: none; }
-  /* the measure gets a ground, and so does its number -- see note 1 */
-  .hud[data-course] .cs-bar {
-    height: 7px; background: rgba(12, 10, 8, 0.62);
-    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(242, 234, 216, 0.18);
+  .hud[data-course="stack"] .cs-num, .hud[data-course="stack"] .cs-bar,
+  .hud[data-course="stack"] .cs-jp, .hud[data-course="stack"] .cs-want,
+  .hud[data-course="stack"] .cs-pct { display: none; }
+  .hud[data-course="stack"] .cs-no {
+    grid-area: no; padding-left: 22px;
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 13px;
+    letter-spacing: 0;
   }
-  .hud[data-course] .cs-bar i { background: var(--gold); }
-  .hud[data-course] .cs-step[data-state="ahead"] .cs-bar { background: rgba(12, 10, 8, 0.42); }
-  .hud[data-course] .cs-pct {
-    font-size: 10.5px; color: var(--gold-hi); text-align: center;
-    font-variant-numeric: tabular-nums;
-    background: rgba(12, 10, 8, 0.62); padding: 2px 0 1px;
-    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4);
+  .hud[data-course="stack"] .cs-en { grid-area: en; font-size: 17px; transform: none; }
+  .hud[data-course="stack"] .cs-tag {
+    grid-area: tag; font-size: 11.5px; text-align: right;
   }
-  .hud[data-course] .cs-step[data-state="ahead"] .cs-pct {
-    color: rgba(242, 234, 216, 0.5); background: rgba(12, 10, 8, 0.4);
+  .hud[data-course="stack"] .cs-step[data-state="done"] {
+    background: rgba(28, 23, 13, 0.86);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(232, 196, 124, 0.5);
   }
-  .hud[data-course] .cs-jp { display: none; }
-  .hud[data-course] .cs-step.on .cs-jp { display: block; color: var(--washi-dim); }
-  .hud[data-course] .cs-step.on .cs-no { color: var(--gold-hi); }
-  .hud[data-course] .cs-step.on .cs-bar { height: 10px; }
-  .hud[data-course] .cs-step.on .cs-bar i { background: var(--gold-hi); }
-  .hud[data-course] .cs-step.on .cs-pct {
-    font-size: 15px; font-family: var(--lat); font-style: italic; font-weight: 900;
-    letter-spacing: 0; color: var(--gold-hi);
+  .hud[data-course="stack"] .cs-step[data-state="done"] .cs-no { color: var(--gold-hi); }
+  .hud[data-course="stack"] .cs-step[data-state="done"] .cs-en { color: rgba(240, 224, 190, 0.92); }
+  .hud[data-course="stack"] .cs-step[data-state="done"] .cs-tag { color: var(--gold-hi); }
+  .hud[data-course="stack"] .cs-step[data-state="here"] {
+    background: rgba(132, 40, 26, 0.86);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(227, 74, 51, 0.7);
   }
-  .hud[data-course] .cs-mark { position: absolute; }
-
-  /* ---- \u5e83 WIDE \u00b7 one column, every step measured -----------------------------------------
-     The first ladder with the width it should have had: 880 across, so every step carries a 300px
-     bar and sixteen of them can be compared at a glance. That is the gain -- a ladder of names says
-     where you are, a ladder of bars says how each part is going, and the second is what a course is
-     for. The rows are 24px because sixteen in one column cannot be more (note 3). */
-  .hud[data-course="wide"] .course-wrap {
-    display: flex; flex-direction: column; gap: 3px; width: 880px;
+  .hud[data-course="stack"] .cs-step[data-state="here"] .cs-no { color: #fff; }
+  .hud[data-course="stack"] .cs-step[data-state="here"] .cs-en { color: #fff; }
+  .hud[data-course="stack"] .cs-step[data-state="here"] .cs-tag { color: #ffd9a1; }
+  .hud[data-course="stack"] .cs-step[data-state="ahead"] {
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(242, 234, 216, 0.13);
   }
-  .hud[data-course="wide"] .cs-step {
-    display: grid; grid-template-columns: 26px 1fr 300px 46px;
-    grid-template-areas: 'no en bar pct';
-    align-items: center; gap: 0 18px; height: 24px; padding-left: 18px;
+  .hud[data-course="stack"] .cs-step[data-state="ahead"] .cs-no { color: rgba(242, 234, 216, 0.34); }
+  .hud[data-course="stack"] .cs-step[data-state="ahead"] .cs-en { color: rgba(222, 214, 189, 0.4); }
+  .hud[data-course="stack"] .cs-step[data-state="ahead"] .cs-tag { color: rgba(242, 234, 216, 0.26); }
+  /* the pick: solid, 64 tall, 56px WIDER to the right than the stack it sits in, and lifted over
+     its neighbours' shadows. */
+  .hud[data-course="stack"] .cs-step.on {
+    height: 64px; margin-right: -56px; z-index: 2;
+    background: var(--hi);
+    box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45);
+    grid-template-columns: 62px 1fr auto;
+    grid-template-areas: 'no en tag' 'no jp pct';
+    align-content: center; row-gap: 2px;
   }
-  .hud[data-course="wide"] .cs-mark { left: -9px; top: 50%; width: 11px; height: 11px; margin-top: -6px; }
-  .hud[data-course="wide"] .cs-no { grid-area: no; }
-  .hud[data-course="wide"] .cs-en { grid-area: en; font-size: 18px; }
-  .hud[data-course="wide"] .cs-bar { grid-area: bar; }
-  .hud[data-course="wide"] .cs-pct { grid-area: pct; }
-  .hud[data-course="wide"] .cs-step.on {
-    height: 84px; grid-template-areas: 'no en bar pct' 'no jp bar pct';
-    align-content: center; gap: 3px 18px;
+  .hud[data-course="stack"] .cs-step.on::before {
+    background: repeating-linear-gradient(180deg,
+      rgba(255, 255, 255, 0.92) 0 5px, rgba(8, 7, 5, 0.72) 5px 10px);
   }
-  .hud[data-course="wide"] .cs-step.on .cs-mark { width: 15px; height: 15px; margin-top: -8px; left: -11px; }
-  .hud[data-course="wide"] .cs-step.on .cs-en { font-size: 34px; }
-  .hud[data-course="wide"] .cs-step.on .cs-no { font-size: 20px; }
-  .hud[data-course="wide"] .cs-step.on .cs-jp { grid-area: jp; font-size: 13px; }
-
-  /* ---- \u6bb5 STAIR \u00b7 the layout is the direction -----------------------------------------
-     Every step sits 34px further right than the one above, so the column IS a flight of stairs and
-     nothing has to be drawn to say which way it goes. Each step's own left border is its piece of
-     the rule and a stub joins it to the one above, so the whole thing draws itself out of sixteen
-     borders. Spreading sideways is also what buys the height back: rows can be 26px here because
-     the eye is following a diagonal rather than scanning a column. */
-  /* 1010 AND 24, MEASURED AGAINST THE SLAB. At 1130 wide with a 34px tread the staircase walks
-     right into the action button: step thirteen's row overlapped it, which a collision test caught
-     and the eye would have caught later. The tread has to be small enough that sixteen of them stay
-     left of x 1185, which is where that corner starts. */
-  .hud[data-course="stair"] .course-wrap {
-    display: flex; flex-direction: column; width: 1010px;
+  .hud[data-course="stack"] .cs-step.on .cs-no { font-size: 22px; color: #fff; }
+  .hud[data-course="stack"] .cs-step.on .cs-en { font-size: 32px; color: #fff; }
+  .hud[data-course="stack"] .cs-step.on .cs-tag { font-size: 13px; color: #ffd9a1; }
+  .hud[data-course="stack"] .cs-step.on .cs-jp {
+    display: block; grid-area: jp; font-size: 14px; color: rgba(255, 255, 255, 0.94);
   }
-  .hud[data-course="stair"] .cs-step {
-    margin-left: calc(var(--i) * 24px);
-    display: grid; grid-template-columns: 24px 1fr 150px 46px;
-    grid-template-areas: 'no en bar pct';
-    align-items: center; gap: 0 14px; height: 26px; padding-left: 15px;
-  }
-  /* the tread, joining each step's rule to the one above it */
-  .hud[data-course="stair"] .cs-step::before {
-    content: ''; position: absolute; left: -28px; top: -4px; width: 28px; height: 4px;
-    background: rgba(242, 234, 216, 0.16); box-shadow: 0 -2px 0 rgba(0, 0, 0, 0.35);
-  }
-  .hud[data-course="stair"] .cs-step[data-state="done"]::before { background: var(--gold); }
-  .hud[data-course="stair"] .cs-step:first-child::before { display: none; }
-  .hud[data-course="stair"] .cs-mark { left: -9px; top: 50%; width: 11px; height: 11px; margin-top: -6px; }
-  .hud[data-course="stair"] .cs-no { grid-area: no; }
-  .hud[data-course="stair"] .cs-en { grid-area: en; font-size: 18px; }
-  .hud[data-course="stair"] .cs-bar { grid-area: bar; }
-  .hud[data-course="stair"] .cs-pct { grid-area: pct; }
-  .hud[data-course="stair"] .cs-step.on {
-    height: 80px; grid-template-areas: 'no en bar pct' 'no jp bar pct';
-    align-content: center; gap: 3px 14px;
-  }
-  .hud[data-course="stair"] .cs-step.on .cs-mark { width: 15px; height: 15px; margin-top: -8px; left: -11px; }
-  .hud[data-course="stair"] .cs-step.on .cs-en { font-size: 32px; }
-  .hud[data-course="stair"] .cs-step.on .cs-jp { grid-area: jp; font-size: 13px; }
-
-  /* ---- \u53cc FLIGHTS \u00b7 two flights of eight ---------------------------------------------
-     THE ONE THAT SOLVES THE ARITHMETIC. Eight steps to a flight means each can be 40px instead of
-     24, which is the difference between a list and something you read.
-
-     AND IT IS COLUMNS, NOT A GRID. The first pass used `grid-auto-flow: column` with eight rows,
-     which couples the two flights: row one holds step one AND step nine, so expanding step nine to
-     96px stretched step one's row to match and left it floating alone in the gap. CSS multi-column
-     flows each column independently and has no such row, which is exactly the property wanted. */
-  .hud[data-course="flights"] .course-wrap {
-    column-count: 2; column-gap: 90px; width: 1090px;
-  }
-  .hud[data-course="flights"] .cs-step {
-    break-inside: avoid; margin-bottom: 5px;
-    display: grid; grid-template-columns: 24px 1fr 120px 44px;
-    grid-template-areas: 'no en bar pct';
-    align-items: center; gap: 0 15px; height: 40px; padding-left: 17px;
-  }
-  .hud[data-course="flights"] .cs-mark { left: -9px; top: 50%; width: 12px; height: 12px; margin-top: -6px; }
-  .hud[data-course="flights"] .cs-no { grid-area: no; }
-  .hud[data-course="flights"] .cs-en { grid-area: en; font-size: 22px; }
-  .hud[data-course="flights"] .cs-bar { grid-area: bar; }
-  .hud[data-course="flights"] .cs-pct { grid-area: pct; }
-  .hud[data-course="flights"] .cs-step.on {
-    height: 96px; grid-template-areas: 'no en bar pct' 'no jp bar pct';
-    align-content: center; gap: 4px 15px;
-  }
-  .hud[data-course="flights"] .cs-step.on .cs-mark { width: 17px; height: 17px; margin-top: -9px; left: -11px; }
-  .hud[data-course="flights"] .cs-step.on .cs-en { font-size: 38px; }
-  .hud[data-course="flights"] .cs-step.on .cs-no { font-size: 22px; }
-  .hud[data-course="flights"] .cs-step.on .cs-jp { grid-area: jp; font-size: 14px; }
-
-  /* ---- \u80cc SPINE \u00b7 names left, progress right ---------------------------------------
-     The rule stops being a margin and becomes an axis. Names sit on its left reading toward it,
-     measures on its right reading away, so the two questions -- which step is this, how is it going
-     -- stop sharing a direction. That is what makes a wide row hard to scan, and it is the reason
-     this one stays legible at 22px where WIDE does not.
-     Here the border trick is inverted: the steps carry their rule on the RIGHT, so the spine is
-     built out of the name column's edge. */
-  .hud[data-course="spine"] .course-wrap {
-    display: flex; flex-direction: column; gap: 3px; width: 900px;
-  }
-  .hud[data-course="spine"] .cs-step {
-    display: grid; grid-template-columns: 1fr 4px 1fr;
-    grid-template-areas: 'en mark bar';
-    align-items: center; height: 24px; gap: 0;
-    border-left: 0; box-shadow: none;
-  }
-  /* the spine itself: each step's middle cell is its own segment of it */
-  .hud[data-course="spine"] .cs-mark {
-    position: static; grid-area: mark; width: 4px; height: 100%;
-    box-shadow: 2px 0 0 rgba(0, 0, 0, 0.4);
-  }
-  .hud[data-course="spine"] .cs-step[data-state="ahead"] .cs-mark {
-    background: rgba(242, 234, 216, 0.16); box-shadow: 2px 0 0 rgba(0, 0, 0, 0.35);
-  }
-  /* NOT ROTATED HERE. The shared rule turns the selected step's mark into a diamond — right when
-     the mark is a small square, wrong when it is a 4px segment of the spine itself, which came out
-     as a diagonal slash across the axis. The spine says "this one" by being vermilion. */
-  .hud[data-course="spine"] .cs-step.on .cs-mark { transform: none; }
-  .hud[data-course="spine"] .cs-en {
-    grid-area: en; font-size: 19px; text-align: right; padding-right: 22px;
-  }
-  .hud[data-course="spine"] .cs-bar { grid-area: bar; margin-left: 22px; max-width: 270px; }
-  .hud[data-course="spine"] .cs-no { display: none; }
-  .hud[data-course="spine"] .cs-pct {
-    position: absolute; left: calc(50% + 314px); top: 50%; transform: translateY(-50%); width: 46px;
-  }
-  .hud[data-course="spine"] .cs-step.on {
-    height: 86px; grid-template-areas: 'en mark bar' 'jp mark pct';
-    align-content: center; gap: 5px 0;
-  }
-  .hud[data-course="spine"] .cs-step.on .cs-en { font-size: 38px; }
-  .hud[data-course="spine"] .cs-step.on .cs-jp {
-    grid-area: jp; font-size: 13px; text-align: right; padding-right: 22px;
-  }
-  .hud[data-course="spine"] .cs-step.on .cs-pct {
-    position: static; grid-area: pct; margin-left: 22px; text-align: left; width: 70px;
+  .hud[data-course="stack"] .cs-step.on .cs-pct {
+    display: block; grid-area: pct; text-align: right;
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px;
+    letter-spacing: 0; color: #fff;
   }
 
   /* ---- the slab, when it is the action rather than a caption ---------------------------------- */
@@ -16884,88 +16997,50 @@ function pathHud() {
 }
 function onCourse() { return HUD.on && HUD.sec === 'STUDY' && HUD.level === 2 && state === 'sub'; }
 
-/* ================= THE COURSE HAS A SHAPE, AND HERE ARE THREE ====================================
-   C cycles; `NAV.course(n)` names. Built as a bench for the same reason the figure sets were: three
-   layouts that differ in STRUCTURE cannot be judged from a description, and the row list they
-   replace was rejected on sight for looking like the four-tile menu it stood in for.
+/* ================= THE COURSE HAS A SHAPE, AND THESE THREE CAME FROM REFERENCE ===================
+   C cycles; `NAV.course(n)` names. Still a bench, for the reason the figure sets were: three layouts
+   that differ in STRUCTURE cannot be judged from a description.
 
-   WHAT ALL THREE FIX. Sixteen ordered steps were being drawn as five equal rows differing only in
-   opacity and a tick colour: no shape, no direction, no hero, and the only thing saying "you are in
-   a sequence" was a small counter at the top of the screen. A course needs three things a list of
-   peers does not — you must be able to see the WHOLE of it, it must have a DIRECTION, and the step
-   you are on must be obviously the one to press.
+   FIVE SHAPES HAVE NOW BEEN REJECTED -- a serpentine, a hero card and four ladders -- and all four
+   ladders failed for the same reason, which is worth stating once: they were tables. Aligned
+   columns, a rule down the side, a hairline bar on every row, sixteen times. Reordering the columns
+   was never going to help, so NONE OF THESE THREE DESCENDS FROM ANY OF THEM. They come from looking
+   at how the genre actually draws a long ordered list -- the note over the stylesheet has the four
+   moves they all copy -- and from the printed single-track board games this feature is a version of.
 
-   ONE MARKUP, THREE STYLESHEETS. Every shape gets the same sixteen `.cs-step` buttons carrying the
-   same parts and the same `data-state`; only the CSS differs, and the serpentine's coordinates ride
-   in as custom properties so even the path is positioned by the stylesheet rather than by a second
-   renderer. Three renderers would have meant three places for a state to go stale.
+   ONE MARKUP, THREE STYLESHEETS, and now one fewer element in it: the serpentine's SVG route and its
+   node table are gone, because no shape drew them. They were dead in all four ladders too.
    ================================================================================================ */
-/* FOUR LADDERS, after the first one was picked and its looks were not. The idea survived — one
-   rule, all sixteen steps, sized by state — and what was wrong was the room it was given: a 430px
-   column hard against the left edge, 22px a row, type at 15px, bars hidden, and most of the screen
-   empty beside it. The panel is full-bleed (`left: 0; right: 0`), so the middle was always
-   available and the first pass simply did not take it.
-   Each of these takes a different amount of it, and one of them stops using a straight rule at all.
-   The serpentine and the hero card are gone; they are in git if the ladder loses. */
 const COURSE_SHAPES = [
-  ['wide', '広', 'full-width rows, a long bar on every step'],
-  ['stair', '段', 'each step indented past the last · the layout is the direction'],
-  ['flights', '双', 'two flights of eight, side by side'],
-  ['spine', '背', 'the rule down the middle, names left, progress right'],
+  ['sheet', '刷', 'a printed sheet · ink on cream, the state as a word, the pick overhangs the edge'],
+  ['tally', '暦', 'the numbers are the interface · sixteen numerals over one very large hero'],
+  ['stack', '札', 'save-slot slabs · fanned, stamped, running off the left edge of the panel'],
 ];
 
-/* the serpentine, in the container's own pixels so the line and the nodes cannot disagree. A sine
-   rather than a zigzag: the path has no corners to catch the eye, which is what makes it read as a
-   route rather than as a chart. */
-/* 392 TALL, AND IT HAS TO BE. The first pass ran the serpentine 556px down, which is taller than
-   the space between the panel's head and its readout — and the stack is anchored to the BOTTOM (the
-   note by `.hud-next` explains why), so the overflow came out of the TOP: the section title climbed
-   into the brand mark and off the screen. Measured: the list area runs y 246 to about 660, so 392
-   fits with room. The amplitude comes down with it or the snake turns into a zigzag. */
-const CS_W = 286, CS_H = 392, CS_AMP = 92;
-function courseNodes() {
-  const n = STUDY_PATH.length;
-  return STUDY_PATH.map((s, i) => ({
-    x: Math.round(CS_W / 2 + Math.sin(i * 0.72) * CS_AMP),
-    y: Math.round(18 + (i * (CS_H - 36)) / (n - 1)),
-  }));
-}
-/* the whole markup for one course, whatever shape is showing */
+/* the whole markup for one course, whatever shape is showing.
+
+   EVERY STEP CARRIES EVERYTHING and each stylesheet decides what is drawn: the state as a word, the
+   number twice (padded for the sheet's right-hand column, bare for the calendar's numerals), both
+   names, the gate, a bar and a percentage. That is also how the calendar gets a hero without a hero
+   element -- the lit step's own parts are positioned down the page by CSS, so there is nothing extra
+   for `hudSync` to fill and no second place for the state to go stale.
+
+   `--i` rides along as a NUMBER for the stack's fan (`calc(var(--i) * -1.6px)`). `--x`/`--y` and the
+   node table that fed them are gone with the serpentine. */
+const CS_TAG = { done: 'DONE', here: 'NOW', ahead: 'LOCKED' };
 function courseMarkup(rows) {
-  const pts = courseNodes();
-  const line = pts.map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ');
-  /* the travelled part of the line is drawn separately and in gold, so the route itself carries the
-     progress — the single cheapest way to give a path a direction */
-  const doneTo = Math.max(0, Math.min(PATH.done, pts.length - 1));
-  const lineDone = pts.slice(0, doneTo + 1).map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ');
-  const steps = rows.map((r, i) => {
-    const p = pts[i];
-    /* `--i` is the step's index as a NUMBER, which the staircase needs for its indent —
-        `calc(var(--i) * 38px)`. `--x`/`--y` are kept for any shape that wants to place a step
-        freely; none of the four ladders does, but they cost one attribute. */
-    return `<button class="cs-step" data-i="${i}" data-state="${r.state}"`
-      + ` style="--i:${i}; --x:${p.x}px; --y:${p.y}px">`
-      + `<span class="cs-mark"></span>`
-      + `<span class="cs-no">${r.no}</span>`
-      + `<span class="cs-en">${r.big}</span>`
-      + `<span class="cs-jp">${r.small}</span>`
-      + `<span class="cs-want">${r.meta}</span>`
-      + `<span class="cs-bar"><i style="width:${Math.max(r.pct, 0)}%"></i></span>`
-      + `<span class="cs-pct">${r.pct}%</span>`
-      + `</button>`;
-  }).join('');
-  /* `--done` is how far up the LADDER's rule the gold runs. The path shape says the same thing with
-     its own two strokes; the ladder has one rule and a gradient stop, and the stop has to come from
-     here because CSS cannot count how many steps are behind you. */
-  const donePct = Math.round((doneTo / Math.max(1, pts.length - 1)) * 100);
-  /* THE SIZE RIDES IN, it is not written twice. `CS_W`/`CS_H` set the node coordinates and the
-     SVG's box; the stylesheet had the same two numbers again as literals, so shrinking the constants
-     moved the nodes and left the container 556 tall — the overflow the shrink was meant to fix. */
-  return `<div class="course-wrap" style="--done:${donePct}%;`
-    + ` --cs-w:${CS_W}px; --cs-h:${CS_H}px">`
-    + `<svg class="cs-line" viewBox="0 0 ${CS_W} ${CS_H}" width="${CS_W}" height="${CS_H}"`
-    + ` aria-hidden="true"><path class="cs-track" d="${line}"/>`
-    + `<path class="cs-trav" d="${lineDone}"/></svg>${steps}</div>`;
+  const steps = rows.map((r, i) => `<button class="cs-step" data-i="${i}" data-state="${r.state}"`
+    + ` style="--i:${i}">`
+    + `<span class="cs-tag">${CS_TAG[r.state] || ''}</span>`
+    + `<span class="cs-no">${r.no}</span>`
+    + `<span class="cs-num">${i + 1}</span>`
+    + `<span class="cs-en">${r.big}</span>`
+    + `<span class="cs-jp">${r.small}</span>`
+    + `<span class="cs-want">${r.meta}</span>`
+    + `<span class="cs-bar"><i style="width:${Math.max(r.pct, 0)}%"></i></span>`
+    + `<span class="cs-pct">${r.pct}%</span>`
+    + `</button>`).join('');
+  return `<div class="course-wrap">${steps}</div>`;
 }
 
 /* ================================================================================================
