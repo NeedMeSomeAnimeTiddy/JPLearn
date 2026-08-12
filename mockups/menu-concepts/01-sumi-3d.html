@@ -6688,6 +6688,7 @@ const STEAM = {
   time: { value: 0 },
   col: { value: new THREE.Color(0xe6ecef) },     /* steam: the mist colour, near white */
   smoke: { value: new THREE.Color(0x6b6a66) },   /* and woodsmoke, which is a grey */
+  cap: 460,                      /* room for the editor to add vents — see steamSeed */
   mesh: null, vents: [], puffs: 0, props: [],
 };
 /* WHERE IT COMES FROM, BY NAME, so a re-export that moves the town moves the steam with it.
@@ -6741,7 +6742,7 @@ function steamBuild(root) {
       vents.push({
         x: cx + (sx > sz ? f * sx : 0) + ox * sx,
         y, z: cz + (sx > sz ? 0 : f * sz) + oz * sz,
-        r: Math.min(sx, sz) * 0.26, rule,
+        r: Math.min(sx, sz) * 0.26, rule: Object.assign({}, rule),
       });
     }
   });
@@ -6768,11 +6769,11 @@ function steamBuild(root) {
       for (let i = 0; i < o.count; i++) {
         o.getMatrixAt(i, m4);
         V.setFromMatrixPosition(m4).applyMatrix4(o.matrixWorld);
-        vents.push({ x: V.x, y: V.y + 8, z: V.z, r: 16, rule: PROP_RULE });
+        vents.push({ x: V.x, y: V.y + 8, z: V.z, r: 16, rule: Object.assign({}, PROP_RULE) });
       }
     } else {
       V.setFromMatrixPosition(o.matrixWorld);
-      vents.push({ x: V.x, y: V.y + 8, z: V.z, r: 16, rule: PROP_RULE });
+      vents.push({ x: V.x, y: V.y + 8, z: V.z, r: 16, rule: Object.assign({}, PROP_RULE) });
     }
   });
   if (!vents.length) return 0;
@@ -6843,7 +6844,10 @@ function steamBuild(root) {
       }`,
     transparent: true, depthWrite: false, side: THREE.DoubleSide,
   });
-  const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, total);
+  /* ALLOCATED TO A CAP, NOT TO THE CURRENT TABLE. An InstancedMesh's buffer cannot grow, and the
+     editor below adds vents — so the room is taken once and `count` follows the table. Same
+     bargain FLY.cap struck for the fireflies. */
+  const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, Math.max(total, STEAM.cap));
   /* `sun-` so the ink prepass leaves it alone: a plume has no silhouette worth drawing and an
      outline round a puff of steam is a cartoon cloud */
   mesh.name = 'sun-steam';
@@ -6854,9 +6858,20 @@ function steamBuild(root) {
   STEAM.mesh = mesh;
   const m = new THREE.Matrix4();
   let i = 0;
-  for (let v = 0; v < vents.length; v++) {
-    const vent = vents[v];
-    for (let k = 0; k < vent.rule.n; k++) {
+  return steamSeed();
+}
+/* THE TABLE INTO PUFFS, and it can be run again. Everything a puff is lives in its matrix, so
+   re-seeding is one pass over the vents and a new `count`; nothing is disposed and no shader is
+   recompiled, which is what makes the editor able to rebuild on every mouse-up. */
+function steamSeed() {
+  const mesh = STEAM.mesh;
+  if (!mesh) return 0;
+  const m = new THREE.Matrix4();
+  let i = 0;
+  for (let v = 0; v < STEAM.vents.length; v++) {
+    const vent = STEAM.vents[v];
+    const n = Math.max(0, Math.round(vent.rule.n));
+    for (let k = 0; k < n && i < mesh.instanceMatrix.count; k++) {
       const e = m.elements;
       e.fill(0);
       const ang = walkRnd(i, 71) * 6.2831;
@@ -6866,13 +6881,14 @@ function steamBuild(root) {
       e[2] = Math.sin(ang) * rad;                            /* jz */
       e[4] = 0.72 + walkRnd(i, 74) * 0.56;                   /* rate */
       e[5] = vent.rule.w * (0.74 + walkRnd(i, 75) * 0.52);   /* width */
-      e[8] = k / vent.rule.n + walkRnd(i, 76) * 0.08;        /* phase, evenly spread */
+      e[8] = k / n + walkRnd(i, 76) * 0.08;                  /* phase, evenly spread */
       e[10] = vent.rule.grey;
       e[12] = vent.x; e[13] = vent.y; e[14] = vent.z; e[15] = 1;
       mesh.setMatrixAt(i, m);
       i++;
     }
   }
+  mesh.count = i;
   mesh.instanceMatrix.needsUpdate = true;
   STEAM.puffs = i;
   return i;
@@ -21137,6 +21153,307 @@ fetch('./boats.json', { cache: 'no-store' })
     const lay = () => {
       const n = BOAT_EDITOR.apply(j);
       if (n) console.log('[boats] boats.json laid over %d laps', n);
+      else setTimeout(lay, 400);
+    };
+    lay();
+  })
+  .catch(() => {});
+
+/* ================= THE FIFTH EDITOR: WHERE THE STEAM RISES =================
+   The vents were found by NAME — six SotoYu, the Yumomi hall, three points across the open pool,
+   two chimneys and the twelve authored `Onsen_Props_Steam` columns. That is a defensible first
+   guess and it is not a judgement about the place, which is the same thing the fireflies needed
+   an editor for and for the same reason: the question is not "where is there water" but "where
+   does this look right", and no amount of naming answers it.
+
+   SAME BARGAIN AS THE OTHER FOUR. `steam.json` is an overlay over the found vents, `del
+   steam.json` is a full undo, COPY puts the table on the clipboard. Re-seeding is one pass over
+   the table — see steamSeed — so a drag rebuilds on mouse-up with nothing disposed.
+
+   THE MAP IS THE ONSEN'S OWN FOOTPRINTS, because steam is sited against buildings: a plume needs
+   a bath or a roof under it, and the one mistake this can make is putting one in the street. */
+const STEAM_EDITOR = (() => {
+  const PW = 440, PH = 400;
+  const CSS = `
+  #sed { position:fixed; left:14px; top:14px; z-index:60; width:${PW + 24}px;
+    background:rgba(16,17,21,0.94); color:#e8e4dc; border:1px solid #3a3d46;
+    font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; padding:10px 12px 12px;
+    max-height:calc(100vh - 28px); overflow:auto; display:none; }
+  #sed.on { display:block; }
+  #sed h4 { margin:0 0 8px; font:600 11px/1 ui-monospace,monospace; letter-spacing:.16em;
+    display:flex; justify-content:space-between; }
+  #sed canvas { display:block; width:${PW}px; height:${PH}px; background:#0d1116;
+    border:1px solid #2c2f36; cursor:crosshair; }
+  #sed .row { display:flex; align-items:center; gap:6px; margin:7px 0; flex-wrap:wrap; }
+  #sed label { width:46px; opacity:.65; }
+  #sed input[type=number] { width:64px; background:#14161a; color:#e8e4dc;
+    border:1px solid #3a3d46; padding:3px 5px; font:11px ui-monospace,monospace; }
+  #sed .btn { background:#22242b; color:#cdc9c1; border:1px solid #3a3d46; padding:4px 9px;
+    cursor:pointer; font:inherit; }
+  #sed .btn:hover { border-color:#5a5f6c; color:#fff; }
+  #sed .btn.hot { background:#8d3a2e; color:#fff; border-color:#a4463a; }
+  #sed .note { margin-top:7px; opacity:.62; min-height:15px; }
+  #sed .keys { opacity:.5; margin-top:6px; }
+  #sed hr { border:0; border-top:1px solid #2b2f3a; margin:9px 0; }`;
+
+  let open = false, built = false, sel = 0, drag = false;
+  let cv = null, g = null, foot = null, authored = null;
+  const els = {};
+  const view = { x0: 0, z0: 0, w: 1, h: 1 };
+
+  const sx = (x) => (x - view.x0) / view.w * PW;
+  const sz = (z) => (z - view.z0) / view.h * PH;
+  const wx = (px) => px / PW * view.w + view.x0;
+  const wz = (pz) => pz / PH * view.h + view.z0;
+
+  /* the onsen's footprints, taken once */
+  function buildMap() {
+    if (foot) return foot;
+    foot = [];
+    const root = ENV.root;
+    if (!root) return foot;
+    const V = new THREE.Vector3();
+    root.traverse((o) => {
+      if (!o.isMesh || o.isInstancedMesh) return;
+      if (!/Onsen_|Garden_Buildings|Zen_Buildings/i.test(o.name || '')) return;
+      const b = o.geometry.boundingBox || (o.geometry.computeBoundingBox(), o.geometry.boundingBox);
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (let i = 0; i < 8; i++) {
+        V.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z)
+          .applyMatrix4(o.matrixWorld);
+        x0 = Math.min(x0, V.x); x1 = Math.max(x1, V.x);
+        z0 = Math.min(z0, V.z); z1 = Math.max(z1, V.z);
+      }
+      foot.push([x0, z0, x1 - x0, z1 - z0, /Surfaces|Pool/i.test(o.name) ? 1 : 0]);
+    });
+    return foot;
+  }
+
+  function fit() {
+    const v = STEAM.vents;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const s of v) {
+      x0 = Math.min(x0, s.x); x1 = Math.max(x1, s.x);
+      z0 = Math.min(z0, s.z); z1 = Math.max(z1, s.z);
+    }
+    if (!v.length) { x0 = -9000; x1 = -3500; z0 = -7500; z1 = -1500; }
+    const mx = Math.max(600, (x1 - x0) * 0.35), mz = Math.max(600, (z1 - z0) * 0.35);
+    x0 -= mx; x1 += mx; z0 -= mz; z1 += mz;
+    /* one scale for both axes, or the map lies about distance */
+    const s = Math.max((x1 - x0) / PW, (z1 - z0) / PH);
+    view.w = s * PW; view.h = s * PH;
+    view.x0 = (x0 + x1) / 2 - view.w / 2;
+    view.z0 = (z0 + z1) / 2 - view.h / 2;
+  }
+
+  function draw() {
+    if (!g) return;
+    g.clearRect(0, 0, PW, PH);
+    for (const f of buildMap()) {
+      g.fillStyle = f[4] ? 'rgba(70,110,130,0.5)' : 'rgba(120,120,130,0.22)';
+      g.fillRect(sx(f[0]), sz(f[1]), Math.max(1, f[2] / view.w * PW), Math.max(1, f[3] / view.h * PH));
+    }
+    STEAM.vents.forEach((v, i) => {
+      const x = sx(v.x), z = sz(v.z);
+      const r = Math.max(3, v.r / view.w * PW);
+      g.beginPath(); g.arc(x, z, r, 0, Math.PI * 2);
+      g.fillStyle = v.rule.grey > 0.5 ? 'rgba(150,150,150,0.30)' : 'rgba(210,235,245,0.30)';
+      g.fill();
+      g.strokeStyle = i === sel ? '#e0913a' : (v.rule.grey > 0.5 ? '#8b8f9a' : '#9fd3e6');
+      g.lineWidth = i === sel ? 2 : 1;
+      g.stroke();
+      /* the plume's reach, so a vent's size is visible without selecting it */
+      g.beginPath(); g.arc(x, z, Math.max(2, v.rule.w * 1.9 / view.w * PW), 0, Math.PI * 2);
+      g.strokeStyle = 'rgba(200,220,235,0.13)'; g.lineWidth = 1; g.stroke();
+      if (i === sel) {
+        g.fillStyle = '#e0913a'; g.font = '9px ui-monospace,monospace';
+        g.fillText(String(i + 1), x + r + 3, z - r - 2);
+      }
+    });
+  }
+
+  function refresh() {
+    const v = STEAM.vents[sel];
+    if (v) {
+      els.n.value = v.rule.n;
+      els.w.value = Math.round(v.rule.w);
+      els.h.value = Math.round(v.rule.h);
+      els.r.value = Math.round(v.r);
+      els.grey.value = v.rule.grey;
+    }
+    els.amt.value = STEAM.amt.value;
+    els.rise.value = STEAM.rise.value;
+    els.stats.textContent = STEAM.vents.length + ' vents · ' + STEAM.puffs + ' of '
+      + STEAM.cap + ' puffs · ' + (sel + 1) + ' selected';
+    draw();
+  }
+
+  const payload = () => ({
+    amt: STEAM.amt.value, rise: STEAM.rise.value,
+    vents: STEAM.vents.map((v) => ({ x: Math.round(v.x), y: Math.round(v.y), z: Math.round(v.z),
+      r: Math.round(v.r), n: v.rule.n, w: Math.round(v.rule.w), h: Math.round(v.rule.h),
+      grey: v.rule.grey })),
+  });
+
+  function build() {
+    if (built) return;
+    built = true;
+    const st = document.createElement('style');
+    st.textContent = CSS;
+    document.head.appendChild(st);
+    const p = document.createElement('div');
+    p.id = 'sed';
+    p.innerHTML = `<h4><span>STEAM VENTS</span><button class="btn" id="sedX">CLOSE</button></h4>
+      <canvas id="sedPlan" width="${PW}" height="${PH}"></canvas>
+      <div class="row"><label>PUFFS</label><input type="number" id="sedN" step="1" min="0" max="40">
+        <label style="width:auto">WIDE</label><input type="number" id="sedW" step="4" min="8" max="400">
+        <label style="width:auto">CLIMB</label><input type="number" id="sedH" step="20" min="40" max="1400"></div>
+      <div class="row"><label>SPREAD</label><input type="number" id="sedR" step="4" min="0" max="600">
+        <label style="width:auto">SMOKE</label><input type="number" id="sedGrey" step="0.1" min="0" max="1">
+        <button class="btn" id="sedDel">DELETE</button></div>
+      <hr>
+      <div class="row"><label>AMOUNT</label><input type="number" id="sedAmt" step="0.05" min="0" max="2">
+        <label style="width:auto">RISE</label><input type="number" id="sedRise" step="1" min="1" max="90"></div>
+      <div class="row" style="gap:5px">
+        <button class="btn hot" id="sedSave">SAVE</button>
+        <button class="btn" id="sedCopy">COPY TABLE</button>
+        <button class="btn" id="sedRevert">REVERT</button></div>
+      <div class="note" id="sedStats"></div>
+      <div class="note" id="sedNote"></div>
+      <div class="keys">drag a vent to move it · shift-click the map to add one, on the ground
+        under that point · del removes the selected one · blue boxes are water, grey are
+        buildings · the faint ring is how far that plume spreads</div>`;
+    document.body.appendChild(p);
+    els.panel = p;
+    cv = p.querySelector('#sedPlan');
+    g = cv.getContext('2d');
+    ['N', 'W', 'H', 'R', 'Grey', 'Amt', 'Rise', 'Note', 'Stats'].forEach((k) => {
+      els[k.toLowerCase()] = p.querySelector('#sed' + k);
+    });
+    p.querySelector('#sedX').onclick = () => api.toggle(false);
+    const set = (f) => () => { const v = STEAM.vents[sel]; if (v) { f(v); steamSeed(); refresh(); } };
+    els.n.oninput = set((v) => { v.rule.n = Math.max(0, Math.min(40, +els.n.value | 0)); });
+    els.w.oninput = set((v) => { v.rule.w = Math.max(8, +els.w.value); });
+    els.h.oninput = set((v) => { v.rule.h = Math.max(40, +els.h.value); });
+    els.r.oninput = set((v) => { v.r = Math.max(0, +els.r.value); });
+    els.grey.oninput = set((v) => { v.rule.grey = Math.max(0, Math.min(1, +els.grey.value)); });
+    els.amt.oninput = () => { STEAM.amt.value = +els.amt.value; };
+    els.rise.oninput = () => { STEAM.rise.value = Math.max(1, +els.rise.value); };
+    p.querySelector('#sedDel').onclick = () => {
+      if (STEAM.vents.length < 2) return;
+      STEAM.vents.splice(sel, 1);
+      sel = Math.max(0, sel - 1);
+      steamSeed(); refresh();
+    };
+    p.querySelector('#sedCopy').onclick = () => {
+      navigator.clipboard.writeText(JSON.stringify(payload(), null, 2));
+      els.note.textContent = 'table copied';
+    };
+    p.querySelector('#sedRevert').onclick = () => {
+      if (!authored) return;
+      api.apply(authored);
+      els.note.textContent = 'back to the vents found by name';
+    };
+    p.querySelector('#sedSave').onclick = () => {
+      fetch('./__steam', { method: 'POST', body: JSON.stringify(payload()) })
+        .then((r) => { els.note.textContent = r.ok ? 'saved to steam.json' : 'save failed ' + r.status; })
+        .catch((e) => { els.note.textContent = 'save failed: ' + e.message; });
+    };
+    const at = (e) => {
+      const r = cv.getBoundingClientRect();
+      return [(e.clientX - r.left) / r.width * PW, (e.clientY - r.top) / r.height * PH];
+    };
+    cv.addEventListener('pointerdown', (e) => {
+      const [px, pz] = at(e);
+      if (e.shiftKey) {
+        /* a new vent stands on the ground under the point, which is the one thing a plan view
+           cannot tell you and the one thing that must not be guessed */
+        const x = wx(px), z = wz(pz);
+        const src = STEAM.vents[sel];
+        STEAM.vents.push({ x, y: walkGroundY(x, z) + 6, z, r: src ? src.r : 60,
+          rule: Object.assign({}, src ? src.rule : { n: 10, w: 70, h: 280, grey: 0 }) });
+        sel = STEAM.vents.length - 1;
+        steamSeed(); refresh();
+        return;
+      }
+      let best = -1, bd = 18;
+      STEAM.vents.forEach((v, i) => {
+        const d = Math.hypot(px - sx(v.x), pz - sz(v.z));
+        if (d < bd) { bd = d; best = i; }
+      });
+      if (best < 0) return;
+      sel = best; drag = true;
+      cv.setPointerCapture(e.pointerId);
+      refresh();
+    });
+    cv.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const [px, pz] = at(e);
+      const v = STEAM.vents[sel];
+      v.x = wx(px); v.z = wz(pz);
+      v.y = walkGroundY(v.x, v.z) + 6;
+      steamSeed(); refresh();
+    });
+    const up = () => { drag = false; };
+    cv.addEventListener('pointerup', up);
+    cv.addEventListener('pointercancel', up);
+  }
+
+  const api = {
+    toggle(v) {
+      const want = v == null ? !open : !!v;
+      if (want && !STEAM.mesh) { console.warn('[steam] nothing built yet'); return false; }
+      open = want;
+      if (open) { build(); if (!authored) authored = payload(); fit(); refresh(); }
+      if (built) els.panel.classList.toggle('on', open);
+      DBG.touch();
+      return open;
+    },
+    payload,
+    /* the overlay: it REPLACES the table found by name rather than merging into it, because a
+       vent that was deleted has to stay deleted */
+    apply(j) {
+      if (!j || !Array.isArray(j.vents) || !j.vents.length) return 0;
+      if (STEAM.mesh && !authored) authored = payload();
+      STEAM.vents = j.vents.map((v) => ({ x: +v.x, y: +v.y, z: +v.z, r: +v.r || 40,
+        rule: { n: +v.n || 0, w: +v.w || 60, h: +v.h || 260, grey: +v.grey || 0 } }));
+      if (typeof j.amt === 'number') STEAM.amt.value = j.amt;
+      if (typeof j.rise === 'number') STEAM.rise.value = j.rise;
+      const n = steamSeed();
+      if (built && open) refresh();
+      return STEAM.vents.length && n >= 0 ? STEAM.vents.length : 0;
+    },
+  };
+  addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) {
+      if (e.key === 'Escape') t.blur();
+      return;
+    }
+    if (e.key === '.' || e.key === '>') { e.preventDefault(); api.toggle(); return; }
+    if (!open) return;
+    if (e.key === 'Escape') { api.toggle(false); return; }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && STEAM.vents.length > 1) {
+      e.preventDefault();
+      STEAM.vents.splice(sel, 1);
+      sel = Math.max(0, sel - 1);
+      steamSeed(); refresh();
+    }
+  });
+  DBG.add({ label: 'STEAM VENTS', key: '.', toggle: () => api.toggle(), isOpen: () => open });
+  return api;
+})();
+NAV.steamEdit = STEAM_EDITOR;
+
+/* and its overlay, which like the boats' has to wait for something to exist before it can be
+   laid over anything */
+fetch('./steam.json', { cache: 'no-store' })
+  .then((r) => (r.ok ? r.json() : null))
+  .then((j) => {
+    if (!j) return;
+    const lay = () => {
+      const n = STEAM.mesh ? STEAM_EDITOR.apply(j) : 0;
+      if (n) console.log('[steam] steam.json laid over the siting: %d vents', n);
       else setTimeout(lay, 400);
     };
     lay();

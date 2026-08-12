@@ -18,12 +18,14 @@ import os
 import sys
 
 # The only paths this server will write, and the only reason it accepts a POST at all: the page's
-# four editors saving what they were opened to edit — the six camera routes, the walkers' loops,
-# the firefly knots and the boats' laps. All are OVERLAYS over the tables in the HTML, not
+# five editors saving what they were opened to edit — the six camera routes, the walkers' loops,
+# the firefly knots, the boats' laps and the steam vents. All are OVERLAYS over the HTML's own
+# tables, not
 # rewrites of them: the page lays each over its own table at boot and deleting the file is a full
 # undo, so nothing here can damage anything that is not reproducible from the HTML alone.
 SAVES = {'__flights': 'flights.json', '__loops': 'loops.json', '__flies': 'fireflies.json',
-         '__boats': 'boats.json'}
+         '__boats': 'boats.json',
+         '__steam': 'steam.json'}
 SAVE_MAX = 64 * 1024
 
 
