@@ -65,6 +65,8 @@ deck browser, so the five tiles go.
 | STUDY's route | 2,090 units, gate to arbour | landmarks projected onto the stone chain |
 | 16 nodes on it | **139 units apart** | 2,090 / 15 gaps; a person here is 66 tall |
 | on the stones alone | 75 units apart — a shuffle | 1,021-unit chain, why the route is longer |
+| the bamboo stairway | 3,157 units of run, 215 of rise | `ZEN_L4`'s pose, walked and shot |
+| 6–44 blocks on it | 72–526 units apart | the six deck nodes' real block counts |
 
 **The shape rule that falls out of it: a level is either a SHOT or a CORRIDOR.** A shot is five
 siblings you choose between while standing still. A corridor is any length and you walk it. L2
@@ -183,9 +185,38 @@ The side branch is a real branch in the graph — sentences hangs off grammar as
 sits inline on the walk between grammar and scripted conversation, because a fork in a corridor
 is a worse problem than a slightly wrong graph.
 
-## L3 — the lessons inside a node
+## L3 — the lessons, up the bamboo stairway
 
-That node's blocks, which is where the six deck nodes land. The block list is the corridor.
+That node's blocks, which is where the six deck nodes land — and it stands on the route `ZEN_L4`
+was placed for, which is what that marker has been waiting on since it was set.
+
+**It is a stairway, not a grove.** The first look at this searched for objects named `Bamboo`,
+found nine clumps, and concluded the level-four camera was aimed at some scenery. Standing at the
+authored pose and taking a picture showed what is actually there: a **stone stairway climbing
+through the bamboo**, lined with kasuga lanterns down both sides, with a timber handrail, jizo
+and gorinto beside it, and walkers already on it. The steps are terrain — cut into
+`Zen_Surfaces_ZenGround_001`, 4,182 × 4,541 with **236 units of rise** — which is why no object
+is called "step" and why a name census could never have found it. "Up the bamboo" was literal.
+
+Measured: about **3,157 units of ground run** for 215 of climb, a grade of roughly 1:15, which
+matches the shallow steps in the render. It runs off the Zen court, so the course and the lessons
+are physically joined — you walk the course through the garden and turn and climb to do a node.
+
+**Why this route and not the stones.** The two levels want opposite things and the garden happens
+to have both:
+
+| | route | why |
+|---|---|---|
+| L2, the course | the processional way, 2,090 units | **nine landmarks** — a course wants milestones that say how far you have come |
+| L3, the lessons | the bamboo stairway, 3,157 units | **no landmarks, even cadence** — a list of forty identical blocks wants uniformity and nothing competing with it |
+
+And the arithmetic works because the course only ever reaches six deck nodes, whose block counts
+run 6 to 44: over 3,157 units that is **72 to 526 units between placards**. The lists that would
+break it — vocab N1's 137 — are not on the course. They sit behind the JLPT nodes, which hand off
+to another section entirely.
+
+Climbing is also the right shape for the thing: the course is a walk on the level, one deck is a
+hill.
 
 The real block names. A sample of what each list holds:
 
@@ -242,8 +273,8 @@ Stated plainly, because none of it is free:
   feel like units are the garden's, chosen here. Nothing breaks if the app disagrees later,
   because the milestones are scenery rather than data.
 - **The route needs authoring.** Sixteen stops from the main gate to the arbour is a camera path
-  nobody has composed yet, and only STUDY has an authored level-four marker (`ZEN_L4`) to
-  start from.
+  nobody has composed yet. The level below it is in better shape: `ZEN_L4` already stands at the
+  foot of the stairway looking up it, so the lessons have their shot and only the course does not.
 
 ---
 
