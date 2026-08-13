@@ -347,7 +347,7 @@
     /* the card takes the new room -- 78 tall against 54 -- and does NOT rotate in CSS any more.
        The plane carries the tilt now, so the box keeps its own bounding height. */
     inset: 25px 206px 25px 0;
-    padding: 20px 0 0; align-items: center;
+    padding: 0; align-items: center;
     transform: skewX(-8deg) translateX(calc(var(--i) * 9px));
     /* WHITE PAPER AND ONE ACCENT, which is what the L2 box actually does -- its colour lives in
        the top tab and the slab, and the card itself is paper. Mixing the section colour through
@@ -359,29 +359,34 @@
   }
   /* the tab, full bleed across the top the way a stone wears its destination */
   body.menu-box .t-inner::before {
-    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 20px;
+    /* THE STRIP IS THE LEFT EDGE, FULL HEIGHT, and the seal fills it exactly. It was a bar across
+       the top plus a 62px square floating in it, so there were eight pixels of bare colour above
+       the character and eight below -- accent showing where nothing was printed on it. The strip
+       and the seal are the same box now, so that cannot happen again. */
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 66px;
     background: var(--sec, var(--hi));
   }
   body.menu-box .t-slash, body.menu-box .drop { display: none; }
   body.menu-box .t-tick { display: none; }
   body.menu-box .t-en {
-    color: var(--ink); text-shadow: none; transform: none; font-size: 30px; margin-left: 20px;
+    color: var(--ink); text-shadow: none; transform: none; font-size: 30px; margin-left: 88px;
   }
   /* the reading rides IN the tab, which is where the stone puts its one small label */
   body.menu-box .t-jp {
-    left: 0; right: 0; top: 0; width: auto; height: 20px; line-height: 20px;
-    padding-left: 14px; font-family: var(--jp-go); font-weight: 700;
+    left: 88px; right: auto; top: auto; bottom: 11px; width: auto; height: auto;
+    line-height: 1; padding-left: 0; font-family: var(--jp-go); font-weight: 700;
     font-size: 9.5px; letter-spacing: 0.28em; color: var(--washi); background: none;
     text-shadow: none; z-index: 3;
   }
   body.menu-box .t-line {
-    left: 20px; right: auto; width: 48px; bottom: 8px; height: 2px;
+    left: 88px; right: auto; width: 56px; bottom: 6px; height: 2px;
     background: rgba(20, 17, 13, 0.35); transform: scaleX(1);
   }
   body.menu-box .t-stamp {
-    width: 32px; height: 32px; font-size: 18px; margin-left: 14px;
-    background: var(--sec, var(--hi)); color: var(--washi);
-    box-shadow: inset 0 0 0 2px var(--washi), inset 0 0 0 4px var(--sec, var(--hi));
+    position: absolute; left: 0; top: 0; bottom: 0; width: 66px; height: auto; margin: 0;
+    display: grid; place-items: center; font-size: 32px;
+    animation: none !important; opacity: 1; transform: none;
+    background: none; color: var(--washi); box-shadow: none; z-index: 3;
   }
   body.menu-box .t-badge {
     min-width: 26px; height: 26px; font-size: 15px; margin-top: 20px;
@@ -392,8 +397,7 @@
      bottom edge, and the card lifts on a longer shadow. */
   body.menu-box .type-item.is-active .t-inner {
     background: linear-gradient(178deg, #ffffff 0%, #f2ede0 100%);
-    box-shadow: 11px 14px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.3),
-      inset 0 -6px 0 var(--sec, var(--hi));
+    box-shadow: 11px 14px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.3);
   }
   body.menu-box .type-item.is-active .t-en {
     color: var(--ink); text-shadow: none; transform: scale(1.05) translateX(8px);
@@ -407,55 +411,10 @@
     color: #fff; letter-spacing: 0.3em; transform: none; background: none;
   }
   body.menu-box .type-item.is-active .t-line { background: var(--hi); }
-  body.menu-box .type-item.is-active .t-stamp {
-    background: var(--ink); color: var(--washi);
-    box-shadow: inset 0 0 0 2px var(--washi), inset 0 0 0 4px var(--ink);
-  }
+  /* the strip goes ink when you point at it -- the one state change, and it is on the accent */
+  body.menu-box .type-item.is-active .t-inner::before { background: var(--ink); }
+  body.menu-box .type-item.is-active .t-stamp { background: none; color: #fff; }
   body.menu-box .type-item.is-dimmed { filter: brightness(0.9) saturate(0.82); }
-
-  /* ---- WHERE THE ONE ACCENT GOES. M cycles; `NAV.boxStyle(n)` names. -------------------------
-     The card is white paper in all four and carries exactly one piece of colour. What changes is
-     where it sits, which is the only decision left once the ground stops being coloured.
-       TAB     a full-width strip across the top, holding the reading. The L2 box's own answer.
-       CORNER  a wedge cut into the top-left corner and nothing else. The quietest.
-       RULE    a thick bar along the FOOT, nothing on top -- the L2 hero's action slab, moved to
-               every card instead of only the chosen one.
-       MARK    a square at the trailing end holding the section's character, like a seal pressed
-               after the writing. The only one where the accent carries a glyph.
-     ------------------------------------------------------------------------------------------ */
-  body[data-box="corner"] .t-inner::before {
-    left: 0; top: 0; right: auto; bottom: auto; width: 54px; height: 54px;
-    clip-path: polygon(0 0, 100% 0, 0 100%);
-  }
-  body[data-box="corner"] .t-jp {
-    left: 62px; right: auto; top: auto; bottom: 7px; height: auto; line-height: 1;
-    width: auto; padding-left: 0; color: rgba(20, 17, 13, 0.5);
-  }
-  body[data-box="corner"] .t-en { margin-left: 62px; }
-  body[data-box="corner"] .t-line { display: none; }
-
-  body[data-box="rule"] .t-inner::before { top: auto; bottom: 0; height: 8px; }
-  body[data-box="rule"] .t-inner { padding: 0 0 8px; }
-  body[data-box="rule"] .t-jp {
-    left: auto; right: 16px; top: 10px; width: auto; height: auto; line-height: 1;
-    padding-left: 0; color: rgba(20, 17, 13, 0.45);
-  }
-  body[data-box="rule"] .t-line { display: none; }
-
-  body[data-box="mark"] .t-inner::before {
-    left: auto; right: 0; top: 0; bottom: 0; width: 62px; height: auto;
-  }
-  body[data-box="mark"] .t-jp {
-    left: 20px; right: auto; top: auto; bottom: 7px; height: auto; line-height: 1;
-    width: auto; padding-left: 0; color: rgba(20, 17, 13, 0.5);
-  }
-  body[data-box="mark"] .t-inner { padding: 0; }
-  body[data-box="mark"] .t-stamp {
-    position: absolute; right: 0; top: 50%; margin: -31px 0 0; width: 62px; height: 62px;
-    font-size: 30px; animation: none !important; opacity: 1; transform: none;
-    background: none; color: var(--washi); box-shadow: none; z-index: 3;
-  }
-  body[data-box="mark"] .t-line { display: none; }
 
   .drop { position: absolute; background: var(--gold); width: 8px; height: 8px; z-index: 1; opacity: 0; filter: url(#roughEdge); }
   .type-item.is-active .drop { animation: dropFly 0.5s cubic-bezier(0.2, 0.8, 0.4, 1) forwards; }
@@ -17972,7 +17931,6 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'b' || e.key === 'B') { HUD.b = (HUD.b + 1) % HUD_BORDERS.length; hudDraw(); }
   else if (e.key === 'a' || e.key === 'A') { HUD.air = !HUD.air; hudDraw(); }
   else if (e.key === 'c' || e.key === 'C') { NAV.course(HUD.c + 1); }
-  else if (e.key === 'm' || e.key === 'M') { NAV.boxStyle(boxStyle + 1); }
 });
 /* C from the keyboard, `NAV.course(n)` from the console, `NAV.course()` to ask which is on. It
    prints, because three layouts that differ in structure are not tellable apart from a screenshot
@@ -20526,24 +20484,8 @@ NAV.box = (v) => {
 };
 document.body.classList.add('menu-box');
 
-/* the four treatments, on their own axis so the on/off switch and the choice stay separable */
-const BOX_STYLES = [
-  ['mark', 'a square at the trailing end holding the section character, like a seal'],
-  ['tab', 'the accent across the top, holding the reading -- what the L2 box does'],
-  ['corner', 'a wedge cut into the top-left corner, and nothing else'],
-  ['rule', 'a thick bar along the foot -- the hero action slab, on every card'],
-];
-let boxStyle = 0;
-document.body.dataset.box = BOX_STYLES[0][0];
-NAV.boxStyle = (i) => {
-  if (i != null) {
-    boxStyle = ((i % BOX_STYLES.length) + BOX_STYLES.length) % BOX_STYLES.length;
-    document.body.dataset.box = BOX_STYLES[boxStyle][0];
-  }
-  const [k, note] = BOX_STYLES[boxStyle];
-  console.log('box ' + boxStyle + '/' + (BOX_STYLES.length - 1) + '  ' + k + ' — ' + note);
-  return k;
-};
+/* one treatment now, so there is no axis to cycle. `NAV.box(false)` still returns the whole thing
+   to bare type, which is the only question left. */
 DBG.add({
   label: 'MENU CARDS', key: '',
   isOpen: () => document.body.classList.contains('menu-box'),
