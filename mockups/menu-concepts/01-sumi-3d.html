@@ -1699,7 +1699,12 @@
   }
 
   /* ---- the two counted tags, one at each edge ---- */
-  .cs-side { position: absolute; top: 220px; width: 48px; height: 140px; z-index: 38;
+  /* CENTRED ON THE ROAD, not standing on it. P13 bottom-aligns these with the tablets -- tag and
+     stone both end at the same y, as if planted in the same ground -- which put their middles 78px
+     below the middle of everything else and read as two posts that had slipped down.
+     One number does it, because the tablets and the hero share a centre: the tablets run 64..360
+     in the wrap and the hero 20..404, and both are centred on 212. Minus half the tag's 140. */
+  .cs-side { position: absolute; top: 142px; width: 48px; height: 140px; z-index: 38;
     transition: opacity 0.32s ease; }
   .cs-side.lo { left: 30px; } .cs-side.hi { right: 30px; }
   .cs-side i {
