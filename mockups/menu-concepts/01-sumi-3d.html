@@ -1739,17 +1739,17 @@
 
   /* ---- the whole of it, small, under the road ---- */
   .cs-mini {
-    position: absolute; left: 0; right: 0; top: 414px;
-    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    position: fixed; left: 0; right: 0; bottom: 24px; z-index: 6;
+    display: flex; flex-direction: column; align-items: center; gap: 9px;
   }
-  .cs-minibars { display: flex; align-items: flex-end; gap: 3px; }
+  .cs-minibars { display: flex; align-items: flex-end; gap: 5px; }
   .cs-minibars i {
     display: block; transition: width 0.34s cubic-bezier(0.2, 0.92, 0.24, 1),
       height 0.34s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.2s ease;
   }
   .cs-minitext {
-    display: flex; align-items: baseline; gap: 9px; white-space: nowrap;
-    font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.16em;
+    display: flex; align-items: baseline; gap: 11px; white-space: nowrap;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 13px; letter-spacing: 0.18em;
     color: var(--gold-hi);
     paint-order: stroke fill; -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
   }
@@ -2793,7 +2793,7 @@
      same job — which step of how many, with a button either side — and STUDY's course is the second
      thing to need it. What `body.course` deliberately does NOT do is turn on `.walk-pick`: those are
      the transparent twins for world objects, and the course has no world objects. */
-  body.at-walk .walk-hud, body.course .walk-hud { opacity: 1; }
+  body.at-walk .walk-hud, body.course:not(.at-path) .walk-hud { opacity: 1; }
   /* AN INVISIBLE CONTROL THAT STILL EATS CLICKS. The walk counter is hidden with `opacity: 0`,
      and an opacity-0 element is still in the hit-test -- so its two stepper buttons have been
      swallowing pointer events across the top of the screen the whole time, for every state
@@ -2801,7 +2801,8 @@
      The back tab already guards itself this way (`body.at-menu .back-tab button`); this one was
      missed. Specificity beats `.chrome button { pointer-events: auto }` without !important. */
   body:not(.at-walk):not(.course) .walk-hud,
-  body:not(.at-walk):not(.course) .walk-hud button { pointer-events: none; }
+  body:not(.at-walk):not(.course) .walk-hud button,
+  body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   .walk-hud .wh-jp { font-family: var(--jp); font-weight: 700; font-size: 21px; letter-spacing: 0.12em; color: var(--washi); }
   .walk-hud .wh-en { font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.32em; color: rgba(242,234,216,0.6); }
   .walk-hud .wh-at { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 14px; letter-spacing: 0.04em; color: var(--sec, var(--hi)); }
@@ -3496,6 +3497,12 @@
      you have to hit with a mouse; and it sets `pointer-events: none`, which a slider cannot
      live with. It also means the bench does not leave with the camera on a flight, which is
      what you want from something you are using to watch a flight. */
+  /* OFF UNTIL DEBUG ASKS FOR IT. This is a development control -- a slider for the time of day --
+     and it was sitting in the middle of the bottom edge of a composition, which is the one place a
+     bench should never be. It cannot become a DEBUG row itself (those are buttons and this is a
+     range input a mouse has to drag), so the row is a switch and the bench stays a bench: hidden
+     until wanted, then exactly where it always was. */
+  .clock-bar.bench-off { display: none; }
   .clock-bar {
     position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
     z-index: 40; display: flex; align-items: center; gap: 13px;
@@ -17123,11 +17130,11 @@ function courseLayout(rows) {
   hi.querySelector('b').textContent = ahead;
   wrap.querySelector('.cs-minibars').querySelectorAll('i').forEach((bar, i) => {
     const d = Math.abs(i - sel);
-    const w = [15, 12, 10, 8][d] ?? 6, ht = [20, 15, 12, 9][d] ?? 7;
+    const w = [26, 21, 17, 13][d] ?? 10, ht = [36, 28, 22, 16][d] ?? 12;
     const bg = rows[i].state === 'done' ? 'var(--gold)'
       : rows[i].state === 'here' ? 'var(--gold-hi)' : 'rgba(242,234,216,0.26)';
     bar.style.cssText = `width: ${w}px; height: ${ht}px; background: ${bg};`
-      + (i === sel ? ' box-shadow: 0 0 0 2px var(--hi);' : '');
+      + (i === sel ? ' box-shadow: 0 0 0 3px var(--hi);' : '');
   });
   const cleared = rows.filter((x) => x.state === 'done').length;
   wrap.querySelector('.cs-cleared').textContent = cleared + ' STEPS CLEARED';
@@ -17343,6 +17350,9 @@ function hudBuild(rows) {
      have hidden the figure chips in all six sections via the rule at the end of the course block. */
   if (shaped) hudEl.dataset.course = COURSE_SHAPES[HUD.c][0];
   else delete hudEl.dataset.course;
+  /* `body.course` covers the whole of STUDY, both levels; this is the PATH specifically, and it
+     is written beside `data-course` so the two cannot disagree about which screen is up */
+  document.body.classList.toggle('at-path', shaped);
   const middle = shaped
     ? `<div class="course-shape">${courseMarkup(rows)}</div>`
     : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
@@ -17686,6 +17696,7 @@ function hudClose() {
   /* or the counter stays up over the menu, with two live buttons on it. The back tab learned this
      the same way — see the note by `.walk-hud`'s pointer-events guard. */
   document.body.classList.remove('course');
+  document.body.classList.remove('at-path');
 }
 addEventListener('keydown', (e) => {
   if (!HUD.on || state !== 'sub' || hudEl.hidden) return;
@@ -20242,6 +20253,20 @@ const DBG = (() => {
   return api;
 })();
 NAV.debug = DBG;
+
+/* the clock bench's switch. Registered HERE rather than inside `CLOCK_BAR` because that IIFE runs
+   a couple of hundred lines earlier, before `DBG` exists -- and guarded, because `?clock=off` and
+   a day cycle that is switched off both remove the element outright. */
+(() => {
+  const el = document.getElementById('clockBar');
+  if (!el) return;
+  el.classList.add('bench-off');
+  DBG.add({
+    label: 'TIME OF DAY', key: '',
+    isOpen: () => !el.classList.contains('bench-off'),
+    toggle: () => { el.classList.toggle('bench-off'); DBG.touch(); },
+  });
+})();
 
 /* ================= THE FLIGHT EDITOR =================
    Six routes, edited where they are flown, against the geometry they have to miss.
