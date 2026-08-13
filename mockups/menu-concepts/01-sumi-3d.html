@@ -378,48 +378,104 @@
   }
 
 
-  /* ---- FOUR TREATMENTS ON ONE AXIS. M cycles; `NAV.boxStyle(n)` names. ----------------------
-     The rules above are CARD, and they are the shared base -- these three change one decision
-     each rather than restyling from scratch, so what is being compared is the decision.
-       PLATE flips the value: dark ground, cream type. The valley is bright most of the day and a
-         light card is a hole in it; this is the same object cut the other way.
-       CHIP stops the card being a slab. It hugs the word, which puts six small objects on the
-         hillside instead of six bars, and lets the world back in between them.
-       SPINE gives the accent edge a job: it widens to 74px and takes the reading, set vertically
-         -- which is the path's standing stone, laid on its side.
+  /* ---- FOUR SHAPES, NOT FOUR DRESSINGS. M cycles; `NAV.boxStyle(n)` names. -------------------
+     The first bench was card, plate, chip and spine, and they were rightly called samey: all four
+     were a LEFT-ALIGNED HORIZONTAL BAR with the accent on its leading edge, differing in fill,
+     width and how wide that edge was. That is one silhouette wearing four coats, which is exactly
+     what four ladders were before them. What differs here is the SHAPE of the thing:
+
+       CARD   one bar, ink on cream. The baseline, kept so the others have something to be unlike.
+       SEAL   the box shrinks to a square stamp holding the section's character, and the word
+              leaves the box entirely -- back on the world with its keyline and halo. The only
+              one where the type is not on a panel, and the only square.
+       TORN   no straight edges. A hand-cut strip of paper, notched top and bottom, which is the
+              course sheet's own edge at button scale.
+       GHOST  no fill at all. A hollow keyline with the corners cut, cream type inside it, the
+              accent as two short marks -- a box that is only implied until you point at it.
      ------------------------------------------------------------------------------------------ */
-  body[data-box="plate"] .t-inner {
-    background: rgba(14, 12, 9, 0.86);
-    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(242, 234, 216, 0.18);
-  }
-  body[data-box="plate"] .t-en { color: var(--washi); }
-  body[data-box="plate"] .t-jp { color: rgba(242, 234, 216, 0.5); }
-  body[data-box="plate"] .t-tick {
-    background: var(--sec, var(--hi)); box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
-  }
-  body[data-box="plate"] .t-line {
-    background: linear-gradient(90deg, var(--gold), transparent);
-  }
-  body[data-box="plate"] .t-badge {
-    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 2px rgba(242, 234, 216, 0.3);
-  }
 
-  /* the chip hugs the word: `right: auto` and a max-content width, which is the one change */
-  body[data-box="chip"] .t-inner {
-    inset: 30px auto 30px 0; width: max-content; padding-right: 30px;
+  /* ---- SEAL: a square stamp, and the word back on the world ---- */
+  body[data-box="seal"] .t-inner {
+    inset: 0; background: none; box-shadow: none; transform: none;
+    padding-left: 128px;
   }
+  body[data-box="seal"] .t-inner::before { display: none; }
+  body[data-box="seal"] .t-tick { display: none; }
+  /* the stamp stops waiting to be pressed and becomes the button's face */
+  body[data-box="seal"] .t-stamp {
+    position: absolute; left: 8px; top: 50%; margin: -48px 0 0; width: 96px; height: 96px;
+    font-size: 54px; animation: none !important;
+    transform: skewX(-8deg) rotate(-1.2deg); opacity: 1;
+    background: var(--sec, var(--hi)); color: var(--washi);
+    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 3px rgba(242, 234, 216, 0.85);
+    transition: transform 0.24s var(--ease-pop), box-shadow 0.24s ease;
+  }
+  body[data-box="seal"] .type-item.is-active .t-stamp {
+    transform: skewX(-8deg) rotate(-1.2deg) scale(1.12);
+    box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 3px #fff;
+  }
+  /* the word is not on a panel here, so it takes its keyline and halo back */
+  body[data-box="seal"] .t-en {
+    font-size: 54px; color: #ded6bd; transform: skewX(-8deg);
+    text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.55), 0 0 16px rgba(6, 9, 15, 0.62);
+  }
+  body[data-box="seal"] .type-item.is-active .t-en {
+    color: #fff; transform: skewX(-8deg) scale(1.05) translateX(9px);
+  }
+  body[data-box="seal"] .t-jp {
+    left: 132px; top: calc(50% + 24px); font-size: 12px; letter-spacing: 0.36em;
+    color: var(--washi-dim); text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+  }
+  body[data-box="seal"] .type-item.is-active .t-jp { color: var(--gold-hi); }
+  /* SEAL HAS NO PANEL, so it must refuse the shared active fill. `.t-inner` is `inset: 0` here --
+     the whole 620x128 plane -- and the base rule filled all of it with the section accent, which
+     put a green rectangle the size of the plane behind a design whose whole idea is that the word
+     is NOT on one. The stamp keeps its own colour too, rather than taking the ink the card's
+     active stamp wears. */
+  body[data-box="seal"] .type-item.is-active .t-inner { background: none; box-shadow: none; }
+  body[data-box="seal"] .type-item.is-active .t-stamp {
+    background: var(--sec, var(--hi)); color: #fff;
+    box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 3px #fff;
+  }
+  body[data-box="seal"] .t-line { left: 132px; background: linear-gradient(90deg, var(--gold), transparent); }
 
-  body[data-box="spine"] .t-inner::before { width: 74px; }
-  body[data-box="spine"] .t-jp {
-    left: 0; top: 0; bottom: 0; width: 74px; height: auto;
-    display: grid; place-items: center; writing-mode: vertical-rl;
-    font-family: var(--jp); font-weight: 400; font-size: 21px; letter-spacing: 0.14em;
-    color: var(--washi); z-index: 3;
+  /* ---- TORN: a hand-cut strip, no straight edge on it ---- */
+  body[data-box="torn"] .t-inner {
+    clip-path: polygon(0 6px, 14% 0, 33% 7px, 52% 1px, 71% 8px, 88% 2px, 100% 7px,
+      calc(100% - 5px) 46%, 100% calc(100% - 5px), 84% 100%, 63% calc(100% - 7px),
+      41% 100%, 22% calc(100% - 6px), 0 100%, 5px 52%);
+    box-shadow: none;
+    filter: drop-shadow(4px 6px 0 rgba(0, 0, 0, 0.42));
   }
-  body[data-box="spine"] .t-tick { margin-left: 92px; }
-  body[data-box="spine"] .t-line { left: 92px; }
-  body[data-box="spine"] .type-item.is-active .t-inner::before { background: rgba(20, 17, 13, 0.62); }
-  body[data-box="spine"] .type-item.is-active .t-jp { color: #fff; letter-spacing: 0.14em; }
+  body[data-box="torn"] .t-inner::before { width: 18px; }
+  body[data-box="torn"] .t-tick { display: none; }
+  body[data-box="torn"] .t-en { margin-left: 40px; }
+  body[data-box="torn"] .t-jp { left: 62px; }
+  body[data-box="torn"] .t-line { left: 62px; }
+
+  /* ---- GHOST: the box is only implied ---- */
+  body[data-box="ghost"] .t-inner {
+    background: none; box-shadow: none;
+    border: 2px solid rgba(242, 234, 216, 0.55);
+    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+    transition: border-color 0.24s ease, background 0.24s ease;
+  }
+  /* the accent is two short marks rather than a filled edge */
+  body[data-box="ghost"] .t-inner::before {
+    width: 5px; top: 12px; bottom: 12px; left: -2px;
+  }
+  body[data-box="ghost"] .t-en {
+    color: var(--washi);
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5), 0 0 14px rgba(6, 9, 15, 0.6);
+  }
+  body[data-box="ghost"] .t-jp { color: rgba(242, 234, 216, 0.6); }
+  body[data-box="ghost"] .t-tick { background: var(--sec, var(--hi)); }
+  body[data-box="ghost"] .t-line { background: linear-gradient(90deg, var(--gold), transparent); }
+  body[data-box="ghost"] .type-item.is-active .t-inner {
+    background: rgba(14, 12, 9, 0.72); border-color: var(--sec, var(--hi));
+    box-shadow: none;
+  }
+  body[data-box="ghost"] .type-item.is-active .t-en { color: #fff; }
 
   .drop { position: absolute; background: var(--gold); width: 8px; height: 8px; z-index: 1; opacity: 0; filter: url(#roughEdge); }
   .type-item.is-active .drop { animation: dropFly 0.5s cubic-bezier(0.2, 0.8, 0.4, 1) forwards; }
@@ -20484,10 +20540,10 @@ document.body.classList.add('menu-box');
 
 /* the four treatments, on their own axis so the on/off switch and the choice stay separable */
 const BOX_STYLES = [
-  ['card', 'ink on cream, the accent down the leading edge'],
-  ['plate', 'the same object cut the other way — dark ground, cream type'],
-  ['chip', 'the card hugs the word instead of being a bar'],
-  ['spine', "the accent edge widens and takes the reading, standing — the path's stone on its side"],
+  ['card', 'one bar, ink on cream — the baseline'],
+  ['seal', 'a square stamp holds the character; the word leaves the box and stands on the world'],
+  ['torn', 'a hand-cut strip of paper, no straight edge on it'],
+  ['ghost', 'no fill — a hollow keyline with its corners cut, filled only when pointed at'],
 ];
 let boxStyle = 0;
 document.body.dataset.box = BOX_STYLES[0][0];
