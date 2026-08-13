@@ -337,34 +337,45 @@
     /* 26, not 20. The top tab added 17px of height the plain bar did not have, and at 88 tall
        the six overlapped their neighbours by 5,222 square pixels again -- the same collision the
        first card pass had, from the same cause: the planes' spacing was sited for bare type. */
-    inset: 26px 210px 26px 0;
-    padding: 17px 0 0; align-items: center;
-    transform: skewX(-8deg) rotate(-1.2deg);
-    background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
-    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    inset: 30px 206px 30px 0;
+    padding: 20px 0 0; align-items: center;
+    /* THE FAN. `--i` is already on the element for the entrance stagger, so the six spread from
+       -2.6 to +2.6 degrees and step right as they descend, instead of all leaning -1.2 the same
+       way. Six identical rectangles at one angle is what read as a pad of notes. */
+    transform: skewX(-8deg) rotate(calc((var(--i) - 2.5) * 1.05deg))
+      translateX(calc(var(--i) * 9px));
+    /* AND THE GROUND TAKES THE COLOUR. Quarantining each section's accent in a 17px strip left
+       five sixths of every card the same neutral cream; mixed into the paper it is what makes six
+       cards six things. */
+    background: linear-gradient(168deg,
+      color-mix(in srgb, var(--sec, var(--hi)) 12%, #f2ead8) 0%,
+      color-mix(in srgb, var(--sec, var(--hi)) 34%, #cbc1a4) 100%);
+    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5),
+      inset 0 0 0 1px color-mix(in srgb, var(--sec, var(--hi)) 55%, rgba(20, 17, 13, 0.6));
     transition: box-shadow 0.24s ease, background 0.24s ease;
   }
   /* the tab, full bleed across the top the way a stone wears its destination */
   body.menu-box .t-inner::before {
-    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 17px;
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 20px;
     background: var(--sec, var(--hi));
   }
   body.menu-box .t-slash, body.menu-box .drop { display: none; }
   body.menu-box .t-tick { display: none; }
   body.menu-box .t-en {
-    color: var(--hi-deep); text-shadow: none; transform: none; font-size: 29px;
-    margin-left: 20px;
+    color: color-mix(in srgb, var(--sec, var(--hi)) 72%, var(--ink));
+    text-shadow: none; transform: none; font-size: 29px; margin-left: 20px;
   }
   /* the reading rides IN the tab, which is where the stone puts its one small label */
   body.menu-box .t-jp {
-    left: 0; right: 0; top: 0; width: auto; height: 17px; line-height: 17px;
+    left: 0; right: 0; top: 0; width: auto; height: 20px; line-height: 20px;
     padding-left: 14px; font-family: var(--jp-go); font-weight: 700;
     font-size: 9.5px; letter-spacing: 0.28em; color: var(--washi); background: none;
     text-shadow: none; z-index: 3;
   }
   body.menu-box .t-line {
-    left: 20px; right: auto; width: 36px; bottom: 9px; height: 1px;
-    background: rgba(20, 17, 13, 0.4); transform: scaleX(1);
+    left: 20px; right: auto; width: 52px; bottom: 9px; height: 2px;
+    background: color-mix(in srgb, var(--sec, var(--hi)) 75%, transparent);
+    transform: scaleX(1);
   }
   body.menu-box .t-stamp {
     width: 32px; height: 32px; font-size: 18px; margin-left: 14px;
@@ -379,14 +390,25 @@
      vermilion slab off its foot and stays paper. At this size that slab is a 5px bar inside the
      bottom edge, and the card lifts on a longer shadow. */
   body.menu-box .type-item.is-active .t-inner {
-    background: linear-gradient(178deg, #f2ecdb 0%, #ddd4b8 100%);
-    box-shadow: 9px 12px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.24),
-      inset 0 -5px 0 var(--hi);
+    background: linear-gradient(168deg,
+      color-mix(in srgb, var(--sec, var(--hi)) 24%, #f6f1e2) 0%,
+      color-mix(in srgb, var(--sec, var(--hi)) 50%, #ddd4b8) 100%);
+    box-shadow: 11px 14px 0 rgba(0, 0, 0, 0.52),
+      inset 0 0 0 1px color-mix(in srgb, var(--sec, var(--hi)) 70%, rgba(20, 17, 13, 0.7)),
+      inset 0 -6px 0 var(--hi);
   }
   body.menu-box .type-item.is-active .t-en {
-    color: var(--hi-deep); text-shadow: none; transform: scale(1.03) translateX(6px);
+    color: color-mix(in srgb, var(--sec, var(--hi)) 86%, var(--ink));
+    text-shadow: none; transform: scale(1.05) translateX(8px);
   }
-  body.menu-box .type-item.is-active .t-jp { color: #fff; letter-spacing: 0.3em; }
+  /* THE RED SLASH, KILLED AT ITS SOURCE. `.type-item.is-active .t-jp` rotates the reading -10
+     degrees and gives it a vermilion ground -- right when `.t-jp` is a 60px caption under the
+     word, which is what it was designed as. Box mode re-purposed it to FILL THE TOP TAB, so that
+     rule was rotating a 495x107 bar and scaling it 1.12: the diagonal across two cards. Nothing to
+     do with `.t-slash`, which measured display:none the whole time. */
+  body.menu-box .type-item.is-active .t-jp {
+    color: #fff; letter-spacing: 0.3em; transform: none; background: none;
+  }
   body.menu-box .type-item.is-active .t-line { background: var(--hi); }
   body.menu-box .type-item.is-active .t-stamp {
     background: var(--ink); color: var(--washi);
