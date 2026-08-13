@@ -1541,15 +1541,22 @@
     background: linear-gradient(180deg,
       rgba(14, 17, 26, 0.25) 0%, rgba(14, 17, 26, 0.42) 58%, rgba(14, 17, 26, 0.52) 100%);
   }
+  /* FULL-BLEED, BECAUSE THE ROAD IS A FRAME-WIDE COMPOSITION. Every other block in this panel is
+     a column inset by the panel's 52px left padding, and putting the path in one left-shifted it:
+     the hero centred on the WRAP's middle (590 of 1180) which lands at screen x 649, while the
+     frame's middle is 720. Seventy-one pixels off, and it reads as a mis-set screen rather than as
+     a design choice -- the road, the marker, the minimap and the edge tags were all leaning left
+     together. The padding is cancelled and the block takes the viewport. */
   .course-shape {
     position: relative; margin-top: 6px;
     min-height: 440px; display: flex; align-items: flex-start;
+    margin-left: calc(-52px * var(--u)); width: 100vw;
   }
-  .course-wrap { position: relative; width: 1180px; height: 440px; }
+  .course-wrap { position: relative; width: 100%; height: 440px; }
 
   /* ---- the chapter line, above the road ---- */
   .cs-chapline {
-    position: absolute; left: 0; top: 0; height: 16px;
+    position: absolute; left: calc(52px * var(--u)); top: 0; height: 16px;
     display: flex; align-items: center; gap: 11px; white-space: nowrap;
     font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.2em;
     color: rgba(242, 234, 216, 0.78);
@@ -1694,7 +1701,7 @@
   /* ---- the two counted tags, one at each edge ---- */
   .cs-side { position: absolute; top: 220px; width: 48px; height: 140px; z-index: 38;
     transition: opacity 0.32s ease; }
-  .cs-side.lo { left: 0; } .cs-side.hi { right: 0; }
+  .cs-side.lo { left: 30px; } .cs-side.hi { right: 30px; }
   .cs-side i {
     position: absolute; top: 0; display: block; width: 26px; transform: skewX(-8deg);
   }
@@ -16851,7 +16858,7 @@ function onCourse() { return HUD.on && HUD.sec === 'STUDY' && HUD.level === 2 &&
    and is scaled by transform -- so the ROAD compresses toward the horizon while the stones stay the
    same stone. */
 const COURSE_SHAPES = [['path', '道', 'a walked road of standing tablets, the card riding your place on it']];
-const CS_X0 = 320, CS_W = 94, CS_WSEL = 290, CS_GAP = 18, CS_FOCUS = 590;
+const CS_X0 = 320, CS_W = 94, CS_WSEL = 290, CS_GAP = 18;
 /* inside the strip: the hero spans the full height, the tablets sit lower and shorter, and the
    rule the marker rides is at the hero's foot */
 const CS_TABY = 44, CS_RULE = 377;
@@ -16970,8 +16977,10 @@ function courseLayout(rows) {
     const w = i === sel ? CS_WSEL : Math.round(CS_W * csScale(Math.abs(i - sel)));
     lefts.push(x); centers.push(x + w / 2); x += w;
   }
+  /* the step you are on always lands at the middle of the FRAME, measured rather than assumed */
+  const focus = wrap.clientWidth / 2;
   wrap.querySelector('.cs-rail').style.transform =
-    `translateX(${Math.round(CS_FOCUS - centers[sel])}px)`;
+    `translateX(${Math.round(focus - centers[sel])}px)`;
 
   /* --- the tablets --- */
   wrap.querySelectorAll('.cs-tab').forEach((el, i) => {
