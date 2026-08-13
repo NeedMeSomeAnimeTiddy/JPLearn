@@ -1604,6 +1604,24 @@
     font-family: var(--jp-go); font-weight: 700; font-size: 26px; line-height: 1.06;
     letter-spacing: 0.05em;
   }
+  /* THE SAME SPINE IN THE OTHER SCRIPT, for a deck's blocks -- English names with no Japanese to
+     fall back on. The line turns on its side and reads down the stone like the label on a book
+     spine, which takes any length. Smaller and tracked, because rotated Latin at 26px is a plank,
+     and clipped at the stone's height so a very long name runs out rather than overflowing it. */
+  .cs-vjp[data-lat="1"] {
+    font-family: var(--lat-ui); font-weight: 700; font-size: 13px; letter-spacing: 0.18em;
+    line-height: 1; text-transform: uppercase;
+    max-height: 176px; overflow: hidden;
+  }
+  /* and the hero's big slot, when what it holds is a figure rather than a character */
+  /* the name in the big slot, and it WRAPS: the longest block name in the app is "Descriptions &
+     Questions" at 24 characters, and the card is 254px inside its padding. Two lines at 30px, not
+     one line shrunk until it fits -- a size that changes with the name makes the card breathe as
+     you walk it. */
+  .cs-hjp[data-lat="1"] {
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px;
+    line-height: 1.12; letter-spacing: 0; white-space: normal; padding: 0 18px;
+  }
   .cs-gate {
     flex: none; margin-top: auto; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
     letter-spacing: 0.1em; text-align: center; white-space: nowrap;
@@ -16898,6 +16916,17 @@ const CS_FACE = 'linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%)';
 /* A TABLET HAS ROOM FOR A TOKEN, NOT A SENTENCE. The gate is authored as plain words ("all 46
    characters", "80% of it") because that is what the readout says; ninety-four pixels wants the
    short form of the same fact, so it is DERIVED rather than authored twice and cannot drift. */
+/* ---- A BLOCK IS A STONE WITH NO JAPANESE ON IT ------------------------------------------------
+   The stone works at level two because vertical Japanese fits ninety-four pixels -- four
+   characters down a column. The app's block names are English only ("Descriptions & Questions",
+   "Voiced G + Z") and there is no Japanese anywhere in that data to fall back on.
+
+   SO THE SPINE CHANGES SCRIPT, NOT SHAPE. Turning a Latin line on its side reads it down the stone
+   exactly like the label on a book spine: it takes a name of any length and leaves every other
+   thing about the stone identical. The alternative was truncating, and a road of "Descriptio..."
+   is not a road. */
+const csIsBlocks = () => HUD.level === 3;
+
 function csToken(meta) {
   const m = String(meta || '').toUpperCase();
   let x = m.match(/(\d+)\s*%/); if (x) return x[1] + '%';
@@ -16943,7 +16972,8 @@ function courseMarkup(rows) {
   const side = (k, w) => `<span class="cs-side ${k}"><i></i><i></i>`
     + `<i><b></b><u>${w}</u></i></span>`;
   return `<div class="course-wrap">`
-    + `<div class="cs-chapline"><span>THE PATH 道</span><s>/</s><span class="cs-chapnow"></span></div>`
+    + `<div class="cs-chapline"><span class="cs-chaplead"></span><s>/</s>`
+    + `<span class="cs-chapnow"></span></div>`
     + `<div class="cs-strip"><div class="cs-rail">${tabs}`
     + `<span class="cs-mark"><i></i></span>${hero}</div></div>`
     + side('lo', 'BEHIND') + side('hi', 'AHEAD')
@@ -16955,6 +16985,15 @@ function courseMarkup(rows) {
 
 /* what the slab says, and it still cannot promise something the step cannot do */
 function cardLine(r, status) {
+  /* a block has no `kind` -- it is always the same kind of thing -- so it answers first, or the
+     hand-off branch below prints "GO TO undefined" */
+  if (csIsBlocks()) {
+    if (status === 'locked') {
+      return ['LOCKED', 'rgba(242,234,216,0.62)', 'rgba(12,10,8,0.72)', '600', '0.14em'];
+    }
+    return [status === 'current' ? 'START THIS BLOCK \u25b8' : 'REVISIT THIS BLOCK \u25b8',
+      '#ffd9a1', 'var(--hi)', '700', '0.16em'];
+  }
   if (r.kind === 'none' || (r.kind === 'goto' && !r.to)) {
     return ['NOTHING HERE YET', 'rgba(242,234,216,0.45)', 'rgba(12,10,8,0.5)', '600', '0.14em'];
   }
@@ -16977,6 +17016,7 @@ function courseLayout(rows) {
   if (!wrap) return;
   csPointerLive = false;
   const n = rows.length;
+  const blocks = csIsBlocks();
   const sel = Math.max(0, Math.min(HUD.at | 0, n - 1));
   const cur = rows.findIndex((r) => r.state === 'here');
   const dim = 'rgba(222,214,189,0.55)';
@@ -16999,11 +17039,13 @@ function courseLayout(rows) {
     const r = rows[i];
     const status = r.state === 'done' ? 'done' : (r.state === 'here' ? 'current' : 'locked');
     const isSel = i === sel;
-    const dead = r.kind === 'none' || (r.kind === 'goto' && !r.to);
+    const dead = !blocks && (r.kind === 'none' || (r.kind === 'goto' && !r.to));
     const faceUp = status !== 'locked';
     const d = Math.abs(i - sel);
     const op = isSel ? 0 : [1, 1, 0.92, 0.72, 0.45][d] ?? 0;
-    const bits = csBits(r);
+    /* a block's number is its place in the deck and its token is its card count -- the same pair
+       the course carries: where in the sequence, and how much of a thing it is */
+    const bits = blocks ? { lv: '', en: r.en, vjp: r.en, tok: r.meta } : csBits(r);
     /* DIRECTION, DRAWN. What is finished sinks and takes a small shadow; what is ahead stands
        proud of the road and casts a long one. Behind and ahead stop being mirror images. */
     const dep = status === 'done'
@@ -17021,8 +17063,9 @@ function courseLayout(rows) {
       + ` transition-delay: ${Math.min(d, 3) * 14}ms;`;
     const q = (c) => el.querySelector(c);
     const dst = q('.cs-dest');
-    dst.textContent = r.kind === 'goto' && r.to ? '\u2192 ' + r.to : (dead ? 'NOT BUILT' : 'DECK');
-    dst.style.cssText = r.kind === 'goto' && r.to
+    dst.textContent = blocks ? 'BLOCK'
+      : (r.kind === 'goto' && r.to ? '\u2192 ' + r.to : (dead ? 'NOT BUILT' : 'DECK'));
+    dst.style.cssText = !blocks && r.kind === 'goto' && r.to
       ? `background: ${(SECTION_ACCENT[r.to] || SECTION_ACCENT.STUDY)[0]}; color: var(--washi);`
       : dead
         ? (faceUp
@@ -17040,8 +17083,10 @@ function courseLayout(rows) {
     lv.textContent = bits.lv;
     lv.style.cssText = bits.lv
       ? `color: ${faceUp ? 'var(--hi-deep)' : '#f2ead8'};` : 'display: none;';
-    q('.cs-vjp').textContent = bits.vjp;
-    q('.cs-vjp').style.color = faceUp ? 'var(--ink)' : 'rgba(232,224,203,0.78)';
+    const vj = q('.cs-vjp');
+    vj.textContent = bits.vjp;
+    vj.dataset.lat = blocks ? '1' : '0';
+    vj.style.color = faceUp ? 'var(--ink)' : 'rgba(232,224,203,0.78)';
     q('.cs-gate').textContent = bits.tok;
     q('.cs-gate').style.color = faceUp ? 'rgba(20,17,13,0.62)' : 'rgba(242,234,216,0.62)';
     const g = q('.cs-glyph');
@@ -17054,7 +17099,7 @@ function courseLayout(rows) {
   /* --- the hero, standing in the selected tablet's slot --- */
   const r = rows[sel];
   const status = r.state === 'done' ? 'done' : (r.state === 'here' ? 'current' : 'locked');
-  const dead = r.kind === 'none' || (r.kind === 'goto' && !r.to);
+  const dead = !blocks && (r.kind === 'none' || (r.kind === 'goto' && !r.to));
   const faceUp = status !== 'locked';
   const ch = Math.max(0, csChapter(sel));
   const tone = CS_CHTONE[ch];
@@ -17066,8 +17111,9 @@ function courseLayout(rows) {
     + (!faceUp && dead ? ' border: 1px dashed rgba(242,234,216,0.4);' : '');
   const h = (c) => hero.querySelector(c);
   const htab = h('.cs-htab');
-  htab.textContent = r.kind === 'goto' && r.to ? '\u2192 ' + r.to : (dead ? 'NOT BUILT' : 'DECK');
-  htab.style.cssText = r.kind === 'goto' && r.to
+  htab.textContent = blocks ? 'BLOCK'
+    : (r.kind === 'goto' && r.to ? '\u2192 ' + r.to : (dead ? 'NOT BUILT' : 'DECK'));
+  htab.style.cssText = !blocks && r.kind === 'goto' && r.to
     ? `background: ${(SECTION_ACCENT[r.to] || SECTION_ACCENT.STUDY)[0]}; color: var(--washi);`
     : dead
       ? (faceUp
@@ -17080,16 +17126,30 @@ function courseLayout(rows) {
   h('.cs-hnum').textContent = r.no;
   h('.cs-hnum').style.color = faceUp ? 'var(--ink)' : dim;
   const hc = h('.cs-hchap');
+  /* the chapters belong to the COURSE. Inside one deck every block is in the same chapter, so the
+     mark would be a constant dressed as a state. */
+  hc.style.display = blocks ? 'none' : 'block';
   hc.textContent = CS_CHNUM[ch];
-  hc.style.cssText = `background: ${tone.bg}; color: ${tone.ink};`;
-  h('.cs-hjp').textContent = r.jp;
-  h('.cs-hjp').style.color = faceUp ? 'var(--ink)' : 'rgba(230,222,200,0.72)';
-  h('.cs-hen').textContent = r.en;
+  if (!blocks) hc.style.cssText = `background: ${tone.bg}; color: ${tone.ink};`;
+  /* THE BIG SLOT TAKES THE BLOCK'S WEIGHT. It is sized for one or two characters of mincho and a
+     block's name is neither -- but its card count is exactly one figure, it is the number that
+     differs block to block, and it is the thing you want before pressing START. The name goes
+     where the English name goes at level two, so the card still reads identity-then-detail down
+     the page rather than swapping the two over. */
+  const hjp = h('.cs-hjp');
+  hjp.dataset.lat = blocks ? '1' : '0';
+  hjp.textContent = blocks ? r.en : r.jp;
+  hjp.style.color = faceUp ? 'var(--ink)' : 'rgba(230,222,200,0.72)';
+  h('.cs-hen').textContent = blocks ? r.meta : r.en;
   h('.cs-hen').style.color = faceUp ? 'var(--hi-deep)' : dim;
-  h('.cs-gatelabel').textContent = status === 'current' ? 'GATE TO CLEAR'
-    : status === 'done' ? 'CLEARED' : (dead ? 'NOT BUILT YET' : 'LOCKED UNTIL');
+  h('.cs-gatelabel').textContent = blocks
+    ? (status === 'current' ? 'BLOCK'
+      : status === 'done' ? 'CLEARED' : 'LOCKED UNTIL THE ONE BEFORE')
+    : (status === 'current' ? 'GATE TO CLEAR'
+      : status === 'done' ? 'CLEARED' : (dead ? 'NOT BUILT YET' : 'LOCKED UNTIL'));
   h('.cs-gatelabel').style.color = faceUp ? 'rgba(20,17,13,0.45)' : 'rgba(242,234,216,0.45)';
-  h('.cs-gateval').textContent = dead ? '\u2014' : r.meta;
+  h('.cs-gateval').textContent = blocks ? (r.no + ' / ' + String(n).padStart(2, '0'))
+    : (dead ? '\u2014' : r.meta);
   h('.cs-gateval').style.color = faceUp ? 'rgba(20,17,13,0.8)' : 'rgba(242,234,216,0.78)';
   const showGauge = status === 'current';
   h('.cs-gaugerow').style.display = showGauge ? 'flex' : 'none';
@@ -17126,7 +17186,10 @@ function courseLayout(rows) {
 
   /* --- the chapter line, the edge tags and the whole-of-it strip --- */
   const cd = CS_CHAPTERS[ch];
-  wrap.querySelector('.cs-chapnow').textContent = CS_CHNUM[ch] + ' ' + cd.jp + ' ' + cd.en;
+  wrap.querySelector('.cs-chaplead').textContent = blocks ? 'THE BLOCKS \u5e33' : 'THE PATH \u9053';
+  wrap.querySelector('.cs-chapnow').textContent = blocks
+    ? (n + ' BLOCKS \u00b7 ' + rows.filter((x) => x.state === 'done').length + ' CLEARED')
+    : (CS_CHNUM[ch] + ' ' + cd.jp + ' ' + cd.en);
   const behind = sel, ahead = n - 1 - sel;
   const lo = wrap.querySelector('.cs-side.lo'), hi = wrap.querySelector('.cs-side.hi');
   lo.style.opacity = behind ? 1 : 0.14;
@@ -17142,7 +17205,8 @@ function courseLayout(rows) {
       + (i === sel ? ' box-shadow: 0 0 0 3px var(--hi);' : '');
   });
   const cleared = rows.filter((x) => x.state === 'done').length;
-  wrap.querySelector('.cs-cleared').textContent = cleared + ' STEPS CLEARED';
+  wrap.querySelector('.cs-cleared').textContent = cleared
+    + (blocks ? ' BLOCKS CLEARED' : ' STEPS CLEARED');
   wrap.querySelector('.cs-togo').textContent = (n - cleared - 1) + ' TO GO';
 }
 
@@ -17258,7 +17322,17 @@ function hudWindow(rows) {
 
 /* the course's shapes draw the WHOLE course, which is the point of them, so they opt out of the
    window. Everything else still gets it. */
-function courseShaped() { return HUD.sec === 'STUDY' && HUD.level === 2; }
+/* THE ROAD RUNS AT BOTH LEVELS. A deck's blocks are an ordered, gated sequence with exactly the
+   same three states as the course above them -- cleared, here, locked -- so they are the same road
+   one level in, at a different scale. Six blocks for kanji, twelve for the kana, forty-four for
+   vocabulary; a scrolling strip takes any of those without a decision needing to be made.
+   ONLY WHERE THE ROWS ARE ACTUALLY A SEQUENCE. The other five sections' level threes are lists of
+   peers -- minigames, passages, exam modes -- with no order and no `state`, and they keep the row
+   list. `STUDY_BLOCKS[HUD.tile]` is the test, because it is the thing that produces the order. */
+function courseShaped() {
+  if (HUD.sec !== 'STUDY') return false;
+  return HUD.level === 2 || (HUD.level === 3 && !!STUDY_BLOCKS[HUD.tile]);
+}
 
 function hudDraw(force) {
   const all = hudRows();
