@@ -1724,7 +1724,14 @@
      in the wrap and the hero 20..404, and both are centred on 212. Minus half the tag's 140. */
   .cs-side { position: absolute; top: 142px; width: 48px; height: 140px; z-index: 38;
     transition: opacity 0.32s ease; }
-  .cs-side.lo { left: 30px; } .cs-side.hi { right: 30px; }
+  /* INSET WITH THE REST OF THE CHROME, and scaled the way it is. P13's 30px is a 1280-frame
+     number and it left these two hard against the edge of a 1440 one -- tighter to the glass than
+     the brand, the hint stack and the back tab, all of which sit 40px in and RIDE `--u`, so on a
+     bigger window everything else moved inward and the bookends did not. At 88 they sit about
+     twice the chrome's margin in, which puts them inside the strip's 258px mask fade: the tag is
+     solid and the road behind it is already going. */
+  .cs-side.lo { left: calc(88px * var(--u)); }
+  .cs-side.hi { right: calc(88px * var(--u)); }
   .cs-side i {
     position: absolute; top: 0; display: block; width: 26px; transform: skewX(-8deg);
   }
