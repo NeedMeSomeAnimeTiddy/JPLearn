@@ -337,45 +337,45 @@
     /* 26, not 20. The top tab added 17px of height the plain bar did not have, and at 88 tall
        the six overlapped their neighbours by 5,222 square pixels again -- the same collision the
        first card pass had, from the same cause: the planes' spacing was sited for bare type. */
-    inset: 30px 206px 30px 0;
-    padding: 20px 0 0; align-items: center;
-    /* THE FAN. `--i` is already on the element for the entrance stagger, so the six spread from
-       -2.6 to +2.6 degrees and step right as they descend, instead of all leaning -1.2 the same
-       way. Six identical rectangles at one angle is what read as a pad of notes. */
-    transform: skewX(-8deg) rotate(calc((var(--i) - 2.5) * 1.05deg))
+    /* 32, and the fan cut to +/-1.5 degrees. A 383px card rotated 2.6 adds nine pixels to its
+       bounding box at each end, which put the six back into each other -- the third time this
+       collision has come from the planes being sited for bare type. Measured after, not guessed. */
+    /* SET FROM THE MEASUREMENT THIS TIME. At 72 rendered with a +/-1.5 degree fan the six still
+       overlapped by 2,402 square pixels -- 6.2px of height across a 385px card -- so the height
+       comes down by more than that and the fan by more than half. A rotated card pays for its
+       angle twice: half the width times the sine, at each end. */
+    inset: 38px 206px 38px 0;
+    padding: 18px 0 0; align-items: center;
+    transform: skewX(-8deg) rotate(calc((var(--i) - 2.5) * 0.26deg))
       translateX(calc(var(--i) * 9px));
-    /* AND THE GROUND TAKES THE COLOUR. Quarantining each section's accent in a 17px strip left
-       five sixths of every card the same neutral cream; mixed into the paper it is what makes six
-       cards six things. */
-    background: linear-gradient(168deg,
-      color-mix(in srgb, var(--sec, var(--hi)) 12%, #f2ead8) 0%,
-      color-mix(in srgb, var(--sec, var(--hi)) 34%, #cbc1a4) 100%);
-    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5),
-      inset 0 0 0 1px color-mix(in srgb, var(--sec, var(--hi)) 55%, rgba(20, 17, 13, 0.6));
+    /* WHITE PAPER AND ONE ACCENT, which is what the L2 box actually does -- its colour lives in
+       the top tab and the slab, and the card itself is paper. Mixing the section colour through
+       the ground and the word made six coloured rectangles; the accent is worth more when it is
+       the only one on the card. */
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.22);
     transition: box-shadow 0.24s ease, background 0.24s ease;
   }
   /* the tab, full bleed across the top the way a stone wears its destination */
   body.menu-box .t-inner::before {
-    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 20px;
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 18px;
     background: var(--sec, var(--hi));
   }
   body.menu-box .t-slash, body.menu-box .drop { display: none; }
   body.menu-box .t-tick { display: none; }
   body.menu-box .t-en {
-    color: color-mix(in srgb, var(--sec, var(--hi)) 72%, var(--ink));
-    text-shadow: none; transform: none; font-size: 29px; margin-left: 20px;
+    color: var(--ink); text-shadow: none; transform: none; font-size: 25px; margin-left: 20px;
   }
   /* the reading rides IN the tab, which is where the stone puts its one small label */
   body.menu-box .t-jp {
-    left: 0; right: 0; top: 0; width: auto; height: 20px; line-height: 20px;
+    left: 0; right: 0; top: 0; width: auto; height: 18px; line-height: 18px;
     padding-left: 14px; font-family: var(--jp-go); font-weight: 700;
     font-size: 9.5px; letter-spacing: 0.28em; color: var(--washi); background: none;
     text-shadow: none; z-index: 3;
   }
   body.menu-box .t-line {
-    left: 20px; right: auto; width: 52px; bottom: 9px; height: 2px;
-    background: color-mix(in srgb, var(--sec, var(--hi)) 75%, transparent);
-    transform: scaleX(1);
+    left: 20px; right: auto; width: 48px; bottom: 8px; height: 2px;
+    background: rgba(20, 17, 13, 0.35); transform: scaleX(1);
   }
   body.menu-box .t-stamp {
     width: 32px; height: 32px; font-size: 18px; margin-left: 14px;
@@ -390,16 +390,12 @@
      vermilion slab off its foot and stays paper. At this size that slab is a 5px bar inside the
      bottom edge, and the card lifts on a longer shadow. */
   body.menu-box .type-item.is-active .t-inner {
-    background: linear-gradient(168deg,
-      color-mix(in srgb, var(--sec, var(--hi)) 24%, #f6f1e2) 0%,
-      color-mix(in srgb, var(--sec, var(--hi)) 50%, #ddd4b8) 100%);
-    box-shadow: 11px 14px 0 rgba(0, 0, 0, 0.52),
-      inset 0 0 0 1px color-mix(in srgb, var(--sec, var(--hi)) 70%, rgba(20, 17, 13, 0.7)),
-      inset 0 -6px 0 var(--hi);
+    background: linear-gradient(178deg, #ffffff 0%, #f2ede0 100%);
+    box-shadow: 11px 14px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.3),
+      inset 0 -6px 0 var(--sec, var(--hi));
   }
   body.menu-box .type-item.is-active .t-en {
-    color: color-mix(in srgb, var(--sec, var(--hi)) 86%, var(--ink));
-    text-shadow: none; transform: scale(1.05) translateX(8px);
+    color: var(--ink); text-shadow: none; transform: scale(1.05) translateX(8px);
   }
   /* THE RED SLASH, KILLED AT ITS SOURCE. `.type-item.is-active .t-jp` rotates the reading -10
      degrees and gives it a vermilion ground -- right when `.t-jp` is a 60px caption under the
@@ -416,102 +412,49 @@
   }
   body.menu-box .type-item.is-dimmed { filter: brightness(0.9) saturate(0.82); }
 
-  /* ---- FOUR SHAPES, NOT FOUR DRESSINGS. M cycles; `NAV.boxStyle(n)` names. -------------------
-     The first bench was card, plate, chip and spine, and they were rightly called samey: all four
-     were a LEFT-ALIGNED HORIZONTAL BAR with the accent on its leading edge, differing in fill,
-     width and how wide that edge was. That is one silhouette wearing four coats, which is exactly
-     what four ladders were before them. What differs here is the SHAPE of the thing:
-
-       CARD   one bar, ink on cream. The baseline, kept so the others have something to be unlike.
-       SEAL   the box shrinks to a square stamp holding the section's character, and the word
-              leaves the box entirely -- back on the world with its keyline and halo. The only
-              one where the type is not on a panel, and the only square.
-       TORN   no straight edges. A hand-cut strip of paper, notched top and bottom, which is the
-              course sheet's own edge at button scale.
-       GHOST  no fill at all. A hollow keyline with the corners cut, cream type inside it, the
-              accent as two short marks -- a box that is only implied until you point at it.
+  /* ---- WHERE THE ONE ACCENT GOES. M cycles; `NAV.boxStyle(n)` names. -------------------------
+     The card is white paper in all four and carries exactly one piece of colour. What changes is
+     where it sits, which is the only decision left once the ground stops being coloured.
+       TAB     a full-width strip across the top, holding the reading. The L2 box's own answer.
+       CORNER  a wedge cut into the top-left corner and nothing else. The quietest.
+       RULE    a thick bar along the FOOT, nothing on top -- the L2 hero's action slab, moved to
+               every card instead of only the chosen one.
+       MARK    a square at the trailing end holding the section's character, like a seal pressed
+               after the writing. The only one where the accent carries a glyph.
      ------------------------------------------------------------------------------------------ */
+  body[data-box="corner"] .t-inner::before {
+    left: 0; top: 0; right: auto; bottom: auto; width: 54px; height: 54px;
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+  }
+  body[data-box="corner"] .t-jp {
+    left: 62px; right: auto; top: auto; bottom: 7px; height: auto; line-height: 1;
+    width: auto; padding-left: 0; color: rgba(20, 17, 13, 0.5);
+  }
+  body[data-box="corner"] .t-en { margin-left: 62px; }
+  body[data-box="corner"] .t-line { display: none; }
 
-  /* ---- SEAL: a square stamp, and the word back on the world ---- */
-  body[data-box="seal"] .t-inner {
-    inset: 0; background: none; box-shadow: none; transform: none;
-    padding-left: 128px;
+  body[data-box="rule"] .t-inner::before { top: auto; bottom: 0; height: 8px; }
+  body[data-box="rule"] .t-inner { padding: 0 0 8px; }
+  body[data-box="rule"] .t-jp {
+    left: auto; right: 16px; top: 10px; width: auto; height: auto; line-height: 1;
+    padding-left: 0; color: rgba(20, 17, 13, 0.45);
   }
-  body[data-box="seal"] .t-inner::before { display: none; }
-  body[data-box="seal"] .t-tick { display: none; }
-  /* the stamp stops waiting to be pressed and becomes the button's face */
-  body[data-box="seal"] .t-stamp {
-    position: absolute; left: 8px; top: 50%; margin: -48px 0 0; width: 96px; height: 96px;
-    font-size: 54px; animation: none !important;
-    transform: skewX(-8deg) rotate(-1.2deg); opacity: 1;
-    background: var(--sec, var(--hi)); color: var(--washi);
-    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 3px rgba(242, 234, 216, 0.85);
-    transition: transform 0.24s var(--ease-pop), box-shadow 0.24s ease;
-  }
-  body[data-box="seal"] .type-item.is-active .t-stamp {
-    transform: skewX(-8deg) rotate(-1.2deg) scale(1.12);
-    box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 3px #fff;
-  }
-  /* the word is not on a panel here, so it takes its keyline and halo back */
-  body[data-box="seal"] .t-en {
-    font-size: 54px; color: #ded6bd; transform: skewX(-8deg);
-    text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.55), 0 0 16px rgba(6, 9, 15, 0.62);
-  }
-  body[data-box="seal"] .type-item.is-active .t-en {
-    color: #fff; transform: skewX(-8deg) scale(1.05) translateX(9px);
-  }
-  body[data-box="seal"] .t-jp {
-    left: 132px; top: calc(50% + 24px); font-size: 12px; letter-spacing: 0.36em;
-    color: var(--washi-dim); text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
-  }
-  body[data-box="seal"] .type-item.is-active .t-jp { color: var(--gold-hi); }
-  /* SEAL HAS NO PANEL, so it must refuse the shared active fill. `.t-inner` is `inset: 0` here --
-     the whole 620x128 plane -- and the base rule filled all of it with the section accent, which
-     put a green rectangle the size of the plane behind a design whose whole idea is that the word
-     is NOT on one. The stamp keeps its own colour too, rather than taking the ink the card's
-     active stamp wears. */
-  body[data-box="seal"] .type-item.is-active .t-inner { background: none; box-shadow: none; }
-  body[data-box="seal"] .type-item.is-active .t-stamp {
-    background: var(--sec, var(--hi)); color: #fff;
-    box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 3px #fff;
-  }
-  body[data-box="seal"] .t-line { left: 132px; background: linear-gradient(90deg, var(--gold), transparent); }
+  body[data-box="rule"] .t-line { display: none; }
 
-  /* ---- TORN: a hand-cut strip, no straight edge on it ---- */
-  body[data-box="torn"] .t-inner {
-    clip-path: polygon(0 6px, 14% 0, 33% 7px, 52% 1px, 71% 8px, 88% 2px, 100% 7px,
-      calc(100% - 5px) 46%, 100% calc(100% - 5px), 84% 100%, 63% calc(100% - 7px),
-      41% 100%, 22% calc(100% - 6px), 0 100%, 5px 52%);
-    box-shadow: none;
-    filter: drop-shadow(4px 6px 0 rgba(0, 0, 0, 0.42));
+  body[data-box="mark"] .t-inner::before {
+    left: auto; right: 0; top: 0; bottom: 0; width: 62px; height: auto;
   }
-  body[data-box="torn"] .t-inner::before { height: 14px; }
-  body[data-box="torn"] .t-tick { display: none; }
-  body[data-box="torn"] .t-en { margin-left: 40px; }
-  body[data-box="torn"] .t-jp { left: 62px; }
-  body[data-box="torn"] .t-line { left: 62px; }
-
-  /* ---- GHOST: the box is only implied ---- */
-  body[data-box="ghost"] .t-inner {
-    background: none; box-shadow: none;
-    border: 2px solid rgba(242, 234, 216, 0.55);
-    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
-    transition: border-color 0.24s ease, background 0.24s ease;
+  body[data-box="mark"] .t-jp {
+    left: 20px; right: auto; top: auto; bottom: 7px; height: auto; line-height: 1;
+    width: auto; padding-left: 0; color: rgba(20, 17, 13, 0.5);
   }
-  /* the accent is two short marks rather than a filled edge */
-  body[data-box="ghost"] .t-inner::before { height: 5px; left: 14px; right: 14px; top: -2px; }
-  body[data-box="ghost"] .t-en {
-    color: var(--washi) !important;
-    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5), 0 0 14px rgba(6, 9, 15, 0.6);
+  body[data-box="mark"] .t-inner { padding: 0; }
+  body[data-box="mark"] .t-stamp {
+    position: absolute; right: 0; top: 50%; margin: -31px 0 0; width: 62px; height: 62px;
+    font-size: 30px; animation: none !important; opacity: 1; transform: none;
+    background: none; color: var(--washi); box-shadow: none; z-index: 3;
   }
-  body[data-box="ghost"] .t-jp { color: rgba(242, 234, 216, 0.6); padding-left: 24px; }
-  body[data-box="ghost"] .t-tick { background: var(--sec, var(--hi)); }
-  body[data-box="ghost"] .t-line { background: linear-gradient(90deg, var(--gold), transparent); }
-  body[data-box="ghost"] .type-item.is-active .t-inner {
-    background: rgba(14, 12, 9, 0.72); border-color: var(--sec, var(--hi));
-    box-shadow: none;
-  }
-  body[data-box="ghost"] .type-item.is-active .t-en { color: #fff; }
+  body[data-box="mark"] .t-line { display: none; }
 
   .drop { position: absolute; background: var(--gold); width: 8px; height: 8px; z-index: 1; opacity: 0; filter: url(#roughEdge); }
   .type-item.is-active .drop { animation: dropFly 0.5s cubic-bezier(0.2, 0.8, 0.4, 1) forwards; }
@@ -20576,10 +20519,10 @@ document.body.classList.add('menu-box');
 
 /* the four treatments, on their own axis so the on/off switch and the choice stay separable */
 const BOX_STYLES = [
-  ['card', 'one bar, ink on cream — the baseline'],
-  ['seal', 'a square stamp holds the character; the word leaves the box and stands on the world'],
-  ['torn', 'a hand-cut strip of paper, no straight edge on it'],
-  ['ghost', 'no fill — a hollow keyline with its corners cut, filled only when pointed at'],
+  ['tab', 'the accent across the top, holding the reading -- what the L2 box does'],
+  ['corner', 'a wedge cut into the top-left corner, and nothing else'],
+  ['rule', 'a thick bar along the foot -- the hero action slab, on every card'],
+  ['mark', 'a square at the trailing end holding the section character, like a seal'],
 ];
 let boxStyle = 0;
 document.body.dataset.box = BOX_STYLES[0][0];
