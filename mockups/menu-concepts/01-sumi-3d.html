@@ -291,6 +291,7 @@
   .type-item.is-active .t-jp { transform: rotate(-10deg) scale(1.12); background: var(--hi-deep); }
   body[data-menu="b"] .type-item.is-active .t-jp { transform: scale(1.08); color: #fff; background: none; }
   .type-item.is-dimmed { filter: brightness(0.66); }
+  body.menu-box .type-item.is-dimmed { filter: brightness(0.9) saturate(0.82); }
 
 
   /* ================================================================================
@@ -313,33 +314,38 @@
      screen before the keycaps gave theirs up.
      ================================================================================ */
   body.menu-box .t-inner {
+    inset: 30px 210px 30px 0;
     padding-left: 0; align-items: center;
     transform: skewX(-8deg) rotate(-1.2deg);
     background: var(--washi);
-    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
     transition: background 0.24s ease, box-shadow 0.24s ease;
   }
   /* the accent down the leading edge, the way a stone wears its destination across the top */
   body.menu-box .t-inner::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 30px;
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 22px;
     background: var(--sec, var(--hi));
   }
   /* the brush stroke and the droplets belong to type standing on a world. On a card they are a
      second treatment fighting the first, and the fill says the same thing more quietly. */
   body.menu-box .t-slash, body.menu-box .drop { display: none; }
   body.menu-box .t-tick {
-    margin-left: 52px; margin-right: 20px; background: var(--ink);
+    margin-left: 32px; margin-right: 13px; background: var(--ink);
     box-shadow: 2px 2px 0 rgba(20, 17, 13, 0.25);
   }
   body.menu-box .t-en {
-    color: var(--ink); text-shadow: none; transform: none;
+    color: var(--ink); text-shadow: none; transform: none; font-size: 37px;
   }
   body.menu-box .t-jp {
-    left: 128px; color: rgba(20, 17, 13, 0.55); background: none;
+    left: 82px; top: calc(50% + 14px); font-size: 11px; letter-spacing: 0.3em;
+    color: rgba(20, 17, 13, 0.55); background: none;
   }
   body.menu-box .t-line {
-    left: 128px; background: linear-gradient(90deg, rgba(20, 17, 13, 0.5), transparent);
+    left: 82px; right: 22%; bottom: 9px; height: 2px;
+    background: linear-gradient(90deg, rgba(20, 17, 13, 0.5), transparent);
   }
+  body.menu-box .t-stamp { width: 32px; height: 32px; font-size: 18px; margin-left: 14px; }
+  body.menu-box .t-badge { min-width: 28px; height: 28px; font-size: 16px; margin-top: 8px; }
   body.menu-box .t-stamp {
     background: var(--sec, var(--hi)); color: var(--washi);
     box-shadow: inset 0 0 0 2px var(--washi), inset 0 0 0 4px var(--sec, var(--hi));
@@ -352,12 +358,12 @@
      pointed-at item is that one thing. */
   body.menu-box .type-item.is-active .t-inner {
     background: var(--sec, var(--hi));
-    box-shadow: 9px 11px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.28);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.48), inset 0 0 0 1px rgba(242, 234, 216, 0.28);
   }
   body.menu-box .type-item.is-active .t-inner::before { background: rgba(20, 17, 13, 0.55); }
   body.menu-box .type-item.is-active .t-en {
     color: #fff; text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
-    transform: scale(1.04) translateX(10px);
+    transform: scale(1.03) translateX(7px);
   }
   body.menu-box .type-item.is-active .t-jp {
     color: rgba(255, 255, 255, 0.92); transform: none; background: none; letter-spacing: 0.52em;
