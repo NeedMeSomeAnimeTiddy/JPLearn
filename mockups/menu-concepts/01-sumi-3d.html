@@ -292,6 +292,85 @@
   body[data-menu="b"] .type-item.is-active .t-jp { transform: scale(1.08); color: #fff; background: none; }
   .type-item.is-dimmed { filter: brightness(0.66); }
 
+
+  /* ================================================================================
+     THE MENU ITEMS AS CARDS — the path's language, one level up. A trial, on a switch.
+
+     Level one is six CSS3D planes carrying bare type: the word IS the button, with a tick, a
+     reading and a brush stroke that wipes across on hover. The path below it settled into
+     something else entirely -- ink on cream, square, skewed eight degrees, a hard offset shadow,
+     an accent tab naming what the thing is -- and this asks what happens if the top level speaks
+     it too.
+
+     THE SKEW GOES ON `.t-inner`, NOT THE ROOT. CSS3DRenderer writes a matrix3d onto `.type-item`
+     every frame from the plane's world position; anything set on that element is overwritten
+     between one frame and the next. The wrapper is what the entrance animation already uses for
+     exactly this reason.
+
+     AND THE WORD LOSES ITS SHADOW. `.t-en` carries a hard offset plus a soft halo, which is what
+     holds cream type against an open valley. On a cream card it is ink on light and the halo is
+     the stroke width again -- the same thing that made ENTER and ESC the hardest words on the
+     screen before the keycaps gave theirs up.
+     ================================================================================ */
+  body.menu-box .t-inner {
+    padding-left: 0; align-items: center;
+    transform: skewX(-8deg) rotate(-1.2deg);
+    background: var(--washi);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+    transition: background 0.24s ease, box-shadow 0.24s ease;
+  }
+  /* the accent down the leading edge, the way a stone wears its destination across the top */
+  body.menu-box .t-inner::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 30px;
+    background: var(--sec, var(--hi));
+  }
+  /* the brush stroke and the droplets belong to type standing on a world. On a card they are a
+     second treatment fighting the first, and the fill says the same thing more quietly. */
+  body.menu-box .t-slash, body.menu-box .drop { display: none; }
+  body.menu-box .t-tick {
+    margin-left: 52px; margin-right: 20px; background: var(--ink);
+    box-shadow: 2px 2px 0 rgba(20, 17, 13, 0.25);
+  }
+  body.menu-box .t-en {
+    color: var(--ink); text-shadow: none; transform: none;
+  }
+  body.menu-box .t-jp {
+    left: 128px; color: rgba(20, 17, 13, 0.55); background: none;
+  }
+  body.menu-box .t-line {
+    left: 128px; background: linear-gradient(90deg, rgba(20, 17, 13, 0.5), transparent);
+  }
+  body.menu-box .t-stamp {
+    background: var(--sec, var(--hi)); color: var(--washi);
+    box-shadow: inset 0 0 0 2px var(--washi), inset 0 0 0 4px var(--sec, var(--hi));
+  }
+  body.menu-box .t-badge {
+    box-shadow: 2px 2px 0 rgba(20, 17, 13, 0.35), inset 0 0 0 2px rgba(242, 234, 216, 0.4);
+  }
+  /* ACTIVE FILLS THE CARD rather than wiping a stroke across it: one vermilion-weight fill per
+     screen is the rule the readout and the selected step already follow, and at level one the
+     pointed-at item is that one thing. */
+  body.menu-box .type-item.is-active .t-inner {
+    background: var(--sec, var(--hi));
+    box-shadow: 9px 11px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.28);
+  }
+  body.menu-box .type-item.is-active .t-inner::before { background: rgba(20, 17, 13, 0.55); }
+  body.menu-box .type-item.is-active .t-en {
+    color: #fff; text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+    transform: scale(1.04) translateX(10px);
+  }
+  body.menu-box .type-item.is-active .t-jp {
+    color: rgba(255, 255, 255, 0.92); transform: none; background: none; letter-spacing: 0.52em;
+  }
+  body.menu-box .type-item.is-active .t-tick { background: var(--washi); }
+  body.menu-box .type-item.is-active .t-line {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.75), transparent);
+  }
+  body.menu-box .type-item.is-active .t-stamp {
+    background: var(--ink); color: var(--washi);
+    box-shadow: inset 0 0 0 2px var(--washi), inset 0 0 0 4px var(--ink);
+  }
+
   .drop { position: absolute; background: var(--gold); width: 8px; height: 8px; z-index: 1; opacity: 0; filter: url(#roughEdge); }
   .type-item.is-active .drop { animation: dropFly 0.5s cubic-bezier(0.2, 0.8, 0.4, 1) forwards; }
   .drop:nth-of-type(1) { right: -14px; top: 30%; --dx: 26px; --dy: -18px; }
@@ -20339,6 +20418,23 @@ const DBG = (() => {
   return api;
 })();
 NAV.debug = DBG;
+
+/* THE LEVEL-ONE CARDS, ON A SWITCH. A trial rather than a decision: the six items in the path's
+   own language instead of bare type on the world. `NAV.box()` asks, `NAV.box(false)` puts it back,
+   and the DEBUG row does the same thing with a mouse so the two can be compared rather than
+   remembered. */
+NAV.box = (v) => {
+  const on = v == null ? !document.body.classList.contains('menu-box') : !!v;
+  document.body.classList.toggle('menu-box', on);
+  DBG.touch();
+  return on;
+};
+document.body.classList.add('menu-box');
+DBG.add({
+  label: 'MENU CARDS', key: '',
+  isOpen: () => document.body.classList.contains('menu-box'),
+  toggle: () => NAV.box(),
+});
 
 /* the clock bench's switch. Registered HERE rather than inside `CLOCK_BAR` because that IIFE runs
    a couple of hundred lines earlier, before `DBG` exists -- and guarded, because `?clock=off` and
