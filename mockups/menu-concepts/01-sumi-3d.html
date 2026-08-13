@@ -344,10 +344,11 @@
        overlapped by 2,402 square pixels -- 6.2px of height across a 385px card -- so the height
        comes down by more than that and the fan by more than half. A rotated card pays for its
        angle twice: half the width times the sine, at each end. */
-    inset: 38px 206px 38px 0;
-    padding: 18px 0 0; align-items: center;
-    transform: skewX(-8deg) rotate(calc((var(--i) - 2.5) * 0.26deg))
-      translateX(calc(var(--i) * 9px));
+    /* the card takes the new room -- 78 tall against 54 -- and does NOT rotate in CSS any more.
+       The plane carries the tilt now, so the box keeps its own bounding height. */
+    inset: 25px 206px 25px 0;
+    padding: 20px 0 0; align-items: center;
+    transform: skewX(-8deg) translateX(calc(var(--i) * 9px));
     /* WHITE PAPER AND ONE ACCENT, which is what the L2 box actually does -- its colour lives in
        the top tab and the slab, and the card itself is paper. Mixing the section colour through
        the ground and the word made six coloured rectangles; the accent is worth more when it is
@@ -358,17 +359,17 @@
   }
   /* the tab, full bleed across the top the way a stone wears its destination */
   body.menu-box .t-inner::before {
-    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 18px;
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 20px;
     background: var(--sec, var(--hi));
   }
   body.menu-box .t-slash, body.menu-box .drop { display: none; }
   body.menu-box .t-tick { display: none; }
   body.menu-box .t-en {
-    color: var(--ink); text-shadow: none; transform: none; font-size: 25px; margin-left: 20px;
+    color: var(--ink); text-shadow: none; transform: none; font-size: 30px; margin-left: 20px;
   }
   /* the reading rides IN the tab, which is where the stone puts its one small label */
   body.menu-box .t-jp {
-    left: 0; right: 0; top: 0; width: auto; height: 18px; line-height: 18px;
+    left: 0; right: 0; top: 0; width: auto; height: 20px; line-height: 20px;
     padding-left: 14px; font-family: var(--jp-go); font-weight: 700;
     font-size: 9.5px; letter-spacing: 0.28em; color: var(--washi); background: none;
     text-shadow: none; z-index: 3;
@@ -13578,7 +13579,15 @@ const MENU_VARIANT = ['a', 'b', 'c'].includes(new URLSearchParams(location.searc
 document.body.dataset.menu = MENU_VARIANT;
 const LAYOUTS = {
   /* a: tight jagged stack, center-left, everything within easy reach */
-  a: (i) => ({ x: -470 + (i % 2) * 46, y: 228 - i * 96, z: -i * 34, ry: 11, rz: -2 }),
+  /* SPACING 96 -> 132 AND THE ROLL FANS. The stack was sited for bare type: 96 units apart with
+     every plane rolled the same -2 degrees, which is all a word needs and nowhere near enough for
+     a card. Every attempt to tilt the cards in CSS bought the angle out of the gap and put them
+     back into each other -- a rotated card pays half its width times the sine at BOTH ends -- so
+     the room comes from the siting and the tilt comes from `rz`, where it is part of the placement
+     rather than a transform fighting it. -6.5 to +4.5 across the six, and 268 keeps the taller
+     stack centred on the same band it occupied before. */
+  a: (i) => ({ x: -470 + (i % 2) * 46, y: 330 - i * 122, z: -i * 34, ry: 11,
+    rz: -6.5 + i * 2.2 }),
   /* b: vertical kanji columns (the road not taken) */
   b: (i) => ({ x: -660 + i * 172, y: 40, z: -i * 42, ry: 14, rz: (i % 2 ? 1 : -1.4) }),
   /* c: two rows of three, centered — the ergonomic grid */
@@ -20519,10 +20528,10 @@ document.body.classList.add('menu-box');
 
 /* the four treatments, on their own axis so the on/off switch and the choice stay separable */
 const BOX_STYLES = [
+  ['mark', 'a square at the trailing end holding the section character, like a seal'],
   ['tab', 'the accent across the top, holding the reading -- what the L2 box does'],
   ['corner', 'a wedge cut into the top-left corner, and nothing else'],
   ['rule', 'a thick bar along the foot -- the hero action slab, on every card'],
-  ['mark', 'a square at the trailing end holding the section character, like a seal'],
 ];
 let boxStyle = 0;
 document.body.dataset.box = BOX_STYLES[0][0];
