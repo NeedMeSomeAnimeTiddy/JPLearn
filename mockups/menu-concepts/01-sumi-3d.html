@@ -313,70 +313,86 @@
      the stroke width again -- the same thing that made ENTER and ESC the hardest words on the
      screen before the keycaps gave theirs up.
      ================================================================================ */
+  /* THE L2 BOX, REPRODUCED. Studied off `.cs-tab` and `.cs-hero` rather than approximated, and
+     the six things that actually make one are:
+
+       1. A FULL-BLEED TAB ACROSS THE TOP in the accent, tiny letterspaced caps, cream on colour.
+          Not an edge down the side -- that was my invention and it is the main reason the level
+          one cards read as a different family.
+       2. A CREAM GROUND WITH A GRADIENT IN IT, `linear-gradient(178deg, #e6ddc4, #cbc1a4)`. The
+          stones are not flat washi; the two-degree tilt on the gradient is what makes them read as
+          stone rather than as paper.
+       3. THE HARD OFFSET SHADOW AT 6px 8px 0 / 0.5, and a 1px INSET INK HAIRLINE with it. The
+          hairline is half of it: without one the card has no edge where it meets a bright valley.
+       4. THE WORD IN VERMILION, `--hi-deep` #b23320 -- the hero card sets its English that way and
+          the tablets set theirs the same. Ink was mine.
+       5. A HAIRLINE RULE under the number, 1px at 40% ink, which is the tablet's own divider.
+       6. THE ACTION AS A BAR INSIDE THE BOTTOM EDGE. The hero grows a 38px vermilion slab off its
+          foot; there is no room for one on a 88px card, so it becomes a 5px inset bar, which is
+          the same statement at the size available.
+
+     WHAT DID NOT COME OVER: the hero's 12-segment gauge, its gate row and its number, all of which
+     answer questions a top-level section does not have. */
   body.menu-box .t-inner {
-    inset: 30px 210px 30px 0;
-    padding-left: 0; align-items: center;
+    /* 26, not 20. The top tab added 17px of height the plain bar did not have, and at 88 tall
+       the six overlapped their neighbours by 5,222 square pixels again -- the same collision the
+       first card pass had, from the same cause: the planes' spacing was sited for bare type. */
+    inset: 26px 210px 26px 0;
+    padding: 17px 0 0; align-items: center;
     transform: skewX(-8deg) rotate(-1.2deg);
-    background: var(--washi);
-    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
-    transition: background 0.24s ease, box-shadow 0.24s ease;
+    background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    transition: box-shadow 0.24s ease, background 0.24s ease;
   }
-  /* the accent down the leading edge, the way a stone wears its destination across the top */
+  /* the tab, full bleed across the top the way a stone wears its destination */
   body.menu-box .t-inner::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 22px;
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 17px;
     background: var(--sec, var(--hi));
   }
-  /* the brush stroke and the droplets belong to type standing on a world. On a card they are a
-     second treatment fighting the first, and the fill says the same thing more quietly. */
   body.menu-box .t-slash, body.menu-box .drop { display: none; }
-  body.menu-box .t-tick {
-    margin-left: 32px; margin-right: 13px; background: var(--ink);
-    box-shadow: 2px 2px 0 rgba(20, 17, 13, 0.25);
-  }
+  body.menu-box .t-tick { display: none; }
   body.menu-box .t-en {
-    color: var(--ink); text-shadow: none; transform: none; font-size: 37px;
+    color: var(--hi-deep); text-shadow: none; transform: none; font-size: 29px;
+    margin-left: 20px;
   }
+  /* the reading rides IN the tab, which is where the stone puts its one small label */
   body.menu-box .t-jp {
-    left: 82px; top: calc(50% + 14px); font-size: 11px; letter-spacing: 0.3em;
-    color: rgba(20, 17, 13, 0.55); background: none;
+    left: 0; right: 0; top: 0; width: auto; height: 17px; line-height: 17px;
+    padding-left: 14px; font-family: var(--jp-go); font-weight: 700;
+    font-size: 9.5px; letter-spacing: 0.28em; color: var(--washi); background: none;
+    text-shadow: none; z-index: 3;
   }
   body.menu-box .t-line {
-    left: 82px; right: 22%; bottom: 9px; height: 2px;
-    background: linear-gradient(90deg, rgba(20, 17, 13, 0.5), transparent);
+    left: 20px; right: auto; width: 36px; bottom: 9px; height: 1px;
+    background: rgba(20, 17, 13, 0.4); transform: scaleX(1);
   }
-  body.menu-box .t-stamp { width: 32px; height: 32px; font-size: 18px; margin-left: 14px; }
-  body.menu-box .t-badge { min-width: 28px; height: 28px; font-size: 16px; margin-top: 8px; }
   body.menu-box .t-stamp {
+    width: 32px; height: 32px; font-size: 18px; margin-left: 14px;
     background: var(--sec, var(--hi)); color: var(--washi);
     box-shadow: inset 0 0 0 2px var(--washi), inset 0 0 0 4px var(--sec, var(--hi));
   }
   body.menu-box .t-badge {
+    min-width: 26px; height: 26px; font-size: 15px; margin-top: 20px;
     box-shadow: 2px 2px 0 rgba(20, 17, 13, 0.35), inset 0 0 0 2px rgba(242, 234, 216, 0.4);
   }
-  /* ACTIVE FILLS THE CARD rather than wiping a stroke across it: one vermilion-weight fill per
-     screen is the rule the readout and the selected step already follow, and at level one the
-     pointed-at item is that one thing. */
+  /* ACTIVE KEEPS ITS CREAM. The hero card does not fill when you point at it -- it grows a
+     vermilion slab off its foot and stays paper. At this size that slab is a 5px bar inside the
+     bottom edge, and the card lifts on a longer shadow. */
   body.menu-box .type-item.is-active .t-inner {
-    background: var(--sec, var(--hi));
-    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.48), inset 0 0 0 1px rgba(242, 234, 216, 0.28);
+    background: linear-gradient(178deg, #f2ecdb 0%, #ddd4b8 100%);
+    box-shadow: 9px 12px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.24),
+      inset 0 -5px 0 var(--hi);
   }
-  body.menu-box .type-item.is-active .t-inner::before { background: rgba(20, 17, 13, 0.55); }
   body.menu-box .type-item.is-active .t-en {
-    color: #fff; text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
-    transform: scale(1.03) translateX(7px);
+    color: var(--hi-deep); text-shadow: none; transform: scale(1.03) translateX(6px);
   }
-  body.menu-box .type-item.is-active .t-jp {
-    color: rgba(255, 255, 255, 0.92); transform: none; background: none; letter-spacing: 0.52em;
-  }
-  body.menu-box .type-item.is-active .t-tick { background: var(--washi); }
-  body.menu-box .type-item.is-active .t-line {
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.75), transparent);
-  }
+  body.menu-box .type-item.is-active .t-jp { color: #fff; letter-spacing: 0.3em; }
+  body.menu-box .type-item.is-active .t-line { background: var(--hi); }
   body.menu-box .type-item.is-active .t-stamp {
     background: var(--ink); color: var(--washi);
     box-shadow: inset 0 0 0 2px var(--washi), inset 0 0 0 4px var(--ink);
   }
-
+  body.menu-box .type-item.is-dimmed { filter: brightness(0.9) saturate(0.82); }
 
   /* ---- FOUR SHAPES, NOT FOUR DRESSINGS. M cycles; `NAV.boxStyle(n)` names. -------------------
      The first bench was card, plate, chip and spine, and they were rightly called samey: all four
@@ -447,7 +463,7 @@
     box-shadow: none;
     filter: drop-shadow(4px 6px 0 rgba(0, 0, 0, 0.42));
   }
-  body[data-box="torn"] .t-inner::before { width: 18px; }
+  body[data-box="torn"] .t-inner::before { height: 14px; }
   body[data-box="torn"] .t-tick { display: none; }
   body[data-box="torn"] .t-en { margin-left: 40px; }
   body[data-box="torn"] .t-jp { left: 62px; }
@@ -461,14 +477,12 @@
     transition: border-color 0.24s ease, background 0.24s ease;
   }
   /* the accent is two short marks rather than a filled edge */
-  body[data-box="ghost"] .t-inner::before {
-    width: 5px; top: 12px; bottom: 12px; left: -2px;
-  }
+  body[data-box="ghost"] .t-inner::before { height: 5px; left: 14px; right: 14px; top: -2px; }
   body[data-box="ghost"] .t-en {
-    color: var(--washi);
+    color: var(--washi) !important;
     text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5), 0 0 14px rgba(6, 9, 15, 0.6);
   }
-  body[data-box="ghost"] .t-jp { color: rgba(242, 234, 216, 0.6); }
+  body[data-box="ghost"] .t-jp { color: rgba(242, 234, 216, 0.6); padding-left: 24px; }
   body[data-box="ghost"] .t-tick { background: var(--sec, var(--hi)); }
   body[data-box="ghost"] .t-line { background: linear-gradient(90deg, var(--gold), transparent); }
   body[data-box="ghost"] .type-item.is-active .t-inner {
