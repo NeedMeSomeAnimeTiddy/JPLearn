@@ -340,7 +340,13 @@
      each other -- four passes were lost to that before the room came from the siting instead.
      ================================================================================ */
   body.menu-box .t-inner {
-    inset: 25px 206px 25px 0;
+    /* ONE NUMBER FOR BOTH. The seal is square and the card is exactly as tall as it, so its side
+       is the card's height -- two facts that are the same fact. Written as a variable and the
+       inset derived from it (the plane is 128 tall), because as two literals they drift the
+       moment either is touched, and a seal that is 82 wide on an 80-tall card is not square.
+       82 is what the type wants: a 30px word and an 11.5px reading with air between them. */
+    --seal: 82px;
+    inset: calc((128px - var(--seal)) / 2) 206px calc((128px - var(--seal)) / 2) 0;
     padding: 0; align-items: center;
     transform: skewX(-8deg) translateX(calc(var(--i) * 9px));
     background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
@@ -362,10 +368,10 @@
 
   body.menu-box .t-en {
     color: var(--ink); text-shadow: none; transform: none;
-    font-size: 30px; margin: 0 0 26px 36px;
+    font-size: 30px; margin: 0 0 24px 36px;
   }
   body.menu-box .t-jp {
-    left: 36px; right: auto; top: calc(50% + 10px); bottom: auto;
+    left: 36px; right: auto; top: calc(50% + 9px); bottom: auto;
     width: auto; height: auto; line-height: 1; padding-left: 0;
     font-family: var(--jp-go); font-weight: 700; font-size: 11.5px; letter-spacing: 0.34em;
     color: rgba(20, 17, 13, 0.55); background: none; text-shadow: none; z-index: 3;
@@ -373,9 +379,12 @@
   /* the seal fills its square exactly -- strip and glyph are one box, so no bare colour can
      show above or below the character the way it did when they were two */
   body.menu-box .t-stamp {
-    position: absolute; right: 0; left: auto; top: 0; bottom: 0;
-    width: 68px; height: auto; margin: 0;
-    display: grid; place-items: center; font-size: 32px;
+    /* BOTH SIDES STATED. `height: auto` with top and bottom pinned is supposed to stretch, and
+       here it resolved from the glyph's line box instead -- 67 against a card of 82, so the seal
+       was a rectangle claiming to be a square. Asking for it outright removes the inference. */
+    position: absolute; right: 0; left: auto; top: 0;
+    width: var(--seal); height: var(--seal); margin: 0;
+    display: grid; place-items: center; font-size: 42px;
     background: var(--sec, var(--hi)); color: var(--washi);
     box-shadow: none; opacity: 1; transform: none; animation: none !important; z-index: 3;
   }
