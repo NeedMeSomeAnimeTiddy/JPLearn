@@ -1853,6 +1853,42 @@
     transition: transform 0.52s cubic-bezier(0.2, 0.92, 0.24, 1); will-change: transform;
   }
 
+  /* ---- the two ends of the road ----
+     THE COUNTED TAGS AND THESE ARE NOT THE SAME OBJECT, which is why they are not built the same
+     way. `.cs-side` is pinned to the frame and says how much is behind and ahead of you; these say
+     where the road STOPS, so they live in the rail and travel with it -- they come into view when
+     you are genuinely near an end, and are masked out with the rest of the road when you are not.
+     A label that is always on screen would be saying "the course has a beginning" forever; a
+     terminal you walk up to is a fact about where you are.
+
+     THIN, AND CARRYING ONE WORD. Twenty-six wide against a tablet's ninety-four: they are posts at
+     the ends of the row rather than two more steps, and nothing about them should read as
+     something you could select. `pointer-events` off for the same reason.
+
+     GOLD AT THE START, DEEP VERMILION AT THE END, which is the file's own colour law rather than
+     a traffic light: gold is what is earned and behind you, and the deep red is the one this
+     interface uses when it means a destination rather than a button -- the bright `--hi` is
+     spoken for by the slab on the selected card, and one screen gets one of those. */
+  .cs-cap {
+    position: absolute; width: 26px; height: 296px;
+    display: grid; place-items: center;
+    transform: skewX(-8deg) rotate(-1.2deg);
+    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(20, 17, 13, 0.22);
+    pointer-events: none;
+    transition: left 0.52s cubic-bezier(0.2, 0.92, 0.24, 1);
+  }
+  .cs-cap b {
+    writing-mode: vertical-rl; white-space: nowrap;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.3em;
+  }
+  .cs-cap.start { background: var(--gold); }
+  .cs-cap.start b { color: var(--ink); }
+  .cs-cap.end {
+    background: var(--hi-deep);
+    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(242, 234, 216, 0.24);
+  }
+  .cs-cap.end b { color: #ffd9a1; }
+
   /* ---- a standing tablet ---- */
   .cs-tab {
     position: absolute; width: 94px; height: 296px;
@@ -17485,6 +17521,8 @@ function courseMarkup(rows) {
     + `<div class="cs-chapline"><span class="cs-chaplead"></span><s>/</s>`
     + `<span class="cs-chapnow"></span></div>`
     + `<div class="cs-strip"><div class="cs-rail">${tabs}`
+    + `<span class="cs-cap start"><b>START</b></span>`
+    + `<span class="cs-cap end"><b>END</b></span>`
     + `<span class="cs-mark"><i></i></span>${hero}</div></div>`
     + side('lo', 'BEHIND') + side('hi', 'AHEAD')
     + `<div class="cs-mini"><span class="cs-minibars">${'<i></i>'.repeat(rows.length)}</span>`
@@ -17531,6 +17569,15 @@ function courseLayout(rows) {
     const w = i === sel ? CS_WSEL : Math.round(CS_W * csScale(Math.abs(i - sel)));
     lefts.push(x); centers.push(x + w / 2); x += w;
   }
+  /* the two ends, one gap outside the first and last slots. They are children of the rail, so
+     the translation below carries them with everything else and there is nothing to keep in sync. */
+  const CS_CAP_W = 26;
+  wrap.querySelectorAll('.cs-cap').forEach((el) => {
+    const start = el.classList.contains('start');
+    el.style.cssText = `left: ${Math.round(start ? lefts[0] - CS_GAP - CS_CAP_W : x + CS_GAP)}px;`
+      + ` top: ${CS_TABY}px;`;
+  });
+
   /* the step you are on always lands at the middle of the FRAME, measured rather than assumed */
   const focus = wrap.clientWidth / 2;
   wrap.querySelector('.cs-rail').style.transform =
