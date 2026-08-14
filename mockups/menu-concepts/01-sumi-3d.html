@@ -79,6 +79,14 @@
     --night-hi: #222941;
     --night: #171c2c;
     --night-deep: #10131e;
+    /* HOW HARD THE INTERFACE PUSHES THE WORLD DOWN, for every screen that pushes it down at all.
+       The menu's shade and the course's road were the same three-stop formula at two different
+       densities, 25 against 40, because they were written apart and neither knew about the other --
+       so the valley changed brightness when you walked into STUDY for no reason anyone chose.
+       One number, and `NAV.crush()` moves both. The ceiling is the one already argued on
+       `#typeShade`: past about a quarter this stops being depth and becomes a hole cut in the
+       valley. */
+    --crush: 0.25;
     --washi: #f2ead8;
     --washi-dim: #cfc6ae;
     --ink: #14110d;
@@ -1791,10 +1799,14 @@
      ================================================================================================ */
   /* the wash. Fixed, behind the panel's content, above the canvas -- the same slot the crushed
      backdrop used, with a gentler instrument in it. */
+  /* the road's own wash, on `--crush` like the menu's. It keeps its slightly warmer ink --
+     the rooms are lit and the menu is not -- but the density is the file's, not this screen's. */
   .hud[data-course]::before {
     content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background: linear-gradient(180deg,
-      rgba(14, 17, 26, 0.25) 0%, rgba(14, 17, 26, 0.42) 58%, rgba(14, 17, 26, 0.52) 100%);
+      rgba(14, 17, 26, calc(var(--crush) * 0.62)) 0%,
+      rgba(14, 17, 26, calc(var(--crush) * 1.05)) 58%,
+      rgba(14, 17, 26, calc(var(--crush) * 1.3)) 100%);
   }
   /* FULL-BLEED, BECAUSE THE ROAD IS A FRAME-WIDE COMPOSITION. Every other block in this panel is
      a column inset by the panel's 52px left padding, and putting the path in one left-shifted it:
@@ -3460,11 +3472,9 @@
   /* THE STANDING MENU STANDS ON A DIFFERENT SHAPE. The ellipse is centred on where the type stack
      used to be -- left, upper -- and the column of slabs runs from y 130 to y 620, so the bottom
      third of it had no shade under it at all. A vertical crush covers what the column covers.
-     `--crush` is the density and `NAV.crush(n)` sets it; the design asked for 40 and this is 25,
-     for the reason written on the ellipse above -- past about a quarter it stops being depth and
-     becomes a hole cut in the valley. */
+     `--crush` is on `:root` and is shared with the course road; `NAV.crush(n)` moves both. The
+     design asked for 40 and it is 25, for the reason written on the ellipse above. */
   body.menu-inline #typeShade {
-    --crush: 0.25;
     background:
       linear-gradient(180deg,
         rgba(10, 14, 22, calc(var(--crush) * 0.62)) 0%,
@@ -15467,8 +15477,10 @@ function standReveal() {
 
 document.body.classList.add('menu-inline');
 standBuild();
+/* ON THE ROOT, not on `#typeShade`. Two screens read this now -- the menu's shade and the
+   course road's wash -- and setting it on one of them left the other on the stylesheet's value. */
 NAV.crush = (v) => {
-  const el = document.getElementById('typeShade');
+  const el = document.documentElement;
   if (v != null) el.style.setProperty('--crush', String(v / 100));
   return Math.round(parseFloat(getComputedStyle(el).getPropertyValue('--crush')) * 100);
 };
@@ -17492,17 +17504,9 @@ function cardLine(r, status) {
   return [go, '#ffd9a1', 'var(--hi)', '700', '0.16em'];
 }
 
-/* set by a real pointer move, cleared by every relayout. The road MOVES when you walk it, so a
-   tablet sliding under a stationary pointer fires `mouseenter` exactly as if the pointer had
-   arrived -- which dragged the selection straight back to wherever the mouse happened to rest.
-   Found on the card table by a probe that asked for step 5 and was handed step 1. */
-let csPointerLive = false;
-addEventListener('mousemove', () => { csPointerLive = true; }, { passive: true });
-
 function courseLayout(rows) {
   const wrap = hudEl.querySelector('.course-wrap');
   if (!wrap) return;
-  csPointerLive = false;
   const n = rows.length;
   const blocks = csIsBlocks();
   const sel = Math.max(0, Math.min(HUD.at | 0, n - 1));
@@ -17932,21 +17936,32 @@ function hudBuild(rows) {
        MIDASHI is the design now and the other twelve are a comparison nobody needs printed over
        the world, least of all stacked on top of the key hints in the corner. */
     + '';
+  /* ================================================================================
+     HOVER DOES NOT MOVE THE ROAD, AND NO GUARD CAN MAKE IT SAFE.
+
+     Selecting a step re-centres the whole road on it, which slides a DIFFERENT tablet under the
+     pointer, which selects that one, which slides another. There was a guard here -- a
+     `csPointerLive` flag cleared by every layout and set only by a real `mousemove` -- and it
+     fixed the stationary half of the problem: a card sweeping under a still mouse no longer stole
+     the cursor from the arrow keys. It could not fix the moving half, because a pointer crossing
+     the road IS moving, so every boundary it crosses is a genuine `mouseenter` and the road runs
+     away from the cursor. Measured: dragging from x 340 to x 940 across the road took the
+     selection 8 -> 6 -> 5 -> 4 -> ... -> 13 and never settled anywhere near where it pointed,
+     which is what makes a step impossible to click.
+
+     So the mouse gets the same two-step everything else in this file has. A click on a tablet
+     WALKS to it -- the road moves once, deliberately, and then stops. A click on the big card
+     standing at the centre enters the step it is showing, which is what its own slab has been
+     saying all along. `Enter` is unchanged and still does the second half from the keyboard.
+     ================================================================================ */
   hudEl.querySelectorAll('.cs-tab').forEach((b) => {
-    /* GUARDED, BECAUSE THE CARDS MOVE. Every other list in this interface is stationary, so
-       `mouseenter` there can only mean the pointer arrived. Here choosing a step re-lays out all
-       sixteen cards, and a card sliding under a STATIONARY pointer fires `mouseenter` exactly the
-       same way -- so pressing Right moved the cursor one step and the card that swept under the
-       mouse immediately dragged it back. Caught by a probe that asked for step 5 and was handed
-       step 1; it presents as the arrow keys jumping to wherever the mouse happens to rest.
-       `csPointerLive` is cleared by every layout and set only by a real `mousemove`, so hover has
-       to be earned by the pointer actually moving. */
-    b.addEventListener('mouseenter', () => {
-      if (!csPointerLive) return;
-      pathGo(+b.dataset.i, 0.5);
-    });
-    b.addEventListener('click', () => { HUD.cur = +b.dataset.i; hudPick(); });
+    b.addEventListener('click', () => pathGo(+b.dataset.i, 0.5));
   });
+  /* AND THE HERO IS FINALLY A BUTTON. It has been a `<button>` with `cursor: pointer` and no
+     handler since the road was built -- the one card carrying "START THIS STEP" was the only
+     thing on the screen a mouse could not press. */
+  const heroBtn = hudEl.querySelector('.cs-hero');
+  if (heroBtn) heroBtn.addEventListener('click', () => hudPick());
   hudEl.querySelectorAll('.hud-row').forEach((b) => {
     /* `data-i` is the row's place in the WINDOW, so it is lifted back into the full list before
        it becomes the cursor — otherwise hovering row 0 of a window that starts at 6 jumps the
