@@ -288,6 +288,10 @@ tui.json
 *.png
 dom-snapshot.txt
 nul
+# ...except the menu design system's reference plates, which are assets rather than run output:
+# `design-system/foundations/backdrop.html` is committed and renders them, so a checkout without
+# them is a page with two broken images in it.
+!mockups/menu-concepts/design-system/assets/*.png
 
 # Codebase Memory MCP — local knowledge-graph index + ADR cache.
 # Regenerated via `codebase-memory-mcp cli index_repository`, not version-controlled.

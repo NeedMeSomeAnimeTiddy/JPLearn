@@ -12,6 +12,7 @@ this is stale.
 | --- | --- |
 | `foundations/color.html` | The six tokens, the six section accents, and the colour law: gold = earned, vermilion = the one thing to press, ink = not yet. |
 | `foundations/type.html` | The four faces available and what each is for. Display vs label, mincho vs gothic. |
+| `foundations/backdrop.html` | The real valley, rendered at 1280×720 with the interface switched off, and the six menu items' measured footprints on it. Use `assets/valley-sunset.png` as the background of anything you design. |
 | `foundations/legibility.html` | Physics, not taste: the interface stands on a lit, moving, flat-shaded valley, so type needs a keyline, a ground, or a crushed backdrop. Shown failing and fixed. |
 | `foundations/geometry.html` | The existing chrome's geometry — square corners, one skew angle, one hard shadow. **Square corners are a hard rule; the skew and shadow are the current chrome's habit, not a law.** |
 | `components/chip.html` | The chip family — top row, figure stack, keycaps, gauge track. Shared by all six sections. |
@@ -39,7 +40,9 @@ The step data lives in `STUDY_PATH` in the mockup: an id, an English name, a Jap
    widgets. No boards, signs or tablets in the world.
 2. **Square corners.** No `border-radius`, anywhere.
 3. **It stands on a lit 3D valley** that moves and changes with time of day, from bright sand to
-   green canopy to night. See `foundations/legibility.html`.
+   green canopy to night. Two real frames of it are in `assets/`, and
+   `foundations/backdrop.html` puts the menu's footprints on one of them. Design on top of the
+   plate, not on a flat colour — see `foundations/legibility.html` for why.
 4. **Windows system fonts only** — no webfonts. See `foundations/type.html`.
 5. The panel is full-bleed with ~52px of left padding; the block for the course is about 1,180 ×
    400 CSS px at a 1280×720 design scale.

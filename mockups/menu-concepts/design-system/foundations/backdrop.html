@@ -1,0 +1,180 @@
+<!-- @dsCard group="Foundations" name="The backdrop" subtitle="The real valley, 1:1, with the six item footprints measured onto it" width="1360" height="1780" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The backdrop — JPLearn menu</title>
+<style>
+  :root {
+    --washi: #f2ead8; --washi-dim: #cfc6ae; --ink: #14110d;
+    --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #10131e; color: var(--washi);
+    font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
+    padding: 30px 34px 34px;
+  }
+  h1 {
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+    letter-spacing: 0.01em; margin-bottom: 4px;
+  }
+  h2 {
+    font-size: 12px; letter-spacing: 0.2em; color: var(--gold-hi);
+    margin: 30px 0 10px; font-weight: 700;
+  }
+  .lede {
+    font-size: 11.5px; color: rgba(242, 234, 216, 0.6); max-width: 900px; line-height: 1.7;
+    letter-spacing: 0.1em;
+  }
+  p.note {
+    font-size: 11px; color: rgba(242, 234, 216, 0.55); max-width: 1000px; line-height: 1.75;
+    letter-spacing: 0.1em; margin-top: 9px;
+  }
+  b { color: var(--washi); font-weight: 700; }
+  code {
+    font-family: Consolas, "Courier New", monospace; letter-spacing: 0;
+    color: var(--gold-hi); font-size: 11px;
+  }
+
+  /* THE PLATE IS SHOWN AT 1:1 AND NOTHING IS SCALED ON TOP OF IT. The whole point of this card is
+     that a 620x128 element is a known fraction of a 1280x720 frame; a fitted or responsive image
+     would take exactly that away. */
+  .plate { position: relative; width: 1280px; height: 720px; }
+  .plate img { display: block; width: 1280px; height: 720px; }
+
+  /* The page's own shade, copied value for value out of `#typeShade` in the mockup. It is a real
+     element that already exists under the menu -- not something a design has to invent, and not
+     something it is stuck with either. */
+  .shade {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(58% 96% at 10% 34%, rgba(10,14,22,0.38) 0%, rgba(10,14,22,0.24) 36%,
+        rgba(10,14,22,0.09) 64%, rgba(10,14,22,0) 84%),
+      linear-gradient(100deg, rgba(10,14,22,0.14) 0%, rgba(10,14,22,0.07) 30%,
+        rgba(10,14,22,0) 52%),
+      linear-gradient(0deg, rgba(8,11,18,0.26) 0%, rgba(8,11,18,0) 24%);
+  }
+  .plate svg { position: absolute; inset: 0; }
+  .plate svg polygon { fill: rgba(255, 255, 255, 0.07); stroke-width: 2; }
+  .plate svg text {
+    font-family: "Bahnschrift SemiCondensed", "Bahnschrift", Arial, sans-serif;
+    font-size: 15px; font-weight: 700; letter-spacing: 2.2px; fill: #fff;
+    paint-order: stroke; stroke: rgba(10, 12, 18, 0.85); stroke-width: 4px;
+  }
+
+  .half { width: 640px; }
+  .half img { display: block; width: 640px; height: 360px; }
+
+  .cols { display: flex; gap: 26px; align-items: flex-start; }
+  .cols .lede { max-width: 560px; }
+
+  table { border-collapse: collapse; margin-top: 12px; font-size: 11px; letter-spacing: 0.08em; }
+  th, td { text-align: left; padding: 5px 22px 5px 0; }
+  th { color: var(--gold); font-weight: 700; letter-spacing: 0.16em; font-size: 10px; }
+  td { color: rgba(242, 234, 216, 0.78); font-family: Consolas, "Courier New", monospace;
+       letter-spacing: 0; }
+  td.n { color: var(--washi); font-family: var(--lat-ui); font-weight: 700; letter-spacing: 0.14em; }
+  .sw { display: inline-block; width: 10px; height: 10px; margin-right: 7px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+
+<h1>THE BACKDROP</h1>
+<p class="lede">
+  A real frame of the valley, rendered from the mockup with the interface switched off, at the
+  1280&times;720 design size. <b>Everything the menu draws sits on this.</b> The six outlines are
+  measured, not sketched &mdash; each is where one 620&times;128 element actually lands, read off
+  the running page by planting a point at each corner and taking its projection.
+</p>
+
+<h2>SUNSET &mdash; THE SIGNATURE LOOK, WITH THE PAGE'S OWN SHADE</h2>
+<div class="plate">
+  <img src="../assets/valley-sunset.png" alt="the valley at sunset, interface hidden">
+  <div class="shade"></div>
+  <svg viewBox="0 0 1280 720" width="1280" height="720">
+    <polygon points="149.5,23.6 673.1,51 659.3,175.7 140.5,134.4" stroke="#cfa45c"/>
+    <polygon points="202.3,141.4 724.4,164 714.4,286 196.2,249.9" stroke="#e34a33"/>
+    <polygon points="196.1,257.4 691.4,266.2 687.5,381.8 194.6,360.5" stroke="#4f9d6b"/>
+    <polygon points="245.3,359.7 738.2,362.6 737.9,475.9 246.6,461" stroke="#c2344a"/>
+    <polygon points="238.8,459.6 706.3,454.4 710.2,562.1 243.2,556.3" stroke="#5b86c4"/>
+    <polygon points="284.8,563.1 748.4,546.1 756.9,651.9 293,658.1" stroke="#e0913a"/>
+    <text x="163" y="105">STUDY</text>
+    <text x="215" y="221">DAILY</text>
+    <text x="209" y="327">READING</text>
+    <text x="259" y="421">DRILLS</text>
+    <text x="252" y="513">JLPT</text>
+    <text x="298" y="613">RECORDS</text>
+  </svg>
+</div>
+<p class="note">
+  The outlines are not rectangles because the renderer yaws and rolls each plane in 3D.
+  <b>Do not build that warp in.</b> Design each item as a flat 620&times;128 box; the perspective is
+  applied to it afterwards. What the shapes tell you is how much of it there is &mdash; the roll is
+  small, 3&deg; at the top of the stack easing to &minus;2&deg; at the bottom, but the yaw is not:
+  every item is <b>about a tenth shorter at its far left end than at its near right end</b>, so the
+  left side of a design is the side that gets squeezed.
+</p>
+<p class="note">
+  The wash over the left of the frame is <code>#typeShade</code>, an element that already exists in
+  the page and fades in with the menu. It is <b>yours to keep, strengthen or throw away</b> &mdash;
+  it is the current design's answer to legibility, not a fixed part of the world. If a variant needs
+  no shade at all, that is a better answer than this one.
+</p>
+
+<h2>THE MEASUREMENTS</h2>
+<table>
+  <tr><th>ITEM</th><th>ACCENT</th><th>TOP-LEFT (x, y)</th><th>ON SCREEN (near end)</th><th>ROLL</th></tr>
+  <tr><td class="n"><i class="sw" style="background:#cfa45c"></i>STUDY</td><td>#cfa45c</td>
+      <td>150, 24</td><td>524 &times; 125</td><td>+3.0&deg;</td></tr>
+  <tr><td class="n"><i class="sw" style="background:#e34a33"></i>DAILY</td><td>#e34a33</td>
+      <td>202, 141</td><td>523 &times; 122</td><td>+2.5&deg;</td></tr>
+  <tr><td class="n"><i class="sw" style="background:#4f9d6b"></i>READING</td><td>#4f9d6b</td>
+      <td>196, 257</td><td>495 &times; 116</td><td>+1.0&deg;</td></tr>
+  <tr><td class="n"><i class="sw" style="background:#c2344a"></i>DRILLS</td><td>#c2344a</td>
+      <td>245, 360</td><td>493 &times; 113</td><td>+0.3&deg;</td></tr>
+  <tr><td class="n"><i class="sw" style="background:#5b86c4"></i>JLPT</td><td>#5b86c4</td>
+      <td>239, 460</td><td>467 &times; 108</td><td>&minus;0.6&deg;</td></tr>
+  <tr><td class="n"><i class="sw" style="background:#e0913a"></i>RECORDS</td><td>#e0913a</td>
+      <td>285, 563</td><td>464 &times; 106</td><td>&minus;2.1&deg;</td></tr>
+</table>
+<p class="note">
+  Sizes are the <b>near, right-hand end</b> of each plane; the far left end of the same plane is
+  about a tenth shorter. The stack runs from x&nbsp;140 to x&nbsp;757 and y&nbsp;24 to y&nbsp;658
+  &mdash; it owns the <b>left three fifths of the frame and almost its whole height</b>, and the
+  right two fifths are lake and mountain and stay empty. A 620&times;128 element is displayed at
+  464&ndash;524 px wide, so <b>everything on it is seen at 75&ndash;85% of the size you set it at</b>,
+  smallest at the bottom of the stack.
+</p>
+
+<h2>AFTERNOON &mdash; THE HARD CASE, NO SHADE</h2>
+<div class="cols">
+  <div class="half">
+    <img src="../assets/valley-afternoon.png" alt="the valley in bright afternoon light">
+  </div>
+  <div>
+    <p class="lede">
+      Same camera, 15:36 instead of 18:24, no shade at all. This is what the design has to survive:
+      <b>pale sky behind the top two items and sunlit green meadow behind the rest</b>, with white
+      cloud and pink blossom moving through it.
+    </p>
+    <p class="note">
+      It goes further than this in both directions &mdash; the sun runs a full day cycle, and at
+      night the same frame is deep blue with lit windows and fireflies in it. A design that only
+      works on the sunset plate is not finished. The safe assumption is that
+      <b>any pixel behind the menu can be any luminance</b>, so contrast has to come from something
+      the item itself puts down.
+    </p>
+    <p class="note">
+      Both plates are in <code>assets/</code> at full size. Use
+      <code>../assets/valley-sunset.png</code> as the background of a variant rather than a flat
+      colour &mdash; a card that looks strong on dark grey and disappears here is the failure this
+      folder exists to prevent.
+    </p>
+  </div>
+</div>
+
+</body>
+</html>
