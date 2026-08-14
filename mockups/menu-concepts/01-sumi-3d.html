@@ -331,7 +331,7 @@
 
   /* ---- the row: position, size and the lean everything else inherits ---- */
   .st-row {
-    position: absolute; left: 104px; top: var(--top); width: 720px; height: var(--h);
+    position: absolute; left: 104px; top: var(--top); width: 660px; height: var(--h);
     transform: skewX(-8deg) rotate(-1.2deg) translateX(0);
     transform-origin: 0 50%;
     /* the lag is what makes the stack settle rather than snap: rows further from the one you
@@ -346,7 +346,7 @@
 
   /* ---- the card ---- */
   .st-card {
-    position: absolute; left: 0; top: 0; width: 338px; height: 100%;
+    position: absolute; left: 0; top: 0; width: 292px; height: 100%;
     display: flex; align-items: stretch; overflow: hidden;
     background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
     box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.46), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
@@ -357,7 +357,7 @@
     z-index: 2;
   }
   .st-row.is-open .st-card {
-    width: 418px; background: var(--washi);
+    width: 358px; background: var(--washi);
     box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
   }
   .st-card:hover { transform: translate(12px, -5px); }
@@ -368,44 +368,44 @@
 
   /* ---- the mark column: the accent, the glyph, the number ---- */
   .st-mark {
-    flex: none; width: 42px;
+    flex: none; width: 36px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
     background: var(--acc); box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.2);
     transition: width 0.38s cubic-bezier(0.18, 0.9, 0.24, 1), padding 0.32s ease;
   }
-  .st-row.is-open .st-mark { width: 62px; justify-content: flex-start; gap: 8px; padding: 13px 0 0; }
+  .st-row.is-open .st-mark { width: 52px; justify-content: flex-start; gap: 7px; padding: 11px 0 0; }
   .st-glyph {
-    flex: none; font-family: var(--jp); font-weight: 400; font-size: 21px; line-height: 1;
+    flex: none; font-family: var(--jp); font-weight: 400; font-size: 18px; line-height: 1;
     color: var(--ink);
     transition: font-size 0.38s cubic-bezier(0.18, 0.9, 0.24, 1);
   }
-  .st-row.is-open .st-glyph { font-size: 34px; }
+  .st-row.is-open .st-glyph { font-size: 28px; }
   .st-no {
-    flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 11px;
+    flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 10px;
     line-height: 1; color: rgba(20, 17, 13, 0.6); transition: font-size 0.3s ease;
   }
-  .st-row.is-open .st-no { font-size: 13px; }
+  .st-row.is-open .st-no { font-size: 11px; }
 
   /* ---- the body ---- */
   .st-body {
     flex: 1; min-width: 0;
-    display: flex; flex-direction: column; justify-content: center; padding: 0 15px;
+    display: flex; flex-direction: column; justify-content: center; padding: 0 13px;
     transition: padding 0.34s ease;
   }
-  .st-row.is-open .st-body { justify-content: flex-start; padding: 12px 15px 0; }
-  .st-head { display: flex; align-items: baseline; gap: 12px; }
+  .st-row.is-open .st-body { justify-content: flex-start; padding: 10px 13px 0; }
+  .st-head { display: flex; align-items: baseline; gap: 10px; }
   .st-en {
-    flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 23px;
+    flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 19px;
     line-height: 1; letter-spacing: 0.01em; color: var(--ink); white-space: nowrap;
     transition: font-size 0.38s cubic-bezier(0.18, 0.9, 0.24, 1);
   }
-  .st-row.is-open .st-en { font-size: 31px; }
+  .st-row.is-open .st-en { font-size: 26px; }
   .st-jp {
-    flex: none; font-family: var(--jp); font-weight: 400; font-size: 17px; line-height: 1;
+    flex: none; font-family: var(--jp); font-weight: 400; font-size: 14px; line-height: 1;
     letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.66); white-space: nowrap;
     transition: font-size 0.34s ease;
   }
-  .st-row.is-open .st-jp { font-size: 21px; }
+  .st-row.is-open .st-jp { font-size: 17px; }
   .st-tok {
     flex: none; margin-left: auto;
     font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
@@ -415,7 +415,7 @@
   .st-row.is-open .st-tok { color: var(--hi-deep); }
 
   /* ---- what the open row says: one state line, one figure, one action ---- */
-  .st-detail { display: none; flex-direction: column; gap: 7px; margin-top: 11px; }
+  .st-detail { display: none; flex-direction: column; gap: 6px; margin-top: 9px; }
   .st-row.is-open .st-detail {
     display: flex; animation: stReveal 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: 60ms;
   }
@@ -435,7 +435,7 @@
      so it reads as being counted rather than as a bar that was already there */
   .st-segs { flex: 1; display: flex; gap: 3px; }
   .st-segs i {
-    flex: 1; height: 12px; background: rgba(20, 17, 13, 0.12);
+    flex: 1; height: 10px; background: rgba(20, 17, 13, 0.12);
     box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.18);
     transition: background 0.26s ease var(--d, 0ms);
   }
@@ -444,13 +444,13 @@
     flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; line-height: 1;
     color: var(--hi-deep);
   }
-  .st-pct { font-size: 18px; }
-  .st-fign { font-size: 28px; }
+  .st-pct { font-size: 15px; }
+  .st-fign { font-size: 23px; }
   .st-due {
-    flex: none; width: 30px; height: 30px;
+    flex: none; width: 26px; height: 26px;
     background: var(--hi); color: #fff4e0;
-    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
-    line-height: 30px; text-align: center;
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 14px;
+    line-height: 26px; text-align: center;
     box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4);
     animation: stDue 2.6s ease-in-out infinite;
   }
@@ -462,9 +462,9 @@
   /* THE SLAB BLEEDS PAST THE BODY'S PADDING ON BOTH SIDES, which is what makes it the floor of the
      card rather than a button sitting on it -- the same bargain the action slab at level two makes. */
   .st-slab {
-    display: none; flex: none; margin: auto -15px 0; height: 33px; padding: 9px 15px;
+    display: none; flex: none; margin: auto -13px 0; height: 28px; padding: 7px 13px;
     background: var(--hi);
-    font-family: var(--lat-ui); font-weight: 700; font-size: 11px; line-height: 14px;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; line-height: 13px;
     letter-spacing: 0.16em; color: #ffd9a1; white-space: nowrap; overflow: hidden;
   }
   .st-row.is-open .st-slab {
@@ -478,15 +478,16 @@
      and the bottom for the hard shadow while keeping the left edge shut, which is the edge the
      box comes through. */
   .st-clip {
-    position: absolute; left: 338px; top: 0; width: 320px; height: 100%;
+    position: absolute; left: 292px; top: 0; width: 260px; height: 100%;
     clip-path: inset(0 -30px 0 0); pointer-events: none; z-index: 1;
     transition: left 0.32s cubic-bezier(0.18, 0.9, 0.24, 1);
   }
-  .st-row.is-open .st-clip { left: 418px; clip-path: inset(0 -30px -30px 0); }
+  .st-row.is-open .st-clip { left: 358px; clip-path: inset(0 -30px -30px 0); }
   .st-box {
-    /* `100%` of the clip, which is the row -- so the box is the card's height by construction
-       rather than by a second copy of the same number that can drift away from it */
-    position: absolute; left: 20px; top: 0; width: max-content; max-width: 218px; height: 100%;
+    /* NOT the card's height. It is a tip beside a card, not a second card, and matched heights
+       are what made the two read as a pair of equals. It takes the row's top edge and stops where
+       its own content stops. */
+    position: absolute; left: 16px; top: 0; width: 152px; height: auto;
     display: flex; align-items: stretch;
     background: var(--washi);
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
@@ -502,27 +503,32 @@
   .st-row.is-open.is-boxpress .st-box { transform: translate(2px, 3px); transition-duration: 0.12s; }
   .st-box:focus-visible { outline: 3px solid var(--hi); outline-offset: 6px; }
   .st-box-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .st-box-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 11px 10px 10px; }
+  .st-box-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 8px 9px; }
+  /* A FIXED WIDTH AND A WRAP, rather than `max-content`. Sized to its content the box was as wide
+     as its longest suggestion, so "Study & Language" and "Listening" produced two different
+     objects in the same slot -- and the long one ran most of the way to the middle of the frame.
+     One width, and the name takes as many lines as it takes. */
   .st-box-en {
-    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 16px; line-height: 1.08;
-    letter-spacing: 0.01em; text-transform: uppercase; color: var(--ink);
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 12.5px;
+    line-height: 1.16; letter-spacing: 0.01em; text-transform: uppercase; color: var(--ink);
+    text-wrap: pretty;
   }
   .st-box-jp {
-    margin-top: 5px; font-family: var(--jp); font-weight: 400; font-size: 15px; line-height: 1;
+    margin-top: 4px; font-family: var(--jp); font-weight: 400; font-size: 12px; line-height: 1;
     letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.52); white-space: nowrap;
   }
   .st-box-btn {
-    flex: none; height: 30px; padding: 8px 10px; background: var(--hi);
-    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; line-height: 14px;
+    flex: none; height: 24px; padding: 6px 9px; background: var(--hi);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; line-height: 12px;
     letter-spacing: 0.14em; color: #ffd9a1; white-space: nowrap;
   }
   .st-strip {
-    flex: none; width: 26px; display: grid; place-items: center;
+    flex: none; width: 20px; display: grid; place-items: center;
     background: var(--acc); box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.2);
   }
   .st-strip span {
     writing-mode: vertical-rl;
-    font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.18em;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
     line-height: 1; color: var(--ink);
   }
 
@@ -15277,9 +15283,13 @@ function setActive(i) {
    a review queue, an N3 exam in 12 days) and those are the three that would have contradicted
    something already on screen.
    ================================================================================ */
-const ST_TOP = 130, ST_ROW_H = 48, ST_GAP = 18;
+/* TOP IS DERIVED, NOT CHOSEN. The column's height depends on which row is open, and a fixed top
+   with a shrinking column walks the whole thing up the frame -- so the tallest arrangement is
+   centred and the rest hang from the same line. */
+const ST_ROW_H = 40, ST_GAP = 14;
 /* the open height is set by which figure the row carries -- a due badge is taller than a gauge */
-const ST_H = { gauge: 140, due: 150, fig: 146 };
+const ST_H = { gauge: 118, due: 126, fig: 122 };
+const ST_TOP = Math.round((720 - (5 * (ST_ROW_H + ST_GAP) + Math.max(...Object.values(ST_H)))) / 2);
 
 function standData() {
   const step = PATH.done, cur = STUDY_PATH[step] || {};
