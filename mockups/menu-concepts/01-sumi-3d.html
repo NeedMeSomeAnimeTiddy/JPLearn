@@ -313,137 +313,94 @@
      the stroke width again -- the same thing that made ENTER and ESC the hardest words on the
      screen before the keycaps gave theirs up.
      ================================================================================ */
-  /* THE L2 BOX, REPRODUCED. Studied off `.cs-tab` and `.cs-hero` rather than approximated, and
-     the six things that actually make one are:
+  /* ================================================================================
+     THE MENU ITEM AS A CARD. One declaration per property, and this block is now the only
+     place any of them is set.
 
-       1. A FULL-BLEED TAB ACROSS THE TOP in the accent, tiny letterspaced caps, cream on colour.
-          Not an edge down the side -- that was my invention and it is the main reason the level
-          one cards read as a different family.
-       2. A CREAM GROUND WITH A GRADIENT IN IT, `linear-gradient(178deg, #e6ddc4, #cbc1a4)`. The
-          stones are not flat washi; the two-degree tilt on the gradient is what makes them read as
-          stone rather than as paper.
-       3. THE HARD OFFSET SHADOW AT 6px 8px 0 / 0.5, and a 1px INSET INK HAIRLINE with it. The
-          hairline is half of it: without one the card has no edge where it meets a bright valley.
-       4. THE WORD IN VERMILION, `--hi-deep` #b23320 -- the hero card sets its English that way and
-          the tablets set theirs the same. Ink was mine.
-       5. A HAIRLINE RULE under the number, 1px at 40% ink, which is the tablet's own divider.
-       6. THE ACTION AS A BAR INSIDE THE BOTTOM EDGE. The hero grows a 38px vermilion slab off its
-          foot; there is no room for one on a 88px card, so it becomes a 5px inset bar, which is
-          the same statement at the size available.
+     IT HAD GROWN TWO OF NEARLY EVERYTHING. Six passes moved the same handful of elements
+     around -- the reading went from a caption under the word into a top tab and back out, the
+     seal went from a small square in the flex row to the left edge to the right -- and each
+     move added a rule beside the old one instead of replacing it. Equal specificity, so the
+     stale pass kept winning on order: the seal rendered as a cream glyph on nothing and the
+     reading as cream on a white card. Neither was visible by reading the file; both took
+     asking for the COMPUTED value.
 
-     WHAT DID NOT COME OVER: the hero's 12-segment gauge, its gate row and its number, all of which
-     answer questions a top-level section does not have. */
+     THE CARD: white paper, a 15px band of the section colour down the leading edge, and the
+     seal at the trailing end holding the section's character on the same colour. That is the
+     whole of it -- one accent, in two places that are the same statement. Pointing at a card
+     turns both to ink and lengthens its shadow; the card itself stays paper, which is what the
+     L2 hero does.
+
+     THE HAIRLINE IS GONE. It was the L2 tablet's divider, borrowed when the accent was a strip
+     across the top and the word needed something under it to sit on. With a band down the left
+     edge it was a second rule doing the first one's job.
+
+     The tilt is NOT here. It lives in `LAYOUTS.a`'s `rz`, as a world roll, because a card
+     rotated in CSS pays half its width times the sine at both ends and puts the six back into
+     each other -- four passes were lost to that before the room came from the siting instead.
+     ================================================================================ */
   body.menu-box .t-inner {
-    /* 26, not 20. The top tab added 17px of height the plain bar did not have, and at 88 tall
-       the six overlapped their neighbours by 5,222 square pixels again -- the same collision the
-       first card pass had, from the same cause: the planes' spacing was sited for bare type. */
-    /* 32, and the fan cut to +/-1.5 degrees. A 383px card rotated 2.6 adds nine pixels to its
-       bounding box at each end, which put the six back into each other -- the third time this
-       collision has come from the planes being sited for bare type. Measured after, not guessed. */
-    /* SET FROM THE MEASUREMENT THIS TIME. At 72 rendered with a +/-1.5 degree fan the six still
-       overlapped by 2,402 square pixels -- 6.2px of height across a 385px card -- so the height
-       comes down by more than that and the fan by more than half. A rotated card pays for its
-       angle twice: half the width times the sine, at each end. */
-    /* the card takes the new room -- 78 tall against 54 -- and does NOT rotate in CSS any more.
-       The plane carries the tilt now, so the box keeps its own bounding height. */
     inset: 25px 206px 25px 0;
     padding: 0; align-items: center;
     transform: skewX(-8deg) translateX(calc(var(--i) * 9px));
-    /* WHITE PAPER AND ONE ACCENT, which is what the L2 box actually does -- its colour lives in
-       the top tab and the slab, and the card itself is paper. Mixing the section colour through
-       the ground and the word made six coloured rectangles; the accent is worth more when it is
-       the only one on the card. */
     background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
     box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.22);
     transition: box-shadow 0.24s ease, background 0.24s ease;
   }
-  /* the tab, full bleed across the top the way a stone wears its destination */
+  /* the band down the leading edge */
   body.menu-box .t-inner::before {
-    /* THE STRIP IS THE LEFT EDGE, FULL HEIGHT, and the seal fills it exactly. It was a bar across
-       the top plus a 62px square floating in it, so there were eight pixels of bare colour above
-       the character and eight below -- accent showing where nothing was printed on it. The strip
-       and the seal are the same box now, so that cannot happen again. */
     content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 15px;
     background: var(--sec, var(--hi));
+    transition: background 0.24s ease;
   }
-  body.menu-box .t-slash, body.menu-box .drop { display: none; }
-  body.menu-box .t-tick { display: none; }
-  body.menu-box .t-en {
-    color: var(--ink); text-shadow: none; transform: none; font-size: 30px;
-    margin: 0 0 26px 36px;
-  }
-  /* the reading rides IN the tab, which is where the stone puts its one small label */
-  body.menu-box .t-jp {
-    left: 36px; right: auto; top: calc(50% + 11px); bottom: auto; width: auto; height: auto;
-    line-height: 1; padding-left: 0; font-size: 11.5px; letter-spacing: 0.36em; font-family: var(--jp-go); font-weight: 700;
-    font-size: 9.5px; letter-spacing: 0.28em; color: var(--washi); background: none;
-    text-shadow: none; z-index: 3;
-  }
-  body.menu-box .t-line {
-    left: 36px; right: auto; width: 62px; bottom: 13px; height: 2px;
-    background: rgba(20, 17, 13, 0.35); transform: scaleX(1);
-  }
-  body.menu-box .t-stamp {
-    position: absolute; right: 0; left: auto; top: 0; bottom: 0; width: 68px; height: auto;
-    margin: 0; display: grid; place-items: center; font-size: 32px;
-    background: var(--sec, var(--hi));
-    animation: none !important; opacity: 1; transform: none;
-    background: none; color: var(--washi); box-shadow: none; z-index: 3;
-  }
-  body.menu-box .t-badge {
-    min-width: 26px; height: 26px; font-size: 15px; margin-top: 20px;
-    box-shadow: 2px 2px 0 rgba(20, 17, 13, 0.35), inset 0 0 0 2px rgba(242, 234, 216, 0.4);
-  }
-  /* ACTIVE KEEPS ITS CREAM. The hero card does not fill when you point at it -- it grows a
-     vermilion slab off its foot and stays paper. At this size that slab is a 5px bar inside the
-     bottom edge, and the card lifts on a longer shadow. */
-  body.menu-box .type-item.is-active .t-inner {
-    background: linear-gradient(178deg, #ffffff 0%, #f2ede0 100%);
-    box-shadow: 11px 14px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.3);
-  }
-  body.menu-box .type-item.is-active .t-en {
-    color: var(--ink); text-shadow: none; transform: scale(1.05) translateX(8px);
-  }
-  /* THE RED SLASH, KILLED AT ITS SOURCE. `.type-item.is-active .t-jp` rotates the reading -10
-     degrees and gives it a vermilion ground -- right when `.t-jp` is a 60px caption under the
-     word, which is what it was designed as. Box mode re-purposed it to FILL THE TOP TAB, so that
-     rule was rotating a 495x107 bar and scaling it 1.12: the diagonal across two cards. Nothing to
-     do with `.t-slash`, which measured display:none the whole time. */
-  body.menu-box .type-item.is-active .t-jp {
-    color: #fff; letter-spacing: 0.3em; transform: none; background: none;
-  }
-  body.menu-box .type-item.is-active .t-line { background: var(--hi); }
-  /* the strip goes ink when you point at it -- the one state change, and it is on the accent */
-  body.menu-box .type-item.is-active .t-inner::before { background: var(--ink); }
-  body.menu-box .type-item.is-active .t-stamp { background: var(--ink); color: #fff; }
-  body.menu-box .type-item.is-dimmed { filter: brightness(0.9) saturate(0.82); }
+  /* the brush stroke, the droplets, the tick and the hairline all belong to type standing on a
+     world. On a card each is a second treatment fighting the first. */
+  body.menu-box .t-slash,
+  body.menu-box .drop,
+  body.menu-box .t-tick,
+  body.menu-box .t-line { display: none; }
 
-  /* ---- THE LAST WORD ON THE TWO THAT KEPT LOSING ------------------------------------------
-     `.t-jp` and `.t-stamp` each ended up with two rules in this block -- one from when the reading
-     lived inside a top tab and the seal was a small square in the flex row, one from moving them.
-     Same specificity, so the earlier pass kept winning on order and the seal rendered as cream
-     glyph on nothing while the reading came out cream on white at 9.5px, invisible on both counts.
-     Diagnosed by asking for the computed values rather than by reading the stylesheet: background
-     rgba(0,0,0,0) on the stamp and rgb(242,234,216) on a white card said it in one line.
-     These sit last on purpose. */
-  body.menu-box .t-stamp {
-    background: var(--sec, var(--hi)); color: var(--washi);
-    right: 0; left: auto; top: 0; bottom: 0; width: 68px; height: auto; margin: 0;
-    display: grid; place-items: center; font-size: 32px; box-shadow: none;
+  body.menu-box .t-en {
+    color: var(--ink); text-shadow: none; transform: none;
+    font-size: 30px; margin: 0 0 26px 36px;
   }
-  body.menu-box .type-item.is-active .t-stamp { background: var(--ink); color: #fff; }
-  /* THE READING GETS ROOM. It was 9.5px wedged under the word in the card's own cream, which on a
-     white card is nothing at all -- the one element never re-sited when the card doubled. Ink at
-     55%, 11.5px, on the word's own left margin with the rule beneath both. */
   body.menu-box .t-jp {
     left: 36px; right: auto; top: calc(50% + 10px); bottom: auto;
     width: auto; height: auto; line-height: 1; padding-left: 0;
     font-family: var(--jp-go); font-weight: 700; font-size: 11.5px; letter-spacing: 0.34em;
     color: rgba(20, 17, 13, 0.55); background: none; text-shadow: none; z-index: 3;
   }
+  /* the seal fills its square exactly -- strip and glyph are one box, so no bare colour can
+     show above or below the character the way it did when they were two */
+  body.menu-box .t-stamp {
+    position: absolute; right: 0; left: auto; top: 0; bottom: 0;
+    width: 68px; height: auto; margin: 0;
+    display: grid; place-items: center; font-size: 32px;
+    background: var(--sec, var(--hi)); color: var(--washi);
+    box-shadow: none; opacity: 1; transform: none; animation: none !important; z-index: 3;
+  }
+  body.menu-box .t-badge {
+    min-width: 26px; height: 26px; font-size: 15px; margin-top: 20px;
+    box-shadow: 2px 2px 0 rgba(20, 17, 13, 0.35), inset 0 0 0 2px rgba(242, 234, 216, 0.4);
+  }
+
+  /* ---- pointed at: the accent answers, the paper does not ---- */
+  body.menu-box .type-item.is-active .t-inner {
+    background: linear-gradient(178deg, #ffffff 0%, #f2ede0 100%);
+    box-shadow: 11px 14px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.3);
+  }
+  body.menu-box .type-item.is-active .t-inner::before { background: var(--ink); }
+  body.menu-box .type-item.is-active .t-stamp { background: var(--ink); color: #fff; }
+  body.menu-box .type-item.is-active .t-en {
+    color: var(--ink); text-shadow: none; transform: scale(1.05) translateX(8px);
+  }
   body.menu-box .type-item.is-active .t-jp {
     color: rgba(20, 17, 13, 0.7); transform: none; background: none;
   }
+  /* a tenth off and a little of the colour. `brightness(0.66)` is written for cream type on a
+     valley, where two thirds of a light colour is still light; on a white card it reads as
+     disabled rather than as quiet. */
+  body.menu-box .type-item.is-dimmed { filter: brightness(0.9) saturate(0.82); }
 
   .drop { position: absolute; background: var(--gold); width: 8px; height: 8px; z-index: 1; opacity: 0; filter: url(#roughEdge); }
   .type-item.is-active .drop { animation: dropFly 0.5s cubic-bezier(0.2, 0.8, 0.4, 1) forwards; }
