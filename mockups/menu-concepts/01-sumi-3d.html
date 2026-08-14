@@ -363,28 +363,30 @@
        the top plus a 62px square floating in it, so there were eight pixels of bare colour above
        the character and eight below -- accent showing where nothing was printed on it. The strip
        and the seal are the same box now, so that cannot happen again. */
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 66px;
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 15px;
     background: var(--sec, var(--hi));
   }
   body.menu-box .t-slash, body.menu-box .drop { display: none; }
   body.menu-box .t-tick { display: none; }
   body.menu-box .t-en {
-    color: var(--ink); text-shadow: none; transform: none; font-size: 30px; margin-left: 88px;
+    color: var(--ink); text-shadow: none; transform: none; font-size: 30px;
+    margin: 0 0 26px 36px;
   }
   /* the reading rides IN the tab, which is where the stone puts its one small label */
   body.menu-box .t-jp {
-    left: 88px; right: auto; top: auto; bottom: 11px; width: auto; height: auto;
-    line-height: 1; padding-left: 0; font-family: var(--jp-go); font-weight: 700;
+    left: 36px; right: auto; top: calc(50% + 11px); bottom: auto; width: auto; height: auto;
+    line-height: 1; padding-left: 0; font-size: 11.5px; letter-spacing: 0.36em; font-family: var(--jp-go); font-weight: 700;
     font-size: 9.5px; letter-spacing: 0.28em; color: var(--washi); background: none;
     text-shadow: none; z-index: 3;
   }
   body.menu-box .t-line {
-    left: 88px; right: auto; width: 56px; bottom: 6px; height: 2px;
+    left: 36px; right: auto; width: 62px; bottom: 13px; height: 2px;
     background: rgba(20, 17, 13, 0.35); transform: scaleX(1);
   }
   body.menu-box .t-stamp {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 66px; height: auto; margin: 0;
-    display: grid; place-items: center; font-size: 32px;
+    position: absolute; right: 0; left: auto; top: 0; bottom: 0; width: 68px; height: auto;
+    margin: 0; display: grid; place-items: center; font-size: 32px;
+    background: var(--sec, var(--hi));
     animation: none !important; opacity: 1; transform: none;
     background: none; color: var(--washi); box-shadow: none; z-index: 3;
   }
@@ -413,8 +415,35 @@
   body.menu-box .type-item.is-active .t-line { background: var(--hi); }
   /* the strip goes ink when you point at it -- the one state change, and it is on the accent */
   body.menu-box .type-item.is-active .t-inner::before { background: var(--ink); }
-  body.menu-box .type-item.is-active .t-stamp { background: none; color: #fff; }
+  body.menu-box .type-item.is-active .t-stamp { background: var(--ink); color: #fff; }
   body.menu-box .type-item.is-dimmed { filter: brightness(0.9) saturate(0.82); }
+
+  /* ---- THE LAST WORD ON THE TWO THAT KEPT LOSING ------------------------------------------
+     `.t-jp` and `.t-stamp` each ended up with two rules in this block -- one from when the reading
+     lived inside a top tab and the seal was a small square in the flex row, one from moving them.
+     Same specificity, so the earlier pass kept winning on order and the seal rendered as cream
+     glyph on nothing while the reading came out cream on white at 9.5px, invisible on both counts.
+     Diagnosed by asking for the computed values rather than by reading the stylesheet: background
+     rgba(0,0,0,0) on the stamp and rgb(242,234,216) on a white card said it in one line.
+     These sit last on purpose. */
+  body.menu-box .t-stamp {
+    background: var(--sec, var(--hi)); color: var(--washi);
+    right: 0; left: auto; top: 0; bottom: 0; width: 68px; height: auto; margin: 0;
+    display: grid; place-items: center; font-size: 32px; box-shadow: none;
+  }
+  body.menu-box .type-item.is-active .t-stamp { background: var(--ink); color: #fff; }
+  /* THE READING GETS ROOM. It was 9.5px wedged under the word in the card's own cream, which on a
+     white card is nothing at all -- the one element never re-sited when the card doubled. Ink at
+     55%, 11.5px, on the word's own left margin with the rule beneath both. */
+  body.menu-box .t-jp {
+    left: 36px; right: auto; top: calc(50% + 10px); bottom: auto;
+    width: auto; height: auto; line-height: 1; padding-left: 0;
+    font-family: var(--jp-go); font-weight: 700; font-size: 11.5px; letter-spacing: 0.34em;
+    color: rgba(20, 17, 13, 0.55); background: none; text-shadow: none; z-index: 3;
+  }
+  body.menu-box .type-item.is-active .t-jp {
+    color: rgba(20, 17, 13, 0.7); transform: none; background: none;
+  }
 
   .drop { position: absolute; background: var(--gold); width: 8px; height: 8px; z-index: 1; opacity: 0; filter: url(#roughEdge); }
   .type-item.is-active .drop { animation: dropFly 0.5s cubic-bezier(0.2, 0.8, 0.4, 1) forwards; }
