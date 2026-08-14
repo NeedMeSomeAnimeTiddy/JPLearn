@@ -1836,10 +1836,17 @@
      out of the frame rather than stopping at it, which is most of why this reads as a route. */
   .cs-strip {
     position: absolute; left: 0; right: 0; top: 20px; height: 388px; overflow: hidden;
-    -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,0) 0, rgba(0,0,0,1) 258px,
-      rgba(0,0,0,1) calc(100% - 258px), rgba(0,0,0,0) 100%);
-    mask-image: linear-gradient(90deg, rgba(0,0,0,0) 0, rgba(0,0,0,1) 258px,
-      rgba(0,0,0,1) calc(100% - 258px), rgba(0,0,0,0) 100%);
+    /* the gutter the counted tags stand in, and where the road starts existing again */
+    --gutter: calc(116px * var(--u));
+    --solid: calc(300px * var(--u));
+    -webkit-mask-image: linear-gradient(90deg,
+      rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter), rgba(0,0,0,1) var(--solid),
+      rgba(0,0,0,1) calc(100% - var(--solid)), rgba(0,0,0,0) calc(100% - var(--gutter)),
+      rgba(0,0,0,0) 100%);
+    mask-image: linear-gradient(90deg,
+      rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter), rgba(0,0,0,1) var(--solid),
+      rgba(0,0,0,1) calc(100% - var(--solid)), rgba(0,0,0,0) calc(100% - var(--gutter)),
+      rgba(0,0,0,0) 100%);
   }
   .cs-rail {
     position: absolute; left: 0; top: 0; width: 5200px; height: 388px;
@@ -1994,11 +2001,14 @@
   /* INSET WITH THE REST OF THE CHROME, and scaled the way it is. P13's 30px is a 1280-frame
      number and it left these two hard against the edge of a 1440 one -- tighter to the glass than
      the brand, the hint stack and the back tab, all of which sit 40px in and RIDE `--u`, so on a
-     bigger window everything else moved inward and the bookends did not. At 88 they sit about
-     twice the chrome's margin in, which puts them inside the strip's 258px mask fade: the tag is
-     solid and the road behind it is already going. */
-  .cs-side.lo { left: calc(88px * var(--u)); }
-  .cs-side.hi { right: calc(88px * var(--u)); }
+     bigger window everything else moved inward and the bookends did not.
+     AND 88 WAS INSIDE THE ROAD. "Inside the mask fade" is not the same as behind nothing: at 88
+     the mask still passed a third to a half of its ink, and a tablet four steps out is painted at
+     45%, so a fifth of a full tablet was showing THROUGH a solid tag rather than beside it. The
+     strip has a dead zone now -- see `--gutter` -- and these sit in it: 60 puts the whole 48-wide
+     tag inside 116 with eight pixels to spare. */
+  .cs-side.lo { left: calc(60px * var(--u)); }
+  .cs-side.hi { right: calc(60px * var(--u)); }
   .cs-side i {
     position: absolute; top: 0; display: block; width: 26px; transform: skewX(-8deg);
   }
