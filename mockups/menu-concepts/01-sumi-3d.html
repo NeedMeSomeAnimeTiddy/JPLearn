@@ -484,10 +484,12 @@
   }
   .st-row.is-open .st-clip { left: 358px; clip-path: inset(0 -30px -30px 0); }
   .st-box {
-    /* NOT the card's height. It is a tip beside a card, not a second card, and matched heights
-       are what made the two read as a pair of equals. It takes the row's top edge and stops where
-       its own content stops. */
-    position: absolute; left: 16px; top: 0; width: 152px; height: auto;
+    /* THE CARD'S HEIGHT, BY CONSTRUCTION -- `100%` of the clip, which is the row. What made the
+       two read as a pair of equals was never the height, it was the WIDTH: sized to `max-content`
+       the box grew to whatever its longest suggestion was. With one stated width it is plainly
+       the smaller object, and sharing the card's height is what lets the two red bands along the
+       bottom line up as one. */
+    position: absolute; left: 16px; top: 0; width: 152px; height: 100%;
     display: flex; align-items: stretch;
     background: var(--washi);
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
@@ -518,7 +520,10 @@
     letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.52); white-space: nowrap;
   }
   .st-box-btn {
-    flex: none; height: 24px; padding: 6px 9px; background: var(--hi);
+    /* 28, WHICH IS THE SLAB'S HEIGHT. The two boxes are the same height and share a top edge, so
+       their bottoms already agreed; matching the bands makes the tops agree too and the pair
+       reads as one line across rather than as two red rectangles at slightly different sizes. */
+    flex: none; height: 28px; padding: 8px 9px; background: var(--hi);
     font-family: var(--lat-ui); font-weight: 700; font-size: 9px; line-height: 12px;
     letter-spacing: 0.14em; color: #ffd9a1; white-space: nowrap;
   }
