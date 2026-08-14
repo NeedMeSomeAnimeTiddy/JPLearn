@@ -291,125 +291,250 @@
   .type-item.is-active .t-jp { transform: rotate(-10deg) scale(1.12); background: var(--hi-deep); }
   body[data-menu="b"] .type-item.is-active .t-jp { transform: scale(1.08); color: #fff; background: none; }
   .type-item.is-dimmed { filter: brightness(0.66); }
-  body.menu-box .type-item.is-dimmed { filter: brightness(0.9) saturate(0.82); }
+
 
 
   /* ================================================================================
-     THE MENU ITEMS AS CARDS — the path's language, one level up. A trial, on a switch.
+     THE STANDING MENU -- level one as an accordion of slabs, in the frame rather than the world.
 
-     Level one is six CSS3D planes carrying bare type: the word IS the button, with a tick, a
-     reading and a brush stroke that wipes across on hover. The path below it settled into
-     something else entirely -- ink on cream, square, skewed eight degrees, a hard offset shadow,
-     an accent tab naming what the thing is -- and this asks what happens if the top level speaks
-     it too.
+     The six items were six CSS3D planes carrying bare type, sited by `LAYOUTS.a` and pointed at
+     one at a time. This is the same six as a column of standing cards where ONE IS OPEN: the open
+     one grows, says where you are in that section, and offers the single thing pressing Enter will
+     do; the other five stay shut and say only their name, their reading and one figure.
 
-     THE SKEW GOES ON `.t-inner`, NOT THE ROOT. CSS3DRenderer writes a matrix3d onto `.type-item`
-     every frame from the plane's world position; anything set on that element is overwritten
-     between one frame and the next. The wrapper is what the entrance animation already uses for
-     exactly this reason.
+     WHY IT LEFT THE WORLD. A row that grows has to push the rows below it down, and planes sited
+     at fixed world positions cannot push anything -- their spacing is a constant in `LAYOUTS.a`.
+     The reflow IS the design, so the design is screen-space, which is where the rest of this
+     interface already lives. The planes stay built and hidden: the camera flight still spawns
+     petals from `itemObjs[i].position`, and that is a fact about where an item stood.
 
-     AND THE WORD LOSES ITS SHADOW. `.t-en` carries a hard offset plus a soft halo, which is what
-     holds cream type against an open valley. On a cream card it is ink on light and the halo is
-     the stroke width again -- the same thing that made ENTER and ESC the hardest words on the
-     screen before the keycaps gave theirs up.
+     THE FRAME IS 1280x720 AND CENTRED. `.chrome` carries `zoom: var(--u)`, which is
+     min(w/1280, h/720), so every number below is a design pixel and lands where it was drawn.
+
+     THE SKEW LIVES ON `.st-row` AND NOTHING ELSE PUTS A TRANSFORM THERE. The entrance slide is on
+     `.st-in` inside it, hover and press are on `.st-card` inside that -- three transforms that
+     would otherwise be one property overwriting itself, which is the same trap the type planes
+     have with CSS3DRenderer's matrix3d.
      ================================================================================ */
-  /* ================================================================================
-     THE MENU ITEM AS A CARD. One declaration per property, and this block is now the only
-     place any of them is set.
+  .standing {
+    left: 50%; top: 50%; width: 1280px; height: 720px;
+    transform: translate(-50%, -50%);
+    opacity: 0; transition: opacity 0.34s ease;
+  }
+  body.at-menu .standing { opacity: 1; }
+  /* the planes and the two chrome pieces this supersedes. The description line said what a
+     section is and the up-next button said what to do next; the open row now says both, in the
+     one place you are already looking. */
+  body.menu-inline .type-item { display: none; }
+  body.menu-inline #descLine, body.menu-inline #upnext { display: none; }
+  body:not(.menu-inline) .standing { display: none; }
 
-     IT HAD GROWN TWO OF NEARLY EVERYTHING. Six passes moved the same handful of elements
-     around -- the reading went from a caption under the word into a top tab and back out, the
-     seal went from a small square in the flex row to the left edge to the right -- and each
-     move added a rule beside the old one instead of replacing it. Equal specificity, so the
-     stale pass kept winning on order: the seal rendered as a cream glyph on nothing and the
-     reading as cream on a white card. Neither was visible by reading the file; both took
-     asking for the COMPUTED value.
+  /* ---- the row: position, size and the lean everything else inherits ---- */
+  .st-row {
+    position: absolute; left: 104px; top: var(--top); width: 720px; height: var(--h);
+    transform: skewX(-8deg) rotate(-1.2deg) translateX(0);
+    transform-origin: 0 50%;
+    /* the lag is what makes the stack settle rather than snap: rows further from the one you
+       opened start later, so the column opens outward from the selection */
+    transition: top 0.36s cubic-bezier(0.18, 0.9, 0.24, 1) var(--lag, 0ms),
+                height 0.34s cubic-bezier(0.18, 0.9, 0.24, 1),
+                transform 0.24s cubic-bezier(0.2, 0.92, 0.24, 1);
+    z-index: 14;
+  }
+  .st-row.is-open { transform: skewX(-8deg) rotate(-1.2deg) translateX(20px); z-index: 18; }
+  .st-in { position: absolute; inset: 0; }
 
-     THE CARD: white paper, a 15px band of the section colour down the leading edge, and the
-     seal at the trailing end holding the section's character on the same colour. That is the
-     whole of it -- one accent, in two places that are the same statement. Pointing at a card
-     turns both to ink and lengthens its shadow; the card itself stays paper, which is what the
-     L2 hero does.
+  /* ---- the card ---- */
+  .st-card {
+    position: absolute; left: 0; top: 0; width: 338px; height: 100%;
+    display: flex; align-items: stretch; overflow: hidden;
+    background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+    box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.46), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    border: 0; padding: 0; cursor: pointer; text-align: left; font: inherit; color: inherit;
+    pointer-events: auto;
+    transition: width 0.32s cubic-bezier(0.18, 0.9, 0.24, 1), background 0.26s ease,
+                box-shadow 0.2s ease, transform 0.14s ease;
+    z-index: 2;
+  }
+  .st-row.is-open .st-card {
+    width: 418px; background: var(--washi);
+    box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  }
+  .st-card:hover { transform: translate(12px, -5px); }
+  /* press AFTER hover, at equal specificity, so the press wins on source order rather than on a
+     guess about which one the browser will pick */
+  .st-row.is-press .st-card, .st-row.is-press .st-card:hover { transform: translate(2px, 3px); }
+  .st-card:focus-visible { outline: 3px solid var(--hi); outline-offset: 6px; }
 
-     THE HAIRLINE IS GONE. It was the L2 tablet's divider, borrowed when the accent was a strip
-     across the top and the word needed something under it to sit on. With a band down the left
-     edge it was a second rule doing the first one's job.
+  /* ---- the mark column: the accent, the glyph, the number ---- */
+  .st-mark {
+    flex: none; width: 42px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    background: var(--acc); box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.2);
+    transition: width 0.38s cubic-bezier(0.18, 0.9, 0.24, 1), padding 0.32s ease;
+  }
+  .st-row.is-open .st-mark { width: 62px; justify-content: flex-start; gap: 8px; padding: 13px 0 0; }
+  .st-glyph {
+    flex: none; font-family: var(--jp); font-weight: 400; font-size: 21px; line-height: 1;
+    color: var(--ink);
+    transition: font-size 0.38s cubic-bezier(0.18, 0.9, 0.24, 1);
+  }
+  .st-row.is-open .st-glyph { font-size: 34px; }
+  .st-no {
+    flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 11px;
+    line-height: 1; color: rgba(20, 17, 13, 0.6); transition: font-size 0.3s ease;
+  }
+  .st-row.is-open .st-no { font-size: 13px; }
 
-     The tilt is NOT here. It lives in `LAYOUTS.a`'s `rz`, as a world roll, because a card
-     rotated in CSS pays half its width times the sine at both ends and puts the six back into
-     each other -- four passes were lost to that before the room came from the siting instead.
-     ================================================================================ */
-  body.menu-box .t-inner {
-    /* ONE NUMBER FOR BOTH. The seal is square and the card is exactly as tall as it, so its side
-       is the card's height -- two facts that are the same fact. Written as a variable and the
-       inset derived from it (the plane is 128 tall), because as two literals they drift the
-       moment either is touched, and a seal that is 82 wide on an 80-tall card is not square.
-       82 is what the type wants: a 30px word and an 11.5px reading with air between them. */
-    --seal: 82px;
-    inset: calc((128px - var(--seal)) / 2) 206px calc((128px - var(--seal)) / 2) 0;
-    padding: 0; align-items: center;
-    transform: skewX(-8deg) translateX(calc(var(--i) * 9px));
-    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
-    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.22);
-    transition: box-shadow 0.24s ease, background 0.24s ease;
+  /* ---- the body ---- */
+  .st-body {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; justify-content: center; padding: 0 15px;
+    transition: padding 0.34s ease;
   }
-  /* the band down the leading edge */
-  body.menu-box .t-inner::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 15px;
-    background: var(--sec, var(--hi));
-    transition: background 0.24s ease;
+  .st-row.is-open .st-body { justify-content: flex-start; padding: 12px 15px 0; }
+  .st-head { display: flex; align-items: baseline; gap: 12px; }
+  .st-en {
+    flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 23px;
+    line-height: 1; letter-spacing: 0.01em; color: var(--ink); white-space: nowrap;
+    transition: font-size 0.38s cubic-bezier(0.18, 0.9, 0.24, 1);
   }
-  /* the brush stroke, the droplets, the tick and the hairline all belong to type standing on a
-     world. On a card each is a second treatment fighting the first. */
-  body.menu-box .t-slash,
-  body.menu-box .drop,
-  body.menu-box .t-tick,
-  body.menu-box .t-line { display: none; }
+  .st-row.is-open .st-en { font-size: 31px; }
+  .st-jp {
+    flex: none; font-family: var(--jp); font-weight: 400; font-size: 17px; line-height: 1;
+    letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.66); white-space: nowrap;
+    transition: font-size 0.34s ease;
+  }
+  .st-row.is-open .st-jp { font-size: 21px; }
+  .st-tok {
+    flex: none; margin-left: auto;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+    text-align: right; color: rgba(20, 17, 13, 0.6); white-space: nowrap;
+    transition: color 0.3s ease;
+  }
+  .st-row.is-open .st-tok { color: var(--hi-deep); }
 
-  body.menu-box .t-en {
-    color: var(--ink); text-shadow: none; transform: none;
-    font-size: 30px; margin: 0 0 24px 36px;
+  /* ---- what the open row says: one state line, one figure, one action ---- */
+  .st-detail { display: none; flex-direction: column; gap: 7px; margin-top: 11px; }
+  .st-row.is-open .st-detail {
+    display: flex; animation: stReveal 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: 60ms;
   }
-  body.menu-box .t-jp {
-    left: 36px; right: auto; top: calc(50% + 9px); bottom: auto;
-    width: auto; height: auto; line-height: 1; padding-left: 0;
-    font-family: var(--jp-go); font-weight: 700; font-size: 11.5px; letter-spacing: 0.34em;
-    color: rgba(20, 17, 13, 0.55); background: none; text-shadow: none; z-index: 3;
+  @keyframes stReveal { from { opacity: 0; transform: translateY(9px); } }
+  .st-state { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .st-state b, .st-state i {
+    flex: none; font-family: var(--lat-ui); font-weight: 700; font-style: normal; white-space: nowrap;
   }
-  /* the seal fills its square exactly -- strip and glyph are one box, so no bare colour can
-     show above or below the character the way it did when they were two */
-  body.menu-box .t-stamp {
-    /* BOTH SIDES STATED. `height: auto` with top and bottom pinned is supposed to stretch, and
-       here it resolved from the glyph's line box instead -- 67 against a card of 82, so the seal
-       was a rectangle claiming to be a square. Asking for it outright removes the inference. */
-    position: absolute; right: 0; left: auto; top: 0;
-    width: var(--seal); height: var(--seal); margin: 0;
-    display: grid; place-items: center; font-size: 42px;
-    background: var(--sec, var(--hi)); color: var(--washi);
-    box-shadow: none; opacity: 1; transform: none; animation: none !important; z-index: 3;
+  .st-state b { font-size: 8.5px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.45); }
+  .st-state i { font-size: 10px; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.8); }
+  .st-fig {
+    display: none; align-items: center; gap: 10px;
+    animation: stReveal 0.34s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: 120ms;
   }
-  body.menu-box .t-badge {
-    min-width: 26px; height: 26px; font-size: 15px; margin-top: 20px;
-    box-shadow: 2px 2px 0 rgba(20, 17, 13, 0.35), inset 0 0 0 2px rgba(242, 234, 216, 0.4);
+  .st-row.is-open .st-fig.on { display: flex; }
+  /* the gauge is the chip gauge's track, twelve segments wide, filling left to right on a stagger
+     so it reads as being counted rather than as a bar that was already there */
+  .st-segs { flex: 1; display: flex; gap: 3px; }
+  .st-segs i {
+    flex: 1; height: 12px; background: rgba(20, 17, 13, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    transition: background 0.26s ease var(--d, 0ms);
+  }
+  .st-segs i.on { background: var(--gold); }
+  .st-pct, .st-fign {
+    flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; line-height: 1;
+    color: var(--hi-deep);
+  }
+  .st-pct { font-size: 18px; }
+  .st-fign { font-size: 28px; }
+  .st-due {
+    flex: none; width: 30px; height: 30px;
+    background: var(--hi); color: #fff4e0;
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
+    line-height: 30px; text-align: center;
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4);
+    animation: stDue 2.6s ease-in-out infinite;
+  }
+  @keyframes stDue { 0%, 100% { opacity: 1; } 50% { opacity: 0.34; } }
+  .st-figlab {
+    flex: none; font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.15em;
+    color: rgba(20, 17, 13, 0.68); white-space: nowrap;
+  }
+  /* THE SLAB BLEEDS PAST THE BODY'S PADDING ON BOTH SIDES, which is what makes it the floor of the
+     card rather than a button sitting on it -- the same bargain the action slab at level two makes. */
+  .st-slab {
+    display: none; flex: none; margin: auto -15px 0; height: 33px; padding: 9px 15px;
+    background: var(--hi);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 11px; line-height: 14px;
+    letter-spacing: 0.16em; color: #ffd9a1; white-space: nowrap; overflow: hidden;
+  }
+  .st-row.is-open .st-slab {
+    display: block; animation: stSlab 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: 90ms;
+  }
+  @keyframes stSlab { 0% { opacity: 0; transform: translateY(16px); } 70% { opacity: 1; transform: translateY(-2px); } }
+
+  /* ---- the suggestion, which slides out from behind the open card ----
+     The clip's left edge sits on the card's right edge and travels with it, so the box is never
+     visible anywhere but beside the row it belongs to. `inset(0 -30px -30px 0)` opens the right
+     and the bottom for the hard shadow while keeping the left edge shut, which is the edge the
+     box comes through. */
+  .st-clip {
+    position: absolute; left: 338px; top: 0; width: 320px; height: 100%;
+    clip-path: inset(0 -30px 0 0); pointer-events: none; z-index: 1;
+    transition: left 0.32s cubic-bezier(0.18, 0.9, 0.24, 1);
+  }
+  .st-row.is-open .st-clip { left: 418px; clip-path: inset(0 -30px -30px 0); }
+  .st-box {
+    /* `100%` of the clip, which is the row -- so the box is the card's height by construction
+       rather than by a second copy of the same number that can drift away from it */
+    position: absolute; left: 20px; top: 0; width: max-content; max-width: 218px; height: 100%;
+    display: flex; align-items: stretch;
+    background: var(--washi);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    border: 0; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer;
+    /* `-100%` rather than a measured width: the box is `max-content` and the distance it has to
+       travel to be hidden is its own width plus the gap, which is exactly what percent means here */
+    transform: translateX(calc(-100% - 170px));
+    transition: transform 0.56s cubic-bezier(0.32, 0.04, 0.3, 1);
+  }
+  .st-row.is-open .st-box {
+    transform: translateX(0); transition-duration: 0.32s; pointer-events: auto;
+  }
+  .st-row.is-open.is-boxpress .st-box { transform: translate(2px, 3px); transition-duration: 0.12s; }
+  .st-box:focus-visible { outline: 3px solid var(--hi); outline-offset: 6px; }
+  .st-box-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .st-box-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 11px 10px 10px; }
+  .st-box-en {
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 16px; line-height: 1.08;
+    letter-spacing: 0.01em; text-transform: uppercase; color: var(--ink);
+  }
+  .st-box-jp {
+    margin-top: 5px; font-family: var(--jp); font-weight: 400; font-size: 15px; line-height: 1;
+    letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.52); white-space: nowrap;
+  }
+  .st-box-btn {
+    flex: none; height: 30px; padding: 8px 10px; background: var(--hi);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; line-height: 14px;
+    letter-spacing: 0.14em; color: #ffd9a1; white-space: nowrap;
+  }
+  .st-strip {
+    flex: none; width: 26px; display: grid; place-items: center;
+    background: var(--acc); box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.2);
+  }
+  .st-strip span {
+    writing-mode: vertical-rl;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.18em;
+    line-height: 1; color: var(--ink);
   }
 
-  /* ---- pointed at: the accent answers, the paper does not ---- */
-  body.menu-box .type-item.is-active .t-inner {
-    background: linear-gradient(178deg, #ffffff 0%, #f2ede0 100%);
-    box-shadow: 11px 14px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.3);
+  /* ---- the entrance. The slide is on `.st-in` because `.st-row` is holding the lean and the
+     open offset, and a `both`-filled animation on the same property would freeze one of them. ---- */
+  #standing.enter .st-row { animation: stRowFade 0.5s both; animation-delay: calc(var(--i) * 0.07s); }
+  #standing.enter .st-in {
+    animation: stRowIn 0.52s cubic-bezier(0.18, 1.35, 0.35, 1) both;
+    animation-delay: calc(var(--i) * 0.07s);
   }
-  body.menu-box .type-item.is-active .t-inner::before { background: var(--ink); }
-  body.menu-box .type-item.is-active .t-stamp { background: var(--ink); color: #fff; }
-  body.menu-box .type-item.is-active .t-en {
-    color: var(--ink); text-shadow: none; transform: scale(1.05) translateX(8px);
-  }
-  body.menu-box .type-item.is-active .t-jp {
-    color: rgba(20, 17, 13, 0.7); transform: none; background: none;
-  }
-  /* a tenth off and a little of the colour. `brightness(0.66)` is written for cream type on a
-     valley, where two thirds of a light colour is still light; on a white card it reads as
-     disabled rather than as quiet. */
-  body.menu-box .type-item.is-dimmed { filter: brightness(0.9) saturate(0.82); }
+  @keyframes stRowFade { from { opacity: 0; } }
+  @keyframes stRowIn { from { transform: translateX(-90px); } }
 
   .drop { position: absolute; background: var(--gold); width: 8px; height: 8px; z-index: 1; opacity: 0; filter: url(#roughEdge); }
   .type-item.is-active .drop { animation: dropFly 0.5s cubic-bezier(0.2, 0.8, 0.4, 1) forwards; }
@@ -3321,6 +3446,22 @@
     opacity: 0; transition: opacity 0.5s ease;
   }
   body.at-menu #typeShade { opacity: 1; }
+  /* THE STANDING MENU STANDS ON A DIFFERENT SHAPE. The ellipse is centred on where the type stack
+     used to be -- left, upper -- and the column of slabs runs from y 130 to y 620, so the bottom
+     third of it had no shade under it at all. A vertical crush covers what the column covers.
+     `--crush` is the density and `NAV.crush(n)` sets it; the design asked for 40 and this is 25,
+     for the reason written on the ellipse above -- past about a quarter it stops being depth and
+     becomes a hole cut in the valley. */
+  body.menu-inline #typeShade {
+    --crush: 0.25;
+    background:
+      linear-gradient(180deg,
+        rgba(10, 14, 22, calc(var(--crush) * 0.62)) 0%,
+        rgba(10, 14, 22, calc(var(--crush) * 1.05)) 58%,
+        rgba(10, 14, 22, calc(var(--crush) * 1.3)) 100%),
+      linear-gradient(100deg, rgba(10, 14, 22, 0.16) 0%, rgba(10, 14, 22, 0.08) 34%,
+        rgba(10, 14, 22, 0) 58%);
+  }
   /* THE SAME BARGAIN, FOR LEVELS TWO AND THREE. `#typeShade` is `body.at-menu` only, so every
      drawing past the menu was standing on an undimmed world — and four of the six rooms are lit
      like daylight, where cream on pale sand and pale sky has almost no separation at all. This is
@@ -3824,6 +3965,7 @@
 <div class="chrome upnext menu-only" id="upnext">
   <button class="upnext-item" id="upnextBtn"><span id="upnextText">UP NEXT 次</span><i>→</i></button>
 </div>
+<div class="chrome standing menu-only" id="standing"></div>
 <div class="chrome desc-line menu-only" id="descLine"><span id="descIn"><b>Kana, kanji and vocabulary by section</b><i>かな・漢字・語彙のセクション学習</i></span></div>
 <div class="chrome walk-hud" id="walkHud">
   <button class="wh-step" data-d="-1" type="button">&#8249;</button>
@@ -13698,6 +13840,7 @@ function showHome(v) {
 function showHomeType(v) { for (const o of itemObjs) o.visible = v; }
 function revealHomeType() {
   showHomeType(true);
+  standReveal();
   itemEls.forEach((el) => {
     if (!el.classList.contains('entered') || el.classList.contains('is-consumed')) return;
     gsap.killTweensOf(el);
@@ -15097,6 +15240,7 @@ function setActive(i) {
     el.classList.toggle('is-dimmed', j !== i);
   });
   swapWm(ITEMS[i].kanji);
+  standSync();
   /* THE SAME TREATMENT AS UP NEXT, now that it is the same kind of object. When this was bare
      type on a rule, box and label were the same element and `swapText` took its unpainted path:
      fade out, swap, fade in, no resize -- correct, because there was no box to resize. It is a
@@ -15119,6 +15263,201 @@ function setActive(i) {
     });
   }
 }
+/* ================================================================================
+   THE STANDING MENU -- M3, built.
+
+   One row is open. It carries three things and nothing else: WHERE YOU ARE in that section, ONE
+   figure that differs section to section, and the ONE thing Enter does. Everything else about the
+   section stays where it already lives, one level in.
+
+   THE NUMBERS ARE THE PAGE'S OWN. Every figure on this screen is invented -- that is true of the
+   whole mockup -- but they are invented ONCE. The step and the gauge come from `PATH`, the streak
+   from the same 12 the chip along the top shows, the counts from `SUBTILES`, so nothing here can
+   disagree with the screen it hands you to. The design arrived with its own set (a 38-day streak,
+   a review queue, an N3 exam in 12 days) and those are the three that would have contradicted
+   something already on screen.
+   ================================================================================ */
+const ST_TOP = 130, ST_ROW_H = 48, ST_GAP = 18;
+/* the open height is set by which figure the row carries -- a due badge is taller than a gauge */
+const ST_H = { gauge: 140, due: 150, fig: 146 };
+
+function standData() {
+  const step = PATH.done, cur = STUDY_PATH[step] || {};
+  const no = String(step + 1).padStart(2, '0');
+  const of = STUDY_PATH.length;
+  /* which block of the current deck you are standing in, out of its real block list */
+  const blocks = cur.deck ? STUDY_BLOCKS[cur.deck] : null;
+  const bn = blocks ? Math.min(blocks.length, Math.round((blocks.length * PATH.herePct) / 100) + 1) : 1;
+
+  return {
+    STUDY: {
+      tok: 'STEP ' + no + '/' + of,
+      lab: 'WHERE YOU ARE', val: 'STEP ' + no + ' \u00b7 ' + (cur.en || ''),
+      kind: 'gauge', pct: PATH.herePct,
+      slab: 'CONTINUE THE PATH \u25b8',
+      /* the block's REAL name out of `STUDY_BLOCKS`, not "block 4" -- a suggestion whose whole job
+         is to be the one concrete next thing cannot be a number */
+      sug: blocks ? blocks[bn - 1][0] : (cur.en || 'Next step'),
+      sugJp: (cur.jp || '') + ' \u7b2c' + bn,
+      sugBtn: 'BLOCK ' + bn + ' \u25b8',
+    },
+    DAILY: {
+      tok: (ITEMS[1].badge || 0) + ' OPEN',
+      lab: 'TODAY', val: (ITEMS[1].badge || 0) + ' OF 4 STILL OPEN',
+      kind: 'due', due: ITEMS[1].badge || 0, figLab: 'PUZZLES LEFT TODAY',
+      slab: 'PLAY TODAY\u2019S PUZZLES \u25b8',
+      sug: 'Crossword', sugJp: '\u30af\u30ed\u30b9\u30ef\u30fc\u30c9', sugBtn: 'PLAY \u25b8',
+    },
+    READING: {
+      tok: '4 GRADES',
+      lab: 'GRADED', val: 'N5 TO N2',
+      kind: 'fig', fig: '41', figLab: 'TEXTS IN THE LIBRARY',
+      slab: 'OPEN THE LIBRARY \u25b8',
+      sug: 'Short texts, N5', sugJp: '\u77ed\u6587', sugBtn: 'READ \u25b8',
+    },
+    DRILLS: {
+      tok: '4 KINDS',
+      lab: 'BEST SO FAR', val: 'SPEED \u00b7 42',
+      kind: 'fig', fig: '8', figLab: 'DRILLS READY TO RUN',
+      slab: 'PICK A DRILL \u25b8',
+      sug: 'Listening', sugJp: '\u805e\u304d\u53d6\u308a', sugBtn: 'DRILL \u25b8',
+    },
+    JLPT: {
+      tok: '20 MOCKS',
+      lab: 'N5 READINESS', val: 'FOUR PAPERS \u00b7 5 EACH',
+      kind: 'gauge', pct: 62,
+      slab: 'OPEN JLPT PREP \u25b8',
+      sug: 'Grammar mock', sugJp: '\u6587\u6cd5 \u6a21\u8a66', sugBtn: 'START \u25b8',
+    },
+    RECORDS: {
+      tok: '12 DAYS',
+      lab: 'BEST STREAK', val: '21 DAYS',
+      kind: 'fig', fig: '12', figLab: 'DAY STREAK, RUNNING',
+      slab: 'SEE YOUR RECORD \u25b8',
+      sug: 'Accuracy, 86%', sugJp: '\u6b63\u7b54\u7387', sugBtn: 'VIEW \u25b8',
+    },
+  };
+}
+
+const standEl = document.getElementById('standing');
+const standRows = [];
+
+function standBuild() {
+  const D = standData();
+  ITEMS.forEach((it, i) => {
+    const d = D[it.en];
+    /* DAILY'S ACCENT IS THE DEEP ONE. Its section colour IS the vermilion the slab and the due
+       badge are painted in, and two identical reds a centimetre apart read as one shape with a
+       hole in it rather than as an accent and an action. */
+    const acc = SECTION_ACCENT[it.en][it.en === 'DAILY' ? 1 : 0];
+    const row = document.createElement('div');
+    row.className = 'st-row';
+    row.style.setProperty('--i', i);
+    row.style.setProperty('--acc', acc);
+
+    const segs = d.kind === 'gauge'
+      ? '<span class="st-segs">' + Array.from({ length: 12 },
+        (_, k) => '<i style="--d:' + (160 + k * 26) + 'ms"></i>').join('') + '</span>'
+        + '<b class="st-pct">' + d.pct + '%</b>'
+      : d.kind === 'due'
+        ? '<b class="st-due">' + d.due + '</b><span class="st-figlab">' + d.figLab + '</span>'
+        : '<b class="st-fign">' + d.fig + '</b><span class="st-figlab">' + d.figLab + '</span>';
+
+    row.innerHTML = '<div class="st-in">'
+      + '<button class="st-card" type="button">'
+      + '<span class="st-mark"><span class="st-glyph">' + it.kanji + '</span>'
+      + '<b class="st-no">' + String(i + 1).padStart(2, '0') + '</b></span>'
+      + '<span class="st-body">'
+      + '<span class="st-head"><span class="st-en">' + it.en + '</span>'
+      + '<span class="st-jp">' + it.jp + '</span>'
+      + '<span class="st-tok">' + d.tok + '</span></span>'
+      + '<span class="st-detail">'
+      + '<span class="st-state"><b>' + d.lab + '</b><i>' + d.val + '</i></span>'
+      + '<span class="st-fig on">' + segs + '</span></span>'
+      + '<span class="st-slab">' + d.slab + '</span>'
+      + '</span></button>'
+      + '<div class="st-clip"><button class="st-box" type="button" tabindex="-1">'
+      + '<span class="st-box-col">'
+      + '<span class="st-box-txt"><span class="st-box-en">' + d.sug + '</span>'
+      + '<span class="st-box-jp">' + d.sugJp + '</span></span>'
+      + '<span class="st-box-btn">' + d.sugBtn + '</span></span>'
+      + '<span class="st-strip"><span>SUGGESTED</span></span>'
+      + '</button></div></div>';
+
+    const card = row.querySelector('.st-card');
+    const box = row.querySelector('.st-box');
+    /* HOVER OPENS, A CLICK ON THE OPEN ONE GOES. Same two-step the type planes had -- pointing is
+       not choosing -- so a mouse never enters a section it only crossed. */
+    card.addEventListener('mouseenter', () => setActive(i));
+    card.addEventListener('focus', () => setActive(i));
+    card.addEventListener('click', () => { if (active === i) { standPress(i, 'is-press'); select(i); } else setActive(i); });
+    /* the suggestion is a shortcut INTO the section, so it lands in the same place; there is no
+       deeper route to hand it in this mockup, and pretending otherwise would be a dead button */
+    box.addEventListener('click', (e) => { e.stopPropagation(); standPress(i, 'is-boxpress'); select(i); });
+    standEl.appendChild(row);
+    standRows.push({ row, card, box, kind: d.kind, pct: d.pct });
+  });
+  standSync();
+}
+
+function standPress(i, cls) {
+  const r = standRows[i];
+  if (!r) return;
+  r.row.classList.add(cls);
+  clearTimeout(r['_t' + cls]);
+  r['_t' + cls] = setTimeout(() => r.row.classList.remove(cls), 170);
+}
+
+/* THE COLUMN IS SOLVED, NOT LAID OUT. Every row's top is the sum of the heights above it, and one
+   of those heights depends on which row is open -- so there is no resting geometry to store, only
+   this. It runs on every selection change and costs six writes. */
+function standSync() {
+  let y = ST_TOP;
+  standRows.forEach((r, i) => {
+    const open = i === active;
+    const h = open ? ST_H[r.kind] : ST_ROW_H;
+    r.row.classList.toggle('is-open', open);
+    r.row.style.setProperty('--top', y + 'px');
+    r.row.style.setProperty('--h', h + 'px');
+    r.row.style.setProperty('--lag', Math.min(Math.abs(i - active), 4) * 26 + 'ms');
+    if (r.kind === 'gauge') {
+      const on = Math.round((12 * r.pct) / 100);
+      r.row.querySelectorAll('.st-segs i').forEach((seg, k) => seg.classList.toggle('on', open && k < on));
+    }
+    y += h + ST_GAP;
+  });
+}
+
+function standFocus(i) {
+  const r = standRows[i];
+  if (r) r.card.focus({ preventScroll: true });
+}
+/* the entrance, on the same trigger the type planes use, and cleared on the way out so a
+   `both`-filled slide cannot sit on top of the open row's offset */
+function standIntro() {
+  if (!standEl) return;
+  standEl.classList.remove('enter');
+  void standEl.offsetWidth;
+  standEl.classList.add('enter');
+  clearTimeout(standIntro._t);
+  standIntro._t = setTimeout(() => standEl.classList.remove('enter'), 1200);
+}
+function standReveal() {
+  if (!standEl || reduced) return;
+  standRows.forEach((r, i) => {
+    gsap.killTweensOf(r.row);
+    gsap.fromTo(r.row, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power2.out', delay: i * 0.05 });
+  });
+}
+
+document.body.classList.add('menu-inline');
+standBuild();
+NAV.crush = (v) => {
+  const el = document.getElementById('typeShade');
+  if (v != null) el.style.setProperty('--crush', String(v / 100));
+  return Math.round(parseFloat(getComputedStyle(el).getPropertyValue('--crush')) * 100);
+};
+
 function clearActive() {
   itemEls.forEach((el, i) => {
     el.classList.remove('is-active', 'is-dimmed', 'is-consumed');
@@ -18932,7 +19271,7 @@ if (reduced) {
   /* the spread reads HOME's values NOW, which is exactly why composeWorldHome() has to have
      already run — a tween created against the old home cannot be redirected by changing HOME */
   tl.to(cam, { ...HOME, duration: 1.7, ease: 'power3.inOut' });
-  tl.add(() => { itemEls.forEach((el) => el.classList.add('enter')); }, 0.75);
+  tl.add(() => { itemEls.forEach((el) => el.classList.add('enter')); standIntro(); }, 0.75);
   tl.add(() => { ensoEl.classList.add('draw'); }, 0.9);
 }
 
@@ -18944,10 +19283,18 @@ addEventListener('keydown', (e) => {
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
   if (state === 'menu') {
-    if (e.key === 'ArrowDown') { setActive((active + 1) % ITEMS.length); itemEls[active].focus({ preventScroll: true }); }
-    else if (e.key === 'ArrowUp') { setActive((active + ITEMS.length - 1) % ITEMS.length); itemEls[active].focus({ preventScroll: true }); }
+    /* the cursor has two possible carriers now -- the standing row or the type plane behind it --
+       and focus has to land on whichever one is actually on screen, or the arrow keys move a
+       selection whose focus ring is on a `display: none` button */
+    const go = (i) => {
+      setActive(i);
+      if (document.body.classList.contains('menu-inline')) standFocus(i);
+      else itemEls[i].focus({ preventScroll: true });
+    };
+    if (e.key === 'ArrowDown') go((active + 1) % ITEMS.length);
+    else if (e.key === 'ArrowUp') go((active + ITEMS.length - 1) % ITEMS.length);
     else if (e.key === 'Enter') select(active);
-    else if (e.key >= '1' && e.key <= '6') { const i = +e.key - 1; setActive(i); itemEls[i].focus({ preventScroll: true }); }
+    else if (e.key >= '1' && e.key <= '6') go(+e.key - 1);
   } else if (state === 'sub' && walkSec) {
     /* moving IS the scrollbar down here */
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') walkGo(walkAt + 1);
@@ -20467,25 +20814,16 @@ const DBG = (() => {
 })();
 NAV.debug = DBG;
 
-/* THE LEVEL-ONE CARDS, ON A SWITCH. A trial rather than a decision: the six items in the path's
-   own language instead of bare type on the world. `NAV.box()` asks, `NAV.box(false)` puts it back,
-   and the DEBUG row does the same thing with a mouse so the two can be compared rather than
-   remembered. */
-NAV.box = (v) => {
-  const on = v == null ? !document.body.classList.contains('menu-box') : !!v;
-  document.body.classList.toggle('menu-box', on);
-  DBG.touch();
-  return on;
-};
-document.body.classList.add('menu-box');
-
-/* one treatment now, so there is no axis to cycle. `NAV.box(false)` still returns the whole thing
-   to bare type, which is the only question left. */
+/* the standing menu against the type planes it replaced, on a switch, so the two can be put side
+   by side rather than argued about. Registered HERE for the same reason the clock bench's row is:
+   `DBG` is a const declared thousands of lines after the menu is built. */
 DBG.add({
-  label: 'MENU CARDS', key: '',
-  isOpen: () => document.body.classList.contains('menu-box'),
-  toggle: () => NAV.box(),
+  label: 'STANDING MENU', key: '',
+  isOpen: () => document.body.classList.contains('menu-inline'),
+  toggle: () => { document.body.classList.toggle('menu-inline'); DBG.touch(); },
 });
+
+
 
 /* the clock bench's switch. Registered HERE rather than inside `CLOCK_BAR` because that IIFE runs
    a couple of hundred lines earlier, before `DBG` exists -- and guarded, because `?clock=off` and
