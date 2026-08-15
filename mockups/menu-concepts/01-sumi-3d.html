@@ -4308,6 +4308,49 @@ const L3_DAILY = {
   unit: 'items',
 };
 
+/* ================================================================================
+   VOCABULARY IS NOT CHUNKED, SO IT HAS NO BLOCKS TO WALK -- it has a running order.
+
+   `domain/blocks.py` stopped cutting the vocabulary levels into blocks: 2,699 N1 words at
+   twenty a group is 137 groups, forty of them real topics and the rest containers invented
+   to hold the remainder, ending in a literal "Odds & Ends". Kanji kept its blocks because a
+   character genuinely follows the components it is built from; vocabulary has no such spine.
+   604 blocks across the app became 186.
+
+   WHAT REPLACED THE ORDER IS `domain/vocab_order`: the next word is the one whose kanji you
+   already know, and among those the one that uses the MOST of what you know -- so every
+   kanji block cleared pulls the vocabulary that uses it toward the front. These twelve are
+   the real output of that function against the real N5 deck, for a learner standing exactly
+   where this mockup says they are: step 9, forty-five percent through kanji N5, which is
+   three of its six blocks and sixty-seven characters.
+
+   THE ORDER IS WHY THEY LOOK LIKE THIS. Six of the twelve are date words because 日 and the
+   numerals are the block just cleared, and the feed is meant to exercise what was just
+   learned rather than avoid it. An earlier version of the ordering preferred words with the
+   FEWEST kanji and opened on two hundred alphabetical kana instead -- which was the deck's
+   own gojuon order wearing a new name.
+   ================================================================================ */
+const STUDY_FEED = {
+  vocab_n5: {
+    of: 744, readable: 291, knownKanji: 67, budget: 12,
+    /* [word, reading, meaning, the theme it is still labelled with] */
+    words: [
+      ['\u4e8c\u5341\u65e5', 'hatsuka', 'twenty days', 'Days of the Month'],
+      ['\u4e00\u65e5', 'ichinichi', 'one day (duration)', 'Days of the Month'],
+      ['\u4e94\u65e5', 'itsuka', 'five days', 'Days of the Month'],
+      ['\u7537\u306e\u5b50', 'otokonoko', 'boy', 'Relatives'],
+      ['\u5927\u4eba', 'otona', 'adult', 'Relatives'],
+      ['\u5973\u306e\u5b50', 'onnanoko', 'girl', 'Relatives'],
+      ['\u4e5d\u65e5', 'kokonoka', 'nine days', 'Days of the Month'],
+      ['\u4e0a\u624b', 'jouzu', 'be good at', 'Classroom & Reading'],
+      ['\u4e00\u65e5', 'tsuitachi', 'one day', 'Days of the Month'],
+      ['\u5929\u6c17', 'tenki', 'weather', 'Common Nouns'],
+      ['\u5341\u65e5', 'tooka', 'ten days', 'Days of the Month'],
+      ['\u4e03\u65e5', 'nanoka', 'seven days', 'Days of the Month'],
+    ],
+  },
+};
+
 /* ================= STUDY IS A COURSE ==============================================
    Sixteen steps, walked in order, transcribed from `domain/progression_curriculum.py`. Not
    invented and not rearranged: the chain is the graph's own, and `want` is each node's real
@@ -4379,19 +4422,7 @@ const STUDY_BLOCKS = {
     ['Descriptions & Questions', 18], ['Connectives', 5], ['Key Expressions', 10]],
   sentence_examples: [['Copula / Existence', 6], ['Core Particles', 13], ['Verb Forms', 12],
     ['i-Adjectives', 4], ['na-Adjectives', 3], ['Question Words', 11], ['Connectives', 5],
-    ['Common Patterns', 10]],
-  vocab_n5: [['Greetings', 15], ['Numbers', 6], ['Time & Days', 12], ['Family', 8], ['Body', 6],
-    ['Food & Drink', 13], ['School & Study', 12], ['Places', 8], ['Transport', 7],
-    ['Adjectives', 17], ['Verbs', 20], ['Common Nouns', 21], ['Counting & Digits', 25],
-    ['Counters', 28], ['Days of the Month', 16], ['Days of the Week', 7], ['This Week & Last', 17],
-    ['Times of Day', 21], ['Relatives', 18], ['People & Roles', 19], ['Colours', 14],
-    ['The Body', 12], ['Groceries & Taste', 21], ['Kitchen & Tableware', 14], ['Clothes', 21],
-    ['Rooms & Furniture', 24], ['Around Town', 22], ['Getting Around', 15],
-    ['Classroom & Reading', 21], ['Desk & Stationery', 17], ['Devices & Media', 16],
-    ['Weather', 12], ['Seasons & Holidays', 8], ['Animals & Plants', 7], ['Going & Coming', 21],
-    ['Speaking & Learning', 17], ['Handling Things', 31], ['Daily Routine', 19],
-    ['Size & Shape', 20], ['Quality & Manner', 30], ['Feelings & Likes', 14],
-    ['This, That & Where', 36], ['Asking & Answering', 20], ['Joining Words', 16]],
+    ['Common Patterns', 10]]
 };
 
 /* WHERE THE CAMERA STANDS FOR EACH STEP. The garden's own processional way, measured off the
@@ -17013,6 +17044,27 @@ function ftL3Rows(sec, jp) {
      deck done, that many are behind you and the next one is where you are.
      NOT SLICED TO FIVE. The list below caps at five because a standing shot cannot hold more;
      these are walked up the bamboo stairway, and forty-four is what forty-four looks like. */
+  /* A FEED IS NOT A LIST OF PLACES, it is what you are being given today -- so the rows are
+     the words themselves and there are only as many as the budget. `of` is what the strip
+     reports underneath, because "twelve today" means nothing without "of seven hundred". */
+  if (STUDY_FEED[jp]) {
+    const F = STUDY_FEED[jp];
+    return F.words.map(([w, yomi, gloss, theme], k) => ({
+      key: String(k + 1).padStart(2, '0'),
+      /* `block` HERE MEANS "AN INDEXED ITEM", NOT "A BLOCK". `hudRows` reads it to decide
+         whether a row's number comes from `key` or from `en`, and a feed word needs the
+         first: without it the stone's number slot is handed the English gloss, which is how
+         "ONE DAY (DURATION)" came to be set in 21px display type across a 94px stone and out
+         the other side. The road's own mode is decided by `STUDY_BLOCKS`, not by this, so
+         the feed still draws as peers -- nothing sunk, nothing locked. */
+      block: k + 1, of: F.words.length,
+      en: gloss.toUpperCase(), jp: w, n: 1, pct: 0,
+      /* THE READING GOES LAST BECAUSE `csToken` TAKES THE LAST SEGMENT. A stone has room for
+         one fact about a word and it is how to say it -- with the theme last the twelve
+         stones all read "DAYS OF THE", which is a truncated label for a group, not a word. */
+      meta: theme.toUpperCase() + ' \u00b7 ' + yomi.toUpperCase(), unit: 'words',
+    }));
+  }
   if (STUDY_BLOCKS[jp]) {
     const B = STUDY_BLOCKS[jp];
     const done = Math.round((B.length * PATH.herePct) / 100);
@@ -17575,7 +17627,10 @@ const CS_PEER_KIND = {
   STUDY: 'AREA', DAILY: 'GAME', READING: 'TEXT', DRILLS: 'DRILL',
   JLPT: 'PAPER', RECORDS: 'RECORD',
 };
-const csPeerKind = () => (HUD.level === 3 ? 'THEME' : (CS_PEER_KIND[HUD.sec] || 'AREA'));
+/* a feed's stones are WORDS. Everything else at level three is a theme. */
+const csPeerKind = () => (HUD.level === 3
+  ? (STUDY_FEED[HUD.tile] ? 'WORD' : 'THEME')
+  : (CS_PEER_KIND[HUD.sec] || 'AREA'));
 
 function csToken(meta) {
   const m = String(meta || '').toUpperCase();
@@ -17890,11 +17945,16 @@ function courseLayout(rows) {
 
   /* --- the chapter line, the edge tags and the whole-of-it strip --- */
   const cd = CS_CHAPTERS[ch];
-  wrap.querySelector('.cs-chaplead').textContent = peers
-    ? (HUD.level === 3 ? 'THE THEMES \u984c' : 'THE AREAS \u90e8')
-    : blocks ? 'THE BLOCKS \u5e33' : 'THE PATH \u9053';
-  wrap.querySelector('.cs-chapnow').textContent = peers
-    ? (String(n).padStart(2, '0') + ' \u00b7 ' + (HUD.sec || ''))
+  const feed = HUD.level === 3 ? STUDY_FEED[HUD.tile] : null;
+  wrap.querySelector('.cs-chaplead').textContent = feed ? 'TODAY \u4eca\u65e5'
+    : peers
+      ? (HUD.level === 3 ? 'THE THEMES \u984c' : 'THE AREAS \u90e8')
+      : blocks ? 'THE BLOCKS \u5e33' : 'THE PATH \u9053';
+  wrap.querySelector('.cs-chapnow').textContent = feed
+    ? (String(n).padStart(2, '0') + ' OF ' + feed.of + ' \u00b7 '
+      + feed.readable + ' READABLE')
+    : peers
+      ? (String(n).padStart(2, '0') + ' \u00b7 ' + (HUD.sec || ''))
     : blocks
       ? (n + ' BLOCKS \u00b7 ' + rows.filter((x) => x.state === 'done').length + ' CLEARED')
       : (CS_CHNUM[ch] + ' ' + cd.jp + ' ' + cd.en);
@@ -17915,9 +17975,11 @@ function courseLayout(rows) {
   const cleared = rows.filter((x) => x.state === 'done').length;
   /* CLEARED AND TO GO ARE SEQUENCE WORDS. A peer list has neither, so its strip says the two
      things that ARE true of it: how many there are, and which one you are standing on. */
-  wrap.querySelector('.cs-cleared').textContent = peers
-    ? (String(n).padStart(2, '0') + ' ' + csPeerKind() + 'S')
-    : (cleared + (blocks ? ' BLOCKS CLEARED' : ' STEPS CLEARED'));
+  wrap.querySelector('.cs-cleared').textContent = feed
+    ? (feed.knownKanji + ' KANJI KNOWN')
+    : peers
+      ? (String(n).padStart(2, '0') + ' ' + csPeerKind() + 'S')
+      : (cleared + (blocks ? ' BLOCKS CLEARED' : ' STEPS CLEARED'));
   wrap.querySelector('.cs-togo').textContent = peers
     ? ('ON ' + String(sel + 1).padStart(2, '0'))
     : ((n - cleared - 1) + ' TO GO');
