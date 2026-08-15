@@ -15044,10 +15044,11 @@ let flownTo = 0;
 window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* how sensitive the mouse is: `NAV.feel()` reports, `NAV.feel(wheel, drag)` sets. Lower is
      more sensitive. Wheel is deltaY per step (100 = one mouse notch), drag is px per step. */
-  feel: (w, d) => {
+  feel: (w, d, r) => {
     if (w) WHEEL_STEP = w;
     if (d) DRAG_STEP = d;
-    return { wheelPerStep: WHEEL_STEP, dragPxPerStep: DRAG_STEP };
+    if (r) RAIL_DEAD = r;
+    return { wheelPerStep: WHEEL_STEP, dragPxPerStep: DRAG_STEP, railDeadbandPx: RAIL_DEAD };
   },
   /* which item the keyboard is on. Without this a harness can only COUNT its own ArrowDowns and
      hope none were swallowed — which is how a flight regression run came back reporting READING's
@@ -19631,19 +19632,28 @@ let DRAG = null, dragEnded = 0, wheelAcc = 0;
    THE DRAG IS DELIBERATELY HEAVIER THAN THE WHEEL. 96px is most of a tablet's width, so
    pushing the road along is a decision rather than a twitch. Tune both live with
    `NAV.feel(wheel, drag)` rather than editing this line. */
-let DRAG_STEP = 96;
-let WHEEL_STEP = 100;
+let DRAG_STEP = 130;
+let WHEEL_STEP = 120;
+/* THE RAIL'S DEADBAND. Absolute mapping is right for a map, but 1,128px over 76 blocks is
+   fifteen pixels each -- inside the wobble of a hand holding a mouse still. The pointer has to
+   travel this far from wherever the last change was committed before another one is, which kills
+   the jitter without breaking the metaphor: keep moving and it still lands exactly where you
+   point, because every commit re-arms from the new position. */
+let RAIL_DEAD = 22;
 
 /* THE DRAG IS CLAMPED WHERE THE CLICK IS REFUSED. Scrubbing past the open block would let the
    pointer reach blocks the keyboard and the mouse both decline to open. */
-function dragPickDeck(x) {
+function dragPickDeck(x, force) {
   if (!DRAG || !DRAG.bands) return;
+  /* the first press commits immediately; after that the pointer must clear the deadband */
+  if (!force && DRAG.armed !== undefined && Math.abs(x - DRAG.armed) < RAIL_DEAD) return;
   let i = 0;
   for (let k = 0; k < DRAG.bands.length; k++) if (x >= DRAG.bands[k]) i = k;
   const here = dkHere();
   i = Math.max(0, Math.min(i, here));
   const want = i === here ? -1 : i;
   if (want === DK_PICK) return;
+  DRAG.armed = x;
   DK_PICK = want; DK_OPEN = false; HUD.cur = 0;
   hudDraw();
 }
@@ -19676,9 +19686,13 @@ function hudWheel(e) {
   if (!onDeck && !onRoad) return;
   e.preventDefault();
   wheelAcc += e.deltaY;
-  const step = Math.trunc(wheelAcc / WHEEL_STEP);
+  let step = Math.trunc(wheelAcc / WHEEL_STEP);
   if (!step) return;
   wheelAcc -= step * WHEEL_STEP;
+  /* NO SINGLE EVENT MOVES MORE THAN ONE STEP. A free-spinning wheel and a trackpad flick both
+     deliver enormous deltas in one event, and without this the screen jumps a dozen blocks from
+     one flick. Capping per event turns a hard push into a fast scroll instead of a teleport. */
+  step = Math.max(-1, Math.min(1, step));
   if (onDeck) {
     const here = dkHere();
     const from = DK_PICK < 0 ? here : DK_PICK;
@@ -19913,7 +19927,7 @@ function hudBuild(rows) {
     DRAG = { kind: 'deck', lastX: e.clientX, moved: 0,
       bands: segs.map((el) => el.getBoundingClientRect().left) };
     document.body.classList.add('is-dragging');
-    dragPickDeck(e.clientX);
+    dragPickDeck(e.clientX, true);
   });
   const csStrip = hudEl.querySelector('.cs-strip');
   if (csStrip) csStrip.addEventListener('pointerdown', (e) => {
@@ -20576,9 +20590,10 @@ let walkWheelAcc = 0;
 addEventListener('wheel', (e) => {
   if (!walkSec || busy) { walkWheelAcc = 0; return; }
   walkWheelAcc += e.deltaY;
-  const step = Math.trunc(walkWheelAcc / WHEEL_STEP);
+  let step = Math.trunc(walkWheelAcc / WHEEL_STEP);
   if (!step) return;
   walkWheelAcc -= step * WHEEL_STEP;
+  step = Math.max(-1, Math.min(1, step));
   walkGo(walkAt + step);
 }, { passive: true });
 
