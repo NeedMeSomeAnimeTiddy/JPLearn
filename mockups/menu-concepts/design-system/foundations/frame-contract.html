@@ -1,0 +1,174 @@
+<!-- @dsCard group="Foundations" -->
+<!doctype html>
+<meta charset="utf-8">
+<title>The frame contract — where a screen is allowed to stand</title>
+<style>
+  :root {
+    --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  body { background: #10131e; color: var(--washi); font-family: var(--lat-ui);
+    font-weight: 600; letter-spacing: 0.03em; padding: 34px 40px 60px; }
+  h1 { font-family: var(--lat); font-style: italic; font-size: 26px; margin-bottom: 10px; }
+  .lede { max-width: 1000px; font-size: 13px; line-height: 1.75;
+    color: rgba(242,234,216,0.82); }
+  .lede + .lede { margin-top: 8px; }
+  .lede b { color: var(--gold-hi); }
+  .warn { color: #ff9d86; }
+  h2 { font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 34px 0 14px; }
+
+  /* ---- the diagram: the real valley at half size, with the four zones on it ---- */
+  .frame { position: relative; width: 640px; height: 360px; margin: 4px 0 8px;
+    background: url(../assets/valley-records.png) center/cover; overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(242,234,216,0.3); }
+  .frame > i { position: absolute; display: block; }
+  /* every number below is the contract's own, halved -- the frame is 1280x720 */
+  .stage { left: 80px; top: 96px; width: 480px; height: 192px;
+    box-shadow: inset 0 0 0 2px var(--gold-hi); background: rgba(207,164,92,0.14); }
+  .moat { top: 0; bottom: 0; width: 80px; background: rgba(227,74,51,0.16); }
+  .moat.l { left: 0; } .moat.r { right: 0; }
+  .crown { left: 80px; right: 80px; top: 0; height: 96px; background: rgba(91,134,196,0.16); }
+  .foot { left: 80px; right: 80px; top: 288px; height: 24px; background: rgba(91,134,196,0.26); }
+  .scrim { left: 0; right: 0; top: 280px; bottom: 0;
+    background: linear-gradient(180deg, rgba(14,17,26,0) 0%, rgba(14,17,26,0.28) 100%); }
+  .frame span { position: absolute; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+    letter-spacing: 0.18em; padding: 2px 5px; background: rgba(10,9,6,0.86); white-space: nowrap; }
+  .frame span.g { color: var(--gold-hi); }
+  .frame span.r { color: #ff9d86; }
+  .frame span.b { color: #9fc0f0; }
+  .cap { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 12px; font-size: 11.5px;
+    color: rgba(242,234,216,0.7); }
+  .cap b { color: var(--gold-hi); font-family: ui-monospace, Consolas, monospace;
+    letter-spacing: 0; }
+
+  table { border-collapse: collapse; font-size: 11.5px; margin-top: 10px; max-width: 1000px; }
+  td, th { text-align: left; padding: 6px 20px 6px 0; vertical-align: top;
+    border-bottom: 1px solid rgba(242,234,216,0.1); }
+  th { color: var(--gold-hi); font-size: 9.5px; letter-spacing: 0.18em; font-weight: 700; }
+  td { color: rgba(242,234,216,0.78); }
+  td.n { font-family: ui-monospace, Consolas, monospace; letter-spacing: 0; color: var(--gold-hi); }
+  code { font-family: ui-monospace, Consolas, monospace; color: var(--gold-hi);
+    letter-spacing: 0; font-size: 11px; }
+  .note { margin: 14px 0 0; padding: 15px 18px; background: rgba(227,74,51,0.1);
+    box-shadow: inset 0 0 0 1px rgba(227,74,51,0.4); max-width: 1000px;
+    font-size: 12px; line-height: 1.7; }
+  .note b { color: #ff9d86; }
+  .keep { margin: 14px 0 0; padding: 15px 18px; background: rgba(207,164,92,0.1);
+    box-shadow: inset 0 0 0 1px rgba(207,164,92,0.42); max-width: 1000px;
+    font-size: 12px; line-height: 1.7; }
+  .keep b { color: var(--gold-hi); }
+  ul { margin: 8px 0 0 18px; font-size: 12px; line-height: 1.75;
+    color: rgba(242,234,216,0.78); max-width: 1000px; }
+  li + li { margin-top: 5px; }
+</style>
+
+<h1>The frame contract — where a screen is allowed to stand</h1>
+<p class="lede">
+  This supersedes the old constraint that a screen "gets roughly y&nbsp;200 to y&nbsp;620, full
+  width". Full width was the problem. <b>The valley is the reason this menu exists</b>, and a screen
+  that paints to both edges has spent the whole budget of the idea before it has said anything.
+</p>
+<p class="lede">
+  Every screen in <code>01-sumi-3d.html</code> was moved onto this in August 2026 and measured
+  afterwards — the numbers below are not a proposal.
+</p>
+
+<h2>THE FOUR ZONES</h2>
+<div class="frame">
+  <i class="crown"></i>
+  <i class="foot"></i>
+  <i class="moat l"></i>
+  <i class="moat r"></i>
+  <i class="stage"></i>
+  <i class="scrim"></i>
+  <span class="g" style="left:88px; top:104px">STAGE &middot; 960 &times; 384</span>
+  <span class="r" style="left:4px; top:170px">MOAT</span>
+  <span class="r" style="right:4px; top:170px">MOAT</span>
+  <span class="r" style="left:4px; top:186px">160</span>
+  <span class="r" style="right:4px; top:186px">160</span>
+  <span class="b" style="left:270px; top:40px">CROWN</span>
+  <span class="b" style="left:272px; top:292px">FOOT</span>
+</div>
+<div class="cap">
+  <span>stage <b>x 160&ndash;1120 &middot; y 192&ndash;576</b></span>
+  <span>balanced about <b>x 640</b></span>
+  <span>scrim <b>0% at y560 &rarr; 28% at y720</b></span>
+</div>
+
+<table>
+  <tr><th>ZONE</th><th>WHERE</th><th>WHAT MAY STAND IN IT</th></tr>
+  <tr><td>STAGE</td><td class="n">x 160&ndash;1120<br>y 192&ndash;576</td>
+    <td>The drawing. All of it. 40% of the frame, and it never grows &mdash; when there is more
+      content than fits, the content folds (see overflow), the stage does not.</td></tr>
+  <tr><td>MOAT</td><td class="n">x 0&ndash;160<br>x 1120&ndash;1280</td>
+    <td>Nothing. Bare valley, full height, both sides. Not a rail, not a tally, not an action slab
+      hanging off a card's right end.</td></tr>
+  <tr><td>CROWN</td><td class="n">y 0&ndash;192</td>
+    <td>Furniture only: the brand at (48,&nbsp;24), the heading slab y&nbsp;56&ndash;150, the stat
+      chips to a right edge of 1232.</td></tr>
+  <tr><td>FOOT</td><td class="n">y 576&ndash;~640</td>
+    <td>Whole-set summaries and nothing else &mdash; the library's thirty-bar strip, the deck's
+      minimap, the ascent's plinths, the ledger's level bar. One object, thin, spanning the stage.</td></tr>
+</table>
+
+<h2>THE RULE NOBODY GUESSES — SKEW IS PAINT, NOT LAYOUT</h2>
+<p class="lede">
+  Every plate in this interface is <code>skewX(-8deg) rotate(-1.2deg)</code>, and
+  <b>a bounding box on a skewed plane measures the projection, not the box</b>. Authoring
+  <code>left: 160px</code> does not put a plate's paint at x&nbsp;160 — it puts it somewhere left of
+  that, by an amount that depends on the plate's HEIGHT. This is the single most common way a screen
+  ends up in the moat while its CSS looks correct.
+</p>
+<table>
+  <tr><th>TRANSFORM</th><th>GROWS PER SIDE</th><th>SO</th><th>PAINTS OVER BY</th></tr>
+  <tr><td>skew + roll<br><code>skewX(-8) rotate(-1.2)</code><br>the normal plate</td>
+    <td class="n">horizontal:<br>0.0598 &times; height<br><br>vertical:<br>0.0105 &times; width</td>
+    <td>a 236-tall card<br>a 96-tall rail<br>a 944-wide year band<br>a 660-wide menu row</td>
+    <td class="n">14.1px each side<br>5.7px each side<br>9.9px top and bottom<br>6.9px top and bottom</td></tr>
+  <tr><td>skew only<br><code>skewX(-8)</code><br>the ascent's columns</td>
+    <td class="n">horizontal:<br>0.0703 &times; height<br><br>vertical: none</td>
+    <td>a 352-tall column</td><td class="n">24.7px each side</td></tr>
+</table>
+<p class="lede" style="margin-top:10px">
+  So the stage's 160 and 1120 become an authored <b>174 and 1106</b> for a card, <b>166 and 1114</b>
+  for a rail, <b>185 and 1095</b> for a full-height column. And the vertical one is the expensive
+  one, because it scales with WIDTH: the ledger's four plates come to about <b>425 painted</b> in a
+  384 stage, and 41 of those pixels are nothing but three wide plates rolled 1.2&deg; rising at
+  their ends. That is why its level bar is in the foot band and not on the stage.
+  <span class="warn">Budget for it before laying anything out, or a screen that fits on paper
+  will not fit on screen.</span>
+</p>
+
+<h2>THE OVERFLOW RULE</h2>
+<p class="lede">
+  The stage never grows and nothing scrolls, so a set that does not fit is <b>folded</b>, and
+  <b>what leaves becomes a count on the edge it left over</b>.
+</p>
+<ul>
+  <li><b>Lists window around the selection.</b> The library holds thirty texts and paints six —
+    two above, three below — with "10&nbsp;ABOVE" and "14&nbsp;BELOW" pinned to the stage's top and
+    bottom edges, and a thirty-bar strip in the foot so the whole set is still on screen.</li>
+  <li><b>Chains paint at most 7 stones.</b> The deck screen holds 76 blocks and paints three
+    objects: the count behind you, the one open block, the one ahead. The rest is the proportional
+    rail — which is a whole-set summary, so it takes the foot.</li>
+  <li><b>A whole-set summary may paint every member</b>, because it is one thin object rather than
+    a set of choosable ones. Thirty bars and 76 segments both pass.</li>
+</ul>
+
+<div class="keep">
+  <b>What survives a fold, and what does not.</b> When a card narrows, cut copy rather than type.
+  The deck's gate line lost its tail because the card count was already in the line above it; the
+  ascent's plinths lost their counts because the panel beside them spells those out for the selected
+  level. What must not happen is a 9px caption becoming a 7px one — every caption in this interface
+  is already at the floor, and the ground it stands on is a moving 3D valley.
+</div>
+
+<div class="note">
+  <b>The one deliberate deviation.</b> The standing menu obeys the moat and the bands and does not
+  obey the balance: it is a left column with the mountain to its right, and that composition is the
+  reason the rest of the interface looks the way it does. Every other screen is balanced about
+  x&nbsp;640.
+</div>

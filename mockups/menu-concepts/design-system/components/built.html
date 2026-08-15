@@ -128,7 +128,7 @@
   .tab.locked .tab-foot.word { color: rgba(242,234,216,0.52); }
 
   /* ---------- C. the hero ---------- */
-  .hero { width: 290px; height: 384px; transform: skewX(-8deg) rotate(-1.2deg);
+  .hero { width: 290px; height: 376px; transform: skewX(-8deg) rotate(-1.2deg);
     display: flex; flex-direction: column; background: var(--washi);
     box-shadow: 6px 8px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.15); }
   .h-tab { padding: 5px 0 6px; background: var(--ink); color: var(--gold-hi); text-align: center;
@@ -247,7 +247,17 @@
   </div>
 </div>
 
-<h2>B &amp; C &mdash; THE ROAD &middot; DAILY and DRILLS, and READING&rsquo;s level three &mdash; NO LONGER EVERY SECTION, see components/screens.html</h2>
+<h2>B &amp; C &mdash; THE ROAD &middot; DAILY and DRILLS only &mdash; see components/screens.html</h2>
+<p class="note" style="margin-bottom:16px;max-width:900px">
+  <b>Two things about this object are now settled elsewhere.</b> Its strip is inset to the frame
+  contract's stage rather than running full-bleed, and the road fades at x&nbsp;160 into open valley
+  rather than at the frame edge &mdash; the mask is what makes that read as a route rather than a
+  cut. And the hero is <b>376</b> tall, not 384: skewed and rolled it paints 6px taller than it is
+  authored, and the stage is 384. See <code>foundations/frame-contract.html</code>.
+  <br><br>
+  <b>It is the right shape at DAILY and the wrong one at DRILLS</b>, which is seventeen modes in
+  five groups drawn as four tablets. READING&rsquo;s level three no longer uses it.
+</p>
 <div class="stage">
   <div class="row" style="align-items:flex-end;gap:18px">
     <div class="post"><b>START</b></div>

@@ -9,8 +9,11 @@ this is stale.**
 
 | Card | What it settles |
 | --- | --- |
-| `components/built.html` | **Start here.** The five objects everything past the menu is now made of — menu row, road tablet, hero card, heading slab, caption chip — at real size, on the real backdrop, with the numbers they are built from. |
-| `foundations/backdrop.html` | The real valley, rendered at 1280×720 with the interface switched off, and the six menu items' measured footprints on it. Use `assets/valley-sunset.png` as the background of anything you design. |
+| `foundations/frame-contract.html` | **Start here.** Where a screen is allowed to stand: the stage, the moat, the two bands, the overflow rule, and the skew arithmetic that puts a screen in the moat while its CSS looks correct. Everything built obeys it. |
+| `components/screens.html` | The eleven screens that exist, each as a real 1280×720 plate at one hour, with which of the four shapes it is and which two still have open problems. |
+| `components/built.html` | The five objects those screens are made of — menu row, road tablet, hero card, heading slab, caption chip — at real size, on the real backdrop, with the numbers they are built from. |
+| `foundations/backdrops.html` | The ground each of the six sections actually stands on — six real plates with the interface switched off. The camera stands somewhere different in each section, so design against the one you are designing for. **JLPT and RECORDS are the two extremes.** |
+| `foundations/backdrop.html` | The older single-plate version of the above, kept for the measured menu footprints on it. |
 | `foundations/color.html` | The six tokens, the six section accents, and the colour law: gold = earned, vermilion = the one thing to press, ink = not yet. |
 | `foundations/type.html` | The four faces available and what each is for. Display vs label, mincho vs gothic. |
 | `foundations/legibility.html` | Physics, not taste: the interface stands on a lit, moving, flat-shaded valley, so type needs a keyline, a ground, or a crushed backdrop. Shown failing and fixed. |
@@ -20,20 +23,40 @@ this is stale.**
 
 ## What is settled, and no longer open
 
-The **STUDY course** was the open problem here for a long time and is now built: a horizontal road
-of standing stones with the step you are on as a large card at the centre, START and END posts at
-its two ends, and one divider where the curriculum stops teaching and starts certifying. That shape
-now carries **every section at both levels** — three modes of one layout:
+**Every screen is built.** Eleven of them, across three levels, all shown in
+`components/screens.html`. The four problems this file used to open with — a deck's blocks at real
+scale, RECORDS, JLPT, the vocabulary feed's missing budget — are all drawings now. The reference
+data behind each is kept below, because it is still what those screens are made of.
 
-- `path` — an ordered, gated sequence. Gates, seals, a cleared count, depth for what is behind you.
-- `blocks` — the same, one level in, for a deck's blocks.
-- `peers` — an unordered set. The same stones with none of the sequence furniture: nothing sunk,
-  nothing locked, no marker, no cleared count.
+**Every screen stands on the frame contract**, added August 2026 and applied to all eleven:
+x 160–1120 / y 192–576, bare valley 160px either side, whole-set summaries in the foot band, and
+nothing scrolls. See `foundations/frame-contract.html` — it supersedes the old "y 200 to y 620, full
+width", which is what let screens paint to both edges and bury the valley the menu exists to show.
 
-The menu itself (level one) is a vertical column of the same rows, one open at a time. All of it
-is in `components/built.html`.
+**The road is no longer the shape of everything.** It used to carry every section at both levels.
+It now carries two — DAILY and DRILLS — and it is the right shape for one of them.
 
-## The four open problems
+## The two open problems
+
+Both are **shape** problems rather than layout ones, and both have their own brief.
+
+### A. DRILLS is drawn as four tablets and is seventeen modes in five groups
+
+The road is right for a small unordered set you pick between. DRILLS is not that. It is the same
+category error STUDY had before its rebuild: a drawing describing a decision nobody is offered.
+
+### B. JLPT has no level three, so its level two is doing two jobs
+
+The ascent carries a permanent detail panel for whichever level is selected. That panel is a level
+three living inside level two, and it is why JLPT paid more for the frame contract than any other
+screen — three columns of demand in a 960 stage, with the panel squeezed 340→288 and the plinths
+losing their mastered counts to fit.
+
+## The reference data behind each screen
+
+Every figure below was read out of the running app on 2026-08-15, not remembered. These are no
+longer briefs — the screens exist — but they are what the screens are made of, and a redesign that
+contradicts one of them is wrong.
 
 These are the screens the road does **not** fit. Each is a separate brief. Every figure below was
 read out of the running app on 2026-08-15, not remembered.
@@ -69,8 +92,8 @@ and a locked state: block N+1 opens when block N reaches **70%** of its cards an
 ### 2. RECORDS
 
 Its four items — STREAK, ACCURACY, TIME, RANK — are **figures you read, not places you go**, and
-there is nothing inside a streak to open. It is the one screen in the app that is a dashboard and it
-currently borrows a route.
+there is nothing inside a streak to open. It is the one screen in the app that is a dashboard, and
+the ledger is built as one.
 
 **It has far more data than this brief used to claim.** The earlier version said there was no
 per-day series and nothing to plot. That was wrong. `daily-activity` returns up to **365 days** of
@@ -86,7 +109,8 @@ into this level and XP to the next.
 
 ### 3. JLPT
 
-**The four papers this screen currently shows do not exist in the app.** 文字語彙 / 文法 / 読解 /
+Historical note, kept because it is the mistake this screen was built to correct:
+**the four papers an early version showed do not exist in the app.** 文字語彙 / 文法 / 読解 /
 聴解 at "5 mock exams each" was invented for the mockup. What the app actually has, in
 `views/JLPTPrepView.tsx` and `domain/jlpt_readiness.py`:
 
@@ -102,25 +126,24 @@ into this level and XP to the next.
 - A mock exam is scored against the level's **real pass mark** — N5 80, N4 90, N3 95, N2 90, N1 100
   — plus a vocabulary/grammar section maximum and section pass mark.
 
-So the app knows three things the screen does not show: how ready you are, what is gating the next
-level, and that these four buttons are ways to sit the same exam rather than four exams.
+The built ascent shows all three of the things the early version did not: how ready you are, what is
+gating the next level, and that the four modes are ways to sit the same exam rather than four exams.
+What it does not yet have is anywhere to go when you choose one — see open problem B.
 
-### 4. The vocabulary feed has no control
+### 4. The vocabulary feed
 
-The newest screen, and the only one here that is already built. Vocabulary's level three is no
-longer a block list — it is **today's words**: twelve tablets on the road in peers mode, nothing
+Vocabulary's level three is not a block list — it is **today's words**: twelve tablets on the road in peers mode, nothing
 sunk, nothing locked. Ordering is `domain/vocab_order` — the next word is the one whose kanji you
 already know, and among those the one using the **most** of what you know, so every kanji block
 cleared pulls vocabulary toward the front.
 
-It shows the words and two denominators (291 of 744 readable, 67 kanji known). **It does not show
-the daily budget**, which is the single number the entire screen is generated from. The shipped app
-has a chip row — none / 5 / 10 / 20 / 40 — and the mockup hardcodes twelve with nowhere to change
-it.
+It shows the words, two denominators (291 of 744 readable, 67 kanji known) and **the daily budget**,
+which is the single number the whole screen is generated from — the shipped app's own chip row,
+none / 5 / 10 / 20 / 40. It is on the screen rather than in a setting for that reason.
 
-There is a deeper mismatch under that. A road is a set of places you walk, in an order, and they are
-still there tomorrow. A feed is a queue that is **replaced** tomorrow, and finishing it is the point.
-Both are currently the same drawing.
+The distinction it is built on: a road is a set of places you walk, in an order, and they are still
+there tomorrow. A feed is a queue that is **replaced** tomorrow, and emptying it is the point. They
+are not the same drawing.
 
 ## Hard constraints
 
@@ -128,13 +151,17 @@ Both are currently the same drawing.
    widgets. No boards, signs or tablets in the world.
 2. **Square corners.** No `border-radius`, anywhere.
 3. **It stands on a lit 3D valley** that moves and changes with time of day, from bright sand to
-   green canopy to night. Two real frames are in `assets/`; design on top of a plate, not on a flat
-   colour — see `foundations/legibility.html` for why.
+   green canopy to night. Six real per-section plates are in `assets/valley-*.png`; design on top of
+   the one for your section, not on a flat colour and not on the generic sunset — see
+   `foundations/backdrops.html` for which ground is which, and `foundations/legibility.html` for
+   why it matters.
 4. **Windows system fonts only** — no webfonts. See `foundations/type.html`.
 5. **The frame is 1280×720 design px**, scaled up whole on larger screens (a 2560 display draws
-   everything at exactly 2×). A heading slab occupies the top left down to y 195; a new screen's
-   drawing gets roughly **y 200 to y 620, full width**. A caption strip is pinned at the frame's
-   foot.
+   everything at exactly 2×). A screen's drawing gets **x 160–1120 by y 192–576 and nothing else** —
+   see `foundations/frame-contract.html`, which replaced the old "y 200 to y 620, full width". Full
+   width was the problem: the valley is the reason this menu exists, and a screen that paints to
+   both edges has spent the whole budget of the idea. Whole-set summaries may use the foot band
+   below y 576; the heading, brand and stat chips own the crown above y 192.
 6. **Keyboard first.** Arrows move the selection, Enter opens it, Escape goes back. Anything drawn
    needs an obvious next and previous.
 
