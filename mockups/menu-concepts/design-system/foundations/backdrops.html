@@ -1,0 +1,133 @@
+<!-- @dsCard group="Foundations" -->
+<!doctype html>
+<meta charset="utf-8">
+<title>Backdrops — what each section actually stands on</title>
+<style>
+  :root {
+    --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  body { background: #10131e; color: var(--washi); font-family: var(--lat-ui);
+    font-weight: 600; letter-spacing: 0.03em; padding: 34px 40px 60px; }
+  h1 { font-family: var(--lat); font-style: italic; font-size: 26px; letter-spacing: 0.02em;
+    margin-bottom: 10px; }
+  .lede { max-width: 980px; font-size: 13px; line-height: 1.75;
+    color: rgba(242,234,216,0.82); margin-bottom: 8px; }
+  .lede b { color: var(--gold-hi); }
+  h2 { font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 30px 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 26px; }
+  figure { background: rgba(255,255,255,0.03); box-shadow: inset 0 0 0 1px rgba(242,234,216,0.13); }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { padding: 12px 15px 15px; }
+  .name { display: flex; align-items: baseline; gap: 12px; margin-bottom: 7px; }
+  .name b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
+    color: var(--washi); }
+  .name i { font-style: normal; font-size: 9px; letter-spacing: 0.2em;
+    color: rgba(242,234,216,0.45); }
+  figcaption p { font-size: 11.5px; line-height: 1.65; color: rgba(242,234,216,0.74); }
+  figcaption p + p { margin-top: 6px; }
+  .warn { color: #ff9d86; }
+  .note { margin-top: 34px; padding: 16px 18px; background: rgba(227,74,51,0.1);
+    box-shadow: inset 0 0 0 1px rgba(227,74,51,0.4); max-width: 980px;
+    font-size: 12px; line-height: 1.7; }
+  .note b { color: #ff9d86; }
+  code { font-family: ui-monospace, Consolas, monospace; color: var(--gold-hi);
+    letter-spacing: 0; }
+</style>
+
+<h1>Backdrops — what each section actually stands on</h1>
+<p class="lede">
+  Every one of these is the real mockup at 1280&times;720 with the whole interface switched off:
+  the panel, the chrome, the key hints and the darkening scrim. <b>This is the ground a design
+  has to survive</b>, and it is not one ground — the camera stands somewhere different in each
+  section, so a layout that reads beautifully over a sunset valley can disappear over a lit
+  plaza.
+</p>
+<p class="lede">
+  Design against the section you are designing for. If a screen has to work everywhere, check it
+  against <b>JLPT</b> and <b>RECORDS</b> — they are the two extremes.
+</p>
+
+<h2>THE SIX</h2>
+<div class="grid">
+
+  <figure>
+    <img src="../assets/valley-study.png" alt="STUDY backdrop">
+    <figcaption>
+      <div class="name"><b>STUDY</b><i>学習 · THE COURSE, THE DECK, THE FEED</i></div>
+      <p>A bamboo grove with timber structures. Mid-dark overall and the most forgiving of the
+        six — cream plates sit on it cleanly almost anywhere.</p>
+      <p>Its one hazard is <span class="warn">vertical</span>: the trunks are strong upright
+        stripes, so vertical rules and tall thin columns compete with them.</p>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <img src="../assets/valley-daily.png" alt="DAILY backdrop">
+    <figcaption>
+      <div class="name"><b>DAILY</b><i>日課 · THE FOUR GAMES</i></div>
+      <p>A festival approach under a torii — warm reds, cream stall cloth, figures on the path.
+        Busy through the middle band.</p>
+      <p><span class="warn">Vermilion is already in this picture.</span> The action slab is the
+        only vermilion the interface owns, and here it has competition.</p>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <img src="../assets/valley-reading.png" alt="READING backdrop">
+    <figcaption>
+      <div class="name"><b>READING</b><i>読解 · THE LIBRARY</i></div>
+      <p>A street at dusk with a mountain behind it. Purple-to-orange sky across the top third,
+        lit buildings at both edges, a darker road down the centre.</p>
+      <p>The centre column is the safe place for pale plates; the <span class="warn">two edges
+        are the bright part</span>, which is the opposite of most of the others.</p>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <img src="../assets/valley-drills.png" alt="DRILLS backdrop">
+    <figcaption>
+      <div class="name"><b>DRILLS</b><i>訓練 · THE PRACTICE MODES</i></div>
+      <p>Bamboo again, tighter and darker than STUDY. The most neutral ground in the set and the
+        easiest to put anything on.</p>
+      <p>Low contrast throughout, so a design that relies on the world for separation gets no
+        help here — it needs its own edges.</p>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <img src="../assets/valley-jlpt.png" alt="JLPT backdrop">
+    <figcaption>
+      <div class="name"><b>JLPT</b><i>検定 · THE ASCENT</i></div>
+      <p><b>The hardest one.</b> A five-storey vermilion pagoda dead centre, cream steps, lit
+        lanterns, a crowd. Bright, saturated and busy exactly where a screen wants its middle.</p>
+      <p class="warn">The ascent's dark columns vanished into this before a crush layer was added.
+        If a design works here it works anywhere; if it is only ever checked on the sunset plate,
+        it will fail here and nowhere else.</p>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <img src="../assets/valley-records.png" alt="RECORDS backdrop">
+    <figcaption>
+      <div class="name"><b>RECORDS</b><i>記録 · THE LEDGER</i></div>
+      <p>The wide valley at sunset. Sky across the top half, a pink lake through the middle, a
+        dark band of foreground along the bottom.</p>
+      <p>The <span class="warn">brightest top half</span> of the six — pale type at the top of
+        this frame has nothing to sit against, while the bottom third is nearly black.</p>
+    </figcaption>
+  </figure>
+
+</div>
+
+<div class="note">
+  <b>Two things these pictures are for.</b> First: put the matching one behind whatever you are
+  designing, at 1280&times;720, rather than the generic
+  <code>valley-sunset.png</code> — that plate is RECORDS' view and nobody else's.
+  Second: they show how much of the frame the interface is currently allowed to cover, which is
+  the live question. The valley is the reason this menu exists; a screen that buries it has
+  spent the whole budget of the idea.
+</div>
