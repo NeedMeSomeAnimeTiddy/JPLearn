@@ -1881,13 +1881,27 @@
      hall, which is the brightest pose in the world. Its columns are dark tracks with pale type
      and they simply vanished into a red-and-cream building. This is `foundations/legibility`
      doing its job: a crushed backdrop is one of the three things that makes type survive here. */
+  /* ================================================================================
+     RULE 5 OF THE FRAME CONTRACT -- THE SCRIM IS NO LONGER GLOBAL.
+
+     It used to darken the whole frame: about 16% black at the top rising to 33% at the
+     foot, on every screen past the menu. That is what made the valley read as a texture
+     rather than a place -- three quarters of the picture dimmed to protect type that
+     mostly had its own paper to sit on anyway.
+
+     The contract kills it above y560. Zero darkening across the top three quarters, one
+     band from 0% at y560 to 28% at y720, which exists to hold the tallies and rails that
+     sit at the stage's foot. EVERYTHING ABOVE y560 BRINGS ITS OWN GROUND -- opaque paper,
+     an ink wash, or a keyline. A screen that needed the global scrim to be legible was
+     never legible; it was being carried.
+     ================================================================================ */
   .hud[data-course]::before,
   .hud[data-screen]::before {
     content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background: linear-gradient(180deg,
-      rgba(14, 17, 26, calc(var(--crush) * 0.62)) 0%,
-      rgba(14, 17, 26, calc(var(--crush) * 1.05)) 58%,
-      rgba(14, 17, 26, calc(var(--crush) * 1.3)) 100%);
+      rgba(14, 17, 26, 0) 0%,
+      rgba(14, 17, 26, 0) 77.8%,
+      rgba(14, 17, 26, 0.28) 100%);
   }
   /* FULL-BLEED, BECAUSE THE ROAD IS A FRAME-WIDE COMPOSITION. Every other block in this panel is
      a column inset by the panel's 52px left padding, and putting the path in one left-shifted it:
@@ -20320,7 +20334,11 @@ function libraryLayout() {
     el.classList.toggle('on', isSel);
     el.style.top = L.tops[i] + 'px';
     el.style.height = h + 'px';
-    el.style.opacity = d === 0 ? 1 : d <= 2 ? 0.98 : d <= 4 ? 0.9 : d <= 6 ? 0.74 : 0.5;
+    /* RULE 5 TOOK THE GLOBAL SCRIM AWAY, so a row can no longer borrow legibility from a
+       darkened world -- at 0.5 the street behind was visible straight through the paper. The
+       ramp survives as a whisper and the viewport mask does the actual fading at the edges,
+       which is what it was already there for. */
+    el.style.opacity = d === 0 ? 1 : d <= 2 ? 0.99 : d <= 4 ? 0.97 : d <= 6 ? 0.95 : 0.92;
     el.style.zIndex = isSel ? 12 : 4;
     el.style.transform = `scale(${Math.max(0.9, 1 - Math.min(d, 6) * 0.016)})`;
     /* the leading edge leans with the row's own height, so a tall row leans further */
