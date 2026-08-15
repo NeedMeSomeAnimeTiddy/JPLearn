@@ -2497,7 +2497,10 @@
     color: rgba(20, 17, 13, 0.32); }
 
   /* ---- the band markers, which stick ---- */
-  .lb-heads { position: absolute; left: 160px; top: 26px; width: 960px; height: 384px;
+  /* 28, NOT 26. This block's origin is frame y164, so the stage's 192 is 28 here -- the band
+     plate and the ABOVE count were pinned at the same 26 the view uses and paint two pixels
+     into the crown. The view itself is fine at 26: its first row starts 38 further down. */
+  .lb-heads { position: absolute; left: 160px; top: 28px; width: 960px; height: 384px;
     overflow: hidden; pointer-events: none; z-index: 30; }
   .lb-head { position: absolute; left: 30px; width: 900px; height: 26px; display: flex;
     align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; }
@@ -2533,7 +2536,7 @@
   /* ON THE CONTAINER, NOT IN THE HEAD BOX. They were inside `.lb-heads`, which is 384 tall
      with `overflow: hidden`, so the BELOW chip at top 388 was clipped out of existence --
      present in the DOM, painting nothing. */
-  .lb-count.up { top: 26px; }
+  .lb-count.up { top: 28px; }
   .lb-count.down { top: 386px; }
   .lb-bars { display: flex; align-items: flex-end; gap: 3px; }
   .lb-bars i { display: block; }
