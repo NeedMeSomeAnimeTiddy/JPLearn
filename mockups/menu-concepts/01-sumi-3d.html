@@ -2155,7 +2155,12 @@
   .as-wrap { position: absolute; inset: 0; }
 
   /* ---- the measure ---- */
-  .as-tick { position: absolute; left: 22px; transform: translateY(-50%);
+  /* ---- THE FRAME CONTRACT, ON THE ASCENT. This screen ran 11 to 1265 -- wider than any
+     other, and the only one where the moat cost real drawing. The measure, the five columns
+     and the detail panel are three columns of demand that came to 1230 painted and had to
+     become 960, so all three narrowed: the measure to 70, the columns from 810 to 530, the
+     panel from 340 to 288. What paid for it is listed at each rule. ---- */
+  .as-tick { position: absolute; left: 168px; transform: translateY(-50%);
     padding: 2px 6px; background: rgba(10, 9, 6, 0.82);
     box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22);
     font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
@@ -2169,14 +2174,14 @@
      and over near-black track in the same 800px, so a single colour disappears for half its
      length: the gate alternates gold and ink dash for dash, and the ready line is washi with an
      ink keyline. */
-  .as-rule { position: absolute; left: 92px; width: 800px; height: 2px; z-index: 6;
+  .as-rule { position: absolute; left: 262px; width: 487px; height: 2px; z-index: 6;
     pointer-events: none; }
   .as-rule.gate { background: repeating-linear-gradient(90deg,
     var(--gold-hi) 0 9px, rgba(20, 17, 13, 0.8) 9px 18px); }
   .as-rule.ready { background: var(--washi);
     box-shadow: 0 -1px 0 rgba(20, 17, 13, 0.55), 0 1px 0 rgba(20, 17, 13, 0.55); }
   .as-chip { z-index: 7; }
-  .as-chip { position: absolute; left: 14px; width: 74px; transform: translateY(-50%) skewX(-8deg);
+  .as-chip { position: absolute; left: 163px; width: 66px; transform: translateY(-50%) skewX(-8deg);
     padding: 5px 0 6px; text-align: center; background: rgba(10, 9, 6, 0.9);
     box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); }
   .as-chip.gate { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45),
@@ -2191,7 +2196,7 @@
     font-size: 8px; letter-spacing: 0.2em; margin-top: 3px; color: rgba(242, 234, 216, 0.72); }
 
   /* ---- a level ---- */
-  .as-col { position: absolute; top: 46px; height: 360px; transform: skewX(-8deg);
+  .as-col { position: absolute; top: 54px; height: 352px; transform: skewX(-8deg);
     background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.05) 0 7px,
       rgba(0, 0, 0, 0) 7px 14px), rgba(12, 10, 8, 0.88);
     box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
@@ -2205,33 +2210,36 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28); }
   .as-col.here .as-fill { background: var(--gold-hi);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+  /* SET FOR THE COLUMN THEY STAND IN. 38px reads "94%" at 75px wide, which fitted a 136
+     column and runs out of an 84 -- the number is the drawing here, so it tracks the width. */
   .as-pct { position: absolute; left: 0; right: 0; text-align: center; font-family: var(--lat);
-    font-style: italic; font-weight: 900; font-size: 38px; line-height: 1; color: var(--ink); }
-  .as-col.here .as-pct { font-size: 58px; }
-  .as-col.locked .as-pct { color: rgba(242, 234, 216, 0.5); font-size: 24px; }
+    font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; color: var(--ink); }
+  .as-col.here .as-pct { font-size: 50px; }
+  .as-col.locked .as-pct { color: rgba(242, 234, 216, 0.5); font-size: 22px; }
   .as-mark { position: absolute; left: 0; right: 0; top: 22px; text-align: center;
     font-family: var(--jp); font-size: 40px; line-height: 1; color: var(--washi); }
   .as-lockbox { position: absolute; left: 11px; right: 11px; top: 118px; text-align: center; }
-  .as-lockbox b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
-    letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.5); }
+  .as-lockbox { left: 7px; right: 7px; }
+  .as-lockbox b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+    letter-spacing: 0.14em; color: rgba(242, 234, 216, 0.5); }
   .as-lockbox i { display: block; margin-top: 5px; font-style: normal; font-family: var(--lat);
-    font-weight: 900; font-size: 20px; color: rgba(242, 234, 216, 0.46); }
-  .as-lockbox u { display: block; margin-top: 10px; padding: 4px 0 5px; text-decoration: none;
+    font-weight: 900; font-size: 15px; color: rgba(242, 234, 216, 0.46); }
+  .as-lockbox u { display: block; margin-top: 9px; padding: 4px 0 5px; text-decoration: none;
     box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22); font-family: var(--lat-ui);
-    font-weight: 700; font-size: 9px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.44); }
+    font-weight: 700; font-size: 8px; letter-spacing: 0.1em; color: rgba(242, 234, 216, 0.44); }
 
   .as-plinth { position: absolute; top: 410px; height: 40px; transform: skewX(-8deg);
-    display: flex; align-items: center; justify-content: space-between; padding: 0 11px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 8px;
     background: var(--ink); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34); }
   .as-plinth.here { background: var(--gold); box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); }
   .as-plinth.locked { background: rgba(12, 10, 8, 0.6);
     box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.16); }
-  .as-plinth b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px;
+  .as-plinth b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 18px;
     color: var(--gold-hi); }
-  .as-plinth.here b { font-size: 26px; color: var(--ink); }
+  .as-plinth.here b { font-size: 21px; color: var(--ink); }
   .as-plinth.locked b { color: rgba(242, 234, 216, 0.5); }
   .as-plinth i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-    font-size: 8.5px; letter-spacing: 0.16em; text-align: right; line-height: 1.35;
+    font-size: 7.5px; letter-spacing: 0.1em; text-align: right; line-height: 1.35;
     color: rgba(242, 234, 216, 0.58); }
   .as-plinth.here i { color: rgba(20, 17, 13, 0.7); }
   /* THE READY BADGE IS GOLD BECAUSE GOLD IS EARNED. It is the only thing on this screen that
@@ -2244,12 +2252,14 @@
     place-items: center; background: #5b86c4; color: var(--washi);
     box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); font-family: var(--lat-ui); font-weight: 700;
     font-size: 9px; letter-spacing: 0.2em; }
-  .as-cur { position: absolute; top: 40px; height: 416px; pointer-events: none;
+  .as-cur { position: absolute; top: 48px; height: 406px; pointer-events: none;
     transform: skewX(-8deg); box-shadow: inset 0 0 0 2px var(--washi);
     transition: left 0.3s cubic-bezier(0.2, 0.92, 0.24, 1), width 0.3s cubic-bezier(0.2, 0.92, 0.24, 1); }
 
   /* ---- the selected level, in detail ---- */
-  .as-panel { position: absolute; left: 900px; top: 46px; width: 340px; height: 404px;
+  /* 288 wide and the columns' own height, so it stops at the stage's foot with them --
+     it used to run to y618, past the foot band and under the corner hints. */
+  .as-panel { position: absolute; left: 808px; top: 54px; width: 288px; height: 352px;
     display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
     background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
       rgba(235,230,217,var(--paper)) 100%);
@@ -19576,8 +19586,14 @@ function ledgerLayout() {
    almost nothing done in it. The design drew it sealed with "GATE MET -- UNSEALS ON THE NEXT
    MOCK", which is a mechanic the app does not have.
    ================================================================================================ */
-const AS_COLS = [[96, 136], [242, 136], [388, 176], [574, 136], [720, 136]];
-const AS_TOP = 46, AS_H = 360, AS_BOT = 406;
+/* THE COLUMNS INSIDE THE STAGE. A 360-tall column skewed -8deg paints 25.3px wider each
+   side than it is authored, so the run 267-744 lands at 242-769 -- inside the moat, clear of
+   the measure at its left and the panel at its right. */
+const AS_COLS = [[267, 84], [359, 84], [451, 109], [568, 84], [660, 84]];
+/* EIGHT PIXELS DOWN AND EIGHT SHORTER. The READY/YOU badge hangs 26 above the column, so
+   the drawing's real top is AS_TOP - 26 -- at 46 that put the badge at y184, eight pixels into
+   the crown band. Badge, columns and panel now run 192 to 570 and the plinths take the foot. */
+const AS_TOP = 54, AS_H = 352, AS_BOT = 406;
 const AS_GATE = 30, AS_READY = 80;
 /* mastered / total, per level, kanji then vocabulary */
 const AS_LEVELS = [
@@ -19640,7 +19656,10 @@ function ascentMarkup() {
     const cls = !open ? 'locked' : here ? 'here' : '';
     const state = !open ? 'LOCKED' : here ? 'CURRENT' : (pct >= AS_READY ? 'READY' : 'OPEN');
     return `<span class="as-plinth ${cls}" style="left:${x}px;width:${w}px">`
-      + `<b>${L.id}</b><i>${state}<br>${L.k[0] + L.v[0]} / ${L.k[1] + L.v[1]}</i></span>`;
+      /* THE COUNTS WENT WITH THE WIDTH. "N5" and "READY" and "792 / 843" is three facts in
+         84px; the first two are what the plinth is for, and the counts are spelled out in the
+         panel for whichever level is selected. */
+      + `<b>${L.id}</b><i>${state}</i></span>`;
   }).join('');
 
   const badges = AS_LEVELS.map((L, i) => {
