@@ -2175,13 +2175,18 @@
       height 0.34s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.2s ease;
   }
   .cs-minitext {
-    display: flex; align-items: baseline; gap: 11px; white-space: nowrap;
-    font-family: var(--lat-ui); font-weight: 700; font-size: 13px; letter-spacing: 0.18em;
-    color: var(--gold-hi);
-    paint-order: stroke fill; -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
+    display: flex; align-items: baseline; gap: 9px; white-space: nowrap;
+    padding: 5px 13px 6px;
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    transform: skewX(-8deg) rotate(-1deg);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
+    color: var(--ink);
   }
-  .cs-minitext s { text-decoration: none; color: rgba(242, 234, 216, 0.32); }
-  .cs-minitext em { font-style: normal; color: rgba(242, 234, 216, 0.72); }
+  .cs-minitext s { text-decoration: none; color: rgba(20, 17, 13, 0.26); }
+  /* what is behind you is the fact and what is left is the quieter half of it, which is the same
+     ink split the chapter chip and the open card's state line both make */
+  .cs-minitext em { font-style: normal; color: rgba(20, 17, 13, 0.5); }
 
   .hud[data-course] .hud-next { display: none; }
   .hud[data-course] .hud-figs { display: none; }
