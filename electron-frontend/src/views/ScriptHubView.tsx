@@ -30,6 +30,8 @@ import {
   SCRIPT_LABELS,
   SESSION_LENGTH_PRESETS,
 } from '../constants'
+import { isFedDeck, VocabFeedPanel } from '../features/vocab-feed'
+import type { VocabFeed } from '../features/vocab-feed'
 import { MinigameCassetteCarousel } from '../components/MinigameCassetteCarousel'
 import type { GroupedSlide } from '../components/MinigameCassetteCarousel'
 import type { MinigameSkillGroupKey } from '../constants'
@@ -58,6 +60,10 @@ interface BasicCard {
 }
 
 interface ScriptHubViewProps {
+  /** Today's words, for the levels that are fed rather than unlocked. */
+  vocabFeed: VocabFeed
+  /** The resolved deck, level included — `vocab_n3`, not the `vocab_n5` track key. */
+  activeDeckSlug: string
   navDirection: NavDirection
   activeScript: ScriptKey
   activeGame: MinigameKey
@@ -134,6 +140,8 @@ export function ScriptHubView({
   activeScript,
   activeGame,
   selectedBlockIndices,
+  vocabFeed,
+  activeDeckSlug,
   blockSelectionSummary,
   gameLoading,
   gameError,
@@ -200,7 +208,10 @@ export function ScriptHubView({
   // Tracklist strip: blocks take precedence, categories otherwise. Categories
   // are split by JLPT level so a 28-entry list never renders as one long row.
   const isKanjiTrack = activeScript === 'kanji_n5'
-  const showsBlocks = blockProgressWithMastery.length > 0
+  // A fed deck is decided by the slug, not by an empty block list: "no blocks yet" and
+  // "never has blocks" are different states and only the second one gets a feed.
+  const showsFeed = isFedDeck(activeDeckSlug)
+  const showsBlocks = !showsFeed && blockProgressWithMastery.length > 0
   // The two levelled sections span five JLPT decks. Since issue #78 they render
   // blocks rather than categories, so the level row can no longer hang off
   // `showsCategories` — losing it would strand a learner on N5 with no way to
@@ -370,7 +381,13 @@ export function ScriptHubView({
             ) : null}
           </div>
 
-          {gameLoading ? null : showsBlocks ? (
+          {/* A FED DECK ANSWERS FIRST. Vocabulary levels have no blocks, so `showsBlocks`
+              is false for them and they would otherwise fall through to the category rows --
+              which are the themes, and still useful, but they are a filter rather than the
+              answer to "what am I studying today". */}
+          {gameLoading ? null : showsFeed ? (
+            <VocabFeedPanel feed={vocabFeed} />
+          ) : showsBlocks ? (
             <div
               className="hub-tracklist"
               role="group"
