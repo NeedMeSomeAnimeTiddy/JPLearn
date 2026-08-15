@@ -355,8 +355,15 @@
   body:not(.menu-inline) .standing { display: none; }
 
   /* ---- the row: position, size and the lean everything else inherits ---- */
+  /* 166 RATHER THAN 104, WHICH IS THE MOAT. The row is skewed about its left-middle, so a
+     40-tall one paints 2.8px left of where it is authored and the open one 8.9 -- at 104 the
+     column started at x95, sixty-five pixels inside the bare-valley band.
+     THE COLUMN IS NOT CENTRED, AND THAT IS THE ONE DEVIATION IN THE FILE. The contract
+     balances its stage about x640; this menu is a left column with the mountain on the right,
+     and that composition is the reason the rest of the interface looks the way it does. It
+     obeys the moat and the bands; it does not obey the balance. One number moves it. */
   .st-row {
-    position: absolute; left: 104px; top: var(--top); width: 660px; height: var(--h);
+    position: absolute; left: 166px; top: var(--top); width: 660px; height: var(--h);
     transform: skewX(-8deg) rotate(-1.2deg) translateX(0);
     transform-origin: 0 50%;
     /* the lag is what makes the stack settle rather than snap: rows further from the one you
@@ -2901,11 +2908,19 @@
   /* ---- the strip: a window on a much wider rail ----
      The mask is what stops the tablets ending in a hard vertical cut at each edge -- the road runs
      out of the frame rather than stopping at it, which is most of why this reads as a route. */
+  /* ---- THE FRAME CONTRACT, ON THE ROAD. This is the screen the contract argues with: the
+     strip was full-bleed on purpose, because a road that stops at the frame edge is not a
+     road. It is inset to the stage now, and the mask is why that still works -- the road
+     does not stop at x160, it FADES there, into open valley rather than into the glass. The
+     reading survives the move; arguably it is better, because what it runs out into is a
+     place rather than a screen edge. ---- */
   .cs-strip {
-    position: absolute; left: 0; right: 0; top: 20px; height: 388px; overflow: hidden;
-    /* the gutter the counted tags stand in, and where the road starts existing again */
-    --gutter: 116px;
-    --solid: 300px;
+    position: absolute; left: 160px; right: 160px; top: 32px; height: 380px; overflow: hidden;
+    /* the gutter the counted tags stand in, and where the road starts existing again.
+       SCALED WITH THE STRIP: 116/300 of 1280 became 70/190 of 960, so the fully-painted
+       middle is the same fraction of the road as it was of the frame. */
+    --gutter: 70px;
+    --solid: 190px;
     -webkit-mask-image: linear-gradient(90deg,
       rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter), rgba(0,0,0,1) var(--solid),
       rgba(0,0,0,1) calc(100% - var(--solid)), rgba(0,0,0,0) calc(100% - var(--gutter)),
@@ -2916,7 +2931,7 @@
       rgba(0,0,0,0) 100%);
   }
   .cs-rail {
-    position: absolute; left: 0; top: 0; width: 5200px; height: 388px;
+    position: absolute; left: 0; top: 0; width: 5200px; height: 380px;
     transition: transform 0.52s cubic-bezier(0.2, 0.92, 0.24, 1); will-change: transform;
   }
 
@@ -3030,8 +3045,10 @@
   }
 
   /* ---- the hero, standing in the selected tablet's place ---- */
+  /* 376 rather than 384: skewed and rolled it paints 6px taller than it is authored, and
+     the stage is 384. */
   .cs-hero {
-    position: absolute; top: 0; width: 290px; height: 384px;
+    position: absolute; top: 0; width: 290px; height: 376px;
     display: flex; flex-direction: column; border: 0; padding: 0; cursor: pointer;
     text-align: left; font: inherit; z-index: 14;
     transform: skewX(-8deg) rotate(-1.2deg);
@@ -3120,8 +3137,11 @@
      45%, so a fifth of a full tablet was showing THROUGH a solid tag rather than beside it. The
      strip has a dead zone now -- see `--gutter` -- and these sit in it: 60 puts the whole 48-wide
      tag inside 116 with eight pixels to spare. */
-  .cs-side.lo { left: 60px; }
-  .cs-side.hi { right: 60px; }
+  /* IN THE STRIP'S DEAD ZONE, WHICH MOVED WITH THE STRIP. 60 was eight pixels inside a
+     116 gutter measured from the frame; the gutter is 70 measured from x160 now, so these
+     sit at 168 and the whole 48-wide tag still stands on bare valley. */
+  .cs-side.lo { left: 178px; }
+  .cs-side.hi { right: 178px; }
   .cs-side i {
     position: absolute; top: 0; display: block; width: 26px; transform: skewX(-8deg);
   }
@@ -3158,8 +3178,10 @@
   .cs-side.hi u { color: rgba(242, 234, 216, 0.6); }
 
   /* ---- the whole of it, small, under the road ---- */
+  /* THE FOOT BAND, like the library's strip -- at `bottom: 24` this ran to y697, which is
+     not a band, it is the bottom of the screen. */
   .cs-mini {
-    position: fixed; left: 0; right: 0; bottom: 24px; z-index: 6;
+    position: fixed; left: 0; right: 0; bottom: 71px; z-index: 6;
     display: flex; flex-direction: column; align-items: center; gap: 9px;
   }
   /* THE MINIMAP IS NAVIGATION, NOT DECORATION. One bar per step, and clicking one walks
@@ -16601,10 +16623,17 @@ function setActive(i) {
 /* TOP IS DERIVED, NOT CHOSEN. The column's height depends on which row is open, and a fixed top
    with a shrinking column walks the whole thing up the frame -- so the tallest arrangement is
    centred and the rest hang from the same line. */
-const ST_ROW_H = 40, ST_GAP = 14;
+/* THE GAP PAYS FOR THE STAGE. Five closed rows and one open came to 396 authored with a 14px
+   gap -- and to 410 PAINTED, because the row is rolled -1.2deg about its left edge and a
+   660-wide row therefore drops 13.8px at its right end. At 9 the tallest arrangement paints
+   385 against a 384 stage. */
+const ST_ROW_H = 40, ST_GAP = 9;
 /* the open height is set by which figure the row carries -- a due badge is taller than a gauge */
 const ST_H = { gauge: 118, due: 126, fig: 122 };
-const ST_TOP = Math.round((720 - (5 * (ST_ROW_H + ST_GAP) + Math.max(...Object.values(ST_H)))) / 2);
+/* CENTRED IN THE STAGE, NOT IN THE FRAME. Same derivation as before -- the tallest arrangement
+   is centred and the shorter ones hang from the same line -- against 192-576 rather than 0-720. */
+const ST_STACK = 5 * (ST_ROW_H + ST_GAP) + Math.max(...Object.values(ST_H));
+const ST_TOP = 192 + Math.round((384 - ST_STACK) / 2);
 
 function standData() {
   const step = PATH.done, cur = STUDY_PATH[step] || {};
@@ -18762,7 +18791,7 @@ const COURSE_SHAPES = [['path', '道', 'a walked road of standing tablets, the c
 const CS_X0 = 320, CS_W = 94, CS_WSEL = 290, CS_GAP = 18;
 /* inside the strip: the hero spans the full height, the tablets sit lower and shorter, and the
    rule the marker rides is at the hero's foot */
-const CS_TABY = 44, CS_RULE = 377;
+const CS_TABY = 44, CS_RULE = 373;
 const csScale = (d) => Math.max(0.78, 1 - Math.min(d, 5) * 0.055);
 
 /* FOUR CHAPTERS, contiguous, in the course's own order. The boundaries are real: the two scripts,
@@ -18974,8 +19003,11 @@ function courseLayout(rows) {
       + ` top: ${CS_TABY}px;`;
   });
 
-  /* the step you are on always lands at the middle of the FRAME, measured rather than assumed */
-  const focus = wrap.clientWidth / 2;
+  /* THE MIDDLE OF THE STRIP, NOT OF THE WRAP. This measured `.cs-wrap`, which is the whole
+     frame, and that was the same number until the contract inset the strip to the stage --
+     after which the selected tablet landed at strip-local 640, which is frame 800, and the
+     road sat 160px to the right of the screen it is drawn on. */
+  const focus = (wrap.querySelector('.cs-strip') || wrap).clientWidth / 2;
   wrap.querySelector('.cs-rail').style.transform =
     `translateX(${Math.round(focus - centers[sel])}px)`;
 
