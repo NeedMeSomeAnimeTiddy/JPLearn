@@ -1888,6 +1888,19 @@
     box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(242, 234, 216, 0.24);
   }
   .cs-cap.end b { color: #ffd9a1; }
+  /* THE ONE SEAM THE APP'S OWN DATA AGREES ON, and it is not a third terminal -- so it is
+     narrower than the two ends and wears the section colour of the place it hands over to. Every
+     step past it is `category="jlpt"` in `domain/progression_curriculum.py`, all five at a 0.9
+     mastery ratio where the eleven before them run 0.8 or lower, and all five carry a milestone
+     reward. Nothing else in that file groups: there is no chapter, stage or tier field, `category`
+     is twelve values over fifteen nodes, and the mastery ratios do not fall in contiguous runs.
+     So this is the only divider that is a fact rather than a decoration, and there is one of it. */
+  .cs-cap.seam {
+    width: 18px;
+    background: #5b86c4;
+    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
+  }
+  .cs-cap.seam b { color: var(--washi); font-size: 9px; letter-spacing: 0.28em; }
 
   /* ---- a standing tablet ---- */
   .cs-tab {
@@ -17363,6 +17376,7 @@ function pathRows() {
         [STUDY_PATH.length - i - 1, 'TO GO'],
         [(i + 1) + '/' + STUDY_PATH.length, 'STEP']];
     return {
+      id: s.id,
       no: String(i + 1).padStart(2, '0'), en: s.en, jp: s.jp, big: s.en, small: s.jp,
       meta: s.want.toUpperCase(), pct, figs, state, step: i, kind: s.kind,
       deck: s.deck || null, to: s.to || null,
@@ -17522,6 +17536,7 @@ function courseMarkup(rows) {
     + `<span class="cs-chapnow"></span></div>`
     + `<div class="cs-strip"><div class="cs-rail">${tabs}`
     + `<span class="cs-cap start"><b>START</b></span>`
+    + `<span class="cs-cap seam"><b>CERTIFICATION</b></span>`
     + `<span class="cs-cap end"><b>END</b></span>`
     + `<span class="cs-mark"><i></i></span>${hero}</div></div>`
     + side('lo', 'BEHIND') + side('hi', 'AHEAD')
@@ -17562,10 +17577,17 @@ function courseLayout(rows) {
   const dim = 'rgba(222,214,189,0.55)';
 
   /* --- the road: slots shrink with distance, so it compresses toward each horizon --- */
+  /* the certification seam, derived rather than counted. A deck's blocks are all one kind of
+     thing and have no such boundary -- see the note on `.cs-cap.seam` -- so it exists on the
+     course only. */
+  const CS_SEAM_W = 18;
+  const certAt = blocks ? -1 : rows.findIndex((r) => /^jlpt/.test(r.id || ''));
+  let seamX = null;
   const lefts = [], centers = [];
   let x = CS_X0;
   for (let i = 0; i < n; i++) {
     if (i) x += CS_GAP;
+    if (i === certAt && i > 0) { seamX = x; x += CS_SEAM_W + CS_GAP; }
     const w = i === sel ? CS_WSEL : Math.round(CS_W * csScale(Math.abs(i - sel)));
     lefts.push(x); centers.push(x + w / 2); x += w;
   }
@@ -17573,6 +17595,11 @@ function courseLayout(rows) {
      the translation below carries them with everything else and there is nothing to keep in sync. */
   const CS_CAP_W = 26;
   wrap.querySelectorAll('.cs-cap').forEach((el) => {
+    if (el.classList.contains('seam')) {
+      el.style.cssText = seamX == null ? 'display: none;'
+        : `left: ${Math.round(seamX)}px; top: ${CS_TABY}px;`;
+      return;
+    }
     const start = el.classList.contains('start');
     el.style.cssText = `left: ${Math.round(start ? lefts[0] - CS_GAP - CS_CAP_W : x + CS_GAP)}px;`
       + ` top: ${CS_TABY}px;`;
