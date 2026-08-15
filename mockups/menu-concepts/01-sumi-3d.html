@@ -2377,9 +2377,15 @@
      property is what lets one drawing hold six and seventy-six: `flex: 1` on 76 children is
      12.8px each, on 6 it is 180, and neither overflows because neither can. */
   .dk-segrow { flex: 1; display: flex; align-items: stretch; gap: 3px; padding: 11px 16px 8px; }
-  .dk-segrow i { flex: 1; display: block; max-width: 120px;
+  /* PRESSABLE, BUT ONLY WHERE PRESSING MEANS SOMETHING. A cleared segment jumps the hero
+     to that block, the open one returns it, and a locked one refuses -- the same three
+     answers the rest of this screen gives, now reachable in one click instead of a trip
+     through the grid. */
+  .dk-segrow i { flex: 1; display: block; max-width: 120px; cursor: pointer;
     background: rgba(20, 17, 13, 0.13); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
   .dk-segrow i.done { background: var(--gold); box-shadow: none; }
+  .dk-segrow i:hover { filter: brightness(1.18); }
+  .dk-segrow i.locked { cursor: not-allowed; }
   .dk-segrow i.here { background: #b23320; box-shadow: 0 0 0 2px rgba(20, 17, 13, 0.55); }
   .dk-segrow i.pick { background: var(--ink); box-shadow: 0 0 0 2px var(--hi); }
   .dk-railcap { display: flex; align-items: baseline; justify-content: space-between;
@@ -2848,7 +2854,13 @@
     position: fixed; left: 0; right: 0; bottom: 24px; z-index: 6;
     display: flex; flex-direction: column; align-items: center; gap: 9px;
   }
+  /* THE MINIMAP IS NAVIGATION, NOT DECORATION. One bar per step, and clicking one walks
+     there -- the same single move a click on a tablet makes. `courseLayout` rewrites these
+     bars' `cssText` on every sync, which clears inline styles but never CSS rules, so the
+     cursor and the hover live here rather than being written in the loop. */
   .cs-minibars { display: flex; align-items: flex-end; gap: 5px; }
+  .cs-minibars i { cursor: pointer; }
+  .cs-minibars i:hover { filter: brightness(1.5); }
   .cs-minibars i {
     display: block; transition: width 0.34s cubic-bezier(0.2, 0.92, 0.24, 1),
       height 0.34s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.2s ease;
@@ -3955,33 +3967,54 @@
      pairing the heading uses. The fill it lost comes back as a hover, which is the only moment
      it needs to look like a button.
      ================================================================================ */
+  /* ================================================================================
+     AND NOW IT WEARS THE CAP THE REST OF THE INTERFACE WEARS.
+
+     The note above is still right that the old filled slab was left over from an older
+     screen -- but the fix went one step too far. Stripping it to bare type made it the
+     only control on screen with no button language at all, while its own twin in the
+     opposite corner, the ESC hint, is a washi keycap. Two treatments of one action, one
+     of which does not look pressable.
+
+     So it takes `.hints`' grammar exactly: cap, Latin word, Japanese label, in that
+     order, at those sizes, with the cap carrying the one skew and the one hard shadow
+     this file allows. The section colour it used to spend on the arrow becomes the HOVER
+     fill -- which is what the note below already argued for, "the only moment it needs to
+     look like a button", now said in the same language as everything else.
+     ================================================================================ */
   .back-tab button {
-    display: flex; align-items: baseline; gap: 11px;
+    display: flex; align-items: baseline;
     background: none; border: 0; padding: 4px 8px 4px 0;
-    transform: none;
-    color: var(--washi); cursor: pointer;
+    transform: none; cursor: pointer;
+    font-family: var(--lat-ui); font-weight: 600; font-size: 11.5px; letter-spacing: 0.14em;
+    color: rgba(242, 234, 216, 0.86);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, calc(0.34 + 0.24 * var(--sky))), var(--halo-soft);
   }
-  .back-tab .bt-ar {
-    font-family: var(--lat-ui); font-size: 15px; line-height: 1; opacity: 1;
-    color: var(--sec, var(--hi));
-    text-shadow: var(--halo);
-    transition: color 0.24s ease, transform 0.4s var(--ease-pop, cubic-bezier(0.22, 1.25, 0.36, 1));
+  /* The cap is identical to `.hints b` -- same face, size, tracking, padding, skew and shadow
+     -- but it carries a POINTER, not a key name. Wearing "ESC" it rendered pixel for pixel the
+     same as the ESC hint in the opposite corner, which is one action drawn twice on one screen.
+     The mark is what separates them: the corner you click, and the key you press. */
+  .back-tab .bt-key {
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+    background: var(--washi); color: var(--ink);
+    padding: 3px 9px; margin-right: 8px; min-width: 46px; text-align: center;
+    transform: skewX(-8deg) rotate(-1.2deg); display: inline-block;
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+    text-shadow: none;
+    transition: background 0.2s ease, color 0.2s ease;
   }
-  .back-tab button:hover .bt-ar { color: var(--gold-hi); transform: translateX(-5px); }
   .back-tab .bt-jp {
-    font-family: var(--jp-go); font-weight: 700; font-size: 15px; letter-spacing: 0.16em;
-    text-shadow: var(--halo);
+    font-family: var(--jp-go); font-weight: 400; font-style: normal;
+    font-size: 10px; letter-spacing: 0.1em;
+    color: rgba(242, 234, 216, 0.45); margin-left: 7px;
     transition: color 0.24s ease;
   }
-  .back-tab .bt-en {
-    font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.3em;
-    color: rgba(242, 234, 216, 0.55);
-    text-shadow: var(--halo);
-    transition: color 0.24s ease;
-  }
-  .back-tab button:hover .bt-jp { color: var(--gold-hi); }
-  .back-tab button:hover .bt-en { color: rgba(242, 234, 216, 0.85); }
-  .back-tab button:hover .bt-en, .back-tab button:hover .bt-ar { color: var(--washi); opacity: 1; }
+  .back-tab .bt-en { transition: color 0.24s ease; }
+  /* THE SECTION'S OWN COLOUR, SPENT WHERE IT COUNTS. `--sec` is already set on this element
+     by `ftBuildL2`, so the cap previews the room you would be returning from. */
+  .back-tab button:hover .bt-key { background: var(--sec, var(--hi)); color: var(--washi); }
+  .back-tab button:hover .bt-en { color: var(--washi); }
+  .back-tab button:hover .bt-jp { color: rgba(242, 234, 216, 0.8); }
 
   /* ── STUDY · torn shards, the word knocked out of the black ──────────────────── */
   .w-shard { width: 460px; height: 210px; }
@@ -4829,7 +4862,7 @@
   <span class="cb-read"><b id="clockRead">--:--</b><i id="clockSun">--</i></span>
 </div>
 <div class="chrome back-tab" id="backTab">
-  <button type="button"><span class="bt-ar">&#9666;</span><span class="bt-jp">&#25147;&#12427;</span><span class="bt-en">BACK</span></button>
+  <button type="button"><b class="bt-key">&#9666;</b><span class="bt-en">Back</span><em class="bt-jp">&#25147;&#12427;</em></button>
 </div>
 <div class="chrome hints">
   <span><b>↑↓</b>Select<em>選択</em></span>
@@ -18738,6 +18771,8 @@ function courseLayout(rows) {
   lo.querySelector('b').textContent = behind;
   hi.querySelector('b').textContent = ahead;
   wrap.querySelector('.cs-minibars').querySelectorAll('i').forEach((bar, i) => {
+    /* 10px of bar carries no label, so the title is what makes the strip usable with a mouse */
+    bar.title = `${i + 1}. ${rows[i].big || rows[i].en || ''}`.trim();
     const d = Math.abs(i - sel);
     const w = [26, 21, 17, 13][d] ?? 10, ht = [36, 28, 22, 16][d] ?? 12;
     const bg = rows[i].state === 'done' ? 'var(--gold)'
@@ -19351,8 +19386,13 @@ function deckMarkup() {
   const size = Math.max(26, Math.min(46, Math.floor(560 / (name.length * 0.62))));
 
   const segs = B.map((b, i) => {
-    const cls = i === at && revisit ? 'pick' : i === here ? 'here' : i < cleared ? 'done' : '';
-    return `<i class="${cls}"></i>`;
+    const locked = i > here;
+    const cls = i === at && revisit ? 'pick' : i === here ? 'here' : i < cleared ? 'done' : 'locked';
+    /* A SEGMENT IS 12.8px WIDE ON KANJI N1, so the name cannot be written on it -- the title
+       is the only way a mouse user learns which block they are about to press. */
+    const state = locked ? 'locked' : i === here ? 'open now' : 'cleared';
+    return `<i class="${cls}" data-b="${i}" title="${String(i + 1).padStart(2, '0')} `
+      + `${b[0]} — ${b[1]} cards, ${state}"></i>`;
   }).join('');
 
   return `<div class="dk-wrap">`
@@ -19763,6 +19803,19 @@ function hudBuild(rows) {
       hudDraw();
     });
   });
+  /* THE DECK'S RAIL IS A CONTROL NOW. Clicking a segment says the same three things the
+     screen already says: a cleared block becomes the hero to revisit, the open block puts the
+     hero back where it belongs, and a locked one refuses out loud rather than doing nothing --
+     silence is indistinguishable from a broken click. */
+  hudEl.querySelectorAll('.dk-segrow i').forEach((el) => {
+    el.addEventListener('click', () => {
+      const i = +el.dataset.b, here = dkHere();
+      if (i > here) { doFlash(0.2); punchShake(0.24); return; }
+      DK_PICK = i === here ? -1 : i;
+      DK_OPEN = false; HUD.cur = 0;
+      hudDraw();
+    });
+  });
   hudEl.querySelectorAll('.dk-f').forEach((b) => {
     b.addEventListener('click', () => {
       const to = +b.dataset.i;
@@ -19775,6 +19828,11 @@ function hudBuild(rows) {
   });
   hudEl.querySelectorAll('.cs-tab').forEach((b) => {
     b.addEventListener('click', () => pathGo(+b.dataset.i, 0.5));
+  });
+  /* and the strip beneath them does the same thing -- it is the only part of the road that
+     shows the WHOLE list at once, so it is the fastest way to cross a long one */
+  hudEl.querySelectorAll('.cs-minibars i').forEach((el, i) => {
+    el.addEventListener('click', () => pathGo(i, 0.5));
   });
   /* AND THE HERO IS FINALLY A BUTTON. It has been a `<button>` with `cursor: pointer` and no
      handler since the road was built -- the one card carrying "START THIS STEP" was the only
