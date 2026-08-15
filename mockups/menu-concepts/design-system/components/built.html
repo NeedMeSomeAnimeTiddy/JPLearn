@@ -1,0 +1,313 @@
+<!-- @dsCard group="Components" name="The built language" subtitle="The five objects everything is now made of, at real size" width="1360" height="1720" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The built language — JPLearn menu</title>
+<style>
+  :root {
+    --washi: #f2ead8; --washi-dim: #cfc6ae; --ink: #14110d;
+    --hi: #e34a33; --hi-deep: #b23320; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --jp: "Yu Mincho", YuMincho, "Hiragino Mincho ProN", "MS PMincho", serif;
+    --jp-go: "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", Bahnschrift, "Segoe UI", Arial, sans-serif;
+    --face: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+    --paper: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    --back: repeating-linear-gradient(135deg, rgba(242,234,216,0.06) 0 7px,
+      rgba(0,0,0,0) 7px 14px), linear-gradient(rgba(17,19,28,0.9), rgba(11,13,20,0.94));
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #10131e; color: var(--washi);
+    font-family: var(--lat-ui); font-weight: 600; letter-spacing: 0.14em;
+    padding: 30px 34px 40px;
+  }
+  h1 { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+    letter-spacing: 0.01em; margin-bottom: 4px; }
+  h2 { font-size: 12px; letter-spacing: 0.2em; color: var(--gold-hi); margin: 34px 0 4px;
+    font-weight: 700; }
+  .lede, p.note {
+    font-size: 11.5px; color: rgba(242,234,216,0.62); max-width: 940px; line-height: 1.7;
+    letter-spacing: 0.1em;
+  }
+  p.note { font-size: 11px; margin-top: 9px; }
+  b { color: var(--washi); font-weight: 700; }
+  code { font-family: Consolas, "Courier New", monospace; letter-spacing: 0; color: var(--gold-hi);
+    font-size: 11px; }
+  .stage {
+    position: relative; margin-top: 14px; padding: 30px 34px 34px; overflow: hidden;
+    background: url("../assets/valley-sunset.png") 50% 38% / cover, #171c2c;
+  }
+  .stage::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(10,14,22,0.16) 0%, rgba(10,14,22,0.26) 58%,
+      rgba(10,14,22,0.33) 100%);
+  }
+  .row { position: relative; display: flex; align-items: flex-start; gap: 46px; flex-wrap: wrap; }
+  .tag {
+    position: relative; margin: 0 0 10px; font-size: 9.5px; letter-spacing: 0.22em;
+    color: var(--gold-hi);
+    paint-order: stroke fill; -webkit-text-stroke: 0.2em rgba(8,11,18,0.78);
+  }
+
+  /* ---------- A. the menu row, level one ---------- */
+  .st { transform: skewX(-8deg) rotate(-1.2deg); display: flex; align-items: stretch;
+    background: var(--face);
+    box-shadow: 5px 7px 0 rgba(0,0,0,0.46), inset 0 0 0 1px rgba(20,17,13,0.2); }
+  .st.open { background: var(--washi);
+    box-shadow: 8px 10px 0 rgba(0,0,0,0.52), inset 0 0 0 1px rgba(20,17,13,0.18); }
+  .st { width: 292px; height: 40px; }
+  .st.open { width: 358px; height: 122px; }
+  .st-mark { flex: none; width: 36px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px; background: var(--gold);
+    box-shadow: inset -1px 0 0 rgba(20,17,13,0.2); }
+  .st.open .st-mark { width: 52px; justify-content: flex-start; gap: 7px; padding: 11px 0 0; }
+  .st-glyph { font-family: var(--jp); font-size: 18px; line-height: 1; color: var(--ink); }
+  .st.open .st-glyph { font-size: 28px; }
+  .st-no { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 10px;
+    line-height: 1; color: rgba(20,17,13,0.6); }
+  .st.open .st-no { font-size: 11px; }
+  .st-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;
+    padding: 0 13px; }
+  .st.open .st-body { justify-content: flex-start; padding: 10px 13px 0; }
+  .st-head { display: flex; align-items: baseline; gap: 10px; }
+  .st-en { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 19px;
+    line-height: 1; color: var(--ink); white-space: nowrap; }
+  .st.open .st-en { font-size: 26px; }
+  .st-jp { font-family: var(--jp); font-size: 14px; line-height: 1; letter-spacing: 0.06em;
+    color: rgba(20,17,13,0.66); }
+  .st.open .st-jp { font-size: 17px; }
+  .st-tok { margin-left: auto; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+    letter-spacing: 0.14em; color: rgba(20,17,13,0.6); white-space: nowrap; }
+  .st.open .st-tok { color: var(--hi-deep); }
+  .st-det { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+  .st-state { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    font-family: var(--lat-ui); font-weight: 700; }
+  .st-state b { font-size: 8.5px; letter-spacing: 0.2em; color: rgba(20,17,13,0.45); }
+  .st-state i { font-style: normal; font-size: 9.5px; letter-spacing: 0.1em;
+    color: rgba(20,17,13,0.8); }
+  .segs { display: flex; gap: 3px; flex: 1; }
+  .segs i { flex: 1; height: 10px; background: rgba(20,17,13,0.12);
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.18); }
+  .segs i.on { background: var(--gold); }
+  .gaugerow { display: flex; align-items: center; gap: 10px; }
+  .pct { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
+    line-height: 1; color: var(--hi-deep); }
+  .st-slab { margin: auto -13px 0; height: 28px; padding: 7px 13px; background: var(--hi);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; line-height: 13px;
+    letter-spacing: 0.16em; color: #ffd9a1; white-space: nowrap; }
+
+  /* ---------- B. the road tablet ---------- */
+  .tab { width: 94px; height: 296px; transform: skewX(-8deg) rotate(-1.2deg) translateY(-6px);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 11px 6px 9px; background: var(--face);
+    box-shadow: 6px 9px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.2); }
+  .tab.done { transform: skewX(-8deg) rotate(-1.2deg) translateY(9px) scale(0.945);
+    box-shadow: 3px 4px 0 rgba(0,0,0,0.32), inset 0 0 0 1px rgba(20,17,13,0.2); }
+  .tab.locked { background: var(--back);
+    box-shadow: 6px 9px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(242,234,216,0.16); }
+  .tab-dest { align-self: stretch; margin: -11px -6px 7px; padding: 4px 3px 5px;
+    background: var(--ink); color: var(--gold-hi); text-align: center;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 7.5px; letter-spacing: 0.16em; }
+  .tab-no { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
+    line-height: 1; color: var(--ink); }
+  .tab.locked .tab-no { color: rgba(242,234,216,0.66); }
+  .tab-hair { width: 30px; height: 2px; background: rgba(20,17,13,0.4); }
+  .tab.locked .tab-hair { width: 16px; background: rgba(242,234,216,0.4); }
+  .tab-vjp { writing-mode: vertical-rl; font-family: var(--jp-go); font-weight: 700;
+    font-size: 26px; letter-spacing: 0.05em; color: var(--ink); white-space: nowrap; }
+  .tab.locked .tab-vjp { color: rgba(232,224,203,0.78); }
+  .tab-gate { margin-top: auto; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+    letter-spacing: 0.12em; color: rgba(20,17,13,0.62); }
+  .tab.locked .tab-gate { color: rgba(242,234,216,0.62); }
+  .tab-foot { font-family: var(--jp-go); font-weight: 700; font-size: 20px; color: #a8332a;
+    box-shadow: inset 0 0 0 3px rgba(168,51,42,0.72); padding: 2px 5px; }
+  .tab-foot.word { box-shadow: none; padding: 0; font-family: var(--lat-ui); font-size: 7.5px;
+    letter-spacing: 0.14em; color: var(--hi-deep); }
+  .tab.locked .tab-foot.word { color: rgba(242,234,216,0.52); }
+
+  /* ---------- C. the hero ---------- */
+  .hero { width: 290px; height: 384px; transform: skewX(-8deg) rotate(-1.2deg);
+    display: flex; flex-direction: column; background: var(--washi);
+    box-shadow: 6px 8px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.15); }
+  .h-tab { padding: 5px 0 6px; background: var(--ink); color: var(--gold-hi); text-align: center;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.2em; }
+  .h-head { display: flex; align-items: center; padding: 13px 18px 4px; }
+  .h-no { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 24px;
+    color: var(--ink); }
+  .h-jp { margin-top: auto; padding: 0 12px; font-family: var(--jp); font-weight: 400;
+    font-size: 66px; line-height: 1; text-align: center; color: var(--ink); }
+  .h-en { padding: 6px 12px 0; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 24px; text-align: center; color: var(--hi-deep); }
+  .h-foot { margin-top: auto; padding: 0 15px; }
+  .h-gate { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    font-family: var(--lat-ui); font-weight: 700; margin-bottom: 7px; }
+  .h-gate b { font-size: 8.5px; letter-spacing: 0.2em; color: rgba(20,17,13,0.45); }
+  .h-gate i { font-style: normal; font-size: 10px; letter-spacing: 0.1em;
+    color: rgba(20,17,13,0.8); }
+  .h-slab { margin: 10px -1px -1px; height: 38px; padding: 11px 14px; background: var(--hi); }
+  .h-slab i { display: block; font-family: var(--lat-ui); font-style: normal; font-weight: 700;
+    font-size: 12px; line-height: 16px; letter-spacing: 0.16em; text-align: center;
+    color: #ffd9a1; }
+
+  /* ---------- D. the heading slab + E. the chip ---------- */
+  .hd { width: max-content; display: flex; align-items: stretch;
+    transform: skewX(-8deg) rotate(-1.2deg); background: var(--paper);
+    box-shadow: 7px 9px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.22); }
+  .hd-mark { flex: none; width: 54px; display: grid; place-items: center; background: var(--gold);
+    color: var(--ink); font-family: var(--jp); font-size: 30px; line-height: 1;
+    box-shadow: inset -1px 0 0 rgba(20,17,13,0.2); }
+  .hd-txt { display: flex; flex-direction: column; align-items: flex-start;
+    padding: 10px 18px 11px; }
+  .hd-kick { font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.22em;
+    color: rgba(20,17,13,0.5); margin-bottom: 5px; }
+  .hd-title { display: flex; align-items: baseline; gap: 16px; }
+  .hd-title b { font-family: var(--jp); font-weight: 700; font-size: 34px; letter-spacing: 0.13em;
+    line-height: 1; color: var(--ink); }
+  .hd-title i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 14px;
+    letter-spacing: 0.32em; color: rgba(20,17,13,0.55); }
+  .chip { width: max-content; display: flex; align-items: center; gap: 9px; padding: 5px 13px 6px;
+    margin-top: 12px; background: var(--paper);
+    box-shadow: 3px 4px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(20,17,13,0.2);
+    transform: skewX(-8deg) rotate(1deg); transform-origin: 0 50%;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
+    color: var(--ink); }
+  .chip s { text-decoration: none; color: rgba(20,17,13,0.26); }
+  .chip .lead { color: rgba(20,17,13,0.5); }
+  .post { width: 26px; height: 200px; display: grid; place-items: center;
+    transform: skewX(-8deg) rotate(-1.2deg); background: var(--gold);
+    box-shadow: 4px 6px 0 rgba(0,0,0,0.42), inset 0 0 0 1px rgba(20,17,13,0.22); }
+  .post b { writing-mode: vertical-rl; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 10px; letter-spacing: 0.3em; color: var(--ink); }
+  .post.end { background: var(--hi-deep);
+    box-shadow: 4px 6px 0 rgba(0,0,0,0.42), inset 0 0 0 1px rgba(242,234,216,0.24); }
+  .post.end b { color: #ffd9a1; }
+  .post.seam { width: 18px; background: #5b86c4;
+    box-shadow: 4px 6px 0 rgba(0,0,0,0.42), inset 0 0 0 1px rgba(242,234,216,0.26); }
+  .post.seam b { color: var(--washi); font-size: 9px; letter-spacing: 0.28em; }
+
+  table { border-collapse: collapse; margin-top: 12px; font-size: 11px; letter-spacing: 0.08em; }
+  th, td { text-align: left; padding: 5px 24px 5px 0; vertical-align: top; }
+  th { color: var(--gold); font-weight: 700; letter-spacing: 0.16em; font-size: 10px; }
+  td { color: rgba(242,234,216,0.78); font-family: Consolas, "Courier New", monospace;
+    letter-spacing: 0; }
+  td.n { color: var(--washi); font-family: var(--lat-ui); font-weight: 700; letter-spacing: 0.14em; }
+</style>
+</head>
+<body>
+
+<h1>THE BUILT LANGUAGE</h1>
+<p class="lede">
+  Everything past the menu is made of five objects. They are drawn here at <b>real size</b>, on the
+  real backdrop, with the numbers they are actually built from &mdash; so a new screen can be made
+  of the same parts rather than of something that looks like them. <b>This supersedes the earlier
+  standing-type drawing</b>: the interface has been built since, and where the two disagree, this
+  is what is on screen.
+</p>
+
+<h2>A &mdash; THE MENU ROW &middot; level one, one open at a time</h2>
+<div class="stage">
+  <div class="row">
+    <div>
+      <div class="tag">OPEN &middot; 358 &times; 122</div>
+      <div class="st open">
+        <span class="st-mark"><span class="st-glyph">&#23398;</span><b class="st-no">01</b></span>
+        <span class="st-body">
+          <span class="st-head"><span class="st-en">STUDY</span>
+            <span class="st-jp">&#23398;&#32722;</span>
+            <span class="st-tok">STEP 09/16</span></span>
+          <span class="st-det">
+            <span class="st-state"><b>WHERE YOU ARE</b><i>STEP 09 &middot; KANJI</i></span>
+            <span class="gaugerow"><span class="segs"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><b class="pct">45%</b></span>
+          </span>
+          <span class="st-slab">CONTINUE THE PATH &#9656;</span>
+        </span>
+      </div>
+    </div>
+    <div>
+      <div class="tag">SHUT &middot; 292 &times; 40</div>
+      <div class="st">
+        <span class="st-mark"><span class="st-glyph">&#35712;</span><b class="st-no">03</b></span>
+        <span class="st-body"><span class="st-head"><span class="st-en">READING</span>
+          <span class="st-jp">&#35712;&#35299;</span>
+          <span class="st-tok">4 GRADES</span></span></span>
+      </div>
+      <p class="note" style="margin-top:16px;max-width:300px">
+        Shut is a <b>gradient</b> face and open is flat washi; shut casts 5&times;7 and open
+        8&times;10. Size is not the only thing that changes when a thing is chosen &mdash; it
+        comes forward.
+      </p>
+    </div>
+  </div>
+</div>
+
+<h2>B &amp; C &mdash; THE ROAD &middot; levels two and three, every section</h2>
+<div class="stage">
+  <div class="row" style="align-items:flex-end;gap:18px">
+    <div class="post"><b>START</b></div>
+    <div class="tab done"><span class="tab-dest">DECK</span><b class="tab-no">06</b>
+      <span class="tab-hair"></span><span class="tab-vjp">&#20363;&#25991;</span>
+      <span class="tab-gate">80%</span><span class="tab-foot">&#28168;</span></div>
+    <div class="tab"><span class="tab-dest">DECK</span><b class="tab-no">08</b>
+      <span class="tab-hair"></span><span class="tab-vjp">&#32884;&#35299;</span>
+      <span class="tab-gate">80%</span><span class="tab-foot word">YOU ARE HERE</span></div>
+    <div class="hero">
+      <span class="h-tab">DECK</span>
+      <span class="h-head"><b class="h-no">09</b></span>
+      <span class="h-jp">&#28450;&#23383;</span><span class="h-en">KANJI</span>
+      <span class="h-foot">
+        <span class="h-gate"><b>GATE TO CLEAR</b><i>80 CHARACTERS</i></span>
+        <span class="gaugerow"><span class="segs"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><b class="pct" style="font-size:22px">45%</b></span>
+        <span class="h-slab"><i>START THIS STEP &#9656;</i></span>
+      </span>
+    </div>
+    <div class="tab locked"><span class="tab-dest">&#8594; JLPT</span><b class="tab-no">12</b>
+      <span class="tab-hair"></span><span class="tab-vjp">&#26908;&#23450;</span>
+      <span class="tab-gate">90%</span><span class="tab-foot word">LOCKED</span></div>
+    <div class="post seam"><b>CERTIFICATION</b></div>
+    <div class="post end"><b>END</b></div>
+  </div>
+</div>
+<p class="note">
+  <b>Depth is the sentence.</b> What is cleared sinks 9px and takes a short shadow; what is ahead
+  stands 6px proud and casts a long one, so behind and ahead stop being mirror images. Distance
+  from the selection scales the stone (1 &rarr; 0.78) and fades it
+  (<code>1, 1, 0.92, 0.72, 0.45</code>, then nothing) &mdash; <b>only nine stones are ever
+  painted</b>, which is the constraint the long decks break. The thin posts are terminals at 26px
+  wide; a divider is 18px and wears the colour of what it hands over to.
+</p>
+
+<h2>D &amp; E &mdash; THE HEADING AND ITS CAPTION &middot; top left of every screen past the menu</h2>
+<div class="stage">
+  <div style="position:relative">
+    <div class="hd">
+      <span class="hd-mark">&#23398;</span>
+      <span class="hd-txt">
+        <span class="hd-kick">SECTION 01 / 06</span>
+        <span class="hd-title"><b>&#23398;&#32722;</b><i>STUDY</i></span>
+      </span>
+    </div>
+    <div class="chip"><span class="lead">THE PATH &#36947;</span><s>/</s><span>&#19977; &#23455;&#36341; IN PRACTICE</span></div>
+  </div>
+</div>
+<p class="note">
+  The heading is <b>the menu row it came from</b>, one size down &mdash; same accent block, same
+  mark, same paper. The caption under it is the chip family, and it <b>rolls the other way</b>:
+  two boxes stacked at the same angle read as one mis-cut sheet, at opposite angles as two things
+  set down separately.
+</p>
+
+<h2>THE LAWS THESE FIVE OBEY</h2>
+<table>
+  <tr><th>LAW</th><th>WHAT IT MEANS IN PRACTICE</th></tr>
+  <tr><td class="n">Square, always</td><td>no border-radius on anything, ever</td></tr>
+  <tr><td class="n">One skew</td><td>skewX(-8deg) on every box; roll &plusmn;1&ndash;1.2&deg;, alternating when stacked</td></tr>
+  <tr><td class="n">One hard shadow</td><td>Npx Mpx 0 &mdash; never blurred. Bigger box, longer throw</td></tr>
+  <tr><td class="n">A ground kills the halo</td><td>type on the valley gets a keyline or a shadow; type on paper gets neither</td></tr>
+  <tr><td class="n">One vermilion</td><td>#e34a33 marks the single thing Enter does. Everything else earns gold or stays ink</td></tr>
+  <tr><td class="n">The mark is the section</td><td>one glyph per section, on its accent, wherever that section appears</td></tr>
+</table>
+
+</body>
+</html>
