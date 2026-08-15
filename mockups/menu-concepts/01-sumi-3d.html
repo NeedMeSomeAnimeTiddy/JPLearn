@@ -2406,6 +2406,14 @@
     background: linear-gradient(178deg, #f7f6f3 0%, #e6e4dd 100%); }
   .lb-row.on { background: #fff;
     box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
+  /* THE FADE IS A VEIL, NOT TRANSPARENCY. A far row has to recede, but rule 5 took the global
+     scrim away, so dropping its opacity fades it into the STREET rather than into the distance
+     -- at 0.5 the road behind was legible through the paper. The paper stays opaque and a
+     dusk-coloured veil lies over it instead, type included, so the whole row goes quiet
+     together and the world still never comes through it. */
+  .lb-row::after { content: ''; position: absolute; inset: 0; z-index: 20;
+    pointer-events: none; background: rgba(11, 14, 22, var(--veil, 0));
+    transition: background 0.34s ease; }
   /* THE LEAN IS A CLIP, NOT A SKEW. Skewing the row would skew its type with it; clipping
      the leading edge gives the same diagonal while the words stay upright. */
   .lb-mark { flex: none; display: flex; flex-direction: column; align-items: center;
@@ -20381,11 +20389,12 @@ function libraryLayout() {
     el.classList.toggle('on', isSel);
     el.style.top = L.tops[i] + 'px';
     el.style.height = h + 'px';
-    /* RULE 5 TOOK THE GLOBAL SCRIM AWAY, so a row can no longer borrow legibility from a
-       darkened world -- at 0.5 the street behind was visible straight through the paper. The
-       ramp survives as a whisper and the viewport mask does the actual fading at the edges,
-       which is what it was already there for. */
-    el.style.opacity = d === 0 ? 1 : d <= 2 ? 0.99 : d <= 4 ? 0.97 : d <= 6 ? 0.95 : 0.92;
+    /* DISTANCE IS PAINTED, NOT DISSOLVED -- see `.lb-row::after`. The row keeps its opacity
+       and takes a veil, so the furthest book in the window sits about a third of the way into
+       the dusk while the one you are on is bare white paper. */
+    el.style.opacity = '';
+    el.style.setProperty('--veil', d === 0 ? 0 : d === 1 ? 0.14
+      : d === 2 ? 0.26 : d === 3 ? 0.35 : d === 4 ? 0.41 : 0.45);
     el.style.zIndex = isSel ? 12 : 4;
     el.style.transform = `scale(${Math.max(0.9, 1 - Math.min(d, 6) * 0.016)})`;
     /* the leading edge leans with the row's own height, so a tall row leans further */
