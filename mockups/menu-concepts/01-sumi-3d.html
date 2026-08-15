@@ -1513,7 +1513,8 @@
   .hud[data-t="midashi"] .hud-list,
   .hud[data-t="midashi"] .hud-detail,
   .hud[data-t="midashi"] .course-shape,
-  .hud[data-t="midashi"] .ledger { zoom: var(--u); }
+  .hud[data-t="midashi"] .ledger,
+  .hud[data-t="midashi"] .ascent { zoom: var(--u); }
   .hud[data-t="midashi"] .hud-cut { display: none; }
   .hud[data-t="midashi"] .hud-rule { display: none; }
 
@@ -1854,7 +1855,13 @@
      backdrop used, with a gentler instrument in it. */
   /* the road's own wash, on `--crush` like the menu's. It keeps its slightly warmer ink --
      the rooms are lit and the menu is not -- but the density is the file's, not this screen's. */
-  .hud[data-course]::before {
+  /* THE BESPOKE SCREENS TAKE THE SAME BACKDROP. It was hung off `data-course` alone, so the
+     ledger and the ascent stood on a raw lit valley -- and the ascent stands at the certification
+     hall, which is the brightest pose in the world. Its columns are dark tracks with pale type
+     and they simply vanished into a red-and-cream building. This is `foundations/legibility`
+     doing its job: a crushed backdrop is one of the three things that makes type survive here. */
+  .hud[data-course]::before,
+  .hud[data-screen]::before {
     content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background: linear-gradient(180deg,
       rgba(14, 17, 26, calc(var(--crush) * 0.62)) 0%,
@@ -2068,7 +2075,172 @@
 
   /* the road's furniture belongs to the road: a ledger has no step counter and no figure
      chips, and its own plates carry everything it has to say */
-  .hud[data-screen="ledger"] .hud-detail { display: none; }
+  .hud[data-screen="ledger"] .hud-detail,
+  .hud[data-screen="ascent"] .hud-detail { display: none; }
+
+  /* ================================================================================
+     JLPT IS A LADDER, NOT A ROAD.
+
+     Design's "JLPT A - The Ascent". Five columns whose HEIGHT is that level's readiness,
+     a 0-100 measure down the left edge, and the gate drawn as one line straight across all
+     five so you can see at a glance which levels clear it. That last idea is the whole
+     reason this design was chosen: a threshold that is a line across the whole chart
+     cannot be confused with a threshold that is a number inside one bar.
+
+     WHAT IS DIFFERENT FROM THE DESIGN, AND WHY. It was drawn from a stale brief and built
+     on four papers -- 文字語彙 / 文法 / 読解 / 聴解 at five mock exams each -- which do not
+     exist in this application and never did. Its right-hand panel and its "n / 20 MOCKS"
+     chip are gone. What the app has is FOUR MODES: four ways to sit the same exam.
+
+     AND THERE ARE TWO THRESHOLDS, WHICH THE DESIGN DREW AS ONE. 30% on a level is what
+     unlocks the NEXT one; 80% is what marks a level ready to sit. They are different
+     facts and they are drawn as different marks -- the gate dashed, the ready line solid
+     -- because a single style repeated at two heights reads as one rule measured twice.
+     ================================================================================ */
+  .ascent {
+    position: relative; margin-top: 6px;
+    margin-left: -52px; width: calc(100vw / var(--u)); height: 460px;
+  }
+  .as-wrap { position: absolute; inset: 0; }
+
+  /* ---- the measure ---- */
+  .as-tick { position: absolute; left: 22px; transform: translateY(-50%);
+    padding: 2px 6px; background: rgba(10, 9, 6, 0.82);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+    color: rgba(242, 234, 216, 0.6); }
+  /* THE GATE IS DASHED AND THE READY LINE IS SOLID. See the note above -- this is the one
+     piece of styling on the screen that is carrying a distinction rather than a mood. */
+  /* THE RULES CROSS THE COLUMNS. Drawn behind them they were visible only in the gaps, which
+     throws away the entire reason this design was chosen -- a threshold you can follow across
+     all five levels at once. They are emitted after the columns and lifted above them.
+     AND EACH ONE HAS TO READ ON BOTH GROUNDS. A line spanning the chart passes over gold fill
+     and over near-black track in the same 800px, so a single colour disappears for half its
+     length: the gate alternates gold and ink dash for dash, and the ready line is washi with an
+     ink keyline. */
+  .as-rule { position: absolute; left: 92px; width: 800px; height: 2px; z-index: 6;
+    pointer-events: none; }
+  .as-rule.gate { background: repeating-linear-gradient(90deg,
+    var(--gold-hi) 0 9px, rgba(20, 17, 13, 0.8) 9px 18px); }
+  .as-rule.ready { background: var(--washi);
+    box-shadow: 0 -1px 0 rgba(20, 17, 13, 0.55), 0 1px 0 rgba(20, 17, 13, 0.55); }
+  .as-chip { z-index: 7; }
+  .as-chip { position: absolute; left: 14px; width: 74px; transform: translateY(-50%) skewX(-8deg);
+    padding: 5px 0 6px; text-align: center; background: rgba(10, 9, 6, 0.9);
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); }
+  .as-chip.gate { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(232, 196, 124, 0.55); }
+  .as-chip.ready { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(242, 234, 216, 0.7); }
+  .as-chip b { display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 17px; line-height: 1; }
+  .as-chip.gate b { color: var(--gold-hi); }
+  .as-chip.ready b { color: var(--washi); }
+  .as-chip i { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 8px; letter-spacing: 0.2em; margin-top: 3px; color: rgba(242, 234, 216, 0.72); }
+
+  /* ---- a level ---- */
+  .as-col { position: absolute; top: 46px; height: 360px; transform: skewX(-8deg);
+    background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.05) 0 7px,
+      rgba(0, 0, 0, 0) 7px 14px), rgba(12, 10, 8, 0.88);
+    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
+    border: 0; padding: 0; cursor: pointer; }
+  .as-col.here { background: rgba(10, 9, 6, 0.86);
+    box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.4); }
+  .as-col.locked { background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.06) 0 7px,
+      rgba(0, 0, 0, 0) 7px 14px), linear-gradient(rgba(17, 19, 28, 0.9), rgba(11, 13, 20, 0.94));
+    box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.16); }
+  .as-fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--gold);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28); }
+  .as-col.here .as-fill { background: var(--gold-hi);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+  .as-pct { position: absolute; left: 0; right: 0; text-align: center; font-family: var(--lat);
+    font-style: italic; font-weight: 900; font-size: 38px; line-height: 1; color: var(--ink); }
+  .as-col.here .as-pct { font-size: 58px; }
+  .as-col.locked .as-pct { color: rgba(242, 234, 216, 0.5); font-size: 24px; }
+  .as-mark { position: absolute; left: 0; right: 0; top: 22px; text-align: center;
+    font-family: var(--jp); font-size: 40px; line-height: 1; color: var(--washi); }
+  .as-lockbox { position: absolute; left: 11px; right: 11px; top: 118px; text-align: center; }
+  .as-lockbox b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+    letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.5); }
+  .as-lockbox i { display: block; margin-top: 5px; font-style: normal; font-family: var(--lat);
+    font-weight: 900; font-size: 20px; color: rgba(242, 234, 216, 0.46); }
+  .as-lockbox u { display: block; margin-top: 10px; padding: 4px 0 5px; text-decoration: none;
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22); font-family: var(--lat-ui);
+    font-weight: 700; font-size: 9px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.44); }
+
+  .as-plinth { position: absolute; top: 410px; height: 40px; transform: skewX(-8deg);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 11px;
+    background: var(--ink); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34); }
+  .as-plinth.here { background: var(--gold); box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); }
+  .as-plinth.locked { background: rgba(12, 10, 8, 0.6);
+    box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.16); }
+  .as-plinth b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px;
+    color: var(--gold-hi); }
+  .as-plinth.here b { font-size: 26px; color: var(--ink); }
+  .as-plinth.locked b { color: rgba(242, 234, 216, 0.5); }
+  .as-plinth i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 8.5px; letter-spacing: 0.16em; text-align: right; line-height: 1.35;
+    color: rgba(242, 234, 216, 0.58); }
+  .as-plinth.here i { color: rgba(20, 17, 13, 0.7); }
+  /* THE READY BADGE IS GOLD BECAUSE GOLD IS EARNED. It is the only thing on this screen that
+     says a level is finished rather than in progress. */
+  .as-ready { position: absolute; transform: skewX(-8deg); height: 22px; display: grid;
+    place-items: center; background: var(--gold-hi); color: var(--ink);
+    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42); font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.2em; }
+  .as-you { position: absolute; transform: skewX(-8deg); height: 22px; display: grid;
+    place-items: center; background: #5b86c4; color: var(--washi);
+    box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.2em; }
+  .as-cur { position: absolute; top: 40px; height: 416px; pointer-events: none;
+    transform: skewX(-8deg); box-shadow: inset 0 0 0 2px var(--washi);
+    transition: left 0.3s cubic-bezier(0.2, 0.92, 0.24, 1), width 0.3s cubic-bezier(0.2, 0.92, 0.24, 1); }
+
+  /* ---- the selected level, in detail ---- */
+  .as-panel { position: absolute; left: 900px; top: 46px; width: 340px; height: 404px;
+    display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.22); }
+  .as-banner { padding: 6px 0 7px; text-align: center; white-space: nowrap;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.2em; }
+  .as-split { padding: 12px 16px 0; display: flex; flex-direction: column; gap: 9px; }
+  .as-srow { display: flex; flex-direction: column; gap: 5px; }
+  .as-shead { display: flex; align-items: baseline; gap: 9px; }
+  .as-shead span { font-family: var(--jp-go); font-weight: 700; font-size: 14px;
+    letter-spacing: 0.06em; color: var(--ink); }
+  .as-shead em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9.5px; letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.55); }
+  .as-shead b { margin-left: auto; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 17px; color: var(--ink); }
+  .as-track { position: relative; display: block; height: 12px;
+    background: rgba(20, 17, 13, 0.12); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2); }
+  .as-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); }
+  .as-count { font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.14em;
+    color: rgba(20, 17, 13, 0.5); }
+  /* the two thresholds again, on the level's own bar, drawn the same two ways */
+  .as-track u { position: absolute; top: -4px; bottom: -4px; width: 2px; text-decoration: none; }
+  .as-track u.gate { background: #b23320; }
+  .as-track u.ready { background: var(--ink); }
+
+  .as-modes { margin-top: auto; display: flex; flex-direction: column;
+    box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16); }
+  /* A MODE IS AN ACTION AND CARRIES NO PERCENTAGE. Four ways to sit the same exam is not
+     four things to make progress through, and giving each a bar was exactly the reading the
+     four papers produced. */
+  .as-mode { position: relative; display: flex; align-items: baseline; gap: 10px;
+    padding: 9px 16px; border: 0; background: none; cursor: pointer; text-align: left;
+    box-shadow: inset 0 -1px 0 rgba(207, 164, 92, 0.5); }
+  .as-mode:last-child { box-shadow: none; }
+  .as-mode b { font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+    letter-spacing: 0.16em; color: var(--ink); white-space: nowrap; }
+  .as-mode i { margin-left: auto; font-style: normal; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 9px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.55);
+    white-space: nowrap; }
+  .as-mode.on { background: var(--hi); }
+  .as-mode.on b { color: var(--washi); }
+  .as-mode.on i { color: #ffd9a1; }
+  .as-panel.dim .as-modes { opacity: 0.42; }
 
   .course-shape {
     position: relative; margin-top: 6px;
@@ -18217,6 +18389,7 @@ function hudRows() {
   /* a bespoke screen supplies its own, and it is asked first: RECORDS has four subtiles and six
      things you can stand on, so anything counting `SUBTILES` would lose the year and the level */
   if (hudBespoke() === 'ledger') return ledgerRows();
+  if (hudBespoke() === 'ascent') return ascentRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -18553,9 +18726,181 @@ function ledgerLayout() {
    `courseShaped`, the draw, the build, the sync and the arrow keys -- asks it rather than testing
    the section name itself, so adding the third bespoke screen is one line here.
    ================================================================================================ */
+/* ================================================================================================
+   THE ASCENT -- JLPT'S LEVEL TWO.
+
+   Design's "JLPT A - The Ascent" with its content layer replaced. See the note above `.ascent`
+   in the stylesheet for what was wrong with it and why.
+
+   EVERY TOTAL BELOW IS REAL, counted out of `domain/decks.py` on 2026-08-15 -- N5 is 99 kanji and
+   744 words, N1 is 1,192 and 2,699 -- and so are both thresholds, the five pass marks, and the
+   readiness formula, which is `domain/jlpt_readiness.compute_level_readiness`: mastered kanji
+   plus mastered vocabulary over the level's whole card count. The MASTERED figures are the one
+   invented part, chosen to put a learner partway up N3, which is where this mockup says they are
+   everywhere else.
+
+   AND N2 IS OPEN, WHICH THE DESIGN HAD SEALED. The rule is that a level unlocks when the one
+   below it reaches 30%; N3 stands at 62%, so N2 has been open for a long time and simply has
+   almost nothing done in it. The design drew it sealed with "GATE MET -- UNSEALS ON THE NEXT
+   MOCK", which is a mechanic the app does not have.
+   ================================================================================================ */
+const AS_COLS = [[96, 136], [242, 136], [388, 176], [574, 136], [720, 136]];
+const AS_TOP = 46, AS_H = 360, AS_BOT = 406;
+const AS_GATE = 30, AS_READY = 80;
+/* mastered / total, per level, kanji then vocabulary */
+const AS_LEVELS = [
+  { id: 'N5', k: [96, 99], v: [696, 744], pass: 80, due: 12, leech: 2 },
+  { id: 'N4', k: [148, 177], v: [510, 666], pass: 90, due: 64, leech: 9 },
+  { id: 'N3', k: [256, 366], v: [1297, 2139], pass: 95, due: 128, leech: 14 },
+  { id: 'N2', k: [60, 384], v: [115, 1809], pass: 90, due: 31, leech: 4 },
+  { id: 'N1', k: [30, 1192], v: [40, 2699], pass: 100, due: 8, leech: 1 },
+];
+const AS_MODES = [
+  ['DIAGNOSTIC', (L) => '20 Q · ALL LEVELS'],
+  ['MOCK EXAM', (L) => '30 MIN · PASS AT ' + L.pass],
+  ['ADAPTIVE REVIEW', (L) => L.due + ' CARDS DUE'],
+  ['WEAK AREAS', (L) => L.leech + ' LEECHES'],
+];
+/* the level the learner is standing on -- the wide column. It is NOT the cursor: the cursor is
+   the white ring and it moves, while this stays where their study actually is. */
+const AS_HERE = 2;
+let AS_IN = false, AS_MODE = 0;
+
+function asPct(L) {
+  return Math.round((L.k[0] + L.v[0]) / (L.k[1] + L.v[1]) * 100);
+}
+/* a level is open when the one below it has cleared the gate; N5 has nothing below it */
+function asOpen(i) { return i === 0 || asPct(AS_LEVELS[i - 1]) >= AS_GATE; }
+
+function ascentRows() {
+  return AS_LEVELS.map((L, i) => ({ no: L.id, en: 'JLPT ' + L.id, jp: '検定', big: 'JLPT ' + L.id,
+    small: '検定', meta: asPct(L) + '% READY', pct: asPct(L), figs: [], next: ['', '', ''] }));
+}
+
+function ascentMarkup() {
+  const y = (pct) => AS_BOT - Math.round(AS_H * pct / 100);
+  const cols = AS_LEVELS.map((L, i) => {
+    const [x, w] = AS_COLS[i];
+    const pct = asPct(L), open = asOpen(i), here = i === AS_HERE;
+    const cls = !open ? 'locked' : here ? 'here' : '';
+    const fill = Math.round(AS_H * pct / 100);
+    let inner;
+    if (!open) {
+      inner = `<span class="as-lockbox"><b>OPENS AT</b><i>${AS_LEVELS[i - 1].id} · ${AS_GATE}%</i>`
+        + `<u>${AS_LEVELS[i - 1].id} AT ${asPct(AS_LEVELS[i - 1])}%</u></span>`
+        + `<span class="as-pct" style="bottom:8px">${pct}%</span>`;
+    } else {
+      /* the number rides ON the fill when there is room above it and inside it when there is
+         not -- a 94% column has 22px of track left and a percentage set in it would be cut */
+      const inFill = fill > 120;
+      inner = `<span class="as-fill" style="height:${fill}px"></span>`
+        + (here ? `<span class="as-mark">検定</span>` : '')
+        + `<span class="as-pct" style="${inFill ? 'bottom:' + (fill - (here ? 68 : 48)) + 'px'
+          : 'bottom:' + (fill + 10) + 'px;color:var(--washi)'}">${pct}%</span>`;
+    }
+    return `<button class="as-col ${cls}" data-i="${i}" style="left:${x}px;width:${w}px">`
+      + inner + `</button>`;
+  }).join('');
+
+  const plinths = AS_LEVELS.map((L, i) => {
+    const [x, w] = AS_COLS[i];
+    const pct = asPct(L), open = asOpen(i), here = i === AS_HERE;
+    const cls = !open ? 'locked' : here ? 'here' : '';
+    const state = !open ? 'LOCKED' : here ? 'CURRENT' : (pct >= AS_READY ? 'READY' : 'OPEN');
+    return `<span class="as-plinth ${cls}" style="left:${x}px;width:${w}px">`
+      + `<b>${L.id}</b><i>${state}<br>${L.k[0] + L.v[0]} / ${L.k[1] + L.v[1]}</i></span>`;
+  }).join('');
+
+  const badges = AS_LEVELS.map((L, i) => {
+    const [x, w] = AS_COLS[i];
+    if (i === AS_HERE) {
+      return `<span class="as-you" style="left:${x}px;width:${w}px;top:${AS_TOP - 26}px">`
+        + `YOU ARE HERE</span>`;
+    }
+    if (asOpen(i) && asPct(L) >= AS_READY) {
+      return `<span class="as-ready" style="left:${x}px;width:${w}px;top:${AS_TOP - 26}px">`
+        + `READY TO SIT</span>`;
+    }
+    return '';
+  }).join('');
+
+  return `<div class="as-wrap">`
+    + `<span class="as-tick" style="top:${AS_TOP}px">100</span>`
+    + `<span class="as-tick" style="top:${AS_BOT}px">0</span>`
+    + cols + plinths + badges
+    /* AFTER the columns, so the two thresholds run across all five rather than between them */
+    + `<span class="as-rule ready" style="top:${y(AS_READY)}px"></span>`
+    + `<span class="as-chip ready" style="top:${y(AS_READY)}px"><b>${AS_READY}%</b><i>READY</i></span>`
+    + `<span class="as-rule gate" style="top:${y(AS_GATE)}px"></span>`
+    + `<span class="as-chip gate" style="top:${y(AS_GATE)}px"><b>${AS_GATE}%</b><i>GATE</i></span>`
+    + `<span class="as-cur"></span>`
+    + `<div class="as-panel"></div>`
+    + `</div>`;
+}
+
+/* the selected level's own reading: the split the design never had, then the four modes */
+function asPanel(i) {
+  const L = AS_LEVELS[i], pct = asPct(L), open = asOpen(i), here = i === AS_HERE;
+  const kp = Math.round(L.k[0] / L.k[1] * 100), vp = Math.round(L.v[0] / L.v[1] * 100);
+  const state = !open ? 'LOCKED' : here ? 'CURRENT LEVEL' : (pct >= AS_READY ? 'READY TO SIT' : 'OPEN');
+  const bannerBg = !open ? 'var(--ink)' : here ? '#5b86c4' : 'var(--gold)';
+  const bannerFg = !open ? 'rgba(242,234,216,0.6)' : here ? 'var(--washi)' : 'var(--ink)';
+  const row = (jp, en, done, of, p) => `<span class="as-srow"><span class="as-shead">`
+    + `<span>${jp}</span><em>${en}</em><b>${p}%</b></span>`
+    + `<span class="as-track"><i style="width:${p}%"></i></span>`
+    + `<span class="as-count">${done.toLocaleString()} / ${of.toLocaleString()} MASTERED</span>`
+    + `</span>`;
+  /* WHAT THE GATE MEANS DEPENDS ON WHICH LEVEL YOU ARE LOOKING AT, and saying it in words is
+     the only way the two thresholds cannot be read as one bar with two ticks. */
+  const note = !open
+    ? `${AS_LEVELS[i - 1].id} MUST REACH ${AS_GATE}% TO OPEN THIS`
+    : pct >= AS_READY ? `PAST ${AS_READY}% · READY TO SIT`
+      : i < AS_LEVELS.length - 1
+        ? `${AS_GATE}% OPENED ${AS_LEVELS[i + 1].id} · ${AS_READY}% IS READY`
+        : `${AS_READY}% IS READY TO SIT`;
+  return `<span class="as-banner" style="background:${bannerBg};color:${bannerFg}">`
+      + `${L.id} · ${state}</span>`
+    + `<span class="as-split">`
+      + row('漢字', 'KANJI', L.k[0], L.k[1], kp)
+      + row('語彙', 'VOCAB', L.v[0], L.v[1], vp)
+      + `<span class="as-srow"><span class="as-shead"><span>手応え</span><em>READINESS</em>`
+      + `<b style="color:#b23320">${pct}%</b></span>`
+      + `<span class="as-track"><i style="width:${pct}%"></i>`
+      + `<u class="gate" style="left:${AS_GATE}%"></u>`
+      + `<u class="ready" style="left:${AS_READY}%"></u></span>`
+      + `<span class="as-count">${note}</span></span>`
+    + `</span>`
+    + `<span class="as-modes">`
+    + AS_MODES.map(([name, line], m) => `<button class="as-mode" data-m="${m}">`
+      + `<b>${name}</b><i>${open ? line(L) : 'LOCKED'}</i></button>`).join('')
+    + `</span>`;
+}
+
+function ascentLayout() {
+  const [x, w] = AS_COLS[HUD.at] || AS_COLS[0];
+  const cur = hudEl.querySelector('.as-cur');
+  if (cur) { cur.style.left = x + 'px'; cur.style.width = w + 'px'; }
+  hudEl.querySelectorAll('.as-col').forEach((b, j) => b.classList.toggle('sel', j === HUD.at));
+  const panel = hudEl.querySelector('.as-panel');
+  if (!panel) return;
+  if (panel.dataset.at !== String(HUD.at)) {
+    panel.dataset.at = String(HUD.at);
+    panel.innerHTML = asPanel(HUD.at);
+    panel.querySelectorAll('.as-mode').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (!asOpen(HUD.at)) { doFlash(0.2); punchShake(0.24); return; }
+        AS_IN = true; AS_MODE = +b.dataset.m; hudDraw();
+      });
+    });
+  }
+  panel.classList.toggle('dim', !AS_IN);
+  panel.querySelectorAll('.as-mode').forEach((b, m) => b.classList.toggle('on', AS_IN && m === AS_MODE));
+}
+
 function hudBespoke() {
   if (HUD.level !== 2) return null;
   if (HUD.sec === 'RECORDS') return 'ledger';
+  if (HUD.sec === 'JLPT') return 'ascent';
   return null;
 }
 
@@ -18682,7 +19027,9 @@ function hudBuild(rows) {
   document.body.classList.toggle('at-path', shaped);
   const middle = bespoke === 'ledger'
     ? `<div class="ledger">${ledgerMarkup()}</div>`
-    : shaped
+    : bespoke === 'ascent'
+      ? `<div class="ascent">${ascentMarkup()}</div>`
+      : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
   hudEl.innerHTML = `<div class="hud-panel"><div class="hud-head">${head}</div>`
@@ -18725,6 +19072,9 @@ function hudBuild(rows) {
       HUD.cur = to;
       hudDraw();
     });
+  });
+  hudEl.querySelectorAll('.as-col').forEach((b) => {
+    b.addEventListener('click', () => { HUD.cur = +b.dataset.i; AS_IN = false; hudDraw(); });
   });
   hudEl.querySelectorAll('.cs-tab').forEach((b) => {
     b.addEventListener('click', () => pathGo(+b.dataset.i, 0.5));
@@ -18798,6 +19148,7 @@ function hudSync(rows) {
   /* the path's tablets are `.cs-tab`, not `.hud-row`, and none of this function's row work applies
      to them: no seal to swap, no bar to tween, no lean to set. */
   if (hudBespoke() === 'ledger') { ledgerLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'ascent') { ascentLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -19092,6 +19443,36 @@ addEventListener('keydown', (e) => {
       }
       e.preventDefault(); return;
     }
+  }
+  /* ---- THE ASCENT'S OWN KEYS ----
+     Two depths on one screen, which is the design's own model: the arrows walk the five levels,
+     Enter steps INTO that level's four modes and the arrows then walk those, Escape steps back
+     out to the levels before the menu's Escape is allowed to see it.
+     A LOCKED LEVEL REFUSES. N1 is two gates away and pressing Enter on it must say so rather
+     than open four modes that cannot be started -- the flash and shake are what this interface
+     already uses for "not that". */
+  if (hudBespoke() === 'ascent') {
+    const back = e.key === 'Escape' || e.key === 'Backspace';
+    if (back && AS_IN) {
+      AS_IN = false; hudDraw(); e.preventDefault(); e.stopImmediatePropagation(); return;
+    }
+    if (AS_IN && (e.key === 'ArrowDown' || e.key === 'ArrowRight')) {
+      AS_MODE = (AS_MODE + 1) % AS_MODES.length; hudDraw(); e.preventDefault(); return;
+    }
+    if (AS_IN && (e.key === 'ArrowUp' || e.key === 'ArrowLeft')) {
+      AS_MODE = (AS_MODE + AS_MODES.length - 1) % AS_MODES.length;
+      hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'Enter') {
+      if (!asOpen(HUD.cur)) { doFlash(0.2); punchShake(0.24); e.preventDefault(); return; }
+      if (!AS_IN) { AS_IN = true; AS_MODE = 0; hudDraw(); }
+      else { doFlash(0.14); }
+      e.preventDefault(); return;
+    }
+    /* moving between levels leaves the modes, or the ring is on one level and the lit mode
+       belongs to another */
+    if (!AS_IN && (e.key === 'ArrowUp' || e.key === 'ArrowLeft'
+      || e.key === 'ArrowDown' || e.key === 'ArrowRight')) AS_IN = false;
   }
   /* THE COURSE DOES NOT WRAP. Four peers wrap because there is no first or last one; sixteen
      ordered steps have both, and arriving at the arbour and being thrown back to the main gate
