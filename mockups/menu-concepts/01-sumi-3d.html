@@ -97,17 +97,13 @@
        invalid -- and an invalid background is not ignored, it is NONE. Every plate I touched
        went fully transparent at every setting including 1, which is why the "before" frame
        looked exactly as broken as the "after" one. */
-    /* 0.55 AND 30px TOGETHER, not separately: every point of alpha given away has to be bought
-       back with blur, or the world stops being a wash behind the words and starts being a
-       picture through them. Checked at the certification hall and on RECORDS, which carries
-       more type per plate than any other screen here. */
-    --paper: 0.55;
+    --paper: 1;
     /* AND HOW HARD THE PAPER DIFFUSES WHAT IS BEHIND IT. Straight alpha lets the world through
        as ITSELF -- and this world is flat-shaded, so a hillside's edge crosses a plate as a hard
        line straight through the type. Blur turns that same hillside into colour and light with
        no edges, which is the part worth showing and the part that was breaking it. Applied only
        when `body.frosted` is on, because `backdrop-filter` costs GPU whether it blurs or not. */
-    --frost: 30px;
+    --frost: 0px;
     --washi: #f2ead8;
     --washi-dim: #cfc6ae;
     --ink: #14110d;
@@ -5025,11 +5021,11 @@ function uiScale() {
 }
 uiScale();
 addEventListener('resize', uiScale);
-/* FROSTED BY DEFAULT. Straight transparency let the world through as itself and a flat-shaded
-   hillside crossed the type as a hard line; blur turns the same hillside into colour and light
-   with no edges. Measured at the certification hall, the busiest pose there is: legible at
-   0.78/20px where 0.8 of plain alpha was not, and 163fps against 163 with it off. */
-document.body.classList.add('frosted');
+/* OPAQUE BY DEFAULT -- tried and rejected. Both were built and looked at: straight alpha let
+   the world through as itself, and a flat-shaded hillside crossed the type as a hard line;
+   frosting fixed the legibility and Robbie did not like the look of it either. The machinery
+   stays because it costs nothing switched off -- `NAV.glass(0.55, 30)` brings the frost back,
+   `NAV.glass(0.8)` is plain transparency -- but the design as drawn is solid paper. */
 
 const ITEMS = [
   { jp: '学習', en: 'STUDY',   kanji: '学', desc: 'Kana, kanji and vocabulary by section', descJp: 'かな・漢字・語彙のセクション学習' },
