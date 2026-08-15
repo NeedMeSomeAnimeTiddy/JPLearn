@@ -1512,7 +1512,8 @@
   .hud[data-t="midashi"] .hud-head,
   .hud[data-t="midashi"] .hud-list,
   .hud[data-t="midashi"] .hud-detail,
-  .hud[data-t="midashi"] .course-shape { zoom: var(--u); }
+  .hud[data-t="midashi"] .course-shape,
+  .hud[data-t="midashi"] .ledger { zoom: var(--u); }
   .hud[data-t="midashi"] .hud-cut { display: none; }
   .hud[data-t="midashi"] .hud-rule { display: none; }
 
@@ -1866,6 +1867,209 @@
      frame's middle is 720. Seventy-one pixels off, and it reads as a mis-set screen rather than as
      a design choice -- the road, the marker, the minimap and the edge tags were all leaning left
      together. The padding is cancelled and the block takes the viewport. */
+  /* ================================================================================
+     RECORDS IS A LEDGER, NOT A ROAD.
+
+     Its four items are figures you READ, not places you go -- there is nothing inside a
+     streak to open -- so it is the one section that does not get the road. This is
+     Design's "Records A2 - Ghost Best": the current run set large with your best standing
+     behind it in the same type at fifteen percent, the other three figures stacked at the
+     right, the level strip across the foot.
+
+     WHAT IS DIFFERENT FROM THE DESIGN, AND WHY. The brief it was drawn from said the app
+     keeps no per-day series and that there was nothing underneath accuracy or study time
+     to open. That was false. `daily-activity` returns a YEAR of {date, reviews, accuracy}
+     and the live database holds 319 active days of it. The design believed the brief and
+     printed the claim into the interface three times over -- "THE APP KEEPS ONE ACCURACY
+     FIGURE. THERE IS NOTHING UNDERNEATH IT TO OPEN." So the year is on the screen here as
+     a band of weekly bars, and the two figures that were called dead ends open onto it.
+
+     WEEKLY BARS RATHER THAN THE APP'S CONTRIBUTION GRID, for a reason that is geometry
+     and not taste: 53 columns x 7 rows needs ~126px of height and there is not 126px to
+     spare between the cards and the level strip. 52 weekly columns carry the same year in
+     78px, and a bar whose HEIGHT is volume and whose COLOUR is accuracy shows both
+     channels at once -- which the grid, having one square per day, cannot.
+     ================================================================================ */
+  .ledger {
+    position: relative; margin-top: 6px;
+    margin-left: -52px; width: calc(100vw / var(--u)); height: 440px;
+  }
+  .lg-wrap { position: absolute; inset: 0; }
+
+  /* every pressable figure is a real button, so the mouse and the keyboard agree */
+  .lg-f {
+    position: absolute; border: 0; padding: 0; margin: 0; font: inherit; text-align: left;
+    cursor: pointer; color: var(--ink);
+  }
+  /* THE RING IS OUTSIDE THE PLATE, not inset, because an inset ring on a skewed plate eats
+     three pixels of the content it is meant to be pointing at. */
+  .lg-f::after {
+    content: ''; position: absolute; left: -7px; top: -7px; right: -7px; bottom: -7px;
+    box-shadow: inset 0 0 0 3px var(--hi); opacity: 0; pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .lg-f.on::after { opacity: 1; }
+
+  .lg-plate {
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+    transform: skewX(-8deg) rotate(-1.2deg);
+  }
+  .lg-cap {
+    display: flex; align-items: baseline; justify-content: space-between; white-space: nowrap;
+    padding: 6px 15px 7px; background: var(--ink); color: var(--gold-hi);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
+  }
+  .lg-cap i { font-style: normal; color: rgba(232, 196, 124, 0.62); }
+
+  /* ---- the streak, and the ghost of your best ---- */
+  .lg-streak { left: 56px; top: 24px; width: 648px; height: 210px;
+    display: flex; flex-direction: column; }
+  .lg-run { display: flex; align-items: flex-end; gap: 22px; padding: 16px 24px 0; }
+  .lg-now {
+    font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 132px; line-height: 0.8; letter-spacing: 0.01em; color: var(--ink);
+  }
+  .lg-nowlab { display: flex; flex-direction: column; gap: 5px; padding-bottom: 10px; }
+  .lg-nowlab b { font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 28px; line-height: 1; color: #b23320; }
+  .lg-nowlab i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 10px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
+  /* THE GHOST IS THE WHOLE IDEA OF THIS DRAWING. Your best run is set in the same face at
+     the same weight and fifteen percent ink, so the current number is read against it
+     without a second scale, a second axis or a word of explanation. */
+  .lg-ghost { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end;
+    gap: 2px; padding-bottom: 12px; }
+  .lg-ghost b { font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 92px; line-height: 0.78; color: rgba(20, 17, 13, 0.15); }
+  .lg-ghost i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9.5px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.42); white-space: nowrap; }
+  .lg-frz {
+    margin-top: auto; display: flex; align-items: center; gap: 12px; padding: 10px 24px 12px;
+    background: rgba(20, 17, 13, 0.06); box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
+    color: rgba(20, 17, 13, 0.62); white-space: nowrap;
+  }
+  .lg-frz s { display: flex; gap: 4px; text-decoration: none; }
+  .lg-frz s i { width: 22px; height: 22px; display: grid; place-items: center;
+    background: var(--gold); font-family: var(--jp); font-style: normal; font-size: 14px;
+    color: var(--ink); }
+  .lg-frz u { margin-left: auto; text-decoration: none; color: rgba(20, 17, 13, 0.8); }
+
+  /* ---- the other three figures ---- */
+  .lg-rest { position: absolute; left: 744px; top: 24px; width: 440px; height: 210px;
+    display: flex; flex-direction: column;
+    background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    transform: skewX(-8deg) rotate(-1.2deg); }
+  .lg-resthead { flex: none; padding: 6px 18px 7px; background: rgba(20, 17, 13, 0.86);
+    color: var(--gold-hi); font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.2em; white-space: nowrap; }
+  /* the rows are positioned by flex INSIDE the plate, so the ring has to be relative to the
+     row rather than the frame -- hence its own positioning context here */
+  .lg-row { position: relative; flex: 1; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 20px;
+    box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.22); background: none; }
+  .lg-row:last-child { box-shadow: none; }
+  .lg-row::after { left: 0; top: 0; right: 0; bottom: 0; }
+  .lg-rowlab { display: flex; flex-direction: column; gap: 4px; }
+  .lg-rowlab b { font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+    letter-spacing: 0.22em; color: rgba(20, 17, 13, 0.52); white-space: nowrap; }
+  .lg-rowlab i { font-style: normal; font-family: var(--jp-go); font-weight: 700;
+    font-size: 15px; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.72); }
+  .lg-figure { font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 50px; line-height: 1; color: var(--ink); }
+  .lg-figure em { font-style: inherit; font-size: 22px; }
+  .lg-rank { display: flex; align-items: baseline; gap: 10px; }
+  .lg-rank s { text-decoration: none; font-family: var(--jp); font-weight: 700;
+    font-size: 32px; line-height: 1; letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.5); }
+
+  /* ---- the year ---- */
+  .lg-year { left: 56px; top: 250px; width: 1128px; height: 120px;
+    display: flex; flex-direction: column; }
+  .lg-bars { flex: 1; display: flex; align-items: flex-end; gap: 3px;
+    padding: 9px 16px 10px; }
+  /* A WEEK IS A BAR AND ITS COLOUR IS THAT WEEK'S ACCURACY. A week with nothing in it is
+     still drawn, as a floor tick -- an absent week that renders as nothing at all is
+     indistinguishable from the end of the year, which is exactly the reading a records
+     screen must not give. */
+  .lg-bars i { flex: 1; display: block; min-height: 2px;
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.14); }
+  .lg-bars i.none { background: rgba(20, 17, 13, 0.13); box-shadow: none; }
+
+  /* ---- the level strip ---- */
+  .lg-lv { left: 56px; top: 384px; width: 1128px; height: 54px;
+    display: flex; align-items: stretch; background: rgba(10, 9, 6, 0.86);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
+    transform: skewX(-8deg) rotate(-1.2deg); }
+  .lg-lvn { flex: none; width: 104px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1px; background: var(--gold);
+    box-shadow: inset -4px 0 0 var(--ink); }
+  .lg-lvn span { font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+    letter-spacing: 0.24em; color: rgba(20, 17, 13, 0.62); white-space: nowrap; }
+  .lg-lvn b { font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 30px; line-height: 1; color: var(--ink); }
+  .lg-xp { flex: 1; display: flex; flex-direction: column; justify-content: center;
+    gap: 6px; padding: 0 20px; }
+  .lg-xprow { display: flex; align-items: baseline; justify-content: space-between; }
+  .lg-xprow b { font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+    letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.6); white-space: nowrap; }
+  .lg-xprow i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 10px; letter-spacing: 0.16em; color: var(--gold-hi); white-space: nowrap; }
+  .lg-xpbar { display: block; height: 13px; background: rgba(242, 234, 216, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.24); }
+  .lg-xpbar i { display: block; height: 100%; background: var(--gold-hi); }
+  .lg-badges { flex: none; width: 190px; display: flex; flex-direction: column;
+    align-items: flex-end; justify-content: center; gap: 4px; padding-right: 22px; }
+  .lg-pips { display: flex; gap: 3px; }
+  .lg-pips i { width: 11px; height: 11px; display: block;
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.32); }
+  .lg-pips i.got { background: var(--gold); box-shadow: none; }
+  .lg-badges span { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.55); white-space: nowrap; }
+
+  /* ---- what a figure opens onto ---- */
+  /* THE OVERLAY IS EMITTED OUTSIDE THE LEDGER, as a child of `.hud` -- which is `position:
+     fixed` across the whole frame and carries no zoom of its own. Drawn inside `.ledger` it
+     inherited that block's zoom AND its box, which starts under the heading slab and stops above
+     the caption strip: the scrim then dimmed the middle of the screen and left the head and the
+     foot lit. `.lg-frame` is the design-pixel canvas the sheet is positioned on, zoomed as one
+     piece the way `.chrome` is, so the sheet is placed in 1280x720 coordinates at any size. */
+  .lg-open { position: absolute; inset: 0; z-index: 40; }
+  .lg-scrim { position: absolute; inset: 0; background: rgba(8, 11, 18, 0.62); border: 0; }
+  .lg-frame { position: absolute; left: 0; top: 0; width: 1280px; height: 720px;
+    zoom: var(--u); pointer-events: none; }
+  .lg-frame > * { pointer-events: auto; }
+  .lg-sheet { position: absolute; left: 310px; top: 108px; width: 660px;
+    display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
+    background: var(--washi);
+    box-shadow: 12px 14px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
+  .lg-sheet > .lg-cap { background: #e0913a; color: var(--ink); font-size: 10px;
+    letter-spacing: 0.2em; padding: 7px 18px 8px; }
+  .lg-sheet > .lg-cap i { color: rgba(20, 17, 13, 0.6); }
+  .lg-strip { display: flex; align-items: flex-end; gap: 2px; height: 74px;
+    padding: 14px 20px 0; }
+  .lg-strip i { flex: 1; display: block; min-height: 2px;
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.14); }
+  .lg-strip i.none { background: rgba(20, 17, 13, 0.13); box-shadow: none; }
+  .lg-stripcap { display: flex; justify-content: space-between; padding: 5px 20px 0;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
+    color: rgba(20, 17, 13, 0.45); }
+  .lg-line { display: flex; align-items: baseline; justify-content: space-between;
+    padding: 11px 20px; box-shadow: inset 0 -1px 0 rgba(207, 164, 92, 0.6); }
+  .lg-line b { font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+    letter-spacing: 0.22em; color: rgba(20, 17, 13, 0.55); white-space: nowrap; }
+  .lg-line i { font-style: normal; font-family: var(--lat); font-weight: 900;
+    font-size: 24px; line-height: 1; color: var(--ink); }
+  .lg-line.off b, .lg-line.off i { color: rgba(20, 17, 13, 0.32); }
+  .lg-line i.got { color: #b23320; }
+  .lg-note { padding: 12px 20px 14px; font-family: var(--lat-ui); font-weight: 600;
+    font-size: 10px; line-height: 1.7; letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.6); }
+
+  /* the road's furniture belongs to the road: a ledger has no step counter and no figure
+     chips, and its own plates carry everything it has to say */
+  .hud[data-screen="ledger"] .hud-detail { display: none; }
+
   .course-shape {
     position: relative; margin-top: 6px;
     min-height: 440px; display: flex; align-items: flex-start;
@@ -18010,6 +18214,9 @@ function handOff(gi, tries = 32) {
   gsap.delayedCall(0.2, () => handOff(gi, tries - 1));
 }
 function hudRows() {
+  /* a bespoke screen supplies its own, and it is asked first: RECORDS has four subtiles and six
+     things you can stand on, so anything counting `SUBTILES` would lose the year and the level */
+  if (hudBespoke() === 'ledger') return ledgerRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -18114,13 +18321,256 @@ function hudWindow(rows) {
    does the same one level in; `peers` draws the same stones with none of the sequence furniture --
    nothing sunk, nothing locked, no marker between steps, no cleared count. What survives is what
    is true of a peer list: which of them there are, which one you are on, and what it holds. */
-function courseShaped() { return HUD.level === 2 || HUD.level === 3; }
+/* ================================================================================================
+   THE LEDGER -- RECORDS' LEVEL TWO.
+
+   Everything below is Design's "Records A2 - Ghost Best" with its content layer corrected. The
+   design was briefed from a stale copy of the design system which claimed the app keeps no
+   per-day series; it does, so the year is here and the figures that were drawn as dead ends now
+   open onto it. See the note above `.ledger` in the stylesheet.
+
+   WHERE THE FIGURES COME FROM. The lifetime review count and the year's SHAPE are real, read out
+   of the live database on 2026-08-15: 15,406 reviews, 319 active days of the last 365, 7 to 59
+   reviews on an active day, 75% to 100% accuracy on an active day. The individual days are
+   synthesised from those parameters rather than transcribed -- a year of real dates is 365 lines
+   of data to carry a drawing that only needs the distribution -- and the generator is seeded so
+   the same year is drawn on every reload.
+
+   THE STREAK AND XP FIGURES ARE THE DESIGN'S, KEPT DELIBERATELY. The live database has a best
+   streak of 1 and sits at level 1 with 60 XP despite those 15,406 reviews, because gamification
+   was added long after the reviews were logged. That is a real account but a degenerate one, and
+   a design cannot be judged on it. So `strong` is a mature account and `weak` is the bad week --
+   press W to swap. A records screen has to survive both, and this one leads with a 132px number,
+   which is superb at 12 and brutal at 1.
+   ================================================================================================ */
+const LG_WEEKS = 52;
+let LG_OPEN = false, LG_WEAK = false;
+
+/* seeded, so the year does not reshuffle itself under you between one draw and the next */
+function lgYear(weak) {
+  let s = weak ? 20260815 : 19850226;
+  const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  const days = [];
+  const N = LG_WEEKS * 7;
+  for (let d = 0; d < N; d++) {
+    /* WHETHER a day is active is a flat probability -- 319 of 365 is 0.874, the real ratio, and
+       52 whole weeks is 364 days rather than 365, so the caption reads a shade under 319.
+       HOW MUCH is not flat, and that is the difference between a record and a picket fence: a
+       constant rate over seven days sums to nearly the same total every week, which drew 52 bars
+       of one height. The envelope is what real study looks like -- busy months and quiet ones. */
+    const env = 0.42 + 0.58 * (0.5 + 0.5 * Math.sin((d / N) * Math.PI * 2.7 + 1.1));
+    days.push(rnd() < (weak ? 0.15 : 0.874)
+      ? { n: Math.max(3, Math.round((7 + rnd() * 52) * env)), acc: 75 + Math.floor(rnd() * 26) }
+      : null);
+  }
+  const weeks = [];
+  for (let w = 0; w < LG_WEEKS; w++) {
+    const slice = days.slice(w * 7, w * 7 + 7).filter(Boolean);
+    const n = slice.reduce((a, x) => a + x.n, 0);
+    weeks.push({ n, days: slice.length,
+      acc: slice.length ? Math.round(slice.reduce((a, x) => a + x.acc, 0) / slice.length) : 0 });
+  }
+  return { days, weeks, active: days.filter(Boolean).length, total: days.length };
+}
+let LG_YEAR = { strong: null, weak: null };
+function lgData() {
+  const weak = LG_WEAK;
+  const k = weak ? 'weak' : 'strong';
+  if (!LG_YEAR[k]) LG_YEAR[k] = lgYear(weak);
+  const y = LG_YEAR[k];
+  return weak
+    ? { y, now: 1, best: 4, frz: 0, last: '7 / 9', acc: 71, hours: 6, rank: '10TH',
+      rankJp: '十級', lv: 1, xpIn: 60, xpOf: 100, xpAll: 60, reviews: 402 }
+    : { y, now: 12, best: 21, frz: 2, last: '8 / 9', acc: 86, hours: 42, rank: '7TH',
+      rankJp: '七級', lv: 7, xpIn: 640, xpOf: 900, xpAll: 12480, reviews: 15406 };
+}
+
+/* the real milestone set out of `achievement-milestones`, with its real earned flags */
+function lgBadges(D) {
+  const rev = (t) => ({ k: t.toLocaleString() + ' REVIEWS', got: D.reviews >= t });
+  const stk = (t) => ({ k: t + '-DAY STREAK', got: D.best >= t });
+  return [rev(100), rev(500), rev(1000), stk(3), stk(7), stk(14), stk(30), stk(100)];
+}
+
+/* a bar's colour IS its accuracy -- a blend up the gold ramp over 70..100 */
+function lgAccColor(acc) {
+  if (!acc) return null;
+  const t = Math.max(0, Math.min(1, (acc - 70) / 30));
+  const mix = (a, b) => Math.round(a + (b - a) * t);
+  return `rgb(${mix(122, 232)},${mix(92, 196)},${mix(46, 124)})`;
+}
+
+function lgBars(weeks, h, byAcc) {
+  const max = Math.max(1, ...weeks.map((w) => w.n));
+  return weeks.map((w) => {
+    if (!w.n) return `<i class="none" style="height:3px"></i>`;
+    const ht = 4 + Math.round((h - 4) * (w.n / max));
+    const bg = byAcc ? lgAccColor(w.acc) : 'var(--gold)';
+    return `<i style="height:${ht}px;background:${bg}"></i>`;
+  }).join('');
+}
+
+/* THE SIX THINGS THAT CAN BE SELECTED. `figs` is empty on purpose and must exist: `hudBuild`
+   reads `rows[0].figs` to size the readout for every screen, and the ledger's own plates carry
+   what the readout would have said. */
+function ledgerRows() {
+  const D = lgData();
+  const mk = (en, jp, meta) => ({ no: '', en, jp, big: en, small: jp, meta, pct: 0, figs: [],
+    next: ['', '', ''] });
+  return [
+    mk('STREAK', '連続', D.now + ' DAYS'),
+    mk('ACCURACY', '正答率', D.acc + '%'),
+    mk('STUDY TIME', '学習時間', D.hours + ' HOURS'),
+    mk('RANK', '段級', D.rank + ' GRADE'),
+    mk('THE YEAR', '一年', D.y.active + ' OF ' + D.y.total + ' DAYS'),
+    mk('LEVEL', '等級', 'LEVEL ' + D.lv),
+  ];
+}
+
+function ledgerMarkup() {
+  const D = lgData();
+  const badges = lgBadges(D);
+  const got = badges.filter((b) => b.got).length;
+  const next = badges.find((b) => !b.got);
+  return `<div class="lg-wrap">`
+    + `<button class="lg-f lg-streak lg-plate" data-i="0">`
+      + `<span class="lg-cap"><b>連続 STREAK</b>`
+      + `<i>A DAY COUNTS WHEN THE DAILY GAME IS FINISHED</i></span>`
+      + `<span class="lg-run"><b class="lg-now">${D.now}</b>`
+      + `<span class="lg-nowlab"><b>DAY${D.now === 1 ? '' : 'S'}</b><i>RUNNING NOW</i></span>`
+      + `<span class="lg-ghost"><b>${D.best}</b><i>YOUR BEST RUN</i></span></span>`
+      + `<span class="lg-frz"><s>${'<i>凍</i>'.repeat(D.frz)}</s>`
+      + `<em>${D.frz} FREEZE${D.frz === 1 ? '' : 'S'} LEFT · ONE COVERS A MISSED DAY</em>`
+      + `<u>LAST COMPLETED ${D.last}</u></span></button>`
+    + `<div class="lg-rest">`
+      + `<span class="lg-resthead">その他 THE REST OF THE LEDGER</span>`
+      + `<button class="lg-f lg-row" data-i="1"><span class="lg-rowlab">`
+        + `<b>ACCURACY</b><i>正答率</i></span>`
+        + `<b class="lg-figure">${D.acc}<em>%</em></b></button>`
+      + `<button class="lg-f lg-row" data-i="2"><span class="lg-rowlab">`
+        + `<b>STUDY TIME</b><i>学習時間</i></span>`
+        + `<b class="lg-figure">${D.hours}<em> H</em></b></button>`
+      + `<button class="lg-f lg-row" data-i="3"><span class="lg-rowlab">`
+        + `<b>RANK</b><i>段級</i></span>`
+        + `<span class="lg-rank"><s>${D.rankJp}</s>`
+        + `<b class="lg-figure">${D.rank.replace(/(\d+)/, '$1<em>').replace(/$/, '</em>')}</b>`
+        + `</span></button>`
+    + `</div>`
+    + `<button class="lg-f lg-year lg-plate" data-i="4">`
+      + `<span class="lg-cap"><b>一年 THE YEAR · ${D.y.active} OF ${D.y.total} DAYS`
+      + ` · ${D.reviews.toLocaleString()} REVIEWS</b>`
+      + `<i>ONE BAR IS A WEEK · HEIGHT IS VOLUME, COLOUR IS ACCURACY</i></span>`
+      + `<span class="lg-bars">${lgBars(D.y.weeks, 72, true)}</span></button>`
+    + `<button class="lg-f lg-lv" data-i="5">`
+      + `<span class="lg-lvn"><span>LEVEL 等級</span><b>${D.lv}</b></span>`
+      + `<span class="lg-xp"><span class="lg-xprow">`
+        + `<b>${D.xpIn} / ${D.xpOf} XP THIS LEVEL</b>`
+        + `<i>${D.xpOf - D.xpIn} XP TO LEVEL ${D.lv + 1}</i></span>`
+        + `<span class="lg-xpbar"><i style="width:${Math.round(D.xpIn / D.xpOf * 100)}%"></i>`
+        + `</span></span>`
+      + `<span class="lg-badges"><span class="lg-pips">`
+      + badges.map((b) => `<i class="${b.got ? 'got' : ''}"></i>`).join('')
+      + `</span><span>${got} / ${badges.length} · `
+      + `${next ? 'NEXT ' + next.k : 'ALL EARNED'}</span></span></button>`
+    + `</div>`;
+}
+
+/* what a figure opens onto. NOT ONE OF THESE IS A DEAD END, which is the correction: the design
+   this came from said in so many words that accuracy and study time had nothing underneath them. */
+function lgSheet(i) {
+  const D = lgData(), W = D.y.weeks;
+  const live = W.filter((w) => w.n);
+  const best = live.length ? Math.max(...live.map((w) => w.acc)) : 0;
+  const worst = live.length ? Math.min(...live.map((w) => w.acc)) : 0;
+  const busiest = Math.max(0, ...W.map((w) => w.n));
+  let gap = 0, run = 0;
+  D.y.days.forEach((d) => { if (d) { run = 0; } else { run++; gap = Math.max(gap, run); } });
+  const L = (k, v, off) => ({ k, v, off: !!off });
+  const S = [
+    { t: '連続 STREAK', acc: false,
+      lines: [L('CURRENT RUN', D.now + ' DAYS'), L('YOUR BEST', D.best + ' DAYS'),
+        L('FREEZES LEFT', String(D.frz)), L('LAST COMPLETED', D.last)],
+      note: 'A DAY COUNTS WHEN THE DAILY GAME IS FINISHED. A FREEZE COVERS ONE MISSED DAY.' },
+    { t: '正答率 ACCURACY', acc: true,
+      lines: [L('THIS YEAR', D.acc + '%'), L('BEST WEEK', best + '%'), L('WORST WEEK', worst + '%'),
+        L('DAYS COUNTED', D.y.active.toLocaleString())],
+      note: 'THE FIGURE ON THE FRONT IS A MEAN OF ' + D.y.active + ' DAYS, NOT A SINGLE NUMBER '
+        + 'THE APP KEEPS. EVERY BAR ABOVE IS ONE WEEK, COLOURED BY ITS OWN ACCURACY.' },
+    { t: '学習時間 STUDY TIME', acc: false,
+      lines: [L('TOTAL', D.hours + ' HOURS'), L('REVIEWS', D.reviews.toLocaleString()),
+        L('ACTIVE DAYS', D.y.active + ' OF ' + D.y.total),
+        L('BUSIEST WEEK', busiest + ' REVIEWS')],
+      note: 'TIME IS NOT KEPT PER DAY, BUT THE REVIEWS THAT FILL IT ARE -- SO THE YEAR ABOVE IS '
+        + 'WHAT THE TOTAL IS MADE OF.' },
+    { t: '段級 RANK', acc: false,
+      lines: [L('STANDING', D.rank + ' GRADE'), L('REVIEWS', D.reviews.toLocaleString()),
+        L('ACTIVE DAYS', String(D.y.active))],
+      note: 'A GRADE IS HELD, NOT SCORED. IT MOVES ON VOLUME AND CONSISTENCY TOGETHER, WHICH IS '
+        + 'WHY BOTH ARE LISTED BESIDE IT.' },
+    { t: '一年 THE YEAR', acc: false,
+      lines: [L('ACTIVE DAYS', D.y.active + ' OF ' + D.y.total),
+        L('TOTAL REVIEWS', D.reviews.toLocaleString()),
+        L('BUSIEST WEEK', busiest + ' REVIEWS'), L('LONGEST GAP', gap + ' DAYS')],
+      note: 'THE GAP IS PART OF THE RECORD. A YEAR DRAWN WITH THE EMPTY WEEKS LEFT OUT WOULD BE '
+        + 'A DIFFERENT YEAR.' },
+    { t: '等級 LEVEL ' + lgData().lv, acc: false,
+      lines: [L('THIS LEVEL', D.xpIn + ' / ' + D.xpOf + ' XP'),
+        L('TO LEVEL ' + (D.lv + 1), (D.xpOf - D.xpIn) + ' XP'),
+        L('ALL TIME', D.xpAll.toLocaleString() + ' XP')]
+        .concat(lgBadges(D).map((b) => L(b.k, b.got ? 'EARNED' : '—', !b.got))),
+      note: 'THE BADGES ARE THE APP’S OWN, WITH ITS OWN EARNED FLAGS.' },
+  ][i];
+  if (!S) return '';
+  /* THE LEVEL SHEET IS THE ONE WITHOUT A YEAR ON IT, and the reason is height rather than
+     meaning: it already carries three XP lines and eight badges, and eleven lines plus a strip
+     runs off the bottom of the frame. */
+  const strip = i === 5 ? ''
+    : `<span class="lg-strip">${lgBars(W, 60, S.acc)}</span>`
+      + `<span class="lg-stripcap"><b>52 WEEKS AGO</b><b>THIS WEEK</b></span>`;
+  return `<button class="lg-scrim" data-close="1"></button><div class="lg-frame">`
+    + `<div class="lg-sheet"><span class="lg-cap"><b>${S.t}</b><i>THE WHOLE OF IT</i></span>`
+    + strip
+    + S.lines.map((l) => `<span class="lg-line${l.off ? ' off' : ''}">`
+      + `<b>${l.k}</b><i${l.v === 'EARNED' ? ' class="got"' : ''}>${l.v}</i></span>`).join('')
+    + `<span class="lg-note">${S.note}</span></div></div>`;
+}
+
+function ledgerLayout() {
+  hudEl.querySelectorAll('.lg-f').forEach((b, j) => b.classList.toggle('on', j === HUD.at));
+  const open = hudEl.querySelector('.lg-open');
+  if (!open) return;
+  open.hidden = !LG_OPEN;
+  open.innerHTML = LG_OPEN ? lgSheet(HUD.at) : '';
+  const scrim = open.querySelector('.lg-scrim');
+  if (scrim) scrim.addEventListener('click', () => { LG_OPEN = false; hudDraw(); });
+}
+
+/* ================================================================================================
+   A SECTION THAT IS NOT A ROAD.
+
+   Two of the six were always going to refuse the road: RECORDS is a dashboard of figures you read,
+   and JLPT is a certification ladder. This is the single place that decides, and everything else --
+   `courseShaped`, the draw, the build, the sync and the arrow keys -- asks it rather than testing
+   the section name itself, so adding the third bespoke screen is one line here.
+   ================================================================================================ */
+function hudBespoke() {
+  if (HUD.level !== 2) return null;
+  if (HUD.sec === 'RECORDS') return 'ledger';
+  return null;
+}
+
+function courseShaped() {
+  return (HUD.level === 2 || HUD.level === 3) && !hudBespoke();
+}
 
 function hudDraw(force) {
   const all = hudRows();
   if (!all.length) return;
+  const bespoke = hudBespoke();
   let rows;
-  if (courseShaped()) {
+  /* a bespoke screen draws all of itself, the same as the road does -- there is no window,
+     because a dashboard's figures are not a list that can scroll past */
+  if (courseShaped() || bespoke) {
     HUD.lo = 0;
     HUD.cur = Math.max(0, Math.min(HUD.cur, all.length - 1));
     HUD.at = HUD.cur;
@@ -18131,8 +18581,11 @@ function hudDraw(force) {
   /* `HUD.lo` and the FULL length are both in the key: the first because a shift changes every
      row's content, the second because a list that grew or shrank is a different list even if the
      window happens to show the same number of rows. */
+  /* `LG_WEAK` is in the key because swapping to the bad-week account changes every figure on the
+     screen -- that is a different SHAPE, not a different selection, so it has to rebuild. */
   const key = [HUD.sec, HUD.level, HUD.tile, HUD.t, HUD.b, HUD.air,
-    rows.length, HUD.lo, all.length, courseShaped() ? HUD.c : ''].join('|');
+    rows.length, HUD.lo, all.length, courseShaped() ? HUD.c : '',
+    bespoke || '', bespoke ? String(LG_WEAK) : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
   /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
@@ -18219,16 +18672,26 @@ function hudBuild(rows) {
      have hidden the figure chips in all six sections via the rule at the end of the course block. */
   if (shaped) hudEl.dataset.course = COURSE_SHAPES[HUD.c][0];
   else delete hudEl.dataset.course;
+  /* DELETED, NOT EMPTIED, for the same reason `data-course` is -- `[data-screen]` would match an
+     empty string and hide the readout in all six sections. */
+  const bespoke = hudBespoke();
+  if (bespoke) hudEl.dataset.screen = bespoke;
+  else delete hudEl.dataset.screen;
   /* `body.course` covers the whole of STUDY, both levels; this is the PATH specifically, and it
      is written beside `data-course` so the two cannot disagree about which screen is up */
   document.body.classList.toggle('at-path', shaped);
-  const middle = shaped
-    ? `<div class="course-shape">${courseMarkup(rows)}</div>`
-    : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
+  const middle = bespoke === 'ledger'
+    ? `<div class="ledger">${ledgerMarkup()}</div>`
+    : shaped
+      ? `<div class="course-shape">${courseMarkup(rows)}</div>`
+      : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
   hudEl.innerHTML = `<div class="hud-panel"><div class="hud-head">${head}</div>`
     + `<div class="hud-rule"></div>`
     + `${middle}${footed ? '' : detail}</div>`
     + `<div class="hud-cut"></div>`
+    /* OUTSIDE THE PANEL ON PURPOSE -- see the note by `.lg-open`. It has to dim the heading and
+       the key hints as well as the figures, and inside `.ledger` it could reach neither. */
+    + (bespoke === 'ledger' ? `<div class="lg-open" hidden></div>` : '')
     + (footed ? `<div class="hud-foot">${detail}</div>` : '')
     /* NO BENCH TAG. V, B and A still cycle treatment, frame and the place's colour -- but
        MIDASHI is the design now and the other twelve are a comparison nobody needs printed over
@@ -18252,6 +18715,17 @@ function hudBuild(rows) {
      standing at the centre enters the step it is showing, which is what its own slab has been
      saying all along. `Enter` is unchanged and still does the second half from the keyboard.
      ================================================================================ */
+  /* A FIGURE TAKES ONE CLICK, NOT TWO. The road needs its two-step because selecting a tablet
+     moves the road under the pointer; a ledger's plates do not move, so the thing you clicked is
+     still the thing under the cursor when the click lands. */
+  hudEl.querySelectorAll('.lg-f').forEach((b) => {
+    b.addEventListener('click', () => {
+      const to = +b.dataset.i;
+      LG_OPEN = HUD.cur === to ? !LG_OPEN : true;
+      HUD.cur = to;
+      hudDraw();
+    });
+  });
   hudEl.querySelectorAll('.cs-tab').forEach((b) => {
     b.addEventListener('click', () => pathGo(+b.dataset.i, 0.5));
   });
@@ -18323,6 +18797,7 @@ function hudSync(rows) {
   const moved = hudPrevAt !== HUD.at;
   /* the path's tablets are `.cs-tab`, not `.hud-row`, and none of this function's row work applies
      to them: no seal to swap, no bar to tween, no lean to set. */
+  if (hudBespoke() === 'ledger') { ledgerLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -18583,6 +19058,41 @@ function hudClose() {
 addEventListener('keydown', (e) => {
   if (!HUD.on || state !== 'sub' || hudEl.hidden) return;
   const n = hudRows().length;
+  /* ---- THE LEDGER'S OWN KEYS ----
+     Enter OPENS THE FIGURE YOU ARE STANDING ON rather than travelling to it, because there is
+     nowhere to go: `hudPick` would reach the "nothing to drill into" branch and answer a
+     perfectly reasonable keypress with a flash and a shake.
+     Escape has to close the reading BEFORE the menu's own Escape sees the same press, or one key
+     both closes the sheet and leaves the section. Both handlers are on `window` and this one was
+     registered first, so stopping propagation here is what keeps the two apart.
+     The arrows are deliberately left to the generic branch below: it wraps, which is right for a
+     set of figures with no first or last, and moving with the sheet open flips through the
+     readings rather than closing it. */
+  if (hudBespoke() === 'ledger') {
+    if (e.key === 'Escape' && LG_OPEN) {
+      LG_OPEN = false; hudDraw();
+      e.preventDefault(); e.stopImmediatePropagation(); return;
+    }
+    if (e.key === 'Enter') { LG_OPEN = !LG_OPEN; hudDraw(); e.preventDefault(); return; }
+    /* W swaps the whole ledger to a bad week -- streak of one, a year mostly empty, level one.
+       A records screen that has only ever been seen on a good account has not been tested. */
+    if (e.key === 'w' || e.key === 'W') {
+      LG_WEAK = !LG_WEAK; LG_OPEN = false; hudDraw();
+      /* AND THE CHROME HAS TO AGREE. The frame's own streak and level chips are authored
+         constants, so a ledger showing a run of one under a chip still boasting twelve is two
+         readings of the same fact on one screen. */
+      const D = lgData();
+      const chip = document.querySelector('.stat-chip[data-panel="streak"] b');
+      if (chip) chip.textContent = String(D.now);
+      const lvChip = document.querySelector('.stat-chip[data-panel="level"]');
+      if (lvChip) {
+        lvChip.querySelector('b').textContent = String(D.lv);
+        lvChip.querySelector('.xp-track i').style.width =
+          Math.round(D.xpIn / D.xpOf * 100) + '%';
+      }
+      e.preventDefault(); return;
+    }
+  }
   /* THE COURSE DOES NOT WRAP. Four peers wrap because there is no first or last one; sixteen
      ordered steps have both, and arriving at the arbour and being thrown back to the main gate
      would say the course is a carousel. It clamps, and the counter's buttons grey out to match. */
